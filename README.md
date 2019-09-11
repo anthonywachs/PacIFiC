@@ -1,8 +1,24 @@
-"cific!
+# Welcome to Pacific!
 
 Pacific is a high-performance c/c++ software to simulate multiscale behavior of particle-laden flows. It is composed of Grains3D - a Descrete Element Method  (DEM) solver - as well as a Cartesian CFD solver. It is also linked to the octree-adaptative gris CFD solver Basilisk, for which we provide additional features.
 
-## ++I. Installation++
+```mermaid
+graph TD;
+  Pacific-->Octree;
+  Pacific-->Cartesian;
+  Pacific-->GRAINS;
+  Octree-.->basilisk;
+  Octree-->DLMFD;
+  Cartesian-->FLUID;
+  Cartesian-->MacWorld;
+  MacWorld-->MAC;
+  MacWorld-.->HYPRE;
+  MacWorld-.->PETSc;
+```
+
+
+
+## I. Installation
 There is a few steps that need to be done before you can enjoy a functional installation of Pacific. Just follow the guide!
 
 ### 1. Provide paths for your libraries in the environment file
@@ -88,5 +104,5 @@ cd $MACWORLD_ROOT/MAC
 ```
 
 
-## ++II. Usage++
+## II. Usage
 To be completed soon.
