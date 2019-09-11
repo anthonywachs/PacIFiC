@@ -1,0 +1,25 @@
+export MAC_HOME=${MACWORLD_ROOT}/MAC
+export MAC_VERSION=1.0.0
+
+export MAC_OPT_FLAGS=${MACWORLD_OPT_FLAGS}
+export MAC_FULL_EXT=${MACWORLD_FULL_EXT}-MAC-${MAC_VERSION}-PETSC-${PETSC_VERSION}-HYPRE-${HYPRE_VERSION}-MUMPS-${MUMPS_VERSION}
+export MAC_ARCH=Linux-${MAC_FULL_EXT}
+
+# Display
+echo -e '\033[33m*** MAC shell variables\033[0m'
+echo -e '\033[33mMAC_HOME\033[0m =' ${MAC_HOME}
+echo -e '\033[33mMAC_VERSION\033[0m =' ${MAC_VERSION}
+echo -e '\033[33mMAC_FULL_EXT\033[0m =' ${MAC_FULL_EXT}
+echo -e '\033[33mMAC_ARCH\033[0m =' ${MAC_ARCH}
+echo -e '\033[33mMAC_OPT_FLAGS\033[0m =' ${MAC_OPT_FLAGS}
+
+# LD_LIBRARY_PATH
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${MAC_HOME}/lib/${MAC_ARCH}"
+
+if [ -z "$PATH" ]
+then
+   PATH="$MAC_HOME/bin"
+else
+   PATH="$MAC_HOME/bin:$PATH"
+fi
+export PATH

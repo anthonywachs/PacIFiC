@@ -1,0 +1,51 @@
+//----------------------------------------------------------------------
+inline
+size_t
+LA_Vector:: nb_rows( void ) const 
+//----------------------------------------------------------------------
+{
+   return( NB_ROWS ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+LA::SyncState
+LA_Vector:: state( void ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "LA_Vector:: state" ) ;
+   
+   LA::SyncState result = DIST_STATUS ;
+   
+   MAC_CHECK_POST( IMPLIES( !is_desynchronizable(), result == LA::Sync ) ) ;
+   return( result ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+void
+LA_Vector:: set_unsynchronized_state( LA::SyncState new_state )
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "LA_Vector:: set_unsynchronized_state" ) ;
+   MAC_CHECK_PRE( is_desynchronizable() ) ;
+   MAC_CHECK_PRE( new_state != LA::Sync ) ;
+
+   DIST_STATUS = new_state ;
+
+   MAC_CHECK_POST( state() == new_state ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+void
+LA_Vector:: synchronize( void )
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "LA_Vector:: synchronize" ) ;
+   MAC_CHECK_PRE( synchronize_PRE() ) ;
+
+   DIST_STATUS = LA::Sync ;
+ 
+   MAC_CHECK_POST( synchronize_POST() ) ;
+}

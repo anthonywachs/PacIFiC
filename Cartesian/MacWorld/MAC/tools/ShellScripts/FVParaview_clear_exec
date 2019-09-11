@@ -1,0 +1,30 @@
+#!/bin/bash 
+     
+# This script deletes all .pvd, .pvtr and .vtr files in directory $1     
+
+# PVD file
+for file in $1/*.pvd
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+
+# PVTR files    
+for file in $1/*.pvtr
+  do
+    if [ -f $file ]
+      then
+	rm -f $file
+    fi
+  done
+
+# VTR files        
+for file in $1/*.vtr
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done

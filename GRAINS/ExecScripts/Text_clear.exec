@@ -1,0 +1,126 @@
+#!/bin/bash
+
+textFiles_list=(
+  position_x.dat
+  position_y.dat
+  position_z.dat
+  velocity_x.dat
+  velocity_y.dat
+  velocity_z.dat
+  rotation_x.dat
+  rotation_y.dat
+  rotation_z.dat
+  coordinationNumber.dat
+  totalForce_x.dat
+  totalForce_y.dat
+  totalForce_z.dat
+  cumulatedContactForce_x.dat
+  cumulatedContactForce_y.dat
+  cumulatedContactForce_z.dat
+  instantaneousContactForce_x.dat
+  instantaneousContactForce_y.dat
+  instantaneousContactForce_z.dat
+  hydroForce_x.dat
+  hydroForce_y.dat
+  hydroForce_z.dat
+  slipVelocity_x.dat
+  slipVelocity_y.dat
+  slipVelocity_z.dat
+  particleTemperature.dat
+  cumulatedLubriForce_x.dat
+  cumulatedLubriForce_y.dat
+  cumulatedLubriForce_z.dat
+)
+
+for textFile in "${textFiles_list[@]}" ; do
+  if [ -f $1_$textFile ] ; then
+    rm -f $1_$textFile
+  fi
+done
+
+
+# if [ -f $1_position_x.dat ] 
+#   then
+#     rm -f $1_position_x.dat
+# fi
+# 
+# if [ -f $1_position_y.dat ] 
+#   then
+#     rm -f $1_position_y.dat
+# fi
+#   
+# if [ -f $1_position_z.dat ] 
+#   then
+#     rm -f $1_position_z.dat
+# fi
+# 
+# if [ -f $1_velocity_x.dat ] 
+#   then
+#     rm -f $1_velocity_x.dat
+# fi
+# 
+# if [ -f $1_velocity_y.dat ] 
+#   then
+#     rm -f $1_velocity_y.dat
+# fi
+#   
+# if [ -f $1_velocity_z.dat ] 
+#   then
+#     rm -f $1_velocity_z.dat
+# fi
+# 
+# if [ -f $1_rotation_x.dat ] 
+#   then
+#     rm -f $1_rotation_x.dat
+# fi
+# 
+# if [ -f $1_rotation_y.dat ] 
+#   then
+#     rm -f $1_rotation_y.dat
+# fi
+#   
+# if [ -f $1_rotation_z.dat ] 
+#   then
+#     rm -f $1_rotation_z.dat
+# fi
+# 
+# if [ -f $1_coordinationNumber.dat ] 
+#   then
+#     rm -f $1_coordinationNumber.dat
+# fi
+# 
+# if [ -f $1_demcfd_HydroForce_x.dat ] 
+#   then
+#     rm -f $1_demcfd_HydroForce_x.dat
+# fi
+# 
+# if [ -f $1_demcfd_HydroForce_y.dat ] 
+#   then
+#     rm -f $1_demcfd_HydroForce_y.dat
+# fi
+#   
+# if [ -f $1_demcfd_HydroForce_z.dat ] 
+#   then
+#     rm -f $1_demcfd_HydroForce_z.dat
+# fi
+# 
+# if [ -f $1_demcfd_SlipVel_x.dat ] 
+#   then
+#     rm -f $1_demcfd_SlipVel_x.dat
+# fi
+# 
+# if [ -f $1_demcfd_SlipVel_y.dat ] 
+#   then
+#     rm -f $1_demcfd_SlipVel_y.dat
+# fi
+#   
+# if [ -f $1_demcfd_SlipVel_z.dat ] 
+#   then
+#     rm -f $1_demcfd_SlipVel_z.dat
+# fi
+# 
+# if [ -f $1_particle_class.dat ] 
+#   then
+#     rm -f $1_particle_class.dat
+# fi
+

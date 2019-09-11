@@ -1,0 +1,59 @@
+#!/bin/bash 
+     
+# This script deletes all current_*.tmp, *_time.xml, .bin, .pbin, .m 
+# and .pm files in directory $1     
+
+# current_*.tmp file
+for file in $1/current_*.tmp
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+
+# *_time.xml files    
+for file in $1/*_time.xml
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+
+# BIN files        
+for file in $1/*.bin
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+
+# PBIN files        
+for file in $1/*.pbin
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+
+# M files        
+for file in $1/*.m
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+
+# PM files        
+for file in $1/*.pm
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+  

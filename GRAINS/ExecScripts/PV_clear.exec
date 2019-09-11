@@ -1,0 +1,100 @@
+#!/bin/bash
+if [ -f $1_position_x.dat ] 
+  then
+    rm -f $1_position_x.dat
+fi
+
+if [ -f $1_position_y.dat ] 
+  then
+    rm -f $1_position_y.dat
+fi
+  
+if [ -f $1_position_z.dat ] 
+  then
+    rm -f $1_position_z.dat
+fi
+
+if [ -f $1_velocity_x.dat ] 
+  then
+    rm -f $1_velocity_x.dat
+fi
+
+if [ -f $1_velocity_y.dat ] 
+  then
+    rm -f $1_velocity_y.dat
+fi
+  
+if [ -f $1_velocity_z.dat ] 
+  then
+    rm -f $1_velocity_z.dat
+fi
+
+if [ -f $1_rotation_x.dat ] 
+  then
+    rm -f $1_rotation_x.dat
+fi
+
+if [ -f $1_rotation_y.dat ] 
+  then
+    rm -f $1_rotation_y.dat
+fi
+  
+if [ -f $1_rotation_z.dat ] 
+  then
+    rm -f $1_rotation_z.dat
+fi
+
+if [ -f $1_coordinationNumber.dat ] 
+  then
+    rm -f $1_coordinationNumber.dat
+fi
+
+if [ -f $1_demcfd_HydroForce_x.dat ] 
+  then
+    rm -f $1_demcfd_HydroForce_x.dat
+fi
+
+if [ -f $1_demcfd_HydroForce_y.dat ] 
+  then
+    rm -f $1_demcfd_HydroForce_y.dat
+fi
+  
+if [ -f $1_demcfd_HydroForce_z.dat ] 
+  then
+    rm -f $1_demcfd_HydroForce_z.dat
+fi
+
+if [ -f $1_demcfd_SlipVel_x.dat ] 
+  then
+    rm -f $1_demcfd_SlipVel_x.dat
+fi
+
+if [ -f $1_demcfd_SlipVel_y.dat ] 
+  then
+    rm -f $1_demcfd_SlipVel_y.dat
+fi
+  
+if [ -f $1_demcfd_SlipVel_z.dat ] 
+  then
+    rm -f $1_demcfd_SlipVel_z.dat
+fi
+
+if [ -f $1_contact_force_x.dat ] 
+  then
+    rm -f $1_contact_force_x.dat
+fi
+
+if [ -f $1_contact_force_y.dat ] 
+  then
+    rm -f $1_contact_force_y.dat
+fi
+  
+if [ -f $1_contact_force_z.dat ] 
+  then
+    rm -f $1_contact_force_z.dat
+fi
+
+if [ -f $1_particle_class.dat ] 
+  then
+    rm -f $1_particle_class.dat
+fi

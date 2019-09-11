@@ -1,0 +1,38 @@
+//----------------------------------------------------------------------
+inline
+double const&
+doubleArray5D:: operator()( size_t i0, size_t i1, size_t i2, size_t i3,
+                            size_t i4 ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "doubleArray5D:: operator()" ) ;
+   MAC_CHECK_PRE( i0 < index_bound(0) ) ;
+   MAC_CHECK_PRE( i1 < index_bound(1) ) ;
+   MAC_CHECK_PRE( i2 < index_bound(2) ) ;
+   MAC_CHECK_PRE( i3 < index_bound(3) ) ;
+   MAC_CHECK_PRE( i4 < index_bound(4) ) ;
+
+   return( vector( ( ( (  i0*d1 + i1 )*d2 + i2 )*d3 + i3 )*d4 + i4 ) ) ;
+}
+
+
+
+//----------------------------------------------------------------------
+inline
+double&
+doubleArray5D:: operator()( size_t i0, size_t i1, size_t i2, size_t i3,
+                            size_t i4 )
+//----------------------------------------------------------------------
+{   
+   MAC_LABEL( "doubleArray5D:: operator()" ) ;
+   MAC_CHECK_PRE( i0 < index_bound(0) ) ;
+   MAC_CHECK_PRE( i1 < index_bound(1) ) ;
+   MAC_CHECK_PRE( i2 < index_bound(2) ) ;
+   MAC_CHECK_PRE( i3 < index_bound(3) ) ;
+   MAC_CHECK_PRE( i4 < index_bound(4) ) ;
+   
+   return( vector( ( ( (  i0*d1 + i1 )*d2 + i2 )*d3 + i3 )*d4 + i4 ) ) ;
+}
+
+
+

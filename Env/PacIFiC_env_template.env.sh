@@ -1,0 +1,116 @@
+#
+# PacIFiC 64 bits + OpenMPI + GNU
+#
+
+# PacIFiC home
+export PACIFIC_HOME=#Path to your Pacific root folder#
+export PACIFIC_BITS_DEFAULT="64"
+export PACIFIC_BITS_EXT="64"
+echo -e '\033[94m*** PacIFiC shell variables\033[0m'
+echo -e '\033[94mPACIFIC_HOME\033[0m =' $PACIFIC_HOME
+echo -e '\033[94mPACIFIC_BITS_DEFAULT\033[0m =' $PACIFIC_BITS_DEFAULT
+echo -e '\033[94mPACIFIC_BITS_EXT\033[0m =' $PACIFIC_BITS_EXT
+echo -e '  '
+
+
+# MPI
+export PACIFIC_MPI_ROOT=#Path to your MPI root folder#
+export PACIFIC_MPI_DISTRIB=OpenMPI
+export PACIFIC_MPI_VERSION=#Your MPI version, ex "1.10.7" (with quotes)#
+export PACIFIC_MPI_INCDIR=#Path to your MPI include folder#
+export PACIFIC_MPI_GFORTRAN_INCDIR=#Path to your MPI gfortran include folder (may be the same as above)#
+export PACIFIC_MPI_BINDIR="${PACIFIC_MPI_ROOT}/bin"
+export PATH="${PACIFIC_MPI_BINDIR}:${PATH}"
+export PACIFIC_MPI_LIBDIR="${PACIFIC_MPI_ROOT}/lib"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PACIFIC_MPI_LIBDIR}"
+export PACIFIC_MPI_C="mpicc"
+export PACIFIC_MPI_CXX="mpicxx"
+export PACIFIC_MPI_F77="mpifort"
+export PACIFIC_MPI_F90="mpifort" 
+export PACIFIC_MPI_LIBS="mpi mpi_mpifh"
+export PACIFIC_MPI_CPPLIBS="mpi"
+export PACIFIC_MPI_CFLIBS="mpi mpi_mpifh"
+echo -e '\033[32m*** MPI shell variables\033[0m'
+echo -e '\033[32mPACIFIC_MPI_ROOT\033[0m =' $PACIFIC_MPI_ROOT
+echo -e '\033[32mPACIFIC_MPI_DISTRIB\033[0m =' $PACIFIC_MPI_DISTRIB
+echo -e '\033[32mPACIFIC_MPI_VERSION\033[0m =' $PACIFIC_MPI_VERSION
+echo -e '\033[32mPACIFIC_MPI_INCDIR\033[0m =' $PACIFIC_MPI_INCDIR
+echo -e '\033[32mPACIFIC_MPI_GFORTRAN_INCDIR\033[0m =' $PACIFIC_MPI_GFORTRAN_INCDIR
+echo -e '\033[32mPACIFIC_MPI_BINDIR\033[0m =' $PACIFIC_MPI_BINDIR
+echo -e '\033[32mPACIFIC_MPI_LIBDIR\033[0m =' $PACIFIC_MPI_LIBDIR
+echo -e '\033[32mPACIFIC_MPI_C\033[0m =' $PACIFIC_MPI_C
+echo -e '\033[32mPACIFIC_MPI_CXX\033[0m =' $PACIFIC_MPI_CXX
+echo -e '\033[32mPACIFIC_MPI_F77\033[0m =' $PACIFIC_MPI_F77
+echo -e '\033[32mPACIFIC_MPI_F90\033[0m =' $PACIFIC_MPI_F90
+echo -e '\033[32mPACIFIC_MPI_LIBS\033[0m =' $PACIFIC_MPI_LIBS
+echo -e '\033[32mPACIFIC_MPI_CPPLIBS\033[0m =' $PACIFIC_MPI_CPPLIBS
+echo -e '\033[32mPACIFIC_MPI_CFLIBS\033[0m =' $PACIFIC_MPI_CFLIBS
+echo -e '  '
+
+
+# Serial compiler and low level librairies
+export PACIFIC_SERCOMPIL_ENV="GNU"
+export PACIFIC_SERCOMPIL_VERSION=#Your GNU version compiler, ex "4.8.5"#
+if [ $PACIFIC_SERCOMPIL_ENV = "GNU" ] 
+then
+  PACIFIC_SERCOMPIL_C=$(which gcc)
+  PACIFIC_SERCOMPIL_CPP=$(which g++)  
+else if [ $PACIFIC_SERCOMPIL_ENV = "Intel" ]  
+  then
+    PACIFIC_SERCOMPIL_C=$(which icc)
+    PACIFIC_SERCOMPIL_CPP=$(which icpc)    
+  else
+    PACIFIC_SERCOMPIL_C="C compiler undefined"
+    PACIFIC_SERCOMPIL_CPP="C++ compiler undefined"    
+  fi
+fi
+export PACIFIC_SERCOMPIL_C
+export PACIFIC_SERCOMPIL_CPP
+export PACIFIC_OPT_FLAGS="-O3"
+export PACIFIC_BLAS_LIBDIR=/usr/lib64
+export PACIFIC_BLAS_LIBS="blas"
+export PACIFIC_ATLAS_LIBDIR=/usr/lib64/atlas
+export PACIFIC_ATLAS_LIBS="satlas tatlas"
+export PACIFIC_LAPACK_LIBDIR=/usr/lib64
+export PACIFIC_LAPACK_LIBS="lapack"
+export PACIFIC_GFORTRAN_LIBDIR=/usr/lib/gcc/x86_64-redhat-linux/4.8.2
+export PACIFIC_GFORTRAN_LIBS=gfortran
+export PACIFIC_INTEL_LIBDIR=/usr/lib/gcc/x86_64-redhat-linux/4.8.2
+export PACIFIC_INTEL_LIBS=gfortran
+
+echo -e '\033[32m*** Serial compiler and low level librairies shell variables\033[0m'
+echo -e '\033[32mPACIFIC_SERCOMPIL_ENV\033[0m =' $PACIFIC_SERCOMPIL_ENV
+echo -e '\033[32mPACIFIC_SERCOMPIL_VERSION\033[0m =' $PACIFIC_SERCOMPIL_VERSION
+echo -e '\033[32mPACIFIC_SERCOMPIL_C\033[0m =' $PACIFIC_SERCOMPIL_C
+echo -e '\033[32mPACIFIC_SERCOMPIL_CPP\033[0m =' $PACIFIC_SERCOMPIL_CPP
+echo -e '\033[32mPACIFIC_OPT_FLAGS\033[0m =' $PACIFIC_OPT_FLAGS
+echo -e '\033[32mPACIFIC_BLAS_LIBDIR\033[0m =' $PACIFIC_BLAS_LIBDIR
+echo -e '\033[32mPACIFIC_BLAS_LIBS\033[0m =' $PACIFIC_BLAS_LIBS
+echo -e '\033[32mPACIFIC_ATLAS_LIBDIR\033[0m =' $PACIFIC_ATLAS_LIBDIR
+echo -e '\033[32mPACIFIC_ATLAS_LIBS\033[0m =' $PACIFIC_ATLAS_LIBS
+echo -e '\033[32mPACIFIC_LAPACK_LIBDIR\033[0m =' $PACIFIC_LAPACK_LIBDIR
+echo -e '\033[32mPACIFIC_LAPACK_LIBS\033[0m =' $PACIFIC_LAPACK_LIBS
+echo -e '\033[32mPACIFIC_GFORTRAN_LIBDIR\033[0m =' $PACIFIC_GFORTRAN_LIBDIR
+echo -e '\033[32mPACIFIC_GFORTRAN_LIBS\033[0m =' $PACIFIC_GFORTRAN_LIBS
+echo -e '\033[32mPACIFIC_INTEL_LIBDIR\033[0m =' $PACIFIC_INTEL_LIBDIR
+echo -e '\033[32mPACIFIC_INTEL_LIBS\033[0m =' $PACIFIC_INTEL_LIBS
+echo -e '  '
+
+
+# Grains
+source ${PACIFIC_HOME}/GRAINS/Env/grains-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+echo -e '  '
+
+
+# MacWorld
+source ${PACIFIC_HOME}/Cartesian/MacWorld/Env/macworld-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+echo -e '  '
+
+
+# Fluid MAC
+source ${PACIFIC_HOME}/Cartesian/FLUID/Env/fluid-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+echo -e '  '
+
+
+# Basilisk
+source ${PACIFIC_HOME}/Octree/Env/octree.env.sh

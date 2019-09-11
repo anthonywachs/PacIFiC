@@ -1,0 +1,7 @@
+#!/bin/bash
+echo 'COMPILATION MAC0'
+gmake CCC=${MAC_FULL_EXT} exe0
+echo '  '
+echo 'COMPILATION MAC2'
+gmake CCC=${MAC_FULL_EXT} MACLIB=mac2 exe2
+

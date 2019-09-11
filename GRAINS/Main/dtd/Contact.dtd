@@ -1,0 +1,27 @@
+<!-- Contact Definition DTD -->
+
+<!ELEMENT Default (MyContact?, GlueContact?, ERContact?)>
+
+<!ELEMENT Contact (Material,
+                   MyContact?, GlueContact?, ERContact?)>
+
+<!ELEMENT Material EMPTY>
+<!ATTLIST Material materiauA CDATA #REQUIRED>
+<!ATTLIST Material materiauB CDATA #REQUIRED>
+
+
+<!ELEMENT MyContact   (stiff, muc, mun, mut, ks, kms,       color)>
+
+<!ELEMENT GlueContact (stiff, muc, mun, mut, ks, kms, glue, color)>
+
+<!ELEMENT ERContact   (stiff, muc, en, mut, kms,            color)>
+
+  <!ELEMENT color  (#PCDATA)>
+  <!ELEMENT glue   (#PCDATA)>
+  <!ELEMENT kms    (#PCDATA)>
+  <!ELEMENT ks     (#PCDATA)>
+  <!ELEMENT muc    (#PCDATA)>
+  <!ELEMENT mun    (#PCDATA)>
+  <!ELEMENT mut    (#PCDATA)>
+  <!ELEMENT stiff  (#PCDATA)>
+  <!ELEMENT en     (#PCDATA)>  

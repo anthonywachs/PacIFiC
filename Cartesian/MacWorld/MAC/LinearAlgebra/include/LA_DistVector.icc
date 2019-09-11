@@ -1,0 +1,26 @@
+//----------------------------------------------------------------------
+inline
+double
+LA_DistVector:: item( size_t i ) const 
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "LA_DistVector:: item" ) ;
+   MAC_CHECK_PRE( item_PRE( i ) ) ;
+
+   return( LOCAL_VECTOR->item( i-FIRST ) ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+MAC_DistributedPartition const*
+LA_DistVector:: row_distribution( void ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "LA_DistVector:: row_distribution" ) ;
+   MAC_CHECK_PRE( row_distribution_PRE() ) ;
+
+   MAC_DistributedPartition const* result = DIST ;
+
+   MAC_CHECK_POST( row_distribution_POST( result ) ) ;
+   return( result ) ;
+}

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Delete result files
+for file in $1/*
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+
+# Delete restart files
+for file in $2/*
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done

@@ -1,0 +1,57 @@
+//----------------------------------------------------------------------
+inline
+size_t
+boolArray3D:: index_bound( size_t an_index ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "boolArray3D:: index_bound" ) ;
+   MAC_CHECK_PRE( an_index < 3 ) ;
+   
+   switch( an_index )
+   {
+      case 0 : 
+         return( d0 ) ;
+         break ;
+      case 1 : 
+         return( d1 ) ;
+         break ;
+      default : 
+         return( d2 ) ;
+         break ;
+   }
+}
+
+
+
+//----------------------------------------------------------------------
+inline
+bool const&
+boolArray3D:: operator()( size_t i0, size_t i1, size_t i2 ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "boolArray3D:: operator()" ) ;
+   MAC_CHECK_PRE( i0 < index_bound(0) ) ;
+   MAC_CHECK_PRE( i1 < index_bound(1) ) ;
+   MAC_CHECK_PRE( i2 < index_bound(2) ) ;
+   
+   return( vector( ( ( i0*d1 + i1 )*d2 + i2 ) ) ) ;
+}
+
+
+
+//----------------------------------------------------------------------
+inline
+bool&
+boolArray3D:: operator()( size_t i0, size_t i1, size_t i2 )
+//----------------------------------------------------------------------
+{   
+   MAC_LABEL( "boolArray3D:: operator()" ) ;
+   MAC_CHECK_PRE( i0 < index_bound(0) ) ;
+   MAC_CHECK_PRE( i1 < index_bound(1) ) ;
+   MAC_CHECK_PRE( i2 < index_bound(2) ) ;
+   
+   return( vector( ( ( i0*d1 + i1 )*d2 + i2 ) ) ) ;
+}
+
+
+

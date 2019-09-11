@@ -1,0 +1,81 @@
+//----------------------------------------------------------------------
+inline
+MAC_Communicator const*
+MAC_DistributedPartition:: communicator( void ) const
+//----------------------------------------------------------------------
+{
+   return( COMM ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+size_t
+MAC_DistributedPartition:: first_local_index( void ) const
+//----------------------------------------------------------------------
+{
+   return( FIRST ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+size_t
+MAC_DistributedPartition:: global_number( void ) const
+//----------------------------------------------------------------------
+{
+   return( GLOBAL_NB ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+intVector const&
+MAC_DistributedPartition:: partitioning( void ) const
+//----------------------------------------------------------------------
+{
+   return( PARTITION ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+intVector const&
+MAC_DistributedPartition:: start_of_partition( void ) const
+//----------------------------------------------------------------------
+{
+   return( START ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+size_t
+MAC_DistributedPartition:: local_index_limit( void ) const
+//----------------------------------------------------------------------
+{
+   return( LAST ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+size_t
+MAC_DistributedPartition:: local_number( void ) const
+//----------------------------------------------------------------------
+{
+   return( LOCAL_NB ) ;
+}
+
+
+//----------------------------------------------------------------------
+inline
+size_t
+MAC_DistributedPartition:: rank_of( size_t i ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "MAC_DistributedPartition:: rank_of" ) ;
+   MAC_CHECK_PRE( i < global_number() ) ;
+
+   size_t result = 0 ;
+   while( result<SIZE-1 && (size_t)START( result+1 ) <= i ) result++ ;
+   
+   MAC_CHECK_POST( result < SIZE ) ;
+   MAC_CHECK_POST( ( (size_t)START(result) <= i ) && ( (size_t)START(result)+(size_t)PARTITION(result)>i ) ) ;
+   
+   return( result ) ;
+}

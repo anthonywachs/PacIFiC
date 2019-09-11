@@ -1,0 +1,33 @@
+//----------------------------------------------------------------------
+inline
+size_t
+stringVector:: size( void ) const
+//----------------------------------------------------------------------
+{
+   return( LENGTH ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+std::string const&
+stringVector:: operator()( size_t i ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "stringVector:: operator()" ) ;
+   MAC_CHECK_PRE( i < size() ) ;
+
+   return( VECTOR[i] ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+std::string&
+stringVector:: operator()( size_t i )
+//----------------------------------------------------------------------
+{   
+   MAC_LABEL( "stringVector:: operator()" ) ;
+   MAC_CHECK_PRE( i < size() ) ;
+
+   return( VECTOR[i] ) ;
+}
+

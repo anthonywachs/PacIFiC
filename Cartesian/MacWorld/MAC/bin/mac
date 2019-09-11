@@ -1,0 +1,3 @@
+#!/bin/bash
+PERL=$MAC_HOME/tools/Perl
+perl -I $PERL $PERL/mac.pl $*

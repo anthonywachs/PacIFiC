@@ -1,0 +1,49 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+#Others
+*.dtd
+*.so.*
+PacIFiC-*.env.sh
+
+# Folders
+Cartesian/MacWorld/hypre-2.10.1/*
+Cartesian/MacWorld/petsc-3.2.0-p7/*
+GRAINS/Main/bin64*
+GRAINS/diffGrains*
+GRAINS/Archives*
+GRAINS/DoxyGRAINS*
+GRAINS/README
+GRAINS/Utils*
+GRAINS/XERCES*
+Octree/basilisk/*

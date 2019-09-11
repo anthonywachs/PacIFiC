@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [ -f $1_contact_force_x.res ] 
+  then
+    rm -f $1_contact_force_x.res
+fi
+
+if [ -f $1_contact_force_y.res ] 
+  then
+    rm -f $1_contact_force_y.res
+fi
+
+if [ -f $1_contact_force_z.res ] 
+  then
+    rm -f $1_contact_force_z.res
+fi
+
+if [ -f $1_lubri_force_x.res ] 
+  then
+    rm -f $1_lubri_force_x.res
+fi
+
+if [ -f $1_lubri_force_y.res ] 
+  then
+    rm -f $1_lubri_force_y.res
+fi
+
+if [ -f $1_lubri_force_z.res ] 
+  then
+    rm -f $1_lubri_force_z.res
+fi
+
+if [ -f $1_coordinationNumber.res ] 
+  then
+    rm -f $1_coordinationNumber.res
+fi
