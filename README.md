@@ -1,6 +1,6 @@
 # Welcome to Pacific!
 
-Pacific is a high-performance c/c++ software to simulate multiscale behavior of particle-laden flows. It is composed of Grains3D - a Descrete Element Method  (DEM) solver - as well as a Cartesian CFD solver. It is also linked to the octree-adaptative gris CFD solver Basilisk, for which we provide additional features.
+Pacific is a high-performance c/c++ software to simulate multiscale behavior of particle-laden flows. It is composed of Grains3D - a Descrete Element Method  (DEM) solver - as well as a Cartesian CFD solver. It is also linked to the octree-adaptative grid CFD solver Basilisk, for which we provide additional features.
 
 ```mermaid
 graph TD;
