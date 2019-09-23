@@ -597,7 +597,8 @@ LA_SeqVector:: write( std::string const& filename ) const
    MAC_LABEL( "LA_SeqVector:: write" ) ;
    MAC_CHECK_INV( invariant() ) ;
    std::ofstream file( filename.c_str() ) ;
-   MAC_ASSERT( file ) ;
+//   MAC_ASSERT( file ) ; // Not accepted from gcc-9.x.x
+   MAC_ASSERT( file.is_open() ) ;
    file.precision( 15 ) ;
 
    file << nb_rows() ;

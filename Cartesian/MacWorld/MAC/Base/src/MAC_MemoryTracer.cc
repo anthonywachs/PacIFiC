@@ -106,7 +106,8 @@ MAC_MemoryTracer:: display_memory( std::ostream& os, size_t memory )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "MAC_MemoryTracer:: display_memory" ) ;
-   MAC_CHECK_PRE( os ) ;
+//   MAC_CHECK_PRE( os ) ; // Not accepted from gcc-9.x.x
+   MAC_ASSERT( os.good() ) ;
 
    static size_t const mo = 1024*1024 ;
    static size_t const go = 1024*1024*1024 ;

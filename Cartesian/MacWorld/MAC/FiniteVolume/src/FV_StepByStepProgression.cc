@@ -260,7 +260,8 @@ FV_StepByStepProgression:: display_memory_usage(
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "FV_StepByStepProgression:: display_memory_usage" ) ;
-   MAC_CHECK_PRE( os ) ;
+//   MAC_CHECK_PRE( os ) ; // Not accepted from gcc-9.x.x
+   MAC_CHECK_PRE( os.good() ) ;
 
    std::string const s( indent_width, ' ' ) ;
    os << s << "Memory usage: " ;
@@ -285,7 +286,8 @@ FV_StepByStepProgression:: display_memory_usage_proc_by_proc(
 {
    MAC_LABEL( 
      "FV_StepByStepProgression:: display_memory_usage_proc_by_proc" ) ;
-   MAC_CHECK_PRE( os ) ;
+//   MAC_CHECK_PRE( os ) ; // Not accepted from gcc-9.x.x
+   MAC_CHECK_PRE( os.good() ) ;
    
    MAC_Communicator const* macCOMM = MAC_Exec::communicator();
    size_t nb_ranks = macCOMM->nb_ranks() ;

@@ -972,7 +972,8 @@ bool
 LA_Vector:: print_items_PRE( std::ostream& os, size_t indent_width ) const
 //----------------------------------------------------------------------
 {
-   MAC_ASSERT( os ) ;
+//   MAC_ASSERT( os ) ; // Not accepted from gcc-9.x.x
+   MAC_ASSERT( os.good() ) ;
    MAC_ASSERT( is_synchronized() ) ;
    return( true ) ;
 }

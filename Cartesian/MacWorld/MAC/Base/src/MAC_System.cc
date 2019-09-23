@@ -973,7 +973,8 @@ MAC_System:: can_write( std::string const& filename )
    dummy += "_dummy_file_" ;
     
    std::ofstream out( dummy.c_str() ) ;
-   bool result = out!=0 ;
+//   bool result = out!=0 ; // Not accepted from gcc-9.x.x
+   bool result = out.is_open() ;   
    if( result ) 
    {
       out.close() ;

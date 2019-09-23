@@ -665,8 +665,9 @@ LA_Matrix:: readMMHeader( std::ifstream& in,
 {
    MAC_LABEL( "LA_Matrix:: readMMHeader" ) ;
    MAC_CHECK_COLLECTIVE( is_desynchronizable() ) ;
-   MAC_CHECK_PRE( in ) ;
-
+//   MAC_CHECK_PRE( in ) ; // Not accepted from gcc-9.x.x
+   MAC_CHECK_PRE( in.is_open() ) ;
+   
    std::string error_mess ;
 
    if( !in )
@@ -1508,7 +1509,8 @@ bool
 LA_Matrix:: print_items_PRE( std::ostream& os, size_t indent_width ) const
 //----------------------------------------------------------------------
 {
-   MAC_ASSERT( os ) ;
+//   MAC_ASSERT( os ) ; // Not accepted from gcc-9.x.x
+   MAC_ASSERT( os.good() ) ;
    MAC_ASSERT( is_synchronized() ) ;
    return( true ) ;
 }
