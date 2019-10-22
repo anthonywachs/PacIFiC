@@ -447,7 +447,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   coord sum = {0, 0, 0};
 
   boundary ((scalar*) {DLM_lambda});
-  int ccc = 0;
+
   for (int k = 0; k < NPARTICLES; k++) {
     particle * pp = &p[k];
     
@@ -476,10 +476,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 	  	lambdapos, Delta, ppshift);
 
 	  foreach_dimension()
-	  {
-	    ++ccc;
 	    sum.x += weight*DLM_lambda.x[];
-	  }
 	}
       }
       
@@ -526,8 +523,6 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
     }
   }
 #endif
-
-  printf("NN = %d\n",ccc);
 
   /* Broadcast through mpi */
 #if DLM_Moving_particle
