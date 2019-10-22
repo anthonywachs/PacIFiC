@@ -127,7 +127,8 @@ public:
   @param dirRes repertoire de resultats
   @param fluidsolver nom du solveur fluide (PeliGRIFF ou Basilisk) */
   void InitializeExplicitAddedMassRestart( bool const& restart,
-  	string const& dirRes, string const& fluidsolver = "PeliGRIFF" );
+  	string const& dirRes_Or_rootfilename, 
+	string const& fluidsolver = "PeliGRIFF" );
 
   /** @brief Sauvegarde par defaut de l'etat initial pour post-processing */
   virtual void InitialPostProcessing();

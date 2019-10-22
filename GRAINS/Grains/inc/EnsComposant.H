@@ -488,7 +488,7 @@ public:
   void setVelocityAndVelocityDifferencePreviousTimeRestart( 
   	string const& PelDirRes );
   double setVelocityAndVelocityDifferencePreviousTimeRestart_Basilisk( 
-  	string const& dirRes );		
+  	string const& rootfilename );		
 	
   /** @brief Mouvement aleatoire sur les particules actives
   @param coefTrans amplitude max du mouvement translationnel

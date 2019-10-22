@@ -616,9 +616,6 @@ void InterfaceFluide3D::WriteParticulesInFluid(
 	list<Obstacle*> const& obstaclesToFluid,
 	BasiliskDataStructure * basiliskdata) const
 {
-
-
-
   list<Particule*>::const_iterator particule,clone;
   int id = 0, ncorners;
   // size_t nclonesper;

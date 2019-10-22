@@ -690,11 +690,6 @@ void GrainsCoupledWithFluid::Simulation( bool predict,
         break;
       }
     }
-    
-    cout << "Grains Time = " << 
-    	Grains_Exec::doubleToString( ios::scientific, 8, m_temps ) << endl;
-    cout << "Grains dtfluid = " << 
-    	Grains_Exec::doubleToString( ios::scientific, 8, time ) << endl;
   }
 }
 
@@ -845,7 +840,7 @@ void GrainsCoupledWithFluid::AddExplicitAddedMass(
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void GrainsCoupledWithFluid::InitializeExplicitAddedMassRestart(
-	bool const& restart, string const& dirRes, 
+	bool const& restart, string const& dirRes_Or_rootfilename, 
 	string const& fluidsolver )
 {
   if ( m_processorIsActiv )
@@ -854,13 +849,13 @@ void GrainsCoupledWithFluid::InitializeExplicitAddedMassRestart(
     {
       if ( fluidsolver == "PeliGRIFF" ) 
         m_composants.setVelocityAndVelocityDifferencePreviousTimeRestart(
-      		dirRes );
+      		dirRes_Or_rootfilename );
 		
       else
       { 
         double previousdtfluid = m_composants.
 		setVelocityAndVelocityDifferencePreviousTimeRestart_Basilisk(
-      		dirRes );
+      		dirRes_Or_rootfilename );
 	dynamic_cast<AddedMass*>(m_explicitAddedMass)->setsimulTime( 
 		previousdtfluid );
       }	

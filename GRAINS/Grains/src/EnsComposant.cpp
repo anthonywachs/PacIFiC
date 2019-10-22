@@ -2627,7 +2627,7 @@ void EnsComposant::setVelocityAndVelocityDifferencePreviousTimeRestart(
 
 double EnsComposant::
 	setVelocityAndVelocityDifferencePreviousTimeRestart_Basilisk(
-	string const& dirRes )
+	string const& rootfilename )
 {
   string linet, linetnm1, sbuffer ;
   istringstream iss;
@@ -2642,8 +2642,8 @@ double EnsComposant::
     if ( (*particule)->getActivity() == COMPUTE
     	&& (*particule)->getID() >= 0 )
     {
-      ifstream pdata( ( dirRes + "/particle-data-" + Grains_Exec::intToString(i)
-      	+ "" ).c_str(), ios::in );
+      ifstream pdata( ( rootfilename + "_" + Grains_Exec::intToString(i)
+      	+ ".dat" ).c_str(), ios::in );
 	
       while ( !pdata.eof() )
       {

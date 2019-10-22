@@ -62,6 +62,7 @@ Paraview_PostProcessingWriter::Paraview_PostProcessingWriter(
   m_binary( isBinary ),
   m_postProcessObstacle( true ),
   m_initialCycleNumber_forced( false ),
+  m_network( false ),
   BUFFER( NULL ),
   ALLOCATED( 0 ),
   OFFSET( 0 )
