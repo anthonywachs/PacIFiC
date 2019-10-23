@@ -20,7 +20,7 @@ $$
 $$
 
 From a numerical point of view, this is a complicated set of equations
-to solve direclty. One has to deal with three main difficulties:
+to solve directly. One has to deal with three main difficulties:
 
   * an advection-diffusion equation
   * the imcompressibility constraint with the pressure $p$ as unknown 
@@ -66,7 +66,6 @@ solve them successively. We chose here a two-steps time-spliting.
 
 /** Functions and structures needed for the implementation of
     fictitious domain method. */
-# include "save_data.h"
 # include "dlmfd_functions.h"
 
 /** Basilisk scalars and vectors needed for the implementation of the
@@ -77,8 +76,10 @@ scalar flagfield_mailleur[];
 vector index_lambda[];
 vector DLM_periodic_shift[];
 
-FILE * pdata[NPARTICLES];
-FILE * fdata[NPARTICLES];
+FILE* pdata[NPARTICLES];
+FILE* fdata[NPARTICLES];
+FILE* converge = NULL;
+FILE* cellvstime = NULL;
 particle particles[NPARTICLES] = {{{0}}};
 char converge_uzawa_filename_complete_name[80];
 char dlmfd_cells_filename_complete_name[80]; 
@@ -148,25 +149,6 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   int DLM_maxiter = 100;
   vector qu[], tu[];
   coord ppshift = {0, 0, 0}; 
-  
-  static unsigned int iii = 0 ; 
-  if ( iii == 0 )
-  {  
-    char buffer[80] = "";
-    strcpy( buffer, result_dir );
-    strcat( buffer, "/" );
-    strcat( buffer, converge_uzawa_filename );
-    strcpy( converge_uzawa_filename_complete_name, buffer );
-    
-    strcpy( buffer, result_dir );
-    strcat( buffer, "/" );
-    strcat( buffer, dlmfd_cells_filename );
-    strcpy( dlmfd_cells_filename_complete_name, buffer );
-    ++iii;     
-  } 
-  
-  static FILE * converge = fopen ( converge_uzawa_filename_complete_name, "a");
-  static FILE * cellvstime = fopen ( dlmfd_cells_filename_complete_name, "a");
 
   /* Allocate and initialize particles */
   allocate_and_init_particles (p, NPARTICLES, index_lambda, flagfield, 
@@ -316,12 +298,12 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   fprintf (stderr,"# Total Lagrange multipliers: %d, constraint cells: %d, "
   	"Total cells: %d \n", lm, allpts, tcells);
 
-  if ( i == 0 )
-    fprintf (cellvstime,"# Iter \t LagMult \t ConstrainedCells \t "
-    	"TotalCells\n");
-  fprintf( cellvstime,"%d \t %d \t \t %d \t \t \t %d \n", i, lm, allpts, 
+  if ( pid() == 0 )
+  {
+    fprintf( cellvstime, "%d \t %d \t \t %d \t \t \t %d \n", i, lm, allpts, 
   	tcells );
-  fflush( cellvstime ); 
+    fflush( cellvstime );
+  } 
   
 
 #if DLM_Moving_particle
@@ -1350,10 +1332,11 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
     	ki,sqrt(DLM_nr2)); */
   }
 
-  if (i == 0)
-    fprintf (converge, "# Iter \t Uzawa Iter \t ||u-u_imposed||\n");
-  fprintf (converge,"%d \t %d \t \t %10.8e\n", i, ki, sqrt(DLM_nr2));
-  fflush(converge);
+  if ( pid() == 0 )
+  {
+    fprintf( converge,"%d \t %d \t \t %10.8e\n", i, ki, sqrt(DLM_nr2) );
+    fflush( converge );
+  }
 
 #if DLM_Moving_particle
 

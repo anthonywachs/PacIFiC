@@ -65,7 +65,7 @@ typedef struct {
   double kn, en, vzero, wished_ratio;
   coord normalvector;
   coord gravity;
-  double M, Ip[6], rho_s, Vp, DLMFD_couplingfactor;
+  double M, Ip[6], Ip_inv[6], rho_s, Vp, DLMFD_couplingfactor;
 #if TRANSLATION
   coord U, Unm1, qU, tU;
 #endif
@@ -2043,15 +2043,16 @@ void writer_headers (FILE * pdata, FILE * sl)
 #endif
     
     // Flush the buffers such that files are updated dynamically
-    fflush(sl);
-    fflush(pdata);
+    fflush( sl );
+    fflush( pdata );
   }
 }
 
 
 
 
-void particle_data (particle * p, const double t, const int i, FILE ** pdata) 
+// Write particle data
+void particle_data( particle * p, const double t, const int i, FILE ** pdata ) 
 {  
   for (int k = 0; k < NPARTICLES; k++) 
   {
@@ -2120,6 +2121,7 @@ void particle_data (particle * p, const double t, const int i, FILE ** pdata)
 
 
 
+// Compute and write hydrodynamic force & torque
 coord sumLambda (particle * p, FILE ** sl, const double t, const double dt, 
 	scalar Flagfield, vector Lambda, vector Index_lambda, 
 	const double rho_f, vector pshift) 
@@ -2326,7 +2328,7 @@ coord sumLambda (particle * p, FILE ** sl, const double t, const double dt,
       fprintf( sl[k], "%.*e\t", NSDF, lambdasum.x );      
       fprintf( sl[k], "%.*e\t", NSDF, lambdasum.y );          
       fprintf( sl[k], "%.*e\n", NSDF, crossLambdaSum.z );      
-      fflush(sl[k]);
+      fflush( sl[k] );
     }
 #elif dimension == 3
     if( pid() == 0 ) 
@@ -2338,7 +2340,7 @@ coord sumLambda (particle * p, FILE ** sl, const double t, const double dt,
       fprintf( sl[k], "%.*e\t", NSDF, crossLambdaSum.x );      
       fprintf( sl[k], "%.*e\t", NSDF, crossLambdaSum.y );      
       fprintf( sl[k], "%.*e\n", NSDF, crossLambdaSum.z );      
-      fflush(sl[k]);
+      fflush( sl[k] );
     }
 #endif
   }
@@ -2349,15 +2351,19 @@ coord sumLambda (particle * p, FILE ** sl, const double t, const double dt,
 
 
 
-void init_file_pointers (FILE ** p, FILE ** d, const size_t rflag) 
+// Initialize/open all DLMFD file pointers
+void init_file_pointers( FILE** p, FILE** d, FILE** UzawaCV, FILE** CVT, 
+	const size_t rflag ) 
 {
   char name[80] = "";
   char name2[80] = "";
   char suffix[80] = "";
+  char buffer[80] = "";  
 #if _MPI
   if ( pid() == 0 )
 #endif
   {
+    // Particle data
     for (int k = 0; k < NPARTICLES; k++) 
     {
       sprintf( suffix, "_%d.dat", k );
@@ -2376,8 +2382,9 @@ void init_file_pointers (FILE ** p, FILE ** d, const size_t rflag)
       {
 	p[k] = fopen( name,  "w" ); 
 	d[k] = fopen( name2, "w" );
-	/* Write headers in these files */
-	writer_headers (p[k],  d[k]);
+	
+	// Write headers in these files
+	writer_headers( p[k],  d[k] );
       }
       else 
       {
@@ -2385,7 +2392,61 @@ void init_file_pointers (FILE ** p, FILE ** d, const size_t rflag)
 	d[k] = fopen( name2, "a" );
       }
     }
-  }
+    
+    // Uzawa convergence
+    char converge_uzawa_filename_complete_name[80];
+    strcpy( buffer, result_dir );
+    strcat( buffer, "/" );
+    strcat( buffer, converge_uzawa_filename );
+    strcpy( converge_uzawa_filename_complete_name, buffer );
+    if ( !rflag )
+    {
+      *UzawaCV = fopen( converge_uzawa_filename_complete_name, "w" ); 
+      fprintf( *UzawaCV, "# Iter \t Uzawa Iter \t ||u-u_imposed||\n" );
+    }
+    else
+      *UzawaCV = fopen( converge_uzawa_filename_complete_name, "a" );   
+    
+    // Cells, contrained cells and nb of multipliers 
+    char dlmfd_cells_filename_complete_name[80]; 
+    strcpy( buffer, result_dir );
+    strcat( buffer, "/" );
+    strcat( buffer, dlmfd_cells_filename );
+    strcpy( dlmfd_cells_filename_complete_name, buffer );
+    if ( !rflag )
+    {
+      *CVT = fopen ( dlmfd_cells_filename_complete_name, "w" ); 
+      fprintf ( *CVT,"# Iter \t LagMult \t ConstrainedCells \t "
+    	"TotalCells\n" );
+    }
+    else
+      *CVT = fopen( dlmfd_cells_filename_complete_name, "a" );          
+  }    
+}
+
+
+
+
+// Close all DLMFD files
+void close_file_pointers( FILE** p, FILE** d, FILE* UzawaCV, FILE* CVT ) 
+{ 
+#if _MPI
+  if ( pid() == 0 )
+#endif
+  {
+    // Particle data
+    for (int k = 0; k < NPARTICLES; k++) 
+    {
+      fclose( p[k] ); 
+      fclose( d[k] );
+    }
+    
+    // Uzawa convergence
+    fclose( UzawaCV );  
+    
+    // Cells, contrained cells and nb of multipliers 
+    fclose( CVT );               
+  }    
 }
 
 

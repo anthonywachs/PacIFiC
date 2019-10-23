@@ -52,6 +52,9 @@ scalar u_previoustime[];
 /* Fictitious domain implementation */
 # include "DLMFD_reverse_Uzawa.h"
 
+/* Paraview output functions */
+# include "save_data.h"
+
 
 /** Generic granular solver init event: TO BE OVERLOADED */
 // --------------------------------------------------------
@@ -73,7 +76,8 @@ event GranularSolver_updateVelocity (t < -1.)
 
 /** Overloading of the init event: initialize fluid and particles */
 // -----------------------------------------------------------------
-event init (i = 0) {
+event init (i = 0) 
+{
 #ifndef rhoval
 # define rhoval 1.
 #endif
@@ -96,9 +100,6 @@ event init (i = 0) {
   {
     // Set the restarted simulation boolean to 1
     restarted_simu = 0;
-    
-    // Initialise data file pointers
-    init_file_pointers( pdata, fdata, 0 );
 
     /* Generic particle parameters, will be overwritten by the
        GranularSolver_init event if need be */
@@ -136,12 +137,12 @@ event init (i = 0) {
 
 	/* The inertia tensor is: */
 	/* For a solid disk: */
-	particles[k].Ip[0] = (particles[k].M)*sq(gp.radius)/4;  /* Ip[0] = Ixx */
-	particles[k].Ip[1] = particles[k].Ip[0];                /* Ip[1] = Iyy */
-	particles[k].Ip[2] = (particles[k].M)*sq(gp.radius)/2;  /* Ip[2] = Izz */
-	particles[k].Ip[3] = 0.;                                /* Ip[3] = Ixy */
-	particles[k].Ip[4] = 0.;                                /* Ip[4] = Ixz */
-	particles[k].Ip[5] = 0.;                                /* Ip[5] = Iyz */
+	particles[k].Ip[0] = (particles[k].M)*sq(gp.radius)/4; /* Ip[0] = Ixx */
+	particles[k].Ip[1] = particles[k].Ip[0];               /* Ip[1] = Iyy */
+	particles[k].Ip[2] = (particles[k].M)*sq(gp.radius)/2; /* Ip[2] = Izz */
+	particles[k].Ip[3] = 0.;                               /* Ip[3] = Ixy */
+	particles[k].Ip[4] = 0.;                               /* Ip[4] = Ixz */
+	particles[k].Ip[5] = 0.;                               /* Ip[5] = Iyz */
 # endif
 # if dimension == 3
 	/* Volume  of the particle (sphere) */
@@ -150,13 +151,15 @@ event init (i = 0) {
 	/* total weight of the particle */
 	particles[k].M = rhosolid*(particles[k].Vp);
 
-	/* For a sphere it comes: I_xx = I_yy = I_zz = 2/5 M R^2 with R the radius */
-	particles[k].Ip[0] = 2.*(particles[k].M)*sq(gp.radius)/5.; /* Ip[0] = Ixx */
-	particles[k].Ip[1] = particles[k].Ip[0];                   /* Ip[1] = Iyy */
-	particles[k].Ip[2] = particles[k].Ip[0];                   /* Ip[2] = Izz */
-	particles[k].Ip[3] = 0.;                                   /* Ip[3] = Ixy */
-	particles[k].Ip[4] = 0.;                                   /* Ip[4] = Ixz */
-	particles[k].Ip[5] = 0.;                                   /* Ip[5] = Iyz */
+	/* For a sphere it comes: I_xx = I_yy = I_zz = 2/5 M R^2 
+	with R the radius */
+	particles[k].Ip[0] = 2.*(particles[k].M)*sq(gp.radius)/5.; 
+		/* Ip[0] = Ixx */
+	particles[k].Ip[1] = particles[k].Ip[0]; /* Ip[1] = Iyy */
+	particles[k].Ip[2] = particles[k].Ip[0]; /* Ip[2] = Izz */
+	particles[k].Ip[3] = 0.; /* Ip[3] = Ixy */
+	particles[k].Ip[4] = 0.; /* Ip[4] = Ixz */
+	particles[k].Ip[5] = 0.; /* Ip[5] = Iyz */
 # endif
       }
     
@@ -172,14 +175,16 @@ event init (i = 0) {
       /* Restore particle data */
       restore_particle( particles );
 
-      /* Re-initialize file pointers */
-      init_file_pointers( pdata, fdata, 1 );
-
       // Re-initialize the VTK writer
 #if Paraview
       reinitialize_vtk_restart();	
 #endif	
   }
+
+
+  // Initialize/open all DLMFD file pointers
+  init_file_pointers( pdata, fdata, &converge, &cellvstime, restarted_simu );
+
   
   // Initialize the granular solver
   if ( pid() == 0 ) printf ("# granular solver initialization: "); 
@@ -198,11 +203,11 @@ event init (i = 0) {
     }
   }
 
+
   // Perform initial refinement around particles and write particle data
   int totalcell = 0;
-  
-  // Restarted simulation
-  if ( restarted_simu )
+
+  if ( restarted_simu ) // Restarted simulation
   {    
     totalcell = totalcells();
     if ( pid() == 0 ) printf( "Initial total cells = %d\n", totalcell );
@@ -263,6 +268,7 @@ event init (i = 0) {
     particle_data( particles, t, i, pdata );  
   }
 
+
   // Assign gravity to particles
 # ifndef gravity_x
 # define gravity_x 0.
@@ -279,11 +285,13 @@ event init (i = 0) {
     particles[k].gravity.y = gravity_y;
     particles[k].gravity.z = gravity_z;
   }    
+
   
   // Simulation time interval
   maxtime = trestart + SimuTimeInterval;
   fprintf( ferr, "Simulation time interval: t_start = %f to t_end = %f\n", 
     	trestart, maxtime ); 
+
 	
   // Initialize the field u_previoustime to compute x-velocity change
   foreach() { u_previoustime[] = u.x[]; }	   
@@ -304,7 +312,11 @@ event logfile ( i=0; i++ )
   // This is the condition that stops the simulation exactly at t=maxtime
   // We use -0.0001 * dt to avoid the problem of comparison of double that 
   // would exist if we would write if ( t > maxtime )
-  if ( t - maxtime > - RoundDoubleCoef * dt ) return 1; 
+  if ( t - maxtime > - RoundDoubleCoef * dt ) 
+  {
+    close_file_pointers( pdata, fdata, converge, cellvstime ); 
+    return 1; 
+  }
 //  if ( t > maxtime ) return 1; 
 }
 
