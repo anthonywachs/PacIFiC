@@ -3,6 +3,28 @@
   Lagrangian multipliers.
 */
 
+// Define NSDF, the number of significant digits after the decimal point
+// to output data in files in text mode
+// NSDF cannot be lower than 3, larger than 15 and 9 (for formatting reasons)
+# ifndef NSDF
+#   define NSDF 7
+# else 
+#   if ( NSDF == 9 )
+#     undef NSDF
+#     define NSDF 8
+#   else
+#     if ( NSDF < 3 )
+#       undef NSDF
+#       define NSDF 3
+#     else
+#       if ( NSDF > 15 )
+#         undef NSDF
+#         define NSDF 15
+#       endif
+#     endif
+#   endif
+# endif
+ 
 
 /** Structure for the coordinates of the fictitious domain's
     boundary. */
@@ -1971,20 +1993,56 @@ void granular_subproblem (particle * p, const int gravity_flag,
 /** Diagnostic functions. */
 void writer_headers (FILE * pdata, FILE * sl) 
 {
+  // Comments: 
+  // 1) we assume that initial time is always 0 when the simulation is 
+  // not restarted
+  // 2) we assume all hydro forces and torques are 0 at t=0
+  // 3) we position the headers over the 1st line as a function of NSD, the 
+  // number of significant digits after the decimal point
+
 #if _MPI
-  if(pid() == 0)
+  if ( pid() == 0 )
 #endif
-    {
+  {
     /* Write header for particles positions and velocities */
 #if dimension == 2
-    fprintf(pdata, "#t\t position.x\t position.y\t U.x\t U.y\t w.z\n");
-    fprintf(sl, "#t\t F.x\t F.y\t T.z\n");
-      
+    // Position and velocity file
+    if ( NSDF > 9 )
+      fprintf( pdata, "#time\t\t\tposition.x\t\tposition.y"
+    	"\t\tU.x\t\t\tU.y\t\t\tw.z\n" );
+    else
+      fprintf( pdata, "#time\t\tposition.x\tposition.y"
+    	"\tU.x\t\tU.y\t\tw.z\n" );
+
+    // Hydro force and torque file
+    if ( NSDF > 9 )
+      fprintf( sl, "#time\t\t\tF.x\t\t\tF.y\t\t\tT.z\n" );
+    else
+      fprintf( sl, "#time\t\tF.x\t\tF.y\t\tT.z\n" );
+    for (int i=0; i<3; ++i) fprintf( sl, "%.*e\t", NSDF, 0. ); 
+    fprintf( sl, "%.*e\n", NSDF, 0. );   
 #elif dimension == 3
-    fprintf (pdata, "#t\t position.x\t position.y\t position.z\t U.x\t U.y\t "
-    	"U.z\t w.x\t w.y\t w.z\n");
-    fprintf (sl, "#t\t F.x\t F.y\t F.z\t T.x\t T.y\t T.z\n");
+    // Position and velocity file
+    if ( NSDF > 9 )
+      fprintf( pdata, "#time\t\t\tposition.x\t\tposition.y\t\tposition.z"
+    	"\t\tU.x\t\t\tU.y\t\t\tU.z"
+	"\t\t\tw.x\t\t\tw.y\t\t\tw.z\n" );
+    else
+      fprintf( pdata, "#time\t\tposition.x\tposition.y\tposition.z"
+    	"\tU.x\t\tU.y\t\tU.z"
+	"\t\tw.x\t\tw.y\t\tw.z\n" );
+
+    // Hydro force and torque file
+    if ( NSDF > 9 )
+      fprintf( sl, "#time\t\t\tF.x\t\t\tF.y\t\t\tF.z\t\t\tT.x\t\t\tT.y"
+      	"\t\t\tT.z\n" );
+    else
+      fprintf( sl, "#time\t\tF.x\t\tF.y\t\tF.z\t\tT.x\t\tT.y\t\tT.z\n" );
+    for (int i=0; i<6; ++i) fprintf( sl, "%.*e\t", NSDF, 0. ); 
+    fprintf( sl, "%.*e\n", NSDF, 0. );
 #endif
+    
+    // Flush the buffers such that files are updated dynamically
     fflush(sl);
     fflush(pdata);
   }
@@ -1995,7 +2053,8 @@ void writer_headers (FILE * pdata, FILE * sl)
 
 void particle_data (particle * p, const double t, const int i, FILE ** pdata) 
 {  
-  for (int k = 0; k < NPARTICLES; k++) {
+  for (int k = 0; k < NPARTICLES; k++) 
+  {
     GeomParameter * GCi = &(p[k].g);
 #if DLM_Moving_particle
 #if TRANSLATION 
@@ -2006,51 +2065,53 @@ void particle_data (particle * p, const double t, const int i, FILE ** pdata)
 #endif
 #endif
 #if dimension == 2
-    if(pid() == 0) {
-      fprintf(pdata[k], "%20.18f\t %20.18f\t %20.18f %20.18f\t %20.18f\t "
-      	"%20.18f \n", t, (*GCi).center.x, (*GCi).center.y
+    if ( pid() == 0 ) 
+    {
+      fprintf( pdata[k], "%.*e\t", NSDF, t );
+      fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.x );
+      fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.y );         
+      fprintf( pdata[k], "%.*e\t%.*e\t%.*e\n"     
 #if DLM_Moving_particle
 #if TRANSLATION
-	      , (*U).x, (*U).y
+	, NSDF, (*U).x, NSDF, (*U).y 
 #elif TRANSLATION == 0
-	      , 0., 0.
-#endif
+	, NSDF, 0., NSDF, 0.
+#endif   
 #if ROTATION
-	      , (*w).z
+	, NSDF, (*w).z
 #elif ROTATION == 0
-	      , 0.
+	, NSDF, 0.
 #endif
-	      
 #elif DLM_Moving_particle == 0
-	      , 0., 0.
-	      , 0.
+	, NSDF, 0., NSDF, 0., NSDF, 0.
 #endif
-	      );
+      );      
       fflush(pdata[k]);
     }
 #elif dimension == 3
-    if(pid() == 0) {
-      fprintf(pdata[k], "%20.18f\t %20.18f\t %20.18f\t %20.18f\t %20.18f\t "
-      	"%20.18f %20.18f\t %20.18f\t %20.18f\t %20.18f\n", t, (*GCi).center.x, 
-	(*GCi).center.y, (*GCi).center.z
-
+    if ( pid() == 0 ) 
+    {
+      fprintf( pdata[k], "%.*e\t", NSDF, t );
+      fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.x );
+      fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.y );      
+      fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.z );      
+      fprintf( pdata[k], "%.*e\t%.*e\t%.*e\t%.*e\t%.*e\t%.*e\n"     
 #if DLM_Moving_particle
 #if TRANSLATION
-	      , (*U).x, (*U).y, (*U).z
+	, NSDF, (*U).x, NSDF, (*U).y, NSDF, (*U).z
 #elif TRANSLATION == 0
-	       , 0., 0., 0.
-#endif	      
+	, NSDF, 0., NSDF, 0., NSDF, 0.
+#endif   
 #if ROTATION
-	      ,(*w).x, (*w).y, (*w).z
+	, NSDF, (*w).x, NSDF, (*w).y, NSDF, (*w).z
 #elif ROTATION == 0
-	       , 0., 0., 0.
+	, NSDF, 0., NSDF, 0., NSDF, 0.
 #endif
 #elif DLM_Moving_particle == 0
-	      , 0., 0., 0.
-	      , 0., 0., 0.
+	, NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0.
 #endif
-	      );
-      fflush(pdata[k]);
+      );      
+      fflush(pdata[k]);      	
     }
 #endif
   }
@@ -2259,16 +2320,24 @@ coord sumLambda (particle * p, FILE ** sl, const double t, const double dt,
 #if dimension == 2
     crossLambdaSum.z = crossLambdaSumInt.z + crossLambdaSumBoundary.z;
       
-    if(pid() == 0) {
-      fprintf(sl[k], "%f\t %20.18f\t %20.18f\t %20.18f\n", t, lambdasum.x,  
-      	lambdasum.y, crossLambdaSum.z);
+    if( pid() == 0 ) 
+    {
+      fprintf( sl[k], "%.*e\t", NSDF, t );
+      fprintf( sl[k], "%.*e\t", NSDF, lambdasum.x );      
+      fprintf( sl[k], "%.*e\t", NSDF, lambdasum.y );          
+      fprintf( sl[k], "%.*e\n", NSDF, crossLambdaSum.z );      
       fflush(sl[k]);
     }
 #elif dimension == 3
-    if(pid() == 0) {
-      fprintf(sl[k], "%20.18f\t %20.18f\t %20.18f\t %20.18f\t %20.18f\t "
-      	"%20.18f\t %20.18f\n", t, lambdasum.x,  lambdasum.y, lambdasum.z, 
-	crossLambdaSum.x, crossLambdaSum.y, crossLambdaSum.z);
+    if( pid() == 0 ) 
+    {
+      fprintf( sl[k], "%.*e\t", NSDF, t );
+      fprintf( sl[k], "%.*e\t", NSDF, lambdasum.x );      
+      fprintf( sl[k], "%.*e\t", NSDF, lambdasum.y );      
+      fprintf( sl[k], "%.*e\t", NSDF, lambdasum.z );      
+      fprintf( sl[k], "%.*e\t", NSDF, crossLambdaSum.x );      
+      fprintf( sl[k], "%.*e\t", NSDF, crossLambdaSum.y );      
+      fprintf( sl[k], "%.*e\n", NSDF, crossLambdaSum.z );      
       fflush(sl[k]);
     }
 #endif
