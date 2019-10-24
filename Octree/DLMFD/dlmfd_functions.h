@@ -65,7 +65,7 @@ typedef struct {
   double kn, en, vzero, wished_ratio;
   coord normalvector;
   coord gravity;
-  double M, Ip[6], Ip_inv[6], rho_s, Vp, DLMFD_couplingfactor;
+  double M, Ip[6], Ip_inv[3][3], rho_s, Vp, DLMFD_couplingfactor;
 #if TRANSLATION
   coord U, Unm1, qU, tU;
 #endif
@@ -2600,38 +2600,104 @@ bool restore_particle (particle * p)
 
 
 
-void inverse3by3matrix(double oldMatrix[3][3], double ** inversedMatrix) 
+void inverse3by3matrix( double Matrix[3][3], double ** inversedMatrix ) 
 {
-  double block1 = oldMatrix[1][1]*oldMatrix[2][2] 
-  	- oldMatrix[1][2]*oldMatrix[2][1];
-  double block2 = oldMatrix[1][2]*oldMatrix[2][0] 
-  	- oldMatrix[1][0]*oldMatrix[2][2];
-  double block3 = oldMatrix[1][0]*oldMatrix[2][1] 
-  	- oldMatrix[1][1]*oldMatrix[2][0];
+  double block1 = Matrix[1][1] * Matrix[2][2] 
+  	- Matrix[1][2] * Matrix[2][1];
+  double block2 = Matrix[1][2] * Matrix[2][0] 
+  	- Matrix[1][0] * Matrix[2][2];
+  double block3 = Matrix[1][0] * Matrix[2][1] 
+  	- Matrix[1][1] * Matrix[2][0];
 
-  double determinat = oldMatrix[0][0]*block1 + oldMatrix[0][1]*block2 
-  	+ oldMatrix[0][2]*block3;
+  double determinant = Matrix[0][0] * block1 + Matrix[0][1] * block2 
+  	+ Matrix[0][2] * block3;
 
   /* m[i][j], *(*(m + i) + j) */
   
-  *(*(inversedMatrix + 0) + 0) = block1/determinat;
-  *(*(inversedMatrix + 0) + 1) = (oldMatrix[0][2]*oldMatrix[2][1] 
-  	- oldMatrix[0][1]*oldMatrix[2][2])/determinat;
-  *(*(inversedMatrix + 0) + 2) = (oldMatrix[0][1]*oldMatrix[1][2] 
-  	- oldMatrix[0][2]*oldMatrix[1][1])/determinat; 
-  *(*(inversedMatrix + 1) + 0) = block2 / determinat;
-  
-  *(*(inversedMatrix + 1) + 1) = (oldMatrix[0][0]*oldMatrix[2][2] 
-  	- oldMatrix[0][2]*oldMatrix[2][0])/determinat;
-  *(*(inversedMatrix + 1) + 2) = (oldMatrix[0][2]*oldMatrix[1][0] 
-  	- oldMatrix[0][0]*oldMatrix[1][2])/determinat;
-  *(*(inversedMatrix + 2) + 0) = block3/determinat;
-  *(*(inversedMatrix + 2) + 1) = (oldMatrix[0][1]*oldMatrix[2][0] 
-  	- oldMatrix[0][0]*oldMatrix[2][1])/determinat;
-  *(*(inversedMatrix + 2) + 2) = (oldMatrix[0][0]*oldMatrix[1][1] 
-  	- oldMatrix[0][1]*oldMatrix[1][0])/determinat ;
+  *(*(inversedMatrix + 0) + 0) = block1 / determinant;
+  *(*(inversedMatrix + 0) + 1) = ( Matrix[0][2] * Matrix[2][1] 
+  	- Matrix[0][1] * Matrix[2][2] ) / determinant;
+  *(*(inversedMatrix + 0) + 2) = ( Matrix[0][1] * Matrix[1][2] 
+  	- Matrix[0][2] * Matrix[1][1]) / determinant; 
+  *(*(inversedMatrix + 1) + 0) = block2 / determinant;  
+  *(*(inversedMatrix + 1) + 1) = ( Matrix[0][0] * Matrix[2][2] 
+  	- Matrix[0][2] * Matrix[2][0] ) / determinant;
+  *(*(inversedMatrix + 1) + 2) = ( Matrix[0][2] * Matrix[1][0] 
+  	- Matrix[0][0] * Matrix[1][2] ) / determinant;
+  *(*(inversedMatrix + 2) + 0) = block3 / determinant;
+  *(*(inversedMatrix + 2) + 1) = ( Matrix[0][1] * Matrix[2][0] 
+  	- Matrix[0][0] * Matrix[2][1]) / determinant;
+  *(*(inversedMatrix + 2) + 2) = ( Matrix[0][0] * Matrix[1][1] 
+  	- Matrix[0][1] * Matrix[1][0] ) / determinant ;
 }
 
+
+
+
+void inverse3by3matrix__( double Matrix[3][3], double inversedMatrix[3][3] ) 
+{
+  double block1 = Matrix[1][1] * Matrix[2][2] 
+  	- Matrix[1][2] * Matrix[2][1];
+  double block2 = Matrix[1][2] * Matrix[2][0] 
+  	- Matrix[1][0] * Matrix[2][2];
+  double block3 = Matrix[1][0] * Matrix[2][1] 
+  	- Matrix[1][1] * Matrix[2][0];
+
+  double determinant = Matrix[0][0] * block1 + Matrix[0][1] * block2 
+  	+ Matrix[0][2] * block3;
+  
+  inversedMatrix[0][0] = block1 / determinant;
+  inversedMatrix[0][1] = ( Matrix[0][2] * Matrix[2][1] 
+  	- Matrix[0][1] * Matrix[2][2]) / determinant;
+  inversedMatrix[0][2] = ( Matrix[0][1] * Matrix[1][2] 
+  	- Matrix[0][2] * Matrix[1][1] ) / determinant; 
+  inversedMatrix[1][0] = block2 / determinant;
+  inversedMatrix[1][1] = ( Matrix[0][0] * Matrix[2][2] 
+  	- Matrix[0][2] * Matrix[2][0] ) / determinant;
+  inversedMatrix[1][2] = ( Matrix[0][2] * Matrix[1][0] 
+  	- Matrix[0][0] * Matrix[1][2] ) / determinant;
+  inversedMatrix[2][0] = block3 / determinant;
+  inversedMatrix[2][1] = ( Matrix[0][1] * Matrix[2][0] 
+  	- Matrix[0][0] * Matrix[2][1] ) / determinant;
+  inversedMatrix[2][2] = ( Matrix[0][0] * Matrix[1][1] 
+  	- Matrix[0][1] * Matrix[1][0]) / determinant ;
+}
+
+
+
+
+void compute_inv_inertia( particle *p )
+{
+  /* The inertia tensor is */
+  /*  Ixx  Ixy  Ixz */
+  /*  Iyx  Iyy  Iyz */
+  /*  Izx  Izy  Izz */ 
+  /* with */
+  /* Ip[0] = Ixx */
+  /* Ip[1] = Iyy */
+  /* Ip[2] = Izz */
+  /* Ip[3] = Ixy */
+  /* Ip[4] = Ixz */
+  /* Ip[5] = Iyz */
+
+  // Transfer Ip to a 3x3 matrix
+  double Imat[3][3]; 
+  Imat[0][0] = p->Ip[0];
+  Imat[1][1] = p->Ip[1];
+  Imat[2][2] = p->Ip[2];
+
+  Imat[0][1] = p->Ip[3];
+  Imat[0][2] = p->Ip[4];
+  Imat[1][2] = p->Ip[5];
+    
+  Imat[1][0] = Imat[0][1]; 
+  Imat[2][0] = Imat[0][2];
+  Imat[2][1] = Imat[1][2];
+  
+  // Invert Imat and copy the result in p->Ip_inv
+  // Ip_inv is a 2D 3 by 3 array
+  inverse3by3matrix__( Imat, p->Ip_inv );  
+}
 
 
 

@@ -4,16 +4,25 @@
 We are looking for a numerical approximation for the solution of the
 following equations 
 $$
-\rho\left(\partial_t{\mathbf{u}} +\mathbf{u}\cdot \mathbf{\nabla}\mathbf{u}\right) = -\mathbf{\nabla} p + \mathbf{\nabla} \cdot\left(2\mu\mathbf{D}\right) + \rho\mathbf{a} + \mathbf{\lambda}~\text{over}~\Omega
+\rho\left(\partial_t{\mathbf{u}} 
++ \mathbf{u}\cdot \mathbf{\nabla}\mathbf{u}\right) = 
+-\mathbf{\nabla} p + \mathbf{\nabla} \cdot\left(2\mu\mathbf{D}\right) 
++ \rho\mathbf{a} + \mathbf{\lambda}~\text{over}~\Omega
 $$
 $$
-\left(1-\frac{\rho}{\rho_s}\right)\left(M\left(\partial_t{\mathbf{U}}-\mathbf{g}\right)\right)=-\int_{P(t)} {\mathbf{\lambda}} dv~\text{over}~P(t)
+\left(1-\frac{\rho}{\rho_s}\right)
+\left(M\left(\partial_t{\mathbf{U}}-\mathbf{g}\right)\right)=
+-\int_{P(t)} {\mathbf{\lambda}} dv~\text{over}~P(t)
 $$
 $$
-\left(1-\frac{\rho}{\rho_s}\right)\left(\mathbf{I}\partial_t{\mathbf{\omega}} + \mathbf{\omega} \times\mathbf{I}\mathbf{\omega}\right) = -\int_{P(t)}\mathbf{r}\times{\mathbf{\lambda}} dv~\text{over}~P(t)
+\left(1-\frac{\rho}{\rho_s}\right)
+\left(\mathbf{I}\partial_t{\mathbf{\omega}} 
++ \mathbf{\omega} \times\mathbf{I}\mathbf{\omega}\right) = 
+-\int_{P(t)}\mathbf{r}\times{\mathbf{\lambda}} dv~\text{over}~P(t)
 $$
 $$
-\mathbf{u}-\left(\mathbf{U}+\mathbf{\omega}\times \mathbf{r}\right)=0~\text{over}~P(t)
+\mathbf{u}-\left(\mathbf{U}+\mathbf{\omega}\times \mathbf{r}\right)=
+0~\text{over}~P(t)
 $$
 $$
 \mathbf{\nabla}\cdot\mathbf{u} = \mathbf{0} ~\text{over}~\Omega
@@ -92,7 +101,10 @@ vector DLM_explicit[];
 
 We are using the centred solver for this problem.
 $$
-\rho\left(\partial_t{\mathbf{u}}+\mathbf{u}\cdot {\mathbf{\nabla}}\mathbf{u}\right) = -{\mathbf{\nabla}}p + {\mathbf{\nabla}}\cdot\left(2\mu\mathbf{D}\right) + \rho\mathbf{a}~\text{over}~\Omega
+\rho\left(\partial_t{\mathbf{u}}
++\mathbf{u}\cdot {\mathbf{\nabla}}\mathbf{u}\right) = 
+-{\mathbf{\nabla}}p + {\mathbf{\nabla}}\cdot\left(2\mu\mathbf{D}\right) 
++ \rho\mathbf{a}~\text{over}~\Omega
 $$
 $$
 {\mathbf{\nabla}}\cdot\mathbf{u} = \mathbf{0} ~\text{over}~\Omega. 
@@ -118,17 +130,29 @@ $$
 \rho \partial_t\mathbf{u} = {\mathbf{\lambda}}~\text{over}~\Omega
 $$
 $$
-\left(1-\frac{\rho}{\rho_s}\right)\left(M\left(\partial_t\mathbf{U}-\mathbf{g}\right)\right)=-\int_{P(t)}{\mathbf{\lambda}} dv~\text{over}~P(t)
+\left(1-\frac{\rho}{\rho_s}\right)
+\left(M\left(\partial_t\mathbf{U}-\mathbf{g}\right)\right)=
+-\int_{P(t)}{\mathbf{\lambda}} dv~\text{over}~P(t)
 $$
 $$
-\left(1-\frac{\rho}{\rho_s}\right)\left(\mathbf{I}\partial_t {\mathbf{\omega}} + {\mathbf{\omega}} \times\mathbf{I}{\mathbf{\omega}}\right) = -\int_{P(t)}\mathbf{r}\times{\mathbf{\lambda}} dv~\text{over}~P(t)
+\left(1-\frac{\rho}{\rho_s}\right)
+\left(\mathbf{I}\partial_t {\mathbf{\omega}} 
++ {\mathbf{\omega}} \times\mathbf{I}{\mathbf{\omega}}\right) = 
+-\int_{P(t)}\mathbf{r}\times{\mathbf{\lambda}} dv~\text{over}~P(t)
 $$
 $$
-\mathbf{u}-\left(\mathbf{U}+{\mathbf{\omega}}\times \mathbf{r}\right)=0~\text{over}~P(t),
+\mathbf{u}-\left(\mathbf{U}+{\mathbf{\omega}}\times \mathbf{r}\right)=
+0~\text{over}~P(t),
 $$
-with unknowns $\mathbf{u}, \mathbf{U}, {\mathbf{\omega}}$ and ${\mathbf{\lambda}}$ being respectively the fluid velocity field, the particle's translational velocity, the particle's rotational velocity and the Lagrange multipliers. The particle occupies the domain $P(t)$ with density $\rho_s$, Inertia tensor $\mathbf{I}$ and mass $M$. The vector $\mathbf{g}$ is the gravity acceleration here.
+with unknowns $\mathbf{u}, \mathbf{U}, {\mathbf{\omega}}$ and 
+${\mathbf{\lambda}}$ being respectively the fluid velocity field, 
+the particle's translational velocity, the particle's rotational velocity and 
+the Lagrange multipliers. The particle occupies the domain $P(t)$ with density 
+$\rho_s$, Inertia tensor $\mathbf{I}$ and mass $M$. The vector $\mathbf{g}$ is 
+the gravity acceleration here.
 
-This leads to a saddle-point problem which is solved with an iterative solver (Uzawa, conjugate gradient algorithm). It is implemented in the function below. 
+This leads to a saddle-point problem which is solved with an iterative solver 
+(Uzawa, conjugate gradient algorithm). It is implemented in the function below. 
 */
 
 
@@ -348,7 +372,6 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   /* Note that (M_w^T)*lambda <=> - <lambda, xi^r_GM>_P(t) (xi is the test
    * function for w)*/
 
-
   
   foreach() {
     foreach_dimension() {
@@ -526,14 +549,6 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   /* Adding here the fU and fw parts to qU and qw */
   for (int k = 0; k < NPARTICLES; k++) {
 #if TRANSLATION
-    /* (*qU[k]).x += (1. - (rho_f/p[k].rho_s))*(p[k].M)*
-    	(p[k].gravity.x + p[k].adforce.x + (*U[k]).x/dt) ; */
-    /* (*qU[k]).y += (1. - (rho_f/p[k].rho_s))*(p[k].M)*
-    	(p[k].gravity.y + p[k].adforce.y + (*U[k]).y/dt) ; */
-    /* (*qU[k]).z += (1. - (rho_f/p[k].rho_s))*(p[k].M)*
-    	(p[k].gravity.z + p[k].adforce.z + (*U[k]).z/dt) ; */
-
-    /* Modification for the explicit added term  */
     (*qU[k]).x += (1. - (rho_f/p[k].rho_s))*
     	(p[k].M)*(p[k].gravity.x + p[k].adforce.x ) 
 	+ p[k].DLMFD_couplingfactor * p[k].M * (*U[k]).x / dt ;
@@ -547,9 +562,9 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 #endif
 #if ROTATION
     /* The inertia tensor is */
-    /*  Ixx -Ixy -Ixz */
-    /* -Iyx  Iyy -Iyz */
-    /* -Izx -Izy  Izz */ 
+    /*  Ixx  Ixy  Ixz */
+    /*  Iyx  Iyy  Iyz */
+    /*  Izx  Izy  Izz */ 
     /* with */
     /* Ip[0] = Ixx */
     /* Ip[1] = Iyy */
@@ -557,17 +572,6 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
     /* Ip[3] = Ixy */
     /* Ip[4] = Ixz */
     /* Ip[5] = Iyz */
-    /* (*qw[k]).x += (1. - (rho_f/p[k].rho_s))*
-    	( (p[k].Ip[0])*(*w[k]).x - (p[k].Ip[3])*(*w[k]).y 
-		- (p[k].Ip[4])*(*w[k]).z)/dt; */
-    /* (*qw[k]).y += (1. - (rho_f/p[k].rho_s))*
-    	(-(p[k].Ip[3])*(*w[k]).x + (p[k].Ip[1])*(*w[k]).y 
-		- (p[k].Ip[5])*(*w[k]).z)/dt; */
-    /* (*qw[k]).z += (1. - (rho_f/p[k].rho_s))*
-    	(-(p[k].Ip[4])*(*w[k]).x - (p[k].Ip[5])*(*w[k]).y 
-		+ (p[k].Ip[2])*(*w[k]).z)/dt; */
-
-     /* Modification for the explicit added term  */
     (*qw[k]).x += p[k].DLMFD_couplingfactor * ( (p[k].Ip[0])*(*w[k]).x 
     	- (p[k].Ip[3])*(*w[k]).y - (p[k].Ip[4])*(*w[k]).z) / dt;
     (*qw[k]).y += p[k].DLMFD_couplingfactor * (-(p[k].Ip[3])*(*w[k]).x 
@@ -586,79 +590,34 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
     }
   }
   
-  /* Invert A_U U^0 = qU with A_U = ((1 - rho_f/rho_s)*M)/dt *
+  /* Invert A_U U^0 = qU with A_U = (DLMFD_couplingfactor*M)/dt *
      Identity_Matrix */
   
-  /* Invert A_w w^0 = qw with A_w = ((1 - rho_f/rho_s)*Ip)/dt *
-     Identity_Matrix */
+  /* Invert A_w w^0 = qw with A_w = (DLMFD_couplingfactor*Ip)/dt *
+     Inertia_Matrix */
   
 #if DLM_Moving_particle
   for (int k = 0; k < NPARTICLES; k++) {
 #if TRANSLATION
-    /* (*U[k]).x = (dt*(*qU[k]).x)/((1. - rho_f/p[k].rho_s)*p[k].M); */
-    /* (*U[k]).y = (dt*(*qU[k]).y)/((1. - rho_f/p[k].rho_s)*p[k].M); */
-    /* (*U[k]).z = (dt*(*qU[k]).z)/((1. - rho_f/p[k].rho_s)*p[k].M); */
-
-    /* Modification for the explicit added term  */
+    /* Solution of M * DLMFD_couplingfactor * U / dt = qU */
+    /* U = ( dt * qU ) / ( DLMFD_couplingfactor * M ) */
     (*U[k]).x = (dt*(*qU[k]).x)/(p[k].DLMFD_couplingfactor*p[k].M);
     (*U[k]).y = (dt*(*qU[k]).y)/(p[k].DLMFD_couplingfactor*p[k].M);
     (*U[k]).z = (dt*(*qU[k]).z)/(p[k].DLMFD_couplingfactor*p[k].M);
 #endif
 #if ROTATION
-    /* The inertia tensor is */
-    /*  Ixx -Ixy -Ixz */
-    /* -Iyx  Iyy -Iyz */
-    /* -Izx -Izy  Izz */ 
-    /* with */
-    /* Ip[0] = Ixx */
-    /* Ip[1] = Iyy */
-    /* Ip[2] = Izz */
-    /* Ip[3] = Ixy */
-    /* Ip[4] = Ixz */
-    /* Ip[5] = Iyz */
-
-    /* Allocate temporly a matrix for Ip */
-    double ** Imat = malloc(3 * sizeof(double*));
-    for (int ii = 0; ii < 3; ii++) {
-      Imat[ii] = malloc(3 * sizeof(double));
-    }
-
-    Imat[0][0] = p[k].Ip[0];
-    Imat[1][1] = p[k].Ip[1];
-    Imat[2][2] = p[k].Ip[2];
-
-    Imat[0][1] = -p[k].Ip[3];
-    Imat[0][2] = -p[k].Ip[4];
-    Imat[1][2] = -p[k].Ip[5];
-    
-    Imat[1][0] = Imat[0][1]; 
-    Imat[2][0] = Imat[0][2];
-    Imat[2][1] = Imat[1][2];
-
-    /* A_w = ((1 - rho_f/rho_s)*Ip)/dt */
-    
-    double Aw[3][3];
-    for (int ll = 0; ll < 3; ll++) {
-      for (int nn = 0; nn < 3; nn++) {
-	/* Aw[ll][nn] = (1 - rho_f/p[k].rho_s)*Imat[ll][nn]/dt; */
-	/* Modification for the explicit added term  */
-	Aw[ll][nn] = p[k].DLMFD_couplingfactor * Imat[ll][nn] / dt;
-      }
-    }
-
-    /* Takes in Aw and return Aw^-1 as Imat */
-    inverse3by3matrix(Aw, Imat);
-  
-    (*w[k]).x = Imat[0][0]*(*qw[k]).x + Imat[0][1]*(*qw[k]).y 
-    	+ Imat[0][2]*(*qw[k]).z;
-    (*w[k]).y = Imat[1][0]*(*qw[k]).x + Imat[1][1]*(*qw[k]).y 
-    	+ Imat[1][2]*(*qw[k]).z;
-    (*w[k]).z = Imat[2][0]*(*qw[k]).x + Imat[2][1]*(*qw[k]).y 
-    	+ Imat[2][2]*(*qw[k]).z;
-
-    for (int ii = 0; ii < 3; ii++) 
-      free(Imat[ii]);
-    free(Imat);
+    /* Solution of Ip * DLMFD_couplingfactor * w / dt = qw */
+    /* w = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
+    /* where Ip_inv is the inverse of Ip */        
+    (*w[k]).x = ( dt / p[k].DLMFD_couplingfactor ) * 
+    	( (p[k].Ip_inv)[0][0]*(*qw[k]).x + (p[k].Ip_inv)[0][1]*(*qw[k]).y 
+    	+ (p[k].Ip_inv)[0][2]*(*qw[k]).z );
+    (*w[k]).y = ( dt / p[k].DLMFD_couplingfactor ) * 
+    	( (p[k].Ip_inv)[1][0]*(*qw[k]).x + (p[k].Ip_inv)[1][1]*(*qw[k]).y 
+    	+ (p[k].Ip_inv)[1][2]*(*qw[k]).z );
+    (*w[k]).z = ( dt / p[k].DLMFD_couplingfactor ) * 
+    	( (p[k].Ip_inv)[2][0]*(*qw[k]).x + (p[k].Ip_inv)[2][1]*(*qw[k]).y 
+    	+ (p[k].Ip_inv)[2][2]*(*qw[k]).z );    
 #endif
   }
 #endif
@@ -704,7 +663,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 	
 #if DLM_Moving_particle
 #if ROTATION
-	/* Modify temporerly the particle center position for periodic 
+	/* Modify temporarily the particle center position for periodic 
 	boundary condition */
 	foreach_dimension()
 	  (*gci[k]).center.x += DLM_periodic_shift.x[];
@@ -724,7 +683,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 #endif
 	
 #else
-	/* Modify temporerly the particle center position for periodic 
+	/* Modify temporarily the particle center position for periodic 
 	boundary condition */
 	foreach_dimension()
 	  (*gci[k]).center.x += DLM_periodic_shift.x[];
@@ -737,8 +696,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 		- imposedw.y*(x - (*gci[k]).center.x));
 
 	foreach_dimension()
-	  (*gci[k]).center.x -= DLM_periodic_shift.x[];
-	
+	  (*gci[k]).center.x -= DLM_periodic_shift.x[];	
 #endif
       }
     }
@@ -803,8 +761,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 	  DLM_r.x[] +=  (*U[k]).x;
 #endif
 #if ROTATION
-
-	/* Modify temporerly the particle center position for periodic 
+	/* Modify temporarily the particle center position for periodic 
 	boundary condition */
 	foreach_dimension()
 	  (*gci[k]).center.x += DLM_periodic_shift.x[];
@@ -820,15 +777,14 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 		- (*w[k]).y*(lambdapos.x - (*gci[k]).center.x)); 
 
 	foreach_dimension()
-	  (*gci[k]).center.x -= DLM_periodic_shift.x[];
-	
+	  (*gci[k]).center.x -= DLM_periodic_shift.x[];	
 #endif
 #else
 	foreach_dimension() {
 	  DLM_r.x[] += imposedU.x;
 	}
 
-	/* Modify temporerly the particle center position for periodic 
+	/* Modify temporarily the particle center position for periodic 
 	boundary condition */
 	foreach_dimension()
 	  (*gci[k]).center.x += DLM_periodic_shift.x[];
@@ -841,8 +797,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 		- imposedw.y*(lambdapos.x - (*gci[k]).center.x));
 
 	foreach_dimension()
-	  (*gci[k]).center.x -= DLM_periodic_shift.x[];
-	
+	  (*gci[k]).center.x -= DLM_periodic_shift.x[];	
 #endif
       }
     }
@@ -914,8 +869,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 			
 #if DLM_Moving_particle
 #if ROTATION
-
-	/* Modify temporerly the particle center position for periodic 
+	/* Modify temporarily the particle center position for periodic 
 	boundary condition */
 	foreach_dimension()
 	  (*gci[k]).center.x += DLM_periodic_shift.x[];
@@ -930,8 +884,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 		- DLM_w.x[]*(y - (*gci[k]).center.y)); 
 
 	foreach_dimension()
-	  (*gci[k]).center.x -= DLM_periodic_shift.x[];
-	
+	  (*gci[k]).center.x -= DLM_periodic_shift.x[];	
 #endif
 #endif
       }
@@ -1003,7 +956,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 #endif
 
 #if ROTATION
-	/* Modify temporerly the particle center position for periodic 
+	/* Modify temporarily the particle center position for periodic 
 	boundary condition */
 	foreach_dimension()
 	  (*gci[k]).center.x += DLM_periodic_shift.x[];
@@ -1018,8 +971,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 		- DLM_w.x[]*(lambdapos.y - (*gci[k]).center.y)); 
 
 	foreach_dimension()
-	  (*gci[k]).center.x -= DLM_periodic_shift.x[];
-	
+	  (*gci[k]).center.x -= DLM_periodic_shift.x[];	
 #endif
       }
 #endif
@@ -1054,72 +1006,25 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 #if DLM_Moving_particle
     for (int k = 0; k < NPARTICLES; k++) {
 #if TRANSLATION
-      /* (*tU[k]).x = ((*qU[k]).x*dt)/((1. - (rho_f/p[k].rho_s))*p[k].M); */
-      /* (*tU[k]).y = ((*qU[k]).y*dt)/((1. - (rho_f/p[k].rho_s))*p[k].M); */
-      /* (*tU[k]).z = ((*qU[k]).z*dt)/((1. - (rho_f/p[k].rho_s))*p[k].M); */
-
-      /* Modification for the explicit added term  */
+      /* Solution of M * DLMFD_couplingfactor * tU / dt = qU */
+      /* tU = ( dt * qU ) / ( DLMFD_couplingfactor * M ) */
       (*tU[k]).x = ((*qU[k]).x*dt)/( p[k].DLMFD_couplingfactor * p[k].M );
       (*tU[k]).y = ((*qU[k]).y*dt)/( p[k].DLMFD_couplingfactor * p[k].M );
       (*tU[k]).z = ((*qU[k]).z*dt)/( p[k].DLMFD_couplingfactor * p[k].M );
 #endif
 #if ROTATION
-      /* The inertia tensor is */
-      /*  Ixx -Ixy -Ixz */
-      /* -Iyx  Iyy -Iyz */
-      /* -Izx -Izy  Izz */ 
-      /* with */
-      /* Ip[0] = Ixx */
-      /* Ip[1] = Iyy */
-      /* Ip[2] = Izz */
-      /* Ip[3] = Ixy */
-      /* Ip[4] = Ixz */
-      /* Ip[5] = Iyz */
-
-      /* Allocate temporly a matrix for Ip */
-      double ** Imat = malloc(3 * sizeof(double*));
-      for (int ii = 0; ii < 3; ii++) {
-	Imat[ii] = malloc(3 * sizeof(double));
-      }
-
-      Imat[0][0] = p[k].Ip[0];
-      Imat[1][1] = p[k].Ip[1];
-      Imat[2][2] = p[k].Ip[2];
-
-      Imat[0][1] = -p[k].Ip[3];
-      Imat[0][2] = -p[k].Ip[4];
-      Imat[1][2] = -p[k].Ip[5];
-    
-      Imat[1][0] = Imat[0][1]; 
-      Imat[2][0] = Imat[0][2];
-      Imat[2][1] = Imat[1][2];
-
-      double Aw[3][3];
-      for (int ll = 0; ll < 3; ll++) {
-	for (int nn = 0; nn < 3; nn++) {
-	  /* Aw[ll][nn] = (1. - rho_f/p[k].rho_s)*Imat[ll][nn]/dt; */
-	  /* Modification for the explicit added term  */
-	  Aw[ll][nn] = p[k].DLMFD_couplingfactor * Imat[ll][nn] / dt;
-	}
-      }
-
-      /* Takes in Aw and return Aw^-1 as Imat */
-      inverse3by3matrix(Aw, Imat);
-        
-      (*tw[k]).x = Imat[0][0]*(*qw[k]).x + Imat[0][1]*(*qw[k]).y 
-      	+ Imat[0][2]*(*qw[k]).z;
-      (*tw[k]).y = Imat[1][0]*(*qw[k]).x + Imat[1][1]*(*qw[k]).y 
-      	+ Imat[1][2]*(*qw[k]).z;
-      (*tw[k]).z = Imat[2][0]*(*qw[k]).x + Imat[2][1]*(*qw[k]).y 
-      	+ Imat[2][2]*(*qw[k]).z;
-
-      for (int ii = 0; ii < 3; ii++) 
-	free(Imat[ii]);
-      free(Imat);
-      
-      /* (*tw[k]).x = ((*qw[k]).x*dt)/((1.-(rho_f/p[k].rho_s))*p[k].Ip[0]); */
-      /* (*tw[k]).y = ((*qw[k]).y*dt)/((1.-(rho_f/p[k].rho_s))*p[k].Ip[0]); */
-      /* (*tw[k]).z = ((*qw[k]).z*dt)/((1.-(rho_f/p[k].rho_s))*p[k].Ip[0]); */
+      /* Solution of Ip * DLMFD_couplingfactor * w / dt = qw */
+      /* w = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
+      /* where Ip_inv is the inverse of Ip */      
+      (*tw[k]).x = ( dt / p[k].DLMFD_couplingfactor ) * 
+    	( (p[k].Ip_inv)[0][0]*(*qw[k]).x + (p[k].Ip_inv)[0][1]*(*qw[k]).y 
+    	+ (p[k].Ip_inv)[0][2]*(*qw[k]).z );
+      (*tw[k]).y = ( dt / p[k].DLMFD_couplingfactor ) * 
+    	( (p[k].Ip_inv)[1][0]*(*qw[k]).x + (p[k].Ip_inv)[1][1]*(*qw[k]).y 
+    	+ (p[k].Ip_inv)[1][2]*(*qw[k]).z );
+      (*tw[k]).z = ( dt / p[k].DLMFD_couplingfactor ) * 
+    	( (p[k].Ip_inv)[2][0]*(*qw[k]).x + (p[k].Ip_inv)[2][1]*(*qw[k]).y 
+    	+ (p[k].Ip_inv)[2][2]*(*qw[k]).z );
 #endif
     }
 #endif
@@ -1147,8 +1052,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 #endif
 
 #if ROTATION
-
-	  /* Modify temporerly the particle center position for periodic 
+	  /* Modify temporarily the particle center position for periodic 
 	  boundary condition */
 	  foreach_dimension()
 	    (*gci[k]).center.x += DLM_periodic_shift.x[];
@@ -1164,8 +1068,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 	  	- (*tw[k]).y*(x - (*gci[k]).center.x)); 
 
 	  foreach_dimension()
-	    (*gci[k]).center.x -= DLM_periodic_shift.x[];
-	
+	    (*gci[k]).center.x -= DLM_periodic_shift.x[];	
 #endif
 #endif
 	}
@@ -1215,25 +1118,21 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 	    }
 	  }
 
-
 	  if ((testweight < 1. - 0.000001) || (testweight > 1. + 0.000001))
 		printf("testweight = %f\n",testweight);
-	  
-  
+	    
 	  DLM_v.x[] = sum.x;
 	  DLM_v.y[] = sum.y;
 	  DLM_v.z[] = sum.z; 
 
 #if DLM_Moving_particle
 #if TRANSLATION
-
 	  DLM_v.x[] +=  -(*tU[k]).x;
 	  DLM_v.y[] +=  -(*tU[k]).y;
 	  DLM_v.z[] +=  -(*tU[k]).z;
 #endif
 #if ROTATION
-
-	  /* Modify temporerly the particle center position for periodic 
+	  /* Modify temporarily the particle center position for periodic 
 	  boundary condition */
 	  foreach_dimension()
 	    (*gci[k]).center.x += DLM_periodic_shift.x[];
@@ -1249,8 +1148,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 	  	- (*tw[k]).y*(lambdapos.x - (*gci[k]).center.x)); 
 
 	  foreach_dimension()
-	    (*gci[k]).center.x -= DLM_periodic_shift.x[];
-	
+	    (*gci[k]).center.x -= DLM_periodic_shift.x[];	
 #endif
 #endif
 	}

@@ -189,17 +189,20 @@ event init (i = 0)
   // Initialize the granular solver
   if ( pid() == 0 ) printf ("# granular solver initialization: "); 
   event ("GranularSolver_init");
+
       
   // Special case of cubes
   for (int k = 0; k < NPARTICLES; k++) 
   {
-    GeomParameter * gg;
-    gg = &(particles[k].g);
-    if ( gg->ncorners == 8 ) 
+    // Compute the inverse of the moment of inertia matrix
+    compute_inv_inertia( &(particles[k]) ); 
+
+    // Special case of cubes 
+    if ( (particles[k].g).ncorners == 8 ) 
     {
 	particles[k].iscube = 1;
 	compute_principal_vectors_Cubes( &(particles[k]) );
-	printf ("length cube = %f\n", gg->radius);
+	printf ("length cube = %f\n", (particles[k].g).radius);
     }
   }
 
@@ -314,7 +317,10 @@ event logfile ( i=0; i++ )
   // would exist if we would write if ( t > maxtime )
   if ( t - maxtime > - RoundDoubleCoef * dt ) 
   {
+    // Close all DLMFD files
     close_file_pointers( pdata, fdata, converge, cellvstime ); 
+    
+    // Stop simulation
     return 1; 
   }
 //  if ( t > maxtime ) return 1; 

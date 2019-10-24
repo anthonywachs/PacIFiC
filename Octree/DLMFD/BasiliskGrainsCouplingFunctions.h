@@ -250,7 +250,10 @@ void UpdateParticlesBasilisk( struct BasiliskDataStructure * b, particle * p,
     // otherwise DLMFD_couplingFactor = ( 1 - rhoval / rho_s )
     p[k].DLMFD_couplingfactor = 1. ;
     if ( !explicit_added_mass_ ) 
-      p[k].DLMFD_couplingfactor -= rhoval_ / p[k].rho_s ;    
+      p[k].DLMFD_couplingfactor -= rhoval_ / p[k].rho_s ;
+      
+    // Compute the inverse of the moment of inertia matrix
+    compute_inv_inertia( &(p[k]) );           
 #endif
   }
 }
