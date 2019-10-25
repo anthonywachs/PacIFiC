@@ -77,6 +77,7 @@ solve them successively. We chose here a two-steps time-spliting.
     fictitious domain method. */
 # include "dlmfd_functions.h"
 
+
 /** Basilisk scalars and vectors needed for the implementation of the
     fictitious domain method. */
 vector DLM_lambda[];
@@ -84,18 +85,29 @@ scalar flagfield[];
 scalar flagfield_mailleur[];
 vector index_lambda[];
 vector DLM_periodic_shift[];
+vector DLM_r[];
+vector DLM_w[];
+vector DLM_v[];
+#if DLM_alpha_coupling
+vector DLM_explicit[];
+#endif
+
+particle particles[NPARTICLES] = {{{0}}};
+#if ( TRANSLATION && ROTATION )
+#define npartdata 6
+#else 
+#define npartdata 3
+#endif
+double vpartbuf[npartdata*NPARTICLES];
 
 FILE* pdata[NPARTICLES];
 FILE* fdata[NPARTICLES];
 FILE* converge = NULL;
 FILE* cellvstime = NULL;
-particle particles[NPARTICLES] = {{{0}}};
 char converge_uzawa_filename_complete_name[80];
 char dlmfd_cells_filename_complete_name[80]; 
 
-#if DLM_alpha_coupling
-vector DLM_explicit[];
-#endif
+
 /**
 ## First sub-problem: Navier Stokes problem
 
@@ -161,6 +173,9 @@ timing dlmfd_globaltiming = {0.};
 
 # include "dlmfd_perf.h"
 
+
+
+
 void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 
   /* Timers and Timings */
@@ -172,12 +187,15 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   int ki = 0;
   int DLM_maxiter = 100;
   vector qu[], tu[];
-  coord ppshift = {0, 0, 0}; 
+  coord ppshift = {0, 0, 0};
+#if _MPI
+  int counter = 0;
+#endif   
 
   /* Allocate and initialize particles */
-  allocate_and_init_particles (p, NPARTICLES, index_lambda, flagfield, 
-  	flagfield_mailleur, DLM_periodic_shift);
-   
+  allocate_and_init_particles( p, NPARTICLES, index_lambda, flagfield, 
+  	flagfield_mailleur, DLM_periodic_shift );
+  
 #if debugInterior == 0
   Cache * Interior[NPARTICLES];
 #endif
@@ -232,8 +250,8 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 
 #if debugBD == 0   
 #if DLM_Moving_particle
-  reverse_fill_flagfield (p, flagfield_mailleur, index_lambda, 0, 
-  	DLM_periodic_shift);
+  reverse_fill_flagfield( p, flagfield_mailleur, index_lambda, 0, 
+  	DLM_periodic_shift );
 #endif
   
 #if !POISEUILLE
@@ -262,15 +280,10 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   boundary((scalar*) {index_lambda});
 #endif // !POISEUILLE
 
-  /* Tagg the cells belonging to the stencil of the boundary-multipliers 
+  /* Tag the cells belonging to the stencil of the boundary-multipliers 
   points */
-  reverse_fill_flagfield (p, flagfield, index_lambda, 1, DLM_periodic_shift);
+  reverse_fill_flagfield( p, flagfield, index_lambda, 1, DLM_periodic_shift );
 #endif
-  
-  /* Alllocate arrays for CG/Uzawa. */
-  vector DLM_r[];
-  vector DLM_w[];
-  vector DLM_v[];
 
   /* Create fictitious-domain's cache for the interior domain. */
 #if debugInterior == 0 
@@ -296,12 +309,14 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   int allpts = 0; int lm = 0; int tcells = 0;
   foreach() {
     tcells ++; 
-    DLM_lambda.x[] = 0.; DLM_r.x[] = 0.; DLM_w.x[] = 0.; 
-    DLM_v.x[] = 0.; qu.x[] = 0.; tu.x[] = 0.;
-    DLM_lambda.y[] = 0.; DLM_r.y[] = 0.; DLM_w.y[] = 0.; 
-    DLM_v.y[] = 0.; qu.y[] = 0.; tu.y[] = 0.;
-    DLM_lambda.z[] = 0.; DLM_r.z[] = 0.; DLM_w.z[] = 0.; 
-    DLM_v.z[] = 0.; qu.z[] = 0.; tu.z[] = 0.;
+    foreach_dimension() {
+      DLM_lambda.x[] = 0.; 
+      DLM_r.x[] = 0.; 
+      DLM_w.x[] = 0.; 
+      DLM_v.x[] = 0.; 
+      qu.x[] = 0.; 
+      tu.x[] = 0.;
+    }
   }
   
 #if _MPI
@@ -414,7 +429,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 	
 #if DLM_Moving_particle
 #if ROTATION
-	/* Modify temporerly the particle center position for periodic 
+	/* Modify temporarily the particle center position for periodic 
 	boundary condition */
 	foreach_dimension()
 	  (*gci[k]).center.x += DLM_periodic_shift.x[];
@@ -529,98 +544,165 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   }
 #endif
 
-  /* Broadcast through mpi */
+
 #if DLM_Moving_particle
-#if _MPI
-  for (int k = 0; k < NPARTICLES; k++) {
+#if _MPI /* _MPI Reduction */
+  // Reduce to master
+  // Pack data
+  counter = 0;  
+  for (int k = 0; k < NPARTICLES; k++) 
+  {
 #if TRANSLATION
-    mpi_all_reduce ((*qU[k]).x, MPI_DOUBLE, MPI_SUM);
-    mpi_all_reduce ((*qU[k]).y, MPI_DOUBLE, MPI_SUM);
-    mpi_all_reduce ((*qU[k]).z, MPI_DOUBLE, MPI_SUM);
+    vpartbuf[counter] = (*qU[k]).x;
+    vpartbuf[counter+1] = (*qU[k]).y;    
+    vpartbuf[counter+2] = (*qU[k]).z;
+    counter += 3;    
 #endif
 #if ROTATION
-    mpi_all_reduce ((*qw[k]).x, MPI_DOUBLE, MPI_SUM);
-    mpi_all_reduce ((*qw[k]).y, MPI_DOUBLE, MPI_SUM);
-    mpi_all_reduce ((*qw[k]).z, MPI_DOUBLE, MPI_SUM);
+    vpartbuf[counter] = (*qw[k]).x;
+    vpartbuf[counter+1] = (*qw[k]).y;    
+    vpartbuf[counter+2] = (*qw[k]).z;
+    counter += 3; 
 #endif
   }
-#endif
+  
+  // Perform reduction on Master
+  if ( pid() == 0 )
+    MPI_Reduce( MPI_IN_PLACE, vpartbuf, npartdata*NPARTICLES, 
+    	MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD );
+  else
+    MPI_Reduce( vpartbuf, vpartbuf, npartdata*NPARTICLES, 
+    	MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD ); 
 
-  /* Adding here the fU and fw parts to qU and qw */
-  for (int k = 0; k < NPARTICLES; k++) {
+  if ( pid() == 0 )
+  {
+    // Unpack data    
+    counter = 0;
+    for (int k = 0; k < NPARTICLES; k++) 
+    {
 #if TRANSLATION
-    (*qU[k]).x += (1. - (rho_f/p[k].rho_s))*
+      (*qU[k]).x = vpartbuf[counter];
+      (*qU[k]).y = vpartbuf[counter+1];      
+      (*qU[k]).z = vpartbuf[counter+2];      
+      counter += 3;    
+#endif
+#if ROTATION
+      (*qw[k]).x = vpartbuf[counter];
+      (*qw[k]).y = vpartbuf[counter+1];    
+      (*qw[k]).z = vpartbuf[counter+2];    
+      counter += 3; 
+#endif
+    } 	   	
+#endif  /* end of _MPI Reduction */    
+    
+    // Perform the inversion (on master when in MPI)
+    for (int k = 0; k < NPARTICLES; k++) 
+    {
+#if TRANSLATION
+      /* Add here fU to qU */
+      (*qU[k]).x += (1. - (rho_f/p[k].rho_s))*
     	(p[k].M)*(p[k].gravity.x + p[k].adforce.x ) 
 	+ p[k].DLMFD_couplingfactor * p[k].M * (*U[k]).x / dt ;
-    (*qU[k]).y += (1. - (rho_f/p[k].rho_s))*
+      (*qU[k]).y += (1. - (rho_f/p[k].rho_s))*
     	(p[k].M)*(p[k].gravity.y + p[k].adforce.y ) 
 	+ p[k].DLMFD_couplingfactor * p[k].M * (*U[k]).y / dt ;
-    (*qU[k]).z += (1. - (rho_f/p[k].rho_s))
+      (*qU[k]).z += (1. - (rho_f/p[k].rho_s))
     	*(p[k].M)*(p[k].gravity.z + p[k].adforce.z ) 
 	+ p[k].DLMFD_couplingfactor * p[k].M * (*U[k]).z / dt ;
-    
+
+      /* Solution of M * DLMFD_couplingfactor * U / dt = qU */
+      /* U = ( dt * qU ) / ( DLMFD_couplingfactor * M ) */
+      (*U[k]).x = (dt*(*qU[k]).x)/(p[k].DLMFD_couplingfactor*p[k].M);
+      (*U[k]).y = (dt*(*qU[k]).y)/(p[k].DLMFD_couplingfactor*p[k].M);
+      (*U[k]).z = (dt*(*qU[k]).z)/(p[k].DLMFD_couplingfactor*p[k].M);    
 #endif
 #if ROTATION
-    /* The inertia tensor is */
-    /*  Ixx  Ixy  Ixz */
-    /*  Iyx  Iyy  Iyz */
-    /*  Izx  Izy  Izz */ 
-    /* with */
-    /* Ip[0] = Ixx */
-    /* Ip[1] = Iyy */
-    /* Ip[2] = Izz */
-    /* Ip[3] = Ixy */
-    /* Ip[4] = Ixz */
-    /* Ip[5] = Iyz */
-    (*qw[k]).x += p[k].DLMFD_couplingfactor * ( (p[k].Ip[0])*(*w[k]).x 
+      /* Add here fw to qw */
+      /* The inertia tensor is */
+      /*  Ixx  Ixy  Ixz */
+      /*  Iyx  Iyy  Iyz */
+      /*  Izx  Izy  Izz */ 
+      /* with */
+      /* Ip[0] = Ixx */
+      /* Ip[1] = Iyy */
+      /* Ip[2] = Izz */
+      /* Ip[3] = Ixy */
+      /* Ip[4] = Ixz */
+      /* Ip[5] = Iyz */
+      (*qw[k]).x += p[k].DLMFD_couplingfactor * ( (p[k].Ip[0])*(*w[k]).x 
     	- (p[k].Ip[3])*(*w[k]).y - (p[k].Ip[4])*(*w[k]).z) / dt;
-    (*qw[k]).y += p[k].DLMFD_couplingfactor * (-(p[k].Ip[3])*(*w[k]).x 
+      (*qw[k]).y += p[k].DLMFD_couplingfactor * (-(p[k].Ip[3])*(*w[k]).x 
     	+ (p[k].Ip[1])*(*w[k]).y - (p[k].Ip[5])*(*w[k]).z) / dt;
-    (*qw[k]).z += p[k].DLMFD_couplingfactor * (-(p[k].Ip[4])*(*w[k]).x 
-    	- (p[k].Ip[5])*(*w[k]).y + (p[k].Ip[2])*(*w[k]).z) / dt;
-   
-#endif
-  }
-#endif
+      (*qw[k]).z += p[k].DLMFD_couplingfactor * (-(p[k].Ip[4])*(*w[k]).x 
+    	- (p[k].Ip[5])*(*w[k]).y + (p[k].Ip[2])*(*w[k]).z) / dt;   
 
+      /* Solution of Ip * DLMFD_couplingfactor * w / dt = qw */
+      /* w = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
+      /* where Ip_inv is the inverse of Ip */        
+      (*w[k]).x = ( dt / p[k].DLMFD_couplingfactor ) * 
+    	( (p[k].Ip_inv)[0][0]*(*qw[k]).x + (p[k].Ip_inv)[0][1]*(*qw[k]).y 
+    	+ (p[k].Ip_inv)[0][2]*(*qw[k]).z );
+      (*w[k]).y = ( dt / p[k].DLMFD_couplingfactor ) * 
+    	( (p[k].Ip_inv)[1][0]*(*qw[k]).x + (p[k].Ip_inv)[1][1]*(*qw[k]).y 
+    	+ (p[k].Ip_inv)[1][2]*(*qw[k]).z );
+      (*w[k]).z = ( dt / p[k].DLMFD_couplingfactor ) * 
+    	( (p[k].Ip_inv)[2][0]*(*qw[k]).x + (p[k].Ip_inv)[2][1]*(*qw[k]).y 
+    	+ (p[k].Ip_inv)[2][2]*(*qw[k]).z );
+#endif
+    }  
+
+#if _MPI /* _MPI Broadcast */
+    // Broadcast U and w
+    // Pack data
+    counter = 0;  
+    for (int k = 0; k < NPARTICLES; k++) 
+    {
+#if TRANSLATION
+      vpartbuf[counter] = (*U[k]).x;
+      vpartbuf[counter+1] = (*U[k]).y;    
+      vpartbuf[counter+2] = (*U[k]).z;
+      counter += 3;    
+#endif
+#if ROTATION
+      vpartbuf[counter] = (*w[k]).x;
+      vpartbuf[counter+1] = (*w[k]).y;    
+      vpartbuf[counter+2] = (*w[k]).z;
+      counter += 3; 
+#endif
+    }
+  } /* End of "if pid() == 0" */    
+  
+  // Perform the broadcast from the master to the other processes
+  MPI_Bcast( vpartbuf, npartdata*NPARTICLES, 
+    	MPI_DOUBLE, 0, MPI_COMM_WORLD );
+
+  // Unpack data    
+  counter = 0;
+  for (int k = 0; k < NPARTICLES; k++) 
+  {
+#if TRANSLATION
+    (*U[k]).x = vpartbuf[counter];
+    (*U[k]).y = vpartbuf[counter+1];      
+    (*U[k]).z = vpartbuf[counter+2];      
+    counter += 3;    
+#endif
+#if ROTATION
+    (*w[k]).x = vpartbuf[counter];
+    (*w[k]).y = vpartbuf[counter+1];    
+    (*w[k]).z = vpartbuf[counter+2];    
+    counter += 3; 
+#endif
+  }  
+#endif /* end of _MPI Broadcast */ 
+#endif /* end of DLM_Moving_particle */
+
+  
   /* Invert L*u^0 = qu with L=dv*rho/dt*Identity_Matrix */
   foreach() {
     foreach_dimension() {
       u.x[] = qu.x[]*dt/(rho_f*dlmfd_dv());
     }
-  }
-  
-  /* Invert A_U U^0 = qU with A_U = (DLMFD_couplingfactor*M)/dt *
-     Identity_Matrix */
-  
-  /* Invert A_w w^0 = qw with A_w = (DLMFD_couplingfactor*Ip)/dt *
-     Inertia_Matrix */
-  
-#if DLM_Moving_particle
-  for (int k = 0; k < NPARTICLES; k++) {
-#if TRANSLATION
-    /* Solution of M * DLMFD_couplingfactor * U / dt = qU */
-    /* U = ( dt * qU ) / ( DLMFD_couplingfactor * M ) */
-    (*U[k]).x = (dt*(*qU[k]).x)/(p[k].DLMFD_couplingfactor*p[k].M);
-    (*U[k]).y = (dt*(*qU[k]).y)/(p[k].DLMFD_couplingfactor*p[k].M);
-    (*U[k]).z = (dt*(*qU[k]).z)/(p[k].DLMFD_couplingfactor*p[k].M);
-#endif
-#if ROTATION
-    /* Solution of Ip * DLMFD_couplingfactor * w / dt = qw */
-    /* w = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
-    /* where Ip_inv is the inverse of Ip */        
-    (*w[k]).x = ( dt / p[k].DLMFD_couplingfactor ) * 
-    	( (p[k].Ip_inv)[0][0]*(*qw[k]).x + (p[k].Ip_inv)[0][1]*(*qw[k]).y 
-    	+ (p[k].Ip_inv)[0][2]*(*qw[k]).z );
-    (*w[k]).y = ( dt / p[k].DLMFD_couplingfactor ) * 
-    	( (p[k].Ip_inv)[1][0]*(*qw[k]).x + (p[k].Ip_inv)[1][1]*(*qw[k]).y 
-    	+ (p[k].Ip_inv)[1][2]*(*qw[k]).z );
-    (*w[k]).z = ( dt / p[k].DLMFD_couplingfactor ) * 
-    	( (p[k].Ip_inv)[2][0]*(*qw[k]).x + (p[k].Ip_inv)[2][1]*(*qw[k]).y 
-    	+ (p[k].Ip_inv)[2][2]*(*qw[k]).z );    
-#endif
-  }
-#endif
+  }  
 
 
   /* Compute residual r^0 = G - M_u*u^0 - M_U*U^0 - M_w*w^0 */
@@ -752,9 +834,8 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 	if ((testweight < 1. - 0.000001) || (testweight > 1. + 0.000001))
 	  printf("testweight = %f\n",testweight);
 	
-	  DLM_r.x[] =  -sum.x; DLM_r.y[] =  -sum.y; DLM_r.z[] =  -sum.z;
-	
-		
+	DLM_r.x[] =  -sum.x; DLM_r.y[] =  -sum.y; DLM_r.z[] =  -sum.z;
+			
 #if DLM_Moving_particle
 #if TRANSLATION
 	foreach_dimension()
@@ -816,7 +897,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 
 
 #if _MPI
-  mpi_all_reduce(DLM_nr2, MPI_DOUBLE, MPI_SUM);
+  mpi_all_reduce( DLM_nr2, MPI_DOUBLE, MPI_SUM );
 #endif
 
 
@@ -979,42 +1060,70 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   }
 #endif
     
+
 #if DLM_Moving_particle
-#if _MPI
-  for (int k = 0; k < NPARTICLES; k++) {
+#if _MPI /* _MPI Reduction */
+  // Reduce to master
+  // Pack data
+  counter = 0;  
+  for (int k = 0; k < NPARTICLES; k++) 
+  {
 #if TRANSLATION
-    mpi_all_reduce ((*qU[k]).x, MPI_DOUBLE, MPI_SUM);
-    mpi_all_reduce ((*qU[k]).y, MPI_DOUBLE, MPI_SUM);
-    mpi_all_reduce ((*qU[k]).z, MPI_DOUBLE, MPI_SUM);
+    vpartbuf[counter] = (*qU[k]).x;
+    vpartbuf[counter+1] = (*qU[k]).y;    
+    vpartbuf[counter+2] = (*qU[k]).z;
+    counter += 3;    
 #endif
 #if ROTATION
-    mpi_all_reduce ((*qw[k]).x, MPI_DOUBLE, MPI_SUM);
-    mpi_all_reduce ((*qw[k]).y, MPI_DOUBLE, MPI_SUM);
-    mpi_all_reduce ((*qw[k]).z, MPI_DOUBLE, MPI_SUM);
+    vpartbuf[counter] = (*qw[k]).x;
+    vpartbuf[counter+1] = (*qw[k]).y;    
+    vpartbuf[counter+2] = (*qw[k]).z;
+    counter += 3; 
 #endif
   }
-#endif
-#endif
+  
+  // Perform reduction on Master
+  if ( pid() == 0 )
+    MPI_Reduce( MPI_IN_PLACE, vpartbuf, npartdata*NPARTICLES, 
+    	MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD );
+  else
+    MPI_Reduce( vpartbuf, vpartbuf, npartdata*NPARTICLES, 
+    	MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD ); 
 
-    /* (2) Invert L*t = qu with L=rho*dV/dt*I */
-    foreach() {
-      tu.x[] = qu.x[]*dt/(rho_f*dlmfd_dv());
-      tu.y[] = qu.y[]*dt/(rho_f*dlmfd_dv());
-      tu.z[] = qu.z[]*dt/(rho_f*dlmfd_dv());
-    }
-
-#if DLM_Moving_particle
-    for (int k = 0; k < NPARTICLES; k++) {
+  if ( pid() == 0 )
+  {
+    // Unpack data    
+    counter = 0;
+    for (int k = 0; k < NPARTICLES; k++) 
+    {
+#if TRANSLATION
+      (*qU[k]).x = vpartbuf[counter];
+      (*qU[k]).y = vpartbuf[counter+1];      
+      (*qU[k]).z = vpartbuf[counter+2];      
+      counter += 3;    
+#endif
+#if ROTATION
+      (*qw[k]).x = vpartbuf[counter];
+      (*qw[k]).y = vpartbuf[counter+1];    
+      (*qw[k]).z = vpartbuf[counter+2];    
+      counter += 3; 
+#endif
+    } 	   	
+#endif  /* end of _MPI Reduction */    
+    
+    // Perform the inversion (on master when in MPI)
+    for (int k = 0; k < NPARTICLES; k++) 
+    {
 #if TRANSLATION
       /* Solution of M * DLMFD_couplingfactor * tU / dt = qU */
       /* tU = ( dt * qU ) / ( DLMFD_couplingfactor * M ) */
       (*tU[k]).x = ((*qU[k]).x*dt)/( p[k].DLMFD_couplingfactor * p[k].M );
       (*tU[k]).y = ((*qU[k]).y*dt)/( p[k].DLMFD_couplingfactor * p[k].M );
-      (*tU[k]).z = ((*qU[k]).z*dt)/( p[k].DLMFD_couplingfactor * p[k].M );
+      (*tU[k]).z = ((*qU[k]).z*dt)/( p[k].DLMFD_couplingfactor * p[k].M );    
 #endif
 #if ROTATION
-      /* Solution of Ip * DLMFD_couplingfactor * w / dt = qw */
-      /* w = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
+      /* Solution of Ip * DLMFD_couplingfactor * tw / dt = qw */
+      /* tw = ( dt / ( DLMFD_couplingfactor ) * Ip_inv * qw 
       /* where Ip_inv is the inverse of Ip */      
       (*tw[k]).x = ( dt / p[k].DLMFD_couplingfactor ) * 
     	( (p[k].Ip_inv)[0][0]*(*qw[k]).x + (p[k].Ip_inv)[0][1]*(*qw[k]).y 
@@ -1026,8 +1135,61 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
     	( (p[k].Ip_inv)[2][0]*(*qw[k]).x + (p[k].Ip_inv)[2][1]*(*qw[k]).y 
     	+ (p[k].Ip_inv)[2][2]*(*qw[k]).z );
 #endif
-    }
+    }  
+
+#if _MPI /* _MPI Broadcast */
+    // Broadcast tU and tw
+    // Pack data
+    counter = 0;  
+    for (int k = 0; k < NPARTICLES; k++) 
+    {
+#if TRANSLATION
+      vpartbuf[counter] = (*tU[k]).x;
+      vpartbuf[counter+1] = (*tU[k]).y;    
+      vpartbuf[counter+2] = (*tU[k]).z;
+      counter += 3;    
 #endif
+#if ROTATION
+      vpartbuf[counter] = (*tw[k]).x;
+      vpartbuf[counter+1] = (*tw[k]).y;    
+      vpartbuf[counter+2] = (*tw[k]).z;
+      counter += 3; 
+#endif
+    }
+  } /* End of "if pid() == 0" */    
+  
+  // Perform the broadcast from the master to the other processes
+  MPI_Bcast( vpartbuf, npartdata*NPARTICLES, 
+    	MPI_DOUBLE, 0, MPI_COMM_WORLD );
+
+  // Unpack data    
+  counter = 0;
+  for (int k = 0; k < NPARTICLES; k++) 
+  {
+#if TRANSLATION
+    (*tU[k]).x = vpartbuf[counter];
+    (*tU[k]).y = vpartbuf[counter+1];      
+    (*tU[k]).z = vpartbuf[counter+2];      
+    counter += 3;    
+#endif
+#if ROTATION
+    (*tw[k]).x = vpartbuf[counter];
+    (*tw[k]).y = vpartbuf[counter+1];    
+    (*tw[k]).z = vpartbuf[counter+2];    
+    counter += 3; 
+#endif
+  }  
+#endif /* end of _MPI Broadcast */ 
+#endif /* end of DLM_Moving_particle */
+
+
+    /* (2) Invert L*t = qu with L=rho*dV/dt*I */
+    foreach() {
+      tu.x[] = qu.x[]*dt/(rho_f*dlmfd_dv());
+      tu.y[] = qu.y[]*dt/(rho_f*dlmfd_dv());
+      tu.z[] = qu.z[]*dt/(rho_f*dlmfd_dv());
+    }
+
          
     /* (3) Compute residual y = M*t, the residual vector 
        y = <alpha, tu-(tU+tw^GM)>_P(t) 

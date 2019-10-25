@@ -210,6 +210,9 @@ void UpdateParticlesBasilisk( struct BasiliskDataStructure * b, particle * p,
     p[k].wnm1 = p[k].w;
     p[k].w = cc;
 #endif
+
+    /* Particle number */
+    p[k].pnum = k;
     
     /* Physical properties */
     p[k].M = b[k].masse;

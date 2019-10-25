@@ -1558,7 +1558,7 @@ void reverse_fill_flagfield (particle * p, scalar f, vector index_lambda,
 	  
 	  /* assign fictitious-boundary's normal (use boundary's position) */
 	  assign_dial_fd_boundary (&p[k], lambdapos, gcbdum, Delta, &NCX);
-
+	  
 	  if (p->iswall) {
 		  
 #if STENCIL_EXTERIOR
@@ -1608,7 +1608,7 @@ void reverse_fill_flagfield (particle * p, scalar f, vector index_lambda,
 	} // end if (lambda.x[] > -1)
       } // end foreach_neigboor loop
 
-      /* If the cell belongs to the stencil of a Lagrange multiplier tagg it 
+      /* If the cell belongs to the stencil of a Lagrange multiplier tag it 
       and create a reduced domain to optimize the stencil-traversal cost */
       if (goflag == 1) {
 	f[] = 1;

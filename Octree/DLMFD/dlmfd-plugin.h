@@ -297,7 +297,16 @@ event init (i = 0)
 
 	
   // Initialize the field u_previoustime to compute x-velocity change
-  foreach() { u_previoustime[] = u.x[]; }	   
+  foreach() { u_previoustime[] = u.x[]; }
+  
+  
+  // Do not dump the work field vectors used in the Uzawa algorithm
+  foreach_dimension()
+  {
+    DLM_r.x.nodump = true;
+    DLM_w.x.nodump = true;
+    DLM_v.x.nodump = true;
+  }  	   
 }
 
 
