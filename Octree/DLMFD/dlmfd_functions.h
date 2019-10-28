@@ -2666,6 +2666,7 @@ void inverse3by3matrix__( double Matrix[3][3], double inversedMatrix[3][3] )
 
 
 
+#if DLM_Moving_particle
 void compute_inv_inertia( particle *p )
 {
   /* The inertia tensor is */
@@ -2698,7 +2699,7 @@ void compute_inv_inertia( particle *p )
   // Ip_inv is a 2D 3 by 3 array
   inverse3by3matrix__( Imat, p->Ip_inv );  
 }
-
+#endif
 
 
 

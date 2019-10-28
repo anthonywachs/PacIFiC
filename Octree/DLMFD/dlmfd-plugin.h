@@ -194,8 +194,10 @@ event init (i = 0)
   // Special case of cubes
   for (int k = 0; k < NPARTICLES; k++) 
   {
+#if DLM_Moving_particle
     // Compute the inverse of the moment of inertia matrix
-    compute_inv_inertia( &(particles[k]) ); 
+    compute_inv_inertia( &(particles[k]) );
+#endif     
 
     // Special case of cubes 
     if ( (particles[k].g).ncorners == 8 ) 
@@ -273,6 +275,7 @@ event init (i = 0)
 
 
   // Assign gravity to particles
+#if DLM_Moving_particle
 # ifndef gravity_x
 # define gravity_x 0.
 # endif
@@ -288,7 +291,7 @@ event init (i = 0)
     particles[k].gravity.y = gravity_y;
     particles[k].gravity.z = gravity_z;
   }    
-
+# endif
   
   // Simulation time interval
   maxtime = trestart + SimuTimeInterval;

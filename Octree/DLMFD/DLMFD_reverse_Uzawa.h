@@ -188,7 +188,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   int DLM_maxiter = 100;
   vector qu[], tu[];
   coord ppshift = {0, 0, 0};
-#if _MPI
+#if ( _MPI && DLM_Moving_particle )
   int counter = 0;
 #endif   
 
@@ -334,7 +334,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   for (int k = 0; k < NPARTICLES; k++)
     p[k].tcells += allpts;
 
-  fprintf (stderr,"# Total Lagrange multipliers: %d, constraint cells: %d, "
+  fprintf (stderr,"# Total Lagrange multipliers: %d, constrained cells: %d, "
   	"Total cells: %d \n", lm, allpts, tcells);
 
   if ( pid() == 0 )
@@ -467,7 +467,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   coord sum = {0, 0, 0};
 
   boundary ((scalar*) {DLM_lambda});
-
+ 
   for (int k = 0; k < NPARTICLES; k++) {
     particle * pp = &p[k];
     
@@ -480,7 +480,9 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
       foreach_neighbor() {
 	if (((int)index_lambda.x[] > -1) && (level == depth()) 
 		&& is_leaf(cell) && ((int)index_lambda.y[] == pp->pnum)) {
-	  lambdacellpos.x = x; lambdacellpos.y = y; lambdacellpos.z = 0.;
+	  lambdacellpos.x = x; 
+	  lambdacellpos.y = y; 
+	  lambdacellpos.z = 0.;
 	  lambdapos.x = (*sbm[k]).x[(int)index_lambda.x[]];
 	  lambdapos.y = (*sbm[k]).y[(int)index_lambda.x[]];
 	  lambdapos.z = 0.;
@@ -492,15 +494,20 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 	  
 	  foreach_dimension()
 	    ppshift.x = DLM_periodic_shift.x[];
+	    
 	  weight = reversed_weight (pp, weightcellpos, lambdacellpos, 
 	  	lambdapos, Delta, ppshift);
-
+	  
 	  foreach_dimension()
 	    sum.x += weight*DLM_lambda.x[];
 	}
       }
-      
-      qu.x[] -= sum.x; qu.y[] -= sum.y; qu.z[] -= sum.z;
+
+      // -= here as one fluid cell can be affected by multiples particle's
+      // boundary multipliers      
+      qu.x[] -= sum.x; 
+      qu.y[] -= sum.y; 
+      qu.z[] -= sum.z;
     
 #if DLM_Moving_particle
       if (index_lambda.x[] > -1 && ((int)index_lambda.y[] == pp->pnum)) {
@@ -543,7 +550,7 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
     }
   }
 #endif
-
+  
 
 #if DLM_Moving_particle
 #if _MPI /* _MPI Reduction */
@@ -567,12 +574,8 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   }
   
   // Perform reduction on Master
-  if ( pid() == 0 )
-    MPI_Reduce( MPI_IN_PLACE, vpartbuf, npartdata*NPARTICLES, 
+  MPI_Reduce( pid() ? vpartbuf : MPI_IN_PLACE, vpartbuf, npartdata*NPARTICLES, 
     	MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD );
-  else
-    MPI_Reduce( vpartbuf, vpartbuf, npartdata*NPARTICLES, 
-    	MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD ); 
 
   if ( pid() == 0 )
   {
@@ -1009,9 +1012,8 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
 	  weight = reversed_weight (pp, weightcellpos, lambdacellpos, 
 	  	lambdapos, Delta, ppshift);
 
-	  sum.x += weight*DLM_w.x[]; 
-	  sum.y += weight*DLM_w.y[]; 
-	  sum.z += weight*DLM_w.z[];
+	  foreach_dimension()
+	    sum.x += weight*DLM_w.x[]; 
 	}
       }
       
@@ -1083,12 +1085,8 @@ void DLMFD_subproblem (particle * p, const int i, const double rho_f) {
   }
   
   // Perform reduction on Master
-  if ( pid() == 0 )
-    MPI_Reduce( MPI_IN_PLACE, vpartbuf, npartdata*NPARTICLES, 
-    	MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD );
-  else
-    MPI_Reduce( vpartbuf, vpartbuf, npartdata*NPARTICLES, 
-    	MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD ); 
+  MPI_Reduce( pid() ? vpartbuf : MPI_IN_PLACE, vpartbuf, npartdata*NPARTICLES, 
+    	MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD );	
 
   if ( pid() == 0 )
   {
