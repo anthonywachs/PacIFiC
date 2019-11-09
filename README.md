@@ -94,6 +94,11 @@ cd $BASILISK
 ```
 cd $GRAINS_HOME
 tar zxvf xerces-2-8-0.tar.gz
+cd XERCES-2.8.0
+./install.sh
+cd ../
+makeARCH delete
+makeARCH create
 make install
 ```
 
