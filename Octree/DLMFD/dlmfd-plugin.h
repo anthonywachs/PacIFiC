@@ -93,6 +93,9 @@ event init (i = 0)
   /* Initialize the viscosity field */
   const face vector muc[] = {tval, tval, tval};
   mu = muc;
+  
+  // Initialize all DLMFD fields
+  initialize_DLMFD_fields_to_zero();
 
   // If new simulation: set fluid initial condition and initialise data file 
   // pointers 
@@ -300,16 +303,30 @@ event init (i = 0)
 
 	
   // Initialize the field u_previoustime to compute x-velocity change
-  foreach() { u_previoustime[] = u.x[]; }
+  foreach() u_previoustime[] = u.x[];  
   
   
-  // Do not dump the work field vectors used in the Uzawa algorithm
+  // By default:
+  // * do NOT DUMP the work fields used in the DLMFD sub-problem and the 
+  // field u_previoustime
+  // * DUMP the flagfield and DLM_explicit fields in the DLMFD sub-problem
+  u_previoustime.nodump = true ;
+  flagfield.nodump = false;
+  flagfield_mailleur.nodump = true ;
   foreach_dimension()
   {
-    DLM_r.x.nodump = true;
-    DLM_w.x.nodump = true;
-    DLM_v.x.nodump = true;
-  }  	   
+    DLM_lambda.x.nodump = true ;
+    index_lambda.x.nodump = true ;
+    DLM_periodic_shift.x.nodump = true ;
+    DLM_r.x.nodump = true ;
+    DLM_w.x.nodump = true ;
+    DLM_v.x.nodump = true ;
+    qu.x.nodump = true ;
+    tu.x.nodump = true ;
+#if DLM_alpha_coupling
+    DLM_explicit.x.nodump = false ;
+#endif    
+  }   
 }
 
 
@@ -416,12 +433,12 @@ event adapt (i++) {
 #if adaptive
 #if DLM_Moving_particle
   astats s = adapt_wavelet ((scalar *){flagfield_mailleur, u}, 
-			    (double[]){FlagAdaptCrit, UxAdaptCrit, UyAdaptCrit, UzAdaptCrit}, 
-			    maxlevel = MAXLEVEL);
+	(double[]){FlagAdaptCrit, UxAdaptCrit, UyAdaptCrit, UzAdaptCrit}, 
+	maxlevel = MAXLEVEL);
 #else
   astats s = adapt_wavelet ((scalar *){flagfield, u}, 
-			    (double[]){FlagAdaptCrit, UxAdaptCrit, UyAdaptCrit, UzAdaptCrit}, 
-			    maxlevel = MAXLEVEL);
+	(double[]){FlagAdaptCrit, UxAdaptCrit, UyAdaptCrit, UzAdaptCrit}, 
+	maxlevel = MAXLEVEL);
 #endif
   fprintf (ferr, "# refined %d cells, coarsened %d cells\n", s.nf, s.nc);
 #endif
