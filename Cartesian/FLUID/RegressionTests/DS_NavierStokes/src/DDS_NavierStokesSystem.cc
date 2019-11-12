@@ -588,7 +588,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
       1 + PF->get_max_index_unknown_handled_by_proc( 0, l )
    - PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
 
-  if(P_is_xperiodic!=1 || nb_procs_in_x == 1)
+  if(P_is_xperiodic==0 || nb_procs_in_x == 1)
   {
      if(proc_pos_in_x == nb_procs_in_x-1)
      {
@@ -2412,26 +2412,29 @@ DDS_NavierStokesSystem::compute_schlur_x_ref_P( void )
 {
    size_t nrows = schlur_complement_x_P -> nb_rows() ;
    double temp = schlur_complement_x_P->item(0,0);
-   schlur_complement_x_ref_P-> set_item(0,0,schlur_complement_x_P ->item(0,0));
-   schlur_complement_x_ref_P-> set_item(0,1,schlur_complement_x_P ->item(0,1)/temp);
-
     // Perform Forward Elimination
    size_t m;
 
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=schlur_complement_x_P ->item(m,m-1);
-     b=schlur_complement_x_P ->item(m,m);
-     c=schlur_complement_x_P ->item(m,m+1);
-     prevc=schlur_complement_x_ref_P ->item(m-1,m);
+   schlur_complement_x_ref_P-> set_item(0,0,schlur_complement_x_P ->item(0,0));
+   if(nrows > 1){
+     schlur_complement_x_ref_P-> set_item(0,1,schlur_complement_x_P ->item(0,1)/temp);
 
-     if(m<nrows-1)
-         schlur_complement_x_ref_P ->set_item(m,m+1,c/(b - a*prevc));
-      schlur_complement_x_ref_P ->set_item(m,m,b);
-      schlur_complement_x_ref_P ->set_item(m,m-1,a);
+     /// Showing problem for last row elimination
+     for (m=1;m<nrows;++m)
+     {
+       double a,b,c,prevc;
+       a=schlur_complement_x_P ->item(m,m-1);
+       b=schlur_complement_x_P ->item(m,m);
+       c=schlur_complement_x_P ->item(m,m+1);
+       prevc=schlur_complement_x_ref_P ->item(m-1,m);
+
+       if(m<nrows-1)
+           schlur_complement_x_ref_P ->set_item(m,m+1,c/(b - a*prevc));
+        schlur_complement_x_ref_P ->set_item(m,m,b);
+        schlur_complement_x_ref_P ->set_item(m,m-1,a);
+     } 
    }
+   
 }
 
 
@@ -2582,28 +2585,30 @@ DDS_NavierStokesSystem::thomas_algorithm( LA_SeqMatrix* mat_A, LA_SeqVector* rhs
 
     // Perform Forward Elimination
    size_t m;
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,d,prevd,prevc;
-     a=mat_A ->item(m,m-1);
-     b=mat_A ->item(m,m);
-     d=rhs->item(m);
-     prevc=mat_A ->item(m-1,m);
-     prevd=rhs->item(m-1);
 
-     rhs -> set_item(m, (d-a*prevd)/(b-a*prevc));
-   }
-
-   //Perform backward substitution
    if(nrows>1){
-      rhs->set_item(nrows-1,rhs->item(nrows-1));
-      for (m = nrows-2; m< nrows-1;m--) {
-         double c,nextd;
-         c=mat_A ->item(m,m+1);
-         nextd=rhs->item(m+1);
-         rhs->add_to_item(m,-c*nextd);
-      }
+     /// Showing problem for last row elimination
+    for (m=1;m<nrows;++m)
+    {
+       double a,b,d,prevd,prevc;
+       a=mat_A ->item(m,m-1);
+       b=mat_A ->item(m,m);
+       d=rhs->item(m);
+       prevc=mat_A ->item(m-1,m);
+       prevd=rhs->item(m-1);
+
+       rhs -> set_item(m, (d-a*prevd)/(b-a*prevc));
+    }
+
+    //Perform backward substitution
+     
+    rhs->set_item(nrows-1,rhs->item(nrows-1));
+    for (m = nrows-2; m< nrows-1;m--) {
+       double c,nextd;
+       c=mat_A ->item(m,m+1);
+       nextd=rhs->item(m+1);
+       rhs->add_to_item(m,-c*nextd);
+    }
    }
 }
 
@@ -3627,6 +3632,7 @@ DDS_NavierStokesSystem::DS_NavierStokes_y_solver(
    // Transfer in the distributed vector
    size_t nb_local_unk_y = rhs->nb_rows();
    size_t m, j, global_number_in_distributed_vector;
+
    for (m=0;m<nb_local_unk_y;++m)
    {
      j = min_j + m ;
@@ -4806,8 +4812,9 @@ void
 DDS_NavierStokesSystem::display_debug(void)
 //----------------------------------------------------------------------
 {
-  //VEC_DS_PF->print_items(MAC::out(),0);
+  // VEC_DS_UF->print_items(MAC::out(),0);
   // if(proc_pos_in_x == 0)
-  // Aii_z_main_diagonal[0]->print_items(MAC::out(),0);
+  //   schlur_complement_x[1]->print_items(MAC::out(),0);
+  // Aii_x_super_diagonal_P->print_items(MAC::out(),0);
 
 }

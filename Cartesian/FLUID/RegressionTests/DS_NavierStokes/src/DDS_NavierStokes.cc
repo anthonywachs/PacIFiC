@@ -78,7 +78,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , AdvectionScheme( "TVD" )
    , AdvectionTimeAccuracy( 1 )   
    , rho( 1. )
-   , b_bodyterm( false )
    , U_is_xperiodic( false )
    , U_is_yperiodic( false )
    , U_is_zperiodic( false )
@@ -185,11 +184,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
      MAC_Error::object()->raise_bad_data_value( exp,
 	"AdvectionTimeAccuracy", error_message );
    }
-
-
-   // Read with or without body term
-   if ( exp->has_entry( "BodyTerm" ) )
-     b_bodyterm = exp->bool_data( "BodyTerm" ) ;
 
    // Periodic boundary condition check for velocity
    U_periodic_comp = UF->primary_grid()->get_periodic_directions();
@@ -1333,14 +1327,16 @@ DDS_NavierStokes:: assemble_velocity_matrix_1D_y (
         if(j==min_unknown_index(1) && rank_in_y==0){
        if(FF->DOF_in_domain(min_unknown_index(0), j-1, 0, comp) && FF->DOF_has_imposed_Dirichlet_value( min_unknown_index(0), j-1, 0, comp ))
          value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-       else
+       else{
           value = -right + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
+       }
        }
        else if(j==max_unknown_index(1) && rank_in_y==nb_ranks_comm_y-1){
          if(FF->DOF_in_domain(max_unknown_index(0), j+1, 0, comp) && FF->DOF_has_imposed_Dirichlet_value( max_unknown_index(0), j+1, 0, comp ))
            value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-         else
+         else{
             value = -left + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
+         }
        }
        else
          value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
@@ -1363,7 +1359,6 @@ DDS_NavierStokes:: assemble_velocity_matrix_1D_y (
      }
      else
         value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());  
-
     
      if(rank_in_y == nb_ranks_comm_y-1){
 
@@ -2289,6 +2284,8 @@ DDS_NavierStokes:: assemble_pressure_matrix_1D_x (
      if(rank_in_x == 0){
       schlur_complement->add_Mat(Aee);
       schlur_complement->add_Mat(receive_matrix,-1.0);
+      // schlur_complement->print_items(MAC::out(),0);
+
      } 
   }
 
@@ -2305,9 +2302,9 @@ DDS_NavierStokes:: assemble_pressure_matrix_1D_y (
 //---------------------------------------------------------------------------
 {
    MAC_LABEL(
-   "DDS_NavierStokes:: assemble_velocity_matrix_1D_y" ) ;
+   "DDS_NavierStokes:: assemble_pressure_matrix_1D_y" ) ;
 
-   if ( my_rank == is_master ) cout << "velocity matrix 1D in y "
+   if ( my_rank == is_master ) cout << "pressure matrix 1D in y "
     << endl;
 
    // Parameters
@@ -2978,6 +2975,22 @@ DDS_NavierStokes:: assemble_velocity_1D_matrices ( FV_TimeIterator const* t_it )
    MAC_LABEL( "DDS_NavierStokes:: assemble_velocity_1D_matrices" ) ;
 
    // Assemble the matrices for each component
+
+   if(dim == 2){
+     // Assemble Pressure matrix in x 
+     assemble_pressure_matrix_1D_x (PF,t_it);
+     // Assemble Pressure matrix in y 
+     assemble_pressure_matrix_1D_y (PF,t_it);
+   }
+   else{
+     // Assemble Pressure matrix in x 
+     assemble_pressure_matrix_1D_x (PF,t_it);
+     // Assemble Pressure matrix in y 
+     assemble_pressure_matrix_1D_y (PF,t_it);
+     // Assemble Pressure matrix in z 
+     assemble_pressure_matrix_1D_z (PF,t_it);
+   }   
+
    for(size_t comp=0;comp<nb_comps;comp++){
       
           if(dim == 2)
@@ -2988,10 +3001,6 @@ DDS_NavierStokes:: assemble_velocity_1D_matrices ( FV_TimeIterator const* t_it )
            // Assemble Velocity matrix in y 
            assemble_velocity_matrix_1D_y (UF,t_it,gamma,comp  );
 
-           // Assemble Pressure matrix in x 
-           assemble_pressure_matrix_1D_x (PF,t_it);
-           // Assemble Pressure matrix in y 
-           assemble_pressure_matrix_1D_y (PF,t_it);
           }
           else
           {
@@ -3003,12 +3012,6 @@ DDS_NavierStokes:: assemble_velocity_1D_matrices ( FV_TimeIterator const* t_it )
            // Assemble Velocity matrix in z
            assemble_velocity_matrix_1D_z (UF,t_it,gamma,comp );
 
-           // Assemble Pressure matrix in x 
-           assemble_pressure_matrix_1D_x (PF,t_it);
-           // Assemble Pressure matrix in y 
-           assemble_pressure_matrix_1D_y (PF,t_it);
-           // Assemble Pressure matrix in z 
-           assemble_pressure_matrix_1D_z (PF,t_it);
           }
    }
 }
@@ -3323,10 +3326,6 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
           interface_rhs_x->set_item(i,interface_rhs_x->item(i)-Vec_temp_x->item(i)); // Get fe - Aei*xi to solve for ue
           }
 
-          // if(comp == 0){
-          //   interface_rhs_x->print_items(MAC::out(),0);  
-          // }
-
           // Solve for ue (interface unknowns) in the master proc
           GLOBAL_EQ->DS_NavierStokes_x_interface_unknown_solver(interface_rhs_x,comp);
 
@@ -3633,6 +3632,7 @@ LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp) ;
      double dirichlet_value = UF->DOF_value( i, m, k, comp, 1 ) ;
      local_rhs_y->add_to_item( local_rhs_y->nb_rows()-1, + gamma * ai * dirichlet_value );
    }
+
   return fe;
 }
 
@@ -4363,7 +4363,6 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
             - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
   }
 
-
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
   // First Equation
@@ -4459,26 +4458,27 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
             pvalue = (PF->DOF_value( i, shift.j+j, 0, 0, 1 ) - PF->DOF_value( i, shift.j+j-1, 0, 0, 1 ))*dxC;
           }
           
-	  // Advection term
-	  if ( AdvectionScheme == "TVD" )
-	    ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp);
-	  else
-	    ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp);
-	  
-	  if ( AdvectionTimeAccuracy == 1 )
-	    advection_value = ugradu;
-	  else
-	  {
-	    advection_value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
-            UF->set_DOF_value(i,j,k,comp,2,ugradu);
-	  }
+      	  // Advection term
+      	  if ( AdvectionScheme == "TVD" )
+      	    ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp);
+      	  else
+      	    ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp);
+      	  
+      	  if ( AdvectionTimeAccuracy == 1 )
+      	    advection_value = ugradu;
+      	  else
+      	  {
+      	    advection_value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
+                  UF->set_DOF_value(i,j,k,comp,2,ugradu);
+      	  }
 
           rhs = gamma*(xvalue*dyC + yvalue*dxC) - pvalue - advection_value
             + (UF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*rho)/(t_it -> time_step());
-          
+
           if ( cpp >= 0 && cpp==comp ) rhs += - bodyterm*dxC*dyC;  
 
           UF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC*rho));
+
         }
         else
         {
@@ -4549,19 +4549,19 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
               pvalue = (PF->DOF_value( i, j, shift.k+k, 0, 1 ) - PF->DOF_value( i, j, shift.k+k-1, 0, 1 ))*dxC*dyC;
             }
 
-	    // Advection term
-	    if ( AdvectionScheme == "TVD" )
-	      ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp);
-	    else
-	      ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp);
-	  
-	    if ( AdvectionTimeAccuracy == 1 )
-	      advection_value = ugradu;
-	    else
-	    {
-	      advection_value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
-              UF->set_DOF_value(i,j,k,comp,2,ugradu);
-	    }
+      	    // Advection term
+      	    if ( AdvectionScheme == "TVD" )
+      	      ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp);
+      	    else
+      	      ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp);
+      	  
+      	    if ( AdvectionTimeAccuracy == 1 )
+      	      advection_value = ugradu;
+      	    else
+      	    {
+      	      advection_value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
+                    UF->set_DOF_value(i,j,k,comp,2,ugradu);
+      	    }
 
             rhs = gamma*(xvalue*dyC*dzC + yvalue*dxC*dzC + zvalue*dxC*dyC) - pvalue - advection_value + (UF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC*rho)/(t_it -> time_step());
 
@@ -4658,6 +4658,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
             k=0;
            double fe = assemble_local_rhs_y(i,k,gamma,t_it,comp);
            LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp);
+
            if(U_is_yperiodic == 1)
               GLOBAL_EQ->DS_NavierStokes_y_solver_periodic(i,k,min_unknown_index(1),local_rhs_y,NULL,comp);
            else
@@ -4824,32 +4825,11 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
      // Tranfer back to field
      UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
 
-     // // Check if the final solution is periodic
-     // for (size_t l=0;l<dim;++l)
-     //    min_unknown_index(l) =
-     //     UF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-     //  for (size_t l=0;l<dim;++l)
-     //    max_unknown_index(l) =
-     //     UF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-
-     // for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
-     // {  
-     //    if(rank_in_x == 0 && rank_in_y == 0)
-     //      MAC::out()<<"x:"<<rank_in_x<<",y:"<<rank_in_y<<",k:"<<k<<" ,values"<<endl;
-     //    for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-     //    {
-     //      j=min_unknown_index(1);
-     //      if(rank_in_x == 0 && rank_in_y == 0){
-     //        MAC::out()<<UF->DOF_value(i,j,k,2,0)<<endl;
-     //      }
-     //      // if(i == (max_unknown_index(0)) && rank_in_x == 1){
-     //      //   MAC::out()<<"x:"<<rank_in_x<<",y:"<<rank_in_y<<", max value:"<<UF->DOF_value(i,j,0,0,0)<<endl;
-     //      // } 
-     //    }
-     //  }
   }
 
-
+  output_L2norm_velocity(0);
+  output_L2norm_velocity(1);
+  output_L2norm_velocity(2);
 
 }
 
@@ -4933,6 +4913,9 @@ DDS_NavierStokes:: pressure_assemble_local_rhs_x ( size_t const& j, size_t const
 
     pos = i - min_unknown_index(0);
 
+    // if(j==min_unknown_index(1))
+    //   MAC::out()<<xright<<"  "<<yright<<endl;
+
     if(P_is_xperiodic == 0){
       if(rank_in_x == nb_ranks_comm_x-1){
          local_rhs_x->set_item( pos, value);
@@ -4956,9 +4939,6 @@ DDS_NavierStokes:: pressure_assemble_local_rhs_x ( size_t const& j, size_t const
     }
     
   }
-
-  // if(rank_in_x == 0 && rank_in_y == 0)
-  //     local_rhs_x->print_items(MAC::out(),0);
 
  // No term added to rhs for neumann as flux was set to zero during assemble of lhs
  // No term added to rhs for dirichlet as boundary condition for pseudo pressure(psi) becomes zero
@@ -6169,6 +6149,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
           k=0;
           double fe = pressure_assemble_local_rhs_x(j,k,t_it);
           LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x_P();
+
           if(P_is_xperiodic == 1)
               GLOBAL_EQ->DS_NavierStokes_x_solver_P_periodic(j,k,min_unknown_index(0),local_rhs_x,NULL);
           else
@@ -6182,6 +6163,8 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
 
      // Tranfer back to field
      PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
+
+     // output_L2norm_pressure( 1 ); 
 
     // Solve in y for pressure
      if(nb_ranks_comm_y>1){
@@ -6214,6 +6197,8 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
 
      // Tranfer back to field
      PF->update_free_DOFs_value( 1 , GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
+     
+     // output_L2norm_pressure( 1 );
    }
   else{
 
@@ -6321,6 +6306,10 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
      PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
   }
 
+
+  // Debug
+  output_L2norm_pressure( 0 );
+  output_L2norm_pressure( 1 );  
 }
 
 
@@ -6795,6 +6784,83 @@ DDS_NavierStokes::output_L2norm_pressure( size_t level )
   max_P = pelCOMM->max( max_P ) ;
   if ( my_rank == is_master )
       MAC::out()<< "Norm L2 P = "<< MAC::doubleToString( ios::scientific, 12, L2normP ) << " Max P = " << MAC::doubleToString( ios::scientific, 12, max_P ) << endl;
+      
+}
+
+
+
+
+//----------------------------------------------------------------------
+void
+DDS_NavierStokes::output_L2norm_velocity( size_t level )
+//----------------------------------------------------------------------
+{
+  double value;
+  size_t i,j,k;
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  double dx,dy;
+
+  for(size_t comp=0;comp<nb_comps;comp++){
+    for (size_t l=0;l<dim;++l)
+      min_unknown_index(l) =
+       UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+    for (size_t l=0;l<dim;++l)
+      max_unknown_index(l) =
+       UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+
+
+    double L2normU = 0.;
+    double cell_U=0.,max_U=0.;
+
+    for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
+    {
+      for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
+      {
+        if(dim ==2 )
+        {
+          k=0;
+          dx = UF->get_cell_size( i,comp, 0 );
+          dy = UF->get_cell_size( j,comp, 1 );
+          cell_U = UF->DOF_value( i, j, k, comp, level );
+    max_U = MAC::max( MAC::abs(cell_U), max_U );
+          L2normU += cell_U * cell_U * dx * dy;
+        }
+        else
+        {
+          double dz=0.;
+          for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
+    {          
+            dx = UF->get_cell_size( i,comp, 0 );
+            dy = UF->get_cell_size( j,comp, 1 );
+            dz = UF->get_cell_size( k,comp, 2 );
+            cell_U = UF->DOF_value( i, j, k, comp, level );
+      max_U = MAC::max( MAC::abs(cell_U), max_U );
+            L2normU += cell_U * cell_U * dx * dy * dz;
+          }
+        }
+      }
+    }
+
+    FV_Mesh const* primary_mesh = UF->primary_grid() ;
+    double domain_measure = dim == 2 ? 
+      primary_mesh->get_main_domain_boundary_perp_to_direction_measure( 0 )
+      * primary_mesh->get_main_domain_boundary_perp_to_direction_measure( 1 ):
+    primary_mesh->get_main_domain_boundary_perp_to_direction_measure( 0 )
+    * ( primary_mesh->get_main_domain_max_coordinate(2)
+      - primary_mesh->get_main_domain_min_coordinate(2) );
+    
+    L2normU = pelCOMM->sum( L2normU ) ;
+  //  L2normP = MAC::sqrt( L2normP / domain_measure );
+    L2normU = MAC::sqrt( L2normU );  
+    max_U = pelCOMM->max( max_U ) ;
+    if ( my_rank == is_master )
+        MAC::out()<< "Component: "<<comp<< " Norm L2 U = "<< MAC::doubleToString( ios::scientific, 12, L2normU ) << " Max U = " << MAC::doubleToString( ios::scientific, 12, max_U ) << endl;
+    
+  }
+
       
 }
 
@@ -7336,8 +7402,10 @@ DDS_NavierStokes:: assemble_advection_TVD(
    FV_SHIFT_TRIPLET shift = UF->shift_staggeredToStaggered( component ) ;
         
      // Perform assembling
-   dxC =UF->get_cell_size( i, component, 0 ) ;    
-   dyC =UF->get_cell_size( j, component, 1 ) ; 
+   dxC = UF->get_cell_size( i, component, 0 ) ;    
+   dyC = UF->get_cell_size( j, component, 1 ) ; 
+   xC = UF->get_DOF_coordinate( i, component, 0 );
+   yC = UF->get_DOF_coordinate( j, component, 1 );
  
    if ( dim == 2 )
    {
@@ -7457,7 +7525,7 @@ DDS_NavierStokes:: assemble_advection_TVD(
       * ( AdvectedValueRi - AdvectedValueC );
      }
            fle = 0.5 * ( ul * ( cRim12 + cLim12 )
-            - fabs(ul) * ( cRim12 - cLim12 ) );
+             - fabs(ul) * ( cRim12 - cLim12 ) );
          }
              }
    

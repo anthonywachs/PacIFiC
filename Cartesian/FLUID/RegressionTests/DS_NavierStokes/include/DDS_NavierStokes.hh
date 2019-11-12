@@ -256,6 +256,8 @@ public SolverComputingTime
       
       void output_L2norm_pressure( size_t level );
 
+      void output_L2norm_velocity( size_t level );
+
       void compute_CFL( FV_TimeIterator const* t_it, size_t level ) const;
       //@}
 
@@ -313,7 +315,6 @@ public SolverComputingTime
       string AdvectionScheme;
       size_t AdvectionTimeAccuracy;
 
-      bool b_bodyterm ;
       bool b_restart ;
 
       bool U_is_xperiodic;
