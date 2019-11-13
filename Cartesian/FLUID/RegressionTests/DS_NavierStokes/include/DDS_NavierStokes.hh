@@ -135,40 +135,18 @@ public SolverComputingTime
       void assemble_velocity_1D_matrices( FV_TimeIterator const* t_it ) ;
 
       /** @brief Assemble 1D velocity matrix in x */
-      void assemble_velocity_matrix_1D_x (
+      void assemble_velocity_matrix_1D (
         FV_DiscreteField const* FF,
         FV_TimeIterator const* t_it,
         double gamma,
-        size_t const& comp  );
-
-      /** @brief Assemble 1D velocity matrix in y */
-      void assemble_velocity_matrix_1D_y (
-        FV_DiscreteField const* FF,
-        FV_TimeIterator const* t_it,
-        double gamma,
-        size_t const& comp  );
-
-      /** @brief Assemble 1D velocity matrix in z */
-      void assemble_velocity_matrix_1D_z (
-        FV_DiscreteField const* FF,
-        FV_TimeIterator const* t_it,
-        double gamma,
-        size_t const& comp   );
+        size_t const& comp,
+        size_t const dir );
 
       /** @brief Assemble 1D pressure matrix in x */
-      void assemble_pressure_matrix_1D_x (
+      void assemble_pressure_matrix_1D (
         FV_DiscreteField const* FF,
-        FV_TimeIterator const* t_it);
-
-      /** @brief Assemble 1D pressure matrix in y */
-      void assemble_pressure_matrix_1D_y (
-        FV_DiscreteField const* FF,
-        FV_TimeIterator const* t_it);
-
-      /** @brief Assemble 1D pressure matrix in z */
-      void assemble_pressure_matrix_1D_z (
-        FV_DiscreteField const* FF,
-        FV_TimeIterator const* t_it);
+        FV_TimeIterator const* t_it,
+	size_t const dir);
 
       double assemble_advection_Upwind( size_t advecting_level, double const& coef, 
          size_t advected_level,
@@ -267,6 +245,7 @@ public SolverComputingTime
       /** @name Direction splitting communicators */
       /** @brief Create the sub-communicators */
       void create_DDS_subcommunicators ( void ) ;
+      void processor_splitting ( int color, int key, size_t const dir );
 
       /** @brief Free the sub-communicators */
       void free_DDS_subcommunicators ( void ) ;
@@ -295,18 +274,10 @@ public SolverComputingTime
       size_t nb_comps;
 
       MAC_Communicator const* pelCOMM;
-      MPI_Comm DDS_Comm_x;
-      MPI_Comm DDS_Comm_y;
-      MPI_Comm DDS_Comm_z;
+      MPI_Comm DDS_Comm_i[3];
 
-      int nb_ranks_comm_x;
-      int rank_in_x;
-      int nb_ranks_comm_y;
-      int rank_in_y;
-      int nb_ranks_comm_z;
-      int rank_in_z;
-      
-      //MPI_Comm DDS_Comm_z;
+      int rank_in_i[3];
+      int nb_ranks_comm_i[3];
 
       double peclet ;
       double rho;
@@ -317,14 +288,10 @@ public SolverComputingTime
 
       bool b_restart ;
 
-      bool U_is_xperiodic;
-      bool U_is_yperiodic;
-      bool U_is_zperiodic;
+      bool is_Uperiodic[3];
       boolVector const* U_periodic_comp;
 
-      bool P_is_xperiodic;
-      bool P_is_yperiodic;
-      bool P_is_zperiodic;
+      bool is_Pperiodic[3];
       boolVector const* P_periodic_comp;
 
       // double * schlur_mpi_data_u_x;

@@ -61,41 +61,42 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
    , UF( mac_UF )
    , PF( mac_PF )
    , MAT_velocityUnsteadyPlusDiffusion_1D_y( 0 )
-   , U_is_xperiodic( false )
-   , U_is_yperiodic( false )
-   , U_is_zperiodic( false )
-   , P_is_xperiodic( false )
-   , P_is_yperiodic( false )
-   , P_is_zperiodic( false )
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DDS_NavierStokesSystem" ) ;
 
    int const* MPI_coordinates_world = UF->primary_grid()->get_MPI_coordinates() ;
    int const* MPI_max_coordinates_world = UF->primary_grid()->get_domain_decomposition() ;
 
-   proc_pos_in_x = MPI_coordinates_world[0];
-   proc_pos_in_y = MPI_coordinates_world[1];
-   proc_pos_in_z = MPI_coordinates_world[2];
-   nb_procs_in_x = MPI_max_coordinates_world[0];
-   nb_procs_in_y = MPI_max_coordinates_world[1];
-   nb_procs_in_z = MPI_max_coordinates_world[2];
+   is_Uperiodic[0] = false;
+   is_Uperiodic[1] = false;
+   is_Uperiodic[2] = false;
+   is_Pperiodic[0] = false;
+   is_Pperiodic[1] = false;
+   is_Pperiodic[2] = false;
+
+   proc_pos_in_i[0] = MPI_coordinates_world[0];
+   proc_pos_in_i[1] = MPI_coordinates_world[1];
+   proc_pos_in_i[2] = MPI_coordinates_world[2];
+   nb_procs_in_i[0] = MPI_max_coordinates_world[0];
+   nb_procs_in_i[1] = MPI_max_coordinates_world[1];
+   nb_procs_in_i[2] = MPI_max_coordinates_world[2];
 
    dim = UF->primary_grid()->nb_space_dimensions() ;
    nb_comps = UF->nb_components() ;
 
    // Periodic boundary condition check for velocity
    U_periodic_comp = UF->primary_grid()->get_periodic_directions();
-   U_is_xperiodic = U_periodic_comp->operator()( 0 );
-   U_is_yperiodic = U_periodic_comp->operator()( 1 );
+   is_Uperiodic[0] = U_periodic_comp->operator()( 0 );
+   is_Uperiodic[1] = U_periodic_comp->operator()( 1 );
    if(dim >2)
-      U_is_zperiodic = U_periodic_comp->operator()( 2 ); 
+      is_Uperiodic[2] = U_periodic_comp->operator()( 2 ); 
 
    // Periodic boundary condition check for pressure
    P_periodic_comp = PF->primary_grid()->get_periodic_directions();
-   P_is_xperiodic = P_periodic_comp->operator()( 0 );
-   P_is_yperiodic = P_periodic_comp->operator()( 1 );
+   is_Pperiodic[0] = P_periodic_comp->operator()( 0 );
+   is_Pperiodic[1] = P_periodic_comp->operator()( 1 );
    if(dim >2)
-      P_is_zperiodic = P_periodic_comp->operator()( 2 ); 
+      is_Pperiodic[2] = P_periodic_comp->operator()( 2 ); 
 
    // Build the matrices & vectors
    build_system(exp) ;
@@ -269,7 +270,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
  Aii_Aie_product_x_P = MAT_velocityUnsteadyPlusDiffusion_1D_y
     ->create_vector( this ) ;
 
-if(proc_pos_in_x == 0){
+if(proc_pos_in_i[0] == 0){
    Aee_x_P = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
    MAT_velocityUnsteadyPlusDiffusion_1D_y );
    schlur_complement_x_P = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
@@ -313,7 +314,7 @@ product_result_y_P = MAT_velocityUnsteadyPlusDiffusion_1D_y
  Aii_Aie_product_y_P = MAT_velocityUnsteadyPlusDiffusion_1D_y
        ->create_vector( this ) ;
 
-if(proc_pos_in_y == 0){
+if(proc_pos_in_i[1] == 0){
     Aee_y_P = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
     MAT_velocityUnsteadyPlusDiffusion_1D_y );
     schlur_complement_y_P = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
@@ -359,7 +360,7 @@ if(dim>2)
       Aii_Aie_product_z_P = MAT_velocityUnsteadyPlusDiffusion_1D_y
           ->create_vector( this ) ;
 
-     if(proc_pos_in_z == 0){
+     if(proc_pos_in_i[2] == 0){
          Aee_z_P = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
          MAT_velocityUnsteadyPlusDiffusion_1D_y );
          schlur_complement_z_P = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
@@ -406,7 +407,7 @@ if(dim>2)
  	  Aii_Aie_product_x[comp] = MAT_velocityUnsteadyPlusDiffusion_1D_y
  		  ->create_vector( this ) ;
 
-	  if(proc_pos_in_x == 0){
+	  if(proc_pos_in_i[0] == 0){
 		   Aee_x[comp] = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
 		   MAT_velocityUnsteadyPlusDiffusion_1D_y );
        schlur_complement_x[comp] = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
@@ -457,7 +458,7 @@ if(dim>2)
      VEC_rhs_velocity_1D_y[comp] = MAT_velocityUnsteadyPlusDiffusion_1D_y
         ->create_vector( this ) ;
 
-    if(proc_pos_in_y == 0){
+    if(proc_pos_in_i[1] == 0){
         Aee_y[comp] = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
         MAT_velocityUnsteadyPlusDiffusion_1D_y );
         schlur_complement_y[comp] = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
@@ -514,7 +515,7 @@ if(dim>2)
         Aii_Aie_product_z[comp] = MAT_velocityUnsteadyPlusDiffusion_1D_y
             ->create_vector( this ) ;
 
-       if(proc_pos_in_z == 0){
+       if(proc_pos_in_i[2] == 0){
            Aee_z[comp] = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
            MAT_velocityUnsteadyPlusDiffusion_1D_y );
            schlur_complement_z[comp] = MAT_velocityUnsteadyPlusDiffusion_1D_y->create_copy( this,
@@ -588,9 +589,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
       1 + PF->get_max_index_unknown_handled_by_proc( 0, l )
    - PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
 
-  if(P_is_xperiodic==0 || nb_procs_in_x == 1)
+  if(is_Pperiodic[0]==0 || nb_procs_in_i[0] == 1)
   {
-     if(proc_pos_in_x == nb_procs_in_x-1)
+     if(proc_pos_in_i[0] == nb_procs_in_i[0]-1)
      {
         Aii_x_main_diagonal_P->re_initialize(
         nb_unknowns_handled_by_proc( 0 ));
@@ -609,9 +610,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
         Aie_x_P->re_initialize(
         nb_unknowns_handled_by_proc( 0 ),
-        nb_procs_in_x-1);
+        nb_procs_in_i[0]-1);
         Aei_x_P->re_initialize(
-        nb_procs_in_x-1,
+        nb_procs_in_i[0]-1,
         nb_unknowns_handled_by_proc( 0 ) );
         product_result_x_P->re_initialize( nb_unknowns_handled_by_proc( 0 ) );
 
@@ -631,34 +632,34 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
         Aie_x_P->re_initialize(
         nb_unknowns_handled_by_proc( 0 )-1,
-        nb_procs_in_x-1 );
+        nb_procs_in_i[0]-1 );
         Aei_x_P->re_initialize(
-        nb_procs_in_x-1,
+        nb_procs_in_i[0]-1,
         nb_unknowns_handled_by_proc( 0 )-1 );
         product_result_x_P->re_initialize( nb_unknowns_handled_by_proc( 0 )-1 );
         VEC_local_temp_x_P->re_initialize( nb_unknowns_handled_by_proc( 0 )-1) ;
         VEC_local_solution_temp_x_P->re_initialize( nb_unknowns_handled_by_proc( 0 )-1) ;
       }
       Aii_Aie_product_x_P->re_initialize(
-       nb_procs_in_x-1);
+       nb_procs_in_i[0]-1);
 
      Aei_Aii_Aie_product_x_P->re_initialize(
-        nb_procs_in_x-1,
-        nb_procs_in_x-1 );
+        nb_procs_in_i[0]-1,
+        nb_procs_in_i[0]-1 );
 
-     VEC_interface_temp_x_P->re_initialize( nb_procs_in_x-1 ) ;
-     VEC_temp_x_P->re_initialize( nb_procs_in_x-1 ) ;
+     VEC_interface_temp_x_P->re_initialize( nb_procs_in_i[0]-1 ) ;
+     VEC_temp_x_P->re_initialize( nb_procs_in_i[0]-1 ) ;
 
-     if(proc_pos_in_x == 0){
+     if(proc_pos_in_i[0] == 0){
        Aee_x_P->re_initialize(
-          nb_procs_in_x-1,
-          nb_procs_in_x-1 );
+          nb_procs_in_i[0]-1,
+          nb_procs_in_i[0]-1 );
        schlur_complement_x_P->re_initialize(
-            nb_procs_in_x-1,
-            nb_procs_in_x-1 );
+            nb_procs_in_i[0]-1,
+            nb_procs_in_i[0]-1 );
        schlur_complement_x_ref_P->re_initialize(
-            nb_procs_in_x-1,
-            nb_procs_in_x-1 );
+            nb_procs_in_i[0]-1,
+            nb_procs_in_i[0]-1 );
       }
 
   }
@@ -674,39 +675,39 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
     Aie_x_P->re_initialize(
     nb_unknowns_handled_by_proc( 0 )-1,
-    nb_procs_in_x );
+    nb_procs_in_i[0] );
     Aei_x_P->re_initialize(
-    nb_procs_in_x,
+    nb_procs_in_i[0],
     nb_unknowns_handled_by_proc( 0 )-1 );
     product_result_x_P->re_initialize( nb_unknowns_handled_by_proc( 0 )-1 );
     VEC_local_temp_x_P->re_initialize( nb_unknowns_handled_by_proc( 0 )-1) ;
     VEC_local_solution_temp_x_P->re_initialize( nb_unknowns_handled_by_proc( 0 )-1) ;
       
     Aii_Aie_product_x_P->re_initialize(
-       nb_procs_in_x);
+       nb_procs_in_i[0]);
 
     Aei_Aii_Aie_product_x_P->re_initialize(
-        nb_procs_in_x,
-        nb_procs_in_x );
+        nb_procs_in_i[0],
+        nb_procs_in_i[0] );
 
-    VEC_interface_temp_x_P->re_initialize( nb_procs_in_x ) ;
-    VEC_temp_x_P->re_initialize( nb_procs_in_x ) ;
+    VEC_interface_temp_x_P->re_initialize( nb_procs_in_i[0] ) ;
+    VEC_temp_x_P->re_initialize( nb_procs_in_i[0] ) ;
 
-    if(proc_pos_in_x == 0){
+    if(proc_pos_in_i[0] == 0){
        Aee_x_P->re_initialize(
-          nb_procs_in_x,
-          nb_procs_in_x );
+          nb_procs_in_i[0],
+          nb_procs_in_i[0] );
        schlur_complement_x_P->re_initialize(
-            nb_procs_in_x,
-            nb_procs_in_x );
+            nb_procs_in_i[0],
+            nb_procs_in_i[0] );
        schlur_complement_x_ref_P->re_initialize(
-            nb_procs_in_x,
-            nb_procs_in_x );
+            nb_procs_in_i[0],
+            nb_procs_in_i[0] );
     }
   }
-  if(P_is_yperiodic!=1 || nb_procs_in_y == 1)
+  if(is_Pperiodic[1]!=1 || nb_procs_in_i[1] == 1)
   {
-      if(proc_pos_in_y == nb_procs_in_y-1){
+      if(proc_pos_in_i[1] == nb_procs_in_i[1]-1){
         Aii_y_main_diagonal_P->re_initialize(
         nb_unknowns_handled_by_proc( 1 ));
         Aii_y_super_diagonal_P->re_initialize(
@@ -723,9 +724,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
         Aie_y_P->re_initialize(
         nb_unknowns_handled_by_proc( 1 ),
-        nb_procs_in_y-1);
+        nb_procs_in_i[1]-1);
         Aei_y_P->re_initialize(
-        nb_procs_in_y-1,
+        nb_procs_in_i[1]-1,
         nb_unknowns_handled_by_proc( 1 ) );
         product_result_y_P->re_initialize( nb_unknowns_handled_by_proc( 1 ) );
 
@@ -744,9 +745,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
         Aie_y_P->re_initialize(
         nb_unknowns_handled_by_proc( 1 )-1,
-        nb_procs_in_y-1 );
+        nb_procs_in_i[1]-1 );
         Aei_y_P->re_initialize(
-        nb_procs_in_y-1,
+        nb_procs_in_i[1]-1,
         nb_unknowns_handled_by_proc( 1 )-1 );
         product_result_y_P->re_initialize( nb_unknowns_handled_by_proc( 1 )-1 );
         VEC_local_temp_y_P->re_initialize( nb_unknowns_handled_by_proc( 1 )-1) ;
@@ -754,27 +755,27 @@ DDS_NavierStokesSystem:: re_initialize( void )
      }
 
       Aii_Aie_product_y_P->re_initialize(
-         nb_procs_in_y-1);
+         nb_procs_in_i[1]-1);
 
       Aei_Aii_Aie_product_y_P->re_initialize(
-           nb_procs_in_y-1,
-           nb_procs_in_y-1 );
+           nb_procs_in_i[1]-1,
+           nb_procs_in_i[1]-1 );
 
 
-      if(proc_pos_in_y == 0){
+      if(proc_pos_in_i[1] == 0){
          Aee_y_P->re_initialize(
-              nb_procs_in_y-1,
-              nb_procs_in_y-1 );
+              nb_procs_in_i[1]-1,
+              nb_procs_in_i[1]-1 );
          schlur_complement_y_P->re_initialize(
-              nb_procs_in_y-1,
-              nb_procs_in_y-1 );
+              nb_procs_in_i[1]-1,
+              nb_procs_in_i[1]-1 );
          schlur_complement_y_ref_P->re_initialize(
-              nb_procs_in_y-1,
-              nb_procs_in_y-1 );
+              nb_procs_in_i[1]-1,
+              nb_procs_in_i[1]-1 );
       }
 
-     VEC_interface_temp_y_P->re_initialize( nb_procs_in_y-1 ) ;
-     VEC_temp_y_P->re_initialize( nb_procs_in_y-1 ) ;
+     VEC_interface_temp_y_P->re_initialize( nb_procs_in_i[1]-1 ) ;
+     VEC_temp_y_P->re_initialize( nb_procs_in_i[1]-1 ) ;
    }
    else{
       Aii_y_main_diagonal_P->re_initialize(
@@ -788,43 +789,43 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
       Aie_y_P->re_initialize(
       nb_unknowns_handled_by_proc( 1 )-1,
-      nb_procs_in_y );
+      nb_procs_in_i[1] );
       Aei_y_P->re_initialize(
-      nb_procs_in_y,
+      nb_procs_in_i[1],
       nb_unknowns_handled_by_proc( 1 )-1 );
       product_result_y_P->re_initialize( nb_unknowns_handled_by_proc( 1 )-1 );
       VEC_local_temp_y_P->re_initialize( nb_unknowns_handled_by_proc( 1 )-1) ;
       VEC_local_solution_temp_y_P->re_initialize( nb_unknowns_handled_by_proc( 1 )-1) ;
 
       Aii_Aie_product_y_P->re_initialize(
-           nb_procs_in_y);
+           nb_procs_in_i[1]);
 
       Aei_Aii_Aie_product_y_P->re_initialize(
-             nb_procs_in_y,
-             nb_procs_in_y );
+             nb_procs_in_i[1],
+             nb_procs_in_i[1] );
 
 
-      if(proc_pos_in_y == 0){
+      if(proc_pos_in_i[1] == 0){
          Aee_y_P->re_initialize(
-              nb_procs_in_y,
-              nb_procs_in_y );
+              nb_procs_in_i[1],
+              nb_procs_in_i[1] );
          schlur_complement_y_P->re_initialize(
-              nb_procs_in_y,
-              nb_procs_in_y );
+              nb_procs_in_i[1],
+              nb_procs_in_i[1] );
          schlur_complement_y_ref_P->re_initialize(
-              nb_procs_in_y,
-              nb_procs_in_y );
+              nb_procs_in_i[1],
+              nb_procs_in_i[1] );
       }
 
-      VEC_interface_temp_y_P->re_initialize( nb_procs_in_y ) ;
-      VEC_temp_y_P->re_initialize( nb_procs_in_y) ;
+      VEC_interface_temp_y_P->re_initialize( nb_procs_in_i[1] ) ;
+      VEC_temp_y_P->re_initialize( nb_procs_in_i[1]) ;
    }
    if(dim>2)
    {
-      if(P_is_zperiodic !=1 || nb_procs_in_z == 1)
+      if(is_Pperiodic[2] !=1 || nb_procs_in_i[2] == 1)
       {
 
-        if(proc_pos_in_z == nb_procs_in_z-1){
+        if(proc_pos_in_i[2] == nb_procs_in_i[2]-1){
 
            Aii_z_main_diagonal_P->re_initialize(
            nb_unknowns_handled_by_proc( 2 ));
@@ -842,9 +843,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
            Aie_z_P->re_initialize(
            nb_unknowns_handled_by_proc( 2 ),
-           nb_procs_in_z-1);
+           nb_procs_in_i[2]-1);
            Aei_z_P->re_initialize(
-           nb_procs_in_z-1,
+           nb_procs_in_i[2]-1,
            nb_unknowns_handled_by_proc( 2 ) );
            product_result_z_P->re_initialize( nb_unknowns_handled_by_proc( 2 ) );
 
@@ -865,36 +866,36 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
            Aie_z_P->re_initialize(
            nb_unknowns_handled_by_proc( 2 )-1,
-           nb_procs_in_z-1 );
+           nb_procs_in_i[2]-1 );
            Aei_z_P->re_initialize(
-           nb_procs_in_z-1,
+           nb_procs_in_i[2]-1,
            nb_unknowns_handled_by_proc( 2 )-1 );
            product_result_z_P->re_initialize( nb_unknowns_handled_by_proc( 2 )-1 );
            VEC_local_temp_z_P->re_initialize( nb_unknowns_handled_by_proc( 2 )-1) ;
            VEC_local_solution_temp_z_P->re_initialize( nb_unknowns_handled_by_proc( 2 )-1) ;
         }
 
-        if(proc_pos_in_z == 0){
+        if(proc_pos_in_i[2] == 0){
             Aee_z_P->re_initialize(
-                 nb_procs_in_z-1,
-                 nb_procs_in_z-1 );
+                 nb_procs_in_i[2]-1,
+                 nb_procs_in_i[2]-1 );
             schlur_complement_z_P->re_initialize(
-                 nb_procs_in_z-1,
-                 nb_procs_in_z-1 );
+                 nb_procs_in_i[2]-1,
+                 nb_procs_in_i[2]-1 );
             schlur_complement_z_ref_P->re_initialize(
-                 nb_procs_in_z-1,
-                 nb_procs_in_z-1 );
+                 nb_procs_in_i[2]-1,
+                 nb_procs_in_i[2]-1 );
         }
 
         Aii_Aie_product_z_P->re_initialize(
-           nb_procs_in_z-1);
+           nb_procs_in_i[2]-1);
 
         Aei_Aii_Aie_product_z_P->re_initialize(
-           nb_procs_in_z-1,
-           nb_procs_in_z-1 );
+           nb_procs_in_i[2]-1,
+           nb_procs_in_i[2]-1 );
 
-        VEC_interface_temp_z_P->re_initialize( nb_procs_in_z-1 ) ;
-        VEC_temp_z_P->re_initialize( nb_procs_in_z-1 ) ;
+        VEC_interface_temp_z_P->re_initialize( nb_procs_in_i[2]-1 ) ;
+        VEC_temp_z_P->re_initialize( nb_procs_in_i[2]-1 ) ;
     }
     else{
          Aii_z_main_diagonal_P->re_initialize(
@@ -908,35 +909,35 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
          Aie_z_P->re_initialize(
          nb_unknowns_handled_by_proc( 2 )-1,
-         nb_procs_in_z);
+         nb_procs_in_i[2]);
          Aei_z_P->re_initialize(
-         nb_procs_in_z,
+         nb_procs_in_i[2],
          nb_unknowns_handled_by_proc( 2 )-1 );
          product_result_z_P->re_initialize( nb_unknowns_handled_by_proc( 2 )-1 );
          VEC_local_temp_z_P->re_initialize( nb_unknowns_handled_by_proc( 2 )-1) ;
          VEC_local_solution_temp_z_P->re_initialize( nb_unknowns_handled_by_proc( 2 )-1) ;
          
-         if(proc_pos_in_z == 0){
+         if(proc_pos_in_i[2] == 0){
               Aee_z_P->re_initialize(
-                   nb_procs_in_z,
-                   nb_procs_in_z );
+                   nb_procs_in_i[2],
+                   nb_procs_in_i[2] );
               schlur_complement_z_P->re_initialize(
-                   nb_procs_in_z,
-                   nb_procs_in_z );
+                   nb_procs_in_i[2],
+                   nb_procs_in_i[2] );
               schlur_complement_z_ref_P->re_initialize(
-                   nb_procs_in_z,
-                   nb_procs_in_z );
+                   nb_procs_in_i[2],
+                   nb_procs_in_i[2] );
           }
 
          Aii_Aie_product_z_P->re_initialize(
-             nb_procs_in_z);
+             nb_procs_in_i[2]);
 
          Aei_Aii_Aie_product_z_P->re_initialize(
-             nb_procs_in_z,
-             nb_procs_in_z );
+             nb_procs_in_i[2],
+             nb_procs_in_i[2] );
 
-         VEC_interface_temp_z_P->re_initialize( nb_procs_in_z ) ;
-         VEC_temp_z_P->re_initialize( nb_procs_in_z ) ;
+         VEC_interface_temp_z_P->re_initialize( nb_procs_in_i[2] ) ;
+         VEC_temp_z_P->re_initialize( nb_procs_in_i[2] ) ;
     }
   }
    // Initialize Direction splitting matrices & vectors for velocity
@@ -949,8 +950,8 @@ DDS_NavierStokesSystem:: re_initialize( void )
      nb_unknowns_handled_by_proc( l ) =
       1 + UF->get_max_index_unknown_handled_by_proc( comp, l )
    - UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   if(U_is_xperiodic!=1 || nb_procs_in_x == 1){
-      if(proc_pos_in_x == nb_procs_in_x-1)
+   if(is_Uperiodic[0]!=1 || nb_procs_in_i[0] == 1){
+      if(proc_pos_in_i[0] == nb_procs_in_i[0]-1)
        {
 
           Aii_x_main_diagonal[comp]->re_initialize(
@@ -969,9 +970,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
           Aie_x[comp]->re_initialize(
           nb_unknowns_handled_by_proc( 0 ),
-          nb_procs_in_x-1);
+          nb_procs_in_i[0]-1);
           Aei_x[comp]->re_initialize(
-          nb_procs_in_x-1,
+          nb_procs_in_i[0]-1,
           nb_unknowns_handled_by_proc( 0 ) );
           product_result_x[comp]->re_initialize( nb_unknowns_handled_by_proc( 0 ) );
 
@@ -991,34 +992,34 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
           Aie_x[comp]->re_initialize(
           nb_unknowns_handled_by_proc( 0 )-1,
-          nb_procs_in_x-1 );
+          nb_procs_in_i[0]-1 );
           Aei_x[comp]->re_initialize(
-          nb_procs_in_x-1,
+          nb_procs_in_i[0]-1,
           nb_unknowns_handled_by_proc( 0 )-1 );
           product_result_x[comp]->re_initialize( nb_unknowns_handled_by_proc( 0 )-1 );
           VEC_local_temp_x[comp]->re_initialize( nb_unknowns_handled_by_proc( 0 )-1) ;
           VEC_local_solution_temp_x[comp]->re_initialize( nb_unknowns_handled_by_proc( 0 )-1) ;
         }
         Aii_Aie_product_x[comp]->re_initialize(
-         nb_procs_in_x-1);
+         nb_procs_in_i[0]-1);
 
        Aei_Aii_Aie_product_x[comp]->re_initialize(
-          nb_procs_in_x-1,
-          nb_procs_in_x-1 );
+          nb_procs_in_i[0]-1,
+          nb_procs_in_i[0]-1 );
 
-       VEC_interface_temp_x[comp]->re_initialize( nb_procs_in_x-1 ) ;
-       VEC_temp_x[comp]->re_initialize( nb_procs_in_x-1 ) ;
+       VEC_interface_temp_x[comp]->re_initialize( nb_procs_in_i[0]-1 ) ;
+       VEC_temp_x[comp]->re_initialize( nb_procs_in_i[0]-1 ) ;
 
-       if(proc_pos_in_x == 0){
+       if(proc_pos_in_i[0] == 0){
          Aee_x[comp]->re_initialize(
-            nb_procs_in_x-1,
-            nb_procs_in_x-1 );
+            nb_procs_in_i[0]-1,
+            nb_procs_in_i[0]-1 );
            schlur_complement_x[comp]->re_initialize(
-                nb_procs_in_x-1,
-                nb_procs_in_x-1 );
+                nb_procs_in_i[0]-1,
+                nb_procs_in_i[0]-1 );
            schlur_complement_x_ref[comp]->re_initialize(
-                nb_procs_in_x-1,
-                nb_procs_in_x-1 );
+                nb_procs_in_i[0]-1,
+                nb_procs_in_i[0]-1 );
         }
 
       VEC_rhs_velocity_1D_x[comp]->re_initialize( nb_unknowns_handled_by_proc( 0 ) );
@@ -1035,42 +1036,42 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
       Aie_x[comp]->re_initialize(
       nb_unknowns_handled_by_proc( 0 )-1,
-      nb_procs_in_x );
+      nb_procs_in_i[0] );
       Aei_x[comp]->re_initialize(
-      nb_procs_in_x,
+      nb_procs_in_i[0],
       nb_unknowns_handled_by_proc( 0 )-1 );
       product_result_x[comp]->re_initialize( nb_unknowns_handled_by_proc( 0 )-1 );
       VEC_local_temp_x[comp]->re_initialize( nb_unknowns_handled_by_proc( 0 )-1) ;
       VEC_local_solution_temp_x[comp]->re_initialize( nb_unknowns_handled_by_proc( 0 )-1) ;
         
       Aii_Aie_product_x[comp]->re_initialize(
-         nb_procs_in_x);
+         nb_procs_in_i[0]);
 
       Aei_Aii_Aie_product_x[comp]->re_initialize(
-          nb_procs_in_x,
-          nb_procs_in_x );
+          nb_procs_in_i[0],
+          nb_procs_in_i[0] );
 
-      VEC_interface_temp_x[comp]->re_initialize( nb_procs_in_x ) ;
-      VEC_temp_x[comp]->re_initialize( nb_procs_in_x ) ;
+      VEC_interface_temp_x[comp]->re_initialize( nb_procs_in_i[0] ) ;
+      VEC_temp_x[comp]->re_initialize( nb_procs_in_i[0] ) ;
 
-      if(proc_pos_in_x == 0){
+      if(proc_pos_in_i[0] == 0){
          Aee_x[comp]->re_initialize(
-            nb_procs_in_x,
-            nb_procs_in_x );
+            nb_procs_in_i[0],
+            nb_procs_in_i[0] );
          schlur_complement_x[comp]->re_initialize(
-              nb_procs_in_x,
-              nb_procs_in_x );
+              nb_procs_in_i[0],
+              nb_procs_in_i[0] );
          schlur_complement_x_ref[comp]->re_initialize(
-              nb_procs_in_x,
-              nb_procs_in_x );
+              nb_procs_in_i[0],
+              nb_procs_in_i[0] );
       }
 
       VEC_rhs_velocity_1D_x[comp]->re_initialize( nb_unknowns_handled_by_proc( 0 ) );
    }
        
-   if(U_is_yperiodic!=1 || nb_procs_in_y == 1)
+   if(is_Uperiodic[1]!=1 || nb_procs_in_i[1] == 1)
    {
-      if(proc_pos_in_y == nb_procs_in_y-1){
+      if(proc_pos_in_i[1] == nb_procs_in_i[1]-1){
           Aii_y_main_diagonal[comp]->re_initialize(
           nb_unknowns_handled_by_proc( 1 ));
           Aii_y_super_diagonal[comp]->re_initialize(
@@ -1087,9 +1088,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
           Aie_y[comp]->re_initialize(
           nb_unknowns_handled_by_proc( 1 ),
-          nb_procs_in_y-1);
+          nb_procs_in_i[1]-1);
           Aei_y[comp]->re_initialize(
-          nb_procs_in_y-1,
+          nb_procs_in_i[1]-1,
           nb_unknowns_handled_by_proc( 1 ) );
           product_result_y[comp]->re_initialize( nb_unknowns_handled_by_proc( 1 ) );
 
@@ -1108,9 +1109,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
           Aie_y[comp]->re_initialize(
           nb_unknowns_handled_by_proc( 1 )-1,
-          nb_procs_in_y-1 );
+          nb_procs_in_i[1]-1 );
           Aei_y[comp]->re_initialize(
-          nb_procs_in_y-1,
+          nb_procs_in_i[1]-1,
           nb_unknowns_handled_by_proc( 1 )-1 );
           product_result_y[comp]->re_initialize( nb_unknowns_handled_by_proc( 1 )-1 );
           VEC_local_temp_y[comp]->re_initialize( nb_unknowns_handled_by_proc( 1 )-1) ;
@@ -1122,29 +1123,29 @@ DDS_NavierStokesSystem:: re_initialize( void )
           nb_unknowns_handled_by_proc( 1 ) );
 
         Aii_Aie_product_y[comp]->re_initialize(
-           nb_procs_in_y-1);
+           nb_procs_in_i[1]-1);
 
         Aei_Aii_Aie_product_y[comp]->re_initialize(
-             nb_procs_in_y-1,
-             nb_procs_in_y-1 );
+             nb_procs_in_i[1]-1,
+             nb_procs_in_i[1]-1 );
 
 
-        if(proc_pos_in_y == 0){
+        if(proc_pos_in_i[1] == 0){
            Aee_y[comp]->re_initialize(
-                nb_procs_in_y-1,
-                nb_procs_in_y-1 );
+                nb_procs_in_i[1]-1,
+                nb_procs_in_i[1]-1 );
            schlur_complement_y[comp]->re_initialize(
-                nb_procs_in_y-1,
-                nb_procs_in_y-1 );
+                nb_procs_in_i[1]-1,
+                nb_procs_in_i[1]-1 );
            schlur_complement_y_ref[comp]->re_initialize(
-                nb_procs_in_y-1,
-                nb_procs_in_y-1 );
+                nb_procs_in_i[1]-1,
+                nb_procs_in_i[1]-1 );
         }
 
        VEC_rhs_velocity_1D_y[comp]->re_initialize( nb_unknowns_handled_by_proc( 1 ) );
 
-       VEC_interface_temp_y[comp]->re_initialize( nb_procs_in_y-1 ) ;
-       VEC_temp_y[comp]->re_initialize( nb_procs_in_y-1 ) ;
+       VEC_interface_temp_y[comp]->re_initialize( nb_procs_in_i[1]-1 ) ;
+       VEC_temp_y[comp]->re_initialize( nb_procs_in_i[1]-1 ) ;
    }
    else
    {  
@@ -1159,9 +1160,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
           Aie_y[comp]->re_initialize(
           nb_unknowns_handled_by_proc( 1 )-1,
-          nb_procs_in_y);
+          nb_procs_in_i[1]);
           Aei_y[comp]->re_initialize(
-          nb_procs_in_y,
+          nb_procs_in_i[1],
           nb_unknowns_handled_by_proc( 1 )-1 );
           product_result_y[comp]->re_initialize( nb_unknowns_handled_by_proc( 1 )-1 );
           VEC_local_temp_y[comp]->re_initialize( nb_unknowns_handled_by_proc( 1 )-1) ;
@@ -1172,37 +1173,37 @@ DDS_NavierStokesSystem:: re_initialize( void )
           nb_unknowns_handled_by_proc( 1 ) );
 
         Aii_Aie_product_y[comp]->re_initialize(
-           nb_procs_in_y);
+           nb_procs_in_i[1]);
 
         Aei_Aii_Aie_product_y[comp]->re_initialize(
-             nb_procs_in_y,
-             nb_procs_in_y );
+             nb_procs_in_i[1],
+             nb_procs_in_i[1] );
 
 
-        if(proc_pos_in_y == 0){
+        if(proc_pos_in_i[1] == 0){
            Aee_y[comp]->re_initialize(
-                nb_procs_in_y,
-                nb_procs_in_y );
+                nb_procs_in_i[1],
+                nb_procs_in_i[1] );
            schlur_complement_y[comp]->re_initialize(
-                nb_procs_in_y,
-                nb_procs_in_y );
+                nb_procs_in_i[1],
+                nb_procs_in_i[1] );
            schlur_complement_y_ref[comp]->re_initialize(
-                nb_procs_in_y,
-                nb_procs_in_y );
+                nb_procs_in_i[1],
+                nb_procs_in_i[1] );
         }
 
        VEC_rhs_velocity_1D_y[comp]->re_initialize( nb_unknowns_handled_by_proc( 1 ) );
 
-       VEC_interface_temp_y[comp]->re_initialize( nb_procs_in_y) ;
-       VEC_temp_y[comp]->re_initialize( nb_procs_in_y) ;
+       VEC_interface_temp_y[comp]->re_initialize( nb_procs_in_i[1]) ;
+       VEC_temp_y[comp]->re_initialize( nb_procs_in_i[1]) ;
    }
        
 
    if(dim>2)
    {
-      if(U_is_zperiodic!=1 || nb_procs_in_z == 1)
+      if(is_Uperiodic[2]!=1 || nb_procs_in_i[2] == 1)
       {
-        if(proc_pos_in_z == nb_procs_in_z-1){
+        if(proc_pos_in_i[2] == nb_procs_in_i[2]-1){
              Aii_z[comp]->re_initialize(
              nb_unknowns_handled_by_proc( 2 ),
              nb_unknowns_handled_by_proc( 2 ));
@@ -1227,9 +1228,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
              Aie_z[comp]->re_initialize(
              nb_unknowns_handled_by_proc( 2 ),
-             nb_procs_in_z-1);
+             nb_procs_in_i[2]-1);
              Aei_z[comp]->re_initialize(
-             nb_procs_in_z-1,
+             nb_procs_in_i[2]-1,
              nb_unknowns_handled_by_proc( 2 ) );
              product_result_z[comp]->re_initialize( nb_unknowns_handled_by_proc( 2 ) );
 
@@ -1257,36 +1258,36 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
              Aie_z[comp]->re_initialize(
              nb_unknowns_handled_by_proc( 2 )-1,
-             nb_procs_in_z-1 );
+             nb_procs_in_i[2]-1 );
              Aei_z[comp]->re_initialize(
-             nb_procs_in_z-1,
+             nb_procs_in_i[2]-1,
              nb_unknowns_handled_by_proc( 2 )-1 );
              product_result_z[comp]->re_initialize( nb_unknowns_handled_by_proc( 2 )-1 );
              VEC_local_temp_z[comp]->re_initialize( nb_unknowns_handled_by_proc( 2 )-1) ;
              VEC_local_solution_temp_z[comp]->re_initialize( nb_unknowns_handled_by_proc( 2 )-1) ;
           }
 
-          if(proc_pos_in_z == 0){
+          if(proc_pos_in_i[2] == 0){
               Aee_z[comp]->re_initialize(
-                   nb_procs_in_z-1,
-                   nb_procs_in_z-1 );
+                   nb_procs_in_i[2]-1,
+                   nb_procs_in_i[2]-1 );
               schlur_complement_z[comp]->re_initialize(
-                   nb_procs_in_z-1,
-                   nb_procs_in_z-1 );
+                   nb_procs_in_i[2]-1,
+                   nb_procs_in_i[2]-1 );
               schlur_complement_z_ref[comp]->re_initialize(
-                   nb_procs_in_z-1,
-                   nb_procs_in_z-1 );
+                   nb_procs_in_i[2]-1,
+                   nb_procs_in_i[2]-1 );
           }
 
           Aii_Aie_product_z[comp]->re_initialize(
-             nb_procs_in_z-1);
+             nb_procs_in_i[2]-1);
 
           Aei_Aii_Aie_product_z[comp]->re_initialize(
-             nb_procs_in_z-1,
-             nb_procs_in_z-1 );
+             nb_procs_in_i[2]-1,
+             nb_procs_in_i[2]-1 );
 
-          VEC_interface_temp_z[comp]->re_initialize( nb_procs_in_z-1 ) ;
-          VEC_temp_z[comp]->re_initialize( nb_procs_in_z-1 ) ;
+          VEC_interface_temp_z[comp]->re_initialize( nb_procs_in_i[2]-1 ) ;
+          VEC_temp_z[comp]->re_initialize( nb_procs_in_i[2]-1 ) ;
 
           VEC_rhs_velocity_1D_z[comp]->re_initialize( nb_unknowns_handled_by_proc( 2 ) );
       }
@@ -1310,35 +1311,35 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
            Aie_z[comp]->re_initialize(
            nb_unknowns_handled_by_proc( 2 )-1,
-           nb_procs_in_z);
+           nb_procs_in_i[2]);
            Aei_z[comp]->re_initialize(
-           nb_procs_in_z,
+           nb_procs_in_i[2],
            nb_unknowns_handled_by_proc( 2 )-1 );
            product_result_z[comp]->re_initialize( nb_unknowns_handled_by_proc( 2 )-1 );
            VEC_local_temp_z[comp]->re_initialize( nb_unknowns_handled_by_proc( 2 )-1) ;
            VEC_local_solution_temp_z[comp]->re_initialize( nb_unknowns_handled_by_proc( 2 )-1) ;
 
-           if(proc_pos_in_z == 0){
+           if(proc_pos_in_i[2] == 0){
               Aee_z[comp]->re_initialize(
-                   nb_procs_in_z,
-                   nb_procs_in_z );
+                   nb_procs_in_i[2],
+                   nb_procs_in_i[2] );
               schlur_complement_z[comp]->re_initialize(
-                   nb_procs_in_z,
-                   nb_procs_in_z );
+                   nb_procs_in_i[2],
+                   nb_procs_in_i[2] );
               schlur_complement_z_ref[comp]->re_initialize(
-                   nb_procs_in_z,
-                   nb_procs_in_z );
+                   nb_procs_in_i[2],
+                   nb_procs_in_i[2] );
            }
 
            Aii_Aie_product_z[comp]->re_initialize(
-             nb_procs_in_z);
+             nb_procs_in_i[2]);
 
            Aei_Aii_Aie_product_z[comp]->re_initialize(
-             nb_procs_in_z,
-             nb_procs_in_z );
+             nb_procs_in_i[2],
+             nb_procs_in_i[2] );
 
-           VEC_interface_temp_z[comp]->re_initialize( nb_procs_in_z ) ;
-           VEC_temp_z[comp]->re_initialize( nb_procs_in_z ) ;
+           VEC_interface_temp_z[comp]->re_initialize( nb_procs_in_i[2] ) ;
+           VEC_temp_z[comp]->re_initialize( nb_procs_in_i[2] ) ;
 
            VEC_rhs_velocity_1D_z[comp]->re_initialize( nb_unknowns_handled_by_proc( 2 ) );
       }
@@ -1569,7 +1570,7 @@ DDS_NavierStokesSystem:: compute_directionsplitting_velocity_change( void )
 
    double norm_UF = VEC_DS_UF->two_norm() ;
    double time_change = VEC_DS_UF_timechange->two_norm() ;
-   // if(proc_pos_in_x == 0 && proc_pos_in_y == 0)
+   // if(proc_pos_in_i[0] == 0 && proc_pos_in_i[1] == 0)
    //    MAC::out()<<"Time change "<<time_change<<endl;
    if ( norm_UF > 1e-4 ) time_change /= norm_UF;
 
@@ -1792,92 +1793,73 @@ DDS_NavierStokesSystem::get_temp_z( size_t const& c )
 
 }
 
-
-
+//----------------------------------------------------------------------
+LA_SeqVector*
+DDS_NavierStokesSystem::get_U_vec_u( size_t const& c, size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_xu" ) ;
+      return ( U_vec_xu[c] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_yu" ) ;
+      return ( U_vec_yu[c] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_zu" ) ;
+      return ( U_vec_zu[c] ) ;
+   }
+}
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_U_vec_xu( size_t const& c )
+DDS_NavierStokesSystem::get_product_result( size_t const& c, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_xu" ) ;
-
-   return ( U_vec_xu[c] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_x" ) ;
+      return ( product_result_x[c] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_y" ) ;
+      return ( product_result_y[c] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_z" ) ;
+      return ( product_result_z[c] ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_U_vec_xv( size_t const& c )
+DDS_NavierStokesSystem::get_product_result_P( size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_xv" ) ;
-
-   return ( U_vec_xv[c] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_x_P" ) ;
+      return ( product_result_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_y_P" ) ;
+      return ( product_result_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_z_P" ) ;
+      return ( product_result_z_P ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_U_vec_yu( size_t const& c )
+DDS_NavierStokesSystem::get_U_vec_v( size_t const& c, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_yu" ) ;
-
-   return ( U_vec_yu[c] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_xv" ) ;
+      return ( U_vec_xv[c] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_yv" ) ;
+      return ( U_vec_yv[c] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_zv" ) ;
+      return ( U_vec_zv[c] ) ;
+   }
 }
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_U_vec_yv( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_yv" ) ;
-
-   return ( U_vec_yv[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_U_vec_zu( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_zu" ) ;
-
-   return ( U_vec_zu[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_U_vec_zv( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_zv" ) ;
-
-   return ( U_vec_zv[c] ) ;
-
-}
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
@@ -2175,37 +2157,65 @@ DDS_NavierStokesSystem::get_rhs_DS_velocity_z( size_t const& comp )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_Aii_x_ref( size_t const& comp)
+DDS_NavierStokesSystem::compute_Aii_ref( size_t const& comp, size_t const dir)
 //----------------------------------------------------------------------
 {
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir);
+   LA_SeqVector* Aii_super_diagonal = get_aii_super_diag(comp,dir);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir);
 
-   size_t nrows = Aii_x_main_diagonal[comp] -> nb_rows() ;
-
-   double temp = Aii_x_main_diagonal[comp]->item(0);
-   Aii_x_mod_super_diagonal[comp]-> set_item(0,Aii_x_super_diagonal[comp] ->item(0)/temp);
+   size_t nrows = Aii_main_diagonal->nb_rows() ;
+   double temp = Aii_main_diagonal->item(0);
+   Aii_mod_super_diagonal->set_item(0,Aii_super_diagonal->item(0)/temp);
 
    //  // Perform Forward Elimination
    size_t m;
 
    /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=Aii_x_sub_diagonal[comp] ->item(m-1);
-     b=Aii_x_main_diagonal[comp] ->item(m);
-     prevc=Aii_x_mod_super_diagonal[comp] ->item(m-1);
+   for (m=1;m<nrows;++m) {
+      double a,b,c,prevc;
+      a=Aii_sub_diagonal->item(m-1);
+      b=Aii_main_diagonal->item(m);
+      prevc=Aii_mod_super_diagonal->item(m-1);
 
-     if(m<nrows-1){
-         c=Aii_x_super_diagonal[comp] ->item(m);
-         Aii_x_mod_super_diagonal[comp] ->set_item(m,c/(b - a*prevc));
-     }
+      if (m<nrows-1){
+         c=Aii_super_diagonal->item(m);
+         Aii_mod_super_diagonal->set_item(m,c/(b - a*prevc));
+      }
    }
-   if(nb_procs_in_x == 1 && U_is_xperiodic == 1)
-      DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], U_vec_xu[comp]);   
 }
 
+//----------------------------------------------------------------------
+void
+DDS_NavierStokesSystem::compute_Aii_ref_P( size_t const dir)
+//----------------------------------------------------------------------
+{
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag_P(dir);
+   LA_SeqVector* Aii_super_diagonal = get_aii_super_diag_P(dir);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag_P(dir);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag_P(dir);
 
+   size_t nrows = Aii_main_diagonal->nb_rows() ;
+   double temp = Aii_main_diagonal->item(0);
+   Aii_mod_super_diagonal->set_item(0,Aii_super_diagonal->item(0)/temp);
 
+   //  // Perform Forward Elimination
+   size_t m;
+
+   /// Showing problem for last row elimination
+   for (m=1;m<nrows;++m) {
+      double a,b,c,prevc;
+      a=Aii_sub_diagonal->item(m-1);
+      b=Aii_main_diagonal->item(m);
+      prevc=Aii_mod_super_diagonal->item(m-1);
+
+      if (m<nrows-1){
+         c=Aii_super_diagonal->item(m);
+         Aii_mod_super_diagonal->set_item(m,c/(b - a*prevc));
+      }
+   }
+}
 
 //----------------------------------------------------------------------
 void
@@ -2236,43 +2246,6 @@ DDS_NavierStokesSystem::compute_schlur_x_ref( size_t const& comp)
    }
 }
 
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_Aii_y_ref( size_t const& comp)
-//----------------------------------------------------------------------
-{
-   size_t nrows = Aii_y_main_diagonal[comp] -> nb_rows() ;
-   double temp = Aii_y_main_diagonal[comp]->item(0);
-   Aii_y_mod_super_diagonal[comp]-> set_item(0,Aii_y_super_diagonal[comp] ->item(0)/temp);
-
-    // Perform Forward Elimination
-   size_t m;
-
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=Aii_y_sub_diagonal[comp] ->item(m-1);
-     b=Aii_y_main_diagonal[comp] ->item(m);
-
-     prevc=Aii_y_mod_super_diagonal[comp] ->item(m-1);
-
-     if(m<nrows-1){
-         c=Aii_y_super_diagonal[comp] ->item(m);
-         Aii_y_mod_super_diagonal[comp] ->set_item(m,c/(b - a*prevc));
-     }
-
-   }
-   if(nb_procs_in_y == 1 && U_is_yperiodic == 1)
-      DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], U_vec_yu[comp]);   
-}
-
-
-
-
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::compute_schlur_y_ref( size_t const& comp)
@@ -2302,42 +2275,6 @@ DDS_NavierStokesSystem::compute_schlur_y_ref( size_t const& comp)
    }
 }
 
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_Aii_z_ref( size_t const& comp)
-//----------------------------------------------------------------------
-{
-   size_t nrows = Aii_z_main_diagonal[comp] -> nb_rows() ;
-   double temp = Aii_z_main_diagonal[comp]->item(0);
-   Aii_z_mod_super_diagonal[comp]-> set_item(0,Aii_z_super_diagonal[comp] ->item(0)/temp);
-
-    // Perform Forward Elimination
-   size_t m;
-
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=Aii_z_sub_diagonal[comp] ->item(m-1);
-     b=Aii_z_main_diagonal[comp] ->item(m);
-
-     prevc=Aii_z_mod_super_diagonal[comp] ->item(m-1);
-
-     if(m<nrows-1){
-         c=Aii_z_super_diagonal[comp] ->item(m);
-         Aii_z_mod_super_diagonal[comp] ->set_item(m,c/(b - a*prevc));
-     }
-   }
-   if(nb_procs_in_z == 1 && U_is_zperiodic == 1)
-      DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], U_vec_zu[comp]);   
-}
-
-
-
-
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::compute_schlur_z_ref( size_t const& comp)
@@ -2366,44 +2303,6 @@ DDS_NavierStokesSystem::compute_schlur_z_ref( size_t const& comp)
       schlur_complement_z_ref[comp] ->set_item(m,m-1,a);
    }
 }
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_Aii_x_ref_P( void )
-//----------------------------------------------------------------------
-{
-
-   size_t nrows = Aii_x_main_diagonal_P -> nb_rows() ;
-
-   double temp = Aii_x_main_diagonal_P->item(0);
-   Aii_x_mod_super_diagonal_P-> set_item(0,Aii_x_super_diagonal_P ->item(0)/temp);
-
-   //  // Perform Forward Elimination
-   size_t m;
-
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=Aii_x_sub_diagonal_P ->item(m-1);
-     b=Aii_x_main_diagonal_P ->item(m);
-     prevc=Aii_x_mod_super_diagonal_P ->item(m-1);
-
-     if(m<nrows-1){
-         c=Aii_x_super_diagonal_P ->item(m);
-         Aii_x_mod_super_diagonal_P ->set_item(m,c/(b - a*prevc));
-     }
-   }
-   if(nb_procs_in_x == 1 && P_is_xperiodic == 1)
-      DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, P_vec_xu);   
-
-}
-
-
-
 
 //----------------------------------------------------------------------
 void
@@ -2437,43 +2336,6 @@ DDS_NavierStokesSystem::compute_schlur_x_ref_P( void )
    
 }
 
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_Aii_y_ref_P( void )
-//----------------------------------------------------------------------
-{
-   size_t nrows = Aii_y_main_diagonal_P -> nb_rows() ;
-   double temp = Aii_y_main_diagonal_P->item(0);
-   Aii_y_mod_super_diagonal_P-> set_item(0,Aii_y_super_diagonal_P ->item(0)/temp);
-
-    // Perform Forward Elimination
-   size_t m;
-
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=Aii_y_sub_diagonal_P ->item(m-1);
-     b=Aii_y_main_diagonal_P ->item(m);
-
-     prevc=Aii_y_mod_super_diagonal_P ->item(m-1);
-
-     if(m<nrows-1){
-         c=Aii_y_super_diagonal_P ->item(m);
-         Aii_y_mod_super_diagonal_P ->set_item(m,c/(b - a*prevc));
-     }
-
-   }
-   if(nb_procs_in_y == 1 && P_is_yperiodic == 1)
-      DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, P_vec_yu);   
-}
-
-
-
-
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::compute_schlur_y_ref_P( void )
@@ -2502,43 +2364,6 @@ DDS_NavierStokesSystem::compute_schlur_y_ref_P( void )
       schlur_complement_y_ref_P ->set_item(m,m-1,a);
    }
 }
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_Aii_z_ref_P( void )
-//----------------------------------------------------------------------
-{
-   size_t nrows = Aii_z_main_diagonal_P -> nb_rows() ;
-   double temp = Aii_z_main_diagonal_P->item(0);
-   Aii_z_mod_super_diagonal_P-> set_item(0,Aii_z_super_diagonal_P ->item(0)/temp);
-
-    // Perform Forward Elimination
-   size_t m;
-
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=Aii_z_sub_diagonal_P ->item(m-1);
-     b=Aii_z_main_diagonal_P ->item(m);
-
-     prevc=Aii_z_mod_super_diagonal_P ->item(m-1);
-
-     if(m<nrows-1){
-         c=Aii_z_super_diagonal_P ->item(m);
-         Aii_z_mod_super_diagonal_P ->set_item(m,c/(b - a*prevc));
-     }
-   }
-   if(nb_procs_in_z == 1 && P_is_zperiodic == 1)
-      DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, P_vec_zu);   
-
-}
-
-
-
 
 //----------------------------------------------------------------------
 void
@@ -2653,694 +2478,349 @@ DDS_NavierStokesSystem::mod_thomas_algorithm( LA_SeqVector* x,LA_SeqVector* y,LA
    }
 }
 
-
-
+//----------------------------------------------------------------------
+LA_SeqVector*
+DDS_NavierStokesSystem::get_aii_main_diag( size_t const& comp, size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_x" ) ;
+      return ( Aii_x_main_diagonal[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_y" ) ;
+      return ( Aii_y_main_diagonal[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_z" ) ;
+      return ( Aii_z_main_diagonal[comp] ) ;
+   }
+}
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_main_diag_in_x( size_t const& comp )
+DDS_NavierStokesSystem::get_aii_main_diag_P( size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x" ) ;
-
-   return ( Aii_x_main_diagonal[comp] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_P_in_x" ) ;
+      return ( Aii_x_main_diagonal_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_P_in_y" ) ;
+      return ( Aii_y_main_diagonal_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_P_in_z" ) ;
+      return ( Aii_z_main_diagonal_P ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_super_diag_in_x( size_t const& comp )
+DDS_NavierStokesSystem::get_aii_super_diag( size_t const& comp, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x" ) ;
-
-   return ( Aii_x_super_diagonal[comp] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_x" ) ;
+      return ( Aii_x_super_diagonal[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_y" ) ;
+      return ( Aii_y_super_diagonal[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_z" ) ;
+      return ( Aii_z_super_diagonal[comp] ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_sub_diag_in_x( size_t const& comp )
+DDS_NavierStokesSystem::get_aii_super_diag_P( size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x" ) ;
-
-   return ( Aii_x_sub_diagonal[comp] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_x_in_P" ) ;
+      return ( Aii_x_super_diagonal_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_y_in_P" ) ;
+      return ( Aii_y_super_diagonal_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_z_in_P" ) ;
+      return ( Aii_z_super_diagonal_P ) ;
+   }
 }
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aie_in_x( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_x" ) ;
-
-   return ( Aie_x[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aei_in_x( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_x" ) ;
-
-   return ( Aei_x[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aee_matrix_in_x( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aee_matrix" ) ;
-
-   return ( Aee_x[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_schlur_complement_in_x( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_x" ) ;
-
-   return ( schlur_complement_x[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aei_Aii_Aie_product_in_x( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_x" ) ;
-
-   return ( Aei_Aii_Aie_product_x[comp] ) ;
-
-}
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_main_diag_in_y( size_t const& comp )
+DDS_NavierStokesSystem::get_aii_mod_super_diag( size_t const& comp, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x" ) ;
-
-   return ( Aii_y_main_diagonal[comp] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_mod_super_diag_in_x" ) ;
+      return ( Aii_x_mod_super_diagonal[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_mod_super_diag_in_y" ) ;
+      return ( Aii_y_mod_super_diagonal[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_mod_super_diag_in_z" ) ;
+      return ( Aii_z_mod_super_diagonal[comp] ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_super_diag_in_y( size_t const& comp )
+DDS_NavierStokesSystem::get_aii_mod_super_diag_P( size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x" ) ;
-
-   return ( Aii_y_super_diagonal[comp] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_x_in_P" ) ;
+      return ( Aii_x_mod_super_diagonal_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_y_in_P" ) ;
+      return ( Aii_y_mod_super_diagonal_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_z_in_P" ) ;
+      return ( Aii_z_mod_super_diagonal_P ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_sub_diag_in_y( size_t const& comp )
+DDS_NavierStokesSystem::get_aii_sub_diag( size_t const& comp, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x" ) ;
-
-   return ( Aii_y_sub_diagonal[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aie_in_y( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_y" ) ;
-
-   return ( Aie_y[comp] ) ;
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_x" ) ;
+      return ( Aii_x_sub_diagonal[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_y" ) ;
+      return ( Aii_y_sub_diagonal[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_z" ) ;
+      return ( Aii_z_sub_diagonal[comp] ) ;
+   }
 
 }
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aei_in_y( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_y" ) ;
-
-   return ( Aei_y[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aee_matrix_in_y( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aee_matrix_in_y" ) ;
-
-   return ( Aee_y[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_schlur_complement_in_y( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_y" ) ;
-
-   return ( schlur_complement_y[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aei_Aii_Aie_product_in_y( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_y" ) ;
-
-   return ( Aei_Aii_Aie_product_y[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aii_in_z( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_z" ) ;
-
-   return ( Aii_z[comp] ) ;
-
-}
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_main_diag_in_z( size_t const& comp )
+DDS_NavierStokesSystem::get_aii_sub_diag_P( size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_z" ) ;
-
-   return ( Aii_z_main_diagonal[comp] ) ;
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_x_in_P" ) ;
+      return ( Aii_x_sub_diagonal_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_y_in_P" ) ;
+      return ( Aii_y_sub_diagonal_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_z_in_P" ) ;
+      return ( Aii_z_sub_diagonal_P ) ;
+   }
 
 }
 
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_aie( size_t const& comp, size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_x" ) ;
+      return ( Aie_x[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_y" ) ;
+      return ( Aie_y[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_z" ) ;
+      return ( Aie_z[comp] ) ;
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_aei( size_t const& comp, size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_x" ) ;
+      return ( Aei_x[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_y" ) ;
+      return ( Aei_y[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_z" ) ;
+      return ( Aei_z[comp] ) ;
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_aie_P( size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_x_in_P" ) ;
+      return ( Aie_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_y_in_P" ) ;
+      return ( Aie_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_z_in_P" ) ;
+      return ( Aie_z_P ) ;
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_aei_P( size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_x_in_P" ) ;
+      return ( Aei_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_y_in_P" ) ;
+      return ( Aei_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_z_in_P" ) ;
+      return ( Aei_z_P ) ;
+   }
+}
 
 
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_Aee_matrix( size_t const& comp, size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_x" ) ;
+      return ( Aee_x[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_y" ) ;
+      return ( Aee_y[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_z" ) ;
+      return ( Aee_z[comp] ) ;
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_Aee_matrix_P( size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_x_in_P" ) ;
+      return ( Aee_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_y_in_P" ) ;
+      return ( Aee_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_z_in_P" ) ;
+      return ( Aee_z_P ) ;
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_schlur_complement( size_t const& comp, size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_x" ) ;
+      return ( schlur_complement_x[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_y" ) ;
+      return ( schlur_complement_y[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_z" ) ;
+      return ( schlur_complement_z[comp] ) ;
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_schlur_complement_P( size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_x_in_P" ) ;
+      return ( schlur_complement_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_y_in_P" ) ;
+      return ( schlur_complement_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_z_in_P" ) ;
+      return ( schlur_complement_z_P ) ;
+   }
+}
+
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_Aei_Aii_Aie_product( size_t const& comp, size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_x" ) ;
+      return ( Aei_Aii_Aie_product_x[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_y" ) ;
+      return ( Aei_Aii_Aie_product_y[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_z" ) ;
+      return ( Aei_Aii_Aie_product_z[comp] ) ;
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_Aei_Aii_Aie_product_P( size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_x_in_P" ) ;
+      return ( Aei_Aii_Aie_product_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_y_in_P" ) ;
+      return ( Aei_Aii_Aie_product_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_z_in_P" ) ;
+      return ( Aei_Aii_Aie_product_z_P ) ;
+   }
+}
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_super_diag_in_z( size_t const& comp )
+DDS_NavierStokesSystem::get_Aii_Aie_product( size_t const& comp, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x" ) ;
-
-   return ( Aii_z_super_diagonal[comp] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_x" ) ;
+      return ( Aii_Aie_product_x[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_y" ) ;
+      return ( Aii_Aie_product_y[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_z" ) ;
+      return ( Aii_Aie_product_z[comp] ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_sub_diag_in_z( size_t const& comp )
+DDS_NavierStokesSystem::get_Aii_Aie_product_P( size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x" ) ;
-
-   return ( Aii_z_sub_diagonal[comp] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_x_in_P" ) ;
+      return ( Aii_Aie_product_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_y_in_P" ) ;
+      return ( Aii_Aie_product_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_z_in_P" ) ;
+      return ( Aii_Aie_product_z_P ) ;
+   }
 }
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aie_in_z( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_z" ) ;
-
-   return ( Aie_z[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aei_in_z( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_z" ) ;
-
-   return ( Aei_z[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aee_matrix_in_z( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aee_matrix_in_z" ) ;
-
-   return ( Aee_z[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_schlur_complement_in_z( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_z" ) ;
-
-   return ( schlur_complement_z[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aei_Aii_Aie_product_in_z( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_z" ) ;
-
-   return ( Aei_Aii_Aie_product_z[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_main_diag_in_x_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x_P" ) ;
-
-   return ( Aii_x_main_diagonal_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_super_diag_in_x_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x_P" ) ;
-
-   return ( Aii_x_super_diagonal_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_sub_diag_in_x_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_x_P" ) ;
-
-   return ( Aii_x_sub_diagonal_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aie_in_x_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_x_P" ) ;
-
-   return ( Aie_x_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aei_in_x_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_x_P" ) ;
-
-   return ( Aei_x_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aee_matrix_in_x_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aee_matrix_P" ) ;
-
-   return ( Aee_x_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_schlur_complement_in_x_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_x_P" ) ;
-
-   return ( schlur_complement_x_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aei_Aii_Aie_product_in_x_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_x_P" ) ;
-
-   return ( Aei_Aii_Aie_product_x_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_main_diag_in_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_y_P" ) ;
-
-   return ( Aii_y_main_diagonal_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_super_diag_in_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_y_P" ) ;
-
-   return ( Aii_y_super_diagonal_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_sub_diag_in_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_y_P" ) ;
-
-   return ( Aii_y_sub_diagonal_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aie_in_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_y_P" ) ;
-
-   return ( Aie_y_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aei_in_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_y_P" ) ;
-
-   return ( Aei_y_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aee_matrix_in_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aee_matrix_P" ) ;
-
-   return ( Aee_y_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_schlur_complement_in_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_y_P" ) ;
-
-   return ( schlur_complement_y_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aei_Aii_Aie_product_in_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_y_P" ) ;
-
-   return ( Aei_Aii_Aie_product_y_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_main_diag_in_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_z_P" ) ;
-
-   return ( Aii_z_main_diagonal_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_super_diag_in_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_z_P" ) ;
-
-   return ( Aii_z_super_diagonal_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_sub_diag_in_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_in_z_P" ) ;
-
-   return ( Aii_z_sub_diagonal_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aie_in_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_z_P" ) ;
-
-   return ( Aie_z_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aei_in_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_z_P" ) ;
-
-   return ( Aei_z_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aee_matrix_in_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aee_matrix_P" ) ;
-
-   return ( Aee_z_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_schlur_complement_in_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_z_P" ) ;
-
-   return ( schlur_complement_z_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aei_Aii_Aie_product_in_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_z_P" ) ;
-
-   return ( Aei_Aii_Aie_product_z_P ) ;
-
-}
-
-
-
 
 //----------------------------------------------------------------------
 void
@@ -3564,20 +3044,20 @@ DDS_NavierStokesSystem::DS_NavierStokes_x_solver(
    }
 
    // Put the interface unknowns in distributed vector
-   if(nb_procs_in_x > 1){
-      if(U_is_xperiodic == 1){
+   if(nb_procs_in_i[0] > 1){
+      if(is_Uperiodic[0] == 1){
           i = min_i + nb_local_unk_x ;
           global_number_in_distributed_vector =
           UF->DOF_global_number( i, j, k, comp );
           VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_x ) );
+             interface_rhs->item( proc_pos_in_i[0] ) );
       }
-      else if(proc_pos_in_x != nb_procs_in_x-1){
+      else if(proc_pos_in_i[0] != nb_procs_in_i[0]-1){
           i = min_i + nb_local_unk_x ;
           global_number_in_distributed_vector =
           UF->DOF_global_number( i, j, k, comp );
           VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_x ) );
+             interface_rhs->item( proc_pos_in_i[0] ) );
       }
    }
 }
@@ -3643,20 +3123,20 @@ DDS_NavierStokesSystem::DS_NavierStokes_y_solver(
    }
 
    // Put the interface unknowns in distributed vector
-   if(nb_procs_in_y > 1){
-      if(U_is_yperiodic == 1){
+   if(nb_procs_in_i[1] > 1){
+      if(is_Uperiodic[1] == 1){
           j = min_j + nb_local_unk_y ;
           global_number_in_distributed_vector =
           UF->DOF_global_number( i, j, k, comp);
           VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_y ) );
+             interface_rhs->item( proc_pos_in_i[1] ) );
       }
-      else if(proc_pos_in_y != nb_procs_in_y-1){
+      else if(proc_pos_in_i[1] != nb_procs_in_i[1]-1){
           j = min_j + nb_local_unk_y ;
           global_number_in_distributed_vector =
           UF->DOF_global_number( i, j, k, comp);
           VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_y ) );
+             interface_rhs->item( proc_pos_in_i[1] ) );
       }
    }
 }
@@ -3719,20 +3199,20 @@ DDS_NavierStokesSystem::DS_NavierStokes_z_solver(
    }
 
     // Put the interface unknowns in distributed vector
-   if(nb_procs_in_z > 1){
-      if(U_is_zperiodic == 1){
+   if(nb_procs_in_i[2] > 1){
+      if(is_Uperiodic[2] == 1){
           k = min_k + nb_local_unk_z ;
           global_number_in_distributed_vector =
           UF->DOF_global_number( i, j, k, comp );
           VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_z ) );
+             interface_rhs->item( proc_pos_in_i[2] ) );
       }
-      else if(proc_pos_in_z != nb_procs_in_z-1){
+      else if(proc_pos_in_i[2] != nb_procs_in_i[2]-1){
           k = min_k + nb_local_unk_z ;
           global_number_in_distributed_vector =
           UF->DOF_global_number( i, j, k, comp );
           VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_z ) );
+             interface_rhs->item( proc_pos_in_i[2] ) );
       } 
    }
    
@@ -3800,20 +3280,20 @@ DDS_NavierStokesSystem::DS_NavierStokes_x_solver_P(
    }
 
    // Put the interface unknowns in distributed vector for pressure
-   if(nb_procs_in_x > 1){
-    if(P_is_xperiodic == 1){
+   if(nb_procs_in_i[0] > 1){
+    if(is_Pperiodic[0] == 1){
       i = min_i + nb_local_unk_x ;
       global_number_in_distributed_vector =
       PF->DOF_global_number( i, j, k, 0 );
       VEC_DS_PF->set_item( global_number_in_distributed_vector,
-         interface_rhs->item( proc_pos_in_x ) );
+         interface_rhs->item( proc_pos_in_i[0] ) );
     }
-    else if(proc_pos_in_x != nb_procs_in_x-1){
+    else if(proc_pos_in_i[0] != nb_procs_in_i[0]-1){
       i = min_i + nb_local_unk_x ;
       global_number_in_distributed_vector =
       PF->DOF_global_number( i, j, k, 0 );
       VEC_DS_PF->set_item( global_number_in_distributed_vector,
-         interface_rhs->item( proc_pos_in_x ) );
+         interface_rhs->item( proc_pos_in_i[0] ) );
     } 
    }
    
@@ -3883,20 +3363,20 @@ DDS_NavierStokesSystem::DS_NavierStokes_y_solver_P(
    }
 
    // Put the interface unknowns in distributed vector for pressure
-   if(nb_procs_in_y > 1){
-    if(P_is_yperiodic == 1){
+   if(nb_procs_in_i[1] > 1){
+    if(is_Pperiodic[1] == 1){
       j = min_j + nb_local_unk_y ;
       global_number_in_distributed_vector =
       PF->DOF_global_number( i, j, k, 0);
       VEC_DS_PF->set_item( global_number_in_distributed_vector,
-         interface_rhs->item( proc_pos_in_y ) );
+         interface_rhs->item( proc_pos_in_i[1] ) );
     }
-    else if(proc_pos_in_y != nb_procs_in_y-1){
+    else if(proc_pos_in_i[1] != nb_procs_in_i[1]-1){
       j = min_j + nb_local_unk_y ;
       global_number_in_distributed_vector =
       PF->DOF_global_number( i, j, k, 0);
       VEC_DS_PF->set_item( global_number_in_distributed_vector,
-         interface_rhs->item( proc_pos_in_y ) );
+         interface_rhs->item( proc_pos_in_i[1] ) );
     }
    }
 
@@ -3962,20 +3442,20 @@ DDS_NavierStokesSystem::DS_NavierStokes_z_solver_P(
    }
 
     // Put the interface unknowns in distributed vector for pressure
-   if(nb_procs_in_z > 1){
-      if(P_is_zperiodic == 1){
+   if(nb_procs_in_i[2] > 1){
+      if(is_Pperiodic[2] == 1){
           k = min_k + nb_local_unk_z ;
           global_number_in_distributed_vector =
           PF->DOF_global_number( i, j, k, 0 );
           VEC_DS_PF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_z ) );
+             interface_rhs->item( proc_pos_in_i[2] ) );
       }
-      else if(proc_pos_in_z != nb_procs_in_z-1){
+      else if(proc_pos_in_i[2] != nb_procs_in_i[2]-1){
           k = min_k + nb_local_unk_z ;
           global_number_in_distributed_vector =
           PF->DOF_global_number( i, j, k, 0 );
           VEC_DS_PF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_z ) );
+             interface_rhs->item( proc_pos_in_i[2] ) );
       }
    }
 }
@@ -4051,761 +3531,137 @@ DDS_NavierStokesSystem::synchronize_DS_solution_vec_P( void )
    VEC_DS_PF->synchronize();
 }
 
-
-
-
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_product_matrix_x( size_t const& comp )
+DDS_NavierStokesSystem::compute_product_matrix_interior(size_t const& comp, size_t const column, size_t const dir)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix_x" ) ;
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir);
+   LA_SeqVector* product_result = get_product_result(comp,dir);
+   LA_SeqVector* Aii_Aie = get_Aii_Aie_product(comp,dir);
+   LA_SeqMatrix* Aei_Aii_Aie = get_Aei_Aii_Aie_product(comp,dir);
 
-   int i;
-   if(U_is_xperiodic != 1)
-   {
-       if(proc_pos_in_x == nb_procs_in_x-1)
-       {
+   LA_SeqMatrix* Aie = get_aie(comp,dir);
+   LA_SeqMatrix* Aei = get_aei(comp,dir);
 
-          // Get appropriate column of Aie
-          Aie_x[comp] -> extract_col( proc_pos_in_x-1, product_result_x[comp] );
 
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], product_result_x[comp]);
+  // Get appropriate column of Aie
+  Aie->extract_col(column, product_result);
 
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_x[comp]->multiply_vec_then_add(product_result_x[comp],Aii_Aie_product_x[comp]);
-          for(i=0;i<nb_procs_in_x-1;i++){
-             Aei_Aii_Aie_product_x[comp]->set_item(i,proc_pos_in_x-1,Aii_Aie_product_x[comp]->item(i));
-          }
-       }
+  // Get inv(Aii)*Aie for for appropriate column of Aie
+  mod_thomas_algorithm(Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, product_result);
 
-       else if(proc_pos_in_x == 0){
+  // Get product of Aei*inv(Aii)*Aie for appropriate column
+  Aei->multiply_vec_then_add(product_result,Aii_Aie);
 
-          // Get appropriate column of Aie
-          Aie_x[comp] -> extract_col( proc_pos_in_x, product_result_x[comp] );
+  size_t nb_procs;
 
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], product_result_x[comp]);
+  nb_procs = nb_procs_in_i[dir];
 
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_x[comp]->multiply_vec_then_add(product_result_x[comp],Aii_Aie_product_x[comp]);
-          for(i=0;i<nb_procs_in_x-1;i++){
-          Aei_Aii_Aie_product_x[comp]->set_item(i,proc_pos_in_x,Aii_Aie_product_x[comp]->item(i));
-          }
-       }
-       else{
+  size_t int_unknown = Aii_Aie->nb_rows();
 
-          // Get appropriate column of Aie
-          Aie_x[comp] -> extract_col( proc_pos_in_x-1, product_result_x[comp] );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], product_result_x[comp]);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_x[comp]->multiply_vec_then_add(product_result_x[comp],Aii_Aie_product_x[comp]);
-          for(i=0;i<nb_procs_in_x-1;i++){
-             Aei_Aii_Aie_product_x[comp]->set_item(i,proc_pos_in_x-1,Aii_Aie_product_x[comp]->item(i));
-          }
-
-          // Get appropriate column of Aie
-          Aie_x[comp] -> extract_col( proc_pos_in_x, product_result_x[comp] );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], product_result_x[comp]);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_x[comp]->multiply_vec_then_add(product_result_x[comp],Aii_Aie_product_x[comp]);
-          for(i=0;i<nb_procs_in_x-1;i++){
-             Aei_Aii_Aie_product_x[comp]->set_item(i,proc_pos_in_x,Aii_Aie_product_x[comp]->item(i));
-          }
-       } 
-   }
-   else{
-    
-    if(proc_pos_in_x == 0){
-
-      // Get appropriate column of Aie
-      Aie_x[comp] -> extract_col( proc_pos_in_x, product_result_x[comp] );
-
-      // Get inv(Aii)*Aie for for appropriate column of Aie
-      DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], product_result_x[comp]);
-
-      // Get product of Aei*inv(Aii)*Aie for appropriate column
-      Aei_x[comp]->multiply_vec_then_add(product_result_x[comp],Aii_Aie_product_x[comp]);
-      for(i=0;i<nb_procs_in_x;i++){
-      Aei_Aii_Aie_product_x[comp]->set_item(i,proc_pos_in_x,Aii_Aie_product_x[comp]->item(i));
-      }
-
-      // Get appropriate column of Aie
-      Aie_x[comp] -> extract_col( nb_procs_in_x-1, product_result_x[comp] );
-
-      // Get inv(Aii)*Aie for for appropriate column of Aie
-      DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], product_result_x[comp]);
-
-      // Get product of Aei*inv(Aii)*Aie for appropriate column
-      Aei_x[comp]->multiply_vec_then_add(product_result_x[comp],Aii_Aie_product_x[comp]);
-      for(i=0;i<nb_procs_in_x;i++){
-      Aei_Aii_Aie_product_x[comp]->set_item(i,nb_procs_in_x-1,Aii_Aie_product_x[comp]->item(i));
-      }
-    }
-    else{
-
-      // Get appropriate column of Aie
-      Aie_x[comp] -> extract_col( proc_pos_in_x-1, product_result_x[comp] );
-
-      // Get inv(Aii)*Aie for for appropriate column of Aie
-      DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], product_result_x[comp]);
-
-      // Get product of Aei*inv(Aii)*Aie for appropriate column
-      Aei_x[comp]->multiply_vec_then_add(product_result_x[comp],Aii_Aie_product_x[comp]);
-      for(i=0;i<nb_procs_in_x;i++){
-         Aei_Aii_Aie_product_x[comp]->set_item(i,proc_pos_in_x-1,Aii_Aie_product_x[comp]->item(i));
-      }
-
-      // Get appropriate column of Aie
-      Aie_x[comp] -> extract_col( proc_pos_in_x, product_result_x[comp] );
-
-      // Get inv(Aii)*Aie for for appropriate column of Aie
-      DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], product_result_x[comp]);
-
-      // Get product of Aei*inv(Aii)*Aie for appropriate column
-      Aei_x[comp]->multiply_vec_then_add(product_result_x[comp],Aii_Aie_product_x[comp]);
-      for(i=0;i<nb_procs_in_x;i++){
-         Aei_Aii_Aie_product_x[comp]->set_item(i,proc_pos_in_x,Aii_Aie_product_x[comp]->item(i));
-      }
-   }
-   }
-   
+  for (size_t i = 0; i < int_unknown; i++){
+      Aei_Aii_Aie->set_item(i,column,Aii_Aie->item(i));
+  }
 
 }
 
-
-
-
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_product_matrix_y( size_t const& comp )
+DDS_NavierStokesSystem::compute_product_matrix( size_t const& comp, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix_y" ) ;
+   MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix" ) ;
 
-   int i;
-   if(U_is_yperiodic != 1){
-      if(proc_pos_in_y == nb_procs_in_y-1){
+   size_t proc_pos, nb_procs;
 
-          // Get appropriate column of Aie
-          Aie_y[comp] -> extract_col( proc_pos_in_y-1, product_result_y[comp] );
+   proc_pos = proc_pos_in_i[dir];
+   nb_procs = nb_procs_in_i[dir];
 
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], product_result_y[comp]);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_y[comp]->multiply_vec_then_add(product_result_y[comp],Aii_Aie_product_y[comp]);
-          for(i=0;i<nb_procs_in_y-1;i++){
-             Aei_Aii_Aie_product_y[comp]->set_item(i,proc_pos_in_y-1,Aii_Aie_product_y[comp]->item(i));
-          }
-       }
-       else if(proc_pos_in_y==0){
-
-          // Get appropriate column of Aie
-          Aie_y[comp] -> extract_col( proc_pos_in_y, product_result_y[comp] );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], product_result_y[comp]);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_y[comp]->multiply_vec_then_add(product_result_y[comp],Aii_Aie_product_y[comp]);
-          for(i=0;i<nb_procs_in_y-1;i++){
-             Aei_Aii_Aie_product_y[comp]->set_item(i,proc_pos_in_y,Aii_Aie_product_y[comp]->item(i));
-          }
-       }
-       else{
-
-          // Get appropriate column of Aie
-          Aie_y[comp] -> extract_col( proc_pos_in_y-1, product_result_y[comp] );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], product_result_y[comp]);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_y[comp]->multiply_vec_then_add(product_result_y[comp],Aii_Aie_product_y[comp]);
-          for(i=0;i<nb_procs_in_y-1;i++){
-             Aei_Aii_Aie_product_y[comp]->set_item(i,proc_pos_in_y-1,Aii_Aie_product_y[comp]->item(i));
-          }
-
-          // Get appropriate column of Aie
-          Aie_y[comp] -> extract_col( proc_pos_in_y, product_result_y[comp] );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], product_result_y[comp]);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_y[comp]->multiply_vec_then_add(product_result_y[comp],Aii_Aie_product_y[comp]);
-          for(i=0;i<nb_procs_in_y-1;i++){
-             Aei_Aii_Aie_product_y[comp]->set_item(i,proc_pos_in_y,Aii_Aie_product_y[comp]->item(i));
-          }
-        }
-   }
-   else{
-       if(proc_pos_in_y==0){
-
-          // Get appropriate column of Aie
-          Aie_y[comp] -> extract_col( proc_pos_in_y, product_result_y[comp] );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], product_result_y[comp]);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_y[comp]->multiply_vec_then_add(product_result_y[comp],Aii_Aie_product_y[comp]);
-          for(i=0;i<nb_procs_in_y;i++){
-             Aei_Aii_Aie_product_y[comp]->set_item(i,proc_pos_in_y,Aii_Aie_product_y[comp]->item(i));
-          }
-
-          // Get appropriate column of Aie
-          Aie_y[comp] -> extract_col( nb_procs_in_y-1, product_result_y[comp] );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], product_result_y[comp]);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_y[comp]->multiply_vec_then_add(product_result_y[comp],Aii_Aie_product_y[comp]);
-          for(i=0;i<nb_procs_in_y;i++){
-             Aei_Aii_Aie_product_y[comp]->set_item(i,nb_procs_in_y-1,Aii_Aie_product_y[comp]->item(i));
-          }
-       }
-       else{
-
-          // Get appropriate column of Aie
-          Aie_y[comp] -> extract_col( proc_pos_in_y-1, product_result_y[comp] );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], product_result_y[comp]);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_y[comp]->multiply_vec_then_add(product_result_y[comp],Aii_Aie_product_y[comp]);
-          for(i=0;i<nb_procs_in_y;i++){
-             Aei_Aii_Aie_product_y[comp]->set_item(i,proc_pos_in_y-1,Aii_Aie_product_y[comp]->item(i));
-          }
-
-          // Get appropriate column of Aie
-          Aie_y[comp] -> extract_col( proc_pos_in_y, product_result_y[comp] );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], product_result_y[comp]);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_y[comp]->multiply_vec_then_add(product_result_y[comp],Aii_Aie_product_y[comp]);
-          for(i=0;i<nb_procs_in_y;i++){
-             Aei_Aii_Aie_product_y[comp]->set_item(i,proc_pos_in_y,Aii_Aie_product_y[comp]->item(i));
-          }
-        }
-   }       
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_product_matrix_z( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix_z" ) ;
-
-   int i;
-
-   if(U_is_zperiodic !=1){
-      if(proc_pos_in_z == nb_procs_in_z-1){
-
-        // Get appropriate column of Aie
-        Aie_z[comp] -> extract_col( proc_pos_in_z-1, product_result_z[comp] );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], product_result_z[comp]);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z[comp]->multiply_vec_then_add(product_result_z[comp],Aii_Aie_product_z[comp]);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z[comp]->set_item(i,proc_pos_in_z-1,Aii_Aie_product_z[comp]->item(i));
-        }
-     }
-     else if(proc_pos_in_z==0){
-
-        // Get appropriate column of Aie
-        Aie_z[comp] -> extract_col( proc_pos_in_z, product_result_z[comp] );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], product_result_z[comp]);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z[comp]->multiply_vec_then_add(product_result_z[comp],Aii_Aie_product_z[comp]);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z[comp]->set_item(i,proc_pos_in_z,Aii_Aie_product_z[comp]->item(i));
-        }
-     }
-     else{
-
-        // Get appropriate column of Aie
-        Aie_z[comp] -> extract_col( proc_pos_in_z-1, product_result_z[comp] );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], product_result_z[comp]);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z[comp]->multiply_vec_then_add(product_result_z[comp],Aii_Aie_product_z[comp]);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z[comp]->set_item(i,proc_pos_in_z-1,Aii_Aie_product_z[comp]->item(i));
-        }
-
-        // Get appropriate column of Aie
-        Aie_z[comp] -> extract_col( proc_pos_in_z, product_result_z[comp] );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], product_result_z[comp]);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z[comp]->multiply_vec_then_add(product_result_z[comp],Aii_Aie_product_z[comp]);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z[comp]->set_item(i,proc_pos_in_z,Aii_Aie_product_z[comp]->item(i));
-        }
+   if (proc_pos == nb_procs - 1){
+      // Condition for serial processor and multi processor
+      if (proc_pos == 0) {
+         compute_product_matrix_interior(comp,proc_pos,dir);
+      } else {
+         compute_product_matrix_interior(comp,proc_pos-1,dir);
+         if (is_Uperiodic[dir] == 1) compute_product_matrix_interior(comp,proc_pos,dir);
       }
-   }
-   else{
-     if(proc_pos_in_z==0){
-
-        // Get appropriate column of Aie
-        Aie_z[comp] -> extract_col( proc_pos_in_z, product_result_z[comp] );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], product_result_z[comp]);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z[comp]->multiply_vec_then_add(product_result_z[comp],Aii_Aie_product_z[comp]);
-        for(i=0;i<nb_procs_in_z;i++){
-           Aei_Aii_Aie_product_z[comp]->set_item(i,proc_pos_in_z,Aii_Aie_product_z[comp]->item(i));
-        }
-
-        // Get appropriate column of Aie
-        Aie_z[comp] -> extract_col( nb_procs_in_z-1, product_result_z[comp] );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], product_result_z[comp]);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z[comp]->multiply_vec_then_add(product_result_z[comp],Aii_Aie_product_z[comp]);
-        for(i=0;i<nb_procs_in_z;i++){
-           Aei_Aii_Aie_product_z[comp]->set_item(i,nb_procs_in_z-1,Aii_Aie_product_z[comp]->item(i));
-        }
-     }
-     else{
-
-        // Get appropriate column of Aie
-        Aie_z[comp] -> extract_col( proc_pos_in_z-1, product_result_z[comp] );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], product_result_z[comp]);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z[comp]->multiply_vec_then_add(product_result_z[comp],Aii_Aie_product_z[comp]);
-        for(i=0;i<nb_procs_in_z;i++){
-           Aei_Aii_Aie_product_z[comp]->set_item(i,proc_pos_in_z-1,Aii_Aie_product_z[comp]->item(i));
-        }
-
-        // Get appropriate column of Aie
-        Aie_z[comp] -> extract_col( proc_pos_in_z, product_result_z[comp] );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], product_result_z[comp]);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z[comp]->multiply_vec_then_add(product_result_z[comp],Aii_Aie_product_z[comp]);
-        for(i=0;i<nb_procs_in_z;i++){
-           Aei_Aii_Aie_product_z[comp]->set_item(i,proc_pos_in_z,Aii_Aie_product_z[comp]->item(i));
-        }
-      }
+   }else if(proc_pos == 0){
+      compute_product_matrix_interior(comp,proc_pos,dir);
+      if (is_Uperiodic[dir] == 1) compute_product_matrix_interior(comp,nb_procs-1,dir);
+   }else{
+      compute_product_matrix_interior(comp,proc_pos-1,dir);
+      compute_product_matrix_interior(comp,proc_pos,dir);
    }
 }
 
-
-
-
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_product_matrix_x_P( void )
+DDS_NavierStokesSystem::compute_product_matrix_interior_P(size_t const column, size_t const dir)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix_x_P" ) ;
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag_P(dir);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag_P(dir);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag_P(dir);
+   LA_SeqVector* product_result = get_product_result_P(dir);
+   LA_SeqVector* Aii_Aie = get_Aii_Aie_product_P(dir);
+   LA_SeqMatrix* Aei_Aii_Aie = get_Aei_Aii_Aie_product_P(dir);
 
-   int i;
-   if(P_is_xperiodic != 1)
-   {
-       if(proc_pos_in_x == nb_procs_in_x-1){
-
-          // Get appropriate column of Aie
-          Aie_x_P -> extract_col( proc_pos_in_x-1, product_result_x_P );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, product_result_x_P);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_x_P->multiply_vec_then_add(product_result_x_P,Aii_Aie_product_x_P);
-          for(i=0;i<nb_procs_in_x-1;i++){
-             Aei_Aii_Aie_product_x_P->set_item(i,proc_pos_in_x-1,Aii_Aie_product_x_P->item(i));
-          }
-       }
-
-       else if(proc_pos_in_x == 0){
-
-          // Get appropriate column of Aie
-          Aie_x_P -> extract_col( proc_pos_in_x, product_result_x_P );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, product_result_x_P);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_x_P->multiply_vec_then_add(product_result_x_P,Aii_Aie_product_x_P);
-          for(i=0;i<nb_procs_in_x-1;i++){
-          Aei_Aii_Aie_product_x_P->set_item(i,proc_pos_in_x,Aii_Aie_product_x_P->item(i));
-        }
-       }
-       else{
-
-          // Get appropriate column of Aie
-          Aie_x_P -> extract_col( proc_pos_in_x-1, product_result_x_P );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, product_result_x_P);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_x_P->multiply_vec_then_add(product_result_x_P,Aii_Aie_product_x_P);
-        for(i=0;i<nb_procs_in_x-1;i++){
-           Aei_Aii_Aie_product_x_P->set_item(i,proc_pos_in_x-1,Aii_Aie_product_x_P->item(i));
-        }
-
-          // Get appropriate column of Aie
-        Aie_x_P -> extract_col( proc_pos_in_x, product_result_x_P );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, product_result_x_P);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_x_P->multiply_vec_then_add(product_result_x_P,Aii_Aie_product_x_P);
-        for(i=0;i<nb_procs_in_x-1;i++){
-           Aei_Aii_Aie_product_x_P->set_item(i,proc_pos_in_x,Aii_Aie_product_x_P->item(i));
-        }
-       }
-    }
-    else
-    {
-      if(proc_pos_in_x == 0){
-
-          // Get appropriate column of Aie
-          Aie_x_P -> extract_col( proc_pos_in_x, product_result_x_P );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, product_result_x_P);
-
-          // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_x_P->multiply_vec_then_add(product_result_x_P,Aii_Aie_product_x_P);
-          for(i=0;i<nb_procs_in_x-1;i++){
-            Aei_Aii_Aie_product_x_P->set_item(i,proc_pos_in_x,Aii_Aie_product_x_P->item(i));
-          }
-
-          // Get appropriate column of Aie
-          Aie_x_P -> extract_col( nb_procs_in_x-1, product_result_x_P );
-
-            // Get inv(Aii)*Aie for for appropriate column of Aie
-            DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, product_result_x_P);
-
-            // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_x_P->multiply_vec_then_add(product_result_x_P,Aii_Aie_product_x_P);
-          for(i=0;i<nb_procs_in_x-1;i++){
-             Aei_Aii_Aie_product_x_P->set_item(i,nb_procs_in_x-1,Aii_Aie_product_x_P->item(i));
-          }
-       }
-       else{
-
-          // Get appropriate column of Aie
-          Aie_x_P -> extract_col( proc_pos_in_x-1, product_result_x_P );
-
-          // Get inv(Aii)*Aie for for appropriate column of Aie
-          DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, product_result_x_P);
-
-            // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_x_P->multiply_vec_then_add(product_result_x_P,Aii_Aie_product_x_P);
-          for(i=0;i<nb_procs_in_x-1;i++){
-             Aei_Aii_Aie_product_x_P->set_item(i,proc_pos_in_x-1,Aii_Aie_product_x_P->item(i));
-          }
-
-          // Get appropriate column of Aie
-          Aie_x_P -> extract_col( proc_pos_in_x, product_result_x_P );
-
-            // Get inv(Aii)*Aie for for appropriate column of Aie
-            DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, product_result_x_P);
-
-            // Get product of Aei*inv(Aii)*Aie for appropriate column
-          Aei_x_P->multiply_vec_then_add(product_result_x_P,Aii_Aie_product_x_P);
-          for(i=0;i<nb_procs_in_x-1;i++){
-             Aei_Aii_Aie_product_x_P->set_item(i,proc_pos_in_x,Aii_Aie_product_x_P->item(i));
-          }
-       }
-    }
-}
+   LA_SeqMatrix* Aie = get_aie_P(dir);
+   LA_SeqMatrix* Aei = get_aei_P(dir);
 
 
+  // Get appropriate column of Aie
+  Aie->extract_col(column, product_result);
 
+  // Get inv(Aii)*Aie for for appropriate column of Aie
+  mod_thomas_algorithm(Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, product_result);
 
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_product_matrix_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix_y_P" ) ;
+  // Get product of Aei*inv(Aii)*Aie for appropriate column
+  Aei->multiply_vec_then_add(product_result,Aii_Aie);
 
-   int i;
+  size_t nb_procs;
 
-   if(P_is_yperiodic != 1)
-   {
-    if(proc_pos_in_y == nb_procs_in_y-1){
-        // Get appropriate column of Aie
-        Aie_y_P -> extract_col( proc_pos_in_y-1, product_result_y_P );
+  nb_procs = nb_procs_in_i[dir];
 
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, product_result_y_P);
+  size_t int_unknown = Aii_Aie->nb_rows();
 
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_y_P->multiply_vec_then_add(product_result_y_P,Aii_Aie_product_y_P);
-        for(i=0;i<nb_procs_in_y-1;i++){
-           Aei_Aii_Aie_product_y_P->set_item(i,proc_pos_in_y-1,Aii_Aie_product_y_P->item(i));
-        }
-     }
-     if(proc_pos_in_y==0){
-
-        // Get appropriate column of Aie
-        Aie_y_P -> extract_col( proc_pos_in_y, product_result_y_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, product_result_y_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_y_P->multiply_vec_then_add(product_result_y_P,Aii_Aie_product_y_P);
-        for(i=0;i<nb_procs_in_y-1;i++){
-           Aei_Aii_Aie_product_y_P->set_item(i,proc_pos_in_y,Aii_Aie_product_y_P->item(i));
-        }
-     }
-     else{
-
-        // Get appropriate column of Aie
-        Aie_y_P -> extract_col( proc_pos_in_y-1, product_result_y_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, product_result_y_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_y_P->multiply_vec_then_add(product_result_y_P,Aii_Aie_product_y_P);
-        for(i=0;i<nb_procs_in_y-1;i++){
-           Aei_Aii_Aie_product_y_P->set_item(i,proc_pos_in_y-1,Aii_Aie_product_y_P->item(i));
-        }
-
-        // Get appropriate column of Aie
-        Aie_y_P -> extract_col( proc_pos_in_y, product_result_y_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, product_result_y_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_y_P->multiply_vec_then_add(product_result_y_P,Aii_Aie_product_y_P);
-        for(i=0;i<nb_procs_in_y-1;i++){
-           Aei_Aii_Aie_product_y_P->set_item(i,proc_pos_in_y,Aii_Aie_product_y_P->item(i));
-        }
-      }
-   }
-   else
-   {
-      if(proc_pos_in_y==0){
-
-        // Get appropriate column of Aie
-        Aie_y_P -> extract_col( proc_pos_in_y, product_result_y_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, product_result_y_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_y_P->multiply_vec_then_add(product_result_y_P,Aii_Aie_product_y_P);
-        for(i=0;i<nb_procs_in_y-1;i++){
-           Aei_Aii_Aie_product_y_P->set_item(i,proc_pos_in_y,Aii_Aie_product_y_P->item(i));
-        }
-
-        // Get appropriate column of Aie
-        Aie_y_P -> extract_col( nb_procs_in_y-1, product_result_y_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, product_result_y_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_y_P->multiply_vec_then_add(product_result_y_P,Aii_Aie_product_y_P);
-        for(i=0;i<nb_procs_in_y-1;i++){
-           Aei_Aii_Aie_product_y_P->set_item(i,nb_procs_in_y-1,Aii_Aie_product_y_P->item(i));
-        }
-     }
-     else{
-
-        // Get appropriate column of Aie
-        Aie_y_P -> extract_col( proc_pos_in_y-1, product_result_y_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, product_result_y_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_y_P->multiply_vec_then_add(product_result_y_P,Aii_Aie_product_y_P);
-        for(i=0;i<nb_procs_in_y-1;i++){
-           Aei_Aii_Aie_product_y_P->set_item(i,proc_pos_in_y-1,Aii_Aie_product_y_P->item(i));
-        }
-
-        // Get appropriate column of Aie
-        Aie_y_P -> extract_col( proc_pos_in_y, product_result_y_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, product_result_y_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_y_P->multiply_vec_then_add(product_result_y_P,Aii_Aie_product_y_P);
-        for(i=0;i<nb_procs_in_y-1;i++){
-           Aei_Aii_Aie_product_y_P->set_item(i,proc_pos_in_y,Aii_Aie_product_y_P->item(i));
-        }
-      }
-   }
+  for (size_t i = 0; i < int_unknown; i++){
+      Aei_Aii_Aie->set_item(i,column,Aii_Aie->item(i));
+  }
 
 }
 
-
-
-
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_product_matrix_z_P( void )
+DDS_NavierStokesSystem::compute_product_matrix_P( size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix_z_P" ) ;
+   MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix" ) ;
 
-   int i;
+   size_t proc_pos, nb_procs;
 
-   if(P_is_zperiodic != 1){
-    if(proc_pos_in_z == nb_procs_in_z-1){
+   proc_pos = proc_pos_in_i[dir];
+   nb_procs = nb_procs_in_i[dir];
 
-        // Get appropriate column of Aie
-        Aie_z_P -> extract_col( proc_pos_in_z-1, product_result_z_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, product_result_z_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z_P->multiply_vec_then_add(product_result_z_P,Aii_Aie_product_z_P);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z_P->set_item(i,proc_pos_in_z-1,Aii_Aie_product_z_P->item(i));
-        }
-     }
-     else if(proc_pos_in_z==0){
-
-        // Get appropriate column of Aie
-        Aie_z_P -> extract_col( proc_pos_in_z, product_result_z_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, product_result_z_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z_P->multiply_vec_then_add(product_result_z_P,Aii_Aie_product_z_P);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z_P->set_item(i,proc_pos_in_z,Aii_Aie_product_z_P->item(i));
-        }
-     }
-     else{
-
-        // Get appropriate column of Aie
-        Aie_z_P -> extract_col( proc_pos_in_z-1, product_result_z_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, product_result_z_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z_P->multiply_vec_then_add(product_result_z_P,Aii_Aie_product_z_P);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z_P->set_item(i,proc_pos_in_z-1,Aii_Aie_product_z_P->item(i));
-        }
-
-        // Get appropriate column of Aie
-        Aie_z_P -> extract_col( proc_pos_in_z, product_result_z_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, product_result_z_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z_P->multiply_vec_then_add(product_result_z_P,Aii_Aie_product_z_P);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z_P->set_item(i,proc_pos_in_z,Aii_Aie_product_z_P->item(i));
-        }
+   if (proc_pos == nb_procs - 1){
+      // Condition for serial processor and multi processor
+      if (proc_pos == 0) {
+         compute_product_matrix_interior_P(proc_pos,dir);
+      } else {
+         compute_product_matrix_interior_P(proc_pos-1,dir);
+         if (is_Pperiodic[dir] == 1) compute_product_matrix_interior_P(proc_pos,dir);
       }
-   }
-   else{
-      if(proc_pos_in_z==0){
-
-        // Get appropriate column of Aie
-        Aie_z_P -> extract_col( proc_pos_in_z, product_result_z_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, product_result_z_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z_P->multiply_vec_then_add(product_result_z_P,Aii_Aie_product_z_P);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z_P->set_item(i,proc_pos_in_z,Aii_Aie_product_z_P->item(i));
-        }
-
-        // Get appropriate column of Aie
-        Aie_z_P -> extract_col( nb_procs_in_z-1, product_result_z_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, product_result_z_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z_P->multiply_vec_then_add(product_result_z_P,Aii_Aie_product_z_P);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z_P->set_item(i,nb_procs_in_z-1,Aii_Aie_product_z_P->item(i));
-        }
-     }
-     else{
-
-        // Get appropriate column of Aie
-        Aie_z_P -> extract_col( proc_pos_in_z-1, product_result_z_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, product_result_z_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z_P->multiply_vec_then_add(product_result_z_P,Aii_Aie_product_z_P);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z_P->set_item(i,proc_pos_in_z-1,Aii_Aie_product_z_P->item(i));
-        }
-
-        // Get appropriate column of Aie
-        Aie_z_P -> extract_col( proc_pos_in_z, product_result_z_P );
-
-        // Get inv(Aii)*Aie for for appropriate column of Aie
-        DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, product_result_z_P);
-
-        // Get product of Aei*inv(Aii)*Aie for appropriate column
-        Aei_z_P->multiply_vec_then_add(product_result_z_P,Aii_Aie_product_z_P);
-        for(i=0;i<nb_procs_in_z-1;i++){
-           Aei_Aii_Aie_product_z_P->set_item(i,proc_pos_in_z,Aii_Aie_product_z_P->item(i));
-        }
-      }
+   }else if(proc_pos == 0){
+      compute_product_matrix_interior_P(proc_pos,dir);
+      if (is_Pperiodic[dir] == 1) compute_product_matrix_interior_P(nb_procs-1,dir);
+   }else{
+      compute_product_matrix_interior_P(proc_pos-1,dir);
+      compute_product_matrix_interior_P(proc_pos,dir);
    }
 }
-
-
-
 
 //----------------------------------------------------------------------
 void
@@ -4813,7 +3669,7 @@ DDS_NavierStokesSystem::display_debug(void)
 //----------------------------------------------------------------------
 {
   // VEC_DS_UF->print_items(MAC::out(),0);
-  // if(proc_pos_in_x == 0)
+  // if(proc_pos_in_i[0] == 0)
   //   schlur_complement_x[1]->print_items(MAC::out(),0);
   // Aii_x_super_diagonal_P->print_items(MAC::out(),0);
 

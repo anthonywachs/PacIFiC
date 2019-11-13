@@ -78,12 +78,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , AdvectionScheme( "TVD" )
    , AdvectionTimeAccuracy( 1 )   
    , rho( 1. )
-   , U_is_xperiodic( false )
-   , U_is_yperiodic( false )
-   , U_is_zperiodic( false )
-   , P_is_xperiodic( false )
-   , P_is_yperiodic( false )
-   , P_is_zperiodic( false )
 {
    MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -96,6 +90,13 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    my_rank = pelCOMM->rank();
    nb_procs = pelCOMM->nb_ranks();
    is_master = 0;
+
+   is_Uperiodic[0] = false;
+   is_Uperiodic[1] = false;
+   is_Uperiodic[2] = false;
+   is_Pperiodic[0] = false;
+   is_Pperiodic[1] = false;
+   is_Pperiodic[2] = false;
 
    // Timing routines
    if ( my_rank == is_master )
@@ -112,7 +113,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    // Clear results directory in case of a new run
    if( !b_restart ) PAC_Misc::clearAllFiles( "Res", "Savings", my_rank ) ;
 
-
    // Get space dimension
    dim = UF->primary_grid()->nb_space_dimensions() ;
    nb_comps = UF->nb_components() ;
@@ -127,13 +127,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
 
    // Create the Direction Splitting subcommunicators
    create_DDS_subcommunicators();
-
-   // Read Peclet number
-   if ( exp->has_entry( "Peclet" ) )
-   {
-     peclet = exp->double_data( "Peclet" ) ;
-     exp->test_data( "Peclet", "Peclet>0." ) ;
-   }
 
    // Read Density
    if ( exp->has_entry( "Density" ) )
@@ -155,7 +148,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
      kai = exp->double_data( "Kai" ) ;
      exp->test_data( "Kai", "Kai>=0." ) ;
    }
-
 
    // Advection scheme
    if ( exp->has_entry( "AdvectionScheme" ) )
@@ -187,22 +179,20 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
 
    // Periodic boundary condition check for velocity
    U_periodic_comp = UF->primary_grid()->get_periodic_directions();
-   U_is_xperiodic = U_periodic_comp->operator()( 0 );
-   U_is_yperiodic = U_periodic_comp->operator()( 1 );
+   is_Uperiodic[0] = U_periodic_comp->operator()( 0 );
+   is_Uperiodic[1] = U_periodic_comp->operator()( 1 );
    if(dim >2)
-      U_is_zperiodic = U_periodic_comp->operator()( 2 ); 
+      is_Uperiodic[2] = U_periodic_comp->operator()( 2 ); 
 
    // Periodic boundary condition check for pressure
    P_periodic_comp = PF->primary_grid()->get_periodic_directions();
-   P_is_xperiodic = P_periodic_comp->operator()( 0 );
-   P_is_yperiodic = P_periodic_comp->operator()( 1 );
+   is_Pperiodic[0] = P_periodic_comp->operator()( 0 );
+   is_Pperiodic[1] = P_periodic_comp->operator()( 1 );
    if(dim >2)
-      P_is_zperiodic = P_periodic_comp->operator()( 2 ); 
+      is_Pperiodic[2] = P_periodic_comp->operator()( 2 ); 
 
    // Build the matrix system
-   MAC_ModuleExplorer* se =
-	exp->create_subexplorer( 0,
-	"DDS_NavierStokesSystem" ) ;
+   MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DDS_NavierStokesSystem" ) ;
    GLOBAL_EQ = DDS_NavierStokesSystem::create( this, se, UF, PF ) ;
    se->destroy() ;
 
@@ -292,14 +282,6 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
 
-   // Assemble constant matrices and operators
-   // Centered
-   // GLOBAL_EQ->assemble_velocity_unsteady_matrix( 1. / t_it->time_step() ) ;
-   // GLOBAL_EQ->assemble_velocity_diffusion_matrix_rhs( - 1. / peclet );
-   // if ( b_bodyterm ) assemble_velocity_bodyterm_rhs( UF,
-   // 	GLOBAL_EQ->get_diffrhs_plus_bodyterm_vector() ) ;
-   // GLOBAL_EQ->finalize_constant_matrices() ;
-
    // Initialize velocity vector at the matrix level
    GLOBAL_EQ->initialize_DS_velocity();
    GLOBAL_EQ->initialize_DS_pressure();
@@ -309,28 +291,28 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    assemble_velocity_1D_matrices(t_it);
    //GLOBAL_EQ->call_compute_LU_decomposition();
 
-   if ( rank_in_x == 0 && nb_ranks_comm_x>1){
+   if ( rank_in_i[0] == 0 && nb_ranks_comm_i[0]>1){
       GLOBAL_EQ->compute_schlur_x_ref_P();
    }
-   if ( rank_in_y == 0 && nb_ranks_comm_y>1){
+   if ( rank_in_i[1] == 0 && nb_ranks_comm_i[1]>1){
       GLOBAL_EQ->compute_schlur_y_ref_P();
    }
    if(dim > 2){
-      if ( rank_in_z == 0 && nb_ranks_comm_z>1){
+      if ( rank_in_i[2] == 0 && nb_ranks_comm_i[2]>1){
         GLOBAL_EQ->compute_schlur_z_ref_P();
       }
    }
 
    for(size_t comp = 0;comp<nb_comps;comp++){
 
-      if ( rank_in_x == 0 && nb_ranks_comm_x>1){
+      if ( rank_in_i[0] == 0 && nb_ranks_comm_i[0]>1){
         GLOBAL_EQ->compute_schlur_x_ref(comp);
        }
-       if ( rank_in_y == 0 && nb_ranks_comm_y>1){
+       if ( rank_in_i[1] == 0 && nb_ranks_comm_i[1]>1){
         GLOBAL_EQ->compute_schlur_y_ref(comp);
        }
        if(dim > 2){
-        if ( rank_in_z == 0 && nb_ranks_comm_z>1){
+        if ( rank_in_i[2] == 0 && nb_ranks_comm_i[2]>1){
           GLOBAL_EQ->compute_schlur_z_ref(comp);
         }
        }
@@ -460,16 +442,16 @@ DDS_NavierStokes:: allocate_mpi_vectors_U( void )
   if(dim == 3)
     mpi_packed_data_U_z = new double* [nb_comps];
 
-  if(rank_in_x == 0){
+  if(rank_in_i[0] == 0){
     all_receive_data_U_x = new double** [nb_comps];
     all_send_data_U_x = new double** [nb_comps];
   }
-  if(rank_in_y == 0){
+  if(rank_in_i[1] == 0){
     all_receive_data_U_y = new double** [nb_comps];
     all_send_data_U_y = new double** [nb_comps];
   }
   if(dim == 3){
-    if(rank_in_z == 0){
+    if(rank_in_i[2] == 0){
       all_receive_data_U_z = new double** [nb_comps];
       all_send_data_U_z = new double** [nb_comps];
     }
@@ -512,24 +494,24 @@ DDS_NavierStokes:: allocate_mpi_vectors_U( void )
     mpi_packed_data_U_x[comp] = new double[nb_first_send_x];
     mpi_packed_data_U_y[comp] = new double[nb_first_send_y];
 
-    if(rank_in_x == 0){
+    if(rank_in_i[0] == 0){
       
-      all_receive_data_U_x[comp] = new double* [nb_ranks_comm_x];
-      all_send_data_U_x[comp] = new double* [nb_ranks_comm_x];
+      all_receive_data_U_x[comp] = new double* [nb_ranks_comm_i[0]];
+      all_send_data_U_x[comp] = new double* [nb_ranks_comm_i[0]];
 
-      for(p = 0; p < nb_ranks_comm_x; ++p) {
+      for(p = 0; p < nb_ranks_comm_i[0]; ++p) {
           all_receive_data_U_x[comp][p] = new double[nb_first_send_x];
           all_send_data_U_x[comp][p] = new double[nb_second_send_x];
       }
 
     }
     
-    if(rank_in_y == 0){
+    if(rank_in_i[1] == 0){
 
-      all_receive_data_U_y[comp] = new double* [nb_ranks_comm_y];
-      all_send_data_U_y[comp] = new double* [nb_ranks_comm_y];
+      all_receive_data_U_y[comp] = new double* [nb_ranks_comm_i[1]];
+      all_send_data_U_y[comp] = new double* [nb_ranks_comm_i[1]];
 
-      for(p = 0; p < nb_ranks_comm_y; ++p) {
+      for(p = 0; p < nb_ranks_comm_i[1]; ++p) {
           all_receive_data_U_y[comp][p] = new double[nb_first_send_y];
           all_send_data_U_y[comp][p] = new double[nb_second_send_y];
       }
@@ -537,11 +519,11 @@ DDS_NavierStokes:: allocate_mpi_vectors_U( void )
     }
 
     if(dim == 3){
-      if(rank_in_z == 0){
-        all_receive_data_U_z[comp] = new double* [nb_ranks_comm_z];
-        all_send_data_U_z[comp] = new double* [nb_ranks_comm_z];
+      if(rank_in_i[2] == 0){
+        all_receive_data_U_z[comp] = new double* [nb_ranks_comm_i[2]];
+        all_send_data_U_z[comp] = new double* [nb_ranks_comm_i[2]];
 
-        for(p = 0; p < nb_ranks_comm_z; ++p) {
+        for(p = 0; p < nb_ranks_comm_i[2]; ++p) {
             all_receive_data_U_z[comp][p] = new double[nb_first_send_z];
             all_send_data_U_z[comp][p] = new double[nb_second_send_z];
         }
@@ -562,18 +544,18 @@ DDS_NavierStokes:: allocate_mpi_vectors_P( void )
 //---------------------------------------------------------------------------
 {
   // Allocate MPI vectors for pressure
-  if(rank_in_x == 0){
-    all_receive_data_P_x = new double* [nb_ranks_comm_x];
-    all_send_data_P_x = new double* [nb_ranks_comm_x];
+  if(rank_in_i[0] == 0){
+    all_receive_data_P_x = new double* [nb_ranks_comm_i[0]];
+    all_send_data_P_x = new double* [nb_ranks_comm_i[0]];
   }
-  if(rank_in_y == 0){
-    all_receive_data_P_y = new double* [nb_ranks_comm_y];
-    all_send_data_P_y = new double* [nb_ranks_comm_y];
+  if(rank_in_i[1] == 0){
+    all_receive_data_P_y = new double* [nb_ranks_comm_i[1]];
+    all_send_data_P_y = new double* [nb_ranks_comm_i[1]];
   }
   if(dim == 3){
-    if(rank_in_z == 0){
-      all_receive_data_P_z = new double* [nb_ranks_comm_z];
-      all_send_data_P_z = new double* [nb_ranks_comm_z];
+    if(rank_in_i[2] == 0){
+      all_receive_data_P_z = new double* [nb_ranks_comm_i[2]];
+      all_send_data_P_z = new double* [nb_ranks_comm_i[2]];
     }
   }
     
@@ -612,18 +594,18 @@ DDS_NavierStokes:: allocate_mpi_vectors_P( void )
   mpi_packed_data_P_x = new double[nb_first_send_x];
   mpi_packed_data_P_y = new double[nb_first_send_y];
 
-  if(rank_in_x == 0){
+  if(rank_in_i[0] == 0){
 
-      for(p = 0; p < nb_ranks_comm_x; ++p) {
+      for(p = 0; p < nb_ranks_comm_i[0]; ++p) {
           all_receive_data_P_x[p] = new double[nb_first_send_x];
           all_send_data_P_x[p] = new double[nb_second_send_x];
       }
 
     }
     
-    if(rank_in_y == 0){
+    if(rank_in_i[1] == 0){
       
-      for(p = 0; p < nb_ranks_comm_y; ++p) {
+      for(p = 0; p < nb_ranks_comm_i[1]; ++p) {
           all_receive_data_P_y[p] = new double[nb_first_send_y];
           all_send_data_P_y[p] = new double[nb_second_send_y];
       }
@@ -631,9 +613,9 @@ DDS_NavierStokes:: allocate_mpi_vectors_P( void )
     }
 
     if(dim == 3){
-      if(rank_in_z == 0){
+      if(rank_in_i[2] == 0){
 
-        for(p = 0; p < nb_ranks_comm_z; ++p) {
+        for(p = 0; p < nb_ranks_comm_i[2]; ++p) {
             all_receive_data_P_z[p] = new double[nb_first_send_z];
             all_send_data_P_z[p] = new double[nb_second_send_z];
         }
@@ -660,9 +642,9 @@ DDS_NavierStokes:: deallocate_mpi_vectors_U( void )
     if(dim == 3)
       delete [] mpi_packed_data_U_z[comp];
 
-    if(rank_in_x == 0)
+    if(rank_in_i[0] == 0)
     {
-      for(p = 0; p < nb_ranks_comm_x; ++p) {
+      for(p = 0; p < nb_ranks_comm_i[0]; ++p) {
           delete [] all_receive_data_U_x[comp][p];
           delete [] all_send_data_U_x[comp][p];
       }
@@ -670,8 +652,8 @@ DDS_NavierStokes:: deallocate_mpi_vectors_U( void )
       delete [] all_send_data_U_x[comp];
     }
     
-    if(rank_in_y == 0){
-      for(p = 0; p < nb_ranks_comm_y; ++p) {
+    if(rank_in_i[1] == 0){
+      for(p = 0; p < nb_ranks_comm_i[1]; ++p) {
         delete [] all_receive_data_U_y[comp][p];
         delete [] all_send_data_U_y[comp][p];
       }  
@@ -680,9 +662,9 @@ DDS_NavierStokes:: deallocate_mpi_vectors_U( void )
     }
     
     if(dim == 3){
-      if(rank_in_z == 0)
+      if(rank_in_i[2] == 0)
       {
-        for(p = 0; p < nb_ranks_comm_z; ++p) {
+        for(p = 0; p < nb_ranks_comm_i[2]; ++p) {
           delete [] all_receive_data_U_z[comp][p];
           delete [] all_send_data_U_z[comp][p];
         }
@@ -710,9 +692,9 @@ DDS_NavierStokes:: deallocate_mpi_vectors_P( void )
 {
   size_t p;
 
-  if(rank_in_x == 0)
+  if(rank_in_i[0] == 0)
   {
-    for(p = 0; p < nb_ranks_comm_x; ++p) {
+    for(p = 0; p < nb_ranks_comm_i[0]; ++p) {
         delete [] all_receive_data_P_x[p];
         delete [] all_send_data_P_x[p];
     }
@@ -720,9 +702,9 @@ DDS_NavierStokes:: deallocate_mpi_vectors_P( void )
     delete [] all_send_data_P_x;
   }
   
-  if(rank_in_y == 0)
+  if(rank_in_i[1] == 0)
   {
-    for(p = 0; p < nb_ranks_comm_y; ++p) {
+    for(p = 0; p < nb_ranks_comm_i[1]; ++p) {
         delete [] all_receive_data_P_y[p];
         delete [] all_send_data_P_y[p];
     }
@@ -731,9 +713,9 @@ DDS_NavierStokes:: deallocate_mpi_vectors_P( void )
   }
   
   if(dim == 3){
-    if(rank_in_z == 0)
+    if(rank_in_i[2] == 0)
     {
-      for(p = 0; p < nb_ranks_comm_z; ++p) {
+      for(p = 0; p < nb_ranks_comm_i[2]; ++p) {
           delete [] all_receive_data_P_z[p];
           delete [] all_send_data_P_z[p];
       }
@@ -902,2070 +884,409 @@ DDS_NavierStokes:: error_with_analytical_solution (
 
 }
 
-
-
-
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_velocity_matrix_1D_x (
+DDS_NavierStokes:: assemble_velocity_matrix_1D (
   FV_DiscreteField const* FF,
   FV_TimeIterator const* t_it,
   double gamma,
-  size_t const& comp )
+  size_t const& comp,
+  size_t const dir )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL(
-   "DDS_NavierStokes:: assemble_velocity_matrix_1D_x" ) ;
+   MAC_LABEL("DDS_NavierStokes:: assemble_velocity_matrix_1D_x" ) ;
 
-   if ( my_rank == is_master ) cout << "velocity matrix 1D in x "
-    << endl;
+   if ( my_rank == is_master ) cout << "velocity matrix 1D in x " << endl;
 
    // Parameters
-   //size_t nb_comps = FF->nb_components() ;
-   double hr,hl,xr,xl,xc,right,left,center = 0. ;
-   //size_t center_pos_in_matrix = 0 ;
+   double dxr,dxl,xR,xL,xC,right,left,center = 0. ;
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
    size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   for (size_t l=0;l<dim;++l) {
+      min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+      max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   }
 
    // Perform assembling
    int m;
    size_t i;
-   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag_in_x(comp);
-   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag_in_x(comp);
-   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag_in_x(comp);
+   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag(comp,dir);
+   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag(comp,dir);
+   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag(comp,dir);
 
-   LA_SeqVector* VEC_xu = GLOBAL_EQ-> get_U_vec_xu(comp);
-   LA_SeqVector* VEC_xv = GLOBAL_EQ-> get_U_vec_xv(comp);
-
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_in_x(comp);
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_in_x(comp);
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(comp,dir);
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(comp,dir);
 
    double Aee_diagcoef=0.;
 
-   for (m=0,i=min_unknown_index(0);i<=max_unknown_index(0);++i,++m)
-   {
-     xc= FF->get_DOF_coordinate( i, comp, 0 ) ;
-     xr= FF->get_DOF_coordinate( i+1,comp, 0 ) ;
-     xl= FF->get_DOF_coordinate( i-1, comp, 0 ) ;
+   for (m=0,i=min_unknown_index(dir);i<=max_unknown_index(dir);++i,++m) {
+      xC= FF->get_DOF_coordinate( i, comp, dir) ;
+      xR= FF->get_DOF_coordinate( i+1,comp, dir) ;
+      xL= FF->get_DOF_coordinate( i-1, comp, dir) ;
 
-     hr= xr-xc;
-     hl= xc-xl;
+      dxr= xR - xC;
+      dxl= xC - xL;
 
-     right = -gamma/(hr);
-     left = -gamma/(hl);
-     center = - (right+left);
+      right = -gamma/(dxr);
+      left = -gamma/(dxl);
+      center = - (right+left);
 
-     // add unsteady term
-     double value;
+      // add unsteady term
+      size_t k;
+      double value;
+      double unsteady_term = rho*(FF->get_cell_size(i,comp,dir))/(t_it->time_step());
 
-     /** Assemble lhs in x for Neumann/Dirichlet BC Conditions */
-     if(dim == 2 && U_is_xperiodic== 0){
-        if(i==min_unknown_index(0) && rank_in_x==0){
-           if(FF->DOF_in_domain(i-1,min_unknown_index(1), 0,comp) && FF->DOF_has_imposed_Dirichlet_value( i-1,min_unknown_index(1), 0, comp ))
-             value = center + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step());
-           else
-             value = -right + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step());
-       }
-       else if(i==max_unknown_index(0) && rank_in_x==nb_ranks_comm_x-1){
-         if(FF->DOF_in_domain(i+1,max_unknown_index(1), 0,comp) && FF->DOF_has_imposed_Dirichlet_value( i+1,max_unknown_index(1), 0, comp )){
-           value = center + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step());
-         }
-         else
-           value = -left + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step());
-       }
-       else
-          value = center + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step()); 
-     }
-     else if( U_is_xperiodic == 0){
-        if(i==min_unknown_index(0) && rank_in_x==0){
-           if(FF->DOF_in_domain(i-1,min_unknown_index(1), min_unknown_index(2),comp) && FF->DOF_has_imposed_Dirichlet_value( i-1,min_unknown_index(1), min_unknown_index(2), comp ))
-             value = center + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step());
-           else
-             value = -right + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step());
-       }
-       else if(i==max_unknown_index(0) && rank_in_x==nb_ranks_comm_x-1){
-         if(FF->DOF_in_domain(i+1,max_unknown_index(1), max_unknown_index(2),comp) && FF->DOF_has_imposed_Dirichlet_value( i+1,max_unknown_index(1), max_unknown_index(2), comp )){
-           value = center + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step());
-         }
-         else
-           value = -left + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step());
-       }
-       else
-          value = center + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step());
-
-     }
-     else
-        value = center + rho*(FF->get_cell_size( i,comp, 0 ))/(t_it->time_step());        
-     // Set matrices for first proc
-     // For first proc, interface contribution is for max index only.
-
-     if(rank_in_x == nb_ranks_comm_x-1){
-
-      if(U_is_xperiodic != 1){
-        // No periodic boundary condition in x. 
-        // This means the total number of interface unknowns is (number of procs - 1)
-
-          // Set matrices for last proc
-          // No interface unknowns hence, Aee is zero.
-           if(i>min_unknown_index(0)){
-              Aii_main_diagonal->set_item(m,value);
-              if(i<max_unknown_index(0))
-                Aii_super_diagonal->set_item(m,right);
-              if(i>min_unknown_index(0))
-                Aii_sub_diagonal->set_item(m-1,left);
-           }
-           else{
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_x>1){
-                Aie->set_item(m,rank_in_x-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_x-1,m,left);
-              }
-
-              Aii_main_diagonal->set_item(m,value);
-              Aii_super_diagonal->set_item(m,right);
-           }  
-      }
-      else{
-        // Periodic boundary condition in x. 
-        // This means the number of interface unknowns is (number of procs)
-        // Last proc also has an interface unknown
-
-          // For last proc, interface contribution is for min index and max index.
-
-          if(i==min_unknown_index(0)){
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_x>1){
-                Aie->set_item(m,rank_in_x-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_x-1,m,left);
-                Aii_main_diagonal->set_item(m,value);
-              }
-              else{
-                VEC_xu->set_item(m,-value);
-                VEC_xv->set_item(m,1);
-                VEC_xv->set_item(VEC_xv->nb_rows()-1,-left/value);
-                Aii_main_diagonal->set_item(m,2*value);
-              }
-
-              Aii_super_diagonal->set_item(m,right);
-          }
-          else if(i<max_unknown_index(0)){
-              Aii_main_diagonal->set_item(m,value);
-              if(i>min_unknown_index(0))
-                Aii_sub_diagonal->set_item(m-1,left);
-              if(nb_ranks_comm_x>1)
-              {
-                if(i<max_unknown_index(0)-1)
-                  Aii_super_diagonal->set_item(m,right);
-              }  
-              else
-                Aii_super_diagonal->set_item(m,right);
-           }
-          else{
-            if(nb_ranks_comm_x>1){
-            // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-              Aie->set_item(m-1,rank_in_x,left);
-              Aee_diagcoef = value;
-              Aei->set_item(rank_in_x,m-1,left);
-            }
-            else{
-              VEC_xu->set_item(m,right);
-              Aii_main_diagonal->set_item(m,value-VEC_xu->item(m)*VEC_xv->item(m));
-              Aii_sub_diagonal->set_item(m-1,left);
-            }
-          }
+      if (dim == 2) {
+         k = 0;
+      } else {
+         k = min_unknown_index(2);
       }
 
-       
-     }
+      value = center;
 
-     else if(rank_in_x == 0){
+      value = value + unsteady_term;
 
-      if(U_is_xperiodic != 1){
-        // No Periodic boundary condition in x. 
-        // First proc has only non zero value in Aie for last index (interface unknown)
+      bool r_bound = false;
+      bool l_bound = false;
+      // All the proc will have open right bound, except last proc for non periodic systems
+      if ((is_Uperiodic[dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
+      // All the proc will have open left bound, except first proc for non periodic systems
+      if ((is_Uperiodic[dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
 
-          if(i<max_unknown_index(0)){
+      // Set Aie, Aei and Ae 
+      if ((!l_bound) && (i == min_unknown_index(dir))) {
+         // Periodic boundary condition at minimum unknown index
+         // First proc has non zero value in Aie,Aei for first & last index
+         if (rank_in_i[dir] == 0) {
+            Aie->set_item(m,nb_ranks_comm_i[dir]-1,left);
+            Aei->set_item(nb_ranks_comm_i[dir]-1,m,right);
+         } else {
+            Aie->set_item(m,rank_in_i[dir]-1,left);
+            Aei->set_item(rank_in_i[dir]-1,m,right);
+         }
+      }
+
+      if ((!r_bound) && (i == max_unknown_index(dir))) {
+         // Periodic boundary condition at maximum unknown index
+         // For last index, Aee comes from this proc as it is interface unknown wrt this proc
+         Aie->set_item(m-1,rank_in_i[dir],right);
+         Aee_diagcoef = value;
+         Aei->set_item(rank_in_i[dir],m-1,left);
+      }
+
+      // Set Aii_sub_diagonal
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Uperiodic[dir] != 1)) {
+         if (i > min_unknown_index(dir)) Aii_sub_diagonal->set_item(m-1,left);
+      } else {
+         if (i<max_unknown_index(dir)) {
+            if (i>min_unknown_index(dir)) {
+               Aii_sub_diagonal->set_item(m-1,left);
+            }
+         }
+      }
+
+      // Set Aii_super_diagonal
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Uperiodic[dir] != 1)) {
+         if (i < max_unknown_index(dir)) Aii_super_diagonal->set_item(m,right);
+      } else {
+         if (i < max_unknown_index(dir)-1) {
+            Aii_super_diagonal->set_item(m,right);
+         }
+      }
+
+      // Set Aii_main_diagonal
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Uperiodic[dir] != 1)) {
+         Aii_main_diagonal->set_item(m,value);
+      } else {
+         if (i<max_unknown_index(dir)) {
             Aii_main_diagonal->set_item(m,value);
-            if(i<max_unknown_index(0)-1)
-              Aii_super_diagonal->set_item(m,right);
-            if(i>min_unknown_index(0))
-              Aii_sub_diagonal->set_item(m-1,left);
-         }
-         else{
-            // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-            Aie->set_item(m-1,rank_in_x,left);
-            Aee_diagcoef = value;
-            Aei->set_item(rank_in_x,m-1,left);
          }
       }
-      else{ 
-        // Periodic boundary condition in x. 
-        // First proc has non zero value in Aie for first & last index
-
-         // For inner procs, interface contribution is for min index and max index.
-      if(i==min_unknown_index(0)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,nb_ranks_comm_x-1,left);
-        Aei->set_item(nb_ranks_comm_x-1,m,left);
-      }
-      if(i == max_unknown_index(0)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_x,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_x,m-1,left);
-      }
-      if(i<max_unknown_index(0)){
-          Aii_main_diagonal->set_item(m,value);
-          if(i<max_unknown_index(0)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(i>min_unknown_index(0))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-      }
-       
-     }
-
-     else{
-      // Set matrices for inner procs
-
-      // For inner procs, interface contribution is for min index and max index.
-      if(i==min_unknown_index(0)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,rank_in_x-1,left);
-        Aei->set_item(rank_in_x-1,m,left);
-      }
-      if(i == max_unknown_index(0)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_x,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_x,m-1,left);
-      }
-      if(i<max_unknown_index(0)){
-          Aii_main_diagonal->set_item(m,value);
-          if(i<max_unknown_index(0)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(i>min_unknown_index(0))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-     }
-
    }
 
-   GLOBAL_EQ->compute_Aii_x_ref(comp);
+   GLOBAL_EQ->compute_Aii_ref(comp,dir);
    // Compute the product matrix for each proc
 
-   if(nb_ranks_comm_x>1)
-   {
-     GLOBAL_EQ->compute_product_matrix_x(comp);
+   if (nb_ranks_comm_i[dir]>1) {
+      GLOBAL_EQ->compute_product_matrix(comp,dir);
 
-     LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product_in_x(comp);
-     // if(rank_in_x == 1)
-     //      product_matrix->print_items(MAC::out(),0);
-     LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
-     LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix_in_x(comp);
-     LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement_in_x(comp);
+      LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product(comp,dir);
+      LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
+      LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix(comp,dir);
+      LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement(comp,dir);
 
-     if ( rank_in_x == 0 )
-     {
-        Aee->set_item(0,0,Aee_diagcoef);
-        for (i=1;i<nb_ranks_comm_x;++i)
-        {
+      if ( rank_in_i[dir] == 0 ) {
+         Aee->set_item(0,0,Aee_diagcoef);
+   	 for (i=1;i<nb_ranks_comm_i[dir];++i) {
+            // Create the container to receive
+            size_t nbrows = product_matrix->nb_rows();
+            size_t nb_received_data = pow(nbrows,2)+1;
+            double * received_data = new double [nb_received_data];
 
-          // Create the container to receive
-          size_t nbrows = product_matrix->nb_rows();
-          size_t nb_received_data = pow(nbrows,2)+1;
-          double * received_data = new double [nb_received_data];
+            // Receive the data
+            static MPI_Status status ;
+            MPI_Recv( received_data, nb_received_data, MPI_DOUBLE, i, 0,
+                            DDS_Comm_i[dir], &status ) ;
 
-          // Receive the data
-          //pelCOMM->receive( i, received_data, nb_received_data );
-          static MPI_Status status ;
-          MPI_Recv( received_data, nb_received_data, MPI_DOUBLE, i, 0,
-                            DDS_Comm_x, &status ) ;
-
-          // Transfer the received data to the receive matrix
-          for(int k=0;k<nbrows;k++){
-            for(int j=0;j<nbrows;j++){
-                // Assemble the global product matrix by adding contributions from all the procs
-                receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
+            // Transfer the received data to the receive matrix
+            for (int k=0;k<nbrows;k++) {
+               for (int j=0;j<nbrows;j++) {
+                  // Assemble the global product matrix by adding contributions from all the procs
+                  receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
+               }
             }
-          }
-          if(U_is_xperiodic == 0){
-            if(i<nb_ranks_comm_x-1){
-              // Assemble the global Aee matrix 
-              // No periodic condition in x. So no fe contribution from last proc
-              Aee->set_item(i,i,received_data[nb_received_data-1]);
-            }   
-          }
-          else{
-            // Assemble the global Aee matrix
-            // Periodic condition in x. So there is fe contribution from last proc
-            Aee->set_item(i,i,received_data[nb_received_data-1]); 
-          }
 
-        }
-     }
-     else
-     {
-        // Create the packed data container
-        size_t nbrows = product_matrix->nb_rows();
-        size_t nb_send_data = pow(nbrows,2)+1;
-        double * packed_data = new double [nb_send_data];
-
-        // Fill the packed data container with Aie
-        // LA_MatrixIterator* it = product_matrix->create_stored_item_iterator( 0 ) ;
-        // Iterator only fetches the values present. Zeros are not fetched.
-
-        for( i=0 ; i<nbrows ; i++ )
-        {
-           for( size_t j=0 ; j<nbrows ; j++ )
-           {
-             // Packing rule
-             // Pack the product matrix into a vector
-             packed_data[i*nbrows+j]=product_matrix->item(i,j);
-           }
-        }
-
-        //it->destroy() ; it = 0 ;
-
-        // Fill the last element of packed data with the diagonal coefficient Aee
-
-        packed_data[nb_send_data-1] = Aee_diagcoef;
-
-        // Send the data
-        //pelCOMM->send( is_master, packed_data, nb_send_data);
-        MPI_Send( packed_data, nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_x ) ;
-
-        delete [] packed_data;
-
-     }
-
-     // Assemble the schlur complement in the master proc
-
-     if(rank_in_x == 0){
-      schlur_complement->add_Mat(Aee);
-      //receive_matrix->print_items(MAC::out(),0);
-      schlur_complement->add_Mat(receive_matrix,-1.0);
-     }
-  }
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: assemble_velocity_matrix_1D_y (
-	FV_DiscreteField const* FF,
-  FV_TimeIterator const* t_it,
-  double gamma,
-  size_t const& comp  )
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL(
-   "DDS_NavierStokes:: assemble_velocity_matrix_1D_y" ) ;
-
-   if ( my_rank == is_master ) cout << "velocity matrix 1D in y "
-    << endl;
-
-   // Parameters
-   //size_t nb_comps = FF->nb_components() ;
-   double hr,hl,yr,yl,yc,right,left,center = 0. ;
-   //size_t center_pos_in_matrix = 0 ;
-
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-   // Perform assembling
-   int m;
-   size_t i,j,k;
-   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag_in_y(comp);
-   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag_in_y(comp);
-   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag_in_y(comp);
-
-   LA_SeqVector* VEC_yu = GLOBAL_EQ-> get_U_vec_yu(comp);
-   LA_SeqVector* VEC_yv = GLOBAL_EQ-> get_U_vec_yv(comp);
-
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_in_y(comp);
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_in_y(comp);
-   double Aee_diagcoef=0.;
-
-   for (m=0,j=min_unknown_index(1);j<=max_unknown_index(1);++j,++m)
-   {
-     yc= FF->get_DOF_coordinate( j,comp, 1 ) ;
-     yr= FF->get_DOF_coordinate( j+1,comp, 1 ) ;
-     yl= FF->get_DOF_coordinate( j-1,comp, 1 ) ;
-
-     hr= yr-yc;
-     hl= yc-yl;
-
-     right = -gamma/(hr);
-     left = -gamma/(hl);
-     center = - (right+left);
-
-     // add unsteady term
-     double value;
-     /** Assemble lhs in y for Neumann/Dirichlet BC Conditions */
-     if(dim == 2 && U_is_yperiodic == 0){
-        if(j==min_unknown_index(1) && rank_in_y==0){
-       if(FF->DOF_in_domain(min_unknown_index(0), j-1, 0, comp) && FF->DOF_has_imposed_Dirichlet_value( min_unknown_index(0), j-1, 0, comp ))
-         value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-       else{
-          value = -right + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-       }
-       }
-       else if(j==max_unknown_index(1) && rank_in_y==nb_ranks_comm_y-1){
-         if(FF->DOF_in_domain(max_unknown_index(0), j+1, 0, comp) && FF->DOF_has_imposed_Dirichlet_value( max_unknown_index(0), j+1, 0, comp ))
-           value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-         else{
-            value = -left + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-         }
-       }
-       else
-         value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-     }
-     else if(U_is_yperiodic == 0){
-        if(j==min_unknown_index(1) && rank_in_y==0){
-       if(FF->DOF_in_domain(min_unknown_index(0), j-1, min_unknown_index(2), comp) && FF->DOF_has_imposed_Dirichlet_value( min_unknown_index(0), j-1, min_unknown_index(2), comp ))
-         value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-       else
-          value = -right + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-       }
-       else if(j==max_unknown_index(1) && rank_in_y==nb_ranks_comm_y-1){
-         if(FF->DOF_in_domain(max_unknown_index(0), j+1, max_unknown_index(2), comp) && FF->DOF_has_imposed_Dirichlet_value( max_unknown_index(0), j+1, max_unknown_index(2), comp ))
-           value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-         else
-            value = -left + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-       }
-       else
-         value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());
-     }
-     else
-        value = center + rho*(FF->get_cell_size( j,comp,1))/(t_it->time_step());  
-    
-     if(rank_in_y == nb_ranks_comm_y-1){
-
-      if(U_is_yperiodic != 1){
-        // No periodic boundary condition in x. 
-        // This means the total number of interface unknowns is (number of procs - 1)
-
-          // Set matrices for last proc
-          // No interface unknowns hence, Aee is zero.
-           if(j>min_unknown_index(1)){
-              Aii_main_diagonal->set_item(m,value);
-              if(j<max_unknown_index(1))
-                Aii_super_diagonal->set_item(m,right);
-              if(j>min_unknown_index(1))
-                Aii_sub_diagonal->set_item(m-1,left);
-           }
-           else{
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_y>1){
-                Aie->set_item(m,rank_in_y-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_y-1,m,left);
-              }
-
-              Aii_main_diagonal->set_item(m,value);
-              Aii_super_diagonal->set_item(m,right);
-           }  
-      }
-      else{
-        // Periodic boundary condition in x. 
-        // This means the number of interface unknowns is (number of procs)
-        // Last proc also has an interface unknown
-
-          // For last proc, interface contribution is for min index and max index.
-          if(j==min_unknown_index(1)){
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_y>1){
-                Aie->set_item(m,rank_in_y-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_y-1,m,left);
-                Aii_main_diagonal->set_item(m,value);
-              }
-              else{
-                VEC_yu->set_item(m,-value);
-                VEC_yv->set_item(m,1);
-                VEC_yv->set_item(VEC_yv->nb_rows()-1,-left/value);
-                Aii_main_diagonal->set_item(m,2*value);
-              }
-
-              Aii_super_diagonal->set_item(m,right);
-          }
-          else if(j<max_unknown_index(1)){
-              Aii_main_diagonal->set_item(m,value);
-              if(j>min_unknown_index(1))
-                Aii_sub_diagonal->set_item(m-1,left);
-              if(nb_ranks_comm_y>1)
-              {
-                if(j<max_unknown_index(1)-1)
-                  Aii_super_diagonal->set_item(m,right);
-              }  
-              else
-                Aii_super_diagonal->set_item(m,right);
-           }
-          else{
-            if(nb_ranks_comm_y > 1){
-              // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-              Aie->set_item(m-1,rank_in_y,left);
-              Aee_diagcoef = value;
-              Aei->set_item(rank_in_y,m-1,left);  
+  	    if (is_Uperiodic[dir] == 0) {
+               if (i<nb_ranks_comm_i[dir]-1) {
+                  // Assemble the global Aee matrix 
+                  // No periodic condition in x. So no fe contribution from last proc
+                  Aee->set_item(i,i,received_data[nb_received_data-1]);
+               }   
+            } else {
+               // Assemble the global Aee matrix
+               // Periodic condition in x. So there is fe contribution from last proc
+               Aee->set_item(i,i,received_data[nb_received_data-1]); 
             }
-            else{
-              VEC_yu->set_item(m,right);
-              Aii_main_diagonal->set_item(m,value-VEC_yu->item(m)*VEC_yv->item(m));
-              Aii_sub_diagonal->set_item(m-1,left);
+         }
+      } else {
+         // Create the packed data container
+         size_t nbrows = product_matrix->nb_rows();
+         size_t nb_send_data = pow(nbrows,2)+1;
+         double * packed_data = new double [nb_send_data];
+
+         // Fill the packed data container with Aie
+         // Iterator only fetches the values present. Zeros are not fetched.
+
+         for ( i=0 ; i<nbrows ; i++ ) {
+            for ( size_t j=0 ; j<nbrows ; j++ ) {
+               // Packing rule
+               // Pack the product matrix into a vector
+               packed_data[i*nbrows+j]=product_matrix->item(i,j);
             }
-            
-          }
-      }
-     }
-
-     else if(rank_in_y == 0){
-
-      if(U_is_yperiodic != 1){
-        // No Periodic boundary condition in x. 
-        // First proc has only non zero value in Aie for last index (interface unknown)
-
-          if(j<max_unknown_index(1)){
-            Aii_main_diagonal->set_item(m,value);
-            if(j<max_unknown_index(1)-1)
-              Aii_super_diagonal->set_item(m,right);
-            if(j>min_unknown_index(1))
-              Aii_sub_diagonal->set_item(m-1,left);
          }
-         else{
-            // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-            Aie->set_item(m-1,rank_in_y,left);
-            Aee_diagcoef = value;
-            Aei->set_item(rank_in_y,m-1,left);
-         }
-      }
-      else{ 
-        // Periodic boundary condition in x. 
-        // First proc has non zero value in Aie for first & last index
 
-         // For inner procs, interface contribution is for min index and max index.
-      if(j==min_unknown_index(1)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,nb_ranks_comm_y-1,left);
-        Aei->set_item(nb_ranks_comm_y-1,m,left);
-      }
-      if(j == max_unknown_index(1)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_y,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_y,m-1,left);
-      }
-      if(j<max_unknown_index(1)){
-          Aii_main_diagonal->set_item(m,value);
-          if(j<max_unknown_index(1)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(j>min_unknown_index(1))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-      }
-     }
+         // Fill the last element of packed data with the diagonal coefficient Aee
+         packed_data[nb_send_data-1] = Aee_diagcoef;
 
-     else{
-      // Set matrices for inner procs
+         // Send the data
+         MPI_Send( packed_data, nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
 
-      // For inner procs, interface contribution is for min index and max index.
-      if(j==min_unknown_index(1)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,rank_in_y-1,left);
-        Aei->set_item(rank_in_y-1,m,left);
+         delete [] packed_data;
       }
-      if(j == max_unknown_index(1)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_y,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_y,m-1,left);
-      }
-      if(j<max_unknown_index(1)){
-          Aii_main_diagonal->set_item(m,value);
-          if(j<max_unknown_index(1)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(j>min_unknown_index(1))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-     }
 
+      // Assemble the schlur complement in the master proc
+
+      if (rank_in_i[dir] == 0){
+         schlur_complement->add_Mat(Aee);
+         schlur_complement->add_Mat(receive_matrix,-1.0);
+      }
    }
-
-   GLOBAL_EQ->compute_Aii_y_ref(comp);
-
-   if(nb_ranks_comm_y>1)
-   {
-     // Compute the product matrix for each proc
-     GLOBAL_EQ->compute_product_matrix_y(comp);
-
-     LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product_in_y(comp);
-     LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
-     LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix_in_y(comp);
-     LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement_in_y(comp);
-
-     if ( rank_in_y == 0 )
-     {
-        Aee->set_item(0,0,Aee_diagcoef);
-        for (i=1;i<nb_ranks_comm_y;++i)
-        {
-          // Create the container to receive
-          size_t nbrows = product_matrix->nb_rows();
-          size_t nb_received_data = pow(nbrows,2)+1;
-          double * received_data = new double [nb_received_data];
-
-          // Receive the data
-          //pelCOMM->receive( i, received_data, nb_receAii_super_diagonal->set_item(m,right);ived_data );
-          static MPI_Status status ;
-          MPI_Recv( received_data, nb_received_data, MPI_DOUBLE, i, 0,
-                            DDS_Comm_y, &status ) ;
-
-          // Transfer the received data to the receive matrix
-          for(k=0;k<nbrows;k++){
-            for(j=0;j<nbrows;j++){
-                // Assemble the global product matrix by adding contributions from all the procs
-                receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
-            }
-          }
-          if(U_is_yperiodic == 0){
-            if(i<nb_ranks_comm_y-1 ){
-              // Assemble the global Aee matrix
-              Aee->set_item(i,i,received_data[nb_received_data-1]);
-            }  
-          }
-          else{
-            Aee->set_item(i,i,received_data[nb_received_data-1]);
-          }
-        }
-
-     }
-     else
-     {
-        // Create the packed data container
-        size_t nbrows = product_matrix->nb_rows();
-        size_t nb_send_data = pow(nbrows,2)+1;
-        double * packed_data = new double [nb_send_data];
-
-        // Fill the packed data container with Aie
-        // LA_MatrixIterator* it = product_matrix->create_stored_item_iterator( 0 ) ;
-        // Iterator only fetches the values present. Zeros are not fetched.
-
-        for( i=0 ; i<nbrows ; i++ )
-        {
-           for( j=0 ; j<nbrows ; j++ )
-           {
-             // Packing rule
-             // Pack the product matrix into a vector
-             packed_data[i*nbrows+j]=product_matrix->item(i,j);
-           }
-        }
-
-        //it->destroy() ; it = 0 ;
-
-        // Fill the last element of packed data with theAii_super_diagonal->set_item(m,right); diagonal coefficient Aee
-        packed_data[nb_send_data-1] = Aee_diagcoef;
-
-        // Send the data
-        //pelCOMM->send( is_master, packed_data, nb_send_data);
-        MPI_Send( packed_data, nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_y ) ;
-        delete [] packed_data;
-
-     }
-
-     // Assemble the schlur complement in the master proc
-
-     if(rank_in_y == 0){
-      schlur_complement->add_Mat(Aee);
-      schlur_complement->add_Mat(receive_matrix,-1.0);
-     }
-  }
 }
-
-
-
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_velocity_matrix_1D_z (
+DDS_NavierStokes:: assemble_pressure_matrix_1D (
   FV_DiscreteField const* FF,
   FV_TimeIterator const* t_it,
-  double gamma,
-  size_t const& comp  )
+  size_t const dir )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL(
-   "DDS_NavierStokes:: assemble_velocity_matrix_1D_z" ) ;
+   MAC_LABEL("DDS_NavierStokes:: assemble_pressure_matrix_1D" ) ;
 
-   if ( my_rank == is_master ) cout << "velocity matrix 1D in z "
-    << endl;
+   if ( my_rank == is_master ) cout << "Pressure matrix 1D in x " << endl;
 
    // Parameters
-   //size_t nb_comps = FF->nb_components() ;
-   double hr,hl,zr,zl,zc,right,left,center = 0. ;
-   //size_t center_pos_in_matrix = 0 ;
+   double dxr,dxl,dx,xR,xL,xC,right,left,center = 0. ;
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
    size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-   // Perform assembling
-   int m;
-   size_t i,j,k;
-
-   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag_in_z(comp);
-   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag_in_z(comp);
-   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag_in_z(comp);
-
-   LA_SeqVector* VEC_zu = GLOBAL_EQ-> get_U_vec_zu(comp);
-   LA_SeqVector* VEC_zv = GLOBAL_EQ-> get_U_vec_zv(comp);
-
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_in_z(comp);
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_in_z(comp);
-   double Aee_diagcoef=0.;
-
-   for (m=0,k=min_unknown_index(2);k<=max_unknown_index(2);++k,++m)
-   {
-     zc= FF->get_DOF_coordinate( k,comp, 2 ) ;
-     zr= FF->get_DOF_coordinate( k+1,comp, 2 ) ;
-     zl= FF->get_DOF_coordinate( k-1,comp, 2 ) ;
-
-     hr= zr-zc;
-     hl= zc-zl;
-
-     right = -gamma/(hr);
-     left = -gamma/(hl);
-     center = - (right+left);
-
-     // add unsteady term
-     double value;
-     /** Assemble lhs in z for Neumann/Dirichlet BC Conditions */
-     if(U_is_zperiodic == 0){
-       if(k==min_unknown_index(2) && rank_in_z==0){
-         if(FF->DOF_in_domain(min_unknown_index(0), min_unknown_index(1), k-1, comp) && FF->DOF_has_imposed_Dirichlet_value( min_unknown_index(0), min_unknown_index(1), k-1, comp )){
-           value = center + rho*(FF->get_cell_size( k,comp,2))/(t_it->time_step());
-         }
-         else
-           value = -right + rho*(FF->get_cell_size( k,comp,2))/(t_it->time_step());
-       }
-       else if(k==max_unknown_index(2) && rank_in_z==nb_ranks_comm_z-1){
-         if(FF->DOF_in_domain(max_unknown_index(0), max_unknown_index(1), k+1, comp) && FF->DOF_has_imposed_Dirichlet_value( max_unknown_index(0), max_unknown_index(1), k+1, comp )){
-           value = center + rho*(FF->get_cell_size( k,comp,2))/(t_it->time_step());
-         }
-         else
-            value = -left + rho*(FF->get_cell_size( k,comp,2))/(t_it->time_step());
-       }
-       else
-           value = center + rho*(FF->get_cell_size( k,comp,2))/(t_it->time_step());
-     }
-     else
-        value = center + rho*(FF->get_cell_size( k,comp,2))/(t_it->time_step());  
-     // Set matrices for first proc
-     // For first proc, interface contribution is for max index only.
-
-     if(rank_in_z == nb_ranks_comm_z-1){
-
-      if(U_is_zperiodic != 1){
-        // No periodic boundary condition in z. 
-        // This means the total number of interface unknowns is (number of procs - 1)
-
-          // Set matrices for last proc
-          // No interface unknowns hence, Aee is zero.
-           if(k>min_unknown_index(2)){
-              Aii_main_diagonal->set_item(m,value);
-              if(k<max_unknown_index(2))
-                Aii_super_diagonal->set_item(m,right);
-              if(k>min_unknown_index(2))
-                Aii_sub_diagonal->set_item(m-1,left);
-           }
-           else{
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_z>1){
-                Aie->set_item(m,rank_in_z-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_z-1,m,left);
-              }
-
-              Aii_main_diagonal->set_item(m,value);
-              Aii_super_diagonal->set_item(m,right);
-           }  
-      }
-      else{
-        // Periodic boundary condition in z. 
-        // This means the number of interface unknowns is (number of procs)
-        // Last proc also has an interface unknown
-
-          // For last proc, interface contribution is for min index and max index.
-          if(k==min_unknown_index(2)){
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_z>1){
-                Aie->set_item(m,rank_in_z-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_z-1,m,left);
-                Aii_main_diagonal->set_item(m,value);
-              }
-              else{
-                Aii_main_diagonal->set_item(m,2*value);
-                VEC_zu->set_item(m,-value);
-                VEC_zv->set_item(m,1);
-                VEC_zv->set_item(VEC_zv->nb_rows()-1,-left/value);
-              }
-
-              Aii_super_diagonal->set_item(m,right);
-          }
-          else if(k<max_unknown_index(2)){
-              Aii_main_diagonal->set_item(m,value);
-              if(k>min_unknown_index(2))
-                Aii_sub_diagonal->set_item(m-1,left);
-              if(nb_ranks_comm_z>1)
-              {
-                if(k<max_unknown_index(2)-1)
-                Aii_super_diagonal->set_item(m,right);
-              }  
-              else
-                Aii_super_diagonal->set_item(m,right);
-           }
-          else{
-            if(nb_ranks_comm_z > 1){
-              // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-              Aie->set_item(m-1,rank_in_z,left);
-              Aee_diagcoef = value;
-              Aei->set_item(rank_in_z,m-1,left);
-            }
-            else{
-              VEC_zu->set_item(m,right);
-              Aii_main_diagonal->set_item(m,value-VEC_zu->item(m)*VEC_zv->item(m));
-              Aii_sub_diagonal->set_item(m-1,left); 
-            }
-            
-          }
-      }
-
-       
-     }
-
-     else if(rank_in_z == 0){
-
-      if(U_is_zperiodic != 1){
-        // No Periodic boundary condition in x. 
-        // First proc has only non zero value in Aie for last index (interface unknown)
-
-          if(k<max_unknown_index(2)){
-            Aii_main_diagonal->set_item(m,value);
-            if(k<max_unknown_index(2)-1)
-              Aii_super_diagonal->set_item(m,right);
-            if(k>min_unknown_index(2))
-              Aii_sub_diagonal->set_item(m-1,left);
-         }
-         else{
-            // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-            Aie->set_item(m-1,rank_in_z,left);
-            Aee_diagcoef = value;
-            Aei->set_item(rank_in_z,m-1,left);
-         }
-      }
-      else{ 
-        // Periodic boundary condition in x. 
-        // First proc has non zero value in Aie for first & last index
-
-         // For inner procs, interface contribution is for min index and max index.
-      if(k==min_unknown_index(2)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,nb_ranks_comm_z-1,left);
-        Aei->set_item(nb_ranks_comm_z-1,m,left);
-      }
-      if(k == max_unknown_index(2)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_z,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_z,m-1,left);
-      }
-      if(k<max_unknown_index(2)){
-          Aii_main_diagonal->set_item(m,value);
-          if(k<max_unknown_index(2)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(k>min_unknown_index(2))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-      }
-     }
-
-     else{
-      // Set matrices for inner procs
-
-      // For inner procs, interface contribution is for min index and max index.
-      if(k==min_unknown_index(2)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,rank_in_z-1,left);
-        Aei->set_item(rank_in_z-1,m,left);
-      }
-      if(k == max_unknown_index(2)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_z,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_z,m-1,left);
-      }
-      if(k<max_unknown_index(2)){
-          Aii_main_diagonal->set_item(m,value);
-          if(k<max_unknown_index(2)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(k>min_unknown_index(2))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-     }
-
+   for (size_t l=0;l<dim;++l) {
+      min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( 0, l ) ;
+      max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( 0, l ) ;
    }
-
-   GLOBAL_EQ->compute_Aii_z_ref(comp);
-
-   if(nb_ranks_comm_z>1)
-   {
-     // Compute the product matrix for each proc
-     GLOBAL_EQ->compute_product_matrix_z(comp);
-
-     LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product_in_z(comp);
-     LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
-     LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix_in_z(comp);
-     LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement_in_z(comp);
-
-     if ( rank_in_z == 0 )
-     {
-        Aee->set_item(0,0,Aee_diagcoef);
-        for (i=1;i<nb_ranks_comm_z;++i)
-        {
-          // Create the container to receive
-        size_t nbrows = product_matrix->nb_rows();
-          size_t nb_received_data = pow(nbrows,2)+1;
-          double * received_data = new double [nb_received_data];
-
-          // Receive the data
-          //pelCOMM->receive( i, received_data, nb_received_data );
-          static MPI_Status status ;
-          MPI_Recv( received_data, nb_received_data, MPI_DOUBLE, i, 0,
-                            DDS_Comm_z, &status ) ;
-
-          // Transfer the received data to the receive matrix
-          for(k=0;k<nbrows;k++){
-            for(j=0;j<nbrows;j++){
-                // Assemble the global product matrix by adding contributions from all the procs
-                receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
-            }
-          }
-          if(U_is_zperiodic == 0){
-            if(i<nb_ranks_comm_z-1){
-              // Assemble the global Aee matrix
-              Aee->set_item(i,i,received_data[nb_received_data-1]);
-            }  
-          }
-          else
-            Aee->set_item(i,i,received_data[nb_received_data-1]); 
-        }
-
-     }
-     else
-     {
-        // Create the packed data container
-        size_t nbrows = product_matrix->nb_rows();
-        size_t nb_send_data = pow(nbrows,2)+1;
-        double * packed_data = new double [nb_send_data];
-
-        // Fill the packed data container with Aie
-        // LA_MatrixIterator* it = product_matrix->create_stored_item_iterator( 0 ) ;
-        // Iterator only fetches the values present. Zeros are not fetched.
-
-        for( i=0 ; i<nbrows ; i++ )
-        {
-           for( j=0 ; j<nbrows ; j++ )
-           {
-             // Packing rule
-             // Pack the product matrix into a vector
-             packed_data[i*nbrows+j]=product_matrix->item(i,j);
-           }
-        }
-
-        //it->destroy() ; it = 0 ;
-
-        // Fill the last element of packed data with the diagonal coefficient Aee
-        packed_data[nb_send_data-1] = Aee_diagcoef;
-
-        // Send the data
-        //pelCOMM->send( is_master, packed_data, nb_send_data);
-        MPI_Send( packed_data, nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_z ) ;
-        delete [] packed_data;
-
-     }
-
-     // Assemble the schlur complement in the master proc
-
-     if(rank_in_z == 0){
-      schlur_complement->add_Mat(Aee);
-      schlur_complement->add_Mat(receive_matrix,-1.0);
-      // schlur_complement->print_items(MAC::out(),0);
-     }
-  }
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: assemble_pressure_matrix_1D_x (
-  FV_DiscreteField const* FF,
-  FV_TimeIterator const* t_it)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL(
-   "DDS_NavierStokes:: assemble_pressure_matrix_1D_x" ) ;
-
-   if ( my_rank == is_master ) cout << "Pressure matrix 1D in x "
-    << endl;
-
-   // Parameters
-   //size_t nb_comps = FF->nb_components() ;
-   double hr,hl,xr,xl,xc,dx,right,left,center = 0. ;
-   //size_t center_pos_in_matrix = 0 ;
-
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      FF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      FF->get_max_index_unknown_handled_by_proc( 0, l ) ;
 
    // Perform assembling
    int m;
    size_t i;
-   size_t comp=0;
+   size_t comp = 0;
 
-   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag_in_x_P();
-   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag_in_x_P();
-   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag_in_x_P();
+   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag_P(dir);
+   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag_P(dir);
+   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag_P(dir);
 
-
-   LA_SeqVector* VEC_xu = GLOBAL_EQ-> get_P_vec_xu();
-   LA_SeqVector* VEC_xv = GLOBAL_EQ-> get_P_vec_xv();
-
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_in_x_P();
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_in_x_P();
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_P(dir);
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_P(dir);
 
    double Aee_diagcoef=0.;
 
-   for (m=0,i=min_unknown_index(0);i<=max_unknown_index(0);++i,++m)
-   {
-     xc= FF->get_DOF_coordinate( i, comp, 0 ) ;
-     xr= FF->get_DOF_coordinate( i+1,comp, 0 ) ;
-     xl= FF->get_DOF_coordinate( i-1, comp, 0 ) ;
+   for (m=0,i=min_unknown_index(dir);i<=max_unknown_index(dir);++i,++m) {
+      xC= FF->get_DOF_coordinate( i, comp, dir) ;
+      xR= FF->get_DOF_coordinate( i+1,comp, dir) ;
+      xL= FF->get_DOF_coordinate( i-1, comp, dir) ;
 
-     dx = FF->get_cell_size( i,comp, 0 );
+      dx = FF->get_cell_size( i,comp, 0 );
 
-     hr= xr-xc;
-     hl= xc-xl;
+      dxr= xR - xC;
+      dxl= xC - xL;
 
-     right = -1.0/(hr);
-     left = -1.0/(hl);
-     center = - (right+left);
+      right = -1.0/(dxr);
+      left = -1.0/(dxl);
+      center = - (right+left);
 
-     // add unsteady term
+      // add unsteady term
+      size_t k;
+      double value;
+      double unsteady_term = 1.0*dx;
 
-     double value;
-     /** Assemble lhs in x for Neumann/Dirichlet BC Conditions */
-     if(dim == 2 && P_is_xperiodic == 0){
-        if(i==min_unknown_index(0) && rank_in_x==0){
-         if(FF->DOF_in_domain(i-1,min_unknown_index(1), 0,comp) && FF->DOF_has_imposed_Dirichlet_value( i-1,min_unknown_index(1), 0, comp ))
-           value = center + 1.0*dx;
-         else
-           value = -right + 1.0*dx;
-         }
-         else if(i==max_unknown_index(0) && rank_in_x==nb_ranks_comm_x-1){
-           if(FF->DOF_in_domain(i+1,max_unknown_index(1), 0,comp) && FF->DOF_has_imposed_Dirichlet_value( i+1,max_unknown_index(1), 0, comp )){
-             value = center + 1.0*dx;
-           }
-           else
-             value = -left + 1.0*dx;
-         }
-         else
-            value = center + 1.0*dx; 
-     }
-     else if(P_is_xperiodic == 0){
-        if(i==min_unknown_index(0) && rank_in_x==0){
-         if(FF->DOF_in_domain(i-1,min_unknown_index(1), min_unknown_index(2),comp) && FF->DOF_has_imposed_Dirichlet_value( i-1,min_unknown_index(1), min_unknown_index(2), comp ))
-           value = center + 1.0*dx;
-         else
-           value = -right + 1.0*dx;
-         }
-         else if(i==max_unknown_index(0) && rank_in_x==nb_ranks_comm_x-1){
-           if(FF->DOF_in_domain(i+1,max_unknown_index(1), max_unknown_index(2),comp) && FF->DOF_has_imposed_Dirichlet_value( i+1,max_unknown_index(1), max_unknown_index(2), comp )){
-             value = center + 1.0*dx;
-           }
-           else
-             value = -left + 1.0*dx;
-         }
-         else
-            value = center + 1.0*dx; 
-     }
-     else
-        value = center + 1.0*dx; 
-
-     // Set matrices for first proc
-     // For first proc, interface contribution is for max index only.
-
-     if(rank_in_x == nb_ranks_comm_x-1){
-
-      if(P_is_xperiodic != 1){
-        // No periodic boundary condition in x. 
-        // This means the total number of interface unknowns is (number of procs - 1)
-
-          // Set matrices for last proc
-          // No interface unknowns hence, Aee is zero.
-           if(i>min_unknown_index(0)){
-              Aii_main_diagonal->set_item(m,value);
-              if(i<max_unknown_index(0))
-                Aii_super_diagonal->set_item(m,right);
-              if(i>min_unknown_index(0))
-                Aii_sub_diagonal->set_item(m-1,left);
-           }
-           else{
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_x>1){
-                Aie->set_item(m,rank_in_x-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_x-1,m,left);
-              }
-
-              Aii_main_diagonal->set_item(m,value);
-              Aii_super_diagonal->set_item(m,right);
-           }  
-      }
-      else{
-        // Periodic boundary condition in x. 
-        // This means the number of interface unknowns is (number of procs)
-        // Last proc also has an interface unknown
-
-          // For last proc, interface contribution is for min index and max index.
-
-          if(i==min_unknown_index(0)){
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_x>1){
-                Aie->set_item(m,rank_in_x-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_x-1,m,left);
-                Aii_main_diagonal->set_item(m,value);
-              }
-              else{
-                VEC_xu->set_item(m,-value);
-                VEC_xv->set_item(m,1);
-                VEC_xv->set_item(VEC_xv->nb_rows()-1,-left/value);
-                Aii_main_diagonal->set_item(m,2*value);
-              }
-
-              Aii_super_diagonal->set_item(m,right);
-          }
-          else if(i<max_unknown_index(0)){
-              Aii_main_diagonal->set_item(m,value);
-              if(i>min_unknown_index(0))
-                Aii_sub_diagonal->set_item(m-1,left);
-              if(nb_ranks_comm_x>1)
-              {
-                if(i<max_unknown_index(0)-1)
-                  Aii_super_diagonal->set_item(m,right);
-              }  
-              else
-                Aii_super_diagonal->set_item(m,right);
-           }
-          else{
-            if(nb_ranks_comm_x>1){
-            // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-              Aie->set_item(m-1,rank_in_x,left);
-              Aee_diagcoef = value;
-              Aei->set_item(rank_in_x,m-1,left);
-            }
-            else{
-              VEC_xu->set_item(m,right);
-              Aii_main_diagonal->set_item(m,value-VEC_xu->item(m)*VEC_xv->item(m));
-              Aii_sub_diagonal->set_item(m-1,left);
-            }
-          }
+      if (dim == 2) {
+         k = 0;
+      } else {
+         k = min_unknown_index(2);
       }
 
-       
-     }
+      value = center;
 
-     else if(rank_in_x == 0){
+      value = value + unsteady_term;
 
-      if(P_is_xperiodic != 1){
-        // No Periodic boundary condition in x. 
-        // First proc has only non zero value in Aie for last index (interface unknown)
+      bool r_bound = false;
+      bool l_bound = false;
+      // All the proc will have open right bound, except last proc for non periodic systems
+      if ((is_Pperiodic[dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
+      // All the proc will have open left bound, except first proc for non periodic systems
+      if ((is_Pperiodic[dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
 
-          if(i<max_unknown_index(0)){
+      // Set Aie, Aei and Ae 
+      if ((!l_bound) && (i == min_unknown_index(dir))) {
+         // Periodic boundary condition at minimum unknown index
+         // First proc has non zero value in Aie,Aei for first & last index
+         if (rank_in_i[dir] == 0) {
+            Aie->set_item(m,nb_ranks_comm_i[dir]-1,left);
+            Aei->set_item(nb_ranks_comm_i[dir]-1,m,right);
+         } else {
+            Aie->set_item(m,rank_in_i[dir]-1,left);
+            Aei->set_item(rank_in_i[dir]-1,m,right);
+         }
+      }
+
+      if ((!r_bound) && (i == max_unknown_index(dir))) {
+         // Periodic boundary condition at maximum unknown index
+         // For last index, Aee comes from this proc as it is interface unknown wrt this proc
+         Aie->set_item(m-1,rank_in_i[dir],right);
+         Aee_diagcoef = value;
+         Aei->set_item(rank_in_i[dir],m-1,left);
+      }
+
+      // Set Aii_sub_diagonal
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Pperiodic[dir] != 1)) {
+         if (i > min_unknown_index(dir)) Aii_sub_diagonal->set_item(m-1,left);
+      } else {
+         if (i<max_unknown_index(dir)) {
+            if (i>min_unknown_index(dir)) {
+               Aii_sub_diagonal->set_item(m-1,left);
+            }
+         }
+      }
+
+      // Set Aii_super_diagonal
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Pperiodic[dir] != 1)) {
+         if (i < max_unknown_index(dir)) Aii_super_diagonal->set_item(m,right);
+      } else {
+         if (i < max_unknown_index(dir)-1) {
+            Aii_super_diagonal->set_item(m,right);
+         }
+      }
+
+      // Set Aii_main_diagonal
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Pperiodic[dir] != 1)) {
+         Aii_main_diagonal->set_item(m,value);
+      } else {
+         if (i<max_unknown_index(dir)) {
             Aii_main_diagonal->set_item(m,value);
-            if(i<max_unknown_index(0)-1)
-              Aii_super_diagonal->set_item(m,right);
-            if(i>min_unknown_index(0))
-              Aii_sub_diagonal->set_item(m-1,left);
-         }
-         else{
-            // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-            Aie->set_item(m-1,rank_in_x,left);
-            Aee_diagcoef = value;
-            Aei->set_item(rank_in_x,m-1,left);
          }
       }
-      else{ 
-        // Periodic boundary condition in x. 
-        // First proc has non zero value in Aie for first & last index
-
-         // For inner procs, interface contribution is for min index and max index.
-      if(i==min_unknown_index(0)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,nb_ranks_comm_x-1,left);
-        Aei->set_item(nb_ranks_comm_x-1,m,left);
-      }
-      if(i == max_unknown_index(0)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_x,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_x,m-1,left);
-      }
-      if(i<max_unknown_index(0)){
-          Aii_main_diagonal->set_item(m,value);
-          if(i<max_unknown_index(0)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(i>min_unknown_index(0))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-      }
-       
-     }
-
-     else{
-      // Set matrices for inner procs
-
-      // For inner procs, interface contribution is for min index and max index.
-      if(i==min_unknown_index(0)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,rank_in_x-1,left);
-        Aei->set_item(rank_in_x-1,m,left);
-      }
-      if(i == max_unknown_index(0)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_x,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_x,m-1,left);
-      }
-      if(i<max_unknown_index(0)){
-          Aii_main_diagonal->set_item(m,value);
-          if(i<max_unknown_index(0)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(i>min_unknown_index(0))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-     }
-
    }
 
-   GLOBAL_EQ->compute_Aii_x_ref_P();
-
-   // Aii_main_diagonal->print_items(MAC::out(),0);
-
+   GLOBAL_EQ->compute_Aii_ref_P(dir);
    // Compute the product matrix for each proc
 
-   if(nb_ranks_comm_x>1)
-   {
-     GLOBAL_EQ->compute_product_matrix_x_P();
+   if (nb_ranks_comm_i[dir]>1) {
+      GLOBAL_EQ->compute_product_matrix_P(dir);
 
-     LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product_in_x_P();
-     LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
-     LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix_in_x_P();
-     LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement_in_x_P();
+      LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product_P(dir);
+      LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
+      LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix_P(dir);
+      LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement_P(dir);
 
-     if ( rank_in_x == 0 )
-     {
-        Aee->set_item(0,0,Aee_diagcoef);
-        for (i=1;i<nb_ranks_comm_x;++i)
-        {
+      if ( rank_in_i[dir] == 0 ) {
+         Aee->set_item(0,0,Aee_diagcoef);
+   	 for (i=1;i<nb_ranks_comm_i[dir];++i) {
+            // Create the container to receive
+            size_t nbrows = product_matrix->nb_rows();
+            size_t nb_received_data = pow(nbrows,2)+1;
+            double * received_data = new double [nb_received_data];
 
-          // Create the container to receive
-          size_t nbrows = product_matrix->nb_rows();
-          size_t nb_received_data = pow(nbrows,2)+1;
-          double * received_data = new double [nb_received_data];
+            // Receive the data
+            static MPI_Status status ;
+            MPI_Recv( received_data, nb_received_data, MPI_DOUBLE, i, 0,
+                            DDS_Comm_i[dir], &status ) ;
 
-          // Receive the data
-          //pelCOMM->receive( i, received_data, nb_received_data );
-          static MPI_Status status ;
-          MPI_Recv( received_data, nb_received_data, MPI_DOUBLE, i, 0,
-                            DDS_Comm_x, &status ) ;
-
-          // Transfer the received data to the receive matrix
-          for(int k=0;k<nbrows;k++){
-            for(int j=0;j<nbrows;j++){
-                // Assemble the global product matrix by adding contributions from all the procs
-                receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
+            // Transfer the received data to the receive matrix
+            for (int k=0;k<nbrows;k++) {
+               for (int j=0;j<nbrows;j++) {
+                  // Assemble the global product matrix by adding contributions from all the procs
+                  receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
+               }
             }
-          }
-          if(P_is_xperiodic == 0){
-            if(i<nb_ranks_comm_x-1){
-              // Assemble the global Aee matrix 
-              // No periodic condition in x. So no fe contribution from last proc
-              Aee->set_item(i,i,received_data[nb_received_data-1]);
-            }   
-          }
-          else{
-            // Assemble the global Aee matrix
-            // Periodic condition in x. So there is fe contribution from last proc
-            Aee->set_item(i,i,received_data[nb_received_data-1]); 
-          }
 
-        }
-     }
-     else
-     {
-        // Create the packed data container
-        size_t nbrows = product_matrix->nb_rows();
-        size_t nb_send_data = pow(nbrows,2)+1;
-        double * packed_data = new double [nb_send_data];
-
-        // Fill the packed data container with Aie
-        // LA_MatrixIterator* it = product_matrix->create_stored_item_iterator( 0 ) ;
-        // Iterator only fetches the values present. Zeros are not fetched.
-
-        for( i=0 ; i<nbrows ; i++ )
-        {
-           for( size_t j=0 ; j<nbrows ; j++ )
-           {
-             // Packing rule
-             // Pack the product matrix into a vector
-             packed_data[i*nbrows+j]=product_matrix->item(i,j);
-           }
-        }
-
-        //it->destroy() ; it = 0 ;
-
-        // Fill the last element of packed data with the diagonal coefficient Aee
-        packed_data[nb_send_data-1] = Aee_diagcoef;
-
-        // Send the data
-        //pelCOMM->send( is_master, packed_data, nb_send_data);
-        MPI_Send( packed_data, nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_x ) ;
-
-        delete [] packed_data;
-
-     }
-
-     // Assemble the schlur complement in the master proc
-
-     if(rank_in_x == 0){
-      schlur_complement->add_Mat(Aee);
-      schlur_complement->add_Mat(receive_matrix,-1.0);
-      // schlur_complement->print_items(MAC::out(),0);
-
-     } 
-  }
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: assemble_pressure_matrix_1D_y (
-  FV_DiscreteField const* FF,
-  FV_TimeIterator const* t_it)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL(
-   "DDS_NavierStokes:: assemble_pressure_matrix_1D_y" ) ;
-
-   if ( my_rank == is_master ) cout << "pressure matrix 1D in y "
-    << endl;
-
-   // Parameters
-   //size_t nb_comps = FF->nb_components() ;
-   double hr,hl,yr,yl,yc,dy,right,left,center = 0. ;
-   //size_t center_pos_in_matrix = 0 ;
-   size_t comp=0;
-
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-   // Perform assembling
-   int m;
-   size_t i,j,k;
-   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag_in_y_P();
-   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag_in_y_P();
-   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag_in_y_P();
-
-   LA_SeqVector* VEC_yu = GLOBAL_EQ-> get_P_vec_yu();
-   LA_SeqVector* VEC_yv = GLOBAL_EQ-> get_P_vec_yv();
-
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_in_y_P();
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_in_y_P();
-   double Aee_diagcoef=0.;
-
-   for (m=0,j=min_unknown_index(1);j<=max_unknown_index(1);++j,++m)
-   {
-     yc= FF->get_DOF_coordinate( j,comp, 1 ) ;
-     yr= FF->get_DOF_coordinate( j+1,comp, 1 ) ;
-     yl= FF->get_DOF_coordinate( j-1,comp, 1 ) ;
-
-     hr= yr-yc;
-     hl= yc-yl;
-
-     right = -1.0/(hr);
-     left = -1.0/(hl);
-     center = - (right+left);
-
-     dy=FF->get_cell_size(j,0,1);
-
-     // add unsteady term
-     double value;
-     /** Assemble lhs in y for Neumann/Dirichlet BC Conditions */
-     if(dim == 2 && P_is_yperiodic == 0){
-             if(j==min_unknown_index(1) && rank_in_y==0){
-       if(FF->DOF_in_domain(min_unknown_index(0), j-1, 0, comp) && FF->DOF_has_imposed_Dirichlet_value( min_unknown_index(0), j-1, 0, comp ))
-         value = center + 1.0*dy;
-       else
-          value = -right + 1.0*dy;
-       }
-       else if(j==max_unknown_index(1) && rank_in_y==nb_ranks_comm_y-1){
-         if(FF->DOF_in_domain(max_unknown_index(0), j+1, 0, comp) && FF->DOF_has_imposed_Dirichlet_value( max_unknown_index(0), j+1, 0, comp ))
-           value = center + 1.0*dy;
-         else
-            value = -left + 1.0*dy;
-       }
-       else
-         value = center + 1.0*dy;
-     }
-     else if(P_is_yperiodic == 0){
-             if(j==min_unknown_index(1) && rank_in_y==0){
-       if(FF->DOF_in_domain(min_unknown_index(0), j-1, min_unknown_index(2), comp) && FF->DOF_has_imposed_Dirichlet_value( min_unknown_index(0), j-1, min_unknown_index(2), comp ))
-         value = center + 1.0*dy;
-       else
-          value = -right + 1.0*dy;
-       }
-       else if(j==max_unknown_index(1) && rank_in_y==nb_ranks_comm_y-1){
-         if(FF->DOF_in_domain(max_unknown_index(0), j+1, max_unknown_index(2), comp) && FF->DOF_has_imposed_Dirichlet_value( max_unknown_index(0), j+1, max_unknown_index(2), comp ))
-           value = center + 1.0*dy;
-         else
-            value = -left + 1.0*dy;
-       }
-       else
-         value = center + 1.0*dy;
-     }
-     else
-        value = center + 1.0*dy;
-    // value = center + (FF->get_cell_size( j,comp,1))/(t_it->time_step());
-    // Set matrices for first proc
-     // For first proc, interface contribution is for max index only.
-
-     if(rank_in_y == nb_ranks_comm_y-1){
-
-      if(P_is_yperiodic != 1){
-        // No periodic boundary condition in x. 
-        // This means the total number of interface unknowns is (number of procs - 1)
-
-          // Set matrices for last proc
-          // No interface unknowns hence, Aee is zero.
-           if(j>min_unknown_index(1)){
-              Aii_main_diagonal->set_item(m,value);
-              if(j<max_unknown_index(1))
-                Aii_super_diagonal->set_item(m,right);
-              if(j>min_unknown_index(1))
-                Aii_sub_diagonal->set_item(m-1,left);
-           }
-           else{
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_y>1){
-                Aie->set_item(m,rank_in_y-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_y-1,m,left);
-              }
-
-              Aii_main_diagonal->set_item(m,value);
-              Aii_super_diagonal->set_item(m,right);
-           }  
-      }
-      else{
-        // Periodic boundary condition in x. 
-        // This means the number of interface unknowns is (number of procs)
-        // Last proc also has an interface unknown
-
-          // For last proc, interface contribution is for min index and max index.
-          if(j==min_unknown_index(1)){
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_y>1){
-                Aie->set_item(m,rank_in_y-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_y-1,m,left);
-                Aii_main_diagonal->set_item(m,value);
-              }
-              else{
-                VEC_yu->set_item(m,-value);
-                VEC_yv->set_item(m,1);
-                VEC_yv->set_item(VEC_yv->nb_rows()-1,-left/value);
-                Aii_main_diagonal->set_item(m,2*value);
-              }
-
-              Aii_super_diagonal->set_item(m,right);
-          }
-          else if(j<max_unknown_index(1)){
-              Aii_main_diagonal->set_item(m,value);
-              if(j>min_unknown_index(1))
-                Aii_sub_diagonal->set_item(m-1,left);
-              if(nb_ranks_comm_y>1)
-              {
-                if(j<max_unknown_index(1)-1)
-                  Aii_super_diagonal->set_item(m,right);
-              }  
-              else
-                Aii_super_diagonal->set_item(m,right);
-           }
-          else{
-            if(nb_ranks_comm_y > 1){
-              // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-              Aie->set_item(m-1,rank_in_y,left);
-              Aee_diagcoef = value;
-              Aei->set_item(rank_in_y,m-1,left);  
+  	    if (is_Uperiodic[dir] == 0) {
+               if (i<nb_ranks_comm_i[dir]-1) {
+                  // Assemble the global Aee matrix 
+                  // No periodic condition in x. So no fe contribution from last proc
+                  Aee->set_item(i,i,received_data[nb_received_data-1]);
+               }   
+            } else {
+               // Assemble the global Aee matrix
+               // Periodic condition in x. So there is fe contribution from last proc
+               Aee->set_item(i,i,received_data[nb_received_data-1]); 
             }
-            else{
-              VEC_yu->set_item(m,right);
-              Aii_main_diagonal->set_item(m,value-VEC_yu->item(m)*VEC_yv->item(m));
-              Aii_sub_diagonal->set_item(m-1,left);
-            }
-            
-          }
-      }
-     }
-
-     else if(rank_in_y == 0){
-
-      if(P_is_yperiodic != 1){
-        // No Periodic boundary condition in x. 
-        // First proc has only non zero value in Aie for last index (interface unknown)
-
-          if(j<max_unknown_index(1)){
-            Aii_main_diagonal->set_item(m,value);
-            if(j<max_unknown_index(1)-1)
-              Aii_super_diagonal->set_item(m,right);
-            if(j>min_unknown_index(1))
-              Aii_sub_diagonal->set_item(m-1,left);
          }
-         else{
-            // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-            Aie->set_item(m-1,rank_in_y,left);
-            Aee_diagcoef = value;
-            Aei->set_item(rank_in_y,m-1,left);
+      } else {
+         // Create the packed data container
+         size_t nbrows = product_matrix->nb_rows();
+         size_t nb_send_data = pow(nbrows,2)+1;
+         double * packed_data = new double [nb_send_data];
+
+         // Fill the packed data container with Aie
+         // Iterator only fetches the values present. Zeros are not fetched.
+
+         for ( i=0 ; i<nbrows ; i++ ) {
+            for ( size_t j=0 ; j<nbrows ; j++ ) {
+               // Packing rule
+               // Pack the product matrix into a vector
+               packed_data[i*nbrows+j]=product_matrix->item(i,j);
+            }
          }
-      }
-      else{ 
-        // Periodic boundary condition in x. 
-        // First proc has non zero value in Aie for first & last index
 
-         // For inner procs, interface contribution is for min index and max index.
-      if(j==min_unknown_index(1)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,nb_ranks_comm_y-1,left);
-        Aei->set_item(nb_ranks_comm_y-1,m,left);
-      }
-      if(j == max_unknown_index(1)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_y,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_y,m-1,left);
-      }
-      if(j<max_unknown_index(1)){
-          Aii_main_diagonal->set_item(m,value);
-          if(j<max_unknown_index(1)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(j>min_unknown_index(1))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-      }
-     }
+         // Fill the last element of packed data with the diagonal coefficient Aee
+         packed_data[nb_send_data-1] = Aee_diagcoef;
 
-     else{
-      // Set matrices for inner procs
+         // Send the data
+         MPI_Send( packed_data, nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
 
-      // For inner procs, interface contribution is for min index and max index.
-      if(j==min_unknown_index(1)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,rank_in_y-1,left);
-        Aei->set_item(rank_in_y-1,m,left);
+         delete [] packed_data;
       }
-      if(j == max_unknown_index(1)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_y,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_y,m-1,left);
-      }
-      if(j<max_unknown_index(1)){
-          Aii_main_diagonal->set_item(m,value);
-          if(j<max_unknown_index(1)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(j>min_unknown_index(1))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-     }
 
+      // Assemble the schlur complement in the master proc
+
+      if (rank_in_i[dir] == 0){
+         schlur_complement->add_Mat(Aee);
+         schlur_complement->add_Mat(receive_matrix,-1.0);
+      }
    }
-
-   GLOBAL_EQ->compute_Aii_y_ref_P();
-
-   if(nb_ranks_comm_y>1)
-   {
-     // Compute the product matrix for each proc
-     GLOBAL_EQ->compute_product_matrix_y_P();
-
-     LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product_in_y_P();
-     LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
-     LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix_in_y_P();
-     LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement_in_y_P();
-
-     if ( rank_in_y == 0 )
-     {
-        Aee->set_item(0,0,Aee_diagcoef);
-        for (i=1;i<nb_ranks_comm_y;++i)
-        {
-          // Create the container to receive
-          size_t nbrows = product_matrix->nb_rows();
-          size_t nb_received_data = pow(nbrows,2)+1;
-          double * received_data = new double [nb_received_data];
-
-          // Receive the data
-          //pelCOMM->receive( i, received_data, nb_receAii_super_diagonal->set_item(m,right);ived_data );
-          static MPI_Status status ;
-          MPI_Recv( received_data, nb_received_data, MPI_DOUBLE, i, 0,
-                            DDS_Comm_y, &status ) ;
-
-          // Transfer the received data to the receive matrix
-          for(k=0;k<nbrows;k++){
-            for(j=0;j<nbrows;j++){
-                // Assemble the global product matrix by adding contributions from all the procs
-                receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
-            }
-          }
-          if(P_is_yperiodic == 0){
-            if(i<nb_ranks_comm_y-1 ){
-              // Assemble the global Aee matrix
-              Aee->set_item(i,i,received_data[nb_received_data-1]);
-            }  
-          }
-          else{
-            Aee->set_item(i,i,received_data[nb_received_data-1]);
-          }
-        }
-
-     }
-     else
-     {
-        // Create the packed data container
-        size_t nbrows = product_matrix->nb_rows();
-        size_t nb_send_data = pow(nbrows,2)+1;
-        double * packed_data = new double [nb_send_data];
-
-        // Fill the packed data container with Aie
-        // LA_MatrixIterator* it = product_matrix->create_stored_item_iterator( 0 ) ;
-        // Iterator only fetches the values present. Zeros are not fetched.
-
-        for( i=0 ; i<nbrows ; i++ )
-        {
-           for( j=0 ; j<nbrows ; j++ )
-           {
-             // Packing rule
-             // Pack the product matrix into a vector
-             packed_data[i*nbrows+j]=product_matrix->item(i,j);
-           }
-        }
-
-        //it->destroy() ; it = 0 ;
-
-        // Fill the last element of packed data with theAii_super_diagonal->set_item(m,right); diagonal coefficient Aee
-        packed_data[nb_send_data-1] = Aee_diagcoef;
-
-        // Send the data
-        //pelCOMM->send( is_master, packed_data, nb_send_data);
-        MPI_Send( packed_data, nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_y ) ;
-        delete [] packed_data;
-
-     }
-
-     // Assemble the schlur complement in the master proc
-
-     if(rank_in_y == 0){
-      schlur_complement->add_Mat(Aee);
-      schlur_complement->add_Mat(receive_matrix,-1.0);
-     }
-  }
 }
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: assemble_pressure_matrix_1D_z (
-  FV_DiscreteField const* FF,
-  FV_TimeIterator const* t_it)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL(
-   "DDS_NavierStokes:: assemble_pressure_matrix_1D_z" ) ;
-
-   if ( my_rank == is_master ) cout << "Pressure matrix 1D in z "
-    << endl;
-
-   // Parameters
-   //size_t nb_comps = FF->nb_components() ;
-   double hr,hl,zr,zl,zc,dz,right,left,center = 0. ;
-   int comp=0;
-   //size_t center_pos_in_matrix = 0 ;
-
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-   // Perform assembling
-   int m;
-   size_t i,j,k;
-
-   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag_in_z_P();
-   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag_in_z_P();
-   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag_in_z_P();
-   
-   LA_SeqVector* VEC_zu = GLOBAL_EQ-> get_P_vec_zu();
-   LA_SeqVector* VEC_zv = GLOBAL_EQ-> get_P_vec_zv();   
-
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_in_z_P();
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_in_z_P();
-   double Aee_diagcoef=0.;
-
-   for (m=0,k=min_unknown_index(2);k<=max_unknown_index(2);++k,++m)
-   {
-     zc= FF->get_DOF_coordinate( k,comp, 2 ) ;
-     zr= FF->get_DOF_coordinate( k+1,comp, 2 ) ;
-     zl= FF->get_DOF_coordinate( k-1,comp, 2 ) ;
-
-     hr= zr-zc;
-     hl= zc-zl;
-
-     right = -1.0/(hr);
-     left = -1.0/(hl);
-     center = - (right+left);
-
-     dz=FF->get_cell_size(k,0,2);
-
-     // add unsteady term
-     double value;
-     /** Assemble lhs in z for Neumann/Dirichlet BC Conditions */
-     if(P_is_zperiodic == 0){
-        if(k==min_unknown_index(2) && rank_in_z==0){
-         if(FF->DOF_in_domain(min_unknown_index(0), min_unknown_index(1), k-1, comp) && FF->DOF_has_imposed_Dirichlet_value( min_unknown_index(0), min_unknown_index(1), k-1, comp )){
-           value = center + 1.0*dz;
-         }
-         else
-           value = -right + 1.0*dz;
-       }
-       else if(k==max_unknown_index(2) && rank_in_z==nb_ranks_comm_z-1){
-         if(FF->DOF_in_domain(max_unknown_index(0), max_unknown_index(1), k+1, comp) && FF->DOF_has_imposed_Dirichlet_value( max_unknown_index(0), max_unknown_index(1), k+1, comp )){
-           value = center + 1.0*dz;
-         }
-         else
-            value = -left + 1.0*dz;
-       }
-       else
-           value = center + 1.0*dz;
-     }
-     else
-           value = center + 1.0*dz;
-
-       
-     // Set matrices for first proc
-     // For first proc, interface contribution is for max index only.
-
-     if(rank_in_z == nb_ranks_comm_z-1){
-
-      if(P_is_zperiodic != 1){
-        // No periodic boundary condition in x. 
-        // This means the total number of interface unknowns is (number of procs - 1)
-
-          // Set matrices for last proc
-          // No interface unknowns hence, Aee is zero.
-           if(k>min_unknown_index(2)){
-              Aii_main_diagonal->set_item(m,value);
-              if(k<max_unknown_index(2))
-                Aii_super_diagonal->set_item(m,right);
-              if(k>min_unknown_index(2))
-                Aii_sub_diagonal->set_item(m-1,left);
-           }
-           else{
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_z>1){
-                Aie->set_item(m,rank_in_z-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_z-1,m,left);
-              }
-
-              Aii_main_diagonal->set_item(m,value);
-              Aii_super_diagonal->set_item(m,right);
-           }  
-      }
-      else{
-        // Periodic boundary condition in x. 
-        // This means the number of interface unknowns is (number of procs)
-        // Last proc also has an interface unknown
-
-          // For last proc, interface contribution is for min index and max index.
-          if(k==min_unknown_index(2)){
-              // For last proc, interface contribution is for min index only.
-              if(nb_ranks_comm_z>1){
-                Aie->set_item(m,rank_in_z-1,left);
-                Aee_diagcoef = 0;
-                Aei->set_item(rank_in_z-1,m,left);
-                Aii_main_diagonal->set_item(m,value);
-              }
-              else{
-                Aii_main_diagonal->set_item(m,2*value);
-                VEC_zu->set_item(m,-value);
-                VEC_zv->set_item(m,1);
-                VEC_zv->set_item(VEC_zv->nb_rows()-1,-left/value);
-              }
-
-              Aii_super_diagonal->set_item(m,right);
-          }
-          else if(k<max_unknown_index(2)){
-              Aii_main_diagonal->set_item(m,value);
-              if(k>min_unknown_index(2))
-                Aii_sub_diagonal->set_item(m-1,left);
-              if(nb_ranks_comm_z>1)
-              {
-                if(k<max_unknown_index(2)-1)
-                Aii_super_diagonal->set_item(m,right);
-              }  
-              else
-                Aii_super_diagonal->set_item(m,right);
-           }
-          else{
-            if(nb_ranks_comm_z > 1){
-              // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-              Aie->set_item(m-1,rank_in_z,left);
-              Aee_diagcoef = value;
-              Aei->set_item(rank_in_z,m-1,left);
-            }
-            else{
-              VEC_zu->set_item(m,right);
-              Aii_main_diagonal->set_item(m,value-VEC_zu->item(m)*VEC_zv->item(m));
-              Aii_sub_diagonal->set_item(m-1,left); 
-            }
-            
-          }
-      }
-
-       
-     }
-
-     else if(rank_in_z == 0){
-
-      if(P_is_zperiodic != 1){
-        // No Periodic boundary condition in x. 
-        // First proc has only non zero value in Aie for last index (interface unknown)
-
-          if(k<max_unknown_index(2)){
-            Aii_main_diagonal->set_item(m,value);
-            if(k<max_unknown_index(2)-1)
-              Aii_super_diagonal->set_item(m,right);
-            if(k>min_unknown_index(2))
-              Aii_sub_diagonal->set_item(m-1,left);
-         }
-         else{
-            // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-            Aie->set_item(m-1,rank_in_z,left);
-            Aee_diagcoef = value;
-            Aei->set_item(rank_in_z,m-1,left);
-         }
-      }
-      else{ 
-        // Periodic boundary condition in x. 
-        // First proc has non zero value in Aie for first & last index
-
-         // For inner procs, interface contribution is for min index and max index.
-      if(k==min_unknown_index(2)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,nb_ranks_comm_z-1,left);
-        Aei->set_item(nb_ranks_comm_z-1,m,left);
-      }
-      if(k == max_unknown_index(2)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_z,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_z,m-1,left);
-      }
-      if(k<max_unknown_index(2)){
-          Aii_main_diagonal->set_item(m,value);
-          if(k<max_unknown_index(2)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(k>min_unknown_index(2))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-      }
-     }
-
-     else{
-      // Set matrices for inner procs
-
-      // For inner procs, interface contribution is for min index and max index.
-      if(k==min_unknown_index(2)){
-        // For first index, Aee comes from previous proc
-        Aie->set_item(m,rank_in_z-1,left);
-        Aei->set_item(rank_in_z-1,m,left);
-      }
-      if(k == max_unknown_index(2)){
-        // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-        Aie->set_item(m-1,rank_in_z,left);
-        Aee_diagcoef = value;
-        Aei->set_item(rank_in_z,m-1,left);
-      }
-      if(k<max_unknown_index(2)){
-          Aii_main_diagonal->set_item(m,value);
-          if(k<max_unknown_index(2)-1)
-            Aii_super_diagonal->set_item(m,right);
-          if(k>min_unknown_index(2))
-            Aii_sub_diagonal->set_item(m-1,left);
-       }
-     }
-
-   }
-
-   GLOBAL_EQ->compute_Aii_z_ref_P();
-
-   if(nb_ranks_comm_z>1)
-   {
-     // Compute the product matrix for each proc
-     GLOBAL_EQ->compute_product_matrix_z_P();
-
-     LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product_in_z_P();
-     LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
-     LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix_in_z_P();
-     LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement_in_z_P();
-
-     if ( rank_in_z == 0 )
-     {
-        Aee->set_item(0,0,Aee_diagcoef);
-        for (i=1;i<nb_ranks_comm_z;++i)
-        {
-          // Create the container to receive
-          size_t nbrows = product_matrix->nb_rows();
-          size_t nb_received_data = pow(nbrows,2)+1;
-          double * received_data = new double [nb_received_data];
-
-          // Receive the data
-          //pelCOMM->receive( i, received_data, nb_received_data );
-          static MPI_Status status ;
-          MPI_Recv( received_data, nb_received_data, MPI_DOUBLE, i, 0,
-                            DDS_Comm_z, &status ) ;
-
-          // Transfer the received data to the receive matrix
-          for(k=0;k<nbrows;k++){
-            for(j=0;j<nbrows;j++){
-                // Assemble the global product matrix by adding contributions from all the procs
-                receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
-            }
-          }
-          if(P_is_zperiodic == 0){
-            if(i<nb_ranks_comm_z-1){
-              // Assemble the global Aee matrix
-              Aee->set_item(i,i,received_data[nb_received_data-1]);
-            }  
-          }
-          else
-            Aee->set_item(i,i,received_data[nb_received_data-1]); 
-        }
-
-     }
-     else
-     {
-        // Create the packed data container
-        size_t nbrows = product_matrix->nb_rows();
-        size_t nb_send_data = pow(nbrows,2)+1;
-        double * packed_data = new double [nb_send_data];
-
-        // Fill the packed data container with Aie
-        // LA_MatrixIterator* it = product_matrix->create_stored_item_iterator( 0 ) ;
-        // Iterator only fetches the values present. Zeros are not fetched.
-
-        for( i=0 ; i<nbrows ; i++ )
-        {
-           for( j=0 ; j<nbrows ; j++ )
-           {
-             // Packing rule
-             // Pack the product matrix into a vector
-             packed_data[i*nbrows+j]=product_matrix->item(i,j);
-           }
-        }
-
-        //it->destroy() ; it = 0 ;
-
-        // Fill the last element of packed data with the diagonal coefficient Aee
-        packed_data[nb_send_data-1] = Aee_diagcoef;
-
-        // Send the data
-        //pelCOMM->send( is_master, packed_data, nb_send_data);
-        MPI_Send( packed_data, nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_z ) ;
-        delete [] packed_data;
-
-     }
-
-     // Assemble the schlur complement in the master proc
-
-     if(rank_in_z == 0){
-      schlur_complement->add_Mat(Aee);
-      schlur_complement->add_Mat(receive_matrix,-1.0);
-     }
-  }
-}
-
-
-
 
 //---------------------------------------------------------------------------
 void
@@ -2976,43 +1297,15 @@ DDS_NavierStokes:: assemble_velocity_1D_matrices ( FV_TimeIterator const* t_it )
 
    // Assemble the matrices for each component
 
-   if(dim == 2){
-     // Assemble Pressure matrix in x 
-     assemble_pressure_matrix_1D_x (PF,t_it);
-     // Assemble Pressure matrix in y 
-     assemble_pressure_matrix_1D_y (PF,t_it);
+   for (size_t dir=0;dir<dim;dir++) {
+      assemble_pressure_matrix_1D (PF,t_it,dir);
    }
-   else{
-     // Assemble Pressure matrix in x 
-     assemble_pressure_matrix_1D_x (PF,t_it);
-     // Assemble Pressure matrix in y 
-     assemble_pressure_matrix_1D_y (PF,t_it);
-     // Assemble Pressure matrix in z 
-     assemble_pressure_matrix_1D_z (PF,t_it);
-   }   
 
-   for(size_t comp=0;comp<nb_comps;comp++){
-      
-          if(dim == 2)
-          {
-           double gamma = mu/2.0;
-           // Assemble Velocity matrix in x
-           assemble_velocity_matrix_1D_x (UF,t_it,gamma,comp );
-           // Assemble Velocity matrix in y 
-           assemble_velocity_matrix_1D_y (UF,t_it,gamma,comp  );
-
-          }
-          else
-          {
-           double gamma = mu/2.0;
-           // Assemble Velocity matrix in x
-           assemble_velocity_matrix_1D_x (UF,t_it,gamma,comp  );
-           // Assemble Velocity matrix in y 
-           assemble_velocity_matrix_1D_y (UF,t_it,gamma,comp );
-           // Assemble Velocity matrix in z
-           assemble_velocity_matrix_1D_z (UF,t_it,gamma,comp );
-
-          }
+   for (size_t comp=0;comp<nb_comps;comp++) {
+      double gamma = mu/2.0;
+      for (size_t dir=0;dir<dim;dir++) {
+         assemble_velocity_matrix_1D (UF,t_it,gamma,comp,dir);
+      }
    }
 }
 
@@ -3116,8 +1409,8 @@ DDS_NavierStokes:: assemble_local_rhs_x ( size_t const& j, size_t const& k, doub
 
     dxC = UF->get_cell_size( i, comp, 0 ) ;
 
-    if(U_is_xperiodic == 0){
-      if(rank_in_x == nb_ranks_comm_x-1){
+    if(is_Uperiodic[0] == 0){
+      if(rank_in_i[0] == nb_ranks_comm_i[0]-1){
          local_rhs_x->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dxC)/(t_it -> time_step()) - gamma*xvalue );
       }
       else{
@@ -3128,7 +1421,7 @@ DDS_NavierStokes:: assemble_local_rhs_x ( size_t const& j, size_t const& k, doub
       }
     }
     else{
-      if(nb_ranks_comm_x > 1){
+      if(nb_ranks_comm_i[0] > 1){
          if(i == max_unknown_index(0))
            fe = (UF->DOF_value( i, j, k, comp, 0 )*rho*dxC)/(t_it -> time_step()) - gamma*xvalue;
          else
@@ -3196,7 +1489,7 @@ DDS_NavierStokes:: solve_x_for_secondorder ( size_t const& j, size_t const& k, d
    //    local_solution_x->print_items(MAC::out(),0); 
    // }
 
-   LA_SeqMatrix* Aei_x = GLOBAL_EQ-> get_aei_in_x(comp);
+   LA_SeqMatrix* Aei_x = GLOBAL_EQ-> get_aei(comp,0);
    LA_SeqVector* Vec_temp_x = GLOBAL_EQ-> get_temp_x(comp);
 
    for(int i=0;i<Vec_temp_x->nb_rows();i++){
@@ -3215,23 +1508,23 @@ DDS_NavierStokes:: solve_x_for_secondorder ( size_t const& j, size_t const& k, d
       vec_pos=(j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
    }
 
-   if(rank_in_x == 0){
-      if(U_is_xperiodic)
-          packed_data[3*vec_pos+0]=Vec_temp_x->item(nb_ranks_comm_x-1);
+   if(rank_in_i[0] == 0){
+      if(is_Uperiodic[0])
+          packed_data[3*vec_pos+0]=Vec_temp_x->item(nb_ranks_comm_i[0]-1);
       else
           packed_data[3*vec_pos+0]=0;
-      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_x);
+      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
    }
-   else if(rank_in_x == nb_ranks_comm_x-1){
-      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_x-1);
-      if(U_is_xperiodic)
-          packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_x);
+   else if(rank_in_i[0] == nb_ranks_comm_i[0]-1){
+      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_i[0]-1);
+      if(is_Uperiodic[0])
+          packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
       else
           packed_data[3*vec_pos+1]=0;
    }
    else{
-      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_x-1);
-      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_x);
+      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_i[0]-1);
+      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
    }
    packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
    
@@ -3266,22 +1559,22 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
 
    LA_SeqVector* Vec_temp_x = GLOBAL_EQ-> get_temp_x(comp);
 
-   LA_SeqMatrix* Aie_x = GLOBAL_EQ-> get_aie_in_x(comp);
+   LA_SeqMatrix* Aie_x = GLOBAL_EQ-> get_aie(comp,0);
 
    size_t nb_send_data = (nb_received_data*2)/3;
 
   // Send and receive the data first pass
    //if ( my_rank == is_master )
-   if ( rank_in_x == 0 )
+   if ( rank_in_i[0] == 0 )
    {
-      for (i=1;i<nb_ranks_comm_x;++i)
+      for (i=1;i<nb_ranks_comm_i[0];++i)
       //for (i=1;i<nb_procs;++i)
       {
         // Receive the data
         //pelCOMM->receive( i, all_received_data[i], nb_received_data );
         static MPI_Status status;
         MPI_Recv( all_receive_data_U_x[comp][i], nb_received_data, MPI_DOUBLE, i, 0,
-                          DDS_Comm_x, &status ) ;
+                          DDS_Comm_i[0], &status ) ;
       }
 
       // Solve system of interface unknowns for each y
@@ -3295,22 +1588,22 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
             interface_rhs_x->set_item(i,0);
           }
           p = j-min_unknown_index(1);
-          if(U_is_xperiodic)
-              Vec_temp_x->set_item(nb_ranks_comm_x-1,packed_data[3*p]);
+          if(is_Uperiodic[0])
+              Vec_temp_x->set_item(nb_ranks_comm_i[0]-1,packed_data[3*p]);
           Vec_temp_x->set_item(0,packed_data[3*p+1]);
           interface_rhs_x->set_item(0,packed_data[3*p+2]);
 
           // Vec_temp might contain previous values
 
-          for(i=1;i<nb_ranks_comm_x;i++){
+          for(i=1;i<nb_ranks_comm_i[0];i++){
 
-            if(i!=nb_ranks_comm_x-1){
+            if(i!=nb_ranks_comm_i[0]-1){
               Vec_temp_x->add_to_item(i-1,all_receive_data_U_x[comp][i][3*p]);
               Vec_temp_x->add_to_item(i,all_receive_data_U_x[comp][i][3*p+1]);
               interface_rhs_x->set_item(i,all_receive_data_U_x[comp][i][3*p+2]);  // Assemble the interface rhs fe
             }
             else{
-              if(U_is_xperiodic ==0){
+              if(is_Uperiodic[0] ==0){
                   Vec_temp_x->add_to_item(i-1,all_receive_data_U_x[comp][i][3*p]);
               }
               else{
@@ -3330,15 +1623,15 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
           GLOBAL_EQ->DS_NavierStokes_x_interface_unknown_solver(interface_rhs_x,comp);
 
           // Pack the interface_rhs_x into the appropriate send_data
-          for (i=1;i<nb_ranks_comm_x;++i)
+          for (i=1;i<nb_ranks_comm_i[0];++i)
           {
-            if(i!=nb_ranks_comm_x-1){
+            if(i!=nb_ranks_comm_i[0]-1){
               all_send_data_U_x[comp][i][2*p+0]=interface_rhs_x->item(i-1);
               all_send_data_U_x[comp][i][2*p+1]=interface_rhs_x->item(i);
             }
             else{
               all_send_data_U_x[comp][i][2*p+0]=interface_rhs_x->item(i-1);
-              if(U_is_xperiodic)
+              if(is_Uperiodic[0])
                 all_send_data_U_x[comp][i][2*p+1]=interface_rhs_x->item(i);  
               else
                 all_send_data_U_x[comp][i][2*p+1]=0;
@@ -3362,7 +1655,7 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
           // }
 
           // if(comp == 0)
-          //       MAC::out()<<"x: "<<rank_in_x<<" & y: "<<rank_in_y<<" ,min: "<<local_rhs_x->item(0)<<endl;
+          //       MAC::out()<<"x: "<<rank_in_i[0]<<" & y: "<<rank_in_i[1]<<" ,min: "<<local_rhs_x->item(0)<<endl;
 
         }
       }
@@ -3378,23 +1671,23 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
               interface_rhs_x->set_item(i,0);
             }
             p = (j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
-            if(U_is_xperiodic)
-                Vec_temp_x->set_item(nb_ranks_comm_x-1,packed_data[3*p]);
+            if(is_Uperiodic[0])
+                Vec_temp_x->set_item(nb_ranks_comm_i[0]-1,packed_data[3*p]);
             Vec_temp_x->set_item(0,packed_data[3*p+1]);
             interface_rhs_x->set_item(0,packed_data[3*p+2]);
 
             // Vec_temp might contain previous values
 
 
-            for(i=1;i<nb_ranks_comm_x;i++){
+            for(i=1;i<nb_ranks_comm_i[0];i++){
 
-              if(i!=nb_ranks_comm_x-1){
+              if(i!=nb_ranks_comm_i[0]-1){
                 Vec_temp_x->add_to_item(i-1,all_receive_data_U_x[comp][i][3*p]);
                 Vec_temp_x->add_to_item(i,all_receive_data_U_x[comp][i][3*p+1]);
                 interface_rhs_x->set_item(i,all_receive_data_U_x[comp][i][3*p+2]);  // Assemble the interface rhs fe
               }
               else{
-                if(U_is_xperiodic ==0){
+                if(is_Uperiodic[0] ==0){
                     Vec_temp_x->add_to_item(i-1,all_receive_data_U_x[comp][i][3*p]);
                 }
                 else{
@@ -3415,15 +1708,15 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
             GLOBAL_EQ->DS_NavierStokes_x_interface_unknown_solver(interface_rhs_x,comp);
 
             // Pack the interface_rhs_x into the appropriate send_data
-            for (i=1;i<nb_ranks_comm_x;++i)
+            for (i=1;i<nb_ranks_comm_i[0];++i)
             {
-              if(i!=nb_ranks_comm_x-1){
+              if(i!=nb_ranks_comm_i[0]-1){
                 all_send_data_U_x[comp][i][2*p+0]=interface_rhs_x->item(i-1);
                 all_send_data_U_x[comp][i][2*p+1]=interface_rhs_x->item(i);
               }
               else{
                 all_send_data_U_x[comp][i][2*p+0]=interface_rhs_x->item(i-1);
-                if(U_is_xperiodic)
+                if(is_Uperiodic[0])
                   all_send_data_U_x[comp][i][2*p+1]=interface_rhs_x->item(i);  
                 else
                   all_send_data_U_x[comp][i][2*p+1]=0;
@@ -3449,16 +1742,16 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
    {
       // Send the packed data to master
       //pelCOMM->send( is_master, packed_data, nb_received_data );
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_x ) ;
+      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[0] ) ;
    }
 
    // Send the data from master
-   if ( rank_in_x == 0 )
+   if ( rank_in_i[0] == 0 )
    {
-     for (i=1;i<nb_ranks_comm_x;++i)
+     for (i=1;i<nb_ranks_comm_i[0];++i)
       {
         //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_U_x[comp][i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_x ) ;
+        MPI_Send( all_send_data_U_x[comp][i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[0] ) ;
       }
    }
    else
@@ -3468,7 +1761,7 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
       //pelCOMM->receive( is_master, received_data, nb_received_data );
       static MPI_Status status ;
       MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_x, &status ) ;
+                          DDS_Comm_i[0], &status ) ;
 
      // Solve the system of equations in each proc
 
@@ -3478,17 +1771,17 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
         {
           k=0;
           p = j-min_unknown_index(1);
-          if(rank_in_x != nb_ranks_comm_x-1){
-            interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
-            interface_rhs_x->set_item(rank_in_x,packed_data[2*p+1]);
+          if(rank_in_i[0] != nb_ranks_comm_i[0]-1){
+            interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
+            interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
           }
           else{
-            if(U_is_xperiodic ==0){
-              interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
+            if(is_Uperiodic[0] ==0){
+              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
             }
             else{
-              interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
-              interface_rhs_x->set_item(rank_in_x,packed_data[2*p+1]);
+              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
+              interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
             }
           }
           // Need to have the original rhs function assembled for corrosponding j,k pair
@@ -3501,7 +1794,7 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
           GLOBAL_EQ->DS_NavierStokes_x_solver(j,k,min_unknown_index(0),local_rhs_x,interface_rhs_x,comp);
 
           // if(comp == 0)
-          //       MAC::out()<<"x: "<<rank_in_x<<" & y: "<<rank_in_y<<" ,max: "<<interface_rhs_x->item(1)<<endl;
+          //       MAC::out()<<"x: "<<rank_in_i[0]<<" & y: "<<rank_in_i[1]<<" ,max: "<<interface_rhs_x->item(1)<<endl;
 
         }
      }
@@ -3512,17 +1805,17 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
           for(j = min_unknown_index(1);j<=max_unknown_index(1);j++)
           {
             p = (j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
-            if(rank_in_x != nb_ranks_comm_x-1){
-              interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
-              interface_rhs_x->set_item(rank_in_x,packed_data[2*p+1]);
+            if(rank_in_i[0] != nb_ranks_comm_i[0]-1){
+              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
+              interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
             }
             else{
-              if(U_is_xperiodic ==0){
-                interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
+              if(is_Uperiodic[0] ==0){
+                interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
               }
               else{
-                interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
-                interface_rhs_x->set_item(rank_in_x,packed_data[2*p+1]);
+                interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
+                interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
               }
             }
             // Need to have the original rhs function assembled for corrosponding j,k pair
@@ -3591,8 +1884,8 @@ LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp) ;
 
    dyC = UF->get_cell_size( j, comp, 1 ) ;
 
-   if(U_is_yperiodic == 0){
-      if(rank_in_y == nb_ranks_comm_y-1){
+   if(is_Uperiodic[1] == 0){
+      if(rank_in_i[1] == nb_ranks_comm_i[1]-1){
          local_rhs_y->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dyC)/(t_it -> time_step()) - gamma*yvalue );
        }
        else{
@@ -3603,7 +1896,7 @@ LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp) ;
        }
    }
    else{
-      if(nb_ranks_comm_y > 1){
+      if(nb_ranks_comm_i[1] > 1){
          if(j == max_unknown_index(1))
            fe = (UF->DOF_value( i, j, k, comp, 0 )*rho*dyC)/(t_it -> time_step()) - gamma*yvalue ;
          else
@@ -3668,7 +1961,7 @@ DDS_NavierStokes:: solve_y_for_secondorder ( size_t const& i, size_t const& k, d
    // Solve for xi locally and put it in local solution vector
    GLOBAL_EQ->DS_NavierStokes_y_local_unknown_solver(local_solution_y,comp);
 
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_in_y(comp);
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(comp,1);
    LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_y(comp);
 
    for(j=0;j<Vec_temp->nb_rows();j++){
@@ -3685,28 +1978,28 @@ DDS_NavierStokes:: solve_y_for_secondorder ( size_t const& i, size_t const& k, d
       vec_pos=(k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
    }
 
-   if(rank_in_y == 0){
+   if(rank_in_i[1] == 0){
     // Check if bc is periodic in x
      // If it is, we need to pack two elements apart from fe
 
-      if(U_is_yperiodic)
-          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_y-1);
+      if(is_Uperiodic[1])
+          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[1]-1);
       else
           packed_data[3*vec_pos+0]=0;
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_y);
+      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
     }
-    else if(rank_in_y == nb_ranks_comm_y-1){
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_y-1);
+    else if(rank_in_i[1] == nb_ranks_comm_i[1]-1){
+      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[1]-1);
       // Check if bc is periodic in x
       // If it is, we need to pack two elements apart from fe
-      if(U_is_yperiodic)
-          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_y);
+      if(is_Uperiodic[1])
+          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
       else
           packed_data[3*vec_pos+1]=0;
     }
     else{
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_y-1);
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_y);
+      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[1]-1);
+      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
     }
     packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
 }
@@ -3739,20 +2032,20 @@ DDS_NavierStokes:: solve_interface_unknowns_y ( double * packed_data, size_t nb_
 
    LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_y(comp);
 
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_in_y(comp);
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(comp,1);
 
    size_t nb_send_data = (nb_received_data*2)/3;
 
   // Send and receive the data first pass
-   if ( rank_in_y == 0 )
+   if ( rank_in_i[1] == 0 )
    {
-      for (i=1;i<nb_ranks_comm_y;++i)
+      for (i=1;i<nb_ranks_comm_i[1];++i)
       {
         // Receive the data
         //pelCOMM->receive( i, all_received_data[i], nb_received_data );
         static MPI_Status status ;
         MPI_Recv( all_receive_data_U_y[comp][i], nb_received_data, MPI_DOUBLE, i, 0,
-                          DDS_Comm_y, &status ) ;
+                          DDS_Comm_i[1], &status ) ;
       }
 
       // Solve system of interface unknowns for each x
@@ -3766,22 +2059,22 @@ DDS_NavierStokes:: solve_interface_unknowns_y ( double * packed_data, size_t nb_
             interface_rhs_y->set_item(j,0);
           }
           p = i-min_unknown_index(0);
-          if(U_is_yperiodic)
-              Vec_temp->set_item(nb_ranks_comm_y-1,packed_data[3*p]);
+          if(is_Uperiodic[1])
+              Vec_temp->set_item(nb_ranks_comm_i[1]-1,packed_data[3*p]);
           Vec_temp->set_item(0,packed_data[3*p+1]);
           interface_rhs_y->set_item(0,packed_data[3*p+2]);
 
           // Vec_temp might contain previous values
 
-          for(j=1;j<nb_ranks_comm_y;j++){
+          for(j=1;j<nb_ranks_comm_i[1];j++){
 
-            if(j!=nb_ranks_comm_y-1){
+            if(j!=nb_ranks_comm_i[1]-1){
               Vec_temp->add_to_item(j-1,all_receive_data_U_y[comp][j][3*p]);
               Vec_temp->add_to_item(j,all_receive_data_U_y[comp][j][3*p+1]);
               interface_rhs_y->set_item(j,all_receive_data_U_y[comp][j][3*p+2]);  // Assemble the interface rhs fe
             }
             else{
-              if(U_is_yperiodic ==0){
+              if(is_Uperiodic[1] ==0){
                   Vec_temp->add_to_item(j-1,all_receive_data_U_y[comp][j][3*p]);
               }
               else{
@@ -3800,19 +2093,19 @@ DDS_NavierStokes:: solve_interface_unknowns_y ( double * packed_data, size_t nb_
           // Solve for ue (interface unknowns) in the master proc
           GLOBAL_EQ->DS_NavierStokes_y_interface_unknown_solver(interface_rhs_y,comp);
 
-          //if(p==0 && rank_in_x == 1)
+          //if(p==0 && rank_in_i[0] == 1)
           //  interface_rhs_y->print_items(MAC::out(),0);
 
           // Pack the interface_rhs_x into the appropriate send_data
-          for (j=1;j<nb_ranks_comm_y;++j)
+          for (j=1;j<nb_ranks_comm_i[1];++j)
           {
-            if(j!=nb_ranks_comm_y-1){
+            if(j!=nb_ranks_comm_i[1]-1){
               all_send_data_U_y[comp][j][2*p+0]=interface_rhs_y->item(j-1);
               all_send_data_U_y[comp][j][2*p+1]=interface_rhs_y->item(j);
             }
             else{
               all_send_data_U_y[comp][j][2*p+0]=interface_rhs_y->item(j-1);
-              if(U_is_yperiodic)
+              if(is_Uperiodic[1])
                 all_send_data_U_y[comp][j][2*p+1]=interface_rhs_y->item(j); 
               else
                 all_send_data_U_y[comp][j][2*p+1]=0;
@@ -3844,22 +2137,22 @@ DDS_NavierStokes:: solve_interface_unknowns_y ( double * packed_data, size_t nb_
               interface_rhs_y->set_item(j,0);
             }
             p = (k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
-            if(U_is_yperiodic)
-                Vec_temp->set_item(nb_ranks_comm_y-1,packed_data[3*p]);
+            if(is_Uperiodic[1])
+                Vec_temp->set_item(nb_ranks_comm_i[1]-1,packed_data[3*p]);
             Vec_temp->set_item(0,packed_data[3*p+1]);
             interface_rhs_y->set_item(0,packed_data[3*p+2]);
 
             // Vec_temp might contain previous values
 
-            for(j=1;j<nb_ranks_comm_y;j++){
+            for(j=1;j<nb_ranks_comm_i[1];j++){
 
-              if(j!=nb_ranks_comm_y-1){
+              if(j!=nb_ranks_comm_i[1]-1){
                 Vec_temp->add_to_item(j-1,all_receive_data_U_y[comp][j][3*p]);
                 Vec_temp->add_to_item(j,all_receive_data_U_y[comp][j][3*p+1]);
                 interface_rhs_y->set_item(j,all_receive_data_U_y[comp][j][3*p+2]);  // Assemble the interface rhs fe
               }
               else{
-                if(U_is_yperiodic == 0){
+                if(is_Uperiodic[1] == 0){
                   Vec_temp->add_to_item(j-1,all_receive_data_U_y[comp][j][3*p]);
                 }
                 else{
@@ -3877,19 +2170,19 @@ DDS_NavierStokes:: solve_interface_unknowns_y ( double * packed_data, size_t nb_
             // Solve for ue (interface unknowns) in the master proc
             GLOBAL_EQ->DS_NavierStokes_y_interface_unknown_solver(interface_rhs_y,comp);
 
-            //if(p==0 && rank_in_x == 1)
+            //if(p==0 && rank_in_i[0] == 1)
             //  interface_rhs_y->print_items(MAC::out(),0);
 
             // Pack the interface_rhs_x into the appropriate send_data
-            for (j=1;j<nb_ranks_comm_y;++j)
+            for (j=1;j<nb_ranks_comm_i[1];++j)
             {
-              if(j!=nb_ranks_comm_y-1){
+              if(j!=nb_ranks_comm_i[1]-1){
                 all_send_data_U_y[comp][j][2*p+0]=interface_rhs_y->item(j-1);
                 all_send_data_U_y[comp][j][2*p+1]=interface_rhs_y->item(j);
               }
               else{
                 all_send_data_U_y[comp][j][2*p+0]=interface_rhs_y->item(j-1);
-                if(U_is_yperiodic)
+                if(is_Uperiodic[1])
                   all_send_data_U_y[comp][j][2*p+1]=interface_rhs_y->item(j);
                 else
                   all_send_data_U_y[comp][j][2*p+1]=0;
@@ -3915,15 +2208,15 @@ DDS_NavierStokes:: solve_interface_unknowns_y ( double * packed_data, size_t nb_
    {
       // Send the packed data to master
       //pelCOMM->send( is_master, packed_data, nb_received_data );
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_y ) ;
+      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[1] ) ;
    }
    // Send the data from master
-   if ( rank_in_y == 0 )
+   if ( rank_in_i[1] == 0 )
    {
-     for (i=1;i<nb_ranks_comm_y;++i)
+     for (i=1;i<nb_ranks_comm_i[1];++i)
       {
         //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_U_y[comp][i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_y ) ;
+        MPI_Send( all_send_data_U_y[comp][i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[1] ) ;
       }
    }
    else
@@ -3932,7 +2225,7 @@ DDS_NavierStokes:: solve_interface_unknowns_y ( double * packed_data, size_t nb_
       //pelCOMM->receive( is_master, received_data, nb_received_data );
       static MPI_Status status ;
       MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_y, &status ) ;
+                          DDS_Comm_i[1], &status ) ;
 
      // Solve the system of equations in each proc
 
@@ -3942,17 +2235,17 @@ DDS_NavierStokes:: solve_interface_unknowns_y ( double * packed_data, size_t nb_
         {
           p = i-min_unknown_index(0);
 
-          if(rank_in_y != nb_ranks_comm_y-1){
-            interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
-            interface_rhs_y->set_item(rank_in_y,packed_data[2*p+1]);
+          if(rank_in_i[1] != nb_ranks_comm_i[1]-1){
+            interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
+            interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
           }
           else{
-            if(U_is_yperiodic ==0){
-              interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
+            if(is_Uperiodic[1] ==0){
+              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
             }
             else{
-              interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
-              interface_rhs_y->set_item(rank_in_y,packed_data[2*p+1]);
+              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
+              interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
             }
           }
           // Need to have the original rhs function assembled for corrosponding j,k pair
@@ -3974,17 +2267,17 @@ DDS_NavierStokes:: solve_interface_unknowns_y ( double * packed_data, size_t nb_
           for(k = min_unknown_index(2);k<=max_unknown_index(2);k++)
           {
             p = (k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
-            if(rank_in_y != nb_ranks_comm_y-1){
-              interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
-              interface_rhs_y->set_item(rank_in_y,packed_data[2*p+1]);
+            if(rank_in_i[1] != nb_ranks_comm_i[1]-1){
+              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
+              interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
             }
             else{
-              if(U_is_yperiodic ==0){
-                interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
+              if(is_Uperiodic[1] ==0){
+                interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
               }
               else{
-                interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
-                interface_rhs_y->set_item(rank_in_y,packed_data[2*p+1]);
+                interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
+                interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
               }
             }
             // Need to have the original rhs function assembled for corrosponding j,k pair
@@ -4051,8 +2344,8 @@ LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z(comp);
    dzC = UF->get_cell_size( k, comp, 2 ) ;
 
    pos = k - min_unknown_index(2);
-   if(U_is_zperiodic == 0){
-      if(rank_in_z == nb_ranks_comm_z-1){
+   if(is_Uperiodic[2] == 0){
+      if(rank_in_i[2] == nb_ranks_comm_i[2]-1){
         local_rhs_z->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dzC)/(t_it -> time_step()) - gamma*zvalue );
       }
       else{
@@ -4063,7 +2356,7 @@ LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z(comp);
       }
    }
    else{
-      if(nb_ranks_comm_z > 1){
+      if(nb_ranks_comm_i[2] > 1){
         if(k == max_unknown_index(2))
            fe = (UF->DOF_value( i, j, k, comp, 0 )*rho*dzC)/(t_it -> time_step()) - gamma*zvalue ;
         else
@@ -4129,7 +2422,7 @@ DDS_NavierStokes:: solve_z_for_secondorder ( size_t const& i, size_t const& j, d
    // Solve for xi locally and put it in local solution vector
    GLOBAL_EQ->DS_NavierStokes_z_local_unknown_solver(local_solution_z,comp);
 
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_in_z(comp);
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(comp,2);
    LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_z(comp);
 
    for(k=0;k<Vec_temp->nb_rows();k++){
@@ -4141,28 +2434,28 @@ DDS_NavierStokes:: solve_z_for_secondorder ( size_t const& i, size_t const& j, d
 
     size_t vec_pos=(i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
 
-    if(rank_in_z == 0){
+    if(rank_in_i[2] == 0){
       // Check if bc is periodic in x
      // If it is, we need to pack two elements apart from fe
 
-      if(U_is_zperiodic)
-          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_z-1);
+      if(is_Uperiodic[2])
+          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[2]-1);
       else
           packed_data[3*vec_pos+0]=0;
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_z);
+      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
     }
-    else if(rank_in_z == nb_ranks_comm_z-1){
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_z-1);
+    else if(rank_in_i[2] == nb_ranks_comm_i[2]-1){
+      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[2]-1);
       // Check if bc is periodic in x
       // If it is, we need to pack two elements apart from fe
-      if(U_is_zperiodic)
-          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_z);
+      if(is_Uperiodic[2])
+          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
       else
           packed_data[3*vec_pos+1]=0;
     }
     else{
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_z-1);
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_z);
+      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[2]-1);
+      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
     }
     packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
 }
@@ -4194,20 +2487,20 @@ DDS_NavierStokes:: solve_interface_unknowns_z ( double * packed_data, size_t nb_
 
    LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_z(comp);
 
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_in_z(comp);
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(comp,2);
 
    size_t nb_send_data = (2*nb_received_data)/3;
    
   // Send and receive the data first pass
-   if ( rank_in_z == 0 )
+   if ( rank_in_i[2] == 0 )
    {
-      for (p=1;p<nb_ranks_comm_z;++p)
+      for (p=1;p<nb_ranks_comm_i[2];++p)
       {
         // Receive the data
         //pelCOMM->receive( i, all_received_data[i], nb_received_data );
         static MPI_Status status ;
         MPI_Recv( all_receive_data_U_z[comp][p], nb_received_data, MPI_DOUBLE, p, 0,
-                          DDS_Comm_z, &status ) ;
+                          DDS_Comm_i[2], &status ) ;
       }
 
       // Solve system of interface unknowns for each x
@@ -4222,22 +2515,22 @@ DDS_NavierStokes:: solve_interface_unknowns_z ( double * packed_data, size_t nb_
             interface_rhs_z->set_item(m,0);
           }
           p = (i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
-          if(U_is_zperiodic)
-              Vec_temp->set_item(nb_ranks_comm_z-1,packed_data[3*p]);
+          if(is_Uperiodic[2])
+              Vec_temp->set_item(nb_ranks_comm_i[2]-1,packed_data[3*p]);
           Vec_temp->set_item(0,packed_data[3*p+1]);
           interface_rhs_z->set_item(0,packed_data[3*p+2]);
 
           // Vec_temp might contain previous values
 
-          for(m=1;m<nb_ranks_comm_z;m++){
+          for(m=1;m<nb_ranks_comm_i[2];m++){
 
-            if(m!=nb_ranks_comm_z-1){
+            if(m!=nb_ranks_comm_i[2]-1){
               Vec_temp->add_to_item(m-1,all_receive_data_U_z[comp][m][3*p]);
               Vec_temp->add_to_item(m,all_receive_data_U_z[comp][m][3*p+1]);
               interface_rhs_z->set_item(m,all_receive_data_U_z[comp][m][3*p+2]);  // Assemble the interface rhs fe
             }
             else{
-              if(U_is_zperiodic == 0)
+              if(is_Uperiodic[2] == 0)
                   Vec_temp->add_to_item(m-1,all_receive_data_U_z[comp][m][3*p]);
               else{
                   Vec_temp->add_to_item(m-1,all_receive_data_U_z[comp][m][3*p]);
@@ -4255,15 +2548,15 @@ DDS_NavierStokes:: solve_interface_unknowns_z ( double * packed_data, size_t nb_
           GLOBAL_EQ->DS_NavierStokes_z_interface_unknown_solver(interface_rhs_z,comp);
 
           // Pack the interface_rhs_x into the appropriate send_data
-          for (m=1;m<nb_ranks_comm_z;++m)
+          for (m=1;m<nb_ranks_comm_i[2];++m)
           {
-            if(m!=nb_ranks_comm_z-1){
+            if(m!=nb_ranks_comm_i[2]-1){
               all_send_data_U_z[comp][m][2*p+0]=interface_rhs_z->item(m-1);
               all_send_data_U_z[comp][m][2*p+1]=interface_rhs_z->item(m);
             }
             else{
               all_send_data_U_z[comp][m][2*p+0]=interface_rhs_z->item(m-1);
-              if(U_is_zperiodic)
+              if(is_Uperiodic[2])
                 all_send_data_U_z[comp][m][2*p+1]=interface_rhs_z->item(m);
               else
                 all_send_data_U_z[comp][m][2*p+1]=0;
@@ -4287,15 +2580,15 @@ DDS_NavierStokes:: solve_interface_unknowns_z ( double * packed_data, size_t nb_
    {
       // Send the packed data to master
       //pelCOMM->send( is_master, packed_data, nb_received_data );
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_z ) ;
+      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[2] ) ;
    }
    // Send the data from master
-   if ( rank_in_z == 0 )
+   if ( rank_in_i[2] == 0 )
    {
-     for (m=1;m<nb_ranks_comm_z;++m)
+     for (m=1;m<nb_ranks_comm_i[2];++m)
       {
         //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_U_z[comp][m], nb_send_data, MPI_DOUBLE, m, 0, DDS_Comm_z ) ;
+        MPI_Send( all_send_data_U_z[comp][m], nb_send_data, MPI_DOUBLE, m, 0, DDS_Comm_i[2] ) ;
       }
    }
    else
@@ -4305,22 +2598,22 @@ DDS_NavierStokes:: solve_interface_unknowns_z ( double * packed_data, size_t nb_
       //pelCOMM->receive( is_master, received_data, nb_received_data );
       static MPI_Status status ;
       MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_z, &status ) ;
+                          DDS_Comm_i[2], &status ) ;
 
      // Solve the system of equations in each proc
      for(j = min_unknown_index(1);j<=max_unknown_index(1);j++){
         for(i = min_unknown_index(0);i<=max_unknown_index(0);i++){
           p = (i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
-          if(rank_in_z != nb_ranks_comm_z-1){
-            interface_rhs_z->set_item(rank_in_z-1,packed_data[2*p]);
-            interface_rhs_z->set_item(rank_in_z,packed_data[2*p+1]);
+          if(rank_in_i[2] != nb_ranks_comm_i[2]-1){
+            interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);
+            interface_rhs_z->set_item(rank_in_i[2],packed_data[2*p+1]);
           }
           else{
-            if(U_is_zperiodic == 0)
-                interface_rhs_z->set_item(rank_in_z-1,packed_data[2*p]);    
+            if(is_Uperiodic[2] == 0)
+                interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);    
             else{
-                interface_rhs_z->set_item(rank_in_z-1,packed_data[2*p]);
-                interface_rhs_z->set_item(rank_in_z,packed_data[2*p+1]);
+                interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);
+                interface_rhs_z->set_item(rank_in_i[2],packed_data[2*p+1]);
             }
           }
           // Need to have the original rhs function assembled for corrosponding j,k pair
@@ -4594,7 +2887,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
 
       size_t nb_send_data_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1);
       // Solve in x
-      if(nb_ranks_comm_x>1){
+      if(nb_ranks_comm_i[0]>1){
 
         for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
          {
@@ -4613,7 +2906,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
             double fe = assemble_local_rhs_x(j,k,gamma,t_it,comp);
             LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x(comp);
             
-            if(U_is_xperiodic == 1)
+            if(is_Uperiodic[0] == 1)
                 GLOBAL_EQ->DS_NavierStokes_x_solver_periodic(j,k,min_unknown_index(0),local_rhs_x,NULL,comp); 
             else
                 GLOBAL_EQ->DS_NavierStokes_x_solver(j,k,min_unknown_index(0),local_rhs_x,NULL,comp);                            
@@ -4642,7 +2935,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
       size_t nb_send_data_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1);
 
       // Solve in y
-       if(nb_ranks_comm_y>1){
+       if(nb_ranks_comm_i[1]>1){
 
          for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
          {
@@ -4659,7 +2952,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
            double fe = assemble_local_rhs_y(i,k,gamma,t_it,comp);
            LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp);
 
-           if(U_is_yperiodic == 1)
+           if(is_Uperiodic[1] == 1)
               GLOBAL_EQ->DS_NavierStokes_y_solver_periodic(i,k,min_unknown_index(1),local_rhs_y,NULL,comp);
            else
               GLOBAL_EQ->DS_NavierStokes_y_solver(i,k,min_unknown_index(1),local_rhs_y,NULL,comp);
@@ -4690,7 +2983,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
       size_t nb_send_data_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
 
       // Solve in x
-      if(nb_ranks_comm_x>1){
+      if(nb_ranks_comm_i[0]>1){
         
         for (k=min_unknown_index(2);k<=max_unknown_index(2);++k){
           for (j=min_unknown_index(1);j<=max_unknown_index(1);++j){
@@ -4706,7 +2999,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
 //              if ( my_rank == is_master ) SCT_set_start("Velocity x update");
               double fe = assemble_local_rhs_x(j,k,gamma,t_it,comp);
               LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x(comp);
-              if(U_is_xperiodic == 1)
+              if(is_Uperiodic[0] == 1)
                   GLOBAL_EQ->DS_NavierStokes_x_solver_periodic(j,k,min_unknown_index(0),local_rhs_x,NULL,comp);
               else
                   GLOBAL_EQ->DS_NavierStokes_x_solver(j,k,min_unknown_index(0),local_rhs_x,NULL,comp);
@@ -4735,7 +3028,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
       size_t nb_send_data_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
         
       // Solve in y
-      if(nb_ranks_comm_y>1){
+      if(nb_ranks_comm_i[1]>1){
         
         // Third equation - Solve in y
         for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
@@ -4756,7 +3049,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
               //if ( my_rank == is_master ) SCT_set_start("Velocity y update");
               double fe = assemble_local_rhs_y(i,k,gamma,t_it,comp);
               LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp);
-              if(U_is_yperiodic == 1)
+              if(is_Uperiodic[1] == 1)
                   GLOBAL_EQ->DS_NavierStokes_y_solver_periodic(i,k,min_unknown_index(1),local_rhs_y,NULL,comp);
               else
                   GLOBAL_EQ->DS_NavierStokes_y_solver(i,k,min_unknown_index(1),local_rhs_y,NULL,comp);
@@ -4788,7 +3081,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
        // Solve in z
        size_t nb_send_data_z = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(1)-min_unknown_index(1)+1);
          
-       if(nb_ranks_comm_z>1){
+       if(nb_ranks_comm_i[2]>1){
          
          for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
          {
@@ -4808,7 +3101,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
               //if ( my_rank == is_master ) SCT_set_start("Velocity z update");
               double fe = assemble_local_rhs_z(i,j,gamma,t_it,comp);
               LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z(comp);
-              if(U_is_zperiodic == 1)
+              if(is_Uperiodic[2] == 1)
                   GLOBAL_EQ->DS_NavierStokes_z_solver_periodic(i,j,min_unknown_index(2),local_rhs_z,NULL,comp);
               else
                   GLOBAL_EQ->DS_NavierStokes_z_solver(i,j,min_unknown_index(2),local_rhs_z,NULL,comp);
@@ -4916,8 +3209,8 @@ DDS_NavierStokes:: pressure_assemble_local_rhs_x ( size_t const& j, size_t const
     // if(j==min_unknown_index(1))
     //   MAC::out()<<xright<<"  "<<yright<<endl;
 
-    if(P_is_xperiodic == 0){
-      if(rank_in_x == nb_ranks_comm_x-1){
+    if(is_Pperiodic[0] == 0){
+      if(rank_in_i[0] == nb_ranks_comm_i[0]-1){
          local_rhs_x->set_item( pos, value);
       }
       else{
@@ -4928,7 +3221,7 @@ DDS_NavierStokes:: pressure_assemble_local_rhs_x ( size_t const& j, size_t const
       }  
     }
     else{
-      if(nb_ranks_comm_x > 1){
+      if(nb_ranks_comm_i[0] > 1){
          if(i == max_unknown_index(0))
            fe = value;
          else
@@ -4995,7 +3288,7 @@ DDS_NavierStokes:: pressure_solve_x_for_secondorder ( size_t const& j, size_t co
    // Solve for xi locally and put it in local solution vector
    GLOBAL_EQ->DS_NavierStokes_x_local_unknown_solver_P(local_solution_x);
 
-   LA_SeqMatrix* Aei_x = GLOBAL_EQ-> get_aei_in_x_P();
+   LA_SeqMatrix* Aei_x = GLOBAL_EQ-> get_aei_P(0);
    LA_SeqVector* Vec_temp_x = GLOBAL_EQ-> get_temp_x_P();
 
    for(int i=0;i<Vec_temp_x->nb_rows();i++){
@@ -5012,30 +3305,30 @@ DDS_NavierStokes:: pressure_solve_x_for_secondorder ( size_t const& j, size_t co
    else{
       vec_pos=(j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
    }/**/
-   if(rank_in_x == 0){
+   if(rank_in_i[0] == 0){
       // Check if bc is periodic in x
      // If it is, we need to pack two elements apart from fe
 
-      if(P_is_xperiodic)
-          packed_data[3*vec_pos+0]=Vec_temp_x->item(nb_ranks_comm_x-1);
+      if(is_Pperiodic[0])
+          packed_data[3*vec_pos+0]=Vec_temp_x->item(nb_ranks_comm_i[0]-1);
       else
           packed_data[3*vec_pos+0]=0;
 
-      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_x);
+      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
    }
-   else if(rank_in_x == nb_ranks_comm_x-1){
-      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_x-1);
+   else if(rank_in_i[0] == nb_ranks_comm_i[0]-1){
+      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_i[0]-1);
       
       // Check if bc is periodic in x
       // If it is, we need to pack two elements apart from fe
-      if(P_is_xperiodic)
-          packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_x);
+      if(is_Pperiodic[0])
+          packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
       else
           packed_data[3*vec_pos+1]=0;
    }
    else{
-      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_x-1);
-      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_x);
+      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_i[0]-1);
+      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
    }
    packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
 }
@@ -5069,23 +3362,23 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_x ( double * packed_data, s
 
    LA_SeqVector* Vec_temp_x = GLOBAL_EQ-> get_temp_x_P();
 
-   LA_SeqMatrix* Aie_x = GLOBAL_EQ-> get_aie_in_x_P();
+   LA_SeqMatrix* Aie_x = GLOBAL_EQ-> get_aie_P(0);
 
    size_t nb_send_data= (2*nb_received_data)/3;
 
 
   // Send and receive the data first pass
    //if ( my_rank == is_master )
-   if ( rank_in_x == 0 )
+   if ( rank_in_i[0] == 0 )
    {
-      for (i=1;i<nb_ranks_comm_x;++i)
+      for (i=1;i<nb_ranks_comm_i[0];++i)
       //for (i=1;i<nb_procs;++i)
       {
         // Receive the data
         //pelCOMM->receive( i, all_received_data[i], nb_received_data );
         static MPI_Status status;
         MPI_Recv( all_receive_data_P_x[i], nb_received_data, MPI_DOUBLE, i, 0,
-                          DDS_Comm_x, &status ) ;
+                          DDS_Comm_i[0], &status ) ;
       }
 
       // Solve system of interface unknowns for each y
@@ -5098,22 +3391,22 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_x ( double * packed_data, s
             interface_rhs_x->set_item(i,0);
           }
           p = j-min_unknown_index(1);
-          if(P_is_xperiodic)
-              Vec_temp_x->set_item(nb_ranks_comm_x-1,packed_data[3*p]);
+          if(is_Pperiodic[0])
+              Vec_temp_x->set_item(nb_ranks_comm_i[0]-1,packed_data[3*p]);
           Vec_temp_x->set_item(0,packed_data[3*p+1]);
           interface_rhs_x->set_item(0,packed_data[3*p+2]);
 
           // Vec_temp might contain previous values
 
-          for(i=1;i<nb_ranks_comm_x;i++){
+          for(i=1;i<nb_ranks_comm_i[0];i++){
 
-            if(i!=nb_ranks_comm_x-1){
+            if(i!=nb_ranks_comm_i[0]-1){
               Vec_temp_x->add_to_item(i-1,all_receive_data_P_x[i][3*p]);
               Vec_temp_x->add_to_item(i,all_receive_data_P_x[i][3*p+1]);
               interface_rhs_x->set_item(i,all_receive_data_P_x[i][3*p+2]);  // Assemble the interface rhs fe
             }
             else{
-              if(P_is_xperiodic ==0){
+              if(is_Pperiodic[0] ==0){
                   Vec_temp_x->add_to_item(i-1,all_receive_data_P_x[i][3*p]);
               }
               else{
@@ -5133,15 +3426,15 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_x ( double * packed_data, s
           GLOBAL_EQ->DS_NavierStokes_x_interface_unknown_solver_P(interface_rhs_x);
 
           // Pack the interface_rhs_x into the appropriate send_data
-          for (i=1;i<nb_ranks_comm_x;++i)
+          for (i=1;i<nb_ranks_comm_i[0];++i)
           {
-            if(i!=nb_ranks_comm_x-1){
+            if(i!=nb_ranks_comm_i[0]-1){
               all_send_data_P_x[i][2*p+0]=interface_rhs_x->item(i-1);
               all_send_data_P_x[i][2*p+1]=interface_rhs_x->item(i);
             }
             else{
               all_send_data_P_x[i][2*p+0]=interface_rhs_x->item(i-1);
-              if(P_is_xperiodic)
+              if(is_Pperiodic[0])
                 all_send_data_P_x[i][2*p+1]=interface_rhs_x->item(i);  
               else
                 all_send_data_P_x[i][2*p+1]=0;
@@ -5173,23 +3466,23 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_x ( double * packed_data, s
             }
             p = (j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
             
-            if(P_is_xperiodic)
-                Vec_temp_x->set_item(nb_ranks_comm_x-1,packed_data[3*p]);
+            if(is_Pperiodic[0])
+                Vec_temp_x->set_item(nb_ranks_comm_i[0]-1,packed_data[3*p]);
             Vec_temp_x->set_item(0,packed_data[3*p+1]);
             interface_rhs_x->set_item(0,packed_data[3*p+2]);
 
             // Vec_temp might contain previous values
 
 
-            for(i=1;i<nb_ranks_comm_x;i++){
+            for(i=1;i<nb_ranks_comm_i[0];i++){
 
-              if(i!=nb_ranks_comm_x-1){
+              if(i!=nb_ranks_comm_i[0]-1){
                 Vec_temp_x->add_to_item(i-1,all_receive_data_P_x[i][3*p]);
                 Vec_temp_x->add_to_item(i,all_receive_data_P_x[i][3*p+1]);
                 interface_rhs_x->set_item(i,all_receive_data_P_x[i][3*p+2]);  // Assemble the interface rhs fe
               }
               else{
-                if(P_is_xperiodic ==0){
+                if(is_Pperiodic[0] ==0){
                     Vec_temp_x->add_to_item(i-1,all_receive_data_P_x[i][3*p]);
                 }
                 else{
@@ -5210,15 +3503,15 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_x ( double * packed_data, s
             GLOBAL_EQ->DS_NavierStokes_x_interface_unknown_solver_P(interface_rhs_x);
 
             // Pack the interface_rhs_x into the appropriate send_data
-            for (i=1;i<nb_ranks_comm_x;++i)
+            for (i=1;i<nb_ranks_comm_i[0];++i)
             {
-              if(i!=nb_ranks_comm_x-1){
+              if(i!=nb_ranks_comm_i[0]-1){
                 all_send_data_P_x[i][2*p+0]=interface_rhs_x->item(i-1);
                 all_send_data_P_x[i][2*p+1]=interface_rhs_x->item(i);
               }
               else{
                 all_send_data_P_x[i][2*p+0]=interface_rhs_x->item(i-1);
-                if(P_is_xperiodic)
+                if(is_Pperiodic[0])
                   all_send_data_P_x[i][2*p+1]=interface_rhs_x->item(i);  
                 else
                   all_send_data_P_x[i][2*p+1]=0;
@@ -5244,16 +3537,16 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_x ( double * packed_data, s
    {
       // Send the packed data to master
       //pelCOMM->send( is_master, packed_data, nb_received_data );
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_x ) ;
+      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[0] ) ;
    }
 
    // Send the data from master
-   if ( rank_in_x == 0 )
+   if ( rank_in_i[0] == 0 )
    {
-     for (i=1;i<nb_ranks_comm_x;++i)
+     for (i=1;i<nb_ranks_comm_i[0];++i)
       {
         //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_P_x[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_x ) ;
+        MPI_Send( all_send_data_P_x[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[0] ) ;
       }
    }
    else
@@ -5263,7 +3556,7 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_x ( double * packed_data, s
       //pelCOMM->receive( is_master, received_data, nb_received_data );
       static MPI_Status status ;
       MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_x, &status ) ;
+                          DDS_Comm_i[0], &status ) ;
 
      // Solve the system of equations in each proc
 
@@ -5273,17 +3566,17 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_x ( double * packed_data, s
         {
 
           p = j-min_unknown_index(1);
-          if(rank_in_x != nb_ranks_comm_x-1){
-            interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
-            interface_rhs_x->set_item(rank_in_x,packed_data[2*p+1]);
+          if(rank_in_i[0] != nb_ranks_comm_i[0]-1){
+            interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
+            interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
           }
           else{
-            if(P_is_xperiodic ==0){
-              interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
+            if(is_Pperiodic[0] ==0){
+              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
             }
             else{
-              interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
-              interface_rhs_x->set_item(rank_in_x,packed_data[2*p+1]);
+              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
+              interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
             }
 
           }
@@ -5304,17 +3597,17 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_x ( double * packed_data, s
           for(j = min_unknown_index(1);j<=max_unknown_index(1);j++)
           {
             p = (j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
-            if(rank_in_x != nb_ranks_comm_x-1){
-              interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
-              interface_rhs_x->set_item(rank_in_x,packed_data[2*p+1]);
+            if(rank_in_i[0] != nb_ranks_comm_i[0]-1){
+              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
+              interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
             }
             else{
-              if(P_is_xperiodic ==0){
-                interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
+              if(is_Pperiodic[0] ==0){
+                interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
               }
               else{
-                interface_rhs_x->set_item(rank_in_x-1,packed_data[2*p]);
-                interface_rhs_x->set_item(rank_in_x,packed_data[2*p+1]);
+                interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
+                interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
               }
             }
             // Need to have the original rhs function assembled for corrosponding j,k pair
@@ -5365,8 +3658,8 @@ LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y_P() ;
    pos = j - min_unknown_index(1);
    dy = PF->get_cell_size( j,0,1);
 
-   if(P_is_yperiodic == 0){
-      if(rank_in_y == nb_ranks_comm_y-1){
+   if(is_Pperiodic[1] == 0){
+      if(rank_in_i[1] == nb_ranks_comm_i[1]-1){
        local_rhs_y->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
       }
       else{
@@ -5377,7 +3670,7 @@ LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y_P() ;
       }
    }
    else{
-      if(nb_ranks_comm_y > 1){
+      if(nb_ranks_comm_i[1] > 1){
          if(j == max_unknown_index(1))
            fe = PF->DOF_value( i, j, k, 0, 1 )*dy;
          else
@@ -5446,7 +3739,7 @@ DDS_NavierStokes:: pressure_solve_y_for_secondorder ( size_t const& i, size_t co
    // Solve for xi locally and put it in local solution vector
    GLOBAL_EQ->DS_NavierStokes_y_local_unknown_solver_P(local_solution_y);
 
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_in_y_P();
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_P(1);
    LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_y_P();
 
    for(j=0;j<Vec_temp->nb_rows();j++){
@@ -5461,30 +3754,30 @@ DDS_NavierStokes:: pressure_solve_y_for_secondorder ( size_t const& i, size_t co
    else{
       vec_pos=(k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
    }
-   if(rank_in_y == 0){
+   if(rank_in_i[1] == 0){
      // Check if bc is periodic in x
      // If it is, we need to pack two elements apart from fe
 
-      if(P_is_yperiodic)
-          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_y-1);
+      if(is_Pperiodic[1])
+          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[1]-1);
       else
           packed_data[3*vec_pos+0]=0;
         
-     packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_y);
+     packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
    }
-   else if(rank_in_y == nb_ranks_comm_y-1){
-     packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_y-1);
+   else if(rank_in_i[1] == nb_ranks_comm_i[1]-1){
+     packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[1]-1);
      
      // Check if bc is periodic in x
       // If it is, we need to pack two elements apart from fe
-      if(P_is_yperiodic)
-          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_y);
+      if(is_Pperiodic[1])
+          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
       else
           packed_data[3*vec_pos+1]=0;
    }
    else{
-     packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_y-1);
-     packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_y);
+     packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[1]-1);
+     packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
    }
    packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
 
@@ -5519,20 +3812,20 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_y ( double * packed_data, s
 
    LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_y_P();
 
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_in_y_P();
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_P(1);
 
    size_t nb_send_data = (2*nb_received_data)/3;
 
   // Send and receive the data first pass
-   if ( rank_in_y == 0 )
+   if ( rank_in_i[1] == 0 )
    {
-      for (i=1;i<nb_ranks_comm_y;++i)
+      for (i=1;i<nb_ranks_comm_i[1];++i)
       {
         // Receive the data
         //pelCOMM->receive( i, all_received_data[i], nb_received_data );
         static MPI_Status status ;
         MPI_Recv( all_receive_data_P_y[i], nb_received_data, MPI_DOUBLE, i, 0,
-                          DDS_Comm_y, &status ) ;
+                          DDS_Comm_i[1], &status ) ;
       }
 
       // Solve system of interface unknowns for each x
@@ -5546,22 +3839,22 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_y ( double * packed_data, s
             interface_rhs_y->set_item(j,0);
           }
           p = i-min_unknown_index(0);
-          if(P_is_yperiodic)
-              Vec_temp->set_item(nb_ranks_comm_y-1,packed_data[3*p]);
+          if(is_Pperiodic[1])
+              Vec_temp->set_item(nb_ranks_comm_i[1]-1,packed_data[3*p]);
           Vec_temp->set_item(0,packed_data[3*p+1]);
           interface_rhs_y->set_item(0,packed_data[3*p+2]);
 
           // Vec_temp might contain previous values
 
-          for(j=1;j<nb_ranks_comm_y;j++){
+          for(j=1;j<nb_ranks_comm_i[1];j++){
 
-            if(j!=nb_ranks_comm_y-1){
+            if(j!=nb_ranks_comm_i[1]-1){
               Vec_temp->add_to_item(j-1,all_receive_data_P_y[j][3*p]);
               Vec_temp->add_to_item(j,all_receive_data_P_y[j][3*p+1]);
               interface_rhs_y->set_item(j,all_receive_data_P_y[j][3*p+2]);  // Assemble the interface rhs fe
             }
             else{
-              if(P_is_yperiodic ==0){
+              if(is_Pperiodic[1] ==0){
                   Vec_temp->add_to_item(j-1,all_receive_data_P_y[j][3*p]);
               }
               else{
@@ -5580,19 +3873,19 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_y ( double * packed_data, s
           // Solve for ue (interface unknowns) in the master proc
           GLOBAL_EQ->DS_NavierStokes_y_interface_unknown_solver_P(interface_rhs_y);
 
-          //if(p==0 && rank_in_x == 1)
+          //if(p==0 && rank_in_i[0] == 1)
           //  interface_rhs_y->print_items(MAC::out(),0);
 
           // Pack the interface_rhs_x into the appropriate send_data
-          for (j=1;j<nb_ranks_comm_y;++j)
+          for (j=1;j<nb_ranks_comm_i[1];++j)
           {
-            if(j!=nb_ranks_comm_y-1){
+            if(j!=nb_ranks_comm_i[1]-1){
               all_send_data_P_y[j][2*p+0]=interface_rhs_y->item(j-1);
               all_send_data_P_y[j][2*p+1]=interface_rhs_y->item(j);
             }
             else{
               all_send_data_P_y[j][2*p+0]=interface_rhs_y->item(j-1);
-              if(P_is_yperiodic)
+              if(is_Pperiodic[1])
                 all_send_data_P_y[j][2*p+1]=interface_rhs_y->item(j); 
               else
                 all_send_data_P_y[j][2*p+1]=0;
@@ -5622,22 +3915,22 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_y ( double * packed_data, s
               interface_rhs_y->set_item(j,0);
             }
             p = (k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
-            if(P_is_yperiodic)
-                Vec_temp->set_item(nb_ranks_comm_y-1,packed_data[3*p]);
+            if(is_Pperiodic[1])
+                Vec_temp->set_item(nb_ranks_comm_i[1]-1,packed_data[3*p]);
             Vec_temp->set_item(0,packed_data[3*p+1]);
             interface_rhs_y->set_item(0,packed_data[3*p+2]);
 
             // Vec_temp might contain previous values
 
-            for(j=1;j<nb_ranks_comm_y;j++){
+            for(j=1;j<nb_ranks_comm_i[1];j++){
 
-              if(j!=nb_ranks_comm_y-1){
+              if(j!=nb_ranks_comm_i[1]-1){
                 Vec_temp->add_to_item(j-1,all_receive_data_P_y[j][3*p]);
                 Vec_temp->add_to_item(j,all_receive_data_P_y[j][3*p+1]);
                 interface_rhs_y->set_item(j,all_receive_data_P_y[j][3*p+2]);  // Assemble the interface rhs fe
               }
               else{
-                if(P_is_yperiodic == 0){
+                if(is_Pperiodic[1] == 0){
                   Vec_temp->add_to_item(j-1,all_receive_data_P_y[j][3*p]);
                 }
                 else{
@@ -5655,19 +3948,19 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_y ( double * packed_data, s
             // Solve for ue (interface unknowns) in the master proc
             GLOBAL_EQ->DS_NavierStokes_y_interface_unknown_solver_P(interface_rhs_y);
 
-            //if(p==0 && rank_in_x == 1)
+            //if(p==0 && rank_in_i[0] == 1)
             //  interface_rhs_y->print_items(MAC::out(),0);
 
             // Pack the interface_rhs_x into the appropriate send_data
-            for (j=1;j<nb_ranks_comm_y;++j)
+            for (j=1;j<nb_ranks_comm_i[1];++j)
             {
-              if(j!=nb_ranks_comm_y-1){
+              if(j!=nb_ranks_comm_i[1]-1){
                 all_send_data_P_y[j][2*p+0]=interface_rhs_y->item(j-1);
                 all_send_data_P_y[j][2*p+1]=interface_rhs_y->item(j);
               }
               else{
                 all_send_data_P_y[j][2*p+0]=interface_rhs_y->item(j-1);
-                if(P_is_yperiodic)
+                if(is_Pperiodic[1])
                   all_send_data_P_y[j][2*p+1]=interface_rhs_y->item(j);
                 else
                   all_send_data_P_y[j][2*p+1]=0;
@@ -5693,15 +3986,15 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_y ( double * packed_data, s
       // Send the packed data to master
       //pelCOMM->send( is_master, packed_data, nb_received_data );
 
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_y ) ;
+      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[1] ) ;
    }
    // Send the data from master
-   if ( rank_in_y == 0 )
+   if ( rank_in_i[1] == 0 )
    {
-     for (i=1;i<nb_ranks_comm_y;++i)
+     for (i=1;i<nb_ranks_comm_i[1];++i)
       {
         //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_P_y[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_y ) ;
+        MPI_Send( all_send_data_P_y[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[1] ) ;
       }
    }
    else
@@ -5710,7 +4003,7 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_y ( double * packed_data, s
       //pelCOMM->receive( is_master, received_data, nb_received_data );
       static MPI_Status status ;
       MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_y, &status ) ;
+                          DDS_Comm_i[1], &status ) ;
 
      // Solve the system of equations in each proc
 
@@ -5719,17 +4012,17 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_y ( double * packed_data, s
         for(i = min_unknown_index(0);i<=max_unknown_index(0);i++)
         {
           p = i-min_unknown_index(0);
-          if(rank_in_y != nb_ranks_comm_y-1){
-            interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
-            interface_rhs_y->set_item(rank_in_y,packed_data[2*p+1]);
+          if(rank_in_i[1] != nb_ranks_comm_i[1]-1){
+            interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
+            interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
           }
           else{
-            if(P_is_yperiodic ==0){
-              interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
+            if(is_Pperiodic[1] ==0){
+              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
             }
             else{
-              interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
-              interface_rhs_y->set_item(rank_in_y,packed_data[2*p+1]);
+              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
+              interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
             }
           }
           // Need to have the original rhs function assembled for corrosponding j,k pair
@@ -5749,17 +4042,17 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_y ( double * packed_data, s
           for(k = min_unknown_index(2);k<=max_unknown_index(2);k++)
           {
             p = (k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
-            if(rank_in_y != nb_ranks_comm_y-1){
-              interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
-              interface_rhs_y->set_item(rank_in_y,packed_data[2*p+1]);
+            if(rank_in_i[1] != nb_ranks_comm_i[1]-1){
+              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
+              interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
             }
             else{
-              if(P_is_yperiodic ==0){
-                interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
+              if(is_Pperiodic[1] ==0){
+                interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
               }
               else{
-                interface_rhs_y->set_item(rank_in_y-1,packed_data[2*p]);
-                interface_rhs_y->set_item(rank_in_y,packed_data[2*p+1]);
+                interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
+                interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
               }
             }
             // Need to have the original rhs function assembled for corrosponding j,k pair
@@ -5810,8 +4103,8 @@ LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z_P();
    pos = k - min_unknown_index(2);
    dz = PF->get_cell_size( k,0,2);
 
-   if(P_is_zperiodic == 0){
-     if(rank_in_z == nb_ranks_comm_z-1){
+   if(is_Pperiodic[2] == 0){
+     if(rank_in_i[2] == nb_ranks_comm_i[2]-1){
         local_rhs_z->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
      }
      else{
@@ -5822,7 +4115,7 @@ LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z_P();
      }
    }
    else{
-      if(nb_ranks_comm_z > 1){
+      if(nb_ranks_comm_i[2] > 1){
        if(k == max_unknown_index(2))
          fe = PF->DOF_value( i, j, k, 0, 1 )*dz ;
        else
@@ -5892,7 +4185,7 @@ DDS_NavierStokes:: pressure_solve_z_for_secondorder ( size_t const& i, size_t co
    // Solve for xi locally and put it in local solution vector
    GLOBAL_EQ->DS_NavierStokes_z_local_unknown_solver_P(local_solution_z);
 
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_in_z_P();
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_P(2);
    LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_z_P();
 
    for(k=0;k<Vec_temp->nb_rows();k++){
@@ -5904,31 +4197,31 @@ DDS_NavierStokes:: pressure_solve_z_for_secondorder ( size_t const& i, size_t co
 
     size_t vec_pos=(i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
 
-    if(rank_in_z == 0){
+    if(rank_in_i[2] == 0){
       // Check if bc is periodic in x
      // If it is, we need to pack two elements apart from fe
 
-      if(P_is_zperiodic)
-          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_z-1);
+      if(is_Pperiodic[2])
+          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[2]-1);
       else
           packed_data[3*vec_pos+0]=0;
         
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_z);
+      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
     }
-    else if(rank_in_z == nb_ranks_comm_z-1){
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_z-1);
+    else if(rank_in_i[2] == nb_ranks_comm_i[2]-1){
+      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[2]-1);
       
       // Check if bc is periodic in x
       // If it is, we need to pack two elements apart from fe
-      if(P_is_zperiodic)
-          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_z);
+      if(is_Pperiodic[2])
+          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
       else
           packed_data[3*vec_pos+1]=0;
 
     }
     else{
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_z-1);
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_z);
+      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[2]-1);
+      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
     }
     packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
 }
@@ -5961,20 +4254,20 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_z ( double * packed_data, s
 
    LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_z_P();
 
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_in_z_P();
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_P(2);
 
    size_t nb_send_data = (2*nb_received_data)/3;
 
   // Send and receive the data first pass
-   if ( rank_in_z == 0 )
+   if ( rank_in_i[2] == 0 )
    {
-      for (p=1;p<nb_ranks_comm_z;++p)
+      for (p=1;p<nb_ranks_comm_i[2];++p)
       {
         // Receive the data
         //pelCOMM->receive( i, all_received_data[i], nb_received_data );
         static MPI_Status status ;
         MPI_Recv( all_receive_data_P_z[p], nb_received_data, MPI_DOUBLE, p, 0,
-                          DDS_Comm_z, &status ) ;
+                          DDS_Comm_i[2], &status ) ;
       }
 
       // Solve system of interface unknowns for each x
@@ -5990,22 +4283,22 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_z ( double * packed_data, s
           }
           p = (i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
 
-          if(P_is_zperiodic)
-              Vec_temp->set_item(nb_ranks_comm_z-1,packed_data[3*p]);
+          if(is_Pperiodic[2])
+              Vec_temp->set_item(nb_ranks_comm_i[2]-1,packed_data[3*p]);
           Vec_temp->set_item(0,packed_data[3*p+1]);
           interface_rhs_z->set_item(0,packed_data[3*p+2]);
 
           // Vec_temp might contain previous values
 
-          for(m=1;m<nb_ranks_comm_z;m++){
+          for(m=1;m<nb_ranks_comm_i[2];m++){
 
-            if(m!=nb_ranks_comm_z-1){
+            if(m!=nb_ranks_comm_i[2]-1){
               Vec_temp->add_to_item(m-1,all_receive_data_P_z[m][3*p]);
               Vec_temp->add_to_item(m,all_receive_data_P_z[m][3*p+1]);
               interface_rhs_z->set_item(m,all_receive_data_P_z[m][3*p+2]);  // Assemble the interface rhs fe
             }
             else{
-              if(P_is_zperiodic == 0)
+              if(is_Pperiodic[2] == 0)
                   Vec_temp->add_to_item(m-1,all_receive_data_P_z[m][3*p]);
               else{
                   Vec_temp->add_to_item(m-1,all_receive_data_P_z[m][3*p]);
@@ -6023,15 +4316,15 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_z ( double * packed_data, s
           GLOBAL_EQ->DS_NavierStokes_z_interface_unknown_solver_P(interface_rhs_z);
 
           // Pack the interface_rhs_x into the appropriate send_data
-          for (m=1;m<nb_ranks_comm_z;++m)
+          for (m=1;m<nb_ranks_comm_i[2];++m)
           {
-            if(m!=nb_ranks_comm_z-1){
+            if(m!=nb_ranks_comm_i[2]-1){
               all_send_data_P_z[m][2*p+0]=interface_rhs_z->item(m-1);
               all_send_data_P_z[m][2*p+1]=interface_rhs_z->item(m);
             }
             else{
               all_send_data_P_z[m][2*p+0]=interface_rhs_z->item(m-1);
-              if(P_is_zperiodic)
+              if(is_Pperiodic[2])
                 all_send_data_P_z[m][2*p+1]=interface_rhs_z->item(m);
               else
                 all_send_data_P_z[m][2*p+1]=0;
@@ -6055,15 +4348,15 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_z ( double * packed_data, s
    {
       // Send the packed data to master
       //pelCOMM->send( is_master, packed_data, nb_received_data );
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_z ) ;
+      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[2] ) ;
    }
    // Send the data from master
-   if ( rank_in_z == 0 )
+   if ( rank_in_i[2] == 0 )
    {
-     for (m=1;m<nb_ranks_comm_z;++m)
+     for (m=1;m<nb_ranks_comm_i[2];++m)
       {
         //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_P_z[m], nb_send_data, MPI_DOUBLE, m, 0, DDS_Comm_z ) ;
+        MPI_Send( all_send_data_P_z[m], nb_send_data, MPI_DOUBLE, m, 0, DDS_Comm_i[2] ) ;
       }
    }
    else
@@ -6072,22 +4365,22 @@ DDS_NavierStokes:: pressure_solve_interface_unknowns_z ( double * packed_data, s
       //pelCOMM->receive( is_master, received_data, nb_received_data );
       static MPI_Status status ;
       MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_z, &status ) ;
+                          DDS_Comm_i[2], &status ) ;
 
      // Solve the system of equations in each proc
      for(j = min_unknown_index(1);j<=max_unknown_index(1);j++){
         for(i = min_unknown_index(0);i<=max_unknown_index(0);i++){
           p = (i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
-          if(rank_in_z != nb_ranks_comm_z-1){
-            interface_rhs_z->set_item(rank_in_z-1,packed_data[2*p]);
-            interface_rhs_z->set_item(rank_in_z,packed_data[2*p+1]);
+          if(rank_in_i[2] != nb_ranks_comm_i[2]-1){
+            interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);
+            interface_rhs_z->set_item(rank_in_i[2],packed_data[2*p+1]);
           }
           else{
-            if(P_is_zperiodic == 0)
-                interface_rhs_z->set_item(rank_in_z-1,packed_data[2*p]);    
+            if(is_Pperiodic[2] == 0)
+                interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);    
             else{
-                interface_rhs_z->set_item(rank_in_z-1,packed_data[2*p]);
-                interface_rhs_z->set_item(rank_in_z,packed_data[2*p+1]);
+                interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);
+                interface_rhs_z->set_item(rank_in_i[2],packed_data[2*p+1]);
             }
           }
           // Need to have the original rhs function assembled for corrosponding j,k pair
@@ -6132,7 +4425,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
   if(dim == 2){
 
     // Solve in x for pressure
-    if(nb_ranks_comm_x>1){
+    if(nb_ranks_comm_i[0]>1){
       size_t nb_send_data_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1);
 
       for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
@@ -6150,7 +4443,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
           double fe = pressure_assemble_local_rhs_x(j,k,t_it);
           LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x_P();
 
-          if(P_is_xperiodic == 1)
+          if(is_Pperiodic[0] == 1)
               GLOBAL_EQ->DS_NavierStokes_x_solver_P_periodic(j,k,min_unknown_index(0),local_rhs_x,NULL);
           else
               GLOBAL_EQ->DS_NavierStokes_x_solver_P(j,k,min_unknown_index(0),local_rhs_x,NULL);
@@ -6167,7 +4460,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
      // output_L2norm_pressure( 1 ); 
 
     // Solve in y for pressure
-     if(nb_ranks_comm_y>1){
+     if(nb_ranks_comm_i[1]>1){
        size_t nb_send_data_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1);
 
        for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
@@ -6185,7 +4478,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
          double fe = pressure_assemble_local_rhs_y(i,k,t_it);
          LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y_P();
          //local_rhs_y->print_items(MAC::out(),0);
-         if(P_is_yperiodic == 1 )
+         if(is_Pperiodic[1] == 1 )
             GLOBAL_EQ->DS_NavierStokes_y_solver_P_periodic(i,k,min_unknown_index(1),local_rhs_y,NULL);
          else
             GLOBAL_EQ->DS_NavierStokes_y_solver_P(i,k,min_unknown_index(1),local_rhs_y,NULL);
@@ -6204,7 +4497,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
 
     
     // Solve in x for pressure
-    if(nb_ranks_comm_x>1){
+    if(nb_ranks_comm_i[0]>1){
       size_t nb_send_data_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
       
       for (k=min_unknown_index(2);k<=max_unknown_index(2);++k){
@@ -6219,7 +4512,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
         for (j=min_unknown_index(1);j<=max_unknown_index(1);++j){
             double fe = pressure_assemble_local_rhs_x(j,k,t_it);
             LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x_P();
-            if(P_is_xperiodic == 1)
+            if(is_Pperiodic[0] == 1)
                 GLOBAL_EQ->DS_NavierStokes_x_solver_P_periodic(j,k,min_unknown_index(0),local_rhs_x,NULL);
             else
                 GLOBAL_EQ->DS_NavierStokes_x_solver_P(j,k,min_unknown_index(0),local_rhs_x,NULL);
@@ -6235,7 +4528,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
 
     
     // Solve in y for pressure
-    if(nb_ranks_comm_y>1){
+    if(nb_ranks_comm_i[1]>1){
       size_t nb_send_data_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
       
       // Third equation - Solve in y
@@ -6255,7 +4548,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
          {
             double fe = pressure_assemble_local_rhs_y(i,k,t_it);
             LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y_P();
-            if(P_is_yperiodic == 1)
+            if(is_Pperiodic[1] == 1)
                 GLOBAL_EQ->DS_NavierStokes_y_solver_P_periodic(i,k,min_unknown_index(1),local_rhs_y,NULL);
             else
                 GLOBAL_EQ->DS_NavierStokes_y_solver_P(i,k,min_unknown_index(1),local_rhs_y,NULL);
@@ -6271,7 +4564,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
     
     // Solve in z for pressure
 
-     if(nb_ranks_comm_z>1){
+     if(nb_ranks_comm_i[2]>1){
        size_t nb_send_data_z = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(1)-min_unknown_index(1)+1);
        
        for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
@@ -6291,7 +4584,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
          {
             double fe = pressure_assemble_local_rhs_z(i,j,t_it);
             LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z_P();
-            if(P_is_zperiodic == 1)
+            if(is_Pperiodic[2] == 1)
                 GLOBAL_EQ->DS_NavierStokes_z_solver_P_periodic(i,j,min_unknown_index(2),local_rhs_z,NULL);
             else
                 GLOBAL_EQ->DS_NavierStokes_z_solver_P(i,j,min_unknown_index(2),local_rhs_z,NULL);
@@ -6563,77 +4856,6 @@ void
 DDS_NavierStokes::get_velocity_divergence(void)
 //----------------------------------------------------------------------
 {
-// 
-//   double value;
-//   size_t i,j,k;
-// 
-//   size_t_vector min_unknown_index(dim,0);
-//   size_t_vector max_unknown_index(dim,0);
-// 
-//   double ux,uy,dx,dy;
-//   double div_velocity = 0.;
-//   double cell_div=0.,max_divu=0.;
-// 
-//   FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
-//   for (size_t l=0;l<dim;++l)
-//       min_unknown_index(l) =
-//        PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-//     for (size_t l=0;l<dim;++l)
-//       max_unknown_index(l) =
-//        PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-// 
-//   for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-//   {
-//     for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-//     {
-//       if(dim ==2 )
-//       {
-//         k=0;
-// 
-//         // Divergence of u (x component)
-//         ux = UF->DOF_value( shift.i+i, j, k, 0, 1 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 1 ) ;
-// 
-//         // Divergence of u (y component)
-//         uy = UF->DOF_value( i, shift.j+j, k, 1, 1 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 1 ) ;
-// 
-//         dx = PF->get_cell_size( i,0, 0 );
-//         dy = PF->get_cell_size( j,0, 1 );
-// 
-//         cell_div = ux*dy + uy*dx;
-// 	max_divu = MAC::max( MAC::abs(cell_div) / ( dx * dy ), max_divu );
-//         div_velocity += cell_div*cell_div;
-//       }
-//       else{
-//         double zright,zhr,dz,uz=0.;
-//         for (k=min_unknown_index(2);k<=max_unknown_index(2);++k){
-// 
-//           // Divergence of u (x component)
-//           ux = UF->DOF_value( shift.i+i, j, k, 0, 1 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 1 ) ;
-// 
-//           // Divergence of u (y component)
-//           uy = UF->DOF_value( i, shift.j+j, k, 1, 1 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 1 ) ;
-//            
-//           // Divergence of u(z component)
-//           uz = UF->DOF_value( i, j, shift.k+k, 2, 1 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 1 ) ;
-//           
-//           dx = PF->get_cell_size( i,0, 0 );
-//           dy = PF->get_cell_size( j,0, 1 );
-//           dz = PF->get_cell_size( k,0, 2 );
-// 
-//           cell_div = ux*dy*dz + uy*dx*dz+uz*dx*dy;
-// 	  max_divu = MAC::max( MAC::abs(cell_div) / ( dx * dy * dz ), max_divu );
-//           div_velocity += cell_div*cell_div;
-//         }
-//       }
-//     }
-//   }
-//   div_velocity = pelCOMM->sum( div_velocity ) ;
-//   div_velocity = MAC::sqrt(div_velocity);
-//   max_divu = pelCOMM->max( max_divu ) ;
-//   if ( my_rank == is_master )
-//       MAC::out()<< "Norm L2 div(u) = "<< MAC::doubleToString( ios::scientific, 12, div_velocity ) << " Max div(u) = " << MAC::doubleToString( ios::scientific, 12, max_divu ) << endl;
-// 
-//   // Get the maximum value of divergence across cells??????????
 
   size_t i,j,k;
   size_t_vector min_unknown_index(dim,0);
@@ -6864,82 +5086,63 @@ DDS_NavierStokes::output_L2norm_velocity( size_t level )
       
 }
 
-
-
-
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: create_DDS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: create_DDS_subcommunicators" ) ;
+   MAC_LABEL( "DDS_HeatEquation:: create_DDS_subcommunicators" ) ;
 
    int color = 0, key = 0;
-   //int const* number_of_subdomains_per_direction = UF->primary_grid()->get_domain_decomposition() ;
    int const* MPI_coordinates_world = UF->primary_grid()->get_MPI_coordinates() ;
    int const* MPI_number_of_coordinates = UF->primary_grid()->get_domain_decomposition() ;
 
-   if(dim == 2){
-     // Assign color and key for splitting in x
-     color = MPI_coordinates_world[1];
-     key = MPI_coordinates_world[0];
+   if (dim == 2) {
+      // Assign color and key for splitting in x
+      color = MPI_coordinates_world[1];
+      key = MPI_coordinates_world[0];
+      // Split by direction in x
+      processor_splitting (color,key,0);
 
-     // Split by direction in x
-     MPI_Comm_split(MPI_COMM_WORLD, color, key, &DDS_Comm_x);
+      // Assign color and key for splitting in y
+      color = MPI_coordinates_world[0];
+      key = MPI_coordinates_world[1];
+      // Split by direction in y
+      processor_splitting (color,key,1);
+   } else {
+      // Assign color and key for splitting in x
+      color = MPI_coordinates_world[1] + MPI_coordinates_world[2]*MPI_number_of_coordinates[1] ;
+      key = MPI_coordinates_world[0];
+      // Split by direction in x
+      processor_splitting (color,key,0);
 
-     MPI_Comm_size( DDS_Comm_x, &nb_ranks_comm_x ) ;
-     MPI_Comm_rank( DDS_Comm_x, &rank_in_x ) ;
+      // Assign color and key for splitting in y
+      color = MPI_coordinates_world[2] + MPI_coordinates_world[0]*MPI_number_of_coordinates[2];
+      key = MPI_coordinates_world[1];
+      // Split by direction in y
+      processor_splitting (color,key,1);
 
-     // Assign color and key for splitting in y
-     color = MPI_coordinates_world[0];
+      // Assign color and key for splitting in y
+      color = MPI_coordinates_world[0] + MPI_coordinates_world[1]*MPI_number_of_coordinates[0];;
+      key = MPI_coordinates_world[2];
 
-     key = MPI_coordinates_world[1];
-
-     // Split by direction in y
-     MPI_Comm_split(MPI_COMM_WORLD, color, key, &DDS_Comm_y);
-
-     MPI_Comm_size( DDS_Comm_y, &nb_ranks_comm_y ) ;
-     MPI_Comm_rank( DDS_Comm_y, &rank_in_y ) ;
-   }
-   else{
-
-     // Assign color and key for splitting in x
-     color = MPI_coordinates_world[1] + MPI_coordinates_world[2]*MPI_number_of_coordinates[1] ;
-     key = MPI_coordinates_world[0];
-
-     // Split by direction in x
-     MPI_Comm_split(MPI_COMM_WORLD, color, key, &DDS_Comm_x);
-
-     MPI_Comm_size( DDS_Comm_x, &nb_ranks_comm_x ) ;
-     MPI_Comm_rank( DDS_Comm_x, &rank_in_x ) ;
-
-     // Assign color and key for splitting in y
-     color = MPI_coordinates_world[2] + MPI_coordinates_world[0]*MPI_number_of_coordinates[2];
-
-     key = MPI_coordinates_world[1];
-
-     // Split by direction in y
-     MPI_Comm_split(MPI_COMM_WORLD, color, key, &DDS_Comm_y);
-
-     MPI_Comm_size( DDS_Comm_y, &nb_ranks_comm_y ) ;
-     MPI_Comm_rank( DDS_Comm_y, &rank_in_y ) ;
-
-     // Assign color and key for splitting in y
-     color = MPI_coordinates_world[0] + MPI_coordinates_world[1]*MPI_number_of_coordinates[0];;
-
-     key = MPI_coordinates_world[2];
-
-     // Split by direction in y
-     MPI_Comm_split(MPI_COMM_WORLD, color, key, &DDS_Comm_z);
-
-     MPI_Comm_size( DDS_Comm_z, &nb_ranks_comm_z ) ;
-     MPI_Comm_rank( DDS_Comm_z, &rank_in_z ) ;
-
+      // Split by direction in y
+      processor_splitting (color,key,2);
    }
 }
 
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: processor_splitting ( int color, int key, size_t const dir )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatEquation:: processor_splitting" ) ;
 
+   MPI_Comm_split(MPI_COMM_WORLD, color, key, &DDS_Comm_i[dir]);
+   MPI_Comm_size( DDS_Comm_i[dir], &nb_ranks_comm_i[dir] ) ;
+   MPI_Comm_rank( DDS_Comm_i[dir], &rank_in_i[dir] ) ;
 
+}
 
 //---------------------------------------------------------------------------
 void

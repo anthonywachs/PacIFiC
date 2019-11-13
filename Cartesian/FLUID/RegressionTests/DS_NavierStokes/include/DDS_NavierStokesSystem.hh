@@ -119,30 +119,27 @@ class DDS_NavierStokesSystem : public MAC_Object
 
       /** @brief Return the domain decomposition matrices in x direction for velocity */
 
-      LA_SeqVector* get_aii_main_diag_in_x( size_t const& c ) ;
+      LA_SeqVector* get_aii_main_diag( size_t const& c, size_t const dir ) ;
+      LA_SeqVector* get_aii_super_diag( size_t const& c, size_t const dir ) ;
+      LA_SeqVector* get_aii_mod_super_diag( size_t const& c, size_t const dir ) ;
+      LA_SeqVector* get_aii_sub_diag( size_t const& c, size_t const dir ) ;
 
-      LA_SeqVector* get_aii_super_diag_in_x( size_t const& c ) ;
+      LA_SeqMatrix* get_aie( size_t const& c, size_t const dir ) ;
+      LA_SeqMatrix* get_aei( size_t const& c, size_t const dir ) ;
+      LA_SeqMatrix* get_Aee_matrix( size_t const& c, size_t const dir ) ;
 
-      LA_SeqVector* get_aii_sub_diag_in_x( size_t const& c ) ;
-
-      LA_SeqMatrix* get_aie_in_x( size_t const& c ) ;
-
-      LA_SeqMatrix* get_aei_in_x( size_t const& c ) ;
-
-       /** @brief Return the Aei*inv(Aii)*Aie product in x direction */
-      LA_SeqMatrix* get_Aei_Aii_Aie_product_in_x( size_t const& c ) ;
-
-       /** @brief Return the Aee matrix in x */
-      LA_SeqMatrix* get_Aee_matrix_in_x( size_t const& c ) ;
+      LA_SeqVector* get_product_result( size_t const& c, size_t const dir );
+      LA_SeqMatrix* get_Aei_Aii_Aie_product( size_t const& c, size_t const dir ) ;
+      LA_SeqVector* get_Aii_Aie_product( size_t const& c, size_t const dir ) ;
 
        /** @brief Return the schlur complement matrix in x direction */
-      LA_SeqMatrix* get_schlur_complement_in_x( size_t const& c ) ; 
+      LA_SeqMatrix* get_schlur_complement( size_t const& c, size_t const dir ) ; 
 
        /** @brief Return the Aee matrix in x */
-      LA_SeqVector* get_U_vec_xu( size_t const& c ) ;
+      LA_SeqVector* get_U_vec_u( size_t const& c, size_t const dir ) ;
 
        /** @brief Return the schlur complement matrix in x direction */
-      LA_SeqVector* get_U_vec_xv( size_t const& c ) ;      
+      LA_SeqVector* get_U_vec_v( size_t const& c, size_t const dir ) ;      
 
       // Domain Decomposition Functions in y for velocity
 
@@ -160,34 +157,6 @@ class DDS_NavierStokesSystem : public MAC_Object
 
       /** @brief Return the domain decomposition matrices in y direction for velocity */
 
-      LA_SeqVector* get_aii_main_diag_in_y( size_t const& c ) ;
-
-      LA_SeqVector* get_aii_super_diag_in_y( size_t const& c ) ;
-
-      LA_SeqVector* get_aii_sub_diag_in_y( size_t const& c ) ;
-
-      LA_SeqMatrix* get_aie_in_y( size_t const& comp ) ;
-
-      LA_SeqMatrix* get_aei_in_y( size_t const& comp ) ;
-
-       /** @brief Return the Aei*inv(Aii)*Aie product in y direction */
-      LA_SeqMatrix* get_Aei_Aii_Aie_product_in_y( size_t const& comp ) ;
-
-       /** @brief Return the Aee matrix in y */
-      LA_SeqMatrix* get_Aee_matrix_in_y( size_t const& comp ) ;
-
-       /** @brief Return the schlur complement matrix in y direction */
-      LA_SeqMatrix* get_schlur_complement_in_y( size_t const& comp ) ;
-
-
-       /** @brief Return the Aee matrix in x */
-      LA_SeqVector* get_U_vec_yu( size_t const& c ) ;
-
-       /** @brief Return the schlur complement matrix in x direction */
-      LA_SeqVector* get_U_vec_yv( size_t const& c ) ;      
-
-      // Domain Decomposition Functions in z for velocity 
-
       /** @brief Return the local rhs vector in z direction */
       LA_SeqVector* get_local_temp_z( size_t const& comp ) ;
 
@@ -199,36 +168,6 @@ class DDS_NavierStokesSystem : public MAC_Object
 
       /** @brief Return the solution vector for interface unknowns in z direction */
       LA_SeqVector* get_interface_temp_z( size_t const& comp ) ;
-
-      /** @brief Return the domain decomposition matrices in z direction for velocity */
-      LA_SeqMatrix* get_aii_in_z( size_t const& comp ) ;
-
-      LA_SeqVector* get_aii_main_diag_in_z( size_t const& c ) ;
-
-      LA_SeqVector* get_aii_super_diag_in_z( size_t const& c ) ;
-
-      LA_SeqVector* get_aii_sub_diag_in_z( size_t const& c ) ;
-
-      LA_SeqMatrix* get_aie_in_z( size_t const& comp ) ;
-
-      LA_SeqMatrix* get_aei_in_z( size_t const& comp ) ;
-
-       /** @brief Return the Aei*inv(Aii)*Aie product in z direction */
-      LA_SeqMatrix* get_Aei_Aii_Aie_product_in_z( size_t const& comp ) ;
-
-       /** @brief Return the Aee matrix in z */
-      LA_SeqMatrix* get_Aee_matrix_in_z( size_t const& comp ) ;
-
-       /** @brief Return the schlur complement matrix in z direction */
-      LA_SeqMatrix* get_schlur_complement_in_z( size_t const& comp ) ;
-
-
-       /** @brief Return the Aee matrix in x */
-      LA_SeqVector* get_U_vec_zu( size_t const& c ) ;
-
-       /** @brief Return the schlur complement matrix in x direction */
-      LA_SeqVector* get_U_vec_zv( size_t const& c ) ;       
-
 
       // Domain Decomposition Functions in x for pressure
 
@@ -246,24 +185,20 @@ class DDS_NavierStokesSystem : public MAC_Object
 
       /** @brief Return the domain decomposition matrices in x direction for pressure */
 
-      LA_SeqVector* get_aii_main_diag_in_x_P( void ) ;
+      LA_SeqVector* get_aii_main_diag_P( size_t const dir ) ;
+      LA_SeqVector* get_aii_super_diag_P( size_t const dir ) ;
+      LA_SeqVector* get_aii_mod_super_diag_P( size_t const dir ) ;
+      LA_SeqVector* get_aii_sub_diag_P( size_t const dir ) ;
 
-      LA_SeqVector* get_aii_super_diag_in_x_P( void ) ;
+      LA_SeqMatrix* get_aie_P( size_t dir ) ;
+      LA_SeqMatrix* get_aei_P( size_t dir ) ;
+      LA_SeqMatrix* get_Aee_matrix_P( size_t dir ) ;
 
-      LA_SeqVector* get_aii_sub_diag_in_x_P( void ) ;
-
-      LA_SeqMatrix* get_aie_in_x_P( void ) ;
-
-      LA_SeqMatrix* get_aei_in_x_P( void ) ;
-
+      LA_SeqMatrix* get_schlur_complement_P( size_t dir ) ;
        /** @brief Return the Aei*inv(Aii)*Aie product in x direction */
-      LA_SeqMatrix* get_Aei_Aii_Aie_product_in_x_P( void ) ;
-
-       /** @brief Return the Aee matrix in x */
-      LA_SeqMatrix* get_Aee_matrix_in_x_P( void ) ;
-
-       /** @brief Return the schlur complement matrix in x direction */
-      LA_SeqMatrix* get_schlur_complement_in_x_P( void ) ;
+      LA_SeqVector* get_product_result_P( size_t const dir );
+      LA_SeqMatrix* get_Aei_Aii_Aie_product_P( size_t dir ) ;
+      LA_SeqVector* get_Aii_Aie_product_P( size_t dir ) ;
 
        /** @brief Return the Aee matrix in x */
       LA_SeqVector* get_P_vec_xu( void ) ;
@@ -286,28 +221,6 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @brief Return the solution vector for interface unknowns in y direction */
       LA_SeqVector* get_interface_temp_y_P( void ) ;
 
-      /** @brief Return the domain decomposition matrices in y direction for pressure */
-
-      LA_SeqVector* get_aii_main_diag_in_y_P( void ) ;
-
-      LA_SeqVector* get_aii_super_diag_in_y_P( void ) ;
-
-      LA_SeqVector* get_aii_sub_diag_in_y_P( void ) ;
-
-      LA_SeqMatrix* get_aie_in_y_P( void ) ;
-
-      LA_SeqMatrix* get_aei_in_y_P( void ) ;
-
-       /** @brief Return the Aei*inv(Aii)*Aie product in y direction */
-      LA_SeqMatrix* get_Aei_Aii_Aie_product_in_y_P( void ) ;
-
-       /** @brief Return the Aee matrix in y */
-      LA_SeqMatrix* get_Aee_matrix_in_y_P( void ) ;
-
-       /** @brief Return the schlur complement matrix in y direction */
-      LA_SeqMatrix* get_schlur_complement_in_y_P( void ) ;
-
-
        /** @brief Return the Aee matrix in x */
       LA_SeqVector* get_P_vec_yu( void ) ;
 
@@ -328,28 +241,6 @@ class DDS_NavierStokesSystem : public MAC_Object
 
       /** @brief Return the solution vector for interface unknowns in z direction */
       LA_SeqVector* get_interface_temp_z_P( void ) ;
-
-      /** @brief Return the domain decomposition matrices in z direction for pressure */
-
-      LA_SeqVector* get_aii_main_diag_in_z_P( void ) ;
-
-      LA_SeqVector* get_aii_super_diag_in_z_P( void ) ;
-
-      LA_SeqVector* get_aii_sub_diag_in_z_P( void ) ;
-
-      LA_SeqMatrix* get_aie_in_z_P( void ) ;
-
-      LA_SeqMatrix* get_aei_in_z_P( void ) ;
-
-       /** @brief Return the Aei*inv(Aii)*Aie product in z direction */
-      LA_SeqMatrix* get_Aei_Aii_Aie_product_in_z_P( void ) ;
-
-       /** @brief Return the Aee matrix in z */
-      LA_SeqMatrix* get_Aee_matrix_in_z_P( void ) ;
-
-       /** @brief Return the schlur complement matrix in z direction */
-      LA_SeqMatrix* get_schlur_complement_in_z_P( void ) ;
-
 
        /** @brief Return the Aee matrix in x */
       LA_SeqVector* get_P_vec_zu( void ) ;
@@ -507,23 +398,13 @@ class DDS_NavierStokesSystem : public MAC_Object
       //@}
 
       /** @brief Compute the product of Aei*inv(Aii)*Aie in x for Velocity*/
-      void compute_product_matrix_x( size_t const& comp );
+      void compute_product_matrix( size_t const& comp, size_t const dir );
 
-      /** @brief Compute the product of Aei*inv(Aii)*Aie in y for Velocity*/
-      void compute_product_matrix_y(size_t const& comp);
+      void compute_product_matrix_interior(size_t const& comp, size_t const column, size_t const dir);
 
-      /** @brief Compute the product of Aei*inv(Aii)*Aie in z for Velocity*/
-      void compute_product_matrix_z(size_t const& comp);
+      void compute_product_matrix_P( size_t const dir );
 
-      /** @brief Compute the product of Aei*inv(Aii)*Aie in x for Pressure*/
-      void compute_product_matrix_x_P( void );
-
-      /** @brief Compute the product of Aei*inv(Aii)*Aie in y for Pressure*/
-      void compute_product_matrix_y_P( void );
-
-      /** @brief Compute the product of Aei*inv(Aii)*Aie in z for Pressure*/
-      void compute_product_matrix_z_P( void );
-
+      void compute_product_matrix_interior_P(size_t const column, size_t const dir);
       /** @brief Compute the product of Aei*inv(Aii)*Aie in z*/
       double compute_vector_transpose_product(LA_SeqVector* a,LA_SeqVector* b);
 
@@ -538,11 +419,8 @@ class DDS_NavierStokesSystem : public MAC_Object
       static void mod_thomas_algorithm( LA_SeqVector* x,LA_SeqVector* y,LA_SeqVector* z,LA_SeqVector* rhs) ;
 
       /** @brief Compute the modified super diagonal in Aii_x of velocity for thomas algorithm  */
-      void compute_Aii_x_ref(size_t const& comp);
-      /** @brief Compute the modified super diagonal in Aii_y of velocity for thomas algorithm  */
-      void compute_Aii_y_ref(size_t const& comp);
-      /** @brief Compute the modified super diagonal in Aii_z of velocity or thomas algorithm  */
-      void compute_Aii_z_ref(size_t const& comp);
+      void compute_Aii_ref(size_t const& comp, size_t const dir);
+      void compute_Aii_ref_P(size_t const dir);
 
       /** @brief Compute the modified super diagonal in schlur_x of velocity for thomas algorithm  */
       void compute_schlur_x_ref(size_t const& comp);
@@ -551,17 +429,10 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @brief Compute the modified super diagonal in schlur_z of velocity for thomas algorithm  */
       void compute_schlur_z_ref(size_t const& comp);
 
-      /** @brief Compute the modified super diagonal in Aii_x of pressure for thomas algorithm  */
-      void compute_Aii_x_ref_P(void);
       /** @brief Compute the modified super diagonal in Aii_y of pressure for thomas algorithm  */
       void compute_schlur_x_ref_P(void);
-      /** @brief Compute the modified super diagonal in Aii_z of pressure for thomas algorithm  */
-      void compute_Aii_y_ref_P(void);
-
       /** @brief Compute the modified super diagonal in schlur_x of pressure for thomas algorithm  */
       void compute_schlur_y_ref_P(void);
-      /** @brief Compute the modified super diagonal in schlur_y of pressure for thomas algorithm  */
-      void compute_Aii_z_ref_P(void);
       /** @brief Compute the modified super diagonal in schlur_z of pressure for thomas algorithm  */
       void compute_schlur_z_ref_P(void);
 
@@ -874,22 +745,14 @@ class DDS_NavierStokesSystem : public MAC_Object
       size_t nb_comps;
 
       /** Processor positions in x,y,z */
-      size_t proc_pos_in_x;
-      size_t proc_pos_in_y;
-      size_t proc_pos_in_z;
+      size_t proc_pos_in_i[3];
       /** Number of Processors in x,y,z */
-      size_t nb_procs_in_x;
-      size_t nb_procs_in_y;
-      size_t nb_procs_in_z;
+      size_t nb_procs_in_i[3];
 
-      bool U_is_xperiodic;
-      bool U_is_yperiodic;
-      bool U_is_zperiodic;
+      bool is_Uperiodic[3];
       boolVector const* U_periodic_comp;
 
-      bool P_is_xperiodic;
-      bool P_is_yperiodic;
-      bool P_is_zperiodic;
+      bool is_Pperiodic[3];
       boolVector const* P_periodic_comp;
 } ;
 
