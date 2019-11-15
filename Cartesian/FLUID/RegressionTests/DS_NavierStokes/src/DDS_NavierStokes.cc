@@ -289,33 +289,19 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    // Direction splitting
    // Assemble 1D tridiagonal matrices
    assemble_velocity_1D_matrices(t_it);
-   //GLOBAL_EQ->call_compute_LU_decomposition();
 
-   if ( rank_in_i[0] == 0 && nb_ranks_comm_i[0]>1){
-      GLOBAL_EQ->compute_schlur_x_ref_P();
-   }
-   if ( rank_in_i[1] == 0 && nb_ranks_comm_i[1]>1){
-      GLOBAL_EQ->compute_schlur_y_ref_P();
-   }
-   if(dim > 2){
-      if ( rank_in_i[2] == 0 && nb_ranks_comm_i[2]>1){
-        GLOBAL_EQ->compute_schlur_z_ref_P();
+   for (size_t dir = 0; dir < dim; dir++) {
+      if ( rank_in_i[dir] == 0 && nb_ranks_comm_i[dir]>1) {
+         GLOBAL_EQ->compute_schlur_ref_P(dir);
       }
    }
 
-   for(size_t comp = 0;comp<nb_comps;comp++){
-
-      if ( rank_in_i[0] == 0 && nb_ranks_comm_i[0]>1){
-        GLOBAL_EQ->compute_schlur_x_ref(comp);
-       }
-       if ( rank_in_i[1] == 0 && nb_ranks_comm_i[1]>1){
-        GLOBAL_EQ->compute_schlur_y_ref(comp);
-       }
-       if(dim > 2){
-        if ( rank_in_i[2] == 0 && nb_ranks_comm_i[2]>1){
-          GLOBAL_EQ->compute_schlur_z_ref(comp);
-        }
-       }
+   for (size_t comp = 0;comp<nb_comps;comp++) {
+      for (size_t dir = 0; dir < dim; dir++) {
+         if ( rank_in_i[dir] == 0 && nb_ranks_comm_i[dir]>1){
+            GLOBAL_EQ->compute_schlur_ref(comp,dir);
+         }
+      }
    }
 
    allocate_mpi_vectors_U();
@@ -730,84 +716,6 @@ DDS_NavierStokes:: deallocate_mpi_vectors_P( void )
   if(dim == 3)
     delete [] mpi_packed_data_P_z;
 }
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: assemble_velocity_bodyterm_rhs (
-	FV_DiscreteField const* FF,
-	LA_Vector* VEC_rhs )
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL(
-   "DDS_NavierStokes:: assemble_velocity_bodyterm_rhs" ) ;
-
-   if ( my_rank == is_master ) cout << "velocity body term rhs "
-   	<< endl;
-
-   // Parameters
-   double dxC, dyC, dzC, xC, yC, zC, bodyterm = 0. ;
-   size_t center_pos_in_matrix = 0 ;
-
-   for (size_t comp=0;comp<nb_comps;++comp)
-   {
-     // Get local min and max indices
-     size_t_vector min_unknown_index(dim,0);
-     for (size_t l=0;l<dim;++l)
-       min_unknown_index(l) =
-       	FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-     size_t_vector max_unknown_index(dim,0);
-     for (size_t l=0;l<dim;++l)
-       max_unknown_index(l) =
-       	FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-     // Perform assembling
-     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-     {
-       dxC = FF->get_cell_size( i, comp, 0 ) ;
-       xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
-       for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-       {
-
-         dyC = FF->get_cell_size( j, comp, 1 ) ;
-         yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
-
-         if ( dim == 2 )
-	 {
-	   size_t k = 0 ;
-	   bodyterm = 2. * MAC::pi() * MAC::pi() * MAC::sin( MAC::pi() * xC )
-	   	* MAC::sin( MAC::pi() * yC ) / peclet ;
-	   center_pos_in_matrix = FF->DOF_global_number( i, j, k, comp );
-	   VEC_rhs->add_to_item(
-	 	center_pos_in_matrix, bodyterm * dxC * dyC );
-	 }
-	 else
-	 {
-	   for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k)
-	   {
-	     dzC = FF->get_cell_size( k, comp, 2 ) ;
-	     zC = FF->get_DOF_coordinate( k, comp, 2 ) ;
-	     bodyterm = 3. * MAC::pi() * MAC::pi() * MAC::sin( MAC::pi() * xC )
-	   	* MAC::sin( MAC::pi() * yC ) * MAC::sin( MAC::pi() * zC )
-		/ peclet ;
-	     center_pos_in_matrix = FF->DOF_global_number( i, j, k, comp );
-	     VEC_rhs->add_to_item(
-	 	center_pos_in_matrix, bodyterm * dxC * dyC * dzC );
-	   }
-	 }
-       }
-     }
-   }
-
-  // Synchronize vector for parallel usage
-  VEC_rhs->synchronize();
-
-}
-
-
-
 
 //---------------------------------------------------------------------------
 void
@@ -1327,216 +1235,362 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
   size_t_vector max_unknown_index(dim,0);
   // First Equation
 
-    // Get local min and max indices
-    for (size_t l=0;l<dim;++l)
-      min_unknown_index(l) =
-       PF->get_min_index_unknown_on_proc( 0, l ) ;
-    for (size_t l=0;l<dim;++l)
-      max_unknown_index(l) =
-       PF->get_max_index_unknown_on_proc( 0, l ) ;
-    for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-    {
-      for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-      {
-        if(dim ==2 )
-        {
-          k=0;
-          // Set P*_n as sum of P_(n-1/2)+phi_(n-1/2)
-          value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 );
-          PF->set_DOF_value( i, j, k, 0, 1, value);
+  // Get local min and max indices
+  for (size_t l=0;l<dim;++l) {
+     min_unknown_index(l) = PF->get_min_index_unknown_on_proc( 0, l ) ;
+     max_unknown_index(l) = PF->get_max_index_unknown_on_proc( 0, l ) ;
+  }
+
+  for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+     for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+        if (dim == 2) {
+           k=0;
+           // Set P*_n as sum of P_(n-1/2)+phi_(n-1/2)
+           value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 );
+           PF->set_DOF_value( i, j, k, 0, 1, value);
+        } else {
+           for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+              // Set P*_n as sum of P_(n-1/2)+phi_(n-1/2)
+              value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 );
+              PF->set_DOF_value( i, j, k, 0, 1, value);
+           }
         }
-        else
-        {
-          for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
-          {
-            // Set P*_n as sum of P_(n-1/2)+phi_(n-1/2)
-            value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 );
-            PF->set_DOF_value( i, j, k, 0, 1, value);
-          }
-        }
-      }
-    }
-    PF->set_neumann_DOF_values();
-    // What to do for periodic conditions in this function??????????????????
+     }
+  }
+  
+  PF->set_neumann_DOF_values();
+  // What to do for periodic conditions in this function??????????????????
 }
 
+//---------------------------------------------------------------------------
+double
+DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t i, size_t j, size_t k, size_t const dir)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DDS_NavierStokes:: compute_un_component" ) ;
 
+   double xhr,xhl,xright,xleft,yhr,yhl,yright,yleft;
+   double zhr,zhl,zright,zleft, value=0.;
+
+   if (dir == 0) {
+      xhr= UF->get_DOF_coordinate( i+1,comp, 0 ) - UF->get_DOF_coordinate( i, comp, 0 ) ;
+      xhl= UF->get_DOF_coordinate( i, comp, 0 ) - UF->get_DOF_coordinate( i-1, comp, 0 ) ;
+      xright = UF->DOF_value( i+1, j, k, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
+      xleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i-1, j, k, comp, 1 ) ;
+
+      //xvalue = xright/xhr - xleft/xhl;
+      if (UF->DOF_in_domain( i-1, j, k, comp) && UF->DOF_in_domain( i+1, j, k, comp))
+         value = xright/xhr - xleft/xhl;
+      else if (UF->DOF_in_domain( i-1, j, k, comp))
+         value = - xleft/xhl;
+      else
+         value = xright/xhr;
+   } else if (dir == 1) {
+      yhr= UF->get_DOF_coordinate( j+1,comp, 1 ) - UF->get_DOF_coordinate( j, comp, 1 ) ;
+      yhl= UF->get_DOF_coordinate( j, comp, 1 ) - UF->get_DOF_coordinate( j-1, comp, 1 ) ;
+      yright = UF->DOF_value( i, j+1, k, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
+      yleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i, j-1, k, comp, 1 ) ;
+
+      //yvalue = yright/yhr - yleft/yhl;
+      if (UF->DOF_in_domain(i, j-1, k, comp) && UF->DOF_in_domain(i, j+1, k, comp))
+         value = yright/yhr - yleft/yhl;
+      else if(UF->DOF_in_domain(i, j-1, k, comp))
+         value = - yleft/yhl;
+      else
+         value = yright/yhr;
+   } else if (dir == 2) {
+      zhr= UF->get_DOF_coordinate( k+1,comp, 2 ) - UF->get_DOF_coordinate( k, comp, 2 ) ;
+      zhl= UF->get_DOF_coordinate( k, comp, 2 ) - UF->get_DOF_coordinate( k-1, comp, 2 ) ;
+      zright = UF->DOF_value( i, j, k+1, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
+      zleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i, j, k-1, comp, 1 ) ;
+
+      //zvalue = zright/zhr - zleft/zhl;
+      if (UF->DOF_in_domain(i, j, k-1, comp) && UF->DOF_in_domain(i, j, k+1, comp))
+         value = zright/zhr - zleft/zhl;
+      else if(UF->DOF_in_domain(i, j, k-1, comp))
+         value = - zleft/zhl;
+      else
+         value = zright/zhr;
+   }
+
+   return(value);
+
+}
 
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_local_rhs_x ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp)
+DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir)
 //---------------------------------------------------------------------------
 {
-  // Get local min and max indices
+   // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
    size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   for (size_t l=0;l<dim;++l) {
+     min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc(comp,l) ;
+     max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc(comp,l) ;
+   }
 
- size_t i,pos;
- int m;
+   size_t i,pos;
+   int m;
 
-  // Compute VEC_rhs_x = rhs in x
-  double dxC,xhr,xhl,xright,xleft;
-  double fe=0.;
+   // Compute VEC_rhs_x = rhs in x
+   double dC,hr=0,hl=0,right=0,left=0,xC,yC,zC=0;
+   double fe=0.;
 
-  // Vector for fi
-  LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x(comp) ;
+   // Vector for fi
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir) ;
 
-  for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-  {
-    double xvalue=0.;
-    // Get contribution of un
-    xhl= UF->get_DOF_coordinate( i, comp, 0 ) - UF->get_DOF_coordinate( i-1, comp, 0 ) ;
-    xhr= UF->get_DOF_coordinate( i+1,comp, 0 ) - UF->get_DOF_coordinate( i, comp, 0 ) ;
-    xright = UF->DOF_value( i+1, j, k, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
-    xleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i-1, j, k, comp, 1 ) ;
+   for (i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
+     double value=0.;
+     pos = i - min_unknown_index(dir);
 
-    pos = i - min_unknown_index(0);
+     // Get contribution of un
+     hl= UF->get_DOF_coordinate(i,comp,dir) - UF->get_DOF_coordinate(i-1,comp,dir) ;
+     hr= UF->get_DOF_coordinate(i+1,comp,dir) - UF->get_DOF_coordinate(i,comp,dir) ;
 
-    /** Assemble rhs in x for Neumann/Dirichlet BC Conditions */
-    if(UF->DOF_in_domain(i-1, j, k, comp) && UF->DOF_in_domain(i+1, j, k, comp))
-      xvalue = xright/xhr - xleft/xhl;
-    else if(UF->DOF_in_domain(i-1, j, k, comp))
-      xvalue = - xleft/xhl;
-    else
-      xvalue = xright/xhr ;
+     dC = UF->get_cell_size(i,comp,dir)*rho ;
 
-    dxC = UF->get_cell_size( i, comp, 0 ) ;
+     // x direction
+     if (dir == 0) {
+        value = compute_un_component(comp,i,j,k,dir);
+     // y direction
+     } else if (dir == 1) {
+        value = compute_un_component(comp,j,i,k,dir);
+     // z direction
+     } else if (dir == 2) {
+        value = compute_un_component(comp,j,k,i,dir);
+     }
 
-    if(is_Uperiodic[0] == 0){
-      if(rank_in_i[0] == nb_ranks_comm_i[0]-1){
-         local_rhs_x->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dxC)/(t_it -> time_step()) - gamma*xvalue );
+     double temp_val=0.;
+     if (dir == 0) {
+        temp_val = (UF->DOF_value(i,j,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+     } else if (dir == 1) {
+        temp_val = (UF->DOF_value(j,i,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+     } else if (dir == 2) {
+        temp_val = (UF->DOF_value(j,k,i,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+     }
+
+     if (is_Uperiodic[dir] == 0) {
+        if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
+           local_rhs->set_item( pos,temp_val);
+        } else {
+           if (i == max_unknown_index(dir))
+              fe = temp_val;
+           else
+              local_rhs->set_item( pos,temp_val);
+        }
+     } else {
+           if (i == max_unknown_index(dir))
+              fe = temp_val;
+           else
+              local_rhs->set_item( pos,temp_val);
+     }
+
+   }
+
+   // Since, this function is used in all directions; 
+   // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
+   size_t ii=0,jj=0,kk=0;
+
+   // Effect of boundary conditions in case of non-periodic direction
+   m = int(min_unknown_index(dir)) - 1;
+
+   if (dir == 0) {
+      ii = m; jj = j; kk = k;
+   } else if (dir == 1) {
+      ii = j; jj = m; kk = k;
+   } else if (dir == 2) {
+      ii = j; jj = k; kk = m;
+   }
+
+   if ( UF->DOF_in_domain(ii,jj,kk,comp))
+      if ( UF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+         double ai = 1/(UF->get_DOF_coordinate(m+1,comp,dir) - UF->get_DOF_coordinate(m,comp,dir));
+         double dirichlet_value = UF->DOF_value(ii,jj,kk,comp,1) ;
+         local_rhs->add_to_item( 0, + gamma * ai * dirichlet_value );
       }
-      else{
-         if(i == max_unknown_index(0))
-           fe = (UF->DOF_value( i, j, k, comp, 0 )*rho*dxC)/(t_it -> time_step()) - gamma*xvalue;
-         else
-           local_rhs_x->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dxC)/(t_it -> time_step()) - gamma*xvalue );
-      }
-    }
-    else{
-      if(nb_ranks_comm_i[0] > 1){
-         if(i == max_unknown_index(0))
-           fe = (UF->DOF_value( i, j, k, comp, 0 )*rho*dxC)/(t_it -> time_step()) - gamma*xvalue;
-         else
-           local_rhs_x->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dxC)/(t_it -> time_step()) - gamma*xvalue );
-      }
-      else
-        local_rhs_x->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dxC)/(t_it -> time_step()) - gamma*xvalue ); 
-    }
-    
-  }
 
-  m = int(min_unknown_index(0)) - 1;
-  if ( UF->DOF_in_domain( m, j, k, comp ) )
-    if ( UF->DOF_has_imposed_Dirichlet_value( m, j, k, comp ) )
-    {
-      double ai = 1/(UF->get_DOF_coordinate( m+1,comp,0) - UF->get_DOF_coordinate( m,comp,0));
-      double dirichlet_value = UF->DOF_value( m, j, k, comp, 1 ) ;
-      local_rhs_x->add_to_item( 0, + gamma * ai * dirichlet_value );
-    }
+   m = int(max_unknown_index(dir)) + 1;
 
-  m = int(max_unknown_index(0)) + 1;
-  if ( UF->DOF_in_domain( m, j, k, comp ) )
-    if ( UF->DOF_has_imposed_Dirichlet_value( m, j, k, comp ) )
-    {
-      double ai = 1/(UF->get_DOF_coordinate( m,comp,0) - UF->get_DOF_coordinate( m-1,comp,0));
-      double dirichlet_value = UF->DOF_value( m, j, k, comp, 1 ) ;
-      local_rhs_x->add_to_item( local_rhs_x->nb_rows()-1 , + gamma * ai * dirichlet_value );
-    } 
-    return fe;
-}
+   if (dir == 0) {
+      ii = m; jj = j; kk = k;
+   } else if (dir == 1) {
+      ii = j; jj = m; kk = k;
+   } else if (dir == 2) {
+      ii = j; jj = k; kk = m;
+   }
 
+   if ( UF->DOF_in_domain(ii,jj,kk,comp))
+      if ( UF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+      double ai = 1/(UF->get_DOF_coordinate(m,comp,dir) - UF->get_DOF_coordinate(m-1,comp,dir));
+      double dirichlet_value = UF->DOF_value(ii,jj,kk,comp,1) ;
+      local_rhs->add_to_item( local_rhs->nb_rows()-1 , + gamma * ai * dirichlet_value );
+   }
 
-
+   return fe;
+}     
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solve_x_for_secondorder ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it,double * packed_data, size_t const& comp)
+DDS_NavierStokes:: solve_for_secondorder ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it,double * packed_data, size_t const& comp, size_t const dir)
 //---------------------------------------------------------------------------
 {
   // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
    size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   for (size_t l=0;l<dim;++l) {
+      min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+      max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   }
 
-   double fe = assemble_local_rhs_x(j,k,gamma,t_it,comp);
+   double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
 
    // create a replica of local rhs vector in local solution vector
-   LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x(comp) ;
-
-   LA_SeqVector* local_solution_x = GLOBAL_EQ->get_local_solution_temp_x(comp) ;
-   for(size_t i=0;i<local_rhs_x->nb_rows();i++){
-    local_solution_x->set_item(i,local_rhs_x->item(i));
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir) ;
+   LA_SeqVector* local_solution = GLOBAL_EQ->get_local_solution_temp(comp,dir) ;
+   for(size_t i=0;i<local_rhs->nb_rows();i++){
+    local_solution->set_item(i,local_rhs->item(i));
    }
 
    // Solve for xi locally and put it in local solution vector
-   GLOBAL_EQ->DS_NavierStokes_x_local_unknown_solver(local_solution_x,comp);
+   GLOBAL_EQ->DS_NavierStokes_local_unknown_solver(local_solution,comp,dir);
 
-   // if(comp == 0){
-   //    MAC::out()<<"J:"<<j<<endl;
-   //    local_solution_x->print_items(MAC::out(),0); 
-   // }
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(comp,dir);
+   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp(comp,dir);
 
-   LA_SeqMatrix* Aei_x = GLOBAL_EQ-> get_aei(comp,0);
-   LA_SeqVector* Vec_temp_x = GLOBAL_EQ-> get_temp_x(comp);
-
-   for(int i=0;i<Vec_temp_x->nb_rows();i++){
-          Vec_temp_x->set_item(i,0);
+   for(int i=0;i<Vec_temp->nb_rows();i++){
+          Vec_temp->set_item(i,0);
     }
    // Calculate Aei*xi in each proc locally
-   Aei_x->multiply_vec_then_add(local_solution_x,Vec_temp_x);
+   Aei->multiply_vec_then_add(local_solution,Vec_temp);
 
-   // Pack the data
    // Pack the data
    size_t vec_pos;
-   if(dim == 2){
-      vec_pos=j-min_unknown_index(1);
-   }
-   else{
-      vec_pos=(j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
+
+   if (dir == 0) {
+      if (dim == 2) {
+         vec_pos=j-min_unknown_index(1);
+      } else {
+         vec_pos=(j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
+      }
+   } else if (dir == 1) {
+      if (dim == 2) {
+         vec_pos=j-min_unknown_index(0);
+      } else {
+         vec_pos=(j-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(k-min_unknown_index(2));
+      }
+   } else if (dir == 2) {
+      vec_pos=(j-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(k-min_unknown_index(1));
    }
 
-   if(rank_in_i[0] == 0){
-      if(is_Uperiodic[0])
-          packed_data[3*vec_pos+0]=Vec_temp_x->item(nb_ranks_comm_i[0]-1);
+   if(rank_in_i[dir] == 0){
+      if(is_Uperiodic[dir])
+          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[dir]-1);
       else
           packed_data[3*vec_pos+0]=0;
-      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
+      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[dir]);
    }
-   else if(rank_in_i[0] == nb_ranks_comm_i[0]-1){
-      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_i[0]-1);
-      if(is_Uperiodic[0])
-          packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
+   else if(rank_in_i[dir] == nb_ranks_comm_i[dir]-1){
+      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[dir]-1);
+      if(is_Uperiodic[dir])
+          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[dir]);
       else
           packed_data[3*vec_pos+1]=0;
    }
    else{
-      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_i[0]-1);
-      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
+      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[dir]-1);
+      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[dir]);
    }
    packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
    
 
 }
 
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p)
+//---------------------------------------------------------------------------
+{
 
+   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp(comp,dir) ;
+   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp(comp,dir);
 
+   size_t nb_interface_unknowns = Vec_temp->nb_rows();
+
+   for (size_t i=0;i<nb_interface_unknowns;i++) {
+      Vec_temp->set_item(i,0);
+      interface_rhs->set_item(i,0);
+   }
+
+   if (is_Uperiodic[dir])
+      Vec_temp->set_item(nb_ranks_comm_i[dir]-1,packed_data[3*p]);
+   Vec_temp->set_item(0,packed_data[3*p+1]);
+   interface_rhs->set_item(0,packed_data[3*p+2]);
+
+   // Vec_temp might contain previous values
+
+   for (size_t i=1;i<nb_ranks_comm_i[dir];i++) {
+      if (i!=nb_ranks_comm_i[dir]-1) {
+         Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
+         Vec_temp->add_to_item(i,all_received_data[i][3*p+1]);
+         interface_rhs->set_item(i,all_received_data[i][3*p+2]);  // Assemble the interface rhs fe
+      } else {
+         if (is_Uperiodic[dir] ==0) {
+            Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
+         } else{
+            Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
+            // If periodic in x, last proc has an interface unknown
+            Vec_temp->add_to_item(i,all_received_data[i][3*p+1]);
+            interface_rhs->set_item(i,all_received_data[i][3*p+2]);
+         }
+      }
+   }
+
+   for (size_t i=0;i<nb_interface_unknowns;i++) {
+      interface_rhs->set_item(i,interface_rhs->item(i)-Vec_temp->item(i)); // Get fe - Aei*xi to solve for ue
+   }
+
+   // Solve for ue (interface unknowns) in the master proc
+   GLOBAL_EQ->DS_NavierStokes_interface_unknown_solver(interface_rhs,comp,dir);
+
+   for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
+      if (i != nb_ranks_comm_i[dir]-1) {
+         all_send_data[i][2*p+0]=interface_rhs->item(i-1);
+         all_send_data[i][2*p+1]=interface_rhs->item(i);
+      } else {
+         all_send_data[i][2*p+0]=interface_rhs->item(i-1);
+         if (is_Uperiodic[dir])
+            all_send_data[i][2*p+1]=interface_rhs->item(i);
+         else
+            all_send_data[i][2*p+1]=0;
+      }
+   }
+}
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_received_data, double gamma,  FV_TimeIterator const* t_it, size_t const& comp)
+DDS_NavierStokes:: unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p)
+//---------------------------------------------------------------------------
+{
+   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp(comp,dir) ;
+
+   if (rank_in_i[dir] != nb_ranks_comm_i[dir]-1) {
+      interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
+      interface_rhs->set_item(rank_in_i[dir],received_data[2*p+1]);
+   } else {
+      if (is_Uperiodic[dir] ==0) {
+         interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
+      } else {
+         interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
+         interface_rhs->set_item(rank_in_i[dir],received_data[2*p+1]);
+      }
+   }
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: solve_interface_unknowns ( double * packed_data, size_t nb_received_data, double gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const dir)
 //---------------------------------------------------------------------------
 {
    size_t i,j,p;
@@ -1544,1093 +1598,376 @@ DDS_NavierStokes:: solve_interface_unknowns_x ( double * packed_data, size_t nb_
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
    size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   for (size_t l=0;l<dim;++l) {
+      min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+      max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   }
 
    // Vector for fe
-   LA_SeqVector* interface_rhs_x = GLOBAL_EQ->get_interface_temp_x(comp) ;
-   // Vector for fi
-   LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x(comp) ;
+   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp(comp,dir) ;
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir) ;
+   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp(comp,dir);
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(comp,dir);
 
-   LA_SeqVector* Vec_temp_x = GLOBAL_EQ-> get_temp_x(comp);
+   // Array declaration for sending data from master to all slaves
+   double ** all_send_data = new double* [nb_ranks_comm_i[dir]];
+   size_t nb_send_data=0, local_length_j=0, local_length_k=0;
+   size_t local_min_j=0, local_max_j=0;
+   size_t local_min_k=0, local_max_k=0;
 
-   LA_SeqMatrix* Aie_x = GLOBAL_EQ-> get_aie(comp,0);
+   if (dir == 0) {
+      local_min_j = min_unknown_index(1);
+      local_max_j = max_unknown_index(1);
+      if (dim == 3) {
+         local_min_k = min_unknown_index(2);
+         local_max_k = max_unknown_index(2);
+      }
+   } else if (dir == 1) {
+      local_min_j = min_unknown_index(0);
+      local_max_j = max_unknown_index(0);
+      if (dim == 3) {
+         local_min_k = min_unknown_index(2);
+         local_max_k = max_unknown_index(2);
+      }
+   } else if (dir == 2) {
+      local_min_j = min_unknown_index(0);
+      local_max_j = max_unknown_index(0);
+      local_min_k = min_unknown_index(1);
+      local_max_k = max_unknown_index(1);
+   }
 
-   size_t nb_send_data = (nb_received_data*2)/3;
+   local_length_j = (local_max_j-local_min_j+1);
+   local_length_k = (local_max_k-local_min_k+1);
 
-  // Send and receive the data first pass
-   //if ( my_rank == is_master )
-   if ( rank_in_i[0] == 0 )
-   {
-      for (i=1;i<nb_ranks_comm_i[0];++i)
-      //for (i=1;i<nb_procs;++i)
-      {
+   if (dim != 3) {
+      nb_send_data = 2*local_length_j;
+   } else if (dim == 3) {
+      nb_send_data = 2*local_length_j*local_length_k;
+   }
+
+   for (p = 0; p < nb_ranks_comm_i[dir]; ++p) {
+      all_send_data[p] = new double[nb_send_data];
+   }
+
+   if ( rank_in_i[dir] == 0 ) {
+      // Array declaration for receiving data from all slaves
+      double ** all_received_data = new double* [nb_ranks_comm_i[dir]];
+      for(p = 0; p < nb_ranks_comm_i[dir]; ++p) {
+          all_received_data[p] = new double[nb_received_data];
+      }
+	   
+      for (i=1;i<nb_ranks_comm_i[dir];++i) {
         // Receive the data
-        //pelCOMM->receive( i, all_received_data[i], nb_received_data );
         static MPI_Status status;
-        MPI_Recv( all_receive_data_U_x[comp][i], nb_received_data, MPI_DOUBLE, i, 0,
-                          DDS_Comm_i[0], &status ) ;
+        MPI_Recv( all_received_data[i], nb_received_data, MPI_DOUBLE, i, 0,
+                          DDS_Comm_i[dir], &status ) ;
       }
 
       // Solve system of interface unknowns for each y
-      if(dim == 2)
-      {
-        for(j=min_unknown_index(1);j<=max_unknown_index(1);j++){
+      if (dim == 2) {
+	 for (j=local_min_j;j<=local_max_j;j++) {
 
-          size_t nb_interface_unknowns = Vec_temp_x->nb_rows();
-          for(i=0;i<nb_interface_unknowns;i++){
-            Vec_temp_x->set_item(i,0);
-            interface_rhs_x->set_item(i,0);
-          }
-          p = j-min_unknown_index(1);
-          if(is_Uperiodic[0])
-              Vec_temp_x->set_item(nb_ranks_comm_i[0]-1,packed_data[3*p]);
-          Vec_temp_x->set_item(0,packed_data[3*p+1]);
-          interface_rhs_x->set_item(0,packed_data[3*p+2]);
+            p = j-local_min_j;
+  
+            unpack_compute_ue_pack(comp,all_received_data,packed_data,all_send_data,dir,p);
 
-          // Vec_temp might contain previous values
+            // Need to have the original rhs function assembled for corrosponding j,k pair
+            double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
 
-          for(i=1;i<nb_ranks_comm_i[0];i++){
+            // Setup RHS = fi - Aie*xe for solving ui
+            Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
 
-            if(i!=nb_ranks_comm_i[0]-1){
-              Vec_temp_x->add_to_item(i-1,all_receive_data_U_x[comp][i][3*p]);
-              Vec_temp_x->add_to_item(i,all_receive_data_U_x[comp][i][3*p+1]);
-              interface_rhs_x->set_item(i,all_receive_data_U_x[comp][i][3*p+2]);  // Assemble the interface rhs fe
+            // Solve ui and transfer solution into distributed vector
+            GLOBAL_EQ->DS_NavierStokes_solver(j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir);
+         }
+      } else {
+         for (k=local_min_k;k<=local_max_k;k++) {
+            for (j=local_min_j;j<=local_max_j;j++) {
+	      
+	       p = (j-local_min_j)+local_length_j*(k-local_min_k);
+
+               unpack_compute_ue_pack(comp,all_received_data,packed_data,all_send_data,dir,p);
+
+     	       // Need to have the original rhs function assembled for corrosponding j,k pair
+               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
+
+               // Setup RHS = fi - Aie*xe for solving ui
+               Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
+
+               // Solve ui and transfer solution into distributed vector
+               GLOBAL_EQ->DS_NavierStokes_solver(j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir);
             }
-            else{
-              if(is_Uperiodic[0] ==0){
-                  Vec_temp_x->add_to_item(i-1,all_receive_data_U_x[comp][i][3*p]);
-              }
-              else{
-                  Vec_temp_x->add_to_item(i-1,all_receive_data_U_x[comp][i][3*p]);
-                  // If periodic in x, last proc has an interface unknown
-                  Vec_temp_x->add_to_item(i,all_receive_data_U_x[comp][i][3*p+1]);
-                  interface_rhs_x->set_item(i,all_receive_data_U_x[comp][i][3*p+2]);
-              }
-            }
-          }
-
-          for(i=0;i<nb_interface_unknowns;i++){
-          interface_rhs_x->set_item(i,interface_rhs_x->item(i)-Vec_temp_x->item(i)); // Get fe - Aei*xi to solve for ue
-          }
-
-          // Solve for ue (interface unknowns) in the master proc
-          GLOBAL_EQ->DS_NavierStokes_x_interface_unknown_solver(interface_rhs_x,comp);
-
-          // Pack the interface_rhs_x into the appropriate send_data
-          for (i=1;i<nb_ranks_comm_i[0];++i)
-          {
-            if(i!=nb_ranks_comm_i[0]-1){
-              all_send_data_U_x[comp][i][2*p+0]=interface_rhs_x->item(i-1);
-              all_send_data_U_x[comp][i][2*p+1]=interface_rhs_x->item(i);
-            }
-            else{
-              all_send_data_U_x[comp][i][2*p+0]=interface_rhs_x->item(i-1);
-              if(is_Uperiodic[0])
-                all_send_data_U_x[comp][i][2*p+1]=interface_rhs_x->item(i);  
-              else
-                all_send_data_U_x[comp][i][2*p+1]=0;
-            }
-
-          }
-
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = assemble_local_rhs_x(j,k,gamma,t_it,comp);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie_x->multiply_vec_then_add(interface_rhs_x,local_rhs_x,-1.0,1.0);
-
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_x_solver(j,k,min_unknown_index(0),local_rhs_x,interface_rhs_x,comp);
-
-          // if(comp == 0){
-          //   MAC::out()<<"J is"<<j<<endl;
-          //   local_rhs_x->print_items(MAC::out(),0);  
-          // }
-
-          // if(comp == 0)
-          //       MAC::out()<<"x: "<<rank_in_i[0]<<" & y: "<<rank_in_i[1]<<" ,min: "<<local_rhs_x->item(0)<<endl;
-
-        }
-      }
-      else
-      {
-        for(k=min_unknown_index(2);k<=max_unknown_index(2);k++)
-        {
-          for(j=min_unknown_index(1);j<=max_unknown_index(1);j++)
-          {
-            size_t nb_interface_unknowns = Vec_temp_x->nb_rows();
-            for(i=0;i<nb_interface_unknowns;i++){
-              Vec_temp_x->set_item(i,0);
-              interface_rhs_x->set_item(i,0);
-            }
-            p = (j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
-            if(is_Uperiodic[0])
-                Vec_temp_x->set_item(nb_ranks_comm_i[0]-1,packed_data[3*p]);
-            Vec_temp_x->set_item(0,packed_data[3*p+1]);
-            interface_rhs_x->set_item(0,packed_data[3*p+2]);
-
-            // Vec_temp might contain previous values
-
-
-            for(i=1;i<nb_ranks_comm_i[0];i++){
-
-              if(i!=nb_ranks_comm_i[0]-1){
-                Vec_temp_x->add_to_item(i-1,all_receive_data_U_x[comp][i][3*p]);
-                Vec_temp_x->add_to_item(i,all_receive_data_U_x[comp][i][3*p+1]);
-                interface_rhs_x->set_item(i,all_receive_data_U_x[comp][i][3*p+2]);  // Assemble the interface rhs fe
-              }
-              else{
-                if(is_Uperiodic[0] ==0){
-                    Vec_temp_x->add_to_item(i-1,all_receive_data_U_x[comp][i][3*p]);
-                }
-                else{
-                    Vec_temp_x->add_to_item(i-1,all_receive_data_U_x[comp][i][3*p]);
-                    // If periodic in x, last proc has an interface unknown
-                    Vec_temp_x->add_to_item(i,all_receive_data_U_x[comp][i][3*p+1]);
-                    interface_rhs_x->set_item(i,all_receive_data_U_x[comp][i][3*p+2]);
-                }
-              }
-            }
-
-            for(i=0;i<nb_interface_unknowns;i++){
-            interface_rhs_x->set_item(i,interface_rhs_x->item(i)-Vec_temp_x->item(i)); // Get fe - Aei*xi to solve for ue
-            }
-
-
-            // Solve for ue (interface unknowns) in the master proc
-            GLOBAL_EQ->DS_NavierStokes_x_interface_unknown_solver(interface_rhs_x,comp);
-
-            // Pack the interface_rhs_x into the appropriate send_data
-            for (i=1;i<nb_ranks_comm_i[0];++i)
-            {
-              if(i!=nb_ranks_comm_i[0]-1){
-                all_send_data_U_x[comp][i][2*p+0]=interface_rhs_x->item(i-1);
-                all_send_data_U_x[comp][i][2*p+1]=interface_rhs_x->item(i);
-              }
-              else{
-                all_send_data_U_x[comp][i][2*p+0]=interface_rhs_x->item(i-1);
-                if(is_Uperiodic[0])
-                  all_send_data_U_x[comp][i][2*p+1]=interface_rhs_x->item(i);  
-                else
-                  all_send_data_U_x[comp][i][2*p+1]=0;
-              }
-
-            }
-
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = assemble_local_rhs_x(j,k,gamma,t_it,comp);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie_x->multiply_vec_then_add(interface_rhs_x,local_rhs_x,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_x_solver(j,k,min_unknown_index(0),local_rhs_x,interface_rhs_x,comp);
-          }
-        }
+         }
       }
 
+      for (p = 0; p < nb_ranks_comm_i[dir]; ++p) delete [] all_received_data[p];
+      delete [] all_received_data;
 
-    }
-   else
-   {
+   } else {
       // Send the packed data to master
-      //pelCOMM->send( is_master, packed_data, nb_received_data );
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[0] ) ;
+      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
    }
 
    // Send the data from master
-   if ( rank_in_i[0] == 0 )
-   {
-     for (i=1;i<nb_ranks_comm_i[0];++i)
-      {
-        //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_U_x[comp][i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[0] ) ;
+   if ( rank_in_i[dir] == 0 ) {
+      for (i=1;i<nb_ranks_comm_i[dir];++i) {
+        MPI_Send( all_send_data[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[dir] ) ;
       }
-   }
-   else
-   {
+   } else {
       // Receive the data
-
-      //pelCOMM->receive( is_master, received_data, nb_received_data );
       static MPI_Status status ;
-      MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_i[0], &status ) ;
+      MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir], &status ) ;
 
-     // Solve the system of equations in each proc
+      // Solve the system of equations in each proc
 
-     if(dim == 2)
-     {
-        for(j = min_unknown_index(1);j<=max_unknown_index(1);j++)
-        {
-          k=0;
-          p = j-min_unknown_index(1);
-          if(rank_in_i[0] != nb_ranks_comm_i[0]-1){
-            interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-            interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
-          }
-          else{
-            if(is_Uperiodic[0] ==0){
-              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-            }
-            else{
-              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-              interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
-            }
-          }
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = assemble_local_rhs_x(j,k,gamma,t_it,comp);
+      if (dim == 2) {
+         for (j = local_min_j;j<=local_max_j;j++) {
+            k=0;
+            p = j-local_min_j;
 
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie_x->multiply_vec_then_add(interface_rhs_x,local_rhs_x,-1.0,1.0);
+	    unpack_ue(comp,packed_data,dir,p);
 
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_x_solver(j,k,min_unknown_index(0),local_rhs_x,interface_rhs_x,comp);
-
-          // if(comp == 0)
-          //       MAC::out()<<"x: "<<rank_in_i[0]<<" & y: "<<rank_in_i[1]<<" ,max: "<<interface_rhs_x->item(1)<<endl;
-
-        }
-     }
-     else
-     {
-        for(k = min_unknown_index(2);k<=max_unknown_index(2);k++)
-        {
-          for(j = min_unknown_index(1);j<=max_unknown_index(1);j++)
-          {
-            p = (j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
-            if(rank_in_i[0] != nb_ranks_comm_i[0]-1){
-              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-              interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
-            }
-            else{
-              if(is_Uperiodic[0] ==0){
-                interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-              }
-              else{
-                interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-                interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
-              }
-            }
-            // Need to have the original rhs function assembled for corrosponding j,k pair
-            double fe = assemble_local_rhs_x(j,k,gamma,t_it,comp);
+  	    // Need to have the original rhs function assembled for corrosponding j,k pair
+            double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
 
             // Setup RHS = fi - Aie*xe for solving ui
-            Aie_x->multiply_vec_then_add(interface_rhs_x,local_rhs_x,-1.0,1.0);
+            Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
 
             // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_x_solver(j,k,min_unknown_index(0),local_rhs_x,interface_rhs_x,comp);
-          }
+            GLOBAL_EQ->DS_NavierStokes_solver(j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir);
+         }
+      } else {
+         for (k = local_min_k;k<=local_max_k;k++) {
+            for (j = local_min_j;j<=local_max_j;j++) {
+               p = (j-local_min_j)+local_length_j*(k-local_min_k);
+   
+	       unpack_ue(comp,packed_data,dir,p);
 
-        }
-     }
+   	       // Need to have the original rhs function assembled for corrosponding j,k pair
+               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
 
+               // Setup RHS = fi - Aie*xe for solving ui
+               Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
+
+               // Solve ui and transfer solution into distributed vector
+               GLOBAL_EQ->DS_NavierStokes_solver(j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir);
+            }
+         }
+      }
    }
+
+   for (p = 0; p < nb_ranks_comm_i[dir]; ++p) delete [] all_send_data[p];
+   delete [] all_send_data;
+
 }
-
-
-
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_local_rhs_y ( size_t const& i, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp )
+DDS_NavierStokes:: compute_p_component ( size_t const& comp, size_t i, size_t j, size_t k)
 //---------------------------------------------------------------------------
 {
-  // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   MAC_LABEL("DDS_NavierStokes:: compute_p_component" ) ;
+   FV_SHIFT_TRIPLET shift ;
+   double value=0.;
 
-size_t j,pos;
-int m;
+   // Here we use shift_staggeredToStaggered to shitf centered to staggered
+   // for the following reason: the ith component of UU is staggered with the 
+   // centered field only in the ith direction, which shares its ith location 
+   // with the non-ith components of the velocity field
+   // Example: 
+   // For ux, it is staggered with the centered field tf in the x
+   // direction only, in the y & z direction, ux and tf have the same location
+   // Now, in the x direction, tf is located at the same x position as uy and
+   // uz and hence the shift_staggeredToStaggered can be used for tf
+   // When interpolating a centered field to a staggered field, we use 
+   // shift_staggeredToStaggered for each ith component and consider the ith 
+   // shift in the ith direction only, i.e.:
+   // * for ux, use shift_staggeredToStaggered(0) and shift in the x direction
+   // with shift.i (the xth component of the shift) only
+   // * for uy, use shift_staggeredToStaggered(1) and shift in the y direction
+   // with shift.j (the yth component of the shift) only
+   // * for uz, use shift_staggeredToStaggered(2) and shift in the z direction
+   // with shift.k (the zth component of the shift) only    
+   shift = UF->shift_staggeredToStaggered( comp ) ;
 
-// Compute VEC_rhs_x = rhs in x
-double dyC,yhr,yhl,yright,yleft;
-double fe=0.;
+   double dxC = UF->get_cell_size( i, comp, 0 ) ;
+   double dyC = UF->get_cell_size( j, comp, 1 ) ;
 
- // Vector for fi
-LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp) ;
+   if (dim == 2) {
+      if (comp == 0) {
+         value = (PF->DOF_value( shift.i+i, j, 0, 0, 1 ) - PF->DOF_value( shift.i+i-1, j, 0, 0, 1 ))*dyC;
+      } else {
+         value = (PF->DOF_value( i, shift.j+j, 0, 0, 1 ) - PF->DOF_value( i, shift.j+j-1, 0, 0, 1 ))*dxC;
+      }
+   } else if (dim == 3) {
+      double dzC = UF->get_cell_size( k, comp, 2 ) ;
+      if (comp == 0) {
+         value = (PF->DOF_value( shift.i+i, j, k, 0, 1 ) - PF->DOF_value( shift.i+i-1, j, k, 0, 1 ))*dyC*dzC;
+      } else if(comp==1) {
+         value = (PF->DOF_value( i, shift.j+j, k, 0, 1 ) - PF->DOF_value( i, shift.j+j-1, k, 0, 1 ))*dxC*dzC;
+      } else {
+         value = (PF->DOF_value( i, j, shift.k+k, 0, 1 ) - PF->DOF_value( i, j, shift.k+k-1, 0, 1 ))*dxC*dyC;
+      }
+   }
+   return(value);
+}
 
- // Compute VEC_rhs_y = rhs in y
- for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
- {
-   double yvalue=0.;
+//---------------------------------------------------------------------------
+double
+DDS_NavierStokes:: compute_adv_component ( size_t const& comp, size_t i, size_t j, size_t k)
+//---------------------------------------------------------------------------
+{
+   double ugradu = 0., value = 0.;
 
-   yhr= UF->get_DOF_coordinate( j+1,comp, 1 ) - UF->get_DOF_coordinate( j, comp, 1 ) ;
-   yhl= UF->get_DOF_coordinate( j, comp, 1 ) - UF->get_DOF_coordinate( j-1, comp, 1 ) ;
-   yright = UF->DOF_value( i, j+1, k, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
-   yleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i, j-1, k, comp, 1 ) ;
-
-   pos = j - min_unknown_index(1);
-
-   /** Assemble rhs in y for Neumann/Dirichlet BC Conditions */
-   if(UF->DOF_in_domain(i, j-1, k, comp) && UF->DOF_in_domain(i, j+1, k, comp))
-     yvalue = yright/yhr - yleft/yhl;
-   else if(UF->DOF_in_domain(i, j-1, k, comp))
-     yvalue = - yleft/yhl;
+   if ( AdvectionScheme == "TVD" )
+      ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp);
    else
-     yvalue = yright/yhr;
+      ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp);
 
-   dyC = UF->get_cell_size( j, comp, 1 ) ;
-
-   if(is_Uperiodic[1] == 0){
-      if(rank_in_i[1] == nb_ranks_comm_i[1]-1){
-         local_rhs_y->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dyC)/(t_it -> time_step()) - gamma*yvalue );
-       }
-       else{
-         if(j == max_unknown_index(1))
-           fe = (UF->DOF_value( i, j, k, comp, 0 )*rho*dyC)/(t_it -> time_step()) - gamma*yvalue ;
-         else
-           local_rhs_y->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dyC)/(t_it -> time_step()) - gamma*yvalue );
-       }
-   }
-   else{
-      if(nb_ranks_comm_i[1] > 1){
-         if(j == max_unknown_index(1))
-           fe = (UF->DOF_value( i, j, k, comp, 0 )*rho*dyC)/(t_it -> time_step()) - gamma*yvalue ;
-         else
-           local_rhs_y->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dyC)/(t_it -> time_step()) - gamma*yvalue );
-      }
-      else
-        local_rhs_y->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dyC)/(t_it -> time_step()) - gamma*yvalue );
-   }
-   
- }
-
- m = int(min_unknown_index(1)) - 1;
- if ( UF->DOF_in_domain( i, m, k, comp ) )
-   if ( UF->DOF_has_imposed_Dirichlet_value( i, m, k, comp ) )
-   {
-     double ai = 1/(UF->get_DOF_coordinate( m+1,comp,1) - UF->get_DOF_coordinate( m,comp,1));
-     double dirichlet_value = UF->DOF_value( i, m, k, comp, 1 ) ;
-     local_rhs_y->add_to_item( 0, + gamma * ai * dirichlet_value );
+   if ( AdvectionTimeAccuracy == 1 ) {
+      value = ugradu;
+   } else {
+      value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
+      UF->set_DOF_value(i,j,k,comp,2,ugradu);
    }
 
- m = int(max_unknown_index(1)) + 1;
- if ( UF->DOF_in_domain( i, m, k, comp ) )
-   if ( UF->DOF_has_imposed_Dirichlet_value( i, m, k, comp ) )
-   {
-     double ai = 1/(UF->get_DOF_coordinate( m,comp,1) - UF->get_DOF_coordinate( m-1,comp,1));
-     double dirichlet_value = UF->DOF_value( i, m, k, comp, 1 ) ;
-     local_rhs_y->add_to_item( local_rhs_y->nb_rows()-1, + gamma * ai * dirichlet_value );
-   }
+   return(value);
 
-  return fe;
 }
-
-
-
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solve_y_for_secondorder ( size_t const& i, size_t const& k, double gamma, FV_TimeIterator const* t_it,double * packed_data, size_t const& comp )
+DDS_NavierStokes:: assemble_DS_un_at_rhs (
+        FV_TimeIterator const* t_it, double const gamma)
 //---------------------------------------------------------------------------
 {
-  // Get local min and max indices
+
+   size_t i, j, k;
+
+   double dxC,xC,dyC,yC,dzC,zC;
+   double pvalue =0., xvalue=0.,yvalue=0.,zvalue=0.,rhs=0.,bodyterm=0.,adv_value = 0.;
+   int cpp=-1;
+
+   // Periodic pressure gradient
+   if ( UF->primary_grid()->is_periodic_flow() ) {
+      cpp = UF->primary_grid()->get_periodic_flow_direction() ;
+      bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
+               ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
+               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
+   }
+
    size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
    size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
 
-   double fe = assemble_local_rhs_y(i,k,gamma,t_it,comp);
-
-   size_t j;
-   // create a replica of local rhs vector in local solution vector
-   LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp) ;
-
-   LA_SeqVector* local_solution_y = GLOBAL_EQ->get_local_solution_temp_y(comp) ;
-   for(j=0;j<local_rhs_y->nb_rows();j++){
-    local_solution_y->set_item(j,local_rhs_y->item(j));
-   }
-
-   // Solve for xi locally and put it in local solution vector
-   GLOBAL_EQ->DS_NavierStokes_y_local_unknown_solver(local_solution_y,comp);
-
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(comp,1);
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_y(comp);
-
-   for(j=0;j<Vec_temp->nb_rows();j++){
-          Vec_temp->set_item(j,0);
-    }
-   // Calculate Aei*xi in each proc locally
-   Aei->multiply_vec_then_add(local_solution_y,Vec_temp);
-
-   size_t vec_pos;
-   if(dim == 2){
-      vec_pos=i-min_unknown_index(0);
-   }
-   else{
-      vec_pos=(k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
-   }
-
-   if(rank_in_i[1] == 0){
-    // Check if bc is periodic in x
-     // If it is, we need to pack two elements apart from fe
-
-      if(is_Uperiodic[1])
-          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[1]-1);
-      else
-          packed_data[3*vec_pos+0]=0;
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
-    }
-    else if(rank_in_i[1] == nb_ranks_comm_i[1]-1){
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[1]-1);
-      // Check if bc is periodic in x
-      // If it is, we need to pack two elements apart from fe
-      if(is_Uperiodic[1])
-          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
-      else
-          packed_data[3*vec_pos+1]=0;
-    }
-    else{
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[1]-1);
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
-    }
-    packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: solve_interface_unknowns_y ( double * packed_data, size_t nb_received_data, double gamma,  FV_TimeIterator const* t_it, size_t const& comp  )
-//---------------------------------------------------------------------------
-{
-   size_t i,j,p;
-   size_t k =0;
-
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-   // Vector for fe
-   LA_SeqVector* interface_rhs_y = GLOBAL_EQ->get_interface_temp_y(comp) ;
-   // Vector for fi
-   LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp);
-
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_y(comp);
-
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(comp,1);
-
-   size_t nb_send_data = (nb_received_data*2)/3;
-
-  // Send and receive the data first pass
-   if ( rank_in_i[1] == 0 )
-   {
-      for (i=1;i<nb_ranks_comm_i[1];++i)
-      {
-        // Receive the data
-        //pelCOMM->receive( i, all_received_data[i], nb_received_data );
-        static MPI_Status status ;
-        MPI_Recv( all_receive_data_U_y[comp][i], nb_received_data, MPI_DOUBLE, i, 0,
-                          DDS_Comm_i[1], &status ) ;
+   for (size_t comp=0;comp<nb_comps;comp++) {
+      // Get local min and max indices
+      for (size_t l=0;l<dim;++l) {
+         min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+         max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
       }
 
-      // Solve system of interface unknowns for each x
-      if(dim == 2)
-      {
-        for(i=min_unknown_index(0);i<=max_unknown_index(0);i++)
-        {
-          size_t nb_interface_unknowns = Vec_temp->nb_rows();
-          for(j=0;j<nb_interface_unknowns;j++){
-            Vec_temp->set_item(j,0);
-            interface_rhs_y->set_item(j,0);
-          }
-          p = i-min_unknown_index(0);
-          if(is_Uperiodic[1])
-              Vec_temp->set_item(nb_ranks_comm_i[1]-1,packed_data[3*p]);
-          Vec_temp->set_item(0,packed_data[3*p+1]);
-          interface_rhs_y->set_item(0,packed_data[3*p+2]);
-
-          // Vec_temp might contain previous values
-
-          for(j=1;j<nb_ranks_comm_i[1];j++){
-
-            if(j!=nb_ranks_comm_i[1]-1){
-              Vec_temp->add_to_item(j-1,all_receive_data_U_y[comp][j][3*p]);
-              Vec_temp->add_to_item(j,all_receive_data_U_y[comp][j][3*p+1]);
-              interface_rhs_y->set_item(j,all_receive_data_U_y[comp][j][3*p+2]);  // Assemble the interface rhs fe
-            }
-            else{
-              if(is_Uperiodic[1] ==0){
-                  Vec_temp->add_to_item(j-1,all_receive_data_U_y[comp][j][3*p]);
-              }
-              else{
-                  // If periodic in y, last proc has an interface unknown
-                  Vec_temp->add_to_item(j-1,all_receive_data_U_y[comp][j][3*p]);
-                  Vec_temp->add_to_item(j,all_receive_data_U_y[comp][j][3*p+1]);
-                  interface_rhs_y->set_item(j,all_receive_data_U_y[comp][j][3*p+2]);
-              }
-            }
-          }
-
-          for(j=0;j<nb_interface_unknowns;j++){
-          interface_rhs_y->set_item(j,interface_rhs_y->item(j)-Vec_temp->item(j)); // Get fe - Aei*xi to solve for ue
-          }
-
-          // Solve for ue (interface unknowns) in the master proc
-          GLOBAL_EQ->DS_NavierStokes_y_interface_unknown_solver(interface_rhs_y,comp);
-
-          //if(p==0 && rank_in_i[0] == 1)
-          //  interface_rhs_y->print_items(MAC::out(),0);
-
-          // Pack the interface_rhs_x into the appropriate send_data
-          for (j=1;j<nb_ranks_comm_i[1];++j)
-          {
-            if(j!=nb_ranks_comm_i[1]-1){
-              all_send_data_U_y[comp][j][2*p+0]=interface_rhs_y->item(j-1);
-              all_send_data_U_y[comp][j][2*p+1]=interface_rhs_y->item(j);
-            }
-            else{
-              all_send_data_U_y[comp][j][2*p+0]=interface_rhs_y->item(j-1);
-              if(is_Uperiodic[1])
-                all_send_data_U_y[comp][j][2*p+1]=interface_rhs_y->item(j); 
-              else
-                all_send_data_U_y[comp][j][2*p+1]=0;
-            }
-
-          }
-
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = assemble_local_rhs_y(i,k,gamma,t_it,comp);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie->multiply_vec_then_add(interface_rhs_y,local_rhs_y,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_y_solver(i,k,min_unknown_index(1),local_rhs_y,interface_rhs_y,comp);
-
+      for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+         // Compute VEC_rhs_x = rhs in x
+         dxC = UF->get_cell_size( i, comp, 0 ) ;
+         xC = UF->get_DOF_coordinate( i, comp, 0 ) ;
+         for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+            dyC = UF->get_cell_size( j, comp, 1 ) ;
+            yC = UF->get_DOF_coordinate( j, comp, 1 ) ;
+            if (dim ==2 ) {
+               k=0;
+               // Dxx for un
+               xvalue = compute_un_component(comp,i,j,k,0);
+               // Dyy for un
+               yvalue = compute_un_component(comp,i,j,k,1);
+               // Pressure contribution
+	       pvalue = compute_p_component(comp,i,j,k);
+               // Advection contribution
+	       adv_value = compute_adv_component(comp,i,j,k);
           
+               rhs = gamma*(xvalue*dyC + yvalue*dxC) - pvalue - adv_value
+                   + (UF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*rho)/(t_it -> time_step());
 
-        }
+               if ( cpp >= 0 && cpp==comp ) rhs += - bodyterm*dxC*dyC;  
+
+               UF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC*rho));
+            } else {
+               for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+                  dzC = UF->get_cell_size( k, comp, 2 ) ;
+                  zC = UF->get_DOF_coordinate( k, comp, 2 ) ;
+                  // Dxx for un
+                  xvalue = compute_un_component(comp,i,j,k,0);
+                  // Dyy for un
+                  yvalue = compute_un_component(comp,i,j,k,1);
+                  // Dzz for un
+                  zvalue = compute_un_component(comp,i,j,k,2);
+                  // Pressure contribution
+                  pvalue = compute_p_component(comp,i,j,k);
+                  // Advection contribution
+                  adv_value = compute_adv_component(comp,i,j,k);
+
+                  rhs = gamma*(xvalue*dyC*dzC + yvalue*dxC*dzC + zvalue*dxC*dyC) - pvalue - adv_value + (UF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC*rho)/(t_it -> time_step());
+
+                  if ( cpp >= 0 && cpp==comp ) rhs += - bodyterm*dxC*dyC*dzC;
+
+		  UF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC*dzC*rho));
+               }
+            }
+         }
       }
-      else{
-        for(i=min_unknown_index(0);i<=max_unknown_index(0);i++)
-        {
-          for(k=min_unknown_index(2);k<=max_unknown_index(2);k++)
-          { 
-            size_t nb_interface_unknowns = Vec_temp->nb_rows();
-            for(j=0;j<nb_interface_unknowns;j++){
-              Vec_temp->set_item(j,0);
-              interface_rhs_y->set_item(j,0);
-            }
-            p = (k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
-            if(is_Uperiodic[1])
-                Vec_temp->set_item(nb_ranks_comm_i[1]-1,packed_data[3*p]);
-            Vec_temp->set_item(0,packed_data[3*p+1]);
-            interface_rhs_y->set_item(0,packed_data[3*p+2]);
-
-            // Vec_temp might contain previous values
-
-            for(j=1;j<nb_ranks_comm_i[1];j++){
-
-              if(j!=nb_ranks_comm_i[1]-1){
-                Vec_temp->add_to_item(j-1,all_receive_data_U_y[comp][j][3*p]);
-                Vec_temp->add_to_item(j,all_receive_data_U_y[comp][j][3*p+1]);
-                interface_rhs_y->set_item(j,all_receive_data_U_y[comp][j][3*p+2]);  // Assemble the interface rhs fe
-              }
-              else{
-                if(is_Uperiodic[1] == 0){
-                  Vec_temp->add_to_item(j-1,all_receive_data_U_y[comp][j][3*p]);
-                }
-                else{
-                  Vec_temp->add_to_item(j-1,all_receive_data_U_y[comp][j][3*p]);
-                  Vec_temp->add_to_item(j,all_receive_data_U_y[comp][j][3*p+1]);
-                  interface_rhs_y->set_item(j,all_receive_data_U_y[comp][j][3*p+2]);
-                }
-              }
-            }
-
-            for(j=0;j<nb_interface_unknowns;j++){
-            interface_rhs_y->set_item(j,interface_rhs_y->item(j)-Vec_temp->item(j)); // Get fe - Aei*xi to solve for ue
-            }
-
-            // Solve for ue (interface unknowns) in the master proc
-            GLOBAL_EQ->DS_NavierStokes_y_interface_unknown_solver(interface_rhs_y,comp);
-
-            //if(p==0 && rank_in_i[0] == 1)
-            //  interface_rhs_y->print_items(MAC::out(),0);
-
-            // Pack the interface_rhs_x into the appropriate send_data
-            for (j=1;j<nb_ranks_comm_i[1];++j)
-            {
-              if(j!=nb_ranks_comm_i[1]-1){
-                all_send_data_U_y[comp][j][2*p+0]=interface_rhs_y->item(j-1);
-                all_send_data_U_y[comp][j][2*p+1]=interface_rhs_y->item(j);
-              }
-              else{
-                all_send_data_U_y[comp][j][2*p+0]=interface_rhs_y->item(j-1);
-                if(is_Uperiodic[1])
-                  all_send_data_U_y[comp][j][2*p+1]=interface_rhs_y->item(j);
-                else
-                  all_send_data_U_y[comp][j][2*p+1]=0;
-              }
-
-            }
-
-            // Need to have the original rhs function assembled for corrosponding j,k pair
-            double fe = assemble_local_rhs_y(i,k,gamma,t_it,comp);
-
-            // Setup RHS = fi - Aie*xe for solving ui
-            Aie->multiply_vec_then_add(interface_rhs_y,local_rhs_y,-1.0,1.0);
-
-            // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_y_solver(i,k,min_unknown_index(1),local_rhs_y,interface_rhs_y,comp);
-
-          }
-        }
-      }
-
-    }
-   else
-   {
-      // Send the packed data to master
-      //pelCOMM->send( is_master, packed_data, nb_received_data );
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[1] ) ;
-   }
-   // Send the data from master
-   if ( rank_in_i[1] == 0 )
-   {
-     for (i=1;i<nb_ranks_comm_i[1];++i)
-      {
-        //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_U_y[comp][i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[1] ) ;
-      }
-   }
-   else
-   {
-      // Receive the data
-      //pelCOMM->receive( is_master, received_data, nb_received_data );
-      static MPI_Status status ;
-      MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_i[1], &status ) ;
-
-     // Solve the system of equations in each proc
-
-     if(dim == 2)
-     {
-        for(i = min_unknown_index(0);i<=max_unknown_index(0);i++)
-        {
-          p = i-min_unknown_index(0);
-
-          if(rank_in_i[1] != nb_ranks_comm_i[1]-1){
-            interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-            interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
-          }
-          else{
-            if(is_Uperiodic[1] ==0){
-              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-            }
-            else{
-              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-              interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
-            }
-          }
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = assemble_local_rhs_y(i,k,gamma,t_it,comp);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie->multiply_vec_then_add(interface_rhs_y,local_rhs_y,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_y_solver(i,k,min_unknown_index(1),local_rhs_y,interface_rhs_y,comp);
-
-
-        }
-     }
-     else
-     {
-        for(i = min_unknown_index(0);i<=max_unknown_index(0);i++)
-        {
-          for(k = min_unknown_index(2);k<=max_unknown_index(2);k++)
-          {
-            p = (k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
-            if(rank_in_i[1] != nb_ranks_comm_i[1]-1){
-              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-              interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
-            }
-            else{
-              if(is_Uperiodic[1] ==0){
-                interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-              }
-              else{
-                interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-                interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
-              }
-            }
-            // Need to have the original rhs function assembled for corrosponding j,k pair
-            double fe = assemble_local_rhs_y(i,k,gamma,t_it,comp);
-
-            // Setup RHS = fi - Aie*xe for solving ui
-            Aie->multiply_vec_then_add(interface_rhs_y,local_rhs_y,-1.0,1.0);
-
-            // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_y_solver(i,k,min_unknown_index(1),local_rhs_y,interface_rhs_y,comp);
-          }
-        }
-     }
-
    }
 }
-
-
-
-
-//---------------------------------------------------------------------------
-double
-DDS_NavierStokes:: assemble_local_rhs_z ( size_t const& i, size_t const& j, double gamma, FV_TimeIterator const* t_it, size_t const& comp )
-//---------------------------------------------------------------------------
-{
-  // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-size_t k,pos;
-int m;
-
-
-double dzC,zhr,zhl,zright,zleft;
-double fe=0.;
-
-// Vector for fi
-LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z(comp);
-
- // Compute VEC_rhs_z = rhs in z
- for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
- {
-   double zvalue=0.;
-
-   zhr= UF->get_DOF_coordinate( k+1,comp, 2 ) - UF->get_DOF_coordinate( k, comp, 2 ) ;
-   zhl= UF->get_DOF_coordinate( k, comp, 2 ) - UF->get_DOF_coordinate( k-1, comp, 2 ) ;
-   zright = UF->DOF_value( i, j, k+1, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
-   zleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i, j, k-1, comp, 1 ) ;
-
-   /** Assemble rhs in z for Neumann/Dirichlet BC Conditions */
-   if(UF->DOF_in_domain(i, j, k-1, comp) && UF->DOF_in_domain(i, j, k+1, comp))
-     zvalue = zright/zhr - zleft/zhl;
-   else if(UF->DOF_in_domain(i, j, k-1, comp))
-     zvalue = - zleft/zhl;
-   else
-     zvalue = zright/zhr;
-
-   dzC = UF->get_cell_size( k, comp, 2 ) ;
-
-   pos = k - min_unknown_index(2);
-   if(is_Uperiodic[2] == 0){
-      if(rank_in_i[2] == nb_ranks_comm_i[2]-1){
-        local_rhs_z->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dzC)/(t_it -> time_step()) - gamma*zvalue );
-      }
-      else{
-         if(k == max_unknown_index(2))
-           fe = (UF->DOF_value( i, j, k, comp, 0 )*rho*dzC)/(t_it -> time_step()) - gamma*zvalue ;
-         else
-           local_rhs_z->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dzC)/(t_it -> time_step()) - gamma*zvalue );
-      }
-   }
-   else{
-      if(nb_ranks_comm_i[2] > 1){
-        if(k == max_unknown_index(2))
-           fe = (UF->DOF_value( i, j, k, comp, 0 )*rho*dzC)/(t_it -> time_step()) - gamma*zvalue ;
-        else
-           local_rhs_z->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dzC)/(t_it -> time_step()) - gamma*zvalue );
-      }
-      else
-        local_rhs_z->set_item( pos, (UF->DOF_value( i, j, k, comp, 0 )*rho*dzC)/(t_it -> time_step()) - gamma*zvalue );
-   }
-
-    
- }
-
- m = int(min_unknown_index(2)) - 1;
- if ( UF->DOF_in_domain( i, j, m, comp ) )
-   if ( UF->DOF_has_imposed_Dirichlet_value( i, j, m, comp ) )
-   {
-     double ai = 1/(UF->get_DOF_coordinate( m+1,comp,2) - UF->get_DOF_coordinate( m,comp,2));
-     double dirichlet_value = UF->DOF_value( i, j, m, comp, 1 ) ;
-     local_rhs_z->add_to_item( 0, + gamma * ai * dirichlet_value );
-   }
-
- m = int(max_unknown_index(2)) + 1;
- if ( UF->DOF_in_domain( i, j, m, comp ) )
-   if ( UF->DOF_has_imposed_Dirichlet_value( i, j, m, comp ) )
-   {
-     double ai = 1/(UF->get_DOF_coordinate( m,comp,2) - UF->get_DOF_coordinate( m-1,comp,2));
-     double dirichlet_value = UF->DOF_value( i, j, m, comp, 1 ) ;
-     local_rhs_z->add_to_item( local_rhs_z->nb_rows()-1, + gamma * ai * dirichlet_value );
-   }
-
-return fe;
-}
-
-
-
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solve_z_for_secondorder ( size_t const& i, size_t const& j, double gamma, FV_TimeIterator const* t_it,double * packed_data, size_t const& comp )
+DDS_NavierStokes:: SolveU_i_in_jk ( FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, size_t const gamma )
 //---------------------------------------------------------------------------
 {
-  // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
 
-   double fe = assemble_local_rhs_z(i,j,gamma,t_it,comp);
+  for (size_t comp=0;comp<nb_comps;comp++) {
+     // Get local min and max indices
+     for (size_t l=0;l<dim;++l) {
+        min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+     }
 
-   size_t k;
-   // create a replica of local rhs vector in local solution vector
-   LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z(comp) ;
+     size_t local_min_k = 0;
+     size_t local_max_k = 0;
 
-   LA_SeqVector* local_solution_z = GLOBAL_EQ->get_local_solution_temp_z(comp) ;
-   for(k=0;k<local_rhs_z->nb_rows();k++){
-    local_solution_z->set_item(k,local_rhs_z->item(k));
-   }
+     size_t nb_send_data=0;
+     if (dim == 2) {
+        nb_send_data = 3*(max_unknown_index(dir_j)-min_unknown_index(dir_j)+1);
+     } else if (dim == 3) {
+        nb_send_data = 3*(max_unknown_index(dir_j)-min_unknown_index(dir_j)+1)*(max_unknown_index(dir_k)-min_unknown_index(dir_k)+1);
+        local_min_k = min_unknown_index(dir_k);
+        local_max_k = max_unknown_index(dir_k);
+     }
 
-   // Solve for xi locally and put it in local solution vector
-   GLOBAL_EQ->DS_NavierStokes_z_local_unknown_solver(local_solution_z,comp);
+     double * packed_data = new double[nb_send_data];
 
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(comp,2);
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_z(comp);
-
-   for(k=0;k<Vec_temp->nb_rows();k++){
-          Vec_temp->set_item(k,0);
-    }
-   // Calculate Aei*xi in each proc locally
-   Aei->multiply_vec_then_add(local_solution_z,Vec_temp);
-
-
-    size_t vec_pos=(i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
-
-    if(rank_in_i[2] == 0){
-      // Check if bc is periodic in x
-     // If it is, we need to pack two elements apart from fe
-
-      if(is_Uperiodic[2])
-          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[2]-1);
-      else
-          packed_data[3*vec_pos+0]=0;
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
-    }
-    else if(rank_in_i[2] == nb_ranks_comm_i[2]-1){
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[2]-1);
-      // Check if bc is periodic in x
-      // If it is, we need to pack two elements apart from fe
-      if(is_Uperiodic[2])
-          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
-      else
-          packed_data[3*vec_pos+1]=0;
-    }
-    else{
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[2]-1);
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
-    }
-    packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: solve_interface_unknowns_z ( double * packed_data, size_t nb_received_data, double gamma,  FV_TimeIterator const* t_it, size_t const& comp  )
-//---------------------------------------------------------------------------
-{
-   size_t i,j,p,m;
-
-  // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-   // Vector for fe
-   LA_SeqVector* interface_rhs_z = GLOBAL_EQ->get_interface_temp_z(comp) ;
-   // Vector for fi
-   LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z(comp);
-
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_z(comp);
-
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(comp,2);
-
-   size_t nb_send_data = (2*nb_received_data)/3;
-   
-  // Send and receive the data first pass
-   if ( rank_in_i[2] == 0 )
-   {
-      for (p=1;p<nb_ranks_comm_i[2];++p)
-      {
-        // Receive the data
-        //pelCOMM->receive( i, all_received_data[i], nb_received_data );
-        static MPI_Status status ;
-        MPI_Recv( all_receive_data_U_z[comp][p], nb_received_data, MPI_DOUBLE, p, 0,
-                          DDS_Comm_i[2], &status ) ;
-      }
-
-      // Solve system of interface unknowns for each x
-
-      for(j=min_unknown_index(1);j<=max_unknown_index(1);j++)
-      {
-        for(i=min_unknown_index(0);i<=max_unknown_index(0);i++)
-        { 
-          size_t nb_interface_unknowns = Vec_temp->nb_rows();
-          for(m=0;m<nb_interface_unknowns;m++){
-            Vec_temp->set_item(m,0);
-            interface_rhs_z->set_item(m,0);
-          }
-          p = (i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
-          if(is_Uperiodic[2])
-              Vec_temp->set_item(nb_ranks_comm_i[2]-1,packed_data[3*p]);
-          Vec_temp->set_item(0,packed_data[3*p+1]);
-          interface_rhs_z->set_item(0,packed_data[3*p+2]);
-
-          // Vec_temp might contain previous values
-
-          for(m=1;m<nb_ranks_comm_i[2];m++){
-
-            if(m!=nb_ranks_comm_i[2]-1){
-              Vec_temp->add_to_item(m-1,all_receive_data_U_z[comp][m][3*p]);
-              Vec_temp->add_to_item(m,all_receive_data_U_z[comp][m][3*p+1]);
-              interface_rhs_z->set_item(m,all_receive_data_U_z[comp][m][3*p+2]);  // Assemble the interface rhs fe
-            }
-            else{
-              if(is_Uperiodic[2] == 0)
-                  Vec_temp->add_to_item(m-1,all_receive_data_U_z[comp][m][3*p]);
-              else{
-                  Vec_temp->add_to_item(m-1,all_receive_data_U_z[comp][m][3*p]);
-                  Vec_temp->add_to_item(m,all_receive_data_U_z[comp][m][3*p+1]);
-                  interface_rhs_z->set_item(m,all_receive_data_U_z[comp][m][3*p+2]);
-              }
-            }
-          }
-
-          for(m=0;m<nb_interface_unknowns;m++){
-          interface_rhs_z->set_item(m,interface_rhs_z->item(m)-Vec_temp->item(m)); // Get fe - Aei*xi to solve for ue
-          }
-
-          // Solve for ue (interface unknowns) in the master proc
-          GLOBAL_EQ->DS_NavierStokes_z_interface_unknown_solver(interface_rhs_z,comp);
-
-          // Pack the interface_rhs_x into the appropriate send_data
-          for (m=1;m<nb_ranks_comm_i[2];++m)
-          {
-            if(m!=nb_ranks_comm_i[2]-1){
-              all_send_data_U_z[comp][m][2*p+0]=interface_rhs_z->item(m-1);
-              all_send_data_U_z[comp][m][2*p+1]=interface_rhs_z->item(m);
-            }
-            else{
-              all_send_data_U_z[comp][m][2*p+0]=interface_rhs_z->item(m-1);
-              if(is_Uperiodic[2])
-                all_send_data_U_z[comp][m][2*p+1]=interface_rhs_z->item(m);
-              else
-                all_send_data_U_z[comp][m][2*p+1]=0;
-            }
-
-          }
-
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = assemble_local_rhs_z(i,j,gamma,t_it,comp);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie->multiply_vec_then_add(interface_rhs_z,local_rhs_z,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_z_solver(i,j,min_unknown_index(2),local_rhs_z,interface_rhs_z,comp);
+     // Solve in i
+     if ((nb_ranks_comm_i[dir_i]>1)||(is_Uperiodic[dir_i] == 1)) {
+        for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
+           for (size_t k=local_min_k; k <= local_max_k; ++k) {
+               solve_for_secondorder(j,k,gamma,t_it,packed_data,comp,dir_i);
+           }
         }
-      }
+        solve_interface_unknowns ( packed_data, nb_send_data, gamma, t_it, comp, dir_i );
 
-    }
-   else
-   {
-      // Send the packed data to master
-      //pelCOMM->send( is_master, packed_data, nb_received_data );
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[2] ) ;
-   }
-   // Send the data from master
-   if ( rank_in_i[2] == 0 )
-   {
-     for (m=1;m<nb_ranks_comm_i[2];++m)
-      {
-        //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_U_z[comp][m], nb_send_data, MPI_DOUBLE, m, 0, DDS_Comm_i[2] ) ;
-      }
-   }
-   else
-   {
-      
-      // Receive the data
-      //pelCOMM->receive( is_master, received_data, nb_received_data );
-      static MPI_Status status ;
-      MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_i[2], &status ) ;
-
-     // Solve the system of equations in each proc
-     for(j = min_unknown_index(1);j<=max_unknown_index(1);j++){
-        for(i = min_unknown_index(0);i<=max_unknown_index(0);i++){
-          p = (i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
-          if(rank_in_i[2] != nb_ranks_comm_i[2]-1){
-            interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);
-            interface_rhs_z->set_item(rank_in_i[2],packed_data[2*p+1]);
-          }
-          else{
-            if(is_Uperiodic[2] == 0)
-                interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);    
-            else{
-                interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);
-                interface_rhs_z->set_item(rank_in_i[2],packed_data[2*p+1]);
-            }
-          }
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = assemble_local_rhs_z(i,j,gamma,t_it,comp);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie->multiply_vec_then_add(interface_rhs_z,local_rhs_z,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_z_solver(i,j,min_unknown_index(2),local_rhs_z,interface_rhs_z,comp);
+     } else if (is_Uperiodic[dir_i] == 0) {  // Serial mode with non-periodic condition
+        for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
+           for (size_t k=local_min_k; k <= local_max_k; ++k) {
+              double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
+	      LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir_i);
+              GLOBAL_EQ->DS_NavierStokes_solver(j,k,min_unknown_index(dir_i),local_rhs,NULL,comp,dir_i);
+           }
         }
      }
-   }
+     delete [] packed_data;
+  }
 }
-
-
-
 
 //---------------------------------------------------------------------------
 void
@@ -2639,495 +1976,39 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
 {
    MAC_LABEL( "DDS_NavierStokes:: NS_velocity_update" ) ;
 
-   double gamma=mu, ugradu = 0.;
-   size_t i, j, k;
+   double gamma=mu;
+   //if ( my_rank == is_master ) SCT_set_start("Explicit Velocity step");
+   assemble_DS_un_at_rhs(t_it,gamma);
+   //if ( my_rank == is_master ) SCT_get_elapsed_time( "Explicit Velocity step" );
 
-  double dxC,xC,dyC,yC,xhr,xhl,xright,xleft,yhr,yhl,yright,yleft;
-  double pvalue =0., xvalue=0.,yvalue=0.,rhs=0.,bodyterm=0.0,advection_value = 0.;
-  FV_SHIFT_TRIPLET shift ;
-  int cpp=-1;
+   // Update gamma based for invidual direction
+   gamma = mu/2.0;
 
-  // Periodic pressure gradient
-  if ( UF->primary_grid()->is_periodic_flow() )
-  {
-    cpp = UF->primary_grid()->get_periodic_flow_direction() ;
-    bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
-            ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
-            - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
-  }
+   SolveU_i_in_jk(t_it,0,1,2,gamma);
+   // Synchronize the distributed DS solution vector
+   GLOBAL_EQ->synchronize_DS_solution_vec();
+   // Tranfer back to field
+   UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
 
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-  // First Equation
+   SolveU_i_in_jk(t_it,1,0,2,gamma);
+   // Synchronize the distributed DS solution vector
+   GLOBAL_EQ->synchronize_DS_solution_vec();
+   // Tranfer back to field
+   UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ; 
 
-  //if ( my_rank == is_master ) SCT_set_start("Explicit Velocity step");
-
-  for(size_t comp=0;comp<nb_comps;comp++)
-  {
-    // Get local min and max indices
-    for (size_t l=0;l<dim;++l)
-      min_unknown_index(l) =
-       UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-    for (size_t l=0;l<dim;++l)
-      max_unknown_index(l) =
-       UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-    // Here we use shift_staggeredToStaggered to shitf centered to staggered
-    // for the following reason: the ith component of UU is staggered with the 
-    // centered field only in the ith direction, which shares its ith location 
-    // with the non-ith components of the velocity field
-    // Example: 
-    // For ux, it is staggered with the centered field tf in the x
-    // direction only, in the y & z direction, ux and tf have the same location
-    // Now, in the x direction, tf is located at the same x position as uy and
-    // uz and hence the shift_staggeredToStaggered can be used for tf
-    // When interpolating a centered field to a staggered field, we use 
-    // shift_staggeredToStaggered for each ith component and consider the ith 
-    // shift in the ith direction only, i.e.:
-    // * for ux, use shift_staggeredToStaggered(0) and shift in the x direction
-    // with shift.i (the xth component of the shift) only
-    // * for uy, use shift_staggeredToStaggered(1) and shift in the y direction
-    // with shift.j (the yth component of the shift) only
-    // * for uz, use shift_staggeredToStaggered(2) and shift in the z direction
-    // with shift.k (the zth component of the shift) only    
-    shift = UF->shift_staggeredToStaggered( comp ) ;   
-
-    for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-    {
-      // Compute VEC_rhs_x = rhs in x
-      for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-      {
-
-        if(dim ==2 )
-        {
-
-          k=0;
-
-          // Dxx for un
-          xhr= UF->get_DOF_coordinate( i+1,comp, 0 ) - UF->get_DOF_coordinate( i, comp, 0 ) ;
-          xhl= UF->get_DOF_coordinate( i, comp, 0 ) - UF->get_DOF_coordinate( i-1, comp, 0 ) ;
-          xright = UF->DOF_value( i+1, j, 0, comp, 1 ) - UF->DOF_value( i, j, 0, comp, 1 ) ;
-          xleft = UF->DOF_value( i, j, 0, comp, 1 ) - UF->DOF_value( i-1, j, 0, comp, 1 ) ;
-
-          /** Assemble rhs in x for Neumann/Dirichlet BC Conditions */
-          if(UF->DOF_in_domain( i-1, j, k, comp) && UF->DOF_in_domain( i+1, j, k, comp))
-              xvalue = xright/xhr - xleft/xhl;
-          else if (UF->DOF_in_domain( i-1, j, k, comp))
-            xvalue = - xleft/xhl;
-          else
-            xvalue = xright/xhr;
-
-          // Dyy for un
-          yhr= UF->get_DOF_coordinate( j+1,comp, 1 ) - UF->get_DOF_coordinate( j, comp, 1 ) ;
-          yhl= UF->get_DOF_coordinate( j, comp, 1 ) - UF->get_DOF_coordinate( j-1, comp, 1 ) ;
-          yright = UF->DOF_value( i, j+1, 0, comp, 1 ) - UF->DOF_value( i, j, 0, comp, 1 ) ;
-          yleft = UF->DOF_value( i, j, 0, comp, 1 ) - UF->DOF_value( i, j-1, 0, comp, 1 ) ;
-
-          /** Assemble rhs in y for Neumann/Dirichlet BC Conditions */
-          //yvalue = yright/yhr - yleft/yhl;
-          if(UF->DOF_in_domain(i, j-1, k, comp) && UF->DOF_in_domain(i, j+1, k, comp))
-            yvalue = yright/yhr - yleft/yhl;
-          else if(UF->DOF_in_domain(i, j-1, k, comp))
-            yvalue = - yleft/yhl;
-          else
-            yvalue = yright/yhr;
-
-          // Assemble the bodyterm
-          dxC = UF->get_cell_size( i, comp, 0 ) ;
-          xC = UF->get_DOF_coordinate( i, comp, 0 ) ;
-          dyC = UF->get_cell_size( j, comp, 1 ) ;
-          yC = UF->get_DOF_coordinate( j, comp, 1 ) ;
-
-          // if(b_bodyterm)
-          // {
-          //   bodyterm = 2. * MAC::pi() * MAC::pi() * MAC::sin( MAC::pi() * xC )* MAC::sin( MAC::pi() * yC );
-          // }
-
-          // Pressure contribution
-          if(comp == 0){
-            pvalue = (PF->DOF_value( shift.i+i, j, 0, 0, 1 ) - PF->DOF_value( shift.i+i-1, j, 0, 0, 1 ))*dyC;
-          }
-          else{
-            pvalue = (PF->DOF_value( i, shift.j+j, 0, 0, 1 ) - PF->DOF_value( i, shift.j+j-1, 0, 0, 1 ))*dxC;
-          }
-          
-      	  // Advection term
-      	  if ( AdvectionScheme == "TVD" )
-      	    ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp);
-      	  else
-      	    ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp);
-      	  
-      	  if ( AdvectionTimeAccuracy == 1 )
-      	    advection_value = ugradu;
-      	  else
-      	  {
-      	    advection_value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
-                  UF->set_DOF_value(i,j,k,comp,2,ugradu);
-      	  }
-
-          rhs = gamma*(xvalue*dyC + yvalue*dxC) - pvalue - advection_value
-            + (UF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*rho)/(t_it -> time_step());
-
-          if ( cpp >= 0 && cpp==comp ) rhs += - bodyterm*dxC*dyC;  
-
-          UF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC*rho));
-
-        }
-        else
-        {
-
-          for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
-          {
-
-            // Dxx for un
-            xhr= UF->get_DOF_coordinate( i+1,comp, 0 ) - UF->get_DOF_coordinate( i, comp, 0 ) ;
-            xhl= UF->get_DOF_coordinate( i, comp, 0 ) - UF->get_DOF_coordinate( i-1, comp, 0 ) ;
-            xright = UF->DOF_value( i+1, j, k, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
-            xleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i-1, j, k, comp, 1 ) ;
-
-            /** Assemble rhs in x for Neumann/Dirichlet BC Conditions */
-            if(UF->DOF_in_domain( i-1, j, k, comp) && UF->DOF_in_domain( i+1, j, k, comp))
-                xvalue = xright/xhr - xleft/xhl;
-            else if (UF->DOF_in_domain( i-1, j, k, comp))
-              xvalue = - xleft/xhl;
-            else
-              xvalue = xright/xhr;
-
-            // Dyy for un
-            yhr= UF->get_DOF_coordinate( j+1,comp, 1 ) - UF->get_DOF_coordinate( j, comp, 1 ) ;
-            yhl= UF->get_DOF_coordinate( j, comp, 1 ) - UF->get_DOF_coordinate( j-1, comp, 1 ) ;
-            yright = UF->DOF_value( i, j+1, k, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
-            yleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i, j-1, k, comp, 1 ) ;
-
-            /** Assemble rhs in y for Neumann/Dirichlet BC Conditions */
-            if(UF->DOF_in_domain(i, j-1, k, comp) && UF->DOF_in_domain(i, j+1, k, comp))
-              yvalue = yright/yhr - yleft/yhl;
-            else if(UF->DOF_in_domain(i, j-1, k, comp))
-              yvalue = - yleft/yhl;
-            else
-              yvalue = yright/yhr;
-
-            // Assemble the bodyterm
-            dxC = UF->get_cell_size( i, comp, 0 ) ;
-            xC = UF->get_DOF_coordinate( i, comp, 0 ) ;
-            dyC = UF->get_cell_size( j, comp, 1 ) ;
-            yC = UF->get_DOF_coordinate( j, comp, 1 ) ;
-
-            double dzC,zC,zhr,zhl,zright,zleft,zvalue=0.;
-            zhr= UF->get_DOF_coordinate( k+1,comp, 2 ) - UF->get_DOF_coordinate( k, comp, 2 ) ;
-            zhl= UF->get_DOF_coordinate( k, comp, 2 ) - UF->get_DOF_coordinate( k-1, comp, 2 ) ;
-            zright = UF->DOF_value( i, j, k+1, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
-            zleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i, j, k-1, comp, 1 ) ;
-
-            /** Assemble rhs in z for Neumann/Dirichlet BC Conditions */
-            if(UF->DOF_in_domain(i, j, k-1, comp) && UF->DOF_in_domain(i, j, k+1, comp))
-              zvalue = zright/zhr - zleft/zhl;
-            else if(UF->DOF_in_domain(i, j, k-1, comp))
-              zvalue = - zleft/zhl;
-            else
-              zvalue = zright/zhr;
-
-
-            dzC = UF->get_cell_size( k, comp, 2 ) ;
-            zC = UF->get_DOF_coordinate( k, comp, 2 ) ;
-
-            // Pressure contribution
-            if(comp == 0){
-              pvalue = (PF->DOF_value( shift.i+i, j, k, 0, 1 ) - PF->DOF_value( shift.i+i-1, j, k, 0, 1 ))*dyC*dzC;
-            }
-            else if(comp==1){
-              pvalue = (PF->DOF_value( i, shift.j+j, k, 0, 1 ) - PF->DOF_value( i, shift.j+j-1, k, 0, 1 ))*dxC*dzC;
-            }
-            else{
-              pvalue = (PF->DOF_value( i, j, shift.k+k, 0, 1 ) - PF->DOF_value( i, j, shift.k+k-1, 0, 1 ))*dxC*dyC;
-            }
-
-      	    // Advection term
-      	    if ( AdvectionScheme == "TVD" )
-      	      ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp);
-      	    else
-      	      ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp);
-      	  
-      	    if ( AdvectionTimeAccuracy == 1 )
-      	      advection_value = ugradu;
-      	    else
-      	    {
-      	      advection_value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
-                    UF->set_DOF_value(i,j,k,comp,2,ugradu);
-      	    }
-
-            rhs = gamma*(xvalue*dyC*dzC + yvalue*dxC*dzC + zvalue*dxC*dyC) - pvalue - advection_value + (UF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC*rho)/(t_it -> time_step());
-
-            if ( cpp >= 0 && cpp==comp ) rhs += - bodyterm*dxC*dyC*dzC;
-
-            UF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC*dzC*rho));
-          }
-        }
-      }
-
-    }
-  }
-
-  //if ( my_rank == is_master ) SCT_get_elapsed_time( "Explicit Velocity step" );
-
-  // Update gamma based for invidual direction
-  gamma = mu/2.0;
-
-  if(dim == 2){
-
-    for(size_t comp=0;comp<nb_comps;comp++){
-
-      // Get local min and max indices
-      for (size_t l=0;l<dim;++l)
-        min_unknown_index(l) =
-         UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      for (size_t l=0;l<dim;++l)
-        max_unknown_index(l) =
-         UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-      size_t nb_send_data_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1);
-      // Solve in x
-      if(nb_ranks_comm_i[0]>1){
-
-        for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-         {
-            k=0;
-            solve_x_for_secondorder(j,k,gamma,t_it,mpi_packed_data_U_x[comp],comp);
-         }
-
-         solve_interface_unknowns_x ( mpi_packed_data_U_x[comp], nb_send_data_x, gamma, t_it,comp );
-
-      }
-      else{
-        for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-         {
-            k=0;
-
-            double fe = assemble_local_rhs_x(j,k,gamma,t_it,comp);
-            LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x(comp);
-            
-            if(is_Uperiodic[0] == 1)
-                GLOBAL_EQ->DS_NavierStokes_x_solver_periodic(j,k,min_unknown_index(0),local_rhs_x,NULL,comp); 
-            else
-                GLOBAL_EQ->DS_NavierStokes_x_solver(j,k,min_unknown_index(0),local_rhs_x,NULL,comp);                            
-          }
-      }
-
-
-    }
-
-     // Synchronize the distributed DS solution vector
-     GLOBAL_EQ->synchronize_DS_solution_vec();
-
-     // Tranfer back to field
-     UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
-
-     for(size_t comp=0;comp<nb_comps;comp++){
-
-      // Get local min and max indices
-      for (size_t l=0;l<dim;++l)
-        min_unknown_index(l) =
-         UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      for (size_t l=0;l<dim;++l)
-        max_unknown_index(l) =
-         UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-      size_t nb_send_data_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1);
-
-      // Solve in y
-       if(nb_ranks_comm_i[1]>1){
-
-         for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-         {
-            k=0;
-            solve_y_for_secondorder(i,k,gamma,t_it,mpi_packed_data_U_y[comp],comp);
-         }
-
-         solve_interface_unknowns_y ( mpi_packed_data_U_y[comp], nb_send_data_y, gamma, t_it,comp );
-       }
-       else{
-        for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-         {
-            k=0;
-           double fe = assemble_local_rhs_y(i,k,gamma,t_it,comp);
-           LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp);
-
-           if(is_Uperiodic[1] == 1)
-              GLOBAL_EQ->DS_NavierStokes_y_solver_periodic(i,k,min_unknown_index(1),local_rhs_y,NULL,comp);
-           else
-              GLOBAL_EQ->DS_NavierStokes_y_solver(i,k,min_unknown_index(1),local_rhs_y,NULL,comp);
-         }
-       }
-
-     }
-
-     // // Synchronize the distributed DS solution vector
-     GLOBAL_EQ->synchronize_DS_solution_vec();
-
-     // Tranfer back to field
-     UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ; 
-     
+   if (dim == 3) {
+      SolveU_i_in_jk(t_it,2,0,1,gamma);
+      // Synchronize the distributed DS solution vector
+      GLOBAL_EQ->synchronize_DS_solution_vec();
+      // Tranfer back to field
+      UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
    }
-  else{
-    
-    for(size_t comp=0;comp<nb_comps;comp++)
-    {
 
-      // Get local min and max indices
-      for (size_t l=0;l<dim;++l)
-        min_unknown_index(l) =
-         UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      for (size_t l=0;l<dim;++l)
-        max_unknown_index(l) =
-         UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-      size_t nb_send_data_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
-
-      // Solve in x
-      if(nb_ranks_comm_i[0]>1){
-        
-        for (k=min_unknown_index(2);k<=max_unknown_index(2);++k){
-          for (j=min_unknown_index(1);j<=max_unknown_index(1);++j){
-              solve_x_for_secondorder(j,k,gamma,t_it,mpi_packed_data_U_x[comp],comp);
-          }
-        }
-        solve_interface_unknowns_x ( mpi_packed_data_U_x[comp], nb_send_data_x, gamma, t_it,comp );
-      }
-      else{
-        
-        for (k=min_unknown_index(2);k<=max_unknown_index(2);++k){
-          for (j=min_unknown_index(1);j<=max_unknown_index(1);++j){
-//              if ( my_rank == is_master ) SCT_set_start("Velocity x update");
-              double fe = assemble_local_rhs_x(j,k,gamma,t_it,comp);
-              LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x(comp);
-              if(is_Uperiodic[0] == 1)
-                  GLOBAL_EQ->DS_NavierStokes_x_solver_periodic(j,k,min_unknown_index(0),local_rhs_x,NULL,comp);
-              else
-                  GLOBAL_EQ->DS_NavierStokes_x_solver(j,k,min_unknown_index(0),local_rhs_x,NULL,comp);
-//              if ( my_rank == is_master ) SCT_get_elapsed_time( "Velocity x update" );
-          }
-        }
-      }
-    }
-
-    // Synchronize the distributed DS solution vector
-    GLOBAL_EQ->synchronize_DS_solution_vec();
-
-    // Tranfer back to field
-    UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
-
-    for(size_t comp=0;comp<nb_comps;comp++)
-    {
-
-      // Get local min and max indices
-      for (size_t l=0;l<dim;++l)
-        min_unknown_index(l) =
-         UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      for (size_t l=0;l<dim;++l)
-        max_unknown_index(l) =
-         UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-      size_t nb_send_data_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
-        
-      // Solve in y
-      if(nb_ranks_comm_i[1]>1){
-        
-        // Third equation - Solve in y
-        for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-         {
-           for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
-           {
-                solve_y_for_secondorder(i,k,gamma,t_it,mpi_packed_data_U_y[comp],comp);
-           }
-         }
-
-         solve_interface_unknowns_y ( mpi_packed_data_U_y[comp], nb_send_data_y, gamma, t_it,comp );
-      }
-      else{
-        for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-         {
-           for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
-           {
-              //if ( my_rank == is_master ) SCT_set_start("Velocity y update");
-              double fe = assemble_local_rhs_y(i,k,gamma,t_it,comp);
-              LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y(comp);
-              if(is_Uperiodic[1] == 1)
-                  GLOBAL_EQ->DS_NavierStokes_y_solver_periodic(i,k,min_unknown_index(1),local_rhs_y,NULL,comp);
-              else
-                  GLOBAL_EQ->DS_NavierStokes_y_solver(i,k,min_unknown_index(1),local_rhs_y,NULL,comp);
-              //if ( my_rank == is_master ) SCT_get_elapsed_time( "Velocity y update" );
-           }
-         }
-      }
-
-    }
-
-     // Synchronize the distributed DS solution vector
-     GLOBAL_EQ->synchronize_DS_solution_vec();
-
-     // Tranfer back to field
-     UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ;
-
-    
-    for(size_t comp=0;comp<nb_comps;comp++)
-    {
-
-      // Get local min and max indices
-      for (size_t l=0;l<dim;++l)
-        min_unknown_index(l) =
-         UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      for (size_t l=0;l<dim;++l)
-        max_unknown_index(l) =
-         UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-       // Solve in z
-       size_t nb_send_data_z = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(1)-min_unknown_index(1)+1);
-         
-       if(nb_ranks_comm_i[2]>1){
-         
-         for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-         {
-           for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-           {
-             solve_z_for_secondorder(i,j,gamma,t_it,mpi_packed_data_U_z[comp],comp);
-           }
-         }
-
-         solve_interface_unknowns_z ( mpi_packed_data_U_z[comp], nb_send_data_z, gamma, t_it,comp );
-       }
-       else{
-         for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-         {
-           for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-           {
-              //if ( my_rank == is_master ) SCT_set_start("Velocity z update");
-              double fe = assemble_local_rhs_z(i,j,gamma,t_it,comp);
-              LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z(comp);
-              if(is_Uperiodic[2] == 1)
-                  GLOBAL_EQ->DS_NavierStokes_z_solver_periodic(i,j,min_unknown_index(2),local_rhs_z,NULL,comp);
-              else
-                  GLOBAL_EQ->DS_NavierStokes_z_solver(i,j,min_unknown_index(2),local_rhs_z,NULL,comp);
-              //if ( my_rank == is_master ) SCT_get_elapsed_time( "Velocity z update" );
-           }
-         }
-       }
-
-    }
-
-     // Synchronize the distributed DS solution vector
-     GLOBAL_EQ->synchronize_DS_solution_vec();
-
-     // Tranfer back to field
-     UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
-
-  }
-
-  output_L2norm_velocity(0);
-  output_L2norm_velocity(1);
-  output_L2norm_velocity(2);
+   output_L2norm_velocity(0);
+   output_L2norm_velocity(1);
+   output_L2norm_velocity(2);
 
 }
-
-
-
 
 //---------------------------------------------------------------------------
 double
@@ -3136,1268 +2017,609 @@ DDS_NavierStokes:: pressure_assemble_local_rhs_x ( size_t const& j, size_t const
 {
   // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
    size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
+   for (size_t l=0;l<dim;++l) {
+      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
+      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
+   }
 
-  size_t i,pos,m;
-  FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
+   size_t i,pos,m;
+   FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 
-  // Compute VEC_rhs_x = rhs in x
-  double xhr,xright,yhr,yright,dx;
-  double fe=0.;
-  double xvalue = 0.,yvalue=0.,value=0.;
+   // Compute VEC_rhs_x = rhs in x
+   double xhr,xright,yhr,yright,dx;
+   double fe=0.;
+   double xvalue = 0.,yvalue=0.,value=0.;
 
-  // Vector for fi
-  LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x_P() ;
+   // Vector for fi
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(0) ;
 
-  for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-  {
-    if(dim ==2 )
-    {
-
-      // Dxx for un
-
-      xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-      xright = UF->DOF_value( shift.i+i, j, 0, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, 0, 0, 0 ) ;
-
-      xvalue = xright/xhr;
+   for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+      if (dim == 2) {
+         // Dxx for un
+         xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
+         xright = UF->DOF_value( shift.i+i, j, 0, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, 0, 0, 0 ) ;
+         xvalue = xright/xhr;
       
-      // Dyy for un
-      yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-      yright = UF->DOF_value( i, shift.j+j, 0, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, 0, 1, 0 ) ;
+         // Dyy for un
+         yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
+         yright = UF->DOF_value( i, shift.j+j, 0, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, 0, 1, 0 ) ;
+         yvalue = yright/yhr;
 
-      yvalue = yright/yhr;
+         dx = PF->get_cell_size( i, 0, 0 );
+         // Assemble the bodyterm
+         value = -(rho*(xvalue + yvalue)*dx)/(t_it -> time_step());
+      } else {
+         // Dxx for un
+         xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
+         xright = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
+         xvalue = xright/xhr;
 
-      dx = PF->get_cell_size( i,0, 0 );
+ 	 // Dyy for un
+         yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
+         yright = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
+         yvalue = yright/yhr;
 
-      // Assemble the bodyterm
-      value = -(rho*(xvalue + yvalue)*dx)/(t_it -> time_step());
+ 	 // Dzz for un
+         double zhr,zright,zvalue=0.;
+         zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
+         zright = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
+         zvalue = zright/zhr;
 
-
-    }
-    else
-    {
-        // Dxx for un
-        xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-        xright = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
-
-        xvalue = xright/xhr;
-
-        // Dyy for un
-        yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-        yright = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
-
-        yvalue = yright/yhr;
-
-        double zhr,zright,zvalue=0.;
-        zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
-        zright = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
-
-        zvalue = zright/zhr;
-
-        dx = PF->get_cell_size( i,0, 0 );
-        value = -(rho*(xvalue + yvalue + zvalue)*dx)/(t_it -> time_step());
-    }
-
-    pos = i - min_unknown_index(0);
-
-    // if(j==min_unknown_index(1))
-    //   MAC::out()<<xright<<"  "<<yright<<endl;
-
-    if(is_Pperiodic[0] == 0){
-      if(rank_in_i[0] == nb_ranks_comm_i[0]-1){
-         local_rhs_x->set_item( pos, value);
+         dx = PF->get_cell_size( i,0, 0 );
+         // Assemble the bodyterm
+         value = -(rho*(xvalue + yvalue + zvalue)*dx)/(t_it -> time_step());
       }
-      else{
-         if(i == max_unknown_index(0))
-           fe = value;
-         else
-           local_rhs_x->set_item( pos, value);
-      }  
-    }
-    else{
-      if(nb_ranks_comm_i[0] > 1){
-         if(i == max_unknown_index(0))
-           fe = value;
-         else
-           local_rhs_x->set_item( pos, value);
+
+      pos = i - min_unknown_index(0);
+
+      if (is_Pperiodic[0] == 0) {
+         if (rank_in_i[0] == nb_ranks_comm_i[0]-1) {
+            local_rhs->set_item( pos, value);
+         } else {
+            if (i == max_unknown_index(0))
+               fe = value;
+            else
+               local_rhs->set_item( pos, value);
+         }  
+      } else {
+         if (nb_ranks_comm_i[0] > 1) {
+            if (i == max_unknown_index(0))
+               fe = value;
+            else
+               local_rhs->set_item( pos, value);
+         } else
+            local_rhs->set_item( pos, value);
       }
-      else
-        local_rhs_x->set_item( pos, value);
-    }
     
-  }
+   }
 
- // No term added to rhs for neumann as flux was set to zero during assemble of lhs
- // No term added to rhs for dirichlet as boundary condition for pseudo pressure(psi) becomes zero
-
-  /*m = int(min_unknown_index(0)) - 1;
-  if ( PF->DOF_in_domain( m, j, k, 0 ) )
-    if ( PF->DOF_has_imposed_Dirichlet_value( m, j, k, 0 ) )
-    {
-      double ai = 1/(PF->get_DOF_coordinate( m+1,0,0) - PF->get_DOF_coordinate( m,0,0));
-      double dirichlet_value = PF->DOF_value( m, j, k, 0, 0 ) ;
-      local_rhs_x->add_to_item( 0, + ai * dirichlet_value );
-    }
-
-  m = int(max_unknown_index(0)) + 1;
-  if ( PF->DOF_in_domain( m, j, k, 0 ) )
-    if ( PF->DOF_has_imposed_Dirichlet_value( m, j, k, 0 ) )
-    {
-      double ai = 1/(PF->get_DOF_coordinate( m,0,0) - PF->get_DOF_coordinate( m-1,0,0));
-      double dirichlet_value = PF->DOF_value( m, j, k, 0, 0 ) ;
-      local_rhs_x->add_to_item( local_rhs_x->nb_rows()-1 , + ai * dirichlet_value );
-    }*/
-
-  return fe;
+   return fe;
 }
-
-
 
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: pressure_solve_x_for_secondorder ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it,double * packed_data)
+DDS_NavierStokes:: unpack_compute_ue_pack_P(double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p)
 //---------------------------------------------------------------------------
 {
-  // Get local min and max indices
-  size_t comp=0;
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
 
-   double fe = pressure_assemble_local_rhs_x(j,k,t_it);
+   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp_P(dir) ;
+   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_P(dir);
+
+   size_t nb_interface_unknowns = Vec_temp->nb_rows();
+
+   for (size_t i=0;i<nb_interface_unknowns;i++) {
+      Vec_temp->set_item(i,0);
+      interface_rhs->set_item(i,0);
+   }
+
+   if (is_Pperiodic[dir])
+      Vec_temp->set_item(nb_ranks_comm_i[dir]-1,packed_data[3*p]);
+   Vec_temp->set_item(0,packed_data[3*p+1]);
+   interface_rhs->set_item(0,packed_data[3*p+2]);
+
+   // Vec_temp might contain previous values
+
+   for (size_t i=1;i<nb_ranks_comm_i[dir];i++) {
+      if (i!=nb_ranks_comm_i[dir]-1) {
+         Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
+         Vec_temp->add_to_item(i,all_received_data[i][3*p+1]);
+         interface_rhs->set_item(i,all_received_data[i][3*p+2]);  // Assemble the interface rhs fe
+      } else {
+         if (is_Pperiodic[dir] ==0) {
+            Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
+         } else{
+            Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
+            // If periodic in x, last proc has an interface unknown
+            Vec_temp->add_to_item(i,all_received_data[i][3*p+1]);
+            interface_rhs->set_item(i,all_received_data[i][3*p+2]);
+         }
+      }
+   }
+
+   for (size_t i=0;i<nb_interface_unknowns;i++) {
+      interface_rhs->set_item(i,interface_rhs->item(i)-Vec_temp->item(i)); // Get fe - Aei*xi to solve for ue
+   }
+
+   // Solve for ue (interface unknowns) in the master proc
+   GLOBAL_EQ->DS_NavierStokes_interface_unknown_solver_P(interface_rhs,dir);
+
+   for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
+      if (i != nb_ranks_comm_i[dir]-1) {
+         all_send_data[i][2*p+0]=interface_rhs->item(i-1);
+         all_send_data[i][2*p+1]=interface_rhs->item(i);
+      } else {
+         all_send_data[i][2*p+0]=interface_rhs->item(i-1);
+         if (is_Pperiodic[dir])
+            all_send_data[i][2*p+1]=interface_rhs->item(i);
+         else
+            all_send_data[i][2*p+1]=0;
+      }
+   }
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: unpack_ue_P(double * received_data, size_t const dir, int p)
+//---------------------------------------------------------------------------
+{
+   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp_P(dir) ;
+
+   if (rank_in_i[dir] != nb_ranks_comm_i[dir]-1) {
+      interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
+      interface_rhs->set_item(rank_in_i[dir],received_data[2*p+1]);
+   } else {
+      if (is_Pperiodic[dir] ==0) {
+         interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
+      } else {
+         interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
+         interface_rhs->set_item(rank_in_i[dir],received_data[2*p+1]);
+      }
+   }
+}
+
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: pressure_solve_for_secondorder ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it,double * packed_data, size_t const dir)
+//---------------------------------------------------------------------------
+{
+   // Get local min and max indices
+   size_t comp=0;
+   size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
+   for (size_t l=0;l<dim;++l) {
+      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   }
+
+   double fe = 0.;
+   if (dir == 0) {
+      fe = pressure_assemble_local_rhs_x(j,k,t_it);
+   } else if (dir == 1) {
+      fe = pressure_assemble_local_rhs_y(j,k,t_it);
+   } else if (dir == 2) {
+      fe = pressure_assemble_local_rhs_z(j,k,t_it);
+   }
 
    // create a replica of local rhs vector in local solution vector
-   LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x_P() ;
-   LA_SeqVector* local_solution_x = GLOBAL_EQ->get_local_solution_temp_x_P() ;
-   for(size_t i=0;i<local_rhs_x->nb_rows();i++){
-    local_solution_x->set_item(i,local_rhs_x->item(i));
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(dir) ;
+   LA_SeqVector* local_solution = GLOBAL_EQ->get_local_solution_temp_P(dir) ;
+
+   for (size_t i=0;i<local_rhs->nb_rows();i++) {
+      local_solution->set_item(i,local_rhs->item(i));
    }
 
    // Solve for xi locally and put it in local solution vector
-   GLOBAL_EQ->DS_NavierStokes_x_local_unknown_solver_P(local_solution_x);
+   GLOBAL_EQ->DS_NavierStokes_local_unknown_solver_P(local_solution,dir);
 
-   LA_SeqMatrix* Aei_x = GLOBAL_EQ-> get_aei_P(0);
-   LA_SeqVector* Vec_temp_x = GLOBAL_EQ-> get_temp_x_P();
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_P(dir);
+   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_P(dir);
 
-   for(int i=0;i<Vec_temp_x->nb_rows();i++){
-          Vec_temp_x->set_item(i,0);
-    }
+   for (int i=0;i<Vec_temp->nb_rows();i++){
+      Vec_temp->set_item(i,0);
+   }
+
    // Calculate Aei*xi in each proc locally
-   Aei_x->multiply_vec_then_add(local_solution_x,Vec_temp_x);
+   Aei->multiply_vec_then_add(local_solution,Vec_temp);
 
    // Pack the data
    size_t vec_pos;
-   if(dim == 2){
-      vec_pos=j-min_unknown_index(1);
-   }
-   else{
-      vec_pos=(j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
-   }/**/
-   if(rank_in_i[0] == 0){
-      // Check if bc is periodic in x
-     // If it is, we need to pack two elements apart from fe
 
-      if(is_Pperiodic[0])
-          packed_data[3*vec_pos+0]=Vec_temp_x->item(nb_ranks_comm_i[0]-1);
+   if (dir == 0) {
+      if (dim == 2) {
+         vec_pos=j-min_unknown_index(1);
+      } else {
+         vec_pos=(j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
+      }
+   } else if (dir == 1) {
+      if (dim == 2) {
+         vec_pos=j-min_unknown_index(0);
+      } else {
+         vec_pos=(j-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(k-min_unknown_index(2));
+      }
+   } else if (dir == 2) {
+      vec_pos=(j-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(k-min_unknown_index(1));
+   }
+
+   if(rank_in_i[dir] == 0){
+      if(is_Pperiodic[dir])
+          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[dir]-1);
       else
           packed_data[3*vec_pos+0]=0;
-
-      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
+      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[dir]);
    }
-   else if(rank_in_i[0] == nb_ranks_comm_i[0]-1){
-      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_i[0]-1);
-      
-      // Check if bc is periodic in x
-      // If it is, we need to pack two elements apart from fe
-      if(is_Pperiodic[0])
-          packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
+   else if(rank_in_i[dir] == nb_ranks_comm_i[dir]-1){
+      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[dir]-1);
+      if(is_Pperiodic[dir])
+          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[dir]);
       else
           packed_data[3*vec_pos+1]=0;
    }
    else{
-      packed_data[3*vec_pos+0]=Vec_temp_x->item(rank_in_i[0]-1);
-      packed_data[3*vec_pos+1]=Vec_temp_x->item(rank_in_i[0]);
+      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[dir]-1);
+      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[dir]);
    }
    packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
 }
 
 
-
-
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: pressure_solve_interface_unknowns_x ( double * packed_data, size_t nb_received_data, FV_TimeIterator const* t_it)
+DDS_NavierStokes:: pressure_solve_interface_unknowns ( double * packed_data, size_t nb_received_data, FV_TimeIterator const* t_it, size_t const dir)
 //---------------------------------------------------------------------------
 {
    size_t i,j,p;
    size_t k =0;
-   size_t comp=0;
+   size_t comp = 0;
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
    size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   for (size_t l=0;l<dim;++l) {
+      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   }
 
    // Vector for fe
-   LA_SeqVector* interface_rhs_x = GLOBAL_EQ->get_interface_temp_x_P() ;
-   // Vector for fi
-   LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x_P() ;
+   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp_P(dir) ;
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(dir) ;
+   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_P(dir);
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_P(dir);
 
-   LA_SeqVector* Vec_temp_x = GLOBAL_EQ-> get_temp_x_P();
+   // Array declaration for sending data from master to all slaves
+   double ** all_send_data = new double* [nb_ranks_comm_i[dir]];
+   size_t nb_send_data=0, local_length_j=0, local_length_k=0;
+   size_t local_min_j=0, local_max_j=0;
+   size_t local_min_k=0, local_max_k=0;
 
-   LA_SeqMatrix* Aie_x = GLOBAL_EQ-> get_aie_P(0);
+   if (dir == 0) {
+      local_min_j = min_unknown_index(1);
+      local_max_j = max_unknown_index(1);
+      if (dim == 3) {
+         local_min_k = min_unknown_index(2);
+         local_max_k = max_unknown_index(2);
+      }
+   } else if (dir == 1) {
+      local_min_j = min_unknown_index(0);
+      local_max_j = max_unknown_index(0);
+      if (dim == 3) {
+         local_min_k = min_unknown_index(2);
+         local_max_k = max_unknown_index(2);
+      }
+   } else if (dir == 2) {
+      local_min_j = min_unknown_index(0);
+      local_max_j = max_unknown_index(0);
+      local_min_k = min_unknown_index(1);
+      local_max_k = max_unknown_index(1);
+   }
 
-   size_t nb_send_data= (2*nb_received_data)/3;
+   local_length_j = (local_max_j-local_min_j+1);
+   local_length_k = (local_max_k-local_min_k+1);
 
+   if (dim != 3) {
+      nb_send_data = 2*local_length_j;
+   } else if (dim == 3) {
+      nb_send_data = 2*local_length_j*local_length_k;
+   }
 
-  // Send and receive the data first pass
-   //if ( my_rank == is_master )
-   if ( rank_in_i[0] == 0 )
-   {
-      for (i=1;i<nb_ranks_comm_i[0];++i)
-      //for (i=1;i<nb_procs;++i)
-      {
+   for (p = 0; p < nb_ranks_comm_i[dir]; ++p) {
+      all_send_data[p] = new double[nb_send_data];
+   }
+
+   if ( rank_in_i[dir] == 0 ) {
+      // Array declaration for receiving data from all slaves
+      double ** all_received_data = new double* [nb_ranks_comm_i[dir]];
+      for(p = 0; p < nb_ranks_comm_i[dir]; ++p) {
+          all_received_data[p] = new double[nb_received_data];
+      }
+	   
+      for (i=1;i<nb_ranks_comm_i[dir];++i) {
         // Receive the data
-        //pelCOMM->receive( i, all_received_data[i], nb_received_data );
         static MPI_Status status;
-        MPI_Recv( all_receive_data_P_x[i], nb_received_data, MPI_DOUBLE, i, 0,
-                          DDS_Comm_i[0], &status ) ;
+        MPI_Recv( all_received_data[i], nb_received_data, MPI_DOUBLE, i, 0,
+                          DDS_Comm_i[dir], &status ) ;
       }
 
       // Solve system of interface unknowns for each y
-      if(dim == 2)
-      {
-        for(j=min_unknown_index(1);j<=max_unknown_index(1);j++){
-          size_t nb_interface_unknowns = Vec_temp_x->nb_rows();
-          for(i=0;i<nb_interface_unknowns;i++){
-            Vec_temp_x->set_item(i,0);
-            interface_rhs_x->set_item(i,0);
-          }
-          p = j-min_unknown_index(1);
-          if(is_Pperiodic[0])
-              Vec_temp_x->set_item(nb_ranks_comm_i[0]-1,packed_data[3*p]);
-          Vec_temp_x->set_item(0,packed_data[3*p+1]);
-          interface_rhs_x->set_item(0,packed_data[3*p+2]);
+      if (dim == 2) {
+	 for (j=local_min_j;j<=local_max_j;j++) {
 
-          // Vec_temp might contain previous values
+            p = j-local_min_j;
+  
+            unpack_compute_ue_pack_P(all_received_data,packed_data,all_send_data,dir,p);
 
-          for(i=1;i<nb_ranks_comm_i[0];i++){
-
-            if(i!=nb_ranks_comm_i[0]-1){
-              Vec_temp_x->add_to_item(i-1,all_receive_data_P_x[i][3*p]);
-              Vec_temp_x->add_to_item(i,all_receive_data_P_x[i][3*p+1]);
-              interface_rhs_x->set_item(i,all_receive_data_P_x[i][3*p+2]);  // Assemble the interface rhs fe
-            }
-            else{
-              if(is_Pperiodic[0] ==0){
-                  Vec_temp_x->add_to_item(i-1,all_receive_data_P_x[i][3*p]);
-              }
-              else{
-                  Vec_temp_x->add_to_item(i-1,all_receive_data_P_x[i][3*p]);
-                  // If periodic in x, last proc has an interface unknown
-                  Vec_temp_x->add_to_item(i,all_receive_data_P_x[i][3*p+1]);
-                  interface_rhs_x->set_item(i,all_receive_data_P_x[i][3*p+2]);
-              }
-            }
-          }
-
-          for(i=0;i<nb_interface_unknowns;i++){
-          interface_rhs_x->set_item(i,interface_rhs_x->item(i)-Vec_temp_x->item(i)); // Get fe - Aei*xi to solve for ue
-          }
-
-          // Solve for ue (interface unknowns) in the master proc
-          GLOBAL_EQ->DS_NavierStokes_x_interface_unknown_solver_P(interface_rhs_x);
-
-          // Pack the interface_rhs_x into the appropriate send_data
-          for (i=1;i<nb_ranks_comm_i[0];++i)
-          {
-            if(i!=nb_ranks_comm_i[0]-1){
-              all_send_data_P_x[i][2*p+0]=interface_rhs_x->item(i-1);
-              all_send_data_P_x[i][2*p+1]=interface_rhs_x->item(i);
-            }
-            else{
-              all_send_data_P_x[i][2*p+0]=interface_rhs_x->item(i-1);
-              if(is_Pperiodic[0])
-                all_send_data_P_x[i][2*p+1]=interface_rhs_x->item(i);  
-              else
-                all_send_data_P_x[i][2*p+1]=0;
+            // Need to have the original rhs function assembled for corrosponding j,k pair
+            double fe = 0.;
+            if (dir == 0) {
+               fe = pressure_assemble_local_rhs_x(j,k,t_it);
+            } else if (dir == 1) {
+               fe = pressure_assemble_local_rhs_y(j,k,t_it);
+            } else if (dir == 2) {
+               fe = pressure_assemble_local_rhs_z(j,k,t_it);
             }
 
-          }
+            // Setup RHS = fi - Aie*xe for solving ui
+            Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
 
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = pressure_assemble_local_rhs_x(j,k,t_it);
+            // Solve ui and transfer solution into distributed vector
+            GLOBAL_EQ->DS_NavierStokes_solver_P(j,k,min_unknown_index(dir),local_rhs,interface_rhs,dir);
+         }
+      } else {
+         for (k=local_min_k;k<=local_max_k;k++) {
+            for (j=local_min_j;j<=local_max_j;j++) {
+	      
+	       p = (j-local_min_j)+local_length_j*(k-local_min_k);
 
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie_x->multiply_vec_then_add(interface_rhs_x,local_rhs_x,-1.0,1.0);
+               unpack_compute_ue_pack_P(all_received_data,packed_data,all_send_data,dir,p);
 
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_x_solver_P(j,k,min_unknown_index(0),local_rhs_x,interface_rhs_x);
+     	       // Need to have the original rhs function assembled for corrosponding j,k pair
+               double fe = 0.;
+               if (dir == 0) {
+                  fe = pressure_assemble_local_rhs_x(j,k,t_it);
+               } else if (dir == 1) {
+                  fe = pressure_assemble_local_rhs_y(j,k,t_it);
+               } else if (dir == 2) {
+                  fe = pressure_assemble_local_rhs_z(j,k,t_it);
+               }
 
-        }
-      }
-      else
-      {
-        for(k=min_unknown_index(2);k<=max_unknown_index(2);k++)
-        {
-          for(j=min_unknown_index(1);j<=max_unknown_index(1);j++)
-          {
-            size_t nb_interface_unknowns = Vec_temp_x->nb_rows();
-            for(i=0;i<nb_interface_unknowns;i++){
-              Vec_temp_x->set_item(i,0);
-              interface_rhs_x->set_item(i,0);
+               // Setup RHS = fi - Aie*xe for solving ui
+               Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
+
+               // Solve ui and transfer solution into distributed vector
+               GLOBAL_EQ->DS_NavierStokes_solver_P(j,k,min_unknown_index(dir),local_rhs,interface_rhs,dir);
             }
-            p = (j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
-            
-            if(is_Pperiodic[0])
-                Vec_temp_x->set_item(nb_ranks_comm_i[0]-1,packed_data[3*p]);
-            Vec_temp_x->set_item(0,packed_data[3*p+1]);
-            interface_rhs_x->set_item(0,packed_data[3*p+2]);
-
-            // Vec_temp might contain previous values
-
-
-            for(i=1;i<nb_ranks_comm_i[0];i++){
-
-              if(i!=nb_ranks_comm_i[0]-1){
-                Vec_temp_x->add_to_item(i-1,all_receive_data_P_x[i][3*p]);
-                Vec_temp_x->add_to_item(i,all_receive_data_P_x[i][3*p+1]);
-                interface_rhs_x->set_item(i,all_receive_data_P_x[i][3*p+2]);  // Assemble the interface rhs fe
-              }
-              else{
-                if(is_Pperiodic[0] ==0){
-                    Vec_temp_x->add_to_item(i-1,all_receive_data_P_x[i][3*p]);
-                }
-                else{
-                    Vec_temp_x->add_to_item(i-1,all_receive_data_P_x[i][3*p]);
-                    // If periodic in x, last proc has an interface unknown
-                    Vec_temp_x->add_to_item(i,all_receive_data_P_x[i][3*p+1]);
-                    interface_rhs_x->set_item(i,all_receive_data_P_x[i][3*p+2]);
-                }
-              }
-            }
-
-            for(i=0;i<nb_interface_unknowns;i++){
-            interface_rhs_x->set_item(i,interface_rhs_x->item(i)-Vec_temp_x->item(i)); // Get fe - Aei*xi to solve for ue
-            }
-
-
-            // Solve for ue (interface unknowns) in the master proc
-            GLOBAL_EQ->DS_NavierStokes_x_interface_unknown_solver_P(interface_rhs_x);
-
-            // Pack the interface_rhs_x into the appropriate send_data
-            for (i=1;i<nb_ranks_comm_i[0];++i)
-            {
-              if(i!=nb_ranks_comm_i[0]-1){
-                all_send_data_P_x[i][2*p+0]=interface_rhs_x->item(i-1);
-                all_send_data_P_x[i][2*p+1]=interface_rhs_x->item(i);
-              }
-              else{
-                all_send_data_P_x[i][2*p+0]=interface_rhs_x->item(i-1);
-                if(is_Pperiodic[0])
-                  all_send_data_P_x[i][2*p+1]=interface_rhs_x->item(i);  
-                else
-                  all_send_data_P_x[i][2*p+1]=0;
-              }
-
-            }
-
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = pressure_assemble_local_rhs_x(j,k,t_it);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie_x->multiply_vec_then_add(interface_rhs_x,local_rhs_x,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_x_solver_P(j,k,min_unknown_index(0),local_rhs_x,interface_rhs_x);
-          }
-        }
+         }
       }
 
+      for (p = 0; p < nb_ranks_comm_i[dir]; ++p) delete [] all_received_data[p];
+      delete [] all_received_data;
 
-    }
-   else
-   {
+   } else {
       // Send the packed data to master
-      //pelCOMM->send( is_master, packed_data, nb_received_data );
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[0] ) ;
+      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
    }
 
    // Send the data from master
-   if ( rank_in_i[0] == 0 )
-   {
-     for (i=1;i<nb_ranks_comm_i[0];++i)
-      {
-        //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_P_x[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[0] ) ;
+   if ( rank_in_i[dir] == 0 ) {
+      for (i=1;i<nb_ranks_comm_i[dir];++i) {
+        MPI_Send( all_send_data[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[dir] ) ;
       }
-   }
-   else
-   {
+   } else {
       // Receive the data
-
-      //pelCOMM->receive( is_master, received_data, nb_received_data );
       static MPI_Status status ;
-      MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_i[0], &status ) ;
+      MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir], &status ) ;
 
-     // Solve the system of equations in each proc
+      // Solve the system of equations in each proc
 
-     if(dim == 2)
-     {
-        for(j = min_unknown_index(1);j<=max_unknown_index(1);j++)
-        {
+      if (dim == 2) {
+         for (j = local_min_j;j<=local_max_j;j++) {
+            k=0;
+            p = j-local_min_j;
 
-          p = j-min_unknown_index(1);
-          if(rank_in_i[0] != nb_ranks_comm_i[0]-1){
-            interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-            interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
-          }
-          else{
-            if(is_Pperiodic[0] ==0){
-              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
+	    unpack_ue_P(packed_data,dir,p);
+
+  	    // Need to have the original rhs function assembled for corrosponding j,k pair
+            double fe = 0.;
+            if (dir == 0) {
+               fe = pressure_assemble_local_rhs_x(j,k,t_it);
+            } else if (dir == 1) {
+               fe = pressure_assemble_local_rhs_y(j,k,t_it);
+            } else if (dir == 2) {
+               fe = pressure_assemble_local_rhs_z(j,k,t_it);
             }
-            else{
-              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-              interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
-            }
-
-          }
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = pressure_assemble_local_rhs_x(j,k,t_it);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie_x->multiply_vec_then_add(interface_rhs_x,local_rhs_x,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_x_solver_P(j,k,min_unknown_index(0),local_rhs_x,interface_rhs_x);
-        }
-     }
-     else
-     {
-        for(k = min_unknown_index(2);k<=max_unknown_index(2);k++)
-        {
-          for(j = min_unknown_index(1);j<=max_unknown_index(1);j++)
-          {
-            p = (j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
-            if(rank_in_i[0] != nb_ranks_comm_i[0]-1){
-              interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-              interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
-            }
-            else{
-              if(is_Pperiodic[0] ==0){
-                interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-              }
-              else{
-                interface_rhs_x->set_item(rank_in_i[0]-1,packed_data[2*p]);
-                interface_rhs_x->set_item(rank_in_i[0],packed_data[2*p+1]);
-              }
-            }
-            // Need to have the original rhs function assembled for corrosponding j,k pair
-            double fe = pressure_assemble_local_rhs_x(j,k,t_it);
 
             // Setup RHS = fi - Aie*xe for solving ui
-            Aie_x->multiply_vec_then_add(interface_rhs_x,local_rhs_x,-1.0,1.0);
+            Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
 
             // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_x_solver_P(j,k,min_unknown_index(0),local_rhs_x,interface_rhs_x);
-          }
+            GLOBAL_EQ->DS_NavierStokes_solver_P(j,k,min_unknown_index(dir),local_rhs,interface_rhs,dir);
+         }
+      } else {
+         for (k = local_min_k;k<=local_max_k;k++) {
+            for (j = local_min_j;j<=local_max_j;j++) {
+               p = (j-local_min_j)+local_length_j*(k-local_min_k);
+   
+	       unpack_ue_P(packed_data,dir,p);
 
-        }
-     }
+   	       // Need to have the original rhs function assembled for corrosponding j,k pair
+               double fe = 0.;
+               if (dir == 0) {
+                  fe = pressure_assemble_local_rhs_x(j,k,t_it);
+               } else if (dir == 1) {
+                  fe = pressure_assemble_local_rhs_y(j,k,t_it);
+               } else if (dir == 2) {
+                  fe = pressure_assemble_local_rhs_z(j,k,t_it);
+               }
 
+               // Setup RHS = fi - Aie*xe for solving ui
+               Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
+
+               // Solve ui and transfer solution into distributed vector
+               GLOBAL_EQ->DS_NavierStokes_solver_P(j,k,min_unknown_index(dir),local_rhs,interface_rhs,dir);
+            }
+         }
+      }
    }
+
+   for (p = 0; p < nb_ranks_comm_i[dir]; ++p) delete [] all_send_data[p];
+   delete [] all_send_data;
+
 }
-
-
-
 
 //---------------------------------------------------------------------------
 double
 DDS_NavierStokes:: pressure_assemble_local_rhs_y ( size_t const& i, size_t const& k, FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-  // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-
-size_t j,pos,m;
-
-double fe=0.,dy;
-
- // Vector for fi
-LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y_P() ;
-
- // Compute local_rhs_y = psi_{n} for pressure in y
- for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
- {
-   
-   pos = j - min_unknown_index(1);
-   dy = PF->get_cell_size( j,0,1);
-
-   if(is_Pperiodic[1] == 0){
-      if(rank_in_i[1] == nb_ranks_comm_i[1]-1){
-       local_rhs_y->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
-      }
-      else{
-         if(j == max_unknown_index(1))
-           fe = PF->DOF_value( i, j, k, 0, 1 )*dy;
-         else
-           local_rhs_y->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
-      }
-   }
-   else{
-      if(nb_ranks_comm_i[1] > 1){
-         if(j == max_unknown_index(1))
-           fe = PF->DOF_value( i, j, k, 0, 1 )*dy;
-         else
-           local_rhs_y->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
-      }
-      else
-        local_rhs_y->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
-   }
-    
- }
-
- // No term added to rhs for neumann as flux was set to zero during assemble of lhs
- // No term added to rhs for dirichlet as boundary condition for pseudo pressure(psi) becomes zero
-
- /*m = int(min_unknown_index(1)) - 1;
- if ( PF->DOF_in_domain( i, m, k, 0 ) )
-   if ( PF->DOF_has_imposed_Dirichlet_value( i, m, k, 0 ) )
-   {
-     double ai = 1/(PF->get_DOF_coordinate( m+1,0,1) - PF->get_DOF_coordinate( m,0,1));
-     double dirichlet_value = PF->DOF_value( i, m, k, 0, 0 ) ;
-     local_rhs_y->add_to_item( 0, + ai * dirichlet_value );
-   }
-
- m = int(max_unknown_index(1)) + 1;
- if ( PF->DOF_in_domain( i, m, k, 0 ) )
-   if ( PF->DOF_has_imposed_Dirichlet_value( i, m, k, 0 ) )
-   {
-     double ai = 1/(PF->get_DOF_coordinate( m,0,1) - PF->get_DOF_coordinate( m-1,0,1));
-     double dirichlet_value = PF->DOF_value( i, m, k, 0, 0 ) ;
-     local_rhs_y->add_to_item( local_rhs_y->nb_rows()-1, + ai * dirichlet_value );
-   }*/
-
-  return fe;
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: pressure_solve_y_for_secondorder ( size_t const& i, size_t const& k, FV_TimeIterator const* t_it,double * packed_data )
-//---------------------------------------------------------------------------
-{
-  // Get local min and max indices
-  size_t comp=0;
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-   double fe = pressure_assemble_local_rhs_y(i,k,t_it);
-
-   size_t j;
-   // create a replica of local rhs vector in local solution vector
-   LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y_P() ;
-
-   LA_SeqVector* local_solution_y = GLOBAL_EQ->get_local_solution_temp_y_P() ;
-   for(j=0;j<local_rhs_y->nb_rows();j++){
-    local_solution_y->set_item(j,local_rhs_y->item(j));
-   }
-
-   // Solve for xi locally and put it in local solution vector
-   GLOBAL_EQ->DS_NavierStokes_y_local_unknown_solver_P(local_solution_y);
-
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_P(1);
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_y_P();
-
-   for(j=0;j<Vec_temp->nb_rows();j++){
-          Vec_temp->set_item(j,0);
-    }
-   // Calculate Aei*xi in each proc locally
-   Aei->multiply_vec_then_add(local_solution_y,Vec_temp);
-   size_t vec_pos;
-   if(dim==2){
-      vec_pos=i-min_unknown_index(0);
-   }
-   else{
-      vec_pos=(k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
-   }
-   if(rank_in_i[1] == 0){
-     // Check if bc is periodic in x
-     // If it is, we need to pack two elements apart from fe
-
-      if(is_Pperiodic[1])
-          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[1]-1);
-      else
-          packed_data[3*vec_pos+0]=0;
-        
-     packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
-   }
-   else if(rank_in_i[1] == nb_ranks_comm_i[1]-1){
-     packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[1]-1);
-     
-     // Check if bc is periodic in x
-      // If it is, we need to pack two elements apart from fe
-      if(is_Pperiodic[1])
-          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
-      else
-          packed_data[3*vec_pos+1]=0;
-   }
-   else{
-     packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[1]-1);
-     packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[1]);
-   }
-   packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: pressure_solve_interface_unknowns_y ( double * packed_data, size_t nb_received_data, FV_TimeIterator const* t_it )
-//---------------------------------------------------------------------------
-{
-   size_t i,j,p;
-   size_t k =0;
-   size_t comp=0;
-
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
    size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
 
-   // Vector for fe
-   LA_SeqVector* interface_rhs_y = GLOBAL_EQ->get_interface_temp_y_P() ;
+   for (size_t l=0;l<dim;++l) {
+      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
+      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
+   }
+
+   size_t j,pos,m;
+   double fe=0.,dy;
+
    // Vector for fi
-   LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y_P();
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(1) ;
 
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_y_P();
+   // Compute local_rhs_y = psi_{n} for pressure in y
+   for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+      pos = j - min_unknown_index(1);
+      dy = PF->get_cell_size( j,0,1);
 
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_P(1);
-
-   size_t nb_send_data = (2*nb_received_data)/3;
-
-  // Send and receive the data first pass
-   if ( rank_in_i[1] == 0 )
-   {
-      for (i=1;i<nb_ranks_comm_i[1];++i)
-      {
-        // Receive the data
-        //pelCOMM->receive( i, all_received_data[i], nb_received_data );
-        static MPI_Status status ;
-        MPI_Recv( all_receive_data_P_y[i], nb_received_data, MPI_DOUBLE, i, 0,
-                          DDS_Comm_i[1], &status ) ;
+      if (is_Pperiodic[1] == 0) {
+         if (rank_in_i[1] == nb_ranks_comm_i[1]-1) {
+            local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
+         } else {
+            if (j == max_unknown_index(1))
+               fe = PF->DOF_value( i, j, k, 0, 1 )*dy;
+            else
+               local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
+         }
+      } else {
+         if (nb_ranks_comm_i[1] > 1) {
+            if (j == max_unknown_index(1))
+               fe = PF->DOF_value( i, j, k, 0, 1 )*dy;
+            else
+               local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
+         } else
+            local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
       }
-
-      // Solve system of interface unknowns for each x
-      if(dim == 2)
-      {
-        for(i=min_unknown_index(0);i<=max_unknown_index(0);i++)
-        {
-          size_t nb_interface_unknowns = Vec_temp->nb_rows();
-          for(j=0;j<nb_interface_unknowns;j++){
-            Vec_temp->set_item(j,0);
-            interface_rhs_y->set_item(j,0);
-          }
-          p = i-min_unknown_index(0);
-          if(is_Pperiodic[1])
-              Vec_temp->set_item(nb_ranks_comm_i[1]-1,packed_data[3*p]);
-          Vec_temp->set_item(0,packed_data[3*p+1]);
-          interface_rhs_y->set_item(0,packed_data[3*p+2]);
-
-          // Vec_temp might contain previous values
-
-          for(j=1;j<nb_ranks_comm_i[1];j++){
-
-            if(j!=nb_ranks_comm_i[1]-1){
-              Vec_temp->add_to_item(j-1,all_receive_data_P_y[j][3*p]);
-              Vec_temp->add_to_item(j,all_receive_data_P_y[j][3*p+1]);
-              interface_rhs_y->set_item(j,all_receive_data_P_y[j][3*p+2]);  // Assemble the interface rhs fe
-            }
-            else{
-              if(is_Pperiodic[1] ==0){
-                  Vec_temp->add_to_item(j-1,all_receive_data_P_y[j][3*p]);
-              }
-              else{
-                  // If periodic in y, last proc has an interface unknown
-                  Vec_temp->add_to_item(j-1,all_receive_data_P_y[j][3*p]);
-                  Vec_temp->add_to_item(j,all_receive_data_P_y[j][3*p+1]);
-                  interface_rhs_y->set_item(j,all_receive_data_P_y[j][3*p+2]);
-              }
-            }
-          }
-
-          for(j=0;j<nb_interface_unknowns;j++){
-          interface_rhs_y->set_item(j,interface_rhs_y->item(j)-Vec_temp->item(j)); // Get fe - Aei*xi to solve for ue
-          }
-
-          // Solve for ue (interface unknowns) in the master proc
-          GLOBAL_EQ->DS_NavierStokes_y_interface_unknown_solver_P(interface_rhs_y);
-
-          //if(p==0 && rank_in_i[0] == 1)
-          //  interface_rhs_y->print_items(MAC::out(),0);
-
-          // Pack the interface_rhs_x into the appropriate send_data
-          for (j=1;j<nb_ranks_comm_i[1];++j)
-          {
-            if(j!=nb_ranks_comm_i[1]-1){
-              all_send_data_P_y[j][2*p+0]=interface_rhs_y->item(j-1);
-              all_send_data_P_y[j][2*p+1]=interface_rhs_y->item(j);
-            }
-            else{
-              all_send_data_P_y[j][2*p+0]=interface_rhs_y->item(j-1);
-              if(is_Pperiodic[1])
-                all_send_data_P_y[j][2*p+1]=interface_rhs_y->item(j); 
-              else
-                all_send_data_P_y[j][2*p+1]=0;
-            }
-
-          }
-
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = pressure_assemble_local_rhs_y(i,k,t_it);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie->multiply_vec_then_add(interface_rhs_y,local_rhs_y,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_y_solver_P(i,k,min_unknown_index(1),local_rhs_y,interface_rhs_y);
-
-        }
-      }
-      else{
-        for(i=min_unknown_index(0);i<=max_unknown_index(0);i++)
-        {
-          for(k=min_unknown_index(2);k<=max_unknown_index(2);k++)
-          {
-            size_t nb_interface_unknowns = Vec_temp->nb_rows();
-            for(j=0;j<nb_interface_unknowns;j++){
-              Vec_temp->set_item(j,0);
-              interface_rhs_y->set_item(j,0);
-            }
-            p = (k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
-            if(is_Pperiodic[1])
-                Vec_temp->set_item(nb_ranks_comm_i[1]-1,packed_data[3*p]);
-            Vec_temp->set_item(0,packed_data[3*p+1]);
-            interface_rhs_y->set_item(0,packed_data[3*p+2]);
-
-            // Vec_temp might contain previous values
-
-            for(j=1;j<nb_ranks_comm_i[1];j++){
-
-              if(j!=nb_ranks_comm_i[1]-1){
-                Vec_temp->add_to_item(j-1,all_receive_data_P_y[j][3*p]);
-                Vec_temp->add_to_item(j,all_receive_data_P_y[j][3*p+1]);
-                interface_rhs_y->set_item(j,all_receive_data_P_y[j][3*p+2]);  // Assemble the interface rhs fe
-              }
-              else{
-                if(is_Pperiodic[1] == 0){
-                  Vec_temp->add_to_item(j-1,all_receive_data_P_y[j][3*p]);
-                }
-                else{
-                  Vec_temp->add_to_item(j-1,all_receive_data_P_y[j][3*p]);
-                  Vec_temp->add_to_item(j,all_receive_data_P_y[j][3*p+1]);
-                  interface_rhs_y->set_item(j,all_receive_data_P_y[j][3*p+2]);
-                }
-              }
-            }
-
-            for(j=0;j<nb_interface_unknowns;j++){
-            interface_rhs_y->set_item(j,interface_rhs_y->item(j)-Vec_temp->item(j)); // Get fe - Aei*xi to solve for ue
-            }
-
-            // Solve for ue (interface unknowns) in the master proc
-            GLOBAL_EQ->DS_NavierStokes_y_interface_unknown_solver_P(interface_rhs_y);
-
-            //if(p==0 && rank_in_i[0] == 1)
-            //  interface_rhs_y->print_items(MAC::out(),0);
-
-            // Pack the interface_rhs_x into the appropriate send_data
-            for (j=1;j<nb_ranks_comm_i[1];++j)
-            {
-              if(j!=nb_ranks_comm_i[1]-1){
-                all_send_data_P_y[j][2*p+0]=interface_rhs_y->item(j-1);
-                all_send_data_P_y[j][2*p+1]=interface_rhs_y->item(j);
-              }
-              else{
-                all_send_data_P_y[j][2*p+0]=interface_rhs_y->item(j-1);
-                if(is_Pperiodic[1])
-                  all_send_data_P_y[j][2*p+1]=interface_rhs_y->item(j);
-                else
-                  all_send_data_P_y[j][2*p+1]=0;
-              }
-
-            }
-
-            // Need to have the original rhs function assembled for corrosponding j,k pair
-            double fe = pressure_assemble_local_rhs_y(i,k,t_it);
-
-            // Setup RHS = fi - Aie*xe for solving ui
-            Aie->multiply_vec_then_add(interface_rhs_y,local_rhs_y,-1.0,1.0);
-
-            // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_y_solver_P(i,k,min_unknown_index(1),local_rhs_y,interface_rhs_y);
-          }
-        }
-      }
-
-    }
-   else
-   {
-      // Send the packed data to master
-      //pelCOMM->send( is_master, packed_data, nb_received_data );
-
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[1] ) ;
+    
    }
-   // Send the data from master
-   if ( rank_in_i[1] == 0 )
-   {
-     for (i=1;i<nb_ranks_comm_i[1];++i)
-      {
-        //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_P_y[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[1] ) ;
-      }
-   }
-   else
-   {
-      // Receive the data
-      //pelCOMM->receive( is_master, received_data, nb_received_data );
-      static MPI_Status status ;
-      MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_i[1], &status ) ;
-
-     // Solve the system of equations in each proc
-
-     if(dim == 2)
-     {
-        for(i = min_unknown_index(0);i<=max_unknown_index(0);i++)
-        {
-          p = i-min_unknown_index(0);
-          if(rank_in_i[1] != nb_ranks_comm_i[1]-1){
-            interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-            interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
-          }
-          else{
-            if(is_Pperiodic[1] ==0){
-              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-            }
-            else{
-              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-              interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
-            }
-          }
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = pressure_assemble_local_rhs_y(i,k,t_it);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie->multiply_vec_then_add(interface_rhs_y,local_rhs_y,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_y_solver_P(i,k,min_unknown_index(1),local_rhs_y,interface_rhs_y);
-        }
-     }
-     else
-     {
-        for(i = min_unknown_index(0);i<=max_unknown_index(0);i++)
-        {
-          for(k = min_unknown_index(2);k<=max_unknown_index(2);k++)
-          {
-            p = (k-min_unknown_index(2))+(max_unknown_index(2)-min_unknown_index(2)+1)*(i-min_unknown_index(0));
-            if(rank_in_i[1] != nb_ranks_comm_i[1]-1){
-              interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-              interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
-            }
-            else{
-              if(is_Pperiodic[1] ==0){
-                interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-              }
-              else{
-                interface_rhs_y->set_item(rank_in_i[1]-1,packed_data[2*p]);
-                interface_rhs_y->set_item(rank_in_i[1],packed_data[2*p+1]);
-              }
-            }
-            // Need to have the original rhs function assembled for corrosponding j,k pair
-            double fe = pressure_assemble_local_rhs_y(i,k,t_it);
-
-            // Setup RHS = fi - Aie*xe for solving ui
-            Aie->multiply_vec_then_add(interface_rhs_y,local_rhs_y,-1.0,1.0);
-
-            // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_y_solver_P(i,k,min_unknown_index(1),local_rhs_y,interface_rhs_y);
-          }
-        }
-     }
-
-   }
+   return fe;
 }
-
-
-
 
 //---------------------------------------------------------------------------
 double
 DDS_NavierStokes:: pressure_assemble_local_rhs_z ( size_t const& i, size_t const& j, FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-  // Get local min and max indices
-
- size_t_vector min_unknown_index(dim,0);
- for (size_t l=0;l<dim;++l)
-   min_unknown_index(l) =
-    PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
- size_t_vector max_unknown_index(dim,0);
- for (size_t l=0;l<dim;++l)
-   max_unknown_index(l) =
-    PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-
-size_t k,pos,m;
-
-double fe=0.,dz;
-
-// Vector for fi
-LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z_P();
-
-// Compute local_rhs_z = phi_{n} for pressure in z
- for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
- {
-   
-   pos = k - min_unknown_index(2);
-   dz = PF->get_cell_size( k,0,2);
-
-   if(is_Pperiodic[2] == 0){
-     if(rank_in_i[2] == nb_ranks_comm_i[2]-1){
-        local_rhs_z->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
-     }
-     else{
-       if(k == max_unknown_index(2))
-         fe = PF->DOF_value( i, j, k, 0, 1 )*dz ;
-       else
-         local_rhs_z->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
-     }
-   }
-   else{
-      if(nb_ranks_comm_i[2] > 1){
-       if(k == max_unknown_index(2))
-         fe = PF->DOF_value( i, j, k, 0, 1 )*dz ;
-       else
-         local_rhs_z->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
-      }
-      else
-        local_rhs_z->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
-   }
-   
- }
-
- // No term added to rhs for neumann as flux was set to zero during assemble of lhs
- // No term added to rhs for dirichlet as boundary condition for pseudo pressure(psi) becomes zero
-
- /*m = int(min_unknown_index(2)) - 1;
- if ( PF->DOF_in_domain( i, j, m, 0 ) )
-   if ( PF->DOF_has_imposed_Dirichlet_value( i, j, m, 0 ) )
-   {
-     double ai = 1/(PF->get_DOF_coordinate( m+1,0,2) - PF->get_DOF_coordinate( m,0,2));
-     double dirichlet_value = PF->DOF_value( i, j, m, 0, 0 ) ;
-     local_rhs_z->add_to_item( 0, + ai * dirichlet_value );
-   }
-
- m = int(max_unknown_index(2)) + 1;
- if ( PF->DOF_in_domain( i, j, m, 0 ) )
-   if ( PF->DOF_has_imposed_Dirichlet_value( i, j, m, 0 ) )
-   {
-     double ai = 1/(PF->get_DOF_coordinate( m,0,2) - PF->get_DOF_coordinate( m-1,0,2));
-     double dirichlet_value = PF->DOF_value( i, j, m, 0, 0
-      ) ;
-     local_rhs_z->add_to_item( local_rhs_z->nb_rows()-1, + ai * dirichlet_value );
-   }*/
-
-return fe;
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: pressure_solve_z_for_secondorder ( size_t const& i, size_t const& j,FV_TimeIterator const* t_it,double * packed_data )
-//---------------------------------------------------------------------------
-{
-  size_t comp=0;
-  // Get local min and max indices
+   // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
    size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-   double fe = pressure_assemble_local_rhs_z(i,j,t_it);
-
-   size_t k;
-   // create a replica of local rhs vector in local solution vector
-   LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z_P() ;
-
-   LA_SeqVector* local_solution_z = GLOBAL_EQ->get_local_solution_temp_z_P() ;
-   for(k=0;k<local_rhs_z->nb_rows();k++){
-    local_solution_z->set_item(k,local_rhs_z->item(k));
+   for (size_t l=0;l<dim;++l) { 
+      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
+      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
    }
 
-   // Solve for xi locally and put it in local solution vector
-   GLOBAL_EQ->DS_NavierStokes_z_local_unknown_solver_P(local_solution_z);
+   size_t k,pos,m;
+   double fe=0.,dz;
 
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_P(2);
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_z_P();
-
-   for(k=0;k<Vec_temp->nb_rows();k++){
-          Vec_temp->set_item(k,0);
-    }
-   // Calculate Aei*xi in each proc locally
-   Aei->multiply_vec_then_add(local_solution_z,Vec_temp);
-
-
-    size_t vec_pos=(i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
-
-    if(rank_in_i[2] == 0){
-      // Check if bc is periodic in x
-     // If it is, we need to pack two elements apart from fe
-
-      if(is_Pperiodic[2])
-          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[2]-1);
-      else
-          packed_data[3*vec_pos+0]=0;
-        
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
-    }
-    else if(rank_in_i[2] == nb_ranks_comm_i[2]-1){
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[2]-1);
-      
-      // Check if bc is periodic in x
-      // If it is, we need to pack two elements apart from fe
-      if(is_Pperiodic[2])
-          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
-      else
-          packed_data[3*vec_pos+1]=0;
-
-    }
-    else{
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[2]-1);
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[2]);
-    }
-    packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: pressure_solve_interface_unknowns_z ( double * packed_data, size_t nb_received_data, FV_TimeIterator const* t_it  )
-//---------------------------------------------------------------------------
-{
-   size_t i,j,p,m;
-   size_t comp=0;
-
-  // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     min_unknown_index(l) =
-      PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l)
-     max_unknown_index(l) =
-      PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-
-   // Vector for fe
-   LA_SeqVector* interface_rhs_z = GLOBAL_EQ->get_interface_temp_z_P() ;
    // Vector for fi
-   LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z_P();
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(2);
 
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_z_P();
+   // Compute local_rhs_z = phi_{n} for pressure in z
+   for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+      pos = k - min_unknown_index(2);
+      dz = PF->get_cell_size( k,0,2);
 
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_P(2);
-
-   size_t nb_send_data = (2*nb_received_data)/3;
-
-  // Send and receive the data first pass
-   if ( rank_in_i[2] == 0 )
-   {
-      for (p=1;p<nb_ranks_comm_i[2];++p)
-      {
-        // Receive the data
-        //pelCOMM->receive( i, all_received_data[i], nb_received_data );
-        static MPI_Status status ;
-        MPI_Recv( all_receive_data_P_z[p], nb_received_data, MPI_DOUBLE, p, 0,
-                          DDS_Comm_i[2], &status ) ;
-      }
-
-      // Solve system of interface unknowns for each x
-
-      for(j=min_unknown_index(1);j<=max_unknown_index(1);j++)
-      {
-        for(i=min_unknown_index(0);i<=max_unknown_index(0);i++)
-        {
-          size_t nb_interface_unknowns = Vec_temp->nb_rows();
-          for(m=0;m<nb_interface_unknowns;m++){
-            Vec_temp->set_item(m,0);
-            interface_rhs_z->set_item(m,0);
-          }
-          p = (i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
-
-          if(is_Pperiodic[2])
-              Vec_temp->set_item(nb_ranks_comm_i[2]-1,packed_data[3*p]);
-          Vec_temp->set_item(0,packed_data[3*p+1]);
-          interface_rhs_z->set_item(0,packed_data[3*p+2]);
-
-          // Vec_temp might contain previous values
-
-          for(m=1;m<nb_ranks_comm_i[2];m++){
-
-            if(m!=nb_ranks_comm_i[2]-1){
-              Vec_temp->add_to_item(m-1,all_receive_data_P_z[m][3*p]);
-              Vec_temp->add_to_item(m,all_receive_data_P_z[m][3*p+1]);
-              interface_rhs_z->set_item(m,all_receive_data_P_z[m][3*p+2]);  // Assemble the interface rhs fe
-            }
-            else{
-              if(is_Pperiodic[2] == 0)
-                  Vec_temp->add_to_item(m-1,all_receive_data_P_z[m][3*p]);
-              else{
-                  Vec_temp->add_to_item(m-1,all_receive_data_P_z[m][3*p]);
-                  Vec_temp->add_to_item(m,all_receive_data_P_z[m][3*p+1]);
-                  interface_rhs_z->set_item(m,all_receive_data_P_z[m][3*p+2]);
-              }  
-            }
-          }
-
-          for(m=0;m<nb_interface_unknowns;m++){
-          interface_rhs_z->set_item(m,interface_rhs_z->item(m)-Vec_temp->item(m)); // Get fe - Aei*xi to solve for ue
-          }
-
-          // Solve for ue (interface unknowns) in the master proc
-          GLOBAL_EQ->DS_NavierStokes_z_interface_unknown_solver_P(interface_rhs_z);
-
-          // Pack the interface_rhs_x into the appropriate send_data
-          for (m=1;m<nb_ranks_comm_i[2];++m)
-          {
-            if(m!=nb_ranks_comm_i[2]-1){
-              all_send_data_P_z[m][2*p+0]=interface_rhs_z->item(m-1);
-              all_send_data_P_z[m][2*p+1]=interface_rhs_z->item(m);
-            }
-            else{
-              all_send_data_P_z[m][2*p+0]=interface_rhs_z->item(m-1);
-              if(is_Pperiodic[2])
-                all_send_data_P_z[m][2*p+1]=interface_rhs_z->item(m);
-              else
-                all_send_data_P_z[m][2*p+1]=0;
-            }
-
-          }
-
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = pressure_assemble_local_rhs_z(i,j,t_it);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie->multiply_vec_then_add(interface_rhs_z,local_rhs_z,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_z_solver_P(i,j,min_unknown_index(2),local_rhs_z,interface_rhs_z);
-        }
-      }
-
-    }
-   else
-   {
-      // Send the packed data to master
-      //pelCOMM->send( is_master, packed_data, nb_received_data );
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[2] ) ;
-   }
-   // Send the data from master
-   if ( rank_in_i[2] == 0 )
-   {
-     for (m=1;m<nb_ranks_comm_i[2];++m)
-      {
-        //pelCOMM->send( i, all_send_data[i], nb_send_data );
-        MPI_Send( all_send_data_P_z[m], nb_send_data, MPI_DOUBLE, m, 0, DDS_Comm_i[2] ) ;
+      if (is_Pperiodic[2] == 0) {
+         if (rank_in_i[2] == nb_ranks_comm_i[2]-1) {
+            local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
+         } else {
+            if (k == max_unknown_index(2))
+               fe = PF->DOF_value( i, j, k, 0, 1 )*dz ;
+            else
+               local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
+         }
+      } else {
+         if (nb_ranks_comm_i[2] > 1) {
+            if (k == max_unknown_index(2))
+               fe = PF->DOF_value( i, j, k, 0, 1 )*dz ;
+            else
+               local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
+         } else
+            local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
       }
    }
-   else
-   {
-      // Receive the data
-      //pelCOMM->receive( is_master, received_data, nb_received_data );
-      static MPI_Status status ;
-      MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0,
-                          DDS_Comm_i[2], &status ) ;
-
-     // Solve the system of equations in each proc
-     for(j = min_unknown_index(1);j<=max_unknown_index(1);j++){
-        for(i = min_unknown_index(0);i<=max_unknown_index(0);i++){
-          p = (i-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(j-min_unknown_index(1));
-          if(rank_in_i[2] != nb_ranks_comm_i[2]-1){
-            interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);
-            interface_rhs_z->set_item(rank_in_i[2],packed_data[2*p+1]);
-          }
-          else{
-            if(is_Pperiodic[2] == 0)
-                interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);    
-            else{
-                interface_rhs_z->set_item(rank_in_i[2]-1,packed_data[2*p]);
-                interface_rhs_z->set_item(rank_in_i[2],packed_data[2*p+1]);
-            }
-          }
-          // Need to have the original rhs function assembled for corrosponding j,k pair
-          double fe = pressure_assemble_local_rhs_z(i,j,t_it);
-
-          // Setup RHS = fi - Aie*xe for solving ui
-          Aie->multiply_vec_then_add(interface_rhs_z,local_rhs_z,-1.0,1.0);
-
-          // Solve ui and transfer solution into distributed vector
-          GLOBAL_EQ->DS_NavierStokes_z_solver_P(i,j,min_unknown_index(2),local_rhs_z,interface_rhs_z);
-        }
-     }
-   }
+   return fe;
 }
 
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: SolveP_i_in_jk ( FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k )
+//---------------------------------------------------------------------------
+{
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+  size_t comp = 0;
 
+  for (size_t comp=0;comp<nb_comps;comp++) {
+     // Get local min and max indices
+     for (size_t l=0;l<dim;++l) {
+        min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+     }
 
+     size_t local_min_k = 0;
+     size_t local_max_k = 0;
+
+     size_t nb_send_data=0;
+     if (dim == 2) {
+        nb_send_data = 3*(max_unknown_index(dir_j)-min_unknown_index(dir_j)+1);
+     } else if (dim == 3) {
+        nb_send_data = 3*(max_unknown_index(dir_j)-min_unknown_index(dir_j)+1)*(max_unknown_index(dir_k)-min_unknown_index(dir_k)+1);
+        local_min_k = min_unknown_index(dir_k);
+        local_max_k = max_unknown_index(dir_k);
+     }
+
+     double * packed_data = new double[nb_send_data];
+
+     // Solve in i
+     if ((nb_ranks_comm_i[dir_i]>1)||(is_Pperiodic[dir_i] == 1)) {
+        for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
+           for (size_t k=local_min_k; k <= local_max_k; ++k) {
+               pressure_solve_for_secondorder(j,k,t_it,packed_data,dir_i);
+           }
+        }
+        pressure_solve_interface_unknowns ( packed_data, nb_send_data, t_it, dir_i );
+
+     } else if (is_Pperiodic[dir_i] == 0) {  // Serial mode with non-periodic condition
+        for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
+           for (size_t k=local_min_k; k <= local_max_k; ++k) {
+              double fe = 0.;
+              if (dir_i == 0) {
+                 fe = pressure_assemble_local_rhs_x(j,k,t_it);
+              } else if (dir_i == 1) {
+                 fe = pressure_assemble_local_rhs_y(j,k,t_it);
+              } else if (dir_i == 2) {
+                 fe = pressure_assemble_local_rhs_z(j,k,t_it);
+              }
+	      LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(dir_i);
+              GLOBAL_EQ->DS_NavierStokes_solver_P(j,k,min_unknown_index(dir_i),local_rhs,NULL,dir_i);
+           }
+        }
+     }
+     delete [] packed_data;
+  }
+}
 
 //---------------------------------------------------------------------------
 void
@@ -4406,200 +2628,26 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
 {
   MAC_LABEL( "DDS_NavierStokes:: NS_pressure_update" ) ;
 
-  size_t i, j, k;
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
+  SolveP_i_in_jk (t_it,0,1,2);
+  // Synchronize the distributed DS solution vector
+  GLOBAL_EQ->synchronize_DS_solution_vec_P();
+  // Tranfer back to field
+  PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
   
-  for (size_t l=0;l<dim;++l)
-      min_unknown_index(l) =
-       PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-  for (size_t l=0;l<dim;++l)
-      max_unknown_index(l) =
-       PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-
-  // PF->copy_DOFs_value( 1, 0 );
-  // First Equation
-  double m,dirichlet_value;
-  
-  if(dim == 2){
-
-    // Solve in x for pressure
-    if(nb_ranks_comm_i[0]>1){
-      size_t nb_send_data_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1);
-
-      for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-       {
-          k=0;
-          pressure_solve_x_for_secondorder(j,k,t_it,mpi_packed_data_P_x);
-       }
-
-       pressure_solve_interface_unknowns_x ( mpi_packed_data_P_x, nb_send_data_x,t_it);
-    }
-    else{
-      for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-       {
-          k=0;
-          double fe = pressure_assemble_local_rhs_x(j,k,t_it);
-          LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x_P();
-
-          if(is_Pperiodic[0] == 1)
-              GLOBAL_EQ->DS_NavierStokes_x_solver_P_periodic(j,k,min_unknown_index(0),local_rhs_x,NULL);
-          else
-              GLOBAL_EQ->DS_NavierStokes_x_solver_P(j,k,min_unknown_index(0),local_rhs_x,NULL);
-        }
-
-    }
-
+  SolveP_i_in_jk (t_it,1,0,2);
+  // Synchronize the distributed DS solution vector
+  GLOBAL_EQ->synchronize_DS_solution_vec_P();
+  // Tranfer back to field
+  PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
+ 
+  if (dim == 3) { 
+     SolveP_i_in_jk (t_it,2,0,1);
      // Synchronize the distributed DS solution vector
      GLOBAL_EQ->synchronize_DS_solution_vec_P();
-
-     // Tranfer back to field
-     PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
-
-     // output_L2norm_pressure( 1 ); 
-
-    // Solve in y for pressure
-     if(nb_ranks_comm_i[1]>1){
-       size_t nb_send_data_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1);
-
-       for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-       {
-          k=0;
-          pressure_solve_y_for_secondorder(i,k,t_it,mpi_packed_data_P_y);
-       }
-
-       pressure_solve_interface_unknowns_y ( mpi_packed_data_P_y, nb_send_data_y, t_it);
-     }
-     else{
-      for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-       {
-          k=0;
-         double fe = pressure_assemble_local_rhs_y(i,k,t_it);
-         LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y_P();
-         //local_rhs_y->print_items(MAC::out(),0);
-         if(is_Pperiodic[1] == 1 )
-            GLOBAL_EQ->DS_NavierStokes_y_solver_P_periodic(i,k,min_unknown_index(1),local_rhs_y,NULL);
-         else
-            GLOBAL_EQ->DS_NavierStokes_y_solver_P(i,k,min_unknown_index(1),local_rhs_y,NULL);
-       }
-     }
-
-     // Synchronize the distributed DS solution vector
-     GLOBAL_EQ->synchronize_DS_solution_vec_P();
-
-     // Tranfer back to field
-     PF->update_free_DOFs_value( 1 , GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
-     
-     // output_L2norm_pressure( 1 );
-   }
-  else{
-
-    
-    // Solve in x for pressure
-    if(nb_ranks_comm_i[0]>1){
-      size_t nb_send_data_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
-      
-      for (k=min_unknown_index(2);k<=max_unknown_index(2);++k){
-        for (j=min_unknown_index(1);j<=max_unknown_index(1);++j){
-            pressure_solve_x_for_secondorder(j,k,t_it,mpi_packed_data_P_x);
-        }
-      }
-      pressure_solve_interface_unknowns_x ( mpi_packed_data_P_x, nb_send_data_x, t_it);
-    }
-    else{
-      for (k=min_unknown_index(2);k<=max_unknown_index(2);++k){
-        for (j=min_unknown_index(1);j<=max_unknown_index(1);++j){
-            double fe = pressure_assemble_local_rhs_x(j,k,t_it);
-            LA_SeqVector* local_rhs_x = GLOBAL_EQ->get_local_temp_x_P();
-            if(is_Pperiodic[0] == 1)
-                GLOBAL_EQ->DS_NavierStokes_x_solver_P_periodic(j,k,min_unknown_index(0),local_rhs_x,NULL);
-            else
-                GLOBAL_EQ->DS_NavierStokes_x_solver_P(j,k,min_unknown_index(0),local_rhs_x,NULL);
-        }
-      }
-    }
-
-    // Synchronize the distributed DS solution vector
-    GLOBAL_EQ->synchronize_DS_solution_vec_P();
-
-    // Tranfer back to field
-    PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
-
-    
-    // Solve in y for pressure
-    if(nb_ranks_comm_i[1]>1){
-      size_t nb_send_data_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
-      
-      // Third equation - Solve in y
-      for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-       {
-         for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
-         {
-              pressure_solve_y_for_secondorder(i,k,t_it,mpi_packed_data_P_y);
-         }
-       }
-       pressure_solve_interface_unknowns_y ( mpi_packed_data_P_y, nb_send_data_y, t_it );
-    }
-    else{
-      for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-       {
-         for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
-         {
-            double fe = pressure_assemble_local_rhs_y(i,k,t_it);
-            LA_SeqVector* local_rhs_y = GLOBAL_EQ->get_local_temp_y_P();
-            if(is_Pperiodic[1] == 1)
-                GLOBAL_EQ->DS_NavierStokes_y_solver_P_periodic(i,k,min_unknown_index(1),local_rhs_y,NULL);
-            else
-                GLOBAL_EQ->DS_NavierStokes_y_solver_P(i,k,min_unknown_index(1),local_rhs_y,NULL);
-         }
-       }
-    }
-     // Synchronize the distributed DS solution vector
-     GLOBAL_EQ->synchronize_DS_solution_vec_P();
-
-     // Tranfer back to field
-     PF->update_free_DOFs_value( 1 , GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
-
-    
-    // Solve in z for pressure
-
-     if(nb_ranks_comm_i[2]>1){
-       size_t nb_send_data_z = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(1)-min_unknown_index(1)+1);
-       
-       for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-       {
-         for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-         {
-           pressure_solve_z_for_secondorder(i,j,t_it,mpi_packed_data_P_z);
-         }
-       }
-
-       pressure_solve_interface_unknowns_z ( mpi_packed_data_P_z, nb_send_data_z,t_it);
-     }
-     else{
-       for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-       {
-         for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-         {
-            double fe = pressure_assemble_local_rhs_z(i,j,t_it);
-            LA_SeqVector* local_rhs_z = GLOBAL_EQ->get_local_temp_z_P();
-            if(is_Pperiodic[2] == 1)
-                GLOBAL_EQ->DS_NavierStokes_z_solver_P_periodic(i,j,min_unknown_index(2),local_rhs_z,NULL);
-            else
-                GLOBAL_EQ->DS_NavierStokes_z_solver_P(i,j,min_unknown_index(2),local_rhs_z,NULL);
-         }
-       }
-     }
-
-     // Synchronize the distributed DS solution vector
-     GLOBAL_EQ->synchronize_DS_solution_vec_P();
-
      // Tranfer back to field
      PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
   }
-
-
+  
   // Debug
   output_L2norm_pressure( 0 );
   output_L2norm_pressure( 1 );  
@@ -4618,127 +2666,94 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 
    size_t i, j, k,m;
 
-  double value=0.;
+   double value=0.;
 
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
+   size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
 
-  double xhr,xright,xvalue1=0.,xvalue2=0.,xvalue=0.;
-  double yhr,yright,yvalue1=0.,yvalue2=0.,yvalue=0.;
-  double dirichlet_value;
-  FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
+   double xhr,xright,xvalue1=0.,xvalue2=0.,xvalue=0.;
+   double yhr,yright,yvalue1=0.,yvalue2=0.,yvalue=0.;
+   double dirichlet_value;
+   FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 
-    // Get local min and max indices 
-    // When we are running in parallel, the unknowns in the overlapping region are not solved. So we need to include 
-    // them here by calling get_min_index_unknown_on_proc() instead of get_min_index_unknown_handled_by_proc().
+   // Get local min and max indices 
+   // When we are running in parallel, the unknowns in the overlapping region are not solved. So we need to include 
+   // them here by calling get_min_index_unknown_on_proc() instead of get_min_index_unknown_handled_by_proc().
 
+   for (size_t l=0;l<dim;++l) {
+       min_unknown_index(l) = PF->get_min_index_unknown_on_proc( 0, l ) ;
+       max_unknown_index(l) = PF->get_max_index_unknown_on_proc( 0, l ) ;
+   }
 
-    for (size_t l=0;l<dim;++l)
-      min_unknown_index(l) =
-       PF->get_min_index_unknown_on_proc( 0, l ) ;
-    for (size_t l=0;l<dim;++l)
-      max_unknown_index(l) =
-       PF->get_max_index_unknown_on_proc( 0, l ) ;
-
-    for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-    {
-      for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-      {
-        if(dim ==2 )
-        {
-          k=0;
+   for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+      for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+         if (dim ==2 ) {
+            k=0;
           
-          xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-
-          // Divergence of un (x component)
-          xright = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
-          xvalue1 = xright/xhr;
-
-          // Divergence of un+1 (x component)
-          xright = UF->DOF_value( shift.i+i, j, k, 0, 1 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 1 ) ;
-          xvalue2 = xright/xhr;
-        
-          xvalue = 0.5*(xvalue1+xvalue2);
-
-          yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-          
-          // Divergence of un (y component)
-          yright = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
-          yvalue1 = yright/yhr;
-
-          // Divergence of un+1 (y component)
-          yright = UF->DOF_value( i, shift.j+j, k, 1, 1 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 1 ) ;
-          yvalue2 = yright/yhr;
-
-          yvalue = 0.5*(yvalue1+yvalue2);
-
-          // Assemble the bodyterm
-          value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - kai*mu*(xvalue + yvalue);
-
-          PF->set_DOF_value( i, j, k, 0, 0, value);
-          //MAC::out() << PF->DOF_value( i, j, k, 0, 1 ) << endl;
-        }
-        else
-        {
-          for (k=min_unknown_index(2);k<=max_unknown_index(2);++k)
-          {
-
             xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-
             // Divergence of un (x component)
             xright = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
             xvalue1 = xright/xhr;
-
             // Divergence of un+1 (x component)
             xright = UF->DOF_value( shift.i+i, j, k, 0, 1 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 1 ) ;
-            xvalue2 = xright/xhr;
-          
+            xvalue2 = xright/xhr;      
             xvalue = 0.5*(xvalue1+xvalue2);
 
             yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-  
-            // Divergence of un (y component)            
+            // Divergence of un (y component)
             yright = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
             yvalue1 = yright/yhr;
-
             // Divergence of un+1 (y component)
             yright = UF->DOF_value( i, shift.j+j, k, 1, 1 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 1 ) ;
             yvalue2 = yright/yhr;
-
             yvalue = 0.5*(yvalue1+yvalue2);
 
-            double zhr,zright,zvalue1=0.,zvalue2=0.,zvalue=0.;
-
-            zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
-            
-            // Divergence of un (z component)
-            zright = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
-            zvalue1 = zright/zhr;
-
-            // Divergence of un+1 (z component)
-            zright = UF->DOF_value( i, j, shift.k+k, 2, 1 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 1 ) ;
-            zvalue2 = zright/zhr;            
-            
-            zvalue = 0.5*(zvalue1+zvalue2);
-
             // Assemble the bodyterm
-            value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - kai*mu*(xvalue + yvalue+ zvalue);
+            value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - kai*mu*(xvalue + yvalue);
 
             PF->set_DOF_value( i, j, k, 0, 0, value);
+        } else {
+            for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+               xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
+               // Divergence of un (x component)
+               xright = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
+               xvalue1 = xright/xhr;
+               // Divergence of un+1 (x component)
+               xright = UF->DOF_value( shift.i+i, j, k, 0, 1 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 1 ) ;
+               xvalue2 = xright/xhr;
+               xvalue = 0.5*(xvalue1+xvalue2);
 
-          }
-        }
+               yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
+               // Divergence of un (y component)            
+               yright = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
+               yvalue1 = yright/yhr;
+               // Divergence of un+1 (y component)
+               yright = UF->DOF_value( i, shift.j+j, k, 1, 1 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 1 ) ;
+               yvalue2 = yright/yhr;
+               yvalue = 0.5*(yvalue1+yvalue2);
+
+               double zhr,zright,zvalue1=0.,zvalue2=0.,zvalue=0.;
+               zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
+               // Divergence of un (z component)
+               zright = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
+               zvalue1 = zright/zhr;
+               // Divergence of un+1 (z component)
+               zright = UF->DOF_value( i, j, shift.k+k, 2, 1 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 1 ) ;
+               zvalue2 = zright/zhr;            
+               zvalue = 0.5*(zvalue1+zvalue2);
+
+               // Assemble the bodyterm
+               value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - kai*mu*(xvalue + yvalue+ zvalue);
+               PF->set_DOF_value( i, j, k, 0, 0, value);
+            }
+         }
       }
+   }
 
-    }
+   // Propagate values to the boundaries depending on BC conditions
+   PF->set_neumann_DOF_values();
 
-    // Propagate values to the boundaries depending on BC conditions
-    PF->set_neumann_DOF_values();
-
-    // Un=Un+1
-    //UF->copy_DOFs_value( 1, 2 );
-
-    UF->copy_DOFs_value( 0, 1 );
+   UF->copy_DOFs_value( 0, 1 );
 
 }
 

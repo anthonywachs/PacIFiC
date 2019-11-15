@@ -1350,18 +1350,12 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
 }
 
-
-
-
 //----------------------------------------------------------------------
 DDS_NavierStokesSystem:: ~DDS_NavierStokesSystem( void )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: ~DDS_NavierStokesSystem" ) ;
 }
-
-
-
 
 //----------------------------------------------------------------------
 void
@@ -1375,9 +1369,6 @@ DDS_NavierStokesSystem::initialize_velocity( void )
          
 }
 
-
-
-
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::initialize_DS_velocity( void )
@@ -1390,9 +1381,6 @@ DDS_NavierStokesSystem::initialize_DS_velocity( void )
          
 }
 
-
-
-
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::initialize_DS_pressure( void )
@@ -1404,9 +1392,6 @@ DDS_NavierStokesSystem::initialize_DS_pressure( void )
    PF_NUM->scatter()->set( PF_DS_LOC, VEC_DS_PF ) ;
          
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector const*
@@ -1423,9 +1408,6 @@ DDS_NavierStokesSystem:: get_solution_velocity( void ) const
 
 }
 
-
-
-
 //----------------------------------------------------------------------
 LA_SeqVector const*
 DDS_NavierStokesSystem:: get_solution_DS_velocity( void ) const
@@ -1441,9 +1423,6 @@ DDS_NavierStokesSystem:: get_solution_DS_velocity( void ) const
 
 }
 
-
-
-
 //----------------------------------------------------------------------
 LA_SeqVector const*
 DDS_NavierStokesSystem:: get_solution_DS_velocity_P( void ) const
@@ -1458,9 +1437,6 @@ DDS_NavierStokesSystem:: get_solution_DS_velocity_P( void ) const
    return( DS_result ) ;
 
 }
-
-
-
 
 //----------------------------------------------------------------------
 void
@@ -1482,39 +1458,6 @@ DDS_NavierStokesSystem:: finalize_constant_matrices( void )
 
 }
 
-
-
-
-//----------------------------------------------------------------------
-bool
-DDS_NavierStokesSystem:: NavierStokes_solver( void  )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: NavierStokes_solver" ) ;
-
-   // Synchronize matrices & vectors
-   VEC_UF->synchronize() ;
-
-   // Compute velocity unsteady rhs
-   MAT_A_velocityUnsteady->multiply_vec_then_add( VEC_UF,
-   	VEC_rhs_A_velocityUnsteady ) ;
-
-   // Add velocity BC rhs
-   VEC_rhs_A_velocityUnsteady->sum(
-   	VEC_rhs_D_velocityDiffusionPlusBodyTerm ) ;
-
-   // Solve unsteady laplacian problem
-   SOLVER_velocity->solve( VEC_rhs_A_velocityUnsteady,
-   	VEC_UF );
-   MAC_ASSERT( SOLVER_velocity->solution_is_achieved() ) ;
-
-   return( true ) ;
-
-}
-
-
-
-
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::at_each_time_step( void )
@@ -1530,9 +1473,6 @@ DDS_NavierStokesSystem::at_each_time_step( void )
    VEC_DS_PF->synchronize() ;
 
 }
-
-
-
 
 //----------------------------------------------------------------------
 double
@@ -1552,9 +1492,6 @@ DDS_NavierStokesSystem:: compute_velocity_change( void )
    return ( time_change ) ;
 
 }
-
-
-
 
 //----------------------------------------------------------------------
 double
@@ -1578,219 +1515,72 @@ DDS_NavierStokesSystem:: compute_directionsplitting_velocity_change( void )
 
 }
 
-
-
-
 //----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem:: assemble_velocity_unsteady_matrix(
-	double const& coef )
+LA_SeqVector*
+DDS_NavierStokesSystem::get_local_temp( size_t const& c, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL(
-   "REG_ProjectionNavierStokesSystem:: assemble_velocity_unsteady_matrix" ) ;
-
-   UF->assemble_mass_matrix( coef, MAT_A_velocityUnsteady );
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_x" ) ;
+      return ( VEC_local_temp_x[c] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_y" ) ;
+      return ( VEC_local_temp_y[c] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_z" ) ;
+      return ( VEC_local_temp_z[c] ) ;
+   }
 }
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem:: assemble_velocity_diffusion_matrix_rhs(
-	double const& coef_lap )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL(
-   "DDS_NavierStokesSystem:: assemble_velocity_diffusion_matrix_rhs" ) ;
-
-   UF->assemble_constantcoef_laplacian_matrix( coef_lap,
-	MAT_D_velocityUnsteadyPlusDiffusion,
-	VEC_rhs_D_velocityDiffusionPlusBodyTerm );
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_Vector*
-DDS_NavierStokesSystem::get_diffrhs_plus_bodyterm_vector( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_diffrhs_plus_bodyterm_vector" ) ;
-
-   return ( VEC_rhs_D_velocityDiffusionPlusBodyTerm ) ;
-
-}
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_local_temp_x( size_t const& c )
+DDS_NavierStokesSystem::get_local_solution_temp( size_t const& c, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_x" ) ;
-
-   return ( VEC_local_temp_x[c] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_x" ) ;
+      return ( VEC_local_solution_temp_x[c] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_y" ) ;
+      return ( VEC_local_solution_temp_y[c] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_z" ) ;
+      return ( VEC_local_solution_temp_z[c] ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_local_solution_temp_x( size_t const& c )
+DDS_NavierStokesSystem::get_interface_temp( size_t const& c, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_x" ) ;
-
-   return ( VEC_local_solution_temp_x[c] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x" ) ;
+      return ( VEC_interface_temp_x[c] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y" ) ;
+      return ( VEC_interface_temp_y[c] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z" ) ;
+      return ( VEC_interface_temp_z[c] ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_interface_temp_x( size_t const& c )
+DDS_NavierStokesSystem::get_temp( size_t const& c, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x" ) ;
-
-   return ( VEC_interface_temp_x[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_temp_x( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x" ) ;
-
-   return ( VEC_temp_x[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_local_temp_y( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_y" ) ;
-
-   return ( VEC_local_temp_y[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_local_solution_temp_y( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_y" ) ;
-
-   return ( VEC_local_solution_temp_y[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_interface_temp_y( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y" ) ;
-
-   return ( VEC_interface_temp_y[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_temp_y( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y" ) ;
-
-   return ( VEC_temp_y[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_local_temp_z( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_z" ) ;
-
-   return ( VEC_local_temp_z[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_local_solution_temp_z( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_z" ) ;
-
-   return ( VEC_local_solution_temp_z[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_interface_temp_z( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z" ) ;
-
-   return ( VEC_interface_temp_z[c] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_temp_z( size_t const& c )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z" ) ;
-
-   return ( VEC_temp_z[c] ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x" ) ;
+      return ( VEC_temp_x[c] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y" ) ;
+      return ( VEC_temp_y[c] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z" ) ;
+      return ( VEC_temp_z[c] ) ;
+   }
 }
 
 //----------------------------------------------------------------------
@@ -1947,171 +1737,72 @@ DDS_NavierStokesSystem::get_P_vec_zv( void )
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_local_temp_x_P( void )
+DDS_NavierStokesSystem::get_local_temp_P(size_t const dir)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_x_P" ) ;
-
-   return ( VEC_local_temp_x_P ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_x_P" ) ;
+      return ( VEC_local_temp_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_y_P" ) ;
+      return ( VEC_local_temp_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_z_P" ) ;
+      return ( VEC_local_temp_z_P ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_local_solution_temp_x_P( void )
+DDS_NavierStokesSystem::get_local_solution_temp_P(size_t const dir)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_x_P" ) ;
-
-   return ( VEC_local_solution_temp_x_P ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_x_P" ) ;
+      return ( VEC_local_solution_temp_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_y_P" ) ;
+      return ( VEC_local_solution_temp_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_z_P" ) ;
+      return ( VEC_local_solution_temp_z_P ) ;
+   }
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_interface_temp_x_P( void )
+DDS_NavierStokesSystem::get_interface_temp_P(size_t const dir)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x_P" ) ;
-
-   return ( VEC_interface_temp_x_P ) ;
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x_P" ) ;
+      return ( VEC_interface_temp_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y_P" ) ;
+      return ( VEC_interface_temp_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z_P" ) ;
+      return ( VEC_interface_temp_z_P ) ;
+   }
 
 }
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_temp_x_P( void )
+DDS_NavierStokesSystem::get_temp_P(size_t const dir)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x_P" ) ;
-
-   return ( VEC_temp_x_P ) ;
-
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_temp_x_P" ) ;
+      return ( VEC_temp_x_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_temp_y_P" ) ;
+      return ( VEC_temp_y_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_temp_z_P" ) ;
+      return ( VEC_temp_z_P ) ;
+   }
 }
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_local_temp_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_y_P" ) ;
-
-   return ( VEC_local_temp_y_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_local_solution_temp_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_y_P" ) ;
-
-   return ( VEC_local_solution_temp_y_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_interface_temp_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y_P" ) ;
-
-   return ( VEC_interface_temp_y_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_temp_y_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_temp_y_P" ) ;
-
-   return ( VEC_temp_y_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_local_temp_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_z_P" ) ;
-
-   return ( VEC_local_temp_z_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_local_solution_temp_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_z_P" ) ;
-
-   return ( VEC_local_solution_temp_z_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_interface_temp_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z_P" ) ;
-
-   return ( VEC_interface_temp_z_P ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_temp_z_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z_P" ) ;
-
-   return ( VEC_temp_z_P ) ;
-
-}
-
-
-
 
 //----------------------------------------------------------------------
 LA_SeqVector*
@@ -2219,13 +1910,15 @@ DDS_NavierStokesSystem::compute_Aii_ref_P( size_t const dir)
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_schlur_x_ref( size_t const& comp)
+DDS_NavierStokesSystem::compute_schlur_ref( size_t const& comp, size_t const dir)
 //----------------------------------------------------------------------
 {
-   size_t nrows = schlur_complement_x[comp] -> nb_rows() ;
-   double temp = schlur_complement_x[comp]->item(0,0);
-   schlur_complement_x_ref[comp]-> set_item(0,0,schlur_complement_x[comp] ->item(0,0));
-   schlur_complement_x_ref[comp]-> set_item(0,1,schlur_complement_x[comp] ->item(0,1)/temp);
+   LA_SeqMatrix* schlur_complement = get_schlur_complement(comp,dir);	
+   LA_SeqMatrix* schlur_complement_ref = get_schlur_complement_ref(comp,dir);	
+   size_t nrows = schlur_complement->nb_rows() ;
+   double temp = schlur_complement->item(0,0);
+   schlur_complement_ref-> set_item(0,0,schlur_complement->item(0,0));
+   schlur_complement_ref-> set_item(0,1,schlur_complement->item(0,1)/temp);
 
     // Perform Forward Elimination
    size_t m;
@@ -2234,168 +1927,51 @@ DDS_NavierStokesSystem::compute_schlur_x_ref( size_t const& comp)
    for (m=1;m<nrows;++m)
    {
      double a,b,c,prevc;
-     a=schlur_complement_x[comp] ->item(m,m-1);
-     b=schlur_complement_x[comp] ->item(m,m);
-     c=schlur_complement_x[comp] ->item(m,m+1);
-     prevc=schlur_complement_x_ref[comp] ->item(m-1,m);
+     a=schlur_complement->item(m,m-1);
+     b=schlur_complement->item(m,m);
+     c=schlur_complement->item(m,m+1);
+     prevc=schlur_complement_ref->item(m-1,m);
 
      if(m<nrows-1)
-         schlur_complement_x_ref[comp] ->set_item(m,m+1,c/(b - a*prevc));
-      schlur_complement_x_ref[comp] ->set_item(m,m,b);
-      schlur_complement_x_ref[comp] ->set_item(m,m-1,a);
+         schlur_complement_ref->set_item(m,m+1,c/(b - a*prevc));
+      schlur_complement_ref->set_item(m,m,b);
+      schlur_complement_ref->set_item(m,m-1,a);
    }
 }
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_schlur_y_ref( size_t const& comp)
+DDS_NavierStokesSystem::compute_schlur_ref_P( size_t const dir )
 //----------------------------------------------------------------------
 {
-   size_t nrows = schlur_complement_y[comp] -> nb_rows() ;
-   double temp = schlur_complement_y[comp]->item(0,0);
-   schlur_complement_y_ref[comp]-> set_item(0,0,schlur_complement_y[comp] ->item(0,0));
-   schlur_complement_y_ref[comp]-> set_item(0,1,schlur_complement_y[comp] ->item(0,1)/temp);
-
+   LA_SeqMatrix* schlur_complement = get_schlur_complement_P(dir);	
+   LA_SeqMatrix* schlur_complement_ref = get_schlur_complement_P_ref(dir);	
+   size_t nrows = schlur_complement->nb_rows() ;
+   double temp = schlur_complement->item(0,0);
     // Perform Forward Elimination
    size_t m;
 
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=schlur_complement_y[comp] ->item(m,m-1);
-     b=schlur_complement_y[comp] ->item(m,m);
-     c=schlur_complement_y[comp] ->item(m,m+1);
-     prevc=schlur_complement_y_ref[comp] ->item(m-1,m);
-
-     if(m<nrows-1)
-         schlur_complement_y_ref[comp] ->set_item(m,m+1,c/(b - a*prevc));
-      schlur_complement_y_ref[comp] ->set_item(m,m,b);
-      schlur_complement_y_ref[comp] ->set_item(m,m-1,a);
-   }
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_schlur_z_ref( size_t const& comp)
-//----------------------------------------------------------------------
-{
-   size_t nrows = schlur_complement_z[comp] -> nb_rows() ;
-   double temp = schlur_complement_z[comp]->item(0,0);
-   schlur_complement_z_ref[comp]-> set_item(0,0,schlur_complement_z[comp] ->item(0,0));
-   schlur_complement_z_ref[comp]-> set_item(0,1,schlur_complement_z[comp] ->item(0,1)/temp);
-
-    // Perform Forward Elimination
-   size_t m;
-
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=schlur_complement_z[comp] ->item(m,m-1);
-     b=schlur_complement_z[comp] ->item(m,m);
-     c=schlur_complement_z[comp] ->item(m,m+1);
-     prevc=schlur_complement_z_ref[comp] ->item(m-1,m);
-
-     if(m<nrows-1)
-         schlur_complement_z_ref[comp] ->set_item(m,m+1,c/(b - a*prevc));
-      schlur_complement_z_ref[comp] ->set_item(m,m,b);
-      schlur_complement_z_ref[comp] ->set_item(m,m-1,a);
-   }
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_schlur_x_ref_P( void )
-//----------------------------------------------------------------------
-{
-   size_t nrows = schlur_complement_x_P -> nb_rows() ;
-   double temp = schlur_complement_x_P->item(0,0);
-    // Perform Forward Elimination
-   size_t m;
-
-   schlur_complement_x_ref_P-> set_item(0,0,schlur_complement_x_P ->item(0,0));
+   schlur_complement_ref->set_item(0,0,schlur_complement->item(0,0));
    if(nrows > 1){
-     schlur_complement_x_ref_P-> set_item(0,1,schlur_complement_x_P ->item(0,1)/temp);
+     schlur_complement_ref->set_item(0,1,schlur_complement->item(0,1)/temp);
 
      /// Showing problem for last row elimination
      for (m=1;m<nrows;++m)
      {
        double a,b,c,prevc;
-       a=schlur_complement_x_P ->item(m,m-1);
-       b=schlur_complement_x_P ->item(m,m);
-       c=schlur_complement_x_P ->item(m,m+1);
-       prevc=schlur_complement_x_ref_P ->item(m-1,m);
+       a=schlur_complement->item(m,m-1);
+       b=schlur_complement->item(m,m);
+       c=schlur_complement->item(m,m+1);
+       prevc=schlur_complement_ref->item(m-1,m);
 
        if(m<nrows-1)
-           schlur_complement_x_ref_P ->set_item(m,m+1,c/(b - a*prevc));
-        schlur_complement_x_ref_P ->set_item(m,m,b);
-        schlur_complement_x_ref_P ->set_item(m,m-1,a);
+           schlur_complement_ref->set_item(m,m+1,c/(b - a*prevc));
+        schlur_complement_ref->set_item(m,m,b);
+        schlur_complement_ref->set_item(m,m-1,a);
      } 
    }
    
 }
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_schlur_y_ref_P( void )
-//----------------------------------------------------------------------
-{
-   size_t nrows = schlur_complement_y_P -> nb_rows() ;
-   double temp = schlur_complement_y_P->item(0,0);
-   schlur_complement_y_ref_P-> set_item(0,0,schlur_complement_y_P ->item(0,0));
-   schlur_complement_y_ref_P-> set_item(0,1,schlur_complement_y_P ->item(0,1)/temp);
-
-    // Perform Forward Elimination
-   size_t m;
-
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=schlur_complement_y_P ->item(m,m-1);
-     b=schlur_complement_y_P ->item(m,m);
-     c=schlur_complement_y_P ->item(m,m+1);
-     prevc=schlur_complement_y_ref_P ->item(m-1,m);
-
-     if(m<nrows-1)
-         schlur_complement_y_ref_P ->set_item(m,m+1,c/(b - a*prevc));
-      schlur_complement_y_ref_P ->set_item(m,m,b);
-      schlur_complement_y_ref_P ->set_item(m,m-1,a);
-   }
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_schlur_z_ref_P( void )
-//----------------------------------------------------------------------
-{
-   size_t nrows = schlur_complement_z_P -> nb_rows() ;
-   double temp = schlur_complement_z_P->item(0,0);
-   schlur_complement_z_ref_P-> set_item(0,0,schlur_complement_z_P ->item(0,0));
-   schlur_complement_z_ref_P-> set_item(0,1,schlur_complement_z_P ->item(0,1)/temp);
-
-    // Perform Forward Elimination
-   size_t m;
-
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m)
-   {
-     double a,b,c,prevc;
-     a=schlur_complement_z_P ->item(m,m-1);
-     b=schlur_complement_z_P ->item(m,m);
-     c=schlur_complement_z_P ->item(m,m+1);
-     prevc=schlur_complement_z_ref_P ->item(m-1,m);
-
-     if(m<nrows-1)
-         schlur_complement_z_ref_P ->set_item(m,m+1,c/(b - a*prevc));
-      schlur_complement_z_ref_P ->set_item(m,m,b);
-      schlur_complement_z_ref_P ->set_item(m,m-1,a);
-   }
-}
-
-
-
 
 //----------------------------------------------------------------------
 void
@@ -2738,6 +2314,23 @@ DDS_NavierStokesSystem::get_schlur_complement( size_t const& comp, size_t const 
 
 //----------------------------------------------------------------------
 LA_SeqMatrix*
+DDS_NavierStokesSystem::get_schlur_complement_ref( size_t const& comp, size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_x_ref" ) ;
+      return ( schlur_complement_x_ref[comp] ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_y_ref" ) ;
+      return ( schlur_complement_y_ref[comp] ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_z_ref" ) ;
+      return ( schlur_complement_z_ref[comp] ) ;
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
 DDS_NavierStokesSystem::get_schlur_complement_P( size_t const dir )
 //----------------------------------------------------------------------
 {
@@ -2753,6 +2346,22 @@ DDS_NavierStokesSystem::get_schlur_complement_P( size_t const dir )
    }
 }
 
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_schlur_complement_P_ref( size_t const dir )
+//----------------------------------------------------------------------
+{
+   if (dir == 0) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_x_ref_P" ) ;
+      return ( schlur_complement_x_ref_P ) ;
+   } else if (dir == 1) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_y_ref_P" ) ;
+      return ( schlur_complement_y_ref_P ) ;
+   } else if (dir == 2) {
+      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_z_ref_P" ) ;
+      return ( schlur_complement_z_ref_P ) ;
+   }
+}
 
 //----------------------------------------------------------------------
 LA_SeqMatrix*
@@ -2824,181 +2433,63 @@ DDS_NavierStokesSystem::get_Aii_Aie_product_P( size_t const dir )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::DS_NavierStokes_x_local_unknown_solver( LA_SeqVector* rhs, size_t const& comp )
+DDS_NavierStokesSystem::DS_NavierStokes_local_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_x_local_unknown_solver" ) ;
+   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_local_unknown_solver" ) ;
+
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir);
 
    // Solve the DS splitting problem in
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], rhs);
+   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, rhs);
 
 }
 
-
-
-
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::DS_NavierStokes_x_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp  )
+DDS_NavierStokesSystem::DS_NavierStokes_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const dir )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_x_interface_unknown_solver" ) ;
 
-   // Solve the DS splitting problem in
-   DDS_NavierStokesSystem::thomas_algorithm( schlur_complement_x_ref[comp], rhs);
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_y_local_unknown_solver( LA_SeqVector* rhs, size_t const& comp  )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_y_local_unknown_solver" ) ;
+   LA_SeqMatrix* schlur_complement_ref = get_schlur_complement_ref(comp,dir);
 
    // Solve the DS splitting problem in
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], rhs);
+   DDS_NavierStokesSystem::thomas_algorithm( schlur_complement_ref, rhs);
+
 }
-
-
-
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::DS_NavierStokes_y_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp  )
+DDS_NavierStokesSystem::DS_NavierStokes_local_unknown_solver_P( LA_SeqVector* rhs, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_y_interface_unknown_solver" ) ;
+   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_local_unknown_solver_P" ) ;
 
-   // Solve the DS splitting problem in
-
-   DDS_NavierStokesSystem::thomas_algorithm( schlur_complement_y_ref[comp], rhs);
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_z_local_unknown_solver( LA_SeqVector* rhs, size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_z_local_unknown_solver" ) ;
-
-   // Solve the DS splitting problem in
-	 DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], rhs);
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_z_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp)
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_z_interface_unknown_solver" ) ;
-
-   // Solve the DS splitting problem in z
-
-   DDS_NavierStokesSystem::thomas_algorithm( schlur_complement_z_ref[comp], rhs);
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_x_local_unknown_solver_P( LA_SeqVector* rhs )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_x_local_unknown_solver_P" ) ;
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag_P(dir);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag_P(dir);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag_P(dir);
 
    // Solve the DS splitting problem in x
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, rhs);
+   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, rhs);
 
 }
-
-
-
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::DS_NavierStokes_x_interface_unknown_solver_P( LA_SeqVector* rhs  )
+DDS_NavierStokesSystem::DS_NavierStokes_interface_unknown_solver_P( LA_SeqVector* rhs, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_x_interface_unknown_solver_P" ) ;
+   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_interface_unknown_solver_P" ) ;
+
+   LA_SeqMatrix* schlur_complement_ref = get_schlur_complement_P_ref(dir);
 
    // Solve the DS splitting problem in x
-   DDS_NavierStokesSystem::thomas_algorithm( schlur_complement_x_ref_P, rhs);
+   DDS_NavierStokesSystem::thomas_algorithm( schlur_complement_ref, rhs);
 
 }
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_y_local_unknown_solver_P( LA_SeqVector* rhs )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_y_local_unknown_solver_P" ) ;
-
-   // Solve the DS splitting problem in x
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, rhs);
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_y_interface_unknown_solver_P( LA_SeqVector* rhs  )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_y_interface_unknown_solver_P" ) ;
-
-   // Solve the DS splitting problem in x
-   DDS_NavierStokesSystem::thomas_algorithm( schlur_complement_y_ref_P, rhs);
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_z_local_unknown_solver_P( LA_SeqVector* rhs )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_z_local_unknown_solver_P" ) ;
-
-   // Solve the DS splitting problem in x
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, rhs);
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_z_interface_unknown_solver_P( LA_SeqVector* rhs  )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_z_interface_unknown_solver_P" ) ;
-
-   // Solve the DS splitting problem in x
-   DDS_NavierStokesSystem::thomas_algorithm( schlur_complement_z_ref_P, rhs);
-
-}
-
-
-
 
 //----------------------------------------------------------------------
 double
@@ -3020,480 +2511,126 @@ DDS_NavierStokesSystem::compute_vector_transpose_product(
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::DS_NavierStokes_x_solver(
-	size_t const& j, size_t const& k, size_t const& min_i, LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const& comp )
+DDS_NavierStokesSystem::DS_NavierStokes_solver(
+	size_t const& j, size_t const& k, size_t const& min_i, LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const& comp, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_x_solver" ) ;
+   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_solver" ) ;
 
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir);
    // Solve the DS splitting problem in
 
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], rhs);
+   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, rhs);
 
    // Transfer in the distributed vector
-   size_t nb_local_unk_x = rhs->nb_rows();
+   size_t nb_local_unk = rhs->nb_rows();
+   // Since, this function is used in all directions;
+   // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
+   size_t ii=0,jj=0,kk=0;
+   
    size_t m, i, global_number_in_distributed_vector;
 
-   for (m=0;m<nb_local_unk_x;++m)
-   {
-     i = min_i + m ;
-     global_number_in_distributed_vector =
-     	UF->DOF_global_number( i, j, k, comp );
-     VEC_DS_UF->set_item( global_number_in_distributed_vector,
-     	rhs->item( m ) );
+   for (m=0;m<nb_local_unk;++m) {
+      i = min_i + m ;
+
+      if (dir == 0) {
+         ii = i; jj = j; kk = k;
+      } else if (dir == 1) {
+         ii = j; jj = i; kk = k;
+      } else if (dir == 2) {
+         ii = j; jj = k; kk = i;
+      }      
+
+      global_number_in_distributed_vector = UF->DOF_global_number( ii, jj, kk, comp );
+      VEC_DS_UF->set_item( global_number_in_distributed_vector, rhs->item( m ) );
    }
 
    // Put the interface unknowns in distributed vector
-   if(nb_procs_in_i[0] > 1){
-      if(is_Uperiodic[0] == 1){
-          i = min_i + nb_local_unk_x ;
-          global_number_in_distributed_vector =
-          UF->DOF_global_number( i, j, k, comp );
-          VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_i[0] ) );
-      }
-      else if(proc_pos_in_i[0] != nb_procs_in_i[0]-1){
-          i = min_i + nb_local_unk_x ;
-          global_number_in_distributed_vector =
-          UF->DOF_global_number( i, j, k, comp );
-          VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_i[0] ) );
-      }
+   i = min_i + nb_local_unk ;
+   if (dir == 0) {
+      ii = i; jj = j; kk = k;
+   } else if (dir == 1) {
+      ii = j; jj = i; kk = k;
+   } else if (dir == 2) {
+      ii = j; jj = k; kk = i;
+   }
+
+   if ((is_Uperiodic[dir] == 1)) {
+      global_number_in_distributed_vector =
+      UF->DOF_global_number( ii, jj, kk, comp );
+      VEC_DS_UF->set_item( global_number_in_distributed_vector,
+           interface_rhs->item( proc_pos_in_i[dir] ) );
+   } else if ((is_Uperiodic[dir] == 0) && (proc_pos_in_i[dir] != nb_procs_in_i[dir]-1)) {
+      global_number_in_distributed_vector =
+      UF->DOF_global_number( ii, jj, kk, comp );
+      VEC_DS_UF->set_item( global_number_in_distributed_vector,
+           interface_rhs->item( proc_pos_in_i[dir] ) );
    }
 }
 
-
-
-
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::DS_NavierStokes_x_solver_periodic(
-  size_t const& j, size_t const& k, size_t const& min_i, LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const& comp )
+DDS_NavierStokesSystem::DS_NavierStokes_solver_P(
+  size_t const& j, size_t const& k, size_t const& min_i, LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const dir )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_x_solver" ) ;
+   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_solver_P" ) ;
 
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag_P(dir);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag_P(dir);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag_P(dir);
    // Solve the DS splitting problem in
 
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal[comp],Aii_x_main_diagonal[comp],Aii_x_mod_super_diagonal[comp], rhs);
-
-   double scale = (compute_vector_transpose_product(U_vec_xv[comp],rhs))/(1+compute_vector_transpose_product(U_vec_xv[comp],U_vec_xu[comp]) );
-
-   rhs->sum(U_vec_xu[comp],-1.0*scale);
-
-   // Transfer in the distributed vector
-   size_t nb_local_unk_x = rhs->nb_rows();
-   size_t m, i, global_number_in_distributed_vector;
-
-   for (m=0;m<nb_local_unk_x;++m)
-   {
-     i = min_i + m ;
-     global_number_in_distributed_vector =
-      UF->DOF_global_number( i, j, k, comp );
-     VEC_DS_UF->set_item( global_number_in_distributed_vector,
-      rhs->item( m ) );
-   }
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_y_solver(
-   size_t const& i, size_t const& k, size_t const& min_j ,LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const& comp  )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_y_solver" ) ;
-
-   // Solve the DS splitting problem in
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], rhs);
-
-   // Transfer in the distributed vector
-   size_t nb_local_unk_y = rhs->nb_rows();
-   size_t m, j, global_number_in_distributed_vector;
-
-   for (m=0;m<nb_local_unk_y;++m)
-   {
-     j = min_j + m ;
-     global_number_in_distributed_vector =
-      UF->DOF_global_number( i, j, k, comp );
-     VEC_DS_UF->set_item( global_number_in_distributed_vector,
-      rhs->item( m ) );
-   }
-
-   // Put the interface unknowns in distributed vector
-   if(nb_procs_in_i[1] > 1){
-      if(is_Uperiodic[1] == 1){
-          j = min_j + nb_local_unk_y ;
-          global_number_in_distributed_vector =
-          UF->DOF_global_number( i, j, k, comp);
-          VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_i[1] ) );
-      }
-      else if(proc_pos_in_i[1] != nb_procs_in_i[1]-1){
-          j = min_j + nb_local_unk_y ;
-          global_number_in_distributed_vector =
-          UF->DOF_global_number( i, j, k, comp);
-          VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_i[1] ) );
-      }
-   }
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_y_solver_periodic(
-   size_t const& i, size_t const& k, size_t const& min_j ,LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const& comp  )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_y_solver" ) ;
-
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal[comp],Aii_y_main_diagonal[comp],Aii_y_mod_super_diagonal[comp], rhs);
-
-   double scale = (compute_vector_transpose_product(U_vec_yv[comp],rhs))/(1+compute_vector_transpose_product(U_vec_yv[comp],U_vec_yu[comp]) );
-
-   rhs->sum(U_vec_yu[comp],-1.0*scale);
-
-   // Transfer in the distributed vector
-   size_t nb_local_unk_y = rhs->nb_rows();
-   size_t m, j, global_number_in_distributed_vector;
-   for (m=0;m<nb_local_unk_y;++m)
-   {
-     j = min_j + m ;
-     global_number_in_distributed_vector =
-      UF->DOF_global_number( i, j, k, comp );
-     VEC_DS_UF->set_item( global_number_in_distributed_vector,
-      rhs->item( m ) );
-   }
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_z_solver(
-	size_t const& i, size_t const& j, size_t const& min_k ,LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const& comp  )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_z_solver" ) ;
-
-   // Solve the DS splitting problem in
-
-	 DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], rhs);
-
-   // Transfer in the distributed vector
-   size_t nb_local_unk_z = rhs->nb_rows();
-   size_t m, k, global_number_in_distributed_vector;
-   for (m=0;m<nb_local_unk_z;++m)
-   {
-     k = min_k + m ;
-     global_number_in_distributed_vector =
-     	UF->DOF_global_number( i, j, k, comp );
-     VEC_DS_UF->set_item( global_number_in_distributed_vector,
-     	rhs->item( m ) );
-   }
-
-    // Put the interface unknowns in distributed vector
-   if(nb_procs_in_i[2] > 1){
-      if(is_Uperiodic[2] == 1){
-          k = min_k + nb_local_unk_z ;
-          global_number_in_distributed_vector =
-          UF->DOF_global_number( i, j, k, comp );
-          VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_i[2] ) );
-      }
-      else if(proc_pos_in_i[2] != nb_procs_in_i[2]-1){
-          k = min_k + nb_local_unk_z ;
-          global_number_in_distributed_vector =
-          UF->DOF_global_number( i, j, k, comp );
-          VEC_DS_UF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_i[2] ) );
-      } 
-   }
-   
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_z_solver_periodic(
-  size_t const& i, size_t const& j, size_t const& min_k ,LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const& comp  )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_z_solver" ) ;
-
-   // Solve the DS splitting problem in
-
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal[comp],Aii_z_main_diagonal[comp],Aii_z_mod_super_diagonal[comp], rhs);
-
-   double scale = (compute_vector_transpose_product(U_vec_zv[comp],rhs))/(1+compute_vector_transpose_product(U_vec_zv[comp],U_vec_zu[comp]) );
-
-   rhs->sum(U_vec_zu[comp],-1.0*scale);
-
-   // Transfer in the distributed vector
-   size_t nb_local_unk_z = rhs->nb_rows();
-   size_t m, k, global_number_in_distributed_vector;
-   for (m=0;m<nb_local_unk_z;++m)
-   {
-     k = min_k + m ;
-     global_number_in_distributed_vector =
-      UF->DOF_global_number( i, j, k, comp );
-     VEC_DS_UF->set_item( global_number_in_distributed_vector,
-      rhs->item( m ) );
-   }
-   
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_x_solver_P(
-  size_t const& j, size_t const& k, size_t const& min_i, LA_SeqVector* rhs, LA_SeqVector* interface_rhs )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_x_solver_P" ) ;
-
-   // Solve the DS splitting problem in
-
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, rhs);
+   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, rhs);
    
    // Transfer in the distributed vector for pressure
-   size_t nb_local_unk_x = rhs->nb_rows();
+   size_t nb_local_unk = rhs->nb_rows();
+
+   // Since, this function is used in all directions;
+   // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
+   size_t ii=0,jj=0,kk=0;
+
    size_t m, i, global_number_in_distributed_vector;
 
-   for (m=0;m<nb_local_unk_x;++m)
-   {
-     i = min_i + m ;
-     global_number_in_distributed_vector =
-      PF->DOF_global_number( i, j, k, 0 );
-     VEC_DS_PF->set_item( global_number_in_distributed_vector,
-      rhs->item( m ) );
+   for (m=0;m<nb_local_unk;++m) {
+      i = min_i + m ;
+
+      if (dir == 0) {
+         ii = i; jj = j; kk = k;
+      } else if (dir == 1) {
+         ii = j; jj = i; kk = k;
+      } else if (dir == 2) {
+         ii = j; jj = k; kk = i;
+      }      
+
+      global_number_in_distributed_vector = PF->DOF_global_number( ii, jj, kk, 0 );
+      VEC_DS_PF->set_item( global_number_in_distributed_vector, rhs->item( m ) );
    }
 
    // Put the interface unknowns in distributed vector for pressure
-   if(nb_procs_in_i[0] > 1){
-    if(is_Pperiodic[0] == 1){
-      i = min_i + nb_local_unk_x ;
+   i = min_i + nb_local_unk ;
+   if (dir == 0) {
+      ii = i; jj = j; kk = k;
+   } else if (dir == 1) {
+      ii = j; jj = i; kk = k;
+   } else if (dir == 2) {
+      ii = j; jj = k; kk = i;
+   }
+
+   if ((is_Pperiodic[dir] == 1)) {
       global_number_in_distributed_vector =
-      PF->DOF_global_number( i, j, k, 0 );
+      PF->DOF_global_number( ii, jj, kk, 0 );
       VEC_DS_PF->set_item( global_number_in_distributed_vector,
-         interface_rhs->item( proc_pos_in_i[0] ) );
-    }
-    else if(proc_pos_in_i[0] != nb_procs_in_i[0]-1){
-      i = min_i + nb_local_unk_x ;
+         interface_rhs->item( proc_pos_in_i[dir] ) );
+   } else if ((is_Pperiodic[dir] == 0) && (proc_pos_in_i[dir] != nb_procs_in_i[dir]-1)) {
       global_number_in_distributed_vector =
-      PF->DOF_global_number( i, j, k, 0 );
+      PF->DOF_global_number( ii, jj, kk, 0 );
       VEC_DS_PF->set_item( global_number_in_distributed_vector,
-         interface_rhs->item( proc_pos_in_i[0] ) );
-    } 
-   }
-   
+         interface_rhs->item( proc_pos_in_i[dir] ) );
+   } 
 }
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_x_solver_P_periodic(
-  size_t const& j, size_t const& k, size_t const& min_i, LA_SeqVector* rhs, LA_SeqVector* interface_rhs )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_x_solver_P" ) ;
-
-   // Solve the DS splitting problem in
-
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_x_sub_diagonal_P,Aii_x_main_diagonal_P,Aii_x_mod_super_diagonal_P, rhs);
-
-   double scale = (compute_vector_transpose_product(P_vec_xv,rhs))/(1+compute_vector_transpose_product(P_vec_xv,P_vec_xu) );
-
-   rhs->sum(P_vec_xu,-1.0*scale);
-
-   // Transfer in the distributed vector for pressure
-   size_t nb_local_unk_x = rhs->nb_rows();
-   size_t m, i, global_number_in_distributed_vector;
-
-   for (m=0;m<nb_local_unk_x;++m)
-   {
-     i = min_i + m ;
-     global_number_in_distributed_vector =
-      PF->DOF_global_number( i, j, k, 0 );
-     VEC_DS_PF->set_item( global_number_in_distributed_vector,
-      rhs->item( m ) );
-   }
-   
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_y_solver_P(
-   size_t const& i, size_t const& k, size_t const& min_j ,LA_SeqVector* rhs, LA_SeqVector* interface_rhs )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_y_solver_P" ) ;
-
-   // Solve the DS splitting problem in
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, rhs);
-
-   /*if(i >= 8){
-      rhs->print_items(MAC::out(),0); 
-   }*/
-   // Transfer in the distributed vector for pressure
-   size_t nb_local_unk_y = rhs->nb_rows();
-   size_t m, j, global_number_in_distributed_vector;
-   for (m=0;m<nb_local_unk_y;++m)
-   {
-     j = min_j + m ;
-     global_number_in_distributed_vector =
-      PF->DOF_global_number( i, j, k, 0 );
-     VEC_DS_PF->set_item( global_number_in_distributed_vector,
-      rhs->item( m ) );
-   }
-
-   // Put the interface unknowns in distributed vector for pressure
-   if(nb_procs_in_i[1] > 1){
-    if(is_Pperiodic[1] == 1){
-      j = min_j + nb_local_unk_y ;
-      global_number_in_distributed_vector =
-      PF->DOF_global_number( i, j, k, 0);
-      VEC_DS_PF->set_item( global_number_in_distributed_vector,
-         interface_rhs->item( proc_pos_in_i[1] ) );
-    }
-    else if(proc_pos_in_i[1] != nb_procs_in_i[1]-1){
-      j = min_j + nb_local_unk_y ;
-      global_number_in_distributed_vector =
-      PF->DOF_global_number( i, j, k, 0);
-      VEC_DS_PF->set_item( global_number_in_distributed_vector,
-         interface_rhs->item( proc_pos_in_i[1] ) );
-    }
-   }
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_y_solver_P_periodic(
-   size_t const& i, size_t const& k, size_t const& min_j ,LA_SeqVector* rhs, LA_SeqVector* interface_rhs )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_y_solver_P" ) ;
-
-   // Solve the DS splitting problem in
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_y_sub_diagonal_P,Aii_y_main_diagonal_P,Aii_y_mod_super_diagonal_P, rhs);
-
-   double scale = (compute_vector_transpose_product(P_vec_yv,rhs))/(1+compute_vector_transpose_product(P_vec_yv,P_vec_yu) );
-
-   rhs->sum(P_vec_yu,-1.0*scale);
-
-   // Transfer in the distributed vector for pressure
-   size_t nb_local_unk_y = rhs->nb_rows();
-   size_t m, j, global_number_in_distributed_vector;
-   for (m=0;m<nb_local_unk_y;++m)
-   {
-     j = min_j + m ;
-     global_number_in_distributed_vector =
-      PF->DOF_global_number( i, j, k, 0 );
-     VEC_DS_PF->set_item( global_number_in_distributed_vector,
-      rhs->item( m ) );
-   }
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_z_solver_P(
-  size_t const& i, size_t const& j, size_t const& min_k ,LA_SeqVector* rhs, LA_SeqVector* interface_rhs )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_z_solver_P" ) ;
-
-   // Solve the DS splitting problem in
-
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, rhs);
-
-   // Transfer in the distributed vector for pressure
-   size_t nb_local_unk_z = rhs->nb_rows();
-   size_t m, k, global_number_in_distributed_vector;
-   for (m=0;m<nb_local_unk_z;++m)
-   {
-     k = min_k + m ;
-     global_number_in_distributed_vector =
-      PF->DOF_global_number( i, j, k, 0 );
-     VEC_DS_PF->set_item( global_number_in_distributed_vector,
-      rhs->item( m ) );
-   }
-
-    // Put the interface unknowns in distributed vector for pressure
-   if(nb_procs_in_i[2] > 1){
-      if(is_Pperiodic[2] == 1){
-          k = min_k + nb_local_unk_z ;
-          global_number_in_distributed_vector =
-          PF->DOF_global_number( i, j, k, 0 );
-          VEC_DS_PF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_i[2] ) );
-      }
-      else if(proc_pos_in_i[2] != nb_procs_in_i[2]-1){
-          k = min_k + nb_local_unk_z ;
-          global_number_in_distributed_vector =
-          PF->DOF_global_number( i, j, k, 0 );
-          VEC_DS_PF->set_item( global_number_in_distributed_vector,
-             interface_rhs->item( proc_pos_in_i[2] ) );
-      }
-   }
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_z_solver_P_periodic(
-  size_t const& i, size_t const& j, size_t const& min_k ,LA_SeqVector* rhs, LA_SeqVector* interface_rhs )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_z_solver_P" ) ;
-
-   // Solve the DS splitting problem in
-
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_z_sub_diagonal_P,Aii_z_main_diagonal_P,Aii_z_mod_super_diagonal_P, rhs);
-
-   double scale = (compute_vector_transpose_product(P_vec_zv,rhs))/(1+compute_vector_transpose_product(P_vec_zv,P_vec_zu) );
-
-   rhs->sum(P_vec_zu,-1.0*scale);
-
-   // Transfer in the distributed vector for pressure
-   size_t nb_local_unk_z = rhs->nb_rows();
-   size_t m, k, global_number_in_distributed_vector;
-   for (m=0;m<nb_local_unk_z;++m)
-   {
-     k = min_k + m ;
-     global_number_in_distributed_vector =
-      PF->DOF_global_number( i, j, k, 0 );
-     VEC_DS_PF->set_item( global_number_in_distributed_vector,
-      rhs->item( m ) );
-   }
-}
-
-
-
 
 //----------------------------------------------------------------------
 void
@@ -3505,9 +2642,6 @@ DDS_NavierStokesSystem::synchronize_DS_solution_vec( void )
    VEC_DS_UF->synchronize();
 }
 
-
-
-
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::synchronize_solution_vec( void )
@@ -3517,9 +2651,6 @@ DDS_NavierStokesSystem::synchronize_solution_vec( void )
 
    VEC_UF->synchronize();
 }
-
-
-
 
 //----------------------------------------------------------------------
 void
