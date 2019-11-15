@@ -664,6 +664,7 @@ void compute_nboundary_Cube_v2 (GeomParameter * gcp, int * nb, int * lN)
       /* printf ("lengthedge = %f on thread %d\n", lengthedge, pid() ); */
       foreach_cache (poscache) {
 	*lN = floor (sqrt(3.)*lengthedge/(2.*Delta));
+	//*lN = floor (lengthedge/(2.*Delta));
       }
 #if dimension == 2
       /* number of points required for the 4 edges of the square */

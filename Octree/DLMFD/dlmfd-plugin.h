@@ -207,7 +207,7 @@ event init (i = 0)
     {
 	particles[k].iscube = 1;
 	compute_principal_vectors_Cubes( &(particles[k]) );
-	printf ("length cube = %f\n", (particles[k].g).radius);
+	//printf ("length cube = %f\n", (particles[k].g).radius);
     }
   }
 
