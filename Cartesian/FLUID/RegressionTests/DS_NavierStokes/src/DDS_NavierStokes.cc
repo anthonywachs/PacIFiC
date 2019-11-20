@@ -91,12 +91,12 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    nb_procs = pelCOMM->nb_ranks();
    is_master = 0;
 
-   is_Uperiodic[0] = false;
-   is_Uperiodic[1] = false;
-   is_Uperiodic[2] = false;
-   is_Pperiodic[0] = false;
-   is_Pperiodic[1] = false;
-   is_Pperiodic[2] = false;
+   is_periodic[0][0] = false;
+   is_periodic[0][1] = false;
+   is_periodic[0][2] = false;
+   is_periodic[1][0] = false;
+   is_periodic[1][1] = false;
+   is_periodic[1][2] = false;
 
    // Timing routines
    if ( my_rank == is_master )
@@ -115,7 +115,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
 
    // Get space dimension
    dim = UF->primary_grid()->nb_space_dimensions() ;
-   nb_comps = UF->nb_components() ;
+   nb_comps[0] = PF->nb_components() ;
+   nb_comps[1] = UF->nb_components() ;
 
    if ( dim == 1 )
    {
@@ -179,17 +180,17 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
 
    // Periodic boundary condition check for velocity
    U_periodic_comp = UF->primary_grid()->get_periodic_directions();
-   is_Uperiodic[0] = U_periodic_comp->operator()( 0 );
-   is_Uperiodic[1] = U_periodic_comp->operator()( 1 );
+   is_periodic[1][0] = U_periodic_comp->operator()( 0 );
+   is_periodic[1][1] = U_periodic_comp->operator()( 1 );
    if(dim >2)
-      is_Uperiodic[2] = U_periodic_comp->operator()( 2 ); 
+      is_periodic[1][2] = U_periodic_comp->operator()( 2 ); 
 
    // Periodic boundary condition check for pressure
    P_periodic_comp = PF->primary_grid()->get_periodic_directions();
-   is_Pperiodic[0] = P_periodic_comp->operator()( 0 );
-   is_Pperiodic[1] = P_periodic_comp->operator()( 1 );
+   is_periodic[0][0] = P_periodic_comp->operator()( 0 );
+   is_periodic[0][1] = P_periodic_comp->operator()( 1 );
    if(dim >2)
-      is_Pperiodic[2] = P_periodic_comp->operator()( 2 ); 
+      is_periodic[0][2] = P_periodic_comp->operator()( 2 ); 
 
    // Build the matrix system
    MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DDS_NavierStokesSystem" ) ;
@@ -223,10 +224,6 @@ DDS_NavierStokes:: ~DDS_NavierStokes( void )
    MAC_LABEL( "DDS_NavierStokes:: ~DDS_NavierStokes" ) ;
 
    free_DDS_subcommunicators() ;
-
-   deallocate_mpi_vectors_U();
-
-   deallocate_mpi_vectors_P();
 
 }
 
@@ -290,22 +287,16 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    // Assemble 1D tridiagonal matrices
    assemble_velocity_1D_matrices(t_it);
 
-   for (size_t dir = 0; dir < dim; dir++) {
-      if ( rank_in_i[dir] == 0 && nb_ranks_comm_i[dir]>1) {
-         GLOBAL_EQ->compute_schlur_ref_P(dir);
-      }
-   }
-
-   for (size_t comp = 0;comp<nb_comps;comp++) {
-      for (size_t dir = 0; dir < dim; dir++) {
-         if ( rank_in_i[dir] == 0 && nb_ranks_comm_i[dir]>1){
-            GLOBAL_EQ->compute_schlur_ref(comp,dir);
+   // Calculation of schur complement for pressure(0) and velocity(1) field
+   for (size_t field = 0; field < 2; field++) {
+      for (size_t comp = 0;comp<nb_comps[field];comp++) {
+         for (size_t dir = 0; dir < dim; dir++) {
+            if ( rank_in_i[dir] == 0 && nb_ranks_comm_i[dir]>1) {
+               GLOBAL_EQ->compute_schlur_ref(comp,dir,field);
+            }
          }
       }
    }
-
-   allocate_mpi_vectors_U();
-   allocate_mpi_vectors_P();
 
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
 
@@ -361,9 +352,6 @@ DDS_NavierStokes:: do_before_inner_iterations_stage(
 
 }
 
-
-
-
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: do_after_inner_iterations_stage(
@@ -395,9 +383,6 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
 
 }
 
-
-
-
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
@@ -413,310 +398,6 @@ DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
    GLOBAL_EQ->display_debug();
 }
 
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: allocate_mpi_vectors_U( void )
-//---------------------------------------------------------------------------
-{
-  // Allocate MPI vectors for velocity components
-
-  mpi_packed_data_U_x = new double* [nb_comps];
-  mpi_packed_data_U_y = new double* [nb_comps];
-  if(dim == 3)
-    mpi_packed_data_U_z = new double* [nb_comps];
-
-  if(rank_in_i[0] == 0){
-    all_receive_data_U_x = new double** [nb_comps];
-    all_send_data_U_x = new double** [nb_comps];
-  }
-  if(rank_in_i[1] == 0){
-    all_receive_data_U_y = new double** [nb_comps];
-    all_send_data_U_y = new double** [nb_comps];
-  }
-  if(dim == 3){
-    if(rank_in_i[2] == 0){
-      all_receive_data_U_z = new double** [nb_comps];
-      all_send_data_U_z = new double** [nb_comps];
-    }
-  }
-    
-
-  size_t nb_first_send_x,nb_first_send_y,nb_first_send_z;
-
-  size_t nb_second_send_x,nb_second_send_y,nb_second_send_z;
-
-  size_t comp,p;
-
-  for(comp=0;comp<nb_comps;comp++)
-  {
-    size_t_vector min_unknown_index(dim,comp);
-    size_t_vector max_unknown_index(dim,comp);
-
-    for (size_t l=0;l<dim;++l)
-      min_unknown_index(l) =
-       UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-    for (size_t l=0;l<dim;++l)
-      max_unknown_index(l) =
-       UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-    
-    if(dim == 2){
-      nb_first_send_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1);
-      nb_first_send_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1);
-    }
-    else{
-      nb_first_send_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
-      nb_first_send_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
-      nb_first_send_z = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(1)-min_unknown_index(1)+1);
-      mpi_packed_data_U_z[comp] = new double[nb_first_send_z];
-    }
-
-    nb_second_send_x = (2*nb_first_send_x)/3;
-    nb_second_send_y = (2*nb_first_send_y)/3;
-    nb_second_send_z = (2*nb_first_send_z)/3;
-
-    mpi_packed_data_U_x[comp] = new double[nb_first_send_x];
-    mpi_packed_data_U_y[comp] = new double[nb_first_send_y];
-
-    if(rank_in_i[0] == 0){
-      
-      all_receive_data_U_x[comp] = new double* [nb_ranks_comm_i[0]];
-      all_send_data_U_x[comp] = new double* [nb_ranks_comm_i[0]];
-
-      for(p = 0; p < nb_ranks_comm_i[0]; ++p) {
-          all_receive_data_U_x[comp][p] = new double[nb_first_send_x];
-          all_send_data_U_x[comp][p] = new double[nb_second_send_x];
-      }
-
-    }
-    
-    if(rank_in_i[1] == 0){
-
-      all_receive_data_U_y[comp] = new double* [nb_ranks_comm_i[1]];
-      all_send_data_U_y[comp] = new double* [nb_ranks_comm_i[1]];
-
-      for(p = 0; p < nb_ranks_comm_i[1]; ++p) {
-          all_receive_data_U_y[comp][p] = new double[nb_first_send_y];
-          all_send_data_U_y[comp][p] = new double[nb_second_send_y];
-      }
-
-    }
-
-    if(dim == 3){
-      if(rank_in_i[2] == 0){
-        all_receive_data_U_z[comp] = new double* [nb_ranks_comm_i[2]];
-        all_send_data_U_z[comp] = new double* [nb_ranks_comm_i[2]];
-
-        for(p = 0; p < nb_ranks_comm_i[2]; ++p) {
-            all_receive_data_U_z[comp][p] = new double[nb_first_send_z];
-            all_send_data_U_z[comp][p] = new double[nb_second_send_z];
-        }
-      }  
-    }
-    
-    
-  }
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: allocate_mpi_vectors_P( void )
-//---------------------------------------------------------------------------
-{
-  // Allocate MPI vectors for pressure
-  if(rank_in_i[0] == 0){
-    all_receive_data_P_x = new double* [nb_ranks_comm_i[0]];
-    all_send_data_P_x = new double* [nb_ranks_comm_i[0]];
-  }
-  if(rank_in_i[1] == 0){
-    all_receive_data_P_y = new double* [nb_ranks_comm_i[1]];
-    all_send_data_P_y = new double* [nb_ranks_comm_i[1]];
-  }
-  if(dim == 3){
-    if(rank_in_i[2] == 0){
-      all_receive_data_P_z = new double* [nb_ranks_comm_i[2]];
-      all_send_data_P_z = new double* [nb_ranks_comm_i[2]];
-    }
-  }
-    
-
-  size_t nb_first_send_x,nb_first_send_y,nb_first_send_z;
-
-  size_t nb_second_send_x,nb_second_send_y,nb_second_send_z;
-
-  size_t p,comp;
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-
-  for (size_t l=0;l<dim;++l)
-    min_unknown_index(l) =
-     PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-  for (size_t l=0;l<dim;++l)
-    max_unknown_index(l) =
-     PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-  
-  if(dim == 2){
-    nb_first_send_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1);
-    nb_first_send_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1);
-  }
-  else{
-    nb_first_send_x = 3*(max_unknown_index(1)-min_unknown_index(1)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
-    nb_first_send_y = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(2)-min_unknown_index(2)+1);
-    nb_first_send_z = 3*(max_unknown_index(0)-min_unknown_index(0)+1)*(max_unknown_index(1)-min_unknown_index(1)+1);
-    mpi_packed_data_P_z = new double[nb_first_send_z];
-  }
-
-  nb_second_send_x = (2*nb_first_send_x)/3;
-  nb_second_send_y = (2*nb_first_send_y)/3;
-  nb_second_send_z = (2*nb_first_send_z)/3;
-
-  mpi_packed_data_P_x = new double[nb_first_send_x];
-  mpi_packed_data_P_y = new double[nb_first_send_y];
-
-  if(rank_in_i[0] == 0){
-
-      for(p = 0; p < nb_ranks_comm_i[0]; ++p) {
-          all_receive_data_P_x[p] = new double[nb_first_send_x];
-          all_send_data_P_x[p] = new double[nb_second_send_x];
-      }
-
-    }
-    
-    if(rank_in_i[1] == 0){
-      
-      for(p = 0; p < nb_ranks_comm_i[1]; ++p) {
-          all_receive_data_P_y[p] = new double[nb_first_send_y];
-          all_send_data_P_y[p] = new double[nb_second_send_y];
-      }
-
-    }
-
-    if(dim == 3){
-      if(rank_in_i[2] == 0){
-
-        for(p = 0; p < nb_ranks_comm_i[2]; ++p) {
-            all_receive_data_P_z[p] = new double[nb_first_send_z];
-            all_send_data_P_z[p] = new double[nb_second_send_z];
-        }
-
-      }
-    }
-      
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: deallocate_mpi_vectors_U( void )
-//---------------------------------------------------------------------------
-{
-  size_t p;
-  for(size_t comp=0;comp<nb_comps;comp++)
-  {
-    delete [] mpi_packed_data_U_x[comp];
-    delete [] mpi_packed_data_U_y[comp];
-    if(dim == 3)
-      delete [] mpi_packed_data_U_z[comp];
-
-    if(rank_in_i[0] == 0)
-    {
-      for(p = 0; p < nb_ranks_comm_i[0]; ++p) {
-          delete [] all_receive_data_U_x[comp][p];
-          delete [] all_send_data_U_x[comp][p];
-      }
-      delete [] all_receive_data_U_x[comp];
-      delete [] all_send_data_U_x[comp];
-    }
-    
-    if(rank_in_i[1] == 0){
-      for(p = 0; p < nb_ranks_comm_i[1]; ++p) {
-        delete [] all_receive_data_U_y[comp][p];
-        delete [] all_send_data_U_y[comp][p];
-      }  
-      delete [] all_receive_data_U_y[comp];
-      delete [] all_send_data_U_y[comp];
-    }
-    
-    if(dim == 3){
-      if(rank_in_i[2] == 0)
-      {
-        for(p = 0; p < nb_ranks_comm_i[2]; ++p) {
-          delete [] all_receive_data_U_z[comp][p];
-          delete [] all_send_data_U_z[comp][p];
-        }
-        delete [] all_receive_data_U_z[comp];  
-        delete [] all_send_data_U_z[comp];
-      }
-    }
-      
-    
-
-  }
-  delete [] mpi_packed_data_U_x;
-  delete [] mpi_packed_data_U_y;
-  if(dim == 3)
-    delete [] mpi_packed_data_U_z;
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: deallocate_mpi_vectors_P( void )
-//---------------------------------------------------------------------------
-{
-  size_t p;
-
-  if(rank_in_i[0] == 0)
-  {
-    for(p = 0; p < nb_ranks_comm_i[0]; ++p) {
-        delete [] all_receive_data_P_x[p];
-        delete [] all_send_data_P_x[p];
-    }
-    delete [] all_receive_data_P_x;
-    delete [] all_send_data_P_x;
-  }
-  
-  if(rank_in_i[1] == 0)
-  {
-    for(p = 0; p < nb_ranks_comm_i[1]; ++p) {
-        delete [] all_receive_data_P_y[p];
-        delete [] all_send_data_P_y[p];
-    }
-    delete [] all_receive_data_P_y;
-    delete [] all_send_data_P_y;
-  }
-  
-  if(dim == 3){
-    if(rank_in_i[2] == 0)
-    {
-      for(p = 0; p < nb_ranks_comm_i[2]; ++p) {
-          delete [] all_receive_data_P_z[p];
-          delete [] all_send_data_P_z[p];
-      }
-      delete [] all_receive_data_P_z;
-      delete [] all_send_data_P_z;
-    }
-  }
-    
-
-  delete [] mpi_packed_data_P_x;
-  delete [] mpi_packed_data_P_y;
-  if(dim == 3)
-    delete [] mpi_packed_data_P_z;
-}
-
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: error_with_analytical_solution (
@@ -730,7 +411,7 @@ DDS_NavierStokes:: error_with_analytical_solution (
    // Parameters
    double x, y, z, computed_field, analytical_solution, error_L2 = 0. ;
 
-   for (size_t comp=0;comp<nb_comps;++comp)
+   for (size_t comp=0;comp<nb_comps[1];++comp)
    {
      // Get nb of local dof
      size_t_vector local_dof_number( dim, 0 );
@@ -820,12 +501,12 @@ DDS_NavierStokes:: assemble_velocity_matrix_1D (
    // Perform assembling
    int m;
    size_t i;
-   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag(comp,dir);
-   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag(comp,dir);
-   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag(comp,dir);
+   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag(comp,dir,1);
+   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag(comp,dir,1);
+   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag(comp,dir,1);
 
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(comp,dir);
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(comp,dir);
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(comp,dir,1);
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(comp,dir,1);
 
    double Aee_diagcoef=0.;
 
@@ -859,9 +540,9 @@ DDS_NavierStokes:: assemble_velocity_matrix_1D (
       bool r_bound = false;
       bool l_bound = false;
       // All the proc will have open right bound, except last proc for non periodic systems
-      if ((is_Uperiodic[dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
+      if ((is_periodic[1][dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
       // All the proc will have open left bound, except first proc for non periodic systems
-      if ((is_Uperiodic[dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
+      if ((is_periodic[1][dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
 
       // Set Aie, Aei and Ae 
       if ((!l_bound) && (i == min_unknown_index(dir))) {
@@ -885,7 +566,7 @@ DDS_NavierStokes:: assemble_velocity_matrix_1D (
       }
 
       // Set Aii_sub_diagonal
-      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Uperiodic[dir] != 1)) {
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_periodic[1][dir] != 1)) {
          if (i > min_unknown_index(dir)) Aii_sub_diagonal->set_item(m-1,left);
       } else {
          if (i<max_unknown_index(dir)) {
@@ -896,7 +577,7 @@ DDS_NavierStokes:: assemble_velocity_matrix_1D (
       }
 
       // Set Aii_super_diagonal
-      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Uperiodic[dir] != 1)) {
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_periodic[1][dir] != 1)) {
          if (i < max_unknown_index(dir)) Aii_super_diagonal->set_item(m,right);
       } else {
          if (i < max_unknown_index(dir)-1) {
@@ -905,7 +586,7 @@ DDS_NavierStokes:: assemble_velocity_matrix_1D (
       }
 
       // Set Aii_main_diagonal
-      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Uperiodic[dir] != 1)) {
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_periodic[1][dir] != 1)) {
          Aii_main_diagonal->set_item(m,value);
       } else {
          if (i<max_unknown_index(dir)) {
@@ -914,16 +595,16 @@ DDS_NavierStokes:: assemble_velocity_matrix_1D (
       }
    }
 
-   GLOBAL_EQ->compute_Aii_ref(comp,dir);
+   GLOBAL_EQ->compute_Aii_ref(comp,dir,1);
    // Compute the product matrix for each proc
 
    if (nb_ranks_comm_i[dir]>1) {
-      GLOBAL_EQ->compute_product_matrix(comp,dir);
+      GLOBAL_EQ->compute_product_matrix(comp,dir,1);
 
-      LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product(comp,dir);
+      LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product(comp,dir,1);
       LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
-      LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix(comp,dir);
-      LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement(comp,dir);
+      LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix(comp,dir,1);
+      LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement(comp,dir,1);
 
       if ( rank_in_i[dir] == 0 ) {
          Aee->set_item(0,0,Aee_diagcoef);
@@ -946,7 +627,7 @@ DDS_NavierStokes:: assemble_velocity_matrix_1D (
                }
             }
 
-  	    if (is_Uperiodic[dir] == 0) {
+  	    if (is_periodic[1][dir] == 0) {
                if (i<nb_ranks_comm_i[dir]-1) {
                   // Assemble the global Aee matrix 
                   // No periodic condition in x. So no fe contribution from last proc
@@ -1021,12 +702,12 @@ DDS_NavierStokes:: assemble_pressure_matrix_1D (
    size_t i;
    size_t comp = 0;
 
-   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag_P(dir);
-   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag_P(dir);
-   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag_P(dir);
+   LA_SeqVector* Aii_main_diagonal = GLOBAL_EQ-> get_aii_main_diag(0,dir,0);
+   LA_SeqVector* Aii_super_diagonal = GLOBAL_EQ-> get_aii_super_diag(0,dir,0);
+   LA_SeqVector* Aii_sub_diagonal = GLOBAL_EQ-> get_aii_sub_diag(0,dir,0);
 
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_P(dir);
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_P(dir);
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(0,dir,0);
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(0,dir,0);
 
    double Aee_diagcoef=0.;
 
@@ -1062,9 +743,9 @@ DDS_NavierStokes:: assemble_pressure_matrix_1D (
       bool r_bound = false;
       bool l_bound = false;
       // All the proc will have open right bound, except last proc for non periodic systems
-      if ((is_Pperiodic[dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
+      if ((is_periodic[0][dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
       // All the proc will have open left bound, except first proc for non periodic systems
-      if ((is_Pperiodic[dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
+      if ((is_periodic[0][dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
 
       // Set Aie, Aei and Ae 
       if ((!l_bound) && (i == min_unknown_index(dir))) {
@@ -1088,7 +769,7 @@ DDS_NavierStokes:: assemble_pressure_matrix_1D (
       }
 
       // Set Aii_sub_diagonal
-      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Pperiodic[dir] != 1)) {
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_periodic[0][dir] != 1)) {
          if (i > min_unknown_index(dir)) Aii_sub_diagonal->set_item(m-1,left);
       } else {
          if (i<max_unknown_index(dir)) {
@@ -1099,7 +780,7 @@ DDS_NavierStokes:: assemble_pressure_matrix_1D (
       }
 
       // Set Aii_super_diagonal
-      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Pperiodic[dir] != 1)) {
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_periodic[0][dir] != 1)) {
          if (i < max_unknown_index(dir)) Aii_super_diagonal->set_item(m,right);
       } else {
          if (i < max_unknown_index(dir)-1) {
@@ -1108,7 +789,7 @@ DDS_NavierStokes:: assemble_pressure_matrix_1D (
       }
 
       // Set Aii_main_diagonal
-      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_Pperiodic[dir] != 1)) {
+      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_periodic[0][dir] != 1)) {
          Aii_main_diagonal->set_item(m,value);
       } else {
          if (i<max_unknown_index(dir)) {
@@ -1117,16 +798,16 @@ DDS_NavierStokes:: assemble_pressure_matrix_1D (
       }
    }
 
-   GLOBAL_EQ->compute_Aii_ref_P(dir);
+   GLOBAL_EQ->compute_Aii_ref(0,dir,0);
    // Compute the product matrix for each proc
 
    if (nb_ranks_comm_i[dir]>1) {
-      GLOBAL_EQ->compute_product_matrix_P(dir);
+      GLOBAL_EQ->compute_product_matrix(0,dir,0);
 
-      LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product_P(dir);
+      LA_SeqMatrix* product_matrix = GLOBAL_EQ-> get_Aei_Aii_Aie_product(0,dir,0);
       LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
-      LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix_P(dir);
-      LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement_P(dir);
+      LA_SeqMatrix* Aee = GLOBAL_EQ-> get_Aee_matrix(0,dir,0);
+      LA_SeqMatrix* schlur_complement = GLOBAL_EQ-> get_schlur_complement(0,dir,0);
 
       if ( rank_in_i[dir] == 0 ) {
          Aee->set_item(0,0,Aee_diagcoef);
@@ -1149,7 +830,7 @@ DDS_NavierStokes:: assemble_pressure_matrix_1D (
                }
             }
 
-  	    if (is_Uperiodic[dir] == 0) {
+  	    if (is_periodic[1][dir] == 0) {
                if (i<nb_ranks_comm_i[dir]-1) {
                   // Assemble the global Aee matrix 
                   // No periodic condition in x. So no fe contribution from last proc
@@ -1209,7 +890,7 @@ DDS_NavierStokes:: assemble_velocity_1D_matrices ( FV_TimeIterator const* t_it )
       assemble_pressure_matrix_1D (PF,t_it,dir);
    }
 
-   for (size_t comp=0;comp<nb_comps;comp++) {
+   for (size_t comp=0;comp<nb_comps[1];comp++) {
       double gamma = mu/2.0;
       for (size_t dir=0;dir<dim;dir++) {
          assemble_velocity_matrix_1D (UF,t_it,gamma,comp,dir);
@@ -1320,7 +1001,7 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t i, size_t j
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir)
+DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir)
 //---------------------------------------------------------------------------
 {
    // Get local min and max indices
@@ -1339,7 +1020,7 @@ DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double
    double fe=0.;
 
    // Vector for fi
-   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir) ;
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir,1) ;
 
    for (i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
      double value=0.;
@@ -1371,7 +1052,7 @@ DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double
         temp_val = (UF->DOF_value(j,k,i,comp,0)*dC)/(t_it->time_step()) - gamma*value;
      }
 
-     if (is_Uperiodic[dir] == 0) {
+     if (is_periodic[1][dir] == 0) {
         if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
            local_rhs->set_item( pos,temp_val);
         } else {
@@ -1433,35 +1114,36 @@ DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solve_for_secondorder ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it,double * packed_data, size_t const& comp, size_t const dir)
+DDS_NavierStokes:: solve_for_secondorder ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it,double * packed_data, size_t const& comp, size_t const dir, size_t const field)
 //---------------------------------------------------------------------------
 {
   // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
    for (size_t l=0;l<dim;++l) {
-      min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+      min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+      max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
    }
 
-   double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
+   double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
 
    // create a replica of local rhs vector in local solution vector
-   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir) ;
-   LA_SeqVector* local_solution = GLOBAL_EQ->get_local_solution_temp(comp,dir) ;
-   for(size_t i=0;i<local_rhs->nb_rows();i++){
-    local_solution->set_item(i,local_rhs->item(i));
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir,field) ;
+   LA_SeqVector* local_solution = GLOBAL_EQ->get_local_solution_temp(comp,dir,field) ;
+
+   for (size_t i=0;i<local_rhs->nb_rows();i++){
+      local_solution->set_item(i,local_rhs->item(i));
    }
 
    // Solve for xi locally and put it in local solution vector
-   GLOBAL_EQ->DS_NavierStokes_local_unknown_solver(local_solution,comp,dir);
+   GLOBAL_EQ->DS_NavierStokes_local_unknown_solver(local_solution,comp,dir,field);
 
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(comp,dir);
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp(comp,dir);
+   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei(comp,dir,field);
+   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp(comp,dir,field);
 
-   for(int i=0;i<Vec_temp->nb_rows();i++){
-          Vec_temp->set_item(i,0);
-    }
+   for (int i=0;i<Vec_temp->nb_rows();i++){
+      Vec_temp->set_item(i,0);
+   }
    // Calculate Aei*xi in each proc locally
    Aei->multiply_vec_then_add(local_solution,Vec_temp);
 
@@ -1485,7 +1167,7 @@ DDS_NavierStokes:: solve_for_secondorder ( size_t const& j, size_t const& k, dou
    }
 
    if(rank_in_i[dir] == 0){
-      if(is_Uperiodic[dir])
+      if(is_periodic[field][dir])
           packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[dir]-1);
       else
           packed_data[3*vec_pos+0]=0;
@@ -1493,7 +1175,7 @@ DDS_NavierStokes:: solve_for_secondorder ( size_t const& j, size_t const& k, dou
    }
    else if(rank_in_i[dir] == nb_ranks_comm_i[dir]-1){
       packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[dir]-1);
-      if(is_Uperiodic[dir])
+      if(is_periodic[field][dir])
           packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[dir]);
       else
           packed_data[3*vec_pos+1]=0;
@@ -1509,12 +1191,12 @@ DDS_NavierStokes:: solve_for_secondorder ( size_t const& j, size_t const& k, dou
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p)
+DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p, size_t const field)
 //---------------------------------------------------------------------------
 {
 
-   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp(comp,dir) ;
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp(comp,dir);
+   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp(comp,dir,field) ;
+   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp(comp,dir,field);
 
    size_t nb_interface_unknowns = Vec_temp->nb_rows();
 
@@ -1523,7 +1205,7 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_rece
       interface_rhs->set_item(i,0);
    }
 
-   if (is_Uperiodic[dir])
+   if (is_periodic[field][dir])
       Vec_temp->set_item(nb_ranks_comm_i[dir]-1,packed_data[3*p]);
    Vec_temp->set_item(0,packed_data[3*p+1]);
    interface_rhs->set_item(0,packed_data[3*p+2]);
@@ -1536,7 +1218,7 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_rece
          Vec_temp->add_to_item(i,all_received_data[i][3*p+1]);
          interface_rhs->set_item(i,all_received_data[i][3*p+2]);  // Assemble the interface rhs fe
       } else {
-         if (is_Uperiodic[dir] ==0) {
+         if (is_periodic[field][dir] ==0) {
             Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
          } else{
             Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
@@ -1552,7 +1234,7 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_rece
    }
 
    // Solve for ue (interface unknowns) in the master proc
-   GLOBAL_EQ->DS_NavierStokes_interface_unknown_solver(interface_rhs,comp,dir);
+   GLOBAL_EQ->DS_NavierStokes_interface_unknown_solver(interface_rhs,comp,dir,field);
 
    for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
       if (i != nb_ranks_comm_i[dir]-1) {
@@ -1560,7 +1242,7 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_rece
          all_send_data[i][2*p+1]=interface_rhs->item(i);
       } else {
          all_send_data[i][2*p+0]=interface_rhs->item(i-1);
-         if (is_Uperiodic[dir])
+         if (is_periodic[field][dir])
             all_send_data[i][2*p+1]=interface_rhs->item(i);
          else
             all_send_data[i][2*p+1]=0;
@@ -1570,16 +1252,16 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_rece
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p)
+DDS_NavierStokes:: unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p, size_t const field)
 //---------------------------------------------------------------------------
 {
-   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp(comp,dir) ;
+   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp(comp,dir,field) ;
 
    if (rank_in_i[dir] != nb_ranks_comm_i[dir]-1) {
       interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
       interface_rhs->set_item(rank_in_i[dir],received_data[2*p+1]);
    } else {
-      if (is_Uperiodic[dir] ==0) {
+      if (is_periodic[field][dir] ==0) {
          interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
       } else {
          interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
@@ -1590,7 +1272,7 @@ DDS_NavierStokes:: unpack_ue(size_t const& comp, double * received_data, size_t 
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solve_interface_unknowns ( double * packed_data, size_t nb_received_data, double gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const dir)
+DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double * packed_data, size_t nb_received_data, double gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field)
 //---------------------------------------------------------------------------
 {
    size_t i,j,p;
@@ -1600,15 +1282,15 @@ DDS_NavierStokes:: solve_interface_unknowns ( double * packed_data, size_t nb_re
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
    for (size_t l=0;l<dim;++l) {
-      min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+      min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+      max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
    }
 
    // Vector for fe
-   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp(comp,dir) ;
-   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir) ;
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp(comp,dir);
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(comp,dir);
+   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp(comp,dir,field) ;
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir,field) ;
+   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp(comp,dir,field);
+   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie(comp,dir,field);
 
    // Array declaration for sending data from master to all slaves
    double ** all_send_data = new double* [nb_ranks_comm_i[dir]];
@@ -1670,16 +1352,16 @@ DDS_NavierStokes:: solve_interface_unknowns ( double * packed_data, size_t nb_re
 
             p = j-local_min_j;
   
-            unpack_compute_ue_pack(comp,all_received_data,packed_data,all_send_data,dir,p);
+            unpack_compute_ue_pack(comp,all_received_data,packed_data,all_send_data,dir,p,field);
 
             // Need to have the original rhs function assembled for corrosponding j,k pair
-            double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
+            double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
 
             // Setup RHS = fi - Aie*xe for solving ui
             Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
 
             // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_solver(j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir);
+            GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir,field);
          }
       } else {
          for (k=local_min_k;k<=local_max_k;k++) {
@@ -1687,16 +1369,16 @@ DDS_NavierStokes:: solve_interface_unknowns ( double * packed_data, size_t nb_re
 	      
 	       p = (j-local_min_j)+local_length_j*(k-local_min_k);
 
-               unpack_compute_ue_pack(comp,all_received_data,packed_data,all_send_data,dir,p);
+               unpack_compute_ue_pack(comp,all_received_data,packed_data,all_send_data,dir,p,field);
 
      	       // Need to have the original rhs function assembled for corrosponding j,k pair
-               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
+               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
 
                // Setup RHS = fi - Aie*xe for solving ui
                Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
 
                // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_NavierStokes_solver(j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir);
+               GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir,field);
             }
          }
       }
@@ -1726,32 +1408,32 @@ DDS_NavierStokes:: solve_interface_unknowns ( double * packed_data, size_t nb_re
             k=0;
             p = j-local_min_j;
 
-	    unpack_ue(comp,packed_data,dir,p);
+	    unpack_ue(comp,packed_data,dir,p,field);
 
   	    // Need to have the original rhs function assembled for corrosponding j,k pair
-            double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
+            double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
 
             // Setup RHS = fi - Aie*xe for solving ui
             Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
 
             // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_solver(j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir);
+            GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir,field);
          }
       } else {
          for (k = local_min_k;k<=local_max_k;k++) {
             for (j = local_min_j;j<=local_max_j;j++) {
                p = (j-local_min_j)+local_length_j*(k-local_min_k);
    
-	       unpack_ue(comp,packed_data,dir,p);
+	       unpack_ue(comp,packed_data,dir,p,field);
 
    	       // Need to have the original rhs function assembled for corrosponding j,k pair
-               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
+               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
 
                // Setup RHS = fi - Aie*xe for solving ui
                Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
 
                // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_NavierStokes_solver(j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir);
+               GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),local_rhs,interface_rhs,comp,dir,field);
             }
          }
       }
@@ -1860,7 +1542,7 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
 
-   for (size_t comp=0;comp<nb_comps;comp++) {
+   for (size_t comp=0;comp<nb_comps[1];comp++) {
       // Get local min and max indices
       for (size_t l=0;l<dim;++l) {
          min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
@@ -1920,17 +1602,17 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: SolveU_i_in_jk ( FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, size_t const gamma )
+DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, size_t const gamma, size_t const field )
 //---------------------------------------------------------------------------
 {
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
 
-  for (size_t comp=0;comp<nb_comps;comp++) {
+  for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-        max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
      }
 
      size_t local_min_k = 0;
@@ -1948,25 +1630,39 @@ DDS_NavierStokes:: SolveU_i_in_jk ( FV_TimeIterator const* t_it, size_t const di
      double * packed_data = new double[nb_send_data];
 
      // Solve in i
-     if ((nb_ranks_comm_i[dir_i]>1)||(is_Uperiodic[dir_i] == 1)) {
+     if ((nb_ranks_comm_i[dir_i]>1)||(is_periodic[field][dir_i] == 1)) {
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
-               solve_for_secondorder(j,k,gamma,t_it,packed_data,comp,dir_i);
+               solve_for_secondorder(FF,j,k,gamma,t_it,packed_data,comp,dir_i,field);
            }
         }
-        solve_interface_unknowns ( packed_data, nb_send_data, gamma, t_it, comp, dir_i );
+        solve_interface_unknowns ( FF, packed_data, nb_send_data, gamma, t_it, comp, dir_i,field );
 
-     } else if (is_Uperiodic[dir_i] == 0) {  // Serial mode with non-periodic condition
+     } else if (is_periodic[field][dir_i] == 0) {  // Serial mode with non-periodic condition
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
-              double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
-	      LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir_i);
-              GLOBAL_EQ->DS_NavierStokes_solver(j,k,min_unknown_index(dir_i),local_rhs,NULL,comp,dir_i);
+              double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i,field);
+	      LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(comp,dir_i,field);
+              GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir_i),local_rhs,NULL,comp,dir_i,field);
            }
         }
      }
      delete [] packed_data;
   }
+}
+
+//---------------------------------------------------------------------------
+double
+DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field )
+//---------------------------------------------------------------------------
+{
+   double fe = 0.;
+   if (field == 0) {
+      fe = pressure_local_rhs(j,k,t_it,dir);
+   } else if (field == 1) {
+      fe = velocity_local_rhs(j,k,gamma,t_it,comp,dir);
+   }
+   return(fe);
 }
 
 //---------------------------------------------------------------------------
@@ -1984,20 +1680,20 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    // Update gamma based for invidual direction
    gamma = mu/2.0;
 
-   SolveU_i_in_jk(t_it,0,1,2,gamma);
+   Solve_i_in_jk(UF,t_it,0,1,2,gamma,1);
    // Synchronize the distributed DS solution vector
    GLOBAL_EQ->synchronize_DS_solution_vec();
    // Tranfer back to field
    UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
 
-   SolveU_i_in_jk(t_it,1,0,2,gamma);
+   Solve_i_in_jk(UF,t_it,1,0,2,gamma,1);
    // Synchronize the distributed DS solution vector
    GLOBAL_EQ->synchronize_DS_solution_vec();
    // Tranfer back to field
    UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ; 
 
    if (dim == 3) {
-      SolveU_i_in_jk(t_it,2,0,1,gamma);
+      Solve_i_in_jk(UF,t_it,2,0,1,gamma,1);
       // Synchronize the distributed DS solution vector
       GLOBAL_EQ->synchronize_DS_solution_vec();
       // Tranfer back to field
@@ -2012,12 +1708,13 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: pressure_assemble_local_rhs_x ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it)
+DDS_NavierStokes:: pressure_local_rhs ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const dir)
 //---------------------------------------------------------------------------
 {
-  // Get local min and max indices
+   // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
+
    for (size_t l=0;l<dim;++l) {
       min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
       max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
@@ -2027,598 +1724,69 @@ DDS_NavierStokes:: pressure_assemble_local_rhs_x ( size_t const& j, size_t const
    FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 
    // Compute VEC_rhs_x = rhs in x
-   double xhr,xright,yhr,yright,dx;
+   double xhr,xright,yhr,yright,dx,zhr,zright;
    double fe=0.;
-   double xvalue = 0.,yvalue=0.,value=0.;
+   double xvalue = 0.,yvalue=0.,zvalue=0.,value=0.;
 
    // Vector for fi
-   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(0) ;
+   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp(0,dir,0) ;
 
-   for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-      if (dim == 2) {
-         // Dxx for un
-         xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-         xright = UF->DOF_value( shift.i+i, j, 0, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, 0, 0, 0 ) ;
-         xvalue = xright/xhr;
-      
-         // Dyy for un
-         yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-         yright = UF->DOF_value( i, shift.j+j, 0, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, 0, 1, 0 ) ;
-         yvalue = yright/yhr;
-
-         dx = PF->get_cell_size( i, 0, 0 );
-         // Assemble the bodyterm
-         value = -(rho*(xvalue + yvalue)*dx)/(t_it -> time_step());
-      } else {
+   for (i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
+      dx = PF->get_cell_size( i, 0, dir );
+      if (dir == 0) {
          // Dxx for un
          xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
          xright = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
          xvalue = xright/xhr;
 
- 	 // Dyy for un
+         // Dyy for un
          yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
          yright = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
          yvalue = yright/yhr;
 
- 	 // Dzz for un
-         double zhr,zright,zvalue=0.;
-         zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
-         zright = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
-         zvalue = zright/zhr;
+         if (dim == 3) {
+            // Dzz for un
+            zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
+            zright = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
+            zvalue = zright/zhr;
+         }
 
-         dx = PF->get_cell_size( i,0, 0 );
          // Assemble the bodyterm
-         value = -(rho*(xvalue + yvalue + zvalue)*dx)/(t_it -> time_step());
+         if (dim == 2) {
+            value = -(rho*(xvalue + yvalue)*dx)/(t_it -> time_step());
+         } else {
+            value = -(rho*(xvalue + yvalue + zvalue)*dx)/(t_it -> time_step());
+         }
+      } else {
+         if (dir == 1) {
+            value = PF->DOF_value( j, i, k, 0, 1 )*dx;
+         } else if (dir == 2) {
+            value = PF->DOF_value( j, k, i, 0, 1 )*dx;
+         }
       }
 
-      pos = i - min_unknown_index(0);
+      pos = i - min_unknown_index(dir);
 
-      if (is_Pperiodic[0] == 0) {
-         if (rank_in_i[0] == nb_ranks_comm_i[0]-1) {
+      if (is_periodic[0][dir] == 0) {
+         if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
             local_rhs->set_item( pos, value);
          } else {
-            if (i == max_unknown_index(0))
+            if (i == max_unknown_index(dir))
                fe = value;
             else
                local_rhs->set_item( pos, value);
          }  
       } else {
-         if (nb_ranks_comm_i[0] > 1) {
-            if (i == max_unknown_index(0))
+         if (nb_ranks_comm_i[dir] > 1) {
+            if (i == max_unknown_index(dir))
                fe = value;
             else
                local_rhs->set_item( pos, value);
          } else
             local_rhs->set_item( pos, value);
       }
-    
-   }
-
-   return fe;
-}
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: unpack_compute_ue_pack_P(double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p)
-//---------------------------------------------------------------------------
-{
-
-   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp_P(dir) ;
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_P(dir);
-
-   size_t nb_interface_unknowns = Vec_temp->nb_rows();
-
-   for (size_t i=0;i<nb_interface_unknowns;i++) {
-      Vec_temp->set_item(i,0);
-      interface_rhs->set_item(i,0);
-   }
-
-   if (is_Pperiodic[dir])
-      Vec_temp->set_item(nb_ranks_comm_i[dir]-1,packed_data[3*p]);
-   Vec_temp->set_item(0,packed_data[3*p+1]);
-   interface_rhs->set_item(0,packed_data[3*p+2]);
-
-   // Vec_temp might contain previous values
-
-   for (size_t i=1;i<nb_ranks_comm_i[dir];i++) {
-      if (i!=nb_ranks_comm_i[dir]-1) {
-         Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
-         Vec_temp->add_to_item(i,all_received_data[i][3*p+1]);
-         interface_rhs->set_item(i,all_received_data[i][3*p+2]);  // Assemble the interface rhs fe
-      } else {
-         if (is_Pperiodic[dir] ==0) {
-            Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
-         } else{
-            Vec_temp->add_to_item(i-1,all_received_data[i][3*p]);
-            // If periodic in x, last proc has an interface unknown
-            Vec_temp->add_to_item(i,all_received_data[i][3*p+1]);
-            interface_rhs->set_item(i,all_received_data[i][3*p+2]);
-         }
-      }
-   }
-
-   for (size_t i=0;i<nb_interface_unknowns;i++) {
-      interface_rhs->set_item(i,interface_rhs->item(i)-Vec_temp->item(i)); // Get fe - Aei*xi to solve for ue
-   }
-
-   // Solve for ue (interface unknowns) in the master proc
-   GLOBAL_EQ->DS_NavierStokes_interface_unknown_solver_P(interface_rhs,dir);
-
-   for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
-      if (i != nb_ranks_comm_i[dir]-1) {
-         all_send_data[i][2*p+0]=interface_rhs->item(i-1);
-         all_send_data[i][2*p+1]=interface_rhs->item(i);
-      } else {
-         all_send_data[i][2*p+0]=interface_rhs->item(i-1);
-         if (is_Pperiodic[dir])
-            all_send_data[i][2*p+1]=interface_rhs->item(i);
-         else
-            all_send_data[i][2*p+1]=0;
-      }
-   }
-}
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: unpack_ue_P(double * received_data, size_t const dir, int p)
-//---------------------------------------------------------------------------
-{
-   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp_P(dir) ;
-
-   if (rank_in_i[dir] != nb_ranks_comm_i[dir]-1) {
-      interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
-      interface_rhs->set_item(rank_in_i[dir],received_data[2*p+1]);
-   } else {
-      if (is_Pperiodic[dir] ==0) {
-         interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
-      } else {
-         interface_rhs->set_item(rank_in_i[dir]-1,received_data[2*p]);
-         interface_rhs->set_item(rank_in_i[dir],received_data[2*p+1]);
-      }
-   }
-}
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: pressure_solve_for_secondorder ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it,double * packed_data, size_t const dir)
-//---------------------------------------------------------------------------
-{
-   // Get local min and max indices
-   size_t comp=0;
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l) {
-      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-   }
-
-   double fe = 0.;
-   if (dir == 0) {
-      fe = pressure_assemble_local_rhs_x(j,k,t_it);
-   } else if (dir == 1) {
-      fe = pressure_assemble_local_rhs_y(j,k,t_it);
-   } else if (dir == 2) {
-      fe = pressure_assemble_local_rhs_z(j,k,t_it);
-   }
-
-   // create a replica of local rhs vector in local solution vector
-   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(dir) ;
-   LA_SeqVector* local_solution = GLOBAL_EQ->get_local_solution_temp_P(dir) ;
-
-   for (size_t i=0;i<local_rhs->nb_rows();i++) {
-      local_solution->set_item(i,local_rhs->item(i));
-   }
-
-   // Solve for xi locally and put it in local solution vector
-   GLOBAL_EQ->DS_NavierStokes_local_unknown_solver_P(local_solution,dir);
-
-   LA_SeqMatrix* Aei = GLOBAL_EQ-> get_aei_P(dir);
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_P(dir);
-
-   for (int i=0;i<Vec_temp->nb_rows();i++){
-      Vec_temp->set_item(i,0);
-   }
-
-   // Calculate Aei*xi in each proc locally
-   Aei->multiply_vec_then_add(local_solution,Vec_temp);
-
-   // Pack the data
-   size_t vec_pos;
-
-   if (dir == 0) {
-      if (dim == 2) {
-         vec_pos=j-min_unknown_index(1);
-      } else {
-         vec_pos=(j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
-      }
-   } else if (dir == 1) {
-      if (dim == 2) {
-         vec_pos=j-min_unknown_index(0);
-      } else {
-         vec_pos=(j-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(k-min_unknown_index(2));
-      }
-   } else if (dir == 2) {
-      vec_pos=(j-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(k-min_unknown_index(1));
-   }
-
-   if(rank_in_i[dir] == 0){
-      if(is_Pperiodic[dir])
-          packed_data[3*vec_pos+0]=Vec_temp->item(nb_ranks_comm_i[dir]-1);
-      else
-          packed_data[3*vec_pos+0]=0;
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[dir]);
-   }
-   else if(rank_in_i[dir] == nb_ranks_comm_i[dir]-1){
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[dir]-1);
-      if(is_Pperiodic[dir])
-          packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[dir]);
-      else
-          packed_data[3*vec_pos+1]=0;
-   }
-   else{
-      packed_data[3*vec_pos+0]=Vec_temp->item(rank_in_i[dir]-1);
-      packed_data[3*vec_pos+1]=Vec_temp->item(rank_in_i[dir]);
-   }
-   packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
-}
-
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: pressure_solve_interface_unknowns ( double * packed_data, size_t nb_received_data, FV_TimeIterator const* t_it, size_t const dir)
-//---------------------------------------------------------------------------
-{
-   size_t i,j,p;
-   size_t k =0;
-   size_t comp = 0;
-
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l) {
-      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-   }
-
-   // Vector for fe
-   LA_SeqVector* interface_rhs = GLOBAL_EQ->get_interface_temp_P(dir) ;
-   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(dir) ;
-   LA_SeqVector* Vec_temp = GLOBAL_EQ-> get_temp_P(dir);
-   LA_SeqMatrix* Aie = GLOBAL_EQ-> get_aie_P(dir);
-
-   // Array declaration for sending data from master to all slaves
-   double ** all_send_data = new double* [nb_ranks_comm_i[dir]];
-   size_t nb_send_data=0, local_length_j=0, local_length_k=0;
-   size_t local_min_j=0, local_max_j=0;
-   size_t local_min_k=0, local_max_k=0;
-
-   if (dir == 0) {
-      local_min_j = min_unknown_index(1);
-      local_max_j = max_unknown_index(1);
-      if (dim == 3) {
-         local_min_k = min_unknown_index(2);
-         local_max_k = max_unknown_index(2);
-      }
-   } else if (dir == 1) {
-      local_min_j = min_unknown_index(0);
-      local_max_j = max_unknown_index(0);
-      if (dim == 3) {
-         local_min_k = min_unknown_index(2);
-         local_max_k = max_unknown_index(2);
-      }
-   } else if (dir == 2) {
-      local_min_j = min_unknown_index(0);
-      local_max_j = max_unknown_index(0);
-      local_min_k = min_unknown_index(1);
-      local_max_k = max_unknown_index(1);
-   }
-
-   local_length_j = (local_max_j-local_min_j+1);
-   local_length_k = (local_max_k-local_min_k+1);
-
-   if (dim != 3) {
-      nb_send_data = 2*local_length_j;
-   } else if (dim == 3) {
-      nb_send_data = 2*local_length_j*local_length_k;
-   }
-
-   for (p = 0; p < nb_ranks_comm_i[dir]; ++p) {
-      all_send_data[p] = new double[nb_send_data];
-   }
-
-   if ( rank_in_i[dir] == 0 ) {
-      // Array declaration for receiving data from all slaves
-      double ** all_received_data = new double* [nb_ranks_comm_i[dir]];
-      for(p = 0; p < nb_ranks_comm_i[dir]; ++p) {
-          all_received_data[p] = new double[nb_received_data];
-      }
-	   
-      for (i=1;i<nb_ranks_comm_i[dir];++i) {
-        // Receive the data
-        static MPI_Status status;
-        MPI_Recv( all_received_data[i], nb_received_data, MPI_DOUBLE, i, 0,
-                          DDS_Comm_i[dir], &status ) ;
-      }
-
-      // Solve system of interface unknowns for each y
-      if (dim == 2) {
-	 for (j=local_min_j;j<=local_max_j;j++) {
-
-            p = j-local_min_j;
-  
-            unpack_compute_ue_pack_P(all_received_data,packed_data,all_send_data,dir,p);
-
-            // Need to have the original rhs function assembled for corrosponding j,k pair
-            double fe = 0.;
-            if (dir == 0) {
-               fe = pressure_assemble_local_rhs_x(j,k,t_it);
-            } else if (dir == 1) {
-               fe = pressure_assemble_local_rhs_y(j,k,t_it);
-            } else if (dir == 2) {
-               fe = pressure_assemble_local_rhs_z(j,k,t_it);
-            }
-
-            // Setup RHS = fi - Aie*xe for solving ui
-            Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
-
-            // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_solver_P(j,k,min_unknown_index(dir),local_rhs,interface_rhs,dir);
-         }
-      } else {
-         for (k=local_min_k;k<=local_max_k;k++) {
-            for (j=local_min_j;j<=local_max_j;j++) {
-	      
-	       p = (j-local_min_j)+local_length_j*(k-local_min_k);
-
-               unpack_compute_ue_pack_P(all_received_data,packed_data,all_send_data,dir,p);
-
-     	       // Need to have the original rhs function assembled for corrosponding j,k pair
-               double fe = 0.;
-               if (dir == 0) {
-                  fe = pressure_assemble_local_rhs_x(j,k,t_it);
-               } else if (dir == 1) {
-                  fe = pressure_assemble_local_rhs_y(j,k,t_it);
-               } else if (dir == 2) {
-                  fe = pressure_assemble_local_rhs_z(j,k,t_it);
-               }
-
-               // Setup RHS = fi - Aie*xe for solving ui
-               Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
-
-               // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_NavierStokes_solver_P(j,k,min_unknown_index(dir),local_rhs,interface_rhs,dir);
-            }
-         }
-      }
-
-      for (p = 0; p < nb_ranks_comm_i[dir]; ++p) delete [] all_received_data[p];
-      delete [] all_received_data;
-
-   } else {
-      // Send the packed data to master
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
-   }
-
-   // Send the data from master
-   if ( rank_in_i[dir] == 0 ) {
-      for (i=1;i<nb_ranks_comm_i[dir];++i) {
-        MPI_Send( all_send_data[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[dir] ) ;
-      }
-   } else {
-      // Receive the data
-      static MPI_Status status ;
-      MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir], &status ) ;
-
-      // Solve the system of equations in each proc
-
-      if (dim == 2) {
-         for (j = local_min_j;j<=local_max_j;j++) {
-            k=0;
-            p = j-local_min_j;
-
-	    unpack_ue_P(packed_data,dir,p);
-
-  	    // Need to have the original rhs function assembled for corrosponding j,k pair
-            double fe = 0.;
-            if (dir == 0) {
-               fe = pressure_assemble_local_rhs_x(j,k,t_it);
-            } else if (dir == 1) {
-               fe = pressure_assemble_local_rhs_y(j,k,t_it);
-            } else if (dir == 2) {
-               fe = pressure_assemble_local_rhs_z(j,k,t_it);
-            }
-
-            // Setup RHS = fi - Aie*xe for solving ui
-            Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
-
-            // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_solver_P(j,k,min_unknown_index(dir),local_rhs,interface_rhs,dir);
-         }
-      } else {
-         for (k = local_min_k;k<=local_max_k;k++) {
-            for (j = local_min_j;j<=local_max_j;j++) {
-               p = (j-local_min_j)+local_length_j*(k-local_min_k);
-   
-	       unpack_ue_P(packed_data,dir,p);
-
-   	       // Need to have the original rhs function assembled for corrosponding j,k pair
-               double fe = 0.;
-               if (dir == 0) {
-                  fe = pressure_assemble_local_rhs_x(j,k,t_it);
-               } else if (dir == 1) {
-                  fe = pressure_assemble_local_rhs_y(j,k,t_it);
-               } else if (dir == 2) {
-                  fe = pressure_assemble_local_rhs_z(j,k,t_it);
-               }
-
-               // Setup RHS = fi - Aie*xe for solving ui
-               Aie->multiply_vec_then_add(interface_rhs,local_rhs,-1.0,1.0);
-
-               // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_NavierStokes_solver_P(j,k,min_unknown_index(dir),local_rhs,interface_rhs,dir);
-            }
-         }
-      }
-   }
-
-   for (p = 0; p < nb_ranks_comm_i[dir]; ++p) delete [] all_send_data[p];
-   delete [] all_send_data;
-
-}
-
-//---------------------------------------------------------------------------
-double
-DDS_NavierStokes:: pressure_assemble_local_rhs_y ( size_t const& i, size_t const& k, FV_TimeIterator const* t_it )
-//---------------------------------------------------------------------------
-{
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-
-   for (size_t l=0;l<dim;++l) {
-      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-   }
-
-   size_t j,pos,m;
-   double fe=0.,dy;
-
-   // Vector for fi
-   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(1) ;
-
-   // Compute local_rhs_y = psi_{n} for pressure in y
-   for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-      pos = j - min_unknown_index(1);
-      dy = PF->get_cell_size( j,0,1);
-
-      if (is_Pperiodic[1] == 0) {
-         if (rank_in_i[1] == nb_ranks_comm_i[1]-1) {
-            local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
-         } else {
-            if (j == max_unknown_index(1))
-               fe = PF->DOF_value( i, j, k, 0, 1 )*dy;
-            else
-               local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
-         }
-      } else {
-         if (nb_ranks_comm_i[1] > 1) {
-            if (j == max_unknown_index(1))
-               fe = PF->DOF_value( i, j, k, 0, 1 )*dy;
-            else
-               local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
-         } else
-            local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dy);
-      }
-    
    }
    return fe;
-}
-
-//---------------------------------------------------------------------------
-double
-DDS_NavierStokes:: pressure_assemble_local_rhs_z ( size_t const& i, size_t const& j, FV_TimeIterator const* t_it )
-//---------------------------------------------------------------------------
-{
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l) { 
-      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-   }
-
-   size_t k,pos,m;
-   double fe=0.,dz;
-
-   // Vector for fi
-   LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(2);
-
-   // Compute local_rhs_z = phi_{n} for pressure in z
-   for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-      pos = k - min_unknown_index(2);
-      dz = PF->get_cell_size( k,0,2);
-
-      if (is_Pperiodic[2] == 0) {
-         if (rank_in_i[2] == nb_ranks_comm_i[2]-1) {
-            local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
-         } else {
-            if (k == max_unknown_index(2))
-               fe = PF->DOF_value( i, j, k, 0, 1 )*dz ;
-            else
-               local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
-         }
-      } else {
-         if (nb_ranks_comm_i[2] > 1) {
-            if (k == max_unknown_index(2))
-               fe = PF->DOF_value( i, j, k, 0, 1 )*dz ;
-            else
-               local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
-         } else
-            local_rhs->set_item( pos, PF->DOF_value( i, j, k, 0, 1 )*dz);
-      }
-   }
-   return fe;
-}
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: SolveP_i_in_jk ( FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k )
-//---------------------------------------------------------------------------
-{
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-  size_t comp = 0;
-
-  for (size_t comp=0;comp<nb_comps;comp++) {
-     // Get local min and max indices
-     for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-        max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-     }
-
-     size_t local_min_k = 0;
-     size_t local_max_k = 0;
-
-     size_t nb_send_data=0;
-     if (dim == 2) {
-        nb_send_data = 3*(max_unknown_index(dir_j)-min_unknown_index(dir_j)+1);
-     } else if (dim == 3) {
-        nb_send_data = 3*(max_unknown_index(dir_j)-min_unknown_index(dir_j)+1)*(max_unknown_index(dir_k)-min_unknown_index(dir_k)+1);
-        local_min_k = min_unknown_index(dir_k);
-        local_max_k = max_unknown_index(dir_k);
-     }
-
-     double * packed_data = new double[nb_send_data];
-
-     // Solve in i
-     if ((nb_ranks_comm_i[dir_i]>1)||(is_Pperiodic[dir_i] == 1)) {
-        for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
-           for (size_t k=local_min_k; k <= local_max_k; ++k) {
-               pressure_solve_for_secondorder(j,k,t_it,packed_data,dir_i);
-           }
-        }
-        pressure_solve_interface_unknowns ( packed_data, nb_send_data, t_it, dir_i );
-
-     } else if (is_Pperiodic[dir_i] == 0) {  // Serial mode with non-periodic condition
-        for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
-           for (size_t k=local_min_k; k <= local_max_k; ++k) {
-              double fe = 0.;
-              if (dir_i == 0) {
-                 fe = pressure_assemble_local_rhs_x(j,k,t_it);
-              } else if (dir_i == 1) {
-                 fe = pressure_assemble_local_rhs_y(j,k,t_it);
-              } else if (dir_i == 2) {
-                 fe = pressure_assemble_local_rhs_z(j,k,t_it);
-              }
-	      LA_SeqVector* local_rhs = GLOBAL_EQ->get_local_temp_P(dir_i);
-              GLOBAL_EQ->DS_NavierStokes_solver_P(j,k,min_unknown_index(dir_i),local_rhs,NULL,dir_i);
-           }
-        }
-     }
-     delete [] packed_data;
-  }
 }
 
 //---------------------------------------------------------------------------
@@ -2628,20 +1796,22 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
 {
   MAC_LABEL( "DDS_NavierStokes:: NS_pressure_update" ) ;
 
-  SolveP_i_in_jk (t_it,0,1,2);
+  double gamma=mu/2.0;
+
+  Solve_i_in_jk (PF,t_it,0,1,2,gamma,0);
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec_P();
   // Tranfer back to field
   PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
   
-  SolveP_i_in_jk (t_it,1,0,2);
+  Solve_i_in_jk (PF,t_it,1,0,2,gamma,0);
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec_P();
   // Tranfer back to field
   PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
  
   if (dim == 3) { 
-     SolveP_i_in_jk (t_it,2,0,1);
+     Solve_i_in_jk (PF,t_it,2,0,1,gamma,0);
      // Synchronize the distributed DS solution vector
      GLOBAL_EQ->synchronize_DS_solution_vec_P();
      // Tranfer back to field
@@ -2829,9 +1999,8 @@ DDS_NavierStokes::write_velocity_field(FV_TimeIterator const* t_it)
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
-  size_t nb_comps = UF->nb_components() ;
 
-  for(size_t comp=0;comp<nb_comps;comp++)
+  for(size_t comp=0;comp<nb_comps[1];comp++)
   {
     // Get local min and max indices
     for (size_t l=0;l<dim;++l)
@@ -3040,7 +2209,7 @@ DDS_NavierStokes::output_L2norm_velocity( size_t level )
 
   double dx,dy;
 
-  for(size_t comp=0;comp<nb_comps;comp++){
+  for(size_t comp=0;comp<nb_comps[1];comp++){
     for (size_t l=0;l<dim;++l)
       min_unknown_index(l) =
        UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
@@ -3167,9 +2336,6 @@ DDS_NavierStokes:: free_DDS_subcommunicators ( void )
    MAC_LABEL( "DDS_NavierStokes:: free_DDS_subcommunicators" ) ;
 }
 
-
-
-
 //----------------------------------------------------------------------
 double 
 DDS_NavierStokes:: assemble_advection_Upwind( 
@@ -3183,18 +2349,17 @@ DDS_NavierStokes:: assemble_advection_Upwind(
    double dxC = 0., dyC = 0., dzC = 0.;
    double AdvectedValueC = 0., AdvectedValueRi = 0., AdvectedValueLe = 0.,
     AdvectedValueTo = 0., AdvectedValueBo = 0., AdvectedValueFr = 0., 
-  AdvectedValueBe = 0,
-    AdvectorValueC = 0., AdvectorValueRi = 0., AdvectorValueLe = 0.,
-    AdvectorValueTo = 0., AdvectorValueBo = 0., AdvectorValueFr = 0., 
-  AdvectorValueBe = 0, AdvectorValueToLe = 0., AdvectorValueToRi = 0., 
-  AdvectorValueBoLe = 0., AdvectorValueBoRi = 0., AdvectorValueFrLe = 0., 
-  AdvectorValueFrRi = 0., AdvectorValueBeLe = 0., AdvectorValueBeRi = 0.,
-  AdvectorValueFrTo = 0., AdvectorValueFrBo = 0., AdvectorValueBeTo = 0., 
-  AdvectorValueBeBo = 0.,
-  ur = 0., ul = 0., vt = 0., vb = 0., wf = 0., wb = 0.,
-  fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
+    AdvectedValueBe = 0, AdvectorValueC = 0., AdvectorValueRi = 0., 
+    AdvectorValueLe = 0., AdvectorValueTo = 0., AdvectorValueBo = 0., 
+    AdvectorValueFr = 0., AdvectorValueBe = 0, AdvectorValueToLe = 0., 
+    AdvectorValueToRi = 0., AdvectorValueBoLe = 0., AdvectorValueBoRi = 0., 
+    AdvectorValueFrLe = 0., AdvectorValueFrRi = 0., AdvectorValueBeLe = 0., 
+    AdvectorValueBeRi = 0., AdvectorValueFrTo = 0., AdvectorValueFrBo = 0., 
+    AdvectorValueBeTo = 0., AdvectorValueBeBo = 0.,
+    ur = 0., ul = 0., vt = 0., vb = 0., wf = 0., wb = 0.,
+    fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
    
-  // Comment: staggered unknowns always have a defined value at +1/-1
+   // Comment: staggered unknowns always have a defined value at +1/-1
    // indices in directions different from their component number, 
    // i.e. u in x, v in y and w in z. 
    // For instance, if u on the right or left boundary is an unknown with
@@ -3211,373 +2376,189 @@ DDS_NavierStokes:: assemble_advection_Upwind(
 
    dxC = UF->get_cell_size(i,component,0) ;          
    dyC = UF->get_cell_size(j,component,1) ;
- 
-   if( dim == 2 )
-   {
+   if (dim == 3) dzC = UF->get_cell_size(k,component,2) ;       
 
-     AdvectedValueC = UF->DOF_value( i, j, k, component, 
-      advected_level );
-     AdvectorValueC = UF->DOF_value( i, j, k, component, 
-      advecting_level );
-     
-     // The First Component (u)
-     if ( component == 0 )
-     {
-       // Right (U_X)
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
+   AdvectedValueC = UF->DOF_value( i, j, k, component, advected_level );
+   AdvectorValueC = UF->DOF_value( i, j, k, component, advecting_level );
+ 
+   // The First Component (u)
+   if ( component == 0 ) {
+      // Right (U_X)
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
          fri = AdvectorValueC * AdvectedValueC;
-       else
-       {
-               AdvectedValueRi = UF->DOF_value(
-                   i+1, j, k, component, advected_level );
-         AdvectorValueRi = UF->DOF_value( 
-             i+1, j, k, component, advecting_level );
+      else {
+         AdvectedValueRi = UF->DOF_value(i+1, j, k, component, advected_level );
+         AdvectorValueRi = UF->DOF_value(i+1, j, k, component, advecting_level );
          ur = 0.5 * ( AdvectorValueC + AdvectorValueRi );
          if ( ur > 0. ) fri = ur * AdvectedValueC;
          else fri = ur * AdvectedValueRi;
-       }
+      }
            
-       // Left (U_X)
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
+      // Left (U_X)
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
          fle = AdvectorValueC * AdvectedValueC;
-       else
-       {
-               AdvectedValueLe = UF->DOF_value( 
-               i-1, j, k, component, advected_level );
-         AdvectorValueLe = UF->DOF_value( 
-             i-1, j, k, component, advecting_level );
+      else {
+         AdvectedValueLe = UF->DOF_value(i-1, j, k, component, advected_level );
+         AdvectorValueLe = UF->DOF_value(i-1, j, k, component, advecting_level );
          ul = 0.5 * ( AdvectorValueC + AdvectorValueLe );
          if ( ul > 0. ) fle = ul * AdvectedValueLe;
          else fle = ul * AdvectedValueC;
-       }
+      }
        
-       // Top (U_Y)
-       AdvectedValueTo = UF->DOF_value(
-               i, j+1, k, component, advected_level );
-       AdvectorValueToLe = UF->DOF_value(
-             i+shift.i-1, j+shift.j, k, 1, advecting_level );
-       AdvectorValueToRi = UF->DOF_value(
-             i+shift.i, j+shift.j, k, 1, advecting_level );
-       vt = 0.5 * ( AdvectorValueToLe + AdvectorValueToRi );
-       if ( vt > 0. ) fto = vt * AdvectedValueC;
-       else fto = vt * AdvectedValueTo;
+      // Top (U_Y)
+      AdvectedValueTo = UF->DOF_value(i, j+1, k, component, advected_level );
+      AdvectorValueToLe = UF->DOF_value(i+shift.i-1, j+shift.j, k, 1, advecting_level );
+      AdvectorValueToRi = UF->DOF_value(i+shift.i, j+shift.j, k, 1, advecting_level );
+      vt = 0.5 * ( AdvectorValueToLe + AdvectorValueToRi );
+      if ( vt > 0. ) fto = vt * AdvectedValueC;
+      else fto = vt * AdvectedValueTo;
    
-       // Bottom (U_Y)
-       AdvectedValueBo = UF->DOF_value(
-               i, j-1, k, component, advected_level );
-       AdvectorValueBoLe = UF->DOF_value(
-             i+shift.i-1, j+shift.j-1, k, 1, advecting_level );
-       AdvectorValueBoRi = UF->DOF_value(
-             i+shift.i, j+shift.j-1, k, 1, advecting_level );
-       vb = 0.5 * ( AdvectorValueBoLe + AdvectorValueBoRi );
-       if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-       else fbo = vb * AdvectedValueC;
-     }
-     
-     // The second Component (v)
-     else
-     {
-       // Right (V_X)
-       AdvectedValueRi = UF->DOF_value(
-               i+1, j, k, component, advected_level );
-       AdvectorValueToRi = UF->DOF_value(
-             i+shift.i, j+shift.j, k, 0, advecting_level );
-       AdvectorValueBoRi = UF->DOF_value(
-             i+shift.i, j+shift.j-1, k, 0, advecting_level );
-       ur = 0.5 * ( AdvectorValueToRi + AdvectorValueBoRi );
-       if ( ur > 0. ) fri = ur * AdvectedValueC;
-       else fri = ur * AdvectedValueRi;
-           
-       // Left (V_X)
-       AdvectedValueLe = UF->DOF_value(
-               i-1, j, k, component, advected_level );
-       AdvectorValueToLe = UF->DOF_value(
-             i+shift.i-1, j+shift.j, k, 0, advecting_level );
-       AdvectorValueBoLe = UF->DOF_value(
-             i+shift.i-1, j+shift.j-1, k, 0, advecting_level );
-       ul = 0.5 * ( AdvectorValueToLe + AdvectorValueBoLe );
-       if ( ul > 0. ) fle = ul * AdvectedValueLe;
-       else fle = ul * AdvectedValueC;
-   
-       // Top (V_Y)
-       if ( UF->DOF_color(i, j, k, component ) == FV_BC_TOP )
-         fto = AdvectorValueC * AdvectedValueC;
-       else
-       {
-         AdvectedValueTo = UF->DOF_value(
-               i, j+1, k, component, advected_level );
-         AdvectorValueTo = UF->DOF_value(
-             i, j+1, k, component, advecting_level );
-         vt = 0.5 * ( AdvectorValueTo + AdvectorValueC );
-         if ( vt > 0. ) fto = vt * AdvectedValueC;
-         else fto = vt * AdvectedValueTo;
-       }
-   
-       // Bottom (V_Y)
-       if ( UF->DOF_color(i, j, k, component ) == FV_BC_BOTTOM )
-         fbo = AdvectorValueC * AdvectedValueC;
-       else
-       {
-         AdvectedValueBo = UF->DOF_value(
-               i, j-1, k, component, advected_level );
-         AdvectorValueBo = UF->DOF_value(
-             i, j-1, k, component, advecting_level );
-         vb = 0.5 * ( AdvectorValueBo + AdvectorValueC );
-         if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-         else fbo = vb * AdvectedValueC;
-       }
-     }
+      // Bottom (U_Y)
+      AdvectedValueBo = UF->DOF_value(i, j-1, k, component, advected_level );
+      AdvectorValueBoLe = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, 1, advecting_level );
+      AdvectorValueBoRi = UF->DOF_value(i+shift.i, j+shift.j-1, k, 1, advecting_level );
+      vb = 0.5 * ( AdvectorValueBoLe + AdvectorValueBoRi );
+      if ( vb > 0. ) fbo = vb * AdvectedValueBo;
+      else fbo = vb * AdvectedValueC;
 
-           flux = (fto - fbo) * dxC + (fri - fle) * dyC;
-   }
-   else // DIM = 3
-   {
-     dzC = UF->get_cell_size(k,component,2) ;       
-    AdvectedValueC = UF->DOF_value( i, j, k, component, 
-        advected_level );
-    AdvectorValueC = UF->DOF_value( i, j, k, component, 
-        advecting_level );
-
-       // The First Component (u)
-       if ( component == 0 )
-       {
-         // Right (U_X)
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
-           fri = AdvectorValueC * AdvectedValueC;
-         else
-         {
-                 AdvectedValueRi = UF->DOF_value(
-           i+1, j, k, component, advected_level );
-     AdvectorValueRi = UF->DOF_value(
-         i+1, j, k, component, advecting_level );
-                 ur = 0.5 * ( AdvectorValueRi + AdvectorValueC );
-                 if ( ur > 0. ) fri = ur * AdvectedValueC;
-                 else fri = ur * AdvectedValueRi;
-         }
-           
-         // Left (U_X)
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
-           fle = AdvectorValueC * AdvectedValueC;
-         else
-         {
-                 AdvectedValueLe = UF->DOF_value(
-           i-1, j, k, component, advected_level );
-     AdvectorValueLe = UF->DOF_value(
-         i-1, j, k, component, advecting_level );
-                 ul = 0.5 * ( AdvectorValueLe + AdvectorValueC );
-                 if ( ul > 0. ) fle = ul * AdvectedValueLe;
-                 else fle = ul * AdvectedValueC;
-         }
-   
-         // Top (U_Y)
-         AdvectedValueTo = UF->DOF_value(
-           i, j+1, k, component, advected_level );
-         AdvectorValueToLe = UF->DOF_value( 
-         i+shift.i-1, j+shift.j, k, 1, advecting_level );
-         AdvectorValueToRi = UF->DOF_value( 
-         i+shift.i, j+shift.j, k, 1, advecting_level );
-         vt = 0.5 * ( AdvectorValueToLe + AdvectorValueToRi );
-         if ( vt > 0. ) fto = vt * AdvectedValueC;
-         else fto = vt * AdvectedValueTo;
-   
-         // Bottom (U_Y)
-         AdvectedValueBo = UF->DOF_value(
-           i, j-1, k, component, advected_level );
-         AdvectorValueBoLe = UF->DOF_value(
-         i+shift.i-1, j+shift.j-1, k, 1, advecting_level );
-         AdvectorValueBoRi = UF->DOF_value(
-         i+shift.i, j+shift.j-1, k, 1, advecting_level );
-         vb = 0.5 * ( AdvectorValueBoLe + AdvectorValueBoRi );
-         if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-         else fbo = vb * AdvectedValueC;
-      
+      if (dim == 3) {
          // Front (U_Z)
-         AdvectedValueFr = UF->DOF_value(
-           i, j, k+1, component, advected_level );
-         AdvectorValueFrLe = UF->DOF_value(
-         i+shift.i-1, j, k+shift.k, 2, advecting_level );
-         AdvectorValueFrRi = UF->DOF_value(
-         i+shift.i, j, k+shift.k, 2, advecting_level );
+         AdvectedValueFr = UF->DOF_value(i, j, k+1, component, advected_level );
+         AdvectorValueFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, 2, advecting_level );
+         AdvectorValueFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, 2, advecting_level );
          wf = 0.5 * ( AdvectorValueFrLe + AdvectorValueFrRi );
          if ( wf > 0. ) ffr = wf * AdvectedValueC;
          else ffr = wf * AdvectedValueFr;
-     
+
          // Behind (U_Z)
-         AdvectedValueBe = UF->DOF_value(
-           i, j, k-1, component, advected_level );
-         AdvectorValueBeLe = UF->DOF_value(
-         i+shift.i-1, j, k+shift.k-1, 2, advecting_level );
-         AdvectorValueBeRi = UF->DOF_value(
-         i+shift.i, j, k+shift.k-1, 2, advecting_level );
+         AdvectedValueBe = UF->DOF_value(i, j, k-1, component, advected_level );
+         AdvectorValueBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, 2, advecting_level );
+         AdvectorValueBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, 2, advecting_level );
          wb = 0.5 * ( AdvectorValueBeLe + AdvectorValueBeRi );
          if ( wb > 0. ) fbe = wb * AdvectedValueBe;
          else fbe = wb * AdvectedValueC;
-       }
-       
-       // The Second Component (v)
-       else if ( component == 1 )
-       {
-         // Right (V_X)
-         AdvectedValueRi = UF->DOF_value(
-           i+1, j, k, component, advected_level );
-         AdvectorValueToRi = UF->DOF_value(
-         i+shift.i, j+shift.j, k, 0, advecting_level );
-         AdvectorValueBoRi = UF->DOF_value(
-         i+shift.i, j+shift.j-1, k, 0, advecting_level );
-         ur = 0.5 * ( AdvectorValueToRi + AdvectorValueBoRi );
-         if ( ur > 0. ) fri = ur * AdvectedValueC;
-         else fri = ur * AdvectedValueRi;
+      }
+   } else if (component == 1) {
+      // The second Component (v)
+      // Right (V_X)
+      AdvectedValueRi = UF->DOF_value(i+1, j, k, component, advected_level );
+      AdvectorValueToRi = UF->DOF_value(i+shift.i, j+shift.j, k, 0, advecting_level );
+      AdvectorValueBoRi = UF->DOF_value(i+shift.i, j+shift.j-1, k, 0, advecting_level );
+      ur = 0.5 * ( AdvectorValueToRi + AdvectorValueBoRi );
+      if ( ur > 0. ) fri = ur * AdvectedValueC;
+      else fri = ur * AdvectedValueRi;
            
-         // Left (V_X)
-         AdvectedValueLe = UF->DOF_value(
-           i-1, j, k, component, advected_level );
-         AdvectorValueToLe = UF->DOF_value(
-         i+shift.i-1, j+shift.j, k, 0, advecting_level );
-         AdvectorValueBoLe = UF->DOF_value(
-         i+shift.i-1, j+shift.j-1, k, 0, advecting_level );
-         ul = 0.5 * ( AdvectorValueToLe + AdvectorValueBoLe );
-         if ( ul > 0. ) fle = ul * AdvectedValueLe;
-         else fle = ul * AdvectedValueC;
+      // Left (V_X)
+      AdvectedValueLe = UF->DOF_value(i-1, j, k, component, advected_level );
+      AdvectorValueToLe = UF->DOF_value(i+shift.i-1, j+shift.j, k, 0, advecting_level );
+      AdvectorValueBoLe = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, 0, advecting_level );
+      ul = 0.5 * ( AdvectorValueToLe + AdvectorValueBoLe );
+      if ( ul > 0. ) fle = ul * AdvectedValueLe;
+      else fle = ul * AdvectedValueC;
    
-         // Top (V_Y)
-         if ( UF->DOF_color(i, j, k, component ) == FV_BC_TOP )
-           fto = AdvectorValueC * AdvectedValueC;
-         else
-         {
-           AdvectedValueTo = UF->DOF_value(
-           i, j+1, k, component, advected_level );
-     AdvectorValueTo = UF->DOF_value(
-         i, j+1, k, component, advecting_level );
-           vt = 0.5 * ( AdvectorValueTo + AdvectorValueC );
-           if ( vt > 0. ) fto = vt * AdvectedValueC;
-           else fto = vt * AdvectedValueTo;
-         }
+      // Top (V_Y)
+      if ( UF->DOF_color(i, j, k, component ) == FV_BC_TOP )
+         fto = AdvectorValueC * AdvectedValueC;
+      else {
+         AdvectedValueTo = UF->DOF_value(i, j+1, k, component, advected_level );
+         AdvectorValueTo = UF->DOF_value(i, j+1, k, component, advecting_level );
+         vt = 0.5 * ( AdvectorValueTo + AdvectorValueC );
+         if ( vt > 0. ) fto = vt * AdvectedValueC;
+         else fto = vt * AdvectedValueTo;
+      }
    
-         // Bottom (V_Y)
-         if ( UF->DOF_color(i, j, k, component ) == FV_BC_BOTTOM )
-           fbo = AdvectorValueC * AdvectedValueC;
-         else
-         {
-           AdvectedValueBo = UF->DOF_value(
-           i, j-1, k, component, advected_level );
-     AdvectorValueBo = UF->DOF_value(
-         i, j-1, k, component, advecting_level );
-           vb = 0.5 * ( AdvectorValueBo + AdvectorValueC );
-           if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-           else fbo = vb * AdvectedValueC;
-         }
-      
+      // Bottom (V_Y)
+      if ( UF->DOF_color(i, j, k, component ) == FV_BC_BOTTOM )
+         fbo = AdvectorValueC * AdvectedValueC;
+      else {
+         AdvectedValueBo = UF->DOF_value(i, j-1, k, component, advected_level );
+         AdvectorValueBo = UF->DOF_value(i, j-1, k, component, advecting_level );
+         vb = 0.5 * ( AdvectorValueBo + AdvectorValueC );
+         if ( vb > 0. ) fbo = vb * AdvectedValueBo;
+         else fbo = vb * AdvectedValueC;
+      }
+
+      if (dim == 3) {
          // Front (V_Z)
-         AdvectedValueFr = UF->DOF_value(
-           i, j, k+1, component, advected_level );
-         AdvectorValueFrTo = UF->DOF_value(
-         i, j+shift.j, k+shift.k, 2, advecting_level );
-         AdvectorValueFrBo = UF->DOF_value(
-         i, j+shift.j-1, k+shift.k, 2, advecting_level );
+         AdvectedValueFr = UF->DOF_value(i, j, k+1, component, advected_level );
+         AdvectorValueFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, 2, advecting_level );
+         AdvectorValueFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, 2, advecting_level );
          wf = 0.5 * ( AdvectorValueFrTo + AdvectorValueFrBo );
          if ( wf > 0. ) ffr = wf * AdvectedValueC;
          else ffr = wf * AdvectedValueFr;
-     
+
          // Behind (V_Z)
-         AdvectedValueBe = UF->DOF_value(
-           i, j, k-1, component, advected_level );
-         AdvectorValueBeTo = UF->DOF_value(
-         i, j+shift.j, k+shift.k-1, 2, advecting_level );
-         AdvectorValueBeBo = UF->DOF_value(
-         i, j+shift.j-1, k+shift.k-1, 2, advecting_level );
+         AdvectedValueBe = UF->DOF_value(i, j, k-1, component, advected_level );
+         AdvectorValueBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, 2, advecting_level );
+         AdvectorValueBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, 2, advecting_level );
          wb = 0.5 * ( AdvectorValueBeTo + AdvectorValueBeBo );
          if ( wb > 0. ) fbe = wb * AdvectedValueBe;
          else fbe = wb * AdvectedValueC;
-       }
-       
-       // The Third Component (w)
-       else
-       {
-         // Right (W_X)
-         AdvectedValueRi = UF->DOF_value(
-           i+1, j, k, component, advected_level );
-         AdvectorValueFrRi = UF->DOF_value(
-           i+shift.i, j, k+shift.k, 0, advecting_level );
-         AdvectorValueBeRi = UF->DOF_value(
-         i+shift.i, j, k+shift.k-1, 0, advecting_level );
-         ur = 0.5 * ( AdvectorValueFrRi + AdvectorValueBeRi );
-         if ( ur > 0. ) fri = ur * AdvectedValueC;
-         else fri = ur * AdvectedValueRi;
+      }          
+   } else {
+      // The Third Component (w)
+      // Right (W_X)
+      AdvectedValueRi = UF->DOF_value(i+1, j, k, component, advected_level );
+      AdvectorValueFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, 0, advecting_level );
+      AdvectorValueBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, 0, advecting_level );
+      ur = 0.5 * ( AdvectorValueFrRi + AdvectorValueBeRi );
+      if ( ur > 0. ) fri = ur * AdvectedValueC;
+      else fri = ur * AdvectedValueRi;
            
-         // Left (W_X)
-         AdvectedValueLe = UF->DOF_value(
-           i-1, j, k, component, advected_level );
-         AdvectorValueFrLe = UF->DOF_value(
-         i+shift.i-1, j, k+shift.k, 0, advecting_level );
-         AdvectorValueBeLe = UF->DOF_value(
-         i+shift.i-1, j, k+shift.k-1, 0, advecting_level );
-         ul = 0.5 * ( AdvectorValueFrLe + AdvectorValueBeLe );
-         if ( ul > 0. ) fle = ul * AdvectedValueLe;
-         else fle = ul * AdvectedValueC;
+      // Left (W_X)
+      AdvectedValueLe = UF->DOF_value(i-1, j, k, component, advected_level );
+      AdvectorValueFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, 0, advecting_level );
+      AdvectorValueBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, 0, advecting_level );
+      ul = 0.5 * ( AdvectorValueFrLe + AdvectorValueBeLe );
+      if ( ul > 0. ) fle = ul * AdvectedValueLe;
+      else fle = ul * AdvectedValueC;
 
-         // Top (W_Y)
-         AdvectedValueTo = UF->DOF_value(
-           i, j+1, k, component, advected_level );
-         AdvectorValueFrTo = UF->DOF_value(
-        i, j+shift.j, k+shift.k, 1, advecting_level );
-         AdvectorValueBeTo = UF->DOF_value(
-        i, j+shift.j, k+shift.k-1, 1, advecting_level );
-         vt = 0.5 * ( AdvectorValueFrTo + AdvectorValueBeTo );
-         if ( vt > 0. ) fto = vt * AdvectedValueC;
-         else fto = vt * AdvectedValueTo;
+      // Top (W_Y)
+      AdvectedValueTo = UF->DOF_value(i, j+1, k, component, advected_level );
+      AdvectorValueFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, 1, advecting_level );
+      AdvectorValueBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, 1, advecting_level );
+      vt = 0.5 * ( AdvectorValueFrTo + AdvectorValueBeTo );
+      if ( vt > 0. ) fto = vt * AdvectedValueC;
+      else fto = vt * AdvectedValueTo;
    
-         // Bottom (W_Y)
-         AdvectedValueBo = UF->DOF_value(
-           i, j-1, k, component, advected_level );
-         AdvectorValueFrBo = UF->DOF_value(
-         i, j+shift.j-1, k+shift.k, 1, advecting_level );
-         AdvectorValueBeBo = UF->DOF_value(
-         i, j+shift.j-1, k+shift.k-1, 1, advecting_level );
-         vb = 0.5 * ( AdvectorValueFrBo + AdvectorValueBeBo );
-         if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-         else fbo = vb * AdvectedValueC;
+      // Bottom (W_Y)
+      AdvectedValueBo = UF->DOF_value(i, j-1, k, component, advected_level );
+      AdvectorValueFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, 1, advecting_level );
+      AdvectorValueBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, 1, advecting_level );
+      vb = 0.5 * ( AdvectorValueFrBo + AdvectorValueBeBo );
+      if ( vb > 0. ) fbo = vb * AdvectedValueBo;
+      else fbo = vb * AdvectedValueC;
       
-         // Front (W_Z)
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
-           ffr = AdvectorValueC * AdvectedValueC;
-         else
-         {
-           AdvectedValueFr = UF->DOF_value(
-           i, j, k+1, component, advected_level );
-           AdvectorValueFr = UF->DOF_value(
-         i, j, k+1, component, advecting_level );
-           wf = 0.5 * ( AdvectorValueFr + AdvectorValueC );
-           if ( wf > 0. ) ffr = wf * AdvectedValueC;
-           else ffr = wf * AdvectedValueFr;
-         }
+      // Front (W_Z)
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
+         ffr = AdvectorValueC * AdvectedValueC;
+      else {
+         AdvectedValueFr = UF->DOF_value(i, j, k+1, component, advected_level );
+         AdvectorValueFr = UF->DOF_value(i, j, k+1, component, advecting_level );
+         wf = 0.5 * ( AdvectorValueFr + AdvectorValueC );
+         if ( wf > 0. ) ffr = wf * AdvectedValueC;
+         else ffr = wf * AdvectedValueFr;
+      }
      
-         // Behind (W_Z)
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND )
-           fbe = AdvectorValueC * AdvectedValueC;
-         else
-         {
-           AdvectedValueBe = UF->DOF_value(
-           i, j, k-1, component, advected_level );
-           AdvectorValueBe = UF->DOF_value(
-         i, j, k-1, component, advecting_level );
-           wb = 0.5 * ( AdvectorValueBe + AdvectorValueC );
-           if ( wb > 0. ) fbe = wb * AdvectedValueBe;
-           else fbe = wb * AdvectedValueC;
-         }
-       }
-       
-             flux = (fto - fbo) * dxC * dzC
-          + (fri - fle) * dyC * dzC
-      + (ffr - fbe) * dxC * dyC;
+      // Behind (W_Z)
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND )
+         fbe = AdvectorValueC * AdvectedValueC;
+      else {
+         AdvectedValueBe = UF->DOF_value(i, j, k-1, component, advected_level );
+         AdvectorValueBe = UF->DOF_value(i, j, k-1, component, advecting_level );
+         wb = 0.5 * ( AdvectorValueBe + AdvectorValueC );
+         if ( wb > 0. ) fbe = wb * AdvectedValueBe;
+         else fbe = wb * AdvectedValueC;
+      }
+   }  
 
-     }   
-     
+   if (dim == 2) { 
+      flux = (fto - fbo) * dxC + (fri - fle) * dyC;
+   } else if (dim == 3) {
+      flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
+   }   
    return ( coef * flux ); 
-
 }
-
-
-
 
 //----------------------------------------------------------------------
 double
@@ -3586,1584 +2567,803 @@ DDS_NavierStokes:: assemble_advection_TVD(
          size_t const& i, size_t const& j, size_t const& k, size_t const& component ) const
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "FV_DiscreteField_Staggered:: assemble_advection_TVD" );   
+   MAC_LABEL( "DDS_NavierStokes:: assemble_advection_TVD" );   
    
    // Parameters
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
    double xC = 0., yC = 0., zC = 0., xr = 0., xR = 0., xl = 0., xL = 0., 
     yt = 0., yT = 0., yb = 0., yB = 0.,
-  zf = 0., zF = 0., zb = 0., zB = 0.;
+    zf = 0., zF = 0., zb = 0., zB = 0.;
    double dxC = 0., dyC = 0., dzC = 0., dxr = 0., dxl = 0., dxCr = 0., 
     dxCl = 0., dxRr = 0., dxR = 0., dxLl = 0., dyt = 0., dyb = 0., 
-  dyCt = 0., dyCb = 0., dyTt = 0., dyT = 0., dyBb = 0., dzf = 0., 
-  dzb = 0., dzCf = 0., dzCb = 0., dzFf = 0., dzF = 0., dzBb = 0.;
+    dyCt = 0., dyCb = 0., dyTt = 0., dyT = 0., dyBb = 0., dzf = 0., 
+    dzb = 0., dzCf = 0., dzCb = 0., dzFf = 0., dzF = 0., dzBb = 0.;
 
    double AdvectedValueC = 0., AdvectedValueRi = 0., AdvectedValueLe = 0.,
     AdvectedValueTo = 0., AdvectedValueBo = 0., AdvectedValueFr = 0., 
-  AdvectedValueBe = 0, AdvectedValueLeLe=0., AdvectedValueRiRi=0., 
-  AdvectedValueBoBo=0., AdvectedValueToTo=0., AdvectedValueBeBe=0.,
-  AdvectedValueFrFr=0.,  
-    AdvectorValueC = 0., AdvectorValueRi = 0., AdvectorValueLe = 0.,
-    AdvectorValueTo = 0., AdvectorValueBo = 0., AdvectorValueFr = 0., 
-  AdvectorValueBe = 0, AdvectorValueToLe = 0., AdvectorValueToRi = 0., 
-  AdvectorValueBoLe = 0., AdvectorValueBoRi = 0., AdvectorValueFrLe = 0., 
-  AdvectorValueFrRi = 0., AdvectorValueBeLe = 0., AdvectorValueBeRi = 0.,
-  AdvectorValueFrTo = 0., AdvectorValueFrBo = 0., AdvectorValueBeTo = 0., 
-  AdvectorValueBeBo = 0.;
+    AdvectedValueBe = 0, AdvectedValueLeLe=0., AdvectedValueRiRi=0., 
+    AdvectedValueBoBo=0., AdvectedValueToTo=0., AdvectedValueBeBe=0.,
+    AdvectedValueFrFr=0., AdvectorValueC = 0., AdvectorValueRi = 0., 
+    AdvectorValueLe = 0., AdvectorValueTo = 0., AdvectorValueBo = 0., 
+    AdvectorValueFr = 0., AdvectorValueBe = 0, AdvectorValueToLe = 0., 
+    AdvectorValueToRi = 0., AdvectorValueBoLe = 0., AdvectorValueBoRi = 0., 
+    AdvectorValueFrLe = 0., AdvectorValueFrRi = 0., AdvectorValueBeLe = 0., 
+    AdvectorValueBeRi = 0., AdvectorValueFrTo = 0., AdvectorValueFrBo = 0., 
+    AdvectorValueBeTo = 0., AdvectorValueBeBo = 0.;
    double ur = 0., ul = 0., vt = 0., vb = 0., wf = 0., wb = 0.,
-  fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
+    fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
    double cRip12 = 0., cLip12 = 0., cRim12 = 0., cLim12 = 0., thetaC = 0., 
     thetaRi = 0., thetaLe = 0., thetaTo = 0., thetaBo = 0., thetaFr = 0., 
-  thetaBe = 0.;
+    thetaBe = 0.;
    
    FV_SHIFT_TRIPLET shift = UF->shift_staggeredToStaggered( component ) ;
         
-     // Perform assembling
-   dxC = UF->get_cell_size( i, component, 0 ) ;    
-   dyC = UF->get_cell_size( j, component, 1 ) ; 
+   // Perform assembling
    xC = UF->get_DOF_coordinate( i, component, 0 );
+   dxC = UF->get_cell_size( i, component, 0 ) ;    
    yC = UF->get_DOF_coordinate( j, component, 1 );
+   dyC = UF->get_cell_size( j, component, 1 ) ; 
+   if (dim == 3) {
+      zC =UF->get_DOF_coordinate( k, component, 2 ) ;
+      dzC =UF->get_cell_size( k, component, 2 ) ;      
+   }
  
-   if ( dim == 2 )
-   {
-      AdvectorValueC = UF->DOF_value( i, j, k, component, 
-      advecting_level );
-      AdvectedValueC =UF->DOF_value( i, j, k, component, advected_level );
-     
-     // The First component (u)
-     if ( component == 0 )
-     {               
-       // Right and Left
-       // --------------
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
-       {
+   AdvectorValueC = UF->DOF_value( i, j, k, component, advecting_level );
+   AdvectedValueC = UF->DOF_value( i, j, k, component, advected_level );
+
+   // The First component (u)
+   if (component == 0) {
+      // Right and Left
+      // --------------
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) {
          AdvectorValueRi = AdvectorValueC;
          AdvectedValueRi = AdvectedValueC;
-       }
-       else
-       {
-         AdvectorValueRi = UF->DOF_value( i+1, j, k, 
-            component, advecting_level );      
-         AdvectedValueRi =UF->DOF_value(
-            i+1, j, k, component, advected_level );      
-       }
-       
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
-       {
+      } else {
+         AdvectorValueRi = UF->DOF_value( i+1, j, k, component, advecting_level );
+         AdvectedValueRi =UF->DOF_value( i+1, j, k, component, advected_level );
+      }
+
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT ) {
          AdvectorValueLe = AdvectorValueC;
          AdvectedValueLe = AdvectedValueC;
-       }
-       else
-       {
-         AdvectorValueLe = UF->DOF_value( i-1, j, k, 
-            component, advecting_level );
-         AdvectedValueLe =UF->DOF_value(
-            i-1, j, k, component, advected_level );
-       }
+      } else {
+         AdvectorValueLe = UF->DOF_value( i-1, j, k, component, advecting_level );
+         AdvectedValueLe = UF->DOF_value( i-1, j, k, component, advected_level );
+      }
 
-       thetaC = fabs( AdvectedValueRi - AdvectedValueC ) > 1.e-20 ? 
-      ( AdvectedValueC - AdvectedValueLe ) /
-    ( AdvectedValueRi - AdvectedValueC ) : 1.e20;
-       
-       // Right (X)
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
+      thetaC = fabs( AdvectedValueRi - AdvectedValueC ) > 1.e-20 ?
+      ( AdvectedValueC - AdvectedValueLe ) / ( AdvectedValueRi - AdvectedValueC ) : 1.e20;
+
+      // Right (X)
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
          fri = AdvectorValueC * AdvectedValueC;
-       else
-       {       
-               ur = 0.5 * ( AdvectorValueRi + AdvectorValueC );
-         if ( UF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT )
-         {
-                 if ( ur > 0. ) fri = ur * AdvectedValueC;
-                 else fri = ur * AdvectedValueRi;
-         }
-         else
-         {
-           xr =UF->get_DOF_coordinate( i+shift.i, 1, 0 );
-           xR =UF->get_DOF_coordinate( i+1, component, 0 );
-           dxCr = xr - xC;
-           dxr  = xR - xC;
-     cLip12 = AdvectedValueC + ( dxCr / dxr )
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-        * ( AdvectedValueRi - AdvectedValueC );
-      
-           dxRr = xR - xr;
-           dxR =UF->get_cell_size( i+1, component, 0 );
-                 AdvectedValueRiRi =UF->DOF_value( 
-               i+2, j, k, component, advected_level );
-       
-           thetaRi = fabs( AdvectedValueRiRi - AdvectedValueRi ) > 
-      1.e-20 ? ( AdvectedValueRi - AdvectedValueC ) /
-      ( AdvectedValueRiRi - AdvectedValueRi ) : 1.e20;
-           cRip12 = AdvectedValueRi - ( dxRr / dxR ) 
-      * FV_DiscreteField::SuperBee_phi(thetaRi)
-      * ( AdvectedValueRiRi - AdvectedValueRi );
-           fri = 0.5 * ( ur * ( cRip12 + cLip12 )
-        - fabs(ur) * ( cRip12 - cLip12 ) );  
-         }
-             }
+      else {
+         ur = 0.5 * ( AdvectorValueRi + AdvectorValueC );
+         if ( UF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT ) {
+            if ( ur > 0. ) fri = ur * AdvectedValueC;
+            else fri = ur * AdvectedValueRi;
+         } else {
+            xr =UF->get_DOF_coordinate( i+shift.i, 1, 0 );
+            xR =UF->get_DOF_coordinate( i+1, component, 0 );
+            dxCr = xr - xC;
+            dxr  = xR - xC;
+            cLip12 = AdvectedValueC + ( dxCr / dxr ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                     * ( AdvectedValueRi - AdvectedValueC );
 
-       // Left (X)
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
+            dxRr = xR - xr;
+            dxR = UF->get_cell_size( i+1, component, 0 );
+            AdvectedValueRiRi =UF->DOF_value( i+2, j, k, component, advected_level );
+
+            thetaRi = fabs( AdvectedValueRiRi - AdvectedValueRi ) > 1.e-20 ?
+            ( AdvectedValueRi - AdvectedValueC ) / ( AdvectedValueRiRi - AdvectedValueRi ) : 1.e20;
+            cRip12 = AdvectedValueRi - ( dxRr / dxR ) * FV_DiscreteField::SuperBee_phi(thetaRi)
+                                                      * ( AdvectedValueRiRi - AdvectedValueRi );
+            fri = 0.5 * ( ur * ( cRip12 + cLip12 ) - fabs(ur) * ( cRip12 - cLip12 ) );
+         }
+      }
+
+      // Left (X)
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
          fle = AdvectorValueC * AdvectedValueC;
-       else
-       {       
+      else {
          ul = 0.5 * ( AdvectorValueLe + AdvectorValueC );
-         if ( UF->DOF_color(i-1, j, k, component ) == FV_BC_LEFT )
-         {
-           if ( ul > 0. ) fle = ul * AdvectedValueLe;
-           else fle = ul * AdvectedValueC;
+         if ( UF->DOF_color(i-1, j, k, component ) == FV_BC_LEFT ) {
+            if ( ul > 0. ) fle = ul * AdvectedValueLe;
+            else fle = ul * AdvectedValueC;
+         } else {
+            xl =UF->get_DOF_coordinate( i+shift.i-1, 1, 0 );
+            xL =UF->get_DOF_coordinate( i-1, component, 0 );
+            dxl  = xC - xL;
+            dxLl = xl - xL;
+
+            AdvectedValueLeLe =UF->DOF_value( i-2, j, k, component, advected_level );
+
+            thetaLe = fabs( AdvectedValueC - AdvectedValueLe ) > 1.e-20 ?
+            ( AdvectedValueLe - AdvectedValueLeLe ) / ( AdvectedValueC - AdvectedValueLe ) : 1.e20;
+            cLim12 = AdvectedValueLe + ( dxLl / dxl ) * FV_DiscreteField::SuperBee_phi(thetaLe)
+                                                      * ( AdvectedValueC - AdvectedValueLe );
+            if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
+               cRim12 = AdvectedValueC;
+            else {
+               xR =UF->get_DOF_coordinate( i+1, component, 0 );
+               dxr  = xR - xC;
+               dxCl = xC - xl;
+
+               cRim12 = AdvectedValueC - ( dxCl / dxr ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                        * ( AdvectedValueRi - AdvectedValueC );
+            }
+
+            fle = 0.5 * ( ul * ( cRim12 + cLim12 ) - fabs(ul) * ( cRim12 - cLim12 ) );
          }
-         else
-         {
-           xl =UF->get_DOF_coordinate( i+shift.i-1, 1, 0 );
-           xL =UF->get_DOF_coordinate( i-1, component, 0 );
-           dxl  = xC - xL;
-           dxLl = xl - xL;
-     
-                 AdvectedValueLeLe =UF->DOF_value( 
-               i-2, j, k, component, advected_level );
-           
-     thetaLe = fabs( AdvectedValueC - AdvectedValueLe ) > 1.e-20 ?
-      ( AdvectedValueLe - AdvectedValueLeLe )/
-      ( AdvectedValueC - AdvectedValueLe ) : 1.e20;
-           cLim12 = AdvectedValueLe + ( dxLl / dxl ) 
-      * FV_DiscreteField::SuperBee_phi(thetaLe)
-      * ( AdvectedValueC - AdvectedValueLe );
-           if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) 
-       cRim12 = AdvectedValueC;
-           else
-     {
-             xR =UF->get_DOF_coordinate( i+1, component, 0 );
-       dxr  = xR - xC;
-       dxCl = xC - xl;
-       
-             cRim12 = AdvectedValueC - ( dxCl / dxr ) 
-        * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueRi - AdvectedValueC );
-     }
-           fle = 0.5 * ( ul * ( cRim12 + cLim12 )
-             - fabs(ul) * ( cRim12 - cLim12 ) );
-         }
-             }
-   
-       // Top and Bottom
-       // --------------
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP )
-       {
+      }
+
+      // Top and Bottom
+      // --------------
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP ) {
          AdvectorValueTo = AdvectorValueC;
          AdvectedValueTo = AdvectedValueC;
-       }
-       else
-       {
-         AdvectorValueTo = UF->DOF_value( i, j+1, k, 
-            component, advecting_level );      
-               AdvectedValueTo =UF->DOF_value( 
-             i, j+1, k, component, advected_level );
-       }
+      } else {
+         AdvectorValueTo = UF->DOF_value( i, j+1, k, component, advecting_level );
+         AdvectedValueTo =UF->DOF_value( i, j+1, k, component, advected_level );
+      }
 
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM )
-       {
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM ) {
          AdvectorValueBo = AdvectorValueC;
          AdvectedValueBo = AdvectedValueC;
-       }
-       else
-             {
-         AdvectorValueBo = UF->DOF_value( i, j-1, k, 
-            component, advecting_level );
-               AdvectedValueBo =UF->DOF_value( 
-      i, j-1, k, component, advected_level );
-       }
+      } else {
+         AdvectorValueBo = UF->DOF_value( i, j-1, k, component, advecting_level );
+         AdvectedValueBo =UF->DOF_value( i, j-1, k, component, advected_level );
+      }
 
-       thetaC = fabs( AdvectedValueTo - AdvectedValueC ) > 1.e-20 ? 
-    ( AdvectedValueC - AdvectedValueBo ) /
-    ( AdvectedValueTo - AdvectedValueC ) : 1.e20;
+      thetaC = fabs( AdvectedValueTo - AdvectedValueC ) > 1.e-20 ?
+      ( AdvectedValueC - AdvectedValueBo ) / ( AdvectedValueTo - AdvectedValueC ) : 1.e20;
 
-       // Top (Y)
-       AdvectorValueToLe = UF->DOF_value( i+shift.i-1, 
-            j+shift.j, k, 1, advecting_level );
-       AdvectorValueToRi = UF->DOF_value( i+shift.i, 
-            j+shift.j, k, 1, advecting_level );
-       vt = 0.5 * ( AdvectorValueToLe + AdvectorValueToRi );
-       if ( UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP
-          || UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP_LEFT
-          || UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP_RIGHT )
-       {
+      // Top (Y)
+      AdvectorValueToLe = UF->DOF_value( i+shift.i-1, j+shift.j, k, 1, advecting_level );
+      AdvectorValueToRi = UF->DOF_value( i+shift.i, j+shift.j, k, 1, advecting_level );
+      vt = 0.5 * ( AdvectorValueToLe + AdvectorValueToRi );
+      if ( UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP
+        || UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP_LEFT
+        || UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP_RIGHT ) {
          if ( vt > 0. ) fto = vt * AdvectedValueC;
          else fto = vt * AdvectedValueTo;
-       }
-       else
-       {
-         yt =UF->get_DOF_coordinate( j+shift.j, 1, 1 );
-         yT =UF->get_DOF_coordinate( j+1, component, 1 );
+      } else {
+         yt = UF->get_DOF_coordinate( j+shift.j, 1, 1 );
+         yT = UF->get_DOF_coordinate( j+1, component, 1 );
          dyCt = yt - yC;
          dyt  = yT - yC;
-     
-         cLip12 = AdvectedValueC + ( dyCt / dyt ) 
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueTo - AdvectedValueC );
+
+         cLip12 = AdvectedValueC + ( dyCt / dyt ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                   * ( AdvectedValueTo - AdvectedValueC );
          dyTt = yT - yt;
          dyT =UF->get_cell_size( j+1, component, 1 );
-           
-               AdvectedValueToTo =UF->DOF_value( 
-               i, j+2, k, component, advected_level );
-     
-         thetaTo = fabs( AdvectedValueToTo - AdvectedValueTo ) > 
-      1.e-20 ? ( AdvectedValueTo - AdvectedValueC ) /
-      ( AdvectedValueToTo - AdvectedValueTo ) : 1.e20;
-         cRip12 = AdvectedValueTo - ( dyTt / dyT ) 
-      * FV_DiscreteField::SuperBee_phi(thetaTo)
-            * ( AdvectedValueToTo - AdvectedValueTo );
-     
-         fto = 0.5 * ( vt * ( cRip12 + cLip12 )
-          - fabs(vt) * ( cRip12 - cLip12 ) );
-       }
 
-       // Bottom (Y)
-       AdvectorValueBoLe = UF->DOF_value(
-             i+shift.i-1, j+shift.j-1, k, 1, advecting_level );
-       AdvectorValueBoRi = UF->DOF_value( 
-             i+shift.i, j+shift.j-1, k, 1, advecting_level );
-       vb = 0.5 * ( AdvectorValueBoLe + AdvectorValueBoRi );
-       if ( UF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM
-          || UF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM_LEFT
-          || UF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM_RIGHT )
-       {
+         AdvectedValueToTo =UF->DOF_value( i, j+2, k, component, advected_level );
+
+         thetaTo = fabs( AdvectedValueToTo - AdvectedValueTo ) > 1.e-20 ?
+         ( AdvectedValueTo - AdvectedValueC ) / ( AdvectedValueToTo - AdvectedValueTo ) : 1.e20;
+
+         cRip12 = AdvectedValueTo - ( dyTt / dyT ) * FV_DiscreteField::SuperBee_phi(thetaTo)
+                                                 * ( AdvectedValueToTo - AdvectedValueTo );
+
+         fto = 0.5 * ( vt * ( cRip12 + cLip12 ) - fabs(vt) * ( cRip12 - cLip12 ) );
+      }
+
+      // Bottom (Y)
+      AdvectorValueBoLe = UF->DOF_value( i+shift.i-1, j+shift.j-1, k, 1, advecting_level );
+      AdvectorValueBoRi = UF->DOF_value( i+shift.i, j+shift.j-1, k, 1, advecting_level );
+      vb = 0.5 * ( AdvectorValueBoLe + AdvectorValueBoRi );
+      if ( UF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM
+        || UF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM_LEFT
+        || UF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM_RIGHT ) {
          if ( vb > 0. ) fbo = vb * AdvectedValueBo;
          else fbo = vb * AdvectedValueC;
-       }
-       else
-       {
+      } else {
          yb =UF->get_DOF_coordinate( j+shift.j-1, 1, 1 );
          yB =UF->get_DOF_coordinate( j-1, component, 1 );
          dyb  = yC - yB;
          if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP)
-     cRim12 = AdvectedValueC;
-         else
-         {
-     yT =UF->get_DOF_coordinate( j+1, component, 1 );
-     dyt  = yT - yC;
-     dyCb = yC - yb;
-           cRim12 = AdvectedValueC - ( dyCb / dyt ) 
-        * FV_DiscreteField::SuperBee_phi(thetaC)
-          * ( AdvectedValueTo - AdvectedValueC );
+            cRim12 = AdvectedValueC;
+         else {
+            yT = UF->get_DOF_coordinate( j+1, component, 1 );
+            dyt  = yT - yC;
+            dyCb = yC - yb;
+            cRim12 = AdvectedValueC - ( dyCb / dyt ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                      * ( AdvectedValueTo - AdvectedValueC );
          }
          dyBb = yb - yB;
-               AdvectedValueBoBo =UF->DOF_value( 
-               i, j-2, k, component, advected_level );
-     
+         AdvectedValueBoBo =UF->DOF_value( i, j-2, k, component, advected_level );
+
          thetaBo = fabs( AdvectedValueC - AdvectedValueBo ) > 1.e-20 ?
-        ( AdvectedValueBo - AdvectedValueBoBo ) /
-      ( AdvectedValueC - AdvectedValueBo ) : 1.e20;
-         cLim12 = AdvectedValueBo + ( dyBb / dyb ) 
-      * FV_DiscreteField::SuperBee_phi(thetaBo)
-            * ( AdvectedValueC - AdvectedValueBo );
-         fbo = 0.5 * ( vb * ( cRim12 + cLim12 )
-          - fabs(vb) * ( cRim12 - cLim12 ) );
-       }
-     }
-     
-     // The second component (v)
-     else
-     {
-       // Right and Left
-       // --------------
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
-       {
+         ( AdvectedValueBo - AdvectedValueBoBo ) / ( AdvectedValueC - AdvectedValueBo ) : 1.e20;
+         cLim12 = AdvectedValueBo + ( dyBb / dyb ) * FV_DiscreteField::SuperBee_phi(thetaBo)
+                                                      * ( AdvectedValueC - AdvectedValueBo );
+         fbo = 0.5 * ( vb * ( cRim12 + cLim12 ) - fabs(vb) * ( cRim12 - cLim12 ) );
+      }
+
+      if (dim == 3) {
+         // Front and Behind
+         // ----------------
+         if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT ) {
+            AdvectorValueFr = AdvectorValueC;
+            AdvectedValueFr = AdvectedValueC;
+         } else {
+            AdvectorValueFr = UF->DOF_value( i, j, k+1, component, advecting_level );
+            AdvectedValueFr =UF->DOF_value( i, j, k+1, component, advected_level );
+         }
+
+         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND ) {
+            AdvectorValueBe = AdvectorValueC;
+            AdvectedValueBe = AdvectedValueC;
+         } else {
+            AdvectorValueBe = UF->DOF_value( i, j, k-1, component, advecting_level );
+            AdvectedValueBe =UF->DOF_value( i, j, k-1, component, advected_level );
+         }
+
+         thetaC = fabs( AdvectedValueFr - AdvectedValueC ) > 1.e-20 ?
+         ( AdvectedValueC - AdvectedValueBe ) / ( AdvectedValueFr - AdvectedValueC ) : 1.e20;
+
+         // Front (Z)
+         AdvectorValueFrLe = UF->DOF_value( i+shift.i-1, j, k+shift.k, 2, advecting_level );
+         AdvectorValueFrRi = UF->DOF_value( i+shift.i, j, k+shift.k, 2, advecting_level );
+         wf = 0.5 * (AdvectorValueFrLe + AdvectorValueFrRi);
+         if ( UF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT
+           || UF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT_LEFT
+           || UF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT_RIGHT ) {
+            if ( wf > 0. ) ffr = wf * AdvectedValueC;
+            else ffr = wf * AdvectedValueFr;
+         } else {
+            zf =UF->get_DOF_coordinate( k+shift.k, 2, 2 );
+            zF =UF->get_DOF_coordinate( k+1, component, 2 );
+            dzCf = zf - zC;
+            dzf  = zF - zC;
+            cLip12 = AdvectedValueC + ( dzCf / dzf ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                      * ( AdvectedValueFr - AdvectedValueC );
+            dzFf = zF - zf;
+            dzF =UF->get_cell_size( k+1, component, 2 );
+            AdvectedValueFrFr =UF->DOF_value( i, j, k+2, component, advected_level );
+
+            thetaFr = fabs( AdvectedValueFrFr - AdvectedValueFr ) > 1.e-20 ?
+            ( AdvectedValueFr - AdvectedValueC ) / ( AdvectedValueFrFr - AdvectedValueFr ) : 1.e20;
+            cRip12 = AdvectedValueFr - ( dzFf / dzF ) * FV_DiscreteField::SuperBee_phi(thetaFr)
+                                                     * ( AdvectedValueFrFr - AdvectedValueFr );
+            ffr = 0.5 * ( wf * ( cRip12 + cLip12 ) - fabs(wf) * ( cRip12 - cLip12 ) );
+         }
+
+         // Behind (Z)
+         AdvectorValueBeLe = UF->DOF_value( i+shift.i-1, j, k+shift.k-1, 2, advecting_level );
+         AdvectorValueBeRi = UF->DOF_value( i+shift.i, j, k+shift.k-1, 2, advecting_level );
+         wb = 0.5 * ( AdvectorValueBeLe + AdvectorValueBeRi );
+         if ( UF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND
+           || UF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND_LEFT
+           || UF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND_RIGHT ) {
+            if ( wb > 0. ) fbe = wb * AdvectedValueBe;
+            else fbe = wb * AdvectedValueC;
+         } else {
+            zb =UF->get_DOF_coordinate( k+shift.k-1, 2, 2 );
+            zB =UF->get_DOF_coordinate( k-1, component, 2 );
+            dzb = zC - zB;
+            if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
+               cRim12 = AdvectedValueC;
+            else {
+               zF =UF->get_DOF_coordinate( k+1, component, 2 );
+               dzf  = zF - zC;
+               dzCb = zC - zb;
+               cRim12 = AdvectedValueC - ( dzCb / dzf ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                         * ( AdvectedValueFr - AdvectedValueC );
+            }
+            dzBb = zb - zB;
+            AdvectedValueBeBe =UF->DOF_value( i, j, k-2, component, advected_level );
+
+            thetaBe = fabs( AdvectedValueC - AdvectedValueBe ) > 1.e-20 ?
+            ( AdvectedValueBe - AdvectedValueBeBe ) / ( AdvectedValueC - AdvectedValueBe ) : 1.e20;
+            cLim12 = AdvectedValueBe + ( dzBb / dzb ) * FV_DiscreteField::SuperBee_phi(thetaBe)
+                                                        * ( AdvectedValueC - AdvectedValueBe );
+            fbe = 0.5 * ( wb * ( cRim12 + cLim12 ) - fabs(wb) * ( cRim12 - cLim12 ) );
+         }
+      }  
+   } else if (component == 1) {
+      // The second component (v)
+      // Right and Left
+      // --------------
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) {
          AdvectorValueRi = AdvectorValueC;
          AdvectedValueRi = AdvectedValueC;
-       }
-       else
-       {
-         AdvectorValueRi = UF->DOF_value( i+1, j, k, 
-            component, advecting_level );      
-               AdvectedValueRi =UF->DOF_value( 
-             i+1, j, k, component, advected_level );
-       }
+      } else {
+         AdvectorValueRi = UF->DOF_value( i+1, j, k, component, advecting_level );      
+         AdvectedValueRi =UF->DOF_value( i+1, j, k, component, advected_level );
+      }
 
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
-       {
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT ) {
          AdvectorValueLe = AdvectorValueC;
          AdvectedValueLe = AdvectedValueC;
-       }
-       else
-             {
-         AdvectorValueLe = UF->DOF_value( i-1, j, k, 
-            component, advecting_level );
-               AdvectedValueLe =UF->DOF_value( 
-             i-1, j, k, component, advected_level );
-       }
+      } else {
+         AdvectorValueLe = UF->DOF_value( i-1, j, k, component, advecting_level );
+         AdvectedValueLe =UF->DOF_value( i-1, j, k, component, advected_level );
+      }
 
-       thetaC = fabs( AdvectedValueRi - AdvectedValueC ) > 1.e-20 ? 
-        ( AdvectedValueC - AdvectedValueLe ) /
-    ( AdvectedValueRi - AdvectedValueC ) : 1.e20;
+      thetaC = fabs( AdvectedValueRi - AdvectedValueC ) > 1.e-20 ? 
+      ( AdvectedValueC - AdvectedValueLe ) / ( AdvectedValueRi - AdvectedValueC ) : 1.e20;
 
-       // Right (X)
-       AdvectorValueToRi = UF->DOF_value( 
-             i+shift.i, j+shift.j, k, 0, advecting_level );
-       AdvectorValueBoRi = UF->DOF_value( 
-             i+shift.i, j+shift.j-1, k, 0, advecting_level );
-       ur = 0.5 * ( AdvectorValueToRi + AdvectorValueBoRi );
-       if ( UF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT
-          || UF->DOF_color( i+1, j, k, component ) == FV_BC_BOTTOM_RIGHT
-          || UF->DOF_color( i+1, j, k, component ) == FV_BC_TOP_RIGHT )
-       {
+      // Right (X)
+      AdvectorValueToRi = UF->DOF_value( i+shift.i, j+shift.j, k, 0, advecting_level );
+      AdvectorValueBoRi = UF->DOF_value( i+shift.i, j+shift.j-1, k, 0, advecting_level );
+      ur = 0.5 * ( AdvectorValueToRi + AdvectorValueBoRi );
+      if ( UF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT
+        || UF->DOF_color( i+1, j, k, component ) == FV_BC_BOTTOM_RIGHT
+        || UF->DOF_color( i+1, j, k, component ) == FV_BC_TOP_RIGHT ) {
          if ( ur > 0. ) fri = ur * AdvectedValueC;
          else fri = ur * AdvectedValueRi;
-       }
-       else
-       {
+      } else {
          xr =UF->get_DOF_coordinate( i+shift.i, 0, 0 );
          xR =UF->get_DOF_coordinate( i+1, component, 0 );
          dxCr = xr - xC;
          dxr  = xR - xC;
      
-         cLip12 = AdvectedValueC + ( dxCr / dxr ) 
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-          * ( AdvectedValueRi - AdvectedValueC );
+         cLip12 = AdvectedValueC + ( dxCr / dxr ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                   * ( AdvectedValueRi - AdvectedValueC );
      
          dxRr = xR - xr;
          dxR =UF->get_cell_size( i+1, component, 0 );
-         AdvectedValueRiRi =UF->DOF_value( 
-               i+2, j, k, component, advected_level );
-     
-         thetaRi = fabs( AdvectedValueRiRi - AdvectedValueRi ) > 
-      1.e-20 ? ( AdvectedValueRi - AdvectedValueC ) /
-      ( AdvectedValueRiRi - AdvectedValueRi ) : 1.e20;
-         cRip12 = AdvectedValueRi - ( dxRr / dxR ) 
-      * FV_DiscreteField::SuperBee_phi(thetaRi)
-            * ( AdvectedValueRiRi - AdvectedValueRi );
-         fri = 0.5 * ( ur * ( cRip12 + cLip12 )
-          - fabs(ur) * ( cRip12 - cLip12 ) );
-       }
+         AdvectedValueRiRi =UF->DOF_value( i+2, j, k, component, advected_level );
+    
+         thetaRi = fabs( AdvectedValueRiRi - AdvectedValueRi ) > 1.e-20 ? 
+         ( AdvectedValueRi - AdvectedValueC ) / ( AdvectedValueRiRi - AdvectedValueRi ) : 1.e20;
+         cRip12 = AdvectedValueRi - ( dxRr / dxR ) * FV_DiscreteField::SuperBee_phi(thetaRi)
+                                                  * ( AdvectedValueRiRi - AdvectedValueRi );
+         fri = 0.5 * ( ur * ( cRip12 + cLip12 ) - fabs(ur) * ( cRip12 - cLip12 ) );
+      }
            
-       // Left (X)
-       AdvectorValueToLe = UF->DOF_value(
-             i+shift.i-1, j+shift.j, k, 0, advecting_level );
-       AdvectorValueBoLe = UF->DOF_value(
-             i+shift.i-1, j+shift.j-1, k, 0, advecting_level );
-       ul = 0.5 * ( AdvectorValueToLe + AdvectorValueBoLe );
-       if ( UF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT
-          || UF->DOF_color( i-1, j, k, component ) == FV_BC_BOTTOM_LEFT
-          || UF->DOF_color( i-1, j, k, component ) == FV_BC_TOP_LEFT)
-       {
+      // Left (X)
+      AdvectorValueToLe = UF->DOF_value( i+shift.i-1, j+shift.j, k, 0, advecting_level );
+      AdvectorValueBoLe = UF->DOF_value( i+shift.i-1, j+shift.j-1, k, 0, advecting_level );
+      ul = 0.5 * ( AdvectorValueToLe + AdvectorValueBoLe );
+      if ( UF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT
+        || UF->DOF_color( i-1, j, k, component ) == FV_BC_BOTTOM_LEFT
+        || UF->DOF_color( i-1, j, k, component ) == FV_BC_TOP_LEFT) {
          if ( ul > 0. ) fle = ul * AdvectedValueLe;
          else fle = ul * AdvectedValueC;
-       }
-       else
-       {
+      } else {
          xl =UF->get_DOF_coordinate( i+shift.i-1, 0, 0 );
          xL =UF->get_DOF_coordinate( i-1, component, 0 );
          dxl  = xC - xL;
          if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) 
-     cRim12 = AdvectedValueC;
-         else
-         {
-     xR =UF->get_DOF_coordinate( i+1, component, 0 );
-     dxr  = xR - xC;
-     dxCl = xC - xl;
-     cRim12 = AdvectedValueC
-      - ( dxCl / dxr ) 
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueRi - AdvectedValueC );
+            cRim12 = AdvectedValueC;
+         else {
+            xR =UF->get_DOF_coordinate( i+1, component, 0 );
+            dxr  = xR - xC;
+            dxCl = xC - xl;
+            cRim12 = AdvectedValueC - ( dxCl / dxr ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                      * ( AdvectedValueRi - AdvectedValueC );
          }
          dxLl = xl - xL;
-               AdvectedValueLeLe =UF->DOF_value( 
-               i-2, j, k, component, advected_level );
+         AdvectedValueLeLe =UF->DOF_value( i-2, j, k, component, advected_level );
      
          thetaLe = fabs( AdvectedValueC - AdvectedValueLe ) > 1.e-20 ?
-        ( AdvectedValueLe - AdvectedValueLeLe ) /
-      ( AdvectedValueC - AdvectedValueLe ) : 1.e20;
-         cLim12 = AdvectedValueLe + ( dxLl / dxl ) 
-      * FV_DiscreteField::SuperBee_phi(thetaLe)
-            * ( AdvectedValueC - AdvectedValueLe );
-         fle = 0.5 * ( ul * ( cRim12 + cLim12 )
-          - fabs(ul) * ( cRim12 - cLim12 ) );
-       }
+         ( AdvectedValueLe - AdvectedValueLeLe ) / ( AdvectedValueC - AdvectedValueLe ) : 1.e20;
+         cLim12 = AdvectedValueLe + ( dxLl / dxl ) * FV_DiscreteField::SuperBee_phi(thetaLe)
+                                                     * ( AdvectedValueC - AdvectedValueLe );
+         fle = 0.5 * ( ul * ( cRim12 + cLim12 ) - fabs(ul) * ( cRim12 - cLim12 ) );
+      }
    
-       // Top and Bottom
-       // --------------
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP )
-       {
+      // Top and Bottom
+      // --------------
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP ) {
          AdvectorValueTo = AdvectorValueC;
          AdvectedValueTo = AdvectedValueC;
-       }
-       else
-       {
-         AdvectorValueTo = UF->DOF_value( i, j+1, k, 
-            component, advecting_level );      
-               AdvectedValueTo =UF->DOF_value( 
-             i, j+1, k, component, advected_level );
-       }
+      } else {
+         AdvectorValueTo = UF->DOF_value( i, j+1, k, component, advecting_level );      
+         AdvectedValueTo =UF->DOF_value( i, j+1, k, component, advected_level );
+      }
 
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM )
-       {
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM ) {
          AdvectorValueBo = AdvectorValueC;
          AdvectedValueBo = AdvectedValueC;
-       }
-       else
-       {
-               AdvectorValueBo = UF->DOF_value( i, j-1, k, 
-            component, advecting_level );
-               AdvectedValueBo =UF->DOF_value( 
-               i, j-1, k, component, advected_level );
-       }
+      } else {
+         AdvectorValueBo = UF->DOF_value( i, j-1, k, component, advecting_level );
+         AdvectedValueBo =UF->DOF_value( i, j-1, k, component, advected_level );
+      }
 
-       thetaC = fabs( AdvectedValueTo - AdvectedValueC ) > 1.e-20 ? 
-      ( AdvectedValueC - AdvectedValueBo ) /
-    ( AdvectedValueTo - AdvectedValueC ) : 1.e20;
+      thetaC = fabs( AdvectedValueTo - AdvectedValueC ) > 1.e-20 ? 
+      ( AdvectedValueC - AdvectedValueBo ) / ( AdvectedValueTo - AdvectedValueC ) : 1.e20;
        
-       // Top (Y)
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP )
+      // Top (Y)
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP )
          fto = AdvectorValueC * AdvectedValueC;
-       else
-       {       
-               vt = 0.5 * ( AdvectorValueTo + AdvectorValueC );
-         if ( UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP )
-         {
-           if ( vt > 0. ) fto = vt * AdvectedValueC;
-           else fto = vt * AdvectedValueTo;
-         }
-         else
-         {
-           yt =UF->get_DOF_coordinate( j+shift.j, 0, 1 );
-           yT =UF->get_DOF_coordinate( j+1, component, 1 );
-           dyCt = yt - yC;
-           dyt  = yT - yC;
-     cLip12 = AdvectedValueC + ( dyCt / dyt ) 
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-        * ( AdvectedValueTo - AdvectedValueC );
+      else {       
+         vt = 0.5 * ( AdvectorValueTo + AdvectorValueC );
+         if ( UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
+            if ( vt > 0. ) fto = vt * AdvectedValueC;
+            else fto = vt * AdvectedValueTo;
+         } else {
+            yt =UF->get_DOF_coordinate( j+shift.j, 0, 1 );
+            yT =UF->get_DOF_coordinate( j+1, component, 1 );
+            dyCt = yt - yC;
+            dyt  = yT - yC;
+            cLip12 = AdvectedValueC + ( dyCt / dyt ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                      * ( AdvectedValueTo - AdvectedValueC );
 
-           dyTt = yT - yt;
-           dyT =UF->get_cell_size( j+1, component, 1 );
-                 AdvectedValueToTo =UF->DOF_value( 
-               i, j+2, k, component, advected_level );
-       
-           thetaTo = fabs( AdvectedValueToTo - AdvectedValueTo ) > 
-      1.e-20 ? ( AdvectedValueTo - AdvectedValueC ) /
-          ( AdvectedValueToTo - AdvectedValueTo ) : 1.e20;
-           cRip12 = AdvectedValueTo - ( dyTt / dyT ) 
-      * FV_DiscreteField::SuperBee_phi(thetaTo)
-      * ( AdvectedValueToTo - AdvectedValueTo );
-           fto = 0.5 * ( vt * ( cRip12 + cLip12 )
-            - fabs(vt) * ( cRip12 - cLip12 ) );
+            dyTt = yT - yt;
+            dyT =UF->get_cell_size( j+1, component, 1 );
+            AdvectedValueToTo =UF->DOF_value( i, j+2, k, component, advected_level );
+    
+            thetaTo = fabs( AdvectedValueToTo - AdvectedValueTo ) > 1.e-20 ? 
+            ( AdvectedValueTo - AdvectedValueC ) / ( AdvectedValueToTo - AdvectedValueTo ) : 1.e20;
+            cRip12 = AdvectedValueTo - ( dyTt / dyT ) * FV_DiscreteField::SuperBee_phi(thetaTo)
+                                                     * ( AdvectedValueToTo - AdvectedValueTo );
+            fto = 0.5 * ( vt * ( cRip12 + cLip12 ) - fabs(vt) * ( cRip12 - cLip12 ) );
          }     
-             }
+      }
 
-       // Bottom (Y)
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM )
+      // Bottom (Y)
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM )
          fbo = AdvectorValueC * AdvectedValueC;
-       else
-       {
+      else {
          vb = 0.5 * ( AdvectorValueBo + AdvectorValueC );
-         if ( UF->DOF_color(i,j-1,k,component) == FV_BC_BOTTOM )
-         {
-           if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-           else fbo = vb * AdvectedValueC;
-         }
-         else
-         {
-           yb =UF->get_DOF_coordinate( j+shift.j-1, 0, 1 );
-           yB =UF->get_DOF_coordinate( j-1, component, 1 );
-           dyb  = yC - yB;
-         
-           dyBb = yb - yB;
-                 AdvectedValueBoBo =UF->DOF_value( 
-               i, j-2, k, component, advected_level );
+         if ( UF->DOF_color(i,j-1,k,component) == FV_BC_BOTTOM ) {
+            if ( vb > 0. ) fbo = vb * AdvectedValueBo;
+            else fbo = vb * AdvectedValueC;
+         } else {
+            yb =UF->get_DOF_coordinate( j+shift.j-1, 0, 1 );
+            yB =UF->get_DOF_coordinate( j-1, component, 1 );
+            dyb  = yC - yB;
+        
+            dyBb = yb - yB;
+            AdvectedValueBoBo =UF->DOF_value( i, j-2, k, component, advected_level );
        
-           thetaBo = fabs( AdvectedValueC - AdvectedValueBo ) > 1.e-20 ?
-      ( AdvectedValueBo - AdvectedValueBoBo ) /
-      ( AdvectedValueC - AdvectedValueBo ) : 1.e20;
-           cLim12 = AdvectedValueBo + ( dyBb / dyb ) 
-      * FV_DiscreteField::SuperBee_phi(thetaBo)
-      * ( AdvectedValueC - AdvectedValueBo );
+            thetaBo = fabs( AdvectedValueC - AdvectedValueBo ) > 1.e-20 ?
+            ( AdvectedValueBo - AdvectedValueBoBo ) / ( AdvectedValueC - AdvectedValueBo ) : 1.e20;
+            cLim12 = AdvectedValueBo + ( dyBb / dyb ) * FV_DiscreteField::SuperBee_phi(thetaBo)
+                                                        * ( AdvectedValueC - AdvectedValueBo );
      
-           if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP )
-       cRim12 = AdvectedValueC;
-           else
-     {
-       yT =UF->get_DOF_coordinate( j+1, component, 1 );
-       dyt  = yT - yC;
-       dyCb = yC - yb;
-             cRim12 = AdvectedValueC - ( dyCb / dyt )
-        * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueTo - AdvectedValueC );
-           }
-     fbo = 0.5 * ( vb * ( cRim12 + cLim12 )
-            - fabs(vb) * ( cRim12 - cLim12 ) );
-         }
-             }
-     }
-
-           flux = ( fto - fbo ) * dxC + ( fri - fle ) * dyC;
-   }
-   else // DIM = 3
-   {
-     zC =UF->get_DOF_coordinate( k, component, 2 ) ;
-       dzC =UF->get_cell_size( k, component, 2 ) ;      
-             AdvectorValueC = UF->DOF_value( i, j, k, component, 
-        advecting_level );
-             AdvectedValueC =UF->DOF_value( 
-             i, j, k, component, advected_level );
-
-       // The First component (u)
-       if ( component == 0 )
-       {
-         // Right and Left
-         // --------------
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
-         {
-           AdvectorValueRi = AdvectorValueC;
-           AdvectedValueRi = AdvectedValueC;
-         }
-         else
-         {
-           AdvectorValueRi = UF->DOF_value( i+1, j, k, 
-      component, advecting_level );
-                 AdvectedValueRi =UF->DOF_value( 
-                i+1, j, k, component, advected_level );
-         }
-
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
-         {
-           AdvectorValueLe = AdvectorValueC;
-           AdvectedValueLe = AdvectedValueC;
-         }
-         else
-         {
-           AdvectorValueLe = UF->DOF_value( i-1, j, k, 
-      component, advecting_level );
-                 AdvectedValueLe =UF->DOF_value( 
-               i-1, j, k, component, advected_level );
-        }
-
-         thetaC = fabs( AdvectedValueRi - AdvectedValueC ) > 1.e-20 ? 
-            ( AdvectedValueC - AdvectedValueLe ) /
-      ( AdvectedValueRi - AdvectedValueC ) : 1.e20;
-       
-         // Right (X)
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
-           fri = AdvectorValueC * AdvectedValueC;
-         else
-         {       
-           ur = 0.5 * ( AdvectorValueRi + AdvectorValueC );
-           if ( UF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT )
-     {
-                   if ( ur > 0. ) fri = ur * AdvectedValueC;
-                   else fri = ur * AdvectedValueRi;
-     }
-           else
-           {     
-       xr =UF->get_DOF_coordinate( i+shift.i, 1, 0 );
-             xR =UF->get_DOF_coordinate( i+1, component, 0 );
-             dxCr = xr - xC;
-             dxr  = xR - xC;
-       cLip12 = AdvectedValueC + ( dxCr / dxr ) 
-        * FV_DiscreteField::SuperBee_phi(thetaC)
-        * ( AdvectedValueRi - AdvectedValueC );
-      
-             dxRr = xR - xr;
-             dxR =UF->get_cell_size( i+1, component, 0 );
-                   AdvectedValueRiRi =UF->DOF_value( 
-                 i+2, j, k, component, advected_level );
-       
-             thetaRi = fabs( AdvectedValueRiRi - AdvectedValueRi ) > 
-        1.e-20 ? ( AdvectedValueRi - AdvectedValueC ) /
-      ( AdvectedValueRiRi - AdvectedValueRi ) : 1.e20 ;
-             cRip12 = AdvectedValueRi - ( dxRr / dxR ) 
-        * FV_DiscreteField::SuperBee_phi(thetaRi)
-      * ( AdvectedValueRiRi - AdvectedValueRi );
-             fri = 0.5 * ( ur * ( cRip12 + cLip12 )
-            - fabs(ur) * ( cRip12 - cLip12 ) );
-    }
-               }
-
-         // Left (X)
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
-           fle = AdvectorValueC * AdvectedValueC;
-         else
-         {       
-           ul = 0.5 * ( AdvectorValueLe + AdvectorValueC );
-           if ( UF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT )
-     {
-             if ( ul > 0. ) fle = ul * AdvectedValueLe;
-             else fle = ul * AdvectedValueC;
-     }
-           else
-           {
-       xl =UF->get_DOF_coordinate( i+shift.i-1, 1, 0 );
-       xL =UF->get_DOF_coordinate( i-1, component, 0 );
-       dxl  = xC - xL;       
-       dxLl = xl - xL;
-                   AdvectedValueLeLe =UF->DOF_value( 
-               i-2, j, k, component, advected_level );
-
-             thetaLe = fabs( AdvectedValueC - AdvectedValueLe ) > 1.e-20 ?
-      ( AdvectedValueLe - AdvectedValueLeLe ) /
-      ( AdvectedValueC - AdvectedValueLe ) : 1.e20;
-             cLim12 = AdvectedValueLe + ( dxLl / dxl ) 
-        * FV_DiscreteField::SuperBee_phi(thetaLe)
-      * ( AdvectedValueC - AdvectedValueLe );
-     
-             if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) 
-         cRim12 = AdvectedValueC;
-             else
-       {
-               xR =UF->get_DOF_coordinate( i+1, component, 0 );
-         dxr  = xR - xC;
-         dxCl = xC - xl;
-         cRim12 = AdvectedValueC - ( dxCl / dxr )
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueRi - AdvectedValueC );
-             }
-             fle = 0.5 * ( ul * ( cRim12 + cLim12 )
-            - fabs(ul) * ( cRim12 - cLim12 ) );
-           }
-               }
-
-   
-         // Top and Bottom
-         // --------------
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP )
-         {
-           AdvectorValueTo = AdvectorValueC;
-           AdvectedValueTo = AdvectedValueC;
-         }
-         else
-         {
-           AdvectorValueTo = UF->DOF_value( i, j+1, k, 
-      component, advecting_level );      
-                 AdvectedValueTo =UF->DOF_value( 
-                i, j+1, k, component, advected_level );
-               }
-         
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM )
-         {
-           AdvectorValueBo = AdvectorValueC;
-           AdvectedValueBo = AdvectedValueC;
-         }
-         else
-               {
-           AdvectorValueBo = UF->DOF_value( i, j-1, k, 
-      component, advecting_level );
-                 AdvectedValueBo =UF->DOF_value( 
-                i, j-1, k, component, advected_level );
-               }
-         
-         thetaC = fabs( AdvectedValueTo - AdvectedValueC ) > 1.e-20 ? 
-      ( AdvectedValueC - AdvectedValueBo ) /
-      ( AdvectedValueTo - AdvectedValueC ) : 1.e20;
-
-         // Top (Y)
-         AdvectorValueToLe = UF->DOF_value(
-         i+shift.i-1, j+shift.j, k, 1, advecting_level );
-         AdvectorValueToRi = UF->DOF_value( 
-         i+shift.i, j+shift.j, k, 1, advecting_level );
-         vt = 0.5 * ( AdvectorValueToLe + AdvectorValueToRi );
-         if ( UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP
-              || UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP_LEFT
-              || UF->DOF_color( i, j+1, k, component ) 
-        == FV_BC_TOP_RIGHT )
-         {
-           if ( vt > 0. ) fto = vt * AdvectedValueC;
-           else fto = vt * AdvectedValueTo;
-         }
-         else
-         {
-           yt =UF->get_DOF_coordinate( j+shift.j, 1, 1 );
-     yT =UF->get_DOF_coordinate( j+1, component, 1 );
-     dyCt = yt - yC;
-     dyt  = yT - yC;
-     cLip12 = AdvectedValueC + ( dyCt / dyt ) 
-        * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueTo - AdvectedValueC );
-           dyTt = yT - yt;
-           dyT =UF->get_cell_size( j+1, component, 1 );
-                 AdvectedValueToTo =UF->DOF_value( 
-                 i, j+2, k, component, advected_level );
-     
-           thetaTo = fabs( AdvectedValueToTo - AdvectedValueTo ) > 
-        1.e-20 ? ( AdvectedValueTo - AdvectedValueC ) /
-      ( AdvectedValueToTo - AdvectedValueTo ) : 1.e20;
-           cRip12 = AdvectedValueTo - ( dyTt / dyT ) 
-        * FV_DiscreteField::SuperBee_phi(thetaTo)
-            * ( AdvectedValueToTo - AdvectedValueTo );
-     fto = 0.5 * ( vt * ( cRip12 + cLip12 )
-          - fabs(vt) * ( cRip12 - cLip12 ) );
-         }
-
-         // Bottom (Y)
-         AdvectorValueBoLe = UF->DOF_value( 
-         i+shift.i-1, j+shift.j-1, k, 1, advecting_level );
-         AdvectorValueBoRi = UF->DOF_value( 
-         i+shift.i, j+shift.j-1, k, 1, advecting_level );
-         vb = 0.5 * ( AdvectorValueBoLe + AdvectorValueBoRi );
-         if ( UF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM
-              || UF->DOF_color( i, j-1, k, component ) 
-        == FV_BC_BOTTOM_LEFT
-              || UF->DOF_color( i, j-1, k, component ) 
-        == FV_BC_BOTTOM_RIGHT )
-         {
-           if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-           else fbo = vb * AdvectedValueC;
-         }
-         else
-         {
-           yb =UF->get_DOF_coordinate( j+shift.j-1, 1, 1 );
-           yB =UF->get_DOF_coordinate( j-1, component, 1 );
-           dyb  = yC - yB;
-     if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP ) 
-       cRim12 = AdvectedValueC;
-     else
-     {
-       yT =UF->get_DOF_coordinate( j+1, component, 1 );
-       dyt  = yT - yC;
-       dyCb = yC - yb;
-       cRim12 = AdvectedValueC - ( dyCb / dyt )
-          * FV_DiscreteField::SuperBee_phi(thetaC)
-          * ( AdvectedValueTo - AdvectedValueC );
-           }
-     dyBb = yb - yB;
-                 AdvectedValueBoBo =UF->DOF_value( 
-                 i, j-2, k, component, advected_level );
-     
-           thetaBo = fabs( AdvectedValueC - AdvectedValueBo ) > 1.e-20 ?
-        ( AdvectedValueBo - AdvectedValueBoBo ) /
-      ( AdvectedValueC - AdvectedValueBo ) : 1.e20;
-           cLim12 = AdvectedValueBo + ( dyBb / dyb )
-        * FV_DiscreteField::SuperBee_phi(thetaBo)
-            * ( AdvectedValueC - AdvectedValueBo );
-           fbo = 0.5 * ( vb * ( cRim12 + cLim12 )
-          - fabs(vb) * ( cRim12 - cLim12 ) );
-         }
-
-         // Front and Behind
-         // ----------------
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
-         {
-           AdvectorValueFr = AdvectorValueC;
-           AdvectedValueFr = AdvectedValueC;
-         }
-         else
-         {
-           AdvectorValueFr = UF->DOF_value( i, j, k+1, 
-      component, advecting_level );      
-                 AdvectedValueFr =UF->DOF_value( 
-                i, j, k+1, component, advected_level );
-               }
-         
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND )
-         {
-           AdvectorValueBe = AdvectorValueC;
-           AdvectedValueBe = AdvectedValueC;
-         }
-         else
-               {
-           AdvectorValueBe = UF->DOF_value( i, j, k-1, 
-      component, advecting_level );
-                 AdvectedValueBe =UF->DOF_value( 
-                i, j, k-1, component, advected_level );
-               }
-         
-         thetaC = fabs( AdvectedValueFr - AdvectedValueC ) > 1.e-20 ? 
-            ( AdvectedValueC - AdvectedValueBe ) /
-      ( AdvectedValueFr - AdvectedValueC ) : 1.e20;
-         
-         // Front (Z)
-         AdvectorValueFrLe = UF->DOF_value( 
-         i+shift.i-1, j, k+shift.k, 2, advecting_level );
-         AdvectorValueFrRi = UF->DOF_value( 
-         i+shift.i, j, k+shift.k, 2, advecting_level );
-         wf = 0.5 * (AdvectorValueFrLe + AdvectorValueFrRi);
-         if ( UF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT
-            || UF->DOF_color( i, j, k+1, component ) 
-        == FV_BC_FRONT_LEFT 
-            || UF->DOF_color( i, j, k+1, component ) 
-        == FV_BC_FRONT_RIGHT )
-         {
-     if ( wf > 0. ) ffr = wf * AdvectedValueC;
-           else ffr = wf * AdvectedValueFr;
-         }
-         else
-         {
-     zf =UF->get_DOF_coordinate( k+shift.k, 2, 2 );
-     zF =UF->get_DOF_coordinate( k+1, component, 2 );
-     dzCf = zf - zC;
-     dzf  = zF - zC;
-     cLip12 = AdvectedValueC + ( dzCf / dzf )
-        * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueFr - AdvectedValueC );
-     dzFf = zF - zf;
-     dzF =UF->get_cell_size( k+1, component, 2 );
-                 AdvectedValueFrFr =UF->DOF_value( 
-                 i, j, k+2, component, advected_level );
-
-     thetaFr = fabs( AdvectedValueFrFr - AdvectedValueFr ) > 
-        1.e-20 ? ( AdvectedValueFr - AdvectedValueC ) /
-      ( AdvectedValueFrFr - AdvectedValueFr ) : 1.e20;
-           cRip12 = AdvectedValueFr - ( dzFf / dzF )
-      * FV_DiscreteField::SuperBee_phi(thetaFr)
-            * ( AdvectedValueFrFr - AdvectedValueFr );
-     ffr = 0.5 * ( wf * ( cRip12 + cLip12 )
-          - fabs(wf) * ( cRip12 - cLip12 ) );
-         }
-
-         // Behind (Z)
-         AdvectorValueBeLe = UF->DOF_value( 
-         i+shift.i-1, j, k+shift.k-1, 2, advecting_level );
-         AdvectorValueBeRi = UF->DOF_value(
-         i+shift.i, j, k+shift.k-1, 2, advecting_level );
-         wb = 0.5 * ( AdvectorValueBeLe + AdvectorValueBeRi );
-         if ( UF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND
-      || UF->DOF_color( i, j, k-1, component ) 
-        == FV_BC_BEHIND_LEFT
-      || UF->DOF_color( i, j, k-1, component ) 
-        == FV_BC_BEHIND_RIGHT )
-         {
-           if ( wb > 0. ) fbe = wb * AdvectedValueBe;
-           else fbe = wb * AdvectedValueC;
-         }
-         else
-         {
-     zb =UF->get_DOF_coordinate( k+shift.k-1, 2, 2 );
-     zB =UF->get_DOF_coordinate( k-1, component, 2 );
-     dzb  = zC - zB;
-     if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT ) 
-       cRim12 = AdvectedValueC;
-     else
-     {
-       zF =UF->get_DOF_coordinate( k+1, component, 2 );
-       dzf  = zF - zC;
-       dzCb = zC - zb;
-       cRim12 = AdvectedValueC - ( dzCb / dzf )
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueFr - AdvectedValueC );
-     }
-     dzBb = zb - zB;
-                 AdvectedValueBeBe =UF->DOF_value( 
-      i, j, k-2, component, advected_level );
-     
-           thetaBe = fabs( AdvectedValueC - AdvectedValueBe ) > 1.e-20 ?
-        ( AdvectedValueBe - AdvectedValueBeBe ) /
-      ( AdvectedValueC - AdvectedValueBe ) : 1.e20;
-           cLim12 = AdvectedValueBe + ( dzBb / dzb )
-      * FV_DiscreteField::SuperBee_phi(thetaBe)
-            * ( AdvectedValueC - AdvectedValueBe );
-     fbe = 0.5 * ( wb * ( cRim12 + cLim12 )
-          - fabs(wb) * ( cRim12 - cLim12 ) );
-         }
-       }
-       
-       // The Second component (v)
-       else if ( component == 1 )
-       {
-         // Right and Left
-         // --------------
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
-         {
-           AdvectorValueRi = AdvectorValueC;
-           AdvectedValueRi = AdvectedValueC;
-         }
-         else
-         {
-           AdvectorValueRi = UF->DOF_value( i+1, j, k, 
-      component, advecting_level );      
-                 AdvectedValueRi =UF->DOF_value( 
-                i+1, j, k, component, advected_level );
-               }
-         
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
-         {
-           AdvectorValueLe = AdvectorValueC;
-           AdvectedValueLe = AdvectedValueC;
-         }
-         else
-         {
-                 AdvectorValueLe = UF->DOF_value( i-1, j, k, 
-      component, advecting_level );
-                 AdvectedValueLe =UF->DOF_value( 
-                i-1, j, k, component, advected_level );
-         }
-
-         thetaC = fabs( AdvectedValueRi - AdvectedValueC ) > 1.e-20 ? 
-            ( AdvectedValueC - AdvectedValueLe ) /
-      ( AdvectedValueRi - AdvectedValueC ) : 1.e20;
-
-         // Right (X)
-         AdvectorValueToRi = UF->DOF_value( 
-         i+shift.i, j+shift.j, k, 0, advecting_level );
-         AdvectorValueBoRi = UF->DOF_value(
-         i+shift.i, j+shift.j-1, k, 0, advecting_level );
-         ur = 0.5 * ( AdvectorValueToRi + AdvectorValueBoRi );
-         if ( UF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT
-            || UF->DOF_color( i+1, j, k, component ) 
-        == FV_BC_BOTTOM_RIGHT
-            || UF->DOF_color( i+1, j, k, component ) 
-        == FV_BC_TOP_RIGHT )
-         {
-     if ( ur > 0. ) fri = ur * AdvectedValueC;
-     else fri = ur * AdvectedValueRi;
-         }
-         else
-         {
-     xr =UF->get_DOF_coordinate( i+shift.i, 0, 0 );
-     xR =UF->get_DOF_coordinate( i+1, component, 0 );
-     dxCr = xr - xC;
-     dxr  = xR - xC;
-     cLip12 = AdvectedValueC + ( dxCr / dxr ) 
-        * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueRi - AdvectedValueC );
-       
-     dxRr = xR - xr;
-           dxR =UF->get_cell_size( i+1, component, 0 );
-                 AdvectedValueRiRi =UF->DOF_value( 
-      i+2, j, k, component, advected_level );
-     
-           thetaRi = fabs( AdvectedValueRiRi - AdvectedValueRi ) > 
-        1.e-20 ? ( AdvectedValueRi - AdvectedValueC ) /
-      ( AdvectedValueRiRi - AdvectedValueRi ) : 1.e20;
-           cRip12 = AdvectedValueRi - ( dxRr / dxR )
-      * FV_DiscreteField::SuperBee_phi(thetaRi)
-      * ( AdvectedValueRiRi - AdvectedValueRi );
-     fri = 0.5 * ( ur * ( cRip12 + cLip12 )
-          - fabs(ur) * ( cRip12 - cLip12 ) );
-         }
-         
-         // Left (X)
-         AdvectorValueToLe = UF->DOF_value(
-         i+shift.i-1, j+shift.j, k, 0, advecting_level );
-         AdvectorValueBoLe = UF->DOF_value(
-         i+shift.i-1, j+shift.j-1, k, 0, advecting_level );
-         ul = 0.5 * (AdvectorValueToLe + AdvectorValueBoLe);
-         if ( UF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT
-            || UF->DOF_color( i-1, j, k, component ) 
-        == FV_BC_BOTTOM_LEFT
-            || UF->DOF_color( i-1, j, k, component ) 
-        == FV_BC_TOP_LEFT )
-         {
-           if ( ul > 0. ) fle = ul * AdvectedValueLe;
-           else fle = ul * AdvectedValueC;
-         }
-         else
-         {
-     xl =UF->get_DOF_coordinate( i+shift.i-1, 0, 0 );
-     xL =UF->get_DOF_coordinate( i-1, component, 0 );
-     dxl  = xC - xL;
-     if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) 
-       cRim12 = AdvectedValueC;
-     else
-     {
-       xR =UF->get_DOF_coordinate( i+1, component, 0 );
-       dxr  = xR - xC;
-       dxCl = xC - xl;
-       cRim12 = AdvectedValueC - ( dxCl / dxr )
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-          * ( AdvectedValueRi - AdvectedValueC );
-     }
-       
-     dxLl = xl - xL;
-                 AdvectedValueLeLe =UF->DOF_value( 
-      i-2, j, k, component, advected_level );
-
-           thetaLe = fabs( AdvectedValueC - AdvectedValueLe ) > 1.e-20 ?
-        ( AdvectedValueLe - AdvectedValueLeLe ) /
-      ( AdvectedValueC - AdvectedValueLe ) : 1.e20;
-           cLim12 = AdvectedValueLe + ( dxLl / dxl )
-      * FV_DiscreteField::SuperBee_phi(thetaLe)
-      * ( AdvectedValueC - AdvectedValueLe );
-     fle = 0.5 * ( ul * ( cRim12 + cLim12 )
-          - fabs(ul) * ( cRim12 - cLim12 ) );
-         }
-
-
-         // Top and Bottom
-         // --------------
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP )
-         {
-           AdvectorValueTo = AdvectorValueC;
-           AdvectedValueTo = AdvectedValueC;
-         }
-         else
-         {
-           AdvectorValueTo = UF->DOF_value( i, j+1, k, 
-      component, advecting_level );      
-                 AdvectedValueTo =UF->DOF_value( 
-                i, j+1, k, component, advected_level );
-         }
-
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM )
-         {
-           AdvectorValueBo = AdvectorValueC;
-           AdvectedValueBo = AdvectedValueC;
-         }
-         else
-         {
-                 AdvectorValueBo = UF->DOF_value( i, j-1, k, 
-      component, advecting_level );
-                 AdvectedValueBo =UF->DOF_value( 
-                i, j-1, k, component, advected_level );
-               }
-         thetaC = fabs( AdvectedValueTo - AdvectedValueC ) > 1.e-20 ? 
-            ( AdvectedValueC - AdvectedValueBo ) /
-      ( AdvectedValueTo - AdvectedValueC ) : 1.e20;
-       
-         // Top (Y)
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP )
-           fto = AdvectorValueC * AdvectedValueC;
-         else
-         {       
-           vt = 0.5 * ( AdvectorValueTo + AdvectorValueC );
-           if ( UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP )
-     {
-             if ( vt > 0. ) fto = vt * AdvectedValueC;
-             else fto = vt * AdvectedValueTo;
-     }
-           else
-           {
-       yt =UF->get_DOF_coordinate( j+shift.j, 0, 1 );
-             yT =UF->get_DOF_coordinate( j+1, component, 1 );
-             dyCt = yt - yC;
-             dyt  = yT - yC;
-       cLip12 = AdvectedValueC + ( dyCt / dyt )
-        * FV_DiscreteField::SuperBee_phi(thetaC)
-        * ( AdvectedValueTo - AdvectedValueC );
-      
-             dyTt = yT - yt;
-             dyT =UF->get_cell_size( j+1, component, 1 );
-                   AdvectedValueToTo =UF->DOF_value( 
-                 i, j+2, k, component, advected_level );
-       
-             thetaTo = fabs( AdvectedValueToTo - AdvectedValueTo ) > 
-        1.e-20 ? ( AdvectedValueTo - AdvectedValueC ) /
-           ( AdvectedValueToTo - AdvectedValueTo ) : 1.e20;
-             cRip12 = AdvectedValueTo - ( dyTt / dyT )
-      * FV_DiscreteField::SuperBee_phi(thetaTo)
-      * ( AdvectedValueToTo - AdvectedValueTo );
-             fto = 0.5 * ( vt * ( cRip12 + cLip12 )
-            - fabs(vt) * ( cRip12 - cLip12 ) );
-     }
-               }
-   
-         // Bottom (Y)
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM )
-           fbo = AdvectorValueC * AdvectedValueC;
-         else
-         {
-           vb = 0.5 * ( AdvectorValueBo + AdvectorValueC );
-     if ( UF->DOF_color(i, j-1, k, component ) == FV_BC_BOTTOM )
-     {
-       if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-             else fbo = vb * AdvectedValueC;
-     }
-           else
-           {
-             yb =UF->get_DOF_coordinate( j+shift.j-1, 0, 1 );
-             yB =UF->get_DOF_coordinate( j-1, component, 1 );
-             dyb  = yC - yB;
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP ) 
-         cRim12 = AdvectedValueC;
-             else
-       {
+            if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP )
+               cRim12 = AdvectedValueC;
+            else {
                yT =UF->get_DOF_coordinate( j+1, component, 1 );
-         dyt  = yT - yC;
-         dyCb = yC - yb;
-               cRim12 = AdvectedValueC - ( dyCb / dyt )
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueTo - AdvectedValueC );
-             }
-       dyBb = yb - yB;
-                   AdvectedValueBoBo =UF->DOF_value( 
-                 i, j-2, k, component, advected_level );
-       
-             thetaBo = fabs( AdvectedValueC - AdvectedValueBo ) > 1.e-20 ?
-      ( AdvectedValueBo - AdvectedValueBoBo ) /
-      ( AdvectedValueC - AdvectedValueBo ) : 1.e20;
-             cLim12 = AdvectedValueBo + ( dyBb / dyb )
-      * FV_DiscreteField::SuperBee_phi(thetaBo)
-      * ( AdvectedValueC - AdvectedValueBo );
-             fbo = 0.5 * ( vb * ( cRim12 + cLim12 )
-            - fabs(vb) * ( cRim12 - cLim12 ) );
-           }
-               }
+               dyt  = yT - yC;
+               dyCb = yC - yb;
+               cRim12 = AdvectedValueC - ( dyCb / dyt ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                         * ( AdvectedValueTo - AdvectedValueC );
+            }
+            fbo = 0.5 * ( vb * ( cRim12 + cLim12 ) - fabs(vb) * ( cRim12 - cLim12 ) );
+         }
+      }
 
-
+      if (dim == 3) {
          // Front and Behind
          // ----------------
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
-         {
-           AdvectorValueFr = AdvectorValueC;
-           AdvectedValueFr = AdvectedValueC;
-         }
-         else
-         {
-           AdvectorValueFr = UF->DOF_value( i, j, k+1, 
-      component, advecting_level );      
-                 AdvectedValueFr =UF->DOF_value( 
-                i, j, k+1, component, advected_level );
+         if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT ) {
+            AdvectorValueFr = AdvectorValueC;
+            AdvectedValueFr = AdvectedValueC;
+         } else {
+            AdvectorValueFr = UF->DOF_value( i, j, k+1, component, advecting_level );      
+            AdvectedValueFr =UF->DOF_value( i, j, k+1, component, advected_level );
          }
 
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND )
-         {
-           AdvectorValueBe = AdvectorValueC;
-           AdvectedValueBe = AdvectedValueC;
-         }
-         else
-         {
-                 AdvectorValueBe = UF->DOF_value( i, j, k-1, 
-      component, advecting_level );
-                 AdvectedValueBe =UF->DOF_value( 
-                i, j, k-1, component, advected_level );
+         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND ) {
+            AdvectorValueBe = AdvectorValueC;
+            AdvectedValueBe = AdvectedValueC;
+         } else {
+            AdvectorValueBe = UF->DOF_value( i, j, k-1, component, advecting_level );
+            AdvectedValueBe =UF->DOF_value( i, j, k-1, component, advected_level );
          }
 
          thetaC = fabs( AdvectedValueFr - AdvectedValueC ) > 1.e-20 ? 
-            ( AdvectedValueC - AdvectedValueBe ) /
-      ( AdvectedValueFr - AdvectedValueC ) : 1.e20;
+         ( AdvectedValueC - AdvectedValueBe ) / ( AdvectedValueFr - AdvectedValueC ) : 1.e20;
          
          // Front (Z)
-         AdvectorValueFrBo = UF->DOF_value( 
-         i, j+shift.j-1, k+shift.k, 2, advecting_level );
-         AdvectorValueFrTo = UF->DOF_value( 
-         i, j+shift.j, k+shift.k, 2, advecting_level );
-               wf = 0.5 * ( AdvectorValueFrBo + AdvectorValueFrTo );
+         AdvectorValueFrBo = UF->DOF_value( i, j+shift.j-1, k+shift.k, 2, advecting_level );
+         AdvectorValueFrTo = UF->DOF_value( i, j+shift.j, k+shift.k, 2, advecting_level );
+         wf = 0.5 * ( AdvectorValueFrBo + AdvectorValueFrTo );
          if ( UF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT
-            || UF->DOF_color( i, j, k+1, component ) 
-        == FV_BC_FRONT_BOTTOM
-            || UF->DOF_color( i, j, k+1, component ) 
-        == FV_BC_FRONT_TOP )
-         {
-     if ( wf > 0. ) ffr = wf * AdvectedValueC;
-           else ffr = wf * AdvectedValueFr;
-         }
-         else
-         {
-     zf =UF->get_DOF_coordinate( k+shift.k, 2, 2 );
-     zF =UF->get_DOF_coordinate( k+1, component, 2 );
-     dzCf = zf - zC;
-     dzf  = zF - zC;
-     cLip12 = AdvectedValueC + ( dzCf / dzf )
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueFr - AdvectedValueC );
-     dzFf = zF - zf;
-     dzF =UF->get_cell_size( k+1, component, 2 );
-                 AdvectedValueFrFr =UF->DOF_value( 
-      i, j, k+2, component, advected_level );
+           || UF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT_BOTTOM
+           || UF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT_TOP ) {
+            if ( wf > 0. ) ffr = wf * AdvectedValueC;
+            else ffr = wf * AdvectedValueFr;
+         } else {
+            zf =UF->get_DOF_coordinate( k+shift.k, 2, 2 );
+            zF =UF->get_DOF_coordinate( k+1, component, 2 );
+            dzCf = zf - zC;
+            dzf  = zF - zC;
+            cLip12 = AdvectedValueC + ( dzCf / dzf ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                      * ( AdvectedValueFr - AdvectedValueC );
+            dzFf = zF - zf;
+            dzF =UF->get_cell_size( k+1, component, 2 );
+            AdvectedValueFrFr =UF->DOF_value( i, j, k+2, component, advected_level );
 
-     thetaFr = fabs( AdvectedValueFrFr - AdvectedValueFr ) > 
-        1.e-20 ? ( AdvectedValueFr - AdvectedValueC ) /
-      ( AdvectedValueFrFr - AdvectedValueFr ) : 1.e20;
-           cRip12 = AdvectedValueFr - ( dzFf / dzF )
-      * FV_DiscreteField::SuperBee_phi(thetaFr)
-      * ( AdvectedValueFrFr - AdvectedValueFr );
-     ffr = 0.5 * ( wf * ( cRip12 + cLip12 )
-          - fabs(wf) * ( cRip12 - cLip12 ) );
+            thetaFr = fabs( AdvectedValueFrFr - AdvectedValueFr ) > 1.e-20 ? 
+            ( AdvectedValueFr - AdvectedValueC ) / ( AdvectedValueFrFr - AdvectedValueFr ) : 1.e20;
+            cRip12 = AdvectedValueFr - ( dzFf / dzF ) * FV_DiscreteField::SuperBee_phi(thetaFr)
+                                                     * ( AdvectedValueFrFr - AdvectedValueFr );
+            ffr = 0.5 * ( wf * ( cRip12 + cLip12 ) - fabs(wf) * ( cRip12 - cLip12 ) );
          }
 
          // Behind (Z)
-         AdvectorValueBeBo = UF->DOF_value( 
-         i, j+shift.j-1, k+shift.k-1, 2, advecting_level );
-         AdvectorValueBeTo = UF->DOF_value(
-         i, j+shift.j, k+shift.k-1, 2, advecting_level );
+         AdvectorValueBeBo = UF->DOF_value( i, j+shift.j-1, k+shift.k-1, 2, advecting_level );
+         AdvectorValueBeTo = UF->DOF_value( i, j+shift.j, k+shift.k-1, 2, advecting_level );
          wb = 0.5 * ( AdvectorValueBeBo + AdvectorValueBeTo );
          if ( UF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND
-            || UF->DOF_color( i, j, k-1, component ) 
-        == FV_BC_BEHIND_BOTTOM
-            || UF->DOF_color( i, j, k-1, component ) 
-        == FV_BC_BEHIND_TOP )
-         {
-           if ( wb > 0. ) fbe = wb * AdvectedValueBe;
-           else fbe = wb * AdvectedValueC;
-         }
-         else
-         {
-     zb =UF->get_DOF_coordinate( k+shift.k-1, 2, 2 );
-     zB =UF->get_DOF_coordinate( k-1, component, 2 );
-     dzb  = zC - zB;
-     if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT ) 
-       cRim12 = AdvectedValueC;
-     else
-     {
-       zF =UF->get_DOF_coordinate( k+1, component, 2 );
-       dzf  = zF - zC;
-       dzCb = zC - zb;
-       cRim12 = AdvectedValueC - ( dzCb / dzf )
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueFr - AdvectedValueC );
-     }
-     dzBb = zb - zB;
-                 AdvectedValueBeBe =UF->DOF_value( 
-                 i, j, k-2, component, advected_level );
-     
-           thetaBe = fabs( AdvectedValueC - AdvectedValueBe ) > 1.e-20 ?
-        ( AdvectedValueBe - AdvectedValueBeBe ) /
-      ( AdvectedValueC - AdvectedValueBe ) : 1.e20;
-           cLim12 = AdvectedValueBe + ( dzBb / dzb )
-      * FV_DiscreteField::SuperBee_phi(thetaBe)
-      * ( AdvectedValueC - AdvectedValueBe );
-     fbe = 0.5 * ( wb * ( cRim12 + cLim12 )
-          - fabs(wb) * ( cRim12 - cLim12 ) );
-         }
-       }
-       
-       // The Third component (w)
-       else
-       {
-         // Right and Left
-         // --------------
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
-         {
-           AdvectorValueRi = AdvectorValueC;
-           AdvectedValueRi = AdvectedValueC;
-         }
-         else
-         {
-           AdvectorValueRi = UF->DOF_value( i+1, j, k, 
-      component, advecting_level );
-                 AdvectedValueRi =UF->DOF_value( 
-                i+1, j, k, component, advected_level );
-         }
-
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT )
-         {
-           AdvectorValueLe = AdvectorValueC;
-           AdvectedValueLe = AdvectedValueC;
-         }
-         else
-         {
-                 AdvectorValueLe = UF->DOF_value( i-1, j, k, 
-      component, advecting_level );
-                 AdvectedValueLe =UF->DOF_value( 
-                i-1, j, k, component, advected_level );
-         }
-
-         thetaC = fabs( AdvectedValueRi - AdvectedValueC ) > 1.e-20 ? 
-            ( AdvectedValueC - AdvectedValueLe ) /
-      ( AdvectedValueRi - AdvectedValueC ) : 1.e20;
-
-         // Right (X)
-         AdvectorValueFrRi = UF->DOF_value(
-         i+shift.i, j, k+shift.k, 0, advecting_level );
-         AdvectorValueBeRi = UF->DOF_value( 
-         i+shift.i, j, k+shift.k-1, 0, advecting_level );
-         ur = 0.5 * (AdvectorValueFrRi + AdvectorValueBeRi);
-         if ( UF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT
-            || UF->DOF_color( i+1, j, k, component ) 
-        == FV_BC_BEHIND_RIGHT
-            || UF->DOF_color( i+1, j, k, component ) 
-        == FV_BC_FRONT_RIGHT )
-         {
-     if ( ur > 0. ) fri = ur * AdvectedValueC;
-     else fri = ur * AdvectedValueRi;
-         }
-         else
-         {
-     xr =UF->get_DOF_coordinate( i+shift.i, 0, 0 );
-     xR =UF->get_DOF_coordinate( i+1, component, 0 );
-     dxCr = xr - xC;
-     dxr  = xR - xC;
-     cLip12 = AdvectedValueC + ( dxCr / dxr ) 
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueRi - AdvectedValueC );
-       
-     dxRr = xR - xr;
-           dxR =UF->get_cell_size( i+1, component, 0 );
-                 AdvectedValueRiRi =UF->DOF_value( 
-      i+2, j, k, component, advected_level );
-     
-           thetaRi = fabs( AdvectedValueRiRi - AdvectedValueRi ) > 
-        1.e-20 ? ( AdvectedValueRi - AdvectedValueC ) /
-      ( AdvectedValueRiRi - AdvectedValueRi ) : 1.e20;
-           cRip12 = AdvectedValueRi - ( dxRr / dxR )
-      * FV_DiscreteField::SuperBee_phi(thetaRi)
-      * ( AdvectedValueRiRi - AdvectedValueRi );
-     fri = 0.5 * ( ur * ( cRip12 + cLip12 )
-          - fabs(ur) * ( cRip12 - cLip12 ) );
-         }
-         
-         // Left (X)
-         AdvectorValueFrLe = UF->DOF_value(
-         i+shift.i-1, j, k+shift.k, 0, advecting_level );
-         AdvectorValueBeLe = UF->DOF_value(
-         i+shift.i-1, j, k+shift.k-1, 0, advecting_level );
-         ul = 0.5 * ( AdvectorValueFrLe + AdvectorValueBeLe );
-         if ( UF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT
-            || UF->DOF_color( i-1, j, k, component ) 
-        == FV_BC_BEHIND_LEFT
-            || UF->DOF_color( i-1, j, k, component ) 
-        == FV_BC_FRONT_LEFT )
-         {
-           if ( ul > 0. ) fle = ul * AdvectedValueLe;
-           else fle = ul * AdvectedValueC;
-         }
-         else
-         {
-     xl =UF->get_DOF_coordinate( i+shift.i-1, 0, 0 );
-     xL =UF->get_DOF_coordinate( i-1, component, 0 );
-     dxl  = xC - xL;
-     if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) 
-       cRim12 = AdvectedValueC;
-     else
-     {
-       xR =UF->get_DOF_coordinate( i+1, component, 0 );
-       dxr  = xR - xC;
-       dxCl = xC - xl;
-       cRim12 = AdvectedValueC - ( dxCl / dxr )
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueRi - AdvectedValueC );
-     }
-       
-     dxLl = xl - xL;
-                 AdvectedValueLeLe =UF->DOF_value( 
-                 i-2, j, k, component, advected_level );
-
-           thetaLe = fabs( AdvectedValueC - AdvectedValueLe ) > 1.e-20 ?
-        ( AdvectedValueLe - AdvectedValueLeLe ) /
-      ( AdvectedValueC - AdvectedValueLe ) : 1.e20;
-           cLim12 = AdvectedValueLe + ( dxLl / dxl )
-      * FV_DiscreteField::SuperBee_phi(thetaLe)
-      * ( AdvectedValueC - AdvectedValueLe );
-     fle = 0.5 * ( ul * ( cRim12 + cLim12 )
-          - fabs(ul) * ( cRim12 - cLim12 ) );
-         }
-
-         // Top and Bottom
-         // --------------
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP )
-         {
-           AdvectorValueTo = AdvectorValueC;
-           AdvectedValueTo = AdvectedValueC;
-         }
-         else
-         {
-           AdvectorValueTo = UF->DOF_value( i, j+1, k, 
-      component, advecting_level );
-                 AdvectedValueTo =UF->DOF_value( 
-                i, j+1, k, component, advected_level );
-         }
-
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM )
-         {
-           AdvectorValueBo = AdvectorValueC;
-           AdvectedValueBo = AdvectedValueC;
-         }
-         else
-         {
-                 AdvectorValueBo = UF->DOF_value( i, j-1, k, 
-      component, advecting_level );
-                 AdvectedValueBo =UF->DOF_value( 
-                i, j-1, k, component, advected_level );
-         }
-
-         thetaC = fabs( AdvectedValueTo - AdvectedValueC ) > 1.e-20 ? 
-            ( AdvectedValueC - AdvectedValueBo ) /
-      ( AdvectedValueTo - AdvectedValueC ) : 1.e20;
-
-         // Top (Y)
-         AdvectorValueBeTo = UF->DOF_value(
-         i, j+shift.j, k+shift.k-1, 1, advecting_level );
-               AdvectorValueFrTo = UF->DOF_value( 
-         i, j+shift.j, k+shift.k, 1, advecting_level );
-         vt = 0.5 * ( AdvectorValueBeTo + AdvectorValueFrTo );
-         if ( UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP
-            || UF->DOF_color( i, j+1, k, component ) 
-        == FV_BC_BEHIND_TOP
-            || UF->DOF_color( i, j+1, k, component ) 
-        == FV_BC_FRONT_TOP )
-         {
-           if ( vt > 0. ) fto = vt * AdvectedValueC;
-           else fto = vt * AdvectedValueTo;
-         }
-         else
-         {
-           yt =UF->get_DOF_coordinate( j+shift.j, 1, 1 );
-     yT =UF->get_DOF_coordinate( j+1, component, 1 );
-     dyCt = yt - yC;
-     dyt  = yT - yC;
-     cLip12 = AdvectedValueC + ( dyCt / dyt ) 
-        * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueTo - AdvectedValueC );
-           dyTt = yT - yt;
-           dyT =UF->get_cell_size( j+1, component, 1 );
-                 AdvectedValueToTo =UF->DOF_value( 
-                 i, j+2, k, component, advected_level );
-     
-           thetaTo = fabs( AdvectedValueToTo - AdvectedValueTo ) > 
-        1.e-20 ? ( AdvectedValueTo - AdvectedValueC ) /
-      ( AdvectedValueToTo - AdvectedValueTo ) : 1.e20;
-           cRip12 = AdvectedValueTo - ( dyTt / dyT ) 
-        * FV_DiscreteField::SuperBee_phi(thetaTo)
-            * ( AdvectedValueToTo - AdvectedValueTo );
-     fto = 0.5 * ( vt * ( cRip12 + cLip12 )
-          - fabs(vt) * ( cRip12 - cLip12 ) );
-         }
-
-         // Bottom (Y)
-         AdvectorValueBeBo = UF->DOF_value( 
-         i, j+shift.j-1, k+shift.k-1, 1, advecting_level );
-         AdvectorValueFrBo = UF->DOF_value( 
-         i, j+shift.j-1, k+shift.k, 1, advecting_level );
-         vb = 0.5 * ( AdvectorValueBeBo + AdvectorValueFrBo );
-         if ( UF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM
-            || UF->DOF_color( i, j-1, k, component ) 
-        == FV_BC_BEHIND_BOTTOM
-            || UF->DOF_color( i, j-1, k, component ) 
-        == FV_BC_FRONT_BOTTOM )
-         {
-           if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-           else fbo = vb * AdvectedValueC;
-         }
-         else
-         {
-           yb =UF->get_DOF_coordinate( j+shift.j-1, 1, 1 );
-           yB =UF->get_DOF_coordinate( j-1, component, 1 );
-           dyb  = yC - yB;
-     if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP ) 
-       cRim12 = AdvectedValueC;
-     else
-     {
-       yT =UF->get_DOF_coordinate( j+1, component, 1 );
-       dyt  = yT - yC;
-       dyCb = yC - yb;
-       cRim12 = AdvectedValueC - ( dyCb / dyt )
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueTo - AdvectedValueC );
-           }
-     dyBb = yb - yB;
-                 AdvectedValueBoBo =UF->DOF_value( 
-                 i, j-2, k, component, advected_level );
-     
-           thetaBo = fabs( AdvectedValueC - AdvectedValueBo ) > 1.e-20 ?
-        ( AdvectedValueBo - AdvectedValueBoBo ) /
-      ( AdvectedValueC - AdvectedValueBo ) : 1.e20;
-           cLim12 = AdvectedValueBo + ( dyBb / dyb )
-        * FV_DiscreteField::SuperBee_phi(thetaBo)
-            * ( AdvectedValueC - AdvectedValueBo );
-           fbo = 0.5 * ( vb * ( cRim12 + cLim12 )
-          - fabs(vb) * ( cRim12 - cLim12 ) );
-         }
-
-
-         // Front and Behind
-         // ----------------
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
-         {
-           AdvectorValueFr = AdvectorValueC;
-           AdvectedValueFr = AdvectedValueC;
-         }
-         else
-         {
-           AdvectorValueFr = UF->DOF_value( i, j, k+1, 
-      component, advecting_level );      
-                 AdvectedValueFr =UF->DOF_value( 
-                i, j, k+1, component, advected_level );
-         }
-
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND )
-         {
-           AdvectorValueBe = AdvectorValueC;
-           AdvectedValueBe = AdvectedValueC;
-         }
-         else
-         {
-                 AdvectorValueBe = UF->DOF_value( i, j, k-1, 
-      component, advecting_level );
-                 AdvectedValueBe =UF->DOF_value( 
-                i, j, k-1, component, advected_level );
-         }
-
-         thetaC = fabs( AdvectedValueFr - AdvectedValueC ) > 1.e-20 ? 
-            ( AdvectedValueC - AdvectedValueBe ) /
-      ( AdvectedValueFr - AdvectedValueC ) : 1.e20;
-         
-         // Front (Z)
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
-           ffr = AdvectorValueC * AdvectedValueC;
-         else
-         {       
-           wf = 0.5 * ( AdvectorValueFr + AdvectorValueC );
-           if ( UF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT )
-     {
-             if ( wf > 0. ) ffr = wf * AdvectedValueC;
-             else ffr = wf * AdvectedValueFr;
-     }
-           else
-           {
-       zf =UF->get_DOF_coordinate( k+shift.k, 0, 2 );
-             zF =UF->get_DOF_coordinate( k+1, component, 2 );
-             dzCf = zf - zC;
-             dzf  = zF - zC;
-       cLip12 = AdvectedValueC + ( dzCf / dzf ) 
-        * FV_DiscreteField::SuperBee_phi(thetaC)
-        * ( AdvectedValueFr - AdvectedValueC );    
-
-             dzFf = zF - zf;
-             dzF =UF->get_cell_size( k+1, component, 2 );
-                   AdvectedValueFrFr =UF->DOF_value( 
-                 i, j, k+2, component, advected_level );
-
-             thetaFr = fabs( AdvectedValueFrFr - AdvectedValueFr ) > 
-        1.e-20 ? ( AdvectedValueFr - AdvectedValueC ) /
-      ( AdvectedValueFrFr - AdvectedValueFr ) : 1.e20;
-             cRip12 = AdvectedValueFr - ( dzFf / dzF )
-      * FV_DiscreteField::SuperBee_phi(thetaFr)
-      * ( AdvectedValueFrFr - AdvectedValueFr );
-             ffr = 0.5 * ( wf * ( cRip12 + cLip12 )
-            - fabs(wf) * ( cRip12 - cLip12 ) );
-     } 
-               }
-
-         // Behind (Z)
-         if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND )
-           fbe = AdvectorValueC * AdvectedValueC;
-         else
-         {       
-           wb = 0.5 * (AdvectorValueBe + AdvectorValueC);
-           if ( UF->DOF_color(i, j, k-1, component ) == FV_BC_BEHIND )
-     {
-             if (wb > 0.) fbe = wb * AdvectedValueBe;
-             else fbe = wb * AdvectedValueC;
-     }
-           else
-           {
-             zb =UF->get_DOF_coordinate( k+shift.k-1, 0, 2 );
-             zB =UF->get_DOF_coordinate( k-1, component, 2 );
-             dzb  = zC - zB;
-       if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT ) 
-         cRim12 = AdvectedValueC;
-             else
-       {
+           || UF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND_BOTTOM
+           || UF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND_TOP ) {
+            if ( wb > 0. ) fbe = wb * AdvectedValueBe;
+            else fbe = wb * AdvectedValueC;
+         } else {
+            zb =UF->get_DOF_coordinate( k+shift.k-1, 2, 2 );
+            zB =UF->get_DOF_coordinate( k-1, component, 2 );
+            dzb  = zC - zB;
+            if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT ) 
+               cRim12 = AdvectedValueC;
+            else {
                zF =UF->get_DOF_coordinate( k+1, component, 2 );
-         dzf  = zF - zC;
-         dzCb = zC - zb;
-               cRim12 = AdvectedValueC - ( dzCb / dzf )
-      * FV_DiscreteField::SuperBee_phi(thetaC)
-      * ( AdvectedValueFr - AdvectedValueC );
-       }
-       dzBb = zb - zB;
-                   AdvectedValueBeBe =UF->DOF_value( 
-                 i, j, k-2, component, advected_level );
+               dzf  = zF - zC;
+               dzCb = zC - zb;
+               cRim12 = AdvectedValueC - ( dzCb / dzf ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                         * ( AdvectedValueFr - AdvectedValueC );
+            }
+            dzBb = zb - zB;
+            AdvectedValueBeBe =UF->DOF_value( i, j, k-2, component, advected_level );
+     
+            thetaBe = fabs( AdvectedValueC - AdvectedValueBe ) > 1.e-20 ?
+            ( AdvectedValueBe - AdvectedValueBeBe ) / ( AdvectedValueC - AdvectedValueBe ) : 1.e20;
+            cLim12 = AdvectedValueBe + ( dzBb / dzb ) * FV_DiscreteField::SuperBee_phi(thetaBe)
+                                                        * ( AdvectedValueC - AdvectedValueBe );
+            fbe = 0.5 * ( wb * ( cRim12 + cLim12 ) - fabs(wb) * ( cRim12 - cLim12 ) );
+         }
+      }
+   } else if (component == 2) {
+      // The Third component (w)
+      // Right and Left
+      // --------------
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) {
+         AdvectorValueRi = AdvectorValueC;
+         AdvectedValueRi = AdvectedValueC;
+      } else {
+         AdvectorValueRi = UF->DOF_value( i+1, j, k, component, advecting_level );
+         AdvectedValueRi =UF->DOF_value( i+1, j, k, component, advected_level );
+      }
+
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_LEFT ) {
+         AdvectorValueLe = AdvectorValueC;
+         AdvectedValueLe = AdvectedValueC;
+      } else {
+         AdvectorValueLe = UF->DOF_value( i-1, j, k, component, advecting_level );
+         AdvectedValueLe =UF->DOF_value( i-1, j, k, component, advected_level );
+      }
+
+      thetaC = fabs( AdvectedValueRi - AdvectedValueC ) > 1.e-20 ? 
+      ( AdvectedValueC - AdvectedValueLe ) / ( AdvectedValueRi - AdvectedValueC ) : 1.e20;
+
+      // Right (X)
+      AdvectorValueFrRi = UF->DOF_value( i+shift.i, j, k+shift.k, 0, advecting_level );
+      AdvectorValueBeRi = UF->DOF_value( i+shift.i, j, k+shift.k-1, 0, advecting_level );
+      ur = 0.5 * (AdvectorValueFrRi + AdvectorValueBeRi);
+      if ( UF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT
+        || UF->DOF_color( i+1, j, k, component ) == FV_BC_BEHIND_RIGHT
+        || UF->DOF_color( i+1, j, k, component ) == FV_BC_FRONT_RIGHT ) {
+         if ( ur > 0. ) fri = ur * AdvectedValueC;
+         else fri = ur * AdvectedValueRi;
+      } else {
+         xr =UF->get_DOF_coordinate( i+shift.i, 0, 0 );
+         xR =UF->get_DOF_coordinate( i+1, component, 0 );
+         dxCr = xr - xC;
+         dxr  = xR - xC;
+         cLip12 = AdvectedValueC + ( dxCr / dxr ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                   * ( AdvectedValueRi - AdvectedValueC );
        
-             thetaBe = fabs( AdvectedValueC - AdvectedValueBe ) > 1.e-20 ?
-      ( AdvectedValueBe - AdvectedValueBeBe ) /
-      ( AdvectedValueC - AdvectedValueBe ) : 1.e20;
-             cLim12 = AdvectedValueBe + ( dzBb / dzb )
-        * FV_DiscreteField::SuperBee_phi(thetaBe)
-      * ( AdvectedValueC - AdvectedValueBe );
-             fbe = 0.5 * ( wb * ( cRim12 + cLim12 )
-            - fabs(wb) * ( cRim12 - cLim12 ) );
-           }
-               }
-       }
+         dxRr = xR - xr;
+         dxR =UF->get_cell_size( i+1, component, 0 );
+         AdvectedValueRiRi =UF->DOF_value( i+2, j, k, component, advected_level );
+     
+         thetaRi = fabs( AdvectedValueRiRi - AdvectedValueRi ) > 1.e-20 ? 
+         ( AdvectedValueRi - AdvectedValueC ) / ( AdvectedValueRiRi - AdvectedValueRi ) : 1.e20;
+         cRip12 = AdvectedValueRi - ( dxRr / dxR ) * FV_DiscreteField::SuperBee_phi(thetaRi)
+                                                  * ( AdvectedValueRiRi - AdvectedValueRi );
+         fri = 0.5 * ( ur * ( cRip12 + cLip12 ) - fabs(ur) * ( cRip12 - cLip12 ) );
+      }
+         
+      // Left (X)
+      AdvectorValueFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, 0, advecting_level );
+      AdvectorValueBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, 0, advecting_level );
+      ul = 0.5 * ( AdvectorValueFrLe + AdvectorValueBeLe );
+      if ( UF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT
+        || UF->DOF_color( i-1, j, k, component ) == FV_BC_BEHIND_LEFT
+        || UF->DOF_color( i-1, j, k, component ) == FV_BC_FRONT_LEFT ) {
+         if ( ul > 0. ) fle = ul * AdvectedValueLe;
+         else fle = ul * AdvectedValueC;
+      } else {
+         xl =UF->get_DOF_coordinate( i+shift.i-1, 0, 0 );
+         xL =UF->get_DOF_coordinate( i-1, component, 0 );
+         dxl  = xC - xL;
+         if ( UF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) 
+            cRim12 = AdvectedValueC;
+         else {
+            xR =UF->get_DOF_coordinate( i+1, component, 0 );
+            dxr  = xR - xC;
+            dxCl = xC - xl;
+            cRim12 = AdvectedValueC - ( dxCl / dxr ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                      * ( AdvectedValueRi - AdvectedValueC );
+         }
        
-             flux = ( fto - fbo ) * dxC * dzC
-                  + ( fri - fle ) * dyC * dzC
-                  + ( ffr - fbe ) * dxC * dyC;
+         dxLl = xl - xL;
+         AdvectedValueLeLe =UF->DOF_value( i-2, j, k, component, advected_level );
+
+         thetaLe = fabs( AdvectedValueC - AdvectedValueLe ) > 1.e-20 ?
+         ( AdvectedValueLe - AdvectedValueLeLe ) / ( AdvectedValueC - AdvectedValueLe ) : 1.e20;
+         cLim12 = AdvectedValueLe + ( dxLl / dxl ) * FV_DiscreteField::SuperBee_phi(thetaLe)
+                                                    * ( AdvectedValueC - AdvectedValueLe );
+         fle = 0.5 * ( ul * ( cRim12 + cLim12 ) - fabs(ul) * ( cRim12 - cLim12 ) );
+      }
+
+      // Top and Bottom
+      // --------------
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP ) {
+         AdvectorValueTo = AdvectorValueC;
+         AdvectedValueTo = AdvectedValueC;
+      } else {
+         AdvectorValueTo = UF->DOF_value( i, j+1, k, component, advecting_level );
+         AdvectedValueTo =UF->DOF_value( i, j+1, k, component, advected_level );
+      }
+
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_BOTTOM ) {
+         AdvectorValueBo = AdvectorValueC;
+         AdvectedValueBo = AdvectedValueC;
+      } else {
+         AdvectorValueBo = UF->DOF_value( i, j-1, k, component, advecting_level );
+         AdvectedValueBo =UF->DOF_value( i, j-1, k, component, advected_level );
+      }
+
+      thetaC = fabs( AdvectedValueTo - AdvectedValueC ) > 1.e-20 ? 
+      ( AdvectedValueC - AdvectedValueBo ) / ( AdvectedValueTo - AdvectedValueC ) : 1.e20;
+
+      // Top (Y)
+      AdvectorValueBeTo = UF->DOF_value( i, j+shift.j, k+shift.k-1, 1, advecting_level );
+      AdvectorValueFrTo = UF->DOF_value( i, j+shift.j, k+shift.k, 1, advecting_level );
+      vt = 0.5 * ( AdvectorValueBeTo + AdvectorValueFrTo );
+      if ( UF->DOF_color( i, j+1, k, component ) == FV_BC_TOP
+        || UF->DOF_color( i, j+1, k, component ) == FV_BC_BEHIND_TOP
+        || UF->DOF_color( i, j+1, k, component ) == FV_BC_FRONT_TOP ) {
+         if ( vt > 0. ) fto = vt * AdvectedValueC;
+         else fto = vt * AdvectedValueTo;
+      } else {
+         yt =UF->get_DOF_coordinate( j+shift.j, 1, 1 );
+         yT =UF->get_DOF_coordinate( j+1, component, 1 );
+         dyCt = yt - yC;
+         dyt  = yT - yC;
+         cLip12 = AdvectedValueC + ( dyCt / dyt ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                   * ( AdvectedValueTo - AdvectedValueC );
+         dyTt = yT - yt;
+         dyT =UF->get_cell_size( j+1, component, 1 );
+         AdvectedValueToTo =UF->DOF_value( i, j+2, k, component, advected_level );
+    
+         thetaTo = fabs( AdvectedValueToTo - AdvectedValueTo ) > 1.e-20 ? 
+         ( AdvectedValueTo - AdvectedValueC ) / ( AdvectedValueToTo - AdvectedValueTo ) : 1.e20;
+         cRip12 = AdvectedValueTo - ( dyTt / dyT ) * FV_DiscreteField::SuperBee_phi(thetaTo)
+                                                  * ( AdvectedValueToTo - AdvectedValueTo );
+         fto = 0.5 * ( vt * ( cRip12 + cLip12 ) - fabs(vt) * ( cRip12 - cLip12 ) );
+      }
+
+      // Bottom (Y)
+      AdvectorValueBeBo = UF->DOF_value( i, j+shift.j-1, k+shift.k-1, 1, advecting_level );
+      AdvectorValueFrBo = UF->DOF_value( i, j+shift.j-1, k+shift.k, 1, advecting_level );
+      vb = 0.5 * ( AdvectorValueBeBo + AdvectorValueFrBo );
+      if ( UF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM
+        || UF->DOF_color( i, j-1, k, component ) == FV_BC_BEHIND_BOTTOM
+        || UF->DOF_color( i, j-1, k, component ) == FV_BC_FRONT_BOTTOM ) {
+         if ( vb > 0. ) fbo = vb * AdvectedValueBo;
+         else fbo = vb * AdvectedValueC;
+      } else {
+         yb =UF->get_DOF_coordinate( j+shift.j-1, 1, 1 );
+         yB =UF->get_DOF_coordinate( j-1, component, 1 );
+         dyb  = yC - yB;
+         if ( UF->DOF_color( i, j, k, component ) == FV_BC_TOP ) 
+            cRim12 = AdvectedValueC;
+         else {
+            yT =UF->get_DOF_coordinate( j+1, component, 1 );
+            dyt  = yT - yC;
+            dyCb = yC - yb;
+            cRim12 = AdvectedValueC - ( dyCb / dyt ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                      * ( AdvectedValueTo - AdvectedValueC );
+         }
+         dyBb = yb - yB;
+         AdvectedValueBoBo =UF->DOF_value( i, j-2, k, component, advected_level );
+     
+         thetaBo = fabs( AdvectedValueC - AdvectedValueBo ) > 1.e-20 ?
+         ( AdvectedValueBo - AdvectedValueBoBo ) / ( AdvectedValueC - AdvectedValueBo ) : 1.e20;
+         cLim12 = AdvectedValueBo + ( dyBb / dyb ) * FV_DiscreteField::SuperBee_phi(thetaBo)
+                                                     * ( AdvectedValueC - AdvectedValueBo );
+         fbo = 0.5 * ( vb * ( cRim12 + cLim12 ) - fabs(vb) * ( cRim12 - cLim12 ) );
+      }
+
+      // Front and Behind
+      // ----------------
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT ) {
+         AdvectorValueFr = AdvectorValueC;
+         AdvectedValueFr = AdvectedValueC;
+      } else {
+         AdvectorValueFr = UF->DOF_value( i, j, k+1, component, advecting_level );      
+         AdvectedValueFr =UF->DOF_value( i, j, k+1, component, advected_level );
+      }
+
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND ) {
+         AdvectorValueBe = AdvectorValueC;
+         AdvectedValueBe = AdvectedValueC;
+      } else {
+         AdvectorValueBe = UF->DOF_value( i, j, k-1, component, advecting_level );
+         AdvectedValueBe =UF->DOF_value( i, j, k-1, component, advected_level );
+      }
+
+      thetaC = fabs( AdvectedValueFr - AdvectedValueC ) > 1.e-20 ? 
+      ( AdvectedValueC - AdvectedValueBe ) / ( AdvectedValueFr - AdvectedValueC ) : 1.e20;
+         
+      // Front (Z)
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
+         ffr = AdvectorValueC * AdvectedValueC;
+      else {       
+         wf = 0.5 * ( AdvectorValueFr + AdvectorValueC );
+         if ( UF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT ) {
+            if ( wf > 0. ) ffr = wf * AdvectedValueC;
+            else ffr = wf * AdvectedValueFr;
+         } else {
+            zf =UF->get_DOF_coordinate( k+shift.k, 0, 2 );
+            zF =UF->get_DOF_coordinate( k+1, component, 2 );
+            dzCf = zf - zC;
+            dzf  = zF - zC;
+            cLip12 = AdvectedValueC + ( dzCf / dzf ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                      * ( AdvectedValueFr - AdvectedValueC );    
+
+            dzFf = zF - zf;
+            dzF =UF->get_cell_size( k+1, component, 2 );
+            AdvectedValueFrFr =UF->DOF_value( i, j, k+2, component, advected_level );
+
+            thetaFr = fabs( AdvectedValueFrFr - AdvectedValueFr ) > 1.e-20 ? 
+            ( AdvectedValueFr - AdvectedValueC ) / ( AdvectedValueFrFr - AdvectedValueFr ) : 1.e20;
+            cRip12 = AdvectedValueFr - ( dzFf / dzF ) * FV_DiscreteField::SuperBee_phi(thetaFr)
+                                                     * ( AdvectedValueFrFr - AdvectedValueFr );
+            ffr = 0.5 * ( wf * ( cRip12 + cLip12 ) - fabs(wf) * ( cRip12 - cLip12 ) );
+         } 
+      }
+
+      // Behind (Z)
+      if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND )
+         fbe = AdvectorValueC * AdvectedValueC;
+      else {       
+         wb = 0.5 * (AdvectorValueBe + AdvectorValueC);
+         if ( UF->DOF_color(i, j, k-1, component ) == FV_BC_BEHIND ) {
+            if (wb > 0.) fbe = wb * AdvectedValueBe;
+            else fbe = wb * AdvectedValueC;
+         } else {
+            zb =UF->get_DOF_coordinate( k+shift.k-1, 0, 2 );
+            zB =UF->get_DOF_coordinate( k-1, component, 2 );
+            dzb  = zC - zB;
+            if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT ) 
+               cRim12 = AdvectedValueC;
+            else {
+               zF =UF->get_DOF_coordinate( k+1, component, 2 );
+               dzf  = zF - zC;
+               dzCb = zC - zb;
+               cRim12 = AdvectedValueC - ( dzCb / dzf ) * FV_DiscreteField::SuperBee_phi(thetaC)
+                                                         * ( AdvectedValueFr - AdvectedValueC );
+            }
+            dzBb = zb - zB;
+            AdvectedValueBeBe =UF->DOF_value( i, j, k-2, component, advected_level );
+       
+            thetaBe = fabs( AdvectedValueC - AdvectedValueBe ) > 1.e-20 ?
+            ( AdvectedValueBe - AdvectedValueBeBe ) / ( AdvectedValueC - AdvectedValueBe ) : 1.e20;
+            cLim12 = AdvectedValueBe + ( dzBb / dzb ) * FV_DiscreteField::SuperBee_phi(thetaBe)
+                                                        * ( AdvectedValueC - AdvectedValueBe );
+            fbe = 0.5 * ( wb * ( cRim12 + cLim12 ) - fabs(wb) * ( cRim12 - cLim12 ) );
+         }
+      }
    }
 
+   if (dim == 2) {   
+      flux = ( fto - fbo ) * dxC + ( fri - fle ) * dyC;
+   } else if (dim == 3) {
+      flux = ( fto - fbo ) * dxC * dzC + ( fri - fle ) * dyC * dzC + ( ffr - fbe ) * dxC * dyC;
+   }
    return ( coef * flux ); 
 }
-
-
-
 
 //----------------------------------------------------------------------
 void

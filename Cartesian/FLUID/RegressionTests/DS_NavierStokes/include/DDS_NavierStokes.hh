@@ -112,14 +112,6 @@ public SolverComputingTime
 
    //-- Basic discrete system building
 
-      void allocate_mpi_vectors_U(void);
-
-      void allocate_mpi_vectors_P(void);
-
-      void deallocate_mpi_vectors_U(void);
-
-      void deallocate_mpi_vectors_P(void);
-
       /** @name Basic discrete system building */
       //@{
       /** @brief Error compared to analytical solution */
@@ -161,41 +153,31 @@ public SolverComputingTime
       /** @brief Second order Direction splitting with Domain Decomposition of Velocity Update step in Navier Stokes solver */
 
       /** @brief Assemble rhs for velocity in x */
-      double assemble_local_rhs( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir );
+      double velocity_local_rhs( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir );
       double compute_un_component ( size_t const& comp, size_t i, size_t j, size_t k, size_t const dir);
       double compute_p_component ( size_t const& comp, size_t i, size_t j, size_t k);
       double compute_adv_component ( size_t const& comp, size_t i, size_t j, size_t k);
       void assemble_DS_un_at_rhs (FV_TimeIterator const* t_it, double const gamma);
 
+      double assemble_local_rhs ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field );
       
+      /** @brief Assemble rhs for pressure in x */
+      double pressure_local_rhs( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const dir );
 
       /** @brief Solve interface unknowns for velocity in x */
-      void solve_interface_unknowns( double* packed_data,size_t nb_send_data,double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir );
-      void unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p);
-      void unpack_compute_ue_pack(size_t const& comp, double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p);
-
-      void pressure_solve_interface_unknowns( double* packed_data,size_t nb_send_data, FV_TimeIterator const* t_it, size_t const dir );
-      void unpack_ue_P(double * received_data, size_t const dir, int p);
-      void unpack_compute_ue_pack_P(double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p);
+      void solve_interface_unknowns( FV_DiscreteField* FF, double* packed_data,size_t nb_send_data,double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field );
+      void unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p, size_t const field);
+      void unpack_compute_ue_pack(size_t const& comp, double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p, size_t const field);
 
       /** @brief Solve local unknowns for velocity in x */
-      void solve_for_secondorder ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, double * packed_data, size_t const& comp, size_t const dir );
+      void solve_for_secondorder ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, double * packed_data, size_t const& comp, size_t const dir, size_t const field );
 
 
       /** @brief Second order Direction splitting with Domain Decomposition of Pressure Update step in Navier Stokes solver */
 
-      /** @brief Solve local unknowns for pressure in x */
-      void pressure_solve_for_secondorder ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, double * packed_data, size_t const dir );
-      /** @brief Assemble rhs for pressure in x */
-      double pressure_assemble_local_rhs_x( size_t const& j, size_t const& k, FV_TimeIterator const* t_it );
-      /** @brief Assemble rhs for pressure in y */
-      double pressure_assemble_local_rhs_y( size_t const& i, size_t const& k, FV_TimeIterator const* t_it );
-      /** @brief Assemble rhs for pressure in z */
-      double pressure_assemble_local_rhs_z( size_t const& i, size_t const& j, FV_TimeIterator const* t_it );
       
        /** @brief Navier Stokes solver */
-      void SolveP_i_in_jk ( FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k );
-      void SolveU_i_in_jk ( FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, size_t const gamma );
+      void Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, size_t const gamma, size_t const field );
 
 
       /** Pressure predictor */
@@ -256,7 +238,7 @@ public SolverComputingTime
       size_t my_rank;
       size_t is_master;
       size_t dim;
-      size_t nb_comps;
+      size_t nb_comps[2];               // 0th element for P and 1st element for U
 
       MAC_Communicator const* pelCOMM;
       MPI_Comm DDS_Comm_i[3];
@@ -273,15 +255,9 @@ public SolverComputingTime
 
       bool b_restart ;
 
-      bool is_Uperiodic[3];
-      boolVector const* U_periodic_comp;
-
-      bool is_Pperiodic[3];
       boolVector const* P_periodic_comp;
-
-      // double * schlur_mpi_data_u_x;
-      // double * schlur_mpi_data_u_y;
-      // double * schlur_mpi_data_u_z;
+      boolVector const* U_periodic_comp;
+      bool is_periodic[2][3];
 
       double ** mpi_packed_data_U_x;
       double ** mpi_packed_data_U_y;

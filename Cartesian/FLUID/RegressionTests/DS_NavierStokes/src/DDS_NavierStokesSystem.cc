@@ -67,12 +67,12 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
    int const* MPI_coordinates_world = UF->primary_grid()->get_MPI_coordinates() ;
    int const* MPI_max_coordinates_world = UF->primary_grid()->get_domain_decomposition() ;
 
-   is_Uperiodic[0] = false;
-   is_Uperiodic[1] = false;
-   is_Uperiodic[2] = false;
-   is_Pperiodic[0] = false;
-   is_Pperiodic[1] = false;
-   is_Pperiodic[2] = false;
+   is_periodic[0][0] = false;
+   is_periodic[0][1] = false;
+   is_periodic[0][2] = false;
+   is_periodic[1][0] = false;
+   is_periodic[1][1] = false;
+   is_periodic[1][2] = false;
 
    proc_pos_in_i[0] = MPI_coordinates_world[0];
    proc_pos_in_i[1] = MPI_coordinates_world[1];
@@ -86,17 +86,17 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
 
    // Periodic boundary condition check for velocity
    U_periodic_comp = UF->primary_grid()->get_periodic_directions();
-   is_Uperiodic[0] = U_periodic_comp->operator()( 0 );
-   is_Uperiodic[1] = U_periodic_comp->operator()( 1 );
+   is_periodic[1][0] = U_periodic_comp->operator()( 0 );
+   is_periodic[1][1] = U_periodic_comp->operator()( 1 );
    if(dim >2)
-      is_Uperiodic[2] = U_periodic_comp->operator()( 2 ); 
+      is_periodic[1][2] = U_periodic_comp->operator()( 2 ); 
 
    // Periodic boundary condition check for pressure
    P_periodic_comp = PF->primary_grid()->get_periodic_directions();
-   is_Pperiodic[0] = P_periodic_comp->operator()( 0 );
-   is_Pperiodic[1] = P_periodic_comp->operator()( 1 );
+   is_periodic[0][0] = P_periodic_comp->operator()( 0 );
+   is_periodic[0][1] = P_periodic_comp->operator()( 1 );
    if(dim >2)
-      is_Pperiodic[2] = P_periodic_comp->operator()( 2 ); 
+      is_periodic[0][2] = P_periodic_comp->operator()( 2 ); 
 
    // Build the matrices & vectors
    build_system(exp) ;
@@ -589,7 +589,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
       1 + PF->get_max_index_unknown_handled_by_proc( 0, l )
    - PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
 
-  if(is_Pperiodic[0]==0 || nb_procs_in_i[0] == 1)
+  if(is_periodic[0][0]==0 || nb_procs_in_i[0] == 1)
   {
      if(proc_pos_in_i[0] == nb_procs_in_i[0]-1)
      {
@@ -705,7 +705,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
             nb_procs_in_i[0] );
     }
   }
-  if(is_Pperiodic[1]!=1 || nb_procs_in_i[1] == 1)
+  if(is_periodic[0][1]!=1 || nb_procs_in_i[1] == 1)
   {
       if(proc_pos_in_i[1] == nb_procs_in_i[1]-1){
         Aii_y_main_diagonal_P->re_initialize(
@@ -822,7 +822,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
    }
    if(dim>2)
    {
-      if(is_Pperiodic[2] !=1 || nb_procs_in_i[2] == 1)
+      if(is_periodic[0][2] !=1 || nb_procs_in_i[2] == 1)
       {
 
         if(proc_pos_in_i[2] == nb_procs_in_i[2]-1){
@@ -950,7 +950,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
      nb_unknowns_handled_by_proc( l ) =
       1 + UF->get_max_index_unknown_handled_by_proc( comp, l )
    - UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-   if(is_Uperiodic[0]!=1 || nb_procs_in_i[0] == 1){
+   if(is_periodic[1][0]!=1 || nb_procs_in_i[0] == 1){
       if(proc_pos_in_i[0] == nb_procs_in_i[0]-1)
        {
 
@@ -1069,7 +1069,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
       VEC_rhs_velocity_1D_x[comp]->re_initialize( nb_unknowns_handled_by_proc( 0 ) );
    }
        
-   if(is_Uperiodic[1]!=1 || nb_procs_in_i[1] == 1)
+   if(is_periodic[1][1]!=1 || nb_procs_in_i[1] == 1)
    {
       if(proc_pos_in_i[1] == nb_procs_in_i[1]-1){
           Aii_y_main_diagonal[comp]->re_initialize(
@@ -1201,7 +1201,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
    if(dim>2)
    {
-      if(is_Uperiodic[2]!=1 || nb_procs_in_i[2] == 1)
+      if(is_periodic[1][2]!=1 || nb_procs_in_i[2] == 1)
       {
         if(proc_pos_in_i[2] == nb_procs_in_i[2]-1){
              Aii_z[comp]->re_initialize(
@@ -1395,21 +1395,6 @@ DDS_NavierStokesSystem::initialize_DS_pressure( void )
 
 //----------------------------------------------------------------------
 LA_SeqVector const*
-DDS_NavierStokesSystem:: get_solution_velocity( void ) const
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_solution_velocity" ) ;
-
-   UF_NUM->scatter()->get( VEC_UF, UF_LOC ) ;
-
-   LA_SeqVector const* result = UF_LOC ;
-
-   return( result ) ;
-
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector const*
 DDS_NavierStokesSystem:: get_solution_DS_velocity( void ) const
 //----------------------------------------------------------------------
 {
@@ -1517,344 +1502,163 @@ DDS_NavierStokesSystem:: compute_directionsplitting_velocity_change( void )
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_local_temp( size_t const& c, size_t const dir )
+DDS_NavierStokesSystem::get_local_temp( size_t const& c, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_x" ) ;
-      return ( VEC_local_temp_x[c] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_y" ) ;
-      return ( VEC_local_temp_y[c] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_z" ) ;
-      return ( VEC_local_temp_z[c] ) ;
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_x_P" ) ;
+         return ( VEC_local_temp_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_y_P" ) ;
+         return ( VEC_local_temp_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_z_P" ) ;
+         return ( VEC_local_temp_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_x" ) ;
+         return ( VEC_local_temp_x[c] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_y" ) ;
+         return ( VEC_local_temp_y[c] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_z" ) ;
+         return ( VEC_local_temp_z[c] ) ;
+      }
    }
 }
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_local_solution_temp( size_t const& c, size_t const dir )
+DDS_NavierStokesSystem::get_local_solution_temp( size_t const& c, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_x" ) ;
-      return ( VEC_local_solution_temp_x[c] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_y" ) ;
-      return ( VEC_local_solution_temp_y[c] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_z" ) ;
-      return ( VEC_local_solution_temp_z[c] ) ;
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_x_P" ) ;
+         return ( VEC_local_solution_temp_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_y_P" ) ;
+         return ( VEC_local_solution_temp_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_z_P" ) ;
+         return ( VEC_local_solution_temp_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_x" ) ;
+         return ( VEC_local_solution_temp_x[c] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_y" ) ;
+         return ( VEC_local_solution_temp_y[c] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_z" ) ;
+         return ( VEC_local_solution_temp_z[c] ) ;
+      }
    }
 }
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_interface_temp( size_t const& c, size_t const dir )
+DDS_NavierStokesSystem::get_interface_temp( size_t const& c, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x" ) ;
-      return ( VEC_interface_temp_x[c] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y" ) ;
-      return ( VEC_interface_temp_y[c] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z" ) ;
-      return ( VEC_interface_temp_z[c] ) ;
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x_P" ) ;
+         return ( VEC_interface_temp_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y_P" ) ;
+         return ( VEC_interface_temp_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z_P" ) ;
+         return ( VEC_interface_temp_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x" ) ;
+         return ( VEC_interface_temp_x[c] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y" ) ;
+         return ( VEC_interface_temp_y[c] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z" ) ;
+         return ( VEC_interface_temp_z[c] ) ;
+      }
    }
 }
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_temp( size_t const& c, size_t const dir )
+DDS_NavierStokesSystem::get_temp( size_t const& c, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x" ) ;
-      return ( VEC_temp_x[c] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y" ) ;
-      return ( VEC_temp_y[c] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z" ) ;
-      return ( VEC_temp_z[c] ) ;
+   if (field == 0) { 
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_temp_x_P" ) ;
+         return ( VEC_temp_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_temp_y_P" ) ;
+         return ( VEC_temp_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_temp_z_P" ) ;
+         return ( VEC_temp_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x" ) ;
+         return ( VEC_temp_x[c] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y" ) ;
+         return ( VEC_temp_y[c] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z" ) ;
+         return ( VEC_temp_z[c] ) ;
+      }
    }
 }
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_U_vec_u( size_t const& c, size_t const dir )
+DDS_NavierStokesSystem::get_product_result( size_t const& c, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_xu" ) ;
-      return ( U_vec_xu[c] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_yu" ) ;
-      return ( U_vec_yu[c] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_zu" ) ;
-      return ( U_vec_zu[c] ) ;
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_x_P" ) ;
+         return ( product_result_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_y_P" ) ;
+         return ( product_result_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_z_P" ) ;
+         return ( product_result_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_x" ) ;
+         return ( product_result_x[c] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_y" ) ;
+         return ( product_result_y[c] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_z" ) ;
+         return ( product_result_z[c] ) ;
+      }
    }
 }
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_product_result( size_t const& c, size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_x" ) ;
-      return ( product_result_x[c] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_y" ) ;
-      return ( product_result_y[c] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_z" ) ;
-      return ( product_result_z[c] ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_product_result_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_x_P" ) ;
-      return ( product_result_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_y_P" ) ;
-      return ( product_result_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_product_result_z_P" ) ;
-      return ( product_result_z_P ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_U_vec_v( size_t const& c, size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_xv" ) ;
-      return ( U_vec_xv[c] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_yv" ) ;
-      return ( U_vec_yv[c] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_U_vec_zv" ) ;
-      return ( U_vec_zv[c] ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_P_vec_xu( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_P_vec_xu" ) ;
-
-   return ( P_vec_xu ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_P_vec_xv( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_P_vec_xv" ) ;
-
-   return ( P_vec_xv ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_P_vec_yu( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_P_vec_yu" ) ;
-
-   return ( P_vec_yu ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_P_vec_yv( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_P_vec_yv" ) ;
-
-   return ( P_vec_yv ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_P_vec_zu( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_P_vec_zu" ) ;
-
-   return ( P_vec_zu ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_P_vec_zv( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_P_vec_zv" ) ;
-
-   return ( P_vec_zv ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_local_temp_P(size_t const dir)
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_x_P" ) ;
-      return ( VEC_local_temp_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_y_P" ) ;
-      return ( VEC_local_temp_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_temp_z_P" ) ;
-      return ( VEC_local_temp_z_P ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_local_solution_temp_P(size_t const dir)
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_x_P" ) ;
-      return ( VEC_local_solution_temp_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_y_P" ) ;
-      return ( VEC_local_solution_temp_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_local_solution_temp_z_P" ) ;
-      return ( VEC_local_solution_temp_z_P ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_interface_temp_P(size_t const dir)
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_x_P" ) ;
-      return ( VEC_interface_temp_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_y_P" ) ;
-      return ( VEC_interface_temp_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_interface_temp_z_P" ) ;
-      return ( VEC_interface_temp_z_P ) ;
-   }
-
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_temp_P(size_t const dir)
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_temp_x_P" ) ;
-      return ( VEC_temp_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_temp_y_P" ) ;
-      return ( VEC_temp_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_temp_z_P" ) ;
-      return ( VEC_temp_z_P ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_rhs_DS_velocity_x( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_rhs_DS_velocity_x" ) ;
-
-   return ( VEC_rhs_velocity_1D_x[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_rhs_DS_velocity_y( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_rhs_DS_velocity_y" ) ;
-
-   return ( VEC_rhs_velocity_1D_y[comp] ) ;
-
-}
-
-
-
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_rhs_DS_velocity_z( size_t const& comp )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_rhs_DS_velocity_z" ) ;
-
-   return ( VEC_rhs_velocity_1D_z[comp] ) ;
-
-}
-
-
-
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_Aii_ref( size_t const& comp, size_t const dir)
+DDS_NavierStokesSystem::compute_Aii_ref( size_t const& comp, size_t const dir, size_t const field)
 //----------------------------------------------------------------------
 {
-   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir);
-   LA_SeqVector* Aii_super_diagonal = get_aii_super_diag(comp,dir);
-   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir);
-   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir);
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir,field);
+   LA_SeqVector* Aii_super_diagonal = get_aii_super_diag(comp,dir,field);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir,field);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir,field);
 
    size_t nrows = Aii_main_diagonal->nb_rows() ;
    double temp = Aii_main_diagonal->item(0);
@@ -1879,42 +1683,11 @@ DDS_NavierStokesSystem::compute_Aii_ref( size_t const& comp, size_t const dir)
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_Aii_ref_P( size_t const dir)
+DDS_NavierStokesSystem::compute_schlur_ref( size_t const& comp, size_t const dir, size_t const field)
 //----------------------------------------------------------------------
 {
-   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag_P(dir);
-   LA_SeqVector* Aii_super_diagonal = get_aii_super_diag_P(dir);
-   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag_P(dir);
-   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag_P(dir);
-
-   size_t nrows = Aii_main_diagonal->nb_rows() ;
-   double temp = Aii_main_diagonal->item(0);
-   Aii_mod_super_diagonal->set_item(0,Aii_super_diagonal->item(0)/temp);
-
-   //  // Perform Forward Elimination
-   size_t m;
-
-   /// Showing problem for last row elimination
-   for (m=1;m<nrows;++m) {
-      double a,b,c,prevc;
-      a=Aii_sub_diagonal->item(m-1);
-      b=Aii_main_diagonal->item(m);
-      prevc=Aii_mod_super_diagonal->item(m-1);
-
-      if (m<nrows-1){
-         c=Aii_super_diagonal->item(m);
-         Aii_mod_super_diagonal->set_item(m,c/(b - a*prevc));
-      }
-   }
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_schlur_ref( size_t const& comp, size_t const dir)
-//----------------------------------------------------------------------
-{
-   LA_SeqMatrix* schlur_complement = get_schlur_complement(comp,dir);	
-   LA_SeqMatrix* schlur_complement_ref = get_schlur_complement_ref(comp,dir);	
+   LA_SeqMatrix* schlur_complement = get_schlur_complement(comp,dir,field);	
+   LA_SeqMatrix* schlur_complement_ref = get_schlur_complement_ref(comp,dir,field);	
    size_t nrows = schlur_complement->nb_rows() ;
    double temp = schlur_complement->item(0,0);
    schlur_complement_ref-> set_item(0,0,schlur_complement->item(0,0));
@@ -1937,40 +1710,6 @@ DDS_NavierStokesSystem::compute_schlur_ref( size_t const& comp, size_t const dir
       schlur_complement_ref->set_item(m,m,b);
       schlur_complement_ref->set_item(m,m-1,a);
    }
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_schlur_ref_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   LA_SeqMatrix* schlur_complement = get_schlur_complement_P(dir);	
-   LA_SeqMatrix* schlur_complement_ref = get_schlur_complement_P_ref(dir);	
-   size_t nrows = schlur_complement->nb_rows() ;
-   double temp = schlur_complement->item(0,0);
-    // Perform Forward Elimination
-   size_t m;
-
-   schlur_complement_ref->set_item(0,0,schlur_complement->item(0,0));
-   if(nrows > 1){
-     schlur_complement_ref->set_item(0,1,schlur_complement->item(0,1)/temp);
-
-     /// Showing problem for last row elimination
-     for (m=1;m<nrows;++m)
-     {
-       double a,b,c,prevc;
-       a=schlur_complement->item(m,m-1);
-       b=schlur_complement->item(m,m);
-       c=schlur_complement->item(m,m+1);
-       prevc=schlur_complement_ref->item(m-1,m);
-
-       if(m<nrows-1)
-           schlur_complement_ref->set_item(m,m+1,c/(b - a*prevc));
-        schlur_complement_ref->set_item(m,m,b);
-        schlur_complement_ref->set_item(m,m-1,a);
-     } 
-   }
-   
 }
 
 //----------------------------------------------------------------------
@@ -2056,391 +1795,345 @@ DDS_NavierStokesSystem::mod_thomas_algorithm( LA_SeqVector* x,LA_SeqVector* y,LA
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_main_diag( size_t const& comp, size_t const dir )
+DDS_NavierStokesSystem::get_aii_main_diag( size_t const& comp, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_x" ) ;
-      return ( Aii_x_main_diagonal[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_y" ) ;
-      return ( Aii_y_main_diagonal[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_z" ) ;
-      return ( Aii_z_main_diagonal[comp] ) ;
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_P_in_x" ) ;
+         return ( Aii_x_main_diagonal_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_P_in_y" ) ;
+         return ( Aii_y_main_diagonal_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_P_in_z" ) ;
+         return ( Aii_z_main_diagonal_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_x" ) ;
+         return ( Aii_x_main_diagonal[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_y" ) ;
+         return ( Aii_y_main_diagonal[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_z" ) ;
+         return ( Aii_z_main_diagonal[comp] ) ;
+      }
    }
 }
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_main_diag_P( size_t const dir )
+DDS_NavierStokesSystem::get_aii_super_diag( size_t const& comp, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_P_in_x" ) ;
-      return ( Aii_x_main_diagonal_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_P_in_y" ) ;
-      return ( Aii_y_main_diagonal_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_main_diag_in_P_in_z" ) ;
-      return ( Aii_z_main_diagonal_P ) ;
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_x_in_P" ) ;
+         return ( Aii_x_super_diagonal_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_y_in_P" ) ;
+         return ( Aii_y_super_diagonal_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_z_in_P" ) ;
+         return ( Aii_z_super_diagonal_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_x" ) ;
+         return ( Aii_x_super_diagonal[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_y" ) ;
+         return ( Aii_y_super_diagonal[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_z" ) ;
+         return ( Aii_z_super_diagonal[comp] ) ;
+      }
    }
 }
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_super_diag( size_t const& comp, size_t const dir )
+DDS_NavierStokesSystem::get_aii_mod_super_diag( size_t const& comp, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_x" ) ;
-      return ( Aii_x_super_diagonal[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_y" ) ;
-      return ( Aii_y_super_diagonal[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_z" ) ;
-      return ( Aii_z_super_diagonal[comp] ) ;
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_x_in_P" ) ;
+         return ( Aii_x_mod_super_diagonal_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_y_in_P" ) ;
+         return ( Aii_y_mod_super_diagonal_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_z_in_P" ) ;
+         return ( Aii_z_mod_super_diagonal_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_mod_super_diag_in_x" ) ;
+         return ( Aii_x_mod_super_diagonal[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_mod_super_diag_in_y" ) ;
+         return ( Aii_y_mod_super_diagonal[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_mod_super_diag_in_z" ) ;
+         return ( Aii_z_mod_super_diagonal[comp] ) ;
+      }
    }
 }
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_super_diag_P( size_t const dir )
+DDS_NavierStokesSystem::get_aii_sub_diag( size_t const& comp, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_x_in_P" ) ;
-      return ( Aii_x_super_diagonal_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_y_in_P" ) ;
-      return ( Aii_y_super_diagonal_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_z_in_P" ) ;
-      return ( Aii_z_super_diagonal_P ) ;
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_x_in_P" ) ;
+         return ( Aii_x_sub_diagonal_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_y_in_P" ) ;
+         return ( Aii_y_sub_diagonal_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_z_in_P" ) ;
+         return ( Aii_z_sub_diagonal_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_x" ) ;
+         return ( Aii_x_sub_diagonal[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_y" ) ;
+         return ( Aii_y_sub_diagonal[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_z" ) ;
+         return ( Aii_z_sub_diagonal[comp] ) ;
+      }
+   }
+
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_aie( size_t const& comp, size_t const dir, size_t const field )
+//----------------------------------------------------------------------
+{
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_x_in_P" ) ;
+         return ( Aie_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_y_in_P" ) ;
+         return ( Aie_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_z_in_P" ) ;
+         return ( Aie_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_x" ) ;
+         return ( Aie_x[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_y" ) ;
+         return ( Aie_y[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_z" ) ;
+         return ( Aie_z[comp] ) ;
+      }
+   } 
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_aei( size_t const& comp, size_t const dir, size_t const field )
+//----------------------------------------------------------------------
+{
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_x_in_P" ) ;
+         return ( Aei_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_y_in_P" ) ;
+         return ( Aei_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_z_in_P" ) ;
+         return ( Aei_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_x" ) ;
+         return ( Aei_x[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_y" ) ;
+         return ( Aei_y[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_z" ) ;
+         return ( Aei_z[comp] ) ;
+      }
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_Aee_matrix( size_t const& comp, size_t const dir, size_t const field )
+//----------------------------------------------------------------------
+{
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_x_in_P" ) ;
+         return ( Aee_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_y_in_P" ) ;
+         return ( Aee_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_z_in_P" ) ;
+         return ( Aee_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_x" ) ;
+         return ( Aee_x[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_y" ) ;
+         return ( Aee_y[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_z" ) ;
+         return ( Aee_z[comp] ) ;
+      }
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_schlur_complement( size_t const& comp, size_t const dir, size_t const field )
+//----------------------------------------------------------------------
+{
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_x_in_P" ) ;
+         return ( schlur_complement_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_y_in_P" ) ;
+         return ( schlur_complement_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_z_in_P" ) ;
+         return ( schlur_complement_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_x" ) ;
+         return ( schlur_complement_x[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_y" ) ;
+         return ( schlur_complement_y[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_z" ) ;
+         return ( schlur_complement_z[comp] ) ;
+      }
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_schlur_complement_ref( size_t const& comp, size_t const dir, size_t const field )
+//----------------------------------------------------------------------
+{
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_x_ref_P" ) ;
+         return ( schlur_complement_x_ref_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_y_ref_P" ) ;
+         return ( schlur_complement_y_ref_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_z_ref_P" ) ;
+         return ( schlur_complement_z_ref_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_x_ref" ) ;
+         return ( schlur_complement_x_ref[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_y_ref" ) ;
+         return ( schlur_complement_y_ref[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_z_ref" ) ;
+         return ( schlur_complement_z_ref[comp] ) ;
+      }
+   }
+}
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_Aei_Aii_Aie_product( size_t const& comp, size_t const dir, size_t const field )
+//----------------------------------------------------------------------
+{
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_x_in_P" ) ;
+         return ( Aei_Aii_Aie_product_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_y_in_P" ) ;
+         return ( Aei_Aii_Aie_product_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_z_in_P" ) ;
+         return ( Aei_Aii_Aie_product_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_x" ) ;
+         return ( Aei_Aii_Aie_product_x[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_y" ) ;
+         return ( Aei_Aii_Aie_product_y[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_z" ) ;
+         return ( Aei_Aii_Aie_product_z[comp] ) ;
+      }
    }
 }
 
 //----------------------------------------------------------------------
 LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_mod_super_diag( size_t const& comp, size_t const dir )
+DDS_NavierStokesSystem::get_Aii_Aie_product( size_t const& comp, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_mod_super_diag_in_x" ) ;
-      return ( Aii_x_mod_super_diagonal[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_mod_super_diag_in_y" ) ;
-      return ( Aii_y_mod_super_diagonal[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_mod_super_diag_in_z" ) ;
-      return ( Aii_z_mod_super_diagonal[comp] ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_mod_super_diag_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_x_in_P" ) ;
-      return ( Aii_x_mod_super_diagonal_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_y_in_P" ) ;
-      return ( Aii_y_mod_super_diagonal_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_super_diag_in_z_in_P" ) ;
-      return ( Aii_z_mod_super_diagonal_P ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_sub_diag( size_t const& comp, size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_x" ) ;
-      return ( Aii_x_sub_diagonal[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_y" ) ;
-      return ( Aii_y_sub_diagonal[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_z" ) ;
-      return ( Aii_z_sub_diagonal[comp] ) ;
-   }
-
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_aii_sub_diag_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_x_in_P" ) ;
-      return ( Aii_x_sub_diagonal_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_y_in_P" ) ;
-      return ( Aii_y_sub_diagonal_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aii_sub_diag_in_z_in_P" ) ;
-      return ( Aii_z_sub_diagonal_P ) ;
-   }
-
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aie( size_t const& comp, size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_x" ) ;
-      return ( Aie_x[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_y" ) ;
-      return ( Aie_y[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_z" ) ;
-      return ( Aie_z[comp] ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aei( size_t const& comp, size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_x" ) ;
-      return ( Aei_x[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_y" ) ;
-      return ( Aei_y[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_z" ) ;
-      return ( Aei_z[comp] ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aie_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_x_in_P" ) ;
-      return ( Aie_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_y_in_P" ) ;
-      return ( Aie_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aie_in_z_in_P" ) ;
-      return ( Aie_z_P ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_aei_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_x_in_P" ) ;
-      return ( Aei_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_y_in_P" ) ;
-      return ( Aei_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aei_in_z_in_P" ) ;
-      return ( Aei_z_P ) ;
-   }
-}
-
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aee_matrix( size_t const& comp, size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_x" ) ;
-      return ( Aee_x[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_y" ) ;
-      return ( Aee_y[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_z" ) ;
-      return ( Aee_z[comp] ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aee_matrix_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_x_in_P" ) ;
-      return ( Aee_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_y_in_P" ) ;
-      return ( Aee_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_aee_in_z_in_P" ) ;
-      return ( Aee_z_P ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_schlur_complement( size_t const& comp, size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_x" ) ;
-      return ( schlur_complement_x[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_y" ) ;
-      return ( schlur_complement_y[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_z" ) ;
-      return ( schlur_complement_z[comp] ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_schlur_complement_ref( size_t const& comp, size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_x_ref" ) ;
-      return ( schlur_complement_x_ref[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_y_ref" ) ;
-      return ( schlur_complement_y_ref[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_z_ref" ) ;
-      return ( schlur_complement_z_ref[comp] ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_schlur_complement_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_x_in_P" ) ;
-      return ( schlur_complement_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_y_in_P" ) ;
-      return ( schlur_complement_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_in_z_in_P" ) ;
-      return ( schlur_complement_z_P ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_schlur_complement_P_ref( size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_x_ref_P" ) ;
-      return ( schlur_complement_x_ref_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_y_ref_P" ) ;
-      return ( schlur_complement_y_ref_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_schlur_complement_z_ref_P" ) ;
-      return ( schlur_complement_z_ref_P ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aei_Aii_Aie_product( size_t const& comp, size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_x" ) ;
-      return ( Aei_Aii_Aie_product_x[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_y" ) ;
-      return ( Aei_Aii_Aie_product_y[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_z" ) ;
-      return ( Aei_Aii_Aie_product_z[comp] ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqMatrix*
-DDS_NavierStokesSystem::get_Aei_Aii_Aie_product_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_x_in_P" ) ;
-      return ( Aei_Aii_Aie_product_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_y_in_P" ) ;
-      return ( Aei_Aii_Aie_product_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aei_Aii_Aie_product_in_z_in_P" ) ;
-      return ( Aei_Aii_Aie_product_z_P ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_Aii_Aie_product( size_t const& comp, size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_x" ) ;
-      return ( Aii_Aie_product_x[comp] ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_y" ) ;
-      return ( Aii_Aie_product_y[comp] ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_z" ) ;
-      return ( Aii_Aie_product_z[comp] ) ;
-   }
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector*
-DDS_NavierStokesSystem::get_Aii_Aie_product_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   if (dir == 0) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_x_in_P" ) ;
-      return ( Aii_Aie_product_x_P ) ;
-   } else if (dir == 1) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_y_in_P" ) ;
-      return ( Aii_Aie_product_y_P ) ;
-   } else if (dir == 2) {
-      MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_z_in_P" ) ;
-      return ( Aii_Aie_product_z_P ) ;
+   if (field == 0) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_x_in_P" ) ;
+         return ( Aii_Aie_product_x_P ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_y_in_P" ) ;
+         return ( Aii_Aie_product_y_P ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_z_in_P" ) ;
+         return ( Aii_Aie_product_z_P ) ;
+      }
+   } else if (field == 1) {
+      if (dir == 0) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_x" ) ;
+         return ( Aii_Aie_product_x[comp] ) ;
+      } else if (dir == 1) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_y" ) ;
+         return ( Aii_Aie_product_y[comp] ) ;
+      } else if (dir == 2) {
+         MAC_LABEL( "DDS_NavierStokesSystem:: get_Aii_Aie_product_in_z" ) ;
+         return ( Aii_Aie_product_z[comp] ) ;
+      }
    }
 }
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::DS_NavierStokes_local_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const dir )
+DDS_NavierStokesSystem::DS_NavierStokes_local_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_local_unknown_solver" ) ;
 
-   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir);
-   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir);
-   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir);
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir,field);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir,field);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir,field);
 
    // Solve the DS splitting problem in
    DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, rhs);
@@ -2449,12 +2142,12 @@ DDS_NavierStokesSystem::DS_NavierStokes_local_unknown_solver( LA_SeqVector* rhs,
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::DS_NavierStokes_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const dir )
+DDS_NavierStokesSystem::DS_NavierStokes_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_x_interface_unknown_solver" ) ;
 
-   LA_SeqMatrix* schlur_complement_ref = get_schlur_complement_ref(comp,dir);
+   LA_SeqMatrix* schlur_complement_ref = get_schlur_complement_ref(comp,dir,field);
 
    // Solve the DS splitting problem in
    DDS_NavierStokesSystem::thomas_algorithm( schlur_complement_ref, rhs);
@@ -2463,63 +2156,15 @@ DDS_NavierStokesSystem::DS_NavierStokes_interface_unknown_solver( LA_SeqVector* 
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::DS_NavierStokes_local_unknown_solver_P( LA_SeqVector* rhs, size_t const dir )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_local_unknown_solver_P" ) ;
-
-   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag_P(dir);
-   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag_P(dir);
-   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag_P(dir);
-
-   // Solve the DS splitting problem in x
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, rhs);
-
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_interface_unknown_solver_P( LA_SeqVector* rhs, size_t const dir )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_interface_unknown_solver_P" ) ;
-
-   LA_SeqMatrix* schlur_complement_ref = get_schlur_complement_P_ref(dir);
-
-   // Solve the DS splitting problem in x
-   DDS_NavierStokesSystem::thomas_algorithm( schlur_complement_ref, rhs);
-
-}
-
-//----------------------------------------------------------------------
-double
-DDS_NavierStokesSystem::compute_vector_transpose_product(
-  LA_SeqVector* a, LA_SeqVector* b)
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_HeatEquationSystem:: DS_HeatEquation_x_solver" ) ;
-   size_t i;
-   double result = 0.;
-   for(i=0;i<a->nb_rows();i++)
-      result += a->item(i)*b->item(i);
-
-   return result;
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_solver(
-	size_t const& j, size_t const& k, size_t const& min_i, LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const& comp, size_t const dir )
+DDS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
+	,size_t const& j, size_t const& k, size_t const& min_i, LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const& comp, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_solver" ) ;
 
-   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir);
-   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir);
-   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir);
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir,field);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir,field);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir,field);
    // Solve the DS splitting problem in
 
    DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, rhs);
@@ -2543,8 +2188,12 @@ DDS_NavierStokesSystem::DS_NavierStokes_solver(
          ii = j; jj = k; kk = i;
       }      
 
-      global_number_in_distributed_vector = UF->DOF_global_number( ii, jj, kk, comp );
-      VEC_DS_UF->set_item( global_number_in_distributed_vector, rhs->item( m ) );
+      global_number_in_distributed_vector = FF->DOF_global_number( ii, jj, kk, comp );
+      if (field == 0) {
+         VEC_DS_PF->set_item( global_number_in_distributed_vector, rhs->item( m ) );
+      } else if (field == 1) { 
+         VEC_DS_UF->set_item( global_number_in_distributed_vector, rhs->item( m ) );
+      }
    }
 
    // Put the interface unknowns in distributed vector
@@ -2557,79 +2206,21 @@ DDS_NavierStokesSystem::DS_NavierStokes_solver(
       ii = j; jj = k; kk = i;
    }
 
-   if ((is_Uperiodic[dir] == 1)) {
-      global_number_in_distributed_vector =
-      UF->DOF_global_number( ii, jj, kk, comp );
-      VEC_DS_UF->set_item( global_number_in_distributed_vector,
-           interface_rhs->item( proc_pos_in_i[dir] ) );
-   } else if ((is_Uperiodic[dir] == 0) && (proc_pos_in_i[dir] != nb_procs_in_i[dir]-1)) {
-      global_number_in_distributed_vector =
-      UF->DOF_global_number( ii, jj, kk, comp );
-      VEC_DS_UF->set_item( global_number_in_distributed_vector,
-           interface_rhs->item( proc_pos_in_i[dir] ) );
+   if ((is_periodic[field][dir] == 1)) {
+      global_number_in_distributed_vector = FF->DOF_global_number( ii, jj, kk, comp );
+      if (field == 0) {
+         VEC_DS_PF->set_item( global_number_in_distributed_vector,interface_rhs->item( proc_pos_in_i[dir] ) );
+      } else if (field == 1) {
+         VEC_DS_UF->set_item( global_number_in_distributed_vector, interface_rhs->item( proc_pos_in_i[dir] ) );
+      }
+   } else if ((is_periodic[field][dir] == 0) && (proc_pos_in_i[dir] != nb_procs_in_i[dir]-1)) {
+      global_number_in_distributed_vector = FF->DOF_global_number( ii, jj, kk, comp );
+      if (field == 0) {
+         VEC_DS_PF->set_item( global_number_in_distributed_vector,interface_rhs->item( proc_pos_in_i[dir] ) );
+      } else if (field == 1) {
+         VEC_DS_UF->set_item( global_number_in_distributed_vector, interface_rhs->item( proc_pos_in_i[dir] ) );
+      }
    }
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::DS_NavierStokes_solver_P(
-  size_t const& j, size_t const& k, size_t const& min_i, LA_SeqVector* rhs, LA_SeqVector* interface_rhs, size_t const dir )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_solver_P" ) ;
-
-   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag_P(dir);
-   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag_P(dir);
-   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag_P(dir);
-   // Solve the DS splitting problem in
-
-   DDS_NavierStokesSystem::mod_thomas_algorithm( Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, rhs);
-   
-   // Transfer in the distributed vector for pressure
-   size_t nb_local_unk = rhs->nb_rows();
-
-   // Since, this function is used in all directions;
-   // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
-   size_t ii=0,jj=0,kk=0;
-
-   size_t m, i, global_number_in_distributed_vector;
-
-   for (m=0;m<nb_local_unk;++m) {
-      i = min_i + m ;
-
-      if (dir == 0) {
-         ii = i; jj = j; kk = k;
-      } else if (dir == 1) {
-         ii = j; jj = i; kk = k;
-      } else if (dir == 2) {
-         ii = j; jj = k; kk = i;
-      }      
-
-      global_number_in_distributed_vector = PF->DOF_global_number( ii, jj, kk, 0 );
-      VEC_DS_PF->set_item( global_number_in_distributed_vector, rhs->item( m ) );
-   }
-
-   // Put the interface unknowns in distributed vector for pressure
-   i = min_i + nb_local_unk ;
-   if (dir == 0) {
-      ii = i; jj = j; kk = k;
-   } else if (dir == 1) {
-      ii = j; jj = i; kk = k;
-   } else if (dir == 2) {
-      ii = j; jj = k; kk = i;
-   }
-
-   if ((is_Pperiodic[dir] == 1)) {
-      global_number_in_distributed_vector =
-      PF->DOF_global_number( ii, jj, kk, 0 );
-      VEC_DS_PF->set_item( global_number_in_distributed_vector,
-         interface_rhs->item( proc_pos_in_i[dir] ) );
-   } else if ((is_Pperiodic[dir] == 0) && (proc_pos_in_i[dir] != nb_procs_in_i[dir]-1)) {
-      global_number_in_distributed_vector =
-      PF->DOF_global_number( ii, jj, kk, 0 );
-      VEC_DS_PF->set_item( global_number_in_distributed_vector,
-         interface_rhs->item( proc_pos_in_i[dir] ) );
-   } 
 }
 
 //----------------------------------------------------------------------
@@ -2664,18 +2255,18 @@ DDS_NavierStokesSystem::synchronize_DS_solution_vec_P( void )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_product_matrix_interior(size_t const& comp, size_t const column, size_t const dir)
+DDS_NavierStokesSystem::compute_product_matrix_interior(size_t const& comp, size_t const column, size_t const dir, size_t const field)
 //----------------------------------------------------------------------
 {
-   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir);
-   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir);
-   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir);
-   LA_SeqVector* product_result = get_product_result(comp,dir);
-   LA_SeqVector* Aii_Aie = get_Aii_Aie_product(comp,dir);
-   LA_SeqMatrix* Aei_Aii_Aie = get_Aei_Aii_Aie_product(comp,dir);
+   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag(comp,dir,field);
+   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag(comp,dir,field);
+   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag(comp,dir,field);
+   LA_SeqVector* product_result = get_product_result(comp,dir,field);
+   LA_SeqVector* Aii_Aie = get_Aii_Aie_product(comp,dir,field);
+   LA_SeqMatrix* Aei_Aii_Aie = get_Aei_Aii_Aie_product(comp,dir,field);
 
-   LA_SeqMatrix* Aie = get_aie(comp,dir);
-   LA_SeqMatrix* Aei = get_aei(comp,dir);
+   LA_SeqMatrix* Aie = get_aie(comp,dir,field);
+   LA_SeqMatrix* Aei = get_aei(comp,dir,field);
 
 
   // Get appropriate column of Aie
@@ -2701,7 +2292,7 @@ DDS_NavierStokesSystem::compute_product_matrix_interior(size_t const& comp, size
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_product_matrix( size_t const& comp, size_t const dir )
+DDS_NavierStokesSystem::compute_product_matrix( size_t const& comp, size_t const dir, size_t const field )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix" ) ;
@@ -2714,83 +2305,17 @@ DDS_NavierStokesSystem::compute_product_matrix( size_t const& comp, size_t const
    if (proc_pos == nb_procs - 1){
       // Condition for serial processor and multi processor
       if (proc_pos == 0) {
-         compute_product_matrix_interior(comp,proc_pos,dir);
+         compute_product_matrix_interior(comp,proc_pos,dir,field);
       } else {
-         compute_product_matrix_interior(comp,proc_pos-1,dir);
-         if (is_Uperiodic[dir] == 1) compute_product_matrix_interior(comp,proc_pos,dir);
+         compute_product_matrix_interior(comp,proc_pos-1,dir,field);
+         if (is_periodic[field][dir] == 1) compute_product_matrix_interior(comp,proc_pos,dir,field);
       }
    }else if(proc_pos == 0){
-      compute_product_matrix_interior(comp,proc_pos,dir);
-      if (is_Uperiodic[dir] == 1) compute_product_matrix_interior(comp,nb_procs-1,dir);
+      compute_product_matrix_interior(comp,proc_pos,dir,field);
+      if (is_periodic[field][dir] == 1) compute_product_matrix_interior(comp,nb_procs-1,dir,field);
    }else{
-      compute_product_matrix_interior(comp,proc_pos-1,dir);
-      compute_product_matrix_interior(comp,proc_pos,dir);
-   }
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_product_matrix_interior_P(size_t const column, size_t const dir)
-//----------------------------------------------------------------------
-{
-   LA_SeqVector* Aii_main_diagonal = get_aii_main_diag_P(dir);
-   LA_SeqVector* Aii_mod_super_diagonal = get_aii_mod_super_diag_P(dir);
-   LA_SeqVector* Aii_sub_diagonal = get_aii_sub_diag_P(dir);
-   LA_SeqVector* product_result = get_product_result_P(dir);
-   LA_SeqVector* Aii_Aie = get_Aii_Aie_product_P(dir);
-   LA_SeqMatrix* Aei_Aii_Aie = get_Aei_Aii_Aie_product_P(dir);
-
-   LA_SeqMatrix* Aie = get_aie_P(dir);
-   LA_SeqMatrix* Aei = get_aei_P(dir);
-
-
-  // Get appropriate column of Aie
-  Aie->extract_col(column, product_result);
-
-  // Get inv(Aii)*Aie for for appropriate column of Aie
-  mod_thomas_algorithm(Aii_sub_diagonal,Aii_main_diagonal,Aii_mod_super_diagonal, product_result);
-
-  // Get product of Aei*inv(Aii)*Aie for appropriate column
-  Aei->multiply_vec_then_add(product_result,Aii_Aie);
-
-  size_t nb_procs;
-
-  nb_procs = nb_procs_in_i[dir];
-
-  size_t int_unknown = Aii_Aie->nb_rows();
-
-  for (size_t i = 0; i < int_unknown; i++){
-      Aei_Aii_Aie->set_item(i,column,Aii_Aie->item(i));
-  }
-
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokesSystem::compute_product_matrix_P( size_t const dir )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix" ) ;
-
-   size_t proc_pos, nb_procs;
-
-   proc_pos = proc_pos_in_i[dir];
-   nb_procs = nb_procs_in_i[dir];
-
-   if (proc_pos == nb_procs - 1){
-      // Condition for serial processor and multi processor
-      if (proc_pos == 0) {
-         compute_product_matrix_interior_P(proc_pos,dir);
-      } else {
-         compute_product_matrix_interior_P(proc_pos-1,dir);
-         if (is_Pperiodic[dir] == 1) compute_product_matrix_interior_P(proc_pos,dir);
-      }
-   }else if(proc_pos == 0){
-      compute_product_matrix_interior_P(proc_pos,dir);
-      if (is_Pperiodic[dir] == 1) compute_product_matrix_interior_P(nb_procs-1,dir);
-   }else{
-      compute_product_matrix_interior_P(proc_pos-1,dir);
-      compute_product_matrix_interior_P(proc_pos,dir);
+      compute_product_matrix_interior(comp,proc_pos-1,dir,field);
+      compute_product_matrix_interior(comp,proc_pos,dir,field);
    }
 }
 
