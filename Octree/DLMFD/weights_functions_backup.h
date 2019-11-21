@@ -3165,12 +3165,12 @@ void assign_dial_fd_boundary (particle * p, const coord posb, const GeomParamete
   size_t  isin_xp = 0, isin_yp = 0;
   double RDelta = Delta / 100.;
   
-  if (!(p->iscube) && !(p->iswall)) {
+  if ( p->shape == SPHERE || p->shape == CIRCULARCYLINDER2D ) {
     isin_xp = is_it_in_sphere (posb.x + RDelta, posb.y, posb.z, gp);
     isin_yp = is_it_in_sphere (posb.x, posb.y + RDelta, posb.z, gp);
   }
 
-  if (p->iscube) {
+  if ( p->shape == CUBE ) {
     coord checkpt = {posb.x + RDelta, posb.y, posb.z};
     isin_xp = is_it_in_cube_v2 (&(p->g.u1), &(p->g.v1), &(p->g.w1), &(p->g.mins), &(p->g.maxs), &checkpt);
 
@@ -3204,7 +3204,7 @@ void assign_dial_fd_boundary (particle * p, const coord posb, const GeomParamete
 #elif dimension == 3
   size_t isin_zp = 0;
 
-  if (!(p->iscube) && !(p->iswall)) {
+  if ( p->shape == SPHERE || p->shape == CIRCULARCYLINDER2D ) {
     isin_zp = is_it_in_sphere (posb.x, posb.y, posb.z + RDelta, gp);
   }
   coord checkpt;
@@ -3212,7 +3212,7 @@ void assign_dial_fd_boundary (particle * p, const coord posb, const GeomParamete
   checkpt.y = posb.y;
   checkpt.z  = posb.z + RDelta;
   
-  if (p->iscube)
+  if ( p->shape == CUBE )
     isin_zp = is_it_in_cube_v2 (&(p->g.u1), &(p->g.v1), &(p->g.w1), &(p->g.mins), &(p->g.maxs), &checkpt);
   
   if (isin_zp) {

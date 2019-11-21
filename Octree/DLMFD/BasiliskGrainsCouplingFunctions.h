@@ -183,12 +183,14 @@ void UpdateParticlesBasilisk( struct BasiliskDataStructure * b, particle * p,
     
     p[k].g = gg;
 
-    // In case of a cube
+    // Rigid body shape: only cube or sphere so far
     if ( gg.ncorners == 8 ) 
     {
-      p[k].iscube = 1;
+      p[k].shape = CUBE;
       compute_principal_vectors_Cubes( &(p[k]) );
     }
+    else
+      p[k].shape = SPHERE;
     
 #if DLM_Moving_particle    
     /* Velocities */

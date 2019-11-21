@@ -24,6 +24,26 @@
 #     endif
 #   endif
 # endif
+
+
+// Define the factor alpha (generally between 1 and 2) that is involved 
+// in the inter- boundary point distance on the rigid body surface
+# ifndef INTERBPCOEF
+#   define INTERBPCOEF 2.
+# endif 
+
+
+
+
+// Different rigid body shapes supported       
+enum RigidBodyShape {
+  SPHERE,
+  CIRCULARCYLINDER2D,
+  CUBE,
+  WALL
+};
+
+
  
 
 /** Structure for the coordinates of the fictitious domain's
@@ -73,16 +93,22 @@ typedef struct {
   coord w, wnm1, qw, tw;
 #endif
 #endif
-  size_t pnum, iswall, iscube;
+  size_t pnum;
   coord wallmax, wallmin, wallpos;
   coord imposedU, imposedw;
   Cache Interior;
   Cache reduced_domain;
   coord adforce;
   long tcells, tmultipliers;
+  enum RigidBodyShape shape;
 } particle;
 
 
+
+
+# include "CircularCylinder2D.h"
+# include "Sphere.h"
+# include "Cube.h"
 
 
 /** Function that allocates in memory the SolidBodyBoundary
@@ -91,11 +117,12 @@ void allocate_SolidBodyBoundary (SolidBodyBoundary *sbm, const int m)
 {
   sbm->x = (double*) calloc( m, sizeof(double)); 
   sbm->y = (double*) calloc( m, sizeof(double));
-  
-  if ( dimension == 3 )
+
+# if dimension == 3  
     sbm->z = (double*) calloc( m, sizeof(double));
-  else
+# else
     sbm->z = NULL;
+# endif
 
   sbm->m = m;
 }
@@ -108,8 +135,9 @@ void reallocate_SolidBodyBoundary (SolidBodyBoundary *sbm, const int m)
   sbm->x = (double*) realloc (sbm->x, m*sizeof(double)); 
   sbm->y = (double*) realloc (sbm->y, m*sizeof(double));
   
-  if (dimension == 3)
+# if dimension == 3 
     sbm->z = (double*) realloc (sbm->z, m*sizeof(double));
+# endif    
   
   sbm->m = m;
 }
@@ -123,7 +151,9 @@ void free_SolidBodyBoundary (SolidBodyBoundary *sbm)
 {
   free(sbm->x); sbm->x = NULL;
   free(sbm->y); sbm->y = NULL;
-  if ( dimension == 3 ){free(sbm->z); sbm->z = NULL;}
+# if dimension == 3 
+    free(sbm->z); sbm->z = NULL;
+# endif 
 }
 
 
@@ -137,417 +167,6 @@ void allocate_Cache (Cache * p)
   if (p->n >= p->nm) {
     p->p = (Index *) calloc (5, sizeof(int));
   }
-}
-
-
-
-
-/** Set of functions for the sphere/circle as fictitious domain */
-void compute_nboundary (const GeomParameter gcp, int * nb) 
-{
-  coord pos[6];
-  Cache poscache = {0};
-  Point lpoint;
-   
-  pos[0].x = gcp.center.x + gcp.radius + X0;
-  pos[0].y = gcp.center.y + Y0;
-
-  pos[1].x = gcp.center.x - gcp.radius + X0;
-  pos[1].y = gcp.center.y + Y0;
-
-  pos[2].x = gcp.center.x + X0;
-  pos[2].y = gcp.center.y + gcp.radius + Y0;
-
-  pos[3].x = gcp.center.x + X0;
-  pos[3].y = gcp.center.y - gcp.radius + Y0;
-
-
-  
-#if dimension == 3
-  pos[0].z = gcp.center.z + Z0;
-  pos[1].z = gcp.center.z + Z0;
-  pos[2].z = gcp.center.z + Z0;
-  pos[3].z = gcp.center.z + Z0;
-  pos[4].x = gcp.center.x + X0;
-  pos[4].y = gcp.center.y + Y0;
-  
-  pos[4].z = gcp.center.z + gcp.radius + Z0;
-  pos[5].x = gcp.center.x + X0;
-  pos[5].y = gcp.center.y + Y0;
-  pos[5].z = gcp.center.z - gcp.radius + Z0;
-#endif
-  
-  *nb = 0;
-  lpoint.level = -1;
-  int ip = 0;
-  
-  /* We assume that around the sphere at least one point has to be at
-     maximum level of refinement. */
-  for (ip = 0; ip < dimension*2; ip++) {
-#if dimension == 3
-    lpoint = locate (pos[ip].x, pos[ip].y, pos[ip].z);
-#elif dimension ==2 
-    lpoint = locate (pos[ip].x, pos[ip].y);
-#endif
-    if (lpoint.level == depth())
-      break;
-  }
-  
-  /** Multiple threads can have a different point at the same level of
-      refinement. This is fine, they will do the same computation for
-      *nb. This problem does not exist in serial but the code below
-      still works. */
-  if (lpoint.level == depth()) {
-           
-    /** Only this thread creates the Cache ... */
-    cache_append(&poscache, lpoint, 0);
-
-    /** and only this thread computes the number of boundary points
-	... */
-    foreach_cache(poscache) {
-#if dimension == 2
-      *nb += (int){floor(gcp.radius*2*pi/(sqrt(2)*Delta))};
-#elif dimension == 3
-      *nb += (int){floor(pow( 3.809 * gcp.radius / (sqrt(3)*Delta), 2.))};
-#endif
-    }
-    /** and finally, this thread destroys the cache. */
-    
-    free(poscache.p);
-  }
-
-#if _MPI
-  MPI_Barrier(MPI_COMM_WORLD);
-  mpi_all_reduce (*nb, MPI_INT, MPI_MAX);
-#endif
-    
-  
-  if(*nb == 0)
-    printf("nboundary = 0: No boundary points !!!\n");
-}
-
-
-
-
-void create_FD_Interior_Particle (particle * p, vector Index_lambda, 
-	vector shift, scalar flag) 
-{
-  GeomParameter gci = p->g;
-  Cache * fd = &(p->Interior);
-  
-  /** Create the cache for the interior points */
-  foreach() {
-#if dimension == 2
-    if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0))) 
-	< sq(gci.radius)) 
-    {
-      cache_append (fd, point, 0);
-      
-      /* tagg cell with the number of the particle */
-      if ((int)Index_lambda.y[] == -1)
-	Index_lambda.y[] = p->pnum; 
-    }
-
-    if (Period.x) {
-      if ((sq(x - L0 - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0))) 
-	< sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	
-    	/* tagg cell with the number of the particle */
-    	if ((int)Index_lambda.y[] == -1) 
-    	  Index_lambda.y[] = p->pnum;
-	if ((int)Index_lambda.y[] == p->pnum)
-	  shift.x[] = L0;
-      }
-      if ((sq(x + L0 - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0))) 
-      	< sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-
-	/* tagg cell with the number of the particle */
-    	if ((int)Index_lambda.y[] == -1) 
-    	  Index_lambda.y[] = p->pnum;
-	if ((int)Index_lambda.y[] == p->pnum)
-	  shift.x[] = -L0;
-      }
-    }
-   
-    if (Period.y) {
-      if ((sq(x - (gci.center.x + X0)) + sq(y - L0 - (gci.center.y + Y0))) 
-      	< sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	
-	/* tagg cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.y[] = L0;
-	}
-      }
-      if ((sq(x - (gci.center.x + X0)) + sq(y + L0 - (gci.center.y + Y0))) 
-      	< sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	
-	/* tagg cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.y[] = -L0;
-	}
-      }
-    }    
-#endif
-    
-#if dimension == 3
-    if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0)) 
-    	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
-    {
-      cache_append (fd, point, 0);
-      /* tagg cell with the number of the particle */
-      if ((int)Index_lambda.y[] == -1)
-	Index_lambda.y[] = p->pnum;
-    }
-    if (Period.x) {
-      if ((sq(x - L0 - (gci.center.x + X0) ) + sq(y - (gci.center.y + Y0)) 
-      	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-    	/* tagg cell with the number of the particle */
-    	if ((int)Index_lambda.y[] == -1) 
-    	  Index_lambda.y[] = p->pnum;
-	if ((int)Index_lambda.y[] == p->pnum)
-	  shift.x[] = L0;
-      }
-	if ((sq(x + L0 - (gci.center.x + X0) ) + sq(y - (gci.center.y + Y0)) 
-	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-    	/* tagg cell with the number of the particle */
-    	if ((int)Index_lambda.y[] == -1) 
-    	  Index_lambda.y[] = p->pnum;
-	if ((int)Index_lambda.y[] == p->pnum)
-	  shift.x[] = -L0;
-      }
-    }
-   
-    if (Period.y) {
-      if ((sq(x - (gci.center.x + X0)) + sq(y - L0 - (gci.center.y + Y0)) 
-      	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	/* tagg cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.y[] = L0;
-	}
-      }
-      if ((sq(x - (gci.center.x + X0)) + sq(y + L0 - (gci.center.y + Y0)) 
-      	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	/* tagg cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.y[] = -L0;
-	}
-      }
-    }
-
-    if (Period.z) {
-      if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0)) 
-      	+ sq(z - L0 - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	/* tagg cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.z[] = L0;
-	}
-      }
-      if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0)) 
-      	+ sq(z + L0 - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	/* tagg cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.z[] = -L0;
-	}
-      }
-    }
-#endif
-    
-  }
-  cache_shrink (fd);
-}
-
-
-
-
-void create_FD_Boundary_Particle (GeomParameter gcp, 
-	SolidBodyBoundary * dlm_bd, const int nsphere, vector pshift) 
-{
-
-  int m = nsphere;
-  coord pos;
-  Point lpoint;
-  
-  coord shift = {0., 0., 0.};
-  coord ori = {X0, Y0, Z0};
- 
-#if dimension == 2
-  int i;
-  double theta[m];
-  double radius  = gcp.radius;
-  coord fact_theta[m];
-
-  
-  for (i = 0; i < m; i++) {
-    theta[i] = i*2*pi/m; 
-    fact_theta[i].x = cos (theta[i]);
-    fact_theta[i].y = sin (theta[i]);
-    
-    /* Assign positions x,y on a circle's boundary */ 
-    pos.x = radius*fact_theta[i].x + gcp.center.x + X0;
-    pos.y = radius*fact_theta[i].y + gcp.center.y + Y0;
-
-    /* Check if the point falls outside of the domain */
-    foreach_dimension() {
-      if (Period.x) {
-	shift.x = 0.;
-	if (pos.x > (L0 + ori.x)) {
-	  pos.x -= L0;
-	  shift.x = -L0;
-	} 
-	if (pos.x < (0. + ori.x)) {
-	  pos.x += L0;
-	  shift.x = L0;
-	}
-      }
-      dlm_bd->x[i] = pos.x; 
-    }
-
-   
-    Cache poscache = {0};
-    lpoint = locate (pos.x, pos.y);
-
-    if (lpoint.level > -1) {
-	
-      cache_append (&poscache, lpoint, 0);
-
-      foreach_cache (poscache) {
-	foreach_dimension() {
-	  pshift.x[] = shift.x;
-	}
-      }
-      
-      free (poscache.p);
-    }
-  }
-  
-#elif dimension == 3
-
-  /* Lay out points on a sphere with a Z oriented spiral scheme */
-  /* This portion of code is recovered from Peligriff and adapted */
-  /* More information of this method can be found at: */
-  /* Saff, E. & Kuijlaars, A. Distributing many points on a sphere The
-     Mathematical Intelligencer, 1997 */
-  
-  double spiral_spacing_correction = 0;
-  foreach_level(depth()) 
-     spiral_spacing_correction = 2.*Delta/sqrt(3.); 
-  
-  double hydro_radius = gcp.radius;
-  size_t k;
-  
-  /* Number of points */
-  size_t NSpiral = m;      
-    
-  /* Spiral points construction */
-  double hk, thetak, phik, phikm1 = 0., TwoPi = 2. * pi, 
-    Cspiral = 3.6 / sqrt( NSpiral ), dphi = 0.;
-
-  for (k = 0; k < NSpiral; ++k) {
-    hk = - 1. + 2. * (double)(k) / ( NSpiral - 1. );
-    thetak = acos( hk ) ;
-    if ( k == 0 ) {
-      phik = 0.;
-      thetak = pi - 0.5 * spiral_spacing_correction / hydro_radius ;
-    }      
-    else if ( k == NSpiral - 1 ) {
-      phik = phikm1 + 1. * dphi; 
-      if ( phik > TwoPi ) phik -= TwoPi ;
-      thetak = 0.5 * spiral_spacing_correction / hydro_radius ;        
-    }          
-    else {
-      dphi = Cspiral / sqrt( 1. - hk * hk ) ;
-      phik = phikm1 + dphi ;
-      if ( phik > TwoPi ) phik -= TwoPi ;  
-    }   
-
-    phikm1 = phik ;
-         
-    if ( k == 1 ) thetak -= 0.4 * spiral_spacing_correction / hydro_radius ;
-    
-    if ( k == NSpiral - 2 ) {
-      phik -= 0.1 * dphi ;
-      thetak += 0.25 * spiral_spacing_correction / hydro_radius ; 
-    }
-      
-    pos.x = hydro_radius * cos( phik ) * sin( thetak ) + gcp.center.x + X0;
-    pos.y = hydro_radius * sin( phik ) * sin( thetak ) + gcp.center.y + Y0;
-    pos.z = hydro_radius * cos( thetak ) + gcp.center.z + Z0;
-
-    
-    
-    foreach_dimension() {
-      if (Period.x) {
-	shift.x = 0.;
-	if (pos.x > (L0 + ori.x)) {
-	  pos.x -= L0;
-	  shift.x = -L0;
-	} 
-	if (pos.x < (0. + ori.x)) {
-	  pos.x += L0;
-	  shift.x = L0;
-	}
-      }
-    }
-    
-    
-    Cache poscache = {0};
-    /* find the cell of this multiplier */
-    lpoint = locate (pos.x, pos.y, pos.z);
-
-    if (lpoint.level > -1) {
-	
-      cache_append(&poscache, lpoint, 0);
-
-      foreach_cache(poscache) {
-	foreach_dimension() {
-	  pshift.x[] = shift.x;
-	}
-      }
-      
-      free(poscache.p);
-    }
-    
-
-      
-    dlm_bd->x[k] = pos.x;
-    dlm_bd->y[k] = pos.y;
-    dlm_bd->z[k] = pos.z;
-
-  }
-#endif
-  boundary((scalar*){pshift});
 }
 
 
@@ -622,457 +241,6 @@ void compute_nboundary_Wall (coord wallpos, int * nb)
     mindelta = Delta;
 
   *nb = floor(wallpos.x/mindelta);    
-}
-
-
-
-
-/** Set of functions for the cube as fictitious domain */
-void compute_nboundary_Cube_v2 (GeomParameter * gcp, int * nb, int * lN) 
-{
-  Cache poscache = {0};
-  Point lpoint;
-  *nb = 0;
-  coord pos = {0., 0., 0.};
-  int ip = 0;
-
-  while (*nb == 0) {
-    pos.x = gcp->cornersCoord[ip][0];
-    pos.y = gcp->cornersCoord[ip][1];
-    
-#if dimension == 3
-    pos.z = gcp->cornersCoord[ip][2];
-    lpoint = locate(pos.x, pos.y, pos.z);
-#elif dimension ==2
-    lpoint = locate(pos.x, pos.y);
-#endif
-   
-
-    /** Only one thread has the point in its domain (works in serial
-	too). */
-    if (lpoint.level > -1) {
-    
-      /** Only this thread creates the Cache ... */
-      cache_append(&poscache, lpoint, 0);
-
-      /** and only this thread computes the number of boundary points
-	  ... */
-    
-      /* Grains sends an equivalent radius that is  multiplied by sqrt(3)/2 */
-      double lengthedge = 2.*(gcp->radius)/sqrt(3.);
-    
-      /* printf ("lengthedge = %f on thread %d\n", lengthedge, pid() ); */
-      foreach_cache (poscache) {
-	*lN = floor (sqrt(3.)*lengthedge/(2.*Delta));
-	//*lN = floor (lengthedge/(2.*Delta));
-      }
-#if dimension == 2
-      /* number of points required for the 4 edges of the square */
-      *nb += (*lN-2)*4;
-      /* number of points required for the face */
-      *nb += (*lN-2)*(*lN-2);
-      /* number of points required for the 4 corners */
-      *nb += 4;
-#elif dimension == 3
-      /* number of points required for the 12 edges of the cube */
-      *nb += (*lN-2)*12;
-      /* number of points required for the 6 faces of the cube */
-      *nb += 6*(*lN-2)*(*lN-2);
-      /* number of points required for the 8 corners */
-      *nb += 8;
-#endif
-      
-      /** and finally, this thread destroys the cache. */
-      free(poscache.p);
-    }
-  
-#if _MPI
-    MPI_Barrier(MPI_COMM_WORLD);
-    mpi_all_reduce(*nb, MPI_INT, MPI_MAX);
-    mpi_all_reduce(*lN, MPI_INT, MPI_MAX);
-#endif
-    if (ip < gcp->ncorners)
-      ip++;
-    else
-      break;
-  }
-  
-  /* printf("lN number of points for a complete edge:%d\n",*lN); */
-  if (*nb == 0)
-    fprintf(stderr,"nboundary = 0: No boundary points for the"
-    	" cube/square !!!\n");
-}
-
-
-
-
-void distribute_points_edge_Cube_v2 (coord const corner1, coord const corner2, 
-	SolidBodyBoundary * dlm_bd, int const lN, int const istart) 
-{
-# if dimension == 3 
-  if (lN > 0) {
-    coord dinc; 
-
-    foreach_dimension() {
-      dinc.x = (corner2.x - corner1.x)/(lN-1);
-    }
-    /* printf( "length edge corner to corner = %f\n", 
-    	sqrt( sq(corner2.x - corner1.x) + sq(corner2.y - corner1.y)
-	+ sq(corner2.z - corner1.z))); */
-    for (int i = 1; i <= lN-2; i++) {
-      dlm_bd->x[istart + i -1] = corner1.x + (double)i * dinc.x; 
-      dlm_bd->y[istart + i -1] = corner1.y + (double)i * dinc.y;
-      dlm_bd->z[istart + i -1] = corner1.z + (double)i * dinc.z;
-    }
-  }
-#endif
-}
-
-
-
-
-bool is_it_in_cube_v2 (coord * u, coord * v, coord * w, coord * mins, 
-	coord * maxs, coord * checkpt) 
-{
-  
-  /* a point x with coord (x,y,z) lies in the rectangle if the 3
-     following conditions are satisfied */
-  /* 1- u.p0 <= u.x <= u.p3 */
-  /* 2- v.p0 <= v.x <= v.p1 */
-  /* 3- w.p0 <= w.w <= w.p4 */
-  double x = checkpt->x;
-  double y = checkpt->y;
-  double z = checkpt->z;
-  double checkval = 0.;
-  coord u1 = *u;
-  coord v1 = *v;
-  coord w1 = *w;
-  coord cpt = {0., 0., 0.};
-  bool isin = false;
-  
-  checkval = u1.x*x + u1.y*y + u1.z*z;
-  cpt.x = checkval;
-
-  checkval = v1.x*x + v1.y*y + v1.z*z;
-  cpt.y = checkval; 
-
-  checkval = w1.x*x + w1.y*y + w1.z*z;
-  cpt.z = checkval;
-
-  if ((cpt.x >= maxs->x) && (cpt.x <= mins->x) && (cpt.y >= maxs->y) 
-  	&& (cpt.y <= mins->y) && (cpt.z >= maxs->z) && (cpt.z <= mins->z) )
-    isin = true;
-
-  return isin;
-}
-
-
-
-
-void compute_principal_vectors_Cubes (particle * p) 
-{
-  GeomParameter * gcp = &(p->g);
-  int nfaces = gcp->allFaces;
-  int npoints;
-
-  /* get the 3 directions u1, u2, u3 of the cube with such that */
-  /* u1 = corner0 - corner3; */
-  /* u2 = corner0 - corner1; */
-  /* u3 = corner0 - corner4; */
-  coord corner0 = {0, 0, 0}, corner1 = {0, 0, 0}, corner3 = {0, 0, 0}, corner4 = {0, 0, 0};
-  coord u1, v1, w1;
-  coord mins, maxs;
-  
-  /* find the coordinates of these 4 corners */
-  for (int i = 0; i < nfaces; i++) {
-    npoints = gcp->numPointsOnFaces[i];
-    
-    for (int j = 0; j < npoints; j++) {
-      /* printf("index = %lu\n", gcp->cornersIndex[i][j]); */
-      if (gcp->cornersIndex[i][j] == 0) {
-	long int ii = gcp->cornersIndex[i][j];
-	corner0.x = gcp->cornersCoord[ii][0];
-	corner0.y = gcp->cornersCoord[ii][1];
-	corner0.z = gcp->cornersCoord[ii][2];
-	/* printf("index = %lu with coordinate (%f,%f,%f)\n", 
-		gcp->cornersIndex[i][j], corner0.x, corner0.y, corner0.z); */
-      }
-      if (gcp->cornersIndex[i][j] == 1) {
-	long int ii = gcp->cornersIndex[i][j];
-	corner1.x = gcp->cornersCoord[ii][0];
-	corner1.y = gcp->cornersCoord[ii][1];
-	corner1.z = gcp->cornersCoord[ii][2];
-	/* printf("index = %lu with coordinate (%f,%f,%f)\n", 
-		gcp->cornersIndex[i][j], corner1.x, corner1.y, corner1.z); */
-      }
-      if (gcp->cornersIndex[i][j] == 3) {
-	long int ii = gcp->cornersIndex[i][j];
-	corner3.x = gcp->cornersCoord[ii][0];
-	corner3.y = gcp->cornersCoord[ii][1];
-	corner3.z = gcp->cornersCoord[ii][2];
-	/* printf("index = %lu with coordinate (%f,%f,%f)\n", 
-		gcp->cornersIndex[i][j], corner3.x, corner3.y, corner3.z); */
-      }
-      if (gcp->cornersIndex[i][j] == 4) {
-	long int ii = gcp->cornersIndex[i][j];
-	corner4.x = gcp->cornersCoord[ii][0];
-	corner4.y = gcp->cornersCoord[ii][1];
-	corner4.z = gcp->cornersCoord[ii][2];
-	/* printf("index = %lu with coordinate (%f,%f,%f)\n", 
-		gcp->cornersIndex[i][j], corner4.x, corner4.y, corner4.z); */
-      }
-    }  
-  }
-
-  foreach_dimension() {
-    u1.x = corner0.x - corner3.x;
-    v1.x = corner0.x - corner1.x;
-    w1.x = corner0.x - corner4.x;
-    mins.x = 0.;
-    maxs.x = 0.;
-  }
-  
-  gcp->u1 = u1;
-  gcp->v1 = v1;
-  gcp->w1 = w1;
-  
-  double minval = 0., maxval = 0.;
-
-  foreach_dimension() {
-    minval += u1.x*corner0.x;
-    maxval += u1.x*corner3.x;
-  }
-
-  mins.x = (minval); maxs.x = (maxval);
-
-  minval = 0; maxval = 0;
-  foreach_dimension() {
-    minval += v1.x*corner0.x;
-    maxval += v1.x*corner1.x;
-  }
-  
-  mins.y = (minval); maxs.y = (maxval);
-
-  minval = 0; maxval = 0;
-  foreach_dimension() {
-    minval += w1.x*corner0.x;
-    maxval += w1.x*corner4.x;
-  }
-  
-  mins.z = (minval); maxs.z = (maxval);
-
-
-  gcp->mins = mins;
-  gcp->maxs = maxs;
-  
-}
-
-/* void compute_principal_mins_maxs_Cubes (particle * p) { */
-/*   GeomParameter * gcp = &(p->g); */
-/*   coord u1 = gcp->u1; */
-/*   coord v1 = gcp->v1; */
-/*   coord w1 = gcp->w1; */
-  
-/* } */
-
-
-
-
-void create_FD_Boundary_Cube_v2 (GeomParameter * gcp, 
-	SolidBodyBoundary * dlm_bd, const int m, const int lN, vector pshift) 
-{
-  int nfaces = gcp->allFaces;
-  int iref, i1, i2, ichoice;
-
-  ichoice = 0;
-  int isb = 0;
-  int npoints;
-
-  /* Add first interrior points on surfaces */
-  for (int i = 0; i < nfaces; i++) {
-    npoints = gcp->numPointsOnFaces[i];
-    
-    iref = gcp->cornersIndex[i][ichoice];
-    i1 = gcp->cornersIndex[i][ichoice + 1];
-    i2 = gcp->cornersIndex[i][npoints-1];
-
-    /* printf("on face %d, iref = %d, i1 = %d, i2 = %d\n", i, iref, i1, i2); */
-    coord refcorner = {gcp->cornersCoord[iref][0], gcp->cornersCoord[iref][1],
-    	gcp->cornersCoord[iref][2]} ; 
-
-    coord dir1 = {gcp->cornersCoord[i1][0], gcp->cornersCoord[i1][1],
-    	gcp->cornersCoord[i1][2]};
-
-    coord dir2 = {gcp->cornersCoord[i2][0], gcp->cornersCoord[i2][1],
-    	gcp->cornersCoord[i2][2]};
-    
-    /* printf ("corresponding coord for ref = (%f,%f,%f)\n",refcorner.x, 
-    	refcorner.y, refcorner.z); */
-    /* printf ("corresponding coord for i1 = (%f,%f,%f)\n", dir1.x, dir1.y, 
-    	dir1.z); */
-    /* printf ("corresponding coord for i2 = (%f,%f,%f)\n", dir2.x, dir2.y, 
-    	dir2.z); */
-    
-    foreach_dimension() {
-      dir1.x -= refcorner.x;
-      dir2.x -= refcorner.x;
-      dir1.x /= (lN-1);
-      dir2.x /= (lN-1);
-    }
-       
-    for (int ii = 1; ii <= lN-2; ii++) {
-      for (int jj = 1; jj <= lN-2; jj++) { 
-
-	dlm_bd->x[isb] = refcorner.x + (double) ii * dir1.x 
-		+ (double) jj * dir2.x;
-
-	dlm_bd->y[isb] = refcorner.y + (double) ii * dir1.y 
-		+ (double) jj * dir2.y;
-
-	dlm_bd->z[isb] = refcorner.z + (double) ii * dir1.z 
-		+ (double) jj * dir2.z;
-	isb++;
-      }
-    }
-  }
-
-  int allindextable[8][8] = {{0}};
-  int j1,jm1;
-
-  
-  /* Add points on the edges without the corners*/
-  for (int i = 0; i < nfaces; i++) {
-    npoints = gcp->numPointsOnFaces[i];
-    i1 = gcp->cornersIndex[i][1];
-
-    for (int j = 1; j < npoints; j++) {
-      jm1 = gcp->cornersIndex[i][j-1];
-      j1 = gcp->cornersIndex[i][j];
-      if (jm1 > j1) {
-	if (allindextable[jm1][j1] == 0) {
-	  coord c1 = {gcp->cornersCoord[jm1][0], gcp->cornersCoord[jm1][1], 
-	  	gcp->cornersCoord[jm1][2]};
-	  coord c2 = {gcp->cornersCoord[j1][0], gcp->cornersCoord[j1][1], 
-	  	gcp->cornersCoord[j1][2]};
-	  distribute_points_edge_Cube_v2 (c1, c2, dlm_bd, lN, isb);
-	  allindextable[jm1][j1] = 1;
-	  isb +=lN-2;
-	}
-      }
-      
-      else {
-	if (allindextable[j1][jm1] == 0) {
-	  coord c1 = {gcp->cornersCoord[j1][0], gcp->cornersCoord[j1][1], 
-	  	gcp->cornersCoord[j1][2]};
-	  coord c2 = {gcp->cornersCoord[jm1][0], gcp->cornersCoord[jm1][1], 
-	  	gcp->cornersCoord[jm1][2]};
-	  distribute_points_edge_Cube_v2 (c1, c2, dlm_bd, lN, isb);
-	  allindextable[j1][jm1] = 1;
-	  isb +=lN-2;
-	}
-      }
-      /* printf ("isb after face %d = %d\n", i, isb); */
-    }   
-  }
-  /* printf ("isb after all edges = %d\n", isb); */
-
-  /* Add the final 8 corners points */
-  for (int i = 0; i  < gcp->ncorners; i++) {
-    dlm_bd->x[isb] = gcp->cornersCoord[i][0];
-    dlm_bd->y[isb] = gcp->cornersCoord[i][1];
-    dlm_bd->z[isb] = gcp->cornersCoord[i][2];
-    isb++;
-  }
-  /* printf ("isb after 8 corners = %d\n", isb); */
-}
-
-
-
-
-void create_FD_Interior_Cube_v2 (particle *p, vector Index_lambda, 
-	vector pshift) 
-{
-  Cache * c;
-  /** Create the cache of the interior points for a cube*/
-  c = &(p->Interior);
-
-  /* compute the 3 principal vector of the cube */
-  compute_principal_vectors_Cubes (p);
-
-  /* a point x with coord (x,y,z) lies in the cube if the 3
-     following conditions are satisfied */
-  /* 1- u.p0 <= u.x <= u.p3 */
-  /* 2- v.p0 <= v.x <= v.p1 */
-  /* 3- w.p0 <= w.w <= w.p4  */
-  coord checkpt;
-  coord u1 = p->g.u1;
-  coord v1 = p->g.v1;
-  coord w1 = p->g.w1;
-  coord mins = p->g.mins;
-  coord maxs = p->g.maxs;
-
-  /* Min/Max coordinates for the AABB (Axed-Aligned-Bounding-Box) */
-  coord mincoord = {HUGE, HUGE, HUGE};
-  coord maxcoord = {-HUGE, -HUGE, -HUGE};
-
-  double ** table = p->g.cornersCoord;
-  for (int ii = 0; ii < p->g.ncorners; ii++) {
-    if (mincoord.x > table[ii][0])
-      mincoord.x = table[ii][0];
-
-    if (mincoord.y > table[ii][1])
-      mincoord.y = table[ii][1];
-
-    if (mincoord.z > table[ii][2])
-      mincoord.z = table[ii][2];
-
-    if (maxcoord.x < table[ii][0])
-      maxcoord.x = table[ii][0];
-
-    if (maxcoord.y < table[ii][1])
-      maxcoord.y = table[ii][1];
-
-    if (maxcoord.z < table[ii][2])
-      maxcoord.z = table[ii][2];
-  }
-  /* if (pid() == 0) { */
-  /*   printf ("mincoord = (%f,%f,%f)\n",mincoord.x, mincoord.y, mincoord.z);*/
-  /*   printf ("maxcoord = (%f,%f,%f)\n",maxcoord.x, maxcoord.y, maxcoord.z);*/
-  /* } */
-
-  foreach() {
-    checkpt.x = x;
-    checkpt.y = y;
-    checkpt.z = z;
-
-    /* Check only if the point is in the AABB (Axed-Aligned-Bounding-Box) */
-    if ((x > mincoord.x) && (x < maxcoord.x)) 
-      if ((y > mincoord.y) && (y < maxcoord.y))
-	if ((z > mincoord.z) && (z < maxcoord.z))
-
-	  /* If yes: check if it is inside the cube now */
-    	  if (is_it_in_cube_v2 (&u1, &v1, &w1, &mins, &maxs, &checkpt)) {
-	    cache_append (c, point, 0);
-	    /* tagg cell with the number of the particle */
-	    if ((int)Index_lambda.y[] == -1)
-	      Index_lambda.y[] = p->pnum;
-	  }
-
-    /* /\* For periodic boundaries, we have to check for the image-cubes 
-    as well *\/ */
-    /* if (Period.x)  */
-    /*   if (mincoord.x < 0 + X0) */
-	
-  }
-
-  /* foreach_dimension() { */
-  /*   if (Period.x) { */
-      
-      
-  /*   } */
-  /* } */
- 
-  cache_shrink (c);    
 }
 
 
@@ -1212,7 +380,7 @@ double reversed_weight (particle * pp, const coord weightcellpos,
   /* assign fictitious-boundary's normal (use boundary's analytical position)*/
   assign_dial_fd_boundary (pp, lambdapos, gcbdum, delta, &NCX);
 
-  if (pp->iswall) {
+  if ( pp->shape == WALL ) {
 #if STENCIL_EXTERIOR
     /* Stencils oriented toward the wall */
     if (lambdapos.y > 0) {
@@ -1295,7 +463,7 @@ void remove_too_close_multipliers(particle * p, vector index_lambda)
 	    %zu iteration %d\n", pid(), p[k].pnum, other_particle->pnum, l); */
 
       	    /* Check particle's type */
-      	    if (other_particle->iscube) {
+      	    if ( other_particle->shape == CUBE ) {
       	      compute_principal_vectors_Cubes (other_particle);
       	      coord u = other_particle->g.u1;
       	      coord v = other_particle->g.v1;
@@ -1560,7 +728,7 @@ void reverse_fill_flagfield (particle * p, scalar f, vector index_lambda,
 	  /* assign fictitious-boundary's normal (use boundary's position) */
 	  assign_dial_fd_boundary (&p[k], lambdapos, gcbdum, Delta, &NCX);
 	  
-	  if (p->iswall) {
+	  if ( p->shape == WALL ) {
 		  
 #if STENCIL_EXTERIOR
 	    /* Stencils oriented toward the wall */
@@ -1654,28 +822,39 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
 #if debugBD == 0
     GeomParameter gci = p[k].g;
     int m = 0;
-  
+    int lN = 0;
+    coord wallpos;
     
-    /* default case, sphere */
-    if (!(p[k].iswall) && !(p[k].iscube)) {
-      compute_nboundary (gci, &m);
-      allocate_SolidBodyBoundary(&(p[k].s), m);
-      create_FD_Boundary_Particle (gci, &(p[k].s), m, pshift);
-    }
-    
-    if (p[k].iswall) {
-      coord wallpos = p[k].wallmax;
-      compute_nboundary_Wall (wallpos, &m);
-      allocate_SolidBodyBoundary(&(p[k].s), m);
-      create_FD_Boundary_Wall (&p[k]);
-    }
-
-    if (p[k].iscube) {
-      int lN = 0;        
-      compute_nboundary_Cube_v2 (&gci, &m, &lN);
-      allocate_SolidBodyBoundary(&(p[k].s), m);
-      create_FD_Boundary_Cube_v2 (&gci, &(p[k].s), m, lN, pshift);
-    }
+    switch( p[k].shape )
+    {
+      case SPHERE:
+        compute_nboundary_Sphere( gci, &m );
+        allocate_SolidBodyBoundary( &(p[k].s), m );
+        create_FD_Boundary_Sphere( gci, &(p[k].s), m, pshift );
+	break;
+	  
+      case CIRCULARCYLINDER2D:
+        compute_nboundary_CircularCylinder2D( gci, &m );
+        allocate_SolidBodyBoundary( &(p[k].s), m );
+        create_FD_Boundary_CircularCylinder2D( gci, &(p[k].s), m, pshift );
+	break;
+	  
+      case CUBE:
+	compute_nboundary_Cube_v2( &gci, &m, &lN );
+        allocate_SolidBodyBoundary( &(p[k].s), m );
+        create_FD_Boundary_Cube_v2( &gci, &(p[k].s), m, lN, pshift );
+	break;
+	  
+      case WALL:
+        wallpos = p[k].wallmax;
+        compute_nboundary_Wall( wallpos, &m );
+        allocate_SolidBodyBoundary( &(p[k].s), m );
+        create_FD_Boundary_Wall( &p[k] );
+	break;
+	  
+      default:
+        fprintf( stderr, "Unknown Rigid Body shape !!\n" );
+    }    
 
     create_index_lambda_scalar ((p[k].s), e, k);
     c = &(p[k].reduced_domain);

@@ -1,43 +1,43 @@
 /* File names definition and global variables */  
 # ifndef fluid_dump_filename
-# define fluid_dump_filename "Savings/dump"
+#   define fluid_dump_filename "Savings/dump"
 # endif
 # ifndef particle_dump_filename
-# define particle_dump_filename "Savings/dump_particle"
+#   define particle_dump_filename "Savings/dump_particle"
 # endif
 # ifndef dump_dir
-# define dump_dir "Savings"
+#   define dump_dir "Savings"
 # endif
 
 # ifndef result_dir
-# define result_dir "Res"
+#   define result_dir "Res"
 # endif
 # ifndef result_particle_vp_rootfilename
-# define result_particle_vp_rootfilename "particle_data"
+#   define result_particle_vp_rootfilename "particle_data"
 # endif
 # ifndef result_particle_hydroFaT_rootfilename
-# define result_particle_hydroFaT_rootfilename "particle_hydroFaT"
+#   define result_particle_hydroFaT_rootfilename "particle_hydroFaT"
 # endif
 # ifndef result_fluid_rootfilename
-# define result_fluid_rootfilename "fluid_basilisk"
+#   define result_fluid_rootfilename "fluid_basilisk"
 # endif
 
 # ifndef result_dir
-# define result_dir "Res"
+#   define result_dir "Res"
 # endif
 
 # ifndef converge_uzawa_filename 
-# define converge_uzawa_filename "converge_uzawa.dat"
+#   define converge_uzawa_filename "converge_uzawa.dat"
 # endif
 # ifndef dlmfd_cells_filename 
-# define dlmfd_cells_filename "dlmfd_cells.dat"
+#   define dlmfd_cells_filename "dlmfd_cells.dat"
 # endif
 # ifndef dlmfd_perf_filename 
-# define dlmfd_perf_filename "dlmfd_perf.dat"
+#   define dlmfd_perf_filename "dlmfd_perf.dat"
 # endif
 
 # ifndef RoundDoubleCoef
-# define RoundDoubleCoef (1.e-4)
+#   define RoundDoubleCoef (1.e-4)
 # endif
 
 
@@ -128,7 +128,8 @@ event init (i = 0)
       particles[k].DLMFD_couplingfactor -= rhoval / particles[k].rho_s ;
 #endif
       
-      if ( !particles[k].iswall && !particles[k].iscube ) 
+      if ( particles[k].shape == SPHERE 
+      		|| particles[k].shape == CIRCULARCYLINDER2D ) 
       {
 	GeomParameter gp = particles[k].g;
 # if dimension == 2 
@@ -165,8 +166,6 @@ event init (i = 0)
 	particles[k].Ip[5] = 0.; /* Ip[5] = Iyz */
 # endif
       }
-    
-      if (particles[k].iscube) { /* To be done if needed */ }
 #endif
     }
   }
@@ -205,9 +204,11 @@ event init (i = 0)
     // Special case of cubes 
     if ( (particles[k].g).ncorners == 8 ) 
     {
-	particles[k].iscube = 1;
+	particles[k].shape = CUBE;
 	compute_principal_vectors_Cubes( &(particles[k]) );
-	//printf ("length cube = %f\n", (particles[k].g).radius);
+	if ( pid() == 0 )
+	  printf( "cube edge length = %f\n", 
+	  	2. * (particles[k].g).radius / sqrt(3.) );
     }
   }
 
