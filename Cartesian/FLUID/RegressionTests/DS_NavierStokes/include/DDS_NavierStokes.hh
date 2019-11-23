@@ -118,70 +118,65 @@ public SolverComputingTime
       void error_with_analytical_solution ( FV_DiscreteField const* FF,
       	 FV_DiscreteField* FF_ERROR ) ;
 
-      /** @brief Assemble 1D velocity matrices */
-      void assemble_velocity_1D_matrices( FV_TimeIterator const* t_it ) ;
+      /** @brief Call the function to assemble 1D matrices for both velocity and pressure field*/
+      void assemble_1D_matrices( FV_TimeIterator const* t_it ) ;
 
-      /** @brief Assemble 1D velocity matrix in x */
-      void assemble_velocity_matrix_1D (
+      /** @brief Assemble 1D matrices for both velocity and pressure field in all directions */
+      double assemble_field_matrix (
         FV_DiscreteField const* FF,
         FV_TimeIterator const* t_it,
         double gamma,
         size_t const& comp,
-        size_t const dir );
+        size_t const dir, size_t const field );
 
-      /** @brief Assemble 1D pressure matrix in x */
-      void assemble_pressure_matrix_1D (
-        FV_DiscreteField const* FF,
-        FV_TimeIterator const* t_it,
-	size_t const dir);
+      /** @brief Assemble 1D schur matrices for both velocity and pressure field in all directions */
+      void assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const dir, double Aee_diagcoef, size_t const field );
 
+      /** @brief Assemble advection term for Upwind spacial scheme */
       double assemble_advection_Upwind( size_t advecting_level, double const& coef, 
          size_t advected_level,
          size_t const& i, size_t const& j, size_t const& k, size_t const& component) const;
 
+      /** @brief Assemble advection term for TVD spacial scheme */
       double assemble_advection_TVD( size_t advecting_level, double const& coef, size_t advected_level,
          size_t const& i, size_t const& j, size_t const& k, size_t const& component) const;
 
-
-      //@}
-
-   //-- Solver
-
-      /** @name Solvers */
-      //@{
-      
-      /** @brief Second order Direction splitting with Domain Decomposition of Velocity Update step in Navier Stokes solver */
-
-      /** @brief Assemble rhs for velocity in x */
+      /** @brief Assemble rhs for velocity in any direction */
       double velocity_local_rhs( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir );
+      /** @brief Compute diffusive term of velocity field from previous timestep */
       double compute_un_component ( size_t const& comp, size_t i, size_t j, size_t k, size_t const dir);
+      /** @brief Compute diffusive term of pressure field from previous timestep */
       double compute_p_component ( size_t const& comp, size_t i, size_t j, size_t k);
+      /** @brief Compute advective term based on either Upwind or TVD spacial scheme */
       double compute_adv_component ( size_t const& comp, size_t i, size_t j, size_t k);
+      /** @brief Assemble rhs term after calling compute_**_component */
       void assemble_DS_un_at_rhs (FV_TimeIterator const* t_it, double const gamma);
 
-      double assemble_local_rhs ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field );
+      /** @brief Call functions to assemble rhs for pressure or velocity fields in any direction */
+      double assemble_local_rhs(size_t const& j,size_t const& k,double gamma,FV_TimeIterator const* t_it,size_t const& comp,size_t const dir,size_t const field);
       
-      /** @brief Assemble rhs for pressure in x */
+      /** @brief Assemble rhs for pressure in any direction */
       double pressure_local_rhs( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const dir );
 
-      /** @brief Solve interface unknowns for velocity in x */
+      /** @brief Solve interface unknowns for both fields in any particular direction */
       void solve_interface_unknowns( FV_DiscreteField* FF, double* packed_data,size_t nb_send_data,double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field );
+      /** @brief Unpack the interface variable sent by master processor to slave processor */
       void unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p, size_t const field);
+      /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */
       void unpack_compute_ue_pack(size_t const& comp, double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p, size_t const field);
 
-      /** @brief Solve local unknowns for velocity in x */
-      void solve_for_secondorder ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, double * packed_data, size_t const& comp, size_t const dir, size_t const field );
+      /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */
+      void data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double * packed_data, double fe, size_t const& comp, size_t const dir, size_t const field);
+      /** @brief Compute Aei*(Aii)-1*fi required to compute interface unknown */
+      void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const dir);
 
-
-      /** @brief Second order Direction splitting with Domain Decomposition of Pressure Update step in Navier Stokes solver */
-
+      /** @brief Solve interface unknown for all cases */
+      void DS_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const dir, size_t const field ) ;
       
-       /** @brief Navier Stokes solver */
+      /** @brief Solve i in j and k; e.g. solve x in y ank z */
       void Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, size_t const gamma, size_t const field );
 
-
       /** Pressure predictor */
-
       void NS_first_step( FV_TimeIterator const* t_it ) ;
 
       /** Velocity update */
@@ -258,31 +253,6 @@ public SolverComputingTime
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;
       bool is_periodic[2][3];
-
-      double ** mpi_packed_data_U_x;
-      double ** mpi_packed_data_U_y;
-      double ** mpi_packed_data_U_z;
-
-      // MPI vectors on the master proc
-      double *** all_receive_data_U_x;
-      double *** all_receive_data_U_y;
-      double *** all_receive_data_U_z;
-
-      double *** all_send_data_U_x;
-      double *** all_send_data_U_y;
-      double *** all_send_data_U_z;
-
-      double * mpi_packed_data_P_x;
-      double * mpi_packed_data_P_y;
-      double * mpi_packed_data_P_z;
-
-      double ** all_receive_data_P_x;
-      double ** all_receive_data_P_y;
-      double ** all_receive_data_P_z;
-
-      double ** all_send_data_P_x;
-      double ** all_send_data_P_y;
-      double ** all_send_data_P_z;
 } ;
 
 #endif

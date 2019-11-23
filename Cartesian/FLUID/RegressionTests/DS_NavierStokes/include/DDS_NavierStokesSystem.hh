@@ -24,6 +24,30 @@ class FV_SystemNumbering ;
 class FV_DiscreteField ;
 class FV_TimeIterator ;
 
+/** @brief TDMatrix include all elements of block matrices (ii,ie,ei,ee) */
+struct TDMatrix {
+   LA_SeqVector ** ii_main;
+   LA_SeqVector ** ii_super;
+   LA_SeqVector ** ii_sub;
+   LA_SeqMatrix ** ie;
+   LA_SeqMatrix ** ei;
+   LA_SeqMatrix ** ee;
+};
+
+/** @brief Product matrix is composed of products elements of block matrices (ii,ie,ei,ee) */
+struct ProdMatrix {
+   LA_SeqMatrix ** ei_ii_ie;
+   LA_SeqVector ** ii_ie;
+   LA_SeqVector ** result;
+};
+
+/** @brief LocalVector to be used in storing the local values and interface values of DOF */
+struct LocalVector {
+   LA_SeqVector** local_T;
+   LA_SeqVector** local_solution_T;
+   LA_SeqVector** T;
+   LA_SeqVector** interface_T;
+};
 
 /** @brief The Class DDS_NavierStokesSystem.
 
@@ -91,38 +115,20 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @brief Return the DS pressure solution vector DS_PF */
       LA_SeqVector const* get_solution_DS_velocity_P( void ) const ;
 
-      // Domain Decomposition Functions in x for velocity
-
-      /** @brief Return the local rhs vector in x direction */
-      LA_SeqVector* get_local_temp( size_t const& c, size_t const dir, size_t const field ) ;
-
-      /** @brief Return the solution vector for local unknowns in x direction */
-      LA_SeqVector* get_local_solution_temp( size_t const& c, size_t const dir, size_t const field ) ;
-
-      /** @brief Return the Aei*xi vector in x direction */
-      LA_SeqVector* get_temp( size_t const& c, size_t const dir, size_t const field ) ;
-
-      /** @brief Return the solution vector for interface unknowns in x direction */
-      LA_SeqVector* get_interface_temp( size_t const& c, size_t const dir, size_t const field ) ;
-
-      /** @brief Return the domain decomposition matrices in x direction for velocity */
-
-      LA_SeqVector* get_aii_main_diag( size_t const& c, size_t const dir, size_t const field ) ;
-      LA_SeqVector* get_aii_super_diag( size_t const& c, size_t const dir, size_t const field ) ;
-      LA_SeqVector* get_aii_mod_super_diag( size_t const& c, size_t const dir, size_t const field ) ;
-      LA_SeqVector* get_aii_sub_diag( size_t const& c, size_t const dir, size_t const field ) ;
-
-      LA_SeqMatrix* get_aie( size_t const& c, size_t const dir, size_t const field ) ;
-      LA_SeqMatrix* get_aei( size_t const& c, size_t const dir, size_t const field ) ;
-      LA_SeqMatrix* get_Aee_matrix( size_t const& c, size_t const dir, size_t const field ) ;
-
-      LA_SeqVector* get_product_result( size_t const& c, size_t const dir, size_t const field );
-      LA_SeqMatrix* get_Aei_Aii_Aie_product( size_t const& c, size_t const dir, size_t const field ) ;
-      LA_SeqVector* get_Aii_Aie_product( size_t const& c, size_t const dir, size_t const field ) ;
-
-       /** @brief Return the schlur complement matrix in x direction */
-      LA_SeqMatrix* get_schlur_complement( size_t const& c, size_t const dir, size_t const field ) ; 
-      LA_SeqMatrix* get_schlur_complement_ref( size_t const& comp, size_t const dir, size_t const field );
+      /** @brief Return the matrix system of spacial discretization */
+      TDMatrix* get_A(size_t const field);
+      /** @brief Return the Schur complement of spacial discretization */
+      TDMatrix* get_Schur(size_t const field);
+      /** @brief Return the Schur complement of Schur complement in case of periodic domain */
+      TDMatrix* get_DoubleSchur(size_t const field);
+      /** @brief Return the product matrix of Schur complement */
+      ProdMatrix* get_SchurP(size_t const field);
+      /** @brief Return RHS for the Schur complement */
+      LocalVector* get_Schur_VEC(size_t const field);
+      /** @brief Return the product matrix of spacial discretization */
+      ProdMatrix* get_Ap(size_t const field);
+      /** @brief Return RHS for the matrix system of spacial discretization */
+      LocalVector* get_VEC(size_t const field);
 
    //-- Basic operations on matrices & vectors
 
@@ -130,26 +136,13 @@ class DDS_NavierStokesSystem : public MAC_Object
       //@{
       /** @brief Initialize the velocity unknown vector with field values */
       void initialize_DS_velocity( void );
-
       /** @brief Initialize the pressure unknown vector with field values */
       void initialize_DS_pressure( void ); 
-      
-      /** @brief Initialize the velocity unknown vector with field values */
-      void initialize_velocity( void );       
-
-      /** @brief Finalize constant matrices */
-      void finalize_constant_matrices( void ) ;
-
       /** @brief Store velocity vector at previous time step */
       void at_each_time_step( void ) ;
-
-      /** @brief Compute velocity change from one time step to the
-      next one */
-      double compute_velocity_change( void );
-
       /** @brief Compute velocity change from one time step to the
       next one with the direction splitting solution method */
-      double compute_directionsplitting_velocity_change( void );
+      double compute_DS_velocity_change( void );
 
    //-- Solver
 
@@ -157,24 +150,12 @@ class DDS_NavierStokesSystem : public MAC_Object
       //@{
       /** @brief Solve the DS splitting problem in x by performing the
       matrix-vector product A_x^-1.Vx and transfer in the distributed vector */
-      void DS_NavierStokes_solver( FV_DiscreteField* FF, size_t const& j, size_t const& k, size_t const& min_i, LA_SeqVector* rhs, LA_SeqVector* interface_rhs , size_t const& comp, size_t const dir, size_t const field) ;
-
-      /** @brief Solve the domain decomposition problem in x by solving for interface 
-      unknowns using schlur complement */
-      void DS_NavierStokes_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const dir, size_t const field ) ;
-
-      /** @brief Solve the domain decomposition problem in x by obtaining the interface
-      unknowns and solving for the local unknowns */
-      void DS_NavierStokes_local_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const dir, size_t const field ) ;
+      void DS_NavierStokes_solver( FV_DiscreteField* FF, size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const dir, size_t const field) ;
 
       //@}
 
-      /** @brief Synchronize the solution vector for velocity*/
-      void synchronize_solution_vec( void );
-
       /** @brief Synchronize the DS solution vector for velocity*/
       void synchronize_DS_solution_vec( void );
-
       /** @brief Synchronize the DS solution vector for pressure*/
       void synchronize_DS_solution_vec_P( void );
 
@@ -186,29 +167,20 @@ class DDS_NavierStokesSystem : public MAC_Object
       void display_debug( void );
       //@}
 
-      /** @brief Compute the product of Aei*inv(Aii)*Aie in x for Velocity*/
-      void compute_product_matrix( size_t const& comp, size_t const dir, size_t const field );
-
-      void compute_product_matrix_interior(size_t const& comp, size_t const column, size_t const dir, size_t const field);
+      /** @brief Calls interior function for different conditions to compute the product of Aei*inv(Aii)*Aie */
+      void compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const dir, size_t const field );
+      /** @brief Compute the product of Aei*inv(Aii)*Aie in any direction for any field*/
+      void compute_product_matrix_interior(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const column, size_t const dir);
 
    //-- Utilities
 
       /** @name Utilities */
       //@{
-      /** @brief Solve Linear system mat_A*x = rhs using thomas algorithm  */
-      static void thomas_algorithm( LA_SeqMatrix* mat_A,LA_SeqVector* rhs) ;
-
       /** @brief Solve Linear system mat_A*x = rhs with only three vectors of mat_A(x,y,z) using thomas algorithm  */
-      static void mod_thomas_algorithm( LA_SeqVector* x,LA_SeqVector* y,LA_SeqVector* z,LA_SeqVector* rhs) ;
-
-      /** @brief Compute the modified super diagonal in Aii_x of velocity for thomas algorithm  */
-      void compute_Aii_ref(size_t const& comp, size_t const dir, size_t const field);
-
-      /** @brief Compute the modified super diagonal in schlur_x of velocity for thomas algorithm  */
-      void compute_schlur_ref(size_t const& comp, size_t const dir, size_t const field);
-
+      void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const dir);
+      /** @brief Compute the modified super diagonal for thomas algorithm  */
+      void pre_thomas_treatment( size_t const& comp, size_t const dir, struct TDMatrix *arr);
       //@}
-
 
    protected: //--------------------------------------------------------
 
@@ -226,259 +198,12 @@ class DDS_NavierStokesSystem : public MAC_Object
       //@}
 
       //-- Attributes
-
       FV_DiscreteField* UF ;
       FV_DiscreteField* PF ; 
 
       // Local vectors
-      LA_SeqVector * UF_LOC ;
       LA_SeqVector * UF_DS_LOC ;
       LA_SeqVector * PF_DS_LOC ;
-
-      // Unknowns vectors
-      LA_Vector * VEC_UF ;
-      LA_Vector * VEC_UF_previoustime ;
-      LA_Vector * VEC_UF_timechange ;
-      // Matrices & rhs
-      LA_Matrix * MAT_D_velocityUnsteadyPlusDiffusion ;
-      LA_Matrix * MAT_A_velocityUnsteady ;
-      LA_Vector * VEC_rhs_D_velocityDiffusionPlusBodyTerm ;
-      LA_Vector * VEC_rhs_A_velocityUnsteady ;
-
-      // Solvers
-      LA_Solver* SOLVER_velocity ;
-
-      // Unknowns numbering
-      FV_SystemNumbering* UF_NUM ;
-      FV_SystemNumbering* PF_NUM ;
-
-      // Direction splitting matrices
-      
-      LA_SeqMatrix * MAT_velocityUnsteadyPlusDiffusion_1D_y ;
-      LA_SeqMatrix * MAT_velocityUnsteadyPlusDiffusion_1D_y_L ;
-      LA_SeqMatrix * MAT_velocityUnsteadyPlusDiffusion_1D_y_U ;
-      LA_SeqMatrix * MAT_velocityUnsteadyPlusDiffusion_1D_z ;
-      LA_SeqMatrix * MAT_velocityUnsteadyPlusDiffusion_1D_z_L ;
-      LA_SeqMatrix * MAT_velocityUnsteadyPlusDiffusion_1D_z_U ;
-
-      // First Order Direction splitting vectors
-      LA_SeqVector ** VEC_rhs_velocity_1D_x ;
-      LA_SeqVector ** VEC_rhs_velocity_1D_y ;
-      LA_SeqVector ** VEC_rhs_velocity_1D_z ;
-      LA_SeqVector ** VEC_rhs_velocity_1D_x_P;
-
-
-      // Domain decomposition matrices in x for velocity
-      LA_SeqVector ** Aii_x_main_diagonal;
-      LA_SeqVector ** Aii_x_super_diagonal;
-      LA_SeqVector ** Aii_x_sub_diagonal;
-      LA_SeqVector ** Aii_x_mod_super_diagonal;
-
-      LA_SeqMatrix ** Aie_x ;
-      LA_SeqMatrix ** Aei_x ;
-
-      // Aei*inv(Aii)*Aie product matrix in x
-      LA_SeqMatrix ** Aei_Aii_Aie_product_x ;
-
-      // inv(Aii)*Aie product vector in x
-      LA_SeqVector ** product_result_x ; 
-
-      // Aei*inv(Aii)*Aie product vector (only for one column) in x
-      LA_SeqVector ** Aii_Aie_product_x ;
-
-      // Matrices for interface unknowns (only on master proc) in x
-      LA_SeqMatrix ** Aee_x;
-      LA_SeqMatrix ** schlur_complement_x ;
-      LA_SeqMatrix ** schlur_complement_x_ref ;
-
-      // Rhs for local unknowns in x
-      LA_SeqVector ** VEC_local_temp_x ;
-
-      // RHS for interface unknowns in x
-      LA_SeqVector ** VEC_interface_temp_x ;   
-
-      // Initial Solution vector for local unknowns in x
-      LA_SeqVector ** VEC_local_solution_temp_x ;   
-
-      // Vector for sending Aei*xi product in x
-      LA_SeqVector ** VEC_temp_x ;      
-
-      // Domain decomposition matrices in y for velocity
-      LA_SeqVector ** Aii_y_main_diagonal;
-      LA_SeqVector ** Aii_y_super_diagonal;
-      LA_SeqVector ** Aii_y_sub_diagonal;
-      LA_SeqVector ** Aii_y_mod_super_diagonal;
-
-      LA_SeqMatrix ** Aie_y ;
-      LA_SeqMatrix ** Aei_y ;
-
-      // Aei*inv(Aii)*Aie product matrix in y
-      LA_SeqMatrix ** Aei_Aii_Aie_product_y ;
-
-      // inv(Aii)*Aie product vector in x
-      LA_SeqVector ** product_result_y ; 
-
-      // Aei*inv(Aii)*Aie product vector (only for one column) in y
-      LA_SeqVector ** Aii_Aie_product_y ;
-
-      // Matrices for interface unknowns (only on master proc) in y
-      LA_SeqMatrix ** Aee_y;
-      LA_SeqMatrix ** schlur_complement_y ;
-      LA_SeqMatrix ** schlur_complement_y_ref ;
-
-      // Rhs for local unknowns in y
-      LA_SeqVector ** VEC_local_temp_y ;
-
-      // RHS for interface unknowns in y
-      LA_SeqVector ** VEC_interface_temp_y ;   
-
-      // Initial Solution vector for local unknowns in y
-      LA_SeqVector ** VEC_local_solution_temp_y ;   
-
-      // Vector for sending Aei*xi product in y
-      LA_SeqVector ** VEC_temp_y ;
-
-      // Domain decomposition matrices in z for velocity
-      LA_SeqMatrix ** Aii_z;
-      LA_SeqVector ** Aii_z_main_diagonal;
-      LA_SeqVector ** Aii_z_super_diagonal;
-      LA_SeqVector ** Aii_z_sub_diagonal;
-      LA_SeqVector ** Aii_z_mod_super_diagonal;
-      LA_SeqMatrix ** Aii_z_ref ;
-
-      LA_SeqMatrix ** Aie_z ;
-      LA_SeqMatrix ** Aei_z ;
-
-      // Aei*inv(Aii)*Aie product matrix in z
-      LA_SeqMatrix ** Aei_Aii_Aie_product_z ;
-
-      // inv(Aii)*Aie product vector in z
-      LA_SeqVector ** product_result_z ; 
-
-      // Aei*inv(Aii)*Aie product vector (only for one column) in z
-      LA_SeqVector ** Aii_Aie_product_z ;
-
-      // Matrices for interface unknowns (only on master proc) in z
-      LA_SeqMatrix ** Aee_z;
-      LA_SeqMatrix ** schlur_complement_z ;
-      LA_SeqMatrix ** schlur_complement_z_ref;
-
-      // Rhs for local unknowns in z
-      LA_SeqVector ** VEC_local_temp_z;
-
-      // RHS for interface unknowns in z
-      LA_SeqVector ** VEC_interface_temp_z ;   
-
-      // Initial Solution vector for local unknowns in z
-      LA_SeqVector ** VEC_local_solution_temp_z ;   
-
-      // Vector for sending Aei*xi product in z
-      LA_SeqVector ** VEC_temp_z ;
-
-      // Domain decomposition matrices in x for Pressure
-      LA_SeqVector * Aii_x_main_diagonal_P;
-      LA_SeqVector * Aii_x_super_diagonal_P;
-      LA_SeqVector * Aii_x_sub_diagonal_P;
-      LA_SeqVector * Aii_x_mod_super_diagonal_P;
-
-      LA_SeqMatrix * Aie_x_P ;
-      LA_SeqMatrix * Aei_x_P ;
-
-      // Aei*inv(Aii)*Aie product matrix in x for P
-      LA_SeqMatrix * Aei_Aii_Aie_product_x_P ;
-
-      // inv(Aii)*Aie product vector in x for P
-      LA_SeqVector * product_result_x_P ; 
-
-      // Aei*inv(Aii)*Aie product vector (only for one column) in x for P
-      LA_SeqVector * Aii_Aie_product_x_P ;
-
-      // Matrices for interface unknowns (only on master proc) in x for P
-      LA_SeqMatrix * Aee_x_P;
-      LA_SeqMatrix * schlur_complement_x_P ;
-      LA_SeqMatrix * schlur_complement_x_ref_P ;
-
-      // Rhs for local unknowns in x for P
-      LA_SeqVector * VEC_local_temp_x_P ;
-
-      // RHS for interface unknowns in x for P
-      LA_SeqVector * VEC_interface_temp_x_P ;   
-
-      // Initial Solution vector for local unknowns in x for P
-      LA_SeqVector * VEC_local_solution_temp_x_P ;   
-
-      // Vector for sending Aei*xi product in x for P
-      LA_SeqVector * VEC_temp_x_P ;
-
-      // Domain decomposition matrices in y for Pressure
-      LA_SeqVector * Aii_y_main_diagonal_P;
-      LA_SeqVector * Aii_y_super_diagonal_P;
-      LA_SeqVector * Aii_y_sub_diagonal_P;
-      LA_SeqVector * Aii_y_mod_super_diagonal_P;
-
-      LA_SeqMatrix * Aie_y_P ;
-      LA_SeqMatrix * Aei_y_P ;
-
-      // Aei*inv(Aii)*Aie product matrix in y for P
-      LA_SeqMatrix * Aei_Aii_Aie_product_y_P ;
-
-      // inv(Aii)*Aie product vector in y for P
-      LA_SeqVector * product_result_y_P ; 
-
-      // Aei*inv(Aii)*Aie product vector (only for one column) in y for P
-      LA_SeqVector * Aii_Aie_product_y_P ;
-
-      // Matrices for interface unknowns (only on master proc) in y for P
-      LA_SeqMatrix * Aee_y_P;
-      LA_SeqMatrix * schlur_complement_y_P ;
-      LA_SeqMatrix * schlur_complement_y_ref_P ;
-
-      // Rhs for local unknowns in y for P
-      LA_SeqVector * VEC_local_temp_y_P ;
-
-      // RHS for interface unknowns in y for P
-      LA_SeqVector * VEC_interface_temp_y_P ;   
-
-      // Initial Solution vector for local unknowns in y for P
-      LA_SeqVector * VEC_local_solution_temp_y_P ;   
-
-      // Vector for sending Aei*xi product in y for P
-      LA_SeqVector * VEC_temp_y_P ;
-
-      // Domain decomposition matrices in z for Pressure
-      LA_SeqVector * Aii_z_main_diagonal_P;
-      LA_SeqVector * Aii_z_super_diagonal_P;
-      LA_SeqVector * Aii_z_sub_diagonal_P;
-      LA_SeqVector * Aii_z_mod_super_diagonal_P;
-
-      LA_SeqMatrix * Aie_z_P ;
-      LA_SeqMatrix * Aei_z_P ;
-
-      // Aei*inv(Aii)*Aie product matrix in z for P
-      LA_SeqMatrix * Aei_Aii_Aie_product_z_P ;
-
-      // inv(Aii)*Aie product vector in z for P
-      LA_SeqVector * product_result_z_P ; 
-
-      // Aei*inv(Aii)*Aie product vector (onlz for one column) in z for P
-      LA_SeqVector * Aii_Aie_product_z_P ;
-
-      // Matrices for interface unknowns (onlz on master proc) in z for P
-      LA_SeqMatrix * Aee_z_P;
-      LA_SeqMatrix * schlur_complement_z_P ;
-      LA_SeqMatrix * schlur_complement_z_ref_P ;
-
-      // Rhs for local unknowns in z for P
-      LA_SeqVector * VEC_local_temp_z_P ;
-
-      // RHS for interface unknowns in z for P
-      LA_SeqVector * VEC_interface_temp_z_P ;   
-
-      // Initial Solution vector for local unknowns in z for P
-      LA_SeqVector * VEC_local_solution_temp_z_P ;   
-
-      // Vector for sending Aei*xi product in z for P
-      LA_SeqVector * VEC_temp_z_P ;
 
       // Global velocity solution vectors
       LA_Vector * VEC_DS_UF ;
@@ -486,34 +211,33 @@ class DDS_NavierStokesSystem : public MAC_Object
       LA_Vector * VEC_DS_UF_timechange ;
       // Global pressure solution vectors
       LA_Vector * VEC_DS_PF ;
+      // Matrices & rhs
+      LA_Matrix * MAT_D_velocityUnsteadyPlusDiffusion ;
+      LA_Vector * VEC_rhs_D_velocityDiffusionPlusBodyTerm ;
 
-      // Two additional vectors in x for 1 proc periodic scenario for velocity
-      LA_SeqVector ** U_vec_xu ;
-      LA_SeqVector ** U_vec_xv ;
+      // Unknowns numbering
+      FV_SystemNumbering* UF_NUM ;
+      FV_SystemNumbering* PF_NUM ;
 
-      // Two additional vectors in y for 1 proc periodic scenario for velocity
-      LA_SeqVector ** U_vec_yu ;
-      LA_SeqVector ** U_vec_yv ;
+      // Direction splitting matrices
+      LA_SeqMatrix * MAT_velocityUnsteadyPlusDiffusion_1D ;
 
-      // Two additional vectors in z for 1 proc periodic scenario for velocity
-      LA_SeqVector ** U_vec_zu ;
-      LA_SeqVector ** U_vec_zv ;
+      // Spacitial discretization matrices
+      struct TDMatrix A[2][3];          // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      struct ProdMatrix Ap[2][3];       // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      struct LocalVector VEC[2][3];     // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
 
-      // Two additional vectors in x for 1 proc periodic scenario for pressure
-      LA_SeqVector * P_vec_xu ;
-      LA_SeqVector * P_vec_xv ;
+      // Schur complement matrices
+      struct TDMatrix Schur[2][3];      // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      struct ProdMatrix SchurP[2][3];
+      struct LocalVector Schur_VEC[2][3];
 
-      // Two additional vectors in y for 1 proc periodic scenario for pressure
-      LA_SeqVector * P_vec_yu ;
-      LA_SeqVector * P_vec_yv ;
-
-      // Two additional vectors in z for 1 proc periodic scenario for pressure
-      LA_SeqVector * P_vec_zu ;
-      LA_SeqVector * P_vec_zv ;
+      // Schur complement of Schur complement
+      struct TDMatrix DoubleSchur[2][3];
 
       size_t dim;
       MAC_Communicator const* pelCOMM;
-      size_t nb_comps;
+      size_t nb_comps[2];
 
       /** Processor positions in x,y,z */
       size_t proc_pos_in_i[3];
@@ -522,7 +246,6 @@ class DDS_NavierStokesSystem : public MAC_Object
 
       bool is_periodic[2][3];
       boolVector const* U_periodic_comp;
-
       boolVector const* P_periodic_comp;
 } ;
 
