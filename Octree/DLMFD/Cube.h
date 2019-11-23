@@ -1,5 +1,5 @@
 /** Set of functions for the cube as fictitious domain */
-void compute_nboundary_Cube_v2 (GeomParameter * gcp, int * nb, int * lN) 
+void compute_nboundary_Cube_v2( GeomParameter* gcp, int* nb, int* lN ) 
 {
   Cache poscache = {0};
   Point lpoint;
@@ -14,9 +14,9 @@ void compute_nboundary_Cube_v2 (GeomParameter * gcp, int * nb, int * lN)
     
 #if dimension == 3
     pos.z = gcp->cornersCoord[ip][2];
-    lpoint = locate(pos.x, pos.y, pos.z);
+    lpoint = locate( pos.x, pos.y, pos.z );
 #elif dimension ==2
-    lpoint = locate(pos.x, pos.y);
+    lpoint = locate( pos.x, pos.y );
 #endif
    
     /** Only one thread has the point in its domain (works in serial
@@ -38,8 +38,8 @@ void compute_nboundary_Cube_v2 (GeomParameter * gcp, int * nb, int * lN)
       {
 	*lN = floor( lengthedge / ( INTERBPCOEF * Delta ) );
 
-        double actual_INTERBPCOEF = ( lengthedge / *lN ) / Delta;
-        fprintf( stderr, "actual inter-BP coef = %6.4f\n", actual_INTERBPCOEF );
+//         double actual_INTERBPCOEF = ( lengthedge / *lN ) / Delta;
+//         fprintf( stderr, "actual inter-BP coef = %6.4f\n", actual_INTERBPCOEF );
 	
         /* The numberof points on a cube edge is the number of intervals + 1 */
         *lN += 1;      
@@ -70,7 +70,7 @@ void compute_nboundary_Cube_v2 (GeomParameter * gcp, int * nb, int * lN)
     mpi_all_reduce(*nb, MPI_INT, MPI_MAX);
     mpi_all_reduce(*lN, MPI_INT, MPI_MAX);
 #endif
-    if (ip < gcp->ncorners)
+    if ( ip < gcp->ncorners )
       ip++;
     else
       break;

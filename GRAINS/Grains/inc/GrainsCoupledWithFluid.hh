@@ -131,10 +131,10 @@ public:
 	string const& fluidsolver = "PeliGRIFF" );
 
   /** @brief Sauvegarde par defaut de l'etat initial pour post-processing */
-  virtual void InitialPostProcessing();
+  virtual void InitialPostProcessing( size_t indent_width = 0 );
 
   /** @brief Sauvegarde pour post-processing et restart */
-  virtual void doPostProcessing();
+  virtual void doPostProcessing( size_t indent_width = 0 );
 
   /** @brief Sauvegarde pour post-processing evolution et restart */
   virtual void doPostProcessingEvo( const double &time );

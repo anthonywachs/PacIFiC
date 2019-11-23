@@ -75,13 +75,13 @@ extern "C" {
   }
 
 
-  void SaveResults_Grains( void ) 
+  void SaveResults_Grains() 
   {
     static unsigned int ppcounter = 0;
     if ( !ppcounter ) 
-      grains->InitialPostProcessing();
+      grains->InitialPostProcessing( 6 );
     else
-      grains->doPostProcessing();
+      grains->doPostProcessing( 6 );
     ++ppcounter; 
   }  
 

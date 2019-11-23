@@ -34,7 +34,7 @@ extern "C" {
 
   void Setviscosity_Grains (double const viscosity);
 
-  void SaveResults_Grains( void );
+  void SaveResults_Grains();
 
   void checkParaviewPostProcessing_Grains ( char * solid_resDir );
 

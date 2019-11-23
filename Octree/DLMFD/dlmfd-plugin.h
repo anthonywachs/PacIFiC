@@ -78,6 +78,13 @@ event GranularSolver_updateVelocity (t < -1.)
 // -----------------------------------------------------------------
 event init (i = 0) 
 {
+  if ( pid() == 0 )
+  {
+    printf( "==================================\n" );
+    printf( "======   Basilisk + DLMFD   ======\n" );
+    printf( "==================================\n" );        
+  }
+
 #ifndef rhoval
 # define rhoval 1.
 #endif
@@ -93,6 +100,16 @@ event init (i = 0)
   /* Initialize the viscosity field */
   const face vector muc[] = {tval, tval, tval};
   mu = muc;
+
+  // Output basic fluid and geometric parameters
+  if ( pid() == 0 )
+  {
+    printf( "Fluid density = %6.3e\n", rhoval );
+    printf( "Fluid viscosity = %6.3e\n", tval );
+    printf( "Space dimension = %d\n", dimension );    
+    printf( "Domain size = %6.3e\n", L0 );
+    printf( "\n" );            
+  }  
   
   // Initialize all DLMFD fields
   initialize_DLMFD_fields_to_zero();
@@ -189,8 +206,16 @@ event init (i = 0)
 
   
   // Initialize the granular solver
-  if ( pid() == 0 ) printf ("# granular solver initialization: "); 
-  event ("GranularSolver_init");
+  if ( pid() == 0 ) 
+  {  
+    printf( "Granular solver initialization\n");
+    printf( "------------------------------\n"); 
+    printf( "Name : " );
+  }    
+  event( "GranularSolver_init" );
+# if _MPI
+    MPI_Barrier( MPI_COMM_WORLD );
+# endif     
 
       
   // Special case of cubes
@@ -206,9 +231,6 @@ event init (i = 0)
     {
 	particles[k].shape = CUBE;
 	compute_principal_vectors_Cubes( &(particles[k]) );
-	if ( pid() == 0 )
-	  printf( "cube edge length = %f\n", 
-	  	2. * (particles[k].g).radius / sqrt(3.) );
     }
   }
 
@@ -224,6 +246,12 @@ event init (i = 0)
   else // Simulation from t=0
   {
 # if adaptive
+    if ( pid() == 0 )
+    {
+      printf( "\nInitial grid refinement in the particle volume\n" );
+      printf( "----------------------------------------------\n" );      
+    }
+      
     for (int k = 0; k < NPARTICLES; k++) 
     {
       GeomParameter * gg;
@@ -232,7 +260,8 @@ event init (i = 0)
       /* Perform initial refinement */
       totalcell = totalcells();
       if ( pid() == 0 )
-	printf("# total cells before initial refinement = %d\n", totalcell);
+	printf( "# total cells before initial refinement of particle %d = %d\n",
+		k, totalcell );
 
       coord position = gg->center;
       double radius = gg->radius;
@@ -243,13 +272,13 @@ event init (i = 0)
       int ilvl = 0;
       while( ilvl < MAXLEVEL ) 
       {
-	printf ("current level of refinement = %d, we want level %d\n",
+	printf( "current level of refinement = %d, we want level %d\n",
 	  	ilvl, MAXLEVEL );
 	printf ("refining ... \n");
 	if ( lpoint.level > -1 ) 
 	{
-	  refine_cell (lpoint, all, 0, &tree->refined);
-	  printf ("refined once on thread %d \n", pid());
+	  refine_cell( lpoint, all, 0, &tree->refined );
+	  printf( "refined once on thread %d \n", pid() );
 	}
 	mpi_boundary_refine( all );
 	mpi_boundary_update( all );
@@ -258,18 +287,19 @@ event init (i = 0)
 	ilvl = lpoint.level;
 
 #if _MPI
-	mpi_all_reduce (ilvl, MPI_INT, MPI_MAX);
+	mpi_all_reduce( ilvl, MPI_INT, MPI_MAX );
 #endif
       }
   
       radius = 1.2 * radius ;
-      refine (sq(x - position.x) + sq(y - position.y) + sq(z - position.z) 
-	      - sq(radius) < 0 && level < MAXLEVEL);
+      refine( sq(x - position.x) + sq(y - position.y) + sq(z - position.z) 
+	      - sq(radius) < 0. && level < MAXLEVEL );
 	     
       // Compute the total number of cells after refinement and 
       totalcell = totalcells();
       if ( pid() == 0 )
-	printf ("# total cells after initial refinement = %d\n", totalcell);
+	printf( "# total cells after initial refinement of particle %d = "
+		"%d\n\n", k, totalcell );
     }
 #endif
     
@@ -299,7 +329,8 @@ event init (i = 0)
   
   // Simulation time interval
   maxtime = trestart + SimuTimeInterval;
-  fprintf( ferr, "Simulation time interval: t_start = %f to t_end = %f\n", 
+  if ( pid() == 0 ) 
+    printf( "Simulation time interval: t_start = %f to t_end = %f\n\n", 
     	trestart, maxtime ); 
 
 	
@@ -333,15 +364,10 @@ event init (i = 0)
 
 
 
-/** Overloading of the logfile event: we log the number of iterations of the 
-multigrid solver for pressure and viscosity and stop the simulation at 
-maxtime */
-// -------------------------------------------------------------------------
+/** Logfile event to stop the simulation at maxtime */
+// ---------------------------------------------------
 event logfile ( i=0; i++ ) 
 {
-  deltau = change( u.x, u_previoustime );
-  fprintf ( stderr, "%d %g %d %d %g %g \n", i, t, mgp.i, mgu.i, deltau, dt );
-
   // This is the condition that stops the simulation exactly at t=maxtime
   // We use -0.0001 * dt to avoid the problem of comparison of double that 
   // would exist if we would write if ( t > maxtime )
@@ -382,16 +408,27 @@ granular problem followed by the solution to the DLMFD problem */
 // -------------------------------------------------------------------------
 event end_timestep (i++) 
 {
+  if ( pid() == 0 )
+  {
+    printf( "\n****** ITER %d - TIME t=%8.5e to t+dt=%8.5e ******\n", 
+    	i, t, t+dt );
+    printf( "   Time step = %8.5e\n", dt );
+    printf( "   Navier-Stokes solver\n" ); 
+    printf( "      MGu_niter = %d, MGp_niter = %d\n", mgu.i,
+    	mgp.i );    
+  }
+
   /* Granular solver predictor */
-  if ( pid() == 0 ) printf( "Iter %d: ", i ); 
-  event ("GranularSolver_predictor");  
+  if ( pid() == 0 ) printf( "   GS predictor step: " ); 
+  event( "GranularSolver_predictor" );  
  
   /* Solve the DLMFD problem by a Uzawa algorithm */
+  if ( pid() == 0 ) printf( "   DLMFD problem\n" ); 
   DLMFD_subproblem( particles, i, rhoval );
 
   /* Update velocity in the granular solver */
-  if ( pid() == 0 ) printf( "Iter %d: ", i );
-  event ("GranularSolver_updateVelocity");    
+  if ( pid() == 0 ) printf( "   GS velocity update in " );
+  event( "GranularSolver_updateVelocity" );    
 
   /* Save the forces acting on particles before adapting the mesh  */
   sumLambda( particles, fdata, t + dt, dt, flagfield, DLM_lambda, index_lambda, 
@@ -402,6 +439,11 @@ event end_timestep (i++)
   
   /* Save all particles trajectories */
   particle_data( particles, t + dt, i, pdata );
+  
+  /* Fluid velocity change over the time step */
+  deltau = change( u.x, u_previoustime );
+  if ( pid() == 0 )
+    printf( "   Velocity change = %8.5e\n", deltau );  
 }
 
 
@@ -427,11 +469,18 @@ field and a phase indicator */
 # endif
 
 event adapt (i++) {
-  int totalcell = totalcells();
-  if (pid() == 0)
-    fprintf (stderr, "# Total number of cells: %d \n", totalcell);
-
 #if adaptive
+  int totalcell = totalcells();
+  if ( pid() == 0 )
+  {
+#   if dimension == 2  
+      printf( "   Quadtree grid\n" );
+#   else
+      printf( "   Octree grid\n" );
+#   endif
+    printf( "      Total number of cells = %d \n", totalcell );
+  }
+
 #if DLM_Moving_particle
   astats s = adapt_wavelet ((scalar *){flagfield_mailleur, u}, 
 	(double[]){FlagAdaptCrit, UxAdaptCrit, UyAdaptCrit, UzAdaptCrit}, 
@@ -441,6 +490,7 @@ event adapt (i++) {
 	(double[]){FlagAdaptCrit, UxAdaptCrit, UyAdaptCrit, UzAdaptCrit}, 
 	maxlevel = MAXLEVEL);
 #endif
-  fprintf (ferr, "# refined %d cells, coarsened %d cells\n", s.nf, s.nc);
+  if ( pid() == 0 ) 
+    printf( "      Refined %d cells, coarsened %d cells\n", s.nf, s.nc );
 #endif
 }

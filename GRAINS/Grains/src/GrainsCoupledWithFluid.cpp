@@ -949,11 +949,12 @@ void GrainsCoupledWithFluid::setPositionParticulesBloc(const PullMode& mode)
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Sauvegarde par defaut de l'etat initial pour post-processing
-void GrainsCoupledWithFluid::InitialPostProcessing()
+void GrainsCoupledWithFluid::InitialPostProcessing( size_t indent_width )
 {
   // Par defaut l'etat initial est sauvegarde
   if ( m_processorIsActiv )
-    m_composants.PostProcessing_start( m_temps, m_dt, m_sec, m_fenetres );
+    m_composants.PostProcessing_start( m_temps, m_dt, m_sec, m_fenetres,
+    	0, 1, NULL, indent_width );
 }
 
 
@@ -961,12 +962,13 @@ void GrainsCoupledWithFluid::InitialPostProcessing()
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Sauvegarde pour post-processing et restart
-void GrainsCoupledWithFluid::doPostProcessing()
+void GrainsCoupledWithFluid::doPostProcessing( size_t indent_width )
 {
   if ( m_processorIsActiv )
   {
     // Post processing
-    m_composants.PostProcessing( m_temps, m_dt, m_sec );
+    m_composants.PostProcessing( m_temps, m_dt, m_sec,
+    	0, 1, NULL, indent_width );
 
     // Sauvegarde du fichier de fin pour Reload
     saveReload( m_temps );

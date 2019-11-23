@@ -487,11 +487,9 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
   for (int k = 0; k < NPARTICLES; k++)
     p[k].tcells += allpts;
 
-  fprintf( stderr,"# Total Lagrange multipliers: %d, constrained cells: %d, "
-  	"Total cells: %d \n", lm, allpts, tcells );
-
   if ( pid() == 0 )
   {
+    printf( "      DLM points = %d, constrained cells = %d\n", lm, allpts );
     fprintf( cellvstime, "%d \t %d \t \t %d \t \t \t %d \n", i, lm, allpts, 
   	tcells );
     fflush( cellvstime );
@@ -1873,38 +1871,15 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
   // Once algorithm has converged
   if ( pid() == 0 )
   {
+    printf( "      niter = %d residual = %8.5e\n", ki, sqrt(DLM_nr2) );
     fprintf( converge,"%d \t %d \t \t %10.8e\n", i, ki, sqrt(DLM_nr2) );
     fflush( converge );
   }
-
-# if DLM_Moving_particle
-#   if TRANSLATION
-      fprintf (stderr,"DLMFD: particle-0's velocity on thread %d is (%20.18f, "
-  	"%20.18f, %20.18f)\n",pid(), (*U[0]).x, (*U[0]).y, (*U[0]).z);
-      coord cc = (*gci[0]).center;
-      fprintf (stderr,"DLMFD: particle-0's position on thread %d is (%20.18f, "
-  	"%20.18f, %20.18f)\n",pid(), cc.x, cc.y, cc.z);
-#    endif  
-#    if ROTATION
-       fprintf (stderr,"DLMFD: particle-0's rotation on thread %d is (%20.18f, "
-  	"%20.18f, %20.18f)\n",pid(), (*w[0]).x, (*w[0]).y, (*w[0]).z);
-#    endif  
-# endif
 
   
   /* Compute the explicit term here */
 # if DLM_alpha_coupling 
     boundary ((scalar*) {DLM_lambda});
-    coord nn = {0., 0., 0.};
-
-    foreach_dimension() 
-    {
-      nn.x = 0.;
-      norm n = normf (DLM_lambda.x);
-      nn.x = n.max;
-    }
-    fprintf (stderr, "# Lambda explicit term: max of each component (%g, "
-    	"%g, %g)\n",  nn.x, nn.y, nn.z); // log
 
     for (int k = 0; k < NPARTICLES; k++) 
     {

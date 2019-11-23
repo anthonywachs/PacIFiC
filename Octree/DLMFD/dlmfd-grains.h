@@ -98,7 +98,7 @@ event GranularSolver_predictor (t < -1.)
   if ( pid() == 0 ) 
   {
     // Output the call to Grains3D
-    printf ("# granular solver predictor step: calling Grains3D\n");
+    printf ("run Grains3D\n");
 
     // Set the fluid time step magnitude in Grains3D
     Setdt_Grains( dt );
@@ -126,8 +126,7 @@ event GranularSolver_predictor (t < -1.)
 event GranularSolver_updateVelocity (t < -1.)
 {
   // Output the call to Grains3D
-  if ( pid() == 0 ) printf ("# granular solver velocity update: "
-  	"sending velocity to Grains3D\n");
+  if ( pid() == 0 ) printf ("Grains3D\n");
 
   // Update Basilisk particle structure  
   UpdateBasiliskStructure( &BasiliskData[0], particles, NPARTICLES );

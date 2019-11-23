@@ -1517,7 +1517,8 @@ ostream& operator << ( ostream &f, const EnsComposant &EC )
 void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
 	LinkedCell const* LC, vector<Fenetre> const& insert_windows,
 	int rang, int nprocs,
-	MPIWrapperGrains const* wrapper )
+	MPIWrapperGrains const* wrapper,
+	size_t indent_width )
 {
   list<Particule*>* postProcessingParticules = NULL;
   list<Particule*>* postProcessingWait = NULL;
@@ -1525,12 +1526,13 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
   vector<Particule*>* particulespost = NULL;
   list<PostProcessingWriter*>::iterator pp;
   bool written = false ;
+  string const siw( indent_width, ' ' ) ;  
 
   if ( rang == 0 )
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
       if ( !(*pp)->isCompFeaturesWriter() && !written )
       {
-	cout << "Sortie resultats: START" << endl;
+	cout << siw << "Sortie resultats: START" << endl;
 	written = true;
       }
 
@@ -1555,7 +1557,8 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
   if ( nprocs > 1 && m_hasSerialPostProcessors )
   {
     if ( rang == 0 )
-      cout << "Copie des particules sur le master pour Post-processing" << endl;
+      cout << siw << "Copie des particules sur le master pour Post-processing" 
+      	<< endl;
 
     // Collecte les particules de tous les processeurs dans un vecteur
     // sur le master
@@ -1647,7 +1650,7 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
       if ( !(*pp)->isCompFeaturesWriter() && !written )
       {
-	cout << "Sortie resultats: COMPLETED" << endl;
+	cout << siw << "Sortie resultats: COMPLETED" << endl;
 	written = true;
       }
   if ( rang == 0 && Grains_Exec::m_ContactforceOutput )
@@ -1664,15 +1667,17 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
 // A.WACHS - Fev.2010 - Modification
 void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
 	LinkedCell const* LC, int rang,
-	int nprocs, MPIWrapperGrains const* wrapper )
+	int nprocs, MPIWrapperGrains const* wrapper,
+	size_t indent_width )
 {
   list<Particule*>* postProcessingParticules = NULL;
   list<Particule*>* postProcessingWait = NULL;
   list<Particule*>* postProcessingPeriodiques = NULL;
   vector<Particule*>* particulespost = NULL;
-
+  string const siw( indent_width, ' ' ) ;  
+  
   if ( rang == 0 )
-    cout << "Sortie resultats: START" << endl;
+    cout << siw << "Sortie resultats: START" << endl;
 
   // Dans le cas d'une simulation periodique ou la periodicite est geree
   // par le pattern MPI, il faut determiner les clones periodiques
@@ -1688,7 +1693,8 @@ void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
   if ( nprocs > 1 && m_hasSerialPostProcessors )
   {
     if ( rang == 0 )
-      cout << "Copie des particules sur le master pour Post-processing" << endl;
+      cout << siw << "Copie des particules sur le master pour Post-processing" 
+      	<< endl;
 
     // Collecte les particules de tous les processeurs dans un vecteur
     // sur le master
@@ -1787,7 +1793,7 @@ void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
   if ( Grains_Exec::m_MPIperiodique ) m_particulesClonesPeriodiques.clear();
 
   if ( rang == 0 )
-    cout << "Sortie resultats: COMPLETED" << endl;
+    cout << siw << "Sortie resultats: COMPLETED" << endl;
 }
 
 
