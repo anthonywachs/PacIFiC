@@ -115,8 +115,7 @@ public SolverComputingTime
       /** @name Basic discrete system building */
       //@{
       /** @brief Error compared to analytical solution */
-      void error_with_analytical_solution ( FV_DiscreteField const* FF,
-      	 FV_DiscreteField* FF_ERROR ) ;
+      void error_with_analytical_solution ( ) ;
 
       /** @brief Call the function to assemble 1D matrices for both velocity and pressure field*/
       void assemble_1D_matrices( FV_TimeIterator const* t_it ) ;
@@ -192,13 +191,11 @@ public SolverComputingTime
 
       void write_velocity_field( FV_TimeIterator const* t_it );
 
-      void get_velocity_divergence(void);
+      double get_velocity_divergence(void);
       
       void output_L2norm_pressure( size_t level );
 
       void output_L2norm_velocity( size_t level );
-
-      void compute_CFL( FV_TimeIterator const* t_it, size_t level ) const;
       //@}
 
 
@@ -249,6 +246,7 @@ public SolverComputingTime
       size_t AdvectionTimeAccuracy;
 
       bool b_restart ;
+      bool is_firstorder ;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;

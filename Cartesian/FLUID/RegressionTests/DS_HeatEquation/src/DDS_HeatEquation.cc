@@ -854,7 +854,7 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
 	   yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
 	   if (dim == 3) zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
 	   // Add bodyterm for first step of Crank_Nicolson scheme
-           value = -bodyterm_value(xC,yC,zC)*dC;
+           value = -bodyterm_value(xC,yC,zC)*dC/gamma;
 	}
      }
 

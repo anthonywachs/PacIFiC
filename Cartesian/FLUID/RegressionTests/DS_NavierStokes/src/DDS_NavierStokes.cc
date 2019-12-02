@@ -310,6 +310,10 @@ DDS_NavierStokes:: do_after_time_stepping( void )
    // write_velocity_field(t_it);
    // SCT_get_elapsed_time( "Writing CSV" );
 
+   output_L2norm_velocity(0);
+   output_L2norm_pressure(0);
+   //error_with_analytical_solution();
+
    if ( my_rank == is_master )
    {
      double cputime = CT_get_elapsed_time();
@@ -359,9 +363,8 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
    if ( my_rank == is_master ) cout << "velocity change = " <<
      	MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
 
-   get_velocity_divergence();
+   double vel_divergence = get_velocity_divergence();
 
-   //compute_CFL(t_it,0);
    double cfl = UF->compute_CFL( t_it, 0 );
    if ( my_rank == is_master )
       MAC::out() << "CFL: "<< cfl <<endl;
@@ -387,75 +390,72 @@ DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: error_with_analytical_solution (
-	FV_DiscreteField const* FF,
-	FV_DiscreteField* FF_ERROR )
+DDS_NavierStokes:: error_with_analytical_solution ( )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL(
    "DDS_NavierStokes:: error_with_analytical_solution" ) ;
 
    // Parameters
-   double x, y, z, computed_field, analytical_solution, error_L2 = 0. ;
+   double x, y, z;
+   size_t cpp; 
+   double bodyterm=0., height;
 
-   for (size_t comp=0;comp<nb_comps[1];++comp)
-   {
-     // Get nb of local dof
-     size_t_vector local_dof_number( dim, 0 );
-     for (size_t l=0;l<dim;++l)
-       local_dof_number(l) = FF->get_local_nb_dof( comp, l ) ;
+   // Periodic pressure gradient
+   if ( UF->primary_grid()->is_periodic_flow() ) {
+      cpp = UF->primary_grid()->get_periodic_flow_direction() ;
+      bodyterm = UF->primary_grid()->get_periodic_pressure_drop() / 
+               ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
+               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
+   }
 
-     // Compute error
-     error_L2 = 0. ;
-     for (size_t i=0;i<local_dof_number(0);++i)
-     {
-       x = FF->get_DOF_coordinate( i, comp, 0 ) ;
-       for (size_t j=0;j<local_dof_number(1);++j)
-       {
-         y = FF->get_DOF_coordinate( j, comp, 1 ) ;
+   height = ( UF->primary_grid()->get_main_domain_max_coordinate(1) - UF->primary_grid()->get_main_domain_min_coordinate(1) ) /2. ;
 
-         if ( dim == 2 )
+   for (size_t comp=0;comp<nb_comps[1];++comp) {
+      // Get nb of local dof
+      size_t_vector local_dof_number( dim, 0 );
+      for (size_t l=0;l<dim;++l)
+         local_dof_number(l) = UF->get_local_nb_dof( comp, l ) ;
 
-	 {
-	   size_t k = 0 ;
-	   computed_field = FF->DOF_value( i, j, k, comp, 0 ) ;
+      // Compute error
+      double computed_field = 0., analytical_solution = 0.;
+      double error_L2 = 0.;
+      for (size_t i=0;i<local_dof_number(0);++i) {
+         x = UF->get_DOF_coordinate( i, comp, 0 ) ;
+         for (size_t j=0;j<local_dof_number(1);++j) {
+            y = UF->get_DOF_coordinate( j, comp, 1 ) ;
 
-	   analytical_solution = MAC::sin( MAC::pi() * x )
-	   	* MAC::sin( MAC::pi() * y ) ;
+            if ( dim == 2 ) {
+               size_t k = 0 ;
+               computed_field = UF->DOF_value( i, j, k, comp, 0 ) ;
 
-	   FF_ERROR->set_DOF_value( i, j, k, comp, 0, MAC::abs( computed_field
-	   	- analytical_solution ) ) ;
+               if (comp == cpp) {
+                  analytical_solution = (bodyterm/(2.*mu))*((y-height)*(y-height)-height*height);
+               }
 
-	   if ( FF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) )
-	     error_L2 += MAC::sqr( computed_field - analytical_solution )
-	     	* FF->get_cell_measure( i, j, k, comp ) ;
-	 }
-	 else
-	 {
-	   for (size_t k=0;k<local_dof_number(2);++k)
-	   {
-             z = FF->get_DOF_coordinate( k, comp, 2 ) ;
-	     computed_field = FF->DOF_value( i, j, k, comp, 0 ) ;
+               if ( UF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) )
+	          error_L2 += MAC::sqr( computed_field - analytical_solution ) * UF->get_cell_measure( i, j, k, comp ) ;
+	    } else {
+               for (size_t k=0;k<local_dof_number(2);++k) {
+                  z = UF->get_DOF_coordinate( k, comp, 2 ) ;
+                  computed_field = UF->DOF_value( i, j, k, comp, 0 ) ;
 
-	     analytical_solution = MAC::sin( MAC::pi() * x )
-	   	* MAC::sin( MAC::pi() * y ) * MAC::sin( MAC::pi() * z ) ;
+                  if (comp == cpp) {
+                     analytical_solution = (bodyterm/(2.*mu))*(y*y-height*height);
+                  }
 
-	     FF_ERROR->set_DOF_value( i, j, k, comp, 0, MAC::abs( computed_field
-	   	- analytical_solution ) ) ;
+                  if ( UF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) )
+                     error_L2 += MAC::sqr( computed_field - analytical_solution ) * UF->get_cell_measure( i, j, k, comp ) ;
+	       }
+	    }
+         }
+      }
 
-             if ( FF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) )
-	       error_L2 += MAC::sqr( computed_field - analytical_solution )
-	     	* FF->get_cell_measure( i, j, k, comp ) ;
-	   }
-	 }
-       }
-     }
+      error_L2 = pelCOMM->sum( error_L2 );
+      error_L2 = MAC::sqrt(error_L2);
 
-     error_L2 = pelCOMM->sum( error_L2 ) ;
-     error_L2 = MAC::sqrt(error_L2);
-     if ( my_rank == 0 )
-       cout << "L2 Error without direction splitting, field " << FF->name() << ", component " << comp
-     	<< " = " << error_L2 << endl;
+      if ( my_rank == 0 )
+         cout << "L2 Error with analytical solution field " << UF->name() << ", component " << comp << " = " << std::fixed << std::setprecision(16) << error_L2 << endl;
    }
 
 }
@@ -883,7 +883,7 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double
      hl= UF->get_DOF_coordinate(i,comp,dir) - UF->get_DOF_coordinate(i-1,comp,dir) ;
      hr= UF->get_DOF_coordinate(i+1,comp,dir) - UF->get_DOF_coordinate(i,comp,dir) ;
 
-     dC = UF->get_cell_size(i,comp,dir)*rho ;
+     dC = UF->get_cell_size(i,comp,dir);
 
      // x direction
      if (dir == 0) {
@@ -898,11 +898,11 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double
 
      double temp_val=0.;
      if (dir == 0) {
-        temp_val = (UF->DOF_value(i,j,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+        temp_val = (UF->DOF_value(i,j,k,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
      } else if (dir == 1) {
-        temp_val = (UF->DOF_value(j,i,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+        temp_val = (UF->DOF_value(j,i,k,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
      } else if (dir == 2) {
-        temp_val = (UF->DOF_value(j,k,i,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+        temp_val = (UF->DOF_value(j,k,i,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
      }
 
      if (is_periodic[1][dir] == 0) {
@@ -1596,10 +1596,8 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    MAC_LABEL( "DDS_NavierStokes:: NS_velocity_update" ) ;
 
    double gamma=mu;
-   //if ( my_rank == is_master ) SCT_set_start("Explicit Velocity step");
-   assemble_DS_un_at_rhs(t_it,gamma);
-   //if ( my_rank == is_master ) SCT_get_elapsed_time( "Explicit Velocity step" );
 
+   assemble_DS_un_at_rhs(t_it,gamma);
    // Update gamma based for invidual direction
    gamma = mu/2.0;
 
@@ -1622,10 +1620,6 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
       // Tranfer back to field
       UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
    }
-
-   output_L2norm_velocity(0);
-   //output_L2norm_velocity(1);
-   //output_L2norm_velocity(2);
 
 }
 
@@ -1723,25 +1717,21 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec_P();
   // Tranfer back to field
-  PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
+  PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
   
   Solve_i_in_jk (PF,t_it,1,0,2,gamma,0);
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec_P();
   // Tranfer back to field
-  PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
+  PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
  
   if (dim == 3) { 
      Solve_i_in_jk (PF,t_it,2,0,1,gamma,0);
      // Synchronize the distributed DS solution vector
      GLOBAL_EQ->synchronize_DS_solution_vec_P();
      // Tranfer back to field
-     PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_velocity_P() ) ;
+     PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
   }
-  
-  // Debug
-  output_L2norm_pressure( 0 );
-  //output_L2norm_pressure( 1 );  
 }
 
 
@@ -1781,59 +1771,59 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
             k=0;
           
             xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-            // Divergence of un (x component)
+            // Divergence of un+1 (x component)
             xright = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
             xvalue1 = xright/xhr;
-            // Divergence of un+1 (x component)
+            // Divergence of un (x component)
             xright = UF->DOF_value( shift.i+i, j, k, 0, 1 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 1 ) ;
             xvalue2 = xright/xhr;      
-            xvalue = 0.5*(xvalue1+xvalue2);
+            xvalue = xvalue1+xvalue2;
 
             yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-            // Divergence of un (y component)
+            // Divergence of un+1 (y component)
             yright = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
             yvalue1 = yright/yhr;
-            // Divergence of un+1 (y component)
+            // Divergence of un (y component)
             yright = UF->DOF_value( i, shift.j+j, k, 1, 1 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 1 ) ;
             yvalue2 = yright/yhr;
-            yvalue = 0.5*(yvalue1+yvalue2);
+            yvalue = yvalue1+yvalue2;
 
             // Assemble the bodyterm
-            value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - kai*mu*(xvalue + yvalue);
+            value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - 0.5*kai*mu*(xvalue + yvalue);
 
             PF->set_DOF_value( i, j, k, 0, 0, value);
         } else {
             for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-               // Divergence of un (x component)
+               // Divergence of un+1 (x component)
                xright = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
                xvalue1 = xright/xhr;
-               // Divergence of un+1 (x component)
+               // Divergence of un (x component)
                xright = UF->DOF_value( shift.i+i, j, k, 0, 1 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 1 ) ;
                xvalue2 = xright/xhr;
-               xvalue = 0.5*(xvalue1+xvalue2);
+               xvalue = xvalue1+xvalue2;
 
                yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-               // Divergence of un (y component)            
+               // Divergence of un+1 (y component)            
                yright = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
                yvalue1 = yright/yhr;
-               // Divergence of un+1 (y component)
+               // Divergence of un (y component)
                yright = UF->DOF_value( i, shift.j+j, k, 1, 1 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 1 ) ;
                yvalue2 = yright/yhr;
-               yvalue = 0.5*(yvalue1+yvalue2);
+               yvalue = yvalue1+yvalue2;
 
                double zhr,zright,zvalue1=0.,zvalue2=0.,zvalue=0.;
                zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
-               // Divergence of un (z component)
+               // Divergence of un+1 (z component)
                zright = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
                zvalue1 = zright/zhr;
-               // Divergence of un+1 (z component)
+               // Divergence of un (z component)
                zright = UF->DOF_value( i, j, shift.k+k, 2, 1 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 1 ) ;
                zvalue2 = zright/zhr;            
-               zvalue = 0.5*(zvalue1+zvalue2);
+               zvalue = zvalue1+zvalue2;
 
                // Assemble the bodyterm
-               value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - kai*mu*(xvalue + yvalue+ zvalue);
+               value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - 0.5*kai*mu*(xvalue + yvalue+ zvalue);
                PF->set_DOF_value( i, j, k, 0, 0, value);
             }
          }
@@ -1956,7 +1946,7 @@ DDS_NavierStokes::write_velocity_field(FV_TimeIterator const* t_it)
 
 
 //----------------------------------------------------------------------
-void
+double
 DDS_NavierStokes::get_velocity_divergence(void)
 //----------------------------------------------------------------------
 {
@@ -2040,6 +2030,8 @@ DDS_NavierStokes::get_velocity_divergence(void)
   max_divu = pelCOMM->max( max_divu ) ;
   if ( my_rank == is_master )
     MAC::out() << "Norm L2 div(u) = "<< MAC::doubleToString( ios::scientific, 12, div_velocity ) << " Max div(u) = " << MAC::doubleToString( ios::scientific, 12, max_divu ) << endl;
+
+  return(max_divu);
 }
 
 
@@ -3258,100 +3250,4 @@ DDS_NavierStokes:: assemble_advection_TVD(
       flux = ( fto - fbo ) * dxC * dzC + ( fri - fle ) * dyC * dzC + ( ffr - fbe ) * dxC * dyC;
    }
    return ( coef * flux ); 
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokes:: compute_CFL( FV_TimeIterator const* t_it,
-  size_t level ) const
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokes:: compute_CFL" ); 
-   
-   double local_cfl = 0., CFL = 0., dl, velo = 0., dt = t_it->time_step() ;
-   size_t comp;
-  
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-
-   // X component
-   comp = 0;
-
-   // Get local max indices
-   for (size_t l=0;l<dim;++l) {
-     min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-     max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-   }
-
-   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {          
-      dl = UF->get_cell_size(i,comp,0) ;      
-      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-         if ( dim == 2 ) {
-            size_t k = 0 ;
-            velo = fabs( UF->DOF_value(i,j,k,comp,level));
-            local_cfl = velo * dt / dl;
-            CFL = local_cfl > CFL ? local_cfl : CFL; 
-         } else {
-            for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-               velo = fabs( UF->DOF_value(i,j,k,comp,level));
-               local_cfl = velo * dt / dl;
-               CFL = local_cfl > CFL ? local_cfl : CFL;
-            }
-         }
-      }
-   }
-    
-   // Y component
-   comp = 1;
-
-   // Get local max indices
-   for (size_t l=0;l<dim;++l) {
-     min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-     max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-   }
-
-   for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {          
-      dl = UF->get_cell_size(j,comp,1) ;      
-      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-         if ( dim == 2 ) {
-            size_t k = 0 ;
-            velo = fabs( UF->DOF_value(i,j,k,comp,level));
-            local_cfl = velo * dt / dl;
-            CFL = local_cfl > CFL ? local_cfl : CFL; 
-         } else {
-            for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-               velo = fabs( UF->DOF_value(i,j,k,comp,level));
-               local_cfl = velo * dt / dl;
-               CFL = local_cfl > CFL ? local_cfl : CFL;
-            }
-         }
-      }
-   }
-
-   if ( dim == 3 ) {
-      // Z component
-      comp = 2;
-
-      // Get local max indices
-      for (size_t l=0;l<dim;++l) {
-         min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-         max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-      }
-
-      for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {          
-         dl = UF->get_cell_size(k,comp,2) ;
-         for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-            for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-               velo = fabs( UF->DOF_value(i,j,k,comp,level));
-               local_cfl = velo * dt / dl;
-               CFL = local_cfl > CFL ? local_cfl : CFL;
-            }
-         } 
-      }
-   }
-   
-   double collective_CFL = MAC_Exec::communicator()->max(CFL);
-
-   // return collective_CFL;
-   if(my_rank == is_master) MAC::out()<<"CFL: "<<collective_CFL<<endl;
 }

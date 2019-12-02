@@ -421,10 +421,10 @@ DDS_NavierStokesSystem:: get_solution_DS_velocity( void ) const
 
 //----------------------------------------------------------------------
 LA_SeqVector const*
-DDS_NavierStokesSystem:: get_solution_DS_velocity_P( void ) const
+DDS_NavierStokesSystem:: get_solution_DS_pressure( void ) const
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_solution_DS_velocity_P" ) ;
+   MAC_LABEL( "DDS_NavierStokesSystem:: get_solution_DS_pressure" ) ;
 
    PF_NUM->scatter()->get( VEC_DS_PF, PF_DS_LOC ) ;
 

@@ -113,7 +113,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       LA_SeqVector const* get_solution_DS_velocity( void ) const ;
 
       /** @brief Return the DS pressure solution vector DS_PF */
-      LA_SeqVector const* get_solution_DS_velocity_P( void ) const ;
+      LA_SeqVector const* get_solution_DS_pressure( void ) const ;
 
       /** @brief Return the matrix system of spacial discretization */
       TDMatrix* get_A(size_t const field);
