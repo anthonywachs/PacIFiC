@@ -496,13 +496,13 @@ DDS_NavierStokes:: assemble_field_matrix (
       xR= FF->get_DOF_coordinate( i+1,comp, dir) ;
       xL= FF->get_DOF_coordinate( i-1, comp, dir) ;
 
-      dx = FF->get_cell_size( i,comp, 0 );
+      dx = FF->get_cell_size( i,comp, dir);
 
       dxr= xR - xC;
       dxl= xC - xL;
 
-      size_t k;
-      double value, unsteady_term=0.;
+      size_t k_min, k_max;
+      double value=0., unsteady_term=0.;
 
       if (field == 0) {
          right = -1.0/(dxr);
@@ -519,14 +519,10 @@ DDS_NavierStokes:: assemble_field_matrix (
       center = - (right+left);
 
       if (dim == 2) {
-         k = 0;
+         k_min = 0; k_max = 0;
       } else {
-         k = min_unknown_index(2);
+         k_min = min_unknown_index(2); k_max = max_unknown_index(2);
       }
-
-      value = center;
-
-      value = value + unsteady_term;
 
       bool r_bound = false;
       bool l_bound = false;
@@ -534,6 +530,43 @@ DDS_NavierStokes:: assemble_field_matrix (
       if ((is_periodic[field][dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
       // All the proc will have open left bound, except first proc for non periodic systems
       if ((is_periodic[field][dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
+
+      // Since, this function is used in all directions; 
+      // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
+      size_t ii=0,jj=0,kk=0;
+
+      // Condition for handling the pressure neumann conditions at wall
+      if (i==min_unknown_index(dir) && l_bound) {
+         if (dir == 0) {
+            ii = i-1; jj = min_unknown_index(1); kk = k_min;
+         } else if (dir == 1) {
+            ii = min_unknown_index(0); jj = i-1; kk = k_min;
+         } else if (dir == 2) {
+            ii = min_unknown_index(0); jj = min_unknown_index(1); kk = i-1;
+         }
+         if (FF->DOF_in_domain(ii,jj,kk,comp) && FF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+            value = center;
+         } else {
+            value = -right;
+         }
+      } else if (i==max_unknown_index(dir) && r_bound) {
+         if (dir == 0) {
+            ii = i+1; jj = max_unknown_index(1); kk = k_max;
+         } else if (dir == 1) {
+            ii = max_unknown_index(0); jj = i+1; kk = k_max;
+         } else if (dir == 2) {
+            ii = max_unknown_index(0); jj = max_unknown_index(1); kk = i+1;
+         }
+         if (FF->DOF_in_domain(ii,jj,kk,comp) && FF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+            value = center;
+         } else {
+            value = -left;
+         }
+      } else {
+         value = center;
+      }
+
+      value = value + unsteady_term;
 
       // Set Aie, Aei and Ae 
       if ((!l_bound) && (i == min_unknown_index(dir))) {
@@ -1344,7 +1377,6 @@ DDS_NavierStokes:: compute_adv_component ( size_t const& comp, size_t i, size_t 
    }
 
    return(value);
-
 }
 
 //---------------------------------------------------------------------------
