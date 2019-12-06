@@ -823,7 +823,6 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
   }
   
   PF->set_neumann_DOF_values();
-  // What to do for periodic conditions in this function??????????????????
 }
 
 //---------------------------------------------------------------------------
@@ -1707,12 +1706,10 @@ DDS_NavierStokes:: pressure_local_rhs ( size_t const& j, size_t const& k, FV_Tim
          } else {
             value = -(rho*(xvalue + yvalue + zvalue)*dx)/(t_it -> time_step());
          }
-      } else {
-         if (dir == 1) {
-            value = PF->DOF_value( j, i, k, 0, 1 )*dx;
-         } else if (dir == 2) {
-            value = PF->DOF_value( j, k, i, 0, 1 )*dx;
-         }
+      } else if (dir == 1) {
+         value = PF->DOF_value( j, i, k, 0, 1 )*dx;
+      } else if (dir == 2) {
+         value = PF->DOF_value( j, k, i, 0, 1 )*dx;
       }
 
       pos = i - min_unknown_index(dir);

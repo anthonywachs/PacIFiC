@@ -209,6 +209,8 @@ DDS_HeatEquation:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
 
+   allocate_mpi_variables();
+
    // Direction splitting
    // Assemble 1D tridiagonal matrices and schur complement calculation
    assemble_temperature_and_schur(t_it);
@@ -307,6 +309,8 @@ DDS_HeatEquation:: do_after_time_stepping( void )
    //DS_error_with_analytical_solution(TF,TF_DS_ERROR);
    GLOBAL_EQ->display_debug();
    output_l2norm();
+
+   deallocate_mpi_variables();
 }
 
 //---------------------------------------------------------------------------
@@ -821,7 +825,7 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
    int m;
 
    // Compute VEC_rhs_x = rhs in x
-   double dC,hr=0,hl=0,right=0,left=0,xC,yC,zC=0;
+   double dC,xC,yC,zC=0;
    double fe=0.;
 
    // Vector for fi
@@ -832,9 +836,6 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
      pos = i - min_unknown_index(dir);
 
      // Get contribution of un
-     hl= TF->get_DOF_coordinate(i,comp,dir) - TF->get_DOF_coordinate(i-1,comp,dir) ;
-     hr= TF->get_DOF_coordinate(i+1,comp,dir) - TF->get_DOF_coordinate(i,comp,dir) ;
-
      dC = TF->get_cell_size(i,comp,dir) ;
 
      if (!is_firstorder) {
@@ -952,10 +953,12 @@ DDS_HeatEquation:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: data_packing ( size_t const& j, size_t const& k, double * packed_data, double fe, size_t const& comp, size_t const dir)
+DDS_HeatEquation:: data_packing ( size_t const& j, size_t const& k, double fe, size_t const& comp, size_t const dir)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
+
+   double *packed_data = first_pass[dir].send[comp][rank_in_i[dir]]; 
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
@@ -1014,7 +1017,7 @@ DDS_HeatEquation:: data_packing ( size_t const& j, size_t const& k, double * pac
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p)
+DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, size_t const dir, size_t p)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
@@ -1027,24 +1030,24 @@ DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, double ** all_rece
 
    // If periodic in x, first proc contributes to last interface unknown
    if (is_iperiodic[dir])
-      VEC[dir].T[comp]->set_item(nb_ranks_comm_i[dir]-1,packed_data[3*p]);
-   VEC[dir].T[comp]->set_item(0,packed_data[3*p+1]);
-   VEC[dir].interface_T[comp]->set_item(0,packed_data[3*p+2]);
+      VEC[dir].T[comp]->set_item(nb_ranks_comm_i[dir]-1,first_pass[dir].send[comp][rank_in_i[dir]][3*p]);
+   VEC[dir].T[comp]->set_item(0,first_pass[dir].send[comp][rank_in_i[dir]][3*p+1]);
+   VEC[dir].interface_T[comp]->set_item(0,first_pass[dir].send[comp][rank_in_i[dir]][3*p+2]);
 
    // Vec_temp might contain previous values
    for (size_t i=1;i<nb_ranks_comm_i[dir];i++) {
       if (i!=nb_ranks_comm_i[dir]-1) {
-         VEC[dir].T[comp]->add_to_item(i-1,all_received_data[i][3*p]);
-         VEC[dir].T[comp]->add_to_item(i,all_received_data[i][3*p+1]);
-         VEC[dir].interface_T[comp]->set_item(i,all_received_data[i][3*p+2]);  // Assemble the interface rhs fe
+         VEC[dir].T[comp]->add_to_item(i-1,first_pass[dir].receive[comp][i][3*p]);
+         VEC[dir].T[comp]->add_to_item(i,first_pass[dir].receive[comp][i][3*p+1]);
+         VEC[dir].interface_T[comp]->set_item(i,first_pass[dir].receive[comp][i][3*p+2]);  // Assemble the interface rhs fe
       } else {
          if (is_iperiodic[dir] ==0) {
-            VEC[dir].T[comp]->add_to_item(i-1,all_received_data[i][3*p]);
+            VEC[dir].T[comp]->add_to_item(i-1,first_pass[dir].receive[comp][i][3*p]);
          } else {
-            VEC[dir].T[comp]->add_to_item(i-1,all_received_data[i][3*p]);
+            VEC[dir].T[comp]->add_to_item(i-1,first_pass[dir].receive[comp][i][3*p]);
             // If periodic in x, last proc has an interface unknown
-            VEC[dir].T[comp]->add_to_item(i,all_received_data[i][3*p+1]);
-            VEC[dir].interface_T[comp]->set_item(i,all_received_data[i][3*p+2]);
+            VEC[dir].T[comp]->add_to_item(i,first_pass[dir].receive[comp][i][3*p+1]);
+            VEC[dir].interface_T[comp]->set_item(i,first_pass[dir].receive[comp][i][3*p+2]);
          }
       }
    }
@@ -1059,14 +1062,14 @@ DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, double ** all_rece
    // Pack the interface_rhs_x into the appropriate send_data
    for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
       if (i!=nb_ranks_comm_i[dir]-1) {
-         all_send_data[i][2*p+0] = VEC[dir].interface_T[comp]->item(i-1);
-         all_send_data[i][2*p+1] = VEC[dir].interface_T[comp]->item(i);
+         second_pass[dir].send[comp][i][2*p+0] = VEC[dir].interface_T[comp]->item(i-1);
+         second_pass[dir].send[comp][i][2*p+1] = VEC[dir].interface_T[comp]->item(i);
       } else {
-         all_send_data[i][2*p+0] = VEC[dir].interface_T[comp]->item(i-1);
+         second_pass[dir].send[comp][i][2*p+0] = VEC[dir].interface_T[comp]->item(i-1);
          if (is_iperiodic[dir])
-            all_send_data[i][2*p+1] = VEC[dir].interface_T[comp]->item(i);
+            second_pass[dir].send[comp][i][2*p+1] = VEC[dir].interface_T[comp]->item(i);
          else
-            all_send_data[i][2*p+1] = 0;
+            second_pass[dir].send[comp][i][2*p+1] = 0;
       }
    }
    
@@ -1094,12 +1097,9 @@ DDS_HeatEquation:: unpack_ue(size_t const& comp, double * received_data, size_t 
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: solve_interface_unknowns ( double * packed_data, size_t nb_received_data, double gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const dir)
+DDS_HeatEquation:: solve_interface_unknowns ( double gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const dir)
 //---------------------------------------------------------------------------
 {
-   size_t i,j,p;
-   size_t k = 0;
-
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
@@ -1112,8 +1112,7 @@ DDS_HeatEquation:: solve_interface_unknowns ( double * packed_data, size_t nb_re
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
 
    // Array declaration for sending data from master to all slaves
-   double ** all_send_data = new double* [nb_ranks_comm_i[dir]];
-   size_t nb_send_data=0, local_length_j=0, local_length_k=0;
+   size_t local_length_j=0;
    size_t local_min_j=0, local_max_j=0;
    size_t local_min_k=0, local_max_k=0;
 
@@ -1139,42 +1138,26 @@ DDS_HeatEquation:: solve_interface_unknowns ( double * packed_data, size_t nb_re
    }
 
    local_length_j = (local_max_j-local_min_j+1);
-   local_length_k = (local_max_k-local_min_k+1);
-
-   if (dim != 3) {
-      nb_send_data = 2*local_length_j;
-   } else if (dim == 3) {
-      nb_send_data = 2*local_length_j*local_length_k;
-   }
-
-   for (p = 0; p < nb_ranks_comm_i[dir]; ++p) {
-      all_send_data[p] = new double[nb_send_data];
-   }
-
 
    // Send and receive the data first pass
    if ( rank_in_i[dir] == 0 ) {
-      // Array declaration for receiving data from all slaves
-      double ** all_received_data = new double* [nb_ranks_comm_i[dir]];
-      for(p = 0; p < nb_ranks_comm_i[dir]; ++p) {
-          all_received_data[p] = new double[nb_received_data];
-      }
       // Receiving data from all the slave procs iff multi processors are used
       if (nb_ranks_comm_i[dir] != 1) {
-         for (i=1;i<nb_ranks_comm_i[dir];++i) {
+         for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
             static MPI_Status status;
-            MPI_Recv( all_received_data[i], nb_received_data, MPI_DOUBLE, i, 0,
+            MPI_Recv( first_pass[dir].receive[comp][i], first_pass[dir].size[comp], MPI_DOUBLE, i, 0,
                                              DDS_Comm_i[dir], &status ) ;
          }
       }
 
       // Solve system of interface unknowns for each y
       if (dim == 2) {
-         for (j=local_min_j;j<=local_max_j;j++) {
+         size_t k = 0;
+         for (size_t j=local_min_j;j<=local_max_j;j++) {
 
-     	    p = j-local_min_j;
+     	    size_t p = j-local_min_j;
 
-	    unpack_compute_ue_pack(comp,all_received_data,packed_data,all_send_data,dir,p); 
+	    unpack_compute_ue_pack(comp,dir,p); 
 
             // Need to have the original rhs function assembled for corrosponding j,k pair
             double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
@@ -1184,15 +1167,14 @@ DDS_HeatEquation:: solve_interface_unknowns ( double * packed_data, size_t nb_re
 
             // Solve ui and transfer solution into distributed vector
             GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir);
-
          }
       } else {
-         for (k=local_min_k;k<=local_max_k;k++) {
-            for (j=local_min_j;j<=local_max_j;j++) {
+         for (size_t k=local_min_k;k<=local_max_k;k++) {
+            for (size_t j=local_min_j;j<=local_max_j;j++) {
 
-   	       p = (j-local_min_j)+local_length_j*(k-local_min_k);
+   	       size_t p = (j-local_min_j)+local_length_j*(k-local_min_k);
 
-	       unpack_compute_ue_pack(comp,all_received_data,packed_data,all_send_data,dir,p); 
+	       unpack_compute_ue_pack(comp,dir,p); 
 
                // Need to have the original rhs function assembled for corrosponding j,k pair
                double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
@@ -1205,41 +1187,31 @@ DDS_HeatEquation:: solve_interface_unknowns ( double * packed_data, size_t nb_re
             }
          }
       }
-
-      for (p = 0; p < nb_ranks_comm_i[dir]; ++p) delete [] all_received_data[p];
-      delete [] all_received_data;
-
    } else {
       // Send the packed data to master
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
+      MPI_Send( first_pass[dir].send[comp][rank_in_i[dir]], first_pass[dir].size[comp], MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
    }
 
    // Send the data from master iff multi processor are used
    if (nb_ranks_comm_i[dir] != 1) {
       if ( rank_in_i[dir] == 0 ) {
-         for (i=1;i<nb_ranks_comm_i[dir];++i) {
-            MPI_Send( all_send_data[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[dir] ) ;
+         for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
+            MPI_Send( second_pass[dir].send[comp][i], second_pass[dir].size[comp], MPI_DOUBLE, i, 0, DDS_Comm_i[dir] ) ;
          }
       } else {
          // Create the container to receive the ue
-         if (dim==2)
-            nb_received_data = 2*local_length_j;
-         else
-            nb_received_data = 2*local_length_j*local_length_k;
-
-         double * received_data = new double [nb_received_data];
-
          static MPI_Status status ;
-         MPI_Recv( received_data, nb_received_data, MPI_DOUBLE, 0, 0,
+         MPI_Recv( second_pass[dir].receive[comp][rank_in_i[dir]], second_pass[dir].size[comp], MPI_DOUBLE, 0, 0,
                              DDS_Comm_i[dir], &status ) ;
 
          // Solve the system of equations in each proc
 
          if (dim == 2) {
-            for (j = local_min_j;j<=local_max_j;j++) {
-               p = j-local_min_j;
+            size_t k = 0;
+            for (size_t j = local_min_j;j<=local_max_j;j++) {
+               size_t p = j-local_min_j;
 
-               unpack_ue(comp,received_data,dir,p);
+               unpack_ue(comp,second_pass[dir].receive[comp][rank_in_i[dir]],dir,p);
 
                // Need to have the original rhs function assembled for corrosponding j,k pair
                double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
@@ -1251,11 +1223,11 @@ DDS_HeatEquation:: solve_interface_unknowns ( double * packed_data, size_t nb_re
                GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir);
             }
          } else {
-            for (k = local_min_k;k<=local_max_k;k++) {
-               for (j = local_min_j;j<=local_max_j;j++) {
-                  p = (j-local_min_j)+local_length_j*(k-local_min_k);
+            for (size_t k = local_min_k;k<=local_max_k;k++) {
+               for (size_t j = local_min_j;j<=local_max_j;j++) {
+                  size_t p = (j-local_min_j)+local_length_j*(k-local_min_k);
 
-	          unpack_ue(comp,received_data,dir,p);
+	          unpack_ue(comp,second_pass[dir].receive[comp][rank_in_i[dir]],dir,p);
 
                   // Need to have the original rhs function assembled for corrosponding j,k pair
                   double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
@@ -1268,13 +1240,8 @@ DDS_HeatEquation:: solve_interface_unknowns ( double * packed_data, size_t nb_re
                }
             }
          }
-         delete [] received_data;
       }
    }
-
-   for (p = 0; p < nb_ranks_comm_i[dir]; ++p) delete [] all_send_data[p];
-   delete [] all_send_data;
-
 }
 
 //---------------------------------------------------------------------------
@@ -1295,16 +1262,11 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double gamma, si
      size_t local_min_k = 0;
      size_t local_max_k = 0;
 
-     size_t nb_send_data=0;
-     if (dim == 2) {
-        nb_send_data = 3*(max_unknown_index(dir_j)-min_unknown_index(dir_j)+1);
-     } else if (dim == 3) {
-        nb_send_data = 3*(max_unknown_index(dir_j)-min_unknown_index(dir_j)+1)*(max_unknown_index(dir_k)-min_unknown_index(dir_k)+1);
+     if (dim == 3) {
         local_min_k = min_unknown_index(dir_k);
         local_max_k = max_unknown_index(dir_k);
      }
 
-     double * packed_data = new double[nb_send_data];
      LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
      TDMatrix* A = GLOBAL_EQ->get_A();
 
@@ -1317,10 +1279,10 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double gamma, si
               // Calculate Aei*ui in each proc locally
               compute_Aei_ui(A,VEC,comp,dir_i);
               // Pack Aei_ui and fe for sending it to master
-              data_packing (j,k,packed_data,fe,comp,dir_i);
+              data_packing (j,k,fe,comp,dir_i);
 	   }
         }
-        solve_interface_unknowns ( packed_data, nb_send_data, gamma, t_it,comp,dir_i );
+        solve_interface_unknowns (gamma,t_it,comp,dir_i);
 
      } else if (is_iperiodic[dir_i] == 0) {  // Serial mode with non-periodic condition
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
@@ -1330,7 +1292,6 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double gamma, si
            }
         }
      }
-     delete [] packed_data;
   }
 }
 
@@ -1631,6 +1592,110 @@ DDS_HeatEquation:: processor_splitting ( int color, int key, size_t const dir )
    MPI_Comm_size( DDS_Comm_i[dir], &nb_ranks_comm_i[dir] ) ;
    MPI_Comm_rank( DDS_Comm_i[dir], &rank_in_i[dir] ) ;
 
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_HeatEquation:: allocate_mpi_variables ( void )
+//---------------------------------------------------------------------------
+{
+
+   for (size_t dir = 0; dir < dim; dir++) {  
+      first_pass[dir].size = new int [nb_comps];
+      second_pass[dir].size = new int [nb_comps];
+      for (size_t comp = 0; comp < nb_comps; comp++) {
+         size_t local_min_j=0, local_max_j=0;
+         size_t local_min_k=0, local_max_k=0;
+
+         // Get local min and max indices
+         size_t_vector min_unknown_index(dim,0);
+         size_t_vector max_unknown_index(dim,0);
+         for (size_t l=0;l<dim;++l) {
+            min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+            max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+         }
+
+         if (dir == 0) {
+            local_min_j = min_unknown_index(1);
+            local_max_j = max_unknown_index(1);
+            if (dim == 3) {
+               local_min_k = min_unknown_index(2);
+               local_max_k = max_unknown_index(2);
+            }
+         } else if (dir == 1) {
+            local_min_j = min_unknown_index(0);
+            local_max_j = max_unknown_index(0);
+            if (dim == 3) {
+               local_min_k = min_unknown_index(2);
+               local_max_k = max_unknown_index(2);
+            }
+         } else if (dir == 2) {
+            local_min_j = min_unknown_index(0);
+            local_max_j = max_unknown_index(0);
+            local_min_k = min_unknown_index(1);
+            local_max_k = max_unknown_index(1);
+         }
+
+         size_t local_length_j = (local_max_j-local_min_j+1);
+         size_t local_length_k = (local_max_k-local_min_k+1);
+
+         if (dim != 3) {
+            first_pass[dir].size[comp] = 3*local_length_j;
+            second_pass[dir].size[comp] = 2*local_length_j;
+         } else if (dim == 3) {
+            first_pass[dir].size[comp] = 3*local_length_j*local_length_k;
+            second_pass[dir].size[comp] = 2*local_length_j*local_length_k;
+         }
+      }
+   }
+
+   // Array declarations
+   for (size_t dir = 0; dir < dim; dir++) {  
+      first_pass[dir].send = new double** [nb_comps];
+      first_pass[dir].receive = new double** [nb_comps];
+      second_pass[dir].send = new double** [nb_comps];
+      second_pass[dir].receive = new double** [nb_comps];
+      for (size_t comp = 0; comp < nb_comps; comp++) {
+         first_pass[dir].send[comp] = new double* [nb_ranks_comm_i[dir]];
+         first_pass[dir].receive[comp] = new double* [nb_ranks_comm_i[dir]];
+         second_pass[dir].send[comp] = new double* [nb_ranks_comm_i[dir]];
+         second_pass[dir].receive[comp] = new double* [nb_ranks_comm_i[dir]];
+         for (size_t i = 0; i < nb_ranks_comm_i[dir]; i++) {
+            first_pass[dir].send[comp][i] = new double[first_pass[dir].size[comp]];
+            first_pass[dir].receive[comp][i] = new double[first_pass[dir].size[comp]];
+            second_pass[dir].send[comp][i] = new double[second_pass[dir].size[comp]];
+            second_pass[dir].receive[comp][i] = new double[second_pass[dir].size[comp]];
+         }
+      }
+   }
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_HeatEquation:: deallocate_mpi_variables ( void )
+//---------------------------------------------------------------------------
+{
+   // Array declarations
+   for (size_t dir = 0; dir < dim; dir++) {
+      for (size_t comp = 0; comp < nb_comps; comp++) {
+         for (size_t i = 0; i < nb_ranks_comm_i[dir]; i++) {
+            delete first_pass[dir].send[comp][i];
+            delete first_pass[dir].receive[comp][i];
+            delete second_pass[dir].send[comp][i];
+            delete second_pass[dir].receive[comp][i];
+         }
+         delete [] first_pass[dir].send[comp];
+         delete [] first_pass[dir].receive[comp];
+         delete [] second_pass[dir].send[comp];
+         delete [] second_pass[dir].receive[comp];
+      }
+      delete [] first_pass[dir].send;
+      delete [] first_pass[dir].receive;
+      delete [] second_pass[dir].send;
+      delete [] second_pass[dir].receive;
+      delete [] first_pass[dir].size;
+      delete [] second_pass[dir].size;
+   }
 }
 
 //---------------------------------------------------------------------------

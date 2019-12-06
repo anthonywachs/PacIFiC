@@ -32,6 +32,20 @@ Equation: dT/dt = ( 1 / Pe ) * lap(T) + bodyterm, where Pe is the Peclet number.
 
 @author A. Wachs - Pacific project 2017 */
 
+/** @brief MPIVar include all vectors required while message passing */
+/*struct MPIVar {
+   size_t *first_size;
+   size_t *second_pass_size;
+   double ***first_send;
+   double ***second_pass;
+};*/
+
+struct MPIVar {
+   int *size;
+   double ***send;
+   double ***receive;
+};
+
 class DDS_HeatEquation : public FV_OneStepIteration, public ComputingTime,
 public SolverComputingTime
 {
@@ -154,16 +168,16 @@ public SolverComputingTime
       void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const dir);
 
       /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */ 
-      void data_packing ( size_t const& j, size_t const& k, double * packed_data, double fe, size_t const& comp, size_t const dir);
+      void data_packing ( size_t const& j, size_t const& k, double fe, size_t const& comp, size_t const dir);
 
       /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */ 
-      void unpack_compute_ue_pack(size_t const& comp,double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p);
+      void unpack_compute_ue_pack(size_t const& comp, size_t const dir, size_t p);
 
       /** @brief Unpack the interface variable sent by master processor to slave processor */ 
       void unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p);
 
       /** @brief Call the appropriate functions to solve local variable and interface unknown */ 
-      void solve_interface_unknowns(double * packed_data,size_t nb_send_data, double gamma,FV_TimeIterator const* t_it, size_t const& comp, size_t const dir );
+      void solve_interface_unknowns(double gamma,FV_TimeIterator const* t_it, size_t const& comp, size_t const dir );
       
       /** @brief Call the appropriate functions to solve any particular direction in the other directions */ 
       void HeatEquation_DirectionSplittingSolver( FV_TimeIterator const* t_it ) ;
@@ -188,6 +202,10 @@ public SolverComputingTime
       /** @brief Create the sub-communicators */
       void create_DDS_subcommunicators ( void ) ;
       void processor_splitting ( int color, int key, size_t const dir );
+
+      void allocate_mpi_variables (void);
+      void deallocate_mpi_variables ( void );
+
 
       /** @brief Free the sub-communicators */
       void free_DDS_subcommunicators ( void ) ;
@@ -220,6 +238,9 @@ public SolverComputingTime
 
       int rank_in_i[3];
       int nb_ranks_comm_i[3];
+
+      struct MPIVar first_pass[3];
+      struct MPIVar second_pass[3];
       
       double peclet ;
       bool b_bodyterm ;
