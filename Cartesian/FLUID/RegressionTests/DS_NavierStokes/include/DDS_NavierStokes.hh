@@ -31,6 +31,13 @@ Equation: dT/dt = ( 1 / Pe ) * lap(T) + bodyterm, where Pe is the Peclet number.
 
 @author A. Wachs - Pacific project 2017 */
 
+/** @brief MPIVar include all vectors required while message passing */
+struct MPIVar {
+   int *size;
+   double ***send;
+   double ***receive;
+};
+
 class DDS_NavierStokes : public FV_OneStepIteration, public ComputingTime,
 public SolverComputingTime
 {
@@ -158,14 +165,14 @@ public SolverComputingTime
       double pressure_local_rhs( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const dir );
 
       /** @brief Solve interface unknowns for both fields in any particular direction */
-      void solve_interface_unknowns( FV_DiscreteField* FF, double* packed_data,size_t nb_send_data,double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field );
+      void solve_interface_unknowns( FV_DiscreteField* FF, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field );
       /** @brief Unpack the interface variable sent by master processor to slave processor */
       void unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p, size_t const field);
       /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */
-      void unpack_compute_ue_pack(size_t const& comp, double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p, size_t const field);
+      void unpack_compute_ue_pack(size_t const& comp, size_t const dir, size_t p, size_t const field);
 
       /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */
-      void data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double * packed_data, double fe, size_t const& comp, size_t const dir, size_t const field);
+      void data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double fe, size_t const& comp, size_t const dir, size_t const field);
       /** @brief Compute Aei*(Aii)-1*fi required to compute interface unknown */
       void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const dir);
 
@@ -173,7 +180,7 @@ public SolverComputingTime
       void DS_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const dir, size_t const field ) ;
       
       /** @brief Solve i in j and k; e.g. solve x in y ank z */
-      void Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, size_t const gamma, size_t const field );
+      void Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, double const gamma, size_t const field );
 
       /** Pressure predictor */
       void NS_first_step( FV_TimeIterator const* t_it ) ;
@@ -206,6 +213,9 @@ public SolverComputingTime
       void create_DDS_subcommunicators ( void ) ;
       void processor_splitting ( int color, int key, size_t const dir );
 
+      void allocate_mpi_variables (FV_DiscreteField const* FF, size_t const field);
+      void deallocate_mpi_variables (size_t const field);
+
       /** @brief Free the sub-communicators */
       void free_DDS_subcommunicators ( void ) ;
 
@@ -237,6 +247,10 @@ public SolverComputingTime
 
       int rank_in_i[3];
       int nb_ranks_comm_i[3];
+
+      struct MPIVar first_pass[2][3];           // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      struct MPIVar second_pass[2][3];          // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+
 
       double peclet ;
       double rho;

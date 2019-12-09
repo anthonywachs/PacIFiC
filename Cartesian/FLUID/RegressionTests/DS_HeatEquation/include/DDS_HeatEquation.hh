@@ -33,13 +33,6 @@ Equation: dT/dt = ( 1 / Pe ) * lap(T) + bodyterm, where Pe is the Peclet number.
 @author A. Wachs - Pacific project 2017 */
 
 /** @brief MPIVar include all vectors required while message passing */
-/*struct MPIVar {
-   size_t *first_size;
-   size_t *second_pass_size;
-   double ***first_send;
-   double ***second_pass;
-};*/
-
 struct MPIVar {
    int *size;
    double ***send;

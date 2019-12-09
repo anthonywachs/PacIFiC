@@ -1679,10 +1679,10 @@ DDS_HeatEquation:: deallocate_mpi_variables ( void )
    for (size_t dir = 0; dir < dim; dir++) {
       for (size_t comp = 0; comp < nb_comps; comp++) {
          for (size_t i = 0; i < nb_ranks_comm_i[dir]; i++) {
-            delete first_pass[dir].send[comp][i];
-            delete first_pass[dir].receive[comp][i];
-            delete second_pass[dir].send[comp][i];
-            delete second_pass[dir].receive[comp][i];
+            delete [] first_pass[dir].send[comp][i];
+            delete [] first_pass[dir].receive[comp][i];
+            delete [] second_pass[dir].send[comp][i];
+            delete [] second_pass[dir].receive[comp][i];
          }
          delete [] first_pass[dir].send[comp];
          delete [] first_pass[dir].receive[comp];

@@ -279,6 +279,9 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
 
+   allocate_mpi_variables(PF,0);
+   allocate_mpi_variables(UF,1);
+
    // Initialize velocity vector at the matrix level
    GLOBAL_EQ->initialize_DS_velocity();
    GLOBAL_EQ->initialize_DS_pressure();
@@ -292,9 +295,6 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    stop_total_timer() ;
 
 }
-
-
-
 
 //---------------------------------------------------------------------------
 void
@@ -321,10 +321,10 @@ DDS_NavierStokes:: do_after_time_stepping( void )
      write_elapsed_time_smhd(cout,cputime,"Computation time");
      SCT_get_summary(cout,cputime);
    }
+
+   deallocate_mpi_variables(0);
+   deallocate_mpi_variables(1);
 }
-
-
-
 
 //---------------------------------------------------------------------------
 void
@@ -901,7 +901,7 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double
    int m;
 
    // Compute VEC_rhs_x = rhs in x
-   double dC,hr=0,hl=0,right=0,left=0,xC,yC,zC=0;
+   double dC,hr=0,hl=0;//,right=0,left=0,xC,yC,zC=0;
    double fe=0.;
 
    // Vector for fi
@@ -999,7 +999,7 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_received_data, double * packed_data, double ** all_send_data, size_t const dir, size_t p, size_t const field)
+DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, size_t const dir, size_t p, size_t const field)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: unpack_compute_ue_pack" ) ;  
@@ -1014,25 +1014,25 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_rece
    }
 
    if (is_periodic[field][dir])
-      VEC[dir].T[comp]->set_item(nb_ranks_comm_i[dir]-1,packed_data[3*p]);
-   VEC[dir].T[comp]->set_item(0,packed_data[3*p+1]);
-   VEC[dir].interface_T[comp]->set_item(0,packed_data[3*p+2]);
+      VEC[dir].T[comp]->set_item(nb_ranks_comm_i[dir]-1,first_pass[field][dir].send[comp][rank_in_i[dir]][3*p]);
+   VEC[dir].T[comp]->set_item(0,first_pass[field][dir].send[comp][rank_in_i[dir]][3*p+1]);
+   VEC[dir].interface_T[comp]->set_item(0,first_pass[field][dir].send[comp][rank_in_i[dir]][3*p+2]);
 
    // Vec_temp might contain previous values
 
    for (size_t i=1;i<nb_ranks_comm_i[dir];i++) {
       if (i!=nb_ranks_comm_i[dir]-1) {
-         VEC[dir].T[comp]->add_to_item(i-1,all_received_data[i][3*p]);
-         VEC[dir].T[comp]->add_to_item(i,all_received_data[i][3*p+1]);
-         VEC[dir].interface_T[comp]->set_item(i,all_received_data[i][3*p+2]);  // Assemble the interface rhs fe
+         VEC[dir].T[comp]->add_to_item(i-1,first_pass[field][dir].receive[comp][i][3*p]);
+         VEC[dir].T[comp]->add_to_item(i,first_pass[field][dir].receive[comp][i][3*p+1]);
+         VEC[dir].interface_T[comp]->set_item(i,first_pass[field][dir].receive[comp][i][3*p+2]);  // Assemble the interface rhs fe
       } else {
          if (is_periodic[field][dir] ==0) {
-            VEC[dir].T[comp]->add_to_item(i-1,all_received_data[i][3*p]);
+            VEC[dir].T[comp]->add_to_item(i-1,first_pass[field][dir].receive[comp][i][3*p]);
          } else{
-            VEC[dir].T[comp]->add_to_item(i-1,all_received_data[i][3*p]);
+            VEC[dir].T[comp]->add_to_item(i-1,first_pass[field][dir].receive[comp][i][3*p]);
             // If periodic in x, last proc has an interface unknown
-            VEC[dir].T[comp]->add_to_item(i,all_received_data[i][3*p+1]);
-            VEC[dir].interface_T[comp]->set_item(i,all_received_data[i][3*p+2]);
+            VEC[dir].T[comp]->add_to_item(i,first_pass[field][dir].receive[comp][i][3*p+1]);
+            VEC[dir].interface_T[comp]->set_item(i,first_pass[field][dir].receive[comp][i][3*p+2]);
          }
       }
    }
@@ -1046,14 +1046,14 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, double ** all_rece
 
    for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
       if (i != nb_ranks_comm_i[dir]-1) {
-         all_send_data[i][2*p+0]=VEC[dir].interface_T[comp]->item(i-1);
-         all_send_data[i][2*p+1]=VEC[dir].interface_T[comp]->item(i);
+         second_pass[field][dir].send[comp][i][2*p+0]=VEC[dir].interface_T[comp]->item(i-1);
+         second_pass[field][dir].send[comp][i][2*p+1]=VEC[dir].interface_T[comp]->item(i);
       } else {
-         all_send_data[i][2*p+0]=VEC[dir].interface_T[comp]->item(i-1);
+         second_pass[field][dir].send[comp][i][2*p+0]=VEC[dir].interface_T[comp]->item(i-1);
          if (is_periodic[field][dir])
-            all_send_data[i][2*p+1]=VEC[dir].interface_T[comp]->item(i);
+            second_pass[field][dir].send[comp][i][2*p+1]=VEC[dir].interface_T[comp]->item(i);
          else
-            all_send_data[i][2*p+1]=0;
+            second_pass[field][dir].send[comp][i][2*p+1]=0;
       }
    }
 }
@@ -1128,13 +1128,15 @@ DDS_NavierStokes:: unpack_ue(size_t const& comp, double * received_data, size_t 
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double * packed_data, size_t nb_received_data, double gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field)
+DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: solve_interface_unknowns" ) ;
 
    size_t i,j,p;
    size_t k =0;
+
+   //first_pass[field][dir_i].send[comp][rank_in_i[dir_i]], first_pass[field][dir_i].size[comp],
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
@@ -1148,8 +1150,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double * pac
    LocalVector* VEC = GLOBAL_EQ->get_VEC(field);
 
    // Array declaration for sending data from master to all slaves
-   double ** all_send_data = new double* [nb_ranks_comm_i[dir]];
-   size_t nb_send_data=0, local_length_j=0, local_length_k=0;
+   size_t local_length_j=0, local_length_k=0;
    size_t local_min_j=0, local_max_j=0;
    size_t local_min_k=0, local_max_k=0;
 
@@ -1177,30 +1178,13 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double * pac
    local_length_j = (local_max_j-local_min_j+1);
    local_length_k = (local_max_k-local_min_k+1);
 
-   if (dim != 3) {
-      nb_send_data = 2*local_length_j;
-   } else if (dim == 3) {
-      nb_send_data = 2*local_length_j*local_length_k;
-   }
-
-   for (p = 0; p < nb_ranks_comm_i[dir]; ++p) {
-      all_send_data[p] = new double[nb_send_data];
-   }
-
-
    // Send and receive the data first pass
    if ( rank_in_i[dir] == 0 ) {
-      // Array declaration for receiving data from all slaves
-      double ** all_received_data = new double* [nb_ranks_comm_i[dir]];
-      for(p = 0; p < nb_ranks_comm_i[dir]; ++p) {
-          all_received_data[p] = new double[nb_received_data];
-      }
-
       if (nb_ranks_comm_i[dir] != 1) {      
          for (i=1;i<nb_ranks_comm_i[dir];++i) {
             // Receive the data
             static MPI_Status status;
-            MPI_Recv( all_received_data[i], nb_received_data, MPI_DOUBLE, i, 0,
+            MPI_Recv( first_pass[field][dir].receive[comp][i], first_pass[field][dir].size[comp], MPI_DOUBLE, i, 0,
                               DDS_Comm_i[dir], &status ) ;
          }
       }
@@ -1211,7 +1195,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double * pac
 
             p = j-local_min_j;
   
-            unpack_compute_ue_pack(comp,all_received_data,packed_data,all_send_data,dir,p,field);
+            unpack_compute_ue_pack(comp,dir,p,field);
 
             // Need to have the original rhs function assembled for corrosponding j,k pair
             double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
@@ -1228,7 +1212,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double * pac
 	      
 	       p = (j-local_min_j)+local_length_j*(k-local_min_k);
 
-               unpack_compute_ue_pack(comp,all_received_data,packed_data,all_send_data,dir,p,field);
+               unpack_compute_ue_pack(comp,dir,p,field);
 
      	       // Need to have the original rhs function assembled for corrosponding j,k pair
                double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
@@ -1242,24 +1226,21 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double * pac
          }
       }
 
-      for (p = 0; p < nb_ranks_comm_i[dir]; ++p) delete [] all_received_data[p];
-      delete [] all_received_data;
-
    } else {
       // Send the packed data to master
-      MPI_Send( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
+      MPI_Send( first_pass[field][dir].send[comp][rank_in_i[dir]], first_pass[field][dir].size[comp], MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
    }
 
    // Send the data from master iff multi processor are used
    if (nb_ranks_comm_i[dir] != 1) {
       if ( rank_in_i[dir] == 0 ) {
          for (i=1;i<nb_ranks_comm_i[dir];++i) {
-            MPI_Send( all_send_data[i], nb_send_data, MPI_DOUBLE, i, 0, DDS_Comm_i[dir] ) ;
+            MPI_Send( second_pass[field][dir].send[comp][i], second_pass[field][dir].size[comp], MPI_DOUBLE, i, 0, DDS_Comm_i[dir] ) ;
          }
       } else {
          // Receive the data
          static MPI_Status status ;
-         MPI_Recv( packed_data, nb_received_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir], &status ) ;
+         MPI_Recv( second_pass[field][dir].send[comp][rank_in_i[dir]], first_pass[field][dir].size[comp], MPI_DOUBLE, 0, 0, DDS_Comm_i[dir], &status ) ;
 
          // Solve the system of equations in each proc
 
@@ -1267,7 +1248,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double * pac
             for (j = local_min_j;j<=local_max_j;j++) {
                p = j-local_min_j;
 
-	       unpack_ue(comp,packed_data,dir,p,field);
+	       unpack_ue(comp,second_pass[field][dir].send[comp][rank_in_i[dir]],dir,p,field);
 
                // Need to have the original rhs function assembled for corrosponding j,k pair
                double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
@@ -1283,7 +1264,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double * pac
                for (j = local_min_j;j<=local_max_j;j++) {
                   p = (j-local_min_j)+local_length_j*(k-local_min_k);
    
-                  unpack_ue(comp,packed_data,dir,p,field);
+                  unpack_ue(comp,second_pass[field][dir].send[comp][rank_in_i[dir]],dir,p,field);
 
                   // Need to have the original rhs function assembled for corrosponding j,k pair
                   double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
@@ -1298,10 +1279,6 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double * pac
          }
       }
    }
-
-   for (p = 0; p < nb_ranks_comm_i[dir]; ++p) delete [] all_send_data[p];
-   delete [] all_send_data;
-
 }
 
 //---------------------------------------------------------------------------
@@ -1462,7 +1439,7 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, size_t const gamma, size_t const field )
+DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, double const gamma, size_t const field )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: Solve_i_in_jk" ) ;
@@ -1479,16 +1456,11 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* 
      size_t local_min_k = 0;
      size_t local_max_k = 0;
 
-     size_t nb_send_data=0;
-     if (dim == 2) {
-        nb_send_data = 3*(max_unknown_index(dir_j)-min_unknown_index(dir_j)+1);
-     } else if (dim == 3) {
-        nb_send_data = 3*(max_unknown_index(dir_j)-min_unknown_index(dir_j)+1)*(max_unknown_index(dir_k)-min_unknown_index(dir_k)+1);
+     if (dim == 3) {
         local_min_k = min_unknown_index(dir_k);
         local_max_k = max_unknown_index(dir_k);
      }
 
-     double * packed_data = new double[nb_send_data];
      LocalVector* VEC = GLOBAL_EQ->get_VEC(field) ;
      TDMatrix* A = GLOBAL_EQ->get_A(field);
 
@@ -1501,10 +1473,10 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* 
               // Calculate Aei*ui in each proc locally
               compute_Aei_ui(A,VEC,comp,dir_i);
               // Pack Aei_ui and fe for sending it to master
-              data_packing (FF,j,k,packed_data,fe,comp,dir_i,field);
+              data_packing (FF,j,k,fe,comp,dir_i,field);
            }
         }
-        solve_interface_unknowns ( FF, packed_data, nb_send_data, gamma, t_it, comp, dir_i,field );
+        solve_interface_unknowns ( FF, gamma, t_it, comp, dir_i,field );
 
      } else if (is_periodic[field][dir_i] == 0) {  // Serial mode with non-periodic condition
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
@@ -1514,17 +1486,18 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* 
            }
         }
      }
-     delete [] packed_data;
   }
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double * packed_data, double fe, size_t const& comp, size_t const dir, size_t const field)
+DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double fe, size_t const& comp, size_t const dir, size_t const field)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: data_packing" ) ;
    LocalVector* VEC = GLOBAL_EQ->get_VEC(field) ;
+
+   double *packed_data = first_pass[field][dir].send[comp][rank_in_i[dir]];
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
@@ -2242,6 +2215,110 @@ DDS_NavierStokes:: processor_splitting ( int color, int key, size_t const dir )
    MPI_Comm_size( DDS_Comm_i[dir], &nb_ranks_comm_i[dir] ) ;
    MPI_Comm_rank( DDS_Comm_i[dir], &rank_in_i[dir] ) ;
 
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF, size_t const field)
+//---------------------------------------------------------------------------
+{
+
+   for (size_t dir = 0; dir < dim; dir++) {
+      first_pass[field][dir].size = new int [nb_comps[field]];
+      second_pass[field][dir].size = new int [nb_comps[field]];
+      for (size_t comp = 0; comp < nb_comps[field]; comp++) {
+         size_t local_min_j=0, local_max_j=0;
+         size_t local_min_k=0, local_max_k=0;
+
+         // Get local min and max indices
+         size_t_vector min_unknown_index(dim,0);
+         size_t_vector max_unknown_index(dim,0);
+         for (size_t l=0;l<dim;++l) {
+            min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+            max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+         }
+
+         if (dir == 0) {
+            local_min_j = min_unknown_index(1);
+            local_max_j = max_unknown_index(1);
+            if (dim == 3) {
+               local_min_k = min_unknown_index(2);
+               local_max_k = max_unknown_index(2);
+            }
+         } else if (dir == 1) {
+            local_min_j = min_unknown_index(0);
+            local_max_j = max_unknown_index(0);
+            if (dim == 3) {
+               local_min_k = min_unknown_index(2);
+               local_max_k = max_unknown_index(2);
+            }
+         } else if (dir == 2) {
+            local_min_j = min_unknown_index(0);
+            local_max_j = max_unknown_index(0);
+            local_min_k = min_unknown_index(1);
+            local_max_k = max_unknown_index(1);
+         }
+
+         size_t local_length_j = (local_max_j-local_min_j+1);
+         size_t local_length_k = (local_max_k-local_min_k+1);
+
+         if (dim != 3) {
+            first_pass[field][dir].size[comp] = 3*local_length_j;
+            second_pass[field][dir].size[comp] = 2*local_length_j;
+         } else if (dim == 3) {
+            first_pass[field][dir].size[comp] = 3*local_length_j*local_length_k;
+            second_pass[field][dir].size[comp] = 2*local_length_j*local_length_k;
+         }
+      }
+   }
+
+   // Array declarations
+   for (size_t dir = 0; dir < dim; dir++) {
+      first_pass[field][dir].send = new double** [nb_comps[field]];
+      first_pass[field][dir].receive = new double** [nb_comps[field]];
+      second_pass[field][dir].send = new double** [nb_comps[field]];
+      second_pass[field][dir].receive = new double** [nb_comps[field]];
+      for (size_t comp = 0; comp < nb_comps[field]; comp++) {
+         first_pass[field][dir].send[comp] = new double* [nb_ranks_comm_i[dir]];
+         first_pass[field][dir].receive[comp] = new double* [nb_ranks_comm_i[dir]];
+         second_pass[field][dir].send[comp] = new double* [nb_ranks_comm_i[dir]];
+         second_pass[field][dir].receive[comp] = new double* [nb_ranks_comm_i[dir]];
+         for (size_t i = 0; i < nb_ranks_comm_i[dir]; i++) {
+            first_pass[field][dir].send[comp][i] = new double[first_pass[field][dir].size[comp]];
+            first_pass[field][dir].receive[comp][i] = new double[first_pass[field][dir].size[comp]];
+            second_pass[field][dir].send[comp][i] = new double[second_pass[field][dir].size[comp]];
+            second_pass[field][dir].receive[comp][i] = new double[second_pass[field][dir].size[comp]];
+         }
+      }
+   }
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: deallocate_mpi_variables (size_t const field)
+//---------------------------------------------------------------------------
+{
+   // Array declarations
+   for (size_t dir = 0; dir < dim; dir++) {
+      for (size_t comp = 0; comp < nb_comps[field]; comp++) {
+         for (size_t i = 0; i < nb_ranks_comm_i[dir]; i++) {
+            delete [] first_pass[field][dir].send[comp][i];
+            delete [] first_pass[field][dir].receive[comp][i];
+            delete [] second_pass[field][dir].send[comp][i];
+            delete [] second_pass[field][dir].receive[comp][i];
+         }
+         delete [] first_pass[field][dir].send[comp];
+         delete [] first_pass[field][dir].receive[comp];
+         delete [] second_pass[field][dir].send[comp];
+         delete [] second_pass[field][dir].receive[comp];
+      }
+      delete [] first_pass[field][dir].send;
+      delete [] first_pass[field][dir].receive;
+      delete [] second_pass[field][dir].send;
+      delete [] second_pass[field][dir].receive;
+      delete [] first_pass[field][dir].size;
+      delete [] second_pass[field][dir].size;
+   }
 }
 
 //---------------------------------------------------------------------------
