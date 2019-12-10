@@ -386,7 +386,7 @@ DDS_HeatEquation::write_output_field()
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: bodyterm_value ( double xC, double yC, double zC) 
+DDS_HeatEquation:: bodyterm_value ( double const& xC, double const& yC, double const& zC) 
 //---------------------------------------------------------------------------
 {
    double bodyterm = 0.;
@@ -407,7 +407,7 @@ DDS_HeatEquation:: bodyterm_value ( double xC, double yC, double zC)
 //---------------------------------------------------------------------------
 void
 DDS_HeatEquation:: assemble_DS_un_at_rhs (
-        FV_TimeIterator const* t_it, double const gamma)
+        FV_TimeIterator const* t_it, double const& gamma)
 //---------------------------------------------------------------------------
 {
   double dxC, dyC, dzC, xC, yC, zC=0.;
@@ -470,7 +470,7 @@ DDS_HeatEquation:: assemble_DS_un_at_rhs (
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t i, size_t j, size_t k, size_t const dir)
+DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_HeatEquation:: compute_un_component" ) ;
@@ -528,9 +528,9 @@ double
 DDS_HeatEquation:: assemble_temperature_matrix (
   FV_DiscreteField const* FF,
   FV_TimeIterator const* t_it,
-  double gamma,
+  double const& gamma,
   size_t const& comp,
-  size_t const dir )
+  size_t const& dir )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: assemble_temperature_matrix" ) ;
@@ -647,7 +647,7 @@ DDS_HeatEquation:: assemble_temperature_matrix (
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: assemble_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const dir, double Aee_diagcoef )
+DDS_HeatEquation:: assemble_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: assemble_schur_matrix" ) ;
@@ -810,7 +810,7 @@ DDS_HeatEquation:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it 
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir)
+DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    // Get local min and max indices
@@ -931,7 +931,7 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const dir)
+DDS_HeatEquation:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    // create a replica of local rhs vector in local solution vector
@@ -953,7 +953,7 @@ DDS_HeatEquation:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: data_packing ( size_t const& j, size_t const& k, double fe, size_t const& comp, size_t const dir)
+DDS_HeatEquation:: data_packing ( size_t const& j, size_t const& k, double const& fe, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
@@ -1017,7 +1017,7 @@ DDS_HeatEquation:: data_packing ( size_t const& j, size_t const& k, double fe, s
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, size_t const dir, size_t p)
+DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
@@ -1077,7 +1077,7 @@ DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, size_t const dir, 
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p)
+DDS_HeatEquation:: unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
@@ -1097,7 +1097,7 @@ DDS_HeatEquation:: unpack_ue(size_t const& comp, double * received_data, size_t 
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: solve_interface_unknowns ( double gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const dir)
+DDS_HeatEquation:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    // Get local min and max indices
@@ -1246,7 +1246,7 @@ DDS_HeatEquation:: solve_interface_unknowns ( double gamma,  FV_TimeIterator con
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double gamma, size_t const dir_i, size_t const dir_j, size_t const dir_k )
+DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k )
 //---------------------------------------------------------------------------
 {
   size_t_vector min_unknown_index(dim,0);
@@ -1297,7 +1297,7 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double gamma, si
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquation::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const dir)
+DDS_HeatEquation::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: DS_interface_unknown_solver" ) ;
@@ -1583,7 +1583,7 @@ DDS_HeatEquation:: create_DDS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: processor_splitting ( int color, int key, size_t const dir )
+DDS_HeatEquation:: processor_splitting ( int const& color, int const& key, size_t const& dir )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: processor_splitting" ) ;

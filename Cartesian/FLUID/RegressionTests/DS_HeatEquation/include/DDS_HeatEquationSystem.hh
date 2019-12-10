@@ -147,7 +147,7 @@ class DDS_HeatEquationSystem : public MAC_Object
 
       /** @brief Solve the DS splitting problem in x by performing the
       matrix-vector product A_x^-1.Vx and transfer in the distributed vector */
-      void DS_HeatEquation_solver( size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const dir) ;
+      void DS_HeatEquation_solver( size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir) ;
 
       //@}
 
@@ -162,18 +162,18 @@ class DDS_HeatEquationSystem : public MAC_Object
       //@}
 
       /** @brief Call the interior function for different conditions of procs and periodicity*/
-      void compute_product_matrix( struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const dir );
+      void compute_product_matrix( struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir );
       /** @brief Compute the product of Aei*inv(Aii)*Aie in x*/
-      void compute_product_matrix_interior( struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const column, size_t const dir);
+      void compute_product_matrix_interior( struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column, size_t const& dir);
 
    //-- Utilities
 
       /** @name Utilities */
       //@{
       /** @brief Compute the pre-thomas step on the provided matrix arr */
-      void pre_thomas_treatment(size_t const& comp, size_t const dir, struct TDMatrix *arr);
+      void pre_thomas_treatment(size_t const& comp, size_t const& dir, struct TDMatrix *arr);
       /** @brief Compute the inverse of 1 tridiagonal matrix  */
-      static void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const dir) ;
+      static void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir) ;
 
       //@}
 

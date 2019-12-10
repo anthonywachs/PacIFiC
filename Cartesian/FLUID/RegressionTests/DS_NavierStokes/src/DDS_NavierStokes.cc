@@ -901,7 +901,7 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double
    int m;
 
    // Compute VEC_rhs_x = rhs in x
-   double dC,hr=0,hl=0;//,right=0,left=0,xC,yC,zC=0;
+   double dC,hr=0,hl=0;
    double fe=0.;
 
    // Vector for fi

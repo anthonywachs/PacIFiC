@@ -405,7 +405,7 @@ DDS_HeatEquationSystem:: compute_temperature_change( void )
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquationSystem::pre_thomas_treatment( size_t const& comp, size_t const dir, struct TDMatrix *arr)
+DDS_HeatEquationSystem::pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr)
 //----------------------------------------------------------------------
 {
    size_t nb_procs;
@@ -437,7 +437,7 @@ DDS_HeatEquationSystem::pre_thomas_treatment( size_t const& comp, size_t const d
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquationSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const dir)
+DDS_HeatEquationSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: mod_thomas_algorithm" ) ;
@@ -539,7 +539,7 @@ DDS_HeatEquationSystem::get_Schur_VEC()
 //----------------------------------------------------------------------
 void
 DDS_HeatEquationSystem::DS_HeatEquation_solver(
-        size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const dir)
+        size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: DS_HeatEquation_solver" ) ;
@@ -612,7 +612,7 @@ DDS_HeatEquationSystem::synchronize_DS_solution_vec( void )
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquationSystem::compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const dir )
+DDS_HeatEquationSystem::compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: compute_product_matrix" ) ;
@@ -642,7 +642,7 @@ DDS_HeatEquationSystem::compute_product_matrix(struct TDMatrix *arr, struct Prod
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquationSystem::compute_product_matrix_interior(struct TDMatrix *arr,struct ProdMatrix *prr, size_t const& comp, size_t const column, size_t const dir)
+DDS_HeatEquationSystem::compute_product_matrix_interior(struct TDMatrix *arr,struct ProdMatrix *prr, size_t const& comp, size_t const& column, size_t const& dir)
 //----------------------------------------------------------------------
 {
 

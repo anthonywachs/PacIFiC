@@ -123,12 +123,12 @@ public SolverComputingTime
       /** @name Basic discrete system building */
       //@{
       /** @brief Compute diffusive term of temperature from perivious timestep */
-      double compute_un_component ( size_t const& comp, size_t i, size_t j, size_t k, size_t const dir);
+      double compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir);
       /** @brief Assemble temperature body term */
-      double bodyterm_value ( double xC, double yC, double zC);
+      double bodyterm_value ( double const& xC, double const& yC, double const& zC);
 
       /** @brief Assemble RHS of temperature for first step of Crank_Nicolson time discretization */
-      void assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it, double const gamma);
+      void assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it, double const& gamma);
 
 
 
@@ -139,11 +139,11 @@ public SolverComputingTime
       double assemble_temperature_matrix (
         FV_DiscreteField const* FF,
         FV_TimeIterator const* t_it,
-        double gamma,
-        size_t const& comp, size_t const dir  );
+        double const& gamma,
+        size_t const& comp, size_t const& dir  );
 
       /** @brief Assemble schur matrix */
-      void assemble_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const dir, double Aee_diagcoef );
+      void assemble_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef );
 
 
       void write_output_field();
@@ -155,31 +155,31 @@ public SolverComputingTime
       //@{
 
       /** @brief Assemble local RHS for 1D equation solver */
-      double assemble_local_rhs( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir );
+      double assemble_local_rhs( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir );
 
       /** @brief Compute Aei*(Aii)-1*fi required to compute interface unknown */
-      void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const dir);
+      void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir);
 
       /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */ 
-      void data_packing ( size_t const& j, size_t const& k, double fe, size_t const& comp, size_t const dir);
+      void data_packing ( size_t const& j, size_t const& k, double const& fe, size_t const& comp, size_t const& dir);
 
       /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */ 
-      void unpack_compute_ue_pack(size_t const& comp, size_t const dir, size_t p);
+      void unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p);
 
       /** @brief Unpack the interface variable sent by master processor to slave processor */ 
-      void unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p);
+      void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p);
 
       /** @brief Call the appropriate functions to solve local variable and interface unknown */ 
-      void solve_interface_unknowns(double gamma,FV_TimeIterator const* t_it, size_t const& comp, size_t const dir );
+      void solve_interface_unknowns(double const& gamma,FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir );
       
       /** @brief Call the appropriate functions to solve any particular direction in the other directions */ 
       void HeatEquation_DirectionSplittingSolver( FV_TimeIterator const* t_it ) ;
 
       /** @brief Solve i in j and k; e.g. solve x in y ank z */ 
-      void Solve_i_in_jk (FV_TimeIterator const* t_it, double gamma, size_t const dir_i, size_t const dir_j, size_t const dir_k );
+      void Solve_i_in_jk (FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k );
 
       /** @brief Solve interface unknown for all cases */ 
-      void DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const dir);
+      void DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir);
 
       /** @brief Error compared to analytical solution */
       void DS_error_with_analytical_solution ( FV_DiscreteField const* FF,FV_DiscreteField* FF_ERROR ) ;
@@ -194,7 +194,7 @@ public SolverComputingTime
       /** @name Direction splitting communicators */
       /** @brief Create the sub-communicators */
       void create_DDS_subcommunicators ( void ) ;
-      void processor_splitting ( int color, int key, size_t const dir );
+      void processor_splitting ( int const& color, int const& key, size_t const& dir );
 
       void allocate_mpi_variables (void);
       void deallocate_mpi_variables ( void );
