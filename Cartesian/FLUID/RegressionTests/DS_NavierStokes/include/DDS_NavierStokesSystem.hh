@@ -116,19 +116,19 @@ class DDS_NavierStokesSystem : public MAC_Object
       LA_SeqVector const* get_solution_DS_pressure( void ) const ;
 
       /** @brief Return the matrix system of spacial discretization */
-      TDMatrix* get_A(size_t const field);
+      TDMatrix* get_A(size_t const& field);
       /** @brief Return the Schur complement of spacial discretization */
-      TDMatrix* get_Schur(size_t const field);
+      TDMatrix* get_Schur(size_t const& field);
       /** @brief Return the Schur complement of Schur complement in case of periodic domain */
-      TDMatrix* get_DoubleSchur(size_t const field);
+      TDMatrix* get_DoubleSchur(size_t const& field);
       /** @brief Return the product matrix of Schur complement */
-      ProdMatrix* get_SchurP(size_t const field);
+      ProdMatrix* get_SchurP(size_t const& field);
       /** @brief Return RHS for the Schur complement */
-      LocalVector* get_Schur_VEC(size_t const field);
+      LocalVector* get_Schur_VEC(size_t const& field);
       /** @brief Return the product matrix of spacial discretization */
-      ProdMatrix* get_Ap(size_t const field);
+      ProdMatrix* get_Ap(size_t const& field);
       /** @brief Return RHS for the matrix system of spacial discretization */
-      LocalVector* get_VEC(size_t const field);
+      LocalVector* get_VEC(size_t const& field);
 
    //-- Basic operations on matrices & vectors
 
@@ -150,7 +150,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       //@{
       /** @brief Solve the DS splitting problem in x by performing the
       matrix-vector product A_x^-1.Vx and transfer in the distributed vector */
-      void DS_NavierStokes_solver( FV_DiscreteField* FF, size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const dir, size_t const field) ;
+      void DS_NavierStokes_solver( FV_DiscreteField* FF, size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& field) ;
 
       //@}
 
@@ -168,18 +168,18 @@ class DDS_NavierStokesSystem : public MAC_Object
       //@}
 
       /** @brief Calls interior function for different conditions to compute the product of Aei*inv(Aii)*Aie */
-      void compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const dir, size_t const field );
+      void compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& field );
       /** @brief Compute the product of Aei*inv(Aii)*Aie in any direction for any field*/
-      void compute_product_matrix_interior(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const column, size_t const dir);
+      void compute_product_matrix_interior(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column, size_t const& dir);
 
    //-- Utilities
 
       /** @name Utilities */
       //@{
       /** @brief Solve Linear system mat_A*x = rhs with only three vectors of mat_A(x,y,z) using thomas algorithm  */
-      void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const dir);
+      void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir);
       /** @brief Compute the modified super diagonal for thomas algorithm  */
-      void pre_thomas_treatment( size_t const& comp, size_t const dir, struct TDMatrix *arr);
+      void pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr);
       //@}
 
    protected: //--------------------------------------------------------

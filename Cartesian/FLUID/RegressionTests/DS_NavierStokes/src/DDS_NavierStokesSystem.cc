@@ -468,7 +468,7 @@ DDS_NavierStokesSystem:: compute_DS_velocity_change( void )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::pre_thomas_treatment( size_t const& comp, size_t const dir, struct TDMatrix *arr)
+DDS_NavierStokesSystem::pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: pre_thomas_treatment" ) ;
@@ -501,7 +501,7 @@ DDS_NavierStokesSystem::pre_thomas_treatment( size_t const& comp, size_t const d
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const dir)
+DDS_NavierStokesSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: mod_thomas_algorithm" ) ;
@@ -539,7 +539,7 @@ DDS_NavierStokesSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, s
 
 //----------------------------------------------------------------------
 TDMatrix*
-DDS_NavierStokesSystem::get_A(size_t const field)
+DDS_NavierStokesSystem::get_A(size_t const& field)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_A" ) ;
@@ -548,7 +548,7 @@ DDS_NavierStokesSystem::get_A(size_t const field)
 
 //----------------------------------------------------------------------
 TDMatrix*
-DDS_NavierStokesSystem::get_Schur(size_t const field)
+DDS_NavierStokesSystem::get_Schur(size_t const& field)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_Schur" ) ;
@@ -557,7 +557,7 @@ DDS_NavierStokesSystem::get_Schur(size_t const field)
 
 //----------------------------------------------------------------------
 TDMatrix*
-DDS_NavierStokesSystem::get_DoubleSchur(size_t const field)
+DDS_NavierStokesSystem::get_DoubleSchur(size_t const& field)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_DoubleSchur" ) ;
@@ -566,7 +566,7 @@ DDS_NavierStokesSystem::get_DoubleSchur(size_t const field)
 
 //----------------------------------------------------------------------
 ProdMatrix*
-DDS_NavierStokesSystem::get_Ap(size_t const field)
+DDS_NavierStokesSystem::get_Ap(size_t const& field)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_Ap" ) ;
@@ -575,7 +575,7 @@ DDS_NavierStokesSystem::get_Ap(size_t const field)
 
 //----------------------------------------------------------------------
 ProdMatrix*
-DDS_NavierStokesSystem::get_SchurP(size_t const field)
+DDS_NavierStokesSystem::get_SchurP(size_t const& field)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_SchurP" ) ;
@@ -584,7 +584,7 @@ DDS_NavierStokesSystem::get_SchurP(size_t const field)
 
 //----------------------------------------------------------------------
 LocalVector*
-DDS_NavierStokesSystem::get_Schur_VEC(size_t const field)
+DDS_NavierStokesSystem::get_Schur_VEC(size_t const& field)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_Schur_VEC" ) ;
@@ -593,7 +593,7 @@ DDS_NavierStokesSystem::get_Schur_VEC(size_t const field)
 
 //----------------------------------------------------------------------
 LocalVector*
-DDS_NavierStokesSystem::get_VEC(size_t const field)
+DDS_NavierStokesSystem::get_VEC(size_t const& field)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_VEC" ) ;
@@ -603,7 +603,7 @@ DDS_NavierStokesSystem::get_VEC(size_t const field)
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
-	,size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const dir, size_t const field )
+	,size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& field )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_solver" ) ;
@@ -695,7 +695,7 @@ DDS_NavierStokesSystem::synchronize_DS_solution_vec_P( void )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_product_matrix_interior(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const column,size_t const dir)
+DDS_NavierStokesSystem::compute_product_matrix_interior(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column,size_t const& dir)
 //----------------------------------------------------------------------
 {
 
@@ -724,7 +724,7 @@ DDS_NavierStokesSystem::compute_product_matrix_interior(struct TDMatrix *arr, st
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const dir, size_t const field )
+DDS_NavierStokesSystem::compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& field )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix" ) ;

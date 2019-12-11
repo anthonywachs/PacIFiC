@@ -465,9 +465,9 @@ double
 DDS_NavierStokes:: assemble_field_matrix (
   FV_DiscreteField const* FF,
   FV_TimeIterator const* t_it,
-  double gamma,
+  double const& gamma,
   size_t const& comp,
-  size_t const dir, size_t const field )
+  size_t const& dir, size_t const& field )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: assemble_field_matrix" ) ;
@@ -626,7 +626,7 @@ DDS_NavierStokes:: assemble_field_matrix (
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const dir, double Aee_diagcoef, size_t const field )
+DDS_NavierStokes:: assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& field )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokes:: assemble_field_schur_matrix" ) ;
@@ -827,7 +827,7 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t i, size_t j, size_t k, size_t const dir)
+DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: compute_un_component" ) ;
@@ -883,7 +883,7 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t i, size_t j
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir)
+DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
 
@@ -999,7 +999,7 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, size_t const dir, size_t p, size_t const field)
+DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p, size_t const& field)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: unpack_compute_ue_pack" ) ;  
@@ -1060,7 +1060,7 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, size_t const dir, 
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs, size_t const& comp, size_t const dir, size_t const field )
+DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& field )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DS_interface_unknown_solver" ) ;
@@ -1106,7 +1106,7 @@ DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs, size
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: unpack_ue(size_t const& comp, double * received_data, size_t const dir, int p, size_t const field)
+DDS_NavierStokes:: unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p, size_t const& field)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: unpack_ue" ) ;
@@ -1128,7 +1128,7 @@ DDS_NavierStokes:: unpack_ue(size_t const& comp, double * received_data, size_t 
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field)
+DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const& gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: solve_interface_unknowns" ) ;
@@ -1283,7 +1283,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double gamma
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: compute_p_component ( size_t const& comp, size_t i, size_t j, size_t k)
+DDS_NavierStokes:: compute_p_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: compute_p_component" ) ;
@@ -1334,7 +1334,7 @@ DDS_NavierStokes:: compute_p_component ( size_t const& comp, size_t i, size_t j,
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: compute_adv_component ( size_t const& comp, size_t i, size_t j, size_t k)
+DDS_NavierStokes:: compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: compute_adv_component" ) ;
@@ -1358,7 +1358,7 @@ DDS_NavierStokes:: compute_adv_component ( size_t const& comp, size_t i, size_t 
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: assemble_DS_un_at_rhs (
-        FV_TimeIterator const* t_it, double const gamma)
+        FV_TimeIterator const* t_it, double const& gamma)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: assemble_DS_un_at_rhs" ) ;
@@ -1439,7 +1439,7 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const dir_i, size_t const dir_j, size_t const dir_k, double const gamma, size_t const field )
+DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k, double const& gamma, size_t const& field )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: Solve_i_in_jk" ) ;
@@ -1491,7 +1491,7 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* 
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double fe, size_t const& comp, size_t const dir, size_t const field)
+DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double const& fe, size_t const& comp, size_t const& dir, size_t const& field)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: data_packing" ) ;
@@ -1556,7 +1556,7 @@ DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF, size_t const& j, s
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const dir)
+DDS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: compute_Aei_ui" ) ;
@@ -1579,7 +1579,7 @@ DDS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const dir, size_t const field )
+DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: assemble_local_rhs" ) ;
@@ -1629,7 +1629,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: pressure_local_rhs ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const dir)
+DDS_NavierStokes:: pressure_local_rhs ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: pressure_local_rhs" ) ;
@@ -2041,7 +2041,7 @@ DDS_NavierStokes::get_velocity_divergence(void)
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::output_L2norm_pressure( size_t level )
+DDS_NavierStokes::output_L2norm_pressure( size_t const& level )
 //----------------------------------------------------------------------
 {
   size_t i,j,k;
@@ -2100,7 +2100,7 @@ DDS_NavierStokes::output_L2norm_pressure( size_t level )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::output_L2norm_velocity( size_t level )
+DDS_NavierStokes::output_L2norm_velocity( size_t const& level )
 //----------------------------------------------------------------------
 {
   size_t i,j,k;
@@ -2206,7 +2206,7 @@ DDS_NavierStokes:: create_DDS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: processor_splitting ( int color, int key, size_t const dir )
+DDS_NavierStokes:: processor_splitting ( int const& color, int const& key, size_t const& dir )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: processor_splitting" ) ;
@@ -2219,7 +2219,7 @@ DDS_NavierStokes:: processor_splitting ( int color, int key, size_t const dir )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF, size_t const field)
+DDS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF, size_t const& field)
 //---------------------------------------------------------------------------
 {
 
@@ -2295,7 +2295,7 @@ DDS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF, size_t co
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: deallocate_mpi_variables (size_t const field)
+DDS_NavierStokes:: deallocate_mpi_variables (size_t const& field)
 //---------------------------------------------------------------------------
 {
    // Array declarations
@@ -2332,7 +2332,7 @@ DDS_NavierStokes:: free_DDS_subcommunicators ( void )
 //----------------------------------------------------------------------
 double 
 DDS_NavierStokes:: assemble_advection_Upwind( 
-  size_t advecting_level, double const& coef, size_t advected_level,
+  size_t const& advecting_level, double const& coef, size_t const& advected_level,
   size_t const& i, size_t const& j, size_t const& k, size_t const& component ) const
 //----------------------------------------------------------------------
 {
@@ -2556,7 +2556,7 @@ DDS_NavierStokes:: assemble_advection_Upwind(
 //----------------------------------------------------------------------
 double
 DDS_NavierStokes:: assemble_advection_TVD( 
-  size_t advecting_level, double const& coef, size_t advected_level,
+  size_t const& advecting_level, double const& coef, size_t const& advected_level,
          size_t const& i, size_t const& j, size_t const& k, size_t const& component ) const
 //----------------------------------------------------------------------
 {
