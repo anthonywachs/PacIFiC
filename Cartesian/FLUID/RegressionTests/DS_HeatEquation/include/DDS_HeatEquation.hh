@@ -123,7 +123,7 @@ public SolverComputingTime
       /** @name Basic discrete system building */
       //@{
       /** @brief Compute diffusive term of temperature from perivious timestep */
-      double compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir);
+      double compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level);
       /** @brief Assemble temperature body term */
       double bodyterm_value ( double const& xC, double const& yC, double const& zC);
 

@@ -75,6 +75,8 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
 {
    MAC_LABEL( "DDS_HeatEquation:: DDS_HeatEquation" ) ;
 
+   MAC_ASSERT( TF->storage_depth() == 4 ) ;
+
    // Call of MAC_Communicator routine to set the rank of each proces and
    // the number of processes during execution
    pelCOMM = MAC_Exec::communicator();
@@ -434,9 +436,11 @@ DDS_HeatEquation:: assemble_DS_un_at_rhs (
            if (dim ==2 ) {
               k = 0;
               // Dxx for un
-              xvalue = compute_un_component(comp,i,j,k,0);
+              //xvalue = compute_un_component(comp,i,j,k,0,1);
+              xvalue = compute_un_component(comp,i,j,k,0,2);
               // Dyy for un
-              yvalue = compute_un_component(comp,i,j,k,1);
+              //yvalue = compute_un_component(comp,i,j,k,1,1);
+              yvalue = compute_un_component(comp,i,j,k,1,1);
 	      // Bodyterm for rhs
 	      bodyterm = bodyterm_value(xC,yC,zC);
 
@@ -448,11 +452,14 @@ DDS_HeatEquation:: assemble_DS_un_at_rhs (
                  dzC = TF->get_cell_size( k, comp, 2 ) ;
 	         zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
                  // Dxx for un
-                 xvalue = compute_un_component(comp,i,j,k,0);
+                 //xvalue = compute_un_component(comp,i,j,k,0,1);
+                 xvalue = compute_un_component(comp,i,j,k,0,2);
                  // Dyy for un
-                 yvalue = compute_un_component(comp,i,j,k,1);
+                 //yvalue = compute_un_component(comp,i,j,k,1,1);
+                 yvalue = compute_un_component(comp,i,j,k,1,3);
                  // Dzz for un
-                 zvalue = compute_un_component(comp,i,j,k,2);
+                 //zvalue = compute_un_component(comp,i,j,k,2,1);
+                 zvalue = compute_un_component(comp,i,j,k,2,1);
 	         // Bodyterm for rhs
 	         bodyterm = bodyterm_value(xC,yC,zC);
 
@@ -470,7 +477,7 @@ DDS_HeatEquation:: assemble_DS_un_at_rhs (
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir)
+DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_HeatEquation:: compute_un_component" ) ;
@@ -481,8 +488,8 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
    if (dir == 0) {
       xhr= TF->get_DOF_coordinate( i+1,comp, 0 ) - TF->get_DOF_coordinate( i, comp, 0 ) ;
       xhl= TF->get_DOF_coordinate( i, comp, 0 ) - TF->get_DOF_coordinate( i-1, comp, 0 ) ;
-      xright = TF->DOF_value( i+1, j, k, comp, 1 ) - TF->DOF_value( i, j, k, comp, 1 ) ;
-      xleft = TF->DOF_value( i, j, k, comp, 1 ) - TF->DOF_value( i-1, j, k, comp, 1 ) ;
+      xright = TF->DOF_value( i+1, j, k, comp, level ) - TF->DOF_value( i, j, k, comp, level ) ;
+      xleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i-1, j, k, comp, level ) ;
 
       //xvalue = xright/xhr - xleft/xhl;
       if (TF->DOF_in_domain( i-1, j, k, comp) && TF->DOF_in_domain( i+1, j, k, comp))
@@ -494,8 +501,8 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
    } else if (dir == 1) {
       yhr= TF->get_DOF_coordinate( j+1,comp, 1 ) - TF->get_DOF_coordinate( j, comp, 1 ) ;
       yhl= TF->get_DOF_coordinate( j, comp, 1 ) - TF->get_DOF_coordinate( j-1, comp, 1 ) ;
-      yright = TF->DOF_value( i, j+1, k, comp, 1 ) - TF->DOF_value( i, j, k, comp, 1 ) ;
-      yleft = TF->DOF_value( i, j, k, comp, 1 ) - TF->DOF_value( i, j-1, k, comp, 1 ) ;
+      yright = TF->DOF_value( i, j+1, k, comp, level ) - TF->DOF_value( i, j, k, comp, level ) ;
+      yleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i, j-1, k, comp, level ) ;
 
       //yvalue = yright/yhr - yleft/yhl;
       if (TF->DOF_in_domain(i, j-1, k, comp) && TF->DOF_in_domain(i, j+1, k, comp))
@@ -507,8 +514,8 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
    } else if (dir == 2) {
       zhr= TF->get_DOF_coordinate( k+1,comp, 2 ) - TF->get_DOF_coordinate( k, comp, 2 ) ;
       zhl= TF->get_DOF_coordinate( k, comp, 2 ) - TF->get_DOF_coordinate( k-1, comp, 2 ) ;
-      zright = TF->DOF_value( i, j, k+1, comp, 1 ) - TF->DOF_value( i, j, k, comp, 1 ) ;
-      zleft = TF->DOF_value( i, j, k, comp, 1 ) - TF->DOF_value( i, j, k-1, comp, 1 ) ;
+      zright = TF->DOF_value( i, j, k+1, comp, level ) - TF->DOF_value( i, j, k, comp, level ) ;
+      zleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i, j, k-1, comp, level ) ;
 
       //zvalue = zright/zhr - zleft/zhl;
       if (TF->DOF_in_domain(i, j, k-1, comp) && TF->DOF_in_domain(i, j, k+1, comp))
@@ -841,13 +848,20 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
      if (!is_firstorder) {
 	// x direction
         if (dir == 0) {
-           value = compute_un_component(comp,i,j,k,dir);
+           //value = compute_un_component(comp,i,j,k,dir,1);
+           value = compute_un_component(comp,i,j,k,dir,2);
 	// y direction
         } else if (dir == 1) {
-           value = compute_un_component(comp,j,i,k,dir);
+           //value = compute_un_component(comp,j,i,k,dir,1);
+           if (dim == 2) {
+              value = compute_un_component(comp,j,i,k,dir,1);
+           } else if (dim == 3) {
+              value = compute_un_component(comp,j,i,k,dir,3);
+           }
 	// z direction
         } else if (dir == 2) {
-           value = compute_un_component(comp,j,k,i,dir);
+           //value = compute_un_component(comp,j,k,i,dir,1);
+           value = compute_un_component(comp,j,k,i,dir,1);
         }
      } else {
 	if ((b_bodyterm) && (dir==0)) {
@@ -863,9 +877,11 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
      if (dir == 0) {
         temp_val = (TF->DOF_value(i,j,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
      } else if (dir == 1) {
-        temp_val = (TF->DOF_value(j,i,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+        //temp_val = (TF->DOF_value(j,i,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+        temp_val = (TF->DOF_value(j,i,k,comp,2)*dC)/(t_it->time_step()) - gamma*value;
      } else if (dir == 2) {
-        temp_val = (TF->DOF_value(j,k,i,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+        //temp_val = (TF->DOF_value(j,k,i,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+        temp_val = (TF->DOF_value(j,k,i,comp,3)*dC)/(t_it->time_step()) - gamma*value;
      }
 
      if (is_iperiodic[dir] == 0) {
@@ -1372,7 +1388,8 @@ DDS_HeatEquation:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec();
   // Tranfer back to field
-  TF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_temperature() ) ;
+  //TF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_temperature() ) ;
+  TF->update_free_DOFs_value( 2, GLOBAL_EQ->get_solution_DS_temperature() ) ;
   if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer x solution");
 
 
@@ -1384,7 +1401,12 @@ DDS_HeatEquation:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec();
   // Tranfer back to field
-  TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+  //TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+  if (dim == 2) {
+     TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+  } else if (dim == 3) {
+     TF->update_free_DOFs_value( 3 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+  }
   if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer y solution");
 
   if (dim == 3) {
