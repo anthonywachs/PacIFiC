@@ -72,6 +72,7 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
    , peclet( 1. )
    , b_bodyterm( false )
    , is_firstorder( false )
+   , is_solids ( false )
 {
    MAC_LABEL( "DDS_HeatEquation:: DDS_HeatEquation" ) ;
 
@@ -128,6 +129,10 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
    if ( exp->has_entry( "BodyTerm" ) )
      b_bodyterm = exp->bool_data( "BodyTerm" ) ;
 
+   // Read the presence of particles
+   if ( exp->has_entry( "Particles" ) )
+     is_solids = exp->bool_data( "Particles" ) ;
+
    // Implement first order/second order in time
    if ( exp->has_entry( "FirstOrder" ) )
      is_firstorder = exp->bool_data( "FirstOrder" ) ;
@@ -138,6 +143,11 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
    is_iperiodic[1] = periodic_comp->operator()( 1 );
    if(dim >2) {
       is_iperiodic[2] = periodic_comp->operator()( 2 );
+   }
+
+   if (is_solids) {
+      Npart = exp->int_data( "NParticles" ) ;
+      Rpart = exp->double_data( "RadPart" ) ;
    }
 
    // Build the matrix system
@@ -213,9 +223,12 @@ DDS_HeatEquation:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    allocate_mpi_variables();
 
+   // Generate solid particles if required
+   if (is_solids) Solids_generation();
+
    // Direction splitting
    // Assemble 1D tridiagonal matrices and schur complement calculation
-   assemble_temperature_and_schur(t_it);
+   //assemble_temperature_and_schur(t_it);
 
    GLOBAL_EQ->initialize_temperature();
 
@@ -256,10 +269,18 @@ DDS_HeatEquation:: do_one_inner_iteration( FV_TimeIterator const* t_it )
    start_solving_timer() ;
 
    if ( my_rank == is_master ) SCT_set_start("DS_Solution");
-   
+
+   if (is_solids) node_property_calculation();
+   if (is_solids) {
+      nodes_in_solid_correction(0);
+      nodes_in_solid_correction(1);
+      nodes_in_solid_correction(2);
+      if (dim == 3) nodes_in_solid_correction(3);
+   }
+
    // Solve heat equation using direction splitting 
    HeatEquation_DirectionSplittingSolver(t_it);
-   
+
    if ( my_rank == is_master ) SCT_get_elapsed_time( "DS_Solution" );
 
    stop_solving_timer() ;
@@ -343,45 +364,52 @@ DDS_HeatEquation::write_output_field()
 //----------------------------------------------------------------------
 {
 
-  double value;
   ofstream outputFile ;
 
-  outputFile.open("/home/path/Results/output_5.txt", std::ios_base::out | std::ios_base::trunc) ;
+  std::ostringstream os2;
+  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/output_" << my_rank << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename);
+
+
+//  outputFile.open("/home/goyal001/Documents/Computing/MAC-Test/DS_results/output_" << my_rank << ".txt", std::ios_base::out | std::ios_base::trunc) ;
   size_t i,j,k;
+  outputFile << "x,y,void_frac,left,right,bottom,top" << endl;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
 
-  for(size_t comp=0;comp<nb_comps;comp++)
-  {
-    // Get local min and max indices
-    for (size_t l=0;l<dim;++l)
-      min_unknown_index(l) =
-       TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-    for (size_t l=0;l<dim;++l)
-      max_unknown_index(l) =
-       TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+  PartInput solid = GLOBAL_EQ->get_solid();
+  NodeProp node = GLOBAL_EQ->get_node_property();
+  BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect();
 
-    for (i=min_unknown_index(0);i<=max_unknown_index(0);++i)
-    {
-      for (j=min_unknown_index(1);j<=max_unknown_index(1);++j)
-      {
-        if(dim ==2 )
-        {
-          k=0;
-          value = TF->DOF_value( i, j, k, comp, 0 );
-             outputFile << std::fixed << std::setprecision(8) << value ;
-             outputFile<<endl;
+  for (size_t comp=0;comp<nb_comps;comp++) {
+     // Get local min and max indices
+     for (size_t l=0;l<dim;++l) {
+        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+     }
+
+     for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+        size_t xpos = i - min_unknown_index(0);
+        double xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
+        for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+           size_t ypos = j - min_unknown_index(1);
+           double yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
+           if (dim ==2 ) {
+              k=0;
+              size_t p = ypos + (1+max_unknown_index(1)-min_unknown_index(1))*xpos;
+              size_t id = node.parID[comp]->item(p);
+              size_t voidf = node.void_frac[comp]->item(p);
+
+              outputFile << xC << "," << yC << "," << voidf << "," << b_intersect[0].offset[comp]->item(p,0) << "," << b_intersect[0].offset[comp]->item(p,1) << "," << b_intersect[1].offset[comp]->item(p,0) << "," << b_intersect[1].offset[comp]->item(p,1) << endl;
+           } else {
+              for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+                  // DO something here as well
+              }
+           } 
         }
-        else{
-          for (k=min_unknown_index(2);k<=max_unknown_index(2);++k){
-            value = TF->DOF_value( i, j, k, comp, 0 );
-             outputFile << std::fixed << std::setprecision(8) << value;
-             outputFile<<endl;
-          }
-        }
-      }
-    }
+     }
   }
   outputFile.close();
 }
@@ -436,10 +464,8 @@ DDS_HeatEquation:: assemble_DS_un_at_rhs (
            if (dim ==2 ) {
               k = 0;
               // Dxx for un
-              //xvalue = compute_un_component(comp,i,j,k,0,1);
               xvalue = compute_un_component(comp,i,j,k,0,2);
               // Dyy for un
-              //yvalue = compute_un_component(comp,i,j,k,1,1);
               yvalue = compute_un_component(comp,i,j,k,1,1);
 	      // Bodyterm for rhs
 	      bodyterm = bodyterm_value(xC,yC,zC);
@@ -452,13 +478,10 @@ DDS_HeatEquation:: assemble_DS_un_at_rhs (
                  dzC = TF->get_cell_size( k, comp, 2 ) ;
 	         zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
                  // Dxx for un
-                 //xvalue = compute_un_component(comp,i,j,k,0,1);
                  xvalue = compute_un_component(comp,i,j,k,0,2);
                  // Dyy for un
-                 //yvalue = compute_un_component(comp,i,j,k,1,1);
                  yvalue = compute_un_component(comp,i,j,k,1,3);
                  // Dzz for un
-                 //zvalue = compute_un_component(comp,i,j,k,2,1);
                  zvalue = compute_un_component(comp,i,j,k,2,1);
 	         // Bodyterm for rhs
 	         bodyterm = bodyterm_value(xC,yC,zC);
@@ -485,11 +508,33 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
    double xhr,xhl,xright,xleft,yhr,yhl,yright,yleft;
    double zhr,zhl,zright,zleft, value=0.;
 
+   size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
+   // Get local min and max indices
+   for (size_t l=0;l<dim;++l) {
+      min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+      max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   }
+   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect();
+   NodeProp node = GLOBAL_EQ->get_node_property();
+   PartInput solid = GLOBAL_EQ->get_solid();
+
    if (dir == 0) {
       xhr= TF->get_DOF_coordinate( i+1,comp, 0 ) - TF->get_DOF_coordinate( i, comp, 0 ) ;
       xhl= TF->get_DOF_coordinate( i, comp, 0 ) - TF->get_DOF_coordinate( i-1, comp, 0 ) ;
       xright = TF->DOF_value( i+1, j, k, comp, level ) - TF->DOF_value( i, j, k, comp, level ) ;
       xleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i-1, j, k, comp, level ) ;
+
+      if (is_solids) {
+         size_t p = (j-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(i-min_unknown_index(0)); 
+         if (b_intersect[dir].offset[comp]->item(p,0) == 1) {
+            xleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
+            xhl = b_intersect[dir].value[comp]->item(p,0);
+         } else if (b_intersect[dir].offset[comp]->item(p,1) == 1) {
+            xright = b_intersect[dir].field[comp]->item(p,1) - TF->DOF_value( i, j, k, comp, level );
+            xhr = b_intersect[dir].value[comp]->item(p,1);
+         }
+      }
 
       //xvalue = xright/xhr - xleft/xhl;
       if (TF->DOF_in_domain( i-1, j, k, comp) && TF->DOF_in_domain( i+1, j, k, comp))
@@ -503,6 +548,17 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
       yhl= TF->get_DOF_coordinate( j, comp, 1 ) - TF->get_DOF_coordinate( j-1, comp, 1 ) ;
       yright = TF->DOF_value( i, j+1, k, comp, level ) - TF->DOF_value( i, j, k, comp, level ) ;
       yleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i, j-1, k, comp, level ) ;
+
+      if (is_solids) {
+         size_t p = (j-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(i-min_unknown_index(0));           
+         if (b_intersect[dir].offset[comp]->item(p,0) == 1) {
+            yleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
+            yhl = b_intersect[dir].value[comp]->item(p,0);
+         } else if (b_intersect[dir].offset[comp]->item(p,1) == 1) {
+            yright = b_intersect[dir].field[comp]->item(p,1) - TF->DOF_value( i, j, k, comp, level );
+            yhr = b_intersect[dir].value[comp]->item(p,1);
+         }
+      }
 
       //yvalue = yright/yhr - yleft/yhl;
       if (TF->DOF_in_domain(i, j-1, k, comp) && TF->DOF_in_domain(i, j+1, k, comp))
@@ -537,12 +593,14 @@ DDS_HeatEquation:: assemble_temperature_matrix (
   FV_TimeIterator const* t_it,
   double const& gamma,
   size_t const& comp,
-  size_t const& dir )
+  size_t const& dir,
+  size_t const& j,
+  size_t const& k )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: assemble_temperature_matrix" ) ;
 
-   if ( my_rank == is_master ) cout << "Temperature matrix in " << dir << endl;
+//   if ( my_rank == is_master ) cout << "Temperature matrix in " << dir << endl;
 
    // Parameters
    double dxr,dxl,xR,xL,xC,right,left,center = 0. ;
@@ -558,6 +616,7 @@ DDS_HeatEquation:: assemble_temperature_matrix (
    // Perform assembling
    size_t m, i;
    TDMatrix* A = GLOBAL_EQ-> get_A();
+   TDMatrix_new* A_new = GLOBAL_EQ-> get_Anew();
 
    double Aee_diagcoef=0.;
 
@@ -571,19 +630,41 @@ DDS_HeatEquation:: assemble_temperature_matrix (
 
        right = -gamma/(dxr);
        left = -gamma/(dxl);
-       center = - (right+left);
+
+       size_t p;
+       if (is_solids) {
+          BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect();
+          NodeProp node = GLOBAL_EQ->get_node_property();
+          if (dir == 0) {
+             p = (j-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(i-min_unknown_index(0));
+          } else if (dir == 1) {
+             p = (i-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(j-min_unknown_index(0));
+          }
+          // if left node is inside the solid particle
+          if (b_intersect[dir].offset[comp]->item(p,0) == 1) {
+             left = -gamma/(b_intersect[dir].value[comp]->item(p,0));
+          }
+          // if right node is inside the solid particle
+          if (b_intersect[dir].offset[comp]->item(p,1) == 1) {
+             right = -gamma/(b_intersect[dir].value[comp]->item(p,1));
+          }
+          // if center node is inside the solid particle
+          if (node.void_frac[comp]->item(p) == 1.) {
+             left = 0.;
+             right = 0.;
+          }
+
+          center = -(right+left);
+          //cout << "CENTER in presence of solid: " << center << endl;
+          if (b_intersect[dir].offset[comp]->item(p,0) == 1) left = 0.;
+          if (b_intersect[dir].offset[comp]->item(p,1) == 1) right = 0.;
+       } else {
+          center = - (right+left);
+       }
 
        // add unsteady term
-       size_t k;
        double value;
        double unsteady_term = (FF->get_cell_size(i,comp,dir))/(t_it->time_step());
-
-
-       if (dim == 2) {
-	  k = 0;
-       } else {
-	  k = min_unknown_index(2);
-       }
 
        value = center;
 
@@ -640,12 +721,17 @@ DDS_HeatEquation:: assemble_temperature_matrix (
        // Set Aii_main_diagonal
        if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_iperiodic[dir] != 1)) {
           A[dir].ii_main[comp]->set_item(m,value);
+          A_new[dir].ii_main[comp][1]->set_item(m,value);
        } else {
           if (i<max_unknown_index(dir)) {
              A[dir].ii_main[comp]->set_item(m,value);
+             A_new[dir].ii_main[comp][1]->set_item(m,value);
           }
        }
    }  // End of for loop
+
+   if ((dir == 1) && (my_rank == 0)) A_new[dir].ii_main[comp][1]->print_items(MAC::out(),0);
+//   if ((dir == 0) && (my_rank == 2) && (j == 5)) A[dir].ii_sub[comp]->print_items(MAC::out(),0);
 
    GLOBAL_EQ->pre_thomas_treatment(comp,dir,A);
 
@@ -660,7 +746,7 @@ DDS_HeatEquation:: assemble_schur_matrix (struct TDMatrix *A, size_t const& comp
    MAC_LABEL( "DDS_HeatEquation:: assemble_schur_matrix" ) ;
    // Compute the product matrix for each proc
 
-   if ( my_rank == is_master ) cout << "Schur matrix in " << dir << endl;
+//   if ( my_rank == is_master ) cout << "Schur matrix in " << dir << endl;
 
    if (nb_ranks_comm_i[dir]>1) {
 
@@ -791,7 +877,7 @@ DDS_HeatEquation:: assemble_schur_matrix (struct TDMatrix *A, size_t const& comp
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it )
+DDS_HeatEquation:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it, size_t const& dir, size_t const& j, size_t const& k )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: assemble_temperature_and_schur" ) ;
@@ -808,10 +894,10 @@ DDS_HeatEquation:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it 
                 gamma = 1.0/2.0/peclet;
         }
 
-	for (size_t i = 0; i<dim; i++) {
-            double Aee_diagcoef = assemble_temperature_matrix (TF,t_it,gamma,comp,i);
-	    assemble_schur_matrix(A,comp,i,Aee_diagcoef);
-	}
+//	for (size_t dir = 0; dir<dim; i++) {                    // Commented when the assemble_temperature_and_schur are add in the time iterator loop
+            double Aee_diagcoef = assemble_temperature_matrix (TF,t_it,gamma,comp,dir,j,k);
+	    assemble_schur_matrix(A,comp,dir,Aee_diagcoef);
+//	}
    }
 }
 
@@ -848,19 +934,38 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
      if (!is_firstorder) {
 	// x direction
         if (dir == 0) {
-           //value = compute_un_component(comp,i,j,k,dir,1);
            value = compute_un_component(comp,i,j,k,dir,2);
+           if (is_solids) {
+              BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect();
+              size_t p = (j-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(i-min_unknown_index(0));
+              if (b_intersect[dir].offset[comp]->item(p,0) == 1) {
+                 value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
+//                 cout << "Value of p for left boundary: " << p << endl;
+              }
+              if (b_intersect[dir].offset[comp]->item(p,1) == 1) {
+                 value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
+//                 cout << "Value of p for right boundary: " << p << endl;
+              }
+           }
 	// y direction
         } else if (dir == 1) {
-           //value = compute_un_component(comp,j,i,k,dir,1);
            if (dim == 2) {
               value = compute_un_component(comp,j,i,k,dir,1);
+              if (is_solids) {
+                 BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect();
+                 size_t p = (i-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(j-min_unknown_index(0));
+                 if (b_intersect[dir].offset[comp]->item(p,0) == 1) {
+                    value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
+                 }
+                 if (b_intersect[dir].offset[comp]->item(p,1) == 1) {
+                    value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
+                 }
+              }
            } else if (dim == 3) {
               value = compute_un_component(comp,j,i,k,dir,3);
            }
 	// z direction
         } else if (dir == 2) {
-           //value = compute_un_component(comp,j,k,i,dir,1);
            value = compute_un_component(comp,j,k,i,dir,1);
         }
      } else {
@@ -877,10 +982,8 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
      if (dir == 0) {
         temp_val = (TF->DOF_value(i,j,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
      } else if (dir == 1) {
-        //temp_val = (TF->DOF_value(j,i,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
         temp_val = (TF->DOF_value(j,i,k,comp,2)*dC)/(t_it->time_step()) - gamma*value;
      } else if (dir == 2) {
-        //temp_val = (TF->DOF_value(j,k,i,comp,0)*dC)/(t_it->time_step()) - gamma*value;
         temp_val = (TF->DOF_value(j,k,i,comp,3)*dC)/(t_it->time_step()) - gamma*value;
      }
 
@@ -1290,6 +1393,7 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& ga
      if ((nb_ranks_comm_i[dir_i]>1)||(is_iperiodic[dir_i] == 1)) {
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
 	   for (size_t k=local_min_k; k <= local_max_k; ++k) {
+              assemble_temperature_and_schur(t_it,dir_i,j,k);
               // Assemble fi and return fe for each proc locally        
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
               // Calculate Aei*ui in each proc locally
@@ -1303,6 +1407,7 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& ga
      } else if (is_iperiodic[dir_i] == 0) {  // Serial mode with non-periodic condition
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
+              assemble_temperature_and_schur(t_it,dir_i,j,k);
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir_i),comp,dir_i);
            }
@@ -1360,6 +1465,250 @@ DDS_HeatEquation::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_
 
 //---------------------------------------------------------------------------
 void
+DDS_HeatEquation:: Solids_generation ()
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_HeatEquation:: Solids_generation" ) ;
+
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid();
+
+  for (size_t comp=0;comp<nb_comps;comp++) {
+     for (size_t i=0;i<Npart;i++) {
+        solid.coord[comp]->set_item(i,0,5.E-1);
+        solid.coord[comp]->set_item(i,1,5.E-1);
+        solid.coord[comp]->set_item(i,2,5.E-1);
+        solid.size[comp]->set_item(i,Rpart);
+        solid.temp[comp]->set_item(i,1.);
+     }
+/*        solid.coord[comp]->set_item(0,0,2.5E-1);
+        solid.coord[comp]->set_item(0,1,5.E-1);
+        solid.coord[comp]->set_item(0,2,5.E-1);
+        solid.size[comp]->set_item(0,Rpart);
+        solid.temp[comp]->set_item(0,1.);
+        solid.coord[comp]->set_item(1,0,7.5E-1);
+        solid.coord[comp]->set_item(1,1,5.E-1);
+        solid.coord[comp]->set_item(1,2,5.E-1);
+        solid.size[comp]->set_item(1,Rpart);
+        solid.temp[comp]->set_item(1,-1.);*/
+  }
+} 
+  
+//---------------------------------------------------------------------------
+void
+DDS_HeatEquation:: nodes_in_solid_correction ( size_t const& level )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_HeatEquation:: Solids_flux_correction" ) ;
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  // Vector for solid presence
+  NodeProp node = GLOBAL_EQ->get_node_property();
+  PartInput solid = GLOBAL_EQ->get_solid();
+
+  for (size_t comp=0;comp<nb_comps;comp++) {
+     // Get local min and max indices
+     for (size_t l=0;l<dim;++l) {
+        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+     }
+     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+        size_t xpos = i - min_unknown_index(0);
+        for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+           size_t ypos = j - min_unknown_index(1);
+           if (dim == 2) {
+              size_t p = ypos + (1+max_unknown_index(1)-min_unknown_index(1))*xpos;
+              if (node.void_frac[comp]->item(p) == 1.) {
+                 size_t par_id = node.parID[comp]->item(p);
+                 double Tpart = solid.temp[comp]->item(par_id);
+                 TF->set_DOF_value( i, j, 0, comp, level,Tpart);
+              }
+           }
+        }
+     }
+  }
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_HeatEquation:: node_property_calculation ( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_HeatEquation:: node_property_calculation" ) ;
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  PartInput solid = GLOBAL_EQ->get_solid();
+  NodeProp node = GLOBAL_EQ->get_node_property();
+  BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect();
+
+  for (size_t comp=0;comp<nb_comps;comp++) {
+     // Get local min and max indices
+     for (size_t l=0;l<dim;++l) {
+        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+     }
+
+     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+        double xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
+        size_t xpos = i - min_unknown_index(0);
+        for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+           double yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
+           size_t ypos = j - min_unknown_index(1);
+           if (dim == 2) {
+              size_t p = ypos + (1+max_unknown_index(1)-min_unknown_index(1))*xpos;
+              for (size_t m=0;m<Npart;m++) {
+                 double xp = solid.coord[comp]->item(m,0);
+                 double yp = solid.coord[comp]->item(m,1);
+                 double Rp = solid.size[comp]->item(m);
+                 if (pow(xC-xp,2)+pow(yC-yp,2)-pow(Rp,2) <= 0.) {
+                    node.void_frac[comp]->set_item(p,1.);
+                    node.parID[comp]->set_item(p,m);
+                 }
+              }
+           } else {
+              for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+                 double zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
+                 size_t zpos = k - min_unknown_index(2);
+                 // Need to write the algorithm for 3D system here
+              }
+           }
+        }
+     }
+
+     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+        double xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
+        size_t xpos = i - min_unknown_index(0);
+        for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+           double yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
+           size_t ypos = j - min_unknown_index(1);
+           if (dim == 2) {
+              size_t p = ypos + (1+max_unknown_index(1)-min_unknown_index(1))*xpos;
+              if (node.void_frac[comp]->item(p) != 1.) {
+                 size_t p_left = ypos + (1+max_unknown_index(1)-min_unknown_index(1))*(xpos-1);
+                 size_t p_right = ypos + (1+max_unknown_index(1)-min_unknown_index(1))*(xpos+1);
+                 size_t p_bottom = (ypos-1) + (1+max_unknown_index(1)-min_unknown_index(1))*xpos;
+                 size_t p_top = (ypos+1) + (1+max_unknown_index(1)-min_unknown_index(1))*xpos;
+
+                 if ((node.void_frac[comp]->item(p_left) == 1.) && (xpos != 0)) {
+                    double x_int = find_intersection(i-1,i,j,comp,0,0);
+                    b_intersect[0].offset[comp]->set_item(p,0,1);
+                    b_intersect[0].value[comp]->set_item(p,0,abs(xC-x_int));
+                    size_t par_id = node.parID[comp]->item(p_left);
+                    size_t field_value = solid.temp[comp]->item(par_id);
+                    b_intersect[0].field[comp]->set_item(p,0,field_value);
+                 } 
+                 if ((node.void_frac[comp]->item(p_right) == 1.) && (xpos != (max_unknown_index(0)-min_unknown_index(0)))) {
+                    double x_int = find_intersection(i,i+1,j,comp,0,1);
+                    b_intersect[0].offset[comp]->set_item(p,1,1);
+                    b_intersect[0].value[comp]->set_item(p,1,abs(xC-x_int));
+                    size_t par_id = node.parID[comp]->item(p_right);
+                    size_t field_value = solid.temp[comp]->item(par_id);
+                    b_intersect[0].field[comp]->set_item(p,1,field_value);
+                 }
+                 if ((node.void_frac[comp]->item(p_bottom) == 1.) && (ypos != 0)) {
+                    double y_int = find_intersection(j-1,j,i,comp,1,0);
+                    b_intersect[1].offset[comp]->set_item(p,0,1);
+                    b_intersect[1].value[comp]->set_item(p,0,abs(yC-y_int));
+                    size_t par_id = node.parID[comp]->item(p_bottom);
+                    size_t field_value = solid.temp[comp]->item(par_id);
+                    b_intersect[1].field[comp]->set_item(p,0,field_value);
+                 } 
+                 if ((node.void_frac[comp]->item(p_top) == 1.) && (ypos != (max_unknown_index(1)-min_unknown_index(1)))) {
+                    double y_int = find_intersection(j,j+1,i,comp,1,1);
+                    b_intersect[1].offset[comp]->set_item(p,1,1);
+                    b_intersect[1].value[comp]->set_item(p,1,abs(yC-y_int));
+                    size_t par_id = node.parID[comp]->item(p_top);
+                    size_t field_value = solid.temp[comp]->item(par_id);
+                    b_intersect[1].field[comp]->set_item(p,1,field_value);
+                 }
+              }
+           }
+           // Requires the addition of algorithm for 3D cases as well
+        }
+     }
+     //b_intersect[1].value[comp]->print_items(MAC::out(),0);
+  }
+}
+
+//---------------------------------------------------------------------------
+double
+DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& comp, size_t const& dir, size_t const& off)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_HeatEquation:: find_intersection" ) ;
+
+  PartInput solid = GLOBAL_EQ->get_solid();
+  NodeProp node = GLOBAL_EQ->get_node_property();
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  for (size_t l=0;l<dim;++l) {
+     min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+     max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+  }
+
+  double tolerance = 1., funl, func, funr;
+
+  double xleft = TF->get_DOF_coordinate( left, comp, dir ) ;
+  double xright = TF->get_DOF_coordinate( right, comp, dir ) ;
+
+  double yvalue;
+  size_t p;
+
+  if (dir == 0) {
+     yvalue = TF->get_DOF_coordinate( yconst, comp, 1 ) ;
+     if (off == 0) {
+        p = (yconst-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(left-min_unknown_index(0));
+     } else if (off == 1) {
+        p = (yconst-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(right-min_unknown_index(0));
+     }
+  } else if (dir == 1) {
+     yvalue = TF->get_DOF_coordinate( yconst, comp, 0 ) ;
+     if (off == 0) {
+        p = (left-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(yconst-min_unknown_index(0));
+     } else if (off == 1) {
+        p = (right-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(yconst-min_unknown_index(0));
+     }
+  }
+
+  size_t id = node.parID[comp]->item(p);
+  double xp = solid.coord[comp]->item(id,0);
+  double yp = solid.coord[comp]->item(id,1);
+  double Rp = solid.size[comp]->item(id);
+
+  double xcenter;
+
+  while (tolerance > 1.E-10) {
+     xcenter = (xleft+xright)/2.;
+     if (dir == 0) {
+        funl = pow(xleft-xp,2)+pow(yvalue-yp,2)-pow(Rp,2);
+        func = pow(xcenter-xp,2)+pow(yvalue-yp,2)-pow(Rp,2);
+        funr = pow(xright-xp,2)+pow(yvalue-yp,2)-pow(Rp,2);
+     } else if (dir == 1) {
+        funl = pow(yvalue-xp,2)+pow(xleft-yp,2)-pow(Rp,2);
+        func = pow(yvalue-xp,2)+pow(xcenter-yp,2)-pow(Rp,2);
+        funr = pow(yvalue-xp,2)+pow(xright-yp,2)-pow(Rp,2);
+     }
+
+     if ((func == 0.) || ((xcenter-xleft)/2. <= 1.E-10)) break;
+
+     if (func*funl >= 0.) {
+        xleft = xcenter;
+     } else {
+        xright = xcenter;
+     }
+  }
+
+  return (xcenter);
+}
+
+//---------------------------------------------------------------------------
+void
 DDS_HeatEquation:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
@@ -1380,6 +1729,8 @@ DDS_HeatEquation:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
      gamma = 1.0/2.0/peclet;
   }
 
+  if (is_solids) nodes_in_solid_correction(0);
+
   if ( my_rank == is_master ) SCT_set_start("Solver x solution");
   // Solve x-direction(i.e. 0) in y(i.e. 1) and z(i.e. 2)
   Solve_i_in_jk (t_it,gamma,0,1,2);
@@ -1388,10 +1739,10 @@ DDS_HeatEquation:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec();
   // Tranfer back to field
-  //TF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_temperature() ) ;
   TF->update_free_DOFs_value( 2, GLOBAL_EQ->get_solution_DS_temperature() ) ;
   if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer x solution");
 
+  if (is_solids) nodes_in_solid_correction(2);
 
   if ( my_rank == is_master ) SCT_set_start("Solver y solution");
   // Solve y-direction(i.e. 1) in x(i.e. 0) and z(i.e. 2)
@@ -1401,11 +1752,12 @@ DDS_HeatEquation:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec();
   // Tranfer back to field
-  //TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
   if (dim == 2) {
      TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+     if (is_solids) nodes_in_solid_correction(0);
   } else if (dim == 3) {
      TF->update_free_DOFs_value( 3 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+     if (is_solids) nodes_in_solid_correction(3);
   }
   if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer y solution");
 

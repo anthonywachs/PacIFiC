@@ -133,14 +133,17 @@ public SolverComputingTime
 
 
       /** @brief Call the functions to assemble temperature and schur complement */
-      void assemble_temperature_and_schur( FV_TimeIterator const* t_it ) ;
+      void assemble_temperature_and_schur( FV_TimeIterator const* t_it, size_t const& dir, size_t const& j, size_t const& k) ;
 
       /** @brief Assemble temperature matrix */
       double assemble_temperature_matrix (
         FV_DiscreteField const* FF,
         FV_TimeIterator const* t_it,
         double const& gamma,
-        size_t const& comp, size_t const& dir  );
+        size_t const& comp, 
+        size_t const& dir,
+        size_t const& j,
+        size_t const& k  );
 
       /** @brief Assemble schur matrix */
       void assemble_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef );
@@ -174,6 +177,19 @@ public SolverComputingTime
       
       /** @brief Call the appropriate functions to solve any particular direction in the other directions */ 
       void HeatEquation_DirectionSplittingSolver( FV_TimeIterator const* t_it ) ;
+
+      /** @brief Calculate the required field parrameters such as void_fractions, intersection pointes with the solid objects */ 
+      void node_property_calculation( ) ;
+
+      /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
+      void nodes_in_solid_correction ( size_t const& level );
+
+      /** @brief Find the intersection using bisection method with the solid interface */ 
+      double find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& comp, size_t const& dir, size_t const& off);
+
+
+      /** @brief Generate the solid particles present in the domain */ 
+      void Solids_generation( ) ;
 
       /** @brief Solve i in j and k; e.g. solve x in y ank z */ 
       void Solve_i_in_jk (FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k );
@@ -225,6 +241,7 @@ public SolverComputingTime
       size_t is_master;
       size_t dim;
       size_t nb_comps;
+      size_t Npart;
 
       MAC_Communicator const* pelCOMM;
       MPI_Comm DDS_Comm_i[3];
@@ -236,8 +253,10 @@ public SolverComputingTime
       struct MPIVar second_pass[3];
       
       double peclet ;
+      double Rpart ;
       bool b_bodyterm ;
       bool is_firstorder ;
+      bool is_solids;
       bool b_restart ;
       bool is_iperiodic[3];
       boolVector const* periodic_comp;

@@ -33,6 +33,14 @@ struct TDMatrix {
    LA_SeqMatrix ** ei;
    LA_SeqMatrix ** ee;
 };
+struct TDMatrix_new {
+   LA_SeqVector *** ii_main;
+   LA_SeqVector *** ii_super;
+   LA_SeqVector *** ii_sub;
+   LA_SeqMatrix *** ie;
+   LA_SeqMatrix *** ei;
+   LA_SeqMatrix *** ee;
+};
 
 /** @brief Product matrix is composed of products elements of block matrices (ii,ie,ei,ee) */
 struct ProdMatrix {
@@ -47,6 +55,26 @@ struct LocalVector {
    LA_SeqVector** local_solution_T;
    LA_SeqVector** T;
    LA_SeqVector** interface_T;
+};
+
+/** @brief PartInput to be used to store the Input properties of particles in the domian */
+struct PartInput {
+   LA_SeqMatrix ** coord;               // Coordinates
+   LA_SeqVector ** size;                // Size of the sphere
+   LA_SeqVector ** temp;         // Temperature of the sphere
+};
+
+/** @brief NodeProp to be used to store the nodes properties due to presence of solid particles in the domian */
+struct NodeProp {
+   LA_SeqVector ** void_frac;               // void_fraction of the node due to particle
+   LA_SeqVector ** parID;                   // ID of solid particle on the node
+};
+
+/** @brief BoundaryBisec to be used to store the intersection of solids with grids in each direction */
+struct BoundaryBisec {
+   LA_SeqMatrix ** offset;                  // Direction of intersection relative to node (Column 0 for left and Column 1 for right) 
+   LA_SeqMatrix ** value;                   // Value of offset relative to node point
+   LA_SeqMatrix ** field;                   // Value of field variable at the intersection
 };
 
 /** @brief The Class DDS_HeatEquationSystem.
@@ -113,6 +141,7 @@ class DDS_HeatEquationSystem : public MAC_Object
 
       /** @brief Return the matrix system of spacial discretization */
       TDMatrix* get_A();
+      TDMatrix_new* get_Anew();
       /** @brief Return the product matrix of spacial discretization */
       ProdMatrix* get_Ap();
       /** @brief Return the Schur complement of spacial discretization */
@@ -125,6 +154,12 @@ class DDS_HeatEquationSystem : public MAC_Object
       LocalVector* get_VEC();
       /** @brief Return RHS for the Schur complement */
       LocalVector* get_Schur_VEC();
+      /** @brief Return information of intersection with solid boundary */
+      BoundaryBisec* get_b_intersect();
+      /** @brief Return the (presence/absence) of particle vector */
+      NodeProp get_node_property();
+      /** @brief Return the particle input properties */
+      PartInput get_solid();
 
    //-- Basic operations on matrices & vectors
 
@@ -210,8 +245,14 @@ class DDS_HeatEquationSystem : public MAC_Object
 
       // Spacitial discretization matrices
       struct TDMatrix A[3];
+      struct TDMatrix_new A_new[3];
       struct ProdMatrix Ap[3];
       struct LocalVector VEC[3];
+
+      // Particle structures
+      struct PartInput solid;
+      struct NodeProp node;
+      struct BoundaryBisec b_intersect[3];
 
       // Schur complement matrices
       struct TDMatrix Schur[3];
@@ -229,6 +270,9 @@ class DDS_HeatEquationSystem : public MAC_Object
       size_t dim;
       MAC_Communicator const* pelCOMM;
       size_t nb_comps;
+      size_t Npart;
+      double Rpart;
+      bool is_solids;
 
       size_t proc_pos_in_i[3];
       size_t nb_procs_in_i[3];

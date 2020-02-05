@@ -58,6 +58,7 @@ DDS_HeatEquationSystem:: DDS_HeatEquationSystem(
    : MAC_Object( a_owner )
    , TF( mac_tf )
    , MAT_TemperatureUnsteadyPlusDiffusion_1D( 0 )
+   , is_solids (false)
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: DDS_HeatEquationSystem" ) ;
 
@@ -77,6 +78,14 @@ DDS_HeatEquationSystem:: DDS_HeatEquationSystem(
 
    dim = TF->primary_grid()->nb_space_dimensions() ;
    nb_comps = TF->nb_components() ;
+
+   if ( exp->has_entry( "Particles" ) )
+     is_solids = exp->bool_data( "Particles" ) ;
+
+   if (is_solids) {
+      Npart = exp->int_data( "NParticles" ) ;
+      Rpart = exp->double_data( "RadPart" ) ;
+   }
 
    periodic_comp = TF->primary_grid()->get_periodic_directions();
    is_iperiodic[0] = periodic_comp->operator()( 0 );
@@ -119,6 +128,15 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
    MAT_TemperatureUnsteadyPlusDiffusion_1D =
    	LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
 
+   // Structure for the particle input data
+   solid.coord = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+   solid.size = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
+   solid.temp = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
+
+   // Vector to store the presence/absence of particle on the field variable
+   node.void_frac = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
+   node.parID = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
+
    for (size_t dir = 0; dir < dim; dir++) {
       // Spacial discretization matrices
       A[dir].ii_main = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
@@ -127,6 +145,54 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
       A[dir].ie = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
       A[dir].ei = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
       A[dir].ee = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+
+      A_new[dir].ii_main = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
+      A_new[dir].ii_super = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
+      A_new[dir].ii_sub = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
+      A_new[dir].ie = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
+      A_new[dir].ei = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
+      A_new[dir].ee = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
+
+      for (size_t comp = 0; comp < nb_comps; comp++) {
+         size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
+         size_t nb_index;
+         for (size_t l=0;l<dim;++l) {
+            nb_unknowns_handled_by_proc( l ) =
+                            1 + TF->get_max_index_unknown_handled_by_proc( comp, l )
+                              - TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+         }
+         if (dir == 0) {
+            if (dim == 2) {
+               nb_index = nb_unknowns_handled_by_proc(1);
+            } else if (dim == 3) {
+               nb_index = nb_unknowns_handled_by_proc(1)*nb_unknowns_handled_by_proc(2);
+            }
+         } else if (dir == 1) {
+            if (dim == 2) {
+               nb_index = nb_unknowns_handled_by_proc(0);
+            } else if (dim == 3) {
+               nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(2);
+            }
+         } else if (dir == 2) {
+            nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
+         }
+         A_new[dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+         A_new[dir].ii_super[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+         A_new[dir].ii_sub[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+         A_new[dir].ie[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+         A_new[dir].ei[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+         A_new[dir].ee[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+         
+         for (size_t index = 0; index < nb_index; index++) {
+            A_new[dir].ii_main[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            A_new[dir].ii_super[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            A_new[dir].ii_sub[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            A_new[dir].ie[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+            A_new[dir].ei[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+         }
+
+      }
+         
 
       // Product matrices of spacial discretization
       Ap[dir].ei_ii_ie = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
@@ -161,6 +227,9 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
       // Matrix for Schur complement of Schur complement
       DoubleSchur[dir].ii_main = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
 
+      b_intersect[dir].offset = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+      b_intersect[dir].value = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+      b_intersect[dir].field = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
    }
 
    for (size_t dir=0;dir<dim;++dir) {
@@ -179,6 +248,18 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
          VEC[dir].local_solution_T[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          VEC[dir].T[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          VEC[dir].interface_T[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+
+         if (dir == 0) {
+            solid.coord[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+            solid.size[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            solid.temp[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            node.void_frac[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            node.parID[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+         }
+
+         b_intersect[dir].offset[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+         b_intersect[dir].value[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+         b_intersect[dir].field[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
 
          if (proc_pos_in_i[dir] == 0) {
             A[dir].ee[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
@@ -234,14 +315,44 @@ DDS_HeatEquationSystem:: re_initialize( void )
    for (size_t comp=0;comp<nb_comps;++comp) {
       size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
 
+      size_t nb_total_unknown = 1;
+
       for (size_t l=0;l<dim;++l) {
 
          nb_unknowns_handled_by_proc( l ) =
                             1 + TF->get_max_index_unknown_handled_by_proc( comp, l )
                               - TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
 
+         nb_total_unknown *= nb_unknowns_handled_by_proc(l);
+
+/*         size_t nb_index;
+         if (l == 0) {
+            if (dim == 2) {
+               nb_index = nb_unknowns_handled_by_proc(1);
+            } else if (dim == 3) {
+               nb_index = nb_unknowns_handled_by_proc(1)*nb_unknowns_handled_by_proc(2);
+            }
+         } else if (l == 1) {
+            if (dim == 2) {
+               nb_index = nb_unknowns_handled_by_proc(0);
+            } else if (dim == 3) {
+               nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(2);
+            }
+         } else if (l == 2) {
+            nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
+         }*/
+
          nb_procs = nb_procs_in_i[l];
          proc_pos = proc_pos_in_i[l];
+
+         if ((l == 0) && (is_solids)) {
+            // Presence of solid and only once
+            solid.coord[comp]->re_initialize(Npart,3);
+            solid.size[comp]->re_initialize(Npart);
+            solid.temp[comp]->re_initialize(Npart);
+         }
+
+         A_new[l].ii_main[comp][1]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
 
          if (is_iperiodic[l] != 1) {
             if (proc_pos == nb_procs-1) {
@@ -332,6 +443,15 @@ DDS_HeatEquationSystem:: re_initialize( void )
                   Schur[l].ii_sub[comp]->re_initialize(nb_procs-1);
 	       }
             }
+         }
+      }
+      if (is_solids) {
+         node.void_frac[comp]->re_initialize( nb_total_unknown ) ;
+         node.parID[comp]->re_initialize( nb_total_unknown ) ;
+         for (size_t i=0;i<dim;i++) {
+            b_intersect[i].offset[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
+            b_intersect[i].value[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
+            b_intersect[i].field[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
          }
       }
    }
@@ -501,6 +621,15 @@ DDS_HeatEquationSystem::get_A()
 }
 
 //----------------------------------------------------------------------
+TDMatrix_new*
+DDS_HeatEquationSystem::get_Anew()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatEquationSystem:: get_Anew" ) ;
+   return (A_new) ;
+}
+
+//----------------------------------------------------------------------
 ProdMatrix*
 DDS_HeatEquationSystem::get_Ap()
 //----------------------------------------------------------------------
@@ -508,6 +637,16 @@ DDS_HeatEquationSystem::get_Ap()
    MAC_LABEL( "DDS_HeatEquationSystem:: get_Ap" ) ;
    return (Ap) ;
 }
+
+//----------------------------------------------------------------------
+PartInput
+DDS_HeatEquationSystem::get_solid()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatEquationSystem:: get_solid" ) ;
+   return (solid) ;
+}
+
 
 //----------------------------------------------------------------------
 ProdMatrix*
@@ -525,6 +664,24 @@ DDS_HeatEquationSystem::get_VEC()
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: get_VEC" ) ;
    return (VEC) ;
+}
+
+//----------------------------------------------------------------------
+BoundaryBisec*
+DDS_HeatEquationSystem::get_b_intersect()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatEquationSystem:: get_b_intersect" ) ;
+   return (b_intersect) ;
+}
+
+//----------------------------------------------------------------------
+NodeProp
+DDS_HeatEquationSystem::get_node_property()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatEquationSystem:: get_voidfrac_VEC" ) ;
+   return (node) ;
 }
 
 //----------------------------------------------------------------------
