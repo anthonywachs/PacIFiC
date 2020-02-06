@@ -26,14 +26,6 @@ class FV_TimeIterator ;
 
 /** @brief TDMatrix include all elements of block matrices (ii,ie,ei,ee) */
 struct TDMatrix {
-   LA_SeqVector ** ii_main;
-   LA_SeqVector ** ii_super;
-   LA_SeqVector ** ii_sub;
-   LA_SeqMatrix ** ie;
-   LA_SeqMatrix ** ei;
-   LA_SeqMatrix ** ee;
-};
-struct TDMatrix_new {
    LA_SeqVector *** ii_main;
    LA_SeqVector *** ii_super;
    LA_SeqVector *** ii_sub;
@@ -141,7 +133,6 @@ class DDS_HeatEquationSystem : public MAC_Object
 
       /** @brief Return the matrix system of spacial discretization */
       TDMatrix* get_A();
-      TDMatrix_new* get_Anew();
       /** @brief Return the product matrix of spacial discretization */
       ProdMatrix* get_Ap();
       /** @brief Return the Schur complement of spacial discretization */
@@ -182,7 +173,7 @@ class DDS_HeatEquationSystem : public MAC_Object
 
       /** @brief Solve the DS splitting problem in x by performing the
       matrix-vector product A_x^-1.Vx and transfer in the distributed vector */
-      void DS_HeatEquation_solver( size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir) ;
+      void DS_HeatEquation_solver( size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir,size_t const& r_index) ;
 
       //@}
 
@@ -197,18 +188,18 @@ class DDS_HeatEquationSystem : public MAC_Object
       //@}
 
       /** @brief Call the interior function for different conditions of procs and periodicity*/
-      void compute_product_matrix( struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir );
+      void compute_product_matrix( struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& r_index );
       /** @brief Compute the product of Aei*inv(Aii)*Aie in x*/
-      void compute_product_matrix_interior( struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column, size_t const& dir);
+      void compute_product_matrix_interior( struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column, size_t const& dir, size_t const& r_index);
 
    //-- Utilities
 
       /** @name Utilities */
       //@{
       /** @brief Compute the pre-thomas step on the provided matrix arr */
-      void pre_thomas_treatment(size_t const& comp, size_t const& dir, struct TDMatrix *arr);
+      void pre_thomas_treatment(size_t const& comp, size_t const& dir, struct TDMatrix *arr, size_t const& r_index);
       /** @brief Compute the inverse of 1 tridiagonal matrix  */
-      static void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir) ;
+      static void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& r_index) ;
 
       //@}
 
@@ -245,7 +236,6 @@ class DDS_HeatEquationSystem : public MAC_Object
 
       // Spacitial discretization matrices
       struct TDMatrix A[3];
-      struct TDMatrix_new A_new[3];
       struct ProdMatrix Ap[3];
       struct LocalVector VEC[3];
 

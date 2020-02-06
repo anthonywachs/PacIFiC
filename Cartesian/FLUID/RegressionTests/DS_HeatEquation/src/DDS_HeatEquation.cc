@@ -226,10 +226,6 @@ DDS_HeatEquation:: do_before_time_stepping( FV_TimeIterator const* t_it,
    // Generate solid particles if required
    if (is_solids) Solids_generation();
 
-   // Direction splitting
-   // Assemble 1D tridiagonal matrices and schur complement calculation
-   //assemble_temperature_and_schur(t_it);
-
    GLOBAL_EQ->initialize_temperature();
 
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
@@ -252,6 +248,9 @@ DDS_HeatEquation:: do_before_inner_iterations_stage(
 
    // Perform matrix level operations before each time step
    GLOBAL_EQ->at_each_time_step( );
+
+   // Assemble 1D tridiagonal matrices and schur complement calculation
+   assemble_temperature_and_schur(t_it);
 
    stop_total_timer() ;
 
@@ -515,9 +514,6 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
       min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
       max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
    }
-   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect();
-   NodeProp node = GLOBAL_EQ->get_node_property();
-   PartInput solid = GLOBAL_EQ->get_solid();
 
    if (dir == 0) {
       xhr= TF->get_DOF_coordinate( i+1,comp, 0 ) - TF->get_DOF_coordinate( i, comp, 0 ) ;
@@ -526,6 +522,9 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
       xleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i-1, j, k, comp, level ) ;
 
       if (is_solids) {
+         BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect();
+         NodeProp node = GLOBAL_EQ->get_node_property();
+         PartInput solid = GLOBAL_EQ->get_solid();
          size_t p = (j-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(i-min_unknown_index(0)); 
          if (b_intersect[dir].offset[comp]->item(p,0) == 1) {
             xleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
@@ -550,6 +549,9 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
       yleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i, j-1, k, comp, level ) ;
 
       if (is_solids) {
+         BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect();
+         NodeProp node = GLOBAL_EQ->get_node_property();
+         PartInput solid = GLOBAL_EQ->get_solid();
          size_t p = (j-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(i-min_unknown_index(0));           
          if (b_intersect[dir].offset[comp]->item(p,0) == 1) {
             yleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
@@ -587,6 +589,47 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
 }
 
 //---------------------------------------------------------------------------
+size_t
+DDS_HeatEquation:: return_row_index (
+  FV_DiscreteField const* FF,
+  size_t const& comp,
+  size_t const& dir,
+  size_t const& j,
+  size_t const& k )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatEquation:: return_row_index" ) ;
+
+   // Get local min and max indices
+   size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
+   for (size_t l=0;l<dim;++l) {
+	min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+	max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   }
+
+   size_t p=0;
+
+   if (dim == 2) {
+      if (dir == 0) {
+         p = j - min_unknown_index(1);
+      } else if (dir == 1) {
+         p = j - min_unknown_index(0);
+      }
+   } else if (dim == 3) {
+      if (dir == 0) {
+         p = (j-min_unknown_index(1))+(1+max_unknown_index(1)-min_unknown_index(1))*(k-min_unknown_index(2));
+      } else if (dir == 1) {
+         p = (j-min_unknown_index(0))+(1+max_unknown_index(0)-min_unknown_index(0))*(k-min_unknown_index(2));
+      } else if (dir == 2) {
+         p = (j-min_unknown_index(0))+(1+max_unknown_index(0)-min_unknown_index(0))*(k-min_unknown_index(1));
+      }
+   }
+
+   return(p); 
+}
+
+//---------------------------------------------------------------------------
 double
 DDS_HeatEquation:: assemble_temperature_matrix (
   FV_DiscreteField const* FF,
@@ -595,12 +638,11 @@ DDS_HeatEquation:: assemble_temperature_matrix (
   size_t const& comp,
   size_t const& dir,
   size_t const& j,
-  size_t const& k )
+  size_t const& k,
+  size_t const& r_index )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: assemble_temperature_matrix" ) ;
-
-//   if ( my_rank == is_master ) cout << "Temperature matrix in " << dir << endl;
 
    // Parameters
    double dxr,dxl,xR,xL,xC,right,left,center = 0. ;
@@ -616,7 +658,6 @@ DDS_HeatEquation:: assemble_temperature_matrix (
    // Perform assembling
    size_t m, i;
    TDMatrix* A = GLOBAL_EQ-> get_A();
-   TDMatrix_new* A_new = GLOBAL_EQ-> get_Anew();
 
    double Aee_diagcoef=0.;
 
@@ -631,8 +672,8 @@ DDS_HeatEquation:: assemble_temperature_matrix (
        right = -gamma/(dxr);
        left = -gamma/(dxl);
 
-       size_t p;
        if (is_solids) {
+          size_t p=0;
           BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect();
           NodeProp node = GLOBAL_EQ->get_node_property();
           if (dir == 0) {
@@ -655,7 +696,7 @@ DDS_HeatEquation:: assemble_temperature_matrix (
           }
 
           center = -(right+left);
-          //cout << "CENTER in presence of solid: " << center << endl;
+
           if (b_intersect[dir].offset[comp]->item(p,0) == 1) left = 0.;
           if (b_intersect[dir].offset[comp]->item(p,1) == 1) right = 0.;
        } else {
@@ -682,83 +723,80 @@ DDS_HeatEquation:: assemble_temperature_matrix (
           // Periodic boundary condition at minimum unknown index
           // First proc has non zero value in Aie,Aei for first & last index
 	  if (rank_in_i[dir] == 0) {
-             A[dir].ie[comp]->set_item(m,nb_ranks_comm_i[dir]-1,left);
-      	     A[dir].ei[comp]->set_item(nb_ranks_comm_i[dir]-1,m,right);			
+             A[dir].ie[comp][r_index]->set_item(m,nb_ranks_comm_i[dir]-1,left);
+      	     A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,right);			
 	  } else {
-             A[dir].ie[comp]->set_item(m,rank_in_i[dir]-1,left);
-	     A[dir].ei[comp]->set_item(rank_in_i[dir]-1,m,right);			
+             A[dir].ie[comp][r_index]->set_item(m,rank_in_i[dir]-1,left);
+	     A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,right);			
 	  }
        }
 
        if ((!r_bound) && (i == max_unknown_index(dir))) {
           // Periodic boundary condition at maximum unknown index
           // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-          A[dir].ie[comp]->set_item(m-1,rank_in_i[dir],right);			
+          A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],right);			
           Aee_diagcoef = value;
-          A[dir].ei[comp]->set_item(rank_in_i[dir],m-1,left);
+          A[dir].ei[comp][r_index]->set_item(rank_in_i[dir],m-1,left);
        }
 
        // Set Aii_sub_diagonal
        if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_iperiodic[dir] != 1)) {
-          if (i > min_unknown_index(dir)) A[dir].ii_sub[comp]->set_item(m-1,left);
+          if (i > min_unknown_index(dir)) A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
        } else {
           if (i<max_unknown_index(dir)) {
              if (i>min_unknown_index(dir)) {
-                A[dir].ii_sub[comp]->set_item(m-1,left);
+                A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
 	     }
 	  }
        }
 
        // Set Aii_super_diagonal
        if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_iperiodic[dir] != 1)) {
-          if (i < max_unknown_index(dir)) A[dir].ii_super[comp]->set_item(m,right);
+          if (i < max_unknown_index(dir)) A[dir].ii_super[comp][r_index]->set_item(m,right);
        } else {
           if (i < max_unknown_index(dir)-1) {
-             A[dir].ii_super[comp]->set_item(m,right);
+             A[dir].ii_super[comp][r_index]->set_item(m,right);
           }
        }
 
        // Set Aii_main_diagonal
        if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_iperiodic[dir] != 1)) {
-          A[dir].ii_main[comp]->set_item(m,value);
-          A_new[dir].ii_main[comp][1]->set_item(m,value);
+          A[dir].ii_main[comp][r_index]->set_item(m,value);
        } else {
           if (i<max_unknown_index(dir)) {
-             A[dir].ii_main[comp]->set_item(m,value);
-             A_new[dir].ii_main[comp][1]->set_item(m,value);
+             A[dir].ii_main[comp][r_index]->set_item(m,value);
           }
        }
    }  // End of for loop
 
-   if ((dir == 1) && (my_rank == 0)) A_new[dir].ii_main[comp][1]->print_items(MAC::out(),0);
+//   if ((dir == 0) && (my_rank == 0)) A[dir].ii_super[comp][r_index]->print_items(MAC::out(),0);
 //   if ((dir == 0) && (my_rank == 2) && (j == 5)) A[dir].ii_sub[comp]->print_items(MAC::out(),0);
 
-   GLOBAL_EQ->pre_thomas_treatment(comp,dir,A);
+   GLOBAL_EQ->pre_thomas_treatment(comp,dir,A,r_index);
 
    return(Aee_diagcoef);
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: assemble_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef )
+DDS_HeatEquation:: assemble_schur_matrix (size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& r_index)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: assemble_schur_matrix" ) ;
-   // Compute the product matrix for each proc
 
-//   if ( my_rank == is_master ) cout << "Schur matrix in " << dir << endl;
+   TDMatrix* A = GLOBAL_EQ-> get_A();
 
    if (nb_ranks_comm_i[dir]>1) {
 
       ProdMatrix* Ap = GLOBAL_EQ->get_Ap();
 
-      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir);
+      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,r_index);
 
       LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
       LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
 
       if ( rank_in_i[dir] == 0 ) {
-         A[dir].ee[comp]->set_item(0,0,Aee_diagcoef);
+         A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
          for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
 
              // Create the container to receive
@@ -783,12 +821,12 @@ DDS_HeatEquation:: assemble_schur_matrix (struct TDMatrix *A, size_t const& comp
                 if (i<nb_ranks_comm_i[dir]-1) {
                    // Assemble the global Aee matrix
                    // No periodic condition in x. So no fe contribution from last proc
-                   A[dir].ee[comp]->set_item(i,i,received_data[nb_received_data-1]);
+                   A[dir].ee[comp][r_index]->set_item(i,i,received_data[nb_received_data-1]);
                 }
              } else{
                 // Assemble the global Aee matrix
                 // Periodic condition in x. So there is fe contribution from last proc
-                A[dir].ee[comp]->set_item(i,i,received_data[nb_received_data-1]);
+                A[dir].ee[comp][r_index]->set_item(i,i,received_data[nb_received_data-1]);
              }
 	     delete [] received_data;
 
@@ -825,79 +863,108 @@ DDS_HeatEquation:: assemble_schur_matrix (struct TDMatrix *A, size_t const& comp
 
       if (rank_in_i[dir] == 0) {
 	 TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
-         size_t nb_row = Schur[dir].ii_main[comp]->nb_rows();
+         size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
          for (int p = 0; p < nb_row; p++) {
-            Schur[dir].ii_main[comp]->set_item(p,A[dir].ee[comp]->item(p,p)-receive_matrix->item(p,p));
-            if (p < nb_row-1) Schur[dir].ii_super[comp]->set_item(p,-receive_matrix->item(p,p+1));
-            if (p > 0) Schur[dir].ii_sub[comp]->set_item(p-1,-receive_matrix->item(p,p-1));
+            Schur[dir].ii_main[comp][r_index]->set_item(p,A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
+            if (p < nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,-receive_matrix->item(p,p+1));
+            if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,-receive_matrix->item(p,p-1));
 	    // In case of periodic and multi-processor, there will be a variant of Tridiagonal matrix instead of normal format
             if (is_iperiodic[dir] == 1) {
-               Schur[dir].ie[comp]->set_item(p,0,-receive_matrix->item(p,nb_row)); 
-               Schur[dir].ei[comp]->set_item(0,p,-receive_matrix->item(nb_row,p)); 
+               Schur[dir].ie[comp][r_index]->set_item(p,0,-receive_matrix->item(p,nb_row)); 
+               Schur[dir].ei[comp][r_index]->set_item(0,p,-receive_matrix->item(nb_row,p)); 
 	    }
 	 }
 
 	 // Pre-thomas treatment on Schur complement
-	 GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur);
+	 GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
 
 	 // In case of periodic and multi-processor, there will be a variant of Tridiagonal matrix instead of normal format
 	 // So, Schur complement of Schur complement is calculated
 	 if (is_iperiodic[dir] == 1) {
-            Schur[dir].ee[comp]->set_item(0,0,A[dir].ee[comp]->item(nb_row,nb_row)-receive_matrix->item(nb_row,nb_row));
+            Schur[dir].ee[comp][r_index]->set_item(0,0,A[dir].ee[comp][r_index]->item(nb_row,nb_row)-receive_matrix->item(nb_row,nb_row));
 
 	    ProdMatrix* SchurP = GLOBAL_EQ->get_SchurP();
-            GLOBAL_EQ->compute_product_matrix_interior(Schur,SchurP,comp,0,dir);
+            GLOBAL_EQ->compute_product_matrix_interior(Schur,SchurP,comp,0,dir,r_index);
 
             TDMatrix* DoubleSchur = GLOBAL_EQ-> get_DoubleSchur();
-            size_t nb_row = DoubleSchur[dir].ii_main[comp]->nb_rows();
-            DoubleSchur[dir].ii_main[comp]->set_item(0,Schur[dir].ee[comp]->item(0,0)-SchurP[dir].ei_ii_ie[comp]->item(0,0));
+            size_t nb_row = DoubleSchur[dir].ii_main[comp][r_index]->nb_rows();
+            DoubleSchur[dir].ii_main[comp][r_index]->set_item(0,Schur[dir].ee[comp][r_index]->item(0,0)-SchurP[dir].ei_ii_ie[comp]->item(0,0));
 	 }
 
       }
    } else if (is_iperiodic[dir] == 1) {
       // Condition for single processor in any direction with periodic boundary conditions
       ProdMatrix* Ap = GLOBAL_EQ->get_Ap();
-      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir);
+      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,r_index);
 
       LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
       LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
 
-      A[dir].ee[comp]->set_item(0,0,Aee_diagcoef);
+      A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
 
       TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
-      size_t nb_row = Schur[dir].ii_main[comp]->nb_rows();
+      size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
       for (int p = 0; p < nb_row; p++) {
-         Schur[dir].ii_main[comp]->set_item(p,A[dir].ee[comp]->item(p,p)-receive_matrix->item(p,p));
-         if (p < nb_row-1) Schur[dir].ii_super[comp]->set_item(p,-receive_matrix->item(p,p+1));
-         if (p > 0) Schur[dir].ii_sub[comp]->set_item(p-1,-receive_matrix->item(p,p-1));
+         Schur[dir].ii_main[comp][r_index]->set_item(p,A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
+         if (p < nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,-receive_matrix->item(p,p+1));
+         if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,-receive_matrix->item(p,p-1));
       }
-      GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur);
+      GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
    }
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it, size_t const& dir, size_t const& j, size_t const& k )
+DDS_HeatEquation:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: assemble_temperature_and_schur" ) ;
 
    double gamma;
 
-   TDMatrix* A = GLOBAL_EQ-> get_A();
+   size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
 
    // Assemble temperature matrix and schur complement for each component
-   for (size_t comp=0;comp<nb_comps;comp++) {
-        if (is_firstorder) {
-                gamma = 1.0/peclet;
-        } else {
-                gamma = 1.0/2.0/peclet;
-        }
+   for (size_t comp = 0; comp < nb_comps; comp++) {
+      // Get local min and max indices
+      for (size_t l=0;l<dim;++l) {
+         min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+         max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+      }
 
-//	for (size_t dir = 0; dir<dim; i++) {                    // Commented when the assemble_temperature_and_schur are add in the time iterator loop
-            double Aee_diagcoef = assemble_temperature_matrix (TF,t_it,gamma,comp,dir,j,k);
-	    assemble_schur_matrix(A,comp,dir,Aee_diagcoef);
-//	}
+      if (is_firstorder) {
+         gamma = 1.0/peclet;
+      } else {
+         gamma = 1.0/2.0/peclet;
+      }
+
+      for (size_t dir = 0; dir < dim; dir++) {
+         size_t dir_j, dir_k;
+         size_t local_min_k = 0;
+         size_t local_max_k = 0;
+
+         if (dir == 0) {
+            dir_j = 1; dir_k = 2;
+         } else if (dir == 1) {
+            dir_j = 0; dir_k = 2;
+         } else if (dir == 2) {
+            dir_j = 0; dir_k = 1;
+         }
+
+         if (dim == 3) {
+            local_min_k = min_unknown_index(dir_k);
+            local_max_k = max_unknown_index(dir_k);
+         }
+
+         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
+            for (size_t k=local_min_k; k <= local_max_k; ++k) {
+               size_t r_index = return_row_index (TF,comp,dir,j,k);
+               double Aee_diagcoef = assemble_temperature_matrix (TF,t_it,gamma,comp,dir,j,k,r_index);
+               assemble_schur_matrix(comp,dir,Aee_diagcoef,r_index);
+            }
+         }
+      }
    }
 }
 
@@ -940,11 +1007,9 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
               size_t p = (j-min_unknown_index(1)) + (1+max_unknown_index(1)-min_unknown_index(1))*(i-min_unknown_index(0));
               if (b_intersect[dir].offset[comp]->item(p,0) == 1) {
                  value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
-//                 cout << "Value of p for left boundary: " << p << endl;
               }
               if (b_intersect[dir].offset[comp]->item(p,1) == 1) {
                  value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
-//                 cout << "Value of p for right boundary: " << p << endl;
               }
            }
 	// y direction
@@ -1050,7 +1115,7 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir)
+DDS_HeatEquation:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index)
 //---------------------------------------------------------------------------
 {
    // create a replica of local rhs vector in local solution vector
@@ -1059,51 +1124,25 @@ DDS_HeatEquation:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC
    }
 
    // Solve for ui locally and put it in local solution vector
-   GLOBAL_EQ->mod_thomas_algorithm(arr, VEC[dir].local_solution_T[comp], comp, dir);
+   GLOBAL_EQ->mod_thomas_algorithm(arr, VEC[dir].local_solution_T[comp], comp, dir,r_index);
 
    for (size_t i=0;i<VEC[dir].T[comp]->nb_rows();i++){
           VEC[dir].T[comp]->set_item(i,0);
    }
 
    // Calculate Aei*ui in each proc locally and put it in T vector
-   arr[dir].ei[comp]->multiply_vec_then_add(VEC[dir].local_solution_T[comp],VEC[dir].T[comp]);
+   arr[dir].ei[comp][r_index]->multiply_vec_then_add(VEC[dir].local_solution_T[comp],VEC[dir].T[comp]);
 
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: data_packing ( size_t const& j, size_t const& k, double const& fe, size_t const& comp, size_t const& dir)
+DDS_HeatEquation:: data_packing ( double const& fe, size_t const& comp, size_t const& dir, size_t const& vec_pos)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
 
    double *packed_data = first_pass[dir].send[comp][rank_in_i[dir]]; 
-
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l) {
-      min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-   }
-
-   // Pack the data
-   size_t vec_pos=0;
-   if (dir == 0) {
-      if (dim == 2) {
-         vec_pos=j-min_unknown_index(1);
-      } else {
-         vec_pos=(j-min_unknown_index(1))+(max_unknown_index(1)-min_unknown_index(1)+1)*(k-min_unknown_index(2));
-      }
-   } else if (dir == 1) {
-      if (dim == 2) {
-         vec_pos=j-min_unknown_index(0);
-      } else {
-         vec_pos=(j-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(k-min_unknown_index(2));
-      }
-   } else if (dir == 2) {
-      vec_pos=(j-min_unknown_index(0))+(max_unknown_index(0)-min_unknown_index(0)+1)*(k-min_unknown_index(1));
-   }
 
    if (rank_in_i[dir] == 0) {
       // Check if bc is periodic in x
@@ -1176,7 +1215,7 @@ DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir,
    }
 
    // Solve for ue (interface unknowns) in the master proc
-   DS_interface_unknown_solver(VEC[dir].interface_T[comp], comp, dir);
+   DS_interface_unknown_solver(VEC[dir].interface_T[comp], comp, dir,p);
 
    // Pack the interface_rhs_x into the appropriate send_data
    for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
@@ -1282,10 +1321,10 @@ DDS_HeatEquation:: solve_interface_unknowns ( double const& gamma,  FV_TimeItera
             double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
 
             // Setup RHS = fi - Aie*ue for solving ui
-            A[dir].ie[comp]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
+            A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
             // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir);
+            GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p);
          }
       } else {
          for (size_t k=local_min_k;k<=local_max_k;k++) {
@@ -1299,10 +1338,10 @@ DDS_HeatEquation:: solve_interface_unknowns ( double const& gamma,  FV_TimeItera
                double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
 
                // Setup RHS = fi - Aie*ue for solving ui
-               A[dir].ie[comp]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
+               A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
                // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir);
+               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p);
             }
          }
       }
@@ -1336,10 +1375,10 @@ DDS_HeatEquation:: solve_interface_unknowns ( double const& gamma,  FV_TimeItera
                double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
 
                // Setup RHS = fi - Aie*xe for solving ui
-               A[dir].ie[comp]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
+               A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
                // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir);
+               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p);
             }
          } else {
             for (size_t k = local_min_k;k<=local_max_k;k++) {
@@ -1352,10 +1391,10 @@ DDS_HeatEquation:: solve_interface_unknowns ( double const& gamma,  FV_TimeItera
                   double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
 
                   // Setup RHS = fi - Aie*xe for solving ui
-                  A[dir].ie[comp]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
+                  A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
                   // Solve ui and transfer solution into distributed vector
-                  GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir);
+                  GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p);
                }
             }
          }
@@ -1393,13 +1432,13 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& ga
      if ((nb_ranks_comm_i[dir_i]>1)||(is_iperiodic[dir_i] == 1)) {
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
 	   for (size_t k=local_min_k; k <= local_max_k; ++k) {
-              assemble_temperature_and_schur(t_it,dir_i,j,k);
+              size_t r_index = return_row_index (TF,comp,dir_i,j,k);
               // Assemble fi and return fe for each proc locally        
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
               // Calculate Aei*ui in each proc locally
-              compute_Aei_ui(A,VEC,comp,dir_i);
+              compute_Aei_ui(A,VEC,comp,dir_i,r_index);
               // Pack Aei_ui and fe for sending it to master
-              data_packing (j,k,fe,comp,dir_i);
+              data_packing (fe,comp,dir_i,r_index);
 	   }
         }
         solve_interface_unknowns (gamma,t_it,comp,dir_i);
@@ -1407,9 +1446,9 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& ga
      } else if (is_iperiodic[dir_i] == 0) {  // Serial mode with non-periodic condition
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
-              assemble_temperature_and_schur(t_it,dir_i,j,k);
+              size_t r_index = return_row_index (TF,comp,dir_i,j,k);
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
-              GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir_i),comp,dir_i);
+              GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir_i),comp,dir_i,r_index);
            }
         }
      }
@@ -1418,7 +1457,7 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& ga
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquation::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir)
+DDS_HeatEquation::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: DS_interface_unknown_solver" ) ;
@@ -1438,19 +1477,19 @@ DDS_HeatEquation::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_
       Schur_VEC[dir].interface_T[comp]->set_item(0,interface_rhs->item(nrows));
 
       // Calculate Sei*(Sii)-1*S_fi
-      compute_Aei_ui(Schur,Schur_VEC,comp,dir);
+      compute_Aei_ui(Schur,Schur_VEC,comp,dir,r_index);
 
       // Calculate S_fe - Sei*(Sii)-1*S_fi
       Schur_VEC[dir].interface_T[comp]->set_item(0,Schur_VEC[dir].interface_T[comp]->item(0)-Schur_VEC[dir].T[comp]->item(0));
 
       // Calculate S_ue, using Schur complement of Schur complement
-      GLOBAL_EQ->mod_thomas_algorithm(DoubleSchur, Schur_VEC[dir].interface_T[comp], comp, dir);
+      GLOBAL_EQ->mod_thomas_algorithm(DoubleSchur, Schur_VEC[dir].interface_T[comp], comp, dir,r_index);
 
       // Calculate S_fi-Sie*S_ue
-      Schur[dir].ie[comp]->multiply_vec_then_add(Schur_VEC[dir].interface_T[comp],Schur_VEC[dir].local_T[comp],-1.0,1.0);
+      Schur[dir].ie[comp][r_index]->multiply_vec_then_add(Schur_VEC[dir].interface_T[comp],Schur_VEC[dir].local_T[comp],-1.0,1.0);
 
       // Calculate S_ui
-      GLOBAL_EQ->mod_thomas_algorithm(Schur, Schur_VEC[dir].local_T[comp], comp, dir);
+      GLOBAL_EQ->mod_thomas_algorithm(Schur, Schur_VEC[dir].local_T[comp], comp, dir, r_index);
 
       // Transfer back the solution to interface_rhs
       for (size_t i = 0; i < nrows; i++) {
@@ -1458,7 +1497,7 @@ DDS_HeatEquation::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_
       }
       interface_rhs->set_item(nrows,Schur_VEC[dir].interface_T[comp]->item(0));
    } else {
-      GLOBAL_EQ->mod_thomas_algorithm(Schur, interface_rhs, comp, dir);
+      GLOBAL_EQ->mod_thomas_algorithm(Schur, interface_rhs, comp, dir,r_index);
    }
 
 }
@@ -1474,23 +1513,23 @@ DDS_HeatEquation:: Solids_generation ()
   PartInput solid = GLOBAL_EQ->get_solid();
 
   for (size_t comp=0;comp<nb_comps;comp++) {
-     for (size_t i=0;i<Npart;i++) {
-        solid.coord[comp]->set_item(i,0,5.E-1);
-        solid.coord[comp]->set_item(i,1,5.E-1);
-        solid.coord[comp]->set_item(i,2,5.E-1);
+/*     for (size_t i=0;i<Npart;i++) {
+        solid.coord[comp]->set_item(i,0,7.5E-1);
+        solid.coord[comp]->set_item(i,1,7.5E-1);
+        solid.coord[comp]->set_item(i,2,7.5E-1);
         solid.size[comp]->set_item(i,Rpart);
         solid.temp[comp]->set_item(i,1.);
-     }
-/*        solid.coord[comp]->set_item(0,0,2.5E-1);
-        solid.coord[comp]->set_item(0,1,5.E-1);
+     }*/
+        solid.coord[comp]->set_item(0,0,2.6E-1);
+        solid.coord[comp]->set_item(0,1,2.5E-1);
         solid.coord[comp]->set_item(0,2,5.E-1);
         solid.size[comp]->set_item(0,Rpart);
         solid.temp[comp]->set_item(0,1.);
-        solid.coord[comp]->set_item(1,0,7.5E-1);
-        solid.coord[comp]->set_item(1,1,5.E-1);
+        solid.coord[comp]->set_item(1,0,7.7E-1);
+        solid.coord[comp]->set_item(1,1,7.5E-1);
         solid.coord[comp]->set_item(1,2,5.E-1);
         solid.size[comp]->set_item(1,Rpart);
-        solid.temp[comp]->set_item(1,-1.);*/
+        solid.temp[comp]->set_item(1,1.);
   }
 } 
   
@@ -1564,7 +1603,7 @@ DDS_HeatEquation:: node_property_calculation ( )
                  double xp = solid.coord[comp]->item(m,0);
                  double yp = solid.coord[comp]->item(m,1);
                  double Rp = solid.size[comp]->item(m);
-                 if (pow(xC-xp,2)+pow(yC-yp,2)-pow(Rp,2) <= 0.) {
+                 if (pow(xC-xp,2)+pow(yC-yp,2)-pow(Rp,2) <= 1.E-16) {
                     node.void_frac[comp]->set_item(p,1.);
                     node.parID[comp]->set_item(p,m);
                  }
@@ -1630,7 +1669,7 @@ DDS_HeatEquation:: node_property_calculation ( )
            // Requires the addition of algorithm for 3D cases as well
         }
      }
-     //b_intersect[1].value[comp]->print_items(MAC::out(),0);
+     //b_intersect[0].value[comp]->print_items(MAC::out(),0);
   }
 }
 
@@ -1683,7 +1722,7 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
 
   double xcenter;
 
-  while (tolerance > 1.E-10) {
+  while (tolerance > 1.E-16) {
      xcenter = (xleft+xright)/2.;
      if (dir == 0) {
         funl = pow(xleft-xp,2)+pow(yvalue-yp,2)-pow(Rp,2);
@@ -1695,9 +1734,9 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
         funr = pow(yvalue-xp,2)+pow(xright-yp,2)-pow(Rp,2);
      }
 
-     if ((func == 0.) || ((xcenter-xleft)/2. <= 1.E-10)) break;
+     if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
 
-     if (func*funl >= 0.) {
+     if (func*funl >= 1.E-16) {
         xleft = xcenter;
      } else {
         xright = xcenter;
@@ -1805,7 +1844,7 @@ DDS_HeatEquation:: output_l2norm ( void )
             if (dim == 2) {
                k=0;
                local_number = TF->DOF_local_number( i, j, k, comp );
-               computed_DS_field = DS_Solution->item(local_number);
+               computed_DS_field = TF->DOF_value( i, j, k, comp, 0 ) ;
 
                if ( TF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) ) {
                   computed_DS_L2 += computed_DS_field*computed_DS_field

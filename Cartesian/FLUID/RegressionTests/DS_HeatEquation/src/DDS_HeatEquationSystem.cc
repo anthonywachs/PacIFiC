@@ -139,19 +139,24 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
 
    for (size_t dir = 0; dir < dim; dir++) {
       // Spacial discretization matrices
-      A[dir].ii_main = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
-      A[dir].ii_super = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
-      A[dir].ii_sub = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
-      A[dir].ie = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
-      A[dir].ei = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
-      A[dir].ee = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+      A[dir].ii_main = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
+      A[dir].ii_super = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
+      A[dir].ii_sub = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
+      A[dir].ie = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
+      A[dir].ei = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
+      A[dir].ee = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
 
-      A_new[dir].ii_main = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
-      A_new[dir].ii_super = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
-      A_new[dir].ii_sub = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
-      A_new[dir].ie = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
-      A_new[dir].ei = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
-      A_new[dir].ee = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
+      // Schur complement matrices
+      Schur[dir].ii_main = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
+      Schur[dir].ii_super = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
+      Schur[dir].ii_sub = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
+      Schur[dir].ie = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
+      Schur[dir].ei = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
+      Schur[dir].ee = (LA_SeqMatrix***) malloc(nb_comps * sizeof(LA_SeqMatrix**)) ;
+
+      // Matrix for Schur complement of Schur complement
+      DoubleSchur[dir].ii_main = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
+
 
       for (size_t comp = 0; comp < nb_comps; comp++) {
          size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
@@ -176,21 +181,42 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
          } else if (dir == 2) {
             nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
          }
-         A_new[dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
-         A_new[dir].ii_super[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
-         A_new[dir].ii_sub[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
-         A_new[dir].ie[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
-         A_new[dir].ei[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
-         A_new[dir].ee[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
-         
-         for (size_t index = 0; index < nb_index; index++) {
-            A_new[dir].ii_main[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            A_new[dir].ii_super[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            A_new[dir].ii_sub[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            A_new[dir].ie[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-            A_new[dir].ei[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-         }
 
+         A[dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+         A[dir].ii_super[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+         A[dir].ii_sub[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+         A[dir].ie[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+         A[dir].ei[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+         A[dir].ee[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+         
+         Schur[dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+         Schur[dir].ii_super[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+         Schur[dir].ii_sub[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+         Schur[dir].ie[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+         Schur[dir].ei[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+         Schur[dir].ee[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+
+         DoubleSchur[dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+
+         for (size_t index = 0; index < nb_index; index++) {
+            A[dir].ii_main[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            A[dir].ii_super[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            A[dir].ii_sub[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            A[dir].ie[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+            A[dir].ei[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+
+            if (proc_pos_in_i[dir] == 0) {
+               A[dir].ee[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+               Schur[dir].ii_main[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               Schur[dir].ii_super[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               Schur[dir].ii_sub[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               Schur[dir].ie[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+               Schur[dir].ei[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+               Schur[dir].ee[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+
+               DoubleSchur[dir].ii_main[comp][index] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            }
+         }
       }
          
 
@@ -205,14 +231,6 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
       VEC[dir].T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
       VEC[dir].interface_T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
 
-      // Schur complement matrices
-      Schur[dir].ii_main = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
-      Schur[dir].ii_super = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
-      Schur[dir].ii_sub = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
-      Schur[dir].ie = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
-      Schur[dir].ei = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
-      Schur[dir].ee = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
-
       // Product of Schur complement matrices
       SchurP[dir].ei_ii_ie = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
       SchurP[dir].result = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
@@ -224,9 +242,6 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
       Schur_VEC[dir].T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
       Schur_VEC[dir].interface_T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
 
-      // Matrix for Schur complement of Schur complement
-      DoubleSchur[dir].ii_main = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
-
       b_intersect[dir].offset = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
       b_intersect[dir].value = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
       b_intersect[dir].field = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
@@ -234,11 +249,11 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
 
    for (size_t dir=0;dir<dim;++dir) {
       for (size_t comp=0;comp<nb_comps;++comp) {
-         A[dir].ii_main[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+/*         A[dir].ii_main[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          A[dir].ii_super[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          A[dir].ii_sub[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          A[dir].ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-         A[dir].ei[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+         A[dir].ei[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );*/
 
          Ap[dir].ei_ii_ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
          Ap[dir].result[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -262,13 +277,13 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
          b_intersect[dir].field[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
 
          if (proc_pos_in_i[dir] == 0) {
-            A[dir].ee[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+/*            A[dir].ee[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
             Schur[dir].ii_main[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             Schur[dir].ii_super[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             Schur[dir].ii_sub[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             Schur[dir].ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
             Schur[dir].ei[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-            Schur[dir].ee[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+            Schur[dir].ee[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );*/
 
             SchurP[dir].ei_ii_ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
             SchurP[dir].result[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -279,7 +294,7 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
             Schur_VEC[dir].T[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             Schur_VEC[dir].interface_T[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
 
-            DoubleSchur[dir].ii_main[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+//            DoubleSchur[dir].ii_main[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          }
       }
    }
@@ -318,14 +333,16 @@ DDS_HeatEquationSystem:: re_initialize( void )
       size_t nb_total_unknown = 1;
 
       for (size_t l=0;l<dim;++l) {
-
          nb_unknowns_handled_by_proc( l ) =
                             1 + TF->get_max_index_unknown_handled_by_proc( comp, l )
                               - TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+      }
 
+    
+      for (size_t l=0;l<dim;++l) {
          nb_total_unknown *= nb_unknowns_handled_by_proc(l);
 
-/*         size_t nb_index;
+         size_t nb_index;
          if (l == 0) {
             if (dim == 2) {
                nb_index = nb_unknowns_handled_by_proc(1);
@@ -340,7 +357,7 @@ DDS_HeatEquationSystem:: re_initialize( void )
             }
          } else if (l == 2) {
             nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
-         }*/
+         }
 
          nb_procs = nb_procs_in_i[l];
          proc_pos = proc_pos_in_i[l];
@@ -352,29 +369,31 @@ DDS_HeatEquationSystem:: re_initialize( void )
             solid.temp[comp]->re_initialize(Npart);
          }
 
-         A_new[l].ii_main[comp][1]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
-
          if (is_iperiodic[l] != 1) {
             if (proc_pos == nb_procs-1) {
 	       // Non-periodic and last processor
-               A[l].ii_main[comp]->re_initialize(nb_unknowns_handled_by_proc( l ));
-               A[l].ii_super[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
-               A[l].ii_sub[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
+               for (size_t index = 0; index < nb_index; index++) {
+                  A[l].ii_main[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l ));
+                  A[l].ii_super[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
+                  A[l].ii_sub[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
+                  A[l].ie[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l ),nb_procs-1);
+                  A[l].ei[comp][index]->re_initialize(nb_procs-1,nb_unknowns_handled_by_proc( l ) );
+               }
 
-               A[l].ie[comp]->re_initialize(nb_unknowns_handled_by_proc( l ),nb_procs-1);
-               A[l].ei[comp]->re_initialize(nb_procs-1,nb_unknowns_handled_by_proc( l ) );
                Ap[l].result[comp]->re_initialize( nb_unknowns_handled_by_proc( l ) );
                VEC[l].local_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )) ;
                VEC[l].local_solution_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )) ;
 
             } else {
 	       // Non-periodic for processor expect last
-               A[l].ii_main[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
-               A[l].ii_super[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
-               A[l].ii_sub[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
+               for (size_t index = 0; index < nb_index; index++) {
+                  A[l].ii_main[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
+                  A[l].ii_super[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
+                  A[l].ii_sub[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
+                  A[l].ie[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1,nb_procs-1 );
+                  A[l].ei[comp][index]->re_initialize(nb_procs-1,nb_unknowns_handled_by_proc( l )-1 );
+               }
 
-               A[l].ie[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1,nb_procs-1 );
-               A[l].ei[comp]->re_initialize(nb_procs-1,nb_unknowns_handled_by_proc( l )-1 );
                Ap[l].result[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1 );
                VEC[l].local_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
                VEC[l].local_solution_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
@@ -388,21 +407,25 @@ DDS_HeatEquationSystem:: re_initialize( void )
 
             if (proc_pos == 0) {
 	       // Master processor
-               A[l].ee[comp]->re_initialize(nb_procs-1,nb_procs-1 );
-	       if (nb_procs != 1) {
-                  Schur[l].ii_main[comp]->re_initialize(nb_procs-1);
-                  Schur[l].ii_super[comp]->re_initialize(nb_procs-2);
-                  Schur[l].ii_sub[comp]->re_initialize(nb_procs-2);
-	       }
+               for (size_t index = 0; index < nb_index; index++) {
+                  A[l].ee[comp][index]->re_initialize(nb_procs-1,nb_procs-1 );
+                  if (nb_procs != 1) {
+                     Schur[l].ii_main[comp][index]->re_initialize(nb_procs-1);
+                     Schur[l].ii_super[comp][index]->re_initialize(nb_procs-2);
+                     Schur[l].ii_sub[comp][index]->re_initialize(nb_procs-2);
+                  }
+               }
             }
 
          } else {             
             // Periodic domain 
-            A[l].ii_main[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
-            A[l].ii_super[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
-            A[l].ii_sub[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
-            A[l].ie[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1,nb_procs );
-            A[l].ei[comp]->re_initialize(nb_procs,nb_unknowns_handled_by_proc( l )-1 );
+            for (size_t index = 0; index < nb_index; index++) {
+               A[l].ii_main[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
+               A[l].ii_super[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
+               A[l].ii_sub[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
+               A[l].ie[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1,nb_procs );
+               A[l].ei[comp][index]->re_initialize(nb_procs,nb_unknowns_handled_by_proc( l )-1 );
+            }
 
 	    Ap[l].result[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1 );
             Ap[l].ii_ie[comp]->re_initialize(nb_procs);
@@ -415,16 +438,21 @@ DDS_HeatEquationSystem:: re_initialize( void )
 
             if (proc_pos == 0) {
 	       // Master processor
-               A[l].ee[comp]->re_initialize(nb_procs,nb_procs );
+               for (size_t index = 0; index < nb_index; index++) {
+                  A[l].ee[comp][index]->re_initialize(nb_procs,nb_procs );
+               }
 	       if (nb_procs != 1) {
 		  // Mutli processor with periodic domain
 		  // Condition where schur complement won't be a standard tridiagonal matrix but a variation
-                  Schur[l].ii_main[comp]->re_initialize(nb_procs-1);
-                  Schur[l].ii_super[comp]->re_initialize(nb_procs-2);
-                  Schur[l].ii_sub[comp]->re_initialize(nb_procs-2);
-                  Schur[l].ie[comp]->re_initialize(nb_procs-1,1);
-                  Schur[l].ei[comp]->re_initialize(1,nb_procs-1);
-                  Schur[l].ee[comp]->re_initialize(1,1);
+                  for (size_t index = 0; index < nb_index; index++) {
+                     Schur[l].ii_main[comp][index]->re_initialize(nb_procs-1);
+                     Schur[l].ii_super[comp][index]->re_initialize(nb_procs-2);
+                     Schur[l].ii_sub[comp][index]->re_initialize(nb_procs-2);
+                     Schur[l].ie[comp][index]->re_initialize(nb_procs-1,1);
+                     Schur[l].ei[comp][index]->re_initialize(1,nb_procs-1);
+                     Schur[l].ee[comp][index]->re_initialize(1,1);
+		     DoubleSchur[l].ii_main[comp][index]->re_initialize(1);
+                  }
 
 		  SchurP[l].result[comp]->re_initialize(nb_procs-1);
                   SchurP[l].ii_ie[comp]->re_initialize(1);
@@ -435,12 +463,13 @@ DDS_HeatEquationSystem:: re_initialize( void )
                   Schur_VEC[l].interface_T[comp]->re_initialize(1) ;
                   Schur_VEC[l].T[comp]->re_initialize(1) ;
 
-		  DoubleSchur[l].ii_main[comp]->re_initialize(1);
 	       } else {
-		  // Serial mode with periodic domain
-                  Schur[l].ii_main[comp]->re_initialize(nb_procs);
-                  Schur[l].ii_super[comp]->re_initialize(nb_procs-1);
-                  Schur[l].ii_sub[comp]->re_initialize(nb_procs-1);
+                  for (size_t index = 0; index < nb_index; index++) {
+                     // Serial mode with periodic domain
+                     Schur[l].ii_main[comp][index]->re_initialize(nb_procs);
+                     Schur[l].ii_super[comp][index]->re_initialize(nb_procs-1);
+                     Schur[l].ii_sub[comp][index]->re_initialize(nb_procs-1);
+                  }
 	       }
             }
          }
@@ -525,17 +554,17 @@ DDS_HeatEquationSystem:: compute_temperature_change( void )
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquationSystem::pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr)
+DDS_HeatEquationSystem::pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr, size_t const& r_index)
 //----------------------------------------------------------------------
 {
    size_t nb_procs;
 
    nb_procs = nb_procs_in_i[dir];
 
-   size_t nrows = arr[dir].ii_main[comp]->nb_rows() ;
+   size_t nrows = arr[dir].ii_main[comp][r_index]->nb_rows() ;
 
-   double temp = arr[dir].ii_main[comp]->item(0);
-   if (nrows > 1) arr[dir].ii_super[comp]->set_item(0,arr[dir].ii_super[comp]->item(0)/temp);
+   double temp = arr[dir].ii_main[comp][r_index]->item(0);
+   if (nrows > 1) arr[dir].ii_super[comp][r_index]->set_item(0,arr[dir].ii_super[comp][r_index]->item(0)/temp);
 
    //  // Perform Forward Elimination
    size_t m;
@@ -544,26 +573,26 @@ DDS_HeatEquationSystem::pre_thomas_treatment( size_t const& comp, size_t const& 
    for (m=1;m<nrows;++m)
    {
      double a,b,c,prevc;
-     a = arr[dir].ii_sub[comp]->item(m-1);
-     b = arr[dir].ii_main[comp]->item(m);
-     prevc = arr[dir].ii_super[comp]->item(m-1);
+     a = arr[dir].ii_sub[comp][r_index]->item(m-1);
+     b = arr[dir].ii_main[comp][r_index]->item(m);
+     prevc = arr[dir].ii_super[comp][r_index]->item(m-1);
 
      if(m<nrows-1){
-         c = arr[dir].ii_super[comp]->item(m);
-         arr[dir].ii_super[comp]->set_item(m,c/(b - a*prevc));
+         c = arr[dir].ii_super[comp][r_index]->item(m);
+         arr[dir].ii_super[comp][r_index]->set_item(m,c/(b - a*prevc));
      }
    }
 }
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquationSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir)
+DDS_HeatEquationSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& r_index)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: mod_thomas_algorithm" ) ;
 
-   size_t nrows = arr[dir].ii_main[comp] -> nb_rows() ;
-   double temp = arr[dir].ii_main[comp]->item(0);
+   size_t nrows = arr[dir].ii_main[comp][r_index] -> nb_rows() ;
+   double temp = arr[dir].ii_main[comp][r_index]->item(0);
    rhs-> set_item(0,rhs ->item(0)/temp);
 
     // Perform Forward Elimination
@@ -572,10 +601,10 @@ DDS_HeatEquationSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, s
    for (m=1;m<nrows;++m)
    {
      double a,b,d,prevd,prevc;
-     a=arr[dir].ii_sub[comp]->item(m-1);
-     b=arr[dir].ii_main[comp]->item(m);
+     a=arr[dir].ii_sub[comp][r_index]->item(m-1);
+     b=arr[dir].ii_main[comp][r_index]->item(m);
      d=rhs->item(m);
-     prevc=arr[dir].ii_super[comp]->item(m-1);
+     prevc=arr[dir].ii_super[comp][r_index]->item(m-1);
      prevd=rhs->item(m-1);
 
      rhs -> set_item(m, (d-a*prevd)/(b-a*prevc));
@@ -586,7 +615,7 @@ DDS_HeatEquationSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, s
       rhs->set_item(nrows-1,rhs->item(nrows-1));
       for (m = nrows-2; m< nrows-1;m--) {
          double c,nextd;
-         c=arr[dir].ii_super[comp]->item(m);
+         c=arr[dir].ii_super[comp][r_index]->item(m);
          nextd=rhs->item(m+1);
          rhs->add_to_item(m,-c*nextd);
       }
@@ -618,15 +647,6 @@ DDS_HeatEquationSystem::get_A()
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: get_A" ) ;
    return (A) ;
-}
-
-//----------------------------------------------------------------------
-TDMatrix_new*
-DDS_HeatEquationSystem::get_Anew()
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_HeatEquationSystem:: get_Anew" ) ;
-   return (A_new) ;
 }
 
 //----------------------------------------------------------------------
@@ -696,7 +716,7 @@ DDS_HeatEquationSystem::get_Schur_VEC()
 //----------------------------------------------------------------------
 void
 DDS_HeatEquationSystem::DS_HeatEquation_solver(
-        size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir)
+        size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& r_index)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: DS_HeatEquation_solver" ) ;
@@ -710,7 +730,7 @@ DDS_HeatEquationSystem::DS_HeatEquation_solver(
    nb_procs = nb_procs_in_i[dir];
 
    // Solve the DS splitting problem in
-   DDS_HeatEquationSystem::mod_thomas_algorithm(arr, rhs[dir].local_T[comp], comp, dir);
+   DDS_HeatEquationSystem::mod_thomas_algorithm(arr, rhs[dir].local_T[comp], comp, dir,r_index);
 
    // Transfer in the distributed vector
    size_t nb_local_unk = rhs[dir].local_T[comp]->nb_rows();
@@ -769,7 +789,7 @@ DDS_HeatEquationSystem::synchronize_DS_solution_vec( void )
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquationSystem::compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir )
+DDS_HeatEquationSystem::compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& r_index )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: compute_product_matrix" ) ;
@@ -782,35 +802,35 @@ DDS_HeatEquationSystem::compute_product_matrix(struct TDMatrix *arr, struct Prod
    if (proc_pos == nb_procs - 1){
       // Condition for serial processor and multi processor
       if (proc_pos == 0) {
-         compute_product_matrix_interior(arr,prr,comp,proc_pos,dir);
+         compute_product_matrix_interior(arr,prr,comp,proc_pos,dir,r_index);
       } else {
-         compute_product_matrix_interior(arr,prr,comp,proc_pos-1,dir);
-         if (is_iperiodic[dir] == 1) compute_product_matrix_interior(arr,prr,comp,proc_pos,dir);
+         compute_product_matrix_interior(arr,prr,comp,proc_pos-1,dir,r_index);
+         if (is_iperiodic[dir] == 1) compute_product_matrix_interior(arr,prr,comp,proc_pos,dir,r_index);
       }
    }else if(proc_pos == 0){
-      compute_product_matrix_interior(arr,prr,comp,proc_pos,dir);
-      if (is_iperiodic[dir] == 1) compute_product_matrix_interior(arr,prr,comp,nb_procs-1,dir);
+      compute_product_matrix_interior(arr,prr,comp,proc_pos,dir,r_index);
+      if (is_iperiodic[dir] == 1) compute_product_matrix_interior(arr,prr,comp,nb_procs-1,dir,r_index);
    }else{
-      compute_product_matrix_interior(arr,prr,comp,proc_pos-1,dir);
-      compute_product_matrix_interior(arr,prr,comp,proc_pos,dir);
+      compute_product_matrix_interior(arr,prr,comp,proc_pos-1,dir,r_index);
+      compute_product_matrix_interior(arr,prr,comp,proc_pos,dir,r_index);
    }
 
 }
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquationSystem::compute_product_matrix_interior(struct TDMatrix *arr,struct ProdMatrix *prr, size_t const& comp, size_t const& column, size_t const& dir)
+DDS_HeatEquationSystem::compute_product_matrix_interior(struct TDMatrix *arr,struct ProdMatrix *prr, size_t const& comp, size_t const& column,size_t const& dir,size_t const& r_index)
 //----------------------------------------------------------------------
 {
 
   // Get appropriate column of Aie
-  arr[dir].ie[comp] -> extract_col(column, prr[dir].result[comp]);
+  arr[dir].ie[comp][r_index] -> extract_col(column, prr[dir].result[comp]);
 
   // Get inv(Aii)*Aie for for appropriate column of Aie
-  DDS_HeatEquationSystem::mod_thomas_algorithm(arr, prr[dir].result[comp], comp, dir);
+  DDS_HeatEquationSystem::mod_thomas_algorithm(arr, prr[dir].result[comp], comp, dir,r_index);
 
   // Get product of Aei*inv(Aii)*Aie for appropriate column
-  arr[dir].ei[comp]->multiply_vec_then_add(prr[dir].result[comp],prr[dir].ii_ie[comp]);
+  arr[dir].ei[comp][r_index]->multiply_vec_then_add(prr[dir].result[comp],prr[dir].ii_ie[comp]);
 
   size_t nb_procs;
 

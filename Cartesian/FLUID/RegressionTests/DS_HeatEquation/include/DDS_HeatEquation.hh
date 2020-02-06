@@ -133,7 +133,10 @@ public SolverComputingTime
 
 
       /** @brief Call the functions to assemble temperature and schur complement */
-      void assemble_temperature_and_schur( FV_TimeIterator const* t_it, size_t const& dir, size_t const& j, size_t const& k) ;
+      void assemble_temperature_and_schur( FV_TimeIterator const* t_it) ;
+
+      size_t return_row_index ( FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
+
 
       /** @brief Assemble temperature matrix */
       double assemble_temperature_matrix (
@@ -143,10 +146,11 @@ public SolverComputingTime
         size_t const& comp, 
         size_t const& dir,
         size_t const& j,
-        size_t const& k  );
+        size_t const& k,
+        size_t const& r_index  );
 
       /** @brief Assemble schur matrix */
-      void assemble_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef );
+      void assemble_schur_matrix (size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& r_index);
 
 
       void write_output_field();
@@ -161,10 +165,10 @@ public SolverComputingTime
       double assemble_local_rhs( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir );
 
       /** @brief Compute Aei*(Aii)-1*fi required to compute interface unknown */
-      void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir);
+      void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index);
 
       /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */ 
-      void data_packing ( size_t const& j, size_t const& k, double const& fe, size_t const& comp, size_t const& dir);
+      void data_packing ( double const& fe, size_t const& comp, size_t const& dir, size_t const& vec_pos);
 
       /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */ 
       void unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p);
@@ -173,7 +177,7 @@ public SolverComputingTime
       void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p);
 
       /** @brief Call the appropriate functions to solve local variable and interface unknown */ 
-      void solve_interface_unknowns(double const& gamma,FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir );
+      void solve_interface_unknowns(double const& gamma,FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir);
       
       /** @brief Call the appropriate functions to solve any particular direction in the other directions */ 
       void HeatEquation_DirectionSplittingSolver( FV_TimeIterator const* t_it ) ;
@@ -195,7 +199,7 @@ public SolverComputingTime
       void Solve_i_in_jk (FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k );
 
       /** @brief Solve interface unknown for all cases */ 
-      void DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir);
+      void DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index);
 
       /** @brief Error compared to analytical solution */
       void DS_error_with_analytical_solution ( FV_DiscreteField const* FF,FV_DiscreteField* FF_ERROR ) ;
