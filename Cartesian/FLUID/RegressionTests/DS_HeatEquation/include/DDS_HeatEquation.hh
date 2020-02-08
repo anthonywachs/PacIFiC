@@ -188,6 +188,10 @@ public SolverComputingTime
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
       void nodes_in_solid_correction ( size_t const& level );
 
+      /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
+      void assemble_intersection_matrix ( size_t const& comp, size_t const& level);                 // Here level:0 -> fluid; 1-> solid
+      
+
       /** @brief Find the intersection using bisection method with the solid interface */ 
       double find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& comp, size_t const& dir, size_t const& off);
 

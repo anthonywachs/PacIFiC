@@ -242,19 +242,15 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
       Schur_VEC[dir].T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
       Schur_VEC[dir].interface_T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
 
-      b_intersect[dir].offset = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
-      b_intersect[dir].value = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
-      b_intersect[dir].field = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+      for (size_t j=0;j<2;j++) {
+         b_intersect[j][dir].offset = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+         b_intersect[j][dir].value = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+         b_intersect[j][dir].field = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+      }
    }
 
    for (size_t dir=0;dir<dim;++dir) {
       for (size_t comp=0;comp<nb_comps;++comp) {
-/*         A[dir].ii_main[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-         A[dir].ii_super[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-         A[dir].ii_sub[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-         A[dir].ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-         A[dir].ei[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );*/
-
          Ap[dir].ei_ii_ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
          Ap[dir].result[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          Ap[dir].ii_ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -272,19 +268,13 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
             node.parID[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          }
 
-         b_intersect[dir].offset[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-         b_intersect[dir].value[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-         b_intersect[dir].field[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+         for (size_t j=0;j<2;j++) {
+            b_intersect[j][dir].offset[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+            b_intersect[j][dir].value[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+            b_intersect[j][dir].field[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+         }
 
          if (proc_pos_in_i[dir] == 0) {
-/*            A[dir].ee[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-            Schur[dir].ii_main[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            Schur[dir].ii_super[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            Schur[dir].ii_sub[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            Schur[dir].ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-            Schur[dir].ei[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-            Schur[dir].ee[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );*/
-
             SchurP[dir].ei_ii_ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
             SchurP[dir].result[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             SchurP[dir].ii_ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -293,8 +283,6 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
             Schur_VEC[dir].local_solution_T[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             Schur_VEC[dir].T[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             Schur_VEC[dir].interface_T[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-
-//            DoubleSchur[dir].ii_main[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          }
       }
    }
@@ -340,7 +328,7 @@ DDS_HeatEquationSystem:: re_initialize( void )
 
     
       for (size_t l=0;l<dim;++l) {
-         nb_total_unknown *= nb_unknowns_handled_by_proc(l);
+         nb_total_unknown *= (2+nb_unknowns_handled_by_proc(l));
 
          size_t nb_index;
          if (l == 0) {
@@ -478,9 +466,11 @@ DDS_HeatEquationSystem:: re_initialize( void )
          node.void_frac[comp]->re_initialize( nb_total_unknown ) ;
          node.parID[comp]->re_initialize( nb_total_unknown ) ;
          for (size_t i=0;i<dim;i++) {
-            b_intersect[i].offset[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
-            b_intersect[i].value[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
-            b_intersect[i].field[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
+            for (size_t j=0;j<2;j++) {
+               b_intersect[j][i].offset[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
+               b_intersect[j][i].value[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
+               b_intersect[j][i].field[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
+            }
          }
       }
    }
@@ -688,11 +678,11 @@ DDS_HeatEquationSystem::get_VEC()
 
 //----------------------------------------------------------------------
 BoundaryBisec*
-DDS_HeatEquationSystem::get_b_intersect()
+DDS_HeatEquationSystem::get_b_intersect(size_t const& level)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: get_b_intersect" ) ;
-   return (b_intersect) ;
+   return (b_intersect[level]) ;
 }
 
 //----------------------------------------------------------------------

@@ -146,7 +146,7 @@ class DDS_HeatEquationSystem : public MAC_Object
       /** @brief Return RHS for the Schur complement */
       LocalVector* get_Schur_VEC();
       /** @brief Return information of intersection with solid boundary */
-      BoundaryBisec* get_b_intersect();
+      BoundaryBisec* get_b_intersect(size_t const& level);
       /** @brief Return the (presence/absence) of particle vector */
       NodeProp get_node_property();
       /** @brief Return the particle input properties */
@@ -242,7 +242,7 @@ class DDS_HeatEquationSystem : public MAC_Object
       // Particle structures
       struct PartInput solid;
       struct NodeProp node;
-      struct BoundaryBisec b_intersect[3];
+      struct BoundaryBisec b_intersect[2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid)
 
       // Schur complement matrices
       struct TDMatrix Schur[3];
