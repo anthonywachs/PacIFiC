@@ -84,7 +84,6 @@ DDS_HeatEquationSystem:: DDS_HeatEquationSystem(
 
    if (is_solids) {
       Npart = exp->int_data( "NParticles" ) ;
-      Rpart = exp->double_data( "RadPart" ) ;
    }
 
    periodic_comp = TF->primary_grid()->get_periodic_directions();
@@ -132,6 +131,7 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
    solid.coord = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
    solid.size = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
    solid.temp = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
+   solid.inside = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
 
    // Vector to store the presence/absence of particle on the field variable
    node.void_frac = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
@@ -264,6 +264,7 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
             solid.coord[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
             solid.size[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             solid.temp[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            solid.inside[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             node.void_frac[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             node.parID[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          }
@@ -355,6 +356,7 @@ DDS_HeatEquationSystem:: re_initialize( void )
             solid.coord[comp]->re_initialize(Npart,3);
             solid.size[comp]->re_initialize(Npart);
             solid.temp[comp]->re_initialize(Npart);
+            solid.inside[comp]->re_initialize(Npart);
          }
 
          if (is_iperiodic[l] != 1) {

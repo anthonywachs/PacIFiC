@@ -53,7 +53,8 @@ struct LocalVector {
 struct PartInput {
    LA_SeqMatrix ** coord;               // Coordinates
    LA_SeqVector ** size;                // Size of the sphere
-   LA_SeqVector ** temp;         // Temperature of the sphere
+   LA_SeqVector ** temp;                // Temperature of the sphere
+   LA_SeqVector ** inside;              // 1 if solid only from inside; -1 if solid only from outside
 };
 
 /** @brief NodeProp to be used to store the nodes properties due to presence of solid particles in the domian */

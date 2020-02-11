@@ -186,7 +186,10 @@ public SolverComputingTime
       void node_property_calculation( ) ;
 
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
-      void nodes_in_solid_correction ( size_t const& level );
+      void nodes_temperature_initialization ( size_t const& level );
+
+      /** @brief Returns negative value of the point lies inside the solid, otherwise returns a positive number*/
+      double level_set_function (double const& dx, double const& dy, double const& dz, double const& Rp, size_t const& type);
 
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
       void assemble_intersection_matrix ( size_t const& comp, size_t const& level);                 // Here level:0 -> fluid; 1-> solid
