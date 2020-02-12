@@ -326,7 +326,7 @@ void Grains::Construction( DOMElement* rootElement )
     DOMNode* cellsize = ReaderXML::getNode( root, "CellSize" );
     if ( cellsize )
       LC_coef = ReaderXML::getNodeAttr_Double( cellsize, "Factor" );
-    if ( LC_coef < 1. ) LC_coef = 1.;    
+    if ( LC_coef < 1. ) LC_coef = 1.;
     if( Grains_Exec::m_withCohesion && LC_coef < 1.2 )
       LC_coef *= 1.2;
     defineLinkedCell( LC_coef * rayon );

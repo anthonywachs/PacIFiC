@@ -931,6 +931,7 @@ public:
   friend ostream& operator << ( ostream &f, const Particule &P );
   //@}
 
+  void printAllParticleInfos(char* filename);
 
   /** @name Methods Virtual pour la Periodicite */
   //@{

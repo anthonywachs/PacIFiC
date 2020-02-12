@@ -62,10 +62,10 @@ void LinkedCell::define( double arete )
     m_arete_X = App::m_lX / m_nbi ;
     m_nbj = (int)( ( App::m_lY + EPS ) / arete);
     m_nbj = m_nbj == 0 ? 1 : m_nbj;
-    m_arete_Y = App::m_lY / m_nbj ;    
+    m_arete_Y = App::m_lY / m_nbj ;
     m_nbk = (int)( ( App::m_lZ + EPS ) / arete);
     m_nbk = m_nbk == 0 ? 1 : m_nbk;
-    m_arete_Z = App::m_lZ / m_nbk ; 
+    m_arete_Z = App::m_lZ / m_nbk ;
     if ( !m_nbk )
     {
       m_nbk = 1;
@@ -130,7 +130,7 @@ void LinkedCell::define( double arete, int const* nprocsdir,
     m_arete_X = App::m_lX / m_nbi ;
     m_nbj = (int)( ( App::m_lY + EPS ) / arete);
     m_nbj = m_nbj == 0 ? 1 : m_nbj;
-    m_arete_Y = App::m_lY / m_nbj ;    
+    m_arete_Y = App::m_lY / m_nbj ;
     m_nbk = (int)( ( App::m_lZ + EPS ) / arete);
     m_nbk = m_nbk == 0 ? 1 : m_nbk;
     m_arete_Z = App::m_lZ / m_nbk ;
