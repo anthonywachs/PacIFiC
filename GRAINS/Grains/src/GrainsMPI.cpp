@@ -207,26 +207,6 @@ void GrainsMPI::Simulation( bool predict, bool isPredictorCorrector,
           m_composants.getParticulesActives()->size() );
       if( b_perfTiming ) SCT_get_elapsed_time( "ParticulesInsertion" );
 
-
-      //Output particles information
-      char filepath[]="Grains/Init/MPI_particles_log_?.txt";
-      filepath[30] = m_rank + '0';
-      ofstream file;
-      file.open(filepath, std::ios_base::app) ;
-      file << m_temps << "/";
-      file.close();
-      list<Particule*>::const_iterator particule;
-      m_composants.getParticulesActives();
-      for( particule=m_composants.getParticulesActives()->begin();
-           particule!=m_composants.getParticulesActives()->end();
-           particule++)
-      {
-        (*particule)->printAllParticleInfos(filepath);
-      }
-      file.open(filepath, std::ios_base::app) ;
-      file << endl;
-      file.close();
-
       // Calcul des forces
       if ( b_perfTiming ) SCT_set_start( "CalculerForces" );
       // Initialisation des torseurs de force

@@ -3293,7 +3293,6 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
   	multimap<int,Particule*>::iterator > crange;
 
   int nAB=0, nHF=0, nLF=0, nCF=0, nT=0, nST=0;
-  int nSTN=0;
   if ( AdamsBashforth ) nAB = 12;
   if ( b_hydroForce ) nHF = 7; // Eps + (Ux,Uy,Uz) + grad(Px,Py,Pz)
   if ( b_liftForce ) nLF = 3; // (OMx, OMy, OMz)
@@ -3301,7 +3300,6 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
   if ( b_solidTemperature && !b_fluidTemperature ) nT = 2;
   else if ( b_fluidTemperature ) nT = 3;
   if ( b_stochDrag ) nST = 3;
-  if ( b_stochNu ) nSTN = 3;
 
   for( j=0; j<recvsize; ++j )
   {

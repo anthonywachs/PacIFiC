@@ -430,14 +430,14 @@ void Text_PostProcessingWriter::one_output_MPI(Scalar const& temps,
   for (size_t i=0; i<nb_total_part; i++)
   {
     // Position du centre de gravit�
-    gc_coordinates_x << " " << std::fixed << std::setprecision(16) << (*cinematique_Global)[0][i] ;
-    gc_coordinates_y << " " << std::fixed << std::setprecision(16) << (*cinematique_Global)[1][i] ;
-    gc_coordinates_z << " " << std::fixed << std::setprecision(16) << (*cinematique_Global)[2][i] ;
+    gc_coordinates_x << " " << (*cinematique_Global)[0][i] ;
+    gc_coordinates_y << " " << (*cinematique_Global)[1][i] ;
+    gc_coordinates_z << " " << (*cinematique_Global)[2][i] ;
 
     // Vitesse translationnelle du centre de gravit�
-    gc_velocity_x << " " << std::fixed << std::setprecision(16) << (*cinematique_Global)[3][i] ;
-    gc_velocity_y << " " << std::fixed << std::setprecision(16) << (*cinematique_Global)[4][i] ;
-    gc_velocity_z << " " << std::fixed << std::setprecision(16) << (*cinematique_Global)[5][i] ;
+    gc_velocity_x << " " << (*cinematique_Global)[3][i] ;
+    gc_velocity_y << " " << (*cinematique_Global)[4][i] ;
+    gc_velocity_z << " " << (*cinematique_Global)[5][i] ;
 
     // Vitesse de rotation du centre de gravit�
     gc_rotation_x << " " << (*cinematique_Global)[6][i] ;
@@ -877,15 +877,15 @@ void Text_PostProcessingWriter::one_output_Standard(Scalar const& temps,
   {
     // Position du centre de gravit�
     centre = (*particule)->getPosition();
-    gc_coordinates_x << " " << std::fixed << std::setprecision(16) << (*centre)[X];
-    gc_coordinates_y << " " << std::fixed << std::setprecision(16) << (*centre)[Y];
-    gc_coordinates_z << " " << std::fixed << std::setprecision(16) << (*centre)[Z];
+    gc_coordinates_x << " " << (*centre)[X];
+    gc_coordinates_y << " " << (*centre)[Y];
+    gc_coordinates_z << " " << (*centre)[Z];
 
     // Vitesse translationnelle du centre de gravit�
     vitesseT = (*particule)->getVitesseTranslation();
-    gc_velocity_x << " " << std::fixed << std::setprecision(16) << (*vitesseT)[X];
-    gc_velocity_y << " " << std::fixed << std::setprecision(16) << (*vitesseT)[Y];
-    gc_velocity_z << " " << std::fixed << std::setprecision(16) << (*vitesseT)[Z];
+    gc_velocity_x << " " << (*vitesseT)[X];
+    gc_velocity_y << " " << (*vitesseT)[Y];
+    gc_velocity_z << " " << (*vitesseT)[Z];
 
     // Vitesse de rotation du centre de gravit�
     vitesseR = (*particule)->getVitesseRotation();
