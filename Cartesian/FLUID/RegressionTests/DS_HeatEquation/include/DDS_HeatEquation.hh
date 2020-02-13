@@ -137,6 +137,9 @@ public SolverComputingTime
 
       size_t return_row_index ( FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
 
+      /** @brief Returns the node index required in the presence of solids in the system */
+      size_t return_node_index ( FV_DiscreteField const* FF, size_t const& comp, size_t const& i, size_t const& j, size_t const& k );
+
 
       /** @brief Assemble temperature matrix */
       double assemble_temperature_matrix (
@@ -189,7 +192,7 @@ public SolverComputingTime
       void nodes_temperature_initialization ( size_t const& level );
 
       /** @brief Returns negative value of the point lies inside the solid, otherwise returns a positive number*/
-      double level_set_function (double const& dx, double const& dy, double const& dz, double const& Rp, size_t const& type);
+      double level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, size_t const& type);
 
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
       void assemble_intersection_matrix ( size_t const& comp, size_t const& level);                 // Here level:0 -> fluid; 1-> solid
