@@ -793,11 +793,21 @@ DDS_HeatEquation:: assemble_schur_matrix (size_t const& comp, size_t const& dir,
    if (nb_ranks_comm_i[dir]>1) {
 
       ProdMatrix* Ap = GLOBAL_EQ->get_Ap();
+      ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0();
 
       GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,r_index);
 
       LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
-      LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
+
+      size_t nbrow = product_matrix->nb_rows();
+      // Create a copy of product matrix to receive matrix, this will eliminate the memory leak issue which caused by "create_copy" command
+      for (size_t k=0;k<nbrow;k++) {
+         for (size_t j=0;j<nbrow;j++) {
+            Ap_proc0[dir].ei_ii_ie[comp]->set_item(k,j,product_matrix->item(k,j));
+         }
+      }
+
+      LA_SeqMatrix* receive_matrix = Ap_proc0[dir].ei_ii_ie[comp];
 
       if ( rank_in_i[dir] == 0 ) {
          A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
@@ -899,10 +909,20 @@ DDS_HeatEquation:: assemble_schur_matrix (size_t const& comp, size_t const& dir,
    } else if (is_iperiodic[dir] == 1) {
       // Condition for single processor in any direction with periodic boundary conditions
       ProdMatrix* Ap = GLOBAL_EQ->get_Ap();
+      ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0();
       GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,r_index);
 
       LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
-      LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
+
+      size_t nbrow = product_matrix->nb_rows();
+      // Create a copy of product matrix to receive matrix, this will eliminate the memory leak issue which caused by "create_copy" command
+      for (size_t k=0;k<nbrow;k++) {
+         for (size_t j=0;j<nbrow;j++) {
+            Ap_proc0[dir].ei_ii_ie[comp]->set_item(k,j,product_matrix->item(k,j));
+         }
+      }
+
+      LA_SeqMatrix* receive_matrix = Ap_proc0[dir].ei_ii_ie[comp];
 
       A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
 

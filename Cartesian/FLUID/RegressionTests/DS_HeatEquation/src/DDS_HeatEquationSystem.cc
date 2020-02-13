@@ -225,6 +225,8 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
       Ap[dir].result = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
       Ap[dir].ii_ie = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
 
+      Ap_proc0[dir].ei_ii_ie = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+
       // VEC to store local/interface solution and RHS 
       VEC[dir].local_T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
       VEC[dir].local_solution_T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
@@ -254,6 +256,8 @@ DDS_HeatEquationSystem:: build_system( MAC_ModuleExplorer const* exp )
          Ap[dir].ei_ii_ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
          Ap[dir].result[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          Ap[dir].ii_ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+
+         Ap_proc0[dir].ei_ii_ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
 
          VEC[dir].local_T[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          VEC[dir].local_solution_T[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -392,6 +396,7 @@ DDS_HeatEquationSystem:: re_initialize( void )
             if (l == 1) MAT_TemperatureUnsteadyPlusDiffusion_1D->re_initialize(nb_unknowns_handled_by_proc( l ),nb_unknowns_handled_by_proc( l ) );
             Ap[l].ii_ie[comp]->re_initialize(nb_procs-1);
             Ap[l].ei_ii_ie[comp]->re_initialize(nb_procs-1,nb_procs-1 );
+            Ap_proc0[l].ei_ii_ie[comp]->re_initialize(nb_procs-1,nb_procs-1 );
             VEC[l].interface_T[comp]->re_initialize( nb_procs-1 ) ;
             VEC[l].T[comp]->re_initialize( nb_procs-1 ) ;
 
@@ -420,6 +425,8 @@ DDS_HeatEquationSystem:: re_initialize( void )
 	    Ap[l].result[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1 );
             Ap[l].ii_ie[comp]->re_initialize(nb_procs);
             Ap[l].ei_ii_ie[comp]->re_initialize(nb_procs,nb_procs );
+
+            Ap_proc0[l].ei_ii_ie[comp]->re_initialize(nb_procs,nb_procs );
 
 	    VEC[l].local_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
             VEC[l].local_solution_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
@@ -649,6 +656,16 @@ DDS_HeatEquationSystem::get_Ap()
    MAC_LABEL( "DDS_HeatEquationSystem:: get_Ap" ) ;
    return (Ap) ;
 }
+
+//----------------------------------------------------------------------
+ProdMatrix*
+DDS_HeatEquationSystem::get_Ap_proc0()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatEquationSystem:: get_Ap" ) ;
+   return (Ap_proc0) ;
+}
+
 
 //----------------------------------------------------------------------
 PartInput
