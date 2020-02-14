@@ -199,7 +199,7 @@ public SolverComputingTime
       
 
       /** @brief Find the intersection using bisection method with the solid interface */ 
-      double find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& comp, size_t const& dir, size_t const& off);
+      double find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off);
 
 
       /** @brief Generate the solid particles present in the domain */ 
@@ -274,6 +274,8 @@ public SolverComputingTime
       bool b_restart ;
       bool is_iperiodic[3];
       boolVector const* periodic_comp;
+      string insertion_type;
+      string solid_filename;
 } ;
 
 #endif
