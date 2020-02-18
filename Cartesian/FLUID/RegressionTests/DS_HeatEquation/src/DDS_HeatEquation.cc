@@ -227,6 +227,7 @@ DDS_HeatEquation:: do_before_time_stepping( FV_TimeIterator const* t_it,
    // Generate solid particles if required
    if (is_solids) Solids_generation();
 
+
    if (is_solids) node_property_calculation();
    if (is_solids) {
       nodes_temperature_initialization(0);
@@ -319,7 +320,7 @@ DDS_HeatEquation:: do_after_time_stepping( void )
 {
    MAC_LABEL( "DDS_HeatEquation:: do_after_time_stepping" ) ;
 
-   //write_output_field();
+   write_output_field();
 
    // Elapsed time by sub-problems
    if ( my_rank == is_master )
@@ -329,9 +330,9 @@ DDS_HeatEquation:: do_after_time_stepping( void )
      write_elapsed_time_smhd(cout,cputime,"Computation time");
      SCT_get_summary(cout,cputime);
    }
-   DS_error_with_analytical_solution(TF,TF_DS_ERROR);
+//   DS_error_with_analytical_solution(TF,TF_DS_ERROR);
    GLOBAL_EQ->display_debug();
-//   output_l2norm();
+   output_l2norm();
 
    deallocate_mpi_variables();
 }
@@ -1698,6 +1699,7 @@ DDS_HeatEquation:: level_set_function (size_t const& m, size_t const& comp, doub
   delta(2) = 0;
   if (dim == 3) delta(2) = zC-zp;
 
+  // Displacement correction in case of periodic boundary condition in any or all directions
   for (size_t dir=0;dir<dim;dir++) {
      if (is_iperiodic[dir]) {
         double isize = TF->primary_grid()->get_main_domain_max_coordinate(dir) - TF->primary_grid()->get_main_domain_min_coordinate(dir);
@@ -1708,7 +1710,7 @@ DDS_HeatEquation:: level_set_function (size_t const& m, size_t const& comp, doub
   double level_set = 0.;
   // Type 0 is for circular/spherical solids in 2D/3D system
   if (type == 0) {
-     level_set = pow(delta(0),2)+pow(delta(1),2)+pow(delta(2),2)-pow(Rp,2);
+     level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   }
 
   return(level_set);
@@ -1746,17 +1748,27 @@ DDS_HeatEquation:: node_property_calculation ( )
 
      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
         double xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
+        double dx = TF->get_cell_size(i,comp,0) ;
         for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
            double yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
+           double dy = TF->get_cell_size(j,comp,1) ;
            for (size_t k=local_min_k;k<=local_max_k;++k) {
               double zC = 0.;
-              if (dim == 3) zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
+              double dC = min(dx,dy);
+              if (dim == 3) {
+                 zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
+                 double dz = TF->get_cell_size(k,comp,2) ;
+                 dC = min(dC,dz);
+              }
               size_t p = return_node_index(TF,comp,i,j,k);
               for (size_t m=0;m<Npart;m++) {
                  double level_set = level_set_function(m,comp,xC,yC,zC,0);
                  level_set *= solid.inside[comp]->item(m);  
 
-                 if (level_set <= 1.E-16) {
+                 // level_set is xb, if local critical time scale is 1.0% of the global time scale 
+                 // then the node is considered inside the solid object
+                 // (xb/dC)^2 = 0.01 --> (xb/xC) --> 0.1
+                 if (level_set <= 1.E-1*dC) {
                     node.void_frac[comp]->set_item(p,1.);
                     node.parID[comp]->set_item(p,m);
                     break;
@@ -1772,7 +1784,7 @@ DDS_HeatEquation:: node_property_calculation ( )
      assemble_intersection_matrix(comp,1);
 
 //     BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-//     b_intersect[1].value[comp]->print_items(MAC::out(),0);
+//     b_intersect[0].value[comp]->print_items(MAC::out(),0);
   }
 }
 
@@ -1929,11 +1941,14 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
 
      if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
 
-     if (func*funl >= 1.E-16) {
+     if (func*funl >= 0.) {
         xleft = xcenter;
      } else {
         xright = xcenter;
      }
+
+     tolerance = (xcenter-xleft)/2.;
+
   }
 
   if (off == 0) {
