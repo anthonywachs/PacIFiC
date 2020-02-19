@@ -371,7 +371,7 @@ DDS_HeatEquation::write_output_field()
   std::ostringstream os2;
   os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/output_" << my_rank << ".csv";
   std::string filename = os2.str();
-  outputFile.open(filename);
+  outputFile.open(filename.c_str());
 
 
 //  outputFile.open("/home/goyal001/Documents/Computing/MAC-Test/DS_results/output_" << my_rank << ".txt", std::ios_base::out | std::ios_base::trunc) ;
@@ -1619,7 +1619,7 @@ DDS_HeatEquation:: Solids_generation ()
      os2 << "./InputFiles/" << solid_filename;
      std::string filename = os2.str();
 
-     inFile.open(filename);
+     inFile.open(filename.c_str());
      string line;
      getline(inFile,line);
      for (size_t i=0;i<Npart;i++) {
@@ -1967,7 +1967,7 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
      xcenter = TF->get_DOF_coordinate( side(off), comp, dir ) ;
   } else {
      // Bisection method algorithm
-     while (abs(xright-xleft) > 1.E-15) {
+     while (MAC::abs(xright-xleft) > 1.E-15) {
         xcenter = (xleft+xright)/2.;
         if (dir == 0) {
            funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
@@ -1991,9 +1991,9 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
   }
 
   if (off == 0) {
-     xcenter = abs(xcenter - TF->get_DOF_coordinate( side(1), comp, dir ));
+     xcenter = MAC::abs(xcenter - TF->get_DOF_coordinate( side(1), comp, dir ));
   } else if (off == 1) {
-     xcenter = abs(xcenter - TF->get_DOF_coordinate( side(0), comp, dir ));
+     xcenter = MAC::abs(xcenter - TF->get_DOF_coordinate( side(0), comp, dir ));
   }
 
   return (xcenter);
