@@ -150,6 +150,7 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
       insertion_type = exp->string_data( "InsertionType" ) ;
       MAC_ASSERT( insertion_type == "file" ) ;
       solid_filename = exp->string_data( "Particle_FileName" ) ;
+      loc_thres = exp->double_data( "Local_threshold" ) ; 
    }
 
    // Build the matrix system
@@ -320,7 +321,7 @@ DDS_HeatEquation:: do_after_time_stepping( void )
 {
    MAC_LABEL( "DDS_HeatEquation:: do_after_time_stepping" ) ;
 
-   write_output_field();
+//   write_output_field();
 
    // Elapsed time by sub-problems
    if ( my_rank == is_master )
@@ -330,9 +331,9 @@ DDS_HeatEquation:: do_after_time_stepping( void )
      write_elapsed_time_smhd(cout,cputime,"Computation time");
      SCT_get_summary(cout,cputime);
    }
-//   DS_error_with_analytical_solution(TF,TF_DS_ERROR);
+   DS_error_with_analytical_solution(TF,TF_DS_ERROR);
    GLOBAL_EQ->display_debug();
-   output_l2norm();
+//   output_l2norm();
 
    deallocate_mpi_variables();
 }
@@ -1765,10 +1766,11 @@ DDS_HeatEquation:: node_property_calculation ( )
                  double level_set = level_set_function(m,comp,xC,yC,zC,0);
                  level_set *= solid.inside[comp]->item(m);  
 
-                 // level_set is xb, if local critical time scale is 1.0% of the global time scale 
+                 // level_set is xb, if local critical time scale is 0.01 of the global time scale 
                  // then the node is considered inside the solid object
-                 // (xb/dC)^2 = 0.01 --> (xb/xC) --> 0.1
-                 if (level_set <= 1.E-1*dC) {
+                 // (xb/dC)^2 = 0.01 --> (xb/xC) = 0.1
+                 if (level_set <= pow(loc_thres,0.5)*dC) {
+                 //if (level_set <= 1.E-1*dC) {
                     node.void_frac[comp]->set_item(p,1.);
                     node.parID[comp]->set_item(p,m);
                     break;
@@ -1900,7 +1902,7 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
      max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
   }
 
-  double tolerance = 1., funl, func;
+  double funl=0., func=0., funr=0.;
 
   double xleft = TF->get_DOF_coordinate( side(0), comp, dir ) ;
   double xright = TF->get_DOF_coordinate( side(1), comp, dir ) ;
@@ -1926,29 +1928,66 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
 
   double xcenter;
 
-  while (tolerance > 1.E-16) {
-     xcenter = (xleft+xright)/2.;
-     if (dir == 0) {
-        funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
-        func = level_set_function(id,comp,xcenter,yvalue,zvalue,0);
-     } else if (dir == 1) {
-        funl = level_set_function(id,comp,yvalue,xleft,zvalue,0);
-        func = level_set_function(id,comp,yvalue,xcenter,zvalue,0);
-     } else if (dir == 2) {
-        funl = level_set_function(id,comp,yvalue,zvalue,xleft,0);
-        func = level_set_function(id,comp,yvalue,zvalue,xcenter,0);
-     }
+  if (dir == 0) {
+     funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
+     funr = level_set_function(id,comp,xright,yvalue,zvalue,0);
+  } else if (dir == 1) {
+     funl = level_set_function(id,comp,yvalue,xleft,zvalue,0);
+     funr = level_set_function(id,comp,yvalue,xright,zvalue,0);
+  } else if (dir == 2) {
+     funl = level_set_function(id,comp,yvalue,zvalue,xleft,0);
+     funr = level_set_function(id,comp,yvalue,zvalue,xright,0);
+  }
 
-     if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
-
-     if (func*funl >= 0.) {
-        xleft = xcenter;
+  // In case both the points are on the same side of solid interface
+  // This will occur when the point just outside the solid interface will be considered inside the solid
+  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid 
+  if (funl*funr > 0.) {
+     double dx = TF->get_cell_size(side(off),comp,dir) ;
+     if (off == 0) {
+        xleft = xleft - dx;
      } else {
-        xright = xcenter;
+        xright = xright + dx; 
      }
+  }
 
-     tolerance = (xcenter-xleft)/2.;
+  if (dir == 0) {
+     funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
+     funr = level_set_function(id,comp,xright,yvalue,zvalue,0);
+  } else if (dir == 1) {
+     funl = level_set_function(id,comp,yvalue,xleft,zvalue,0);
+     funr = level_set_function(id,comp,yvalue,xright,zvalue,0);
+  } else if (dir == 2) {
+     funl = level_set_function(id,comp,yvalue,zvalue,xleft,0);
+     funr = level_set_function(id,comp,yvalue,zvalue,xright,0);
+  }
 
+  // If the shifted point is also physically outside the solid then xb = dx
+  if (funl*funr > 0.) {
+     xcenter = TF->get_DOF_coordinate( side(off), comp, dir ) ;
+  } else {
+     // Bisection method algorithm
+     while (abs(xright-xleft) > 1.E-15) {
+        xcenter = (xleft+xright)/2.;
+        if (dir == 0) {
+           funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
+           func = level_set_function(id,comp,xcenter,yvalue,zvalue,0);
+        } else if (dir == 1) {
+           funl = level_set_function(id,comp,yvalue,xleft,zvalue,0);
+           func = level_set_function(id,comp,yvalue,xcenter,zvalue,0);
+        } else if (dir == 2) {
+           funl = level_set_function(id,comp,yvalue,zvalue,xleft,0);
+           func = level_set_function(id,comp,yvalue,zvalue,xcenter,0);
+        }
+
+        if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
+
+        if (func*funl >= 1.E-16) {
+           xleft = xcenter;
+        } else {
+           xright = xcenter;
+        }
+     }
   }
 
   if (off == 0) {

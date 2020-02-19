@@ -267,7 +267,7 @@ public SolverComputingTime
       struct MPIVar second_pass[3];
       
       double peclet ;
-      double Rpart ;
+      double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
       bool b_bodyterm ;
       bool is_firstorder ;
       bool is_solids;
