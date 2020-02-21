@@ -170,6 +170,20 @@ public SolverComputingTime
 
       size_t return_row_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
 
+      void Solids_generation (size_t const& field);
+
+      void node_property_calculation (FV_DiscreteField const* FF, size_t const& field );
+
+      size_t return_node_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& i, size_t const& j, size_t const& k );
+
+      double level_set_function (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, size_t const& type, size_t const& field);
+
+      /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */
+      void assemble_intersection_matrix (FV_DiscreteField const* FF, size_t const& comp, size_t const& level, size_t const& field);               // Here level:0 -> fluid; 1-> solid
+
+      /** @brief Find the intersection using bisection method with the solid interface */
+      double find_intersection (FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field);
+
       /** @brief Solve interface unknowns for both fields in any particular direction */
       void solve_interface_unknowns( FV_DiscreteField* FF, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field );
       /** @brief Unpack the interface variable sent by master processor to slave processor */
@@ -200,9 +214,7 @@ public SolverComputingTime
       /** Pressure correction */
       void NS_final_step( FV_TimeIterator const* t_it ) ;
 
-      void write_pressure_field( FV_TimeIterator const* t_it );
-
-      void write_velocity_field( FV_TimeIterator const* t_it );
+      void write_output_field( FV_DiscreteField const* FF, size_t const& field );
 
       double get_velocity_divergence(void);
       
@@ -247,6 +259,7 @@ public SolverComputingTime
       size_t is_master;
       size_t dim;
       size_t nb_comps[2];               // 0th element for P and 1st element for U
+      size_t Npart;
 
       MAC_Communicator const* pelCOMM;
       MPI_Comm DDS_Comm_i[3];
@@ -267,10 +280,15 @@ public SolverComputingTime
 
       bool b_restart ;
       bool is_firstorder ;
+      bool is_solids;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;
       bool is_periodic[2][3];
+      string insertion_type;
+      string solid_filename;
+      double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
+
 } ;
 
 #endif

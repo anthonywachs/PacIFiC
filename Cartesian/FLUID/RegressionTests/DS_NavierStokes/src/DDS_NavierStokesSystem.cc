@@ -61,6 +61,7 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
    , UF( mac_UF )
    , PF( mac_PF )
    , MAT_velocityUnsteadyPlusDiffusion_1D( 0 )
+   , is_solids (false)
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DDS_NavierStokesSystem" ) ;
 
@@ -84,6 +85,13 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
    dim = UF->primary_grid()->nb_space_dimensions() ;
    nb_comps[0] = PF->nb_components() ;
    nb_comps[1] = UF->nb_components() ;
+
+   if ( exp->has_entry( "Particles" ) )
+     is_solids = exp->bool_data( "Particles" ) ;
+
+   if (is_solids) {
+      Npart = exp->int_data( "NParticles" ) ;
+   }
 
    // Periodic boundary condition check for velocity
    U_periodic_comp = UF->primary_grid()->get_periodic_directions();
@@ -139,6 +147,19 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    MAT_velocityUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
 
    for (size_t field = 0; field < 2; field++) {
+
+      // Structure for the particle input data
+      solid[field].coord = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+      solid[field].size = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
+      solid[field].vel = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+      solid[field].temp = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
+      solid[field].inside = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
+
+      // Vector to store the presence/absence of particle on the field variable
+      node[field].void_frac = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
+      node[field].parID = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
+      
+
       for (size_t dir = 0; dir < dim; dir++) {
          // Spacial discretization matrices
          A[field][dir].ii_main = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
@@ -167,6 +188,9 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
          Schur[field][dir].ei = (LA_SeqMatrix***) malloc(nb_comps[field] * sizeof(LA_SeqMatrix**)) ;
          Schur[field][dir].ee = (LA_SeqMatrix***) malloc(nb_comps[field] * sizeof(LA_SeqMatrix**)) ;
 
+         // Matrix for Schur complement of Schur complement
+         DoubleSchur[field][dir].ii_main = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
+
          // Product of Schur complement matrices
          SchurP[field][dir].ei_ii_ie = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
          SchurP[field][dir].result = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
@@ -178,8 +202,11 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
          Schur_VEC[field][dir].T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ; 
          Schur_VEC[field][dir].interface_T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
 
-         // Matrix for Schur complement of Schur complement
-         DoubleSchur[field][dir].ii_main = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
+         for (size_t j=0;j<2;j++) {
+            b_intersect[field][j][dir].offset = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+            b_intersect[field][j][dir].value = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+            b_intersect[field][j][dir].field_var = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+         }
 
          for (size_t comp = 0; comp < nb_comps[field]; comp++) {
             size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
@@ -263,6 +290,22 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
             VEC[field][dir].T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             VEC[field][dir].interface_T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
 
+            if (dir == 0) {
+               solid[field].coord[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+               solid[field].size[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               solid[field].temp[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               solid[field].vel[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+               solid[field].inside[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               node[field].void_frac[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               node[field].parID[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            }
+
+            for (size_t j=0;j<2;j++) {
+               b_intersect[field][j][dir].offset[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+               b_intersect[field][j][dir].value[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+               b_intersect[field][j][dir].field_var[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+            }
+
             if (proc_pos_in_i[dir] == 0) {
                SchurP[field][dir].ei_ii_ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
                SchurP[field][dir].result[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -318,6 +361,8 @@ DDS_NavierStokesSystem:: re_initialize( void )
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
          size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
 
+         size_t nb_total_unknown = 1;
+
          for (size_t l = 0;l < dim; l++) {
             if (field == 0) {
                nb_unknowns_handled_by_proc( l ) = 1 + PF->get_max_index_unknown_handled_by_proc( comp, l )
@@ -329,6 +374,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
          }
 
          for (size_t l = 0;l < dim; l++) {
+            nb_total_unknown *= (2+nb_unknowns_handled_by_proc(l));
             size_t nb_index;
             if (l == 0) {
                if (dim == 2) {
@@ -348,6 +394,15 @@ DDS_NavierStokesSystem:: re_initialize( void )
              
             nb_procs = nb_procs_in_i[l];
             proc_pos = proc_pos_in_i[l];
+
+            if ((l == 0) && (is_solids)) {
+               // Presence of solid and only once
+               solid[field].coord[comp]->re_initialize(Npart,3);
+               solid[field].size[comp]->re_initialize(Npart);
+               solid[field].vel[comp]->re_initialize(Npart,3);
+               solid[field].temp[comp]->re_initialize(Npart);
+               solid[field].inside[comp]->re_initialize(Npart);
+            }
 
             if (is_periodic[field][l] != 1) {
                if (proc_pos == nb_procs-1) {
@@ -450,6 +505,17 @@ DDS_NavierStokesSystem:: re_initialize( void )
                         Schur[field][l].ii_sub[comp][index]->re_initialize(nb_procs-1);
                      }
                   }
+               }
+            }
+         }
+         if (is_solids) {
+            node[field].void_frac[comp]->re_initialize( nb_total_unknown ) ;
+            node[field].parID[comp]->re_initialize( nb_total_unknown ) ;
+            for (size_t i=0;i<dim;i++) {
+               for (size_t j=0;j<2;j++) {
+                  b_intersect[field][j][i].offset[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
+                  b_intersect[field][j][i].value[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
+                  b_intersect[field][j][i].field_var[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
                }
             }
          }
@@ -625,6 +691,33 @@ DDS_NavierStokesSystem::get_A(size_t const& field)
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_A" ) ;
    return (A[field]) ;
+}
+
+//----------------------------------------------------------------------
+PartInput
+DDS_NavierStokesSystem::get_solid(size_t const& field)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokesSystem:: get_solid" ) ;
+   return (solid[field]) ;
+}
+
+//----------------------------------------------------------------------
+BoundaryBisec*
+DDS_NavierStokesSystem::get_b_intersect(size_t const& field, size_t const& level)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokesSystem:: get_b_intersect" ) ;
+   return (b_intersect[field][level]) ;
+}
+
+//----------------------------------------------------------------------
+NodeProp
+DDS_NavierStokesSystem::get_node_property(size_t const& field)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatEquationSystem:: get_node_property" ) ;
+   return (node[field]) ;
 }
 
 //----------------------------------------------------------------------

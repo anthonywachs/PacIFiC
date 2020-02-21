@@ -49,6 +49,28 @@ struct LocalVector {
    LA_SeqVector** interface_T;
 };
 
+/** @brief PartInput to be used to store the Input properties of particles in the domian */
+struct PartInput {
+   LA_SeqMatrix ** coord;               // Coordinates
+   LA_SeqVector ** size;                // Size of the sphere
+   LA_SeqMatrix ** vel;                 // Velocity of the sphere
+   LA_SeqVector ** temp;                // Temperature of the sphere
+   LA_SeqVector ** inside;              // 1 if solid only from inside; -1 if solid only from outside
+};
+
+/** @brief NodeProp to be used to store the nodes properties due to presence of solid particles in the domian */
+struct NodeProp {
+   LA_SeqVector ** void_frac;               // void_fraction of the node due to particle
+   LA_SeqVector ** parID;                   // ID of solid particle on the node
+};
+
+/** @brief BoundaryBisec to be used to store the intersection of solids with grids in each direction */
+struct BoundaryBisec {
+   LA_SeqMatrix ** offset;                  // Direction of intersection relative to node (Column 0 for left and Column 1 for right)
+   LA_SeqMatrix ** value;                   // Value of offset relative to node point
+   LA_SeqMatrix ** field_var;                   // Value of field variable at the intersection
+};
+
 /** @brief The Class DDS_NavierStokesSystem.
 
 Matrix systems for the resolution of the heat equation.
@@ -119,6 +141,13 @@ class DDS_NavierStokesSystem : public MAC_Object
       TDMatrix* get_A(size_t const& field);
       /** @brief Return the Schur complement of spacial discretization */
       TDMatrix* get_Schur(size_t const& field);
+      /** @brief Return the solid information read from input files */
+      PartInput get_solid(size_t const& field);
+      /** @brief Return the (presence/absence) of particle vector */
+      NodeProp get_node_property(size_t const& field);
+      /** @brief Return information of intersection with solid boundary */
+      BoundaryBisec* get_b_intersect(size_t const& field, size_t const& level);
+
       /** @brief Return the Schur complement of Schur complement in case of periodic domain */
       TDMatrix* get_DoubleSchur(size_t const& field);
       /** @brief Return the product matrix of Schur complement */
@@ -235,6 +264,12 @@ class DDS_NavierStokesSystem : public MAC_Object
       // Schur complement of Schur complement
       struct TDMatrix DoubleSchur[2][3];
 
+      // Particle structures
+      struct PartInput solid[2];
+      struct NodeProp node[2];
+      struct BoundaryBisec b_intersect[2][2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid); 2 are fields (PF,UF)
+
+
       size_t dim;
       MAC_Communicator const* pelCOMM;
       size_t nb_comps[2];
@@ -243,6 +278,11 @@ class DDS_NavierStokesSystem : public MAC_Object
       size_t proc_pos_in_i[3];
       /** Number of Processors in x,y,z */
       size_t nb_procs_in_i[3];
+
+      size_t Npart;
+      double Rpart;
+      bool is_solids;
+
 
       bool is_periodic[2][3];
       boolVector const* U_periodic_comp;
