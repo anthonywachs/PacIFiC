@@ -150,7 +150,7 @@ public SolverComputingTime
       /** @brief Assemble rhs for velocity in any direction */
       double velocity_local_rhs( size_t const& j, size_t const& k, double const&  gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir );
       /** @brief Compute diffusive term of velocity field from previous timestep */
-      double compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir);
+      double compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level);
       /** @brief Compute diffusive term of pressure field from previous timestep */
       double compute_p_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k);
       /** @brief Compute advective term based on either Upwind or TVD spacial scheme */

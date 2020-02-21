@@ -82,7 +82,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
    MAC_ASSERT( PF->discretization_type() == "centered" ) ;
-   //MAC_ASSERT( UF->storage_depth() == 1 ) ;
+   MAC_ASSERT( UF->storage_depth() == 5 ) ;
 
    // Call of MAC_Communicator routine to set the rank of each proces and
    // the number of processes during execution
@@ -827,7 +827,7 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir)
+DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: compute_un_component" ) ;
@@ -838,8 +838,8 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, s
    if (dir == 0) {
       xhr= UF->get_DOF_coordinate( i+1,comp, 0 ) - UF->get_DOF_coordinate( i, comp, 0 ) ;
       xhl= UF->get_DOF_coordinate( i, comp, 0 ) - UF->get_DOF_coordinate( i-1, comp, 0 ) ;
-      xright = UF->DOF_value( i+1, j, k, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
-      xleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i-1, j, k, comp, 1 ) ;
+      xright = UF->DOF_value( i+1, j, k, comp, level ) - UF->DOF_value( i, j, k, comp, level ) ;
+      xleft = UF->DOF_value( i, j, k, comp, level ) - UF->DOF_value( i-1, j, k, comp, level ) ;
 
       //xvalue = xright/xhr - xleft/xhl;
       if (UF->DOF_in_domain( i-1, j, k, comp) && UF->DOF_in_domain( i+1, j, k, comp))
@@ -851,8 +851,8 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, s
    } else if (dir == 1) {
       yhr= UF->get_DOF_coordinate( j+1,comp, 1 ) - UF->get_DOF_coordinate( j, comp, 1 ) ;
       yhl= UF->get_DOF_coordinate( j, comp, 1 ) - UF->get_DOF_coordinate( j-1, comp, 1 ) ;
-      yright = UF->DOF_value( i, j+1, k, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
-      yleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i, j-1, k, comp, 1 ) ;
+      yright = UF->DOF_value( i, j+1, k, comp, level ) - UF->DOF_value( i, j, k, comp, level ) ;
+      yleft = UF->DOF_value( i, j, k, comp, level ) - UF->DOF_value( i, j-1, k, comp, level ) ;
 
       //yvalue = yright/yhr - yleft/yhl;
       if (UF->DOF_in_domain(i, j-1, k, comp) && UF->DOF_in_domain(i, j+1, k, comp))
@@ -864,8 +864,8 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, s
    } else if (dir == 2) {
       zhr= UF->get_DOF_coordinate( k+1,comp, 2 ) - UF->get_DOF_coordinate( k, comp, 2 ) ;
       zhl= UF->get_DOF_coordinate( k, comp, 2 ) - UF->get_DOF_coordinate( k-1, comp, 2 ) ;
-      zright = UF->DOF_value( i, j, k+1, comp, 1 ) - UF->DOF_value( i, j, k, comp, 1 ) ;
-      zleft = UF->DOF_value( i, j, k, comp, 1 ) - UF->DOF_value( i, j, k-1, comp, 1 ) ;
+      zright = UF->DOF_value( i, j, k+1, comp, level ) - UF->DOF_value( i, j, k, comp, level ) ;
+      zleft = UF->DOF_value( i, j, k, comp, level ) - UF->DOF_value( i, j, k-1, comp, level ) ;
 
       //zvalue = zright/zhr - zleft/zhl;
       if (UF->DOF_in_domain(i, j, k-1, comp) && UF->DOF_in_domain(i, j, k+1, comp))
@@ -919,22 +919,31 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double
 
      // x direction
      if (dir == 0) {
-        value = compute_un_component(comp,i,j,k,dir);
+        //value = compute_un_component(comp,i,j,k,dir,1);
+        value = compute_un_component(comp,i,j,k,dir,3);
      // y direction
      } else if (dir == 1) {
-        value = compute_un_component(comp,j,i,k,dir);
+        //value = compute_un_component(comp,j,i,k,dir,1);
+        if (dim == 2) {
+           value = compute_un_component(comp,j,i,k,dir,1);
+        } else if (dim == 3) {
+           value = compute_un_component(comp,j,i,k,dir,4);
+        }
+
      // z direction
      } else if (dir == 2) {
-        value = compute_un_component(comp,j,k,i,dir);
+        value = compute_un_component(comp,j,k,i,dir,1);
      }
 
      double temp_val=0.;
      if (dir == 0) {
         temp_val = (UF->DOF_value(i,j,k,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
      } else if (dir == 1) {
-        temp_val = (UF->DOF_value(j,i,k,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
+        //temp_val = (UF->DOF_value(j,i,k,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
+        temp_val = (UF->DOF_value(j,i,k,comp,3)*dC*rho)/(t_it->time_step()) - gamma*value;
      } else if (dir == 2) {
-        temp_val = (UF->DOF_value(j,k,i,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
+        //temp_val = (UF->DOF_value(j,k,i,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
+        temp_val = (UF->DOF_value(j,k,i,comp,4)*dC*rho)/(t_it->time_step()) - gamma*value;
      }
 
      if (is_periodic[1][dir] == 0) {
@@ -1396,9 +1405,10 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
             if (dim ==2 ) {
                k=0;
                // Dxx for un
-               xvalue = compute_un_component(comp,i,j,k,0);
+               //xvalue = compute_un_component(comp,i,j,k,0,1);
+               xvalue = compute_un_component(comp,i,j,k,0,3);
                // Dyy for un
-               yvalue = compute_un_component(comp,i,j,k,1);
+               yvalue = compute_un_component(comp,i,j,k,1,1);
                // Pressure contribution
 	       pvalue = compute_p_component(comp,i,j,k);
                // Advection contribution
@@ -1415,11 +1425,13 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
                   dzC = UF->get_cell_size( k, comp, 2 ) ;
                   zC = UF->get_DOF_coordinate( k, comp, 2 ) ;
                   // Dxx for un
-                  xvalue = compute_un_component(comp,i,j,k,0);
+                  //xvalue = compute_un_component(comp,i,j,k,0,1);
+                  xvalue = compute_un_component(comp,i,j,k,0,3);
                   // Dyy for un
-                  yvalue = compute_un_component(comp,i,j,k,1);
+                  //yvalue = compute_un_component(comp,i,j,k,1,1);
+                  yvalue = compute_un_component(comp,i,j,k,1,4);
                   // Dzz for un
-                  zvalue = compute_un_component(comp,i,j,k,2);
+                  zvalue = compute_un_component(comp,i,j,k,2,1);
                   // Pressure contribution
                   pvalue = compute_p_component(comp,i,j,k);
                   // Advection contribution
@@ -1609,13 +1621,20 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    // Synchronize the distributed DS solution vector
    GLOBAL_EQ->synchronize_DS_solution_vec();
    // Tranfer back to field
-   UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
+   //UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
+   UF->update_free_DOFs_value( 3, GLOBAL_EQ->get_solution_DS_velocity() ) ;
 
    Solve_i_in_jk(UF,t_it,1,0,2,gamma,1);
    // Synchronize the distributed DS solution vector
    GLOBAL_EQ->synchronize_DS_solution_vec();
    // Tranfer back to field
-   UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ; 
+   //UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ; 
+   if (dim == 2) {
+      UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ;
+   } else if (dim == 3) {
+      UF->update_free_DOFs_value( 4 , GLOBAL_EQ->get_solution_DS_velocity() ) ;
+   }
+
 
    if (dim == 3) {
       Solve_i_in_jk(UF,t_it,2,0,1,gamma,1);

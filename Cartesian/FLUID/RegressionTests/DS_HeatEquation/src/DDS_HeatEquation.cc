@@ -2151,6 +2151,7 @@ DDS_HeatEquation:: DS_error_with_analytical_solution ( FV_DiscreteField const* F
 
                computed_DS_field = FF->DOF_value( i, j, k, comp, 0 ) ;
 
+               // Presence of solids; analytical solution of hollow cylindrical shell for 2D
                if (is_solids) {
                   PartInput solid = GLOBAL_EQ->get_solid();
                   NodeProp node = GLOBAL_EQ->get_node_property();
@@ -2185,6 +2186,7 @@ DDS_HeatEquation:: DS_error_with_analytical_solution ( FV_DiscreteField const* F
                for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                   z = FF->get_DOF_coordinate( k, comp, 2 ) ;
                   computed_DS_field = FF->DOF_value( i, j, k, comp, 0 ) ;
+                  // Presence of solids; analytical solution for the hollow spherical shell in 3D
                   if (is_solids) {
                      PartInput solid = GLOBAL_EQ->get_solid();
                      NodeProp node = GLOBAL_EQ->get_node_property();
