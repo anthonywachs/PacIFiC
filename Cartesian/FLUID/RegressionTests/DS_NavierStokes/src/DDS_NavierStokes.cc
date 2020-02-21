@@ -461,18 +461,61 @@ DDS_NavierStokes:: error_with_analytical_solution ( )
 }
 
 //---------------------------------------------------------------------------
+size_t
+DDS_NavierStokes:: return_row_index (
+  FV_DiscreteField const* FF,
+  size_t const& comp,
+  size_t const& dir,
+  size_t const& j,
+  size_t const& k )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokes:: return_row_index" ) ;
+
+   // Get local min and max indices
+   size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
+   for (size_t l=0;l<dim;++l) {
+        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   }
+
+   size_t p=0;
+
+   if (dim == 2) {
+      if (dir == 0) {
+         p = j - min_unknown_index(1);
+      } else if (dir == 1) {
+         p = j - min_unknown_index(0);
+      }
+   } else if (dim == 3) {
+      if (dir == 0) {
+         p = (j-min_unknown_index(1))+(1+max_unknown_index(1)-min_unknown_index(1))*(k-min_unknown_index(2));
+      } else if (dir == 1) {
+         p = (j-min_unknown_index(0))+(1+max_unknown_index(0)-min_unknown_index(0))*(k-min_unknown_index(2));
+      } else if (dir == 2) {
+         p = (j-min_unknown_index(0))+(1+max_unknown_index(0)-min_unknown_index(0))*(k-min_unknown_index(1));
+      }
+   }
+
+   return(p);
+}
+
+//---------------------------------------------------------------------------
 double
 DDS_NavierStokes:: assemble_field_matrix (
   FV_DiscreteField const* FF,
   FV_TimeIterator const* t_it,
   double const& gamma,
   size_t const& comp,
-  size_t const& dir, size_t const& field )
+  size_t const& dir, 
+  size_t const& field,
+  size_t const& j,
+  size_t const& k,
+  size_t const& r_index )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: assemble_field_matrix" ) ;
-
-   if ( my_rank == is_master ) cout << "Assembling fields Matrix 1D " << endl;
 
    // Parameters
    double dxr,dxl,dx,xR,xL,xC,right=0.,left=0.,center=0.;
@@ -573,78 +616,76 @@ DDS_NavierStokes:: assemble_field_matrix (
          // Periodic boundary condition at minimum unknown index
          // First proc has non zero value in Aie,Aei for first & last index
          if (rank_in_i[dir] == 0) {
-            A[dir].ie[comp]->set_item(m,nb_ranks_comm_i[dir]-1,left);
-            A[dir].ei[comp]->set_item(nb_ranks_comm_i[dir]-1,m,right);
+            A[dir].ie[comp][r_index]->set_item(m,nb_ranks_comm_i[dir]-1,left);
+            A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,right);
          } else {
-            A[dir].ie[comp]->set_item(m,rank_in_i[dir]-1,left);
-            A[dir].ei[comp]->set_item(rank_in_i[dir]-1,m,right);
+            A[dir].ie[comp][r_index]->set_item(m,rank_in_i[dir]-1,left);
+            A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,right);
          }
       }
 
       if ((!r_bound) && (i == max_unknown_index(dir))) {
          // Periodic boundary condition at maximum unknown index
          // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-         A[dir].ie[comp]->set_item(m-1,rank_in_i[dir],right);
+         A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],right);
          Aee_diagcoef = value;
-         A[dir].ei[comp]->set_item(rank_in_i[dir],m-1,left);
+         A[dir].ei[comp][r_index]->set_item(rank_in_i[dir],m-1,left);
       }
 
       // Set Aii_sub_diagonal
       if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_periodic[field][dir] != 1)) {
-         if (i > min_unknown_index(dir)) A[dir].ii_sub[comp]->set_item(m-1,left);
+         if (i > min_unknown_index(dir)) A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
       } else {
          if (i<max_unknown_index(dir)) {
             if (i>min_unknown_index(dir)) {
-               A[dir].ii_sub[comp]->set_item(m-1,left);
+               A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
             }
          }
       }
 
       // Set Aii_super_diagonal
       if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_periodic[field][dir] != 1)) {
-         if (i < max_unknown_index(dir)) A[dir].ii_super[comp]->set_item(m,right);
+         if (i < max_unknown_index(dir)) A[dir].ii_super[comp][r_index]->set_item(m,right);
       } else {
          if (i < max_unknown_index(dir)-1) {
-            A[dir].ii_super[comp]->set_item(m,right);
+            A[dir].ii_super[comp][r_index]->set_item(m,right);
          }
       }
 
       // Set Aii_main_diagonal
       if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_periodic[field][dir] != 1)) {
-         A[dir].ii_main[comp]->set_item(m,value);
+         A[dir].ii_main[comp][r_index]->set_item(m,value);
       } else {
          if (i<max_unknown_index(dir)) {
-            A[dir].ii_main[comp]->set_item(m,value);
+            A[dir].ii_main[comp][r_index]->set_item(m,value);
          }
       }
    } // End of for loop
 
-   GLOBAL_EQ->pre_thomas_treatment(comp,dir,A);
+   GLOBAL_EQ->pre_thomas_treatment(comp,dir,A,r_index);
 
    return (Aee_diagcoef);
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& field )
+DDS_NavierStokes:: assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& field, size_t const& r_index )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokes:: assemble_field_schur_matrix" ) ;
    // Compute the product matrix for each proc
 
-   if ( my_rank == is_master ) cout << "Schur matrix in " << dir << endl;
-
    if (nb_ranks_comm_i[dir]>1) {
 
       ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
 
-      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,field);
+      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,field,r_index);
 
       LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
       LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
 
       if ( rank_in_i[dir] == 0 ) {
-         A[dir].ee[comp]->set_item(0,0,Aee_diagcoef);
+         A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
    	 for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
 
             // Create the container to receive
@@ -669,12 +710,12 @@ DDS_NavierStokes:: assemble_field_schur_matrix (struct TDMatrix *A, size_t const
                if (i<nb_ranks_comm_i[dir]-1) {
                   // Assemble the global Aee matrix 
                   // No periodic condition in x. So no fe contribution from last proc
-                  A[dir].ee[comp]->set_item(i,i,received_data[nb_received_data-1]);
+                  A[dir].ee[comp][r_index]->set_item(i,i,received_data[nb_received_data-1]);
                }   
             } else {
                // Assemble the global Aee matrix
                // Periodic condition in x. So there is fe contribution from last proc
-               A[dir].ee[comp]->set_item(i,i,received_data[nb_received_data-1]); 
+               A[dir].ee[comp][r_index]->set_item(i,i,received_data[nb_received_data-1]); 
             }
             delete [] received_data;
          }
@@ -708,51 +749,51 @@ DDS_NavierStokes:: assemble_field_schur_matrix (struct TDMatrix *A, size_t const
 
       if (rank_in_i[dir] == 0){
          TDMatrix* Schur = GLOBAL_EQ-> get_Schur(field);
-         size_t nb_row = Schur[dir].ii_main[comp]->nb_rows();
+         size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
          for (int p = 0; p < nb_row; p++) {
-            Schur[dir].ii_main[comp]->set_item(p,A[dir].ee[comp]->item(p,p)-receive_matrix->item(p,p));
-            if (p < nb_row-1) Schur[dir].ii_super[comp]->set_item(p,-receive_matrix->item(p,p+1));
-            if (p > 0) Schur[dir].ii_sub[comp]->set_item(p-1,-receive_matrix->item(p,p-1));
+            Schur[dir].ii_main[comp][r_index]->set_item(p,A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
+            if (p < nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,-receive_matrix->item(p,p+1));
+            if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,-receive_matrix->item(p,p-1));
             // In case of periodic and multi-processor, there will be a variant of Tridiagonal matrix instead of normal format
             if (is_periodic[field][dir] == 1) {
-               Schur[dir].ie[comp]->set_item(p,0,-receive_matrix->item(p,nb_row));
-               Schur[dir].ei[comp]->set_item(0,p,-receive_matrix->item(nb_row,p));
+               Schur[dir].ie[comp][r_index]->set_item(p,0,-receive_matrix->item(p,nb_row));
+               Schur[dir].ei[comp][r_index]->set_item(0,p,-receive_matrix->item(nb_row,p));
             }
          }
          // Pre-thomas treatment on Schur complement
-         GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur);
+         GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
 
          // In case of periodic and multi-processor, there will be a variant of Tridiagonal matrix instead of normal format
          // So, Schur complement of Schur complement is calculated
          if (is_periodic[field][dir] == 1) {
-            Schur[dir].ee[comp]->set_item(0,0,A[dir].ee[comp]->item(nb_row,nb_row)-receive_matrix->item(nb_row,nb_row));
+            Schur[dir].ee[comp][r_index]->set_item(0,0,A[dir].ee[comp][r_index]->item(nb_row,nb_row)-receive_matrix->item(nb_row,nb_row));
 
             ProdMatrix* SchurP = GLOBAL_EQ->get_SchurP(field);
-            GLOBAL_EQ->compute_product_matrix_interior(Schur,SchurP,comp,0,dir);
+            GLOBAL_EQ->compute_product_matrix_interior(Schur,SchurP,comp,0,dir,r_index);
 
             TDMatrix* DoubleSchur = GLOBAL_EQ-> get_DoubleSchur(field);
-            size_t nb_row = DoubleSchur[dir].ii_main[comp]->nb_rows();
-            DoubleSchur[dir].ii_main[comp]->set_item(0,Schur[dir].ee[comp]->item(0,0)-SchurP[dir].ei_ii_ie[comp]->item(0,0));
+            size_t nb_row = DoubleSchur[dir].ii_main[comp][r_index]->nb_rows();
+            DoubleSchur[dir].ii_main[comp][r_index]->set_item(0,Schur[dir].ee[comp][r_index]->item(0,0)-SchurP[dir].ei_ii_ie[comp]->item(0,0));
          }
       }
    } else if (is_periodic[field][dir] == 1) {
       // Condition for single processor in any direction with periodic boundary conditions
       ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
-      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir, field);
+      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir, field,r_index);
 
       LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
       LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
 
-      A[dir].ee[comp]->set_item(0,0,Aee_diagcoef);
+      A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
 
       TDMatrix* Schur = GLOBAL_EQ-> get_Schur(field);
-      size_t nb_row = Schur[dir].ii_main[comp]->nb_rows();
+      size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
       for (int p = 0; p < nb_row; p++) {
-         Schur[dir].ii_main[comp]->set_item(p,A[dir].ee[comp]->item(p,p)-receive_matrix->item(p,p));
-         if (p < nb_row-1) Schur[dir].ii_super[comp]->set_item(p,-receive_matrix->item(p,p+1));
-         if (p > 0) Schur[dir].ii_sub[comp]->set_item(p-1,-receive_matrix->item(p,p-1));
+         Schur[dir].ii_main[comp][r_index]->set_item(p,A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
+         if (p < nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,-receive_matrix->item(p,p+1));
+         if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,-receive_matrix->item(p,p-1));
       }
-      GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur);      
+      GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index); 
    }
 }
 
@@ -765,21 +806,56 @@ DDS_NavierStokes:: assemble_1D_matrices ( FV_TimeIterator const* t_it )
 
    double gamma = mu/2.0;
 
-   // Assemble the matrices for pressure field
-   for (size_t comp=0;comp<nb_comps[0];comp++) {
-      for (size_t dir=0;dir<dim;dir++) {
-         double Aee_diagcoef = assemble_field_matrix (PF,t_it,gamma,comp,dir,0);
-         TDMatrix* A = GLOBAL_EQ-> get_A(0);
-         assemble_field_schur_matrix (A,comp,dir,Aee_diagcoef,0);
-      }
-   }
+   size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
 
-   // Assemble the matrices for velocity field
-   for (size_t comp=0;comp<nb_comps[1];comp++) {
-      for (size_t dir=0;dir<dim;dir++) {
-         double Aee_diagcoef = assemble_field_matrix (UF,t_it,gamma,comp,dir,1);
-         TDMatrix* A = GLOBAL_EQ-> get_A(1);
-         assemble_field_schur_matrix (A,comp,dir,Aee_diagcoef,1);
+   // Assemble the matrices for pressure field(0) and velocity(1) field
+   for (size_t field=0;field<2;field++) {
+      for (size_t comp=0;comp<nb_comps[field];comp++) {
+         // Get local min and max indices
+         for (size_t l=0;l<dim;++l) {
+            if (field == 0) {
+               min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+               max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+            } else if (field == 1) {
+               min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+               max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+            }
+         }
+         for (size_t dir=0;dir<dim;dir++) {
+            size_t dir_j, dir_k;
+            size_t local_min_k = 0;
+            size_t local_max_k = 0;
+
+            if (dir == 0) {
+               dir_j = 1; dir_k = 2;
+            } else if (dir == 1) {
+               dir_j = 0; dir_k = 2;
+            } else if (dir == 2) {
+               dir_j = 0; dir_k = 1;
+            }
+
+            if (dim == 3) {
+               local_min_k = min_unknown_index(dir_k);
+               local_max_k = max_unknown_index(dir_k);
+            }
+
+            for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
+               for (size_t k=local_min_k; k <= local_max_k; ++k) {
+                  size_t r_index;
+                  double Aee_diagcoef;
+                  if (field == 0) {
+                     r_index = return_row_index (PF,comp,dir,j,k);
+                     Aee_diagcoef = assemble_field_matrix (PF,t_it,gamma,comp,dir,0,j,k,r_index);
+                  } else if (field == 1) {
+                     r_index = return_row_index (UF,comp,dir,j,k);
+                     Aee_diagcoef = assemble_field_matrix (UF,t_it,gamma,comp,dir,1,j,k,r_index);
+                  }
+                  TDMatrix* A = GLOBAL_EQ-> get_A(field);
+                  assemble_field_schur_matrix (A,comp,dir,Aee_diagcoef,field,r_index);
+               }
+            }
+         }
       }
    }
 }
@@ -919,11 +995,9 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double
 
      // x direction
      if (dir == 0) {
-        //value = compute_un_component(comp,i,j,k,dir,1);
         value = compute_un_component(comp,i,j,k,dir,3);
      // y direction
      } else if (dir == 1) {
-        //value = compute_un_component(comp,j,i,k,dir,1);
         if (dim == 2) {
            value = compute_un_component(comp,j,i,k,dir,1);
         } else if (dim == 3) {
@@ -939,10 +1013,8 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double
      if (dir == 0) {
         temp_val = (UF->DOF_value(i,j,k,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
      } else if (dir == 1) {
-        //temp_val = (UF->DOF_value(j,i,k,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
         temp_val = (UF->DOF_value(j,i,k,comp,3)*dC*rho)/(t_it->time_step()) - gamma*value;
      } else if (dir == 2) {
-        //temp_val = (UF->DOF_value(j,k,i,comp,0)*dC*rho)/(t_it->time_step()) - gamma*value;
         temp_val = (UF->DOF_value(j,k,i,comp,4)*dC*rho)/(t_it->time_step()) - gamma*value;
      }
 
@@ -1051,7 +1123,7 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir,
    }
 
    // Solve for ue (interface unknowns) in the master proc
-   DS_interface_unknown_solver(VEC[dir].interface_T[comp],comp,dir,field);
+   DS_interface_unknown_solver(VEC[dir].interface_T[comp],comp,dir,field,p);
 
    for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
       if (i != nb_ranks_comm_i[dir]-1) {
@@ -1069,7 +1141,7 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir,
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& field )
+DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DS_interface_unknown_solver" ) ;
@@ -1089,19 +1161,19 @@ DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs, size
       Schur_VEC[dir].interface_T[comp]->set_item(0,interface_rhs->item(nrows));
 
       // Calculate Sei*(Sii)-1*S_fi
-      compute_Aei_ui(Schur,Schur_VEC,comp,dir);
+      compute_Aei_ui(Schur,Schur_VEC,comp,dir,r_index);
 
       // Calculate S_fe - Sei*(Sii)-1*S_fi
       Schur_VEC[dir].interface_T[comp]->set_item(0,Schur_VEC[dir].interface_T[comp]->item(0)-Schur_VEC[dir].T[comp]->item(0));
 
       // Calculate S_ue, using Schur complement of Schur complement
-      GLOBAL_EQ->mod_thomas_algorithm(DoubleSchur, Schur_VEC[dir].interface_T[comp], comp, dir);
+      GLOBAL_EQ->mod_thomas_algorithm(DoubleSchur, Schur_VEC[dir].interface_T[comp], comp, dir,r_index);
 
       // Calculate S_fi-Sie*S_ue
-      Schur[dir].ie[comp]->multiply_vec_then_add(Schur_VEC[dir].interface_T[comp],Schur_VEC[dir].local_T[comp],-1.0,1.0);
+      Schur[dir].ie[comp][r_index]->multiply_vec_then_add(Schur_VEC[dir].interface_T[comp],Schur_VEC[dir].local_T[comp],-1.0,1.0);
 
       // Calculate S_ui
-      GLOBAL_EQ->mod_thomas_algorithm(Schur, Schur_VEC[dir].local_T[comp], comp, dir);
+      GLOBAL_EQ->mod_thomas_algorithm(Schur, Schur_VEC[dir].local_T[comp], comp, dir,r_index);
 
       // Transfer back the solution to interface_rhs
       for (size_t i = 0; i < nrows; i++) {
@@ -1109,7 +1181,7 @@ DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs, size
       }
       interface_rhs->set_item(nrows,Schur_VEC[dir].interface_T[comp]->item(0));
    } else {
-      GLOBAL_EQ->mod_thomas_algorithm(Schur, interface_rhs, comp, dir);
+      GLOBAL_EQ->mod_thomas_algorithm(Schur, interface_rhs, comp, dir,r_index);
    }
 }
 
@@ -1210,10 +1282,10 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
             double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
 
             // Setup RHS = fi - Aie*xe for solving ui
-            A[dir].ie[comp]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
+            A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
             // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),comp,dir,field);
+            GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),comp,dir,field,p);
          }
       } else {
          for (k=local_min_k;k<=local_max_k;k++) {
@@ -1227,10 +1299,10 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
                double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
 
                // Setup RHS = fi - Aie*xe for solving ui
-               A[dir].ie[comp]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
+               A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
                // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),comp,dir,field);
+               GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),comp,dir,field,p);
             }
          }
       }
@@ -1263,10 +1335,10 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
                double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
  
                // Setup RHS = fi - Aie*xe for solving ui
-               A[dir].ie[comp]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
+               A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
                // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),comp,dir,field);
+               GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),comp,dir,field,p);
             }
          } else {
             for (k = local_min_k;k<=local_max_k;k++) {
@@ -1279,10 +1351,10 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
                   double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir,field);
 
                   // Setup RHS = fi - Aie*xe for solving ui
-                  A[dir].ie[comp]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
+                  A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
                   // Solve ui and transfer solution into distributed vector
-                  GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),comp,dir,field);
+                  GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir),comp,dir,field,p);
                }
             }
          }
@@ -1405,7 +1477,6 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
             if (dim ==2 ) {
                k=0;
                // Dxx for un
-               //xvalue = compute_un_component(comp,i,j,k,0,1);
                xvalue = compute_un_component(comp,i,j,k,0,3);
                // Dyy for un
                yvalue = compute_un_component(comp,i,j,k,1,1);
@@ -1425,10 +1496,8 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
                   dzC = UF->get_cell_size( k, comp, 2 ) ;
                   zC = UF->get_DOF_coordinate( k, comp, 2 ) ;
                   // Dxx for un
-                  //xvalue = compute_un_component(comp,i,j,k,0,1);
                   xvalue = compute_un_component(comp,i,j,k,0,3);
                   // Dyy for un
-                  //yvalue = compute_un_component(comp,i,j,k,1,1);
                   yvalue = compute_un_component(comp,i,j,k,1,4);
                   // Dzz for un
                   zvalue = compute_un_component(comp,i,j,k,2,1);
@@ -1480,10 +1549,11 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* 
      if ((nb_ranks_comm_i[dir_i]>1)||(is_periodic[field][dir_i] == 1)) {
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
+              size_t r_index = return_row_index (FF,comp,dir_i,j,k);
               // Assemble fi and return fe for each proc locally        
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i,field);
               // Calculate Aei*ui in each proc locally
-              compute_Aei_ui(A,VEC,comp,dir_i);
+              compute_Aei_ui(A,VEC,comp,dir_i,r_index);
               // Pack Aei_ui and fe for sending it to master
               data_packing (FF,j,k,fe,comp,dir_i,field);
            }
@@ -1493,8 +1563,9 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* 
      } else if (is_periodic[field][dir_i] == 0) {  // Serial mode with non-periodic condition
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
+              size_t r_index = return_row_index (FF,comp,dir_i,j,k);
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i,field);
-              GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir_i),comp,dir_i,field);
+              GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir_i),comp,dir_i,field,r_index);
            }
         }
      }
@@ -1568,7 +1639,7 @@ DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF, size_t const& j, s
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir)
+DDS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: compute_Aei_ui" ) ;
@@ -1578,14 +1649,14 @@ DDS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC
    }
 
    // Solve for ui locally and put it in local solution vector
-   GLOBAL_EQ->mod_thomas_algorithm(arr, VEC[dir].local_solution_T[comp], comp, dir);
+   GLOBAL_EQ->mod_thomas_algorithm(arr, VEC[dir].local_solution_T[comp], comp, dir,r_index);
 
    for (size_t i=0;i<VEC[dir].T[comp]->nb_rows();i++){
           VEC[dir].T[comp]->set_item(i,0);
    }
 
    // Calculate Aei*ui in each proc locally and put it in T vector
-   arr[dir].ei[comp]->multiply_vec_then_add(VEC[dir].local_solution_T[comp],VEC[dir].T[comp]);
+   arr[dir].ei[comp][r_index]->multiply_vec_then_add(VEC[dir].local_solution_T[comp],VEC[dir].T[comp]);
 
 }
 
@@ -1621,14 +1692,12 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    // Synchronize the distributed DS solution vector
    GLOBAL_EQ->synchronize_DS_solution_vec();
    // Tranfer back to field
-   //UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
    UF->update_free_DOFs_value( 3, GLOBAL_EQ->get_solution_DS_velocity() ) ;
 
    Solve_i_in_jk(UF,t_it,1,0,2,gamma,1);
    // Synchronize the distributed DS solution vector
    GLOBAL_EQ->synchronize_DS_solution_vec();
    // Tranfer back to field
-   //UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ; 
    if (dim == 2) {
       UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ;
    } else if (dim == 3) {

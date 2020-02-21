@@ -26,12 +26,12 @@ class FV_TimeIterator ;
 
 /** @brief TDMatrix include all elements of block matrices (ii,ie,ei,ee) */
 struct TDMatrix {
-   LA_SeqVector ** ii_main;
-   LA_SeqVector ** ii_super;
-   LA_SeqVector ** ii_sub;
-   LA_SeqMatrix ** ie;
-   LA_SeqMatrix ** ei;
-   LA_SeqMatrix ** ee;
+   LA_SeqVector *** ii_main;
+   LA_SeqVector *** ii_super;
+   LA_SeqVector *** ii_sub;
+   LA_SeqMatrix *** ie;
+   LA_SeqMatrix *** ei;
+   LA_SeqMatrix *** ee;
 };
 
 /** @brief Product matrix is composed of products elements of block matrices (ii,ie,ei,ee) */
@@ -150,7 +150,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       //@{
       /** @brief Solve the DS splitting problem in x by performing the
       matrix-vector product A_x^-1.Vx and transfer in the distributed vector */
-      void DS_NavierStokes_solver( FV_DiscreteField* FF, size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& field) ;
+      void DS_NavierStokes_solver( FV_DiscreteField* FF, size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index) ;
 
       //@}
 
@@ -168,18 +168,18 @@ class DDS_NavierStokesSystem : public MAC_Object
       //@}
 
       /** @brief Calls interior function for different conditions to compute the product of Aei*inv(Aii)*Aie */
-      void compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& field );
+      void compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index );
       /** @brief Compute the product of Aei*inv(Aii)*Aie in any direction for any field*/
-      void compute_product_matrix_interior(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column, size_t const& dir);
+      void compute_product_matrix_interior(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column, size_t const& dir, size_t const& r_index);
 
    //-- Utilities
 
       /** @name Utilities */
       //@{
       /** @brief Solve Linear system mat_A*x = rhs with only three vectors of mat_A(x,y,z) using thomas algorithm  */
-      void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir);
+      void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& r_index);
       /** @brief Compute the modified super diagonal for thomas algorithm  */
-      void pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr);
+      void pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr, size_t const& r_index);
       //@}
 
    protected: //--------------------------------------------------------

@@ -141,12 +141,12 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
          // Spacial discretization matrices
-         A[field][dir].ii_main = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-         A[field][dir].ii_super = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-         A[field][dir].ii_sub = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-         A[field][dir].ie = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-         A[field][dir].ei = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-         A[field][dir].ee = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+         A[field][dir].ii_main = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
+         A[field][dir].ii_super = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
+         A[field][dir].ii_sub = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
+         A[field][dir].ie = (LA_SeqMatrix***) malloc(nb_comps[field] * sizeof(LA_SeqMatrix**)) ;
+         A[field][dir].ei = (LA_SeqMatrix***) malloc(nb_comps[field] * sizeof(LA_SeqMatrix**)) ;
+         A[field][dir].ee = (LA_SeqMatrix***) malloc(nb_comps[field] * sizeof(LA_SeqMatrix**)) ;
 
          // Product matrices of spacial discretization
          Ap[field][dir].ei_ii_ie = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
@@ -160,12 +160,12 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
          VEC[field][dir].interface_T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
 
          // Schur complement matrices
-         Schur[field][dir].ii_main = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-         Schur[field][dir].ii_super = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-         Schur[field][dir].ii_sub = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-         Schur[field][dir].ie = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-         Schur[field][dir].ei = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-         Schur[field][dir].ee = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+         Schur[field][dir].ii_main = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
+         Schur[field][dir].ii_super = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
+         Schur[field][dir].ii_sub = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
+         Schur[field][dir].ie = (LA_SeqMatrix***) malloc(nb_comps[field] * sizeof(LA_SeqMatrix**)) ;
+         Schur[field][dir].ei = (LA_SeqMatrix***) malloc(nb_comps[field] * sizeof(LA_SeqMatrix**)) ;
+         Schur[field][dir].ee = (LA_SeqMatrix***) malloc(nb_comps[field] * sizeof(LA_SeqMatrix**)) ;
 
          // Product of Schur complement matrices
          SchurP[field][dir].ei_ii_ie = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
@@ -179,19 +179,81 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
          Schur_VEC[field][dir].interface_T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
 
          // Matrix for Schur complement of Schur complement
-         DoubleSchur[field][dir].ii_main = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
+         DoubleSchur[field][dir].ii_main = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
+
+         for (size_t comp = 0; comp < nb_comps[field]; comp++) {
+            size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
+            size_t nb_index;
+            for (size_t l=0;l<dim;++l) {
+               if (field == 0) {
+                  nb_unknowns_handled_by_proc( l ) =
+                                  1 + PF->get_max_index_unknown_handled_by_proc( comp, l )
+                                    - PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+               } else if (field == 1) {
+                  nb_unknowns_handled_by_proc( l ) =
+                                  1 + UF->get_max_index_unknown_handled_by_proc( comp, l )
+                                    - UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+               }
+
+            }
+            if (dir == 0) {
+               if (dim == 2) {
+                  nb_index = nb_unknowns_handled_by_proc(1);
+               } else if (dim == 3) {
+                  nb_index = nb_unknowns_handled_by_proc(1)*nb_unknowns_handled_by_proc(2);
+               }
+            } else if (dir == 1) {
+               if (dim == 2) {
+                  nb_index = nb_unknowns_handled_by_proc(0);
+               } else if (dim == 3) {
+                  nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(2);
+               }
+            } else if (dir == 2) {
+               nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
+            }
+
+            A[field][dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+            A[field][dir].ii_super[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+            A[field][dir].ii_sub[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+            A[field][dir].ie[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+            A[field][dir].ei[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+            A[field][dir].ee[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+
+            Schur[field][dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+            Schur[field][dir].ii_super[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+            Schur[field][dir].ii_sub[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+            Schur[field][dir].ie[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+            Schur[field][dir].ei[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+            Schur[field][dir].ee[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
+
+            DoubleSchur[field][dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
+
+            for (size_t index = 0; index < nb_index; index++) {
+               A[field][dir].ii_main[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               A[field][dir].ii_super[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               A[field][dir].ii_sub[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               A[field][dir].ie[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+               A[field][dir].ei[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+
+               if (proc_pos_in_i[dir] == 0) {
+                  A[field][dir].ee[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+                  Schur[field][dir].ii_main[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+                  Schur[field][dir].ii_super[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+                  Schur[field][dir].ii_sub[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+                  Schur[field][dir].ie[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+                  Schur[field][dir].ei[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+                  Schur[field][dir].ee[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+
+                  DoubleSchur[field][dir].ii_main[comp][index] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               }
+            }
+         }
       }
    }
 
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
          for (size_t comp=0;comp<nb_comps[field];++comp) {
-            A[field][dir].ii_main[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            A[field][dir].ii_super[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            A[field][dir].ii_sub[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            A[field][dir].ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-            A[field][dir].ei[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-
             Ap[field][dir].ei_ii_ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
             Ap[field][dir].result[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             Ap[field][dir].ii_ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -202,14 +264,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
             VEC[field][dir].interface_T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
 
             if (proc_pos_in_i[dir] == 0) {
-               A[field][dir].ee[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-               Schur[field][dir].ii_main[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               Schur[field][dir].ii_super[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               Schur[field][dir].ii_sub[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               Schur[field][dir].ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-               Schur[field][dir].ei[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-               Schur[field][dir].ee[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-
                SchurP[field][dir].ei_ii_ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
                SchurP[field][dir].result[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                SchurP[field][dir].ii_ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -218,8 +272,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
                Schur_VEC[field][dir].local_solution_T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                Schur_VEC[field][dir].T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                Schur_VEC[field][dir].interface_T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-
-               DoubleSchur[field][dir].ii_main[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             }         
          }
       }
@@ -274,31 +326,54 @@ DDS_NavierStokesSystem:: re_initialize( void )
                nb_unknowns_handled_by_proc( l ) = 1 + UF->get_max_index_unknown_handled_by_proc( comp, l )
                                                     - UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
             }
+         }
 
+         for (size_t l = 0;l < dim; l++) {
+            size_t nb_index;
+            if (l == 0) {
+               if (dim == 2) {
+                  nb_index = nb_unknowns_handled_by_proc(1);
+               } else if (dim == 3) {
+                  nb_index = nb_unknowns_handled_by_proc(1)*nb_unknowns_handled_by_proc(2);
+               }
+            } else if (l == 1) {
+               if (dim == 2) {
+                  nb_index = nb_unknowns_handled_by_proc(0);
+               } else if (dim == 3) {
+                  nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(2);
+               }
+            } else if (l == 2) {
+               nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
+            }
+             
             nb_procs = nb_procs_in_i[l];
             proc_pos = proc_pos_in_i[l];
 
             if (is_periodic[field][l] != 1) {
                if (proc_pos == nb_procs-1) {
                   // Non-periodic and last processor
-                  A[field][l].ii_main[comp]->re_initialize(nb_unknowns_handled_by_proc( l ));
-                  A[field][l].ii_super[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
-                  A[field][l].ii_sub[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
+                  for (size_t index = 0; index < nb_index; index++) {
+                     A[field][l].ii_main[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l ));
+                     A[field][l].ii_super[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
+                     A[field][l].ii_sub[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
+                     A[field][l].ie[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l ),nb_procs-1);
+                     A[field][l].ei[comp][index]->re_initialize(nb_procs-1,nb_unknowns_handled_by_proc( l ) );
+                  }
 
-                  A[field][l].ie[comp]->re_initialize(nb_unknowns_handled_by_proc( l ),nb_procs-1);
-                  A[field][l].ei[comp]->re_initialize(nb_procs-1,nb_unknowns_handled_by_proc( l ) );
                   Ap[field][l].result[comp]->re_initialize( nb_unknowns_handled_by_proc( l ) );
                   VEC[field][l].local_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )) ;
                   VEC[field][l].local_solution_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )) ;
 
                } else {
                   // Non-periodic for processor expect last
-                  A[field][l].ii_main[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
-                  A[field][l].ii_super[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
-                  A[field][l].ii_sub[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
+                  for (size_t index = 0; index < nb_index; index++) {
+                     A[field][l].ii_main[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
+                     A[field][l].ii_super[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
+                     A[field][l].ii_sub[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
+                     A[field][l].ie[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1,nb_procs-1 );
+                     A[field][l].ei[comp][index]->re_initialize(nb_procs-1,nb_unknowns_handled_by_proc( l )-1 );
+                  }
 
-                  A[field][l].ie[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1,nb_procs-1 );
-                  A[field][l].ei[comp]->re_initialize(nb_procs-1,nb_unknowns_handled_by_proc( l )-1 );
                   Ap[field][l].result[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1 );
                   VEC[field][l].local_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
                   VEC[field][l].local_solution_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
@@ -312,21 +387,25 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
                if (proc_pos == 0) {
                   // Master processor
-                  A[field][l].ee[comp]->re_initialize(nb_procs-1,nb_procs-1 );
-                  if (nb_procs != 1) {
-                     Schur[field][l].ii_main[comp]->re_initialize(nb_procs-1);
-                     Schur[field][l].ii_super[comp]->re_initialize(nb_procs-2);
-                     Schur[field][l].ii_sub[comp]->re_initialize(nb_procs-2);
+                  for (size_t index = 0; index < nb_index; index++) {
+                     A[field][l].ee[comp][index]->re_initialize(nb_procs-1,nb_procs-1 );
+                     if (nb_procs != 1) {
+                        Schur[field][l].ii_main[comp][index]->re_initialize(nb_procs-1);
+                        Schur[field][l].ii_super[comp][index]->re_initialize(nb_procs-2);
+                        Schur[field][l].ii_sub[comp][index]->re_initialize(nb_procs-2);
+                     }
                   }
                }
    
             } else {
-               // Periodic domain 
-               A[field][l].ii_main[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
-               A[field][l].ii_super[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
-               A[field][l].ii_sub[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
-               A[field][l].ie[comp]->re_initialize(nb_unknowns_handled_by_proc( l )-1,nb_procs );
-               A[field][l].ei[comp]->re_initialize(nb_procs,nb_unknowns_handled_by_proc( l )-1 );
+               // Periodic domain
+               for (size_t index = 0; index < nb_index; index++) {
+                  A[field][l].ii_main[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
+                  A[field][l].ii_super[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
+                  A[field][l].ii_sub[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
+                  A[field][l].ie[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1,nb_procs );
+                  A[field][l].ei[comp][index]->re_initialize(nb_procs,nb_unknowns_handled_by_proc( l )-1 );
+               }
 
                Ap[field][l].result[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1 );
                Ap[field][l].ii_ie[comp]->re_initialize(nb_procs);
@@ -339,16 +418,21 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
                if (proc_pos == 0) {
                   // Master processor
-                  A[field][l].ee[comp]->re_initialize(nb_procs,nb_procs );
+                  for (size_t index = 0; index < nb_index; index++) {
+                     A[field][l].ee[comp][index]->re_initialize(nb_procs,nb_procs );
+                  }
                   if (nb_procs != 1) {
                      // Mutli processor with periodic domain
                      // Condition where schur complement won't be a standard tridiagonal matrix but a variation
-                     Schur[field][l].ii_main[comp]->re_initialize(nb_procs-1);
-                     Schur[field][l].ii_super[comp]->re_initialize(nb_procs-2);
-                     Schur[field][l].ii_sub[comp]->re_initialize(nb_procs-2);
-                     Schur[field][l].ie[comp]->re_initialize(nb_procs-1,1);
-                     Schur[field][l].ei[comp]->re_initialize(1,nb_procs-1);
-                     Schur[field][l].ee[comp]->re_initialize(1,1);
+                     for (size_t index = 0; index < nb_index; index++) {
+                        Schur[field][l].ii_main[comp][index]->re_initialize(nb_procs-1);
+                        Schur[field][l].ii_super[comp][index]->re_initialize(nb_procs-2);
+                        Schur[field][l].ii_sub[comp][index]->re_initialize(nb_procs-2);
+                        Schur[field][l].ie[comp][index]->re_initialize(nb_procs-1,1);
+                        Schur[field][l].ei[comp][index]->re_initialize(1,nb_procs-1);
+                        Schur[field][l].ee[comp][index]->re_initialize(1,1);
+                        DoubleSchur[field][l].ii_main[comp][index]->re_initialize(1);
+                     }
  
                      SchurP[field][l].result[comp]->re_initialize(nb_procs-1);
                      SchurP[field][l].ii_ie[comp]->re_initialize(1);
@@ -358,13 +442,13 @@ DDS_NavierStokesSystem:: re_initialize( void )
                      Schur_VEC[field][l].local_solution_T[comp]->re_initialize(nb_procs-1) ;
                      Schur_VEC[field][l].interface_T[comp]->re_initialize(1) ;
                      Schur_VEC[field][l].T[comp]->re_initialize(1) ;
-   
-                     DoubleSchur[field][l].ii_main[comp]->re_initialize(1);
                   } else {
                      // Serial mode with periodic domain
-                     Schur[field][l].ii_main[comp]->re_initialize(nb_procs);
-                     Schur[field][l].ii_super[comp]->re_initialize(nb_procs-1);
-                     Schur[field][l].ii_sub[comp]->re_initialize(nb_procs-1);
+                     for (size_t index = 0; index < nb_index; index++) {
+                        Schur[field][l].ii_main[comp][index]->re_initialize(nb_procs);
+                        Schur[field][l].ii_super[comp][index]->re_initialize(nb_procs-1);
+                        Schur[field][l].ii_sub[comp][index]->re_initialize(nb_procs-1);
+                     }
                   }
                }
             }
@@ -468,18 +552,15 @@ DDS_NavierStokesSystem:: compute_DS_velocity_change( void )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr)
+DDS_NavierStokesSystem::pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr, size_t const& r_index)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: pre_thomas_treatment" ) ;
-   size_t nb_procs;
 
-   nb_procs = nb_procs_in_i[dir];
+   size_t nrows = arr[dir].ii_main[comp][r_index]->nb_rows() ;
 
-   size_t nrows = arr[dir].ii_main[comp]->nb_rows() ;
-
-   double temp = arr[dir].ii_main[comp]->item(0);
-   if (nrows > 1) arr[dir].ii_super[comp]->set_item(0,arr[dir].ii_super[comp]->item(0)/temp);
+   double temp = arr[dir].ii_main[comp][r_index]->item(0);
+   if (nrows > 1) arr[dir].ii_super[comp][r_index]->set_item(0,arr[dir].ii_super[comp][r_index]->item(0)/temp);
 
    //  // Perform Forward Elimination
    size_t m;
@@ -488,26 +569,26 @@ DDS_NavierStokesSystem::pre_thomas_treatment( size_t const& comp, size_t const& 
    for (m=1;m<nrows;++m)
    {
      double a,b,c,prevc;
-     a = arr[dir].ii_sub[comp]->item(m-1);
-     b = arr[dir].ii_main[comp]->item(m);
-     prevc = arr[dir].ii_super[comp]->item(m-1);
+     a = arr[dir].ii_sub[comp][r_index]->item(m-1);
+     b = arr[dir].ii_main[comp][r_index]->item(m);
+     prevc = arr[dir].ii_super[comp][r_index]->item(m-1);
 
      if(m<nrows-1){
-         c = arr[dir].ii_super[comp]->item(m);
-         arr[dir].ii_super[comp]->set_item(m,c/(b - a*prevc));
+         c = arr[dir].ii_super[comp][r_index]->item(m);
+         arr[dir].ii_super[comp][r_index]->set_item(m,c/(b - a*prevc));
      }
    }
 }
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir)
+DDS_NavierStokesSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& r_index)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquationSystem:: mod_thomas_algorithm" ) ;
 
-   size_t nrows = arr[dir].ii_main[comp] -> nb_rows() ;
-   double temp = arr[dir].ii_main[comp]->item(0);
+   size_t nrows = arr[dir].ii_main[comp][r_index] -> nb_rows() ;
+   double temp = arr[dir].ii_main[comp][r_index]->item(0);
    rhs-> set_item(0,rhs ->item(0)/temp);
 
     // Perform Forward Elimination
@@ -516,10 +597,10 @@ DDS_NavierStokesSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, s
    for (m=1;m<nrows;++m)
    {
      double a,b,d,prevd,prevc;
-     a=arr[dir].ii_sub[comp]->item(m-1);
-     b=arr[dir].ii_main[comp]->item(m);
+     a=arr[dir].ii_sub[comp][r_index]->item(m-1);
+     b=arr[dir].ii_main[comp][r_index]->item(m);
      d=rhs->item(m);
-     prevc=arr[dir].ii_super[comp]->item(m-1);
+     prevc=arr[dir].ii_super[comp][r_index]->item(m-1);
      prevd=rhs->item(m-1);
 
      rhs -> set_item(m, (d-a*prevd)/(b-a*prevc));
@@ -530,7 +611,7 @@ DDS_NavierStokesSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, s
       rhs->set_item(nrows-1,rhs->item(nrows-1));
       for (m = nrows-2; m< nrows-1;m--) {
          double c,nextd;
-         c=arr[dir].ii_super[comp]->item(m);
+         c=arr[dir].ii_super[comp][r_index]->item(m);
          nextd=rhs->item(m+1);
          rhs->add_to_item(m,-c*nextd);
       }
@@ -603,7 +684,7 @@ DDS_NavierStokesSystem::get_VEC(size_t const& field)
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
-	,size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& field )
+	,size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_solver" ) ;
@@ -617,7 +698,7 @@ DDS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
    nb_procs = nb_procs_in_i[dir];
 
    // Solve the DS splitting problem in
-   DDS_NavierStokesSystem::mod_thomas_algorithm( arr, rhs[dir].local_T[comp], comp, dir);
+   DDS_NavierStokesSystem::mod_thomas_algorithm( arr, rhs[dir].local_T[comp], comp, dir, r_index);
 
    // Transfer in the distributed vector
    size_t nb_local_unk = rhs[dir].local_T[comp]->nb_rows();
@@ -695,20 +776,20 @@ DDS_NavierStokesSystem::synchronize_DS_solution_vec_P( void )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_product_matrix_interior(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column,size_t const& dir)
+DDS_NavierStokesSystem::compute_product_matrix_interior(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column,size_t const& dir,size_t const& r_index)
 //----------------------------------------------------------------------
 {
 
   MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix_interior" ) ;
 
   // Get appropriate column of Aie
-  arr[dir].ie[comp]->extract_col(column, prr[dir].result[comp]);
+  arr[dir].ie[comp][r_index]->extract_col(column, prr[dir].result[comp]);
 
   // Get inv(Aii)*Aie for for appropriate column of Aie
-  mod_thomas_algorithm(arr, prr[dir].result[comp], comp, dir);
+  mod_thomas_algorithm(arr, prr[dir].result[comp], comp, dir,r_index);
 
   // Get product of Aei*inv(Aii)*Aie for appropriate column
-  arr[dir].ei[comp]->multiply_vec_then_add(prr[dir].result[comp],prr[dir].ii_ie[comp]);
+  arr[dir].ei[comp][r_index]->multiply_vec_then_add(prr[dir].result[comp],prr[dir].ii_ie[comp]);
 
   size_t nb_procs;
 
@@ -724,7 +805,7 @@ DDS_NavierStokesSystem::compute_product_matrix_interior(struct TDMatrix *arr, st
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokesSystem::compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& field )
+DDS_NavierStokesSystem::compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: compute_product_matrix" ) ;
@@ -737,17 +818,17 @@ DDS_NavierStokesSystem::compute_product_matrix(struct TDMatrix *arr, struct Prod
    if (proc_pos == nb_procs - 1){
       // Condition for serial processor and multi processor
       if (proc_pos == 0) {
-         compute_product_matrix_interior(arr,prr,comp,proc_pos,dir);
+         compute_product_matrix_interior(arr,prr,comp,proc_pos,dir,r_index);
       } else {
-         compute_product_matrix_interior(arr,prr,comp,proc_pos-1,dir);
-         if (is_periodic[field][dir] == 1) compute_product_matrix_interior(arr,prr,comp,proc_pos,dir);
+         compute_product_matrix_interior(arr,prr,comp,proc_pos-1,dir,r_index);
+         if (is_periodic[field][dir] == 1) compute_product_matrix_interior(arr,prr,comp,proc_pos,dir,r_index);
       }
    }else if(proc_pos == 0){
-      compute_product_matrix_interior(arr,prr,comp,proc_pos,dir);
-      if (is_periodic[field][dir] == 1) compute_product_matrix_interior(arr,prr,comp,nb_procs-1,dir);
+      compute_product_matrix_interior(arr,prr,comp,proc_pos,dir,r_index);
+      if (is_periodic[field][dir] == 1) compute_product_matrix_interior(arr,prr,comp,nb_procs-1,dir,r_index);
    }else{
-      compute_product_matrix_interior(arr,prr,comp,proc_pos-1,dir);
-      compute_product_matrix_interior(arr,prr,comp,proc_pos,dir);
+      compute_product_matrix_interior(arr,prr,comp,proc_pos-1,dir,r_index);
+      compute_product_matrix_interior(arr,prr,comp,proc_pos,dir,r_index);
    }
 }
 

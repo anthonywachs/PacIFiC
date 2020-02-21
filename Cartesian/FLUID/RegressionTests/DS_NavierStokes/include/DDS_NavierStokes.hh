@@ -133,10 +133,14 @@ public SolverComputingTime
         FV_TimeIterator const* t_it,
         double const& gamma,
         size_t const& comp,
-        size_t const& dir, size_t const& field );
+        size_t const& dir,
+        size_t const& field,
+        size_t const& j,
+        size_t const& k,
+        size_t const& r_index );
 
       /** @brief Assemble 1D schur matrices for both velocity and pressure field in all directions */
-      void assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& field );
+      void assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& field, size_t const& r_index );
 
       /** @brief Assemble advection term for Upwind spacial scheme */
       double assemble_advection_Upwind( size_t const& advecting_level, double const& coef, 
@@ -164,6 +168,8 @@ public SolverComputingTime
       /** @brief Assemble rhs for pressure in any direction */
       double pressure_local_rhs( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
+      size_t return_row_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
+
       /** @brief Solve interface unknowns for both fields in any particular direction */
       void solve_interface_unknowns( FV_DiscreteField* FF, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field );
       /** @brief Unpack the interface variable sent by master processor to slave processor */
@@ -174,10 +180,10 @@ public SolverComputingTime
       /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */
       void data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double const& fe, size_t const& comp, size_t const& dir, size_t const& field);
       /** @brief Compute Aei*(Aii)-1*fi required to compute interface unknown */
-      void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir);
+      void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index);
 
       /** @brief Solve interface unknown for all cases */
-      void DS_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& field ) ;
+      void DS_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index ) ;
       
       /** @brief Solve i in j and k; e.g. solve x in y ank z */
       void Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k, double const& gamma,size_t const& field );
