@@ -152,6 +152,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       solid[field].coord = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
       solid[field].size = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
       solid[field].vel = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+      solid[field].ang_vel = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
       solid[field].temp = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
       solid[field].inside = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
 
@@ -295,6 +296,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
                solid[field].size[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                solid[field].temp[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                solid[field].vel[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+               solid[field].ang_vel[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
                solid[field].inside[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field].void_frac[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field].parID[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -400,6 +402,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
                solid[field].coord[comp]->re_initialize(Npart,3);
                solid[field].size[comp]->re_initialize(Npart);
                solid[field].vel[comp]->re_initialize(Npart,3);
+               solid[field].ang_vel[comp]->re_initialize(Npart,3);
                solid[field].temp[comp]->re_initialize(Npart);
                solid[field].inside[comp]->re_initialize(Npart);
             }

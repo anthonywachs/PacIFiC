@@ -181,6 +181,13 @@ public SolverComputingTime
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */
       void assemble_intersection_matrix (FV_DiscreteField const* FF, size_t const& comp, size_t const& level, size_t const& field);               // Here level:0 -> fluid; 1-> solid
 
+      /** @brief Initialize the velocity on the velocity nodes in MAC grid*/
+      void nodes_field_initialization ( size_t const& level );
+
+      void impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
+
+
+
       /** @brief Find the intersection using bisection method with the solid interface */
       double find_intersection (FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field);
 

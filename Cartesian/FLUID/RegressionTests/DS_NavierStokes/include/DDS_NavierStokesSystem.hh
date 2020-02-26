@@ -54,6 +54,7 @@ struct PartInput {
    LA_SeqMatrix ** coord;               // Coordinates
    LA_SeqVector ** size;                // Size of the sphere
    LA_SeqMatrix ** vel;                 // Velocity of the sphere
+   LA_SeqMatrix ** ang_vel;                 // Angular velocity of the sphere
    LA_SeqVector ** temp;                // Temperature of the sphere
    LA_SeqVector ** inside;              // 1 if solid only from inside; -1 if solid only from outside
 };
