@@ -149,6 +149,9 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @brief Return information of intersection with solid boundary */
       BoundaryBisec* get_b_intersect(size_t const& field, size_t const& level);
 
+      void update_global_P_vector(size_t const& i, size_t const& j, size_t const& k, double const& value);
+
+
       /** @brief Return the Schur complement of Schur complement in case of periodic domain */
       TDMatrix* get_DoubleSchur(size_t const& field);
       /** @brief Return the product matrix of Schur complement */

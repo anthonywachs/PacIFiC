@@ -122,7 +122,9 @@ public SolverComputingTime
       /** @name Basic discrete system building */
       //@{
       /** @brief Error compared to analytical solution */
-      void error_with_analytical_solution ( ) ;
+      void error_with_analytical_solution_poiseuille ( ) ;
+
+      void error_with_analytical_solution_couette ( ) ;
 
       /** @brief Call the function to assemble 1D matrices for both velocity and pressure field*/
       void assemble_1D_matrices( FV_TimeIterator const* t_it ) ;

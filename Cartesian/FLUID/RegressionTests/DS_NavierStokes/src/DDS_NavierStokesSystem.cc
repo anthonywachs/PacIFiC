@@ -779,6 +779,18 @@ DDS_NavierStokesSystem::get_VEC(size_t const& field)
 
 //----------------------------------------------------------------------
 void
+DDS_NavierStokesSystem::update_global_P_vector(size_t const& i, size_t const& j, size_t const& k, double const& value)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokesSystem:: update_global_P_vector" ) ;
+
+   size_t global_number_in_distributed_vector = PF->DOF_global_number(i,j,k,0);
+
+   VEC_DS_PF->set_item( global_number_in_distributed_vector, value);
+
+}
+//----------------------------------------------------------------------
+void
 DDS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
 	,size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index )
 //----------------------------------------------------------------------
