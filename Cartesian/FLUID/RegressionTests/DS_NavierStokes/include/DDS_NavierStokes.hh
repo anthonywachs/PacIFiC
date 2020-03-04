@@ -124,7 +124,7 @@ public SolverComputingTime
       /** @brief Error compared to analytical solution */
       void error_with_analytical_solution_poiseuille ( ) ;
 
-      void error_with_analytical_solution_couette ( ) ;
+      void error_with_analytical_solution_couette (FV_DiscreteField const* FF, size_t const& field) ;
 
       /** @brief Call the function to assemble 1D matrices for both velocity and pressure field*/
       void assemble_1D_matrices( FV_TimeIterator const* t_it ) ;
@@ -191,7 +191,7 @@ public SolverComputingTime
 
 
       /** @brief Find the intersection using bisection method with the solid interface */
-      double find_intersection (FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field);
+      double find_intersection (FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field, size_t const& level);
 
       /** @brief Solve interface unknowns for both fields in any particular direction */
       void solve_interface_unknowns( FV_DiscreteField* FF, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field );
