@@ -193,6 +193,14 @@ public SolverComputingTime
       /** @brief Find the intersection using bisection method with the solid interface */
       double find_intersection (FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field, size_t const& level);
 
+      void correct_pressure_inside_solid ( );
+      
+      void correct_mean_pressure ( );
+
+      void write_divergence_field(FV_TimeIterator const* t_it);
+
+      void write_advective_field(FV_TimeIterator const* t_it, size_t const& comp);
+
       /** @brief Solve interface unknowns for both fields in any particular direction */
       void solve_interface_unknowns( FV_DiscreteField* FF, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field );
       /** @brief Unpack the interface variable sent by master processor to slave processor */
