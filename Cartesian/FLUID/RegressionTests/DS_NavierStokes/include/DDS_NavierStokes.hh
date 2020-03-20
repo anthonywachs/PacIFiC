@@ -147,7 +147,13 @@ public SolverComputingTime
       /** @brief Assemble advection term for Upwind spacial scheme */
       double assemble_advection_Upwind( size_t const& advecting_level, double const& coef, 
          size_t const& advected_level,
-         size_t const& i, size_t const& j, size_t const& k, size_t const& component) const;
+         size_t const& i, size_t const& j, size_t const& k, size_t const& component) ;
+
+      /** @brief Assemble advection term for Centered spacial scheme */
+      double assemble_advection_Centered( size_t const& advecting_level, double const& coef, 
+         size_t const& advected_level,
+         size_t const& i, size_t const& j, size_t const& k, size_t const& component );
+
 
       /** @brief Assemble advection term for TVD spacial scheme */
       double assemble_advection_TVD( size_t const& advecting_level, double const& coef, size_t const& advected_level,
@@ -178,7 +184,7 @@ public SolverComputingTime
 
       size_t return_node_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& i, size_t const& j, size_t const& k );
 
-      double level_set_function (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, size_t const& type, size_t const& field);
+      double level_set_function (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field);
 
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */
       void assemble_intersection_matrix (FV_DiscreteField const* FF, size_t const& comp, size_t const& level, size_t const& field);               // Here level:0 -> fluid; 1-> solid
@@ -304,6 +310,7 @@ public SolverComputingTime
       bool is_periodic[2][3];
       string insertion_type;
       string solid_filename;
+      string level_set_type;
       double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
 
 } ;
