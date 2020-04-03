@@ -101,6 +101,8 @@ makeARCH delete
 makeARCH create
 make install
 ```
+It is possible that you get an error during the make install due to the missing file `zlib.h`. On Ubuntu (18.04), the development package of the zlib library can be installed with the command `sudo apt install zlib1g-dev`. Once the installation is complete, simply run the `make` command (there is no need for a make install at this point).
+
 
 * To build the Cartesian solver, type:
 ```
