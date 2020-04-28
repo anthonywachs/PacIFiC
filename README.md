@@ -26,7 +26,8 @@ There is a few steps that need to be done before you can enjoy a functional inst
 cp Env/PacIFiC_env_template.env.sh Env/PacIFiC-temporary-env-file.env.sh
 ```
 
-Modify the file `Env/PacIFiC-temporary-env-file.env.sh` by replacing every part in between the `#`. Then, type the following:
+Modify the file `Env/PacIFiC-temporary-env-file.env.sh` by replacing every part in between the `#`. Note that if there is a space in the path leading to the pacific foler, the routines below will most likely fail.
+Having modified the `Env/PacIFiC-temporary-env-file.env.sh` file, type the following:
 
 ```
 cd Env
@@ -94,14 +95,9 @@ cd $BASILISK
 ```
 cd $GRAINS_HOME
 tar zxvf xerces-2-8-0.tar.gz
-cd XERCES-2.8.0
-./install.sh
-cd ../
-makeARCH delete
-makeARCH create
 make install
 ```
-It is possible that you get an error during the make install due to the missing file `zlib.h`. On Ubuntu (18.04), the development package of the zlib library can be installed with the command `sudo apt install zlib1g-dev`. Once the installation is complete, simply run the `make` command (there is no need for a make install at this point).
+It is possible that you get an error during the make install due to the missing file `zlib.h`. On Ubuntu (18.04), the development package of the zlib library can be installed with the command `sudo apt install zlib1g-dev`. Once the installation is complete, simply run the `make` command (there is no need for a make install at this point). It is also possible that the `mpicxx` executable is not found. In that case, it is most likely that the installed mpi libraries are standard. Grains3D requires the development package instead. If you use openmpi on Ubuntu (18.04), type `sudo apt install libopenmpi-dev`, and then try `make install` again.
 
 
 * To build the Cartesian solver, type:
