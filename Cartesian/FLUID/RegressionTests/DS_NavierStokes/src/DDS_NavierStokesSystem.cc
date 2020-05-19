@@ -159,6 +159,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       // Vector to store the presence/absence of particle on the field variable
       node[field].void_frac = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
       node[field].parID = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
+      node[field].bound_cell = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
       
 
       for (size_t dir = 0; dir < dim; dir++) {
@@ -300,6 +301,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
                solid[field].inside[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field].void_frac[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field].parID[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               node[field].bound_cell[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             }
 
             for (size_t j=0;j<2;j++) {
@@ -514,6 +516,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
          if (is_solids) {
             node[field].void_frac[comp]->re_initialize( nb_total_unknown ) ;
             node[field].parID[comp]->re_initialize( nb_total_unknown ) ;
+            node[field].bound_cell[comp]->re_initialize( nb_total_unknown ) ;
             for (size_t i=0;i<dim;i++) {
                for (size_t j=0;j<2;j++) {
                   b_intersect[field][j][i].offset[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right

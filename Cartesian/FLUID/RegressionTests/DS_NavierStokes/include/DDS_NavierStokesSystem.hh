@@ -63,6 +63,7 @@ struct PartInput {
 struct NodeProp {
    LA_SeqVector ** void_frac;               // void_fraction of the node due to particle
    LA_SeqVector ** parID;                   // ID of solid particle on the node
+   LA_SeqVector ** bound_cell;              // Stores the boundary cell presence in the solids; 1 == 1st boundary cell
 };
 
 /** @brief BoundaryBisec to be used to store the intersection of solids with grids in each direction */

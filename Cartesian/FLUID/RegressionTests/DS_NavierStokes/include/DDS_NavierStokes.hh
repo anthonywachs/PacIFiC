@@ -174,7 +174,10 @@ public SolverComputingTime
       double assemble_local_rhs(size_t const& j,size_t const& k,double const& gamma,FV_TimeIterator const* t_it,size_t const& comp,size_t const& dir,size_t const& field);
       
       /** @brief Assemble rhs for pressure in any direction */
-      double pressure_local_rhs( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
+      double pressure_local_rhs_FD( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
+      double pressure_local_rhs_FDmod( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
+
+      double pressure_local_rhs_FV( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
       double divergence_wall_flux( size_t const& i, size_t const& j, size_t const& k, size_t const& comp, size_t const& wall_dir, double const& length, size_t const& level);
 
@@ -201,8 +204,10 @@ public SolverComputingTime
       /** @brief Find the intersection using bisection method with the solid interface */
       double find_intersection (FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field, size_t const& level);
 
-      void correct_pressure_inside_solid (size_t const& level );
+      void correct_pressure_1st_layer_solid (size_t const& level );
       
+      void correct_pressure_2nd_layer_solid (size_t const& level );
+
       void correct_mean_pressure ( );
 
       void write_divergence_field(FV_TimeIterator const* t_it);
