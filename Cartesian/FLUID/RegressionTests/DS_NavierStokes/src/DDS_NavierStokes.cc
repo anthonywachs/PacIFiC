@@ -258,7 +258,7 @@ DDS_NavierStokes:: do_one_inner_iteration( FV_TimeIterator const* t_it )
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Pressure predictor" );
 
    if ( my_rank == is_master ) SCT_set_start( "Velocity update" );
-//   NS_velocity_update(t_it);
+   NS_velocity_update(t_it);
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Velocity update" );
 
    if ( my_rank == is_master ) SCT_set_start( "Penalty Step" );
@@ -587,8 +587,8 @@ DDS_NavierStokes:: nodes_field_initialization ( size_t const& level )
   for (size_t comp=0;comp<nb_comps[1];comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-        max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+        min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
+        max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
      }
 
      size_t local_min_k = 0;
@@ -2279,9 +2279,9 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
                // Dyy for un
                yvalue = compute_un_component(comp,i,j,k,1,1);
                // Pressure contribution
-//	       pvalue = compute_p_component(comp,i,j,k);
+	       pvalue = compute_p_component(comp,i,j,k);
                // Advection contribution
-//	       adv_value = compute_adv_component(comp,i,j,k);
+	       adv_value = compute_adv_component(comp,i,j,k);
 
 /*               if (comp == 0) {
                   adv_value = -(cos(xC+yC) + 2.*sin(xC)*sin(yC))*dxC*dyC;
@@ -2504,7 +2504,7 @@ DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double
    MAC_LABEL("DDS_NavierStokes:: assemble_local_rhs" ) ;
    double fe = 0.;
    if (field == 0) {
-      fe = pressure_local_rhs_FDmod(j,k,t_it,dir);
+      fe = pressure_local_rhs_FD(j,k,t_it,dir);
    } else if (field == 1) {
       fe = velocity_local_rhs(j,k,gamma,t_it,comp,dir);
    }
@@ -2530,14 +2530,18 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    // Tranfer back to field
    UF->update_free_DOFs_value( 3, GLOBAL_EQ->get_solution_DS_velocity() ) ;
 
+   if (is_solids) nodes_field_initialization(3);
+
    Solve_i_in_jk(UF,t_it,1,0,2,gamma,1);
    // Synchronize the distributed DS solution vector
    GLOBAL_EQ->synchronize_DS_solution_vec();
    // Tranfer back to field
    if (dim == 2) {
       UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ;
+      if (is_solids) nodes_field_initialization(0);
    } else if (dim == 3) {
       UF->update_free_DOFs_value( 4 , GLOBAL_EQ->get_solution_DS_velocity() ) ;
+      if (is_solids) nodes_field_initialization(4);
    }
 
 
@@ -2547,6 +2551,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
       GLOBAL_EQ->synchronize_DS_solution_vec();
       // Tranfer back to field
       UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
+      if (is_solids) nodes_field_initialization(0);
    }
 }
 
@@ -2626,85 +2631,6 @@ double DDS_NavierStokes:: divergence_wall_flux ( size_t const& i, size_t const& 
 //---------------------------------------------------------------------------
 double
 DDS_NavierStokes:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DDS_NavierStokes:: pressure_local_rhs_FD" ) ;
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-
-   for (size_t l=0;l<dim;++l) {
-      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-   }
-
-   size_t i,pos;
-   FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
-
-   // Compute VEC_rhs_x = rhs in x
-   double xhr,xright,yhr,yright,dx,zhr,zright;
-   double fe=0.;
-   double xvalue = 0.,yvalue=0.,zvalue=0.,value=0.;
-
-   // Vector for fi
-   LocalVector* VEC = GLOBAL_EQ->get_VEC(0);
-
-   for (i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
-      dx = PF->get_cell_size( i, 0, dir );
-      if (dir == 0) {
-         // Dxx for un
-         xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-         xright = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
-         xvalue = xright/xhr;
-
-         // Dyy for un
-         yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-         yright = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
-         yvalue = yright/yhr;
-
-         if (dim == 3) {
-            // Dzz for un
-            zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
-            zright = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
-            zvalue = zright/zhr;
-         }
-
-         // Assemble the bodyterm
-         if (dim == 2) {
-            value = -(rho*(xvalue + yvalue)*dx)/(t_it -> time_step());
-         } else {
-            value = -(rho*(xvalue + yvalue + zvalue)*dx)/(t_it -> time_step());
-         }
-      } else if (dir == 1) {
-         value = PF->DOF_value( j, i, k, 0, 1 )*dx;
-      } else if (dir == 2) {
-         value = PF->DOF_value( j, k, i, 0, 1 )*dx;
-      }
-
-      pos = i - min_unknown_index(dir);
-
-      if (is_periodic[0][dir] == 0) {
-         if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
-            VEC[dir].local_T[0]->set_item( pos, value);
-         } else {
-            if (i == max_unknown_index(dir))
-               fe = value;
-            else
-               VEC[dir].local_T[0]->set_item( pos, value);
-         }  
-      } else {
-         if (i == max_unknown_index(dir))
-            fe = value;
-         else
-            VEC[dir].local_T[0]->set_item( pos, value);
-      }
-   }
-   return fe;
-}
-
-//---------------------------------------------------------------------------
-double
-DDS_NavierStokes:: pressure_local_rhs_FDmod ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: pressure_local_rhs" ) ;
@@ -3675,7 +3601,14 @@ DDS_NavierStokes::output_L2norm_pressure( size_t const& level )
            dy = PF->get_cell_size( j,0, 1 );
            cell_P = PF->DOF_value( i, j, k, 0, level );
            max_P = MAC::max( MAC::abs(cell_P), max_P );
-           L2normP += cell_P * cell_P * dx * dy;
+           if (is_solids) {
+              size_t p = return_node_index(PF,0,i,j,k);
+              if (node.void_frac[0]->item(p) == 0) {
+                 L2normP += cell_P * cell_P * dx * dy;
+              }
+           } else {
+              L2normP += cell_P * cell_P * dx * dy;
+           }
         } else {
            double dz=0.;
            for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {          
@@ -3684,7 +3617,14 @@ DDS_NavierStokes::output_L2norm_pressure( size_t const& level )
               dz = PF->get_cell_size( k,0, 2 );
               cell_P = PF->DOF_value( i, j, k, 0, level );
               max_P = MAC::max( MAC::abs(cell_P), max_P );
-              L2normP += cell_P * cell_P * dx * dy * dz;
+              if (is_solids) {
+                 size_t p = return_node_index(PF,0,i,j,k);
+                 if (node.void_frac[0]->item(p) == 0) {
+                    L2normP += cell_P * cell_P * dx * dy * dz;
+                 }
+              } else {
+                 L2normP += cell_P * cell_P * dx * dy * dz;
+              }
            }
         }
      }
@@ -3736,7 +3676,14 @@ DDS_NavierStokes::output_L2norm_velocity( size_t const& level )
               dy = UF->get_cell_size( j,comp, 1 );
               cell_U = UF->DOF_value( i, j, k, comp, level );
               max_U = MAC::max( MAC::abs(cell_U), max_U );
-              L2normU += cell_U * cell_U * dx * dy;
+              if (is_solids) {
+                 size_t p = return_node_index(UF,comp,i,j,k);
+                 if (node.void_frac[comp]->item(p) == 0) {
+                    L2normU += cell_U * cell_U * dx * dy;
+                 }
+              } else {
+                 L2normU += cell_U * cell_U * dx * dy;
+              }
            } else {
               double dz=0.;
               for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {          
@@ -3745,7 +3692,14 @@ DDS_NavierStokes::output_L2norm_velocity( size_t const& level )
                  dz = UF->get_cell_size( k,comp, 2 );
                  cell_U = UF->DOF_value( i, j, k, comp, level );
                  max_U = MAC::max( MAC::abs(cell_U), max_U );
-                 L2normU += cell_U * cell_U * dx * dy * dz;
+                 if (is_solids) {
+                    size_t p = return_node_index(UF,comp,i,j,k);
+                    if (node.void_frac[comp]->item(p) == 0) {
+                       L2normU += cell_U * cell_U * dx * dy * dz;
+                    } 
+                 } else {
+                    L2normU += cell_U * cell_U * dx * dy * dz;
+                 }
               }
            }
         }
