@@ -3593,6 +3593,8 @@ DDS_NavierStokes::output_L2norm_pressure( size_t const& level )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
+  NodeProp node = GLOBAL_EQ->get_node_property(0);
+
   for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
      for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
         if (dim ==2 ) {
@@ -3658,6 +3660,8 @@ DDS_NavierStokes::output_L2norm_velocity( size_t const& level )
   size_t_vector max_unknown_index(dim,0);
 
   double dx,dy;
+
+  NodeProp node = GLOBAL_EQ->get_node_property(1);
 
   for (size_t comp=0;comp<nb_comps[1];comp++) {
      for (size_t l=0;l<dim;++l) {
