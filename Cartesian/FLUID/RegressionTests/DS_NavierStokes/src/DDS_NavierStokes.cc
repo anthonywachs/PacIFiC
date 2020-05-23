@@ -208,8 +208,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    if(dim >2)
       is_periodic[0][2] = P_periodic_comp->operator()( 2 ); 
 
-   cout << "Periodicity: " << is_periodic[0][0] << "," << is_periodic[0][1] << "," << is_periodic[1][0] << "," << is_periodic[1][1] << endl;
-
    // Build the matrix system
    MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DDS_NavierStokesSystem" ) ;
    GLOBAL_EQ = DDS_NavierStokesSystem::create( this, se, UF, PF ) ;
@@ -333,7 +331,7 @@ DDS_NavierStokes:: do_after_time_stepping( void )
    
    // SCT_set_start( "Writing CSV" );
 //   write_output_field(PF,0);
-   write_output_field(UF,1);
+//   write_output_field(UF,1);
    // SCT_get_elapsed_time( "Writing CSV" );
 
    output_L2norm_velocity(0);
@@ -587,8 +585,13 @@ DDS_NavierStokes:: nodes_field_initialization ( size_t const& level )
   for (size_t comp=0;comp<nb_comps[1];comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-        max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+        if (is_periodic[1][l]) {
+           min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
+           max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+        } else {
+           min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l );
+           max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l );
+        }
      }
 
      size_t local_min_k = 0;
@@ -1344,7 +1347,7 @@ DDS_NavierStokes:: assemble_field_matrix (
       }
    } // End of for loop
 
-//   if ((dir == 0) && (r_index == 19) && (field == 1)) A[dir].ii_super[0][r_index]->print_items(MAC::out(),0);
+//   if ((dir == 0) && (r_index == 37) && (field == 0)) A[dir].ii_main[0][r_index]->print_items(MAC::out(),0);
 
    GLOBAL_EQ->pre_thomas_treatment(comp,dir,A,r_index);
 
@@ -1582,13 +1585,6 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
   GLOBAL_EQ->synchronize_DS_solution_vec_P();
   // Tranfer back to field
   PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
-
-  if (is_solids) {
-     correct_pressure_1st_layer_solid(0);
-     correct_pressure_1st_layer_solid(1);
-     correct_pressure_2nd_layer_solid(0);
-     correct_pressure_2nd_layer_solid(1);
-  }
 
   PF->set_neumann_DOF_values();
 }
@@ -2783,6 +2779,7 @@ DDS_NavierStokes:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_
             VEC[dir].local_T[0]->set_item( pos, value);
       }
    }
+
    return fe;
 }
 
@@ -2928,10 +2925,15 @@ DDS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
            }
 
            if (count != 0.) value = value/count;
-           PF->set_DOF_value( i, j, k, comp, level, value);
+           GLOBAL_EQ->update_global_P_vector(i,j,k,value);
         }
      }
   }
+
+  // Synchronize the distributed DS solution vector
+  GLOBAL_EQ->synchronize_DS_solution_vec_P();
+  // Tranfer back to field
+  PF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_pressure() ) ;
 }
 
 //---------------------------------------------------------------------------
@@ -2984,10 +2986,14 @@ DDS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
            }
  
            if (count != 0.) value = value/count;
-           PF->set_DOF_value( i, j, k, comp, level, value);
+           GLOBAL_EQ->update_global_P_vector(i,j,k,value);
         }
      }
   }
+  // Synchronize the distributed DS solution vector
+  GLOBAL_EQ->synchronize_DS_solution_vec_P();
+  // Tranfer back to field
+  PF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_pressure() ) ;
 }
 
 //---------------------------------------------------------------------------
@@ -3074,6 +3080,7 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
      // Tranfer back to field
      PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
   }
+  
 }
 
 //---------------------------------------------------------------------------
@@ -3299,9 +3306,7 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    correct_mean_pressure( );
    if (is_solids) {
       correct_pressure_1st_layer_solid(0);
-      correct_pressure_1st_layer_solid(1);
       correct_pressure_2nd_layer_solid(0);
-      correct_pressure_2nd_layer_solid(1);
    }
    // Propagate values to the boundaries depending on BC conditions
    PF->set_neumann_DOF_values();
