@@ -337,7 +337,7 @@ DDS_NavierStokes:: do_after_time_stepping( void )
    output_L2norm_velocity(0);
    output_L2norm_pressure(0);
 //   error_with_analytical_solution_poiseuille();
-   error_with_analytical_solution_couette(PF,0);
+//   error_with_analytical_solution_couette(PF,0);
    error_with_analytical_solution_couette(UF,1);
 
    if ( my_rank == is_master )
@@ -1273,8 +1273,10 @@ DDS_NavierStokes:: assemble_field_matrix (
             ii = min_unknown_index(0); jj = min_unknown_index(1); kk = i-1;
          }
          if (FF->DOF_in_domain(ii,jj,kk,comp) && FF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+            // For Dirichlet boundary condition
             value = center;
          } else {
+            // For Neumann homogeneous boundary condition
             value = -right;
          }
       } else if (i==max_unknown_index(dir) && r_bound) {
@@ -1286,8 +1288,10 @@ DDS_NavierStokes:: assemble_field_matrix (
             ii = max_unknown_index(0); jj = max_unknown_index(1); kk = i+1;
          }
          if (FF->DOF_in_domain(ii,jj,kk,comp) && FF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+            // For Dirichlet boundary condition
             value = center;
          } else {
+            // For Neumann homogeneous boundary condition
             value = -left;
          }
       } else {
@@ -2779,6 +2783,46 @@ DDS_NavierStokes:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_
             VEC[dir].local_T[0]->set_item( pos, value);
       }
    }
+/*
+   // Since, this function is used in all directions;
+   // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
+   size_t m, ii=0,jj=0,kk=0;
+
+   // Effect of boundary conditions in case of non-periodic direction
+   m = int(min_unknown_index(dir)) - 1;
+
+   if (dir == 0) {
+      ii = m; jj = j; kk = k;
+   } else if (dir == 1) {
+      ii = j; jj = m; kk = k;
+   } else if (dir == 2) {
+      ii = j; jj = k; kk = m;
+   }
+
+   if ( PF->DOF_in_domain(ii,jj,kk,comp))
+      if ( PF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+         double ai = 1/(PF->get_DOF_coordinate(m+1,comp,dir) - PF->get_DOF_coordinate(m,comp,dir));
+         double dirichlet_value = PF->DOF_value(ii,jj,kk,comp,1) ;
+         VEC[dir].local_T[comp]->add_to_item( 0, + ai * dirichlet_value );
+      }
+
+   m = int(max_unknown_index(dir)) + 1;
+
+   if (dir == 0) {
+      ii = m; jj = j; kk = k;
+   } else if (dir == 1) {
+      ii = j; jj = m; kk = k;
+   } else if (dir == 2) {
+      ii = j; jj = k; kk = m;
+   }
+
+   if ( PF->DOF_in_domain(ii,jj,kk,comp))
+      if ( PF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+         double ai = 1/(PF->get_DOF_coordinate(m,comp,dir) - PF->get_DOF_coordinate(m-1,comp,dir));
+         double dirichlet_value = PF->DOF_value(ii,jj,kk,comp,1) ;
+         VEC[dir].local_T[comp]->add_to_item( VEC[dir].local_T[comp]->nb_rows()-1 , + ai * dirichlet_value );
+      }
+*/
 
    return fe;
 }
@@ -3241,7 +3285,6 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 
             // Assemble the bodyterm
             double value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - 0.5*kai*mu*beta*(xvalue + yvalue+ zvalue);
-
             GLOBAL_EQ->update_global_P_vector(i,j,k,value);
          }
       }
@@ -3303,7 +3346,8 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    // Tranfer back to field
    PF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_pressure() ) ;
 
-   correct_mean_pressure( );
+   if (PF->all_BCs_nonDirichlet(0)) correct_mean_pressure( );
+
    if (is_solids) {
       correct_pressure_1st_layer_solid(0);
       correct_pressure_2nd_layer_solid(0);
