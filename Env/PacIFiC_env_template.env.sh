@@ -114,3 +114,12 @@ echo -e '  '
 
 # Basilisk
 source ${PACIFIC_HOME}/Octree/Env/octree.env.sh
+
+# Post processing
+export PP_HOME=$PACIFIC_HOME/postProcessingTools
+
+# Print current branch name:
+echo -e '  '
+cd $PACIFIC_HOME
+echo -e '\033[32m*** You are currently on branch\033[32m' $(git rev-parse --abbrev-ref HEAD) '\033[32m***\033[0m'
+cd -
