@@ -27,10 +27,11 @@
 <u>Example</u>:
 Typing `python3.7 $PP_HOME/DEM/free_surface.py $PP_HOME/test-cases/free_surface_testCase1 -c=blue -ls=: -l=high\ aspect\ ratio $PP_HOME/test-cases/free_surface_testCase2 -ls=black -l=low\ aspect\ ratio -width=20 -run_pv=yes -runout_intensity=0.05` leads to:
 
-![alt text](./image/surface_plots_1.png "Plot of the free surfaces")
-![alt text](./image/surface_plots_2.png "Plot of the initial and final side views for case2")
-![alt text](./image/surface_plots_3.png "Plot of the final top view for case2, with intensity and run-out distances")
-![alt text](./image/surface_plots_4.png "Plot of the initial and final side views for case1")
-![alt text](./image/surface_plots_5.png "Plot of the final top view for case1, with intensity and run-out distances")
+![Image not rendered](https://gitlab.math.ubc.ca/pacific-devel-team/pacific/raw/post-processing-tools/postProcessingTools/images/surface_plots_1.png  "Plot of the free surfaces")
+
+![Image not rendered](https://gitlab.math.ubc.ca/pacific-devel-team/pacific/raw/post-processing-tools/postProcessingTools/images/surface_plots_2.png "Plot of the initial and final side views for case2")
+![Image not rendered](https://gitlab.math.ubc.ca/pacific-devel-team/pacific/raw/post-processing-tools/postProcessingTools/images/surface_plots_3.png "Plot of the final top view for case2, with intensity and run-out distances")
+![Image not rendered](https://gitlab.math.ubc.ca/pacific-devel-team/pacific/raw/post-processing-tools/postProcessingTools/images/surface_plots_4.png "Plot of the initial and final side views for case1")
+![Image not rendered](https://gitlab.math.ubc.ca/pacific-devel-team/pacific/raw/post-processing-tools/postProcessingTools/images/surface_plots_5.png "Plot of the final top view for case1, with intensity and run-out distances")
 
 In the top views of the final state of the avalanche, the solid line represents the vertical-integrated intensity and the dashed vertical line reprensents the run-out distance.
