@@ -210,10 +210,6 @@ public SolverComputingTime
 
       void correct_mean_pressure ( );
 
-      void write_divergence_field(FV_TimeIterator const* t_it);
-
-      void write_advective_field(FV_TimeIterator const* t_it, size_t const& comp);
-
       /** @brief Solve interface unknowns for both fields in any particular direction */
       void solve_interface_unknowns( FV_DiscreteField* FF, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field );
       /** @brief Unpack the interface variable sent by master processor to slave processor */

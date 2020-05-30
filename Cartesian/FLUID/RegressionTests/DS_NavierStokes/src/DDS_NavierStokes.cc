@@ -334,10 +334,10 @@ DDS_NavierStokes:: do_after_time_stepping( void )
 //   write_output_field(UF,1);
    // SCT_get_elapsed_time( "Writing CSV" );
 
-   output_L2norm_velocity(0);
-   output_L2norm_pressure(0);
+//   output_L2norm_velocity(0);
+//   output_L2norm_pressure(0);
 //   error_with_analytical_solution_poiseuille();
-//   error_with_analytical_solution_couette(PF,0);
+   error_with_analytical_solution_couette(PF,0);
    error_with_analytical_solution_couette(UF,1);
 
    if ( my_rank == is_master )
@@ -450,6 +450,8 @@ DDS_NavierStokes:: error_with_analytical_solution_couette (FV_DiscreteField cons
       double o2 = solid.ang_vel[comp]->item(1,2);
       double a = (o2*pow(r2,2.)-o1*pow(r1,2.))/(pow(r2,2.)-pow(r1,2.));
       double b = (o1-o2)*(pow(r1,2.)*pow(r2,2.))/(pow(r2,2.)-pow(r1,2.));
+      //double mean_press = 1./(r2-r1)*(pow(a,2.)*(pow(r2,3.)-pow(r1,3.))/6. + 2.*a*b*((r2*log(r2)-r2)-(r1*log(r1)-r1)) + pow(b,2.)/2./r2 - pow(b,2.)/2./r1);
+      double mean_press = 1./(pow(r2,2)-pow(r1,2))*(pow(a,2.)/4.*(pow(r2,4.)-pow(r1,4.)) + a*b*(2.*pow(r2,2.)*log(r2)-pow(r2,2.)) - a*b*(2.*pow(r1,2.)*log(r1)-pow(r1,2.)) - pow(b,2.)*log(r2/r1));
 
       for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
          double x = FF->get_DOF_coordinate( i, comp, 0 ) ;
@@ -473,7 +475,8 @@ DDS_NavierStokes:: error_with_analytical_solution_couette (FV_DiscreteField cons
                      }
                   } else if (field == 0) {
 //                     analytical_solution = 0.;
-                     analytical_solution = pow(a,2.)*pow(r,2.)/2. + 2.*a*b*log(r) - pow(b,2.)/2./pow(r,2.);
+                     analytical_solution = rho*(pow(a,2.)*pow(r,2.)/2. + 2.*a*b*log(r) - pow(b,2.)/2./pow(r,2.));
+                     analytical_solution -= rho*mean_press;
 //                     analytical_solution = sin(x+y);
                   }
 
@@ -3355,128 +3358,6 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    // Propagate values to the boundaries depending on BC conditions
    PF->set_neumann_DOF_values();
 }
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokes::write_advective_field(FV_TimeIterator const* t_it, size_t const& comp)
-//----------------------------------------------------------------------
-{
-  ofstream outputFile ;
-
-  std::ostringstream os2;
-  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/advective_" << my_rank << "_" << comp << "_" << t_it->time()/t_it->time_step() << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-
-  size_t i,j,k=0;
-  outputFile << "x,y,z,adv_value" << endl;
-  double zC =0.;
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-
-  // Get local min and max indices
-  for (size_t l=0;l<dim;++l) {
-     min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-     max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
-  }
-
-  NodeProp node = GLOBAL_EQ->get_node_property(1);
-
-  for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-     double xC = UF->get_DOF_coordinate( i, comp, 0 ) ;
-     for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-        double yC = UF->get_DOF_coordinate( j, comp, 1 ) ;
-        size_t p = return_node_index(UF,comp,i,j,0);
-        if (node.void_frac[comp]->item(p) == 0) {
-           double adv_value = compute_adv_component(comp,i,j,k);
-           outputFile << xC << "," << yC << "," << zC << "," << adv_value << endl;
-        }
-     }
-  }
-  outputFile.close();
-}
-
-//----------------------------------------------------------------------
-void
-DDS_NavierStokes::write_divergence_field(FV_TimeIterator const* t_it)
-//----------------------------------------------------------------------
-{
-  ofstream outputFile ;
-
-  std::ostringstream os2;
-  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/divergence_" << my_rank << "_" << t_it->time()/t_it->time_step() << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-
-  size_t i,j,k=0;
-  //outputFile << "x,y,z,ux,uy" << endl;
-  outputFile << "x,y,z,div,div_x,div_y,pressure,layer" << endl;
-  double zC =0.;
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-
-  FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
-
-  NodeProp node = GLOBAL_EQ->get_node_property(0);
-  BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(0,0);
-
-  for (size_t comp=0;comp<nb_comps[0];comp++) {
-     // Get local min and max indices
-     for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l );
-        max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l );
-     }
-
-     for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-        double xC = PF->get_DOF_coordinate( i, comp, 0 ) ;
-        for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-           double yC = PF->get_DOF_coordinate( j, comp, 1 ) ;
-           double dx = PF->get_cell_size( i, 0, 0 );
-           double dy = PF->get_cell_size( j, 0, 1 );
-           size_t p = return_node_index(PF,comp,i,j,k);
-/*
-           // Dxx for un
-           // Right face flux calculation
-           double right = divergence_wall_flux(shift.i+i,j,k,0,1,dy,0);
-           // Left face flux calculation
-           double left = divergence_wall_flux(shift.i+i-1,j,k,0,1,dy,0);
-
-           double xvalue = (right - left)/(dx*dy) ;
-
-           // Dyy for un
-           // Top face flux calculation
-           double top = divergence_wall_flux(i,shift.j+j,k,1,0,dx,0);
-           // Bottom face flux calculation
-           double bottom = divergence_wall_flux(i,shift.j+j-1,k,1,0,dx,0);
- 
-           double yvalue = (top - bottom)/(dx*dy) ;
-*/
-           double xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-           double xright = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
-           double xvalue = xright/xhr;
-
-           double yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-           double yright = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
-           double yvalue = yright/yhr;
-
-           
-//           double cell_div = dux * dy + duy * dx;
-//           double div_velocity = dux/dx + duy/dy;
-//           double u_node = 0.5*MAC::abs(UF->DOF_value( shift.i+i, j, k, 0, 0 ) + UF->DOF_value( shift.i+i-1, j, k, 0, 0 )) ;
-//           double v_node = 0.5*MAC::abs(UF->DOF_value( i, shift.j+j, k, 1, 0 ) + UF->DOF_value( i, shift.j+j-1, k, 1, 0 )) ;
-
-//           outputFile << xC << "," << yC << "," << zC << "," << u_node << "," << v_node << endl;
-//           outputFile << xC << "," << yC << "," << zC << "," << div_velocity << "," << dux/dx << "," << duy/dy << "," << (dux/dx)/(duy/dy) << endl;
-           outputFile << xC << "," << yC << "," << zC << "," << xvalue + yvalue << "," << xvalue << "," << yvalue << "," << PF->DOF_value(i,j,k,0,0) << "," << node.bound_cell[comp]->item(p) << endl;
-        }
-     }
-  }
-  outputFile.close();
-}
-
-
 
 //----------------------------------------------------------------------
 void
