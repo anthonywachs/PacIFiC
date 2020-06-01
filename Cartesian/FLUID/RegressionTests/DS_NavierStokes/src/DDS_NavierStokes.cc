@@ -334,11 +334,11 @@ DDS_NavierStokes:: do_after_time_stepping( void )
 //   write_output_field(UF,1);
    // SCT_get_elapsed_time( "Writing CSV" );
 
-//   output_L2norm_velocity(0);
-//   output_L2norm_pressure(0);
+   output_L2norm_velocity(0);
+   output_L2norm_pressure(0);
 //   error_with_analytical_solution_poiseuille();
-   error_with_analytical_solution_couette(PF,0);
-   error_with_analytical_solution_couette(UF,1);
+//   error_with_analytical_solution_couette(PF,0);
+//   error_with_analytical_solution_couette(UF,1);
 
    if ( my_rank == is_master )
    {
@@ -394,12 +394,6 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
    double cfl = UF->compute_CFL( t_it, 0 );
    if ( my_rank == is_master )
       MAC::out() << "CFL: "<< cfl <<endl;
-
-//   if (abs(remainder(t_it->time()/t_it->time_step(),1.)) <= 1.E-5) {
-//      write_divergence_field(t_it);
-//      write_advective_field(t_it,0);
-//      write_advective_field(t_it,1);
-//   }
 
    stop_total_timer() ;
 
@@ -2286,14 +2280,6 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
                // Advection contribution
 	       adv_value = compute_adv_component(comp,i,j,k);
 
-/*               if (comp == 0) {
-                  adv_value = -(cos(xC+yC) + 2.*sin(xC)*sin(yC))*dxC*dyC;
-//                  adv_value = -2.*(sin(xC)*sin(yC))*dxC*dyC;
-               } else if (comp == 1) {
-                  adv_value = -(cos(xC+yC) + 2.*cos(xC)*cos(yC))*dxC*dyC;
-//                  adv_value = -2.*(sin(xC)*sin(yC))*dxC*dyC;
-               }*/
-
                if (is_solids) {
                   size_t p = return_node_index(UF,comp,i,j,k);
                   if (node.void_frac[comp]->item(p) == 1) {
@@ -2724,10 +2710,15 @@ DDS_NavierStokes:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_
 
          yvalue = yright/yhr;
 
+//         double beta = min(1.,min(bx,by));
+         double beta = min(1.,(bx+by)/2.);
+
          if (dim == 3) {
             // Dzz for un
             zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
             zright = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
+
+            double bz = zhr;
 
             if (is_solids) {
                size_t p = return_node_index(PF,comp,i,j,k);
@@ -2749,18 +2740,20 @@ DDS_NavierStokes:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_
                }
             }
 
+            bz = zhr/bz;
+
             zvalue = zright/zhr;
+         
+            beta = min(1.,(bx+by+bz)/3.);
 
          }
 
-//         double beta = min(1.,min(bx,by));
-         double beta = min(1.,0.5*(bx+by));
 
          // Assemble the bodyterm
          if (dim == 2) {
             value = -(rho*beta*(xvalue + yvalue)*dx)/(t_it -> time_step());
          } else {
-            value = -(rho*(xvalue + yvalue + zvalue)*dx)/(t_it -> time_step());
+            value = -(rho*beta*(xvalue + yvalue + zvalue)*dx)/(t_it -> time_step());
          }
       } else if (dir == 1) {
          value = PF->DOF_value( j, i, k, 0, 1 )*dx;
@@ -2786,46 +2779,6 @@ DDS_NavierStokes:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_
             VEC[dir].local_T[0]->set_item( pos, value);
       }
    }
-/*
-   // Since, this function is used in all directions;
-   // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
-   size_t m, ii=0,jj=0,kk=0;
-
-   // Effect of boundary conditions in case of non-periodic direction
-   m = int(min_unknown_index(dir)) - 1;
-
-   if (dir == 0) {
-      ii = m; jj = j; kk = k;
-   } else if (dir == 1) {
-      ii = j; jj = m; kk = k;
-   } else if (dir == 2) {
-      ii = j; jj = k; kk = m;
-   }
-
-   if ( PF->DOF_in_domain(ii,jj,kk,comp))
-      if ( PF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
-         double ai = 1/(PF->get_DOF_coordinate(m+1,comp,dir) - PF->get_DOF_coordinate(m,comp,dir));
-         double dirichlet_value = PF->DOF_value(ii,jj,kk,comp,1) ;
-         VEC[dir].local_T[comp]->add_to_item( 0, + ai * dirichlet_value );
-      }
-
-   m = int(max_unknown_index(dir)) + 1;
-
-   if (dir == 0) {
-      ii = m; jj = j; kk = k;
-   } else if (dir == 1) {
-      ii = j; jj = m; kk = k;
-   } else if (dir == 2) {
-      ii = j; jj = k; kk = m;
-   }
-
-   if ( PF->DOF_in_domain(ii,jj,kk,comp))
-      if ( PF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
-         double ai = 1/(PF->get_DOF_coordinate(m,comp,dir) - PF->get_DOF_coordinate(m-1,comp,dir));
-         double dirichlet_value = PF->DOF_value(ii,jj,kk,comp,1) ;
-         VEC[dir].local_T[comp]->add_to_item( VEC[dir].local_T[comp]->nb_rows()-1 , + ai * dirichlet_value );
-      }
-*/
 
    return fe;
 }
@@ -2936,43 +2889,68 @@ DDS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
+  size_t local_min_k=0,local_max_k=0;
+
+  if (dim == 3) {
+     local_min_k = min_unknown_index(2);
+     local_max_k = max_unknown_index(2);
+  }
+
   NodeProp node = GLOBAL_EQ->get_node_property(0);
 
-  size_t comp = 0,k = 0;
+  size_t comp = 0;
 
   for (size_t i = min_unknown_index(0);i<=max_unknown_index(0);++i) {
      for (size_t j = min_unknown_index(1);j<=max_unknown_index(1);++j) {
-        size_t p = return_node_index(PF,comp,i,j,k);
-        node.bound_cell[0]->set_item(p,0.);
-        if (node.void_frac[comp]->item(p) == 1) {
-           double value = 0., count = 0.;
-           size_t p1 = return_node_index(PF,comp,i+1,j,k);
-           size_t p2 = return_node_index(PF,comp,i-1,j,k);
-           size_t p3 = return_node_index(PF,comp,i,j+1,k);
-           size_t p4 = return_node_index(PF,comp,i,j-1,k);
-           if (node.void_frac[comp]->item(p1) == 0) {
-              node.bound_cell[comp]->set_item(p,1.);
-              value += PF->DOF_value( i+1, j, k, comp, level );
-              count += 1.;
-           }
-           if (node.void_frac[comp]->item(p2) == 0) {
-              node.bound_cell[comp]->set_item(p,1.);
-              value += PF->DOF_value( i-1, j, k, comp, level );
-              count += 1.;
-           }
-           if (node.void_frac[comp]->item(p3) == 0) {
-              node.bound_cell[comp]->set_item(p,1.);
-              value += PF->DOF_value( i, j+1, k, comp, level );
-              count += 1.;
-           }
-           if (node.void_frac[comp]->item(p4) == 0) {
-              node.bound_cell[comp]->set_item(p,1.);
-              value += PF->DOF_value( i, j-1, k, comp, level );
-              count += 1.;
-           }
+        for (size_t k = local_min_k;k<=local_max_k;++k) {
+           size_t p = return_node_index(PF,comp,i,j,k);
+           node.bound_cell[0]->set_item(p,0.);
+           if (node.void_frac[comp]->item(p) == 1) {
+              double value = 0., count = 0.;
+              size_t p1 = return_node_index(PF,comp,i+1,j,k);
+              size_t p2 = return_node_index(PF,comp,i-1,j,k);
+              size_t p3 = return_node_index(PF,comp,i,j+1,k);
+              size_t p4 = return_node_index(PF,comp,i,j-1,k);
+              if (node.void_frac[comp]->item(p1) == 0) {
+                 node.bound_cell[comp]->set_item(p,1.);
+                 value += PF->DOF_value( i+1, j, k, comp, level );
+                 count += 1.;
+              }
+              if (node.void_frac[comp]->item(p2) == 0) {
+                 node.bound_cell[comp]->set_item(p,1.);
+                 value += PF->DOF_value( i-1, j, k, comp, level );
+                 count += 1.;
+              }
+              if (node.void_frac[comp]->item(p3) == 0) {
+                 node.bound_cell[comp]->set_item(p,1.);
+                 value += PF->DOF_value( i, j+1, k, comp, level );
+                 count += 1.;
+              }
+              if (node.void_frac[comp]->item(p4) == 0) {
+                 node.bound_cell[comp]->set_item(p,1.);
+                 value += PF->DOF_value( i, j-1, k, comp, level );
+                 count += 1.;
+              }
 
-           if (count != 0.) value = value/count;
-           GLOBAL_EQ->update_global_P_vector(i,j,k,value);
+              if (dim == 3) {
+                 size_t p5 = return_node_index(PF,comp,i,j,k+1);
+                 size_t p6 = return_node_index(PF,comp,i,j,k-1);
+
+                 if (node.void_frac[comp]->item(p5) == 0) {
+                    node.bound_cell[comp]->set_item(p,1.);
+                    value += PF->DOF_value( i, j, k+1, comp, level );
+                    count += 1.;
+                 }
+                 if (node.void_frac[comp]->item(p6) == 0) {
+                    node.bound_cell[comp]->set_item(p,1.);
+                    value += PF->DOF_value( i, j, k-1, comp, level );
+                    count += 1.;
+                 }
+              }
+   
+              if (count != 0.) value = value/count;
+              GLOBAL_EQ->update_global_P_vector(i,j,k,value);
+           }
         }
      }
   }
@@ -2998,42 +2976,66 @@ DDS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
+  size_t local_min_k=0,local_max_k=0;
+
+  if (dim == 3) {
+     local_min_k = min_unknown_index(2);
+     local_max_k = max_unknown_index(2);
+  }
+
   NodeProp node = GLOBAL_EQ->get_node_property(0);
 
-  size_t comp = 0,k = 0;
+  size_t comp = 0;
 
   for (size_t i = min_unknown_index(0);i<=max_unknown_index(0);++i) {
      for (size_t j = min_unknown_index(1);j<=max_unknown_index(1);++j) {
-        size_t p = return_node_index(PF,comp,i,j,k);
-        if ((node.void_frac[comp]->item(p) == 1) && (node.bound_cell[comp]->item(p) == 0)) {
-           double value = 0., count = 0.;
-           size_t p1 = return_node_index(PF,comp,i+1,j,k);
-           size_t p2 = return_node_index(PF,comp,i-1,j,k);
-           size_t p3 = return_node_index(PF,comp,i,j+1,k);
-           size_t p4 = return_node_index(PF,comp,i,j-1,k);
-           if (node.bound_cell[comp]->item(p1) == 1.) {
-              node.bound_cell[comp]->set_item(p,2.);
-              value += PF->DOF_value( i+1, j, k, comp, level );
-              count += 1.;
-           }
-           if (node.bound_cell[comp]->item(p2) == 1.) {
-              node.bound_cell[comp]->set_item(p,2.);
-              value += PF->DOF_value( i-1, j, k, comp, level );
-              count += 1.;
-           }
-           if (node.bound_cell[comp]->item(p3) == 1.) {
-              node.bound_cell[comp]->set_item(p,2.);
-              value += PF->DOF_value( i, j+1, k, comp, level );
-              count += 1.;
-           }
-           if (node.bound_cell[comp]->item(p4) == 1.) {
-              node.bound_cell[comp]->set_item(p,2.);
-              value += PF->DOF_value( i, j-1, k, comp, level );
-              count += 1.;
-           }
+        for (size_t k = local_min_k;k<=local_max_k;++k) {
+           size_t p = return_node_index(PF,comp,i,j,k);
+           if ((node.void_frac[comp]->item(p) == 1) && (node.bound_cell[comp]->item(p) == 0)) {
+              double value = 0., count = 0.;
+              size_t p1 = return_node_index(PF,comp,i+1,j,k);
+              size_t p2 = return_node_index(PF,comp,i-1,j,k);
+              size_t p3 = return_node_index(PF,comp,i,j+1,k);
+              size_t p4 = return_node_index(PF,comp,i,j-1,k);
+              if (node.bound_cell[comp]->item(p1) == 1.) {
+                 node.bound_cell[comp]->set_item(p,2.);
+                 value += PF->DOF_value( i+1, j, k, comp, level );
+                 count += 1.;
+              }
+              if (node.bound_cell[comp]->item(p2) == 1.) {
+                 node.bound_cell[comp]->set_item(p,2.);
+                 value += PF->DOF_value( i-1, j, k, comp, level );
+                 count += 1.;
+              }
+              if (node.bound_cell[comp]->item(p3) == 1.) {
+                 node.bound_cell[comp]->set_item(p,2.);
+                 value += PF->DOF_value( i, j+1, k, comp, level );
+                 count += 1.;
+              }
+              if (node.bound_cell[comp]->item(p4) == 1.) {
+                 node.bound_cell[comp]->set_item(p,2.);
+                 value += PF->DOF_value( i, j-1, k, comp, level );
+                 count += 1.;
+              }
+
+              if (dim == 3) {
+                 size_t p5 = return_node_index(PF,comp,i,j,k+1);
+                 size_t p6 = return_node_index(PF,comp,i,j,k-1);
+                 if (node.bound_cell[comp]->item(p5) == 1.) {
+                    node.bound_cell[comp]->set_item(p,2.);
+                    value += PF->DOF_value( i, j, k+1, comp, level );
+                    count += 1.;
+                 }
+                 if (node.bound_cell[comp]->item(p6) == 1.) {
+                    node.bound_cell[comp]->set_item(p,2.);
+                    value += PF->DOF_value( i, j, k-1, comp, level );
+                    count += 1.;
+                 }
+              }
  
-           if (count != 0.) value = value/count;
-           GLOBAL_EQ->update_global_P_vector(i,j,k,value);
+              if (count != 0.) value = value/count;
+              GLOBAL_EQ->update_global_P_vector(i,j,k,value);
+           }
         }
      }
   }
@@ -3058,20 +3060,29 @@ DDS_NavierStokes:: correct_mean_pressure ( )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
+  size_t local_min_k=0,local_max_k=0;
+
+  if (dim == 3) {
+     local_min_k = min_unknown_index(2);
+     local_max_k = max_unknown_index(2);
+  }
+
   NodeProp node = GLOBAL_EQ->get_node_property(0);
-  size_t comp = 0,k = 0;
+  size_t comp = 0;
 
   double mean=0.,nb_global_unknown=0.;
 
   for (size_t i = min_unknown_index(0);i<=max_unknown_index(0);++i) {
      for (size_t j = min_unknown_index(1);j<=max_unknown_index(1);++j) {
-        if (is_solids) {
-           size_t p = return_node_index(PF,comp,i,j,k);
-           if (node.void_frac[comp]->item(p) == 0) {
-              mean += PF->DOF_value( i, j, k, comp, 0 );
-              nb_global_unknown += 1.;
-           }
-        }   
+        for (size_t k = local_min_k;k<=local_max_k;++k) {
+           if (is_solids) {
+              size_t p = return_node_index(PF,comp,i,j,k);
+              if (node.void_frac[comp]->item(p) == 0) {
+                 mean += PF->DOF_value( i, j, k, comp, 0 );
+                 nb_global_unknown += 1.;
+              }
+           }   
+        }
      }
   }
 
@@ -3082,11 +3093,13 @@ DDS_NavierStokes:: correct_mean_pressure ( )
 
   for (size_t i = min_unknown_index(0);i<=max_unknown_index(0);++i) {
      for (size_t j = min_unknown_index(1);j<=max_unknown_index(1);++j) {
-        if (is_solids) {
-           size_t p = return_node_index(PF,comp,i,j,k);
-           if (node.void_frac[comp]->item(p) == 0) {
-               double value = PF->DOF_value( i, j, k, comp, 0 );
-               GLOBAL_EQ->update_global_P_vector(i,j,k,value-mean);
+        for (size_t k = local_min_k;k<=local_max_k;++k) {
+           if (is_solids) {
+              size_t p = return_node_index(PF,comp,i,j,k);
+              if (node.void_frac[comp]->item(p) == 0) {
+                 double value = PF->DOF_value( i, j, k, comp, 0 );
+                 GLOBAL_EQ->update_global_P_vector(i,j,k,value-mean);
+              }
            }
         }
      }
@@ -3241,7 +3254,7 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
             yvalue = yvalue1+yvalue2;
 
 //            double beta = min(1.,min(bx,by));
-            double beta = min(1.,0.5*(bx+by));
+            double beta = min(1.,(bx+by)/2.);
 
             if (dim == 3) {
                double zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
@@ -3283,7 +3296,7 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
                zvalue = zvalue1+zvalue2;
 
 //               beta = min(1.,min(bx,min(by,bz)));
-               beta = min(1.,1./3.*(bx+by+bz));
+               beta = min(1.,(bx+by+bz)/3.);
             }
 
             // Assemble the bodyterm
