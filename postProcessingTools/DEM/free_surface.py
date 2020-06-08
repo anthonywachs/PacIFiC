@@ -236,6 +236,12 @@ run_pv = True if my_args.get_attribute("run_paraview")=="yes" else False
 width = float(my_args.get_attribute("width")) if my_args.get_attribute("width")!=None else WIDTH
 runout_intensity =  float(my_args.get_attribute("runout_intensity")) if my_args.get_attribute("runout_intensity")!=None else MIN_INTENSITY_DEFAULT
 
+output_file_path1 = "/home/damien/phd/dem/physics/fig3.10/damien.csv"
+output_file1 = open(output_file_path1,"w")
+
+output_file_path2 = "/home/damien/phd/dem/physics/fig3.11/damien_Hinf.csv"
+output_file2 = open(output_file_path2,"w")
+
 print("Parameters of this application")
 print("Cannel width:",width,"cm")
 print("Intensity threshold for run-out length:",100*runout_intensity,"%")
@@ -284,15 +290,40 @@ for rootfolderpath in my_args.get_attributes("root_path"):
     print("L_infinity from the side (over estimated) =", L_infinity_wrong)
 
     plot_free_surfaces(initial_image, my_initial_first_frame,x_t0,y_t0,x,y,
-                        rootfolderpath,pixel_length,runout)
+    rootfolderpath,pixel_length,runout)
+
     aspect_ratios.append(H0/L0)
     runouts.append(L_infinity)
+
+    # Often some crosses are leaning against the wall, falsely increasing the
+    # final height of the pile. We consider the final height 3 times the
+    # particle width away from the wall, since the image is blurry and the
+    # y function is smoothed out: we need this margin.
+    nb_pixels_per_particle_width = round(3 * 0.3/pixel_length)
+    print("nb_pixels_per_particle_width =",nb_pixels_per_particle_width)
     x=np.array(x[:runout])
     y=y0-np.array(y[:runout])
-    print("H_infinity =",np.max(y)*pixel_length)
-    free_surfaces.append(((x*pixel_length-L0)/(L_infinity-L0),y/np.max(y),
-                    rootfolderpath))
+    y_hinf=y[nb_pixels_per_particle_width:runout]
+    H_infinity = np.max(y_hinf)*pixel_length
+    print("H_infinity =",H_infinity)
+
+    aspect_ratio = H0 / L0
+    nd_runout = (L_infinity - L0) / L0
+    nd_height = H0 / H_infinity
+
+    print("aspect ratio a="+str(aspect_ratio)+", (L_inf-L0)/L0="+str(nd_runout)
+        +", H_inf/H0="+str(H0/H_infinity))
+    output_file1.write(str(aspect_ratio)+", "+str(nd_runout)+"\n")
+    output_file2.write(str(aspect_ratio)+", "+str(nd_height)+"\n")
+
+
+    # free_surfaces.append(((x*pixel_length-L0)/(L_infinity-L0),y/np.max(y),
+    #                 rootfolderpath))
+    free_surfaces.append(((x*pixel_length)/(H_infinity),(y*pixel_length)/H_infinity,rootfolderpath))
     print("\n---------------------------------------------------------------\n")
+
+output_file1.close()
+output_file2.close()
 
 fig = plt.figure()
 
@@ -302,7 +333,9 @@ for case in free_surfaces:
     linewidth = my_args.get_attribute("linewidth",case[2])
     label = my_args.get_attribute("label",case[2])
     plt.plot(case[0],case[1],label=label,c=color,ls=linestyle,lw=linewidth)
-plt.xlabel(r'$\frac{L-L_0}{L_\infty-L_0}$')
+# plt.xlabel(r'$\frac{L-L_0}{L_\infty-L_0}$')
+# plt.ylabel(r'$\frac{h}{H_\infty}$')
+plt.xlabel(r'$\frac{x}{H_\infty}$')
 plt.ylabel(r'$\frac{h}{H_\infty}$')
 if my_args.is_legend():
     plt.legend(loc='best')

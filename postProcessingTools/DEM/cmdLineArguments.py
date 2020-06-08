@@ -9,6 +9,7 @@ class cmdLineArgs:
             "root_paths" : [],
             "labels" : {},
             "titles" : [],
+            "save-figs" : [],
             "linestyles" : {},
             "linewidths" : {},
             "colors" : {}
@@ -16,6 +17,7 @@ class cmdLineArgs:
         self.attributeSymbols = {
             "-l" : "labels",
             "-t" : "titles",
+            "-save" : "save-figs",
             "-ls" : "linestyles",
             "-lw" : "linewidths",
             "-c" : "colors"
@@ -23,12 +25,13 @@ class cmdLineArgs:
         self.default_values = {
             "colors" : "black",
             "linestyles" : "-",
-            "linewidths" : 2,
+            "linewidths" : 1,
             "labels" : "_"
         }
         self.span_root_paths = {
             "labels" : True,
             "titles" : False,
+            "save-figs" : False,
             "linestyles" : True,
             "linewidths" : True,
             "colors" : True
@@ -36,18 +39,24 @@ class cmdLineArgs:
 
     def read_cmd_args(self):
         for argument in sys.argv[1:]:
-            if "=" not in argument:
+            if argument[0] != "-":
                 self.attributes["root_paths"].append(argument)
             else:
                 i=0
-                while argument[i]!="=":
+                while i<len(argument) and argument[i]!="=":
                     i+=1
                 symbol_key = self.attributeSymbols[argument[:i]]
                 if self.span_root_paths[symbol_key] == True:
                     self.attributes[symbol_key][self.attributes["root_paths"]
                         [-1]] = argument[i+1:]
                 else:
-                    self.attributes[symbol_key].append(argument[i+1:])
+                    if symbol_key == "save-figs":
+                        if len(argument)>i:
+                            self.attributes[symbol_key].append(argument[i+1:])
+                        else:
+                            self.attributes[symbol_key].append("./figure.png")
+                    else:
+                        self.attributes[symbol_key].append(argument[i+1:])
 
     def add_cmd_arg(self,arg_name,arg_symbol,span_root_paths=False):
         if arg_name[-1] != "s": #an "s" is added because we always assume there
