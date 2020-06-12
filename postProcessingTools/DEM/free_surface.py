@@ -11,7 +11,7 @@ sys.path.append('./')
 
 # Some variable that could change from one application to another
 WIDTH = 20  # the width of the channel is 20cm
-MIN_INTENSITY_DEFAULT = 0.05
+MIN_INTENSITY_DEFAULT = 0.01
 pvpython_path = ('/home/damien/softwares/ParaView-5.8.0-RC1-MPI-Linux-Python3.7'
     +'-64bit/bin/pvpython')
 generate_frames_path = '$PP_HOME/DEM/generate_first_last_frames.py'
