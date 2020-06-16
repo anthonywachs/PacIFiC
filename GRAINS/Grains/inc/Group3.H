@@ -14,15 +14,15 @@ ostream &operator << (ostream &fileOut, const Group3 &objet);
 istream &operator >> (istream &fileIn, Group3 &objet);
 
 
-/** @brief GJK Engine - A Fast and Robust GJK Implementation 
-  
-    
+/** @brief GJK Engine - A Fast and Robust GJK Implementation
+
+
 @author Copyright (C) 1998  Gino van den Bergen. */
 // ============================================================================
 namespace solid
 {
   /** @brief Classe simulant un anneau de R3.
-      
+
   @author D.PETIT - 2000 - Creation */
   // ==========================================================================
   class Group3
@@ -30,11 +30,11 @@ namespace solid
   public:
     /**@name Constructors */
     //@{
-    /** @brief Constructeur par defaut. 
+    /** @brief Constructeur par defaut.
     @param def valeur des composantes */
     Group3( const Scalar def = 0. );
 
-    /** @brief Constructeur avec initialisation. 
+    /** @brief Constructeur avec initialisation.
     @param x premier element
     @param y deuxieme element
     @param z troisieme element */
@@ -47,71 +47,71 @@ namespace solid
     /** @brief Destructeur. */
     ~Group3();
     //@}
-  
+
 
     /**@name Methods Get */
-    //@{ 
-    /** @brief Renvoi l'element. 
-    @return pointeur sur l'element.*/
-    const Scalar *getValue() const;
-    
+    //@{
     /** @brief Renvoi l'element.
     @return pointeur sur l'element.*/
-    Scalar *getValue();    
+    const Scalar *getValue() const;
 
-    /** @brief nombre de composantes d'un element. 
+    /** @brief Renvoi l'element.
+    @return pointeur sur l'element.*/
+    Scalar *getValue();
+
+    /** @brief nombre de composantes d'un element.
     @return le nombre de composantes.*/
-    int size() const;    
+    int size() const;
     //@}
-    
-    
+
+
     /**@name Methods Set */
-    //@{ 
-    /** @brief Modifie les composantes d'un element. 
+    //@{
+    /** @brief Modifie les composantes d'un element.
     @param x premier element
     @param y deuxieme element
     @param z troisieme element */
     void setValue( const Scalar x, const Scalar y, const Scalar z );
-    
-    /** @brief Modifie les composantes d'un element. 
+
+    /** @brief Modifie les composantes d'un element.
     @param g element a copie. */
-    void setValue( const Scalar* g ); 
-    
+    void setValue( const Scalar* g );
+
     /** @brief Annule toutes les composantes d'un element */
-    void reset();            
+    void reset();
     //@}
 
 
     /**@name Methods */
-    //@{ 
+    //@{
     /** @brief Ecriture de l'objet sur le flux de sortie avec un format de
     precision elevee
     @param fileOut Flux de sortie. */
     void writeGroup3( ostream &fileOut ) const;
-    
+
     /** @brief Ecriture de l'objet en binaire sur le flux de sortie
     @param fileOut Flux de sortie. */
     void writeGroup3_binary( ostream &fileOut ); 
-    
+
     /** @brief Lecture de l'objet en binaire sur le flux d'entree
     @param StreamIN Flux d'entree. */
-    void readGroup3_binary( istream &StreamIN );            
+    void readGroup3_binary( istream &StreamIN );
     //@}
-                 
+
 
     /**@name Operators. */
     //@{
-    /** @brief Operateur d'indexation. 
+    /** @brief Operateur d'indexation.
     @return La composante i.
     @param i  indice de la composantes de l'element */
     Scalar& operator[]( const int i );
-    
-    /** @brief Operateur d'indexation. 
+
+    /** @brief Operateur d'indexation.
     @return la composante i
     @param i  indice de la composantes de l'element */
     const Scalar& operator[]( const int i ) const;
 
-    /** @brief Operateur unaire - 
+    /** @brief Operateur unaire -
     @return Objet avec les composantes opposees. */
     Group3 operator - () const;
 
@@ -119,7 +119,7 @@ namespace solid
     @return Le produit scalaire.
     @param g Le deuxieme objet */
     Scalar operator * ( const Group3 &g ) const;
-    
+
     /** @brief Multiplication par un scalaire
     @return Le nouvel objet
     @param d Le scalaire multipliant les composantes */
@@ -143,20 +143,20 @@ namespace solid
     /** @brief Comparaison pour les valeurs
     @param g2 le deuxieme objet */
     bool operator == (const Group3 &g2) const;
-    
-    /** @brief Objets differents par les valeurs 
+
+    /** @brief Objets differents par les valeurs
     @param g2 le deuxieme objet */
     bool operator != ( const Group3 &g2 );
 
-    /** @brief Egalite d'affectation d'un vecteur 
+    /** @brief Egalite d'affectation d'un vecteur
     @param g2 le deuxieme objet */
     Group3& operator = ( const Group3 &g2 );
-    
+
     /** @brief Affectation d'une valeur aux composantes du vecteur.
     @param valeur Valeur a affecter. */
     void operator = ( Scalar valeur );
 
-    /** @brief Multiplication par un scalaire et affectation 
+    /** @brief Multiplication par un scalaire et affectation
     @param d Le scalaire. */
     Group3& operator *= ( Scalar d );
 
@@ -182,10 +182,10 @@ namespace solid
     @param g1 Premier Group3
     @param g2 Deuxieme Group3
     @param g3 Troisieme Group3 */
-    friend Scalar triple( const Group3 &g1, 
+    friend Scalar triple( const Group3 &g1,
 	const Group3 &g2, const Group3 &g3 );
 
-    /** @brief Multiplication d'un scalaire par un Group3 
+    /** @brief Multiplication d'un scalaire par un Group3
     @return Le Group3 = d * g
     @param d Un scalaire
     @param g Un Group3 */
@@ -214,13 +214,13 @@ namespace solid
 
   /** @brief  Produit triple
   @param g1 groupe 1
-  @param g2 groupe 2  
-  @param g3 groupe 3 */ 
+  @param g2 groupe 2
+  @param g3 groupe 3 */
   Scalar triple( const Group3 &g1, const Group3 &g2, const Group3 &g3 );
 
   /** @brief Multiplication par un scalaire
   @param d Le scalaire
-  @param g groupe */  
+  @param g groupe */
   Group3 operator * ( Scalar d, const Group3 &g );
 
   static Group3 OrigineGroup3; /**< Origine (0.,0.,0.)  */

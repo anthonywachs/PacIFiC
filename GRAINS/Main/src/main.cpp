@@ -1,4 +1,5 @@
 #include <mpi.h>
+#include <unistd.h>
 #include "Grains.H"
 #include "Grains_BuilderFactory.H"
 
@@ -21,6 +22,24 @@ int main(int argc, char *argv[])
   int rankproc = 0, nprocs = 0;
   MPI_Comm_rank( MPI_COMM_WORLD, &rankproc );
   MPI_Comm_size( MPI_COMM_WORLD, &nprocs );
+
+
+  // //MPI debuging routine
+  // //----------------------------------------------------------------
+  // if (rankproc < 2)
+  // {
+  //   volatile int i = 0;
+  //   char hostname[256];
+  //   gethostname(hostname, sizeof(hostname));
+  //   printf("PID %d on %s ready for attach\n", getpid(), hostname);
+  //   fflush(stdout);
+  //   while (0 == i)
+  //   {
+  //       sleep(5);
+  //       cout << "sleeping..." << endl;
+  //   }
+  // }
+  // //----------------------------------------------------------------
 
   // Fichier de mise en donnees
   string filename;

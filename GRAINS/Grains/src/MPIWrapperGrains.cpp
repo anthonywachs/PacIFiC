@@ -2395,7 +2395,8 @@ void MPIWrapperGrains::UpdateOrCreateClones_SendRecvLocal_GeoLoc(Scalar time,
 	LinkedCell* LC)
 {
   list<Particule*>::const_iterator il;
-  int i, j, tag_DOUBLE = 1, recvsize = 0, geoLoc, ireq = 0;
+  int i, j, history_map_size=0, tag_DOUBLE = 1, recvsize_DOUBLE = 0, geoLoc,
+      ireq = 0;
   MPI_Status status;
   MPI_Request sreq = 0;
   list<int> const* neighborsRank = m_voisins->rangVoisinsSeuls();
@@ -2422,25 +2423,13 @@ void MPIWrapperGrains::UpdateOrCreateClones_SendRecvLocal_GeoLoc(Scalar time,
   for (il=particulesClones->begin();il!=particulesClones->end();il++)
     AccessToClones.insert( pair<int,Particule*>( (*il)->getID(), *il ) );
 
-
-  // Copie des infos de particulesHalozone dans des buffers locaux
-  // -------------------------------------------------------------
-  vector<int> nbHzGeoLoc(26,0);
-  vector<int>::iterator iv;
-  for (il=particulesHalozone->begin();il!=particulesHalozone->end();il++)
-  {
-    geoLoc = (*il)->getGeoLocalisation();
-    for (iv=m_particuleHalozoneToNeighboringProcs[geoLoc].begin();
-    	iv!=m_particuleHalozoneToNeighboringProcs[geoLoc].end();iv++)
-      nbHzGeoLoc[*iv]++;
-  }
-
   // Buffer de doubles: cin�matique & configuration
   // Ordre par particule: [numero de particule, classe, rang exp�diteur,
   //	position, vitesse translation, quaternion rotation,
   // 	vitesse rotation]
   // -------------------------------------------------------------------------
-  int NB_DOUBLE_PART=0, nAB=0, nHF=0, nLF=0, nCF=0, nT=0, nST = 0, nSTN=0;
+  int NB_DOUBLE_PART=0, nHC=0, nAB=0, nHF=0, nLF=0, nCF=0, nT=0, nST = 0,
+      nSTN=0;
   if( AdamsBashforth ) nAB = 12;
   if( b_hydroForce ) nHF = 7; // Eps + (Ux,Uy,Uz) + grad(Px,Py,Pz)
   if( b_liftForce ) nLF = 3; // (OMx, OMy, OMz)
@@ -2449,12 +2438,26 @@ void MPIWrapperGrains::UpdateOrCreateClones_SendRecvLocal_GeoLoc(Scalar time,
   else if( b_fluidTemperature ) nT = 3;
   if( b_stochDrag ) nST =3;
   if( b_stochNu ) nSTN = 3;
-  NB_DOUBLE_PART = 29 + nAB + nHF + nLF + nCF + nT + nST + nSTN;
+
+  // Copie des infos de particulesHalozone dans des buffers locaux
+  // -------------------------------------------------------------
+  vector<int> nbHzGeoLoc(26,0);
+  vector<int>::iterator iv;
+  for (il=particulesHalozone->begin();il!=particulesHalozone->end();il++)
+  {
+    geoLoc = (*il)->getGeoLocalisation();
+    history_map_size = (*il)->getContactMapSize();
+    nHC = 1 + history_map_size * 13 ;
+    NB_DOUBLE_PART = 29 + nHC + nAB + nHF + nLF + nCF + nT + nST + nSTN;
+    for (iv=m_particuleHalozoneToNeighboringProcs[geoLoc].begin();
+    	iv!=m_particuleHalozoneToNeighboringProcs[geoLoc].end();iv++)
+      nbHzGeoLoc[*iv] += NB_DOUBLE_PART ;
+  }
 
   vector<int> index( 26, 0 );
   double *pDOUBLE = NULL;
   vector<double*> features( 26, pDOUBLE );
-  for (i=0;i<26;i++) features[i] = new double[ NB_DOUBLE_PART * nbHzGeoLoc[i] ];
+  for (i=0;i<26;i++) features[i] = new double[ nbHzGeoLoc[i] ];
   double ParticuleID=0, ParticuleClasse=0;
 
   for (il=particulesHalozone->begin(),i=0;il!=particulesHalozone->end();il++)
@@ -2462,6 +2465,9 @@ void MPIWrapperGrains::UpdateOrCreateClones_SendRecvLocal_GeoLoc(Scalar time,
     geoLoc = (*il)->getGeoLocalisation();
     ParticuleID = (*il)->getID() + intTodouble ;
     ParticuleClasse = (*il)->getParticuleClasse() + intTodouble ;
+    history_map_size = (*il)->getContactMapSize();
+    nHC = 1 + history_map_size * 13 ;
+    NB_DOUBLE_PART = 29 + nHC + nAB + nHF + nLF + nCF + nT + nST + nSTN;
     for (iv=m_particuleHalozoneToNeighboringProcs[geoLoc].begin();
     	iv!=m_particuleHalozoneToNeighboringProcs[geoLoc].end();iv++)
     {
@@ -2473,39 +2479,40 @@ void MPIWrapperGrains::UpdateOrCreateClones_SendRecvLocal_GeoLoc(Scalar time,
       (*il)->copyQuaternionRotation( features[*iv], j+6 );
       (*il)->copyVitesseRotation( features[*iv], j+10 );
       (*il)->copyTransform( features[*iv], j+13, m_MPIperiodes[*iv] );
+      (*il)->copyHistoryContacts( features[*iv], j+29 );
 
       if( AdamsBashforth )
-        (*il)->copyCinematiqueNm2( features[*iv], j+29 );
+        (*il)->copyCinematiqueNm2( features[*iv], j+29+nHC );
       if( b_hydroForce )
-        (*il)->copyFluidInformations( features[*iv], j+29+nAB );
+        (*il)->copyFluidInformations( features[*iv], j+29+nHC+nAB );
       if( b_liftForce )
-        (*il)->copyFluidVorticity( features[*iv], j+29+nAB+nHF );
+        (*il)->copyFluidVorticity( features[*iv], j+29+nHC+nAB+nHF );
       if( b_cohesiveForce )
       {
-        (*il)->copy_VectFmaxDist( features[*iv], j+29+nAB+nHF+nLF );
-        (*il)->copy_VectIdParticle( features[*iv], j+29+10+nAB+nHF+nLF );
-        (*il)->copy_VectKnElast( features[*iv], j+29+20+nAB+nHF+nLF );
-        (*il)->copy_VectKtElast( features[*iv], j+29+30+nAB+nHF+nLF );
-        (*il)->copy_VectInitialOverlap( features[*iv], j+29+40+nAB+nHF+nLF );
+        (*il)->copy_VectFmaxDist( features[*iv], j+29+nHC+nAB+nHF+nLF );
+        (*il)->copy_VectIdParticle( features[*iv], j+29+nHC+10+nAB+nHF+nLF );
+        (*il)->copy_VectKnElast( features[*iv], j+29+nHC+20+nAB+nHF+nLF );
+        (*il)->copy_VectKtElast( features[*iv], j+29+nHC+30+nAB+nHF+nLF );
+        (*il)->copy_VectInitialOverlap( features[*iv], j+29+nHC+40+nAB+nHF+nLF );
       }
       if( b_solidTemperature && !b_fluidTemperature )
       {
-        (*il)->copy_solidTemperature( features[*iv], j+29+nAB+nHF+nLF+nCF );
-	(*il)->copy_solidNusselt( features[*iv], j+30+nAB+nHF+nLF+nCF );
+        (*il)->copy_solidTemperature( features[*iv], j+29+nHC+nAB+nHF+nLF+nCF );
+	(*il)->copy_solidNusselt( features[*iv], j+30+nHC+nAB+nHF+nLF+nCF );
 //        cout << "TEMPORARY : MPI WG sending proc "<< m_rank
 //             << " ID " << ParticuleID
 //             << " copying  " << features[*iv][j+29+nAB+nHF+nLF+nCF] <<endl;
       }
       else if( b_fluidTemperature )
       {
-        (*il)->copy_solidTemperature( features[*iv], j+29+nAB+nHF+nLF+nCF );
-	(*il)->copy_solidNusselt( features[*iv], j+30+nAB+nHF+nLF+nCF );
-        (*il)->copy_fluidTemperature( features[*iv], j+31+nAB+nHF+nLF+nCF );
+        (*il)->copy_solidTemperature( features[*iv], j+29+nHC+nAB+nHF+nLF+nCF );
+	(*il)->copy_solidNusselt( features[*iv], j+30+nHC+nAB+nHF+nLF+nCF );
+        (*il)->copy_fluidTemperature( features[*iv], j+31+nHC+nAB+nHF+nLF+nCF );
       }
       if( b_stochDrag )
-	(*il)->copy_rnd( features[*iv], j+29+nAB+nHF+nLF+nCF+nT);
+	(*il)->copy_rnd( features[*iv], j+29+nHC+nAB+nHF+nLF+nCF+nT);
       if( b_stochNu )
-	(*il)->copy_rnd_Nu( features[*iv], j+29+nAB+nHF+nLF+nCF+nT+nST);
+	(*il)->copy_rnd_Nu( features[*iv], j+29+nHC+nAB+nHF+nLF+nCF+nT+nST);
 
       index[*iv] += NB_DOUBLE_PART;
     }
@@ -2522,24 +2529,9 @@ void MPIWrapperGrains::UpdateOrCreateClones_SendRecvLocal_GeoLoc(Scalar time,
   for (ireq=0,irn=neighborsRank->begin(),ign=neighborsGeoloc->begin();
   	irn!=neighborsRank->end();irn++,ign++,++ireq)
     {
-      MPI_Isend( features[*ign], nbHzGeoLoc[*ign] * NB_DOUBLE_PART, MPI_DOUBLE,
-	*irn, tag_DOUBLE + m_GeoLocReciprocity[*ign],
-	m_MPI_COMM_activProc, &idreq[ireq] );
-      // if (nbHzGeoLoc[*ign]!=0)
-      // {
-      //   // Routine to store MPI messages in file
-      //   ofstream MPI_log ;
-      //   char filepath[]="Grains/Init/MPI_log_?_to_?.txt";
-      //   filepath[20] = m_rank + '0';
-      //   filepath[25] = *irn + '0';
-      //   MPI_log.open(filepath, std::ios_base::app) ;
-      //   for(int k=0;k<nbHzGeoLoc[*ign]*NB_DOUBLE_PART;k++)
-      //   {
-      //     MPI_log << std::fixed << std::setprecision(15) << features[*ign][k] ;
-      //     MPI_log << ",";
-      //   }
-      //   MPI_log << "\n";
-      // }
+      MPI_Isend( features[*ign], nbHzGeoLoc[*ign], MPI_DOUBLE,
+  *irn, tag_DOUBLE + m_GeoLocReciprocity[*ign],
+  m_MPI_COMM_activProc, &idreq[ireq] );
     }
   SCT_get_elapsed_time( "MPIComm" );
 
@@ -2553,36 +2545,20 @@ void MPIWrapperGrains::UpdateOrCreateClones_SendRecvLocal_GeoLoc(Scalar time,
     // ---------
     // Taille du message � recevoir -> nb de particules
     MPI_Probe( *irn, tag_DOUBLE + *ign, m_MPI_COMM_activProc, &status );
-    MPI_Get_count( &status, MPI_DOUBLE, &recvsize );
-    recvsize /= NB_DOUBLE_PART;
+    MPI_Get_count( &status, MPI_DOUBLE, &recvsize_DOUBLE );
 
     // Reception du message de doubles
-    double *recvbuf_DOUBLE = new double[recvsize * NB_DOUBLE_PART];
-    MPI_Recv( recvbuf_DOUBLE, recvsize * NB_DOUBLE_PART, MPI_DOUBLE,
+    double *recvbuf_DOUBLE = new double[recvsize_DOUBLE];
+    MPI_Recv( recvbuf_DOUBLE, recvsize_DOUBLE, MPI_DOUBLE,
 	*irn, tag_DOUBLE + *ign, m_MPI_COMM_activProc, &status );
-    // if (recvsize != 0)
-    // {
-    //   // Routine to store MPI messages in file
-    //   ofstream MPI_log ;
-    //   char filepath[]="Grains/Init/MPI_log_?_from_?.txt";
-    //   filepath[20] = m_rank + '0';
-    //   filepath[27] = *irn + '0';
-    //   MPI_log.open(filepath, std::ios_base::app) ;
-    //   for(int k=0;k<recvsize*NB_DOUBLE_PART;k++)
-    //   {
-    //     MPI_log << std::fixed << std::setprecision(15) << recvbuf_DOUBLE[k] ;
-    //     MPI_log << ",";
-    //   }
-    //   MPI_log << "\n";
-    // }
 
     SCT_add_elapsed_time( "MPIComm" );
     SCT_set_start( "UpdateCreateClones" );
 
     // Creation ou maj des clones
     // --------------------------
-    UpdateOrCreateClones( time, recvsize, recvbuf_DOUBLE,
-		NB_DOUBLE_PART, particulesClones,
+    UpdateOrCreateClones( time, recvsize_DOUBLE, recvbuf_DOUBLE, 0,
+		particulesClones,
 		particules, particulesHalozone, ParticuleClassesReference, LC );
 
     delete [] recvbuf_DOUBLE;
@@ -3266,15 +3242,15 @@ void MPIWrapperGrains::ContactsFeatures( Scalar& overlap_max,
 // Cr�ation & mise � jour des clones sur la base des infos
 // communiquees par les autres proc
 void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
- 	int const &recvsize, double const* recvbuf_DOUBLE,
-	const int& NB_DOUBLE_PART,
+ 	int const &recvsize_DOUBLE, double const* recvbuf_DOUBLE,
+  const int& NB_DOUBLE_PART_to_remove,
   	list<Particule*>* particulesClones,
 	list<Particule*>* particules,
   	list<Particule*> const* particulesHalozone,
 	vector<Particule*> const* ParticuleClassesReference,
 	LinkedCell* LC )
 {
-  int j, id, classe;
+  int j, id, classe, nb_contacts;
   bool found = false;
   bool AdamsBashforth = Grains_Exec::m_TIScheme == "SecondOrderAdamsBashforth";
   bool b_hydroForce = Grains_Exec::m_withHydroForce ;
@@ -3292,7 +3268,7 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
   pair < multimap<int,Particule*>::iterator,
   	multimap<int,Particule*>::iterator > crange;
 
-  int nAB=0, nHF=0, nLF=0, nCF=0, nT=0, nST=0;
+  int NB_DOUBLE_PART=0, nHC=0, nAB=0, nHF=0, nLF=0, nCF=0, nT=0, nST=0;
   if ( AdamsBashforth ) nAB = 12;
   if ( b_hydroForce ) nHF = 7; // Eps + (Ux,Uy,Uz) + grad(Px,Py,Pz)
   if ( b_liftForce ) nLF = 3; // (OMx, OMy, OMz)
@@ -3301,10 +3277,16 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
   else if ( b_fluidTemperature ) nT = 3;
   if ( b_stochDrag ) nST = 3;
 
-  for( j=0; j<recvsize; ++j )
+
+  j = 0 ;
+  while ( j < recvsize_DOUBLE)
   {
+    nb_contacts = (int) recvbuf_DOUBLE[j+29] ;
+    nHC = 1 + nb_contacts * 13;
+    NB_DOUBLE_PART = 29 + nHC + nAB + nHF + nLF + nCF + nT + nST ;
+
     found = false;
-    id = int( recvbuf_DOUBLE[NB_DOUBLE_PART*j] );
+    id = int( recvbuf_DOUBLE[j] );
 
     // Recherche si le clone existe deja sur ce processeur
     ncid = AccessToClones.count( id );
@@ -3318,9 +3300,9 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
         {
           GC = imm->second->getPosition();
           distGC = sqrt(
-          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+25] - (*GC)[X], 2. ) +
-            pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+26] - (*GC)[Y], 2. ) +
-            pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+27] - (*GC)[Z], 2. ) ) ;
+          	pow( recvbuf_DOUBLE[j+25] - (*GC)[X], 2. ) +
+            pow( recvbuf_DOUBLE[j+26] - (*GC)[Y], 2. ) +
+            pow( recvbuf_DOUBLE[j+27] - (*GC)[Z], 2. ) ) ;
             if ( distGC < 1.1 * imm->second->getRayonInteraction() )
               found = true;
         }
@@ -3334,9 +3316,9 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
         {
           GC = imm->second->getPosition();
           distGC = sqrt(
-          pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+25] - (*GC)[X], 2. ) +
-          pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+26] - (*GC)[Y], 2. ) +
-          pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+27] - (*GC)[Z], 2. ) ) ;
+          pow( recvbuf_DOUBLE[j+25] - (*GC)[X], 2. ) +
+          pow( recvbuf_DOUBLE[j+26] - (*GC)[Y], 2. ) +
+          pow( recvbuf_DOUBLE[j+27] - (*GC)[Z], 2. ) ) ;
           if ( distGC < 1.1 * imm->second->getRayonInteraction() )
             found = true;
           else imm++;
@@ -3353,55 +3335,75 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
       pClone = imm->second;
       AccessToClones.erase( imm );
 
-      pClone->setPosition( &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13] );
-      Vecteur trans( recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
-	  	recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+5] );
+      pClone->setPosition( &recvbuf_DOUBLE[j+13] );
+      Vecteur trans( recvbuf_DOUBLE[j+3],
+	  	recvbuf_DOUBLE[j+4],
+		recvbuf_DOUBLE[j+5] );
       pClone->setVitesseTranslation( trans );
-      pClone->setQuaternionRotation( recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+9] );
-      Vecteur rot(recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
-	  	recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+12] );
+      pClone->setQuaternionRotation( recvbuf_DOUBLE[j+6],
+		recvbuf_DOUBLE[j+7],
+		recvbuf_DOUBLE[j+8],
+		recvbuf_DOUBLE[j+9] );
+      Vecteur rot(recvbuf_DOUBLE[j+10],
+	  	recvbuf_DOUBLE[j+11],
+		recvbuf_DOUBLE[j+12] );
       pClone->setVitesseRotation( rot );
 
+      std::tuple<int,int,int> key;
+      Vecteur kdelta, prev_normal, cumulSpringTorque ;
+      for(int current_contact=0; current_contact < nb_contacts; current_contact ++ )
+      {
+        key = std::make_tuple((int)recvbuf_DOUBLE[j+30+13*current_contact],
+                  (int)recvbuf_DOUBLE[j+30+13*current_contact+1],
+                  (int)recvbuf_DOUBLE[j+30+13*current_contact+2]);
+        kdelta = Vecteur( recvbuf_DOUBLE[j+30+13*current_contact+4],
+                  recvbuf_DOUBLE[j+30+13*current_contact+5],
+                  recvbuf_DOUBLE[j+30+13*current_contact+6]) ;
+        prev_normal = Vecteur( recvbuf_DOUBLE[j+30+13*current_contact+7],
+                  recvbuf_DOUBLE[j+30+13*current_contact+8],
+                  recvbuf_DOUBLE[j+30+13*current_contact+9]) ;
+        cumulSpringTorque = Vecteur( recvbuf_DOUBLE[j+30+13*current_contact+10],
+                  recvbuf_DOUBLE[j+30+13*current_contact+11],
+                  recvbuf_DOUBLE[j+30+13*current_contact+12]) ;
+        pClone->copyContactInMap( key,
+                  (bool)recvbuf_DOUBLE[j+30+13*current_contact+3], kdelta,
+                  prev_normal, cumulSpringTorque) ;
+      }
 
       if( AdamsBashforth )
-        pClone->setCinematiqueNm2( &recvbuf_DOUBLE[NB_DOUBLE_PART*j+29] );
+        pClone->setCinematiqueNm2( &recvbuf_DOUBLE[j+29+nHC] );
       if( b_hydroForce )
       {
         pClone->set_DEMCFD_volumeFraction(
-            recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB] );
+            recvbuf_DOUBLE[j+29+nHC+nAB] );
         pClone->setVitesseTr_fluide(
-            recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB],
-            recvbuf_DOUBLE[NB_DOUBLE_PART*j+31+nAB],
-            recvbuf_DOUBLE[NB_DOUBLE_PART*j+32+nAB] );
+            recvbuf_DOUBLE[j+nHC+30+nAB],
+            recvbuf_DOUBLE[j+nHC+31+nAB],
+            recvbuf_DOUBLE[j+nHC+32+nAB] );
         pClone->setGradientPression_fluide(
-            recvbuf_DOUBLE[NB_DOUBLE_PART*j+33+nAB],
-            recvbuf_DOUBLE[NB_DOUBLE_PART*j+34+nAB],
-            recvbuf_DOUBLE[NB_DOUBLE_PART*j+35+nAB] );
+            recvbuf_DOUBLE[j+nHC+33+nAB],
+            recvbuf_DOUBLE[j+nHC+34+nAB],
+            recvbuf_DOUBLE[j+nHC+35+nAB] );
       }
       if( b_liftForce )
         pClone->setVorticity_fluide(
-            recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF],
-            recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB+nHF],
-            recvbuf_DOUBLE[NB_DOUBLE_PART*j+31+nAB+nHF] );
+            recvbuf_DOUBLE[j+nHC+29+nAB+nHF],
+            recvbuf_DOUBLE[j+nHC+30+nAB+nHF],
+            recvbuf_DOUBLE[j+nHC+31+nAB+nHF] );
       if( b_cohesiveForce )
       {
         for( int k=0; k<10; k++ )
         {
           pClone->set_VectFmaxDist(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+k+nAB+nHF+nLF],k);
+              recvbuf_DOUBLE[j+nHC+29+k+nAB+nHF+nLF],k);
           pClone->set_VectIdParticle(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+39+k+nAB+nHF+nLF],k);
+              recvbuf_DOUBLE[j+nHC+39+k+nAB+nHF+nLF],k);
           pClone->set_VectKnElast(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+49+k+nAB+nHF+nLF],k);
+              recvbuf_DOUBLE[j+nHC+49+k+nAB+nHF+nLF],k);
           pClone->set_VectKtElast(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+59+k+nAB+nHF+nLF],k);
+              recvbuf_DOUBLE[j+nHC+59+k+nAB+nHF+nLF],k);
           pClone->set_VectInitialOverlap(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+69+k+nAB+nHF+nLF],k);
+              recvbuf_DOUBLE[j+nHC+69+k+nAB+nHF+nLF],k);
         }
       }
       if( b_solidTemperature && !b_fluidTemperature )
@@ -3412,37 +3414,38 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
 //             << endl;
 
         pClone->set_solidTemperature(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF+nLF+nCF]);
+              recvbuf_DOUBLE[j+nHC+29+nAB+nHF+nLF+nCF]);
 	pClone->set_solidNusselt(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB+nHF+nLF+nCF]);
+              recvbuf_DOUBLE[j+nHC+30+nAB+nHF+nLF+nCF]);
       }
       else if( b_fluidTemperature )
       {
         pClone->set_solidTemperature(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF+nLF+nCF]);
+              recvbuf_DOUBLE[j+nHC+29+nAB+nHF+nLF+nCF]);
 	pClone->set_solidNusselt(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB+nHF+nLF+nCF]);
+              recvbuf_DOUBLE[j+nHC+30+nAB+nHF+nLF+nCF]);
         pClone->set_DEMCFD_fluidTemperature(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+31+nAB+nHF+nLF+nCF]);
+              recvbuf_DOUBLE[j+nHC+31+nAB+nHF+nLF+nCF]);
       }
       if (b_stochDrag)
-	pClone->set_rnd(recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF+nLF+nCF+nT],
-			recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB+nHF+nLF+nCF+nT],
-			recvbuf_DOUBLE[NB_DOUBLE_PART*j+31+nAB+nHF+nLF+nCF+nT]);
+	pClone->set_rnd(recvbuf_DOUBLE[j+nHC+29+nAB+nHF+nLF+nCF+nT],
+			recvbuf_DOUBLE[j+nHC+30+nAB+nHF+nLF+nCF+nT],
+			recvbuf_DOUBLE[j+nHC+31+nAB+nHF+nLF+nCF+nT]);
       if (b_stochNu)
-	pClone->set_rnd_Nu(recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF+nLF+nCF+nT+nST],
-                           recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB+nHF+nLF+nCF+nT+nST],
-                           recvbuf_DOUBLE[NB_DOUBLE_PART*j+31+nAB+nHF+nLF+nCF+nT+nST]);
+	pClone->set_rnd_Nu(recvbuf_DOUBLE[j+nHC+29+nAB+nHF+nLF+nCF+nT+nST],
+                           recvbuf_DOUBLE[j+nHC+30+nAB+nHF+nLF+nCF+nT+nST],
+                           recvbuf_DOUBLE[j+nHC+31+nAB+nHF+nLF+nCF+nT+nST]);
+
     }
     else // is not found
     {
-      if( LC->isInLinkedCell( recvbuf_DOUBLE[NB_DOUBLE_PART*j+25],
-                              recvbuf_DOUBLE[NB_DOUBLE_PART*j+26],
-                              recvbuf_DOUBLE[NB_DOUBLE_PART*j+27] ) &&
-          ( int( recvbuf_DOUBLE[NB_DOUBLE_PART*j+2] ) != m_rank ||
+      if( LC->isInLinkedCell( recvbuf_DOUBLE[j+25],
+                              recvbuf_DOUBLE[j+26],
+                              recvbuf_DOUBLE[j+27] ) &&
+          ( int( recvbuf_DOUBLE[j+2] ) != m_rank ||
             m_isMPIperiodic ) )
       {
-        classe = int( recvbuf_DOUBLE[NB_DOUBLE_PART*j+1] );
+        classe = int( recvbuf_DOUBLE[j+1] );
 
         if( Grains_Exec::m_MPI_verbose )
         {
@@ -3451,9 +3454,9 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
               << " Create Clone                                Id = "
               << id
               << " Classe = " << classe << " "
-              << recvbuf_DOUBLE[NB_DOUBLE_PART*j+25] << " "
-              << recvbuf_DOUBLE[NB_DOUBLE_PART*j+26] << " "
-              << recvbuf_DOUBLE[NB_DOUBLE_PART*j+27]
+              << recvbuf_DOUBLE[j+25] << " "
+              << recvbuf_DOUBLE[j+26] << " "
+              << recvbuf_DOUBLE[j+27]
               << endl;
           MPIWrapperGrains::addToMPIString(oss.str());
         }
@@ -3463,33 +3466,33 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
         if( (*ParticuleClassesReference)[classe]->isCompParticule() )
           new_clone = new CompParticule( id,
               (*ParticuleClassesReference)[classe],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+5],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+9],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+12],
-              &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13],
+              recvbuf_DOUBLE[j+3],
+              recvbuf_DOUBLE[j+4],
+              recvbuf_DOUBLE[j+5],
+              recvbuf_DOUBLE[j+6],
+              recvbuf_DOUBLE[j+7],
+              recvbuf_DOUBLE[j+8],
+              recvbuf_DOUBLE[j+9],
+              recvbuf_DOUBLE[j+10],
+              recvbuf_DOUBLE[j+11],
+              recvbuf_DOUBLE[j+12],
+              &recvbuf_DOUBLE[j+13],
               COMPUTE,
               2, 0 );
         else
           new_clone = new Particule( id,
               (*ParticuleClassesReference)[classe],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+5],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+9],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+12],
-              &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13],
+              recvbuf_DOUBLE[j+3],
+              recvbuf_DOUBLE[j+4],
+              recvbuf_DOUBLE[j+5],
+              recvbuf_DOUBLE[j+6],
+              recvbuf_DOUBLE[j+7],
+              recvbuf_DOUBLE[j+8],
+              recvbuf_DOUBLE[j+9],
+              recvbuf_DOUBLE[j+10],
+              recvbuf_DOUBLE[j+11],
+              recvbuf_DOUBLE[j+12],
+              &recvbuf_DOUBLE[j+13],
               COMPUTE,
               2 );
 //        // TO BE MODIFIED, GET A POINTER ONCE, THEN PERFORM TEST ON IT !!!
@@ -3498,43 +3501,66 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
 //        for (app=allApp.begin(); app!=allApp.end(); app++)
 //          if( (*app)->isName("TraineeHydro") && !b_hydroForce )
 //            new_clone->allocateDEMCFD_FluidInfos();
+
+          std::tuple<int,int,int> key;
+          Vecteur kdelta, prev_normal, cumulSpringTorque ;
+          for(int current_contact=0; current_contact < nb_contacts; current_contact ++ )
+          {
+            key = std::make_tuple((int)recvbuf_DOUBLE[j+30+13*current_contact],
+                      (int)recvbuf_DOUBLE[j+30+13*current_contact+1],
+                      (int)recvbuf_DOUBLE[j+30+13*current_contact+2]);
+            kdelta = Vecteur( recvbuf_DOUBLE[j+30+13*current_contact+4],
+                      recvbuf_DOUBLE[j+30+13*current_contact+5],
+                      recvbuf_DOUBLE[j+30+13*current_contact+6]) ;
+            prev_normal = Vecteur( recvbuf_DOUBLE[j+30+13*current_contact+7],
+                      recvbuf_DOUBLE[j+30+13*current_contact+8],
+                      recvbuf_DOUBLE[j+30+13*current_contact+9]) ;
+            cumulSpringTorque = Vecteur( recvbuf_DOUBLE[j+30+13*current_contact+10],
+                      recvbuf_DOUBLE[j+30+13*current_contact+11],
+                      recvbuf_DOUBLE[j+30+13*current_contact+12]) ;
+            new_clone->copyContactInMap( key,
+                      (bool)recvbuf_DOUBLE[j+30+13*current_contact+3], kdelta,
+                      prev_normal, cumulSpringTorque) ;
+          }
+
+
         if( b_hydroForce )
           new_clone->allocateDEMCFD_FluidInfos();
 
         if( AdamsBashforth )
-          new_clone->setCinematiqueNm2( &recvbuf_DOUBLE[NB_DOUBLE_PART*j+29] );
+          new_clone->setCinematiqueNm2( &recvbuf_DOUBLE[j+29+nHC] );
         if( b_hydroForce )
         {
           new_clone->set_DEMCFD_volumeFraction(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB] );
+              recvbuf_DOUBLE[j+29+nHC+nAB] );
           new_clone->setVitesseTr_fluide(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+31+nAB],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+32+nAB] );
+              recvbuf_DOUBLE[j+30+nHC+nAB],
+              recvbuf_DOUBLE[j+31+nHC+nAB],
+              recvbuf_DOUBLE[j+32+nHC+nAB] );
           new_clone->setGradientPression_fluide(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+33+nAB],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+34+nAB],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+35+nAB] );
+              recvbuf_DOUBLE[j+33+nHC+nAB],
+              recvbuf_DOUBLE[j+34+nHC+nAB],
+              recvbuf_DOUBLE[j+35+nHC+nAB] );
         }
         if( b_liftForce )
           new_clone->setVorticity_fluide(
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB+nHF],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+31+nAB+nHF] );
+              recvbuf_DOUBLE[j+29+nHC+nAB+nHF],
+              recvbuf_DOUBLE[j+30+nHC+nAB+nHF],
+              recvbuf_DOUBLE[j+31+nHC+nAB+nHF] );
         if( b_cohesiveForce )
         {
           for( int k=0;k<10;k++ )
           {
             new_clone->set_VectFmaxDist(
-                recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+k+nAB+nHF+nLF],k);
+                recvbuf_DOUBLE[j+29+nHC+k+nAB+nHF+nLF],k);
             new_clone->set_VectIdParticle(
-                recvbuf_DOUBLE[NB_DOUBLE_PART*j+39+k+nAB+nHF+nLF],k);
+                recvbuf_DOUBLE[j+39+nHC+k+nAB+nHF+nLF],k);
             new_clone->set_VectKnElast(
-                recvbuf_DOUBLE[NB_DOUBLE_PART*j+49+k+nAB+nHF+nLF],k);
+                recvbuf_DOUBLE[j+49+nHC+k+nAB+nHF+nLF],k);
             new_clone->set_VectKtElast(
-                recvbuf_DOUBLE[NB_DOUBLE_PART*j+59+k+nAB+nHF+nLF],k);
+                recvbuf_DOUBLE[j+59+nHC+k+nAB+nHF+nLF],k);
             new_clone->set_VectInitialOverlap(
-                recvbuf_DOUBLE[NB_DOUBLE_PART*j+69+k+nAB+nHF+nLF],k);
+                recvbuf_DOUBLE[j+69+nHC+k+nAB+nHF+nLF],k);
           }
         }
         if( b_solidTemperature && !b_fluidTemperature )
@@ -3543,30 +3569,30 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
 //               << " id " << id
 //               << " initialize  "<< recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF+nLF+nCF] << endl;
           new_clone->set_solidTemperature(
-                recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF+nLF+nCF]);
+                recvbuf_DOUBLE[j+29+nHC+nAB+nHF+nLF+nCF]);
 	  new_clone->set_solidNusselt(
-                recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB+nHF+nLF+nCF]);
+                recvbuf_DOUBLE[j+30+nHC+nAB+nHF+nLF+nCF]);
         }
         else if( b_fluidTemperature )
         {
           new_clone->set_solidTemperature(
-                recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF+nLF+nCF]);
+                recvbuf_DOUBLE[j+29+nHC+nAB+nHF+nLF+nCF]);
 	  new_clone->set_solidNusselt(
-                recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB+nHF+nLF+nCF]);
+                recvbuf_DOUBLE[j+30+nHC+nAB+nHF+nLF+nCF]);
           new_clone->set_DEMCFD_fluidTemperature(
-                recvbuf_DOUBLE[NB_DOUBLE_PART*j+31+nAB+nHF+nLF+nCF]);
+                recvbuf_DOUBLE[j+31+nHC+nAB+nHF+nLF+nCF]);
         }
         if (b_stochDrag)
         {
-	 new_clone->set_rnd(recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF+nLF+nCF+nT],
-			recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB+nHF+nLF+nCF+nT],
-			recvbuf_DOUBLE[NB_DOUBLE_PART*j+31+nAB+nHF+nLF+nCF+nT]);
+	 new_clone->set_rnd(recvbuf_DOUBLE[j+29+nHC+nAB+nHF+nLF+nCF+nT],
+			recvbuf_DOUBLE[j+30+nHC+nAB+nHF+nLF+nCF+nT],
+			recvbuf_DOUBLE[j+31+nHC+nAB+nHF+nLF+nCF+nT]);
         }
          if (b_stochNu)
         {
-	 new_clone->set_rnd_Nu(recvbuf_DOUBLE[NB_DOUBLE_PART*j+29+nAB+nHF+nLF+nCF+nT+nST],
-                               recvbuf_DOUBLE[NB_DOUBLE_PART*j+30+nAB+nHF+nLF+nCF+nT+nST],
-                               recvbuf_DOUBLE[NB_DOUBLE_PART*j+31+nAB+nHF+nLF+nCF+nT+nST]);
+	 new_clone->set_rnd_Nu(recvbuf_DOUBLE[j+29+nHC+nAB+nHF+nLF+nCF+nT+nST],
+                               recvbuf_DOUBLE[j+30+nHC+nAB+nHF+nLF+nCF+nT+nST],
+                               recvbuf_DOUBLE[j+31+nHC+nAB+nHF+nLF+nCF+nT+nST]);
         }
        // Ajout dans le LinkedCell
         LC->Link( new_clone );
@@ -3579,6 +3605,9 @@ void MPIWrapperGrains::UpdateOrCreateClones(Scalar time,
         AccessToClones.insert( pair<int,Particule*>( id, new_clone ) );
       }
     }
+
+    j += NB_DOUBLE_PART ;
+
   }
 
   /* Mise a jour des donnees des particules elementaires */

@@ -36,7 +36,7 @@ CompObstacle::CompObstacle( DOMNode* root ) :
 
   Obstacle *obstacle = NULL;
   DOMNodeList* allObstacles = ReaderXML::getNodes(root);
-  for (XMLSize_t i=0; i<allObstacles->getLength(); i++) 
+  for (XMLSize_t i=0; i<allObstacles->getLength(); i++)
   {
     obstacle = Obstacle_BuilderFactory::create( allObstacles->item( i ) );
     m_obstacles.push_back(obstacle);
@@ -54,7 +54,7 @@ CompObstacle::~CompObstacle()
 {
   Obstacle *obstacle;
   list<Obstacle*>::iterator iter;
-  for (iter=m_obstacles.begin(); iter!=m_obstacles.end(); iter++) 
+  for (iter=m_obstacles.begin(); iter!=m_obstacles.end(); iter++)
   {
     obstacle = *iter;
     delete obstacle;
@@ -83,19 +83,19 @@ void CompObstacle::append( Obstacle* obstacle )
 bool CompObstacle::Associer( ObstacleChargement &chargement )
 {
   bool status = false;
-  if ( m_nom == chargement.getNom() ) 
+  if ( m_nom == chargement.getNom() )
   {
     m_cinematique.append( chargement );
     status = true;
-  } 
-  else 
+  }
+  else
   {
     list<Obstacle*>::iterator obstacle;
     for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
       status = (*obstacle)->Associer( chargement );
   }
-  
-  return status;  
+
+  return status;
 }
 
 
@@ -109,19 +109,19 @@ bool CompObstacle::Associer( ObstacleChargement &chargement )
 bool CompObstacle::Associer( ObstacleChargement_F &chargement )
 {
   bool status = false;
-  if ( m_nom == chargement.getNom() ) 
+  if ( m_nom == chargement.getNom() )
   {
     m_confinement.append( chargement );
     status = true;
-  } 
-  else 
+  }
+  else
   {
     list<Obstacle*>::iterator obstacle;
     for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
       status = (*obstacle)->Associer( chargement );
   }
-  
-  return status;  
+
+  return status;
 }
 
 
@@ -133,15 +133,15 @@ bool CompObstacle::Associer( ObstacleChargement_F &chargement )
 // On affecte cette vitesse aux composants
 // On evalue la vitesse de chaque composant dans l'espace temps
 // G.FERRER - Octo.2002 - Creation
-list<MonObstacle*> CompObstacle::Deplacer( Scalar temps, Scalar dt, 
-	const bool &b_deplaceCine_Comp, 
+list<MonObstacle*> CompObstacle::Deplacer( Scalar temps, Scalar dt,
+	const bool &b_deplaceCine_Comp,
 	const bool &b_deplaceF_Comp )
 {
   m_deplace = m_cinematique.Deplacement( temps, dt );
   m_deplace = m_deplace || b_deplaceCine_Comp;
 
   // Deplacement du centre du composite
-  if ( m_deplace && Obstacle::m_DeplaceObstacle ) 
+  if ( m_deplace && Obstacle::m_DeplaceObstacle )
   {
     Vecteur const* translation = m_cinematique.getTranslation();
     *m_geoFormeVdw += *translation;
@@ -154,35 +154,35 @@ list<MonObstacle*> CompObstacle::Deplacer( Scalar temps, Scalar dt,
 
   // Deplacement des obstacles
   list<Obstacle*>::iterator obstacle;
-  if ( m_deplace ) 
+  if ( m_deplace )
   {
     Vecteur levier;
-    for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+    for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
     {
       levier = *(*obstacle)->getPosition() - centre;
       (*obstacle)->Decompose( m_cinematique, levier );
     }
   }
-  
-  
+
+
   bool deplaceF = m_confinement.Deplacement( temps, dt, this );
-  deplaceF = deplaceF || b_deplaceF_Comp;    
-  
-  if ( deplaceF ) 
+  deplaceF = deplaceF || b_deplaceF_Comp;
+
+  if ( deplaceF )
     for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
       (*obstacle)->Decompose( m_confinement, *(*obstacle)->getPosition() );
 
-  m_deplace = m_deplace || deplaceF; // ??? demander à Gillos !!
+  m_deplace = m_deplace || deplaceF; // ??? demander ï¿½ Gillos !!
 
   list<MonObstacle*> obstacleEnDeplacement;
-  list<MonObstacle*>::iterator ilo;     
+  list<MonObstacle*>::iterator ilo;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) {
-    list<MonObstacle*> lod = (*obstacle)->Deplacer( temps, dt, m_deplace, 
+    list<MonObstacle*> lod = (*obstacle)->Deplacer( temps, dt, m_deplace,
     	deplaceF );
-    for (ilo=lod.begin();ilo!=lod.end();ilo++) 
+    for (ilo=lod.begin();ilo!=lod.end();ilo++)
       obstacleEnDeplacement.push_back(*ilo);
   }
-  
+
   return obstacleEnDeplacement;
 }
 
@@ -197,12 +197,12 @@ void CompObstacle::EvalPosition()
   Point centre;
   int nbre=0;
   list<Obstacle*>::iterator obstacle;
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); 
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end();
       nbre++, obstacle++)
     centre += *(*obstacle)->getPosition();
   centre /= nbre;
   setPosition(centre);
-  
+
 }
 
 
@@ -215,14 +215,14 @@ const Obstacle* CompObstacle::getNom( const string &nom_ ) const
 {
   const Obstacle *obst = NULL;
   if ( m_nom == nom_ ) obst = (Obstacle*)this;
-  else 
+  else
   {
     list<Obstacle*>::const_iterator obstacle;
-    for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end() && 
+    for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end() &&
     	obst == NULL; obstacle++)
       obst = (*obstacle)->getNom( nom_ );
   }
-  
+
   return obst;
 }
 
@@ -234,14 +234,14 @@ const Obstacle* CompObstacle::getNom( const string &nom_ ) const
 list<MonObstacle*> CompObstacle::getObstacles()
 {
   list<MonObstacle*> liste;
-  
+
   list<Obstacle*>::iterator obstacle;
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
   {
     list<MonObstacle*> tmp = (*obstacle)->getObstacles();
     liste.insert(liste.end(), tmp.begin(), tmp.end());
   }
-  
+
   return liste;
 }
 
@@ -256,15 +256,15 @@ list<Obstacle*> CompObstacle::getObstaclesToFluid()
 {
 //  list<MonObstacle*> liste;
   list<Obstacle*> liste;
-  
+
   list<Obstacle*>::iterator obstacle;
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
   {
 //    list<MonObstacle*> tmp = (*obstacle)->getObstaclesToFluid();
     list<Obstacle*> tmp = (*obstacle)->getObstaclesToFluid();
     liste.insert(liste.end(), tmp.begin(), tmp.end());
   }
-  
+
   return liste;
 }
 
@@ -278,9 +278,9 @@ list<Obstacle*> CompObstacle::getObstaclesToFluid()
 bool CompObstacle::isContact( const Composant* voisin ) const
 {
   bool contact = false;
-    
+
   list<Obstacle*>::const_iterator obstacle;
-  for (obstacle=m_obstacles.begin(); 
+  for (obstacle=m_obstacles.begin();
        obstacle!=m_obstacles.end() && !contact; obstacle++)
   {
     if ( voisin->isCompObstacle() )
@@ -302,9 +302,9 @@ bool CompObstacle::isContact( const Composant* voisin ) const
 bool CompObstacle::isContactVdW( const Composant* voisin ) const
 {
   bool contact = false;
-    
+
   list<Obstacle*>::const_iterator obstacle;
-  for (obstacle=m_obstacles.begin(); 
+  for (obstacle=m_obstacles.begin();
        obstacle!=m_obstacles.end() && !contact; obstacle++)
   {
     if ( voisin->isCompObstacle() )
@@ -326,9 +326,9 @@ bool CompObstacle::isContactVdW( const Composant* voisin ) const
 bool CompObstacle::isProche( const Composant* voisin ) const
 {
   bool contact = false;
-    
+
   list<Obstacle*>::const_iterator obstacle;
-  for (obstacle=m_obstacles.begin(); 
+  for (obstacle=m_obstacles.begin();
        obstacle!=m_obstacles.end() && !contact; obstacle++)
     if ( voisin->isCompObstacle() )
       contact = voisin->isProche( *obstacle );
@@ -348,9 +348,9 @@ bool CompObstacle::isProche( const Composant* voisin ) const
 bool CompObstacle::isProcheVdW( const Composant* voisin ) const
 {
   bool contact = false;
-    
+
   list<Obstacle*>::const_iterator obstacle;
-  for (obstacle=m_obstacles.begin(); 
+  for (obstacle=m_obstacles.begin();
        obstacle!=m_obstacles.end() && !contact; obstacle++)
     if ( voisin->isCompObstacle() )
       contact = voisin->isProcheVdW( *obstacle );
@@ -369,14 +369,14 @@ void CompObstacle::reload( Obstacle &obstacle, istream &file )
 {
   string ttag;
   file >> ttag;
-  while ( ttag != "</Composite>" ) 
+  while ( ttag != "</Composite>" )
   {
     Obstacle_BuilderFactory::reload( ttag, *this, file );
     file >> ttag;
   }
   EvalPosition();
   obstacle.append(this);
-}    
+}
 
 
 
@@ -411,13 +411,13 @@ void CompObstacle::Rotate( const Quaternion &rotation )
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Suppression de l'obstacle dans la zone specifie. 
+// Suppression de l'obstacle dans la zone specifie.
 // Supprime les obstacles contenus se trouvant dans la zone.
 // G.FERRER - Fevr.2004 - Creation
 void CompObstacle::Suppression( const BBox &box )
 {
   list<Obstacle*>::iterator obstacle;
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); ) 
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); )
   {
     (*obstacle)->Suppression( box );
     if ( (*obstacle)->isIn( box ) ) obstacle = m_obstacles.erase(obstacle);
@@ -503,7 +503,7 @@ void CompObstacle::GMVoutput( ostream &fileOut ) const
 void CompObstacle::DestroyObstacle( const string &name_ )
 {
   list<Obstacle*>::iterator obstacle;
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); ) 
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); )
   {
     if ( (*obstacle)->getName() == name_ ||
     	 (*obstacle)->getName() == "ToBeDestroyed" )
@@ -512,13 +512,13 @@ void CompObstacle::DestroyObstacle( const string &name_ )
       delete *obstacle;
       obstacle = m_obstacles.erase(obstacle);
     }
-    else 
+    else
     {
       (*obstacle)->DestroyObstacle( name_ );
       obstacle++;
     }
-  }       
-}  
+  }
+}
 
 
 
@@ -529,7 +529,7 @@ void CompObstacle::DestroyObstacle( const string &name_ )
 void CompObstacle::SupprimeObstacle( const string &name_, LinkedCell *LC )
 {
   list<Obstacle*>::iterator obstacle;
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end();obstacle++) 
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end();obstacle++)
   {
     if ( (*obstacle)->getName() == name_ )
     {
@@ -538,10 +538,10 @@ void CompObstacle::SupprimeObstacle( const string &name_, LinkedCell *LC )
       for(il=allObs.begin(); il!=allObs.end(); il++)
         (*il)->SupprimeObstacle( "ToBeErased", LC );
     }
-    else 
+    else
       (*obstacle)->SupprimeObstacle( name_, LC );
-  }   
-}  
+  }
+}
 
 
 
@@ -552,38 +552,38 @@ void CompObstacle::SupprimeObstacle( const string &name_, LinkedCell *LC )
 void CompObstacle::updateIndicator( Scalar temps, Scalar dt )
 {
   list<Obstacle*>::iterator obstacle;
-  
+
   if ( m_cinematique.rotationEnCours( temps, dt ) )
-      getObstacles().front()->setIndicator( 1. );  
-  
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)   
+      getObstacles().front()->setIndicator( 1. );
+
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
     (*obstacle)->updateIndicator( temps, dt );
-}  
-
-
-
-
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Cree et ajoute l'etat 
-void CompObstacle::createState( list<struct ObstacleState*> &obsStates )
-{
-  struct ObstacleState* obss = new ObstacleState;
-  obss->nom = m_nom;
-  obss->memento_config = new ConfigurationMemento();  
-  obss->memento_config->m_position = *m_geoFormeVdw->getTransform();
-  obss->memento_cine = m_cinematique.createState();
-  obsStates.push_back( obss );
-  
-  for (list<Obstacle*>::const_iterator obstacle=m_obstacles.begin(); 
-  	obstacle!=m_obstacles.end();obstacle++)
-    (*obstacle)->createState( obsStates );  
 }
 
 
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Restauration de l'etat 
+// Cree et ajoute l'etat
+void CompObstacle::createState( list<struct ObstacleState*> &obsStates )
+{
+  struct ObstacleState* obss = new ObstacleState;
+  obss->nom = m_nom;
+  obss->memento_config = new ConfigurationMemento();
+  obss->memento_config->m_position = *m_geoFormeVdw->getTransform();
+  obss->memento_cine = m_cinematique.createState();
+  obsStates.push_back( obss );
+
+  for (list<Obstacle*>::const_iterator obstacle=m_obstacles.begin();
+  	obstacle!=m_obstacles.end();obstacle++)
+    (*obstacle)->createState( obsStates );
+}
+
+
+
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Restauration de l'etat
 void CompObstacle::restaureState( list<struct ObstacleState*>& obsStates )
 {
   list<struct ObstacleState*>::iterator il;
@@ -594,17 +594,17 @@ void CompObstacle::restaureState( list<struct ObstacleState*>& obsStates )
       m_geoFormeVdw->setTransform((*il)->memento_config->m_position);
       m_cinematique.restaureState((*il)->memento_cine);
       delete (*il)->memento_config;
-      delete (*il)->memento_cine;    
-      delete *il;      
+      delete (*il)->memento_cine;
+      delete *il;
       il = obsStates.erase(il) ;
-      found = true ; 
+      found = true ;
     }
     else il++;
-    
-  for (list<Obstacle*>::iterator obstacle=m_obstacles.begin(); 
+
+  for (list<Obstacle*>::iterator obstacle=m_obstacles.begin();
   	obstacle!=m_obstacles.end();obstacle++)
-    (*obstacle)->restaureState( obsStates );       
-} 
+    (*obstacle)->restaureState( obsStates );
+}
 
 
 
@@ -614,10 +614,10 @@ void CompObstacle::restaureState( list<struct ObstacleState*>& obsStates )
 // A.WACHS - Mai.2012 - Creation
 void CompObstacle::InitializeForce( bool const& withWeight )
 {
-  for (list<Obstacle*>::iterator obstacle=m_obstacles.begin(); 
-  	obstacle!=m_obstacles.end(); obstacle++)   
+  for (list<Obstacle*>::iterator obstacle=m_obstacles.begin();
+  	obstacle!=m_obstacles.end(); obstacle++)
     (*obstacle)->InitializeForce( false );
-}    
+}
 
 
 
@@ -627,14 +627,14 @@ void CompObstacle::InitializeForce( bool const& withWeight )
 // A.WACHS - Mai.2012 - Creation
 Torseur const* CompObstacle::getTorseur()
 {
-  m_somme.setToBodyForce( *getPosition(), VecteurNul );  
+  m_somme.setToBodyForce( *getPosition(), VecteurNul );
 
-  for (list<Obstacle*>::iterator obstacle=m_obstacles.begin(); 
+  for (list<Obstacle*>::iterator obstacle=m_obstacles.begin();
   	obstacle!=m_obstacles.end(); obstacle++)
     m_somme += *(*obstacle)->getTorseur();
 
-  return &m_somme;  
-} 
+  return &m_somme;
+}
 
 
 
@@ -695,7 +695,7 @@ int CompObstacle::numberOfCells_PARAVIEW() const
 // ----------------------------------------------------------------------------
 // Ecrit les points du convexe pour post-processing avec Paraview
 // D. RAKOTONIRINA - Dec. 2014 - Creation
-void CompObstacle::write_polygonsPts_PARAVIEW( ostream &f, 
+void CompObstacle::write_polygonsPts_PARAVIEW( ostream &f,
   	Vecteur const* translation ) const
 {
   cout << "Warning when calling CompObstacle::write_polygonsPts_PARAVIEW() "
@@ -708,7 +708,7 @@ void CompObstacle::write_polygonsPts_PARAVIEW( ostream &f,
 
 
 // ----------------------------------------------------------------------------
-// Ecrit les points du convexe pour post-processing avec Paraview  
+// Ecrit les points du convexe pour post-processing avec Paraview
 void CompObstacle::write_polygonsStr_PARAVIEW(list<int> &connectivity,
     	list<int> &offsets, list<int> &cellstype, int& firstpoint_globalnumber,
 	int& last_offset) const
@@ -778,7 +778,7 @@ bool CompObstacle::ContactInMapIsActive( double* &tangentialDepl, int const& id 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Add new contact in the map
-void CompObstacle::addNewContactInMap( double const& tangentialDepl, 
+void CompObstacle::addNewContactInMap( double const& tangentialDepl,
 	int const& id )
 {
   cout << "Warning when calling CompObstacle::addNewContactInMap() "
@@ -792,10 +792,39 @@ void CompObstacle::addNewContactInMap( double const& tangentialDepl,
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Increase cumulative tangential displacement with component id
-void CompObstacle::addDeplContactInMap( double const& tangentialDepl, 
+void CompObstacle::addDeplContactInMap( double const& tangentialDepl,
 	int const& id )
 {
   cout << "Warning when calling CompObstacle::addDeplContactInMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+void CompObstacle::copyHistoryContacts( double* &destination, int start_index )
+{
+  cout << "Warning when calling CompObstacle::copyHistoryContacts() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+// ----------------------------------------------------------------------------
+// Copy existing contact in the map
+void CompObstacle::copyContactInMap( std::tuple<int,int,int> const& id,
+  bool const& isActive, int const& nbDtRemember, int const& nbCumulTangent,
+  Vecteur const& tangent, Vecteur const& prev_normal,
+  Vecteur const& cumulSpringTorque )
+{
+  cout << "Warning when calling CompObstacle::copyContactInMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+int CompObstacle::getContactMapSize()
+{
+  cout << "Warning when calling CompObstacle::getContactMapSize() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);

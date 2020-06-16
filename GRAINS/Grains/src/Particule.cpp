@@ -1659,6 +1659,9 @@ void Particule::read2014( istream &fileSave, vector<Particule*> const*
   	m_geoFormeVdw->getConvex() );
   fileSave >> *m_cinematique;
 
+  // Read the contact memories of the particle (if any)
+  readContactMap_2014( fileSave );
+
   // Calcul de la masse volumique et du poids
   m_masseVolumique = m_masse / m_geoFormeVdw->getVolume();
   computeWeight();
@@ -1673,7 +1676,7 @@ void Particule::read2014( istream &fileSave, vector<Particule*> const*
 // en binaire
 // A.WACHS - Dec 2014 - Creation
 void Particule::read2014_binary( istream &fileSave, vector<Particule*> const*
-  	ParticuleClassesReference )
+  	ParticuleClassesReference, bool const& contact_history_storage )
 {
   // Lecture du n\B0 et de la classe de reference
   fileSave.read( reinterpret_cast<char*>( &m_id ), sizeof(int) );
@@ -1718,12 +1721,16 @@ void Particule::read2014_binary( istream &fileSave, vector<Particule*> const*
   	m_geoFormeVdw->getConvex() );
   m_cinematique->readCineParticule2014_binary( fileSave );
 
+  if (contact_history_storage)
+  {
+    // Read the contact memories of the particle (if any)
+    readContactMap_binary( fileSave );
+  }
+
   // Calcul de la masse volumique et du poids
   m_masseVolumique = m_masse / m_geoFormeVdw->getVolume();
   computeWeight();
 }
-
-
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1794,6 +1801,8 @@ void Particule::write2014( ostream &fileSave ) const
   m_geoFormeVdw->getTransform()->writeTransform2014( fileSave );
   fileSave << " " << ( m_activity == COMPUTE ? true : false ) << " ";
   m_cinematique->writeCineParticule2014( fileSave );
+  fileSave << " ";
+  writeContactMemory_2014( fileSave );
   fileSave << endl;
 }
 
@@ -1812,6 +1821,7 @@ void Particule::write2014_binary( ostream &fileSave )
   unsigned int iact = m_activity == COMPUTE ? true : false ;
   fileSave.write( reinterpret_cast<char*>( &iact ), sizeof(unsigned int) );
   m_cinematique->writeCineParticule2014_binary( fileSave );
+  writeContactMemory_binary( fileSave );
 }
 
 
@@ -2754,4 +2764,25 @@ Scalar Particule::set_shrinking_mass()
 {
   m_masse = m_masseVolumique * m_geoFormeVdw->getVolume();
   return( m_masse );
+}
+
+
+void Particule::copyHistoryContacts( double* &destination, int start_index )
+{
+  Composant::copyHistoryContacts( destination, start_index ) ;
+}
+
+// ----------------------------------------------------------------------------
+// Copy existing contact in the map
+void Particule::copyContactInMap( std::tuple<int,int,int> const& id,
+  bool const& isActive, Vecteur const& tangent, Vecteur const& prev_normal,
+  Vecteur const& cumulSpringTorque )
+{
+  Composant::copyContactInMap( id, isActive, tangent, prev_normal,
+    cumulSpringTorque ) ;
+}
+
+int Particule::getContactMapSize()
+{
+  return ( Composant::getContactMapSize() );
 }
