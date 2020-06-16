@@ -969,6 +969,7 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
                  } else if (dir == 2) {
                     ii = k;jj = i; kk = j;
                  }
+
                  for (size_t off=0;off<2;off++) {
                     size_t left, right;
                     if (off == 0) {
@@ -1117,7 +1118,7 @@ DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const&
      xcenter = FF->get_DOF_coordinate( side(off), comp, dir ) ;
   } else {
      // Bisection method algorithm
-     while (MAC::abs(xright-xleft) > 1.E-15) {
+     while (MAC::abs(xright-xleft) > 1.E-14) {
         xcenter = (xleft+xright)/2.;
         if (dir == 0) {
            funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
@@ -2518,7 +2519,6 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    GLOBAL_EQ->synchronize_DS_solution_vec();
    // Tranfer back to field
    UF->update_free_DOFs_value( 3, GLOBAL_EQ->get_solution_DS_velocity() ) ;
-
    if (is_solids) nodes_field_initialization(3);
 
    Solve_i_in_jk(UF,t_it,1,0,2,gamma,1);
@@ -2542,6 +2542,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
       UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
       if (is_solids) nodes_field_initialization(0);
    }
+
 }
 
 //---------------------------------------------------------------------------
@@ -3047,7 +3048,7 @@ DDS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: correct_mean_pressure ( )
+DDS_NavierStokes:: correct_mean_pressure (size_t const& level )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: correct_mean_pressure" ) ;
@@ -3078,7 +3079,7 @@ DDS_NavierStokes:: correct_mean_pressure ( )
            if (is_solids) {
               size_t p = return_node_index(PF,comp,i,j,k);
               if (node.void_frac[comp]->item(p) == 0) {
-                 mean += PF->DOF_value( i, j, k, comp, 0 );
+                 mean += PF->DOF_value( i, j, k, comp, level );
                  nb_global_unknown += 1.;
               }
            }   
@@ -3097,7 +3098,7 @@ DDS_NavierStokes:: correct_mean_pressure ( )
            if (is_solids) {
               size_t p = return_node_index(PF,comp,i,j,k);
               if (node.void_frac[comp]->item(p) == 0) {
-                 double value = PF->DOF_value( i, j, k, comp, 0 );
+                 double value = PF->DOF_value( i, j, k, comp, level );
                  GLOBAL_EQ->update_global_P_vector(i,j,k,value-mean);
               }
            }
@@ -3108,7 +3109,7 @@ DDS_NavierStokes:: correct_mean_pressure ( )
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec_P();
   // Tranfer back to field
-  PF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+  PF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_pressure() ) ;
 
 }
 
@@ -3141,6 +3142,14 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
      PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
   }
   
+  if (PF->all_BCs_nonDirichlet(0)) {
+     correct_mean_pressure(1);
+  }
+
+  if (is_solids) {
+     correct_pressure_1st_layer_solid(1);
+     correct_pressure_2nd_layer_solid(1);
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -3362,7 +3371,9 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    // Tranfer back to field
    PF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_pressure() ) ;
 
-   if (PF->all_BCs_nonDirichlet(0)) correct_mean_pressure( );
+   if (PF->all_BCs_nonDirichlet(0)) {
+      correct_mean_pressure(0);
+   }
 
    if (is_solids) {
       correct_pressure_1st_layer_solid(0);

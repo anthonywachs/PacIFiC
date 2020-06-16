@@ -208,7 +208,7 @@ public SolverComputingTime
       
       void correct_pressure_2nd_layer_solid (size_t const& level );
 
-      void correct_mean_pressure ( );
+      void correct_mean_pressure (size_t const& level );
 
       /** @brief Solve interface unknowns for both fields in any particular direction */
       void solve_interface_unknowns( FV_DiscreteField* FF, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field );
