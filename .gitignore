@@ -36,6 +36,7 @@
 *.so.*
 PacIFiC-*.env.sh
 GRAINS/Env/grains-*.env.sh
+.tags*
 
 # Folders
 Cartesian/MacWorld/hypre-2.10.1/*

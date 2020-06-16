@@ -207,6 +207,9 @@ void GrainsMPI::Simulation( bool predict, bool isPredictorCorrector,
           m_composants.getParticulesActives()->size() );
       if( b_perfTiming ) SCT_get_elapsed_time( "ParticulesInsertion" );
 
+      // Initialisation des maps de contact
+      m_composants.setAllContactMapToFalse();
+
       // Calcul des forces
       if ( b_perfTiming ) SCT_set_start( "CalculerForces" );
       // Initialisation des torseurs de force
@@ -244,6 +247,9 @@ void GrainsMPI::Simulation( bool predict, bool isPredictorCorrector,
       {
           m_composants.ComputeTemperature( m_temps, m_dt );
       }
+
+      // Mise a jour des maps de contact
+      m_composants.updateAllContactMaps();
 
       // Deplacement des composants
       if ( b_perfTiming ) SCT_set_start( "Deplacer" );

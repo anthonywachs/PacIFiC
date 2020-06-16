@@ -25,11 +25,10 @@ ERHContact::ERHContact( map<string,double>& parameters ) :
   k_m_s = parameters["kms"  ];
   eta_r = parameters["nr"   ];
   mu_r  = parameters["mur"  ];
-  Jn    = parameters["Jn"   ];
   m_f     = parameters["f"  ];
   epsilon = parameters["eps"];
 
-  if ( (!k_m_s) || (!eta_r) || (!mu_r) || (!Jn) || (!m_f) )
+  if ( (k_m_s) || (eta_r) || (mu_r) )
   {
     rolling_friction = true;
   }
@@ -105,7 +104,7 @@ void ERHContact::performForcesCalculusPP( Composant* p0_,
   diss +=  - v_t * delFT;
 
   // Moment de friction de roulement
-  if ( k_m_s )
+  if ( rolling_friction )
   {
     // Calcul de la vitesse de rotation relative
     Vecteur w = *p0_->getVitesseRotation() - *p1_->getVitesseRotation();
@@ -124,30 +123,58 @@ void ERHContact::performForcesCalculusPP( Composant* p0_,
 }
 
 
+void ERHContact::computeTangentialVector(Vecteur& tij, double n_t, const Vecteur ut,
+      const Vecteur kdelta)
+{
+  // Definition of the tangential vector (cf Costa et.al., 2015)
+  if (Norm(ut) > 0.001)
+  {
+    tij = - ut/Norm(ut);
+  }
+  else if ((Norm(kdelta)>epsilon || Norm(n_t*ut)>epsilon) &&
+      Norm(kdelta + n_t*ut)>epsilon)
+  {
+    tij = -(kdelta + n_t*ut) / Norm(kdelta + n_t*ut) ;
+  }
+  else
+  {
+    tij=Vecteur(0.);
+  }
+}
+
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Calcul effectif des forces & moments de contact
 void ERHContact::performForcesCalculus( Composant* p0_,
 	Composant* p1_, Scalar dt, PointContact &contactInfos,
-	Vecteur &delFN, Vecteur &delFT, Vecteur &delM)
+	Vecteur &delFN, Vecteur &delFT, Vecteur &delM,
+  int elementary_id0,
+  int elementary_id1, bool forget_contact)
 {
-  int *pnbCumulTangent = NULL;
-  Vecteur *pvectorTangentFriction = NULL;
-  double *ptangentialDepl = NULL;
-  Vecteur *pspringRotFriction = NULL;
-  double normFTHistory = 0.;
-  Vecteur frictionTorque = 0.;
-  double tangdepl;
-  Vecteur vectorTF;
-  Vecteur w ;
-  Vecteur wn ;
-  Vecteur wt ;
-  double radius ;
-  double radius1 ;
-  double Req = 0. ;
-  double kr ;
-  double Cr ;
-  double max_normFtorque ;
+  Vecteur *kdelta = NULL; // previous vector ks * tangential displacement
+  Vecteur current_kdelta = Vecteur(0.) ; // current vector ks * tangential displacement
+  Vecteur *pprev_normal = NULL; // previous vector normal to the contact plane
+  Vecteur *pspringRotFriction = NULL; // previous rolling friction spring-torque
+  Vecteur frictionTorque = Vecteur(0.);
+  Vecteur tij = Vecteur(0.); // tangential vector (lives in the contact plane)
+  Quaternion qrot=0.; // rotation from the previous to the current contact plane
+  Vecteur w ; // relative angular velocity
+  Vecteur wn ; // normal relative angular velocity
+  Vecteur wt ; // tangential relative angular velocity
+  double radius ; // radius of particle 0 (if any)
+  double radius1 ; // radius of particle 1
+  double Req = 0. ; // effective radius
+  double kr = 0.; // spring torque stiffness
+  double Cr = 0.; // critical torque (cf. Ai, 2011)
+  double max_normFtorque = 0.; // saturation friction torque
+  std::tuple<int,int,int> idmap0; // id of this contact for particle 0
+  std::tuple<int,int,int> idmap1; // id of this contact for particle 1
+  Vecteur unaltered_kdelta, unaltered_prevnormal,
+          unaltered_pspringRotFriction; // unaltered quantities in case of post-
+          // processing computations
+
+  idmap0 = std::make_tuple(elementary_id0,p1_->getID(),elementary_id1);
+  idmap1 = std::make_tuple(elementary_id1,p0_->getID(),elementary_id0);
 
   // Calcul des forces & moments de contact
   // --------------------------------------
@@ -185,13 +212,21 @@ void ERHContact::performForcesCalculus( Composant* p0_,
     Req = p0_->getRayon();
     omega0 = sqrt( 2. * stiff / avmass );
   }
+  // Previous calculations of the parameters of Grains3D
   Scalar muen = - omega0 * log(en) / sqrt( PI * PI + log(en) * log(en) );
   delFN += - muen * 2.0 * avmass * v_n;
+  if (delFN * normal < 0) delFN=Vecteur(0.);
   Scalar normFN = Norm( delFN );
 
   // Force tangentielle de dissipation
   delFT = v_t * ( -muet * 2.0 * avmass );
 
+  // ------------------------------------------------------------------------ //
+  // From here, implementation of the contact model with history (or memory):
+  // spring-dashpot models for the tangential forces and the torques.
+  // ------------------------------------------------------------------------ //
+
+  // First, definition of the rolling friction parameters
   if ( rolling_friction )
   {
     radius = p0_->getRayon() ;
@@ -200,145 +235,183 @@ void ERHContact::performForcesCalculus( Composant* p0_,
       radius1 = p1_->getRayon() ;
       Req = radius * radius1 / (radius + radius1) ;
     }
-    //Req to be changed to be able to handle particle-particle contacts
-    kr = 2*Jn*Req*normFN ;
-    Cr = 2*eta_r*sqrt(3./4 * avmass *kr) * radius;
-    // cout << "mur=" << mu_r << ", Req=" << Req << ", normFN=" << normFN << endl;
+    kr = 3 * stiff * mu_r * mu_r * Req * Req ; //Cf Jiang et al (2005,2015)
+    Cr = 3 * (muen * 2.0 * avmass) * mu_r * mu_r * Req * Req ; //Cf Jiang et al (2005,2015)
+    // --- Alternative (obsolete) definition of the rolling friction parameters
+    // --- Cf Lighhhts documentation, Ai et al (2011), Jiang et al (2005,2015)
+    // kr = 2.25 * stiff * mu_r * mu_r * Req * Req ;
+    // Cr = 2*eta_r*sqrt(3./4 * avmass *kr) * Req;
+    // --- End of alternative definition of rolling friction parameters
     max_normFtorque = mu_r * Req * normFN ;
-    // cout << "Max torque = " << max_normFtorque << endl ;
     // Calcul de la vitesse de rotation relative
     w = *p0_->getVitesseRotation() - *p1_->getVitesseRotation();
     wn = ( w * normal ) * normal;
     wt = w - wn ;
   }
 
-  // Deplacement cumulatif au point de contact
-  tangdepl = Norm(v_t) * dt;
-  vectorTF=tangent;
-
-  if ( p0_->ContactInMapIsActive( p1_->getID(), pnbCumulTangent,
-    pvectorTangentFriction, ptangentialDepl, pspringRotFriction) )
+  // CASE 1: the contact already exists
+  if ( p0_->getContactMemory( idmap0, kdelta, pprev_normal, pspringRotFriction))
   {
-    // Friction in translation
-    *ptangentialDepl += tangdepl;
-    if (normv_t>epsilon){
-      *pvectorTangentFriction=tangent;
-      *pnbCumulTangent = 0.;
+    if (forget_contact)
+    {
+      unaltered_kdelta = *kdelta;
+      unaltered_prevnormal = *pprev_normal;
+      unaltered_pspringRotFriction = *pspringRotFriction;
     }
-    else{
-      if (normv_t>EPS){
-        Scalar scaleNbCumulTangent=*pnbCumulTangent;
-        vectorTF=*pvectorTangentFriction;
-        if (vectorTF*v_t<0.){
-          //making sure the tangential vector points along -v_t
-          scaleNbCumulTangent*=-1;
-        }
-        *pvectorTangentFriction *= (scaleNbCumulTangent);
-        *pvectorTangentFriction+=tangent;
-        // Making sure there is no normal component on the tangential vector
-        *pvectorTangentFriction-=(*pvectorTangentFriction*normal)*normal;
-        *pvectorTangentFriction/=Norm(*pvectorTangentFriction);
-        (*pnbCumulTangent)+=1;
-      }
-      // Nothing to do if normv_t<EPS
+    // a) Friction in translation
+    // The first step is to make sure the contribution of the spring component
+    // of the tangential friction lies in the tangential plane, which may have
+    // slighlty rotated since the last time steps.
+    qrot.setFromRotTwoVectors(*pprev_normal,normal) ;
+    *kdelta = qrot.rotateVector(*kdelta);
+    // Now we add the contribution of the last time step to the spring component
+    // (we do so by using trapezoidal integration, hence the use of the velocity
+    // at this time step)
+    *kdelta += dt*ks*v_t ;
+    computeTangentialVector(tij, muet * 2.0 * avmass, v_t, *kdelta);
+    if (Norm(-*kdelta - v_t * ( muet * 2.0 * avmass )) > muec * normFN)
+    {
+        // If the tangential force is greater than the Coulomb criterion, we
+        // saturate it, and we make sure the definition of k*delta is consistent
+        // with this saturation. The tangential force is always in the direction
+        // of the previously defined unit vector tij, which may or may not
+        // coincide with the current tangential vector.
+        *kdelta = - muec * normFN * tij - v_t * ( muet * 2.0 * avmass );
+        delFT = muec * normFN * tij ;
     }
-    vectorTF=*pvectorTangentFriction;
-    normFTHistory = ks * (*ptangentialDepl);
+    else
+    {
+      // Otherwise, the tangential force is effectively the sum of a spring and
+      // a dashpot part, in the direction of tij
+      delFT = Norm(-*kdelta -v_t * ( muet * 2.0 * avmass )) * tij ;
+    }
 
-    // Friction in rotation
+    if (forget_contact)
+    {
+        *kdelta = unaltered_kdelta;
+        *pprev_normal = unaltered_prevnormal;
+    }
+    // b) Friction in rotation
     if (rolling_friction)
     {
-      *pspringRotFriction += (-kr) * dt * wt;
+      *pspringRotFriction = qrot.rotateVector(*pspringRotFriction);
+      *pspringRotFriction += (-kr) * dt * wt ;
       double normSpringRotFriction = Norm(*pspringRotFriction);
       if (normSpringRotFriction > max_normFtorque)
       {
-        *pspringRotFriction *= max_normFtorque / normSpringRotFriction;
-        p1_->addDeplContactInMap( p0_->getID(), *pnbCumulTangent,
-          *pvectorTangentFriction, *ptangentialDepl, *pspringRotFriction );
+        *pspringRotFriction = (*pspringRotFriction) *
+                              (max_normFtorque / normSpringRotFriction) ;
+        if (forget_contact)
+        {
+          p0_->addDeplContactInMap( idmap0,
+            unaltered_kdelta, unaltered_prevnormal, unaltered_pspringRotFriction );
+          p1_->addDeplContactInMap( idmap1,
+            -unaltered_kdelta, -unaltered_prevnormal, -unaltered_pspringRotFriction );
+        }
+        else
+        {
+          p0_->addDeplContactInMap( idmap0,
+            *kdelta, normal, *pspringRotFriction );
+          p1_->addDeplContactInMap( idmap1,
+            -*kdelta, -normal, -*pspringRotFriction );
+        }
         frictionTorque = *pspringRotFriction ;
         frictionTorque += (-m_f) * Cr * wt;
       }
       else
       {
-        p1_->addDeplContactInMap( p0_->getID(), *pnbCumulTangent,
-          *pvectorTangentFriction, *ptangentialDepl, *pspringRotFriction );
+        if (forget_contact)
+        {
+          p0_->addDeplContactInMap( idmap0,
+            unaltered_kdelta, unaltered_prevnormal, unaltered_pspringRotFriction );
+          p1_->addDeplContactInMap( idmap1,
+            -unaltered_kdelta, -unaltered_prevnormal, -unaltered_pspringRotFriction );
+        }
+        else
+        {
+          p0_->addDeplContactInMap( idmap0,
+            *kdelta, normal, *pspringRotFriction );
+          p1_->addDeplContactInMap( idmap1,
+            -*kdelta, -normal, -*pspringRotFriction );
+        }
         frictionTorque = *pspringRotFriction ;
         frictionTorque += (-Cr) * wt;
       }
     }
     else
     {
-      p1_->addDeplContactInMap( p0_->getID(), *pnbCumulTangent,
-        *pvectorTangentFriction, *ptangentialDepl, *pspringRotFriction );
+      p0_->addDeplContactInMap( idmap0,
+        *kdelta, normal, *pspringRotFriction );
+      p1_->addDeplContactInMap( idmap1,
+        -*kdelta, -normal, -*pspringRotFriction );
     }
-
-
-
-  }
+  } // End of CASE 1
+  // --------------------------------------------------//
+  // CASE 2: the contact does not exist yet
   else
   {
-    normFTHistory = ks * tangdepl;
+    computeTangentialVector(tij, muet * 2.0 * avmass, v_t, Vecteur(0.));
+    if (Norm(delFT)>=muec*normFN)
+    {
+      current_kdelta = ks * delFT - muec*normFN *tij;
+      delFT = muec*normFN*tij ;
+    }
+    else
+    {
+      current_kdelta = ks * dt * v_t;
+      delFT = Norm(delFT) * tij ;
+    }
+
     if (rolling_friction)
     {
       frictionTorque = (-kr) * dt * wt;
       double normSpringRotFriction = Norm(frictionTorque);
-      // cout << endl;
-      // cout << "------------------------------------------------" << endl ;
-      // cout << "Contact has been interrupted" << endl ;
-      // cout << "------------------------------------------------" << endl ;
-      // cout << endl;
       if (normSpringRotFriction > max_normFtorque)
       {
-        // cout << "Saturation of the friction torque from 1st time step" << endl;
         frictionTorque *= max_normFtorque / normSpringRotFriction;
-        p1_->addNewContactInMap( p0_->getID(), 0, vectorTF, tangdepl,
-          frictionTorque);
-        p0_->addNewContactInMap( p1_->getID(), 0, vectorTF, tangdepl,
-          frictionTorque);
+        if (!forget_contact)
+        {
+          p1_->addNewContactInMap( idmap1, -current_kdelta, -normal,
+            -frictionTorque);
+          p0_->addNewContactInMap( idmap0, current_kdelta, normal,
+            frictionTorque);
+        }
         frictionTorque += (-m_f) * Cr * wt;
       }
       else
       {
-        p1_->addNewContactInMap( p0_->getID(), 0, vectorTF, tangdepl,
-          frictionTorque);
-        p0_->addNewContactInMap( p1_->getID(), 0, vectorTF, tangdepl,
-          frictionTorque);
+        if (!forget_contact)
+        {
+          p1_->addNewContactInMap( idmap1, -current_kdelta, -normal,
+            -frictionTorque);
+          p0_->addNewContactInMap( idmap0, current_kdelta, normal,
+            frictionTorque);
+        }
         frictionTorque += (-Cr) * wt;
       }
     }
-  }
-
-  // Friction in translation
-  delFT += vectorTF * (-normFTHistory);
-  Scalar fn = muec * normFN;
-  Scalar ft = Norm( delFT );
-  if ( fn < ft )
-  {
-    delFT = vectorTF * (-fn);
-  }
+    else if (!forget_contact)
+    {
+      p1_->addNewContactInMap( idmap1, -current_kdelta, -normal,
+        -frictionTorque);
+      p0_->addNewContactInMap( idmap0, current_kdelta, normal,
+        frictionTorque);
+    }
+  }// End of CASE 2
 
   // Friction in rotation
   if (rolling_friction)
   {
-    // Correction suivant la normale : effet anti-toupie
-    if (k_m_s) delM = - k_m_s * normFN * 0.001 * wn ;
-    else delM = - kr * 0.001 * wn ;
-
-
-    // Correction with a spring-dashpot model with backwards rolling (see Ai et
-    // al., Powder Technology, 2011)
-    // cout << "friction torque = " << frictionTorque << endl;
-    // delM += frictionTorque;
-
-    // MODEL A : TO REMOVE (just here to reproduce Ai et al. graphs)
-    double normwt=Norm(wt);
-    if (normwt > EPS) delM += -mu_r * Req * normFN * wt / normwt;
-
-    // // Routine to store friction torque in file
-    // ofstream frictionTorqueFile ;
-    // frictionTorqueFile.open("Grains/Init/frictionTorque.txt", std::ios_base::app) ;
-    // frictionTorqueFile << delM ;
+    delM = frictionTorque;
+    // The "anti-spinning" term (commented below) can lead to unbounded
+    // behaviors. To be used with great care.
+    // if (p0_->getForme()->getConvex()->getConvexType() == SPHERE)
+    // {
+    //   // Correction suivant la normale : effet anti-toupie
+    //   delM += - kr * 0.00001 * wn ;
+    // }
   }
+  else delM = Vecteur(0.) ;
 }
 
 
@@ -356,14 +429,25 @@ void ERHContact::computeForcesPostProcessing( Composant* p0_,
   Vecteur delFN, delFT, delM;
   Scalar diss;
   Point geometricPointOfContact = contactInfos.getContact();
+  int elementary_id0 = 0;
+  int elementary_id1 = 0;
+  if( (ref_p0_)->isCompParticule() )
+  {
+    elementary_id0 = p0_->getID() ;
+  }
+  if( (ref_p1_)->isCompParticule() )
+  {
+    elementary_id1 = p1_->getID() ;
+  }
 
-
-  // Calcul des forces & moments de contact
+  // Calcul des forces & moments de contct
   if ( Grains_Exec::m_ContactDissipation )
     performForcesCalculusPP( ref_p0_, ref_p1_, contactInfos, delFN, delFT,
     delM, diss );
+  // Below, the boolean "true" refers to "forget_contact", which prevents the
+  // re-computation of the force to be artificially added to the contact history
   else  performForcesCalculus( ref_p0_, ref_p1_, dt, contactInfos, delFN, delFT,
-    delM);
+    delM, elementary_id0, elementary_id1, true);
 
   // Ajout � la liste des contacts pour post processing
   struct PointForcePostProcessing pfpp;
@@ -410,7 +494,6 @@ bool ERHContact::computeForces( Composant* p0_,
 	Scalar dt, int nbContact )
 {
   bool compute = false ;
-
   // Pour les particules composite, on calcule la moyenne des forces appliquees
   // a chaque point de contact. Par defaut nbContact = 1 (particules convexes)
   double coef = 1./double(nbContact);
@@ -419,6 +502,17 @@ bool ERHContact::computeForces( Composant* p0_,
   // et non celle des particules elementaires
   Composant* ref_p0_ = p0_->ReferenceComposant() ;
   Composant* ref_p1_ = p1_->ReferenceComposant() ;
+
+  int elementary_id0 = 0;
+  int elementary_id1 = 0;
+  if( (ref_p0_)->isCompParticule() )
+  {
+    elementary_id0 = p0_->getID() ;
+  }
+  if( (ref_p1_)->isCompParticule() )
+  {
+    elementary_id1 = p1_->getID() ;
+  }
 
   // Si le contact concerne 2 clones periodiques et que l'angle des directions
   // periodiques est different de 90,
@@ -434,7 +528,8 @@ bool ERHContact::computeForces( Composant* p0_,
     Point geometricPointOfContact = contactInfos.getContact();
 
     // Calcul des forces & moments de contact
-    performForcesCalculus( ref_p0_, ref_p1_, dt, contactInfos, delFN, delFT, delM );
+    performForcesCalculus( ref_p0_, ref_p1_, dt, contactInfos, delFN, delFT,
+                          delM, elementary_id0, elementary_id1 );
 
     // Composant p0_
     if ( ref_p0_->getID() != -2 )
@@ -444,7 +539,7 @@ bool ERHContact::computeForces( Composant* p0_,
       // Ajout aux torseurs d'effort au composant p0_
       if ( Grains_Exec::m_ContactforceOutput )
 	p0_->addContactForcePP( coef * (delFN + delFT) );
-      if ( k_m_s ) p0_->addMoment( delM * coef );
+      if ( rolling_friction ) p0_->addMoment( delM * coef );
     }
     else
     {
@@ -459,7 +554,7 @@ bool ERHContact::computeForces( Composant* p0_,
         p0_->addForce( geometricPointOfContact, (delFN + delFT) * coef );
 	if ( Grains_Exec::m_ContactforceOutput )
 	  p0_->addContactForcePP(  coef * (delFN + delFT) );
-        if ( k_m_s ) p0_->addMoment( delM * coef );
+        if ( rolling_friction ) p0_->addMoment( delM * coef );
       }
     }
 
@@ -470,7 +565,7 @@ bool ERHContact::computeForces( Composant* p0_,
       p1_->addForce( geometricPointOfContact, coef * (-delFN - delFT) );
       if ( Grains_Exec::m_ContactforceOutput )
 	p1_->addContactForcePP(  coef * (-delFN - delFT) );
-      if ( k_m_s ) p1_->addMoment( - delM * coef );
+      if ( rolling_friction ) p1_->addMoment( - delM * coef );
     }
     else
     {
@@ -484,7 +579,7 @@ bool ERHContact::computeForces( Composant* p0_,
         p1_->addForce( geometricPointOfContact, coef * (-delFN - delFT) );
 	if ( Grains_Exec::m_ContactforceOutput )
 	  p1_->addContactForcePP(  coef * (-delFN - delFT) );
-        if ( k_m_s ) p1_->addMoment( - delM * coef );
+        if ( rolling_friction ) p1_->addMoment( - delM * coef );
       }
     }
   }
@@ -536,13 +631,6 @@ map<string,double> ERHContact::defineParameters( DOMNode* &root )
     parameters["mur"]    = value;
   }
   else parameters["mur"] = 0;
-  parameter = ReaderXML::getNode(root, "Jn");
-  if (parameter)
-  {
-    value     = ReaderXML::getNodeValue_Double(parameter);
-    parameters["Jn"]    = value;
-  }
-  else parameters["Jn"] = 0;
   parameter = ReaderXML::getNode(root, "f");
   if (parameter)
   {
@@ -554,8 +642,12 @@ map<string,double> ERHContact::defineParameters( DOMNode* &root )
   value     = ReaderXML::getNodeValue_Double(parameter);
   parameters["ks"]    = value;
   parameter = ReaderXML::getNode(root, "eps");
-  value     = ReaderXML::getNodeValue_Double(parameter);
-  parameters["eps"]  = value;
+  if (parameter)
+  {
+    value     = ReaderXML::getNodeValue_Double(parameter);
+    parameters["eps"]  = value;
+  }
+  else parameters["eps"] = 1.e-10;
   parameter = ReaderXML::getNode(root, "color");
   value     = ReaderXML::getNodeValue_Double(parameter);
   parameters["color"]  = value;

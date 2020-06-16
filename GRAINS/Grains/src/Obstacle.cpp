@@ -488,3 +488,33 @@ void Obstacle::addDeplContactInMap( double const& tangentialDepl,
        << "Need for an assistance ! Stop running !\n";
   exit(10);
 }
+
+
+void Obstacle::copyHistoryContacts( double* &destination, int start_index )
+{
+  cout << "Warning when calling CompObstacle::copyHistoryContacts() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+// ----------------------------------------------------------------------------
+// Copy existing contact in the map
+void Obstacle::copyContactInMap( std::tuple<int,int,int> const& id,
+  bool const& isActive, int const& nbDtRemember, int const& nbCumulTangent,
+  Vecteur const& tangent, Vecteur const& prev_normal,
+  Vecteur const& cumulSpringTorque )
+{
+  cout << "Warning when calling Obstacle::copyContactInMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+int Obstacle::getContactMapSize()
+{
+  cout << "Warning when calling Obstacle::getContactMapSize() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}

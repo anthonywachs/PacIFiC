@@ -902,7 +902,7 @@ public:
   @param ParticuleClassesReference particules de r�f�rence
   	pour chaque classe de particules */
   virtual void read2014_binary( istream &fileSave, vector<Particule*> const*
-  	ParticuleClassesReference );
+  	ParticuleClassesReference, bool const& contact_history_storage = false );
 
   /** @brief Sauvegarde de la particule pour Reload
   @param fileSave Flux de sauvegarde
@@ -1046,6 +1046,16 @@ public:
 
   Scalar set_shrinking_mass(); /** set the current mass */
     //@}
+
+  virtual void copyHistoryContacts( double* &destination, int start_index );
+
+  // ----------------------------------------------------------------------------
+  // Copy existing contact in the map
+  virtual void copyContactInMap( std::tuple<int,int,int> const& id,
+    bool const& isActive, Vecteur const& tangent, Vecteur const& prev_normal,
+    Vecteur const& cumulSpringTorque );
+
+  virtual int getContactMapSize();
 
 protected:
   /**@name Parameters */

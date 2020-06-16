@@ -997,10 +997,12 @@ Scalar Composant::get_InitialOverlap(int id_particle) const
 // Initialize all contact map entries to false
 void Composant::setContactMapToFalse()
 {
-  map<int,std::tuple<bool, int, int, Vecteur, double, Vecteur>,bool >::iterator it;
-
+  map<std::tuple<int,int,int>,std::tuple<bool, Vecteur, Vecteur,
+    Vecteur>,bool >::iterator it;
   for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
-    get<0>(it->second) = false;
+    {
+      get<0>(it->second) = false;
+    }
 }
 
 
@@ -1010,52 +1012,44 @@ void Composant::setContactMapToFalse()
 // Update contact map
 void Composant::updateContactMap()
 {
-  map<int,std::tuple<bool, int, int, Vecteur, double, Vecteur>>::iterator it;
-  list<int> keywithfalse;
-  list<int>::const_iterator il;
+  map<std::tuple<int,int,int>,std::tuple<bool, Vecteur, Vecteur,
+    Vecteur>>::iterator it;
+  list<std::tuple<int,int,int>> keywithfalse;
+  list<std::tuple<int,int,int>>::const_iterator il;
 
   for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
     if ( !(get<0>(it->second)) ) keywithfalse.push_back(it->first);
 
   for (il=keywithfalse.begin();il!=keywithfalse.end();il++)
   {
-    if ( get<1>(m_contactMap[*il])==0 )
-    {
-      m_contactMap.erase(*il);
-    }
-    else
-    {
-      get<1>(m_contactMap[*il]) --;
-    }
+    m_contactMap.erase(*il);
   }
 }
 
 
 
 // ----------------------------------------------------------------------------
-// Does the contact exist in the map, if yes return the pointer to the
-// cumulative tangential displacement
-bool Composant::ContactInMapIsActive( int const& id, int* &nbCumulTangent,
-  Vecteur* &tangent, double* &tangentialDepl, Vecteur* &cumulSpringTorque )
+// Does the contact exist in the map? If so, return true and make kdelta,
+// prev_normal and cumulSpringTorque point to the memorized info. Otherwise,
+// return false and set those pointers to NULL
+bool Composant::getContactMemory( std::tuple<int,int,int> const& id,
+  Vecteur* &kdelta, Vecteur* &prev_normal, Vecteur* &cumulSpringTorque )
 {
   bool active = false;
-  map<int,std::tuple<bool, int, int, Vecteur, double, Vecteur> >
+  map<std::tuple<int,int,int>,std::tuple<bool, Vecteur, Vecteur, Vecteur> >
     ::iterator it = m_contactMap.find(id);
 
   if ( it != m_contactMap.end() )
   {
     active = true;
     get<0>(it->second) = true;
-    get<1>(it->second) = NB_STEPS_REMEMBER_ENDED_CONTACT;
-    nbCumulTangent = &(get<2>(it->second));
-    tangent = &(get<3>(it->second));
-    tangentialDepl = &(get<4>(it->second));
-    cumulSpringTorque = &(get<5>(it->second));
+    kdelta = &(get<1>(it->second));
+    prev_normal = &(get<2>(it->second));
+    cumulSpringTorque = &(get<3>(it->second));
   }
   else{
-    nbCumulTangent = NULL;
-    tangent = NULL;
-    tangentialDepl = NULL;
+    kdelta = NULL;
+    prev_normal = NULL;
     cumulSpringTorque = NULL;
   }
   return active;
@@ -1066,49 +1060,225 @@ bool Composant::ContactInMapIsActive( int const& id, int* &nbCumulTangent,
 
 // ----------------------------------------------------------------------------
 // Add new contact in the map
-void Composant::addNewContactInMap( int const& id, int const& nbCumulTangent,
-  Vecteur const& tangent, double const& tangentialDepl,
+void Composant::addNewContactInMap( std::tuple<int,int,int> const& id,
+  Vecteur const& kdelta, Vecteur const& prev_normal,
   Vecteur const& cumulSpringTorque )
 {
-  // pair<double,bool> pp (tangentialDepl,true);
-  // pair<int,pair<double,bool> > ppp (id,pp);
- // cout << "Create (" << m_id << "," << id << ")" << endl;
-  m_contactMap.insert(std::make_pair( id, std::make_tuple( true,
-    NB_STEPS_REMEMBER_ENDED_CONTACT,
-    nbCumulTangent, tangent, tangentialDepl, cumulSpringTorque) ));
+  m_contactMap.insert(std::make_pair( std::make_tuple(get<0>(id),get<1>(id),
+    get<2>(id)), std::make_tuple(
+    true, kdelta, prev_normal, cumulSpringTorque) ));
 }
 
+
+// ----------------------------------------------------------------------------
+// Copy existing contact in the map
+void Composant::copyContactInMap( std::tuple<int,int,int> const& id,
+  bool const& isActive, Vecteur const& kdelta, Vecteur const& prev_normal,
+  Vecteur const& cumulSpringTorque )
+{
+  m_contactMap.insert(std::make_pair( id, std::make_tuple(
+    isActive, kdelta, prev_normal, cumulSpringTorque) ));
+}
 
 
 
 // ----------------------------------------------------------------------------
 // Increase cumulative tangential displacement with component id
-void Composant::addDeplContactInMap( int const& id, int const& nbCumulTangent,
-  Vecteur const& tangent, double const& tangentialDepl,
+void Composant::addDeplContactInMap( std::tuple<int,int,int> const& id,
+  Vecteur const& kdelta, Vecteur const& prev_normal,
   Vecteur const& cumulSpringTorque )
 {
   get<0>(m_contactMap[id]) = true;
-  get<1>(m_contactMap[id]) = NB_STEPS_REMEMBER_ENDED_CONTACT;
-  get<2>(m_contactMap[id]) = nbCumulTangent;
-  get<3>(m_contactMap[id]) = tangent;
-  get<4>(m_contactMap[id]) += tangentialDepl;
-  get<5>(m_contactMap[id]) = cumulSpringTorque;
+  get<1>(m_contactMap[id]) = kdelta;
+  get<2>(m_contactMap[id]) = prev_normal;
+  get<3>(m_contactMap[id]) = cumulSpringTorque;
 }
 
 // ---------------------------------------------------------------------------
 // Print active neighbors of the particle
 void Composant::printActiveNeighbors(int const& id )
 {
-    map<int,std::tuple<bool, int, int, Vecteur, double, Vecteur> >
+    map<std::tuple<int,int,int>,std::tuple<bool, Vecteur, Vecteur, Vecteur> >
       ::iterator it;
     if (m_contactMap.begin() != m_contactMap.end())
     {
         cout << "Neighbors of #" << id << ": ";
         for (it=m_contactMap.begin();it!=m_contactMap.end();++it){
             if (get<0>(it->second)){
-                cout << it->first  << "  ";
+                cout << get<0>(it->first)  << "/"
+                << get<1>(it->first)  << "/"
+                << get<2>(it->first)  << " ; ";
             }
         }
         cout << endl;
     }
+}
+
+
+void Composant::copyHistoryContacts( double* &destination, int start_index )
+{
+  int nb_contacts = (int) m_contactMap.size();
+  destination[start_index] = nb_contacts;
+  start_index++;
+  map<std::tuple<int,int,int>,std::tuple<bool, Vecteur, Vecteur, Vecteur> >
+    ::iterator it;
+  if (m_contactMap.begin() != m_contactMap.end())
+  {
+    for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
+    {
+      destination[start_index] = (double)get<0>(it->first) ;
+      destination[start_index + 1] = (double)get<1>(it->first) ;
+      destination[start_index + 2] = (double)get<2>(it->first) ;
+      destination[start_index + 3] = (double)get<0>(it->second) ;
+      destination[start_index + 4] = get<1>(it->second)[0] ;
+      destination[start_index + 5] = get<1>(it->second)[1] ;
+      destination[start_index + 6] = get<1>(it->second)[2] ;
+      destination[start_index + 7] = get<2>(it->second)[0] ;
+      destination[start_index + 8] = get<2>(it->second)[1] ;
+      destination[start_index + 9] = get<2>(it->second)[2] ;
+      destination[start_index + 10] = get<3>(it->second)[0] ;
+      destination[start_index + 11] = get<3>(it->second)[1] ;
+      destination[start_index + 12] = get<3>(it->second)[2] ;
+      start_index += 13 ;
+    }
+  }
+}
+
+int Composant::getContactMapSize()
+{
+  return ( (int) m_contactMap.size() );
+}
+
+void Composant::writeContactMemory_2014(ostream &fileOut ) const
+{
+  int mapSize;
+  mapSize = (int) m_contactMap.size();
+  fileOut << mapSize ;
+  fileOut << " ";
+  map<std::tuple<int,int,int>,std::tuple<bool, Vecteur, Vecteur, Vecteur> >
+    ::const_iterator it;
+  if (m_contactMap.begin() != m_contactMap.end())
+  {
+  int c=0;
+  for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
+    {
+      c++;
+      fileOut << get<0>(it->first) ;
+      fileOut << " ";
+      fileOut << get<1>(it->first) ;
+      fileOut << " ";
+      fileOut << get<2>(it->first) ;
+      fileOut << " ";
+      fileOut << get<0>(it->second) ;
+      fileOut << " ";
+      fileOut << " ";
+      get<1>(it->second).writeGroup3(fileOut);
+      fileOut << " ";
+      get<2>(it->second).writeGroup3(fileOut);
+      fileOut << " ";
+      get<3>(it->second).writeGroup3(fileOut);
+      if (c<mapSize) fileOut << " ";
+    }
+  }
+}
+
+void Composant::writeContactMemory_binary( ostream &fileOut )
+{
+  int mapSize;
+  mapSize = (int) m_contactMap.size();
+  fileOut.write( reinterpret_cast<char*>( &mapSize ), sizeof(int) );
+  map<std::tuple<int,int,int>,std::tuple<bool, Vecteur, Vecteur, Vecteur> >
+    ::const_iterator it;
+  if (m_contactMap.begin() != m_contactMap.end())
+  {
+  for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
+    {
+      int buffer_int;
+      Vecteur buffer_vect;
+      buffer_int = get<0>(it->first);
+      fileOut.write(reinterpret_cast<char*>(&buffer_int ), sizeof(int));
+      buffer_int = get<1>(it->first);
+      fileOut.write(reinterpret_cast<char*>(&buffer_int ), sizeof(int));
+      buffer_int = get<2>(it->first);
+      fileOut.write(reinterpret_cast<char*>(&buffer_int ), sizeof(int));
+      buffer_int = get<0>(it->second);
+      fileOut.write(reinterpret_cast<char*>(&buffer_int ), sizeof(int));
+      buffer_vect = Vecteur(get<1>(it->second));
+      buffer_vect.writeGroup3_binary(fileOut);
+      buffer_vect = Vecteur(get<2>(it->second));
+      buffer_vect.writeGroup3_binary(fileOut);
+      buffer_vect = Vecteur(get<3>(it->second));
+      buffer_vect.writeGroup3_binary(fileOut);
+    }
+  }
+}
+
+
+void Composant::updateContactMapId( int prev_id, int new_id)
+{
+  map<std::tuple<int,int,int>,std::tuple<bool, Vecteur, Vecteur, Vecteur> >
+    ::iterator it;
+  for(it=m_contactMap.begin();it!=m_contactMap.end();++it)
+  {
+    if (get<1>((it->first)) == prev_id)
+    {
+      copyContactInMap( std::make_tuple(get<0>(it->first),new_id,
+            get<2>(it->first)), get<0>(it->second), get<1>(it->second), get<2>(it->second), get<3>(it->second));
+      m_contactMap.erase(std::make_tuple(get<0>(it->first),get<1>(it->first),
+            get<2>(it->first)));
+      break;
+    }
+  }
+}
+
+void Composant::readContactMap_2014( istream &fileSave)
+{
+  // Read the contact memories of the particle (if any)
+  char next_char;
+  int contact_map_size=-1;
+  fileSave.get(next_char);
+  if ( next_char != '\n' )
+  {
+    fileSave >> contact_map_size;
+    if (contact_map_size)
+    {
+      for(int j=0; j<contact_map_size; j++)
+      {
+        // Read contact memory map here
+        int id0, id1, id2;
+        bool isActive ;
+        double x, y, z ;
+        Vecteur tangent, prev_normal, cumulSpringTorque ;
+        fileSave >> id0 >> id1 >> id2 >> isActive >> x >> y >> z;
+        tangent = Vecteur(x,y,z);
+        fileSave >> x >> y >> z ;
+        prev_normal = Vecteur(x,y,z);
+        fileSave >> x >> y >> z ;
+        cumulSpringTorque = Vecteur(x,y,z);
+        this->copyContactInMap(std::make_tuple(id0,id1,id2), isActive,
+          tangent, prev_normal, cumulSpringTorque) ;
+      }
+    }
+  }
+}
+
+void Composant::readContactMap_binary( istream &fileSave)
+{
+  int mapSize;
+  fileSave.read( reinterpret_cast<char*>( &mapSize ), sizeof(int) );
+  for(int k=0; k<mapSize; k++)
+  {
+    // Read contact memory map here
+    int id0, id1, id2, isActive ;
+    Vecteur tangent, prev_normal, cumulSpringTorque ;
+    fileSave.read( reinterpret_cast<char*>( &id0 ), sizeof(int) );
+    fileSave.read( reinterpret_cast<char*>( &id1 ), sizeof(int) );
+    fileSave.read( reinterpret_cast<char*>( &id2 ), sizeof(int) );
+    fileSave.read( reinterpret_cast<char*>( &isActive ), sizeof(int) );
+    tangent.readGroup3_binary( fileSave );
+    prev_normal.readGroup3_binary( fileSave );
+    cumulSpringTorque.readGroup3_binary( fileSave );
+    this->copyContactInMap(std::make_tuple(id0,id1,id2), (bool)isActive,
+      tangent, prev_normal, cumulSpringTorque) ;
+  }
 }
