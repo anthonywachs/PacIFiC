@@ -389,6 +389,8 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
    if ( my_rank == is_master ) cout << "velocity change = " <<
      	MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
 
+   compute_fluid_particle_interaction();
+
    double vel_divergence = get_velocity_divergence();
 
    double cfl = UF->compute_CFL( t_it, 0 );
@@ -830,6 +832,43 @@ DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<dou
 
 //---------------------------------------------------------------------------
 void
+DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes:: impose_solid_velocity_for_ghost" ) ;
+
+  doubleVector delta(3,0.);
+  doubleVector grid_coord(3,0.);
+  doubleVector par_coord(3,0.);
+  doubleVector omega(3,0.);
+  doubleVector linear_vel(3,0.);
+
+  PartInput solid = GLOBAL_EQ->get_solid(1);
+
+  grid_coord(0) = xg;
+  grid_coord(1) = yg;
+
+  par_coord(0) = solid.coord[comp]->item(parID,0);
+  par_coord(1) = solid.coord[comp]->item(parID,1);
+
+  if (dim == 3) {
+     grid_coord(2) = zg;
+     par_coord(2) = solid.coord[comp]->item(parID,2);
+  }
+
+  for (size_t m = 0; m < 3; m++) {
+     delta(m) = grid_coord(m) - par_coord(m);
+     omega(m) = solid.ang_vel[comp]->item(parID,m);
+     linear_vel(m) = solid.vel[comp]->item(parID,m);
+  }
+
+  net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
+  net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
+  net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
+}
+
+//---------------------------------------------------------------------------
+void
 DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t const& field )
 //---------------------------------------------------------------------------
 {
@@ -1150,6 +1189,89 @@ DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const&
   return (xcenter);
 }
 
+//---------------------------------------------------------------------------
+double
+DDS_NavierStokes:: find_intersection_for_ghost ( FV_DiscreteField const* FF, double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& field, size_t const& level, size_t const& off)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes:: find_intersection_for_ghost" ) ;
+
+  doubleVector side(2,0);
+
+  double xleft = xl;
+  double xright = xr;
+
+  side(0) = xleft;
+  side(1) = xright;
+
+  double funl=0., func=0., funr=0.;
+
+  double xcenter;
+
+  if (dir == 0) {
+     funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+     funr = level_set_function(FF,id,comp,xright,yvalue,zvalue,level_set_type,field);
+  } else if (dir == 1) {
+     funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+     funr = level_set_function(FF,id,comp,yvalue,xright,zvalue,level_set_type,field);
+  } else if (dir == 2) {
+     funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+     funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
+  }
+
+  // In case both the points are on the same side of solid interface
+  // This will occur when the point just outside the solid interface will be considered inside the solid
+  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid 
+  if (funl*funr > 0.) {
+     if (off == level) {
+        xleft = xleft - dx;
+     } else {
+        xright = xright + dx;
+     }
+  }
+
+  if (dir == 0) {
+     funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+     funr = level_set_function(FF,id,comp,xright,yvalue,zvalue,level_set_type,field);
+  } else if (dir == 1) {
+     funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+     funr = level_set_function(FF,id,comp,yvalue,xright,zvalue,level_set_type,field);
+  } else if (dir == 2) {
+     funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+     funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
+  }
+
+  // Bisection method algorithm
+  while (MAC::abs(xright-xleft) > 1.E-14) {
+     xcenter = (xleft+xright)/2.;
+     if (dir == 0) {
+        funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+        func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
+     } else if (dir == 1) {
+        funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+        func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
+     } else if (dir == 2) {
+        funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+        func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
+     }
+
+     if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
+
+     if (func*funl >= 1.E-16) {
+        xleft = xcenter;
+     } else {
+        xright = xcenter;
+     }
+  }
+
+  if (off == 0) {
+     xcenter = MAC::abs(xcenter - side(1));
+  } else if (off == 1) {
+     xcenter = MAC::abs(xcenter - side(0));
+  }
+
+  return (xcenter);
+}
 
 //---------------------------------------------------------------------------
 double
@@ -2151,6 +2273,455 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
          }
       }
    }
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: compute_pressure_force_on_particle(size_t const& parID, size_t const& Np)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NavierStokes:: compute_pressure_force_on_particle" ) ;
+
+  ofstream outputFile ;
+
+  size_t i0_temp;
+  double theta = 0., ri;
+  bool found = 0;
+
+  std::ostringstream os2;
+  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/pressure_drag_" << my_rank << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+  outputFile << "theta,p_stress" << endl;
+
+  double xpoint, ypoint;
+  doubleVector stress(Np,0);         
+  doubleArray2D press_force(1,3,0);
+  size_t i0, j0, k0=0;
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid(0);
+
+  for (size_t i=0;i<Np;i++) {
+     theta = theta + 2.*MAC::pi()/Np;
+     for (size_t comp=0;comp<nb_comps[0];comp++) {
+        // Get local min and max indices
+        for (size_t l=0;l<dim;++l) {
+           min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+           max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+        }
+
+        double xp = solid.coord[comp]->item(parID,0);
+        double yp = solid.coord[comp]->item(parID,1);
+        ri = solid.size[comp]->item(parID);
+
+        double Dx_min = UF->get_DOF_coordinate( min_unknown_index(0), comp, 0 ) ;
+        double Dx_max = UF->get_DOF_coordinate( max_unknown_index(0), comp, 0 ) ;
+        double Dy_min = UF->get_DOF_coordinate( min_unknown_index(1), comp, 1 ) ;
+        double Dy_max = UF->get_DOF_coordinate( max_unknown_index(1), comp, 1 ) ;
+
+        xpoint = xp + ri*cos(theta);
+        ypoint = yp + ri*sin(theta);
+
+        if ((xpoint > Dx_min) && (xpoint <= Dx_max) && (ypoint > Dy_min) && (ypoint <= Dy_max)) {
+           // Finding the grid indexes next to ghost points
+           found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,0), xpoint, i0_temp);
+           if (found == 1) i0 = i0_temp;
+
+           found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,1), ypoint, i0_temp);
+           if (found == 1) j0 = i0_temp;
+
+           // Min x-coordinate in the grid cell
+           double xmin = PF->get_DOF_coordinate( i0, comp, 0 ) ;
+           // Max x-coordinate in the grid cell
+           double xmax = PF->get_DOF_coordinate( i0+1, comp, 0 ) ;
+           // Min y-coordinate in the grid cell
+           double ymin = PF->get_DOF_coordinate( j0, comp, 1 ) ;
+           // Max y-coordinate in the grid cell
+           double ymax = PF->get_DOF_coordinate( j0+1, comp, 1 ) ;
+
+           double dxR = xmax - xpoint;
+           double dxL = xpoint - xmin;
+           double dxT = ymax - ypoint;
+           double dxB = ypoint - ymin;
+
+           // Calculation of field variable on ghost point(0,0)
+           for (size_t level=0; level<2;level++) {
+              double pRT = PF->DOF_value( i0+1, j0+1, k0, comp, level );       // Right top pressure
+              double pRB = PF->DOF_value( i0+1, j0, k0, comp, level );         // Right bottom pressure
+              double pLT = PF->DOF_value( i0, j0+1, k0, comp, level );         // Left top pressure
+              double pLB = PF->DOF_value( i0, j0, k0, comp, level );           // Left bottom pressure
+
+              double uright = ((ymax - ypoint)*pRB + (ypoint - ymin)*pRT)/(ymax-ymin);
+              double uleft = ((ymax - ypoint)*pLB + (ypoint - ymin)*pLT)/(ymax-ymin);
+              double utop = ((xmax - xpoint)*pLT + (xpoint - xmin)*pRT)/(xmax-xmin);
+              double ubottom = ((xmax - xpoint)*pLB + (xpoint - xmin)*pRB)/(xmax-xmin);
+
+              stress(i) = stress(i) - (0.5*((dxR*uleft + dxL*uright)/(dxR+dxL) + (dxB*utop + dxT*ubottom)/(dxB+dxT)))/2.;
+           }
+
+        }
+     }
+
+     // Ref: Keating thesis Pg-85
+     press_force(0,0) = press_force(0,0) + stress(i)*cos(theta)*(2.*MAC::pi()/Np*ri);
+     press_force(0,1) = press_force(0,1) + stress(i)*sin(theta)*(2.*MAC::pi()/Np*ri);
+     outputFile << theta << "," << stress(i) << endl;
+  }
+  cout << "Pressure Force: " << press_force(0,0) << "," << press_force(0,1) << endl;
+  outputFile.close();
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: compute_fluid_particle_interaction( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NavierStokes:: compute_fluid_particle_interaction" ) ;
+
+  double dh = 0.35, Np = 50;
+
+  for (size_t parID = 0; parID < Npart; parID++) {
+     compute_velocity_force_on_particle(parID, Np, dh); 
+     compute_pressure_force_on_particle(parID, Np); 
+  }
+}
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: compute_velocity_force_on_particle(size_t const& parID, size_t const& Np, double const& dh )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NavierStokes:: compute_velocity_force_on_particle" ) ;
+
+  ofstream outputFile ;
+
+  size_t i0_temp;
+  double theta = 0., ri;
+  bool found = 0;
+  double dfdx=0.,dfdy=0.;
+
+  std::ostringstream os2;
+  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/velocity_drag_" << my_rank << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
+
+  doubleVector xpoint(3,0);
+  doubleVector ypoint(3,0);
+  doubleVector finx(3,0);
+  doubleVector finy(3,0);
+  doubleArray2D stress(Np,3*nb_comps[1],0);         //xx,yy,xy OR xx,yy,zz,xy,yz,zx
+  doubleArray2D force(1,3,0);
+  size_t_vector i0_x(3,0);
+  size_t_vector i0_y(3,0);
+  vector<double> net_vel(3,0.);
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid(1);
+
+  for (size_t i=0;i<Np;i++) {
+     theta = theta + 2.*MAC::pi()/Np;
+     for (size_t comp=0;comp<nb_comps[1];comp++) {
+        // Get local min and max indices
+        for (size_t l=0;l<dim;++l) {
+           min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+           max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+        }
+
+        double xp = solid.coord[comp]->item(parID,0);
+        double yp = solid.coord[comp]->item(parID,1);
+        ri = solid.size[comp]->item(parID);
+
+        double Dx_min = UF->get_DOF_coordinate( min_unknown_index(0), comp, 0 ) ;
+        double Dx_max = UF->get_DOF_coordinate( max_unknown_index(0), comp, 0 ) ;
+        double Dy_min = UF->get_DOF_coordinate( min_unknown_index(1), comp, 1 ) ;
+        double Dy_max = UF->get_DOF_coordinate( max_unknown_index(1), comp, 1 ) ;
+
+        xpoint(0) = xp + ri*cos(theta);
+        ypoint(0) = yp + ri*sin(theta);
+
+        if ((xpoint(0) > Dx_min) && (xpoint(0) <= Dx_max) && (ypoint(0) > Dy_min) && (ypoint(0) <= Dy_max)) {
+           // Ghost points in x for the calculation of x-derivative of field
+           if (cos(theta) <= 0.) {
+              xpoint(1) = xpoint(0) - dh;
+              xpoint(2) = xpoint(1) - dh;
+           } else {
+              xpoint(1) = xpoint(0) + dh;
+              xpoint(2) = xpoint(1) + dh;
+           }
+
+           // Ghost points in y for the calculation of y-derivative of field
+           if (sin(theta) <=0.) {
+              ypoint(1) = ypoint(0) - dh;
+              ypoint(2) = ypoint(1) - dh;
+           } else {
+              ypoint(1) = ypoint(0) + dh;
+              ypoint(2) = ypoint(1) + dh;
+           }
+
+           // Finding the grid indexes next to ghost points
+           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(0), i0_temp);
+           if (found == 1) i0_x(0) = i0_temp;
+
+           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(1), i0_temp);
+           if (found == 1) i0_x(1) = i0_temp;
+
+           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(2), i0_temp);
+           if (found == 1) i0_x(2) = i0_temp;
+
+           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(0), i0_temp);
+           if (found == 1) i0_y(0) = i0_temp;
+
+           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(1), i0_temp);
+           if (found == 1) i0_y(1) = i0_temp;
+
+           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(2), i0_temp);
+           if (found == 1) i0_y(2) = i0_temp;
+
+           // Calculation of field variable on ghost point(0,0)
+           impose_solid_velocity_for_ghost(net_vel,comp,xpoint(0),ypoint(0),0.,parID);
+           finx(0) = net_vel[comp];
+           finy(0) = net_vel[comp];
+           // Calculation of field variable on ghost point(1,0)
+           finx(1) = ghost_field_estimate (comp,i0_x(1),i0_y(0), 0, xpoint(1), ypoint(0), 0, dh);
+           // Calculation of field variable on ghost point(2,0)
+           finx(2) = ghost_field_estimate (comp,i0_x(2),i0_y(0), 0, xpoint(2), ypoint(0), 0, dh);
+           // Calculation of field variable on ghost point(0,1)
+           finy(1) = ghost_field_estimate (comp,i0_x(0),i0_y(1), 0, xpoint(0), ypoint(1), 0, dh);
+           // Calculation of field variable on ghost point(0,2)
+           finy(2) = ghost_field_estimate (comp,i0_x(0),i0_y(2), 0, xpoint(0), ypoint(2), 0, dh);
+
+           if (cos(theta) <= 0.) {
+              dfdx = mu*(finx(2) - 4.*finx(1) + 3.*finx(0))/(2.*dh);
+           } else {
+              dfdx = mu*(-finx(2) + 4.*finx(1) - 3.*finx(0))/(2.*dh);
+           }
+
+           if (sin(theta) <=0.) {
+              dfdy = mu*(finy(2) - 4.*finy(1) + 3.*finy(0))/(2.*dh);
+           } else {
+              dfdy = mu*(-finy(2) + 4.*finy(1) - 3.*finy(0))/(2.*dh);
+           }
+
+           if (comp == 0) {
+              stress(i,0) = 2.*dfdx;
+              stress(i,2) = stress(i,2) + dfdy;
+           } else if (comp == 1) {
+              stress(i,1) = 2.*dfdy;
+              stress(i,2) = stress(i,2) + dfdx;
+           }
+
+/*           outputFile << xpoint(0) << "," << ypoint(0) << "," << 0 << "," << 0. << endl;
+           outputFile << xpoint(1) << "," << ypoint(0) << "," << 0 << "," << finx(1) << endl;
+           outputFile << xpoint(2) << "," << ypoint(0) << "," << 0 << "," << finx(2) << endl;
+           outputFile << xpoint(0) << "," << ypoint(1) << "," << 0 << "," << finy(1) << endl;
+           outputFile << xpoint(0) << "," << ypoint(2) << "," << 0 << "," << finy(2) << endl;*/
+
+        }
+     }
+
+     // Ref: Keating thesis Pg-85
+     force(0,0) = force(0,0) + stress(i,0)*cos(theta)*(2.*MAC::pi()/Np*ri) + stress(i,2)*sin(theta)*(2.*MAC::pi()/Np*ri);
+     force(0,1) = force(0,1) + stress(i,2)*cos(theta)*(2.*MAC::pi()/Np*ri) + stress(i,1)*sin(theta)*(2.*MAC::pi()/Np*ri);
+     outputFile << xpoint(0) << "," << ypoint(0) << "," << 0 << "," << stress(i,0) << "," << stress(i,1) << "," << stress(i,2) << endl;
+  }
+  cout << "Velocity Force: " << force(0,0) << "," << force(0,1) << endl;
+  outputFile.close();
+}
+
+//---------------------------------------------------------------------------
+double
+DDS_NavierStokes:: ghost_field_estimate ( size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DDS_NavierStokes:: ghost_field_estimate" ) ;
+
+// Function calculates the field value at the ghost points 
+// near the particle boundary considering boundary affects
+// x0,y0,z0 are the ghost point coordinated; i0,j0,k0 is the
+// bottom left index of the grid coordinate
+
+   vector<double> net_vel(3,0.);
+   double uright=0., uleft=0., utop=0., ubottom=0.;
+
+   BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(1,0);    // intersect information for velocity field(1) in fluid(0)
+   BoundaryBisec* bs_intersect = GLOBAL_EQ->get_b_intersect(1,1);    // intersect information for velocity field(1) in solid(1)
+   NodeProp node = GLOBAL_EQ->get_node_property(1);                 // node information for velocity field(1)
+
+   // Bottom left grid node 
+   size_t p0 = return_node_index(UF,comp,i0,j0,k0);
+   // Bottom right grid node 
+   size_t p1 = return_node_index(UF,comp,i0+1,j0,k0);
+   // Top left grid node 
+   size_t p2 = return_node_index(UF,comp,i0,j0+1,k0);
+   // Top right grid node 
+   size_t p3 = return_node_index(UF,comp,i0+1,j0+1,k0);
+
+   double uRT = UF->DOF_value( i0+1, j0+1, k0, comp, 0 );       // Right top velocity
+   double uRB = UF->DOF_value( i0+1, j0, k0, comp, 0 );         // Right bottom velocity
+   double uLT = UF->DOF_value( i0, j0+1, k0, comp, 0 );         // Left top velocity
+   double uLB = UF->DOF_value( i0, j0, k0, comp, 0 );           // Left bottom velocity
+
+   double dxR, dxL, dxT, dxB;
+
+   // Min x-coordinate in the grid cell
+   double xmin = UF->get_DOF_coordinate( i0, comp, 0 ) ;
+
+   // Max x-coordinate in the grid cell
+   double xmax = UF->get_DOF_coordinate( i0+1, comp, 0 ) ;
+
+   // Min y-coordinate in the grid cell
+   double ymin = UF->get_DOF_coordinate( j0, comp, 1 ) ;
+
+   // Max y-coordinate in the grid cell
+   double ymax = UF->get_DOF_coordinate( j0+1, comp, 1 ) ;
+
+   // Contribution from right wall
+   if ((node.void_frac[comp]->item(p1) == 0) && (node.void_frac[comp]->item(p3) == 0)) {
+      uright = ((ymax - y0)*uRB + (y0 - ymin)*uRT)/(ymax-ymin);
+      dxR = xmax - x0;
+   } else if ((node.void_frac[comp]->item(p1) == 0) && (bf_intersect[1].offset[comp]->item(p1,1) == 1)) {
+      double yint = bf_intersect[1].value[comp]->item(p1,1);
+      if (yint >= (y0-ymin)) {
+         uright = ((ymin + yint - y0)*uRB + (y0 - ymin)*bf_intersect[1].field_var[comp]->item(p1,1))/(yint);
+         dxR = xmax - x0;
+      } else {
+         size_t id = node.parID[comp]->item(p3);
+         dxR = find_intersection_for_ghost(UF, x0, xmax, y0, z0, id, comp, 0, dh, 1, 0, 1);
+         impose_solid_velocity_for_ghost(net_vel,comp,x0+dxR,y0,z0,id);
+         uright = net_vel[comp];
+
+      }
+   } else if ((node.void_frac[comp]->item(p3) == 0) && (bf_intersect[1].offset[comp]->item(p3,0) == 1)) {
+      double yint = bf_intersect[1].value[comp]->item(p3,0);
+      if (yint >= (ymax-y0)) {
+         uright = ((y0 + yint - ymax)*uRT + (ymax - y0)*bf_intersect[1].field_var[comp]->item(p3,0))/(yint);
+         dxR = xmax - x0;
+      } else {
+         size_t id = node.parID[comp]->item(p1);
+         dxR = find_intersection_for_ghost (UF, x0, xmax, y0, z0, id, comp, 0, dh, 1, 0, 1);
+         impose_solid_velocity_for_ghost(net_vel,comp,x0+dxR,y0,z0,id);
+         uright = net_vel[comp];
+      }
+   } else if ((node.void_frac[comp]->item(p1) == 1) && (node.void_frac[comp]->item(p3) == 1)) {
+      size_t id = node.parID[comp]->item(p1);
+      dxR = find_intersection_for_ghost (UF, x0, xmax, y0, z0, id, comp, 0, dh, 1, 0, 1);
+      impose_solid_velocity_for_ghost(net_vel,comp,x0+dxR,y0,z0,id);
+      uright = net_vel[comp];
+   }
+
+   // Contribution from left wall
+   if ((node.void_frac[comp]->item(p0) == 0) && (node.void_frac[comp]->item(p2) == 0)) {
+      uleft = ((ymax - y0)*uLB + (y0 - ymin)*uLT)/(ymax-ymin);
+      dxL = x0 - xmin;
+   } else if ((node.void_frac[comp]->item(p0) == 0) && (bf_intersect[1].offset[comp]->item(p0,1) == 1)) {
+      double yint = bf_intersect[1].value[comp]->item(p0,1);
+      if (yint >= (y0-ymin)) {
+         uleft = ((ymin + yint - y0)*uLB + (y0 - ymin)*bf_intersect[1].field_var[comp]->item(p0,1))/(yint);
+         dxL = x0 - xmin;
+      } else {
+         size_t id = node.parID[comp]->item(p2);
+         dxL = find_intersection_for_ghost(UF, xmin, x0, y0, z0, id, comp, 0, dh, 1, 0, 0);
+         impose_solid_velocity_for_ghost(net_vel,comp,x0-dxL,y0,z0,id);
+         uleft = net_vel[comp];
+
+      }
+   } else if ((node.void_frac[comp]->item(p2) == 0) && (bf_intersect[1].offset[comp]->item(p2,0) == 1)) {
+      double yint = bf_intersect[1].value[comp]->item(p2,0);
+      if (yint >= (ymax-y0)) {
+         uleft = ((y0 + yint - ymax)*uLT + (ymax - y0)*bf_intersect[1].field_var[comp]->item(p2,0))/(yint);
+         dxL = x0 - xmin;
+      } else {
+         size_t id = node.parID[comp]->item(p0);
+         dxL = find_intersection_for_ghost(UF, xmin, x0, y0, z0, id, comp, 0, dh, 1, 0, 0);
+         impose_solid_velocity_for_ghost(net_vel,comp,x0-dxL,y0,z0,id);
+         uleft = net_vel[comp];
+      }
+   } else if ((node.void_frac[comp]->item(p0) == 1) && (node.void_frac[comp]->item(p2) == 1)) {
+      size_t id = node.parID[comp]->item(p0);
+      dxL = find_intersection_for_ghost(UF, xmin, x0, y0, z0, id, comp, 0, dh, 1, 0, 0);
+      impose_solid_velocity_for_ghost(net_vel,comp,x0-dxL,y0,z0,id);
+      uleft = net_vel[comp];
+   }
+
+   // Contribution from top wall
+   if ((node.void_frac[comp]->item(p2) == 0) && (node.void_frac[comp]->item(p3) == 0)) {
+      utop = ((xmax - x0)*uLT + (x0 - xmin)*uRT)/(xmax-xmin);
+      dxT = ymax - y0;
+   } else if ((node.void_frac[comp]->item(p2) == 0) && (bf_intersect[0].offset[comp]->item(p2,1) == 1)) {
+      double xint = bf_intersect[0].value[comp]->item(p2,1);
+      if (xint >= (x0-xmin)) {
+         utop = ((xmin + xint - x0)*uLT + (x0 - xmin)*bf_intersect[0].field_var[comp]->item(p2,1))/(xint);
+         dxT = ymax - y0;
+      } else {
+         size_t id = node.parID[comp]->item(p3);
+         dxT = find_intersection_for_ghost(UF, y0, ymax, x0, z0, id, comp, 1, dh, 1, 0, 1);
+         impose_solid_velocity_for_ghost(net_vel,comp,x0,y0+dxT,z0,id);
+         utop = net_vel[comp];
+
+      }
+   } else if ((node.void_frac[comp]->item(p3) == 0) && (bf_intersect[0].offset[comp]->item(p3,0) == 1)) {
+      double xint = bf_intersect[0].value[comp]->item(p3,0);
+      if (xint >= (xmax-x0)) {
+         utop = ((x0 + xint - xmax)*uRT + (xmax - x0)*bf_intersect[0].field_var[comp]->item(p3,0))/(xint);
+         dxT = ymax - y0;
+      } else {
+         size_t id = node.parID[comp]->item(p2);
+         dxT = find_intersection_for_ghost(UF, y0, ymax, x0, z0, id, comp, 1, dh, 1, 0, 1);
+         impose_solid_velocity_for_ghost(net_vel,comp,x0,y0+dxT,z0,id);
+         utop = net_vel[comp];
+      }
+   } else if ((node.void_frac[comp]->item(p2) == 1) && (node.void_frac[comp]->item(p3) == 1)) {
+      size_t id = node.parID[comp]->item(p2);
+      dxT = find_intersection_for_ghost(UF, y0, ymax, x0, z0, id, comp, 1, dh, 1, 0, 1);
+      impose_solid_velocity_for_ghost(net_vel,comp,x0,y0+dxT,z0,id);
+      utop = net_vel[comp];
+   }
+
+   // Contribution from bottom wall
+   if ((node.void_frac[comp]->item(p0) == 0) && (node.void_frac[comp]->item(p1) == 0)) {
+      ubottom = ((xmax - x0)*uLB + (x0 - xmin)*uRB)/(xmax-xmin);
+      dxB = y0 - ymin;
+   } else if ((node.void_frac[comp]->item(p0) == 0) && (bf_intersect[0].offset[comp]->item(p0,1) == 1)) {
+      double xint = bf_intersect[0].value[comp]->item(p0,1);
+      if (xint >= (x0-xmin)) {
+         ubottom = ((xmin + xint - x0)*uLB + (x0 - xmin)*bf_intersect[0].field_var[comp]->item(p0,1))/(xint);
+         dxB = y0 - ymin;
+      } else {
+         size_t id = node.parID[comp]->item(p1);
+         dxB = find_intersection_for_ghost(UF, ymin, y0, x0, z0, id, comp, 1, dh, 1, 0, 0);
+         impose_solid_velocity_for_ghost(net_vel,comp,x0,y0-dxB,z0,id);
+         ubottom = net_vel[comp];
+
+      }
+   } else if ((node.void_frac[comp]->item(p1) == 0) && (bf_intersect[0].offset[comp]->item(p1,0) == 1)) {
+      double xint = bf_intersect[0].value[comp]->item(p1,0);
+      if (xint >= (xmax-x0)) {
+         ubottom = ((x0 + xint - xmax)*uRB + (xmax - x0)*bf_intersect[0].field_var[comp]->item(p1,0))/(xint);
+         dxB = y0 - ymin;
+      } else {
+         size_t id = node.parID[comp]->item(p0);
+         dxB = find_intersection_for_ghost(UF, ymin, y0, x0, z0, id, comp, 1, dh, 1, 0, 0);
+         impose_solid_velocity_for_ghost(net_vel,comp,x0,y0-dxB,z0,id);
+         ubottom = net_vel[comp];
+      }
+   } else if ((node.void_frac[comp]->item(p0) == 1) && (node.void_frac[comp]->item(p1) == 1)) {
+      size_t id = node.parID[comp]->item(p0);
+      dxB = find_intersection_for_ghost(UF, ymin, y0, x0, z0, id, comp, 1, dh, 1, 0, 0);
+      impose_solid_velocity_for_ghost(net_vel,comp,x0,y0-dxB,z0,id);
+      ubottom = net_vel[comp];
+   }
+
+   double field_value = 0.5*((dxR*uleft + dxL*uright)/(dxR+dxL) + (dxB*utop + dxT*ubottom)/(dxB+dxT));
+
+   return (field_value);
+
 }
 
 //---------------------------------------------------------------------------

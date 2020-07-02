@@ -198,7 +198,15 @@ public SolverComputingTime
       void nodes_field_initialization ( size_t const& level );
 
       void impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
+      void impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID );
 
+      void compute_velocity_force_on_particle(size_t const& parID, size_t const& Np, double const& dh );
+      void compute_fluid_particle_interaction( );
+      void compute_pressure_force_on_particle(size_t const& parID, size_t const& Np);
+
+      double ghost_field_estimate ( size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh);
+
+      double find_intersection_for_ghost ( FV_DiscreteField const* FF, double const& xleft, double const& xright, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& field, size_t const& level, size_t const& off);
 
 
       /** @brief Find the intersection using bisection method with the solid interface */
