@@ -389,7 +389,9 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
    if ( my_rank == is_master ) cout << "velocity change = " <<
      	MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
 
-   compute_fluid_particle_interaction(t_it);
+   compute_fluid_particle_interaction(t_it,50);
+   compute_fluid_particle_interaction(t_it,100);
+   compute_fluid_particle_interaction(t_it,200);
 
    double vel_divergence = get_velocity_divergence();
 
@@ -2277,7 +2279,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np)
+DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_pressure_force_on_particle" ) ;
@@ -2285,7 +2287,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
   ofstream outputFile ;
 
   size_t i0_temp;
-  double theta = 0., ri;
+  double ri;
   bool found = 0;
 /*
   std::ostringstream os2;
@@ -2305,7 +2307,6 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
   PartInput solid = GLOBAL_EQ->get_solid(0);
 
   for (size_t i=0;i<Np;i++) {
-     theta = theta + 2.*MAC::pi()/Np;
      for (size_t comp=0;comp<nb_comps[0];comp++) {
         // Get local min and max indices
         for (size_t l=0;l<dim;++l) {
@@ -2322,8 +2323,8 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
         double Dy_min = UF->get_DOF_coordinate( min_unknown_index(1), comp, 1 ) ;
         double Dy_max = UF->get_DOF_coordinate( max_unknown_index(1), comp, 1 ) ;
 
-        xpoint = xp + ri*cos(theta);
-        ypoint = yp + ri*sin(theta);
+        xpoint = xp + ri*point_coord(i,0);
+        ypoint = yp + ri*point_coord(i,1);
 
         if ((xpoint > Dx_min) && (xpoint <= Dx_max) && (ypoint > Dy_min) && (ypoint <= Dy_max)) {
            // Finding the grid indexes next to ghost points
@@ -2366,8 +2367,9 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
      }
 
      // Ref: Keating thesis Pg-85
-     force(parID,0) = force(parID,0) + stress(i)*cos(theta)*(2.*MAC::pi()/Np*ri);
-     force(parID,1) = force(parID,1) + stress(i)*sin(theta)*(2.*MAC::pi()/Np*ri);
+     // point_coord*(area) --> Component of area in particular direction
+     force(parID,0) = force(parID,0) + stress(i)*point_coord(i,0)*(cell_area(i)*ri);
+     force(parID,1) = force(parID,1) + stress(i)*point_coord(i,1)*(cell_area(i)*ri);
 //     outputFile << xpoint << "," << ypoint << "," << 0. << "," << stress(i)*cos(theta)*(2.*MAC::pi()/Np*ri) << endl;
   }
 //  outputFile.close();
@@ -2375,7 +2377,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_it)
+DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_it, double const& Np)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_fluid_particle_interaction" ) ;
@@ -2384,40 +2386,58 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
   // For 3D case (i.e. sphere)Aspect ratio of cells (ar); 
   // Number of rings to include while discretization (Nrings); number of points at the
   // pole of the particle
-  double Np = 50, ar = 1;
-  size_t Nrings = 10, k0 = 1;
+  double ar = 1;
+  size_t Nrings = 10, k0 = 3;
 
+  size_t Nmax = (int) Np;
+
+  string fileName = "DS_results/particle_forces.csv" ;
+
+  if (dim == 2) Nrings = 1;
   // Summation of total discretized points with increase in number of rings radially
   doubleVector k(Nrings+1,0.);
   // Zenithal angle for the sphere
   doubleVector eta(Nrings+1,0.);
+  // Radius of the rings in lamber projection plane
+  doubleVector Rring(Nrings+1,0.);
 
-  // Discretize the spherical surface in approximate equal area
-//  solid_surface_discretization (eta, k, ar, k0, Nrings);
+  if (dim == 3) {
+     // Generate parameters to discretize spherical surface in approximate equal area
+     generate_discretization_parameter (eta, k, Rring, ar, k0, Nrings);
+     Nmax = 2*(int)k(Nrings);
+  }
 
-  string fileName = "DS_results/particle_forces.csv" ;
+  doubleArray2D point_coord(Nmax,3,0);
+  doubleVector cell_area(Nmax,0);
+
+  // Discretize the parID particle surface into approximate equal area cells
+  if (dim == 3) {
+     compute_surface_points(eta, k, Rring, point_coord, cell_area, Nrings);
+  } else {
+     compute_surface_points(eta, k, Rring, point_coord, cell_area, Nmax);
+  }
 
   doubleArray2D vel_force(Npart,3,0);
   doubleArray2D press_force(Npart,3,0);
   for (size_t parID = 0; parID < Npart; parID++) {
      // Contribution of stress tensor
-     compute_velocity_force_on_particle(vel_force, parID, Np); 
+     compute_velocity_force_on_particle(point_coord, cell_area, vel_force, parID, Np); 
      // Gathering information from all procs
      vel_force(parID,0) = pelCOMM->sum(vel_force(parID,0)) ;
      vel_force(parID,1) = pelCOMM->sum(vel_force(parID,1)) ;
      vel_force(parID,2) = pelCOMM->sum(vel_force(parID,2)) ;
 
      // Contribution due to pressure tensor
-     compute_pressure_force_on_particle(press_force, parID, Np); 
+     compute_pressure_force_on_particle(point_coord, cell_area, press_force, parID, Np); 
      // Gathering information from all procs
      press_force(parID,0) = pelCOMM->sum(press_force(parID,0)) ;
      press_force(parID,1) = pelCOMM->sum(press_force(parID,1)) ;
      press_force(parID,2) = pelCOMM->sum(press_force(parID,2)) ;
 
      if (my_rank == 0) {
-        cout << "Total force: " << press_force(parID,0)+vel_force(parID,0) << "," << press_force(parID,1)+vel_force(parID,1) << endl;
+        cout << "Total force for Np " << Np << " : " << press_force(parID,0)+vel_force(parID,0) << "," << press_force(parID,1)+vel_force(parID,1) << endl;
         ofstream MyFile( fileName.c_str(), ios::app ) ;
-        MyFile << t_it -> time() << "," << parID << "," << press_force(parID,0)+vel_force(parID,0) << "," << press_force(parID,1)+vel_force(parID,1) << endl;
+        MyFile << t_it -> time() << "," << parID << "," << Np << "," << press_force(parID,0)+vel_force(parID,0) << "," << press_force(parID,1)+vel_force(parID,1) << endl;
         MyFile.close( ) ;
      }
   }
@@ -2425,10 +2445,99 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solid_surface_discretization(class doubleVector& eta, class doubleVector& k, double const& ar, size_t const& k0, size_t const& Nrings)
+DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nrings)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: solid_surface_discretization" ) ;
+  MAC_LABEL("DDS_NavierStokes:: compute_surface_points" ) ;
+
+  ofstream outputFile ;
+  std::ostringstream os2;
+  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/point_data_" << my_rank << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+  outputFile << "x,y,z,area" << endl;
+
+  if (dim == 3) {
+     // Calculation for all rings except at the pole
+     for (int i=Nrings; i>0; --i) {
+        double Ri = Rring(i);
+        Rring(i) = (Rring(i) + Rring(i-1))/2.;
+        eta(i) = (eta(i) + eta(i-1))/2.;
+        double d_theta = 2.*MAC::pi()/(k(i)-k(i-1));
+        // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
+        double theta = 0.01*d_theta;
+        for (int j=k(i-1); j<k(i); j++) {
+           theta = theta + d_theta;
+           point_coord(j,0) = MAC::cos(theta)*MAC::sin(eta(i));
+           point_coord(j,1) = MAC::sin(theta)*MAC::sin(eta(i));
+           point_coord(j,2) = MAC::cos(eta(i));
+           cell_area(j) = 0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.));
+           // For second half of sphere
+           point_coord(k(Nrings)+j,0) = point_coord(j,0);
+           point_coord(k(Nrings)+j,1) = point_coord(j,1);
+           point_coord(k(Nrings)+j,2) = -point_coord(j,2);
+           cell_area(k(Nrings)+j) = cell_area(j);
+//           outputFile << point_coord(j,0) << "," << point_coord(j,1) << "," << point_coord(j,2) << "," << cell_area(j) << endl;
+//           outputFile << point_coord(k(Nrings)+j,0) << "," << point_coord(k(Nrings)+j,1) << "," << point_coord(k(Nrings)+j,2) << "," << cell_area(k(Nrings)+j) << endl;
+        }
+     } 
+
+     // Calculation at the ring on pole (i=0)
+     double Ri = Rring(0);
+     Rring(0) = Rring(0)/2.;
+     eta(0) = eta(0)/2.;
+     double d_theta = 2.*MAC::pi()/(k(0));
+     // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
+     double theta = 0.01*d_theta;
+     if (k(0)>1) {
+        for (int j=0; j < k(0); j++) {
+           theta = theta + d_theta;
+           point_coord(j,0) = MAC::cos(theta)*MAC::sin(eta(0));
+           point_coord(j,1) = MAC::sin(theta)*MAC::sin(eta(0));
+           point_coord(j,2) = MAC::cos(eta(0));
+           cell_area(j) = 0.5*d_theta*pow(Ri,2.);
+           // For second half of sphere
+           point_coord(k(Nrings)+j,0) = point_coord(j,0);
+           point_coord(k(Nrings)+j,1) = point_coord(j,1);
+           point_coord(k(Nrings)+j,2) = -point_coord(j,2);
+           cell_area(k(Nrings)+j) = cell_area(j);
+//           outputFile << point_coord(j,0) << "," << point_coord(j,1) << "," << point_coord(j,2) << "," << cell_area(j) << endl;
+//           outputFile << point_coord(k(Nrings)+j,0) << "," << point_coord(k(Nrings)+j,1) << "," << point_coord(k(Nrings)+j,2) << "," << cell_area(k(Nrings)+j) << endl;
+        }
+     } else {
+        point_coord(0,0) = 0.;
+        point_coord(0,1) = 0.;
+        point_coord(0,2) = 1.;
+        cell_area(0) = 0.5*d_theta*pow(Ri,2.);
+        // For second half of sphere
+        point_coord(k(Nrings),0) = point_coord(0,0);
+        point_coord(k(Nrings),1) = point_coord(0,1);
+        point_coord(k(Nrings),2) = -point_coord(0,2);
+        cell_area(k(Nrings)) = cell_area(0);
+//        outputFile << point_coord(0,0) << "," << point_coord(0,1) << "," << point_coord(0,2) << "," << cell_area(0) << endl;
+//        outputFile << point_coord(k(Nrings),0) << "," << point_coord(k(Nrings),1) << "," << point_coord(k(Nrings),2) << "," << cell_area(k(Nrings)) << endl;
+     }
+  } else if (dim == 2) {
+     double d_theta = 2.*MAC::pi()/Nrings;
+     double theta = 0.01*d_theta;
+     for (int j=0; j < Nrings; j++) {
+        theta = theta + d_theta;
+        point_coord(j,0) = MAC::cos(theta);
+        point_coord(j,1) = MAC::sin(theta);
+        cell_area(j) = d_theta;
+        outputFile << point_coord(j,0) << "," << point_coord(j,1) << "," << point_coord(j,2) << "," << cell_area(j) << endl;
+     }
+  }
+  outputFile.close();
+     
+
+}
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, double const& ar, size_t const& k0, size_t const& Nrings)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NavierStokes:: generate_discretization_parameter" ) ;
 
   // Returns the delta eta (i.e. change in zenithal angle) with provided
   // number of rings for discretization(Nrings), number of cell at poles(k0)
@@ -2438,9 +2547,6 @@ DDS_NavierStokes:: solid_surface_discretization(class doubleVector& eta, class d
   // equal-area cells, Computational Geometry 45 (2012) 275-283
 
   double theta_ref = MAC::pi()/2.;
-
-  // Radius of the rings in lamber projection plane
-  doubleVector Rring(Nrings+1,0.);
 
   double p = MAC::pi()*ar;
   size_t kmax = k0;
@@ -2464,19 +2570,17 @@ DDS_NavierStokes:: solid_surface_discretization(class doubleVector& eta, class d
 }
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_velocity_force_on_particle" ) ;
 
-  ofstream outputFile ;
-
   size_t i0_temp;
-  double theta = 0.01*2.*MAC::pi()/Np;  // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
   double ri;
   bool found = 0;
   double dfdx=0.,dfdy=0.;
 /*
+  ofstream outputFile ;
   std::ostringstream os2;
   os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/velocity_drag_" << my_rank << ".csv";
   std::string filename = os2.str();
@@ -2500,7 +2604,6 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
   PartInput solid = GLOBAL_EQ->get_solid(1);
 
   for (size_t i=0;i<Np;i++) {
-     theta = theta + 2.*MAC::pi()/Np;
      for (size_t comp=0;comp<nb_comps[1];comp++) {
         // Get local min and max indices
         for (size_t l=0;l<dim;++l) {
@@ -2517,8 +2620,8 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
         double Dy_min = UF->get_DOF_coordinate( min_unknown_index(1), comp, 1 ) ;
         double Dy_max = UF->get_DOF_coordinate( max_unknown_index(1), comp, 1 ) ;
 
-        xpoint(0) = xp + ri*cos(theta);
-        ypoint(0) = yp + ri*sin(theta);
+        xpoint(0) = xp + ri*point_coord(i,0);
+        ypoint(0) = yp + ri*point_coord(i,1);
 
         // Finding the grid indexes next to ghost points
         found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(0), i0_temp);
@@ -2533,7 +2636,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
 
         if ((xpoint(0) > Dx_min) && (xpoint(0) <= Dx_max) && (ypoint(0) > Dy_min) && (ypoint(0) <= Dy_max)) {
            // Ghost points in x for the calculation of x-derivative of field
-           if (cos(theta) <= 0.) {
+           if (point_coord(i,0) <= 0.) {
               xpoint(1) = xpoint(0) - dh;
               xpoint(2) = xpoint(1) - dh;
            } else {
@@ -2542,7 +2645,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
            }
 
            // Ghost points in y for the calculation of y-derivative of field
-           if (sin(theta) <=0.) {
+           if (point_coord(i,1) <=0.) {
               ypoint(1) = ypoint(0) - dh;
               ypoint(2) = ypoint(1) - dh;
            } else {
@@ -2576,7 +2679,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
            // Calculation of field variable on ghost point(0,2)
            finy(2) = ghost_field_estimate (comp,i0_x(0),i0_y(2), 0, xpoint(0), ypoint(2), 0, dh);
 
-           if (cos(theta) <= 0.) {
+           if (point_coord(i,0) <= 0.) {
               dfdx = mu*(finx(2) - 4.*finx(1) + 3.*finx(0))/2./dh;
 //              dfdx = mu*(-finx(1) + finx(0))/dh;
            } else {
@@ -2584,7 +2687,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
 //              dfdx = mu*(finx(1) - finx(0))/dh;
            }
 
-           if (sin(theta) <=0.) {
+           if (point_coord(i,1) <=0.) {
               dfdy = mu*(finy(2) - 4.*finy(1) + 3.*finy(0))/2./dh;
 //              dfdy = mu*(-finy(1) + finy(0))/dh;
            } else {
@@ -2610,8 +2713,9 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
      }
 
      // Ref: Keating thesis Pg-85
-     force(parID,0) = force(parID,0) + stress(i,0)*cos(theta)*(2.*MAC::pi()/Np*ri) + stress(i,2)*sin(theta)*(2.*MAC::pi()/Np*ri);
-     force(parID,1) = force(parID,1) + stress(i,2)*cos(theta)*(2.*MAC::pi()/Np*ri) + stress(i,1)*sin(theta)*(2.*MAC::pi()/Np*ri);
+     // point_coord*(area) --> Component of area in particular direction
+     force(parID,0) = force(parID,0) + stress(i,0)*point_coord(i,0)*(cell_area(i)*ri) + stress(i,2)*point_coord(i,1)*(cell_area(i)*ri);
+     force(parID,1) = force(parID,1) + stress(i,2)*point_coord(i,0)*(cell_area(i)*ri) + stress(i,1)*point_coord(i,1)*(cell_area(i)*ri);
 //     outputFile << xpoint(0) << "," << ypoint(0) << "," << 0 << "," << stress(i,0) << "," << stress(i,1) << "," << stress(i,2) << endl;
   }
 //  outputFile.close();
