@@ -81,6 +81,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
    MAC_ASSERT( PF->discretization_type() == "centered" ) ;
    MAC_ASSERT( UF->storage_depth() == 5 ) ;
+   MAC_ASSERT( PF->storage_depth() == 4 ) ;
 
    // Call of MAC_Communicator routine to set the rank of each proces and
    // the number of processes during execution
@@ -254,6 +255,10 @@ DDS_NavierStokes:: do_one_inner_iteration( FV_TimeIterator const* t_it )
    if ( my_rank == is_master ) SCT_set_start("Pressure predictor");
    NS_first_step(t_it);
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Pressure predictor" );
+
+   // Extra levels for the calculation of pressure force in the end of iteration cycle
+   PF->copy_DOFs_value( 0, 2 );
+   PF->copy_DOFs_value( 1, 3 );
 
    if ( my_rank == is_master ) SCT_set_start( "Velocity update" );
    NS_velocity_update(t_it);
@@ -2349,7 +2354,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
            double dxB = ypoint - ymin;
 
            // Calculation of field variable on ghost point(0,0)
-           for (size_t level=0; level<2;level++) {
+           for (size_t level=2; level<4;level++) {
               double pRT = PF->DOF_value( i0+1, j0+1, k0, comp, level );       // Right top pressure
               double pRB = PF->DOF_value( i0+1, j0, k0, comp, level );         // Right bottom pressure
               double pLT = PF->DOF_value( i0, j0+1, k0, comp, level );         // Left top pressure
@@ -2360,7 +2365,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
               double utop = ((xmax - xpoint)*pLT + (xpoint - xmin)*pRT)/(xmax-xmin);
               double ubottom = ((xmax - xpoint)*pLB + (xpoint - xmin)*pRB)/(xmax-xmin);
 
-              stress(i) = stress(i) - ((dxR*uleft + dxL*uright)/(dxR+dxL) + (dxB*utop + dxT*ubottom)/(dxB+dxT))/2.;
+              stress(i) = stress(i) - (0.5*((dxR*uleft + dxL*uright)/(dxR+dxL) + (dxB*utop + dxT*ubottom)/(dxB+dxT)))/2.;
            }
 
         }
