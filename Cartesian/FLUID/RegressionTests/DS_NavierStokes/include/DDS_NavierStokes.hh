@@ -204,9 +204,9 @@ public SolverComputingTime
       void compute_fluid_particle_interaction( FV_TimeIterator const* t_it, double const& Np);
       void compute_pressure_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np);
       void generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, double const& ar, size_t const& k0, size_t const& Nrings);
-      void compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nrings);
+      void compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nrings, size_t const& pole_loc);
 
-      double ghost_field_estimate ( size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh);
+      double ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);
 
       double find_intersection_for_ghost ( FV_DiscreteField const* FF, double const& xleft, double const& xright, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& field, size_t const& level, size_t const& off);
 
