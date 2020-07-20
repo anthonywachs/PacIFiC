@@ -160,6 +160,22 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       }
    }
 
+   // Read weather the sress calculation on particle is ON/OFF
+   if ( exp->has_entry( "Stress_calculation" ) )
+     is_stressCal = exp->bool_data( "Stress_calculation" ) ;
+
+   if (is_stressCal) {
+      if (dim == 2) {
+         Npoints = exp->double_data( "Npoints" ) ;
+      } else {
+         Npoints = 1.;
+         Nrings = exp->int_data( "Nrings" ) ;
+         Pmin = exp->int_data( "Pmin" ) ;
+         ar = exp->double_data( "aspect_ratio" ) ;
+         pole_loc = exp->int_data( "pole_loc" ) ;
+      }
+   }
+
    // Read Kai
    if ( exp->has_entry( "Kai" ) )
    {
@@ -180,6 +196,13 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    	&& UF->primary_grid()->get_security_bandwidth() < 2 )
    {
      string error_message="   >= 2 with TVD scheme";
+     MAC_Error::object()->raise_bad_data_value( exp,
+        "security_bandwidth", error_message );
+   }
+
+   if ( UF->primary_grid()->get_security_bandwidth() < 3 )
+   {
+     string error_message="   >= 3 for correct stress calculations on solids";
      MAC_Error::object()->raise_bad_data_value( exp,
         "security_bandwidth", error_message );
    }
@@ -394,9 +417,9 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
    if ( my_rank == is_master ) cout << "velocity change = " <<
      	MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
 
-   compute_fluid_particle_interaction(t_it,50);
-   compute_fluid_particle_interaction(t_it,100);
-   compute_fluid_particle_interaction(t_it,200);
+   if (is_stressCal) {
+      compute_fluid_particle_interaction(t_it,Npoints);
+   }
 
    double vel_divergence = get_velocity_divergence();
 
@@ -681,8 +704,8 @@ DDS_NavierStokes:: return_node_index (
    size_t_vector max_unknown_index(dim,0);
    size_t_vector i_length(dim,0);
    for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
+        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
         i_length(l) = 1 + max_unknown_index(l) - min_unknown_index(l);
    }
 
@@ -835,6 +858,10 @@ DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<dou
   net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
+/*
+  net_vel[0] = grid_coord(0) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4)*pow(grid_coord(2),3);
+  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3)*pow(grid_coord(2),2);
+  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2)*pow(grid_coord(0)+grid_coord(2),2)*pow(grid_coord(2)+grid_coord(1),2);*/
 }
 
 //---------------------------------------------------------------------------
@@ -872,6 +899,10 @@ DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel, siz
   net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
+
+/*  net_vel[0] = grid_coord(0) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4)*pow(grid_coord(2),3);
+  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3)*pow(grid_coord(2),2);
+  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2)*pow(grid_coord(0)+grid_coord(2),2)*pow(grid_coord(2)+grid_coord(1),2);*/
 }
 
 //---------------------------------------------------------------------------
@@ -890,8 +921,9 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices; Calculation on the rows next to the proc as well
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1 ;
-        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1 ;
+        // Calculations for solids on the total unknown on the proc
+        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) ;
+        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) ;
      }
 
      size_t local_min_k = 0;
@@ -967,8 +999,8 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,level);
 
   for (size_t l=0;l<dim;++l) {
-     min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1 ;
-     max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1 ;
+     min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) ;
+     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) ;
      local_unknown_extents(l,0) = 0;
      local_unknown_extents(l,1) = (max_unknown_index(l)-min_unknown_index(l));
   }
@@ -2289,18 +2321,17 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
 {
   MAC_LABEL("DDS_NavierStokes:: compute_pressure_force_on_particle" ) ;
 
-  ofstream outputFile ;
-
   size_t i0_temp;
   double ri;
   bool found = 0;
-
+/*
+  ofstream outputFile ;
   std::ostringstream os2;
   os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/pressure_drag_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
-  outputFile << "x,y,z,p_stress" << endl;
-
+  outputFile << "x,y,z,p_stress,error" << endl;
+*/
   double xpoint=0., ypoint=0., zpoint=0.;
   doubleVector stress(Np,0);         
   size_t i0, j0, k0=0;
@@ -2315,9 +2346,16 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[0];comp++) {
         // Get local min and max indices
+        // One extra grid cell needs to considered, since ghost points can be 
+        // located in between the min/max index handled by the proc
         for (size_t l=0;l<dim;++l) {
-           min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-           max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+           if (rank_in_i[l] == 0) {
+              min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
+              max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+           } else  {
+              min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l );
+              max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+           }
         }
 
         double xp = solid.coord[comp]->item(parID,0);
@@ -2329,19 +2367,21 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
         ypoint = yp + ri*point_coord(i,1);
         zpoint = zp + ri*point_coord(i,2);
 
-        double Dx_min = UF->get_DOF_coordinate( min_unknown_index(0), comp, 0 ) ;
-        double Dx_max = UF->get_DOF_coordinate( max_unknown_index(0), comp, 0 ) ;
-        double Dy_min = UF->get_DOF_coordinate( min_unknown_index(1), comp, 1 ) ;
-        double Dy_max = UF->get_DOF_coordinate( max_unknown_index(1), comp, 1 ) ;
+        double Dx_min = PF->get_DOF_coordinate( min_unknown_index(0), comp, 0 ) ;
+        double Dx_max = PF->get_DOF_coordinate( max_unknown_index(0), comp, 0 ) ;
+        double Dy_min = PF->get_DOF_coordinate( min_unknown_index(1), comp, 1 ) ;
+        double Dy_max = PF->get_DOF_coordinate( max_unknown_index(1), comp, 1 ) ;
 
         if (dim==3) {
-           Dz_min = UF->get_DOF_coordinate( min_unknown_index(2), comp, 2 ) ;
-           Dz_max = UF->get_DOF_coordinate( max_unknown_index(2), comp, 2 ) ;
+           Dz_min = PF->get_DOF_coordinate( min_unknown_index(2), comp, 2 ) ;
+           Dz_max = PF->get_DOF_coordinate( max_unknown_index(2), comp, 2 ) ;
         }
 
         bool status = (dim==2) ? ((xpoint > Dx_min) && (xpoint <= Dx_max) && (ypoint > Dy_min) && (ypoint <= Dy_max)) :
                                  ((xpoint > Dx_min) && (xpoint <= Dx_max) && (ypoint > Dy_min) && (ypoint <= Dy_max)
                                                                           && (zpoint > Dz_min) && (zpoint <= Dz_max));
+
+//        cout << "Min, Max: " << Dx_min << "," << Dx_max << "," << Dy_min << "," << Dy_max << "," << Dz_min << "," << Dz_max << endl;
 
         if (status) {
            // Finding the grid indexes next to ghost points
@@ -2354,21 +2394,59 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
            found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,2), zpoint, i0_temp);
            if (found == 1) k0 = i0_temp;
 
+           double temp =0.;
            // Calculation of field variable on ghost point(0,0)
            for (size_t level=2; level<4;level++) {
-              double press = ghost_field_estimate (PF,comp,i0,j0,0,xpoint,ypoint,0,0.,2,level);
-              stress(i) = stress(i) - press/2.;
+              if (dim == 2) {
+                 double press0 = ghost_field_estimate_on_face (PF,comp,i0,j0,0,xpoint,ypoint,0,0.,2,level);
+                 stress(i) = stress(i) - press0/2.;
+              } else if (dim == 3) {
+                 doubleArray2D press(dim,2,0);
+                 doubleArray2D del(dim,2,0);
+                 // Behind face
+                 temp = PF->get_DOF_coordinate(k0, comp, 2);
+                 press(2,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,xpoint,ypoint,temp,0.,2,level);
+                 del(2,0) = MAC::abs(temp - zpoint);
+                 // Front face
+                 temp = PF->get_DOF_coordinate(k0+1, comp, 2);
+                 press(2,1) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0+1,xpoint,ypoint,temp,0.,2,level);
+                 del(2,1) = MAC::abs(temp - zpoint);
+                 // Left face
+                 temp = PF->get_DOF_coordinate(i0, comp, 0);
+                 press(0,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,temp,ypoint,zpoint,0.,0,level);
+                 del(0,0) = MAC::abs(temp - xpoint);
+                 // Right face
+                 temp = PF->get_DOF_coordinate(i0+1, comp, 0);
+                 press(0,1) = ghost_field_estimate_on_face (PF,comp,i0+1,j0,k0,temp,ypoint,zpoint,0.,0,level);
+                 del(0,1) = MAC::abs(temp - xpoint);
+                 // Bottom face
+                 temp = PF->get_DOF_coordinate(j0, comp, 1);
+                 press(1,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,xpoint,temp,zpoint,0.,1,level);
+                 del(1,0) = MAC::abs(temp - ypoint);
+                 // Bottom face
+                 temp = PF->get_DOF_coordinate(j0+1, comp, 1);
+                 press(1,1) = ghost_field_estimate_on_face (PF,comp,i0,j0+1,k0,xpoint,temp,zpoint,0.,1,level);
+                 del(1,1) = MAC::abs(temp - ypoint);
+
+                 double press0 = (1./3.)*((del(0,0)*press(0,1)+del(0,1)*press(0,0))/(del(0,0)+del(0,1)) +
+                                          (del(1,0)*press(1,1)+del(1,1)*press(1,0))/(del(1,0)+del(1,1)) +
+                                          (del(2,0)*press(2,1)+del(2,1)*press(2,0))/(del(2,0)+del(2,1)));
+                 stress(i) = stress(i) - press0/2.;
+              }
            }
         }
      }
+
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
      force(parID,0) = force(parID,0) + stress(i)*point_coord(i,0)*(cell_area(i)*ri);
      force(parID,1) = force(parID,1) + stress(i)*point_coord(i,1)*(cell_area(i)*ri);
-     outputFile << xpoint << "," << ypoint << "," << zpoint << "," << stress(i) << endl;
+     force(parID,2) = force(parID,2) + stress(i)*point_coord(i,2)*(cell_area(i)*ri);
+
+//     outputFile << xpoint << "," << ypoint << "," << zpoint << "," << stress(i) << "," << MAC::abs(zpoint + xpoint*ypoint*zpoint + pow(xpoint,2)*ypoint + stress(i)) << endl;
   }
-  outputFile.close();
+//  outputFile.close();
 }
 
 //---------------------------------------------------------------------------
@@ -2382,8 +2460,6 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
   // For 3D case (i.e. sphere)Aspect ratio of cells (ar); 
   // Number of rings to include while discretization (Nrings); number of points at the
   // pole of the particle
-  double ar = 1;
-  size_t Nrings = 5, k0 = 3, pole_loc = 1;
 
   size_t Nmax = (int) Np;
 
@@ -2399,7 +2475,7 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
 
   if (dim == 3) {
      // Generate parameters to discretize spherical surface in approximate equal area
-     generate_discretization_parameter (eta, k, Rring, ar, k0, Nrings);
+     generate_discretization_parameter (eta, k, Rring, Pmin, Nrings);
      Nmax = 2*(int)k(Nrings);
   }
 
@@ -2408,9 +2484,9 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
 
   // Discretize the parID particle surface into approximate equal area cells
   if (dim == 3) {
-     compute_surface_points(eta, k, Rring, point_coord, cell_area, Nrings, pole_loc);
+     compute_surface_points(eta, k, Rring, point_coord, cell_area, Nrings);
   } else {
-     compute_surface_points(eta, k, Rring, point_coord, cell_area, Nmax, pole_loc);
+     compute_surface_points(eta, k, Rring, point_coord, cell_area, Nmax);
   }
 
   doubleArray2D vel_force(Npart,3,0);
@@ -2431,9 +2507,16 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
      press_force(parID,2) = pelCOMM->sum(press_force(parID,2)) ;
 
      if (my_rank == 0) {
-        cout << "Total force for Np " << Np << " : " << press_force(parID,0)+vel_force(parID,0) << "," << press_force(parID,1)+vel_force(parID,1) << endl;
+        cout << "Total force for Np " << Np << " : " << press_force(parID,0)+vel_force(parID,0) 
+                                            << " , " << press_force(parID,1)+vel_force(parID,1) 
+                                            << " , " << press_force(parID,2)+vel_force(parID,2) <<endl;
         ofstream MyFile( fileName.c_str(), ios::app ) ;
-        MyFile << t_it -> time() << "," << parID << "," << Np << "," << press_force(parID,0)+vel_force(parID,0) << "," << press_force(parID,1)+vel_force(parID,1) << endl;
+        MyFile << t_it -> time() << "," << parID << "," << Np << "," << press_force(parID,0) 
+                                                              << "," << press_force(parID,1)
+                                                              << "," << press_force(parID,2)
+                                                              << "," << vel_force(parID,0) 
+                                                              << "," << vel_force(parID,1) 
+                                                              << "," << vel_force(parID,2) << endl;
         MyFile.close( ) ;
      }
   }
@@ -2441,7 +2524,7 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nrings, size_t const& pole_loc)
+DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nring)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_surface_points" ) ;
@@ -2455,7 +2538,7 @@ DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleV
 */
   if (dim == 3) {
      // Calculation for all rings except at the pole
-     for (int i=Nrings; i>0; --i) {
+     for (int i=Nring; i>0; --i) {
         double Ri = Rring(i);
         Rring(i) = (Rring(i) + Rring(i-1))/2.;
         eta(i) = (eta(i) + eta(i-1))/2.;
@@ -2470,33 +2553,33 @@ DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleV
               point_coord(j,2) = MAC::cos(eta(i));
               cell_area(j) = 0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.));
               // For second half of sphere
-              point_coord(k(Nrings)+j,0) = point_coord(j,0);
-              point_coord(k(Nrings)+j,1) = point_coord(j,1);
-              point_coord(k(Nrings)+j,2) = -point_coord(j,2);
-              cell_area(k(Nrings)+j) = cell_area(j);
+              point_coord(k(Nring)+j,0) = point_coord(j,0);
+              point_coord(k(Nring)+j,1) = point_coord(j,1);
+              point_coord(k(Nring)+j,2) = -point_coord(j,2);
+              cell_area(k(Nring)+j) = cell_area(j);
            } else if (pole_loc == 1) {
               point_coord(j,2) = MAC::cos(theta)*MAC::sin(eta(i));
               point_coord(j,0) = MAC::sin(theta)*MAC::sin(eta(i));
               point_coord(j,1) = MAC::cos(eta(i));
               cell_area(j) = 0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.));
               // For second half of sphere
-              point_coord(k(Nrings)+j,2) = point_coord(j,2);
-              point_coord(k(Nrings)+j,0) = point_coord(j,0);
-              point_coord(k(Nrings)+j,1) = -point_coord(j,1);
-              cell_area(k(Nrings)+j) = cell_area(j);
+              point_coord(k(Nring)+j,2) = point_coord(j,2);
+              point_coord(k(Nring)+j,0) = point_coord(j,0);
+              point_coord(k(Nring)+j,1) = -point_coord(j,1);
+              cell_area(k(Nring)+j) = cell_area(j);
            } else if (pole_loc == 0) {
               point_coord(j,1) = MAC::cos(theta)*MAC::sin(eta(i));
               point_coord(j,2) = MAC::sin(theta)*MAC::sin(eta(i));
               point_coord(j,0) = MAC::cos(eta(i));
               cell_area(j) = 0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.));
               // For second half of sphere
-              point_coord(k(Nrings)+j,1) = point_coord(j,1);
-              point_coord(k(Nrings)+j,2) = point_coord(j,2);
-              point_coord(k(Nrings)+j,0) = -point_coord(j,0);
-              cell_area(k(Nrings)+j) = cell_area(j);
+              point_coord(k(Nring)+j,1) = point_coord(j,1);
+              point_coord(k(Nring)+j,2) = point_coord(j,2);
+              point_coord(k(Nring)+j,0) = -point_coord(j,0);
+              cell_area(k(Nring)+j) = cell_area(j);
            } 
 //           outputFile << point_coord(j,0) << "," << point_coord(j,1) << "," << point_coord(j,2) << "," << cell_area(j) << endl;
-//           outputFile << point_coord(k(Nrings)+j,0) << "," << point_coord(k(Nrings)+j,1) << "," << point_coord(k(Nrings)+j,2) << "," << cell_area(k(Nrings)+j) << endl;
+//           outputFile << point_coord(k(Nring)+j,0) << "," << point_coord(k(Nring)+j,1) << "," << point_coord(k(Nring)+j,2) << "," << cell_area(k(Nring)+j) << endl;
         }
      } 
 
@@ -2516,33 +2599,33 @@ DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleV
               point_coord(j,2) = MAC::cos(eta(0));
               cell_area(j) = 0.5*d_theta*pow(Ri,2.);
               // For second half of sphere
-              point_coord(k(Nrings)+j,0) = point_coord(j,0);
-              point_coord(k(Nrings)+j,1) = point_coord(j,1);
-              point_coord(k(Nrings)+j,2) = -point_coord(j,2);
-              cell_area(k(Nrings)+j) = cell_area(j);
+              point_coord(k(Nring)+j,0) = point_coord(j,0);
+              point_coord(k(Nring)+j,1) = point_coord(j,1);
+              point_coord(k(Nring)+j,2) = -point_coord(j,2);
+              cell_area(k(Nring)+j) = cell_area(j);
            } else if (pole_loc == 1) {
               point_coord(j,2) = MAC::cos(theta)*MAC::sin(eta(0));
               point_coord(j,0) = MAC::sin(theta)*MAC::sin(eta(0));
               point_coord(j,1) = MAC::cos(eta(0));
               cell_area(j) = 0.5*d_theta*pow(Ri,2.);
               // For second half of sphere
-              point_coord(k(Nrings)+j,2) = point_coord(j,2);
-              point_coord(k(Nrings)+j,0) = point_coord(j,0);
-              point_coord(k(Nrings)+j,1) = -point_coord(j,1);
-              cell_area(k(Nrings)+j) = cell_area(j);
+              point_coord(k(Nring)+j,2) = point_coord(j,2);
+              point_coord(k(Nring)+j,0) = point_coord(j,0);
+              point_coord(k(Nring)+j,1) = -point_coord(j,1);
+              cell_area(k(Nring)+j) = cell_area(j);
            } else if (pole_loc == 0) {
               point_coord(j,1) = MAC::cos(theta)*MAC::sin(eta(0));
               point_coord(j,2) = MAC::sin(theta)*MAC::sin(eta(0));
               point_coord(j,0) = MAC::cos(eta(0));
               cell_area(j) = 0.5*d_theta*pow(Ri,2.);
               // For second half of sphere
-              point_coord(k(Nrings)+j,1) = point_coord(j,1);
-              point_coord(k(Nrings)+j,2) = point_coord(j,2);
-              point_coord(k(Nrings)+j,0) = -point_coord(j,0);
-              cell_area(k(Nrings)+j) = cell_area(j);
+              point_coord(k(Nring)+j,1) = point_coord(j,1);
+              point_coord(k(Nring)+j,2) = point_coord(j,2);
+              point_coord(k(Nring)+j,0) = -point_coord(j,0);
+              cell_area(k(Nring)+j) = cell_area(j);
            } 
 //           outputFile << point_coord(j,0) << "," << point_coord(j,1) << "," << point_coord(j,2) << "," << cell_area(j) << endl;
-//           outputFile << point_coord(k(Nrings)+j,0) << "," << point_coord(k(Nrings)+j,1) << "," << point_coord(k(Nrings)+j,2) << "," << cell_area(k(Nrings)+j) << endl;
+//           outputFile << point_coord(k(Nring)+j,0) << "," << point_coord(k(Nring)+j,1) << "," << point_coord(k(Nring)+j,2) << "," << cell_area(k(Nring)+j) << endl;
         }
      } else {
         if (pole_loc == 2) { 
@@ -2551,38 +2634,38 @@ DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleV
            point_coord(0,2) = 1.;
            cell_area(0) = 0.5*d_theta*pow(Ri,2.);
            // For second half of sphere
-           point_coord(k(Nrings),0) = point_coord(0,0);
-           point_coord(k(Nrings),1) = point_coord(0,1);
-           point_coord(k(Nrings),2) = -point_coord(0,2);
-           cell_area(k(Nrings)) = cell_area(0);
+           point_coord(k(Nring),0) = point_coord(0,0);
+           point_coord(k(Nring),1) = point_coord(0,1);
+           point_coord(k(Nring),2) = -point_coord(0,2);
+           cell_area(k(Nring)) = cell_area(0);
         } else if (pole_loc == 1) {
            point_coord(0,2) = 0.;
            point_coord(0,0) = 0.;
            point_coord(0,1) = 1.;
            cell_area(0) = 0.5*d_theta*pow(Ri,2.);
            // For second half of sphere
-           point_coord(k(Nrings),2) = point_coord(0,2);
-           point_coord(k(Nrings),0) = point_coord(0,0);
-           point_coord(k(Nrings),1) = -point_coord(0,1);
-           cell_area(k(Nrings)) = cell_area(0);
+           point_coord(k(Nring),2) = point_coord(0,2);
+           point_coord(k(Nring),0) = point_coord(0,0);
+           point_coord(k(Nring),1) = -point_coord(0,1);
+           cell_area(k(Nring)) = cell_area(0);
         } else if (pole_loc == 0) {
            point_coord(0,1) = 0.;
            point_coord(0,2) = 0.;
            point_coord(0,0) = 1.;
            cell_area(0) = 0.5*d_theta*pow(Ri,2.);
            // For second half of sphere
-           point_coord(k(Nrings),1) = point_coord(0,1);
-           point_coord(k(Nrings),2) = point_coord(0,2);
-           point_coord(k(Nrings),0) = -point_coord(0,0);
-           cell_area(k(Nrings)) = cell_area(0);
+           point_coord(k(Nring),1) = point_coord(0,1);
+           point_coord(k(Nring),2) = point_coord(0,2);
+           point_coord(k(Nring),0) = -point_coord(0,0);
+           cell_area(k(Nring)) = cell_area(0);
         } 
 //        outputFile << point_coord(0,0) << "," << point_coord(0,1) << "," << point_coord(0,2) << "," << cell_area(0) << endl;
-//        outputFile << point_coord(k(Nrings),0) << "," << point_coord(k(Nrings),1) << "," << point_coord(k(Nrings),2) << "," << cell_area(k(Nrings)) << endl;
+//        outputFile << point_coord(k(Nring),0) << "," << point_coord(k(Nring),1) << "," << point_coord(k(Nring),2) << "," << cell_area(k(Nring)) << endl;
      }
   } else if (dim == 2) {
-     double d_theta = 2.*MAC::pi()/Nrings;
+     double d_theta = 2.*MAC::pi()/Nring;
      double theta = 0.01*d_theta;
-     for (int j=0; j < Nrings; j++) {
+     for (int j=0; j < Nring; j++) {
         theta = theta + d_theta;
         point_coord(j,0) = MAC::cos(theta);
         point_coord(j,1) = MAC::sin(theta);
@@ -2596,13 +2679,13 @@ DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleV
 }
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, double const& ar, size_t const& k0, size_t const& Nrings)
+DDS_NavierStokes:: generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& k0, size_t const& Nring)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: generate_discretization_parameter" ) ;
 
   // Returns the delta eta (i.e. change in zenithal angle) with provided
-  // number of rings for discretization(Nrings), number of cell at poles(k0)
+  // number of rings for discretization(Nring), number of cell at poles(k0)
   // and the approximate aspect ratio of individual cells
   // NOTE: If the desired rings are 10, then the algorithm return 11 rings.
   // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into 
@@ -2613,16 +2696,16 @@ DDS_NavierStokes:: generate_discretization_parameter(class doubleVector& eta, cl
   double p = MAC::pi()*ar;
   size_t kmax = k0;
 
-  for (size_t i=1; i<Nrings; i++) kmax = round(pow(MAC::sqrt(kmax)+MAC::sqrt(p),2.));
+  for (size_t i=1; i<Nring; i++) kmax = round(pow(MAC::sqrt(kmax)+MAC::sqrt(p),2.));
 
   // Assigning the maximum number of discretized points to the last element of the array
-  k(Nrings) = kmax;
+  k(Nring) = kmax;
   // Zenithal angle for the last must be pi/2.
-  eta(Nrings) = MAC::pi()/2.;
+  eta(Nring) = MAC::pi()/2.;
   // Radius of last ring in lamber projection plane
-  Rring(Nrings) = MAC::sqrt(2.);
+  Rring(Nring) = MAC::sqrt(2.);
 
-  for (int i=Nrings-1; i>=0; --i) {
+  for (int i=Nring-1; i>=0; --i) {
      eta(i) = eta(i+1) - 2./ar*MAC::sqrt(MAC::pi()/k(i+1))*MAC::sin(eta(i+1)/2.);
      Rring(i) = 2.*MAC::sin(eta(i)/2.);
      k(i) = round(k(i+1)*pow(Rring(i)/Rring(i+1),2.));
@@ -2640,23 +2723,28 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
   size_t i0_temp;
   double ri;
   bool found = 0;
-  double dfdx=0.,dfdy=0.;
-/*
+  double dfdx=0.,dfdy=0., dfdz=0., dzh=0.;
+  double Dz_min=0., Dz_max=0.;
+
+/*  
   ofstream outputFile ;
   std::ostringstream os2;
   os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/velocity_drag_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 //  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
-  outputFile << "x,y,z,value" << endl;*/
+  outputFile << "x,y,z,id" << endl;*/
 
   doubleVector xpoint(3,0);
   doubleVector ypoint(3,0);
+  doubleVector zpoint(3,0);
   doubleVector finx(3,0);
   doubleVector finy(3,0);
-  doubleArray2D stress(Np,3*(nb_comps[1]-1),0);         //xx,yy,xy OR xx,yy,zz,xy,yz,zx
+  doubleVector finz(3,0);
+  doubleArray2D stress(Np,6,0);         //xx,yy,zz,xy,yz,zx
   size_t_vector i0_x(3,0);
   size_t_vector i0_y(3,0);
+  size_t_vector i0_z(3,0);
   vector<double> net_vel(3,0.);
 
   size_t_vector min_unknown_index(dim,0);
@@ -2664,17 +2752,24 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
 
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(1);
-
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[1];comp++) {
         // Get local min and max indices
+        // One extra grid cell needs to considered, since ghost points can be 
+        // located in between the min/max index handled by the proc
         for (size_t l=0;l<dim;++l) {
-           min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-           max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+           if (rank_in_i[l] == 0) {
+              min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
+              max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+           } else  {
+              min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l );
+              max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+           }
         }
 
         double xp = solid.coord[comp]->item(parID,0);
         double yp = solid.coord[comp]->item(parID,1);
+        double zp = solid.coord[comp]->item(parID,2);
         ri = solid.size[comp]->item(parID);
 
         double Dx_min = UF->get_DOF_coordinate( min_unknown_index(0), comp, 0 ) ;
@@ -2682,8 +2777,14 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
         double Dy_min = UF->get_DOF_coordinate( min_unknown_index(1), comp, 1 ) ;
         double Dy_max = UF->get_DOF_coordinate( max_unknown_index(1), comp, 1 ) ;
 
+        if (dim==3) {
+           Dz_min = UF->get_DOF_coordinate( min_unknown_index(2), comp, 2 ) ;
+           Dz_max = UF->get_DOF_coordinate( max_unknown_index(2), comp, 2 ) ;
+        }
+
         xpoint(0) = xp + ri*point_coord(i,0);
         ypoint(0) = yp + ri*point_coord(i,1);
+        zpoint(0) = zp + ri*point_coord(i,2);
 
         // Finding the grid indexes next to ghost points
         found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(0), i0_temp);
@@ -2694,9 +2795,19 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
 
         double dxh = UF->get_cell_size(i0_x(0),comp,0) ;
         double dyh = UF->get_cell_size(i0_y(0),comp,1) ;
-        double dh = (dxh+dyh)/2.;
 
-        if ((xpoint(0) > Dx_min) && (xpoint(0) <= Dx_max) && (ypoint(0) > Dy_min) && (ypoint(0) <= Dy_max)) {
+        if (dim == 3) {
+           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(0), i0_temp);
+           if (found == 1) i0_z(0) = i0_temp;
+           dzh = UF->get_cell_size(i0_z(0),comp,2) ;
+        }
+
+        double dh = (dim == 2) ? (dxh+dyh)/2. : (dxh+dyh+dzh)/3.;
+
+        bool status = (dim==2) ? ((xpoint(0) > Dx_min) && (xpoint(0) <= Dx_max) && (ypoint(0) > Dy_min) && (ypoint(0) <= Dy_max)) :
+                                 ((xpoint(0) > Dx_min) && (xpoint(0) <= Dx_max) && (ypoint(0) > Dy_min) && (ypoint(0) <= Dy_max)
+                                                                                && (zpoint(0) > Dz_min) && (zpoint(0) <= Dz_max));
+        if (status) {
            // Ghost points in x for the calculation of x-derivative of field
            if (point_coord(i,0) <= 0.) {
               xpoint(1) = xpoint(0) - dh;
@@ -2715,6 +2826,17 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
               ypoint(2) = ypoint(1) + dh;
            }
 
+           if (dim == 3) {
+              // Ghost points in z for the calculation of z-derivative of field
+              if (point_coord(i,2) <=0.) {
+                 zpoint(1) = zpoint(0) - dh;
+                 zpoint(2) = zpoint(1) - dh;
+              } else {
+                 zpoint(1) = zpoint(0) + dh;
+                 zpoint(2) = zpoint(1) + dh;
+              }
+           }
+
            // Finding the grid indexes next to ghost points
            found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(1), i0_temp);
            if (found == 1) i0_x(1) = i0_temp;
@@ -2729,72 +2851,220 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
            if (found == 1) i0_y(2) = i0_temp;
 
            // Calculation of field variable on ghost point(0,0)
-           impose_solid_velocity_for_ghost(net_vel,comp,xpoint(0),ypoint(0),0.,parID);
+           impose_solid_velocity_for_ghost(net_vel,comp,xpoint(0),ypoint(0),zpoint(0),parID);
            finx(0) = net_vel[comp];
            finy(0) = net_vel[comp];
-           // Calculation of field variable on ghost point(1,0)
-           finx(1) = ghost_field_estimate (UF,comp,i0_x(1),i0_y(0),0, xpoint(1), ypoint(0),0, dh,2,0);
-           // Calculation of field variable on ghost point(2,0)
-           finx(2) = ghost_field_estimate (UF,comp,i0_x(2),i0_y(0),0, xpoint(2), ypoint(0),0, dh,2,0);
-           // Calculation of field variable on ghost point(0,1)
-           finy(1) = ghost_field_estimate (UF,comp,i0_x(0),i0_y(1),0, xpoint(0), ypoint(1),0, dh,2,0);
-           // Calculation of field variable on ghost point(0,2)
-           finy(2) = ghost_field_estimate (UF,comp,i0_x(0),i0_y(2),0, xpoint(0), ypoint(2),0, dh,2,0);
+           finz(0) = net_vel[comp];
+           if (dim == 2) {
+              // Calculation of field variable on ghost point(1,0)
+              finx(1) = ghost_field_estimate_on_face (UF,comp,i0_x(1),i0_y(0),0, xpoint(1), ypoint(0),0, dh,2,0);
+              // Calculation of field variable on ghost point(2,0)
+              finx(2) = ghost_field_estimate_on_face (UF,comp,i0_x(2),i0_y(0),0, xpoint(2), ypoint(0),0, dh,2,0);
+              // Calculation of field variable on ghost point(0,1)
+              finy(1) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(1),0, xpoint(0), ypoint(1),0, dh,2,0);
+              // Calculation of field variable on ghost point(0,2)
+              finy(2) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(2),0, xpoint(0), ypoint(2),0, dh,2,0);
+           } else if (dim == 3) {
+              found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(1), i0_temp);
+              if (found == 1) i0_z(1) = i0_temp;
 
-           if (point_coord(i,0) <= 0.) {
-              dfdx = mu*(finx(2) - 4.*finx(1) + 3.*finx(0))/2./dh;
-//              dfdx = mu*(-finx(1) + finx(0))/dh;
-           } else {
-              dfdx = mu*(-finx(2) + 4.*finx(1) - 3.*finx(0))/2./dh;
-//              dfdx = mu*(finx(1) - finx(0))/dh;
+              found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(2), i0_temp);
+              if (found == 1) i0_z(2) = i0_temp;
+
+              // Calculation of field variable on ghost point(1,0,0)
+              finx(1) = ghost_field_estimate_in_box (UF,comp,i0_x(1),i0_y(0),i0_z(0),xpoint(1),ypoint(0),zpoint(0),dh,0,parID);
+              // Calculation of field variable on ghost point(2,0,0)
+              finx(2) = ghost_field_estimate_in_box (UF,comp,i0_x(2),i0_y(0),i0_z(0),xpoint(2),ypoint(0),zpoint(0),dh,0,parID);
+              // Calculation of field variable on ghost point(0,1,0)
+              finy(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(1),i0_z(0),xpoint(0),ypoint(1),zpoint(0),dh,0,parID);
+              // Calculation of field variable on ghost point(0,2,0)
+              finy(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(2),i0_z(0),xpoint(0),ypoint(2),zpoint(0),dh,0,parID);
+              // Calculation of field variable on ghost point(0,0,1)
+              finz(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(1),xpoint(0),ypoint(0),zpoint(1),dh,0,parID);
+              // Calculation of field variable on ghost point(0,0,2)
+              finz(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(2),xpoint(0),ypoint(0),zpoint(2),dh,0,parID);
+              // Derivative in z
+              if (point_coord(i,2) <=0.) {
+                 dfdz = mu*(finz(2) - 4.*finz(1) + 3.*finz(0))/2./dh;
+              } else {
+                 dfdz = mu*(-finz(2) + 4.*finz(1) - 3.*finz(0))/2./dh;
+              }
            }
 
+           // Derivative in x
+           if (point_coord(i,0) <= 0.) {
+              dfdx = mu*(finx(2) - 4.*finx(1) + 3.*finx(0))/2./dh;
+           } else {
+              dfdx = mu*(-finx(2) + 4.*finx(1) - 3.*finx(0))/2./dh;
+           }
+
+           // Derivative in y
            if (point_coord(i,1) <=0.) {
               dfdy = mu*(finy(2) - 4.*finy(1) + 3.*finy(0))/2./dh;
-//              dfdy = mu*(-finy(1) + finy(0))/dh;
            } else {
               dfdy = mu*(-finy(2) + 4.*finy(1) - 3.*finy(0))/2./dh;
-//              dfdy = mu*(finy(1) - finy(0))/dh;
            }
 
            if (comp == 0) {
               stress(i,0) = 2.*dfdx;
-              stress(i,2) = stress(i,2) + dfdy;
+              stress(i,3) = stress(i,3) + dfdy;
+              stress(i,5) = stress(i,5) + dfdz;
            } else if (comp == 1) {
               stress(i,1) = 2.*dfdy;
-              stress(i,2) = stress(i,2) + dfdx;
+              stress(i,3) = stress(i,3) + dfdx;
+              stress(i,4) = stress(i,4) + dfdz;
+           } else if (comp == 2) {
+              stress(i,2) = 2.*dfdz;
+              stress(i,4) = stress(i,4) + dfdy;
+              stress(i,5) = stress(i,5) + dfdx;
            }
 
-/*           outputFile << xpoint(0) << "," << ypoint(0) << "," << 0 << "," << 0. << endl;
-           outputFile << xpoint(1) << "," << ypoint(0) << "," << 0 << "," << finx(1) << endl;
-           outputFile << xpoint(2) << "," << ypoint(0) << "," << 0 << "," << finx(2) << endl;
-           outputFile << xpoint(0) << "," << ypoint(1) << "," << 0 << "," << finy(1) << endl;
-           outputFile << xpoint(0) << "," << ypoint(2) << "," << 0 << "," << finy(2) << endl;*/
-
+/*           outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(0) << "," << i << endl;
+           outputFile << xpoint(1) << "," << ypoint(0) << "," << zpoint(0) << "," << i << endl;
+           outputFile << xpoint(2) << "," << ypoint(0) << "," << zpoint(0) << "," << i << endl;
+           outputFile << xpoint(0) << "," << ypoint(1) << "," << zpoint(0) << "," << i << endl;
+           outputFile << xpoint(0) << "," << ypoint(2) << "," << zpoint(0) << "," << i << endl;
+           outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(1) << "," << i << endl;
+           outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(2) << "," << i << endl;*/
         }
      }
 
+//     cout << "Stress Error: " << MAC::abs(abs_stress(i,0) - stress(i,0)) << "," << abs_stress(i,0) << "," << stress(i,0) << endl;
+
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i,0)*point_coord(i,0)*(cell_area(i)*ri) + stress(i,2)*point_coord(i,1)*(cell_area(i)*ri);
-     force(parID,1) = force(parID,1) + stress(i,2)*point_coord(i,0)*(cell_area(i)*ri) + stress(i,1)*point_coord(i,1)*(cell_area(i)*ri);
+     force(parID,0) = force(parID,0) + stress(i,0)*point_coord(i,0)*(cell_area(i)*ri) 
+                                     + stress(i,3)*point_coord(i,1)*(cell_area(i)*ri)
+                                     + stress(i,5)*point_coord(i,2)*(cell_area(i)*ri);
+     force(parID,1) = force(parID,1) + stress(i,3)*point_coord(i,0)*(cell_area(i)*ri) 
+                                     + stress(i,1)*point_coord(i,1)*(cell_area(i)*ri)
+                                     + stress(i,4)*point_coord(i,2)*(cell_area(i)*ri);
+     force(parID,2) = force(parID,2) + stress(i,5)*point_coord(i,0)*(cell_area(i)*ri) 
+                                     + stress(i,4)*point_coord(i,1)*(cell_area(i)*ri)
+                                     + stress(i,2)*point_coord(i,2)*(cell_area(i)*ri);
 //     outputFile << xpoint(0) << "," << ypoint(0) << "," << 0 << "," << stress(i,0) << "," << stress(i,1) << "," << stress(i,2) << endl;
   }
 //  outputFile.close();
 }
+//---------------------------------------------------------------------------
+double
+DDS_NavierStokes:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DDS_NavierStokes:: ghost_field_estimate_in_box" ) ;
+
+// Calculates the field value at the ghost points in the box
+// near the particle boundary considering boundary affects;
+// x0,y0,z0 are the ghost point coordinated; i0,j0,k0 is the
+// bottom left index of the grid coordinate  
+
+   doubleArray2D vel(dim,2,0);
+   doubleArray2D del(dim,2,0);
+   vector<double> net_vel(3,0.);
+
+   // Behind face
+   double temp = FF->get_DOF_coordinate(k0,comp , 2); 
+   double face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                       level_set_function (FF,parID,comp,x0,y0,temp,level_set_type,1);
+
+   if (face_solid > 0) {
+      vel(2,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,x0,y0,temp,dh,2,0);
+      del(2,0) = MAC::abs(temp - z0);
+   } else {
+      del(2,0) = find_intersection_for_ghost(FF, temp, z0, x0, y0, parID, comp, 2, dh, 1, 0, 0);    
+      impose_solid_velocity_for_ghost(net_vel,comp,x0,y0,z0-del(2,0),parID);
+      vel(2,0) = net_vel[comp];
+   }
+
+   // Front face
+   temp = FF->get_DOF_coordinate(k0+1,comp , 2); 
+   face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                level_set_function (FF,parID,comp,x0,y0,temp,level_set_type,1);
+
+   if (face_solid > 0) {
+      vel(2,1) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0+1,x0,y0,temp,dh,2,0);
+      del(2,1) = MAC::abs(temp - z0);
+   } else {
+      del(2,1) = find_intersection_for_ghost(FF, z0, temp, x0, y0, parID, comp, 2, dh, 1, 0, 1);    
+      impose_solid_velocity_for_ghost(net_vel,comp,x0,y0,z0+del(2,1),parID);
+      vel(2,1) = net_vel[comp];
+   }
+
+   // Left face
+   temp = FF->get_DOF_coordinate(i0,comp, 0); 
+   face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                level_set_function (FF,parID,comp,temp,y0,z0,level_set_type,1);
+
+   if (face_solid > 0) {
+      vel(0,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,temp,y0,z0,dh,0,0);
+      del(0,0) = MAC::abs(temp - x0);
+   } else {
+      del(0,0) = find_intersection_for_ghost(FF, temp, x0, y0, z0, parID, comp, 0, dh, 1, 0, 0);    
+      impose_solid_velocity_for_ghost(net_vel,comp,x0-del(0,0),y0,z0,parID);
+      vel(0,0) = net_vel[comp];
+   }
+
+   // Right face
+   temp = FF->get_DOF_coordinate(i0+1,comp, 0); 
+   face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                level_set_function (FF,parID,comp,temp,y0,z0,level_set_type,1);
+
+   if (face_solid > 0) {
+      vel(0,1) = ghost_field_estimate_on_face (FF,comp,i0+1,j0,k0,temp,y0,z0,dh,0,0);
+      del(0,1) = MAC::abs(temp - x0);
+   } else {
+      del(0,1) = find_intersection_for_ghost(FF, x0, temp, y0, z0, parID, comp, 0, dh, 1, 0, 1);    
+      impose_solid_velocity_for_ghost(net_vel,comp,x0+del(0,1),y0,z0,parID);
+      vel(0,1) = net_vel[comp];
+   }
+
+   // Bottom face
+   temp = FF->get_DOF_coordinate(j0,comp, 1); 
+   face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                level_set_function (FF,parID,comp,x0,temp,z0,level_set_type,1);
+
+   if (face_solid > 0) {
+      vel(1,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,x0,temp,z0,dh,1,0);
+      del(1,0) = MAC::abs(temp - y0);
+   } else {
+      del(1,0) = find_intersection_for_ghost(FF, temp, y0, x0, z0, parID, comp, 1, dh, 1, 0, 0);    
+      impose_solid_velocity_for_ghost(net_vel,comp,x0,y0-del(1,0),z0,parID);
+      vel(1,0) = net_vel[comp];
+   }
+
+   // Top face
+   temp = FF->get_DOF_coordinate(j0+1,comp, 1); 
+   face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                level_set_function (FF,parID,comp,x0,temp,z0,level_set_type,1);
+
+   if (face_solid > 0) {
+      vel(1,1) = ghost_field_estimate_on_face (FF,comp,i0,j0+1,k0,x0,temp,z0,dh,1,0);
+      del(1,1) = MAC::abs(temp - y0);
+   } else {
+      del(1,1) = find_intersection_for_ghost(FF, y0, temp, x0, z0, parID, comp, 1, dh, 1, 0, 1);    
+      impose_solid_velocity_for_ghost(net_vel,comp,x0,y0+del(1,1),z0,parID);
+      vel(1,1) = net_vel[comp];
+   }
+
+   double value = (1./3.)*((vel(0,1)*del(0,0)+vel(0,0)*del(0,1))/(del(0,0)+del(0,1)) + 
+                           (vel(1,1)*del(1,0)+vel(1,0)*del(1,1))/(del(1,0)+del(1,1)) +
+                           (vel(2,1)*del(2,0)+vel(2,0)*del(2,1))/(del(2,0)+del(2,1)));
+
+   return(value);
+}
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level)
+DDS_NavierStokes:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: ghost_field_estimate" ) ;
+   MAC_LABEL("DDS_NavierStokes:: ghost_field_estimate_on_face" ) ;
 
 // Calculates the field value on a face at the ghost points 
 // near the particle boundary considering boundary affects;
-// x0,y0 are the ghost point coordinated; i0,j0 is the
-// bottom left index of the grid coordinate; face_vec is the 
-// normal vector of the face (i.e. 0 is +x,1 is +y, 2 is z+) 
+// x0,y0,z0 are the ghost point coordinated; i0,j0,k0 is the
+// bottom left index of the face cell; face_vec is the 
+// normal vector of the face (i.e. 0 is x,1 is y, 2 is z) 
 
    size_t field = (FF==UF) ? 1 : 0;
 
@@ -2816,17 +3086,35 @@ DDS_NavierStokes:: ghost_field_estimate ( FV_DiscreteField* FF, size_t const& co
    doubleArray2D fwall(2,2,0);
    // Distance of grid/particle walls from the ghost point
    doubleArray2D del_wall(2,2,0);
+   // Ghost point coordinate
+   doubleVector xghost(3,0);
 
    // Direction in the plane of face
    size_t dir1=0, dir2=0;
 
-   if (face_vec == 2) {
+   if (face_vec == 0) {
+      ix(0,0) = i0,     iy(0,0) = j0,    iz(0,0) = k0;
+      ix(1,0) = i0,     iy(1,0) = j0,    iz(1,0) = k0+1;
+      ix(0,1) = i0,     iy(0,1) = j0+1,  iz(0,1) = k0;
+      ix(1,1) = i0,     iy(1,1) = j0+1,  iz(1,1) = k0+1;
+      dir1 = 2, dir2 = 1;
+   } else if (face_vec == 1) {
+      ix(0,0) = i0,     iy(0,0) = j0,    iz(0,0) = k0;
+      ix(1,0) = i0+1,   iy(1,0) = j0,    iz(1,0) = k0;
+      ix(0,1) = i0,     iy(0,1) = j0,    iz(0,1) = k0+1;
+      ix(1,1) = i0+1,   iy(1,1) = j0,    iz(1,1) = k0+1;
+      dir1 = 0, dir2 = 2;
+   } else if (face_vec == 2) {
       ix(0,0) = i0,     iy(0,0) = j0,    iz(0,0) = k0;
       ix(1,0) = i0+1,   iy(1,0) = j0,    iz(1,0) = k0;
       ix(0,1) = i0,     iy(0,1) = j0+1,  iz(0,1) = k0;
       ix(1,1) = i0+1,   iy(1,1) = j0+1,  iz(1,1) = k0;
       dir1 = 0, dir2 = 1;
    }
+
+   xghost(0) = x0;
+   xghost(1) = y0;
+   xghost(2) = z0;
 
    for (size_t i=0; i < 2; i++) {
       for (size_t j=0; j < 2; j++) {
@@ -2846,92 +3134,203 @@ DDS_NavierStokes:: ghost_field_estimate ( FV_DiscreteField* FF, size_t const& co
    // Max y-coordinate in the grid cell
    extents(1,1) = FF->get_DOF_coordinate( iy(1,1), comp, 1 ) ;
 
+   if (dim == 3) {
+      // Min z-coordinate in the grid cell
+      extents(2,0) = FF->get_DOF_coordinate( iz(0,0), comp, 2 ) ;
+      // Max z-coordinate in the grid cell
+      extents(2,1) = FF->get_DOF_coordinate( iz(1,1), comp, 2 ) ;
+   }
+
    // Contribution from left and right wall
    for (size_t i = 0; i < 2; i++) {     // 0 --> left; 1 --> right
       if ((field == 0) || ((node.void_frac[comp]->item(p(i,0)) == 0) && (node.void_frac[comp]->item(p(i,1)) == 0))) {
-         fwall(0,i) = ((extents(1,1) - y0)*f(i,0) + (y0 - extents(1,0))*f(i,1))/(extents(1,1)-extents(1,0));
-         del_wall(0,i) = MAC::abs(extents(0,i) - x0);
+         fwall(0,i) = ((extents(dir2,1) - xghost(dir2))*f(i,0) + (xghost(dir2) - extents(dir2,0))*f(i,1))/(extents(dir2,1)-extents(dir2,0));
+         del_wall(0,i) = MAC::abs(extents(dir1,i) - xghost(dir1));
       // if bottom vertex is in fluid domain
       } else if ((node.void_frac[comp]->item(p(i,0)) == 0) && (bf_intersect[dir2].offset[comp]->item(p(i,0),1) == 1)) {
          double yint = bf_intersect[dir2].value[comp]->item(p(i,0),1);
-         if (yint >= (y0-extents(1,0))) {
-            fwall(0,i) = ((extents(1,0) + yint - y0)*f(i,0) + (y0 - extents(1,0))*bf_intersect[dir2].field_var[comp]->item(p(i,0),1))/(yint);
-            del_wall(0,i) = MAC::abs(extents(0,i) - x0);
+         // Condition where intersection distance is more than ghost point distance, it means that the ghost 
+         // point can be projected on the wall
+         if (yint >= (xghost(dir2)-extents(dir2,0))) {
+            fwall(0,i) = ((extents(dir2,0)+yint-xghost(dir2))*f(i,0)+(xghost(dir2)-extents(dir2,0))*bf_intersect[dir2].field_var[comp]->item(p(i,0),1))/yint;
+            del_wall(0,i) = MAC::abs(extents(dir1,i) - xghost(dir1));
+         // Ghost point cannot be projected on the wall, as the solid surface come first
          } else {
             size_t id = node.parID[comp]->item(p(i,1));
-            del_wall(0,i) = (i == 1) ? find_intersection_for_ghost(FF, x0, extents(0,i), y0, z0, id, comp, dir1, dh, field, level, i) :
-                                       find_intersection_for_ghost(FF, extents(0,i), x0, y0, z0, id, comp, dir1, dh, field, level, i) ;
-            (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,x0+del_wall(0,i),y0,z0,id) :
-                       impose_solid_velocity_for_ghost(net_vel,comp,x0-del_wall(0,i),y0,z0,id) ;
+            if (face_vec > dir2) {
+               del_wall(0,i) = (i==1) ? 
+                   find_intersection_for_ghost(FF, xghost(dir1), extents(dir1,i), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, field, level, i) :
+                   find_intersection_for_ghost(FF, extents(dir1,i), xghost(dir1), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, field, level, i) ;
+            } else {
+               del_wall(0,i) = (i==1) ? 
+                   find_intersection_for_ghost(FF, xghost(dir1), extents(dir1,i), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, field, level, i) :
+                   find_intersection_for_ghost(FF, extents(dir1,i), xghost(dir1), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, field, level, i) ;
+            }
+
+            if (dir1 == 0) {
+               (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)+del_wall(0,i),xghost(1),xghost(2),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)-del_wall(0,i),xghost(1),xghost(2),id) ;
+            } else if (dir1 == 1) {
+               (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)+del_wall(0,i),xghost(2),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)-del_wall(0,i),xghost(2),id) ;
+            } else if (dir1 == 2) {
+               (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)+del_wall(0,i),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)-del_wall(0,i),id) ;
+            }
             fwall(0,i) = net_vel[comp];
          }
       // if top vertex is in fluid domain
       } else if ((node.void_frac[comp]->item(p(i,1)) == 0) && (bf_intersect[dir2].offset[comp]->item(p(i,1),0) == 1)) {
          double yint = bf_intersect[dir2].value[comp]->item(p(i,1),0);
-         if (yint >= (extents(1,1)-y0)) {
-            fwall(0,i) = ((y0 + yint - extents(1,1))*f(i,1) + (extents(1,1) - y0)*bf_intersect[dir2].field_var[comp]->item(p(i,1),0))/(yint);
-            del_wall(0,i) = MAC::abs(extents(0,i) - x0);
+         // Condition where intersection distance is more than ghost point distance, it means that the ghost 
+         // point can be projected on the wall
+         if (yint >= (extents(dir2,1)-xghost(dir2))) {
+            fwall(0,i) = ((xghost(dir2)+yint-extents(dir2,1))*f(i,1)+(extents(dir2,1)-xghost(dir2))*bf_intersect[dir2].field_var[comp]->item(p(i,1),0))/yint;
+            del_wall(0,i) = MAC::abs(extents(dir1,i) - xghost(dir1));
+         // Ghost point cannot be projected on the wall, as the solid surface come first
          } else {
-            size_t id = node.parID[comp]->item(p(1,0));
-            del_wall(0,i) = (i == 1) ? find_intersection_for_ghost(FF, x0, extents(0,i), y0, z0, id, comp, dir1, dh, field, level, i) :
-                                       find_intersection_for_ghost(FF, extents(0,i), x0, y0, z0, id, comp, dir1, dh, field, level, i) ;
-            (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,x0+del_wall(0,i),y0,z0,id) :
-                       impose_solid_velocity_for_ghost(net_vel,comp,x0-del_wall(0,i),y0,z0,id) ;
+            size_t id = node.parID[comp]->item(p(i,0));
+            if (face_vec > dir2) {
+               del_wall(0,i) = (i==1) ? 
+                   find_intersection_for_ghost(FF, xghost(dir1), extents(dir1,i), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, field, level, i) :
+                   find_intersection_for_ghost(FF, extents(dir1,i), xghost(dir1), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, field, level, i) ;
+            } else {
+               del_wall(0,i) = (i==1) ? 
+                   find_intersection_for_ghost(FF, xghost(dir1), extents(dir1,i), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, field, level, i) :
+                   find_intersection_for_ghost(FF, extents(dir1,i), xghost(dir1), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, field, level, i) ;
+            }
+
+            if (dir1 == 0) {
+               (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)+del_wall(0,i),xghost(1),xghost(2),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)-del_wall(0,i),xghost(1),xghost(2),id) ;
+            } else if (dir1 == 1) {
+               (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)+del_wall(0,i),xghost(2),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)-del_wall(0,i),xghost(2),id) ;
+            } else if (dir1 == 2) {
+               (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)+del_wall(0,i),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)-del_wall(0,i),id) ;
+            }
             fwall(0,i) = net_vel[comp];
          }
       // if both vertex's are in solid domain
       } else if ((node.void_frac[comp]->item(p(i,0)) == 1) && (node.void_frac[comp]->item(p(i,1)) == 1)) {
          size_t id = node.parID[comp]->item(p(i,0));
-         del_wall(0,i) = (i == 1) ? find_intersection_for_ghost (FF, x0, extents(0,i), y0, z0, id, comp, dir1, dh, field, level, i) :
-                                    find_intersection_for_ghost (FF, extents(0,i), x0, y0, z0, id, comp, dir1, dh, field, level, i) ;
-         (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,x0+del_wall(0,i),y0,z0,id) :
-                    impose_solid_velocity_for_ghost(net_vel,comp,x0-del_wall(0,i),y0,z0,id) ;
+
+         if (face_vec > dir2) {
+            del_wall(0,i) = (i==1) ? 
+                find_intersection_for_ghost(FF, xghost(dir1), extents(dir1,i), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, field, level, i) :
+                find_intersection_for_ghost(FF, extents(dir1,i), xghost(dir1), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, field, level, i) ;
+         } else {
+            del_wall(0,i) = (i==1) ? 
+                find_intersection_for_ghost(FF, xghost(dir1), extents(dir1,i), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, field, level, i) :
+                find_intersection_for_ghost(FF, extents(dir1,i), xghost(dir1), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, field, level, i) ;
+         }
+
+         if (dir1 == 0) {
+            (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)+del_wall(0,i),xghost(1),xghost(2),id) :
+                       impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)-del_wall(0,i),xghost(1),xghost(2),id) ;
+         } else if (dir1 == 1) {
+            (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)+del_wall(0,i),xghost(2),id) :
+                       impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)-del_wall(0,i),xghost(2),id) ;
+         } else if (dir1 == 2) {
+            (i == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)+del_wall(0,i),id) :
+                       impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)-del_wall(0,i),id) ;
+         }
          fwall(0,i) = net_vel[comp];
       }
    }
 
    // Contribution from top and bottom wall
-   for (size_t j = 0; j < 2; j++) {
+   for (size_t j = 0; j < 2; j++) {         // 0 --> bottom; 1 --> top
       if ((field == 0) || ((node.void_frac[comp]->item(p(0,j)) == 0) && (node.void_frac[comp]->item(p(1,j)) == 0))) {
-         fwall(1,j) = ((extents(0,1) - x0)*f(0,j) + (x0 - extents(0,0))*f(1,j))/(extents(0,1)-extents(0,0));
-         del_wall(1,j) = MAC::abs(extents(1,j) - y0);
+         fwall(1,j) = ((extents(dir1,1) - xghost(dir1))*f(0,j) + (xghost(dir1) - extents(dir1,0))*f(1,j))/(extents(dir1,1)-extents(dir1,0));
+         del_wall(1,j) = MAC::abs(extents(dir2,j) - xghost(dir2));
+      // if left vertex is in fluid domain
       } else if ((node.void_frac[comp]->item(p(0,j)) == 0) && (bf_intersect[dir1].offset[comp]->item(p(0,j),1) == 1)) {
          double xint = bf_intersect[dir1].value[comp]->item(p(0,j),1);
-         if (xint >= (x0-extents(0,0))) {
-            fwall(1,j) = ((extents(0,0) + xint - x0)*f(0,j) + (x0 - extents(0,0))*bf_intersect[dir1].field_var[comp]->item(p(0,j),1))/(xint);
-            del_wall(1,j) = MAC::abs(extents(1,j) - y0);
+         if (xint >= (xghost(dir1)-extents(dir1,0))) {
+            fwall(1,j) = ((extents(dir1,0)+xint-xghost(dir1))*f(0,j)+(xghost(dir1)-extents(dir1,0))*bf_intersect[dir1].field_var[comp]->item(p(0,j),1))/xint;
+            del_wall(1,j) = MAC::abs(extents(dir2,j) - xghost(dir2));
          } else {
             size_t id = node.parID[comp]->item(p(1,j));
-            del_wall(1,j) = (j == 1) ? find_intersection_for_ghost(FF, y0, extents(1,j), x0, z0, id, comp, dir2, dh, field, level, j) :
-                                       find_intersection_for_ghost(FF, extents(1,j), y0, x0, z0, id, comp, dir2, dh, field, level, j) ;
-            (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,x0,y0+del_wall(1,j),z0,id) :
-                       impose_solid_velocity_for_ghost(net_vel,comp,x0,y0-del_wall(1,j),z0,id);
+            if (face_vec > dir1) {
+               del_wall(1,j) = (j==1) ? 
+                   find_intersection_for_ghost(FF, xghost(dir2), extents(dir2,j), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, field, level, j) :
+                   find_intersection_for_ghost(FF, extents(dir2,j), xghost(dir2), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, field, level, j) ;
+            } else {
+               del_wall(1,j) = (j==1) ? 
+                   find_intersection_for_ghost(FF, xghost(dir2), extents(dir2,j), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, field, level, j) :
+                   find_intersection_for_ghost(FF, extents(dir2,j), xghost(dir2), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, field, level, j) ;
+            }
+            if (dir2 == 0) {
+               (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)+del_wall(1,j),xghost(1),xghost(2),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)-del_wall(1,j),xghost(1),xghost(2),id) ;
+            } else if (dir2 == 1) {
+               (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)+del_wall(1,j),xghost(2),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)-del_wall(1,j),xghost(2),id) ;
+            } else if (dir2 == 2) {
+               (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)+del_wall(1,j),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)-del_wall(1,j),id) ;
+            }
             fwall(1,j) = net_vel[comp];
          }
+      // if right vertex is in fluid domain
       } else if ((node.void_frac[comp]->item(p(1,j)) == 0) && (bf_intersect[dir1].offset[comp]->item(p(1,j),0) == 1)) {
          double xint = bf_intersect[dir1].value[comp]->item(p(1,j),0);
-         if (xint >= (extents(0,1)-x0)) {
-            fwall(1,j) = ((x0 + xint - extents(0,1))*f(1,j) + (extents(0,1) - x0)*bf_intersect[dir1].field_var[comp]->item(p(1,j),0))/(xint);
-            del_wall(1,j) = MAC::abs(extents(1,j) - y0);
+         if (xint >= (extents(dir1,1)-xghost(dir1))) {
+            fwall(1,j) = ((xghost(dir1)+xint-extents(dir1,1))*f(1,j)+(extents(dir1,1)-xghost(dir1))*bf_intersect[dir1].field_var[comp]->item(p(1,j),0))/xint;
+            del_wall(1,j) = MAC::abs(extents(dir2,j) - xghost(dir2));
          } else {
             size_t id = node.parID[comp]->item(p(0,j));
-            del_wall(1,j) = (j == 1) ? find_intersection_for_ghost(FF, y0, extents(1,j), x0, z0, id, comp, dir2, dh, field, level, j) : 
-                                       find_intersection_for_ghost(FF, extents(1,j), y0, x0, z0, id, comp, dir2, dh, field, level, j) ;
-            (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,x0,y0+del_wall(1,j),z0,id) :
-                       impose_solid_velocity_for_ghost(net_vel,comp,x0,y0-del_wall(1,j),z0,id) ;
+            if (face_vec > dir1) {
+               del_wall(1,j) = (j==1) ? 
+                   find_intersection_for_ghost(FF, xghost(dir2), extents(dir2,j), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, field, level, j) :
+                   find_intersection_for_ghost(FF, extents(dir2,j), xghost(dir2), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, field, level, j) ;
+            } else {
+               del_wall(1,j) = (j==1) ? 
+                   find_intersection_for_ghost(FF, xghost(dir2), extents(dir2,j), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, field, level, j) :
+                   find_intersection_for_ghost(FF, extents(dir2,j), xghost(dir2), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, field, level, j) ;
+            }
+            if (dir2 == 0) {
+               (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)+del_wall(1,j),xghost(1),xghost(2),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)-del_wall(1,j),xghost(1),xghost(2),id) ;
+            } else if (dir2 == 1) {
+               (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)+del_wall(1,j),xghost(2),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)-del_wall(1,j),xghost(2),id) ;
+            } else if (dir2 == 2) {
+               (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)+del_wall(1,j),id) :
+                          impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)-del_wall(1,j),id) ;
+            }
             fwall(1,j) = net_vel[comp];
          }
+      // if both vertex's are in solid domain
       } else if ((node.void_frac[comp]->item(p(0,j)) == 1) && (node.void_frac[comp]->item(p(1,j)) == 1)) {
          size_t id = node.parID[comp]->item(p(0,j));
-         del_wall(1,j) = (j == 1) ? find_intersection_for_ghost(FF, y0, extents(1,j), x0, z0, id, comp, dir2, dh, field, level, j) :
-                                    find_intersection_for_ghost(FF, extents(1,j), y0, x0, z0, id, comp, dir2, dh, field, level, j) ;
-         (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,x0,y0+del_wall(1,j),z0,id) :
-                    impose_solid_velocity_for_ghost(net_vel,comp,x0,y0-del_wall(1,j),z0,id) ;
+         if (face_vec > dir1) {
+            del_wall(1,j) = (j==1) ? 
+                find_intersection_for_ghost(FF, xghost(dir2), extents(dir2,j), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, field, level, j) :
+                find_intersection_for_ghost(FF, extents(dir2,j), xghost(dir2), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, field, level, j) ;
+         } else {
+            del_wall(1,j) = (j==1) ? 
+                find_intersection_for_ghost(FF, xghost(dir2), extents(dir2,j), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, field, level, j) :
+                find_intersection_for_ghost(FF, extents(dir2,j), xghost(dir2), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, field, level, j) ;
+         }
+         if (dir2 == 0) {
+            (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)+del_wall(1,j),xghost(1),xghost(2),id) :
+                       impose_solid_velocity_for_ghost(net_vel,comp,xghost(0)-del_wall(1,j),xghost(1),xghost(2),id) ;
+         } else if (dir2 == 1) {
+            (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)+del_wall(1,j),xghost(2),id) :
+                       impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1)-del_wall(1,j),xghost(2),id) ;
+         } else if (dir2 == 2) {
+            (j == 1) ? impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)+del_wall(1,j),id) :
+                       impose_solid_velocity_for_ghost(net_vel,comp,xghost(0),xghost(1),xghost(2)-del_wall(1,j),id) ;
+         }
          fwall(1,j) = net_vel[comp];
       }
    }
 
-   double field_value = 0.5*((del_wall(0,1)*fwall(0,0) + del_wall(0,0)*fwall(0,1))/(del_wall(0,1)+del_wall(0,0)) + (del_wall(1,0)*fwall(1,1) + del_wall(1,1)*fwall(1,0))/(del_wall(1,0)+del_wall(1,1)));
+   double field_value = (1./2.)*((del_wall(0,1)*fwall(0,0) + del_wall(0,0)*fwall(0,1))/(del_wall(0,1)+del_wall(0,0)) + 
+                                 (del_wall(1,0)*fwall(1,1) + del_wall(1,1)*fwall(1,0))/(del_wall(1,0)+del_wall(1,1)));
 
    return (field_value);
 

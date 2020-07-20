@@ -364,6 +364,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
    for (size_t field = 0; field < 2; field++) {
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
          size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
+         size_t_vector nb_unknowns_on_proc( dim, 0 );
 
          size_t nb_total_unknown = 1;
 
@@ -371,14 +372,18 @@ DDS_NavierStokesSystem:: re_initialize( void )
             if (field == 0) {
                nb_unknowns_handled_by_proc( l ) = 1 + PF->get_max_index_unknown_handled_by_proc( comp, l )
                                                     - PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+               nb_unknowns_on_proc( l ) = 1 + PF->get_max_index_unknown_on_proc( comp, l )
+                                            - PF->get_min_index_unknown_on_proc( comp, l ) ;
             } else if (field == 1) {
                nb_unknowns_handled_by_proc( l ) = 1 + UF->get_max_index_unknown_handled_by_proc( comp, l )
                                                     - UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+               nb_unknowns_on_proc( l ) = 1 + UF->get_max_index_unknown_on_proc( comp, l )
+                                            - UF->get_min_index_unknown_on_proc( comp, l ) ;
             }
          }
 
          for (size_t l = 0;l < dim; l++) {
-            nb_total_unknown *= (2+nb_unknowns_handled_by_proc(l));
+            nb_total_unknown *= (2+nb_unknowns_on_proc(l));
             size_t nb_index;
             if (l == 0) {
                if (dim == 2) {
