@@ -2391,8 +2391,10 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
            found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,1), ypoint, i0_temp);
            if (found == 1) j0 = i0_temp;
 
-           found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,2), zpoint, i0_temp);
-           if (found == 1) k0 = i0_temp;
+           if (dim == 3) {
+              found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,2), zpoint, i0_temp);
+              if (found == 1) k0 = i0_temp;
+           }
 
            double temp =0.;
            // Calculation of field variable on ghost point(0,0)
