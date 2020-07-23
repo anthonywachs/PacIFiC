@@ -1009,8 +1009,8 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
   size_t local_max_k = 0;
 
   if (dim == 3) {
-     local_min_k = min_unknown_index(2);
-     local_max_k = max_unknown_index(2);
+     local_min_k = min_unknown_index(2)+1;
+     local_max_k = max_unknown_index(2)-1;
   }
 
   for (size_t i=min_unknown_index(0)+1;i<=max_unknown_index(0)-1;++i) {
