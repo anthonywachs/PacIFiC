@@ -200,9 +200,9 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
         "security_bandwidth", error_message );
    }
 
-   if ( UF->primary_grid()->get_security_bandwidth() < 3 )
+   if ( UF->primary_grid()->get_security_bandwidth() < 4 )
    {
-     string error_message="   >= 3 for correct stress calculations on solids";
+     string error_message="   >= 4 for correct stress calculations on solids";
      MAC_Error::object()->raise_bad_data_value( exp,
         "security_bandwidth", error_message );
    }
@@ -922,8 +922,8 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t
      // Get local min and max indices; Calculation on the rows next to the proc as well
      for (size_t l=0;l<dim;++l) {
         // Calculations for solids on the total unknown on the proc
-        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) ;
-        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) ;
+        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
+        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
      }
 
      size_t local_min_k = 0;
@@ -999,8 +999,8 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,level);
 
   for (size_t l=0;l<dim;++l) {
-     min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) ;
-     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) ;
+     min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
+     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
      local_unknown_extents(l,0) = 0;
      local_unknown_extents(l,1) = (max_unknown_index(l)-min_unknown_index(l));
   }
@@ -1013,9 +1013,9 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
      local_max_k = max_unknown_index(2);
   }
 
-  for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+  for (size_t i=min_unknown_index(0)+1;i<=max_unknown_index(0)-1;++i) {
      ipos(0) = i - min_unknown_index(0);
-     for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+     for (size_t j=min_unknown_index(1)+1;j<=max_unknown_index(1)-1;++j) {
         ipos(1) = j - min_unknown_index(1);
         for (size_t k=local_min_k;k<=local_max_k;++k) {
            ipos(2) = k - local_min_k;
@@ -2340,6 +2340,9 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
 
+  doubleVector Dmin(dim,0);
+  doubleVector Dmax(dim,0);
+
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(0);
 
@@ -2349,12 +2352,14 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
         // One extra grid cell needs to considered, since ghost points can be 
         // located in between the min/max index handled by the proc
         for (size_t l=0;l<dim;++l) {
+           min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l );
+           max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l );
            if (rank_in_i[l] == 0) {
-              min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-              max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+              Dmin(l) = PF->get_DOF_coordinate( min_unknown_index(l), comp, l ) - PF->get_cell_size(min_unknown_index(l),comp,l);
+              Dmax(l) = PF->get_DOF_coordinate( max_unknown_index(l), comp, l ) + PF->get_cell_size(max_unknown_index(l),comp,l);
            } else  {
-              min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l );
-              max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+              Dmin(l) = PF->get_DOF_coordinate( min_unknown_index(l), comp, l );
+              Dmax(l) = PF->get_DOF_coordinate( max_unknown_index(l), comp, l ) + PF->get_cell_size(max_unknown_index(l),comp,l);
            }
         }
 
@@ -2367,21 +2372,9 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
         ypoint = yp + ri*point_coord(i,1);
         zpoint = zp + ri*point_coord(i,2);
 
-        double Dx_min = PF->get_DOF_coordinate( min_unknown_index(0), comp, 0 ) ;
-        double Dx_max = PF->get_DOF_coordinate( max_unknown_index(0), comp, 0 ) ;
-        double Dy_min = PF->get_DOF_coordinate( min_unknown_index(1), comp, 1 ) ;
-        double Dy_max = PF->get_DOF_coordinate( max_unknown_index(1), comp, 1 ) ;
-
-        if (dim==3) {
-           Dz_min = PF->get_DOF_coordinate( min_unknown_index(2), comp, 2 ) ;
-           Dz_max = PF->get_DOF_coordinate( max_unknown_index(2), comp, 2 ) ;
-        }
-
-        bool status = (dim==2) ? ((xpoint > Dx_min) && (xpoint <= Dx_max) && (ypoint > Dy_min) && (ypoint <= Dy_max)) :
-                                 ((xpoint > Dx_min) && (xpoint <= Dx_max) && (ypoint > Dy_min) && (ypoint <= Dy_max)
-                                                                          && (zpoint > Dz_min) && (zpoint <= Dz_max));
-
-//        cout << "Min, Max: " << Dx_min << "," << Dx_max << "," << Dy_min << "," << Dy_max << "," << Dz_min << "," << Dz_max << endl;
+        bool status = (dim==2) ? ((xpoint > Dmin(0)) && (xpoint <= Dmax(0)) && (ypoint > Dmin(1)) && (ypoint <= Dmax(1))) :
+                                 ((xpoint > Dmin(0)) && (xpoint <= Dmax(0)) && (ypoint > Dmin(1)) && (ypoint <= Dmax(1))
+                                                                            && (zpoint > Dmin(2)) && (zpoint <= Dmax(2)));
 
         if (status) {
            // Finding the grid indexes next to ghost points
@@ -2752,6 +2745,9 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
 
+  doubleVector Dmin(dim,0);
+  doubleVector Dmax(dim,0);
+
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(1);
   for (size_t i=0;i<Np;i++) {
@@ -2760,12 +2756,14 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
         // One extra grid cell needs to considered, since ghost points can be 
         // located in between the min/max index handled by the proc
         for (size_t l=0;l<dim;++l) {
+           min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l );
+           max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l );
            if (rank_in_i[l] == 0) {
-              min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-              max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+              Dmin(l) = UF->get_DOF_coordinate( min_unknown_index(l), comp, l ) - UF->get_cell_size(min_unknown_index(l),comp,l);
+              Dmax(l) = UF->get_DOF_coordinate( max_unknown_index(l), comp, l ) + UF->get_cell_size(max_unknown_index(l),comp,l);
            } else  {
-              min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l );
-              max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+              Dmin(l) = UF->get_DOF_coordinate( min_unknown_index(l), comp, l );
+              Dmax(l) = UF->get_DOF_coordinate( max_unknown_index(l), comp, l ) + UF->get_cell_size(max_unknown_index(l),comp,l);
            }
         }
 
@@ -2773,16 +2771,6 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
         double yp = solid.coord[comp]->item(parID,1);
         double zp = solid.coord[comp]->item(parID,2);
         ri = solid.size[comp]->item(parID);
-
-        double Dx_min = UF->get_DOF_coordinate( min_unknown_index(0), comp, 0 ) ;
-        double Dx_max = UF->get_DOF_coordinate( max_unknown_index(0), comp, 0 ) ;
-        double Dy_min = UF->get_DOF_coordinate( min_unknown_index(1), comp, 1 ) ;
-        double Dy_max = UF->get_DOF_coordinate( max_unknown_index(1), comp, 1 ) ;
-
-        if (dim==3) {
-           Dz_min = UF->get_DOF_coordinate( min_unknown_index(2), comp, 2 ) ;
-           Dz_max = UF->get_DOF_coordinate( max_unknown_index(2), comp, 2 ) ;
-        }
 
         xpoint(0) = xp + ri*point_coord(i,0);
         ypoint(0) = yp + ri*point_coord(i,1);
@@ -2806,9 +2794,10 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
 
         double dh = (dim == 2) ? (dxh+dyh)/2. : (dxh+dyh+dzh)/3.;
 
-        bool status = (dim==2) ? ((xpoint(0) > Dx_min) && (xpoint(0) <= Dx_max) && (ypoint(0) > Dy_min) && (ypoint(0) <= Dy_max)) :
-                                 ((xpoint(0) > Dx_min) && (xpoint(0) <= Dx_max) && (ypoint(0) > Dy_min) && (ypoint(0) <= Dy_max)
-                                                                                && (zpoint(0) > Dz_min) && (zpoint(0) <= Dz_max));
+        bool status = (dim==2) ? ((xpoint(0) > Dmin(0)) && (xpoint(0) <= Dmax(0)) && (ypoint(0) > Dmin(1)) && (ypoint(0) <= Dmax(1))) :
+                                 ((xpoint(0) > Dmin(0)) && (xpoint(0) <= Dmax(0)) && (ypoint(0) > Dmin(1)) && (ypoint(0) <= Dmax(1))
+                                                                                  && (zpoint(0) > Dmin(2)) && (zpoint(0) <= Dmax(2)));
+
         if (status) {
            // Ghost points in x for the calculation of x-derivative of field
            if (point_coord(i,0) <= 0.) {
@@ -2930,8 +2919,6 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
            outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(2) << "," << i << endl;*/
         }
      }
-
-//     cout << "Stress Error: " << MAC::abs(abs_stress(i,0) - stress(i,0)) << "," << abs_stress(i,0) << "," << stress(i,0) << endl;
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
