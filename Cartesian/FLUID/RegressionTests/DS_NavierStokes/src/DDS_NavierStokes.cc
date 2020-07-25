@@ -704,8 +704,10 @@ DDS_NavierStokes:: return_node_index (
    size_t_vector max_unknown_index(dim,0);
    size_t_vector i_length(dim,0);
    for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
-        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
+        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) - 1;
+        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
+//        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
+//        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
         i_length(l) = 1 + max_unknown_index(l) - min_unknown_index(l);
    }
 
@@ -919,11 +921,14 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t
   NodeProp node = GLOBAL_EQ->get_node_property(field);
 
   for (size_t comp=0;comp<nb_comps[field];comp++) {
-     // Get local min and max indices; Calculation on the rows next to the proc as well
+     // Get local min and max indices; 
+     // Calculation on the rows next to the unknown (i.e. known) as well
      for (size_t l=0;l<dim;++l) {
         // Calculations for solids on the total unknown on the proc
         min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
         max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
+//        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
+//        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
      }
 
      size_t local_min_k = 0;
@@ -1001,6 +1006,8 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
   for (size_t l=0;l<dim;++l) {
      min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
      max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
+//     min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l );
+//     max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l );
      local_unknown_extents(l,0) = 0;
      local_unknown_extents(l,1) = (max_unknown_index(l)-min_unknown_index(l));
   }
@@ -1009,13 +1016,13 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
   size_t local_max_k = 0;
 
   if (dim == 3) {
-     local_min_k = min_unknown_index(2)+1;
-     local_max_k = max_unknown_index(2)-1;
+     local_min_k = min_unknown_index(2);
+     local_max_k = max_unknown_index(2);
   }
 
-  for (size_t i=min_unknown_index(0)+1;i<=max_unknown_index(0)-1;++i) {
+  for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
      ipos(0) = i - min_unknown_index(0);
-     for (size_t j=min_unknown_index(1)+1;j<=max_unknown_index(1)-1;++j) {
+     for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
         ipos(1) = j - min_unknown_index(1);
         for (size_t k=local_min_k;k<=local_max_k;++k) {
            ipos(2) = k - local_min_k;
