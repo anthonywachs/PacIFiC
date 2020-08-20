@@ -329,6 +329,7 @@ public SolverComputingTime
       double ar;
 
       bool is_par_motion;
+      double Amp, freq;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;

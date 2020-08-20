@@ -168,6 +168,11 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    if ( exp->has_entry( "Particle_motion" ) )
      is_par_motion = exp->bool_data( "Particle_motion" ) ;
 
+   if (is_par_motion) {
+      Amp = exp->double_data( "Amplitude" ) ;
+      freq = exp->double_data( "Frequency" ) ;
+   }
+
 
    if (is_stressCal) {
       if (dim == 2) {
@@ -671,8 +676,6 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: update_particle_system" ) ;
-
-  double Amp = 1., freq = 2.;
 
   for (size_t field=0;field<2;field++) {
      // Structure of particle input data
