@@ -176,6 +176,8 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
          Ap[field][dir].result = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
          Ap[field][dir].ii_ie = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
 
+         Ap_proc0[field][dir].ei_ii_ie = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+
          // VEC to store local/interface solution and RHS
          VEC[field][dir].local_T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
          VEC[field][dir].local_solution_T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
@@ -286,6 +288,8 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
             Ap[field][dir].ei_ii_ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
             Ap[field][dir].result[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             Ap[field][dir].ii_ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+
+            Ap_proc0[field][dir].ei_ii_ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
 
             VEC[field][dir].local_T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             VEC[field][dir].local_solution_T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -447,6 +451,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
                if (l == 1) MAT_velocityUnsteadyPlusDiffusion_1D->re_initialize(nb_unknowns_handled_by_proc( l ),nb_unknowns_handled_by_proc( l ) );
                Ap[field][l].ii_ie[comp]->re_initialize(nb_procs-1);
                Ap[field][l].ei_ii_ie[comp]->re_initialize(nb_procs-1,nb_procs-1 );
+               Ap_proc0[field][l].ei_ii_ie[comp]->re_initialize(nb_procs-1,nb_procs-1 );
                VEC[field][l].interface_T[comp]->re_initialize( nb_procs-1 ) ;
                VEC[field][l].T[comp]->re_initialize( nb_procs-1 ) ;
 
@@ -475,6 +480,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
                Ap[field][l].result[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1 );
                Ap[field][l].ii_ie[comp]->re_initialize(nb_procs);
                Ap[field][l].ei_ii_ie[comp]->re_initialize(nb_procs,nb_procs );
+               Ap_proc0[field][l].ei_ii_ie[comp]->re_initialize(nb_procs,nb_procs );
 
                VEC[field][l].local_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
                VEC[field][l].local_solution_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
@@ -756,6 +762,15 @@ DDS_NavierStokesSystem::get_Ap(size_t const& field)
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_Ap" ) ;
    return (Ap[field]) ;
+}
+
+//----------------------------------------------------------------------
+ProdMatrix*
+DDS_NavierStokesSystem::get_Ap_proc0(size_t const& field)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokesSystem:: get_Ap" ) ;
+   return (Ap_proc0[field]) ;
 }
 
 //----------------------------------------------------------------------

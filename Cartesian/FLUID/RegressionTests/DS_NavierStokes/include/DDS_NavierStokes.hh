@@ -180,6 +180,7 @@ public SolverComputingTime
       double pressure_local_rhs_FV( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
       double divergence_wall_flux( size_t const& i, size_t const& j, size_t const& k, size_t const& comp, size_t const& wall_dir, double const& length, size_t const& level);
+      void update_particle_system(FV_TimeIterator const* t_it);
 
       size_t return_row_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
 
@@ -219,7 +220,7 @@ public SolverComputingTime
       double find_intersection (FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field, size_t const& level);
 
       void correct_pressure_1st_layer_solid (size_t const& level );
-      
+
       void correct_pressure_2nd_layer_solid (size_t const& level );
 
       void correct_mean_pressure (size_t const& level );
@@ -326,6 +327,8 @@ public SolverComputingTime
       double Npoints;
       size_t Nrings, Pmin, pole_loc;
       double ar;
+
+      bool is_par_motion;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;

@@ -164,6 +164,11 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    if ( exp->has_entry( "Stress_calculation" ) )
      is_stressCal = exp->bool_data( "Stress_calculation" ) ;
 
+   // Read weather the particle motion is ON/OFF
+   if ( exp->has_entry( "Particle_motion" ) )
+     is_par_motion = exp->bool_data( "Particle_motion" ) ;
+
+
    if (is_stressCal) {
       if (dim == 2) {
          Npoints = exp->double_data( "Npoints" ) ;
@@ -391,6 +396,20 @@ DDS_NavierStokes:: do_before_inner_iterations_stage(
    start_total_timer( "DDS_NavierStokes:: do_before_inner_iterations_stage" ) ;
 
    FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
+
+   if ((is_par_motion) && (is_solids)) {
+      update_particle_system(t_it);
+      node_property_calculation(PF,0);
+      node_property_calculation(UF,1);
+      nodes_field_initialization(0);
+      nodes_field_initialization(1);
+      nodes_field_initialization(3);
+      if (dim == 3) nodes_field_initialization(4);
+
+      // Direction splitting
+      // Assemble 1D tridiagonal matrices
+      assemble_1D_matrices(t_it);
+   }
 
    // Perform matrix level operations before each time step
    GLOBAL_EQ->at_each_time_step( );
@@ -647,6 +666,43 @@ DDS_NavierStokes:: nodes_field_initialization ( size_t const& level )
 }
 
 //---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes:: update_particle_system" ) ;
+
+  double Amp = 1., freq = 2.;
+
+  for (size_t field=0;field<2;field++) {
+     // Structure of particle input data
+     PartInput solid = GLOBAL_EQ->get_solid(field);
+     for (size_t comp=0;comp<nb_comps[field];comp++) {
+        for (size_t i=0;i<Npart;i++) {
+           double xp = solid.coord[comp]->item(i,0);
+           double yp = solid.coord[comp]->item(i,1);
+           double zp = solid.coord[comp]->item(i,2);
+
+           double vx = solid.vel[comp]->item(i,0);
+           double vy = solid.vel[comp]->item(i,1);
+           double vz = solid.vel[comp]->item(i,2);
+
+           vy = Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
+           yp = yp + vy*t_it->time_step();
+
+           solid.coord[comp]->set_item(i,0,xp);
+           solid.coord[comp]->set_item(i,1,yp);
+           solid.coord[comp]->set_item(i,2,zp);
+
+           solid.vel[comp]->set_item(i,0,vx);
+           solid.vel[comp]->set_item(i,1,vy);
+           solid.vel[comp]->set_item(i,2,vz);
+        }
+     }
+  }
+}
+
+//---------------------------------------------------------------------------
 size_t
 DDS_NavierStokes:: return_row_index (
   FV_DiscreteField const* FF,
@@ -860,10 +916,6 @@ DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<dou
   net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
-/*
-  net_vel[0] = grid_coord(0) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4)*pow(grid_coord(2),3);
-  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3)*pow(grid_coord(2),2);
-  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2)*pow(grid_coord(0)+grid_coord(2),2)*pow(grid_coord(2)+grid_coord(1),2);*/
 }
 
 //---------------------------------------------------------------------------
@@ -901,10 +953,6 @@ DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel, siz
   net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
-
-/*  net_vel[0] = grid_coord(0) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4)*pow(grid_coord(2),3);
-  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3)*pow(grid_coord(2),2);
-  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2)*pow(grid_coord(0)+grid_coord(2),2)*pow(grid_coord(2)+grid_coord(1),2);*/
 }
 
 //---------------------------------------------------------------------------
@@ -938,6 +986,10 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t
         local_min_k = min_unknown_index(2);
         local_max_k = max_unknown_index(2);
      }
+
+     // Clearing the matrices to store new time step value
+     node.void_frac[comp]->nullify();
+     node.parID[comp]->nullify();
 
      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
         double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
@@ -1020,6 +1072,13 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
      local_max_k = max_unknown_index(2);
   }
 
+  // Clearing the matrices to store new time step value
+  for (size_t dir=0;dir<dim;dir++) {
+     b_intersect[dir].offset[comp]->nullify();
+     b_intersect[dir].value[comp]->nullify();
+     b_intersect[dir].field_var[comp]->nullify();            
+  }
+
   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
      ipos(0) = i - min_unknown_index(0);
      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
@@ -1089,7 +1148,7 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
                     }
                  }
               }
-           }
+           }             
         }
      }
   }
@@ -1535,11 +1594,21 @@ DDS_NavierStokes:: assemble_field_schur_matrix (struct TDMatrix *A, size_t const
    if (nb_ranks_comm_i[dir]>1) {
 
       ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
+      ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0(field);
 
       GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,field,r_index);
 
       LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
-      LA_SeqMatrix* receive_matrix = product_matrix->create_copy(this,product_matrix);
+
+      size_t nbrow = product_matrix->nb_rows();
+      // Create a copy of product matrix to receive matrix, this will eliminate the memory leak issue which caused by "create_copy" command
+      for (size_t k=0;k<nbrow;k++) {
+         for (size_t j=0;j<nbrow;j++) {
+            Ap_proc0[dir].ei_ii_ie[comp]->set_item(k,j,product_matrix->item(k,j));
+         }
+      }
+
+      LA_SeqMatrix* receive_matrix = Ap_proc0[dir].ei_ii_ie[comp];
 
       if ( rank_in_i[dir] == 0 ) {
          A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
@@ -2884,23 +2953,29 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
               // Derivative in z
               if (point_coord(i,2) <=0.) {
                  dfdz = mu*(finz(2) - 4.*finz(1) + 3.*finz(0))/2./dh;
+//                 dfdz = mu*(-finz(1) + finz(0))/dh;
               } else {
                  dfdz = mu*(-finz(2) + 4.*finz(1) - 3.*finz(0))/2./dh;
+//                 dfdz = mu*(finz(1) - finz(0))/dh;
               }
            }
 
            // Derivative in x
            if (point_coord(i,0) <= 0.) {
               dfdx = mu*(finx(2) - 4.*finx(1) + 3.*finx(0))/2./dh;
+//              dfdx = mu*(-finx(1) + finx(0))/dh;
            } else {
               dfdx = mu*(-finx(2) + 4.*finx(1) - 3.*finx(0))/2./dh;
+//              dfdx = mu*(finx(1) - finx(0))/dh;
            }
 
            // Derivative in y
            if (point_coord(i,1) <=0.) {
               dfdy = mu*(finy(2) - 4.*finy(1) + 3.*finy(0))/2./dh;
+//              dfdy = mu*(-finy(1) + finy(0))/dh;
            } else {
               dfdy = mu*(-finy(2) + 4.*finy(1) - 3.*finy(0))/2./dh;
+//              dfdy = mu*(finy(1) - finy(0))/dh;
            }
 
            if (comp == 0) {
