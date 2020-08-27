@@ -76,6 +76,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , AdvectionTimeAccuracy( 1 )   
    , rho( 1. )
    , is_solids( false )
+   , is_par_motion( false )
+   , is_stressCal( false )
 {
    MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -158,31 +160,30 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
          string error_message="- Square\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
       }
-   }
 
-   // Read weather the sress calculation on particle is ON/OFF
-   if ( exp->has_entry( "Stress_calculation" ) )
-     is_stressCal = exp->bool_data( "Stress_calculation" ) ;
+      // Read weather the sress calculation on particle is ON/OFF
+      if ( exp->has_entry( "Stress_calculation" ) )
+        is_stressCal = exp->bool_data( "Stress_calculation" ) ;
 
-   // Read weather the particle motion is ON/OFF
-   if ( exp->has_entry( "Particle_motion" ) )
-     is_par_motion = exp->bool_data( "Particle_motion" ) ;
+      // Read weather the particle motion is ON/OFF
+      if ( exp->has_entry( "Particle_motion" ) )
+        is_par_motion = exp->bool_data( "Particle_motion" ) ;
 
-   if (is_par_motion) {
-      Amp = exp->double_data( "Amplitude" ) ;
-      freq = exp->double_data( "Frequency" ) ;
-   }
+      if (is_par_motion) {
+         Amp = exp->double_data( "Amplitude" ) ;
+         freq = exp->double_data( "Frequency" ) ;
+      }
 
-
-   if (is_stressCal) {
-      if (dim == 2) {
-         Npoints = exp->double_data( "Npoints" ) ;
-      } else {
-         Npoints = 1.;
-         Nrings = exp->int_data( "Nrings" ) ;
-         Pmin = exp->int_data( "Pmin" ) ;
-         ar = exp->double_data( "aspect_ratio" ) ;
-         pole_loc = exp->int_data( "pole_loc" ) ;
+      if (is_stressCal) {
+         if (dim == 2) {
+            Npoints = exp->double_data( "Npoints" ) ;
+         } else {
+            Npoints = 1.;
+            Nrings = exp->int_data( "Nrings" ) ;
+            Pmin = exp->int_data( "Pmin" ) ;
+            ar = exp->double_data( "aspect_ratio" ) ;
+            pole_loc = exp->int_data( "pole_loc" ) ;
+         }
       }
    }
 
