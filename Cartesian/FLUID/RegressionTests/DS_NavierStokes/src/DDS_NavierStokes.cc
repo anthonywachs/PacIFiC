@@ -78,6 +78,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , is_solids( false )
    , is_par_motion( false )
    , is_stressCal( false )
+   , DivergenceScheme ( "FD" )
 {
    MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -216,6 +217,18 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
      string error_message="   >= 4 for correct stress calculations on solids";
      MAC_Error::object()->raise_bad_data_value( exp,
         "security_bandwidth", error_message );
+   }
+
+   // Method for calculating divergence 
+   if ( exp->has_entry( "DivergenceScheme" ) )
+   {
+     DivergenceScheme = exp->string_data( "DivergenceScheme" ) ;
+     exp->test_data( "Kai", "Kai>=0." ) ;
+     if ( DivergenceScheme != "FD" && DivergenceScheme != "FV") {
+        string error_message="   - FD\n   - FV";
+        MAC_Error::object()->raise_bad_data_value( exp,
+           "DivergenceScheme", error_message );
+     }
    }
 
 
@@ -3752,7 +3765,11 @@ DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double
    MAC_LABEL("DDS_NavierStokes:: assemble_local_rhs" ) ;
    double fe = 0.;
    if (field == 0) {
-      fe = pressure_local_rhs_FD(j,k,t_it,dir);
+      if (DivergenceScheme == "FD") {
+         fe = pressure_local_rhs_FD(j,k,t_it,dir);
+      } else {
+         fe = pressure_local_rhs_FV(j,k,t_it,dir);
+      }
    } else if (field == 1) {
       fe = velocity_local_rhs(j,k,gamma,t_it,comp,dir);
    }

@@ -317,6 +317,7 @@ public SolverComputingTime
       double mu;
       double kai;
       string AdvectionScheme;
+      string DivergenceScheme;
       size_t AdvectionTimeAccuracy;
 
       bool b_restart ;
