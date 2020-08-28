@@ -607,6 +607,8 @@ DDS_NavierStokes:: error_with_analytical_solution_poiseuille ( )
                   analytical_solution = (bodyterm/(2.*mu))*((y-height)*(y-height)-height*height);
                }
 
+//               analytical_solution = MAC::sin(x)*MAC::sin(y);
+
                if ( UF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) )
 	          error_L2 += MAC::sqr( computed_field - analytical_solution ) * UF->get_cell_measure( i, j, k, comp ) ;
 	    } else {
@@ -933,6 +935,7 @@ DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<dou
   net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
+
 }
 
 //---------------------------------------------------------------------------
@@ -970,6 +973,7 @@ DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel, siz
   net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
+
 }
 
 //---------------------------------------------------------------------------
@@ -3558,7 +3562,6 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
                      pvalue = 0.; adv_value = 0.;
                   }
                } 
-
           
                rhs = gamma*(xvalue*dyC + yvalue*dxC) - pvalue - adv_value
                    + (UF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*rho)/(t_it -> time_step());
@@ -4458,162 +4461,88 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
       local_max_k = max_unknown_index(2);
    }
 
-   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-         for (size_t k=local_min_k;k<=local_max_k;++k) {
-            double xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-            // Divergence of un+1 (x component)
-            double xright1 = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
-            // Divergence of un (x component)
-            double xright2 = UF->DOF_value( shift.i+i, j, k, 0, 1 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 1 ) ;
+   if (DivergenceScheme == "FD" ) {
+      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+         for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+            for (size_t k=local_min_k;k<=local_max_k;++k) {
+               double xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
+               // Divergence of un+1 (x component)
+               double xright1 = UF->DOF_value( shift.i+i, j, k, 0, 0 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 0 ) ;
+               // Divergence of un (x component)
+               double xright2 = UF->DOF_value( shift.i+i, j, k, 0, 1 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 1 ) ;
 
-            double bx = xhr;
-
-            if (is_solids) {
-               size_t p = return_node_index(PF,comp,i,j,k);
-               if (node.void_frac[comp]->item(p) == 0) {
-                  if ((bf_intersect[0].offset[comp]->item(p,0) == 1)) {
-                     xright1 = UF->DOF_value( shift.i+i, j, k, 0, 0) - bf_intersect[0].field_var[comp]->item(p,0);
-                     xright2 = UF->DOF_value( shift.i+i, j, k, 0, 1) - bf_intersect[0].field_var[comp]->item(p,0);
-                     xhr = bf_intersect[0].value[comp]->item(p,0) + PF->get_cell_size( i, 0, 0 )/2.;
-                  }
-                  if ((bf_intersect[0].offset[comp]->item(p,1) == 1)) {
-                     xright1 = bf_intersect[0].field_var[comp]->item(p,1) - UF->DOF_value( shift.i+i-1, j, k, 0, 0);
-                     xright2 = bf_intersect[0].field_var[comp]->item(p,1) - UF->DOF_value( shift.i+i-1, j, k, 0, 1);
-                     xhr = bf_intersect[0].value[comp]->item(p,1) + PF->get_cell_size( i, 0, 0 )/2.;
-                  }
-                  if ((bf_intersect[0].offset[comp]->item(p,1) == 1) && (bf_intersect[0].offset[comp]->item(p,0) == 1)) {
-                     xright1 = bf_intersect[0].field_var[comp]->item(p,1) - bf_intersect[0].field_var[comp]->item(p,0);
-                     xright2 = bf_intersect[0].field_var[comp]->item(p,1) - bf_intersect[0].field_var[comp]->item(p,0);
-                     xhr = bf_intersect[0].value[comp]->item(p,1) + bf_intersect[0].value[comp]->item(p,0);
-                  }
-               } else if (node.void_frac[comp]->item(p) == 1) {
-                  xright1 = 0.;
-                  xright2 = 0.;
-               }
-            }
-
-            bx = xhr/bx;
-
-            double xvalue1 = xright1/xhr;
-            double xvalue2 = xright2/xhr;      
-            xvalue = xvalue1+xvalue2;
-
-            double yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-            // Divergence of un+1 (y component)
-            double yright1 = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
-            // Divergence of un (y component)
-            double yright2 = UF->DOF_value( i, shift.j+j, k, 1, 1 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 1 ) ;
-
-            double by = yhr;
-
-            if (is_solids) {
-               size_t p = return_node_index(PF,comp,i,j,k);
-               if (node.void_frac[comp]->item(p) == 0) {
-                  if ((bf_intersect[1].offset[comp]->item(p,0) == 1)) {
-                     yright1 = UF->DOF_value( i, shift.j+j, k, 1, 0) - bf_intersect[1].field_var[comp]->item(p,0);
-                     yright2 = UF->DOF_value( i, shift.j+j, k, 1, 1) - bf_intersect[1].field_var[comp]->item(p,0);
-                     yhr = bf_intersect[1].value[comp]->item(p,0) + PF->get_cell_size( j, 0, 1 )/2.;
-                  }
-                  if ((bf_intersect[1].offset[comp]->item(p,1) == 1)) {
-                     yright1 = bf_intersect[1].field_var[comp]->item(p,1) - UF->DOF_value( i, shift.j+j-1, k, 1, 0);
-                     yright2 = bf_intersect[1].field_var[comp]->item(p,1) - UF->DOF_value( i, shift.j+j-1, k, 1, 1);
-                     yhr = bf_intersect[1].value[comp]->item(p,1) + PF->get_cell_size( j, 0, 1 )/2.;
-                  }
-                  if ((bf_intersect[1].offset[comp]->item(p,1) == 1) && (bf_intersect[1].offset[comp]->item(p,0) == 1)) {
-                     yright1 = bf_intersect[1].field_var[comp]->item(p,1) - bf_intersect[1].field_var[comp]->item(p,0);
-                     yright2 = bf_intersect[1].field_var[comp]->item(p,1) - bf_intersect[1].field_var[comp]->item(p,0);
-                     yhr = bf_intersect[1].value[comp]->item(p,1) + bf_intersect[1].value[comp]->item(p,0);
-                  }
-               } else if (node.void_frac[comp]->item(p) == 1) {
-                  yright1 = 0.;
-                  yright2 = 0.;
-               }
-            }
-
-            by = yhr/by;
-
-            double yvalue1 = yright1/yhr;
-            double yvalue2 = yright2/yhr;
-            yvalue = yvalue1+yvalue2;
-
-//            double beta = min(1.,min(bx,by));
-            double beta = min(1.,(bx+by)/2.);
-
-            if (dim == 3) {
-               double zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
-               // Divergence of un+1 (z component)
-               double zright1 = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
-               // Divergence of un (z component)
-               double zright2 = UF->DOF_value( i, j, shift.k+k, 2, 1 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 1 ) ;
-
-               double bz = zhr;
+               double bx = xhr;
 
                if (is_solids) {
                   size_t p = return_node_index(PF,comp,i,j,k);
                   if (node.void_frac[comp]->item(p) == 0) {
-                     if ((bf_intersect[2].offset[comp]->item(p,0) == 1)) {
-                        zright1 = UF->DOF_value( i, j, shift.k+k, 2, 0) - bf_intersect[2].field_var[comp]->item(p,0);
-                        zright2 = UF->DOF_value( i, j, shift.k+k, 2, 1) - bf_intersect[2].field_var[comp]->item(p,0);
-                        zhr = bf_intersect[2].value[comp]->item(p,0) + PF->get_cell_size( k, 0, 2 )/2.;
+                     if ((bf_intersect[0].offset[comp]->item(p,0) == 1)) {
+                        xright1 = UF->DOF_value( shift.i+i, j, k, 0, 0) - bf_intersect[0].field_var[comp]->item(p,0);
+                        xright2 = UF->DOF_value( shift.i+i, j, k, 0, 1) - bf_intersect[0].field_var[comp]->item(p,0);
+                        xhr = bf_intersect[0].value[comp]->item(p,0) + PF->get_cell_size( i, 0, 0 )/2.;
                      }
-                     if ((bf_intersect[2].offset[comp]->item(p,1) == 1)) {
-                        zright1 = bf_intersect[2].field_var[comp]->item(p,1) - UF->DOF_value( i, j, shift.k+k-1, 2, 0);
-                        zright2 = bf_intersect[2].field_var[comp]->item(p,1) - UF->DOF_value( i, j, shift.k+k-1, 2, 1);
-                        zhr = bf_intersect[2].value[comp]->item(p,1) + PF->get_cell_size( k, 0, 2 )/2.;
+                     if ((bf_intersect[0].offset[comp]->item(p,1) == 1)) {
+                        xright1 = bf_intersect[0].field_var[comp]->item(p,1) - UF->DOF_value( shift.i+i-1, j, k, 0, 0);
+                        xright2 = bf_intersect[0].field_var[comp]->item(p,1) - UF->DOF_value( shift.i+i-1, j, k, 0, 1);
+                        xhr = bf_intersect[0].value[comp]->item(p,1) + PF->get_cell_size( i, 0, 0 )/2.;
                      }
-                     if ((bf_intersect[2].offset[comp]->item(p,1) == 1) && (bf_intersect[2].offset[comp]->item(p,0) == 1)) {
-                        zright1 = bf_intersect[2].field_var[comp]->item(p,1) - bf_intersect[2].field_var[comp]->item(p,0);
-                        zright2 = bf_intersect[2].field_var[comp]->item(p,1) - bf_intersect[2].field_var[comp]->item(p,0);
-                        zhr = bf_intersect[2].value[comp]->item(p,1) + bf_intersect[2].value[comp]->item(p,0);
+                     if ((bf_intersect[0].offset[comp]->item(p,1) == 1) && (bf_intersect[0].offset[comp]->item(p,0) == 1)) {
+                        xright1 = bf_intersect[0].field_var[comp]->item(p,1) - bf_intersect[0].field_var[comp]->item(p,0);
+                        xright2 = bf_intersect[0].field_var[comp]->item(p,1) - bf_intersect[0].field_var[comp]->item(p,0);
+                        xhr = bf_intersect[0].value[comp]->item(p,1) + bf_intersect[0].value[comp]->item(p,0);
                      }
                   } else if (node.void_frac[comp]->item(p) == 1) {
-                     zright1 = 0.;
-                     zright2 = 0.;
+                     xright1 = 0.;
+                     xright2 = 0.;
+                  }
+               }
+   
+               bx = xhr/bx;
+
+               double xvalue1 = xright1/xhr;
+               double xvalue2 = xright2/xhr;      
+               xvalue = xvalue1+xvalue2;
+
+               double yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
+               // Divergence of un+1 (y component)
+               double yright1 = UF->DOF_value( i, shift.j+j, k, 1, 0 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 0 ) ;
+               // Divergence of un (y component)
+               double yright2 = UF->DOF_value( i, shift.j+j, k, 1, 1 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 1 ) ;
+ 
+               double by = yhr;
+
+               if (is_solids) {
+                  size_t p = return_node_index(PF,comp,i,j,k);
+                  if (node.void_frac[comp]->item(p) == 0) {
+                     if ((bf_intersect[1].offset[comp]->item(p,0) == 1)) {
+                        yright1 = UF->DOF_value( i, shift.j+j, k, 1, 0) - bf_intersect[1].field_var[comp]->item(p,0);
+                        yright2 = UF->DOF_value( i, shift.j+j, k, 1, 1) - bf_intersect[1].field_var[comp]->item(p,0);
+                        yhr = bf_intersect[1].value[comp]->item(p,0) + PF->get_cell_size( j, 0, 1 )/2.;
+                     }
+                     if ((bf_intersect[1].offset[comp]->item(p,1) == 1)) {
+                        yright1 = bf_intersect[1].field_var[comp]->item(p,1) - UF->DOF_value( i, shift.j+j-1, k, 1, 0);
+                        yright2 = bf_intersect[1].field_var[comp]->item(p,1) - UF->DOF_value( i, shift.j+j-1, k, 1, 1);
+                        yhr = bf_intersect[1].value[comp]->item(p,1) + PF->get_cell_size( j, 0, 1 )/2.;
+                     }
+                     if ((bf_intersect[1].offset[comp]->item(p,1) == 1) && (bf_intersect[1].offset[comp]->item(p,0) == 1)) {
+                        yright1 = bf_intersect[1].field_var[comp]->item(p,1) - bf_intersect[1].field_var[comp]->item(p,0);
+                        yright2 = bf_intersect[1].field_var[comp]->item(p,1) - bf_intersect[1].field_var[comp]->item(p,0);
+                        yhr = bf_intersect[1].value[comp]->item(p,1) + bf_intersect[1].value[comp]->item(p,0);
+                     }
+                  } else if (node.void_frac[comp]->item(p) == 1) {
+                     yright1 = 0.;
+                     yright2 = 0.;
                   }
                }
 
-               bz = zhr/bz;
+               by = yhr/by;
 
-               double zvalue1 = zright1/zhr;
-               double zvalue2 = zright2/zhr;            
-               zvalue = zvalue1+zvalue2;
-
-//               beta = min(1.,min(bx,min(by,bz)));
-               beta = min(1.,(bx+by+bz)/3.);
-            }
-
-            // Assemble the bodyterm
-            double value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - 0.5*kai*mu*beta*(xvalue + yvalue+ zvalue);
-            GLOBAL_EQ->update_global_P_vector(i,j,k,value);
-         }
-      }
-   }
-
-/*
-   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-         for (size_t k=local_min_k;k<=local_max_k;++k) {
-            if (kai != 0.) {
-               double dx = PF->get_cell_size( i, 0, 0 );
-               double dy = PF->get_cell_size( j, 0, 1 );
-               // Divergence of un+1 (x component)
-               double xright1 = divergence_wall_flux(shift.i+i,j,k,0,1,dy,0) - divergence_wall_flux(shift.i+i-1,j,k,0,1,dy,0);
-               // Divergence of un (x component)
-               double xright2 = divergence_wall_flux(shift.i+i,j,k,0,1,dy,1) - divergence_wall_flux(shift.i+i-1,j,k,0,1,dy,1);
-
-               double xvalue1 = xright1/(dx*dy);
-               double xvalue2 = xright2/(dx*dy);      
-               xvalue = xvalue1+xvalue2;
-
-               // Divergence of un+1 (y component)
-               double yright1 = divergence_wall_flux(i,shift.j+j,k,1,0,dx,0) - divergence_wall_flux(i,shift.j+j-1,k,1,0,dx,0) ;
-               // Divergence of un (y component)
-               double yright2 = divergence_wall_flux(i,shift.j+j,k,1,0,dx,1) - divergence_wall_flux(i,shift.j+j-1,k,1,0,dx,1) ;
-
-               double yvalue1 = yright1/(dx*dy);
-               double yvalue2 = yright2/(dx*dy);
+               double yvalue1 = yright1/yhr;
+               double yvalue2 = yright2/yhr;
                yvalue = yvalue1+yvalue2;
+
+//               double beta = min(1.,min(bx,by));
+               double beta = min(1.,(bx+by)/2.);
 
                if (dim == 3) {
                   double zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
@@ -4622,24 +4551,99 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
                   // Divergence of un (z component)
                   double zright2 = UF->DOF_value( i, j, shift.k+k, 2, 1 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 1 ) ;
 
+                  double bz = zhr;
+
+                  if (is_solids) {
+                     size_t p = return_node_index(PF,comp,i,j,k);
+                     if (node.void_frac[comp]->item(p) == 0) {
+                        if ((bf_intersect[2].offset[comp]->item(p,0) == 1)) {
+                           zright1 = UF->DOF_value( i, j, shift.k+k, 2, 0) - bf_intersect[2].field_var[comp]->item(p,0);
+                           zright2 = UF->DOF_value( i, j, shift.k+k, 2, 1) - bf_intersect[2].field_var[comp]->item(p,0);
+                           zhr = bf_intersect[2].value[comp]->item(p,0) + PF->get_cell_size( k, 0, 2 )/2.;
+                        }
+                        if ((bf_intersect[2].offset[comp]->item(p,1) == 1)) {
+                           zright1 = bf_intersect[2].field_var[comp]->item(p,1) - UF->DOF_value( i, j, shift.k+k-1, 2, 0);
+                           zright2 = bf_intersect[2].field_var[comp]->item(p,1) - UF->DOF_value( i, j, shift.k+k-1, 2, 1);
+                           zhr = bf_intersect[2].value[comp]->item(p,1) + PF->get_cell_size( k, 0, 2 )/2.;
+                        }
+                        if ((bf_intersect[2].offset[comp]->item(p,1) == 1) && (bf_intersect[2].offset[comp]->item(p,0) == 1)) {
+                           zright1 = bf_intersect[2].field_var[comp]->item(p,1) - bf_intersect[2].field_var[comp]->item(p,0);
+                           zright2 = bf_intersect[2].field_var[comp]->item(p,1) - bf_intersect[2].field_var[comp]->item(p,0);
+                           zhr = bf_intersect[2].value[comp]->item(p,1) + bf_intersect[2].value[comp]->item(p,0);
+                        }
+                     } else if (node.void_frac[comp]->item(p) == 1) {
+                        zright1 = 0.;
+                        zright2 = 0.;
+                     }
+                  }
+
+                  bz = zhr/bz;
+
                   double zvalue1 = zright1/zhr;
                   double zvalue2 = zright2/zhr;            
                   zvalue = zvalue1+zvalue2;
+
+//                  beta = min(1.,min(bx,min(by,bz)));
+                  beta = min(1.,(bx+by+bz)/3.);
                }
 
-//               size_t p = return_node_index(PF,0,i,j,k);
-//               if (node.void_frac[0]->item(p) == 1) {
-//                  xvalue = 0.; yvalue = 0.; zvalue = 0.;
-//               }
+               // Assemble the bodyterm
+               double value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - 0.5*kai*mu*beta*(xvalue + yvalue+ zvalue);
+               GLOBAL_EQ->update_global_P_vector(i,j,k,value);
             }
-
-            // Assemble the bodyterm
-            double value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - 0.5*kai*mu*(xvalue + yvalue+ zvalue);
-
-            GLOBAL_EQ->update_global_P_vector(i,j,k,value);
          }
       }
-   }*/
+   } else {
+      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+         for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+            for (size_t k=local_min_k;k<=local_max_k;++k) {
+               if (kai != 0.) {
+                  double dx = PF->get_cell_size( i, 0, 0 );
+                  double dy = PF->get_cell_size( j, 0, 1 );
+                  // Divergence of un+1 (x component)
+                  double xright1 = divergence_wall_flux(shift.i+i,j,k,0,1,dy,0) - divergence_wall_flux(shift.i+i-1,j,k,0,1,dy,0);
+                  // Divergence of un (x component)
+                  double xright2 = divergence_wall_flux(shift.i+i,j,k,0,1,dy,1) - divergence_wall_flux(shift.i+i-1,j,k,0,1,dy,1);
+
+                  double xvalue1 = xright1/(dx*dy);
+                  double xvalue2 = xright2/(dx*dy);      
+                  xvalue = xvalue1+xvalue2;
+
+                  // Divergence of un+1 (y component)
+                  double yright1 = divergence_wall_flux(i,shift.j+j,k,1,0,dx,0) - divergence_wall_flux(i,shift.j+j-1,k,1,0,dx,0) ;
+                  // Divergence of un (y component)
+                  double yright2 = divergence_wall_flux(i,shift.j+j,k,1,0,dx,1) - divergence_wall_flux(i,shift.j+j-1,k,1,0,dx,1) ;
+
+                  double yvalue1 = yright1/(dx*dy);
+                  double yvalue2 = yright2/(dx*dy);
+                  yvalue = yvalue1+yvalue2;
+
+                  if (dim == 3) {
+                     double zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
+                     // Divergence of un+1 (z component)
+                     double zright1 = UF->DOF_value( i, j, shift.k+k, 2, 0 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 0 ) ;
+                     // Divergence of un (z component)
+                     double zright2 = UF->DOF_value( i, j, shift.k+k, 2, 1 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 1 ) ;
+
+                     double zvalue1 = zright1/zhr;
+                     double zvalue2 = zright2/zhr;            
+                     zvalue = zvalue1+zvalue2;
+                  }
+
+//                  size_t p = return_node_index(PF,0,i,j,k);
+//                  if (node.void_frac[0]->item(p) == 1) {
+//                     xvalue = 0.; yvalue = 0.; zvalue = 0.;
+//                  }
+               }
+
+               // Assemble the bodyterm
+               double value = PF->DOF_value( i, j, k, 0, 0 ) + PF->DOF_value( i, j, k, 0, 1 ) - 0.5*kai*mu*(xvalue + yvalue+ zvalue);
+
+               GLOBAL_EQ->update_global_P_vector(i,j,k,value);
+            }
+         }
+      }
+   }
 
    // Synchronize the distributed DS solution vector
    GLOBAL_EQ->synchronize_DS_solution_vec_P();
