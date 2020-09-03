@@ -212,7 +212,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
         "security_bandwidth", error_message );
    }
 
-   if ( UF->primary_grid()->get_security_bandwidth() < 4 )
+   if ( is_stressCal == true && UF->primary_grid()->get_security_bandwidth() < 4 )
    {
      string error_message="   >= 4 for correct stress calculations on solids";
      MAC_Error::object()->raise_bad_data_value( exp,
@@ -607,7 +607,7 @@ DDS_NavierStokes:: error_with_analytical_solution_poiseuille ( )
                   analytical_solution = (bodyterm/(2.*mu))*((y-height)*(y-height)-height*height);
                }
 
-//               analytical_solution = MAC::sin(x)*MAC::sin(y);
+//               analytical_solution = MAC::sin(MAC::pi()*x)*MAC::sin(MAC::pi()*y);
 
                if ( UF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) )
 	          error_L2 += MAC::sqr( computed_field - analytical_solution ) * UF->get_cell_measure( i, j, k, comp ) ;
@@ -3552,9 +3552,17 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
                // Dyy for un
                yvalue = compute_un_component(comp,i,j,k,1,1);
                // Pressure contribution
-	       pvalue = compute_p_component(comp,i,j,k);
+               pvalue = compute_p_component(comp,i,j,k);
                // Advection contribution
                adv_value = compute_adv_component(comp,i,j,k);
+
+/*               if (comp == 0) {
+                  adv_value = -(cos(xC+yC) + 2.*sin(xC)*sin(yC))*dxC*dyC;
+//                  adv_value = -2.*pow(MAC::pi(),2.)*(sin(MAC::pi()*xC)*sin(MAC::pi()*yC))*dxC*dyC;
+               } else if (comp == 1) {
+                  adv_value = -(cos(xC+yC) + 2.*cos(xC)*cos(yC))*dxC*dyC;
+//                  adv_value = -2.*pow(MAC::pi(),2.)*(sin(MAC::pi()*xC)*sin(MAC::pi()*yC))*dxC*dyC;
+               }*/
 
                if (is_solids) {
                   size_t p = return_node_index(UF,comp,i,j,k);
@@ -3606,7 +3614,7 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
                   if (is_solids) {
                      size_t p = return_node_index(UF,comp,i,j,k);
                      if (node.void_frac[comp]->item(p) == 1) {
-                        if ( cpp >= 0 && cpp==comp ) rhs += bodyterm*dxC*dyC;
+                        if ( cpp >= 0 && cpp==comp ) rhs += bodyterm*dxC*dyC*dzC;
                      }
                   } 
 
