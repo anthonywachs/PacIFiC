@@ -73,13 +73,13 @@ struct BoundaryBisec {
    LA_SeqMatrix ** field_var;                   // Value of field variable at the intersection
 };
 
-/** @brief The Class DDS_NavierStokesSystem.
+/** @brief The Class DDS_NSWithHeatTransferSystem.
 
 Matrix systems for the resolution of the heat equation.
 
 @author A. Wachs - Pacific project 2017 */
 
-class DDS_NavierStokesSystem : public MAC_Object
+class DDS_NSWithHeatTransferSystem : public MAC_Object
 {
    private: //----------------------------------------------------------
 
@@ -88,23 +88,23 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @name Constructors & Destructor */
       //@{
       /** @brief Constructor without argument */
-      DDS_NavierStokesSystem( void ) ;
+      DDS_NSWithHeatTransferSystem( void ) ;
 
       /** @brief Destructor */
-      ~DDS_NavierStokesSystem( void ) ;
+      ~DDS_NSWithHeatTransferSystem( void ) ;
 
       /** @brief Copy constructor */
-      DDS_NavierStokesSystem( DDS_NavierStokesSystem const& other ) ;
+      DDS_NSWithHeatTransferSystem( DDS_NSWithHeatTransferSystem const& other ) ;
 
       /** @brief Operator ==
       @param other the right hand side */
-      DDS_NavierStokesSystem& operator=( DDS_NavierStokesSystem const& other ) ;
+      DDS_NSWithHeatTransferSystem& operator=( DDS_NSWithHeatTransferSystem const& other ) ;
 
       /** @brief Constructor with arguments
       @param a_owner the MAC-based object
       @param exp to read the data file
       @param mac_UF FV velocity field */
-      DDS_NavierStokesSystem ( MAC_Object* a_owner,
+      DDS_NSWithHeatTransferSystem ( MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_UF,
             FV_DiscreteField* mac_PF );
@@ -117,11 +117,11 @@ class DDS_NavierStokesSystem : public MAC_Object
 
       /** @name Instance delivery and initialization */
       //@{
-      /** @brief Create and initialize an instance of DDS_NavierStokesSystem
+      /** @brief Create and initialize an instance of DDS_NSWithHeatTransferSystem
       @param a_owner the MAC-based object
       @param exp to read the data file
       @param mac_UF FV velocity field */
-      static DDS_NavierStokesSystem* create(
+      static DDS_NSWithHeatTransferSystem* create(
             MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_UF,

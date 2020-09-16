@@ -1,7 +1,7 @@
-#include <DDS_HeatEquation.hh>
+#include <DDS_HeatTransfer.hh>
 #include <FV_DomainAndFields.hh>
 #include <FV_DiscreteField.hh>
-#include <DDS_HeatEquationSystem.hh>
+#include <DDS_HeatTransferSystem.hh>
 #include <FV_SystemNumbering.hh>
 #include <FV_Mesh.hh>
 #include <FV_TimeIterator.hh>
@@ -22,51 +22,53 @@
 #include <sys/time.h>
 #include <math.h>
 
-
-DDS_HeatEquation const* DDS_HeatEquation::PROTOTYPE
-                                                 = new DDS_HeatEquation() ;
+/*
+DDS_HeatTransfer const* DDS_HeatTransfer::PROTOTYPE
+                                                 = new DDS_HeatTransfer() ;
 
 
 //---------------------------------------------------------------------------
-DDS_HeatEquation:: DDS_HeatEquation( void )
+DDS_HeatTransfer:: DDS_HeatTransfer( void )
 //--------------------------------------------------------------------------
-   : FV_OneStepIteration( "DDS_HeatEquation" )
+   : FV_OneStepIteration( "DDS_HeatTransfer" )
    , ComputingTime("Solver")
 {
-   MAC_LABEL( "DDS_HeatEquation:: DDS_HeatEquation" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: DDS_HeatTransfer" ) ;
 
 }
-
+*/
 
 
 
 //---------------------------------------------------------------------------
-DDS_HeatEquation*
-DDS_HeatEquation:: create_replica( MAC_Object* a_owner,
-		FV_DomainAndFields const* dom,
-		MAC_ModuleExplorer* exp ) const
+DDS_HeatTransfer*
+DDS_HeatTransfer:: create( MAC_Object* a_owner,
+		MAC_ModuleExplorer const* exp,
+                struct NavierStokes2Temperature const& transfer )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: create_replica" ) ;
-   MAC_CHECK( create_replica_PRE( a_owner, dom, exp ) ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: create" ) ;
+   MAC_CHECK_PRE( exp != 0 ) ;
 
-   DDS_HeatEquation* result =
-                        new DDS_HeatEquation( a_owner, dom, exp ) ;
+   DDS_HeatTransfer* result =
+                        new DDS_HeatTransfer( a_owner, exp, transfer ) ;
 
-   MAC_CHECK( create_replica_POST( result, a_owner, dom, exp ) ) ;
+   MAC_CHECK_POST( result != 0 ) ;
+   MAC_CHECK_POST( result->owner() == a_owner ) ;
+
    return( result ) ;
 
 }
 
 //---------------------------------------------------------------------------
-DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
-		FV_DomainAndFields const* dom,
-		MAC_ModuleExplorer const* exp )
+DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
+		MAC_ModuleExplorer const* exp,
+                struct NavierStokes2Temperature const& fromNS )
 //---------------------------------------------------------------------------
-   : FV_OneStepIteration( a_owner, dom, exp )
+//   : FV_OneStepIteration( a_owner )
+   : MAC_Object( a_owner )
    , ComputingTime("Solver")
-   , TF ( dom->discrete_field( "temperature" ) )
-   , TF_ERROR( 0 )
+   , TF ( fromNS.dom_->discrete_field( "temperature" ) )
    , TF_DS_ERROR( 0 )
    , GLOBAL_EQ( 0 )
    , peclet( 1. )
@@ -74,7 +76,7 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
    , is_firstorder( false )
    , is_solids ( false )
 {
-   MAC_LABEL( "DDS_HeatEquation:: DDS_HeatEquation" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: DDS_HeatTransfer" ) ;
 
    MAC_ASSERT( TF->storage_depth() == 4 ) ;
 
@@ -155,8 +157,8 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
 
    // Build the matrix system
    MAC_ModuleExplorer* se =
-	exp->create_subexplorer( 0,"DDS_HeatEquationSystem" ) ;
-   GLOBAL_EQ = DDS_HeatEquationSystem::create( this, se, TF ) ;
+	exp->create_subexplorer( 0,"DDS_HeatTransferSystem" ) ;
+   GLOBAL_EQ = DDS_HeatTransferSystem::create( this, se, TF ) ;
    se->destroy() ;
 
 
@@ -165,19 +167,12 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
    // on a [0:1]x[0:1]x[0:1] domain
    if ( b_bodyterm )
    {
-     const_cast<FV_DomainAndFields*>(dom)->duplicate_field(
-   	"temperature", "tf_error" ) ;
+     const_cast<FV_DomainAndFields*>(fromNS.dom_)->duplicate_field(
+   	"temperature", "tf_ds_error" ) ;
 
-     TF_ERROR = dom->discrete_field( "tf_error" ) ;
-     TF_ERROR->set_BC_values_modif_status( true ) ;
-   }
-
-   const_cast<FV_DomainAndFields*>(dom)->duplicate_field(
-    "temperature", "tf_ds_error" ) ;
-
-     TF_DS_ERROR = dom->discrete_field( "tf_ds_error" ) ;
+     TF_DS_ERROR = fromNS.dom_->discrete_field( "tf_ds_error" ) ;
      TF_DS_ERROR->set_BC_values_modif_status( true ) ;
-
+   }
 
    // Timing routines
    if ( my_rank == is_master )
@@ -200,10 +195,10 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
 
 
 //---------------------------------------------------------------------------
-DDS_HeatEquation:: ~DDS_HeatEquation( void )
+DDS_HeatTransfer:: ~DDS_HeatTransfer( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: ~DDS_HeatEquation" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: ~DDS_HeatTransfer" ) ;
 
    free_DDS_subcommunicators() ;
 
@@ -211,17 +206,15 @@ DDS_HeatEquation:: ~DDS_HeatEquation( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: do_before_time_stepping( FV_TimeIterator const* t_it,
+DDS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
       	std::string const& basename )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: do_before_time_stepping" ) ;
-
-   start_total_timer( "DDS_HeatEquation:: do_before_time_stepping" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: do_before_time_stepping" ) ;
 
    if ( my_rank == is_master ) SCT_set_start("Matrix_Assembly&Initialization");
 
-   FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
+//   FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
 
    allocate_mpi_variables();
 
@@ -241,21 +234,17 @@ DDS_HeatEquation:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
 
-   stop_total_timer() ;
-
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: do_before_inner_iterations_stage(
+DDS_HeatTransfer:: do_before_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: do_before_inner_iterations_stage" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: do_before_inner_iterations_stage" ) ;
 
-   start_total_timer( "DDS_HeatEquation:: do_before_inner_iterations_stage" ) ;
-
-   FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
+//   FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
 
    // Perform matrix level operations before each time step
    GLOBAL_EQ->at_each_time_step( );
@@ -263,20 +252,14 @@ DDS_HeatEquation:: do_before_inner_iterations_stage(
    // Assemble 1D tridiagonal matrices and schur complement calculation
    assemble_temperature_and_schur(t_it);
 
-   stop_total_timer() ;
-
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: do_one_inner_iteration( FV_TimeIterator const* t_it )
+DDS_HeatTransfer:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: do_one_inner_iteration" ) ;
-   MAC_CHECK_PRE( do_one_inner_iteration_PRE( t_it ) ) ;
-
-   start_total_timer( "DDS_HeatEquation:: do_one_inner_iteration" ) ;
-   start_solving_timer() ;
+   MAC_LABEL( "DDS_HeatTransfer:: do_one_inner_iteration" ) ;
 
    if ( my_rank == is_master ) SCT_set_start("DS_Solution");
 
@@ -285,22 +268,17 @@ DDS_HeatEquation:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
    if ( my_rank == is_master ) SCT_get_elapsed_time( "DS_Solution" );
 
-   stop_solving_timer() ;
-   stop_total_timer() ;
-
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: do_after_inner_iterations_stage(
+DDS_HeatTransfer:: do_after_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: do_after_inner_iterations_stage" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: do_after_inner_iterations_stage" ) ;
 
-   start_total_timer( "DDS_HeatEquation:: do_after_inner_iterations_stage" ) ;
-
-   FV_OneStepIteration::do_after_inner_iterations_stage( t_it ) ;
+//   FV_OneStepIteration::do_after_inner_iterations_stage( t_it ) ;
 
    // Compute temperature change over the time step
    double temperature_time_change = GLOBAL_EQ->compute_temperature_change()
@@ -310,16 +288,14 @@ DDS_HeatEquation:: do_after_inner_iterations_stage(
      	MAC::doubleToString( ios::scientific, 5, temperature_time_change )
 	<< endl;
 
-   stop_total_timer() ;
-
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: do_after_time_stepping( void )
+DDS_HeatTransfer:: do_after_time_stepping( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: do_after_time_stepping" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: do_after_time_stepping" ) ;
 
 //   write_output_field();
 
@@ -340,20 +316,11 @@ DDS_HeatEquation:: do_after_time_stepping( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: do_additional_savings( FV_TimeIterator const* t_it,
+DDS_HeatTransfer:: do_additional_savings( FV_TimeIterator const* t_it,
       	int const& cycleNumber )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: do_additional_savings" ) ;
-
-   start_total_timer( "DDS_HeatEquation:: do_additional_savings" ) ;
-
-   // if ( b_bodyterm )
-   // {
-   //   error_with_analytical_solution( TF, TF_ERROR );
-   // }
-
-   stop_total_timer() ;
+   MAC_LABEL( "DDS_HeatTransfer:: do_additional_savings" ) ;
 
 }
 
@@ -362,7 +329,7 @@ DDS_HeatEquation:: do_additional_savings( FV_TimeIterator const* t_it,
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquation::write_output_field()
+DDS_HeatTransfer::write_output_field()
 //----------------------------------------------------------------------
 {
 
@@ -427,7 +394,7 @@ DDS_HeatEquation::write_output_field()
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: bodyterm_value ( double const& xC, double const& yC, double const& zC) 
+DDS_HeatTransfer:: bodyterm_value ( double const& xC, double const& yC, double const& zC) 
 //---------------------------------------------------------------------------
 {
    double bodyterm = 0.;
@@ -447,7 +414,7 @@ DDS_HeatEquation:: bodyterm_value ( double const& xC, double const& yC, double c
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: assemble_DS_un_at_rhs (
+DDS_HeatTransfer:: assemble_DS_un_at_rhs (
         FV_TimeIterator const* t_it, double const& gamma)
 //---------------------------------------------------------------------------
 {
@@ -509,10 +476,10 @@ DDS_HeatEquation:: assemble_DS_un_at_rhs (
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level)
+DDS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatEquation:: compute_un_component" ) ;
+   MAC_LABEL("DDS_HeatTransfer:: compute_un_component" ) ;
 
    double xhr,xhl,xright,xleft,yhr,yhl,yright,yleft;
    double zhr,zhl,zright,zleft, value=0.;
@@ -615,7 +582,7 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
 
 //---------------------------------------------------------------------------
 size_t
-DDS_HeatEquation:: return_node_index (
+DDS_HeatTransfer:: return_node_index (
   FV_DiscreteField const* FF,
   size_t const& comp,
   size_t const& i,
@@ -623,7 +590,7 @@ DDS_HeatEquation:: return_node_index (
   size_t const& k )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: return_node_index" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: return_node_index" ) ;
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
@@ -646,7 +613,7 @@ DDS_HeatEquation:: return_node_index (
 
 //---------------------------------------------------------------------------
 size_t
-DDS_HeatEquation:: return_row_index (
+DDS_HeatTransfer:: return_row_index (
   FV_DiscreteField const* FF,
   size_t const& comp,
   size_t const& dir,
@@ -654,7 +621,7 @@ DDS_HeatEquation:: return_row_index (
   size_t const& k )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: return_row_index" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: return_row_index" ) ;
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
@@ -687,7 +654,7 @@ DDS_HeatEquation:: return_row_index (
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: assemble_temperature_matrix (
+DDS_HeatTransfer:: assemble_temperature_matrix (
   FV_DiscreteField const* FF,
   FV_TimeIterator const* t_it,
   double const& gamma,
@@ -698,7 +665,7 @@ DDS_HeatEquation:: assemble_temperature_matrix (
   size_t const& r_index )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: assemble_temperature_matrix" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: assemble_temperature_matrix" ) ;
 
    // Parameters
    double dxr,dxl,xR,xL,xC,right,left,center = 0. ;
@@ -834,10 +801,10 @@ DDS_HeatEquation:: assemble_temperature_matrix (
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: assemble_schur_matrix (size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& r_index)
+DDS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& r_index)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: assemble_schur_matrix" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: assemble_schur_matrix" ) ;
 
    TDMatrix* A = GLOBAL_EQ-> get_A();
 
@@ -990,10 +957,10 @@ DDS_HeatEquation:: assemble_schur_matrix (size_t const& comp, size_t const& dir,
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
+DDS_HeatTransfer:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: assemble_temperature_and_schur" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: assemble_temperature_and_schur" ) ;
 
    double gamma;
 
@@ -1045,7 +1012,7 @@ DDS_HeatEquation:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
+DDS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    // Get local min and max indices
@@ -1214,7 +1181,7 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index)
+DDS_HeatTransfer:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index)
 //---------------------------------------------------------------------------
 {
    // create a replica of local rhs vector in local solution vector
@@ -1236,7 +1203,7 @@ DDS_HeatEquation:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: data_packing ( double const& fe, size_t const& comp, size_t const& dir, size_t const& vec_pos)
+DDS_HeatTransfer:: data_packing ( double const& fe, size_t const& comp, size_t const& dir, size_t const& vec_pos)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
@@ -1274,7 +1241,7 @@ DDS_HeatEquation:: data_packing ( double const& fe, size_t const& comp, size_t c
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p)
+DDS_HeatTransfer:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
@@ -1334,7 +1301,7 @@ DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir,
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p)
+DDS_HeatTransfer:: unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
@@ -1354,7 +1321,7 @@ DDS_HeatEquation:: unpack_ue(size_t const& comp, double * received_data, size_t 
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
+DDS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    // Get local min and max indices
@@ -1503,7 +1470,7 @@ DDS_HeatEquation:: solve_interface_unknowns ( double const& gamma,  FV_TimeItera
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k )
+DDS_HeatTransfer:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k )
 //---------------------------------------------------------------------------
 {
   size_t_vector min_unknown_index(dim,0);
@@ -1556,10 +1523,10 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& ga
 
 //----------------------------------------------------------------------
 void
-DDS_HeatEquation::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index)
+DDS_HeatTransfer::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: DS_interface_unknown_solver" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: DS_interface_unknown_solver" ) ;
 
    TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
 
@@ -1603,10 +1570,10 @@ DDS_HeatEquation::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: Solids_generation ()
+DDS_HeatTransfer:: Solids_generation ()
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatEquation:: Solids_generation" ) ;
+  MAC_LABEL( "DDS_HeatTransfer:: Solids_generation" ) ;
 
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid();
@@ -1637,10 +1604,10 @@ DDS_HeatEquation:: Solids_generation ()
   
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: nodes_temperature_initialization ( size_t const& level )
+DDS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatEquation:: Solids_flux_correction" ) ;
+  MAC_LABEL( "DDS_HeatTransfer:: Solids_flux_correction" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -1681,10 +1648,10 @@ DDS_HeatEquation:: nodes_temperature_initialization ( size_t const& level )
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, size_t const& type)
+DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, size_t const& type)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatEquation:: level_set_solids" ) ;
+  MAC_LABEL( "DDS_HeatTransfer:: level_set_solids" ) ;
 
   PartInput solid = GLOBAL_EQ->get_solid();
 
@@ -1721,10 +1688,10 @@ DDS_HeatEquation:: level_set_function (size_t const& m, size_t const& comp, doub
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: node_property_calculation ( )
+DDS_HeatTransfer:: node_property_calculation ( )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatEquation:: node_property_calculation" ) ;
+  MAC_LABEL( "DDS_HeatTransfer:: node_property_calculation" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -1792,10 +1759,10 @@ DDS_HeatEquation:: node_property_calculation ( )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: assemble_intersection_matrix ( size_t const& comp, size_t const& level)
+DDS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t const& level)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatEquation:: assemble_intersection_matrix" ) ;
+  MAC_LABEL( "DDS_HeatTransfer:: assemble_intersection_matrix" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -1882,10 +1849,10 @@ DDS_HeatEquation:: assemble_intersection_matrix ( size_t const& comp, size_t con
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off)
+DDS_HeatTransfer:: find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatEquation:: find_intersection" ) ;
+  MAC_LABEL( "DDS_HeatTransfer:: find_intersection" ) ;
 
   PartInput solid = GLOBAL_EQ->get_solid();
   NodeProp node = GLOBAL_EQ->get_node_property();
@@ -2001,10 +1968,10 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const* t_it )
+DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatEquation:: HeatEquation_DirectionSplittingSolver" ) ;
+  MAC_LABEL( "DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver" ) ;
 
   double gamma=1.0/peclet;
 
@@ -2063,10 +2030,10 @@ DDS_HeatEquation:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: output_l2norm ( void )
+DDS_HeatTransfer:: output_l2norm ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatEquation:: output_l2norm" ) ;
+   MAC_LABEL("DDS_HeatTransfer:: output_l2norm" ) ;
 
    // Parameters
    size_t local_number=0,k=0;
@@ -2122,10 +2089,10 @@ DDS_HeatEquation:: output_l2norm ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: DS_error_with_analytical_solution ( FV_DiscreteField const* FF,FV_DiscreteField* FF_ERROR )
+DDS_HeatTransfer:: DS_error_with_analytical_solution ( FV_DiscreteField const* FF,FV_DiscreteField* FF_ERROR )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatEquation:: DS_error_with_analytical_solution" ) ;
+   MAC_LABEL("DDS_HeatTransfer:: DS_error_with_analytical_solution" ) ;
 
    // Parameters
    size_t i,j,k;
@@ -2241,10 +2208,10 @@ DDS_HeatEquation:: DS_error_with_analytical_solution ( FV_DiscreteField const* F
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: create_DDS_subcommunicators ( void )
+DDS_HeatTransfer:: create_DDS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: create_DDS_subcommunicators" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: create_DDS_subcommunicators" ) ;
 
    int color = 0, key = 0;
    //int const* number_of_subdomains_per_direction = TF->primary_grid()->get_domain_decomposition() ;
@@ -2287,10 +2254,10 @@ DDS_HeatEquation:: create_DDS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: processor_splitting ( int const& color, int const& key, size_t const& dir )
+DDS_HeatTransfer:: processor_splitting ( int const& color, int const& key, size_t const& dir )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: processor_splitting" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: processor_splitting" ) ;
 
    MPI_Comm_split(MPI_COMM_WORLD, color, key, &DDS_Comm_i[dir]);
    MPI_Comm_size( DDS_Comm_i[dir], &nb_ranks_comm_i[dir] ) ;
@@ -2300,7 +2267,7 @@ DDS_HeatEquation:: processor_splitting ( int const& color, int const& key, size_
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: allocate_mpi_variables ( void )
+DDS_HeatTransfer:: allocate_mpi_variables ( void )
 //---------------------------------------------------------------------------
 {
 
@@ -2376,7 +2343,7 @@ DDS_HeatEquation:: allocate_mpi_variables ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: deallocate_mpi_variables ( void )
+DDS_HeatTransfer:: deallocate_mpi_variables ( void )
 //---------------------------------------------------------------------------
 {
    // Array declarations
@@ -2404,10 +2371,10 @@ DDS_HeatEquation:: deallocate_mpi_variables ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatEquation:: free_DDS_subcommunicators ( void )
+DDS_HeatTransfer:: free_DDS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatEquation:: free_DDS_subcommunicators" ) ;
+   MAC_LABEL( "DDS_HeatTransfer:: free_DDS_subcommunicators" ) ;
 
 
 }

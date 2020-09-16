@@ -1,8 +1,8 @@
-#include <DDS_NavierStokes.hh>
+#include <DDS_NSWithHeatTransfer.hh>
 #include <FV_DomainAndFields.hh>
 #include <FV_DomainBuilder.hh>
 #include <FV_DiscreteField.hh>
-#include <DDS_NavierStokesSystem.hh>
+#include <DDS_NSWithHeatTransferSystem.hh>
 #include <FV_SystemNumbering.hh>
 #include <FV_Mesh.hh>
 #include <FV_TimeIterator.hh>
@@ -24,17 +24,17 @@
 #include <math.h>
 
 
-DDS_NavierStokes const* DDS_NavierStokes::PROTOTYPE
-                                                 = new DDS_NavierStokes() ;
+DDS_NSWithHeatTransfer const* DDS_NSWithHeatTransfer::PROTOTYPE
+                                                 = new DDS_NSWithHeatTransfer() ;
 
 
 //---------------------------------------------------------------------------
-DDS_NavierStokes:: DDS_NavierStokes( void )
+DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( void )
 //--------------------------------------------------------------------------
-   : FV_OneStepIteration( "DDS_NavierStokes" )
+   : FV_OneStepIteration( "DDS_NSWithHeatTransfer" )
    , ComputingTime("Solver")
 {
-   MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer" ) ;
 
 }
 
@@ -42,17 +42,17 @@ DDS_NavierStokes:: DDS_NavierStokes( void )
 
 
 //---------------------------------------------------------------------------
-DDS_NavierStokes*
-DDS_NavierStokes:: create_replica( MAC_Object* a_owner,
+DDS_NSWithHeatTransfer*
+DDS_NSWithHeatTransfer:: create_replica( MAC_Object* a_owner,
 		FV_DomainAndFields const* dom,
 		MAC_ModuleExplorer* exp ) const
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: create_replica" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: create_replica" ) ;
    MAC_CHECK( create_replica_PRE( a_owner, dom, exp ) ) ;
 
-   DDS_NavierStokes* result =
-                        new DDS_NavierStokes( a_owner, dom, exp ) ;
+   DDS_NSWithHeatTransfer* result =
+                        new DDS_NSWithHeatTransfer( a_owner, dom, exp ) ;
 
    MAC_CHECK( create_replica_POST( result, a_owner, dom, exp ) ) ;
    return( result ) ;
@@ -60,7 +60,7 @@ DDS_NavierStokes:: create_replica( MAC_Object* a_owner,
 }
 
 //---------------------------------------------------------------------------
-DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
+DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
 		FV_DomainAndFields const* dom,
 		MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
@@ -68,6 +68,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , ComputingTime("Solver")
    , UF ( dom->discrete_field( "velocity" ) )
    , PF ( dom->discrete_field( "pressure" ) )
+   , TF ( dom->discrete_field( "temperature" ) )
    , GLOBAL_EQ( 0 )
    , peclet( 1. )
    , mu( 1. )
@@ -75,12 +76,14 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , AdvectionScheme( "TVD" )
    , AdvectionTimeAccuracy( 1 )   
    , rho( 1. )
+   , b_restart ( false )
    , is_solids( false )
    , is_par_motion( false )
    , is_stressCal( false )
    , DivergenceScheme ( "FD" )
+   , Solver_Temperature ( 0 )
 {
-   MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
    MAC_ASSERT( PF->discretization_type() == "centered" ) ;
    MAC_ASSERT( UF->storage_depth() == 5 ) ;
@@ -257,9 +260,20 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       is_periodic[0][2] = P_periodic_comp->operator()( 2 ); 
 
    // Build the matrix system
-   MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DDS_NavierStokesSystem" ) ;
-   GLOBAL_EQ = DDS_NavierStokesSystem::create( this, se, UF, PF ) ;
+   MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DDS_NSWithHeatTransferSystem" ) ;
+   GLOBAL_EQ = DDS_NSWithHeatTransferSystem::create( this, se, UF, PF ) ;
    se->destroy() ;
+
+   // Create the temperature solver
+   struct NavierStokes2Temperature inputData;
+   inputData.rho_ = rho ;
+   inputData.b_restart_ = b_restart ;
+   inputData.dom_ = dom ;
+   inputData.UF_ = UF ;
+
+   MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DDS_HeatTransfer" ) ;
+   Solver_Temperature = DDS_HeatTransfer::create( this, set, inputData ) ;
+   set->destroy() ;
 
    // Timing routines
    if ( my_rank == is_master )
@@ -279,10 +293,10 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
 }
 
 //---------------------------------------------------------------------------
-DDS_NavierStokes:: ~DDS_NavierStokes( void )
+DDS_NSWithHeatTransfer:: ~DDS_NSWithHeatTransfer( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: ~DDS_NavierStokes" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: ~DDS_NSWithHeatTransfer" ) ;
 
    free_DDS_subcommunicators() ;
 
@@ -290,13 +304,13 @@ DDS_NavierStokes:: ~DDS_NavierStokes( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_one_inner_iteration( FV_TimeIterator const* t_it )
+DDS_NSWithHeatTransfer:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_one_inner_iteration" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: do_one_inner_iteration" ) ;
    MAC_CHECK_PRE( do_one_inner_iteration_PRE( t_it ) ) ;
 
-   start_total_timer( "DDS_NavierStokes:: do_one_inner_iteration" ) ;
+   start_total_timer( "DDS_NSWithHeatTransfer:: do_one_inner_iteration" ) ;
    start_solving_timer() ;
 
    if ( my_rank == is_master ) SCT_set_start("Pressure predictor");
@@ -321,6 +335,9 @@ DDS_NavierStokes:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
    UF->copy_DOFs_value( 0, 1 );
 
+   // Temperature solver
+   Solver_Temperature->do_one_inner_iteration( t_it ) ;
+
    stop_solving_timer() ;
    stop_total_timer() ;
 
@@ -331,13 +348,13 @@ DDS_NavierStokes:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
+DDS_NSWithHeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
       	std::string const& basename )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_before_time_stepping" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: do_before_time_stepping" ) ;
 
-   start_total_timer( "DDS_NavierStokes:: do_before_time_stepping" ) ;
+   start_total_timer( "DDS_NSWithHeatTransfer:: do_before_time_stepping" ) ;
 
    if ( my_rank == is_master ) SCT_set_start("Matrix_Assembly&Initialization");
 
@@ -366,6 +383,9 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    // Assemble 1D tridiagonal matrices
    assemble_1D_matrices(t_it);
 
+   // Temperature solver
+   Solver_Temperature->do_before_time_stepping( t_it, basename ) ;
+
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
 
    stop_total_timer() ;
@@ -374,10 +394,10 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_after_time_stepping( void )
+DDS_NSWithHeatTransfer:: do_after_time_stepping( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_after_time_stepping" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: do_after_time_stepping" ) ;
 
    // Elapsed time by sub-problems
    
@@ -400,19 +420,22 @@ DDS_NavierStokes:: do_after_time_stepping( void )
      SCT_get_summary(cout,cputime);
    }
 
+   // Temperature solver
+   Solver_Temperature->do_after_time_stepping() ;
+
    deallocate_mpi_variables(0);
    deallocate_mpi_variables(1);
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_before_inner_iterations_stage(
+DDS_NSWithHeatTransfer:: do_before_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_before_inner_iterations_stage" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: do_before_inner_iterations_stage" ) ;
 
-   start_total_timer( "DDS_NavierStokes:: do_before_inner_iterations_stage" ) ;
+   start_total_timer( "DDS_NSWithHeatTransfer:: do_before_inner_iterations_stage" ) ;
 
    FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
 
@@ -433,19 +456,22 @@ DDS_NavierStokes:: do_before_inner_iterations_stage(
    // Perform matrix level operations before each time step
    GLOBAL_EQ->at_each_time_step( );
 
+   // Temperature solver
+   Solver_Temperature->do_before_inner_iterations_stage( t_it ) ;
+
    stop_total_timer() ;
 
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_after_inner_iterations_stage(
+DDS_NSWithHeatTransfer:: do_after_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_after_inner_iterations_stage" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: do_after_inner_iterations_stage" ) ;
 
-   start_total_timer( "DDS_NavierStokes:: do_after_inner_iterations_stage" ) ;
+   start_total_timer( "DDS_NSWithHeatTransfer:: do_after_inner_iterations_stage" ) ;
 
    FV_OneStepIteration::do_after_inner_iterations_stage( t_it ) ;
 
@@ -465,19 +491,25 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
    if ( my_rank == is_master )
       MAC::out() << "CFL: "<< cfl <<endl;
 
+   // Temperature solver
+   Solver_Temperature->do_after_inner_iterations_stage( t_it ) ;
+
    stop_total_timer() ;
 
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
+DDS_NSWithHeatTransfer:: do_additional_savings( FV_TimeIterator const* t_it,
       	int const& cycleNumber )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_additional_savings" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: do_additional_savings" ) ;
 
-   start_total_timer( "DDS_NavierStokes:: do_additional_savings" ) ;
+   start_total_timer( "DDS_NSWithHeatTransfer:: do_additional_savings" ) ;
+
+   // Temperature solver
+   Solver_Temperature->do_additional_savings( t_it, cycleNumber ) ;
 
    stop_total_timer() ;
 
@@ -486,10 +518,10 @@ DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: error_with_analytical_solution_couette (FV_DiscreteField const* FF, size_t const& field)
+DDS_NSWithHeatTransfer:: error_with_analytical_solution_couette (FV_DiscreteField const* FF, size_t const& field)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: error_with_analytical_solution_couette" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: error_with_analytical_solution_couette" ) ;
 
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
@@ -564,11 +596,11 @@ DDS_NavierStokes:: error_with_analytical_solution_couette (FV_DiscreteField cons
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: error_with_analytical_solution_poiseuille ( )
+DDS_NSWithHeatTransfer:: error_with_analytical_solution_poiseuille ( )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL(
-   "DDS_NavierStokes:: error_with_analytical_solution_poiseuille" ) ;
+   "DDS_NSWithHeatTransfer:: error_with_analytical_solution_poiseuille" ) ;
 
    // Parameters
    double x, y, z;
@@ -638,7 +670,7 @@ DDS_NavierStokes:: error_with_analytical_solution_poiseuille ( )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: nodes_field_initialization ( size_t const& level )
+DDS_NSWithHeatTransfer:: nodes_field_initialization ( size_t const& level )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_HeatEquation:: nodes_field_initialization" ) ;
@@ -688,10 +720,10 @@ DDS_NavierStokes:: nodes_field_initialization ( size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
+DDS_NSWithHeatTransfer:: update_particle_system(FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: update_particle_system" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: update_particle_system" ) ;
 
   for (size_t field=0;field<2;field++) {
      // Structure of particle input data
@@ -723,7 +755,7 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
 
 //---------------------------------------------------------------------------
 size_t
-DDS_NavierStokes:: return_row_index (
+DDS_NSWithHeatTransfer:: return_row_index (
   FV_DiscreteField const* FF,
   size_t const& comp,
   size_t const& dir,
@@ -731,7 +763,7 @@ DDS_NavierStokes:: return_row_index (
   size_t const& k )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: return_row_index" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: return_row_index" ) ;
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
@@ -764,7 +796,7 @@ DDS_NavierStokes:: return_row_index (
 
 //---------------------------------------------------------------------------
 size_t
-DDS_NavierStokes:: return_node_index (
+DDS_NSWithHeatTransfer:: return_node_index (
   FV_DiscreteField const* FF,
   size_t const& comp,
   size_t const& i,
@@ -772,7 +804,7 @@ DDS_NavierStokes:: return_node_index (
   size_t const& k )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: return_node_index" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: return_node_index" ) ;
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
@@ -797,10 +829,10 @@ DDS_NavierStokes:: return_node_index (
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field)
+DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: level_set_solids" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: level_set_solids" ) ;
 
   PartInput solid = GLOBAL_EQ->get_solid(field);
 
@@ -852,10 +884,10 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: Solids_generation (size_t const& field)
+DDS_NSWithHeatTransfer:: Solids_generation (size_t const& field)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: Solids_generation" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: Solids_generation" ) ;
 
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(field);
@@ -892,10 +924,10 @@ DDS_NavierStokes:: Solids_generation (size_t const& field)
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID )
+DDS_NSWithHeatTransfer:: impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: impose_solid_velocity" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: impose_solid_velocity" ) ;
 
   doubleVector delta(3,0.);
   doubleVector grid_coord(3,0.);
@@ -940,10 +972,10 @@ DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<dou
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID )
+DDS_NSWithHeatTransfer:: impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: impose_solid_velocity_for_ghost" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: impose_solid_velocity_for_ghost" ) ;
 
   doubleVector delta(3,0.);
   doubleVector grid_coord(3,0.);
@@ -978,10 +1010,10 @@ DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel, siz
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t const& field )
+DDS_NSWithHeatTransfer:: node_property_calculation (FV_DiscreteField const* FF, size_t const& field )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: node_property_calculation" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: node_property_calculation" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -1060,10 +1092,10 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, size_t const& comp, size_t const& level, size_t const& field)
+DDS_NSWithHeatTransfer:: assemble_intersection_matrix ( FV_DiscreteField const* FF, size_t const& comp, size_t const& level, size_t const& field)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: assemble_intersection_matrix" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: assemble_intersection_matrix" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -1177,10 +1209,10 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field, size_t const& level)
+DDS_NSWithHeatTransfer:: find_intersection ( FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field, size_t const& level)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: find_intersection" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: find_intersection" ) ;
 
   PartInput solid = GLOBAL_EQ->get_solid(field);
   NodeProp node = GLOBAL_EQ->get_node_property(field);
@@ -1317,10 +1349,10 @@ DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const&
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: find_intersection_for_ghost ( FV_DiscreteField const* FF, double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& field, size_t const& level, size_t const& off)
+DDS_NSWithHeatTransfer:: find_intersection_for_ghost ( FV_DiscreteField const* FF, double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& field, size_t const& level, size_t const& off)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: find_intersection_for_ghost" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: find_intersection_for_ghost" ) ;
 
   doubleVector side(2,0);
 
@@ -1401,7 +1433,7 @@ DDS_NavierStokes:: find_intersection_for_ghost ( FV_DiscreteField const* FF, dou
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_field_matrix (
+DDS_NSWithHeatTransfer:: assemble_field_matrix (
   FV_DiscreteField const* FF,
   FV_TimeIterator const* t_it,
   double const& gamma,
@@ -1413,7 +1445,7 @@ DDS_NavierStokes:: assemble_field_matrix (
   size_t const& r_index )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: assemble_field_matrix" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: assemble_field_matrix" ) ;
 
    // Parameters
    double dxr,dxl,dx,xR,xL,xC,right=0.,left=0.,center=0.;
@@ -1606,10 +1638,10 @@ DDS_NavierStokes:: assemble_field_matrix (
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& field, size_t const& r_index )
+DDS_NSWithHeatTransfer:: assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& field, size_t const& r_index )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: assemble_field_schur_matrix" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: assemble_field_schur_matrix" ) ;
    // Compute the product matrix for each proc
 
    if (nb_ranks_comm_i[dir]>1) {
@@ -1746,10 +1778,10 @@ DDS_NavierStokes:: assemble_field_schur_matrix (struct TDMatrix *A, size_t const
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_1D_matrices ( FV_TimeIterator const* t_it )
+DDS_NSWithHeatTransfer:: assemble_1D_matrices ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: assemble_1D_matrices" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: assemble_1D_matrices" ) ;
 
    double gamma = mu/2.0;
 
@@ -1809,10 +1841,10 @@ DDS_NavierStokes:: assemble_1D_matrices ( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
+DDS_NSWithHeatTransfer:: NS_first_step ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: NS_first_step" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: NS_first_step" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -1851,10 +1883,10 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level)
+DDS_NSWithHeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: compute_un_component" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: compute_un_component" ) ;
 
    double xhr,xhl,xright,xleft,yhr,yhl,yright,yleft;
    double zhr,zhl,zright,zleft, value=0.;
@@ -1959,11 +1991,11 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, s
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
+DDS_NSWithHeatTransfer:: velocity_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
 
-   MAC_LABEL("DDS_NavierStokes:: velocity_local_rhs" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: velocity_local_rhs" ) ;
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
@@ -2129,10 +2161,10 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j, size_t const& k, double
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p, size_t const& field)
+DDS_NSWithHeatTransfer:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p, size_t const& field)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: unpack_compute_ue_pack" ) ;  
+   MAC_LABEL("DDS_NSWithHeatTransfer:: unpack_compute_ue_pack" ) ;  
 
    LocalVector* VEC = GLOBAL_EQ->get_VEC(field);
 
@@ -2190,10 +2222,10 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir,
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index )
+DDS_NSWithHeatTransfer::DS_interface_unknown_solver( LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_interface_unknown_solver" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransferSystem:: DS_interface_unknown_solver" ) ;
 
    TDMatrix* Schur = GLOBAL_EQ->get_Schur(field);
 
@@ -2236,10 +2268,10 @@ DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs, size
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p, size_t const& field)
+DDS_NSWithHeatTransfer:: unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p, size_t const& field)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: unpack_ue" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: unpack_ue" ) ;
  
    LocalVector* VEC = GLOBAL_EQ->get_VEC(field);
 
@@ -2258,10 +2290,10 @@ DDS_NavierStokes:: unpack_ue(size_t const& comp, double * received_data, size_t 
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const& gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field)
+DDS_NSWithHeatTransfer:: solve_interface_unknowns ( FV_DiscreteField* FF, double const& gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: solve_interface_unknowns" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: solve_interface_unknowns" ) ;
 
    size_t i,j,p;
    size_t k =0;
@@ -2413,10 +2445,10 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np)
+DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: compute_pressure_force_on_particle" ) ;
+  MAC_LABEL("DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle" ) ;
 
   size_t i0_temp;
   double ri;
@@ -2543,10 +2575,10 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_it, double const& Np)
+DDS_NSWithHeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator const* t_it, double const& Np)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: compute_fluid_particle_interaction" ) ;
+  MAC_LABEL("DDS_NSWithHeatTransfer:: compute_fluid_particle_interaction" ) ;
 
   // Np: number of points in the surface of particle, required in 2D case of cylinders
   // For 3D case (i.e. sphere)Aspect ratio of cells (ar); 
@@ -2616,10 +2648,10 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nring)
+DDS_NSWithHeatTransfer:: compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nring)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: compute_surface_points" ) ;
+  MAC_LABEL("DDS_NSWithHeatTransfer:: compute_surface_points" ) ;
 /*
   ofstream outputFile ;
   std::ostringstream os2;
@@ -2771,10 +2803,10 @@ DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleV
 }
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& k0, size_t const& Nring)
+DDS_NSWithHeatTransfer:: generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& k0, size_t const& Nring)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: generate_discretization_parameter" ) ;
+  MAC_LABEL("DDS_NSWithHeatTransfer:: generate_discretization_parameter" ) ;
 
   // Returns the delta eta (i.e. change in zenithal angle) with provided
   // number of rings for discretization(Nring), number of cell at poles(k0)
@@ -2807,10 +2839,10 @@ DDS_NavierStokes:: generate_discretization_parameter(class doubleVector& eta, cl
 }
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np )
+DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: compute_velocity_force_on_particle" ) ;
+  MAC_LABEL("DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle" ) ;
 
   size_t i0_temp;
   double ri;
@@ -3040,10 +3072,10 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
 }
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID)
+DDS_NSWithHeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: ghost_field_estimate_in_box" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: ghost_field_estimate_in_box" ) ;
 
 // Calculates the field value at the ghost points in the box
 // near the particle boundary considering boundary affects;
@@ -3147,10 +3179,10 @@ DDS_NavierStokes:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t co
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level)
+DDS_NSWithHeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: ghost_field_estimate_on_face" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: ghost_field_estimate_on_face" ) ;
 
 // Calculates the field value on a face at the ghost points 
 // near the particle boundary considering boundary affects;
@@ -3430,10 +3462,10 @@ DDS_NavierStokes:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: compute_p_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
+DDS_NSWithHeatTransfer:: compute_p_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: compute_p_component" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: compute_p_component" ) ;
    FV_SHIFT_TRIPLET shift ;
    double value=0.;
 
@@ -3481,10 +3513,10 @@ DDS_NavierStokes:: compute_p_component ( size_t const& comp, size_t const& i, si
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
+DDS_NSWithHeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: compute_adv_component" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: compute_adv_component" ) ;
    double ugradu = 0., value = 0.;
 
    if ( AdvectionScheme == "TVD" ) {
@@ -3507,11 +3539,11 @@ DDS_NavierStokes:: compute_adv_component ( size_t const& comp, size_t const& i, 
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_DS_un_at_rhs (
+DDS_NSWithHeatTransfer:: assemble_DS_un_at_rhs (
         FV_TimeIterator const* t_it, double const& gamma)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: assemble_DS_un_at_rhs" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: assemble_DS_un_at_rhs" ) ;
    size_t i, j, k;
 
    double dxC,xC,dyC,yC,dzC,zC;
@@ -3628,10 +3660,10 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs (
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k, double const& gamma, size_t const& field )
+DDS_NSWithHeatTransfer:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k, double const& gamma, size_t const& field )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: Solve_i_in_jk" ) ;
+  MAC_LABEL("DDS_NSWithHeatTransfer:: Solve_i_in_jk" ) ;
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
 
@@ -3682,10 +3714,10 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* 
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double const& fe, size_t const& comp, size_t const& dir, size_t const& field)
+DDS_NSWithHeatTransfer:: data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double const& fe, size_t const& comp, size_t const& dir, size_t const& field)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: data_packing" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: data_packing" ) ;
    LocalVector* VEC = GLOBAL_EQ->get_VEC(field) ;
 
    double *packed_data = first_pass[field][dir].send[comp][rank_in_i[dir]];
@@ -3747,10 +3779,10 @@ DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF, size_t const& j, s
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index)
+DDS_NSWithHeatTransfer:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: compute_Aei_ui" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: compute_Aei_ui" ) ;
    // create a replica of local rhs vector in local solution vector
    for (size_t i=0;i<VEC[dir].local_T[comp]->nb_rows();i++){
       VEC[dir].local_solution_T[comp]->set_item(i,VEC[dir].local_T[comp]->item(i));
@@ -3770,10 +3802,10 @@ DDS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field )
+DDS_NSWithHeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: assemble_local_rhs" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: assemble_local_rhs" ) ;
    double fe = 0.;
    if (field == 0) {
       if (DivergenceScheme == "FD") {
@@ -3789,10 +3821,10 @@ DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
+DDS_NSWithHeatTransfer:: NS_velocity_update ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: NS_velocity_update" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: NS_velocity_update" ) ;
 
    double gamma=mu;
 
@@ -3832,10 +3864,10 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
 }
 
 //---------------------------------------------------------------------------
-double DDS_NavierStokes:: divergence_wall_flux ( size_t const& i, size_t const& j, size_t const& k, size_t const& comp, size_t const& wall_dir, double const& length, size_t const& level)
+double DDS_NSWithHeatTransfer:: divergence_wall_flux ( size_t const& i, size_t const& j, size_t const& k, size_t const& comp, size_t const& wall_dir, double const& length, size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: divergence_wall_flux" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: divergence_wall_flux" ) ;
 
    double value;
 
@@ -3906,10 +3938,10 @@ double DDS_NavierStokes:: divergence_wall_flux ( size_t const& i, size_t const& 
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir)
+DDS_NSWithHeatTransfer:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: pressure_local_rhs" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: pressure_local_rhs" ) ;
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
@@ -4072,10 +4104,10 @@ DDS_NavierStokes:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: pressure_local_rhs_FV ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir)
+DDS_NSWithHeatTransfer:: pressure_local_rhs_FV ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: pressure_local_rhs_FV" ) ;
+   MAC_LABEL("DDS_NSWithHeatTransfer:: pressure_local_rhs_FV" ) ;
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
@@ -4163,10 +4195,10 @@ DDS_NavierStokes:: pressure_local_rhs_FV ( size_t const& j, size_t const& k, FV_
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
+DDS_NSWithHeatTransfer:: correct_pressure_1st_layer_solid (size_t const& level )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: correct_pressure_1st_layer_solid" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: correct_pressure_1st_layer_solid" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -4250,10 +4282,10 @@ DDS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
+DDS_NSWithHeatTransfer:: correct_pressure_2nd_layer_solid (size_t const& level )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: correct_pressure_2nd_layer_solid" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: correct_pressure_2nd_layer_solid" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -4334,10 +4366,10 @@ DDS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: correct_mean_pressure (size_t const& level )
+DDS_NSWithHeatTransfer:: correct_mean_pressure (size_t const& level )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: correct_mean_pressure" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: correct_mean_pressure" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -4401,10 +4433,10 @@ DDS_NavierStokes:: correct_mean_pressure (size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
+DDS_NSWithHeatTransfer:: NS_pressure_update ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: NS_pressure_update" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: NS_pressure_update" ) ;
 
   double gamma=mu/2.0;
 
@@ -4440,10 +4472,10 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
+DDS_NSWithHeatTransfer:: NS_final_step ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: NS_final_step" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: NS_final_step" ) ;
 
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
@@ -4672,7 +4704,7 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& field)
+DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t const& field)
 //----------------------------------------------------------------------
 {
   ofstream outputFile ;
@@ -4734,7 +4766,7 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
 
 //----------------------------------------------------------------------
 double
-DDS_NavierStokes::get_velocity_divergence(void)
+DDS_NSWithHeatTransfer::get_velocity_divergence(void)
 //----------------------------------------------------------------------
 {
 
@@ -4887,7 +4919,7 @@ DDS_NavierStokes::get_velocity_divergence(void)
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::output_L2norm_pressure( size_t const& level )
+DDS_NSWithHeatTransfer::output_L2norm_pressure( size_t const& level )
 //----------------------------------------------------------------------
 {
   size_t i,j,k;
@@ -4962,7 +4994,7 @@ DDS_NavierStokes::output_L2norm_pressure( size_t const& level )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::output_L2norm_velocity( size_t const& level )
+DDS_NSWithHeatTransfer::output_L2norm_velocity( size_t const& level )
 //----------------------------------------------------------------------
 {
   size_t i,j,k;
@@ -5039,7 +5071,7 @@ DDS_NavierStokes::output_L2norm_velocity( size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: create_DDS_subcommunicators ( void )
+DDS_NSWithHeatTransfer:: create_DDS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: create_DDS_subcommunicators" ) ;
@@ -5084,7 +5116,7 @@ DDS_NavierStokes:: create_DDS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: processor_splitting ( int const& color, int const& key, size_t const& dir )
+DDS_NSWithHeatTransfer:: processor_splitting ( int const& color, int const& key, size_t const& dir )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatEquation:: processor_splitting" ) ;
@@ -5097,7 +5129,7 @@ DDS_NavierStokes:: processor_splitting ( int const& color, int const& key, size_
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF, size_t const& field)
+DDS_NSWithHeatTransfer:: allocate_mpi_variables (FV_DiscreteField const* FF, size_t const& field)
 //---------------------------------------------------------------------------
 {
 
@@ -5173,7 +5205,7 @@ DDS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF, size_t co
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: deallocate_mpi_variables (size_t const& field)
+DDS_NSWithHeatTransfer:: deallocate_mpi_variables (size_t const& field)
 //---------------------------------------------------------------------------
 {
    // Array declarations
@@ -5201,20 +5233,20 @@ DDS_NavierStokes:: deallocate_mpi_variables (size_t const& field)
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: free_DDS_subcommunicators ( void )
+DDS_NSWithHeatTransfer:: free_DDS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: free_DDS_subcommunicators" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: free_DDS_subcommunicators" ) ;
 }
 
 //----------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_advection_Centered(
+DDS_NSWithHeatTransfer:: assemble_advection_Centered(
   size_t const& advecting_level, double const& coef, size_t const& advected_level,
   size_t const& i, size_t const& j, size_t const& k, size_t const& component )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: assemble_advection_Centered" );
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: assemble_advection_Centered" );
 
    // Parameters
    double dxC = 0., dyC = 0., dzC = 0.;
@@ -5417,12 +5449,12 @@ DDS_NavierStokes:: assemble_advection_Centered(
 
 //----------------------------------------------------------------------
 double 
-DDS_NavierStokes:: assemble_advection_Upwind( 
+DDS_NSWithHeatTransfer:: assemble_advection_Upwind( 
   size_t const& advecting_level, double const& coef, size_t const& advected_level,
   size_t const& i, size_t const& j, size_t const& k, size_t const& component ) 
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: assemble_advection_Upwind" );   
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: assemble_advection_Upwind" );   
 
    // Parameters
    double dxC = 0., dyC = 0., dzC = 0.;
@@ -5903,12 +5935,12 @@ DDS_NavierStokes:: assemble_advection_Upwind(
 
 //----------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_advection_TVD( 
+DDS_NSWithHeatTransfer:: assemble_advection_TVD( 
   size_t const& advecting_level, double const& coef, size_t const& advected_level,
          size_t const& i, size_t const& j, size_t const& k, size_t const& component ) const
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: assemble_advection_TVD" );   
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: assemble_advection_TVD" );   
    
    // Parameters
    size_t_vector min_unknown_index(dim,0);

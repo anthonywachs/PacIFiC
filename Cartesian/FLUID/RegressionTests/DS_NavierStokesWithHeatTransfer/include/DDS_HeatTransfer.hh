@@ -1,5 +1,5 @@
-#ifndef DDS_HeatEquation_HH
-#define DDS_HeatEquation_HH
+#ifndef DDS_HeatTransfer_HH
+#define DDS_HeatTransfer_HH
 
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
@@ -20,10 +20,10 @@ class MAC_Communicator ;
 class FV_DiscreteField ;
 class LA_Vector ;
 class LA_SeqVector ;
-class DDS_HeatEquationSystem ;
+class DDS_HeatTransferSystem ;
 class LA_SeqMatrix ;
 
-/** @brief The Class DDS_HeatEquation.
+/** @brief The Class DDS_HeatTransfer.
 
 Server for the resolution of the unsteady heat equation by a first order
 implicit time integrator and a Finite Volume MAC scheme on rectangular grids.
@@ -32,6 +32,16 @@ Equation: dT/dt = ( 1 / Pe ) * lap(T) + bodyterm, where Pe is the Peclet number.
 
 @author A. Wachs - Pacific project 2017 */
 
+struct NavierStokes2Temperature
+{
+  double rho_ ;
+  bool b_restart_ ;
+  FV_DomainAndFields const* dom_ ;
+  FV_DiscreteField const* UF_ ;
+//  size_t levelAdvectingVelocity_ ;
+//  string resultsDirectory_ ;
+};
+
 /** @brief MPIVar include all vectors required while message passing */
 struct MPIVar {
    int *size;
@@ -39,12 +49,20 @@ struct MPIVar {
    double ***receive;
 };
 
-class DDS_HeatEquation : public FV_OneStepIteration, public ComputingTime,
-public SolverComputingTime
+class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 
    //-- Substeps of the step by step progression
+
+      /** @brief Create and initialize an instance of REG_HeatTransfer
+      @param a_owner the MAC-based object
+      @param exp to read the data file
+      @param fromNS structure containing input data from the NS solver */
+      static DDS_HeatTransfer* create(
+		MAC_Object* a_owner,
+		MAC_ModuleExplorer const* exp,
+                struct NavierStokes2Temperature const& fromNS );
 
       /** @name Substeps of the step by step progression */
       //@{
@@ -87,34 +105,25 @@ public SolverComputingTime
       /** @name Constructors & Destructor */
       //@{
       /** @brief Destructor */
-      ~DDS_HeatEquation( void ) ;
+      virtual ~DDS_HeatTransfer( void ) ;
 
       /** @brief Copy constructor */
-      DDS_HeatEquation( DDS_HeatEquation const& other ) ;
+      DDS_HeatTransfer( DDS_HeatTransfer const& other ) ;
 
       /** @brief Operator ==
       @param other the right hand side */
-      DDS_HeatEquation& operator=( DDS_HeatEquation const& other ) ;
+      DDS_HeatTransfer& operator=( DDS_HeatTransfer const& other ) ;
 
       /** @brief Constructor with arguments
       @param a_owner the MAC-based object
       @param exp to read the data file */
-      DDS_HeatEquation( MAC_Object* a_owner,
-      		FV_DomainAndFields const* dom,
-		MAC_ModuleExplorer const* exp ) ;
+      DDS_HeatTransfer( MAC_Object* a_owner,
+		MAC_ModuleExplorer const* exp,
+                struct NavierStokes2Temperature const& fromNS );
 
       /** @brief Constructor without argument */
-      DDS_HeatEquation( void ) ;
+      DDS_HeatTransfer( void ) ;
 
-      /** @brief Create a clone
-      @param a_owner the MAC-based object
-      @param dom mesh and fields
-      @param prms set of parameters
-      @param exp to read the data file */
-      virtual DDS_HeatEquation* create_replica(
-		MAC_Object* a_owner,
-		FV_DomainAndFields const* dom,
-		MAC_ModuleExplorer* exp ) const ;
       //@}
 
 
@@ -238,7 +247,7 @@ public SolverComputingTime
 
    //-- Class attributes
 
-      static DDS_HeatEquation const* PROTOTYPE ;
+      static DDS_HeatTransfer const* PROTOTYPE ;
 
    //-- Attributes
 
@@ -248,7 +257,7 @@ public SolverComputingTime
 
       FV_DiscreteField* TF_DS_ERROR;
 
-      DDS_HeatEquationSystem* GLOBAL_EQ ;
+      DDS_HeatTransferSystem* GLOBAL_EQ ;
 
       size_t nb_procs;
       size_t my_rank;

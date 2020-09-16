@@ -70,13 +70,13 @@ struct BoundaryBisec {
    LA_SeqMatrix ** field;                   // Value of field variable at the intersection
 };
 
-/** @brief The Class DDS_HeatEquationSystem.
+/** @brief The Class DDS_HeatTransferSystem.
 
 Matrix systems for the resolution of the heat equation.
 
 @author A. Wachs - Pacific project 2017 */
 
-class DDS_HeatEquationSystem : public MAC_Object
+class DDS_HeatTransferSystem : public MAC_Object
 {
    private: //----------------------------------------------------------
 
@@ -85,23 +85,23 @@ class DDS_HeatEquationSystem : public MAC_Object
       /** @name Constructors & Destructor */
       //@{
       /** @brief Constructor without argument */
-      DDS_HeatEquationSystem( void ) ;
+      DDS_HeatTransferSystem( void ) ;
 
       /** @brief Destructor */
-      ~DDS_HeatEquationSystem( void ) ;
+      ~DDS_HeatTransferSystem( void ) ;
 
       /** @brief Copy constructor */
-      DDS_HeatEquationSystem( DDS_HeatEquationSystem const& other ) ;
+      DDS_HeatTransferSystem( DDS_HeatTransferSystem const& other ) ;
 
       /** @brief Operator ==
       @param other the right hand side */
-      DDS_HeatEquationSystem& operator=( DDS_HeatEquationSystem const& other ) ;
+      DDS_HeatTransferSystem& operator=( DDS_HeatTransferSystem const& other ) ;
 
       /** @brief Constructor with arguments
       @param a_owner the MAC-based object
       @param exp to read the data file
       @param mac_tf FV temperature field */
-      DDS_HeatEquationSystem ( MAC_Object* a_owner,
+      DDS_HeatTransferSystem ( MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_tf );
       //@}
@@ -113,11 +113,11 @@ class DDS_HeatEquationSystem : public MAC_Object
 
       /** @name Instance delivery and initialization */
       //@{
-      /** @brief Create and initialize an instance of DDS_HeatEquationSystem
+      /** @brief Create and initialize an instance of DDS_HeatTransferSystem
       @param a_owner the MAC-based object
       @param exp to read the data file
       @param mac_tf FV temperature field */
-      static DDS_HeatEquationSystem* create(
+      static DDS_HeatTransferSystem* create(
             MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_tf ) ;

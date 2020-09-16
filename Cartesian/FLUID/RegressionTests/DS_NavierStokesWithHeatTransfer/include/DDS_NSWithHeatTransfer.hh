@@ -1,5 +1,5 @@
-#ifndef DDS_NavierStokes_HH
-#define DDS_NavierStokes_HH
+#ifndef DDS_NSWithHeatTransfer_HH
+#define DDS_NSWithHeatTransfer_HH
 
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
@@ -7,6 +7,7 @@
 #include <computingtime.hh>
 #include <boolVector.hh>
 #include <solvercomputingtime.hh>
+#include <DDS_HeatTransfer.hh>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -19,10 +20,10 @@ class MAC_Communicator ;
 class FV_DiscreteField ;
 class LA_Vector ;
 class LA_SeqVector ;
-class DDS_NavierStokesSystem ;
+class DDS_NSWithHeatTransferSystem ;
 class LA_SeqMatrix ;
 
-/** @brief The Class DDS_NavierStokes.
+/** @brief The Class DDS_NSWithHeatTransfer.
 
 Server for the resolution of the unsteady heat equation by a first order
 implicit time integrator and a Finite Volume MAC scheme on rectangular grids.
@@ -31,14 +32,7 @@ Equation: dT/dt = ( 1 / Pe ) * lap(T) + bodyterm, where Pe is the Peclet number.
 
 @author A. Wachs - Pacific project 2017 */
 
-/** @brief MPIVar include all vectors required while message passing */
-struct MPIVar {
-   int *size;
-   double ***send;
-   double ***receive;
-};
-
-class DDS_NavierStokes : public FV_OneStepIteration, public ComputingTime,
+class DDS_NSWithHeatTransfer : public FV_OneStepIteration, public ComputingTime,
 public SolverComputingTime
 {
    public: //-----------------------------------------------------------------
@@ -86,31 +80,31 @@ public SolverComputingTime
       /** @name Constructors & Destructor */
       //@{
       /** @brief Destructor */
-      ~DDS_NavierStokes( void ) ;
+      ~DDS_NSWithHeatTransfer( void ) ;
 
       /** @brief Copy constructor */
-      DDS_NavierStokes( DDS_NavierStokes const& other ) ;
+      DDS_NSWithHeatTransfer( DDS_NSWithHeatTransfer const& other ) ;
 
       /** @brief Operator ==
       @param other the right hand side */
-      DDS_NavierStokes& operator=( DDS_NavierStokes const& other ) ;
+      DDS_NSWithHeatTransfer& operator=( DDS_NSWithHeatTransfer const& other ) ;
 
       /** @brief Constructor with arguments
       @param a_owner the MAC-based object
       @param exp to read the data file */
-      DDS_NavierStokes( MAC_Object* a_owner,
+      DDS_NSWithHeatTransfer( MAC_Object* a_owner,
       		FV_DomainAndFields const* dom,
 		MAC_ModuleExplorer const* exp ) ;
 
       /** @brief Constructor without argument */
-      DDS_NavierStokes( void ) ;
+      DDS_NSWithHeatTransfer( void ) ;
 
       /** @brief Create a clone
       @param a_owner the MAC-based object
       @param dom mesh and fields
       @param prms set of parameters
       @param exp to read the data file */
-      virtual DDS_NavierStokes* create_replica(
+      virtual DDS_NSWithHeatTransfer* create_replica(
 		MAC_Object* a_owner,
 		FV_DomainAndFields const* dom,
 		MAC_ModuleExplorer* exp ) const ;
@@ -285,7 +279,7 @@ public SolverComputingTime
 
    //-- Class attributes
 
-      static DDS_NavierStokes const* PROTOTYPE ;
+      static DDS_NSWithHeatTransfer const* PROTOTYPE ;
 
    //-- Attributes
 
@@ -293,7 +287,7 @@ public SolverComputingTime
 
       FV_DiscreteField* PF;
 
-      DDS_NavierStokesSystem* GLOBAL_EQ ;
+      DDS_NSWithHeatTransferSystem* GLOBAL_EQ ;
 
       size_t nb_procs;
       size_t my_rank;
@@ -310,7 +304,6 @@ public SolverComputingTime
 
       struct MPIVar first_pass[2][3];           // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
       struct MPIVar second_pass[2][3];          // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
-
 
       double peclet ;
       double rho;
@@ -339,6 +332,10 @@ public SolverComputingTime
       string solid_filename;
       string level_set_type;
       double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
+
+      // Temperature
+      FV_DiscreteField const* TF;
+      DDS_HeatTransfer* Solver_Temperature ;
 
 } ;
 
