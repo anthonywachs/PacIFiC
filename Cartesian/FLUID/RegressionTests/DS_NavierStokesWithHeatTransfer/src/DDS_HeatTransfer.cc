@@ -1,6 +1,7 @@
 #include <DDS_HeatTransfer.hh>
 #include <FV_DomainAndFields.hh>
 #include <FV_DiscreteField.hh>
+#include <FV_DomainBuilder.hh>
 #include <DDS_HeatTransferSystem.hh>
 #include <FV_SystemNumbering.hh>
 #include <FV_Mesh.hh>
@@ -21,24 +22,6 @@
 #include <time.h>
 #include <sys/time.h>
 #include <math.h>
-
-/*
-DDS_HeatTransfer const* DDS_HeatTransfer::PROTOTYPE
-                                                 = new DDS_HeatTransfer() ;
-
-
-//---------------------------------------------------------------------------
-DDS_HeatTransfer:: DDS_HeatTransfer( void )
-//--------------------------------------------------------------------------
-   : FV_OneStepIteration( "DDS_HeatTransfer" )
-   , ComputingTime("Solver")
-{
-   MAC_LABEL( "DDS_HeatTransfer:: DDS_HeatTransfer" ) ;
-
-}
-*/
-
-
 
 //---------------------------------------------------------------------------
 DDS_HeatTransfer*
@@ -65,20 +48,24 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp,
                 struct NavierStokes2Temperature const& fromNS )
 //---------------------------------------------------------------------------
-//   : FV_OneStepIteration( a_owner )
    : MAC_Object( a_owner )
    , ComputingTime("Solver")
    , TF ( fromNS.dom_->discrete_field( "temperature" ) )
+   , UF (fromNS.UF_)
    , TF_DS_ERROR( 0 )
    , GLOBAL_EQ( 0 )
-   , peclet( 1. )
+   , rho( fromNS.rho_ )
+   , AdvectionScheme ( fromNS.AdvectionScheme_ )
+   , AdvectionTimeAccuracy ( fromNS.AdvectionTimeAccuracy_ ) 
+   , heat_capacity( exp->double_data( "Heat_capacity") )
+   , thermal_conductivity( exp->double_data( "Thermal_conductivity") )
    , b_bodyterm( false )
-   , is_firstorder( false )
-   , is_solids ( false )
+   , is_solids ( fromNS.is_solids_ )
 {
    MAC_LABEL( "DDS_HeatTransfer:: DDS_HeatTransfer" ) ;
 
-   MAC_ASSERT( TF->storage_depth() == 4 ) ;
+   MAC_ASSERT( TF->discretization_type() == "centered" ) ;
+   MAC_ASSERT( TF->storage_depth() == 5 ) ;
 
    // Call of MAC_Communicator routine to set the rank of each proces and
    // the number of processes during execution
@@ -120,24 +107,9 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
    // Create the Direction Splitting subcommunicators
    create_DDS_subcommunicators();
 
-   // Read Peclet number
-   if ( exp->has_entry( "Peclet" ) )
-   {
-     peclet = exp->double_data( "Peclet" ) ;
-     exp->test_data( "Peclet", "Peclet>0." ) ;
-   }
-
    // Read with or without body term
    if ( exp->has_entry( "BodyTerm" ) )
      b_bodyterm = exp->bool_data( "BodyTerm" ) ;
-
-   // Read the presence of particles
-   if ( exp->has_entry( "Particles" ) )
-     is_solids = exp->bool_data( "Particles" ) ;
-
-   // Implement first order/second order in time
-   if ( exp->has_entry( "FirstOrder" ) )
-     is_firstorder = exp->bool_data( "FirstOrder" ) ;
 
    // Periodic boundary condition check
    periodic_comp = TF->primary_grid()->get_periodic_directions();
@@ -148,11 +120,9 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
    }
 
    if (is_solids) {
-      Npart = exp->int_data( "NParticles" ) ;
-      insertion_type = exp->string_data( "InsertionType" ) ;
-      MAC_ASSERT( insertion_type == "file" ) ;
-      solid_filename = exp->string_data( "Particle_FileName" ) ;
-      loc_thres = exp->double_data( "Local_threshold" ) ; 
+      Npart = fromNS.Npart_ ;
+      solid_filename = fromNS.solid_filename_ ;
+      loc_thres = fromNS.loc_thres_ ; 
    }
 
    // Build the matrix system
@@ -226,8 +196,8 @@ DDS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
    if (is_solids) {
       nodes_temperature_initialization(0);
       nodes_temperature_initialization(1);
-      nodes_temperature_initialization(2);
-      if (dim == 3) nodes_temperature_initialization(3);
+      nodes_temperature_initialization(3);
+      if (dim == 3) nodes_temperature_initialization(4);
    }
 
    GLOBAL_EQ->initialize_temperature();
@@ -307,9 +277,9 @@ DDS_HeatTransfer:: do_after_time_stepping( void )
      write_elapsed_time_smhd(cout,cputime,"Computation time");
      SCT_get_summary(cout,cputime);
    }
-   DS_error_with_analytical_solution(TF,TF_DS_ERROR);
+//   DS_error_with_analytical_solution(TF,TF_DS_ERROR);
    GLOBAL_EQ->display_debug();
-//   output_l2norm();
+   output_l2norm();
 
    deallocate_mpi_variables();
 }
@@ -419,10 +389,12 @@ DDS_HeatTransfer:: assemble_DS_un_at_rhs (
 //---------------------------------------------------------------------------
 {
   double dxC, dyC, dzC, xC, yC, zC=0.;
-  double xvalue=0.,yvalue=0.,zvalue=0.,rhs=0., bodyterm=0.;
+  double xvalue=0.,yvalue=0.,zvalue=0.,rhs=0., bodyterm=0., adv_value=0.;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
+
+  NodeProp node = GLOBAL_EQ->get_node_property();
 
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices
@@ -442,31 +414,49 @@ DDS_HeatTransfer:: assemble_DS_un_at_rhs (
            if (dim ==2 ) {
               k = 0;
               // Dxx for un
-              xvalue = compute_un_component(comp,i,j,k,0,2);
+              xvalue = compute_un_component(comp,i,j,k,0,3);
               // Dyy for un
               yvalue = compute_un_component(comp,i,j,k,1,1);
 	      // Bodyterm for rhs
 	      bodyterm = bodyterm_value(xC,yC,zC);
+              // Advection term
+              adv_value = compute_adv_component(comp,i,j,k);
 
-              rhs = gamma*(xvalue*dyC + yvalue*dxC) + (TF->DOF_value( i, j, k, comp, 1 )*dxC*dyC)/(t_it -> time_step());
-              TF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC)+gamma*bodyterm*(t_it -> time_step()));
+              if (is_solids) {
+                 size_t p = return_node_index(TF,comp,i,j,k);
+                 if (node.void_frac[comp]->item(p) == 1) {
+                    adv_value = 0.;
+                 }
+              } 
+
+              rhs = gamma*(xvalue*dyC + yvalue*dxC) - adv_value + (TF->DOF_value( i, j, k, comp, 1 )*dxC*dyC)/(t_it -> time_step());
+              TF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC) + gamma*bodyterm*(t_it -> time_step()));
 
            } else {
               for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                  dzC = TF->get_cell_size( k, comp, 2 ) ;
 	         zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
                  // Dxx for un
-                 xvalue = compute_un_component(comp,i,j,k,0,2);
+                 xvalue = compute_un_component(comp,i,j,k,0,3);
                  // Dyy for un
-                 yvalue = compute_un_component(comp,i,j,k,1,3);
+                 yvalue = compute_un_component(comp,i,j,k,1,4);
                  // Dzz for un
                  zvalue = compute_un_component(comp,i,j,k,2,1);
 	         // Bodyterm for rhs
 	         bodyterm = bodyterm_value(xC,yC,zC);
+                 // Advection term
+                 adv_value = compute_adv_component(comp,i,j,k);
 
-                 rhs = gamma*(xvalue*dyC*dzC + yvalue*dxC*dzC + zvalue*dxC*dyC)
+                 if (is_solids) {
+                    size_t p = return_node_index(TF,comp,i,j,k);
+                    if (node.void_frac[comp]->item(p) == 1) {
+                       adv_value = 0.;
+                    }
+                 } 
+
+                 rhs = gamma*(xvalue*dyC*dzC + yvalue*dxC*dzC + zvalue*dxC*dyC) - adv_value
                                + (TF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC)/(t_it -> time_step());
-                 TF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC*dzC)+gamma*bodyterm*(t_it -> time_step()));
+                 TF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC*dzC) + gamma*bodyterm*(t_it -> time_step()));
               }
            }
         }
@@ -580,6 +570,31 @@ DDS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, s
 	   
 }
 
+//---------------------------------------------------------------------------
+double
+DDS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DDS_HeatTransfer:: compute_adv_component" ) ;
+   double ugradu = 0., value = 0.;
+
+   if ( AdvectionScheme == "TVD" ) {
+      ugradu = assemble_advection_TVD(UF,1,1.,i,j,k,1);
+   } else if ( AdvectionScheme == "Upwind" ) {
+      ugradu = assemble_advection_Upwind(UF,1,1.,i,j,k,1);
+/*   } else if ( AdvectionScheme == "Centered" ) {
+      ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp);*/
+   } 
+
+   if ( AdvectionTimeAccuracy == 1 ) {
+      value = ugradu;
+   } else {
+      value = 1.5*ugradu - 0.5*TF->DOF_value(i,j,k,comp,2);
+      TF->set_DOF_value(i,j,k,comp,2,ugradu);
+   }
+
+   return(value);
+}
 //---------------------------------------------------------------------------
 size_t
 DDS_HeatTransfer:: return_node_index (
@@ -962,7 +977,7 @@ DDS_HeatTransfer:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
 {
    MAC_LABEL( "DDS_HeatTransfer:: assemble_temperature_and_schur" ) ;
 
-   double gamma;
+   double gamma = (1.0/2.0)*(thermal_conductivity/rho/heat_capacity);
 
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
@@ -973,12 +988,6 @@ DDS_HeatTransfer:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
       for (size_t l=0;l<dim;++l) {
          min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
          max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-      }
-
-      if (is_firstorder) {
-         gamma = 1.0/peclet;
-      } else {
-         gamma = 1.0/2.0/peclet;
       }
 
       for (size_t dir = 0; dir < dim; dir++) {
@@ -1040,82 +1049,72 @@ DDS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double
      // Get contribution of un
      dC = TF->get_cell_size(i,comp,dir) ;
 
-     if (!is_firstorder) {
-	// x direction
-        if (dir == 0) {
-           value = compute_un_component(comp,i,j,k,dir,2);
-           if (is_solids) {
-              BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-              NodeProp node = GLOBAL_EQ->get_node_property();
-              size_t p = return_node_index(TF,comp,i,j,k);
-              if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-                 value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
-              }
-              if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-                 value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
-              }
+     // x direction
+     if (dir == 0) {
+        value = compute_un_component(comp,i,j,k,dir,3);
+        if (is_solids) {
+           BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
+           NodeProp node = GLOBAL_EQ->get_node_property();
+           size_t p = return_node_index(TF,comp,i,j,k);
+           if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
+              value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
            }
-	// y direction
-        } else if (dir == 1) {
-           if (dim == 2) {
-              value = compute_un_component(comp,j,i,k,dir,1);
-              if (is_solids) {
-                 BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-                 NodeProp node = GLOBAL_EQ->get_node_property();
-                 size_t p = return_node_index(TF,comp,j,i,k);
-                 if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-                    value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
-                 }
-                 if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-                    value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
-                 }
-              }
-           } else if (dim == 3) {
-              value = compute_un_component(comp,j,i,k,dir,3);
-              if (is_solids) {
-                 BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-                 NodeProp node = GLOBAL_EQ->get_node_property();
-                 size_t p = return_node_index(TF,comp,j,i,k);
-                 if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-                    value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
-                 }
-                 if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-                    value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
-                 }
-              }
+           if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
+              value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
            }
-	// z direction
-        } else if (dir == 2) {
-           value = compute_un_component(comp,j,k,i,dir,1);
-           if (is_solids) {
-              BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-              NodeProp node = GLOBAL_EQ->get_node_property();
-              size_t p = return_node_index(TF,comp,j,k,i);
-              if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-                 value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
-              }
-              if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-                 value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
-              }
-           }       
         }
-     } else {
-	if ((b_bodyterm) && (dir==0)) {
-	   xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
-	   yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
-	   if (dim == 3) zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
-	   // Add bodyterm for first step of Crank_Nicolson scheme
-           value = -bodyterm_value(xC,yC,zC)*dC/gamma;
-	}
+     // y direction
+     } else if (dir == 1) {
+        if (dim == 2) {
+           value = compute_un_component(comp,j,i,k,dir,1);
+           if (is_solids) {
+              BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
+              NodeProp node = GLOBAL_EQ->get_node_property();
+              size_t p = return_node_index(TF,comp,j,i,k);
+              if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
+                 value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
+              }
+              if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
+                 value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
+              }
+           }
+        } else if (dim == 3) {
+           value = compute_un_component(comp,j,i,k,dir,4);
+           if (is_solids) {
+              BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
+              NodeProp node = GLOBAL_EQ->get_node_property();
+              size_t p = return_node_index(TF,comp,j,i,k);
+              if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
+                 value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
+              }
+              if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
+                 value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
+              }
+           }
+        }
+     // z direction
+     } else if (dir == 2) {
+        value = compute_un_component(comp,j,k,i,dir,1);
+        if (is_solids) {
+           BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
+           NodeProp node = GLOBAL_EQ->get_node_property();
+           size_t p = return_node_index(TF,comp,j,k,i);
+           if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
+              value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
+           }
+           if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
+              value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
+           }
+        }       
      }
 
      double temp_val=0.;
      if (dir == 0) {
         temp_val = (TF->DOF_value(i,j,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
      } else if (dir == 1) {
-        temp_val = (TF->DOF_value(j,i,k,comp,2)*dC)/(t_it->time_step()) - gamma*value;
+        temp_val = (TF->DOF_value(j,i,k,comp,3)*dC)/(t_it->time_step()) - gamma*value;
      } else if (dir == 2) {
-        temp_val = (TF->DOF_value(j,k,i,comp,3)*dC)/(t_it->time_step()) - gamma*value;
+        temp_val = (TF->DOF_value(j,k,i,comp,4)*dC)/(t_it->time_step()) - gamma*value;
      }
 
      if (is_iperiodic[dir] == 0) {
@@ -1578,7 +1577,7 @@ DDS_HeatTransfer:: Solids_generation ()
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid();
 
-  double xp,yp,zp,Rp,Tp,off;
+  double xp,yp,zp,Rp,vx,vy,vz,wx,wy,wz,Tp,off;
 
   for (size_t comp=0;comp<nb_comps;comp++) {
      ifstream inFile;
@@ -1590,7 +1589,7 @@ DDS_HeatTransfer:: Solids_generation ()
      string line;
      getline(inFile,line);
      for (size_t i=0;i<Npart;i++) {
-        inFile >> xp >> yp >> zp >> Rp >> Tp >> off;
+        inFile >> xp >> yp >> zp >> Rp >> vx >> vy >> vz >> wx >> wy >> wz >> Tp >> off;
         solid.coord[comp]->set_item(i,0,xp);
         solid.coord[comp]->set_item(i,1,yp);
         solid.coord[comp]->set_item(i,2,zp);
@@ -1973,20 +1972,16 @@ DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
 {
   MAC_LABEL( "DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver" ) ;
 
-  double gamma=1.0/peclet;
+  double gamma= thermal_conductivity/rho/heat_capacity;
 
   TF->copy_DOFs_value( 0, 1 );
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
 
-  if (!is_firstorder) {
-     // First Equation
-     if ( my_rank == is_master ) SCT_set_start("Solver first step");
-     assemble_DS_un_at_rhs (t_it,gamma);
-     if ( my_rank == is_master ) SCT_get_elapsed_time("Solver first step");
-     // Update gamma based for invidual direction
-     gamma = 1.0/2.0/peclet;
-  }
+  // First Equation
+  if ( my_rank == is_master ) SCT_set_start("Solver first step");
+  assemble_DS_un_at_rhs (t_it,gamma);
+  if ( my_rank == is_master ) SCT_get_elapsed_time("Solver first step");
+  // Update gamma based for invidual direction
+  gamma = (1.0/2.0)*(thermal_conductivity/rho/heat_capacity);
 
   if ( my_rank == is_master ) SCT_set_start("Solver x solution");
   // Solve x-direction(i.e. 0) in y(i.e. 1) and z(i.e. 2)
@@ -1996,7 +1991,7 @@ DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec();
   // Tranfer back to field
-  TF->update_free_DOFs_value( 2, GLOBAL_EQ->get_solution_DS_temperature() ) ;
+  TF->update_free_DOFs_value( 3, GLOBAL_EQ->get_solution_DS_temperature() ) ;
   if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer x solution");
 
   if ( my_rank == is_master ) SCT_set_start("Solver y solution");
@@ -2010,7 +2005,7 @@ DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
   if (dim == 2) {
      TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
   } else if (dim == 3) {
-     TF->update_free_DOFs_value( 3 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+     TF->update_free_DOFs_value( 4 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
   }
   if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer y solution");
 
@@ -2377,4 +2372,531 @@ DDS_HeatTransfer:: free_DDS_subcommunicators ( void )
    MAC_LABEL( "DDS_HeatTransfer:: free_DDS_subcommunicators" ) ;
 
 
+}
+
+//----------------------------------------------------------------------
+double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* AdvectingField, 
+	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatTransfer:: assemble_advection_TVD" );   
+   MAC_CHECK_PRE( advecting_level < AdvectingField->storage_depth() ) ;
+   MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ; 
+   
+   // Parameters
+   size_t center_pos_in_matrix = 0, component = 0 ;  
+   double xC = 0., yC = 0., zC = 0., 
+   	xr = 0., xR = 0., xl = 0., xL = 0., yt = 0., yT = 0., yb = 0., yB = 0.,
+	zf = 0., zF = 0., zb = 0., zB = 0.;
+   double dxC = 0., dyC = 0., dzC = 0., 
+   	dxr = 0., dxl = 0., dxCr = 0., dxCl = 0., dxRr = 0., dxR = 0., 
+	dxLl = 0., dyt = 0., dyb = 0., dyCt = 0., dyCb = 0., dyTt = 0., 
+	dyT = 0., dyBb = 0., dzf = 0., dzb = 0., dzCf = 0., dzCb = 0., 
+	dzFf = 0., dzF = 0., dzBb = 0.;
+
+   double AdvectedvalueC = 0., AdvectedvalueRi = 0., AdvectedvalueRiRi = 0., 
+   	AdvectedvalueLe = 0.,  AdvectedvalueLeLe = 0., AdvectedvalueTo = 0., 
+	AdvectedvalueToTo = 0., AdvectedvalueBo = 0., AdvectedvalueBoBo = 0.,
+   	AdvectedvalueFr = 0., AdvectedvalueFrFr = 0., AdvectedvalueBe = 0., 
+	AdvectedvalueBeBe = 0.;
+   double ur = 0., ul = 0., vt = 0., vb = 0., wf = 0., wb = 0.,
+	fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
+   double cRip12 = 0., cLip12 = 0., cRim12 = 0., cLim12 = 0.,
+   	thetaC = 0., thetaRi = 0., thetaLe = 0., thetaTo = 0., thetaBo = 0., 
+	thetaFr = 0., thetaBe = 0.;
+
+   FV_SHIFT_TRIPLET shift = TF->shift_staggeredToCentered() ;
+
+   // Perform assembling
+
+   xC = TF->get_DOF_coordinate( i, component, 0 );
+   dxC = TF->get_cell_size( i, component, 0 ) ;    
+
+   yC = TF->get_DOF_coordinate( j, component, 1 );
+   dyC = TF->get_cell_size( j, component, 1 ) ;    
+
+   if ( dim == 2 ) {
+      size_t k = 0 ;
+      center_pos_in_matrix = TF->DOF_global_number( i, j, k, component );
+      AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
+	 
+      // Right and Left
+      // --------------
+      AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
+      AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
+	 	 
+      thetaC = fabs( AdvectedvalueRi - AdvectedvalueC ) > 1.e-20  ? 
+                   ( AdvectedvalueC - AdvectedvalueLe ) 
+		 / ( AdvectedvalueRi - AdvectedvalueC ) : 1e20 ;
+
+      // Right (X)
+      ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
+
+      if ( TF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT ) {
+         if ( ur > 0. ) fri = ur * AdvectedvalueC;
+         else fri = ur * AdvectedvalueRi;
+      } else {
+         xr = AdvectingField->get_DOF_coordinate( i+shift.i, 0, 0 );
+	 xR = TF->get_DOF_coordinate( i+1, component, 0 );
+         dxCr = xr - xC;
+         dxr  = xR - xC;
+         dxRr = xR - xr;
+         dxR = TF->get_cell_size( i+1, component, 0 );
+         AdvectedvalueRiRi = TF->DOF_value( i+2, j, k, component, advected_level );
+	     
+         thetaRi = fabs( AdvectedvalueRiRi - AdvectedvalueRi) > 1.e-20 ? 
+ 	               ( AdvectedvalueRi - AdvectedvalueC) 
+		     / ( AdvectedvalueRiRi - AdvectedvalueRi) : 1e20 ;
+         cRip12 = AdvectedvalueRi
+		- ( dxRr / dxR ) * FV_DiscreteField::SuperBee_phi(thetaRi)
+		* ( AdvectedvalueRiRi - AdvectedvalueRi );
+         cLip12 = AdvectedvalueC + ( dxCr / dxr ) 
+	   	* FV_DiscreteField::SuperBee_phi( thetaC )
+		* ( AdvectedvalueRi - AdvectedvalueC );
+
+         fri = 0.5 * ( ur * ( cRip12 + cLip12 )
+		- fabs(ur) * ( cRip12 - cLip12 ) ) ;
+      }
+	 
+      // Left (X)
+      ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
+	   
+      if ( TF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT ) {
+         if ( ul > 0. ) fle = ul * AdvectedvalueLe;
+         else fle = ul * AdvectedvalueC;
+      } else {
+         xl = AdvectingField->get_DOF_coordinate( i+shift.i-1, 0, 0 );
+         xL = TF->get_DOF_coordinate( i-1, component, 0 );
+         dxCl = xC - xl;
+         dxl  = xC - xL;
+         dxLl = xl - xL;
+         AdvectedvalueLeLe = TF->DOF_value( i-2, j, k, component, advected_level );
+	     
+         thetaLe = fabs( AdvectedvalueC - AdvectedvalueLe ) > 1.e-20 ?
+ 		       ( AdvectedvalueLe - AdvectedvalueLeLe ) 
+		     / ( AdvectedvalueC - AdvectedvalueLe ) : 1e20 ;
+         cLim12 = AdvectedvalueLe
+		+ ( dxLl / dxl ) * FV_DiscreteField::SuperBee_phi( thetaLe )
+		* ( AdvectedvalueC - AdvectedvalueLe ) ;
+         if ( TF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) 
+           cRim12 = AdvectedvalueC;
+         else {
+           xR = TF->get_DOF_coordinate( i+1, component, 0 );
+           dxr  = xR - xC;
+           cRim12 = AdvectedvalueC - ( dxCl / dxr ) 
+	     	* FV_DiscreteField::SuperBee_phi( thetaC ) 
+		* ( AdvectedvalueRi - AdvectedvalueC ) ;
+         }
+
+	   fle = 0.5 * ( ul * ( cRim12 + cLim12 )
+			- fabs(ul) * ( cRim12 - cLim12 ) ) ;
+      }
+	 
+      // Top and Bottom
+      // --------------
+      AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
+      AdvectedvalueBo = TF->DOF_value( i, j-1, k, component, advected_level );
+
+      thetaC = fabs( AdvectedvalueTo - AdvectedvalueC ) > 1.e-20 ? 
+    	           ( AdvectedvalueC - AdvectedvalueBo ) 
+		 / ( AdvectedvalueTo - AdvectedvalueC) : 1e20 ;
+
+      // Top (Y)
+      vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
+	   
+      if ( TF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
+         if ( vt > 0. ) fto = vt * AdvectedvalueC;
+         else fto = vt * AdvectedvalueTo;
+      } else {
+         yt = AdvectingField->get_DOF_coordinate( j+shift.j, 1, 1 );
+         yT = TF->get_DOF_coordinate( j+1, component, 1 );
+         dyCt = yt - yC;
+         dyt  = yT - yC;
+         dyTt = yT - yt;
+	 dyT = TF->get_cell_size( j+1, component, 1 );
+         AdvectedvalueToTo = TF->DOF_value( i, j+2, k, component, advected_level );
+	     
+         thetaTo = fabs( AdvectedvalueToTo - AdvectedvalueTo ) > 1.e-20 ? 
+                       ( AdvectedvalueTo - AdvectedvalueC ) 
+                     / ( AdvectedvalueToTo - AdvectedvalueTo) : 1e20 ;
+         cRip12 = AdvectedvalueTo
+		- ( dyTt / dyT ) * FV_DiscreteField::SuperBee_phi( thetaTo )
+		* ( AdvectedvalueToTo - AdvectedvalueTo );   
+         cLip12 = AdvectedvalueC + ( dyCt / dyt ) 
+	   	* FV_DiscreteField::SuperBee_phi( thetaC )
+		* ( AdvectedvalueTo - AdvectedvalueC );
+   
+         fto = 0.5 * ( vt * ( cRip12 + cLip12 ) - fabs(vt) * ( cRip12 - cLip12 ) ) ;
+      }
+
+      // Bottom (Y)
+      vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
+	   
+      if ( TF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM ) {
+         if ( vb > 0. ) fbo = vb * AdvectedvalueBo;
+         else fbo = vb * AdvectedvalueC;
+      } else {
+         yb = AdvectingField->get_DOF_coordinate( j+shift.j-1, 1, 1 );
+         yB = TF->get_DOF_coordinate( j-1, component, 1 );
+         dyCb = yC - yb;
+         dyb  = yC - yB;
+         dyBb = yb - yB;
+         AdvectedvalueBoBo = TF->DOF_value( i, j-2, k, component, advected_level );
+	     
+         thetaBo = fabs( AdvectedvalueC - AdvectedvalueBo ) > 1.e-20 ?
+                       ( AdvectedvalueBo - AdvectedvalueBoBo ) 
+		     / ( AdvectedvalueC - AdvectedvalueBo ) : 1e20 ;
+         cLim12 = AdvectedvalueBo
+		+ ( dyBb / dyb ) * FV_DiscreteField::SuperBee_phi( thetaBo )
+		* ( AdvectedvalueC - AdvectedvalueBo );
+         if ( TF->DOF_color( i, j, k, component ) == FV_BC_TOP ) 
+            cRim12 = AdvectedvalueC;
+         else {
+            yT = TF->get_DOF_coordinate( j+1, component, 1 );
+            dyt  = yT - yC;
+            cRim12 = AdvectedvalueC - ( dyCb / dyt ) 
+	     	* FV_DiscreteField::SuperBee_phi( thetaC ) 
+        	* ( AdvectedvalueTo - AdvectedvalueC );
+	 }
+	     
+	 fbo = 0.5 * ( vb * ( cRim12 + cLim12 ) - fabs(vb) * ( cRim12 - cLim12 ) ) ;
+      }
+
+      flux = ( fto - fbo ) * dxC + ( fri - fle ) * dyC;	 
+
+   } else {
+      zC = TF->get_DOF_coordinate( k, component, 2 );
+      dzC = TF->get_cell_size( k, component, 2 ) ;    
+
+      center_pos_in_matrix = TF->DOF_global_number( i, j, k, component );
+      AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
+	 
+      // Right and Left
+      // --------------
+      AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
+      AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
+	 	 
+      thetaC = fabs( AdvectedvalueRi - AdvectedvalueC) > 1.e-20 ? 
+                   ( AdvectedvalueC - AdvectedvalueLe ) 
+                 / ( AdvectedvalueRi - AdvectedvalueC) : 1e20 ;
+
+
+      // Right (X)
+      ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
+
+
+      if ( TF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT ) {
+          if ( ur > 0. ) fri = ur * AdvectedvalueC;
+          else fri = ur * AdvectedvalueRi;
+      } else {
+          xr = AdvectingField->get_DOF_coordinate( i+shift.i, 0, 0 );
+          xR = TF->get_DOF_coordinate( i+1, component, 0 );
+          dxCr = xr - xC;
+          dxr  = xR - xC;
+          dxRr = xR - xr;
+          dxR = TF->get_cell_size( i+1, component, 0 );
+
+          AdvectedvalueRiRi = TF->DOF_value( i+2, j, k, component, advected_level );
+	     
+          thetaRi = fabs( AdvectedvalueRiRi - AdvectedvalueRi ) > 1.e-20 ? 
+                        ( AdvectedvalueRi - AdvectedvalueC ) \
+                      / ( AdvectedvalueRiRi - AdvectedvalueRi ) : 1e20 ;
+          cRip12 = AdvectedvalueRi
+		- ( dxRr / dxR ) * FV_DiscreteField::SuperBee_phi( thetaRi )
+		* ( AdvectedvalueRiRi - AdvectedvalueRi );
+          cLip12 = AdvectedvalueC + ( dxCr / dxr ) 
+	     	* FV_DiscreteField::SuperBee_phi( thetaC )
+		* ( AdvectedvalueRi - AdvectedvalueC );
+
+          fri = 0.5 * ( ur * ( cRip12 + cLip12 ) - fabs(ur) * ( cRip12 - cLip12 ) ) ;
+      }
+	 
+      // Left (X)
+      ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
+	   
+      if ( TF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT ) {
+         if ( ul > 0. ) fle = ul * AdvectedvalueLe;
+         else fle = ul * AdvectedvalueC;
+      } else {
+         xl = AdvectingField->get_DOF_coordinate( i+shift.i-1, 0, 0 );
+         xL = TF->get_DOF_coordinate( i-1, component, 0 );
+         dxCl = xC - xl;
+         dxl  = xC - xL;
+         dxLl = xl - xL;
+         AdvectedvalueLeLe = TF->DOF_value( i-2, j, k, component, advected_level );
+	     
+         thetaLe = fabs( AdvectedvalueC - AdvectedvalueLe) > 1.e-20 ?
+	               ( AdvectedvalueLe - AdvectedvalueLeLe ) 
+		     / ( AdvectedvalueC - AdvectedvalueLe) : 1e20 ;
+	 cLim12 = AdvectedvalueLe
+		+ ( dxLl / dxl ) * FV_DiscreteField::SuperBee_phi( thetaLe )
+		* ( AdvectedvalueC - AdvectedvalueLe ) ;
+         if ( TF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) 
+            cRim12 = AdvectedvalueC;
+         else {
+            xR = TF->get_DOF_coordinate( i+1, advected_level, 0 );
+            dxr  = xR - xC;
+            cRim12 = AdvectedvalueC - ( dxCl / dxr ) 
+			* FV_DiscreteField::SuperBee_phi( thetaC )
+			* ( AdvectedvalueRi - AdvectedvalueC );
+         }
+
+         fle = 0.5 * ( ul * ( cRim12 + cLim12 )	- fabs(ul) * ( cRim12 - cLim12 ) ) ;
+      }
+	 
+      // Top and Bottom
+      // --------------
+      AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
+      AdvectedvalueBo = TF->DOF_value( i, j-1, k, component, advected_level );
+
+      thetaC = fabs( AdvectedvalueTo - AdvectedvalueC ) > 1.e-20 ? 
+	   	   ( AdvectedvalueC - AdvectedvalueBo ) 
+		 / ( AdvectedvalueTo - AdvectedvalueC ) : 1e20 ;
+
+      // Top (Y)
+      vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
+	   
+      if ( TF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
+         if ( vt > 0. ) fto = vt * AdvectedvalueC;
+         else fto = vt * AdvectedvalueTo;
+      } else {   
+         yt = AdvectingField->get_DOF_coordinate( j+shift.j, 1, 1 );
+         yT = TF->get_DOF_coordinate( j+1, component, 1 );
+         dyCt = yt - yC;
+         dyt  = yT - yC;
+         dyTt = yT - yt;
+         dyT = TF->get_cell_size( j+1, component, 1 );
+         AdvectedvalueToTo = TF->DOF_value( i, j+2, k, component, advected_level );	     
+
+         thetaTo = fabs( AdvectedvalueToTo - AdvectedvalueTo) > 1.e-20 ? 
+	               ( AdvectedvalueTo - AdvectedvalueC ) 
+		     / ( AdvectedvalueToTo - AdvectedvalueTo ) : 1e20 ;
+         cRip12 = AdvectedvalueTo
+		- ( dyTt / dyT ) * FV_DiscreteField::SuperBee_phi( thetaTo )
+		* ( AdvectedvalueToTo - AdvectedvalueTo ) ;   
+         cLip12 = AdvectedvalueC + ( dyCt / dyt ) 
+		* FV_DiscreteField::SuperBee_phi(thetaC)
+		* ( AdvectedvalueTo - AdvectedvalueC ) ;
+   
+         fto = 0.5 * ( vt * ( cRip12 + cLip12 ) - fabs(vt) * ( cRip12 - cLip12 ) ) ;
+      }
+
+      // Bottom (Y)
+      vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
+	   
+      if ( TF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM ) {
+         if ( vb > 0. ) fbo = vb * AdvectedvalueBo;
+         else fbo = vb * AdvectedvalueC;
+      } else {
+          yb = AdvectingField->get_DOF_coordinate( j+shift.j-1, 1, 1 );
+          yB = TF->get_DOF_coordinate( j-1, component, 1 );
+          dyCb = yC - yb;
+          dyb  = yC - yB;
+          dyBb = yb - yB;
+          AdvectedvalueBoBo = TF->DOF_value( i, j-2, k, component, advected_level );
+	     
+          thetaBo = fabs( AdvectedvalueC - AdvectedvalueBo) > 1.e-20 ?
+                        ( AdvectedvalueBo - AdvectedvalueBoBo )
+		      / ( AdvectedvalueC - AdvectedvalueBo ) : 1e20 ;
+          cLim12 = AdvectedvalueBo
+		+ ( dyBb / dyb ) * FV_DiscreteField::SuperBee_phi( thetaBo )
+		* ( AdvectedvalueC - AdvectedvalueBo ) ;
+          if ( TF->DOF_color( i, j, k, component ) == FV_BC_TOP ) 
+             cRim12 = AdvectedvalueC;
+          else {
+             yT = TF->get_DOF_coordinate( j+1, component, 1 );
+             dyt  = yT - yC;
+             cRim12 = AdvectedvalueC - ( dyCb / dyt ) 
+			* FV_DiscreteField::SuperBee_phi( thetaC )
+			* ( AdvectedvalueTo - AdvectedvalueC ) ;
+          }
+	     
+          fbo = 0.5 * ( vb * ( cRim12 + cLim12 ) - fabs(vb) * ( cRim12 - cLim12 ) ) ;
+      }
+	 
+      // Front and Behind
+      // ----------------
+      AdvectedvalueFr = TF->DOF_value( i, j, k+1, component, advected_level );
+      AdvectedvalueBe = TF->DOF_value( i, j, k-1, component, advected_level );
+
+      thetaC = fabs( AdvectedvalueFr - AdvectedvalueC) > 1.e-20 ? 
+    	           ( AdvectedvalueC - AdvectedvalueBe )
+		 / ( AdvectedvalueFr - AdvectedvalueC ) : 1e20 ;
+
+      // Front (Z)
+      wf = AdvectingField->DOF_value( i, j, k+shift.k, 2, advecting_level );
+	   
+      if ( TF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT ) {
+         if ( wf > 0. ) ffr = wf * AdvectedvalueC;
+         else ffr = wf * AdvectedvalueFr;
+      } else {
+         zf = AdvectingField->get_DOF_coordinate( k+shift.k, 2, 2 );
+         zF = TF->get_DOF_coordinate( k+1, component, 2 );
+         dzCf = zf - zC;
+         dzf  = zF - zC;
+         dzFf = zF - zf;
+         dzF = TF->get_cell_size( k+1, component, 2 );
+         AdvectedvalueFrFr = TF->DOF_value( i, j, k+2, component, advected_level );
+	     
+         thetaFr = fabs( AdvectedvalueFrFr - AdvectedvalueFr) > 1.e-20 ? 
+		       ( AdvectedvalueFr - AdvectedvalueC )
+		     / ( AdvectedvalueFrFr - AdvectedvalueFr ) : 1e20 ;
+	 cRip12 = AdvectedvalueFr
+		- ( dzFf / dzF ) * FV_DiscreteField::SuperBee_phi( thetaFr )
+		* ( AdvectedvalueFrFr - AdvectedvalueFr ) ;   
+         cLip12 = AdvectedvalueC + ( dzCf / dzf ) 
+		* FV_DiscreteField::SuperBee_phi( thetaC )
+		* ( AdvectedvalueFr - AdvectedvalueC ) ;
+   
+	 ffr = 0.5 * ( wf * ( cRip12 + cLip12 ) - fabs(wf) * ( cRip12 - cLip12 ) ) ;
+      }
+
+      // Behind (Z)
+      wb = AdvectingField->DOF_value( i, j, k+shift.k-1, 2, advecting_level );
+	   
+      if ( TF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND ) {
+         if ( wb > 0. ) fbe = wb * AdvectedvalueBe;
+         else fbe = wb * AdvectedvalueC;
+      } else {
+          zb = AdvectingField->get_DOF_coordinate( k+shift.k-1, 2, 2 );
+          zB = TF->get_DOF_coordinate( k-1, component, 2 );
+          dzCb = zC - zb;
+          dzb  = zC - zB;
+          dzBb = zb - zB;
+          AdvectedvalueBeBe = TF->DOF_value( i, j, k-2, component, advected_level );
+	     
+          thetaBe = fabs( AdvectedvalueC - AdvectedvalueBe) > 1.e-20 ?
+		        ( AdvectedvalueBe - AdvectedvalueBeBe )
+		      / ( AdvectedvalueC - AdvectedvalueBe ) : 1e20 ;
+          cLim12 = AdvectedvalueBe
+		+ ( dzBb / dzb ) * FV_DiscreteField::SuperBee_phi( thetaBe )
+		* ( AdvectedvalueC - AdvectedvalueBe ) ;
+          if ( TF->DOF_color( i, j, k, component ) == FV_BC_FRONT ) 
+	     cRim12 = AdvectedvalueC;
+	  else {
+             zF = TF->get_DOF_coordinate( k+1, component, 2 );
+             dzf  = zF - zC;
+	     cRim12 = AdvectedvalueC - ( dzCb / dzf ) 
+	       		* FV_DiscreteField::SuperBee_phi( thetaC )
+			* ( AdvectedvalueFr - AdvectedvalueC ) ;
+	  }
+	     
+	  fbe = 0.5 * ( wb * ( cRim12 + cLim12 ) - fabs(wb) * ( cRim12 - cLim12 ) ) ;
+      }
+
+      flux = ( fto - fbo ) * dxC * dzC + ( fri - fle ) * dyC * dzC + ( ffr - fbe ) * dxC * dyC;
+   } 
+   
+   return (coef * flux);
+         
+}
+
+//----------------------------------------------------------------------
+double DDS_HeatTransfer:: assemble_advection_Upwind( FV_DiscreteField const* AdvectingField,
+	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatTransfer:: assemble_advection_Upwind" );
+   MAC_CHECK_PRE( advecting_level < AdvectingField->storage_depth() ) ;
+   MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ;
+
+   // Parameters
+   size_t center_pos_in_matrix = 0, component = 0 ;
+   double dxC = 0., dyC = 0., dzC = 0.;
+   double AdvectedvalueC = 0., AdvectedvalueRi = 0., AdvectedvalueLe = 0.,
+   	AdvectedvalueTo = 0., AdvectedvalueBo = 0.,
+   	AdvectedvalueFr = 0., AdvectedvalueBe = 0,
+	ur = 0., ul = 0., vt = 0., vb = 0., wf = 0., wb = 0.,
+	fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
+
+   // Comment: cell centered unknowns always have a defined value at +1/-1
+   // indices in all 3 directions. Whether one of the +1/-1 DOF values is on a
+   // boundary or not, and whether that boundary has a Dirichlet or Neumann
+   // condition is irrelevant, this +1/-1 DOF always has the right value.
+   // For Neumann, this is guaranted by
+   // FV_BoundaryCondition:: set_free_DOF_values in
+   // FV_DiscreteField:: update_free_DOFs_value or
+   // FV_DiscreteField:: add_to_free_DOFs_value
+
+   FV_SHIFT_TRIPLET shift = TF->shift_staggeredToCentered() ;
+
+   dxC = TF->get_cell_size( i, component, 0 ) ;    
+   dyC = TF->get_cell_size( j, component, 1 ) ;    
+
+   if ( dim == 2 ) {
+      size_t k = 0;
+      center_pos_in_matrix = TF->DOF_global_number( i, j, k, component );
+      AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
+
+      // Right (X)
+      AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
+      ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
+      if ( ur > 0. ) fri = ur * AdvectedvalueC;
+      else fri = ur * AdvectedvalueRi;
+
+      // Left (X)
+      AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
+      ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
+      if ( ul > 0. ) fle = ul * AdvectedvalueLe;
+      else fle = ul * AdvectedvalueC;
+
+      // Top (Y)
+      AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
+      vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
+      if ( vt > 0. ) fto = vt * AdvectedvalueC;
+      else fto = vt * AdvectedvalueTo;
+
+      // Bottom (Y)
+      AdvectedvalueBo = TF->DOF_value( i, j-1, k, component, advected_level );
+      vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
+      if ( vb > 0. ) fbo = vb * AdvectedvalueBo;
+      else fbo = vb * AdvectedvalueC;
+
+      flux = (fto - fbo) * dxC + (fri - fle) * dyC;
+
+   } else {
+      dzC = TF->get_cell_size( k, component, 2);
+      center_pos_in_matrix = TF->DOF_global_number( i, j, k, component );
+      AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
+
+      // Right (X)
+      AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
+      ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
+      if ( ur > 0. ) fri = ur * AdvectedvalueC;
+      else fri = ur * AdvectedvalueRi;
+
+      // Left (X)
+      AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
+      ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
+      if ( ul > 0. ) fle = ul * AdvectedvalueLe;
+      else fle = ul * AdvectedvalueC;
+
+      // Top (Y)
+      AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
+      vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
+      if ( vt > 0. ) fto = vt * AdvectedvalueC;
+      else fto = vt * AdvectedvalueTo;
+
+      // Bottom (Y)
+      AdvectedvalueBo = TF->DOF_value( i, j-1, k, component, advected_level );
+      vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
+      if ( vb > 0. ) fbo = vb * AdvectedvalueBo;
+      else fbo = vb * AdvectedvalueC;
+
+      // Front (Z)
+      AdvectedvalueFr = TF->DOF_value( i, j, k+1, component, advected_level );
+      wf = AdvectingField->DOF_value( i, j, k+shift.k, 2, advecting_level );
+      if ( wf > 0. ) ffr = wf * AdvectedvalueC;
+      else ffr = wf * AdvectedvalueFr;
+
+      // Behind (Z)
+      AdvectedvalueBe = TF->DOF_value( i, j, k-1, component, advected_level );
+      wb = AdvectingField->DOF_value( i, j, k+shift.k-1, 2, advecting_level );
+      if ( wb > 0. ) fbe = wb * AdvectedvalueBe;
+      else fbe = wb * AdvectedvalueC;
+
+      flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
+   }
+
+   return (coef * flux);
 }

@@ -270,6 +270,12 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    inputData.b_restart_ = b_restart ;
    inputData.dom_ = dom ;
    inputData.UF_ = UF ;
+   inputData.AdvectionScheme_ = AdvectionScheme ;
+   inputData.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
+   inputData.is_solids_ = is_solids ;
+   inputData.Npart_ = Npart ;
+   inputData.solid_filename_ = solid_filename ;
+   inputData.loc_thres_ = loc_thres ;
 
    MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DDS_HeatTransfer" ) ;
    Solver_Temperature = DDS_HeatTransfer::create( this, set, inputData ) ;
@@ -5507,23 +5513,6 @@ DDS_NSWithHeatTransfer:: assemble_advection_Upwind(
          ur = 0.5 * ( AdvectorValueC + AdvectorValueRi );
          if ( ur > 0. ) fri = ur * AdvectedValueC;
          else fri = ur * AdvectedValueRi;
-         if (act_solids) {
-            size_t p = return_node_index(UF,component,i,j,k);
-            if (node.void_frac[component]->item(p) == 0.) {
-               if ((b_intersect[0].offset[component]->item(p,1) == 1)) {
-                  double xb = b_intersect[0].value[component]->item(p,1);
-                  double ub = b_intersect[0].field_var[component]->item(p,1);
-                  ur = (dxC/2.*ub + (xb - dxC/2.)*AdvectorValueC)/xb;
-                  if (xb > dxC/2.) {
-                     if ( ur > 0. ) fri = ur * AdvectedValueC;
-                     else fri = ur * ub;
-                  } else {
-                     if ( ur > 0. ) fri = ur * ub;
-                     else fri = ur * AdvectedValueRi;
-                  }
-               }
-            }
-         }
       }
            
       // Left (U_X)
@@ -5535,23 +5524,6 @@ DDS_NSWithHeatTransfer:: assemble_advection_Upwind(
          ul = 0.5 * ( AdvectorValueC + AdvectorValueLe );
          if ( ul > 0. ) fle = ul * AdvectedValueLe;
          else fle = ul * AdvectedValueC;
-         if (act_solids) {
-            size_t p = return_node_index(UF,component,i,j,k);
-            if (node.void_frac[component]->item(p) == 0.) {
-               if ((b_intersect[0].offset[component]->item(p,0) == 1)) {
-                  double xb = b_intersect[0].value[component]->item(p,0);
-                  double ub = b_intersect[0].field_var[component]->item(p,0);
-                  ul = (dxC/2.*ub + (xb - dxC/2.)*AdvectorValueC)/xb;
-                  if (xb > dxC/2.) {
-                     if ( ul > 0. ) fle = ul * ub;
-                     else fle = ul * AdvectedValueC;
-                  } else {
-                     if ( ul > 0. ) fle = ul * AdvectedValueLe;
-                     else fle = ul * ub;
-                  }
-               }
-            }
-         }
       }
       
       // Top (U_Y)
@@ -5562,44 +5534,6 @@ DDS_NSWithHeatTransfer:: assemble_advection_Upwind(
       if ( vt > 0. ) fto = vt * AdvectedValueC;
       else fto = vt * AdvectedValueTo;
 
-      if (act_solids) {
-         size_t p = return_node_index(UF,1,i+shift.i,j+shift.j,k);
-         if (node.void_frac[1]->item(p) == 0.) {
-            if ((b_intersect[0].offset[1]->item(p,0) == 1)) {
-               double ub = b_intersect[0].field_var[1]->item(p,0);
-               double xb = b_intersect[0].value[1]->item(p,0);
-               //vt = 0.5 * (AdvectorValueToRi + ub);
-               vt = 0.5 * (AdvectorValueToLe + ub + (AdvectorValueToRi - AdvectorValueToLe)*xb/dxC);
-            }
-         }
-         p = return_node_index(UF,1,i+shift.i-1,j+shift.j,k);
-         if (node.void_frac[1]->item(p) == 0.) {
-            if ((b_intersect[0].offset[1]->item(p,1) == 1)) {
-               double ub = b_intersect[0].field_var[1]->item(p,1);
-               double xb = b_intersect[0].value[1]->item(p,1);
-               //vt = 0.5 * (AdvectorValueToLe + ub);
-               vt = 0.5 * (AdvectorValueToRi + ub + (AdvectorValueToLe - AdvectorValueToRi)*xb/dxC);
-            }
-         }
-         p = return_node_index(UF,component,i,j,k);
-         if (node.void_frac[component]->item(p) == 0) {
-            if ((b_intersect[1].offset[component]->item(p,1) == 1)) {
-               double xb = b_intersect[1].value[component]->item(p,1);
-               double ub = b_intersect[1].field_var[component]->item(p,1);
-               if (xb > dyC/2.) {
-                  if ( vt > 0. ) fto = vt * AdvectedValueC;
-                  else fto = vt * ub;
-               } else {
-                  if ( vt > 0. ) fto = vt * ub;
-                  else fto = vt * AdvectedValueTo;
-               }
-            } else {
-               if ( vt > 0. ) fto = vt * AdvectedValueC;
-               else fto = vt * AdvectedValueTo;
-            } 
-         }   
-      }
-   
       // Bottom (U_Y)
       AdvectedValueBo = UF->DOF_value(i, j-1, k, component, advected_level );
       AdvectorValueBoLe = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, 1, advecting_level );
@@ -5607,44 +5541,6 @@ DDS_NSWithHeatTransfer:: assemble_advection_Upwind(
       vb = 0.5 * ( AdvectorValueBoLe + AdvectorValueBoRi );
       if ( vb > 0. ) fbo = vb * AdvectedValueBo;
       else fbo = vb * AdvectedValueC;
-
-      if (act_solids) {
-         size_t p = return_node_index(UF,1,i+shift.i,j+shift.j-1,k);
-         if (node.void_frac[1]->item(p) == 0.) {
-            if ((b_intersect[0].offset[1]->item(p,0) == 1)) {
-               double ub = b_intersect[0].field_var[1]->item(p,0);
-               double xb = b_intersect[0].value[1]->item(p,0);
-               //vb = 0.5 * (AdvectorValueBoRi + ub);
-               vb = 0.5 * (AdvectorValueBoLe + ub + (AdvectorValueBoRi - AdvectorValueBoLe)*xb/dxC);
-            }
-         }
-         p = return_node_index(UF,1,i+shift.i-1,j+shift.j-1,k);
-         if (node.void_frac[1]->item(p) == 0.) {
-            if ((b_intersect[0].offset[1]->item(p,1) == 1)) {
-               double ub = b_intersect[0].field_var[1]->item(p,1);
-               double xb = b_intersect[0].value[1]->item(p,1);
-               //vb = 0.5 * (AdvectorValueBoLe + ub);
-               vb = 0.5 * (AdvectorValueBoRi + ub + (AdvectorValueBoLe - AdvectorValueBoRi)*xb/dxC);
-            }
-         }
-         p = return_node_index(UF,component,i,j,k);
-         if (node.void_frac[component]->item(p) == 0) {
-            if ((b_intersect[1].offset[component]->item(p,0) == 1)) {
-               double xb = b_intersect[1].value[component]->item(p,0);
-               double ub = b_intersect[1].field_var[component]->item(p,0);
-               if (xb > dyC/2.) {
-                  if ( vb > 0. ) fbo = vb * ub;
-                  else fbo = vb * AdvectedValueC;
-               } else {
-                  if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-                  else fbo = vb * ub;
-               }
-            } else {
-               if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-               else fbo = vb * AdvectedValueC;
-            }   
-         }   
-      }
 
       if (dim == 3) {
          // Front (U_Z)
@@ -5673,44 +5569,6 @@ DDS_NSWithHeatTransfer:: assemble_advection_Upwind(
       if ( ur > 0. ) fri = ur * AdvectedValueC;
       else fri = ur * AdvectedValueRi;
 
-      if (act_solids) {
-         size_t p = return_node_index(UF,0,i+shift.i,j+shift.j,k);
-         if (node.void_frac[0]->item(p) == 0.) {
-            if ((b_intersect[1].offset[0]->item(p,0) == 1)) {
-               double ub = b_intersect[1].field_var[0]->item(p,0);
-               double xb = b_intersect[1].value[0]->item(p,0);
-               //ur = 0.5 * (AdvectorValueToRi + ub);
-               ur = 0.5 * (AdvectorValueBoRi + ub + (AdvectorValueToRi - AdvectorValueBoRi)*xb/dyC);
-            }
-         }
-         p = return_node_index(UF,0,i+shift.i,j+shift.j-1,k);
-         if (node.void_frac[0]->item(p) == 0.) {
-            if ((b_intersect[1].offset[0]->item(p,1) == 1)) {
-               double ub = b_intersect[1].field_var[0]->item(p,1);
-               double xb = b_intersect[1].value[0]->item(p,1);
-               //ur = 0.5 * (AdvectorValueBoRi + ub);
-               ur = 0.5 * (AdvectorValueToRi + ub + (AdvectorValueBoRi - AdvectorValueToRi)*xb/dyC);
-            }
-         }
-         p = return_node_index(UF,component,i,j,k);
-         if (node.void_frac[component]->item(p) == 0) {
-            if ((b_intersect[0].offset[component]->item(p,1) == 1)) {
-               double xb = b_intersect[0].value[component]->item(p,1);
-               double ub = b_intersect[0].field_var[component]->item(p,1);
-               if (xb > dxC/2.) {
-                  if ( ur > 0. ) fri = ur * AdvectedValueC;
-                  else fri = ur * ub;
-               } else {
-                  if ( ur > 0. ) fri = ur * ub;
-                  else fri = ur * AdvectedValueRi;
-               }
-            } else {
-               if ( ur > 0. ) fri = ur * AdvectedValueC;
-               else fri = ur * AdvectedValueRi;
-            }
-         }
-      }
-           
       // Left (V_X)
       AdvectedValueLe = UF->DOF_value(i-1, j, k, component, advected_level );
       AdvectorValueToLe = UF->DOF_value(i+shift.i-1, j+shift.j, k, 0, advecting_level );
@@ -5719,44 +5577,6 @@ DDS_NSWithHeatTransfer:: assemble_advection_Upwind(
       if ( ul > 0. ) fle = ul * AdvectedValueLe;
       else fle = ul * AdvectedValueC;
  
-      if (act_solids) {
-         size_t p = return_node_index(UF,0,i+shift.i-1,j+shift.j,k);
-         if (node.void_frac[0]->item(p) == 0.) {
-            if ((b_intersect[1].offset[0]->item(p,0) == 1)) {
-               double ub = b_intersect[1].field_var[0]->item(p,0);
-               double xb = b_intersect[1].value[0]->item(p,0);
-               //ul = 0.5 * (AdvectorValueToLe + ub);
-               ul = 0.5 * (AdvectorValueBoLe + ub + (AdvectorValueToLe - AdvectorValueBoLe)*xb/dyC);
-            }
-         }
-         p = return_node_index(UF,0,i+shift.i-1,j+shift.j-1,k);
-         if (node.void_frac[0]->item(p) == 0.) {
-            if ((b_intersect[1].offset[0]->item(p,1) == 1)) {
-               double ub = b_intersect[1].field_var[0]->item(p,1);
-               double xb = b_intersect[1].value[0]->item(p,1);
-               //ul = 0.5 * (AdvectorValueBoLe + ub);
-               ul = 0.5 * (AdvectorValueToLe + ub + (AdvectorValueBoLe - AdvectorValueToLe)*xb/dyC);
-            }
-         }
-         p = return_node_index(UF,component,i,j,k);
-         if (node.void_frac[component]->item(p) == 0) {
-            if ((b_intersect[0].offset[component]->item(p,0) == 1)) {
-               double xb = b_intersect[0].value[component]->item(p,0);
-               double ub = b_intersect[0].field_var[component]->item(p,0);
-               if (xb > dxC/2.) {
-                  if ( ul > 0. ) fle = ul * ub;
-                  else fle = ul * AdvectedValueC;
-               } else {
-                  if ( ul > 0. ) fle = ul * AdvectedValueLe;
-                  else fle = ul * ub;
-               }
-            } else {
-               if ( ul > 0. ) fle = ul * AdvectedValueLe;
-               else fle = ul * AdvectedValueC;
-            }
-         }
-      }
-
       // Top (V_Y)
       if ( UF->DOF_color(i, j, k, component ) == FV_BC_TOP )
          fto = AdvectorValueC * AdvectedValueC;
@@ -5766,23 +5586,6 @@ DDS_NSWithHeatTransfer:: assemble_advection_Upwind(
          vt = 0.5 * ( AdvectorValueTo + AdvectorValueC );
          if ( vt > 0. ) fto = vt * AdvectedValueC;
          else fto = vt * AdvectedValueTo;
-         if (act_solids) {
-            size_t p = return_node_index(UF,component,i,j,k);
-            if (node.void_frac[component]->item(p) == 0.) {
-               if ((b_intersect[1].offset[component]->item(p,1) == 1)) {
-                  double xb = b_intersect[1].value[component]->item(p,1);
-                  double ub = b_intersect[1].field_var[component]->item(p,1);
-                  vt = (dyC/2.*ub + (xb - dyC/2.)*AdvectorValueC)/xb;
-                  if (xb > dyC/2.) {
-                     if ( vt > 0. ) fto = vt * AdvectedValueC;
-                     else fto = vt * ub;
-                  } else {
-                     if ( vt > 0. ) fto = vt * ub;
-                     else fto = vt * AdvectedValueTo;
-                  }
-               }
-            }
-         }
       }
    
       // Bottom (V_Y)
@@ -5794,23 +5597,6 @@ DDS_NSWithHeatTransfer:: assemble_advection_Upwind(
          vb = 0.5 * ( AdvectorValueBo + AdvectorValueC );
          if ( vb > 0. ) fbo = vb * AdvectedValueBo;
          else fbo = vb * AdvectedValueC;
-         if (act_solids) {
-            size_t p = return_node_index(UF,component,i,j,k);
-            if (node.void_frac[component]->item(p) == 0.) {
-               if ((b_intersect[1].offset[component]->item(p,0) == 1)) {
-                  double xb = b_intersect[1].value[component]->item(p,0);
-                  double ub = b_intersect[1].field_var[component]->item(p,0);
-                  vb = (dyC/2.*ub + (xb - dyC/2.)*AdvectorValueC)/xb;
-                  if (xb > dxC/2.) {
-                     if ( vb > 0. ) fbo = vb * ub;
-                     else fbo = vb * AdvectedValueC;
-                  } else {
-                     if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-                     else fbo = vb * ub;
-                  }
-               }
-            }
-         }
       }
 
       if (dim == 3) {
@@ -5887,46 +5673,8 @@ DDS_NSWithHeatTransfer:: assemble_advection_Upwind(
       }
    }  
 
-   double beta_x=1., beta_y=1., beta_z=1.;
-
-   // Volume correction in x
-   if (act_solids) {
-      size_t p = return_node_index(UF,component,i,j,k);
-      if (node.void_frac[component]->item(p) == 0.) {
-         double xb = dxC;
-         if ((b_intersect[0].offset[component]->item(p,0) == 1)) {
-            xb = b_intersect[0].value[component]->item(p,0) + dxC/2.;
-         } 
-         if ((b_intersect[0].offset[component]->item(p,1) == 1)) {
-            xb = b_intersect[0].value[component]->item(p,1) + dxC/2.;
-         }
-         if ((b_intersect[0].offset[component]->item(p,0) == 1) && (b_intersect[0].offset[component]->item(p,1) == 1)) {
-            xb = b_intersect[0].value[component]->item(p,0) + b_intersect[0].value[component]->item(p,1);
-         }
-         beta_x = min(xb,dxC)/dxC;
-      }
-   }
-
-   // Volume correction in y
-   if (act_solids) {
-      size_t p = return_node_index(UF,component,i,j,k);
-      if (node.void_frac[component]->item(p) == 0.) {
-         double xb = dyC;
-         if ((b_intersect[1].offset[component]->item(p,0) == 1)) {
-            xb = b_intersect[1].value[component]->item(p,0) + dyC/2.;
-         } 
-         if ((b_intersect[1].offset[component]->item(p,1) == 1)) {
-            xb = b_intersect[1].value[component]->item(p,1) + dyC/2.;
-         }
-         if ((b_intersect[1].offset[component]->item(p,0) == 1) && (b_intersect[1].offset[component]->item(p,1) == 1)) {
-            xb = b_intersect[1].value[component]->item(p,0) + b_intersect[1].value[component]->item(p,1);
-         }
-         beta_y = min(xb,dyC)/dyC;
-      }
-   }
-
    if (dim == 2) { 
-      flux = ((fto - fbo) * dxC + (fri - fle) * dyC)*beta_x*beta_y;
+      flux = ((fto - fbo) * dxC + (fri - fle) * dyC);
    } else if (dim == 3) {
       flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
    }   

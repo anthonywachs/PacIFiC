@@ -28,7 +28,7 @@ class LA_SeqMatrix ;
 Server for the resolution of the unsteady heat equation by a first order
 implicit time integrator and a Finite Volume MAC scheme on rectangular grids.
 
-Equation: dT/dt = ( 1 / Pe ) * lap(T) + bodyterm, where Pe is the Peclet number.
+Equation: rho*cp*dT/dt + rho*cp*(u.nabla(T))= k * lap(T) + bodyterm
 
 @author A. Wachs - Pacific project 2017 */
 
@@ -38,8 +38,12 @@ struct NavierStokes2Temperature
   bool b_restart_ ;
   FV_DomainAndFields const* dom_ ;
   FV_DiscreteField const* UF_ ;
-//  size_t levelAdvectingVelocity_ ;
-//  string resultsDirectory_ ;
+  string AdvectionScheme_ ;
+  size_t AdvectionTimeAccuracy_ ;
+  bool is_solids_ ;
+  size_t Npart_ ;
+  string solid_filename_ ;
+  double loc_thres_ ; 
 };
 
 /** @brief MPIVar include all vectors required while message passing */
@@ -206,10 +210,15 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
       void assemble_intersection_matrix ( size_t const& comp, size_t const& level);                 // Here level:0 -> fluid; 1-> solid
       
+      /** @brief Compute advective term based on either Upwind or TVD spacial scheme */
+      double compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k);
 
       /** @brief Find the intersection using bisection method with the solid interface */ 
       double find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off);
 
+      double assemble_advection_TVD( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
+
+      double assemble_advection_Upwind( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
 
       /** @brief Generate the solid particles present in the domain */ 
       void Solids_generation( ) ;
@@ -252,6 +261,7 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
    //-- Attributes
 
       FV_DiscreteField* TF;
+      FV_DiscreteField const* UF;
 
       FV_DiscreteField* TF_ERROR;
 
@@ -275,16 +285,16 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       struct MPIVar first_pass[3];
       struct MPIVar second_pass[3];
       
-      double peclet ;
+      double rho, heat_capacity, thermal_conductivity;
       double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
       bool b_bodyterm ;
-      bool is_firstorder ;
       bool is_solids;
       bool b_restart ;
       bool is_iperiodic[3];
       boolVector const* periodic_comp;
-      string insertion_type;
       string solid_filename;
+      string AdvectionScheme;
+      size_t AdvectionTimeAccuracy;
 } ;
 
 #endif
