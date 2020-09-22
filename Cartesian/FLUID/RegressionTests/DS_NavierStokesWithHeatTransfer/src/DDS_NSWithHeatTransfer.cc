@@ -373,6 +373,9 @@ DDS_NSWithHeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
    GLOBAL_EQ->initialize_DS_velocity();
    GLOBAL_EQ->initialize_DS_pressure();
 
+   // Setting ugradu as zero at start of simulation
+   if (b_restart == false) ugradu_initialization ( );
+
    // Generate solid particles if required
    if (is_solids) {
       Solids_generation(0);
@@ -672,6 +675,41 @@ DDS_NSWithHeatTransfer:: error_with_analytical_solution_poiseuille ( )
          cout << "L2 Error with analytical solution field " << UF->name() << ", component " << comp << " = " << std::fixed << std::setprecision(16) << error_L2 << endl;
    }
 
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NSWithHeatTransfer:: ugradu_initialization ( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_HeatEquation:: ugradu_initialization" ) ;
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  for (size_t comp=0;comp<nb_comps[1];comp++) {
+     // Get local min and max indices
+     for (size_t l=0;l<dim;++l) {
+        min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l );
+        max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l );
+     }
+
+     size_t local_min_k = 0;
+     size_t local_max_k = 0;
+
+     if (dim == 3) {
+        local_min_k = min_unknown_index(2);
+        local_max_k = max_unknown_index(2);
+     }
+
+     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+        for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+           for (size_t k=local_min_k;k<=local_max_k;++k) {
+              UF->set_DOF_value( i, j, k, comp, 2, 0.);
+           }
+        }
+     }
+  }
 }
 
 //---------------------------------------------------------------------------

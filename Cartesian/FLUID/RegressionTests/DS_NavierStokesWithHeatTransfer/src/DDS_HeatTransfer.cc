@@ -189,11 +189,9 @@ DDS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
    allocate_mpi_variables();
 
    // Generate solid particles if required
-   if (is_solids) Solids_generation();
-
-
-   if (is_solids) node_property_calculation();
    if (is_solids) {
+      Solids_generation();
+      node_property_calculation();
       nodes_temperature_initialization(0);
       nodes_temperature_initialization(1);
       nodes_temperature_initialization(3);
@@ -201,6 +199,9 @@ DDS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
    }
 
    GLOBAL_EQ->initialize_temperature();
+
+   // Necessary especially for cases with non-zero field initiallization
+   if (b_restart == false) ugradu_initialization ( );
 
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
 
@@ -743,20 +744,64 @@ DDS_HeatTransfer:: assemble_temperature_matrix (
           center = - (right+left);
        }
 
-       // add unsteady term
-       double value;
-       double unsteady_term = (FF->get_cell_size(i,comp,dir))/(t_it->time_step());
-
-       value = center;
-
-       value = value + unsteady_term;
-
        bool r_bound = false;
        bool l_bound = false;
        // All the proc will have open right bound, except last proc for non periodic systems
        if ((is_iperiodic[dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
        // All the proc will have open left bound, except first proc for non periodic systems
        if ((is_iperiodic[dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
+
+       // add unsteady term
+       double value;
+       size_t k_min, k_max;
+       double unsteady_term = (FF->get_cell_size(i,comp,dir))/(t_it->time_step());
+
+       if (dim == 2) {
+          k_min = 0; k_max = 0;
+       } else {
+          k_min = min_unknown_index(2); k_max = max_unknown_index(2);
+       }
+
+       // Since, this function is used in all directions; 
+       // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
+       size_t ii=0,jj=0,kk=0;
+
+       // Condition for handling the pressure neumann conditions at wall
+       if (i==min_unknown_index(dir) && l_bound) {
+          if (dir == 0) {
+             ii = i-1; jj = min_unknown_index(1); kk = k_min;
+          } else if (dir == 1) {
+             ii = min_unknown_index(0); jj = i-1; kk = k_min;
+          } else if (dir == 2) {
+             ii = min_unknown_index(0); jj = min_unknown_index(1); kk = i-1;
+          }
+          if (FF->DOF_in_domain(ii,jj,kk,comp) && FF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+             // For Dirichlet boundary condition
+             value = center;
+          } else {
+             // For Neumann homogeneous boundary condition
+             value = -right;
+          }
+       } else if (i==max_unknown_index(dir) && r_bound) {
+          if (dir == 0) {
+             ii = i+1; jj = max_unknown_index(1); kk = k_max;
+          } else if (dir == 1) {
+             ii = max_unknown_index(0); jj = i+1; kk = k_max;
+          } else if (dir == 2) {
+             ii = max_unknown_index(0); jj = max_unknown_index(1); kk = i+1;
+          }
+          if (FF->DOF_in_domain(ii,jj,kk,comp) && FF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+             // For Dirichlet boundary condition
+             value = center;
+          } else {
+             // For Neumann homogeneous boundary condition
+             value = -left;
+          }
+       } else {
+          value = center;
+       }
+
+       value = value + unsteady_term;
 
        // Set Aie, Aei and Aee 
        if ((!l_bound) && (i == min_unknown_index(dir))) {
@@ -1600,7 +1645,42 @@ DDS_HeatTransfer:: Solids_generation ()
      inFile.close();
   }
 } 
-  
+
+//---------------------------------------------------------------------------
+void
+DDS_HeatTransfer:: ugradu_initialization (  )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_HeatTransfer:: ugradu_initialization" ) ;
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  for (size_t comp=0;comp<nb_comps;comp++) {
+     // Get local min and max indices
+     for (size_t l=0;l<dim;++l) {
+        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+     }
+
+     size_t local_min_k = 0;
+     size_t local_max_k = 0;
+
+     if (dim == 3) {
+        local_min_k = min_unknown_index(2);
+        local_max_k = max_unknown_index(2);
+     }
+
+     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+        for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+           for (size_t k=local_min_k;k<=local_max_k;++k) {
+              TF->set_DOF_value( i, j, k, comp, 2, 0.);
+           }
+        }
+     }
+  }
+}
+ 
 //---------------------------------------------------------------------------
 void
 DDS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
@@ -1933,7 +2013,7 @@ DDS_HeatTransfer:: find_intersection ( size_t const& left, size_t const& right, 
      xcenter = TF->get_DOF_coordinate( side(off), comp, dir ) ;
   } else {
      // Bisection method algorithm
-     while (MAC::abs(xright-xleft) > 1.E-15) {
+     while (MAC::abs(xright-xleft) > 1.E-14) {
         xcenter = (xleft+xright)/2.;
         if (dir == 0) {
            funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
@@ -1992,6 +2072,7 @@ DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
   GLOBAL_EQ->synchronize_DS_solution_vec();
   // Tranfer back to field
   TF->update_free_DOFs_value( 3, GLOBAL_EQ->get_solution_DS_temperature() ) ;
+  if (is_solids) nodes_temperature_initialization(3);
   if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer x solution");
 
   if ( my_rank == is_master ) SCT_set_start("Solver y solution");
@@ -2004,8 +2085,10 @@ DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
   // Tranfer back to field
   if (dim == 2) {
      TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+     if (is_solids) nodes_temperature_initialization(0);
   } else if (dim == 3) {
      TF->update_free_DOFs_value( 4 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+     if (is_solids) nodes_temperature_initialization(4);
   }
   if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer y solution");
 
@@ -2019,6 +2102,7 @@ DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
      GLOBAL_EQ->synchronize_DS_solution_vec();
      // Tranfer back to field
      TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+     if (is_solids) nodes_temperature_initialization(0);
      if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer z solution");
   }
 }

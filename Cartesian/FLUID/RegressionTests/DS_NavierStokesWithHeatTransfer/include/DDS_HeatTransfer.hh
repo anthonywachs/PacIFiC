@@ -232,6 +232,7 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       /** @brief Error compared to analytical solution */
       void DS_error_with_analytical_solution ( FV_DiscreteField const* FF,FV_DiscreteField* FF_ERROR ) ;
       
+      void ugradu_initialization (  );
       /** @brief Calculate L2 norm without any analytical solution */
       void output_l2norm ( void ) ;
       //@}

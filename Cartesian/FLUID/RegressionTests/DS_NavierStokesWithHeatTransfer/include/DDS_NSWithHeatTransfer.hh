@@ -192,6 +192,8 @@ public SolverComputingTime
       /** @brief Initialize the velocity on the velocity nodes in MAC grid*/
       void nodes_field_initialization ( size_t const& level );
 
+      void ugradu_initialization ( );
+
       void impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
       void impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID );
 
