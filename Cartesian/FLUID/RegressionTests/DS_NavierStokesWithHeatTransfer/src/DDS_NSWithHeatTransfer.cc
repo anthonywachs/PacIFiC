@@ -160,8 +160,8 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
       loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
-      if ( level_set_type != "Square" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D") {
-         string error_message="- Square\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D";
+      if ( level_set_type != "Square" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D" && level_set_type != "PipeX") {
+         string error_message="- Square\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D\n   - PipeX";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
       }
 
@@ -276,6 +276,7 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    inputData.Npart_ = Npart ;
    inputData.solid_filename_ = solid_filename ;
    inputData.loc_thres_ = loc_thres ;
+   inputData.level_set_type_ = level_set_type ;
 
    MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DDS_HeatTransfer" ) ;
    Solver_Temperature = DDS_HeatTransfer::create( this, set, inputData ) ;
@@ -901,10 +902,11 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
   }
 
   double level_set = 0.;
-  // Type 0 is for circular/spherical solids in 2D/3D system
+
   if (type == "Sphere") {
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
-  // Type 1 is for yz plane at x = xp, solid on left of the plane
+  } else if (type == "PipeX") {
+     level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Wall_Y") {
      level_set = delta(0);
   } else if (type == "Wall_X") {

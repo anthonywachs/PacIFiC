@@ -44,6 +44,7 @@ struct NavierStokes2Temperature
   size_t Npart_ ;
   string solid_filename_ ;
   double loc_thres_ ; 
+  string level_set_type_ ;
 };
 
 /** @brief MPIVar include all vectors required while message passing */
@@ -205,7 +206,7 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       void nodes_temperature_initialization ( size_t const& level );
 
       /** @brief Returns negative value of the point lies inside the solid, otherwise returns a positive number*/
-      double level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, size_t const& type);
+      double level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type);
 
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
       void assemble_intersection_matrix ( size_t const& comp, size_t const& level);                 // Here level:0 -> fluid; 1-> solid
@@ -296,6 +297,7 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       string solid_filename;
       string AdvectionScheme;
       size_t AdvectionTimeAccuracy;
+      string level_set_type;
 } ;
 
 #endif

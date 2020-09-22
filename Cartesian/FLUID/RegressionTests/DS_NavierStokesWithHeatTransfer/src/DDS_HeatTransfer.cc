@@ -122,7 +122,8 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
    if (is_solids) {
       Npart = fromNS.Npart_ ;
       solid_filename = fromNS.solid_filename_ ;
-      loc_thres = fromNS.loc_thres_ ; 
+      loc_thres = fromNS.loc_thres_ ;
+      level_set_type = fromNS.level_set_type_ ; 
    }
 
    // Build the matrix system
@@ -1727,7 +1728,7 @@ DDS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, size_t const& type)
+DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_HeatTransfer:: level_set_solids" ) ;
@@ -1756,8 +1757,10 @@ DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, doub
 
   double level_set = 0.;
   // Type 0 is for circular/spherical solids in 2D/3D system
-  if (type == 0) {
+  if (type == "Sphere") {
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
+  } else if (type == "PipeX") {
+     level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   }
 
   return(level_set);
@@ -1809,7 +1812,7 @@ DDS_HeatTransfer:: node_property_calculation ( )
               }
               size_t p = return_node_index(TF,comp,i,j,k);
               for (size_t m=0;m<Npart;m++) {
-                 double level_set = level_set_function(m,comp,xC,yC,zC,0);
+                 double level_set = level_set_function(m,comp,xC,yC,zC,level_set_type);
                  level_set *= solid.inside[comp]->item(m);  
 
                  // level_set is xb, if local critical time scale is 0.01 of the global time scale 
@@ -1975,14 +1978,14 @@ DDS_HeatTransfer:: find_intersection ( size_t const& left, size_t const& right, 
   double xcenter;
 
   if (dir == 0) {
-     funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
-     funr = level_set_function(id,comp,xright,yvalue,zvalue,0);
+     funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
+     funr = level_set_function(id,comp,xright,yvalue,zvalue,level_set_type);
   } else if (dir == 1) {
-     funl = level_set_function(id,comp,yvalue,xleft,zvalue,0);
-     funr = level_set_function(id,comp,yvalue,xright,zvalue,0);
+     funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
+     funr = level_set_function(id,comp,yvalue,xright,zvalue,level_set_type);
   } else if (dir == 2) {
-     funl = level_set_function(id,comp,yvalue,zvalue,xleft,0);
-     funr = level_set_function(id,comp,yvalue,zvalue,xright,0);
+     funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
+     funr = level_set_function(id,comp,yvalue,zvalue,xright,level_set_type);
   }
 
   // In case both the points are on the same side of solid interface
@@ -1998,14 +2001,14 @@ DDS_HeatTransfer:: find_intersection ( size_t const& left, size_t const& right, 
   }
 
   if (dir == 0) {
-     funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
-     funr = level_set_function(id,comp,xright,yvalue,zvalue,0);
+     funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
+     funr = level_set_function(id,comp,xright,yvalue,zvalue,level_set_type);
   } else if (dir == 1) {
-     funl = level_set_function(id,comp,yvalue,xleft,zvalue,0);
-     funr = level_set_function(id,comp,yvalue,xright,zvalue,0);
+     funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
+     funr = level_set_function(id,comp,yvalue,xright,zvalue,level_set_type);
   } else if (dir == 2) {
-     funl = level_set_function(id,comp,yvalue,zvalue,xleft,0);
-     funr = level_set_function(id,comp,yvalue,zvalue,xright,0);
+     funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
+     funr = level_set_function(id,comp,yvalue,zvalue,xright,level_set_type);
   }
 
   // If the shifted point is also physically outside the solid then xb = dx
@@ -2016,14 +2019,14 @@ DDS_HeatTransfer:: find_intersection ( size_t const& left, size_t const& right, 
      while (MAC::abs(xright-xleft) > 1.E-14) {
         xcenter = (xleft+xright)/2.;
         if (dir == 0) {
-           funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
-           func = level_set_function(id,comp,xcenter,yvalue,zvalue,0);
+           funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
+           func = level_set_function(id,comp,xcenter,yvalue,zvalue,level_set_type);
         } else if (dir == 1) {
-           funl = level_set_function(id,comp,yvalue,xleft,zvalue,0);
-           func = level_set_function(id,comp,yvalue,xcenter,zvalue,0);
+           funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
+           func = level_set_function(id,comp,yvalue,xcenter,zvalue,level_set_type);
         } else if (dir == 2) {
-           funl = level_set_function(id,comp,yvalue,zvalue,xleft,0);
-           func = level_set_function(id,comp,yvalue,zvalue,xcenter,0);
+           funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
+           func = level_set_function(id,comp,yvalue,zvalue,xcenter,level_set_type);
         }
 
         if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
