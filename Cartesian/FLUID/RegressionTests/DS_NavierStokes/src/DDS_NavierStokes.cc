@@ -157,8 +157,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
-      if ( level_set_type != "Square" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D") {
-         string error_message="- Square\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D";
+      if ( level_set_type != "Square" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D" && level_set_type != "PipeX") {
+         string error_message="- Square\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D\n   - PipeX";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
       }
 
@@ -459,6 +459,8 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
       compute_fluid_particle_interaction(t_it,Npoints);
    }
 
+   error_with_analytical_solution_poiseuille3D();
+
    double vel_divergence = get_velocity_divergence();
 
    double cfl = UF->compute_CFL( t_it, 0 );
@@ -560,6 +562,76 @@ DDS_NavierStokes:: error_with_analytical_solution_couette (FV_DiscreteField cons
       if ( my_rank == 0 )
          cout << "L2 Error with analytical solution field " << FF->name() << ", component " << comp << " = " << std::fixed << std::setprecision(16) << error_L2 << endl;
    }
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: error_with_analytical_solution_poiseuille3D ( )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DDS_NavierStokes:: error_with_analytical_solution_poiseuille3D" ) ;
+
+   // Parameters
+   double x, y, z;
+   size_t cpp;
+   double bodyterm=0.;
+
+   // Periodic pressure gradient
+   if ( UF->primary_grid()->is_periodic_flow() ) {
+      cpp = UF->primary_grid()->get_periodic_flow_direction() ;
+      bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
+               ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
+               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
+   }
+
+   for (size_t comp=0;comp<nb_comps[1];++comp) {
+      // Get nb of local dof
+      size_t_vector local_dof_number( dim, 0 );
+      for (size_t l=0;l<dim;++l)
+         local_dof_number(l) = UF->get_local_nb_dof( comp, l ) ;
+
+      double computed_field = 0., analytical_solution = 0.;
+      double error_L2 = 0.;
+
+      if (is_solids) {
+         PartInput solid = GLOBAL_EQ->get_solid(1);
+         NodeProp node = GLOBAL_EQ->get_node_property(1);
+         double xp = solid.coord[comp]->item(0,0);
+         double yp = solid.coord[comp]->item(0,1);
+         double zp = solid.coord[comp]->item(0,2);
+         double rp = solid.size[comp]->item(0);
+
+         // Compute error
+         for (size_t i=0;i<local_dof_number(0);++i) {
+            x = UF->get_DOF_coordinate( i, comp, 0 ) ;
+            for (size_t j=0;j<local_dof_number(1);++j) {
+               y = UF->get_DOF_coordinate( j, comp, 1 ) - yp ;
+               for (size_t k=0;k<local_dof_number(2);++k) {
+                  z = UF->get_DOF_coordinate( k, comp, 2 ) - zp ;
+                  computed_field = UF->DOF_value( i, j, k, comp, 0 ) ;
+
+                  double ri = pow(pow(y,2)+pow(z,2),0.5);
+
+                  size_t p = return_node_index(UF,comp,i,j,k);
+                  if (node.void_frac[comp]->item(p) == 0.) {
+                     if (comp == cpp) {
+                        analytical_solution = (bodyterm/(4.*mu))*(ri*ri-rp*rp);
+                     }
+                     if ( UF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) )
+                        error_L2 += MAC::sqr( computed_field - analytical_solution ) * UF->get_cell_measure( i, j, k, comp ) ;
+                  }
+               }
+            }
+         }
+      }
+
+      error_L2 = pelCOMM->sum( error_L2 );
+      error_L2 = MAC::sqrt(error_L2);
+
+      if ( my_rank == 0 )
+         cout << "L2 Error with analytical solution field " << UF->name() << ", component " << comp << " = " << std::fixed << std::setprecision(16) << error_L2 << endl;
+   }
+
 }
 
 //---------------------------------------------------------------------------
@@ -825,10 +897,10 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
   }
 
   double level_set = 0.;
-  // Type 0 is for circular/spherical solids in 2D/3D system
   if (type == "Sphere") {
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
-  // Type 1 is for yz plane at x = xp, solid on left of the plane
+  } else if (type == "PipeX") {
+     level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Wall_Y") {
      level_set = delta(0);
   } else if (type == "Wall_X") {

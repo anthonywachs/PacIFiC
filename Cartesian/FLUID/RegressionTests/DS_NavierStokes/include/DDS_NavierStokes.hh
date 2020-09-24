@@ -123,7 +123,7 @@ public SolverComputingTime
       //@{
       /** @brief Error compared to analytical solution */
       void error_with_analytical_solution_poiseuille ( ) ;
-
+      void error_with_analytical_solution_poiseuille3D ( ) ;
       void error_with_analytical_solution_couette (FV_DiscreteField const* FF, size_t const& field) ;
 
       /** @brief Call the function to assemble 1D matrices for both velocity and pressure field*/
