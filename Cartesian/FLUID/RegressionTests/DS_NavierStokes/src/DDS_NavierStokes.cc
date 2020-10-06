@@ -459,7 +459,7 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
       compute_fluid_particle_interaction(t_it,Npoints);
    }
 
-   error_with_analytical_solution_poiseuille3D();
+   if (level_set_type == "PipeX") error_with_analytical_solution_poiseuille3D();
 
    double vel_divergence = get_velocity_divergence();
 
@@ -2601,12 +2601,13 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& point
         }
      }
 
+     double scale = (dim == 2) ? ri : ri*ri;
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i)*point_coord(i,0)*(cell_area(i)*ri);
-     force(parID,1) = force(parID,1) + stress(i)*point_coord(i,1)*(cell_area(i)*ri);
-     force(parID,2) = force(parID,2) + stress(i)*point_coord(i,2)*(cell_area(i)*ri);
+     force(parID,0) = force(parID,0) + stress(i)*point_coord(i,0)*(cell_area(i)*scale);
+     force(parID,1) = force(parID,1) + stress(i)*point_coord(i,1)*(cell_area(i)*scale);
+     force(parID,2) = force(parID,2) + stress(i)*point_coord(i,2)*(cell_area(i)*scale);
 
 //     outputFile << xpoint << "," << ypoint << "," << zpoint << "," << stress(i) << "," << MAC::abs(zpoint + xpoint*ypoint*zpoint + pow(xpoint,2)*ypoint + stress(i)) << endl;
   }
@@ -3095,17 +3096,19 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
         }
      }
 
+     double scale = (dim == 2) ? ri : ri*ri;
+
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i,0)*point_coord(i,0)*(cell_area(i)*ri) 
-                                     + stress(i,3)*point_coord(i,1)*(cell_area(i)*ri)
-                                     + stress(i,5)*point_coord(i,2)*(cell_area(i)*ri);
-     force(parID,1) = force(parID,1) + stress(i,3)*point_coord(i,0)*(cell_area(i)*ri) 
-                                     + stress(i,1)*point_coord(i,1)*(cell_area(i)*ri)
-                                     + stress(i,4)*point_coord(i,2)*(cell_area(i)*ri);
-     force(parID,2) = force(parID,2) + stress(i,5)*point_coord(i,0)*(cell_area(i)*ri) 
-                                     + stress(i,4)*point_coord(i,1)*(cell_area(i)*ri)
-                                     + stress(i,2)*point_coord(i,2)*(cell_area(i)*ri);
+     force(parID,0) = force(parID,0) + stress(i,0)*point_coord(i,0)*(cell_area(i)*scale) 
+                                     + stress(i,3)*point_coord(i,1)*(cell_area(i)*scale)
+                                     + stress(i,5)*point_coord(i,2)*(cell_area(i)*scale);
+     force(parID,1) = force(parID,1) + stress(i,3)*point_coord(i,0)*(cell_area(i)*scale) 
+                                     + stress(i,1)*point_coord(i,1)*(cell_area(i)*scale)
+                                     + stress(i,4)*point_coord(i,2)*(cell_area(i)*scale);
+     force(parID,2) = force(parID,2) + stress(i,5)*point_coord(i,0)*(cell_area(i)*scale) 
+                                     + stress(i,4)*point_coord(i,1)*(cell_area(i)*scale)
+                                     + stress(i,2)*point_coord(i,2)*(cell_area(i)*scale);
 //     outputFile << xpoint(0) << "," << ypoint(0) << "," << 0 << "," << stress(i,0) << "," << stress(i,1) << "," << stress(i,2) << endl;
   }
 //  outputFile.close();
