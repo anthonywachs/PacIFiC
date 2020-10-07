@@ -2886,19 +2886,27 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
   MAC_LABEL("DDS_NavierStokes:: compute_velocity_force_on_particle" ) ;
 
   size_t i0_temp;
-  double ri;
   bool found = 0;
   double dfdx=0.,dfdy=0., dfdz=0., dzh=0.;
   double Dz_min=0., Dz_max=0.;
 
-/*  
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid(1);
+
+  // comp won't matter as the particle position is independent of comp
+  double xp = solid.coord[0]->item(parID,0);
+  double yp = solid.coord[0]->item(parID,1);
+  double zp = solid.coord[0]->item(parID,2);
+  double ri = solid.size[0]->item(parID);
+
+  
   ofstream outputFile ;
   std::ostringstream os2;
-  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/velocity_drag_" << my_rank << ".csv";
+  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/velocity_drag_" << my_rank << "_" << parID << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
-//  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
-  outputFile << "x,y,z,id" << endl;*/
+  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
+//  outputFile << "x,y,z,id" << endl;
 
   doubleVector xpoint(3,0);
   doubleVector ypoint(3,0);
@@ -2907,6 +2915,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
   doubleVector finy(3,0);
   doubleVector finz(3,0);
   doubleArray2D stress(Np,6,0);         //xx,yy,zz,xy,yz,zx
+  doubleArray2D level_set(dim,2,1.);          
   size_t_vector i0_x(3,0);
   size_t_vector i0_y(3,0);
   size_t_vector i0_z(3,0);
@@ -2918,8 +2927,6 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
 
-  // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid(1);
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[1];comp++) {
         // Get local min and max indices
@@ -2936,11 +2943,6 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
               Dmax(l) = UF->get_DOF_coordinate( max_unknown_index(l), comp, l ) + UF->get_cell_size(max_unknown_index(l),comp,l);
            }
         }
-
-        double xp = solid.coord[comp]->item(parID,0);
-        double yp = solid.coord[comp]->item(parID,1);
-        double zp = solid.coord[comp]->item(parID,2);
-        ri = solid.size[comp]->item(parID);
 
         xpoint(0) = xp + ri*point_coord(i,0);
         ypoint(0) = yp + ri*point_coord(i,1);
@@ -2998,6 +3000,41 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
               }
            }
 
+           // Assuming all ghost points are in fluid
+           level_set(0,0) = 1.; level_set(0,1) = 1.;
+           level_set(1,0) = 1.; level_set(1,1) = 1.;
+           if (dim == 3) {level_set(2,0) = 1.; level_set(2,1) = 1.;}
+
+           // Checking all the ghost points in the solid/fluid
+           for (size_t m=0;m<Npart;m++) {
+              if (level_set(0,0) > 0.) {
+                 level_set(0,0) = level_set_function(UF,m,comp,xpoint(1),ypoint(0),zpoint(0),level_set_type,1);
+                 level_set(0,0) *= solid.inside[comp]->item(m);
+              }
+              if (level_set(0,1) > 0.) {
+                 level_set(0,1) = level_set_function(UF,m,comp,xpoint(2),ypoint(0),zpoint(0),level_set_type,1);
+                 level_set(0,1) *= solid.inside[comp]->item(m);
+              }
+              if (level_set(1,0) > 0.) {
+                 level_set(1,0) = level_set_function(UF,m,comp,xpoint(0),ypoint(1),zpoint(0),level_set_type,1);
+                 level_set(1,0) *= solid.inside[comp]->item(m);
+              }
+              if (level_set(1,1) > 0.) {
+                 level_set(1,1) = level_set_function(UF,m,comp,xpoint(0),ypoint(2),zpoint(0),level_set_type,1);
+                 level_set(1,1) *= solid.inside[comp]->item(m);
+              }
+              if (dim == 3) {
+                 if (level_set(2,0) > 0.) {
+                    level_set(2,0) = level_set_function(UF,m,comp,xpoint(0),ypoint(0),zpoint(1),level_set_type,1);
+                    level_set(2,0) *= solid.inside[comp]->item(m);
+                 }
+                 if (level_set(2,1) > 0.) {
+                    level_set(2,1) = level_set_function(UF,m,comp,xpoint(0),ypoint(0),zpoint(2),level_set_type,1);
+                    level_set(2,1) *= solid.inside[comp]->item(m);
+                 }
+              }
+           }
+
            // Finding the grid indexes next to ghost points
            found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(1), i0_temp);
            if (found == 1) i0_x(1) = i0_temp;
@@ -3016,15 +3053,16 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
            finx(0) = net_vel[comp];
            finy(0) = net_vel[comp];
            finz(0) = net_vel[comp];
+
            if (dim == 2) {
               // Calculation of field variable on ghost point(1,0)
-              finx(1) = ghost_field_estimate_on_face (UF,comp,i0_x(1),i0_y(0),0, xpoint(1), ypoint(0),0, dh,2,0);
+              if (level_set(0,0) > 0.) finx(1) = ghost_field_estimate_on_face (UF,comp,i0_x(1),i0_y(0),0, xpoint(1), ypoint(0),0, dh,2,0);
               // Calculation of field variable on ghost point(2,0)
-              finx(2) = ghost_field_estimate_on_face (UF,comp,i0_x(2),i0_y(0),0, xpoint(2), ypoint(0),0, dh,2,0);
+              if (level_set(0,1) > 0.) finx(2) = ghost_field_estimate_on_face (UF,comp,i0_x(2),i0_y(0),0, xpoint(2), ypoint(0),0, dh,2,0);
               // Calculation of field variable on ghost point(0,1)
-              finy(1) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(1),0, xpoint(0), ypoint(1),0, dh,2,0);
+              if (level_set(1,0) > 0.) finy(1) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(1),0, xpoint(0), ypoint(1),0, dh,2,0);
               // Calculation of field variable on ghost point(0,2)
-              finy(2) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(2),0, xpoint(0), ypoint(2),0, dh,2,0);
+              if (level_set(1,1) > 0.) finy(2) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(2),0, xpoint(0), ypoint(2),0, dh,2,0);
            } else if (dim == 3) {
               found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(1), i0_temp);
               if (found == 1) i0_z(1) = i0_temp;
@@ -3033,43 +3071,61 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
               if (found == 1) i0_z(2) = i0_temp;
 
               // Calculation of field variable on ghost point(1,0,0)
-              finx(1) = ghost_field_estimate_in_box (UF,comp,i0_x(1),i0_y(0),i0_z(0),xpoint(1),ypoint(0),zpoint(0),dh,0,parID);
+              if (level_set(0,0) > 0.) finx(1) = ghost_field_estimate_in_box (UF,comp,i0_x(1),i0_y(0),i0_z(0),xpoint(1),ypoint(0),zpoint(0),dh,0,parID);
               // Calculation of field variable on ghost point(2,0,0)
-              finx(2) = ghost_field_estimate_in_box (UF,comp,i0_x(2),i0_y(0),i0_z(0),xpoint(2),ypoint(0),zpoint(0),dh,0,parID);
+              if (level_set(0,1) > 0.) finx(2) = ghost_field_estimate_in_box (UF,comp,i0_x(2),i0_y(0),i0_z(0),xpoint(2),ypoint(0),zpoint(0),dh,0,parID);
               // Calculation of field variable on ghost point(0,1,0)
-              finy(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(1),i0_z(0),xpoint(0),ypoint(1),zpoint(0),dh,0,parID);
+              if (level_set(1,0) > 0.) finy(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(1),i0_z(0),xpoint(0),ypoint(1),zpoint(0),dh,0,parID);
               // Calculation of field variable on ghost point(0,2,0)
-              finy(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(2),i0_z(0),xpoint(0),ypoint(2),zpoint(0),dh,0,parID);
+              if (level_set(1,1) > 0.) finy(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(2),i0_z(0),xpoint(0),ypoint(2),zpoint(0),dh,0,parID);
               // Calculation of field variable on ghost point(0,0,1)
-              finz(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(1),xpoint(0),ypoint(0),zpoint(1),dh,0,parID);
+              if (level_set(2,0) > 0.) finz(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(1),xpoint(0),ypoint(0),zpoint(1),dh,0,parID);
               // Calculation of field variable on ghost point(0,0,2)
-              finz(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(2),xpoint(0),ypoint(0),zpoint(2),dh,0,parID);
+              if (level_set(2,1) > 0.) finz(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(2),xpoint(0),ypoint(0),zpoint(2),dh,0,parID);
               // Derivative in z
               if (point_coord(i,2) <=0.) {
-                 dfdz = mu*(finz(2) - 4.*finz(1) + 3.*finz(0))/2./dh;
-//                 dfdz = mu*(-finz(1) + finz(0))/dh;
+                 if ((level_set(2,0) > 0.) && (level_set(2,1) > 0.)) {
+                    dfdz = mu*(finz(2) - 4.*finz(1) + 3.*finz(0))/2./dh;
+                 } else if ((level_set(2,0) > 0.) && (level_set(2,1) <= 0.)) {
+                    dfdz = mu*(-finz(1) + finz(0))/dh;
+                 }
               } else {
-                 dfdz = mu*(-finz(2) + 4.*finz(1) - 3.*finz(0))/2./dh;
-//                 dfdz = mu*(finz(1) - finz(0))/dh;
+                 if ((level_set(2,0) > 0.) && (level_set(2,1) > 0.)) {
+                    dfdz = mu*(-finz(2) + 4.*finz(1) - 3.*finz(0))/2./dh;
+                 } else if ((level_set(2,0) > 0.) && (level_set(2,1) <= 0.)) {
+                    dfdz = mu*(finz(1) - finz(0))/dh;
+                 }
               }
            }
 
            // Derivative in x
            if (point_coord(i,0) <= 0.) {
-              dfdx = mu*(finx(2) - 4.*finx(1) + 3.*finx(0))/2./dh;
-//              dfdx = mu*(-finx(1) + finx(0))/dh;
+              if ((level_set(0,0) > 0.) && (level_set(0,1) > 0.)) {
+                 dfdx = mu*(finx(2) - 4.*finx(1) + 3.*finx(0))/2./dh;
+              } else if ((level_set(0,0) > 0.) && (level_set(0,1) <= 0.)) {
+                 dfdx = mu*(-finx(1) + finx(0))/dh;
+              }
            } else {
-              dfdx = mu*(-finx(2) + 4.*finx(1) - 3.*finx(0))/2./dh;
-//              dfdx = mu*(finx(1) - finx(0))/dh;
+              if ((level_set(0,0) > 0.) && (level_set(0,1) > 0.)) {
+                 dfdx = mu*(-finx(2) + 4.*finx(1) - 3.*finx(0))/2./dh;
+              } else if ((level_set(0,0) > 0.) && (level_set(0,1) <= 0.)) {
+                 dfdx = mu*(finx(1) - finx(0))/dh;
+              }
            }
 
            // Derivative in y
            if (point_coord(i,1) <=0.) {
-              dfdy = mu*(finy(2) - 4.*finy(1) + 3.*finy(0))/2./dh;
-//              dfdy = mu*(-finy(1) + finy(0))/dh;
+              if ((level_set(1,0) > 0.) && (level_set(1,1) > 0.)) {
+                 dfdy = mu*(finy(2) - 4.*finy(1) + 3.*finy(0))/2./dh;
+              } else if ((level_set(1,0) > 0.) && (level_set(1,1) <= 0.)) {
+                 dfdy = mu*(-finy(1) + finy(0))/dh;
+              }
            } else {
-              dfdy = mu*(-finy(2) + 4.*finy(1) - 3.*finy(0))/2./dh;
-//              dfdy = mu*(finy(1) - finy(0))/dh;
+              if ((level_set(1,0) > 0.) && (level_set(1,1) > 0.)) {
+                 dfdy = mu*(-finy(2) + 4.*finy(1) - 3.*finy(0))/2./dh;
+              } else if ((level_set(1,0) > 0.) && (level_set(1,1) <= 0.)) {
+                 dfdy = mu*(finy(1) - finy(0))/dh;
+              }
            }
 
            if (comp == 0) {
@@ -3109,9 +3165,9 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& point
      force(parID,2) = force(parID,2) + stress(i,5)*point_coord(i,0)*(cell_area(i)*scale) 
                                      + stress(i,4)*point_coord(i,1)*(cell_area(i)*scale)
                                      + stress(i,2)*point_coord(i,2)*(cell_area(i)*scale);
-//     outputFile << xpoint(0) << "," << ypoint(0) << "," << 0 << "," << stress(i,0) << "," << stress(i,1) << "," << stress(i,2) << endl;
+     outputFile << xpoint(0) << "," << ypoint(0) << "," << 0 << "," << stress(i,0) << "," << stress(i,1) << "," << stress(i,3) << endl;
   }
-//  outputFile.close();
+  outputFile.close();
 }
 //---------------------------------------------------------------------------
 double
