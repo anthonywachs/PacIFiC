@@ -221,6 +221,8 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
 
       double assemble_advection_Upwind( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
 
+      double assemble_advection_Upwind_new( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
+
       /** @brief Generate the solid particles present in the domain */ 
       void Solids_generation( ) ;
 

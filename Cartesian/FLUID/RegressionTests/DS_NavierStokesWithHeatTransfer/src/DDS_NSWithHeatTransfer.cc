@@ -11,6 +11,7 @@
 #include <MAC_Error.hh>
 #include <MAC_ModuleExplorer.hh>
 #include <MAC_Vector.hh>
+#include <MAC_BoolArray2D.hh>
 #include <MAC_Communicator.hh>
 #include <MAC_Exec.hh>
 #include <MAC_Application.hh>
@@ -856,11 +857,11 @@ DDS_NSWithHeatTransfer:: return_node_index (
    size_t_vector max_unknown_index(dim,0);
    size_t_vector i_length(dim,0);
    for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) - 1;
-        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
-//        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-//        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
-        i_length(l) = 1 + max_unknown_index(l) - min_unknown_index(l);
+      // To include knowns at dirichlet boundary in the indexing as well, wherever required
+      min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
+                                                                                                     (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
+      max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
+      i_length(l) = 1 + max_unknown_index(l) - min_unknown_index(l);
    }
 
    size_t local_min_k = 0;
@@ -1069,13 +1070,11 @@ DDS_NSWithHeatTransfer:: node_property_calculation (FV_DiscreteField const* FF, 
 
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices; 
-     // Calculation on the rows next to the unknown (i.e. known) as well
+     // Calculation on the rows next to the unknown (i.e. not handled by the proc) as well
      for (size_t l=0;l<dim;++l) {
         // Calculations for solids on the total unknown on the proc
         min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
         max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
-//        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-//        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
      }
 
      size_t local_min_k = 0;
@@ -1155,10 +1154,10 @@ DDS_NSWithHeatTransfer:: assemble_intersection_matrix ( FV_DiscreteField const* 
   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,level);
 
   for (size_t l=0;l<dim;++l) {
-     min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
-     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
-//     min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l );
-//     max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l );
+     // To include knowns at dirichlet boundary in the intersection calculation as well, important in cases where the particle is close to domain boundary
+     min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
+                                                                                                    (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
+     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
      local_unknown_extents(l,0) = 0;
      local_unknown_extents(l,1) = (max_unknown_index(l)-min_unknown_index(l));
   }
@@ -1281,7 +1280,7 @@ DDS_NSWithHeatTransfer:: find_intersection ( FV_DiscreteField const* FF, size_t 
   double xright = FF->get_DOF_coordinate( side(1), comp, dir ) ;
 
   double yvalue=0.,zvalue=0.;
-  size_t p;
+  size_t p=0;
 
   if (dir == 0) {
      yvalue = FF->get_DOF_coordinate( yconst, comp, 1 ) ;
@@ -2497,7 +2496,7 @@ DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle(class doubleArray2D&
   MAC_LABEL("DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle" ) ;
 
   size_t i0_temp;
-  double ri;
+  double ri=0.;
   bool found = 0;
 /*
   ofstream outputFile ;
@@ -2607,12 +2606,13 @@ DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle(class doubleArray2D&
         }
      }
 
+     double scale = (dim == 2) ? ri : ri*ri;
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i)*point_coord(i,0)*(cell_area(i)*ri);
-     force(parID,1) = force(parID,1) + stress(i)*point_coord(i,1)*(cell_area(i)*ri);
-     force(parID,2) = force(parID,2) + stress(i)*point_coord(i,2)*(cell_area(i)*ri);
+     force(parID,0) = force(parID,0) + stress(i)*point_coord(i,0)*(cell_area(i)*scale);
+     force(parID,1) = force(parID,1) + stress(i)*point_coord(i,1)*(cell_area(i)*scale);
+     force(parID,2) = force(parID,2) + stress(i)*point_coord(i,2)*(cell_area(i)*scale);
 
 //     outputFile << xpoint << "," << ypoint << "," << zpoint << "," << stress(i) << "," << MAC::abs(zpoint + xpoint*ypoint*zpoint + pow(xpoint,2)*ypoint + stress(i)) << endl;
   }
@@ -2891,18 +2891,25 @@ DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D&
   MAC_LABEL("DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle" ) ;
 
   size_t i0_temp;
-  double ri;
-  bool found = 0;
   double dfdx=0.,dfdy=0., dfdz=0., dzh=0.;
   double Dz_min=0., Dz_max=0.;
+
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid(1);
+
+  // comp won't matter as the particle position is independent of comp
+  double xp = solid.coord[0]->item(parID,0);
+  double yp = solid.coord[0]->item(parID,1);
+  double zp = solid.coord[0]->item(parID,2);
+  double ri = solid.size[0]->item(parID);
 
 /*  
   ofstream outputFile ;
   std::ostringstream os2;
-  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/velocity_drag_" << my_rank << ".csv";
+  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/velocity_drag_" << my_rank << "_" << parID << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
-//  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
+  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
   outputFile << "x,y,z,id" << endl;*/
 
   doubleVector xpoint(3,0);
@@ -2912,6 +2919,10 @@ DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D&
   doubleVector finy(3,0);
   doubleVector finz(3,0);
   doubleArray2D stress(Np,6,0);         //xx,yy,zz,xy,yz,zx
+  doubleArray2D level_set(dim,2,1.);          
+  boolArray2D in_domain(dim,2,true);        //true if ghost point in the computational domain
+  size_t_array2D in_parID(dim,2,0);         //Store particle ID if level_set becomes negative
+  boolArray2D found(dim,3,false);
   size_t_vector i0_x(3,0);
   size_t_vector i0_y(3,0);
   size_t_vector i0_z(3,0);
@@ -2923,8 +2934,6 @@ DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D&
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
 
-  // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid(1);
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[1];comp++) {
         // Get local min and max indices
@@ -2942,28 +2951,40 @@ DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D&
            }
         }
 
-        double xp = solid.coord[comp]->item(parID,0);
-        double yp = solid.coord[comp]->item(parID,1);
-        double zp = solid.coord[comp]->item(parID,2);
-        ri = solid.size[comp]->item(parID);
-
         xpoint(0) = xp + ri*point_coord(i,0);
         ypoint(0) = yp + ri*point_coord(i,1);
         zpoint(0) = zp + ri*point_coord(i,2);
 
-        // Finding the grid indexes next to ghost points
-        found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(0), i0_temp);
-        if (found == 1) i0_x(0) = i0_temp;
+        if (is_periodic[1][0]) {
+           double isize = UF->primary_grid()->get_main_domain_max_coordinate(0) - UF->primary_grid()->get_main_domain_min_coordinate(0);
+           double imin = UF->primary_grid()->get_main_domain_min_coordinate(0);
+           xpoint(0) = xpoint(0) - MAC::floor((xpoint(0)-imin)/isize)*isize;
+        }
+        if (is_periodic[1][1]) {
+           double isize = UF->primary_grid()->get_main_domain_max_coordinate(1) - UF->primary_grid()->get_main_domain_min_coordinate(1);
+           double imin = UF->primary_grid()->get_main_domain_min_coordinate(1);
+           ypoint(0) = ypoint(0) - MAC::floor((ypoint(0)-imin)/isize)*isize;
+        }
+        if (is_periodic[1][2]) {
+           double isize = UF->primary_grid()->get_main_domain_max_coordinate(2) - UF->primary_grid()->get_main_domain_min_coordinate(2);
+           double imin = UF->primary_grid()->get_main_domain_min_coordinate(2);
+           zpoint(0) = zpoint(0) - MAC::floor((zpoint(0)-imin)/isize)*isize;
+        }
+        // Displacement correction in case of periodic boundary condition in any or all directions
 
-        found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(0), i0_temp);
-        if (found == 1) i0_y(0) = i0_temp;
+        // Finding the grid indexes next to ghost points
+        found(0,0) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(0), i0_temp);
+        if (found(0,0) == 1) i0_x(0) = i0_temp;
+
+        found(1,0) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(0), i0_temp);
+        if (found(1,0) == 1) i0_y(0) = i0_temp;
 
         double dxh = UF->get_cell_size(i0_x(0),comp,0) ;
         double dyh = UF->get_cell_size(i0_y(0),comp,1) ;
 
         if (dim == 3) {
-           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(0), i0_temp);
-           if (found == 1) i0_z(0) = i0_temp;
+           found(2,0) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(0), i0_temp);
+           if (found(2,0) == 1) i0_z(0) = i0_temp;
            dzh = UF->get_cell_size(i0_z(0),comp,2) ;
         }
 
@@ -2974,108 +2995,240 @@ DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D&
                                                                                   && (zpoint(0) > Dmin(2)) && (zpoint(0) <= Dmax(2)));
 
         if (status) {
+           double sign_x = (point_coord(i,0) > 0.) ? 1. : -1.;
+           double sign_y = (point_coord(i,1) > 0.) ? 1. : -1.;
+           double sign_z = 1.;
+
            // Ghost points in x for the calculation of x-derivative of field
-           if (point_coord(i,0) <= 0.) {
-              xpoint(1) = xpoint(0) - dh;
-              xpoint(2) = xpoint(1) - dh;
-           } else {
-              xpoint(1) = xpoint(0) + dh;
-              xpoint(2) = xpoint(1) + dh;
+           xpoint(1) = xpoint(0) + sign_x*dh;
+           xpoint(2) = xpoint(1) + sign_x*dh;
+
+           if (is_periodic[1][0]) {
+              double isize = UF->primary_grid()->get_main_domain_max_coordinate(0) - UF->primary_grid()->get_main_domain_min_coordinate(0);
+              double imin = UF->primary_grid()->get_main_domain_min_coordinate(0);
+              xpoint(1) = xpoint(1) - MAC::floor((xpoint(1)-imin)/isize)*isize;
+              xpoint(2) = xpoint(2) - MAC::floor((xpoint(2)-imin)/isize)*isize;
            }
 
            // Ghost points in y for the calculation of y-derivative of field
-           if (point_coord(i,1) <=0.) {
-              ypoint(1) = ypoint(0) - dh;
-              ypoint(2) = ypoint(1) - dh;
-           } else {
-              ypoint(1) = ypoint(0) + dh;
-              ypoint(2) = ypoint(1) + dh;
+           ypoint(1) = ypoint(0) + sign_y*dh;
+           ypoint(2) = ypoint(1) + sign_y*dh;
+
+           if (is_periodic[1][1]) {
+              double isize = UF->primary_grid()->get_main_domain_max_coordinate(1) - UF->primary_grid()->get_main_domain_min_coordinate(1);
+              double imin = UF->primary_grid()->get_main_domain_min_coordinate(1);
+              ypoint(1) = ypoint(1) - MAC::floor((ypoint(1)-imin)/isize)*isize;
+              ypoint(2) = ypoint(2) - MAC::floor((ypoint(2)-imin)/isize)*isize;
            }
 
            if (dim == 3) {
+              sign_z = (point_coord(i,2) > 0.) ? 1. : -1.;
               // Ghost points in z for the calculation of z-derivative of field
-              if (point_coord(i,2) <=0.) {
-                 zpoint(1) = zpoint(0) - dh;
-                 zpoint(2) = zpoint(1) - dh;
-              } else {
-                 zpoint(1) = zpoint(0) + dh;
-                 zpoint(2) = zpoint(1) + dh;
+              zpoint(1) = zpoint(0) + sign_z*dh;
+              zpoint(2) = zpoint(1) + sign_z*dh;
+
+              if (is_periodic[1][2]) {
+                 double isize = UF->primary_grid()->get_main_domain_max_coordinate(2) - UF->primary_grid()->get_main_domain_min_coordinate(2);
+                 double imin = UF->primary_grid()->get_main_domain_min_coordinate(2);
+                 zpoint(1) = zpoint(1) - MAC::floor((zpoint(1)-imin)/isize)*isize;
+                 zpoint(2) = zpoint(2) - MAC::floor((zpoint(2)-imin)/isize)*isize;
+              }
+           }
+
+           // Assuming all ghost points are in fluid
+           level_set(0,0) = 1.; level_set(0,1) = 1.;
+           level_set(1,0) = 1.; level_set(1,1) = 1.;
+           if (dim == 3) {level_set(2,0) = 1.; level_set(2,1) = 1.;}
+
+           // Checking all the ghost points in the solid/fluid, and storing the parID if present in solid
+           for (size_t m=0;m<Npart;m++) {
+              if (level_set(0,0) > 0.) {
+                 level_set(0,0) = level_set_function(UF,m,comp,xpoint(1),ypoint(0),zpoint(0),level_set_type,1);
+                 level_set(0,0) *= solid.inside[comp]->item(m);
+                 if (level_set(0,0) < 0.) in_parID(0,0) = m;
+              }
+              if (level_set(0,1) > 0.) {
+                 level_set(0,1) = level_set_function(UF,m,comp,xpoint(2),ypoint(0),zpoint(0),level_set_type,1);
+                 level_set(0,1) *= solid.inside[comp]->item(m);
+                 if (level_set(0,1) < 0.) in_parID(0,1) = m;
+              }
+              if (level_set(1,0) > 0.) {
+                 level_set(1,0) = level_set_function(UF,m,comp,xpoint(0),ypoint(1),zpoint(0),level_set_type,1);
+                 level_set(1,0) *= solid.inside[comp]->item(m);
+                 if (level_set(1,0) < 0.) in_parID(1,0) = m;
+              }
+              if (level_set(1,1) > 0.) {
+                 level_set(1,1) = level_set_function(UF,m,comp,xpoint(0),ypoint(2),zpoint(0),level_set_type,1);
+                 level_set(1,1) *= solid.inside[comp]->item(m);
+                 if (level_set(1,1) < 0.) in_parID(1,1) = m;
+              }
+              if (dim == 3) {
+                 if (level_set(2,0) > 0.) {
+                    level_set(2,0) = level_set_function(UF,m,comp,xpoint(0),ypoint(0),zpoint(1),level_set_type,1);
+                    level_set(2,0) *= solid.inside[comp]->item(m);
+                    if (level_set(2,0) < 0.) in_parID(2,0) = m;
+                 }
+                 if (level_set(2,1) > 0.) {
+                    level_set(2,1) = level_set_function(UF,m,comp,xpoint(0),ypoint(0),zpoint(2),level_set_type,1);
+                    level_set(2,1) *= solid.inside[comp]->item(m);
+                    if (level_set(2,1) < 0.) in_parID(2,1) = m;
+                 }
               }
            }
 
            // Finding the grid indexes next to ghost points
-           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(1), i0_temp);
-           if (found == 1) i0_x(1) = i0_temp;
+           found(0,1) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(1), i0_temp);
+           if (found(0,1) == 1) i0_x(1) = i0_temp;
 
-           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(2), i0_temp);
-           if (found == 1) i0_x(2) = i0_temp;
+           found(0,2) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(2), i0_temp);
+           if (found(0,2) == 1) i0_x(2) = i0_temp;
 
-           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(1), i0_temp);
-           if (found == 1) i0_y(1) = i0_temp;
+           found(1,1) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(1), i0_temp);
+           if (found(1,1) == 1) i0_y(1) = i0_temp;
 
-           found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(2), i0_temp);
-           if (found == 1) i0_y(2) = i0_temp;
+           found(1,2) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(2), i0_temp);
+           if (found(1,2) == 1) i0_y(2) = i0_temp;
 
            // Calculation of field variable on ghost point(0,0)
            impose_solid_velocity_for_ghost(net_vel,comp,xpoint(0),ypoint(0),zpoint(0),parID);
            finx(0) = net_vel[comp];
            finy(0) = net_vel[comp];
            finz(0) = net_vel[comp];
-           if (dim == 2) {
-              // Calculation of field variable on ghost point(1,0)
-              finx(1) = ghost_field_estimate_on_face (UF,comp,i0_x(1),i0_y(0),0, xpoint(1), ypoint(0),0, dh,2,0);
-              // Calculation of field variable on ghost point(2,0)
-              finx(2) = ghost_field_estimate_on_face (UF,comp,i0_x(2),i0_y(0),0, xpoint(2), ypoint(0),0, dh,2,0);
-              // Calculation of field variable on ghost point(0,1)
-              finy(1) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(1),0, xpoint(0), ypoint(1),0, dh,2,0);
-              // Calculation of field variable on ghost point(0,2)
-              finy(2) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(2),0, xpoint(0), ypoint(2),0, dh,2,0);
-           } else if (dim == 3) {
-              found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(1), i0_temp);
-              if (found == 1) i0_z(1) = i0_temp;
 
-              found = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(2), i0_temp);
-              if (found == 1) i0_z(2) = i0_temp;
+           if (dim == 2) {
+              in_domain(0,0) = found(0,1)*found(1,0);
+              in_domain(0,1) = found(0,2)*found(1,0);
+              in_domain(1,0) = found(0,0)*found(1,1);
+              in_domain(1,1) = found(0,0)*found(1,2);
+              // Calculation of field variable on ghost point(1,0)
+              if ((level_set(0,0) > 0.) && in_domain(0,0)) 
+                  finx(1) = ghost_field_estimate_on_face (UF,comp,i0_x(1),i0_y(0),0, xpoint(1), ypoint(0),0, dh,2,0);
+              // Calculation of field variable on ghost point(2,0)
+              if ((level_set(0,1) > 0.) && in_domain(0,1)) 
+                  finx(2) = ghost_field_estimate_on_face (UF,comp,i0_x(2),i0_y(0),0, xpoint(2), ypoint(0),0, dh,2,0);
+              // Calculation of field variable on ghost point(0,1)
+              if ((level_set(1,0) > 0.) && in_domain(1,0)) 
+                  finy(1) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(1),0, xpoint(0), ypoint(1),0, dh,2,0);
+              // Calculation of field variable on ghost point(0,2)
+              if ((level_set(1,1) > 0.) && in_domain(1,1)) 
+                  finy(2) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(2),0, xpoint(0), ypoint(2),0, dh,2,0);
+
+           } else if (dim == 3) {
+              found(2,1) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(1), i0_temp);
+              if (found(2,1) == 1) i0_z(1) = i0_temp;
+
+              found(2,2) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(2), i0_temp);
+              if (found(2,2) == 1) i0_z(2) = i0_temp;
+
+              in_domain(0,0) = found(0,1)*found(1,0)*found(2,0);
+              in_domain(0,1) = found(0,2)*found(1,0)*found(2,0);
+              in_domain(1,0) = found(1,1)*found(0,0)*found(2,0);
+              in_domain(1,1) = found(1,2)*found(0,0)*found(2,0);
+              in_domain(2,0) = found(2,1)*found(0,0)*found(1,0);
+              in_domain(2,1) = found(2,2)*found(0,0)*found(1,0);
 
               // Calculation of field variable on ghost point(1,0,0)
-              finx(1) = ghost_field_estimate_in_box (UF,comp,i0_x(1),i0_y(0),i0_z(0),xpoint(1),ypoint(0),zpoint(0),dh,0,parID);
+              if ((level_set(0,0) > 0.) && in_domain(0,0)) 
+                 finx(1) = ghost_field_estimate_in_box (UF,comp,i0_x(1),i0_y(0),i0_z(0),xpoint(1),ypoint(0),zpoint(0),dh,0,parID);
               // Calculation of field variable on ghost point(2,0,0)
-              finx(2) = ghost_field_estimate_in_box (UF,comp,i0_x(2),i0_y(0),i0_z(0),xpoint(2),ypoint(0),zpoint(0),dh,0,parID);
+              if ((level_set(0,1) > 0.) && in_domain(0,1))
+                 finx(2) = ghost_field_estimate_in_box (UF,comp,i0_x(2),i0_y(0),i0_z(0),xpoint(2),ypoint(0),zpoint(0),dh,0,parID);
               // Calculation of field variable on ghost point(0,1,0)
-              finy(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(1),i0_z(0),xpoint(0),ypoint(1),zpoint(0),dh,0,parID);
+              if ((level_set(1,0) > 0.) && in_domain(1,0))
+                 finy(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(1),i0_z(0),xpoint(0),ypoint(1),zpoint(0),dh,0,parID);
               // Calculation of field variable on ghost point(0,2,0)
-              finy(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(2),i0_z(0),xpoint(0),ypoint(2),zpoint(0),dh,0,parID);
+              if ((level_set(1,1) > 0.) && in_domain(1,1))
+                 finy(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(2),i0_z(0),xpoint(0),ypoint(2),zpoint(0),dh,0,parID);
               // Calculation of field variable on ghost point(0,0,1)
-              finz(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(1),xpoint(0),ypoint(0),zpoint(1),dh,0,parID);
+              if ((level_set(2,0) > 0.) && in_domain(2,0))
+                 finz(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(1),xpoint(0),ypoint(0),zpoint(1),dh,0,parID);
               // Calculation of field variable on ghost point(0,0,2)
-              finz(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(2),xpoint(0),ypoint(0),zpoint(2),dh,0,parID);
+              if ((level_set(2,1) > 0.) && in_domain(2,1))
+                 finz(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(2),xpoint(0),ypoint(0),zpoint(2),dh,0,parID);
+
               // Derivative in z
-              if (point_coord(i,2) <=0.) {
-                 dfdz = mu*(finz(2) - 4.*finz(1) + 3.*finz(0))/2./dh;
-//                 dfdz = mu*(-finz(1) + finz(0))/dh;
-              } else {
+              // Both points 1 and 2 are in fluid, and both in the computational domain
+              if ((level_set(2,0) > 0.) && (level_set(2,1) > 0.) && (in_domain(2,0)*in_domain(2,1))) {
                  dfdz = mu*(-finz(2) + 4.*finz(1) - 3.*finz(0))/2./dh;
-//                 dfdz = mu*(finz(1) - finz(0))/dh;
+              // Point 1 in fluid and 2 is either in the solid or out of the computational domain
+              } else if ((level_set(2,0) > 0.) && ((level_set(2,1) <= 0.) || ((in_domain(2,1) == 0) && (in_domain(2,0) == 1)))) {
+                 dfdz = mu*(finz(1) - finz(0))/dh;
+              // Point 1 is present in solid 
+              } else if (level_set(2,0) <= 0.) {
+                 impose_solid_velocity_for_ghost(net_vel,comp,xpoint(0),ypoint(0),zpoint(1),in_parID(2,0));
+                 dfdz = mu*(net_vel[comp] - finz(0))/dh;
+              // Point 1 is out of the computational domain 
+              } else if (in_domain(2,0) == 0) {
+                 double dh_wall = (sign_z > 0.) ? MAC::abs(zpoint(0)-UF->primary_grid()->get_main_domain_max_coordinate(2)) : 
+                                                  MAC::abs(zpoint(0)-UF->primary_grid()->get_main_domain_min_coordinate(2)) ;
+                 size_t ix,iy,iz;
+                 bool found_x = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(0), i0_temp);
+                 if (found_x == 1) ix = i0_temp;
+                 bool found_y = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(0), i0_temp);
+                 if (found_y == 1) iy = i0_temp;
+                 bool found_z = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(0)+sign_z*dh_wall, i0_temp);
+                 if (found_z == 1) iz = i0_temp;
+                 finz(1) = ghost_field_estimate_in_box (UF,comp,ix,iy,iz,xpoint(0),ypoint(0),zpoint(0)+sign_z*dh_wall,dh_wall,0,parID);
+                 dfdz = mu*(finz(1) - finz(0))/dh_wall;
               }
+              dfdz *= sign_z;
            }
 
            // Derivative in x
-           if (point_coord(i,0) <= 0.) {
-              dfdx = mu*(finx(2) - 4.*finx(1) + 3.*finx(0))/2./dh;
-//              dfdx = mu*(-finx(1) + finx(0))/dh;
-           } else {
+           // Both points 1 and 2 are in fluid, and both in the computational domain
+           if ((level_set(0,0) > 0.) && (level_set(0,1) > 0.) && (in_domain(0,0)*in_domain(0,1))) {
               dfdx = mu*(-finx(2) + 4.*finx(1) - 3.*finx(0))/2./dh;
-//              dfdx = mu*(finx(1) - finx(0))/dh;
+           // Point 1 in fluid and 2 is either in the solid or out of the computational domain
+           } else if ((level_set(0,0) > 0.) && ((level_set(0,1) <= 0.) || ((in_domain(0,1) == 0) && (in_domain(0,0) == 1)))) {
+              dfdx = mu*(finx(1) - finx(0))/dh;
+           // Point 1 is present in solid 
+           } else if (level_set(0,0) <= 0.) {
+              impose_solid_velocity_for_ghost(net_vel,comp,xpoint(1),ypoint(0),zpoint(0),in_parID(0,0));
+              dfdx = mu*(net_vel[comp] - finx(0))/dh;
+           // Point 1 is out of the computational domain 
+           } else if (in_domain(0,0) == 0) { 
+              double dh_wall = (sign_x > 0.) ? MAC::abs(xpoint(0)-UF->primary_grid()->get_main_domain_max_coordinate(0)) :
+                                               MAC::abs(xpoint(0)-UF->primary_grid()->get_main_domain_min_coordinate(0)) ;
+              size_t ix,iy,iz=0;
+              bool found_x = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(0)+sign_x*dh_wall, i0_temp);
+              if (found_x == 1) ix = i0_temp;
+              bool found_y = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(0), i0_temp);
+              if (found_y == 1) iy = i0_temp;
+              bool found_z = (dim == 3) ? FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(0), i0_temp) : 0;
+              if (found_z == 1) iz = i0_temp;
+              finx(1) = (dim == 2) ? ghost_field_estimate_on_face (UF,comp,ix,iy,0, xpoint(0)+sign_x*dh_wall, ypoint(0),0, dh_wall,2,0) : 
+                                     ghost_field_estimate_in_box (UF,comp,ix,iy,iz, xpoint(0)+sign_x*dh_wall, ypoint(0),zpoint(0),dh_wall,0,parID);
+              dfdx = mu*(finx(1) - finx(0))/dh_wall;
            }
+           dfdx *= sign_x;
 
            // Derivative in y
-           if (point_coord(i,1) <=0.) {
-              dfdy = mu*(finy(2) - 4.*finy(1) + 3.*finy(0))/2./dh;
-//              dfdy = mu*(-finy(1) + finy(0))/dh;
-           } else {
+           // Both points 1 and 2 are in fluid, and both in the computational domain
+           if ((level_set(1,0) > 0.) && (level_set(1,1) > 0.) && (in_domain(1,0)*in_domain(1,1))) {
               dfdy = mu*(-finy(2) + 4.*finy(1) - 3.*finy(0))/2./dh;
-//              dfdy = mu*(finy(1) - finy(0))/dh;
+           // Point 1 in fluid and 2 is either in the solid or out of the computational domain
+           } else if ((level_set(1,0) > 0.) && ((level_set(1,1) <= 0.) || ((in_domain(1,1) == 0) && (in_domain(1,0) == 1)))) {
+              dfdy = mu*(finy(1) - finy(0))/dh;
+           // Point 1 is present in solid 
+           } else if (level_set(1,0) <= 0.) {
+              impose_solid_velocity_for_ghost(net_vel,comp,xpoint(0),ypoint(1),zpoint(0),in_parID(1,0));
+              dfdy = mu*(net_vel[comp] - finy(0))/dh;
+           // Point 1 is out of the computational domain 
+           } else if (in_domain(1,0) == 0) { 
+              double dh_wall = (sign_y > 0.) ? MAC::abs(ypoint(0)-UF->primary_grid()->get_main_domain_max_coordinate(1)) :
+                                               MAC::abs(ypoint(0)-UF->primary_grid()->get_main_domain_min_coordinate(1)) ;
+              size_t ix,iy,iz=0;
+              bool found_x = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,0), xpoint(0), i0_temp);
+              if (found_x == 1) ix = i0_temp;
+              bool found_y = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,1), ypoint(0)+sign_y*dh_wall, i0_temp);
+              if (found_y == 1) iy = i0_temp;
+              bool found_z = (dim == 3) ? FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(0), i0_temp) : 0;
+              if (found_z == 1) iz = i0_temp;
+              finy(1) = (dim == 2) ? ghost_field_estimate_on_face (UF,comp,ix,iy,0, xpoint(0), ypoint(0)+sign_y*dh_wall,0, dh_wall,2,0) :
+                                     ghost_field_estimate_in_box (UF,comp,ix,iy,iz, xpoint(0), ypoint(0)+sign_y*dh_wall,zpoint(0),dh_wall,0,parID);
+              dfdy = mu*(finy(1) - finy(0))/dh_wall;
            }
+           dfdy *= sign_y;
 
            if (comp == 0) {
               stress(i,0) = 2.*dfdx;
@@ -3101,20 +3254,21 @@ DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D&
         }
      }
 
+     double scale = (dim == 2) ? ri : ri*ri;
+
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i,0)*point_coord(i,0)*(cell_area(i)*ri) 
-                                     + stress(i,3)*point_coord(i,1)*(cell_area(i)*ri)
-                                     + stress(i,5)*point_coord(i,2)*(cell_area(i)*ri);
-     force(parID,1) = force(parID,1) + stress(i,3)*point_coord(i,0)*(cell_area(i)*ri) 
-                                     + stress(i,1)*point_coord(i,1)*(cell_area(i)*ri)
-                                     + stress(i,4)*point_coord(i,2)*(cell_area(i)*ri);
-     force(parID,2) = force(parID,2) + stress(i,5)*point_coord(i,0)*(cell_area(i)*ri) 
-                                     + stress(i,4)*point_coord(i,1)*(cell_area(i)*ri)
-                                     + stress(i,2)*point_coord(i,2)*(cell_area(i)*ri);
-//     outputFile << xpoint(0) << "," << ypoint(0) << "," << 0 << "," << stress(i,0) << "," << stress(i,1) << "," << stress(i,2) << endl;
+     force(parID,0) = force(parID,0) + stress(i,0)*point_coord(i,0)*(cell_area(i)*scale) 
+                                     + stress(i,3)*point_coord(i,1)*(cell_area(i)*scale)
+                                     + stress(i,5)*point_coord(i,2)*(cell_area(i)*scale);
+     force(parID,1) = force(parID,1) + stress(i,3)*point_coord(i,0)*(cell_area(i)*scale) 
+                                     + stress(i,1)*point_coord(i,1)*(cell_area(i)*scale)
+                                     + stress(i,4)*point_coord(i,2)*(cell_area(i)*scale);
+     force(parID,2) = force(parID,2) + stress(i,5)*point_coord(i,0)*(cell_area(i)*scale) 
+                                     + stress(i,4)*point_coord(i,1)*(cell_area(i)*scale)
+                                     + stress(i,2)*point_coord(i,2)*(cell_area(i)*scale);
   }
-//  outputFile.close();
+//  outputFile.close();  
 }
 //---------------------------------------------------------------------------
 double
@@ -3922,7 +4076,7 @@ double DDS_NSWithHeatTransfer:: divergence_wall_flux ( size_t const& i, size_t c
    NodeProp node = GLOBAL_EQ->get_node_property(1);                 // node information for velocity field(1)
 
    // Velocity of neighbouring nodes
-   double botVel, topVel;
+   double botVel=0., topVel=0.;
    if (wall_dir == 1) {
       botVel = UF->DOF_value( i, j-1, k, comp, level );
       topVel = UF->DOF_value( i, j+1, k, comp, level );
@@ -4773,8 +4927,9 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+        min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
+                                                                                                       (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
+        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
      }
 
      size_t local_min_k = 0;

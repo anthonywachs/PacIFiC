@@ -583,7 +583,7 @@ DDS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, 
    if ( AdvectionScheme == "TVD" ) {
       ugradu = assemble_advection_TVD(UF,1,1.,i,j,k,1);
    } else if ( AdvectionScheme == "Upwind" ) {
-      ugradu = assemble_advection_Upwind(UF,1,1.,i,j,k,1);
+      ugradu = assemble_advection_Upwind_new(UF,1,1.,i,j,k,1);
 /*   } else if ( AdvectionScheme == "Centered" ) {
       ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp);*/
    } 
@@ -2981,6 +2981,120 @@ double DDS_HeatTransfer:: assemble_advection_Upwind( FV_DiscreteField const* Adv
       wb = AdvectingField->DOF_value( i, j, k+shift.k-1, 2, advecting_level );
       if ( wb > 0. ) fbe = wb * AdvectedvalueBe;
       else fbe = wb * AdvectedvalueC;
+
+      flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
+   }
+
+   return (coef * flux);
+}
+
+//----------------------------------------------------------------------
+double DDS_HeatTransfer:: assemble_advection_Upwind_new( FV_DiscreteField const* AdvectingField,
+	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatTransfer:: assemble_advection_Upwind_new" );
+   MAC_CHECK_PRE( advecting_level < AdvectingField->storage_depth() ) ;
+   MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ;
+
+   // Parameters
+   size_t component = 0 ;
+   double dxC = 0., dyC = 0., dzC = 0.;
+   double AdvectedvalueC = 0., AdvectedvalueRi = 0., AdvectedvalueLe = 0.,
+   	AdvectedvalueTo = 0., AdvectedvalueBo = 0.,
+   	AdvectedvalueFr = 0., AdvectedvalueBe = 0,
+	ur = 0., ul = 0., vt = 0., vb = 0., wf = 0., wb = 0.,
+        uavg = 0., vavg = 0., wavg = 0.,
+	fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
+
+   // Comment: cell centered unknowns always have a defined value at +1/-1
+   // indices in all 3 directions. Whether one of the +1/-1 DOF values is on a
+   // boundary or not, and whether that boundary has a Dirichlet or Neumann
+   // condition is irrelevant, this +1/-1 DOF always has the right value.
+   // For Neumann, this is guaranted by
+   // FV_BoundaryCondition:: set_free_DOF_values in
+   // FV_DiscreteField:: update_free_DOFs_value or
+   // FV_DiscreteField:: add_to_free_DOFs_value
+
+   FV_SHIFT_TRIPLET shift = TF->shift_staggeredToCentered() ;
+
+   dxC = TF->get_cell_size( i, component, 0 ) ;    
+   dyC = TF->get_cell_size( j, component, 1 ) ;    
+
+   if ( dim == 2 ) {
+      size_t k = 0;
+      AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
+
+      // Right (X) and Left (X)
+      AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
+      AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
+      ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
+      ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
+      uavg = 0.5 * (ur + ul);
+
+      if ( uavg > 0. ) fri = uavg * AdvectedvalueC;
+      else fri = uavg * AdvectedvalueRi;
+
+      if ( uavg > 0. ) fle = uavg * AdvectedvalueLe;
+      else fle = uavg * AdvectedvalueC;
+
+      // Top (Y) and Bottom (Y)
+      AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
+      AdvectedvalueBo = TF->DOF_value( i, j-1, k, component, advected_level );
+      vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
+      vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
+      vavg = 0.5 * (vt + vb);
+
+      if ( vavg > 0. ) fto = vavg * AdvectedvalueC;
+      else fto = vavg * AdvectedvalueTo;
+
+      if ( vavg > 0. ) fbo = vavg * AdvectedvalueBo;
+      else fbo = vavg * AdvectedvalueC;
+
+      flux = (fto - fbo) * dxC + (fri - fle) * dyC;
+
+   } else {
+      dzC = TF->get_cell_size( k, component, 2);
+      AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
+
+      // Right (X) and Left (X)
+      AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
+      AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
+      ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
+      ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
+      uavg = 0.5 * (ur + ul);
+
+      if ( uavg > 0. ) fri = uavg * AdvectedvalueC;
+      else fri = uavg * AdvectedvalueRi;
+
+      if ( uavg > 0. ) fle = uavg * AdvectedvalueLe;
+      else fle = uavg * AdvectedvalueC;
+
+      // Top (Y) and Bottom (Y)
+      AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
+      AdvectedvalueBo = TF->DOF_value( i, j-1, k, component, advected_level );
+      vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
+      vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
+      vavg = 0.5 * (vt + vb);
+
+      if ( vavg > 0. ) fto = vavg * AdvectedvalueC;
+      else fto = vavg * AdvectedvalueTo;
+
+      if ( vavg > 0. ) fbo = vavg * AdvectedvalueBo;
+      else fbo = vavg * AdvectedvalueC;
+
+      // Front (Z) and Behind (Z)
+      AdvectedvalueFr = TF->DOF_value( i, j, k+1, component, advected_level );
+      AdvectedvalueBe = TF->DOF_value( i, j, k-1, component, advected_level );
+      wf = AdvectingField->DOF_value( i, j, k+shift.k, 2, advecting_level );
+      wb = AdvectingField->DOF_value( i, j, k+shift.k-1, 2, advecting_level );
+      wavg = 0.5 * (wf + wb);
+
+      if ( wavg > 0. ) ffr = wavg * AdvectedvalueC;
+      else ffr = wavg * AdvectedvalueFr;
+
+      if ( wavg > 0. ) fbe = wavg * AdvectedvalueBe;
+      else fbe = wavg * AdvectedvalueC;
 
       flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
    }
