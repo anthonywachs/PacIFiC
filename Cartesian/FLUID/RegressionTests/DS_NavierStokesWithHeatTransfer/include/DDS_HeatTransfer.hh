@@ -45,6 +45,12 @@ struct NavierStokes2Temperature
   string solid_filename_ ;
   double loc_thres_ ; 
   string level_set_type_ ;
+  bool is_stressCal_ ;
+  double Npoints_ ;
+  double ar_ ;
+  size_t Nrings_ ;
+  size_t Pmin_ ;
+  size_t pole_loc_ ;
 };
 
 /** @brief MPIVar include all vectors required while message passing */
@@ -215,7 +221,16 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       double compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k);
 
       /** @brief Find the intersection using bisection method with the solid interface */ 
-      double find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off);
+      double find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& level);
+
+      double find_intersection_for_ghost ( double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& level, size_t const& off);
+
+      double impose_solid_temperature_for_ghost (size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID );
+
+      double impose_solid_temperature (size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
+
+      double ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID);
+
 
       double assemble_advection_TVD( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
 
@@ -240,6 +255,14 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       void output_l2norm ( void ) ;
       //@}
 
+      void compute_fluid_particle_interaction( FV_TimeIterator const* t_it, double const& Np);
+      void generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& k0, size_t const& Nring);
+      void compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nring);
+      void compute_temperature_gradient_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleVector& force, size_t const& parID, size_t const& Np );
+      double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);
+
+
+     
 
    // Direction splitting communicators
      
@@ -293,6 +316,10 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
       bool b_bodyterm ;
       bool is_solids;
+      bool is_stressCal;
+      double Npoints;
+      size_t Nrings, Pmin, pole_loc;
+      double ar;
       bool b_restart ;
       bool is_iperiodic[3];
       boolVector const* periodic_comp;

@@ -274,10 +274,16 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    inputData.AdvectionScheme_ = AdvectionScheme ;
    inputData.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
    inputData.is_solids_ = is_solids ;
+   inputData.is_stressCal_ = is_stressCal ;
    inputData.Npart_ = Npart ;
    inputData.solid_filename_ = solid_filename ;
    inputData.loc_thres_ = loc_thres ;
    inputData.level_set_type_ = level_set_type ;
+   inputData.Npoints_ = Npoints ;
+   inputData.Nrings_ = Nrings ;
+   inputData.Pmin_ = Pmin ;
+   inputData.ar_ = ar ;
+   inputData.pole_loc_ = pole_loc ;
 
    MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DDS_HeatTransfer" ) ;
    Solver_Temperature = DDS_HeatTransfer::create( this, set, inputData ) ;
