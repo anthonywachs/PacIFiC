@@ -864,8 +864,10 @@ DDS_NSWithHeatTransfer:: return_node_index (
    size_t_vector i_length(dim,0);
    for (size_t l=0;l<dim;++l) {
       // To include knowns at dirichlet boundary in the indexing as well, wherever required
-      min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
+/*      min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
                                                                                                      (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
+      max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;*/
+      min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) - 1;
       max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
       i_length(l) = 1 + max_unknown_index(l) - min_unknown_index(l);
    }
@@ -1161,9 +1163,11 @@ DDS_NSWithHeatTransfer:: assemble_intersection_matrix ( FV_DiscreteField const* 
 
   for (size_t l=0;l<dim;++l) {
      // To include knowns at dirichlet boundary in the intersection calculation as well, important in cases where the particle is close to domain boundary
-     min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
+/*     min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
                                                                                                     (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
-     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
+     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;*/
+     min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
+     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
      local_unknown_extents(l,0) = 0;
      local_unknown_extents(l,1) = (max_unknown_index(l)-min_unknown_index(l));
   }
@@ -4933,9 +4937,11 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
+/*        min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
                                                                                                        (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
-        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
+        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;*/
+        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
+        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
      }
 
      size_t local_min_k = 0;

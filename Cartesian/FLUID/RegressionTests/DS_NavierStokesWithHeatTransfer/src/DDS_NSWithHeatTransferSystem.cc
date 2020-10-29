@@ -372,7 +372,7 @@ DDS_NSWithHeatTransferSystem:: re_initialize( void )
 
          size_t nb_total_unknown = 1;
 
-         for (size_t l = 0;l < dim; l++) {
+         for (size_t l = 0;l < dim; l++) { 
             if (field == 0) {
                nb_unknowns_handled_by_proc( l ) = 1 + PF->get_max_index_unknown_handled_by_proc( comp, l )
                                                     - PF->get_min_index_unknown_handled_by_proc( comp, l ) ;

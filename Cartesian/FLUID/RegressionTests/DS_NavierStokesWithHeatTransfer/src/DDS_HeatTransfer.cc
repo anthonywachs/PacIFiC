@@ -207,10 +207,10 @@ DDS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
    if (is_solids) {
       Solids_generation();
       node_property_calculation();
-/*      nodes_temperature_initialization(0);
+      nodes_temperature_initialization(0);
       nodes_temperature_initialization(1);
       nodes_temperature_initialization(3);
-      if (dim == 3) nodes_temperature_initialization(4);*/
+      if (dim == 3) nodes_temperature_initialization(4);
    }
 
    GLOBAL_EQ->initialize_temperature();
@@ -632,8 +632,10 @@ DDS_HeatTransfer:: return_node_index (
    size_t_vector max_unknown_index(dim,0);
    size_t_vector i_length(dim,0);
    for (size_t l=0;l<dim;++l) {
-	min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-	max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+/*	min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
+	max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;*/
+	min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) - 1;
+	max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
         i_length(l) = 1 + max_unknown_index(l) - min_unknown_index(l);
    }
 
@@ -1716,8 +1718,13 @@ DDS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+        if (is_iperiodic[l]) {
+           min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
+           max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+        } else {
+           min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l );
+           max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l );
+        }
      }
 
      size_t local_min_k = 0;
@@ -1788,6 +1795,7 @@ DDS_HeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
      // Contribution of stress tensor
      compute_temperature_gradient_on_particle(point_coord, cell_area, temp_force, parID, Nmax);
      // Gathering information from all procs
+     cout << "Temperature stress: " << temp_force(parID) << endl;
      temp_force(parID) = pelCOMM->sum(temp_force(parID)) ;
 
      if (my_rank == 0) {
@@ -1999,7 +2007,7 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
 //        outputFile << ipoint(2,0) << "," << ipoint(2,1) << "," << ipoint(2,2) << "," << i << endl;
      }
 
-     double scale = (dim == 2) ? ri : ri*ri;
+     double scale = (dim == 2) ? (ri/(2.*MAC::pi()*ri)) : (ri*ri/(4.*MAC::pi()*ri*ri));
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
@@ -2716,8 +2724,10 @@ DDS_HeatTransfer:: node_property_calculation ( )
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices; Calculation on the rows next to the proc as well
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) - 1 ;
-        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1 ;
+/*        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) - 1 ;
+        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1 ;*/
+        min_unknown_index(l) = TF->get_min_index_unknown_on_proc( comp, l );
+        max_unknown_index(l) = TF->get_max_index_unknown_on_proc( comp, l );
      }
 
      size_t local_min_k = 0;
@@ -2789,8 +2799,10 @@ DDS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t con
   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(level);
 
   for (size_t l=0;l<dim;++l) {
-     min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) - 1 ;
-     max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1 ;
+/*     min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) - 1 ;
+     max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1 ;*/
+     min_unknown_index(l) = TF->get_min_index_unknown_on_proc( comp, l );
+     max_unknown_index(l) = TF->get_max_index_unknown_on_proc( comp, l );
      local_unknown_extents(l,0) = 0;
      local_unknown_extents(l,1) = (max_unknown_index(l)-min_unknown_index(l));
   }
