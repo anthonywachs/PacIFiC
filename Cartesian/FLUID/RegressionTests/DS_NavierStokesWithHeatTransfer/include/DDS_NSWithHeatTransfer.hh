@@ -164,6 +164,9 @@ public SolverComputingTime
       /** @brief Assemble rhs term after calling compute_**_component */
       void assemble_DS_un_at_rhs (FV_TimeIterator const* t_it, double const& gamma);
 
+      double divergence_of_U( size_t const& i, size_t const& j, size_t const& k, size_t const& component, size_t const& level);
+
+
       /** @brief Call functions to assemble rhs for pressure or velocity fields in any direction */
       double assemble_local_rhs(size_t const& j,size_t const& k,double const& gamma,FV_TimeIterator const* t_it,size_t const& comp,size_t const& dir,size_t const& field);
       

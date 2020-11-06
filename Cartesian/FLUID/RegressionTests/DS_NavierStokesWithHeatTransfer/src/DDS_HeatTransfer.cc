@@ -440,7 +440,7 @@ DDS_HeatTransfer:: assemble_DS_un_at_rhs (
 	      // Bodyterm for rhs
 	      bodyterm = bodyterm_value(xC,yC,zC);
               // Advection term
-              adv_value = compute_adv_component(comp,i,j,k) - TF->DOF_value( i, j, k, comp, 1 )*divergence_of_U(comp, i, j, k);
+              adv_value = compute_adv_component(comp,i,j,k);
 
               if (is_solids) {
                  size_t p = return_node_index(TF,comp,i,j,k);
@@ -486,7 +486,7 @@ DDS_HeatTransfer:: assemble_DS_un_at_rhs (
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: divergence_of_U ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
+DDS_HeatTransfer:: divergence_of_U ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& level)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_HeatTransfer:: divergence_of_U" ) ;
@@ -501,13 +501,13 @@ DDS_HeatTransfer:: divergence_of_U ( size_t const& comp, size_t const& i, size_t
 
    // du/dx
    double xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-   double xright = UF->DOF_value( shift.i+i, j, k, 0, 1 ) - UF->DOF_value( shift.i+i-1, j, k, 0, 1 ) ;
+   double xright = UF->DOF_value( shift.i+i, j, k, 0, level ) - UF->DOF_value( shift.i+i-1, j, k, 0, level ) ;
 
    xvalue = xright/xhr;
 
    // dv/dy
    double yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-   double yright = UF->DOF_value( i, shift.j+j, k, 1, 1 ) - UF->DOF_value( i, shift.j+j-1, k, 1, 1 ) ;
+   double yright = UF->DOF_value( i, shift.j+j, k, 1, level ) - UF->DOF_value( i, shift.j+j-1, k, 1, level ) ;
 
    yvalue = yright/yhr;
 
@@ -515,7 +515,7 @@ DDS_HeatTransfer:: divergence_of_U ( size_t const& comp, size_t const& i, size_t
       // dw/dz
       dzC = TF->get_cell_size( k, comp, 2 ) ;    
       double zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
-      double zright = UF->DOF_value( i, j, shift.k+k, 2, 1 ) - UF->DOF_value( i, j, shift.k+k-1, 2, 1 ) ;
+      double zright = UF->DOF_value( i, j, shift.k+k, 2, level ) - UF->DOF_value( i, j, shift.k+k-1, 2, level ) ;
 
       zvalue = zright/zhr;
    }
@@ -641,11 +641,11 @@ DDS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, 
    double ugradu = 0., value = 0.;
 
    if ( AdvectionScheme == "TVD" ) {
-      ugradu = assemble_advection_TVD(UF,1,1.,i,j,k,1);
+      ugradu = assemble_advection_TVD(UF,1,1.,i,j,k,1) - TF->DOF_value(i,j,k,comp,1)*divergence_of_U(comp,i,j,k,1);
    } else if ( AdvectionScheme == "Upwind" ) {
-      ugradu = assemble_advection_Upwind(UF,1,1.,i,j,k,1);
+      ugradu = assemble_advection_Upwind(UF,1,1.,i,j,k,1) - TF->DOF_value(i,j,k,comp,1)*divergence_of_U(comp,i,j,k,1);
    } else if ( AdvectionScheme == "Centered" ) {
-      ugradu = assemble_advection_Centered(UF,1,1.,i,j,k,1);
+      ugradu = assemble_advection_Centered(UF,1,1.,i,j,k,1) - TF->DOF_value(i,j,k,comp,1)*divergence_of_U(comp,i,j,k,1);
    } 
 
    if ( AdvectionTimeAccuracy == 1 ) {
@@ -1869,13 +1869,13 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
   double zp = solid.coord[comp]->item(parID,2);
   double ri = solid.size[comp]->item(parID);
   
-/*  ofstream outputFile ;
+  ofstream outputFile ;
   std::ostringstream os2;
   os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/temp_grad_" << my_rank << "_" << parID << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 //  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
-  outputFile << "x,y,z,i" << endl;*/
+  outputFile << "i,Nu" << endl;
 
   doubleArray2D ipoint(3,3,0.);         
   doubleVector fini(3,0);
@@ -2049,13 +2049,14 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
 //        outputFile << ipoint(2,0) << "," << ipoint(2,1) << "," << ipoint(2,2) << "," << i << endl;
      }
 
+     outputFile << i << "," << dfdi << endl;
      double scale = (dim == 2) ? (ri/(2.*MAC::pi()*ri)) : (ri*ri/(4.*MAC::pi()*ri*ri));
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
      force(parID) = force(parID) + dfdi*(cell_area(i)*scale);
   }
-//  outputFile.close();  
+  outputFile.close();  
 }
 
 //---------------------------------------------------------------------------

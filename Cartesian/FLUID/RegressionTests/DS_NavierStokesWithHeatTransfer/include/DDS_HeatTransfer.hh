@@ -234,7 +234,7 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       double assemble_advection_Centered( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
       double assemble_advection_Centered_new( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
 
-      double divergence_of_U ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k);
+      double divergence_of_U ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& level);
 
 
       double assemble_advection_TVD( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
