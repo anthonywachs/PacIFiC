@@ -3730,11 +3730,11 @@ DDS_NSWithHeatTransfer:: compute_adv_component ( size_t const& comp, size_t cons
    double ugradu = 0., value = 0.;
 
    if ( AdvectionScheme == "TVD" ) {
-      ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp) - UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
+      ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp) - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
    } else if ( AdvectionScheme == "Upwind" ) {
-      ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp) - UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
+      ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp) - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
    } else if ( AdvectionScheme == "Centered" ) {
-      ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp) - UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
+      ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp) - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
    } 
 
    if ( AdvectionTimeAccuracy == 1 ) {
@@ -5076,12 +5076,13 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
   ofstream outputFile ;
 
   std::ostringstream os2;
-  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/output_" << my_rank << ".csv";
+  os2 << "./DS_results/output_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 
   size_t i,j,k;
   outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv,behind,bev,front,fv" << endl;
+//  outputFile << "x,y,z,par_ID,void_frac,ugradu,error" << endl;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -5096,8 +5097,8 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
 /*        min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
                                                                                                        (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
         max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;*/
-        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
-        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
+        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l );
+        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l );
      }
 
      size_t local_min_k = 0;
@@ -5123,6 +5124,7 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
               for (size_t dir = 0; dir < dim; dir++) {
                   for (size_t off = 0; off < 2; off++) {
                       outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off);
+//                      outputFile << "," << compute_adv_component(comp,i,j,k)/rho << ", " << UF->DOF_value(i,j,k,comp,0)*divergence_of_U(i,j,k,comp,0);
                   }
               }
               outputFile << endl;

@@ -326,7 +326,7 @@ DDS_HeatTransfer::write_output_field()
   ofstream outputFile ;
 
   std::ostringstream os2;
-  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/output_" << my_rank << ".csv";
+  os2 << "./DS_results/outputT_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 
@@ -334,6 +334,7 @@ DDS_HeatTransfer::write_output_field()
 //  outputFile.open("/home/goyal001/Documents/Computing/MAC-Test/DS_results/output_" << my_rank << ".txt", std::ios_base::out | std::ios_base::trunc) ;
   size_t i,j,k;
   outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv,behind,bev,front,fv" << endl;
+//  outputFile << "x,y,z,par_ID,void_frac,ugradu,error" << endl;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -345,8 +346,8 @@ DDS_HeatTransfer::write_output_field()
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l );// - 1;
+        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l );// + 1;
      }
 
      size_t local_min_k = 0;
@@ -372,6 +373,7 @@ DDS_HeatTransfer::write_output_field()
               for (size_t dir = 0; dir < dim; dir++) {
                   for (size_t off = 0; off < 2; off++) {
                       outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off); 
+//                      outputFile << "," << compute_adv_component(comp,i,j,k) << "," << TF->DOF_value(i,j,k,comp,0)*divergence_of_U(comp,i,j,k,0); 
                   }
               }
               outputFile << endl;

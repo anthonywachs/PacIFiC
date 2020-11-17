@@ -3717,11 +3717,11 @@ DDS_NavierStokes:: compute_adv_component ( size_t const& comp, size_t const& i, 
    double ugradu = 0., value = 0.;
 
    if ( AdvectionScheme == "TVD" ) {
-      ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp) - UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
+      ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp) - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
    } else if ( AdvectionScheme == "Upwind" ) {
-      ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp) - UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
+      ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp) - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
    } else if ( AdvectionScheme == "Centered" ) {
-      ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp) - UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
+      ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp) - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
    } 
 
    if ( AdvectionTimeAccuracy == 1 ) {
