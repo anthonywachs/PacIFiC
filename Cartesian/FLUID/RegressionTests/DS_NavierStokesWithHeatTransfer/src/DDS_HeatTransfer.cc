@@ -1870,14 +1870,14 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
   double yp = solid.coord[comp]->item(parID,1);
   double zp = solid.coord[comp]->item(parID,2);
   double ri = solid.size[comp]->item(parID);
-  
+/*  
   ofstream outputFile ;
   std::ostringstream os2;
   os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/temp_grad_" << my_rank << "_" << parID << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 //  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
-  outputFile << "i,Nu" << endl;
+  outputFile << "i,Nu" << endl;*/
 
   doubleArray2D ipoint(3,3,0.);         
   doubleVector fini(3,0);
@@ -2051,14 +2051,14 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
 //        outputFile << ipoint(2,0) << "," << ipoint(2,1) << "," << ipoint(2,2) << "," << i << endl;
      }
 
-     outputFile << i << "," << dfdi << endl;
+//     outputFile << i << "," << dfdi << endl;
      double scale = (dim == 2) ? (ri/(2.*MAC::pi()*ri)) : (ri*ri/(4.*MAC::pi()*ri*ri));
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
      force(parID) = force(parID) + dfdi*(cell_area(i)*scale);
   }
-  outputFile.close();  
+//  outputFile.close();  
 }
 
 //---------------------------------------------------------------------------
