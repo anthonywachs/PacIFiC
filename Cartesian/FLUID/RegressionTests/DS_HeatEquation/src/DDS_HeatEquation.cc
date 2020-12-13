@@ -151,6 +151,12 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
       MAC_ASSERT( insertion_type == "file" ) ;
       solid_filename = exp->string_data( "Particle_FileName" ) ;
       loc_thres = exp->double_data( "Local_threshold" ) ; 
+      if ( exp->has_entry( "LevelSetType" ) )
+         level_set_type = exp->string_data( "LevelSetType" );
+      if ( level_set_type != "Square" && level_set_type != "Rectangle" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D" && level_set_type != "PipeX") {
+         string error_message="- Square\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D\n   - Rectangle\n   - PipeX";
+         MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
+      }      
    }
 
    // Build the matrix system
@@ -331,9 +337,9 @@ DDS_HeatEquation:: do_after_time_stepping( void )
      write_elapsed_time_smhd(cout,cputime,"Computation time");
      SCT_get_summary(cout,cputime);
    }
-   DS_error_with_analytical_solution(TF,TF_DS_ERROR);
+//   DS_error_with_analytical_solution(TF,TF_DS_ERROR);
    GLOBAL_EQ->display_debug();
-//   output_l2norm();
+   output_l2norm();
 
    deallocate_mpi_variables();
 }
@@ -369,7 +375,7 @@ DDS_HeatEquation::write_output_field()
   ofstream outputFile ;
 
   std::ostringstream os2;
-  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/output_" << my_rank << ".csv";
+  os2 << "./DS_results/output_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 
@@ -1681,7 +1687,7 @@ DDS_HeatEquation:: nodes_temperature_initialization ( size_t const& level )
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, size_t const& type)
+DDS_HeatEquation:: level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_HeatEquation:: level_set_solids" ) ;
@@ -1710,8 +1716,37 @@ DDS_HeatEquation:: level_set_function (size_t const& m, size_t const& comp, doub
 
   double level_set = 0.;
   // Type 0 is for circular/spherical solids in 2D/3D system
-  if (type == 0) {
+  if (type == "Sphere") {
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
+//     level_set = pow(delta(0)/0.4,2.)+pow(delta(1)/0.3,2.)-1.;
+  } else if (type == "PipeX") {
+     level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
+  } else if (type == "Wall_Y") {
+     level_set = delta(0);
+  } else if (type == "Wall_X") {
+     level_set = delta(1);
+  } else if (type == "Square") {
+     double theta = 0.0;//MAC::pi()/6.;
+     if ((pow(MAC::abs(delta(0)*MAC::cos(theta) + delta(1)*MAC::sin(theta)),1) - pow(Rp,1) < 0.) 
+      && (pow(MAC::abs(-delta(0)*MAC::sin(theta) + delta(1)*MAC::cos(theta)),1) - pow(Rp,1) < 0.)) {
+        level_set = -1.;
+     } else if ((pow(MAC::abs(delta(0)*MAC::cos(theta) + delta(1)*MAC::sin(theta)),1) - pow(Rp,1) == 0.) 
+             && (pow(MAC::abs(-delta(0)*MAC::sin(theta) + delta(1)*MAC::cos(theta)),1) - pow(Rp,1) == 0.)) {
+        level_set = 0.;
+     } else {
+        level_set = 1.;
+     }
+  } else if (type == "Rectangle") {
+     if ((MAC::abs(delta(0))-zp < 0.) && (MAC::abs(delta(1))-Rp < 0.)) {
+        level_set = -1.;
+     } else if ((MAC::abs(delta(0))-zp == 0.) && (MAC::abs(delta(1))-Rp == 0.)) {
+        level_set = 0.;
+     } else {
+        level_set = 1.;
+     }
+  } else if (type == "Wedge2D") {
+     // ax + by + c = 0 is the line, with a as xp, b as yp, and c as zp
+     level_set = (xp*xC + yp*yC + zp)/pow(pow(xp,2.)+pow(yp,2.),0.5) - Rp;
   }
 
   return(level_set);
@@ -1763,7 +1798,7 @@ DDS_HeatEquation:: node_property_calculation ( )
               }
               size_t p = return_node_index(TF,comp,i,j,k);
               for (size_t m=0;m<Npart;m++) {
-                 double level_set = level_set_function(m,comp,xC,yC,zC,0);
+                 double level_set = level_set_function(m,comp,xC,yC,zC,level_set_type);
                  level_set *= solid.inside[comp]->item(m);  
 
                  // level_set is xb, if local critical time scale is 0.01 of the global time scale 
@@ -1929,14 +1964,14 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
   double xcenter;
 
   if (dir == 0) {
-     funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
-     funr = level_set_function(id,comp,xright,yvalue,zvalue,0);
+     funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
+     funr = level_set_function(id,comp,xright,yvalue,zvalue,level_set_type);
   } else if (dir == 1) {
-     funl = level_set_function(id,comp,yvalue,xleft,zvalue,0);
-     funr = level_set_function(id,comp,yvalue,xright,zvalue,0);
+     funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
+     funr = level_set_function(id,comp,yvalue,xright,zvalue,level_set_type);
   } else if (dir == 2) {
-     funl = level_set_function(id,comp,yvalue,zvalue,xleft,0);
-     funr = level_set_function(id,comp,yvalue,zvalue,xright,0);
+     funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
+     funr = level_set_function(id,comp,yvalue,zvalue,xright,level_set_type);
   }
 
   // In case both the points are on the same side of solid interface
@@ -1952,14 +1987,14 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
   }
 
   if (dir == 0) {
-     funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
-     funr = level_set_function(id,comp,xright,yvalue,zvalue,0);
+     funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
+     funr = level_set_function(id,comp,xright,yvalue,zvalue,level_set_type);
   } else if (dir == 1) {
-     funl = level_set_function(id,comp,yvalue,xleft,zvalue,0);
-     funr = level_set_function(id,comp,yvalue,xright,zvalue,0);
+     funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
+     funr = level_set_function(id,comp,yvalue,xright,zvalue,level_set_type);
   } else if (dir == 2) {
-     funl = level_set_function(id,comp,yvalue,zvalue,xleft,0);
-     funr = level_set_function(id,comp,yvalue,zvalue,xright,0);
+     funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
+     funr = level_set_function(id,comp,yvalue,zvalue,xright,level_set_type);
   }
 
   // If the shifted point is also physically outside the solid then xb = dx
@@ -1970,14 +2005,14 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
      while (MAC::abs(xright-xleft) > 1.E-15) {
         xcenter = (xleft+xright)/2.;
         if (dir == 0) {
-           funl = level_set_function(id,comp,xleft,yvalue,zvalue,0);
-           func = level_set_function(id,comp,xcenter,yvalue,zvalue,0);
+           funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
+           func = level_set_function(id,comp,xcenter,yvalue,zvalue,level_set_type);
         } else if (dir == 1) {
-           funl = level_set_function(id,comp,yvalue,xleft,zvalue,0);
-           func = level_set_function(id,comp,yvalue,xcenter,zvalue,0);
+           funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
+           func = level_set_function(id,comp,yvalue,xcenter,zvalue,level_set_type);
         } else if (dir == 2) {
-           funl = level_set_function(id,comp,yvalue,zvalue,xleft,0);
-           func = level_set_function(id,comp,yvalue,zvalue,xcenter,0);
+           funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
+           func = level_set_function(id,comp,yvalue,zvalue,xcenter,level_set_type);
         }
 
         if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;

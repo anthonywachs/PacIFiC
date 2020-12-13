@@ -192,7 +192,7 @@ public SolverComputingTime
       void nodes_temperature_initialization ( size_t const& level );
 
       /** @brief Returns negative value of the point lies inside the solid, otherwise returns a positive number*/
-      double level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, size_t const& type);
+      double level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type);
 
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
       void assemble_intersection_matrix ( size_t const& comp, size_t const& level);                 // Here level:0 -> fluid; 1-> solid
@@ -275,6 +275,7 @@ public SolverComputingTime
       bool is_iperiodic[3];
       boolVector const* periodic_comp;
       string insertion_type;
+      string level_set_type;
       string solid_filename;
 } ;
 

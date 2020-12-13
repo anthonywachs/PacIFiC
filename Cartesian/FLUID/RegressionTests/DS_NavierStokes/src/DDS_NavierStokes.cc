@@ -158,8 +158,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
-      if ( level_set_type != "Square" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D" && level_set_type != "PipeX") {
-         string error_message="- Square\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D\n   - PipeX";
+      if ( level_set_type != "Cube" && level_set_type != "Square" && level_set_type != "Rectangle" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D" && level_set_type != "PipeX") {
+         string error_message="- Cube\n   - Square\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D\n   - Rectangle\n   - PipeX";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
       }
 
@@ -901,6 +901,7 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
   double level_set = 0.;
   if (type == "Sphere") {
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
+//     level_set = pow(delta(0)/0.4,2.)+pow(delta(1)/0.3,2.)-1.;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Wall_Y") {
@@ -913,7 +914,23 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      } else if ((MAC::abs(delta(0))-Rp == 0.) && (MAC::abs(delta(1))-Rp == 0.)) {
         level_set = 0.;
      } else {
-        level_set == 1.;
+        level_set = 1.;
+     }
+  } else if (type == "Cube") {
+     if ((MAC::abs(delta(0))-Rp < 0.) && (MAC::abs(delta(1))-Rp < 0.) && (MAC::abs(delta(2))-Rp < 0.)) {
+        level_set = -1.;
+     } else if ((MAC::abs(delta(0))-Rp == 0.) && (MAC::abs(delta(1))-Rp == 0.) && (MAC::abs(delta(2))-Rp == 0.)) {
+        level_set = 0.;
+     } else {
+        level_set = 1.;
+     }
+  } else if (type == "Rectangle") {
+     if ((MAC::abs(delta(0))-zp < 0.) && (MAC::abs(delta(1))-Rp < 0.)) {
+        level_set = -1.;
+     } else if ((MAC::abs(delta(0))-zp == 0.) && (MAC::abs(delta(1))-Rp == 0.)) {
+        level_set = 0.;
+     } else {
+        level_set = 1.;
      }
   } else if (type == "Wedge2D") {
      // ax + by + c = 0 is the line, with a as xp, b as yp, and c as zp
@@ -5063,7 +5080,7 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
   ofstream outputFile ;
 
   std::ostringstream os2;
-  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/output_" << my_rank << ".csv";
+  os2 << "./DS_results/output_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 
@@ -5080,9 +5097,8 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
-                                                                                                       (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
-        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
+        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ); 
+        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
      }
 
      size_t local_min_k = 0;
