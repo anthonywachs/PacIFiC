@@ -62,6 +62,7 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
    , PF( mac_PF )
    , MAT_velocityUnsteadyPlusDiffusion_1D( 0 )
    , is_solids (false)
+   , is_stressCal (false)
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DDS_NavierStokesSystem" ) ;
 
@@ -91,6 +92,8 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
 
    if (is_solids) {
       Npart = exp->int_data( "NParticles" ) ;
+      is_stressCal = exp->bool_data( "Stress_calculation" ) ;
+      if (is_stressCal) Nmax = (int) exp->double_data( "Npoints" ) ;
    }
 
    // Periodic boundary condition check for velocity
@@ -145,6 +148,10 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 
    // Direction splitting matrices
    MAT_velocityUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
+
+   // Structure for the particle surface discretization
+   surface.coordinate = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
+   surface.area = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
 
    for (size_t field = 0; field < 2; field++) {
 
@@ -282,6 +289,9 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       }
    }
 
+   surface.coordinate = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+   surface.area = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
          for (size_t comp=0;comp<nb_comps[field];++comp) {
@@ -364,6 +374,17 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
    // Initialize Direction splitting matrices & vectors for pressure 
    size_t nb_procs, proc_pos;
+
+   if (is_solids && is_stressCal) {
+      if (dim == 3) {
+         surface.coordinate->re_initialize(2*Nmax,3);
+         surface.area->re_initialize(2*Nmax);
+      } else {
+         surface.coordinate->re_initialize(Nmax,3);
+         surface.area->re_initialize(Nmax);
+      }
+   }
+
 
    for (size_t field = 0; field < 2; field++) {
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
@@ -717,6 +738,15 @@ DDS_NavierStokesSystem::get_solid(size_t const& field)
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_solid" ) ;
    return (solid[field]) ;
+}
+
+//----------------------------------------------------------------------
+SurfaceDiscretize
+DDS_NavierStokesSystem::get_surface()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokesSystem:: get_surface" ) ;
+   return (surface) ;
 }
 
 //----------------------------------------------------------------------

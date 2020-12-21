@@ -203,11 +203,11 @@ public SolverComputingTime
       void impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
       void impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID );
 
-      void compute_velocity_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np);
-      void compute_fluid_particle_interaction( FV_TimeIterator const* t_it, double const& Np);
-      void compute_pressure_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np);
-      void generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& k0, size_t const& Nrings);
-      void compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nrings);
+      void compute_velocity_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
+      void compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void generate_surface_discretization();
+      void compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
 
       /** @brief Find the interpolation considering the solids affect on the face, used for 2D/3D systems */
       double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);
@@ -328,7 +328,7 @@ public SolverComputingTime
 
       bool is_stressCal;
       double Npoints;
-      size_t Nrings, Pmin, pole_loc;
+      size_t Pmin, pole_loc;
       double ar;
 
       bool is_par_motion;

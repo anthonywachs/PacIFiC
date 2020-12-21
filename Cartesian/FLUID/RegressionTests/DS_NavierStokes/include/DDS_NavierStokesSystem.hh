@@ -66,6 +66,12 @@ struct NodeProp {
    LA_SeqVector ** bound_cell;              // Stores the boundary cell presence in the solids; 1 == 1st boundary cell
 };
 
+/** @brief SurfaceDiscretize to be used to store the coordinates and area of discretize particle surface */
+struct SurfaceDiscretize {
+   LA_SeqMatrix * coordinate;                  // coordinates
+   LA_SeqVector * area;                        // area
+};
+
 /** @brief BoundaryBisec to be used to store the intersection of solids with grids in each direction */
 struct BoundaryBisec {
    LA_SeqMatrix ** offset;                  // Direction of intersection relative to node (Column 0 for left and Column 1 for right)
@@ -145,6 +151,8 @@ class DDS_NavierStokesSystem : public MAC_Object
       TDMatrix* get_Schur(size_t const& field);
       /** @brief Return the solid information read from input files */
       PartInput get_solid(size_t const& field);
+      /** @brief Return the surface discretization from input files */
+      SurfaceDiscretize get_surface();
       /** @brief Return the (presence/absence) of particle vector */
       NodeProp get_node_property(size_t const& field);
       /** @brief Return information of intersection with solid boundary */
@@ -275,6 +283,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       // Particle structures
       struct PartInput solid[2];
       struct NodeProp node[2];
+      struct SurfaceDiscretize surface;
       struct BoundaryBisec b_intersect[2][2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid); 2 are fields (PF,UF)
 
 
@@ -287,9 +296,10 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** Number of Processors in x,y,z */
       size_t nb_procs_in_i[3];
 
-      size_t Npart;
+      size_t Npart, Nmax;
       double Rpart;
       bool is_solids;
+      bool is_stressCal;
 
 
       bool is_periodic[2][3];
