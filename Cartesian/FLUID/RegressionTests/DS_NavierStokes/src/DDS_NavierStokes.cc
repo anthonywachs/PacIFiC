@@ -883,6 +883,9 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
   double yp = solid.coord[comp]->item(m,1);
   double zp = solid.coord[comp]->item(m,2);
   double Rp = solid.size[comp]->item(m);
+  double roll = (MAC::pi()/180.)*solid.thetap[comp]->item(m,0);
+  double pitch = (MAC::pi()/180.)*solid.thetap[comp]->item(m,1);
+  double yaw = (MAC::pi()/180.)*solid.thetap[comp]->item(m,2);
 
   doubleVector delta(3,0);
 
@@ -910,24 +913,47 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
   } else if (type == "Wall_X") {
      level_set = delta(1);
   } else if (type == "Square") {
-     double theta = 0.;//MAC::pi()/4.;
-     if ((pow(MAC::abs(delta(0)*MAC::cos(theta) + delta(1)*MAC::sin(theta)),1) - pow(Rp,1) < 0.) 
-      && (pow(MAC::abs(-delta(0)*MAC::sin(theta) + delta(1)*MAC::cos(theta)),1) - pow(Rp,1) < 0.)) {
+     if ((pow(MAC::abs(delta(0)*MAC::cos(yaw) + delta(1)*MAC::sin(yaw)),1) - pow(Rp,1) < 0.) 
+      && (pow(MAC::abs(-delta(0)*MAC::sin(yaw) + delta(1)*MAC::cos(yaw)),1) - pow(Rp,1) < 0.)) {
         level_set = -1.;
-     } else if ((pow(MAC::abs(delta(0)*MAC::cos(theta) + delta(1)*MAC::sin(theta)),1) - pow(Rp,1) == 0.) 
-             && (pow(MAC::abs(-delta(0)*MAC::sin(theta) + delta(1)*MAC::cos(theta)),1) - pow(Rp,1) == 0.)) {
+     } else if ((pow(MAC::abs(delta(0)*MAC::cos(yaw) + delta(1)*MAC::sin(yaw)),1) - pow(Rp,1) == 0.) 
+             && (pow(MAC::abs(-delta(0)*MAC::sin(yaw) + delta(1)*MAC::cos(yaw)),1) - pow(Rp,1) == 0.)) {
         level_set = 0.;
      } else {
         level_set = 1.;
      }
-  } else if (type == "Cube") {
-     if ((MAC::abs(delta(0))-Rp < 0.) && (MAC::abs(delta(1))-Rp < 0.) && (MAC::abs(delta(2))-Rp < 0.)) {
+  } else if (type == "Cube") { 
+     // yaw along z-axis; pitch along y-axis; roll along x-axis
+     doubleArray2D rot_matrix(3,3,0);
+     // Rotation matrix assemble
+     rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+     rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+     rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+     rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
+     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+     rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+     rot_matrix(2,0) = -MAC::sin(pitch);
+     rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
+     rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+
+     double delta_x = delta(0)*rot_matrix(0,0) - delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
+     double delta_y = - delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) - delta(2)*rot_matrix(1,2);
+     double delta_z = delta(0)*rot_matrix(2,0) - delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
+
+     if ((MAC::abs(delta_x)-Rp < 0.) && (MAC::abs(delta_y)-Rp < 0.) && (MAC::abs(delta_z)-Rp < 0.)) {
+        level_set = -1.;
+     } else if ((MAC::abs(delta_x)-Rp == 0.) && (MAC::abs(delta_y)-Rp == 0.) && (MAC::abs(delta_z)-Rp == 0.)) {
+        level_set = 0.;
+     } else {
+        level_set = 1.;
+     }
+/*     if ((MAC::abs(delta(0))-Rp < 0.) && (MAC::abs(delta(1))-Rp < 0.) && (MAC::abs(delta(2))-Rp < 0.)) {
         level_set = -1.;
      } else if ((MAC::abs(delta(0))-Rp == 0.) && (MAC::abs(delta(1))-Rp == 0.) && (MAC::abs(delta(2))-Rp == 0.)) {
         level_set = 0.;
      } else {
         level_set = 1.;
-     }
+     }*/
   } else if (type == "Rectangle") {
      if ((MAC::abs(delta(0))-zp < 0.) && (MAC::abs(delta(1))-Rp < 0.)) {
         level_set = -1.;
@@ -955,7 +981,7 @@ DDS_NavierStokes:: Solids_generation (size_t const& field)
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(field);
 
-  double xp,yp,zp,Rp,vx,vy,vz,wx,wy,wz,Tp,off;
+  double xp,yp,zp,Rp,tx,ty,tz,vx,vy,vz,wx,wy,wz,Tp,off;
 
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      ifstream inFile;
@@ -967,11 +993,14 @@ DDS_NavierStokes:: Solids_generation (size_t const& field)
      string line;
      getline(inFile,line);
      for (size_t i=0;i<Npart;i++) {
-        inFile >> xp >> yp >> zp >> Rp >> vx >> vy >> vz >> wx >> wy >> wz >> Tp >> off;
+        inFile >> xp >> yp >> zp >> Rp >> tx >> ty >> tz >> vx >> vy >> vz >> wx >> wy >> wz >> Tp >> off;
         solid.coord[comp]->set_item(i,0,xp);
         solid.coord[comp]->set_item(i,1,yp);
         solid.coord[comp]->set_item(i,2,zp);
         solid.size[comp]->set_item(i,Rp);
+        solid.thetap[comp]->set_item(i,0,tx);
+        solid.thetap[comp]->set_item(i,1,ty);
+        solid.thetap[comp]->set_item(i,2,tz);
         solid.vel[comp]->set_item(i,0,vx);
         solid.vel[comp]->set_item(i,1,vy);
         solid.vel[comp]->set_item(i,2,vz);
@@ -5105,8 +5134,8 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ); 
-        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
+        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ); 
+        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l );
      }
 
      size_t local_min_k = 0;
