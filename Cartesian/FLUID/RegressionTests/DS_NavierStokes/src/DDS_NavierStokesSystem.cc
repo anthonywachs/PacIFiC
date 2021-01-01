@@ -92,7 +92,10 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
 
    if (is_solids) {
       Npart = exp->int_data( "NParticles" ) ;
-      if ( exp->has_entry( "Stress_calculation" ) ) is_stressCal = exp->bool_data( "Stress_calculation" ) ;
+      if ( exp->has_entry( "Stress_calculation" ) ) {
+         is_stressCal = exp->bool_data( "Stress_calculation" ) ;
+         level_set_type = exp->string_data( "LevelSetType" );
+      }
       if (is_stressCal) Nmax = (int) exp->double_data( "Npoints" ) ;
    }
 
@@ -379,11 +382,21 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
    if (is_solids && is_stressCal) {
       if (dim == 3) {
-         surface.coordinate->re_initialize(2*Nmax,3);
-         surface.area->re_initialize(2*Nmax);
+         if (level_set_type == "Sphere") {
+            surface.coordinate->re_initialize(2*Nmax,3);
+            surface.area->re_initialize(2*Nmax);
+	 } else if (level_set_type == "Cube") {
+            surface.coordinate->re_initialize(2*(pow(Nmax,2)+2*(Nmax-2)*(Nmax-1)),3);
+            surface.area->re_initialize(2*(pow(Nmax,2)+2*(Nmax-2)*(Nmax-1)));
+	 }
       } else {
-         surface.coordinate->re_initialize(Nmax,3);
-         surface.area->re_initialize(Nmax);
+	 if (level_set_type == "Sphere") {
+            surface.coordinate->re_initialize(Nmax,3);
+            surface.area->re_initialize(Nmax);
+	 } else if (level_set_type == "Cube") {
+            surface.coordinate->re_initialize(4*(Nmax-1),3);
+            surface.area->re_initialize(4*(Nmax-1));
+	 }
       }
    }
 

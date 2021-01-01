@@ -207,7 +207,10 @@ public SolverComputingTime
       void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
       void compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
       void generate_surface_discretization();
-      void compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
+      void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
+      void compute_surface_points_on_cube(size_t const& Np);
+      void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
+
 
       /** @brief Find the interpolation considering the solids affect on the face, used for 2D/3D systems */
       double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);

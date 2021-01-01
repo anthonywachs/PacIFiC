@@ -158,8 +158,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
-      if ( level_set_type != "Cube" && level_set_type != "Square" && level_set_type != "Rectangle" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D" && level_set_type != "PipeX") {
-         string error_message="- Cube\n   - Square\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D\n   - Rectangle\n   - PipeX";
+      if ( level_set_type != "Cube" && level_set_type != "Rectangle" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D" && level_set_type != "PipeX") {
+         string error_message="- Cube\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D\n   - Rectangle\n   - PipeX";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
       }
 
@@ -179,9 +179,11 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       if (is_stressCal) {
          Npoints = exp->double_data( "Npoints" ) ;
          if (dim == 3) {
-            Pmin = exp->int_data( "Pmin" ) ;
-            ar = exp->double_data( "aspect_ratio" ) ;
-            pole_loc = exp->int_data( "pole_loc" ) ;
+            if (level_set_type == "Sphere") {
+               Pmin = exp->int_data( "Pmin" ) ;
+               ar = exp->double_data( "aspect_ratio" ) ;
+               pole_loc = exp->int_data( "pole_loc" ) ;
+	    }
          }
       }
    }
@@ -883,9 +885,6 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
   double yp = solid.coord[comp]->item(m,1);
   double zp = solid.coord[comp]->item(m,2);
   double Rp = solid.size[comp]->item(m);
-  double roll = (MAC::pi()/180.)*solid.thetap[comp]->item(m,0);
-  double pitch = (MAC::pi()/180.)*solid.thetap[comp]->item(m,1);
-  double yaw = (MAC::pi()/180.)*solid.thetap[comp]->item(m,2);
 
   doubleVector delta(3,0);
 
@@ -912,48 +911,25 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      level_set = delta(0);
   } else if (type == "Wall_X") {
      level_set = delta(1);
-  } else if (type == "Square") {
-     if ((pow(MAC::abs(delta(0)*MAC::cos(yaw) + delta(1)*MAC::sin(yaw)),1) - pow(Rp,1) < 0.) 
-      && (pow(MAC::abs(-delta(0)*MAC::sin(yaw) + delta(1)*MAC::cos(yaw)),1) - pow(Rp,1) < 0.)) {
+  } else if (type == "Cube") {
+     // Solid object rotation, if any	  
+     doubleVector angle(3,0.);
+     angle(0) = -solid.thetap[comp]->item(m,0);
+     angle(1) = -solid.thetap[comp]->item(m,1);
+     angle(2) = -solid.thetap[comp]->item(m,2);
+     rotation_matrix(m,delta,angle);
+     delta(0) = MAC::abs(delta(0)) - Rp;
+     delta(1) = MAC::abs(delta(1)) - Rp;
+     delta(2) = MAC::abs(delta(2)) - Rp;
+//     if ((MAC::abs(delta(0))-Rp < 0.) && (MAC::abs(delta(1))-Rp < 0.) && (MAC::abs(delta(2))-Rp < 0.)) {
+     if ((delta(0) < 0.) && (delta(1) < 0.) && (delta(2) < 0.)) {
         level_set = -1.;
-     } else if ((pow(MAC::abs(delta(0)*MAC::cos(yaw) + delta(1)*MAC::sin(yaw)),1) - pow(Rp,1) == 0.) 
-             && (pow(MAC::abs(-delta(0)*MAC::sin(yaw) + delta(1)*MAC::cos(yaw)),1) - pow(Rp,1) == 0.)) {
+//     } else if ((MAC::abs(delta(0))-Rp == 0.) && (MAC::abs(delta(1))-Rp == 0.) && (MAC::abs(delta(2))-Rp == 0.)) {
+     } else if ((delta(0) == 0.) && (delta(1) == 0.) && (delta(2) == 0.)) {
         level_set = 0.;
      } else {
         level_set = 1.;
      }
-  } else if (type == "Cube") { 
-     // yaw along z-axis; pitch along y-axis; roll along x-axis
-     doubleArray2D rot_matrix(3,3,0);
-     // Rotation matrix assemble
-     rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-     rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-     rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
-     rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
-     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-     rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
-     rot_matrix(2,0) = -MAC::sin(pitch);
-     rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
-     rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
-
-     double delta_x = delta(0)*rot_matrix(0,0) - delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
-     double delta_y = - delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) - delta(2)*rot_matrix(1,2);
-     double delta_z = delta(0)*rot_matrix(2,0) - delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
-
-     if ((MAC::abs(delta_x)-Rp < 0.) && (MAC::abs(delta_y)-Rp < 0.) && (MAC::abs(delta_z)-Rp < 0.)) {
-        level_set = -1.;
-     } else if ((MAC::abs(delta_x)-Rp == 0.) && (MAC::abs(delta_y)-Rp == 0.) && (MAC::abs(delta_z)-Rp == 0.)) {
-        level_set = 0.;
-     } else {
-        level_set = 1.;
-     }
-/*     if ((MAC::abs(delta(0))-Rp < 0.) && (MAC::abs(delta(1))-Rp < 0.) && (MAC::abs(delta(2))-Rp < 0.)) {
-        level_set = -1.;
-     } else if ((MAC::abs(delta(0))-Rp == 0.) && (MAC::abs(delta(1))-Rp == 0.) && (MAC::abs(delta(2))-Rp == 0.)) {
-        level_set = 0.;
-     } else {
-        level_set = 1.;
-     }*/
   } else if (type == "Rectangle") {
      if ((MAC::abs(delta(0))-zp < 0.) && (MAC::abs(delta(1))-Rp < 0.)) {
         level_set = -1.;
@@ -971,6 +947,41 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
 
 }
 
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes:: rotation_matrix" ) ;
+
+//  PartInput solid = GLOBAL_EQ->get_solid(field);
+
+  double roll = (MAC::pi()/180.)*angle(0);//solid.thetap[comp]->item(m,0);
+  double pitch = (MAC::pi()/180.)*angle(1);//solid.thetap[comp]->item(m,1);
+  double yaw = (MAC::pi()/180.)*angle(2);//solid.thetap[comp]->item(m,2);
+
+  // yaw along z-axis; pitch along y-axis; roll along x-axis
+  doubleArray2D rot_matrix(3,3,0);
+
+  // Rotation matrix assemble
+  rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+  rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+  rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+  rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
+  rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+  rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+  rot_matrix(2,0) = -MAC::sin(pitch);
+  rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
+  rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+
+  double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
+  double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
+  double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
+
+  delta(0) = delta_x;
+  delta(1) = delta_y;
+  delta(2) = delta_z;
+}
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: Solids_generation (size_t const& field)
@@ -2546,12 +2557,12 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
 /*
   ofstream outputFile ;
   std::ostringstream os2;
-  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/pressure_drag_" << my_rank << ".csv";
+  os2 << "./DS_results/pressure_drag_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
-  outputFile << "x,y,z,p_stress,error" << endl;
-*/
-  double xpoint=0., ypoint=0., zpoint=0.;
+  outputFile << "x,y,z,p_stress,error" << endl;*/
+
+  doubleVector point(3,0);
   doubleVector stress(Np,0);         
   size_t i0, j0, k0=0;
   double Dz_min=0., Dz_max=0.;
@@ -2561,6 +2572,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
 
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
+  doubleVector rotated_coord(dim,0);
 
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(0);
@@ -2589,24 +2601,44 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
         double zp = solid.coord[comp]->item(parID,2);
         ri = solid.size[comp]->item(parID);
 
-        xpoint = xp + ri*surface.coordinate->item(i,0);
-        ypoint = yp + ri*surface.coordinate->item(i,1);
-        zpoint = zp + ri*surface.coordinate->item(i,2);
+	rotated_coord(0) = ri*surface.coordinate->item(i,0);
+	rotated_coord(1) = ri*surface.coordinate->item(i,1);
+	rotated_coord(2) = ri*surface.coordinate->item(i,2);
 
-        bool status = (dim==2) ? ((xpoint > Dmin(0)) && (xpoint <= Dmax(0)) && (ypoint > Dmin(1)) && (ypoint <= Dmax(1))) :
-                                 ((xpoint > Dmin(0)) && (xpoint <= Dmax(0)) && (ypoint > Dmin(1)) && (ypoint <= Dmax(1))
-                                                                            && (zpoint > Dmin(2)) && (zpoint <= Dmax(2)));
+   	doubleVector angle(3,0.);
+        angle(0) = solid.thetap[comp]->item(parID,0);
+        angle(1) = solid.thetap[comp]->item(parID,1);
+        angle(2) = solid.thetap[comp]->item(parID,2);
+
+        rotation_matrix(parID,rotated_coord,angle);
+
+        point(0) = xp + rotated_coord(0);
+        point(1) = yp + rotated_coord(1);
+        point(2) = zp + rotated_coord(2);
+
+      	// Displacement correction in case of periodic boundary condition in any or all directions
+        for (size_t dir=0;dir<dim;dir++) {
+           if (is_periodic[0][dir]) {
+              double isize = PF->primary_grid()->get_main_domain_max_coordinate(dir) - PF->primary_grid()->get_main_domain_min_coordinate(dir);
+              double imin = PF->primary_grid()->get_main_domain_min_coordinate(dir);
+              point(dir) = point(dir) - MAC::floor((point(dir)-imin)/isize)*isize;
+           }
+        }
+
+        bool status = (dim==2) ? ((point(0) > Dmin(0)) && (point(0) <= Dmax(0)) && (point(1) > Dmin(1)) && (point(1) <= Dmax(1))) :
+                                 ((point(0) > Dmin(0)) && (point(0) <= Dmax(0)) && (point(1) > Dmin(1)) && (point(1) <= Dmax(1))
+                                                                                && (point(2) > Dmin(2)) && (point(2) <= Dmax(2)));
 
         if (status) {
            // Finding the grid indexes next to ghost points
-           found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,0), xpoint, i0_temp);
+           found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,0), point(0), i0_temp);
            if (found == 1) i0 = i0_temp;
 
-           found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,1), ypoint, i0_temp);
+           found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,1), point(1), i0_temp);
            if (found == 1) j0 = i0_temp;
 
            if (dim == 3) {
-              found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,2), zpoint, i0_temp);
+              found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,2), point(2), i0_temp);
               if (found == 1) k0 = i0_temp;
            }
 
@@ -2614,35 +2646,35 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
            // Calculation of field variable on ghost point(0,0)
            for (size_t level=2; level<4;level++) {
               if (dim == 2) {
-                 double press0 = ghost_field_estimate_on_face (PF,comp,i0,j0,0,xpoint,ypoint,0,0.,2,level);
+                 double press0 = ghost_field_estimate_on_face (PF,comp,i0,j0,0,point(0),point(1),0,0.,2,level);
                  stress(i) = stress(i) - press0/2.;
               } else if (dim == 3) {
                  doubleArray2D press(dim,2,0);
                  doubleArray2D del(dim,2,0);
                  // Behind face
                  temp = PF->get_DOF_coordinate(k0, comp, 2);
-                 press(2,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,xpoint,ypoint,temp,0.,2,level);
-                 del(2,0) = MAC::abs(temp - zpoint);
+                 press(2,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,point(0),point(1),temp,0.,2,level);
+                 del(2,0) = MAC::abs(temp - point(2));
                  // Front face
                  temp = PF->get_DOF_coordinate(k0+1, comp, 2);
-                 press(2,1) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0+1,xpoint,ypoint,temp,0.,2,level);
-                 del(2,1) = MAC::abs(temp - zpoint);
+                 press(2,1) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0+1,point(0),point(1),temp,0.,2,level);
+                 del(2,1) = MAC::abs(temp - point(2));
                  // Left face
                  temp = PF->get_DOF_coordinate(i0, comp, 0);
-                 press(0,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,temp,ypoint,zpoint,0.,0,level);
-                 del(0,0) = MAC::abs(temp - xpoint);
+                 press(0,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,temp,point(1),point(2),0.,0,level);
+                 del(0,0) = MAC::abs(temp - point(0));
                  // Right face
                  temp = PF->get_DOF_coordinate(i0+1, comp, 0);
-                 press(0,1) = ghost_field_estimate_on_face (PF,comp,i0+1,j0,k0,temp,ypoint,zpoint,0.,0,level);
-                 del(0,1) = MAC::abs(temp - xpoint);
+                 press(0,1) = ghost_field_estimate_on_face (PF,comp,i0+1,j0,k0,temp,point(1),point(2),0.,0,level);
+                 del(0,1) = MAC::abs(temp - point(0));
                  // Bottom face
                  temp = PF->get_DOF_coordinate(j0, comp, 1);
-                 press(1,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,xpoint,temp,zpoint,0.,1,level);
-                 del(1,0) = MAC::abs(temp - ypoint);
+                 press(1,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,point(0),temp,point(2),0.,1,level);
+                 del(1,0) = MAC::abs(temp - point(1));
                  // Bottom face
                  temp = PF->get_DOF_coordinate(j0+1, comp, 1);
-                 press(1,1) = ghost_field_estimate_on_face (PF,comp,i0,j0+1,k0,xpoint,temp,zpoint,0.,1,level);
-                 del(1,1) = MAC::abs(temp - ypoint);
+                 press(1,1) = ghost_field_estimate_on_face (PF,comp,i0,j0+1,k0,point(0),temp,point(2),0.,1,level);
+                 del(1,1) = MAC::abs(temp - point(1));
 
                  double press0 = (1./3.)*((del(0,0)*press(0,1)+del(0,1)*press(0,0))/(del(0,0)+del(0,1)) +
                                           (del(1,0)*press(1,1)+del(1,1)*press(1,0))/(del(1,0)+del(1,1)) +
@@ -2661,7 +2693,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
      force(parID,1) = force(parID,1) + stress(i)*surface.coordinate->item(i,1)*(surface.area->item(i)*scale);
      force(parID,2) = force(parID,2) + stress(i)*surface.coordinate->item(i,2)*(surface.area->item(i)*scale);
 
-//     outputFile << xpoint << "," << ypoint << "," << zpoint << "," << stress(i) << "," << MAC::abs(zpoint + xpoint*ypoint*zpoint + pow(xpoint,2)*ypoint + stress(i)) << endl;
+//     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << stress(i) << "," << (surface.area->item(i)*scale) << endl;
   }
 //  outputFile.close();
 }
@@ -2678,7 +2710,12 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
   doubleArray2D vel_force(Npart,3,0);
   doubleArray2D press_force(Npart,3,0);
 
-  size_t Nmax = (dim == 2) ? Npoints : 2*Npoints ; 
+  size_t Nmax = 0.;
+  if (level_set_type == "Sphere") {
+     Nmax = (dim == 2) ? Npoints : 2*Npoints ; 
+  } else if (level_set_type == "Cube") {
+     Nmax = (dim == 2) ? 4*(Npoints-1) : 2*(pow(Npoints,2)+2*(Npoints-2)*(Npoints-1)) ;
+  }
 
   for (size_t parID = 0; parID < Npart; parID++) {
      // Contribution of stress tensor
@@ -2713,7 +2750,72 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nring)
+DDS_NavierStokes:: compute_surface_points_on_cube(size_t const& Np)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NavierStokes:: compute_surface_points_on_cube" ) ;
+/*
+  ofstream outputFile ;
+  std::ostringstream os2;
+  os2 << "./DS_results/point_data_" << my_rank << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+  outputFile << "x,y,z,area" << endl;
+*/
+
+  // Structure of particle input data
+  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
+
+  double dp = 2./(Np-1);
+
+  if (dim == 3) {
+     size_t counter = 0;
+     for (size_t i=0; i<Np; i++) {
+        for (size_t j=0; j<Np; j++) {
+           for (size_t k=0; k<Np; k++) {
+	      double xp = (-1.0 + dp*i);
+	      double yp = (-1.0 + dp*j);
+	      double zp = (-1.0 + dp*k); 
+	      if ((i == 0) || (i == (Np-1)) || (j == 0) || (j == (Np-1)) || (k == 0) || (k == (Np-1))) {
+                 surface.coordinate->set_item(counter,0,xp);
+                 surface.coordinate->set_item(counter,1,yp);
+                 surface.coordinate->set_item(counter,2,zp);
+		 if ((i==0 || i==(Np-1)) &&
+                     (j==0 || j==(Np-1)) &&
+                     (k==0 || k==(Np-1))) {
+                    surface.area->set_item(counter,(3./4.)*dp*dp);
+		 } else {
+                    surface.area->set_item(counter,dp*dp);
+		 }
+//		 outputFile << surface.coordinate->item(counter,0) << "," << surface.coordinate->item(counter,1) << "," << surface.coordinate->item(counter,2) << "," << surface.area->item(counter) << endl; 
+		 counter++;
+	      }
+           }
+	}
+     }	
+  } else if (dim == 2) {
+     size_t counter = 0;
+     for (size_t i=0; i<Np; i++) {
+        for (size_t j=0; j<Np; j++) {
+           double xp = (-1.0 + dp*i);
+           double yp = (-1.0 + dp*j);
+           if ((i == 0) || (i == (Np-1)) || (j == 0) || (j == (Np-1))) {
+              surface.coordinate->set_item(counter,0,xp);
+              surface.coordinate->set_item(counter,1,yp);
+              surface.area->set_item(counter,dp);
+//              outputFile << surface.coordinate->item(counter,0) << "," << surface.coordinate->item(counter,1) << "," << 0. << "," << surface.area->item(counter) << endl; 
+	      counter++;
+           }
+        }
+     }	
+  }
+//  outputFile.close();
+     
+
+}
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nring)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_surface_points" ) ;
@@ -2877,57 +2979,62 @@ DDS_NavierStokes:: generate_surface_discretization()
 {
   MAC_LABEL("DDS_NavierStokes:: generate_surface_discretization" ) ;
 
-  // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into 
-  // equal-area cells, Computational Geometry 45 (2012) 275-283
-
-  double theta_ref = MAC::pi()/2.;
-
-  double p = MAC::pi()*ar;
   size_t kmax = (int) Npoints;
 
-  double eta_temp = MAC::pi()/2.;
-  size_t k_temp = kmax;
-  double Ro_temp = MAC::sqrt(2);
-  double Rn_temp = MAC::sqrt(2);
-  size_t counter = 0; 
+  if ( level_set_type == "Sphere" ) {
+     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into 
+     // equal-area cells, Computational Geometry 45 (2012) 275-283
 
-  // Estimating the number of rings on the hemisphere
-  while (k_temp > (Pmin+2)) {
-     eta_temp = eta_temp - 2./ar*MAC::sqrt(MAC::pi()/k_temp)*MAC::sin(eta_temp/2.);
-     Rn_temp = 2.*MAC::sin(eta_temp/2.);
-     k_temp = round(k_temp*pow(Rn_temp/Ro_temp,2.));
-     Ro_temp = Rn_temp;
-     counter++;
-  }
+     double theta_ref = MAC::pi()/2.;
 
-  size_t Nrings = counter+1;
+     double p = MAC::pi()*ar;
 
-  // Summation of total discretized points with increase in number of rings radially
-  doubleVector k(Nrings,0.);
-  // Zenithal angle for the sphere
-  doubleVector eta(Nrings,0.);
-  // Radius of the rings in lamber projection plane
-  doubleVector Rring(Nrings,0.);
+     double eta_temp = MAC::pi()/2.;
+     size_t k_temp = kmax;
+     double Ro_temp = MAC::sqrt(2);
+     double Rn_temp = MAC::sqrt(2);
+     size_t counter = 0; 
 
-  // Assigning the maximum number of discretized points to the last element of the array
-  k(Nrings-1) = kmax;
-  // Zenithal angle for the last must be pi/2.
-  eta(Nrings-1) = MAC::pi()/2.;
-  // Radius of last ring in lamber projection plane
-  Rring(Nrings-1) = MAC::sqrt(2.);
+     // Estimating the number of rings on the hemisphere
+     while (k_temp > (Pmin+2)) {
+        eta_temp = eta_temp - 2./ar*MAC::sqrt(MAC::pi()/k_temp)*MAC::sin(eta_temp/2.);
+        Rn_temp = 2.*MAC::sin(eta_temp/2.);
+        k_temp = round(k_temp*pow(Rn_temp/Ro_temp,2.));
+        Ro_temp = Rn_temp;
+        counter++;
+     }
 
-  for (int i=Nrings-2; i>=0; --i) {
-     eta(i) = eta(i+1) - 2./ar*MAC::sqrt(MAC::pi()/k(i+1))*MAC::sin(eta(i+1)/2.);
-     Rring(i) = 2.*MAC::sin(eta(i)/2.);
-     k(i) = round(k(i+1)*pow(Rring(i)/Rring(i+1),2.));
-     if (i==0) k(0) = Pmin;
-  } 
+     size_t Nrings = counter+1;
 
-  // Discretize the parID particle surface into approximate equal area cells
-  if (dim == 3) {
-     compute_surface_points(eta, k, Rring, Nrings);
-  } else {
-     compute_surface_points(eta, k, Rring, kmax);
+     // Summation of total discretized points with increase in number of rings radially
+     doubleVector k(Nrings,0.);
+     // Zenithal angle for the sphere
+     doubleVector eta(Nrings,0.);
+     // Radius of the rings in lamber projection plane
+     doubleVector Rring(Nrings,0.);
+
+     // Assigning the maximum number of discretized points to the last element of the array
+     k(Nrings-1) = kmax;
+     // Zenithal angle for the last must be pi/2.
+     eta(Nrings-1) = MAC::pi()/2.;
+     // Radius of last ring in lamber projection plane
+     Rring(Nrings-1) = MAC::sqrt(2.);
+
+     for (int i=Nrings-2; i>=0; --i) {
+        eta(i) = eta(i+1) - 2./ar*MAC::sqrt(MAC::pi()/k(i+1))*MAC::sin(eta(i+1)/2.);
+        Rring(i) = 2.*MAC::sin(eta(i)/2.);
+        k(i) = round(k(i+1)*pow(Rring(i)/Rring(i+1),2.));
+        if (i==0) k(0) = Pmin;
+     } 
+
+     // Discretize the particle surface into approximate equal area cells
+     if (dim == 3) {
+        compute_surface_points_on_sphere(eta, k, Rring, Nrings);
+     } else {
+        compute_surface_points_on_sphere(eta, k, Rring, kmax);
+     }
+  } else if (level_set_type == "Cube") {
+     compute_surface_points_on_cube(kmax);
   }
 
 }
@@ -2956,10 +3063,10 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
 /*  
   ofstream outputFile ;
   std::ostringstream os2;
-  os2 << "/home/goyal001/Documents/Computing/MAC-Test/DS_results/velocity_drag_" << my_rank << "_" << parID << ".csv";
+  os2 << "./DS_results/velocity_drag_" << my_rank << "_" << parID << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
-  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
+//  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
   outputFile << "x,y,z,id" << endl;*/
 
   doubleVector xpoint(3,0);
@@ -2983,6 +3090,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
 
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
+  doubleVector rotated_coord(dim,0);
 
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[1];comp++) {
@@ -3001,9 +3109,24 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
            }
         }
 
-        xpoint(0) = xp + ri*surface.coordinate->item(i,0);
+	rotated_coord(0) = ri*surface.coordinate->item(i,0);
+	rotated_coord(1) = ri*surface.coordinate->item(i,1);
+	rotated_coord(2) = ri*surface.coordinate->item(i,2);
+
+   	doubleVector angle(3,0.);
+        angle(0) = solid.thetap[comp]->item(parID,0);
+        angle(1) = solid.thetap[comp]->item(parID,1);
+        angle(2) = solid.thetap[comp]->item(parID,2);
+
+        rotation_matrix(parID,rotated_coord,angle);
+
+        xpoint(0) = xp + rotated_coord(0);
+        ypoint(0) = yp + rotated_coord(1);
+        zpoint(0) = zp + rotated_coord(2);
+
+/*        xpoint(0) = xp + ri*surface.coordinate->item(i,0);
         ypoint(0) = yp + ri*surface.coordinate->item(i,1);
-        zpoint(0) = zp + ri*surface.coordinate->item(i,2);
+        zpoint(0) = zp + ri*surface.coordinate->item(i,2);*/
 
         if (is_periodic[1][0]) {
            double isize = UF->primary_grid()->get_main_domain_max_coordinate(0) - UF->primary_grid()->get_main_domain_min_coordinate(0);
@@ -3294,7 +3417,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
               stress(i,5) = stress(i,5) + dfdx;
            }
 
-/*           outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(0) << "," << i << endl;
+/*	   outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(0) << "," << i << endl;
            outputFile << xpoint(1) << "," << ypoint(0) << "," << zpoint(0) << "," << i << endl;
            outputFile << xpoint(2) << "," << ypoint(0) << "," << zpoint(0) << "," << i << endl;
            outputFile << xpoint(0) << "," << ypoint(1) << "," << zpoint(0) << "," << i << endl;

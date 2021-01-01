@@ -302,6 +302,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       bool is_solids;
       bool is_stressCal;
 
+      string level_set_type;
 
       bool is_periodic[2][3];
       boolVector const* U_periodic_comp;
