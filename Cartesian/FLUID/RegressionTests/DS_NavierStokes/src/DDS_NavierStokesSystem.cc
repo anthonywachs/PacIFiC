@@ -155,6 +155,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    // Structure for the particle surface discretization
    surface.coordinate = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
    surface.area = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
+   surface.normal = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
 
    for (size_t field = 0; field < 2; field++) {
 
@@ -295,6 +296,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 
    surface.coordinate = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
    surface.area = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   surface.normal = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
 
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
@@ -385,17 +387,21 @@ DDS_NavierStokesSystem:: re_initialize( void )
          if (level_set_type == "Sphere") {
             surface.coordinate->re_initialize(2*Nmax,3);
             surface.area->re_initialize(2*Nmax);
+            surface.normal->re_initialize(2*Nmax,3);
 	 } else if (level_set_type == "Cube") {
             surface.coordinate->re_initialize(2*(pow(Nmax,2)+2*(Nmax-2)*(Nmax-1)),3);
             surface.area->re_initialize(2*(pow(Nmax,2)+2*(Nmax-2)*(Nmax-1)));
+            surface.normal->re_initialize(2*(pow(Nmax,2)+2*(Nmax-2)*(Nmax-1)),3);
 	 }
       } else {
 	 if (level_set_type == "Sphere") {
             surface.coordinate->re_initialize(Nmax,3);
             surface.area->re_initialize(Nmax);
+            surface.normal->re_initialize(Nmax,3);
 	 } else if (level_set_type == "Cube") {
-            surface.coordinate->re_initialize(4*(Nmax-1),3);
-            surface.area->re_initialize(4*(Nmax-1));
+            surface.coordinate->re_initialize(4*Nmax,3);
+            surface.area->re_initialize(4*Nmax);
+            surface.normal->re_initialize(4*Nmax,3);
 	 }
       }
    }

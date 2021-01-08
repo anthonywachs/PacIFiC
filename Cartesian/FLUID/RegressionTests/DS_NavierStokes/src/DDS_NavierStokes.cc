@@ -901,6 +901,7 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      }
   }
 
+  // Try to add continuous level set function; solver performs better in this case for nodes at interface
   double level_set = 0.;
   if (type == "Sphere") {
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
@@ -921,15 +922,19 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      delta(0) = MAC::abs(delta(0)) - Rp;
      delta(1) = MAC::abs(delta(1)) - Rp;
      delta(2) = MAC::abs(delta(2)) - Rp;
-//     if ((MAC::abs(delta(0))-Rp < 0.) && (MAC::abs(delta(1))-Rp < 0.) && (MAC::abs(delta(2))-Rp < 0.)) {
+
      if ((delta(0) < 0.) && (delta(1) < 0.) && (delta(2) < 0.)) {
+        level_set = MAC::min(delta(0),MAC::min(delta(1),delta(2)));
+     } else {
+        level_set = MAC::max(delta(0),MAC::max(delta(1),delta(2)));
+     }
+/*     if ((delta(0) < 0.) && (delta(1) < 0.) && (delta(2) < 0.)) {
         level_set = -1.;
-//     } else if ((MAC::abs(delta(0))-Rp == 0.) && (MAC::abs(delta(1))-Rp == 0.) && (MAC::abs(delta(2))-Rp == 0.)) {
      } else if ((delta(0) == 0.) && (delta(1) == 0.) && (delta(2) == 0.)) {
         level_set = 0.;
      } else {
         level_set = 1.;
-     }
+     }*/
   } else if (type == "Rectangle") {
      if ((MAC::abs(delta(0))-zp < 0.) && (MAC::abs(delta(1))-Rp < 0.)) {
         level_set = -1.;
@@ -2560,8 +2565,8 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
   os2 << "./DS_results/pressure_drag_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
-  outputFile << "x,y,z,p_stress,error" << endl;*/
-
+  outputFile << "x,y,z,p_stress,area,nx,ny,nz" << endl;
+*/
   doubleVector point(3,0);
   doubleVector stress(Np,0);         
   size_t i0, j0, k0=0;
@@ -2573,6 +2578,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
   doubleVector rotated_coord(dim,0);
+  doubleVector rotated_normal(dim,0);
 
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(0);
@@ -2601,11 +2607,12 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
         double zp = solid.coord[comp]->item(parID,2);
         ri = solid.size[comp]->item(parID);
 
+	// Rotating surface points
 	rotated_coord(0) = ri*surface.coordinate->item(i,0);
 	rotated_coord(1) = ri*surface.coordinate->item(i,1);
 	rotated_coord(2) = ri*surface.coordinate->item(i,2);
 
-   	doubleVector angle(3,0.);
+	doubleVector angle(3,0.);
         angle(0) = solid.thetap[comp]->item(parID,0);
         angle(1) = solid.thetap[comp]->item(parID,1);
         angle(2) = solid.thetap[comp]->item(parID,2);
@@ -2615,6 +2622,12 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
         point(0) = xp + rotated_coord(0);
         point(1) = yp + rotated_coord(1);
         point(2) = zp + rotated_coord(2);
+
+	// Rotating surface vectors
+	rotated_normal(0) = surface.normal->item(i,0);
+	rotated_normal(1) = surface.normal->item(i,1);
+	rotated_normal(2) = surface.normal->item(i,2);
+        rotation_matrix(parID,rotated_normal,angle);
 
       	// Displacement correction in case of periodic boundary condition in any or all directions
         for (size_t dir=0;dir<dim;dir++) {
@@ -2689,11 +2702,12 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i)*surface.coordinate->item(i,0)*(surface.area->item(i)*scale);
-     force(parID,1) = force(parID,1) + stress(i)*surface.coordinate->item(i,1)*(surface.area->item(i)*scale);
-     force(parID,2) = force(parID,2) + stress(i)*surface.coordinate->item(i,2)*(surface.area->item(i)*scale);
+     force(parID,0) = force(parID,0) + stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
+     force(parID,1) = force(parID,1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
+     force(parID,2) = force(parID,2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
 
-//     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << stress(i) << "," << (surface.area->item(i)*scale) << endl;
+//     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (surface.area->item(i)*scale) << endl;
+//     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (surface.area->item(i)*scale) << "," << rotated_normal(0) << "," << rotated_normal(1) << "," << rotated_normal(2) << endl;
   }
 //  outputFile.close();
 }
@@ -2714,7 +2728,7 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
   if (level_set_type == "Sphere") {
      Nmax = (dim == 2) ? Npoints : 2*Npoints ; 
   } else if (level_set_type == "Cube") {
-     Nmax = (dim == 2) ? 4*(Npoints-1) : 2*(pow(Npoints,2)+2*(Npoints-2)*(Npoints-1)) ;
+     Nmax = (dim == 2) ? 4*Npoints : 2*(pow(Npoints,2)+2*(Npoints-2)*(Npoints-1)) ;
   }
 
   for (size_t parID = 0; parID < Npart; parID++) {
@@ -2760,13 +2774,13 @@ DDS_NavierStokes:: compute_surface_points_on_cube(size_t const& Np)
   os2 << "./DS_results/point_data_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
-  outputFile << "x,y,z,area" << endl;
+  outputFile << "x,y,area,nx,ny" << endl;
 */
 
   // Structure of particle input data
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
-  double dp = 2./(Np-1);
+  double dp = 2./(Np);
 
   if (dim == 3) {
      size_t counter = 0;
@@ -2787,7 +2801,20 @@ DDS_NavierStokes:: compute_surface_points_on_cube(size_t const& Np)
 		 } else {
                     surface.area->set_item(counter,dp*dp);
 		 }
-//		 outputFile << surface.coordinate->item(counter,0) << "," << surface.coordinate->item(counter,1) << "," << surface.coordinate->item(counter,2) << "," << surface.area->item(counter) << endl; 
+	         // Surface normal vectors
+	         if (i == 0) surface.normal->set_item(counter,0,-1.); 
+                 if (j == 0) surface.normal->set_item(counter,1,-1.); 
+                 if (k == 0) surface.normal->set_item(counter,2,-1.); 
+	         if (i == (Np-1)) surface.normal->set_item(counter,0,1.); 
+                 if (j == (Np-1)) surface.normal->set_item(counter,1,1.);
+                 if (k == (Np-1)) surface.normal->set_item(counter,2,1.);
+	         double vec_mag = pow(pow(surface.normal->item(counter,0),2.) + pow(surface.normal->item(counter,1),2.) + pow(surface.normal->item(counter,2),2.), 0.5);
+                 if (vec_mag != 0.) {
+                    surface.normal->set_item(counter,0,surface.normal->item(counter,0)/vec_mag); 
+                    surface.normal->set_item(counter,1,surface.normal->item(counter,1)/vec_mag); 
+                    surface.normal->set_item(counter,2,surface.normal->item(counter,2)/vec_mag); 
+	         }
+//		 outputFile << surface.coordinate->item(counter,0) << "," << surface.coordinate->item(counter,1) << "," << surface.coordinate->item(counter,2) << "," << surface.area->item(counter) << "," << surface.normal->item(counter,0) << "," << surface.normal->item(counter,1) << "," << surface.normal->item(counter,2) << endl; 
 		 counter++;
 	      }
            }
@@ -2795,37 +2822,52 @@ DDS_NavierStokes:: compute_surface_points_on_cube(size_t const& Np)
      }	
   } else if (dim == 2) {
      size_t counter = 0;
+     // Generating discretization on surface
+     double lsp=0.;
      for (size_t i=0; i<Np; i++) {
-        for (size_t j=0; j<Np; j++) {
-           double xp = (-1.0 + dp*i);
-           double yp = (-1.0 + dp*j);
-           if ((i == 0) || (i == (Np-1)) || (j == 0) || (j == (Np-1))) {
-              surface.coordinate->set_item(counter,0,xp);
-              surface.coordinate->set_item(counter,1,yp);
-              surface.area->set_item(counter,dp);
-//              outputFile << surface.coordinate->item(counter,0) << "," << surface.coordinate->item(counter,1) << "," << 0. << "," << surface.area->item(counter) << endl; 
-	      counter++;
-           }
-        }
-     }	
+        lsp = -1. + dp*(i+0.5);
+	//y=-1
+	surface.coordinate->set_item(i,0,lsp);
+	surface.coordinate->set_item(i,1,-1.);
+	surface.area->set_item(i,dp);
+	surface.normal->set_item(i,1,-1.);
+	//y=1
+	surface.coordinate->set_item(Np+i,0,lsp);
+	surface.coordinate->set_item(Np+i,1,1.);
+	surface.area->set_item(Np+i,dp);
+	surface.normal->set_item(Np+i,1,1.);
+	//x=-1
+	surface.coordinate->set_item(2*Np+i,0,-1.);
+	surface.coordinate->set_item(2*Np+i,1,lsp);
+	surface.area->set_item(2*Np+i,dp);
+	surface.normal->set_item(2*Np+i,0,-1.);
+	//x=1
+	surface.coordinate->set_item(3*Np+i,0,1.);
+	surface.coordinate->set_item(3*Np+i,1,lsp);
+	surface.area->set_item(3*Np+i,dp);
+	surface.normal->set_item(3*Np+i,0,1.);
+/*  
+  	outputFile << surface.coordinate->item(i,0) << "," << surface.coordinate->item(i,1) << "," << surface.area->item(i) << "," << surface.normal->item(i,0) << "," << surface.normal->item(i,1) << endl; 
+  	outputFile << surface.coordinate->item(1*Np+i,0) << "," << surface.coordinate->item(1*Np+i,1) << "," << surface.area->item(1*Np+i) << "," << surface.normal->item(1*Np+i,0) << "," << surface.normal->item(1*Np+i,1) << endl; 
+  	outputFile << surface.coordinate->item(2*Np+i,0) << "," << surface.coordinate->item(2*Np+i,1) << "," << surface.area->item(2*Np+i) << "," << surface.normal->item(2*Np+i,0) << "," << surface.normal->item(2*Np+i,1) << endl; 
+  	outputFile << surface.coordinate->item(3*Np+i,0) << "," << surface.coordinate->item(3*Np+i,1) << "," << surface.area->item(3*Np+i) << "," << surface.normal->item(3*Np+i,0) << "," << surface.normal->item(3*Np+i,1) << endl; */
+     }
   }
 //  outputFile.close();
-     
-
 }
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nring)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: compute_surface_points" ) ;
+  MAC_LABEL("DDS_NavierStokes:: compute_surface_points_on_sphere" ) ;
 /*
   ofstream outputFile ;
   std::ostringstream os2;
   os2 << "./DS_results/point_data_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
-  outputFile << "x,y,z,area" << endl;
+  outputFile << "x,y,z,area,nx,ny,nz" << endl;
 */
 
   // Structure of particle input data
@@ -2872,9 +2914,19 @@ DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, cla
               surface.coordinate->set_item(k(Nring-1)+j,2,MAC::sin(theta)*MAC::sin(eta(i)));
               surface.coordinate->set_item(k(Nring-1)+j,0,-MAC::cos(eta(i)));
               surface.area->set_item(k(Nring-1)+j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
-           } 
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << endl;
-           outputFile << surface.coordinate->item(k(Nring-1)+j,0) << "," << surface.coordinate->item(k(Nring-1)+j,1) << "," << surface.coordinate->item(k(Nring-1)+j,2) << "," << surface.area->item(k(Nring-1)+j) << endl;*/
+           }
+	   // Create surface normal vectors
+	   surface.normal->set_item(j,0,surface.coordinate->item(j,0));
+	   surface.normal->set_item(j,1,surface.coordinate->item(j,1));
+	   surface.normal->set_item(j,2,surface.coordinate->item(j,2));
+	   surface.normal->set_item(k(Nring-1)+j,0,surface.coordinate->item(k(Nring-1)+j,0));
+	   surface.normal->set_item(k(Nring-1)+j,1,surface.coordinate->item(k(Nring-1)+j,1));
+	   surface.normal->set_item(k(Nring-1)+j,2,surface.coordinate->item(k(Nring-1)+j,2));
+
+/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," 
+		      << surface.area->item(j) << "," 
+		      << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
+           outputFile << surface.coordinate->item(k(Nring-1)+j,0) << "," << surface.coordinate->item(k(Nring-1)+j,1) << "," << surface.coordinate->item(k(Nring-1)+j,2) << "," << surface.area->item(k(Nring-1)+j) << "," << surface.normal->item(k(Nring-1)+j,0) << "," << surface.normal->item(k(Nring-1)+j,1) << "," << surface.normal->item(k(Nring-1)+j,2) << endl;*/
         }
      } 
 
@@ -2919,8 +2971,15 @@ DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, cla
               surface.coordinate->set_item(k(Nring-1)+j,0,-MAC::cos(eta(0)));
               surface.area->set_item(k(Nring-1)+j,0.5*d_theta*pow(Ri,2.));
            } 
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << endl;
-           outputFile << surface.coordinate->item(k(Nring-1)+j,0) << "," << surface.coordinate->item(k(Nring-1)+j,1) << "," << surface.coordinate->item(k(Nring-1)+j,2) << "," << surface.area->item(k(Nring-1)+j) << endl;*/
+	   // Create surface normal vectors
+	   surface.normal->set_item(j,0,surface.coordinate->item(j,0));
+	   surface.normal->set_item(j,1,surface.coordinate->item(j,1));
+	   surface.normal->set_item(j,2,surface.coordinate->item(j,2));
+	   surface.normal->set_item(k(Nring-1)+j,0,surface.coordinate->item(k(Nring-1)+j,0));
+	   surface.normal->set_item(k(Nring-1)+j,1,surface.coordinate->item(k(Nring-1)+j,1));
+	   surface.normal->set_item(k(Nring-1)+j,2,surface.coordinate->item(k(Nring-1)+j,2));
+/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
+           outputFile << surface.coordinate->item(k(Nring-1)+j,0) << "," << surface.coordinate->item(k(Nring-1)+j,1) << "," << surface.coordinate->item(k(Nring-1)+j,2) << "," << surface.area->item(k(Nring-1)+j) << "," << surface.normal->item(k(Nring-1)+j,0) << "," << surface.normal->item(k(Nring-1)+j,1) << "," << surface.normal->item(k(Nring-1)+j,2) << endl;*/
         }
      } else {
         if (pole_loc == 2) { 
@@ -2954,8 +3013,15 @@ DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, cla
            surface.coordinate->set_item(k(Nring-1),0,-1.);
            surface.area->set_item(k(Nring-1),0.5*d_theta*pow(Ri,2.));
         } 
-/*        outputFile << surface.coordinate->item(0,0) << "," << surface.coordinate->item(0,1) << "," << surface.coordinate->item(0,2) << "," << surface.area->item(0) << endl;
-        outputFile << surface.coordinate->item(k(Nring-1),0) << "," << surface.coordinate->item(k(Nring-1),1) << "," << surface.coordinate->item(k(Nring-1),2) << "," << surface.area->item(k(Nring-1)) << endl;*/
+        // Create surface normal vectors
+        surface.normal->set_item(0,0,surface.coordinate->item(0,0));
+        surface.normal->set_item(0,1,surface.coordinate->item(0,1));
+        surface.normal->set_item(0,2,surface.coordinate->item(0,2));
+        surface.normal->set_item(k(Nring-1),0,surface.coordinate->item(k(Nring-1),0));
+        surface.normal->set_item(k(Nring-1),1,surface.coordinate->item(k(Nring-1),1));
+        surface.normal->set_item(k(Nring-1),2,surface.coordinate->item(k(Nring-1),2));
+/*        outputFile << surface.coordinate->item(0,0) << "," << surface.coordinate->item(0,1) << "," << surface.coordinate->item(0,2) << "," << surface.area->item(0) << "," << surface.normal->item(0,0) << "," << surface.normal->item(0,1) << "," << surface.normal->item(0,2) << endl;
+        outputFile << surface.coordinate->item(k(Nring-1),0) << "," << surface.coordinate->item(k(Nring-1),1) << "," << surface.coordinate->item(k(Nring-1),2) << "," << surface.area->item(k(Nring-1)) << "," << surface.normal->item(k(Nring-1),0) << "," << surface.normal->item(k(Nring-1),1) << "," << surface.normal->item(k(Nring-1),2) << endl;*/
      }
   } else if (dim == 2) {
      double d_theta = 2.*MAC::pi()/Nring;
@@ -2965,7 +3031,10 @@ DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, cla
         surface.coordinate->set_item(j,0,MAC::cos(theta));
         surface.coordinate->set_item(j,1,MAC::sin(theta));
         surface.area->set_item(j,d_theta);
-//        outputFile << point_coord(j,0) << "," << point_coord(j,1) << "," << point_coord(j,2) << "," << cell_area(j) << endl;
+        // Create surface normal vectors
+        surface.normal->set_item(j,0,surface.coordinate->item(j,0));
+        surface.normal->set_item(j,1,surface.coordinate->item(j,1));
+//        outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
      }
   }
 //  outputFile.close();
@@ -3067,8 +3136,8 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 //  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
-  outputFile << "x,y,z,id" << endl;*/
-
+  outputFile << "x,y,z,id" << endl;
+*/
   doubleVector xpoint(3,0);
   doubleVector ypoint(3,0);
   doubleVector zpoint(3,0);
@@ -3091,6 +3160,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
   doubleVector rotated_coord(dim,0);
+  doubleVector rotated_normal(dim,0);
 
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[1];comp++) {
@@ -3109,6 +3179,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
            }
         }
 
+	// Rotating surface points
 	rotated_coord(0) = ri*surface.coordinate->item(i,0);
 	rotated_coord(1) = ri*surface.coordinate->item(i,1);
 	rotated_coord(2) = ri*surface.coordinate->item(i,2);
@@ -3124,9 +3195,12 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
         ypoint(0) = yp + rotated_coord(1);
         zpoint(0) = zp + rotated_coord(2);
 
-/*        xpoint(0) = xp + ri*surface.coordinate->item(i,0);
-        ypoint(0) = yp + ri*surface.coordinate->item(i,1);
-        zpoint(0) = zp + ri*surface.coordinate->item(i,2);*/
+        // Rotating surface normal
+	rotated_normal(0) = surface.normal->item(i,0);
+	rotated_normal(1) = surface.normal->item(i,1);
+	rotated_normal(2) = surface.normal->item(i,2);
+
+	rotation_matrix(parID,rotated_normal,angle);
 
         if (is_periodic[1][0]) {
            double isize = UF->primary_grid()->get_main_domain_max_coordinate(0) - UF->primary_grid()->get_main_domain_min_coordinate(0);
@@ -3166,10 +3240,11 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
         bool status = (dim==2) ? ((xpoint(0) > Dmin(0)) && (xpoint(0) <= Dmax(0)) && (ypoint(0) > Dmin(1)) && (ypoint(0) <= Dmax(1))) :
                                  ((xpoint(0) > Dmin(0)) && (xpoint(0) <= Dmax(0)) && (ypoint(0) > Dmin(1)) && (ypoint(0) <= Dmax(1))
                                                                                   && (zpoint(0) > Dmin(2)) && (zpoint(0) <= Dmax(2)));
+        double threshold = pow(loc_thres,0.5)*dh;
 
         if (status) {
-           double sign_x = (surface.coordinate->item(i,0) > 0.) ? 1. : -1.;
-           double sign_y = (surface.coordinate->item(i,1) > 0.) ? 1. : -1.;
+           double sign_x = (rotated_normal(0) > 0.) ? 1. : -1.;
+           double sign_y = (rotated_normal(1) > 0.) ? 1. : -1.;
            double sign_z = 1.;
 
            // Ghost points in x for the calculation of x-derivative of field
@@ -3195,7 +3270,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
            }
 
            if (dim == 3) {
-              sign_z = (surface.coordinate->item(i,2) > 0.) ? 1. : -1.;
+              sign_z = (rotated_normal(2) > 0.) ? 1. : -1.;
               // Ghost points in z for the calculation of z-derivative of field
               zpoint(1) = zpoint(0) + sign_z*dh;
               zpoint(2) = zpoint(1) + sign_z*dh;
@@ -3215,36 +3290,36 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
 
            // Checking all the ghost points in the solid/fluid, and storing the parID if present in solid
            for (size_t m=0;m<Npart;m++) {
-              if (level_set(0,0) > 0.) {
+              if (level_set(0,0) > threshold) {
                  level_set(0,0) = level_set_function(UF,m,comp,xpoint(1),ypoint(0),zpoint(0),level_set_type,1);
                  level_set(0,0) *= solid.inside[comp]->item(m);
-                 if (level_set(0,0) < 0.) in_parID(0,0) = m;
+                 if (level_set(0,0) < threshold) in_parID(0,0) = m;
               }
-              if (level_set(0,1) > 0.) {
+              if (level_set(0,1) > threshold) {
                  level_set(0,1) = level_set_function(UF,m,comp,xpoint(2),ypoint(0),zpoint(0),level_set_type,1);
                  level_set(0,1) *= solid.inside[comp]->item(m);
-                 if (level_set(0,1) < 0.) in_parID(0,1) = m;
+                 if (level_set(0,1) < threshold) in_parID(0,1) = m;
               }
-              if (level_set(1,0) > 0.) {
+              if (level_set(1,0) > threshold) {
                  level_set(1,0) = level_set_function(UF,m,comp,xpoint(0),ypoint(1),zpoint(0),level_set_type,1);
                  level_set(1,0) *= solid.inside[comp]->item(m);
-                 if (level_set(1,0) < 0.) in_parID(1,0) = m;
+                 if (level_set(1,0) < threshold) in_parID(1,0) = m;
               }
-              if (level_set(1,1) > 0.) {
+              if (level_set(1,1) > threshold) {
                  level_set(1,1) = level_set_function(UF,m,comp,xpoint(0),ypoint(2),zpoint(0),level_set_type,1);
                  level_set(1,1) *= solid.inside[comp]->item(m);
-                 if (level_set(1,1) < 0.) in_parID(1,1) = m;
+                 if (level_set(1,1) < threshold) in_parID(1,1) = m;
               }
               if (dim == 3) {
-                 if (level_set(2,0) > 0.) {
+                 if (level_set(2,0) > threshold) {
                     level_set(2,0) = level_set_function(UF,m,comp,xpoint(0),ypoint(0),zpoint(1),level_set_type,1);
                     level_set(2,0) *= solid.inside[comp]->item(m);
-                    if (level_set(2,0) < 0.) in_parID(2,0) = m;
+                    if (level_set(2,0) < threshold) in_parID(2,0) = m;
                  }
-                 if (level_set(2,1) > 0.) {
+                 if (level_set(2,1) > threshold) {
                     level_set(2,1) = level_set_function(UF,m,comp,xpoint(0),ypoint(0),zpoint(2),level_set_type,1);
                     level_set(2,1) *= solid.inside[comp]->item(m);
-                    if (level_set(2,1) < 0.) in_parID(2,1) = m;
+                    if (level_set(2,1) < threshold) in_parID(2,1) = m;
                  }
               }
            }
@@ -3273,19 +3348,30 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
               in_domain(0,1) = found(0,2)*found(1,0);
               in_domain(1,0) = found(0,0)*found(1,1);
               in_domain(1,1) = found(0,0)*found(1,2);
-              // Calculation of field variable on ghost point(1,0)
-              if ((level_set(0,0) > 0.) && in_domain(0,0)) 
+	      // Calculation of field variable on ghost point(1,0)
+              if ((level_set(0,0) > threshold) && in_domain(0,0)) {
                   finx(1) = ghost_field_estimate_on_face (UF,comp,i0_x(1),i0_y(0),0, xpoint(1), ypoint(0),0, dh,2,0);
+	      } else if ((level_set(0,0) < threshold) && in_domain(0,0)) {
+		  finx(1) = net_vel[comp];
+	      }
               // Calculation of field variable on ghost point(2,0)
-              if ((level_set(0,1) > 0.) && in_domain(0,1)) 
+              if ((level_set(0,1) > threshold) && in_domain(0,1)) {
                   finx(2) = ghost_field_estimate_on_face (UF,comp,i0_x(2),i0_y(0),0, xpoint(2), ypoint(0),0, dh,2,0);
+	      } else if ((level_set(0,1) < threshold) && in_domain(0,1)) {
+                  finx(2) = net_vel[comp];
+	      }
               // Calculation of field variable on ghost point(0,1)
-              if ((level_set(1,0) > 0.) && in_domain(1,0)) 
+              if ((level_set(1,0) > threshold) && in_domain(1,0)) {
                   finy(1) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(1),0, xpoint(0), ypoint(1),0, dh,2,0);
+	      } else if ((level_set(1,0) < threshold) && in_domain(1,0)) {
+		  finy(1) = net_vel[comp];
+	      }
               // Calculation of field variable on ghost point(0,2)
-              if ((level_set(1,1) > 0.) && in_domain(1,1)) 
+              if ((level_set(1,1) > threshold) && in_domain(1,1)) {
                   finy(2) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(2),0, xpoint(0), ypoint(2),0, dh,2,0);
-
+	      } else if ((level_set(1,1) < threshold) && in_domain(1,1)) {
+		  finy(2) = net_vel[comp];
+	      }
            } else if (dim == 3) {
               found(2,1) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,2), zpoint(1), i0_temp);
               if (found(2,1) == 1) i0_z(1) = i0_temp;
@@ -3349,13 +3435,13 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
 
            // Derivative in x
            // Both points 1 and 2 are in fluid, and both in the computational domain
-           if ((level_set(0,0) > 0.) && (level_set(0,1) > 0.) && (in_domain(0,0)*in_domain(0,1))) {
+           if ((level_set(0,0) > threshold) && (level_set(0,1) > threshold) && (in_domain(0,0)*in_domain(0,1))) {
               dfdx = mu*(-finx(2) + 4.*finx(1) - 3.*finx(0))/2./dh;
            // Point 1 in fluid and 2 is either in the solid or out of the computational domain
-           } else if ((level_set(0,0) > 0.) && ((level_set(0,1) <= 0.) || ((in_domain(0,1) == 0) && (in_domain(0,0) == 1)))) {
+           } else if ((level_set(0,0) > threshold) && ((level_set(0,1) <= threshold) || ((in_domain(0,1) == 0) && (in_domain(0,0) == 1)))) {
               dfdx = mu*(finx(1) - finx(0))/dh;
            // Point 1 is present in solid 
-           } else if (level_set(0,0) <= 0.) {
+           } else if (level_set(0,0) <= threshold) {
               impose_solid_velocity_for_ghost(net_vel,comp,xpoint(1),ypoint(0),zpoint(0),in_parID(0,0));
               dfdx = mu*(net_vel[comp] - finx(0))/dh;
            // Point 1 is out of the computational domain 
@@ -3377,13 +3463,13 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
 
            // Derivative in y
            // Both points 1 and 2 are in fluid, and both in the computational domain
-           if ((level_set(1,0) > 0.) && (level_set(1,1) > 0.) && (in_domain(1,0)*in_domain(1,1))) {
+           if ((level_set(1,0) > threshold) && (level_set(1,1) > threshold) && (in_domain(1,0)*in_domain(1,1))) {
               dfdy = mu*(-finy(2) + 4.*finy(1) - 3.*finy(0))/2./dh;
            // Point 1 in fluid and 2 is either in the solid or out of the computational domain
-           } else if ((level_set(1,0) > 0.) && ((level_set(1,1) <= 0.) || ((in_domain(1,1) == 0) && (in_domain(1,0) == 1)))) {
+           } else if ((level_set(1,0) > threshold) && ((level_set(1,1) <= threshold) || ((in_domain(1,1) == 0) && (in_domain(1,0) == 1)))) {
               dfdy = mu*(finy(1) - finy(0))/dh;
            // Point 1 is present in solid 
-           } else if (level_set(1,0) <= 0.) {
+           } else if (level_set(1,0) <= threshold) {
               impose_solid_velocity_for_ghost(net_vel,comp,xpoint(0),ypoint(1),zpoint(0),in_parID(1,0));
               dfdy = mu*(net_vel[comp] - finy(0))/dh;
            // Point 1 is out of the computational domain 
@@ -3416,30 +3502,32 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
               stress(i,4) = stress(i,4) + dfdy;
               stress(i,5) = stress(i,5) + dfdx;
            }
-
-/*	   outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(0) << "," << i << endl;
-           outputFile << xpoint(1) << "," << ypoint(0) << "," << zpoint(0) << "," << i << endl;
-           outputFile << xpoint(2) << "," << ypoint(0) << "," << zpoint(0) << "," << i << endl;
-           outputFile << xpoint(0) << "," << ypoint(1) << "," << zpoint(0) << "," << i << endl;
-           outputFile << xpoint(0) << "," << ypoint(2) << "," << zpoint(0) << "," << i << endl;
-           outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(1) << "," << i << endl;
-           outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(2) << "," << i << endl;*/
-        }
+/*
+           if (comp == 0) {
+              outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(0) << "," << finy(0) << endl;
+              outputFile << xpoint(1) << "," << ypoint(0) << "," << zpoint(0) << "," << finx(1) << endl;
+              outputFile << xpoint(2) << "," << ypoint(0) << "," << zpoint(0) << "," << finx(2) << endl;
+              outputFile << xpoint(0) << "," << ypoint(1) << "," << zpoint(0) << "," << finy(1) << endl;
+              outputFile << xpoint(0) << "," << ypoint(2) << "," << zpoint(0) << "," << finy(2) << endl;
+              outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(1) << "," << finz(1) << endl;
+              outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(2) << "," << finz(2) << endl;
+	   }*/
+	}
      }
 
      double scale = (dim == 2) ? ri : ri*ri;
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i,0)*surface.coordinate->item(i,0)*(surface.area->item(i)*scale) 
-                                     + stress(i,3)*surface.coordinate->item(i,1)*(surface.area->item(i)*scale)
-                                     + stress(i,5)*surface.coordinate->item(i,2)*(surface.area->item(i)*scale);
-     force(parID,1) = force(parID,1) + stress(i,3)*surface.coordinate->item(i,0)*(surface.area->item(i)*scale) 
-                                     + stress(i,1)*surface.coordinate->item(i,1)*(surface.area->item(i)*scale)
-                                     + stress(i,4)*surface.coordinate->item(i,2)*(surface.area->item(i)*scale);
-     force(parID,2) = force(parID,2) + stress(i,5)*surface.coordinate->item(i,0)*(surface.area->item(i)*scale) 
-                                     + stress(i,4)*surface.coordinate->item(i,1)*(surface.area->item(i)*scale)
-                                     + stress(i,2)*surface.coordinate->item(i,2)*(surface.area->item(i)*scale);
+     force(parID,0) = force(parID,0) + stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale) 
+                                     + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
+                                     + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(parID,1) = force(parID,1) + stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale) 
+                                     + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
+                                     + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(parID,2) = force(parID,2) + stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale) 
+                                     + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
+                                     + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
   }
 //  outputFile.close();
 }
