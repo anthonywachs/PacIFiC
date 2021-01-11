@@ -2728,7 +2728,7 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
   if (level_set_type == "Sphere") {
      Nmax = (dim == 2) ? Npoints : 2*Npoints ; 
   } else if (level_set_type == "Cube") {
-     Nmax = (dim == 2) ? 4*Npoints : 2*(pow(Npoints,2)+2*(Npoints-2)*(Npoints-1)) ;
+     Nmax = (dim == 2) ? 4*Npoints : 6*pow(Npoints,2) ;
   }
 
   for (size_t parID = 0; parID < Npart; parID++) {
@@ -2774,74 +2774,89 @@ DDS_NavierStokes:: compute_surface_points_on_cube(size_t const& Np)
   os2 << "./DS_results/point_data_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
-  outputFile << "x,y,area,nx,ny" << endl;
+  outputFile << "x,y,z,area,nx,ny,nz" << endl;
 */
-
   // Structure of particle input data
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
   double dp = 2./(Np);
 
   if (dim == 3) {
+     // Generating discretization on surface
+     doubleVector lsp(Np,0.);
+     for (size_t i=0; i<Np; i++) lsp(i) = -1. + dp*(i+0.5);
+
      size_t counter = 0;
+
      for (size_t i=0; i<Np; i++) {
-        for (size_t j=0; j<Np; j++) {
-           for (size_t k=0; k<Np; k++) {
-	      double xp = (-1.0 + dp*i);
-	      double yp = (-1.0 + dp*j);
-	      double zp = (-1.0 + dp*k); 
-	      if ((i == 0) || (i == (Np-1)) || (j == 0) || (j == (Np-1)) || (k == 0) || (k == (Np-1))) {
-                 surface.coordinate->set_item(counter,0,xp);
-                 surface.coordinate->set_item(counter,1,yp);
-                 surface.coordinate->set_item(counter,2,zp);
-		 if ((i==0 || i==(Np-1)) &&
-                     (j==0 || j==(Np-1)) &&
-                     (k==0 || k==(Np-1))) {
-                    surface.area->set_item(counter,(3./4.)*dp*dp);
-		 } else {
-                    surface.area->set_item(counter,dp*dp);
-		 }
-	         // Surface normal vectors
-	         if (i == 0) surface.normal->set_item(counter,0,-1.); 
-                 if (j == 0) surface.normal->set_item(counter,1,-1.); 
-                 if (k == 0) surface.normal->set_item(counter,2,-1.); 
-	         if (i == (Np-1)) surface.normal->set_item(counter,0,1.); 
-                 if (j == (Np-1)) surface.normal->set_item(counter,1,1.);
-                 if (k == (Np-1)) surface.normal->set_item(counter,2,1.);
-	         double vec_mag = pow(pow(surface.normal->item(counter,0),2.) + pow(surface.normal->item(counter,1),2.) + pow(surface.normal->item(counter,2),2.), 0.5);
-                 if (vec_mag != 0.) {
-                    surface.normal->set_item(counter,0,surface.normal->item(counter,0)/vec_mag); 
-                    surface.normal->set_item(counter,1,surface.normal->item(counter,1)/vec_mag); 
-                    surface.normal->set_item(counter,2,surface.normal->item(counter,2)/vec_mag); 
-	         }
-//		 outputFile << surface.coordinate->item(counter,0) << "," << surface.coordinate->item(counter,1) << "," << surface.coordinate->item(counter,2) << "," << surface.area->item(counter) << "," << surface.normal->item(counter,0) << "," << surface.normal->item(counter,1) << "," << surface.normal->item(counter,2) << endl; 
-		 counter++;
-	      }
-           }
+	for (size_t j=0; j<Np; j++) {
+           //Front
+           surface.coordinate->set_item(counter,0,lsp(i));
+           surface.coordinate->set_item(counter,1,lsp(j));
+           surface.coordinate->set_item(counter,2,1.);
+           surface.area->set_item(counter,dp*dp);
+           surface.normal->set_item(counter,2,1.);
+           //Behind
+           surface.coordinate->set_item(Np*Np+counter,0,lsp(i));
+           surface.coordinate->set_item(Np*Np+counter,1,lsp(j));
+           surface.coordinate->set_item(Np*Np+counter,2,-1.);
+           surface.area->set_item(Np*Np+counter,dp*dp);
+           surface.normal->set_item(Np*Np+counter,2,-1.);
+           //Top
+           surface.coordinate->set_item(2*Np*Np+counter,0,lsp(i));
+           surface.coordinate->set_item(2*Np*Np+counter,2,lsp(j));
+           surface.coordinate->set_item(2*Np*Np+counter,1,1.);
+           surface.area->set_item(2*Np*Np+counter,dp*dp);
+           surface.normal->set_item(2*Np*Np+counter,1,1.);
+           //Bottom
+           surface.coordinate->set_item(3*Np*Np+counter,0,lsp(i));
+           surface.coordinate->set_item(3*Np*Np+counter,2,lsp(j));
+           surface.coordinate->set_item(3*Np*Np+counter,1,-1.);
+           surface.area->set_item(3*Np*Np+counter,dp*dp);
+           surface.normal->set_item(3*Np*Np+counter,1,-1.);
+           //Right
+           surface.coordinate->set_item(4*Np*Np+counter,1,lsp(i));
+           surface.coordinate->set_item(4*Np*Np+counter,2,lsp(j));
+           surface.coordinate->set_item(4*Np*Np+counter,0,1.);
+           surface.area->set_item(4*Np*Np+counter,dp*dp);
+           surface.normal->set_item(4*Np*Np+counter,0,1.);
+           //Left
+           surface.coordinate->set_item(5*Np*Np+counter,1,lsp(i));
+           surface.coordinate->set_item(5*Np*Np+counter,2,lsp(j));
+           surface.coordinate->set_item(5*Np*Np+counter,0,-1.);
+           surface.area->set_item(5*Np*Np+counter,dp*dp);
+           surface.normal->set_item(5*Np*Np+counter,0,-1.);
+
+/*	   outputFile << surface.coordinate->item(counter,0) << "," << surface.coordinate->item(counter,1) << "," << surface.coordinate->item(counter,2) << "," << surface.area->item(counter) << "," << surface.normal->item(counter,0) << "," << surface.normal->item(counter,1) << "," << surface.normal->item(counter,2) << endl; 
+           outputFile << surface.coordinate->item(Np*Np+counter,0) << "," << surface.coordinate->item(Np*Np+counter,1) << "," << surface.coordinate->item(Np*Np+counter,2) << "," << surface.area->item(Np*Np+counter) << "," << surface.normal->item(Np*Np+counter,0) << "," << surface.normal->item(Np*Np+counter,1) << "," << surface.normal->item(Np*Np+counter,2) << endl; 
+           outputFile << surface.coordinate->item(2*Np*Np+counter,0) << "," << surface.coordinate->item(2*Np*Np+counter,1) << "," << surface.coordinate->item(2*Np*Np+counter,2) << "," << surface.area->item(2*Np*Np+counter) << "," << surface.normal->item(2*Np*Np+counter,0) << "," << surface.normal->item(2*Np*Np+counter,1) << "," << surface.normal->item(2*Np*Np+counter,2) << endl; 
+           outputFile << surface.coordinate->item(3*Np*Np+counter,0) << "," << surface.coordinate->item(3*Np*Np+counter,1) << "," << surface.coordinate->item(3*Np*Np+counter,2) << "," << surface.area->item(3*Np*Np+counter) << "," << surface.normal->item(3*Np*Np+counter,0) << "," << surface.normal->item(3*Np*Np+counter,1) << "," << surface.normal->item(3*Np*Np+counter,2) << endl; 
+           outputFile << surface.coordinate->item(4*Np*Np+counter,0) << "," << surface.coordinate->item(4*Np*Np+counter,1) << "," << surface.coordinate->item(4*Np*Np+counter,2) << "," << surface.area->item(4*Np*Np+counter) << "," << surface.normal->item(4*Np*Np+counter,0) << "," << surface.normal->item(4*Np*Np+counter,1) << "," << surface.normal->item(4*Np*Np+counter,2) << endl; 
+           outputFile << surface.coordinate->item(5*Np*Np+counter,0) << "," << surface.coordinate->item(5*Np*Np+counter,1) << "," << surface.coordinate->item(5*Np*Np+counter,2) << "," << surface.area->item(5*Np*Np+counter) << "," << surface.normal->item(5*Np*Np+counter,0) << "," << surface.normal->item(5*Np*Np+counter,1) << "," << surface.normal->item(5*Np*Np+counter,2) << endl; */
+           counter++;
 	}
-     }	
+     }
   } else if (dim == 2) {
-     size_t counter = 0;
      // Generating discretization on surface
      double lsp=0.;
      for (size_t i=0; i<Np; i++) {
         lsp = -1. + dp*(i+0.5);
-	//y=-1
+	//Bottom
 	surface.coordinate->set_item(i,0,lsp);
 	surface.coordinate->set_item(i,1,-1.);
 	surface.area->set_item(i,dp);
 	surface.normal->set_item(i,1,-1.);
-	//y=1
+	//Top
 	surface.coordinate->set_item(Np+i,0,lsp);
 	surface.coordinate->set_item(Np+i,1,1.);
 	surface.area->set_item(Np+i,dp);
 	surface.normal->set_item(Np+i,1,1.);
-	//x=-1
+	//Left
 	surface.coordinate->set_item(2*Np+i,0,-1.);
 	surface.coordinate->set_item(2*Np+i,1,lsp);
 	surface.area->set_item(2*Np+i,dp);
 	surface.normal->set_item(2*Np+i,0,-1.);
-	//x=1
+	//Right
 	surface.coordinate->set_item(3*Np+i,0,1.);
 	surface.coordinate->set_item(3*Np+i,1,lsp);
 	surface.area->set_item(3*Np+i,dp);
@@ -3351,25 +3366,25 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
 	      // Calculation of field variable on ghost point(1,0)
               if ((level_set(0,0) > threshold) && in_domain(0,0)) {
                   finx(1) = ghost_field_estimate_on_face (UF,comp,i0_x(1),i0_y(0),0, xpoint(1), ypoint(0),0, dh,2,0);
-	      } else if ((level_set(0,0) < threshold) && in_domain(0,0)) {
+	      } else if ((level_set(0,0) <= threshold) && in_domain(0,0)) {
 		  finx(1) = net_vel[comp];
 	      }
               // Calculation of field variable on ghost point(2,0)
               if ((level_set(0,1) > threshold) && in_domain(0,1)) {
                   finx(2) = ghost_field_estimate_on_face (UF,comp,i0_x(2),i0_y(0),0, xpoint(2), ypoint(0),0, dh,2,0);
-	      } else if ((level_set(0,1) < threshold) && in_domain(0,1)) {
+	      } else if ((level_set(0,1) <= threshold) && in_domain(0,1)) {
                   finx(2) = net_vel[comp];
 	      }
               // Calculation of field variable on ghost point(0,1)
               if ((level_set(1,0) > threshold) && in_domain(1,0)) {
                   finy(1) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(1),0, xpoint(0), ypoint(1),0, dh,2,0);
-	      } else if ((level_set(1,0) < threshold) && in_domain(1,0)) {
+	      } else if ((level_set(1,0) <= threshold) && in_domain(1,0)) {
 		  finy(1) = net_vel[comp];
 	      }
               // Calculation of field variable on ghost point(0,2)
               if ((level_set(1,1) > threshold) && in_domain(1,1)) {
                   finy(2) = ghost_field_estimate_on_face (UF,comp,i0_x(0),i0_y(2),0, xpoint(0), ypoint(2),0, dh,2,0);
-	      } else if ((level_set(1,1) < threshold) && in_domain(1,1)) {
+	      } else if ((level_set(1,1) <= threshold) && in_domain(1,1)) {
 		  finy(2) = net_vel[comp];
 	      }
            } else if (dim == 3) {
@@ -3387,33 +3402,51 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
               in_domain(2,1) = found(2,2)*found(0,0)*found(1,0);
 
               // Calculation of field variable on ghost point(1,0,0)
-              if ((level_set(0,0) > 0.) && in_domain(0,0)) 
+              if ((level_set(0,0) > threshold) && in_domain(0,0)) {
                  finx(1) = ghost_field_estimate_in_box (UF,comp,i0_x(1),i0_y(0),i0_z(0),xpoint(1),ypoint(0),zpoint(0),dh,0,parID);
+	      } else if ((level_set(0,0) <= threshold) && in_domain(0,0)) {
+	         finx(1) = net_vel[comp];
+	      }
               // Calculation of field variable on ghost point(2,0,0)
-              if ((level_set(0,1) > 0.) && in_domain(0,1))
+              if ((level_set(0,1) > threshold) && in_domain(0,1)) {
                  finx(2) = ghost_field_estimate_in_box (UF,comp,i0_x(2),i0_y(0),i0_z(0),xpoint(2),ypoint(0),zpoint(0),dh,0,parID);
+              } else if ((level_set(0,1) <= threshold) && in_domain(0,1)) {
+	         finx(2) = net_vel[comp];
+	      }
               // Calculation of field variable on ghost point(0,1,0)
-              if ((level_set(1,0) > 0.) && in_domain(1,0))
+              if ((level_set(1,0) > threshold) && in_domain(1,0)) {
                  finy(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(1),i0_z(0),xpoint(0),ypoint(1),zpoint(0),dh,0,parID);
+	      } else if ((level_set(1,0) <= threshold) && in_domain(1,0)) {
+		 finy(1) = net_vel[comp];
+	      }
               // Calculation of field variable on ghost point(0,2,0)
-              if ((level_set(1,1) > 0.) && in_domain(1,1))
+              if ((level_set(1,1) > threshold) && in_domain(1,1)) {
                  finy(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(2),i0_z(0),xpoint(0),ypoint(2),zpoint(0),dh,0,parID);
+	      } else if ((level_set(1,1) <= threshold) && in_domain(1,1)) {
+		 finy(2) = net_vel[comp];
+	      }
               // Calculation of field variable on ghost point(0,0,1)
-              if ((level_set(2,0) > 0.) && in_domain(2,0))
+              if ((level_set(2,0) > threshold) && in_domain(2,0)) {
                  finz(1) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(1),xpoint(0),ypoint(0),zpoint(1),dh,0,parID);
+              } else if ((level_set(2,0) <= threshold) && in_domain(2,0)) {
+		 finz(1) = net_vel[comp];
+	      }
               // Calculation of field variable on ghost point(0,0,2)
-              if ((level_set(2,1) > 0.) && in_domain(2,1))
+              if ((level_set(2,1) > threshold) && in_domain(2,1)) {
                  finz(2) = ghost_field_estimate_in_box (UF,comp,i0_x(0),i0_y(0),i0_z(2),xpoint(0),ypoint(0),zpoint(2),dh,0,parID);
+	      } else if ((level_set(2,1) <= threshold) && in_domain(2,1)) {
+		 finz(2) = net_vel[comp];
+	      }
 
               // Derivative in z
               // Both points 1 and 2 are in fluid, and both in the computational domain
-              if ((level_set(2,0) > 0.) && (level_set(2,1) > 0.) && (in_domain(2,0)*in_domain(2,1))) {
+              if ((level_set(2,0) > threshold) && (level_set(2,1) > threshold) && (in_domain(2,0)*in_domain(2,1))) {
                  dfdz = mu*(-finz(2) + 4.*finz(1) - 3.*finz(0))/2./dh;
               // Point 1 in fluid and 2 is either in the solid or out of the computational domain
-              } else if ((level_set(2,0) > 0.) && ((level_set(2,1) <= 0.) || ((in_domain(2,1) == 0) && (in_domain(2,0) == 1)))) {
+              } else if ((level_set(2,0) > threshold) && ((level_set(2,1) <= threshold) || ((in_domain(2,1) == 0) && (in_domain(2,0) == 1)))) {
                  dfdz = mu*(finz(1) - finz(0))/dh;
               // Point 1 is present in solid 
-              } else if (level_set(2,0) <= 0.) {
+              } else if (level_set(2,0) <= threshold) {
                  impose_solid_velocity_for_ghost(net_vel,comp,xpoint(0),ypoint(0),zpoint(1),in_parID(2,0));
                  dfdz = mu*(net_vel[comp] - finz(0))/dh;
               // Point 1 is out of the computational domain 

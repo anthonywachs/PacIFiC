@@ -389,9 +389,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
             surface.area->re_initialize(2*Nmax);
             surface.normal->re_initialize(2*Nmax,3);
 	 } else if (level_set_type == "Cube") {
-            surface.coordinate->re_initialize(2*(pow(Nmax,2)+2*(Nmax-2)*(Nmax-1)),3);
-            surface.area->re_initialize(2*(pow(Nmax,2)+2*(Nmax-2)*(Nmax-1)));
-            surface.normal->re_initialize(2*(pow(Nmax,2)+2*(Nmax-2)*(Nmax-1)),3);
+            surface.coordinate->re_initialize(6*pow(Nmax,2),3);
+            surface.area->re_initialize(6*pow(Nmax,2));
+            surface.normal->re_initialize(6*pow(Nmax,2),3);
 	 }
       } else {
 	 if (level_set_type == "Sphere") {
