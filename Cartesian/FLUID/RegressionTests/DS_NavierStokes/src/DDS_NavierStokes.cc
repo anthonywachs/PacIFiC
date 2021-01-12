@@ -158,8 +158,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
-      if ( level_set_type != "Cube" && level_set_type != "Rectangle" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D" && level_set_type != "PipeX") {
-         string error_message="- Cube\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D\n   - Rectangle\n   - PipeX";
+      if ( level_set_type != "Cube" && level_set_type != "Cylinder" && level_set_type != "Sphere" && level_set_type != "PipeX") {
+         string error_message="- Cube\n   - Sphere\n   - Cylinder\n   - PipeX";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
       }
 
@@ -908,10 +908,6 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
 //     level_set = pow(delta(0)/0.4,2.)+pow(delta(1)/0.3,2.)-1.;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
-  } else if (type == "Wall_Y") {
-     level_set = delta(0);
-  } else if (type == "Wall_X") {
-     level_set = delta(1);
   } else if (type == "Cube") {
      // Solid object rotation, if any	  
      doubleVector angle(3,0.);
@@ -928,24 +924,20 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      } else {
         level_set = MAC::max(delta(0),MAC::max(delta(1),delta(2)));
      }
-/*     if ((delta(0) < 0.) && (delta(1) < 0.) && (delta(2) < 0.)) {
-        level_set = -1.;
-     } else if ((delta(0) == 0.) && (delta(1) == 0.) && (delta(2) == 0.)) {
-        level_set = 0.;
+  } else if (type == "Cylinder") {
+     // Solid object rotation, if any	  
+     doubleVector angle(3,0.);
+     angle(0) = -solid.thetap[comp]->item(m,0);
+     angle(1) = -solid.thetap[comp]->item(m,1);
+     angle(2) = -solid.thetap[comp]->item(m,2);
+     rotation_matrix(m,delta,angle);
+
+     level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
+     if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
+	level_set = MAC::abs(MAC::abs(delta(2))-Rp)*level_set;
      } else {
-        level_set = 1.;
-     }*/
-  } else if (type == "Rectangle") {
-     if ((MAC::abs(delta(0))-zp < 0.) && (MAC::abs(delta(1))-Rp < 0.)) {
-        level_set = -1.;
-     } else if ((MAC::abs(delta(0))-zp == 0.) && (MAC::abs(delta(1))-Rp == 0.)) {
-        level_set = 0.;
-     } else {
-        level_set = 1.;
+	level_set = MAC::max(MAC::abs(MAC::abs(delta(2))-Rp),MAC::abs(level_set));
      }
-  } else if (type == "Wedge2D") {
-     // ax + by + c = 0 is the line, with a as xp, b as yp, and c as zp
-     level_set = (xp*xC + yp*yC + zp)/pow(pow(xp,2.)+pow(yp,2.),0.5) - Rp;
   }
 
   return(level_set);
