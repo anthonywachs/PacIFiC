@@ -24,6 +24,17 @@ class FV_SystemNumbering ;
 class FV_DiscreteField ;
 class FV_TimeIterator ;
 
+/** For set of variables to pass from NavierStokes to System */
+struct NavierStokes2System
+{
+  bool is_solids_ ;
+  size_t Npart_ ;
+  string level_set_type_ ;
+  bool is_stressCal_ ;
+  double Npoints_ ;
+  double ar_ ;
+};
+
 /** @brief TDMatrix include all elements of block matrices (ii,ie,ei,ee) */
 struct TDMatrix {
    LA_SeqVector *** ii_main;
@@ -115,7 +126,8 @@ class DDS_NavierStokesSystem : public MAC_Object
       DDS_NavierStokesSystem ( MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_UF,
-            FV_DiscreteField* mac_PF );
+            FV_DiscreteField* mac_PF ,
+            struct NavierStokes2System const& fromNS );
       //@}
 
 
@@ -133,7 +145,8 @@ class DDS_NavierStokesSystem : public MAC_Object
             MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_UF,
-            FV_DiscreteField* mac_PF ) ;
+            FV_DiscreteField* mac_PF,
+            struct NavierStokes2System const& fromNS );
       //@}
 
 
@@ -299,7 +312,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       size_t nb_procs_in_i[3];
 
       size_t Npart, Nmax;
-      double Rpart;
+      double Rpart,ar;
       bool is_solids;
       bool is_stressCal;
 

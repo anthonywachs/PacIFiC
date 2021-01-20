@@ -30,7 +30,8 @@ DDS_NavierStokesSystem*
 DDS_NavierStokesSystem:: create( MAC_Object* a_owner,
 	MAC_ModuleExplorer const* exp,
 	FV_DiscreteField* mac_UF,
-  FV_DiscreteField* mac_PF )
+        FV_DiscreteField* mac_PF,
+        struct NavierStokes2System const& transfer )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: create" ) ;
@@ -38,7 +39,7 @@ DDS_NavierStokesSystem:: create( MAC_Object* a_owner,
    MAC_CHECK_PRE( mac_UF != 0 ) ;
 
    DDS_NavierStokesSystem* result =
-         new DDS_NavierStokesSystem( a_owner, exp, mac_UF, mac_PF ) ;
+         new DDS_NavierStokesSystem( a_owner, exp, mac_UF, mac_PF, transfer ) ;
 
    MAC_CHECK_POST( result != 0 ) ;
    MAC_CHECK_POST( result->owner() == a_owner ) ;
@@ -55,14 +56,19 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
 	MAC_Object* a_owner,
 	MAC_ModuleExplorer const* exp,
 	FV_DiscreteField* mac_UF,
-  FV_DiscreteField* mac_PF )
+        FV_DiscreteField* mac_PF,
+        struct NavierStokes2System const& fromNS )
 //----------------------------------------------------------------------
    : MAC_Object( a_owner )
    , UF( mac_UF )
    , PF( mac_PF )
    , MAT_velocityUnsteadyPlusDiffusion_1D( 0 )
-   , is_solids (false)
-   , is_stressCal (false)
+   , is_solids ( fromNS.is_solids_ )
+   , is_stressCal (fromNS.is_stressCal_ )
+   , Npart (fromNS.Npart_ )
+   , level_set_type (fromNS.level_set_type_ )
+   , Nmax (fromNS.Npoints_ )
+   , ar (fromNS.ar_ ) 
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DDS_NavierStokesSystem" ) ;
 
@@ -86,18 +92,6 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
    dim = UF->primary_grid()->nb_space_dimensions() ;
    nb_comps[0] = PF->nb_components() ;
    nb_comps[1] = UF->nb_components() ;
-
-   if ( exp->has_entry( "Particles" ) )
-     is_solids = exp->bool_data( "Particles" ) ;
-
-   if (is_solids) {
-      Npart = exp->int_data( "NParticles" ) ;
-      if ( exp->has_entry( "Stress_calculation" ) ) {
-         is_stressCal = exp->bool_data( "Stress_calculation" ) ;
-         level_set_type = exp->string_data( "LevelSetType" );
-      }
-      if (is_stressCal) Nmax = (int) exp->double_data( "Npoints" ) ;
-   }
 
    // Periodic boundary condition check for velocity
    U_periodic_comp = UF->primary_grid()->get_periodic_directions();
@@ -392,6 +386,14 @@ DDS_NavierStokesSystem:: re_initialize( void )
             surface.coordinate->re_initialize(6*pow(Nmax,2),3);
             surface.area->re_initialize(6*pow(Nmax,2));
             surface.normal->re_initialize(6*pow(Nmax,2),3);
+	 } else if (level_set_type == "Cylinder") {
+            double Npm1 = round(pow(MAC::sqrt(Nmax) - MAC::sqrt(MAC::pi()/ar),2.));
+            double dh = 1. - MAC::sqrt(Npm1/Nmax);
+            size_t Nr = round(2./dh);
+	    size_t Ncyl = 2*Nmax + Nr*(Nmax - Npm1);
+            surface.coordinate->re_initialize(Ncyl,3);
+            surface.area->re_initialize(Ncyl);
+            surface.normal->re_initialize(Ncyl,3);
 	 }
       } else {
 	 if (level_set_type == "Sphere") {

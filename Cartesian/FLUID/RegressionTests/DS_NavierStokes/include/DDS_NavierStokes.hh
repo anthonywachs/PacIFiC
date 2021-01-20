@@ -208,6 +208,7 @@ public SolverComputingTime
       void compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
       void generate_surface_discretization();
       void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
+      void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
       void compute_surface_points_on_cube(size_t const& Np);
       void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
 

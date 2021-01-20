@@ -158,8 +158,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
-      if ( level_set_type != "Cube" && level_set_type != "Cylinder" && level_set_type != "Sphere" && level_set_type != "PipeX") {
-         string error_message="- Cube\n   - Sphere\n   - Cylinder\n   - PipeX";
+      if ( level_set_type != "Cube" && level_set_type != "Cylinder" && level_set_type != "Sphere" && level_set_type != "Ellipsoid" && level_set_type != "PipeX" && level_set_type != "Superquadric") {
+         string error_message="- Cube\n   - Sphere\n   - Cylinder\n   - Superquadric\n   - Ellipsoid\n   - PipeX";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
       }
 
@@ -179,7 +179,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       if (is_stressCal) {
          Npoints = exp->double_data( "Npoints" ) ;
          if (dim == 3) {
-            if (level_set_type == "Sphere") {
+            if ((level_set_type == "Sphere") || (level_set_type == "Cylinder")) {
                Pmin = exp->int_data( "Pmin" ) ;
                ar = exp->double_data( "aspect_ratio" ) ;
                pole_loc = exp->int_data( "pole_loc" ) ;
@@ -256,9 +256,18 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    if(dim >2)
       is_periodic[0][2] = P_periodic_comp->operator()( 2 ); 
 
+   // Create structure to input in the solver system
+   struct NavierStokes2System inputData;
+   inputData.is_solids_ = is_solids ;
+   inputData.is_stressCal_ = is_stressCal ;
+   inputData.Npart_ = Npart ;
+   inputData.level_set_type_ = level_set_type ;
+   inputData.Npoints_ = Npoints ;
+   inputData.ar_ = ar ;
+
    // Build the matrix system
    MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DDS_NavierStokesSystem" ) ;
-   GLOBAL_EQ = DDS_NavierStokesSystem::create( this, se, UF, PF ) ;
+   GLOBAL_EQ = DDS_NavierStokesSystem::create( this, se, UF, PF, inputData ) ;
    se->destroy() ;
 
    // Timing routines
@@ -906,6 +915,22 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
   if (type == "Sphere") {
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
 //     level_set = pow(delta(0)/0.4,2.)+pow(delta(1)/0.3,2.)-1.;
+  } else if (type == "Ellipsoid") {
+     // Solid object rotation, if any	  
+     doubleVector angle(3,0.);
+     angle(0) = -solid.thetap[comp]->item(m,0);
+     angle(1) = -solid.thetap[comp]->item(m,1);
+     angle(2) = -solid.thetap[comp]->item(m,2);
+     rotation_matrix(m,delta,angle);
+     level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
+  } else if (type == "Superquadric") {
+     // Solid object rotation, if any	  
+     doubleVector angle(3,0.);
+     angle(0) = -solid.thetap[comp]->item(m,0);
+     angle(1) = -solid.thetap[comp]->item(m,1);
+     angle(2) = -solid.thetap[comp]->item(m,2);
+     rotation_matrix(m,delta,angle);
+     level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Cube") {
@@ -2578,6 +2603,16 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
   for (size_t i=0;i<Np;i++) {
+     double sx = surface.coordinate->item(i,0);
+     double sy = surface.coordinate->item(i,1);
+     double sz = surface.coordinate->item(i,2);
+
+     double s_nx = surface.normal->item(i,0);
+     double s_ny = surface.normal->item(i,1);
+     double s_nz = surface.normal->item(i,2);
+
+     double s_area = surface.area->item(i);
+
      for (size_t comp=0;comp<nb_comps[0];comp++) {
         // Get local min and max indices
         // One extra grid cell needs to considered, since ghost points can be 
@@ -2600,9 +2635,9 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
         ri = solid.size[comp]->item(parID);
 
 	// Rotating surface points
-	rotated_coord(0) = ri*surface.coordinate->item(i,0);
-	rotated_coord(1) = ri*surface.coordinate->item(i,1);
-	rotated_coord(2) = ri*surface.coordinate->item(i,2);
+	rotated_coord(0) = ri*sx;
+	rotated_coord(1) = ri*sy;
+	rotated_coord(2) = ri*sz;
 
 	doubleVector angle(3,0.);
         angle(0) = solid.thetap[comp]->item(parID,0);
@@ -2616,9 +2651,9 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
         point(2) = zp + rotated_coord(2);
 
 	// Rotating surface vectors
-	rotated_normal(0) = surface.normal->item(i,0);
-	rotated_normal(1) = surface.normal->item(i,1);
-	rotated_normal(2) = surface.normal->item(i,2);
+	rotated_normal(0) = s_nx;
+	rotated_normal(1) = s_ny;
+	rotated_normal(2) = s_nz;
         rotation_matrix(parID,rotated_normal,angle);
 
       	// Displacement correction in case of periodic boundary condition in any or all directions
@@ -2694,12 +2729,12 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
-     force(parID,1) = force(parID,1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
-     force(parID,2) = force(parID,2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(parID,0) = force(parID,0) + stress(i)*rotated_normal(0)*(s_area*scale);
+     force(parID,1) = force(parID,1) + stress(i)*rotated_normal(1)*(s_area*scale);
+     force(parID,2) = force(parID,2) + stress(i)*rotated_normal(2)*(s_area*scale);
 
 //     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (surface.area->item(i)*scale) << endl;
-//     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (surface.area->item(i)*scale) << "," << rotated_normal(0) << "," << rotated_normal(1) << "," << rotated_normal(2) << endl;
+//     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (s_area*scale) << "," << rotated_normal(0) << "," << rotated_normal(1) << "," << rotated_normal(2) << endl;
   }
 //  outputFile.close();
 }
@@ -2721,6 +2756,12 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
      Nmax = (dim == 2) ? Npoints : 2*Npoints ; 
   } else if (level_set_type == "Cube") {
      Nmax = (dim == 2) ? 4*Npoints : 6*pow(Npoints,2) ;
+  } else if (level_set_type == "Cylinder") {
+     size_t Npm1 = round(pow(MAC::sqrt(Npoints) - MAC::sqrt(MAC::pi()/ar),2.));
+     size_t Ncyl = (Npoints - Npm1);
+     double dh = 1. - MAC::sqrt(Npm1/Npoints);
+     size_t Nr = round(2./dh);
+     Nmax = (dim == 3) ? 2*Npoints + Nr*Ncyl : 0 ;
   }
 
   for (size_t parID = 0; parID < Npart; parID++) {
@@ -2862,6 +2903,146 @@ DDS_NavierStokes:: compute_surface_points_on_cube(size_t const& Np)
   }
 //  outputFile.close();
 }
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nring)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NavierStokes:: compute_surface_points_on_sphere" ) ;
+/*
+  ofstream outputFile ;
+  std::ostringstream os2;
+  os2 << "./DS_results/point_data_" << my_rank << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+  outputFile << "x,y,z,area,nx,ny,nz" << endl;
+*/
+
+  // Structure of particle input data
+  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
+
+  // Radius of the rings in lamber projection plane
+  doubleVector Rring(Nring,0.);
+
+  Rring(Nring-1) = 1.;
+
+  if (dim == 3) {
+     // Calculation for all rings except at the pole
+     for (int i=Nring-1; i>0; --i) {
+        double Ri = Rring(i);
+        Rring(i-1) = MAC::sqrt(k(i-1)/k(i))*Rring(i);
+        Rring(i) = (Rring(i) + Rring(i-1))/2.;
+        double d_theta = 2.*MAC::pi()/(k(i)-k(i-1));
+        // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
+        double theta = 0.01*d_theta;
+        for (int j=k(i-1); j<k(i); j++) {
+	   // For top disk
+           theta = theta + d_theta;
+           surface.coordinate->set_item(j,0,Rring(i)*MAC::cos(theta));
+           surface.coordinate->set_item(j,1,Rring(i)*MAC::sin(theta));
+           surface.coordinate->set_item(j,2,1.);
+           surface.area->set_item(j,0.5*d_theta*(pow(Ri,2)-pow(Rring(i-1),2)));
+	   // For bottom disk
+	   surface.coordinate->set_item(k(Nring-1)+j,0,Rring(i)*MAC::cos(theta));
+           surface.coordinate->set_item(k(Nring-1)+j,1,Rring(i)*MAC::sin(theta));
+           surface.coordinate->set_item(k(Nring-1)+j,2,-1.);
+           surface.area->set_item(k(Nring-1)+j,0.5*d_theta*(pow(Ri,2)-pow(Rring(i-1),2)));
+	   // Create surface normal vectors
+	   surface.normal->set_item(j,0,0.);
+	   surface.normal->set_item(j,1,0.);
+	   surface.normal->set_item(j,2,1.);
+	   surface.normal->set_item(k(Nring-1)+j,0,0.);
+	   surface.normal->set_item(k(Nring-1)+j,1,0.);
+	   surface.normal->set_item(k(Nring-1)+j,2,-1.);
+
+/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," 
+		      << surface.area->item(j) << "," 
+		      << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
+           outputFile << surface.coordinate->item(k(Nring-1)+j,0) << "," << surface.coordinate->item(k(Nring-1)+j,1) << "," << surface.coordinate->item(k(Nring-1)+j,2) << "," << surface.area->item(k(Nring-1)+j) << "," << surface.normal->item(k(Nring-1)+j,0) << "," << surface.normal->item(k(Nring-1)+j,1) << "," << surface.normal->item(k(Nring-1)+j,2) << endl;*/
+        }
+     } 
+
+     // Calculation at the ring on pole (i=0)
+     double Ri = Rring(0);
+     Rring(0) = Rring(0)/2.;
+     double d_theta = 2.*MAC::pi()/(k(0));
+     // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
+     double theta = 0.01*d_theta;
+     if (k(0)>1) {
+        for (int j=0; j < k(0); j++) {
+	   // For top disk
+           theta = theta + d_theta;
+           surface.coordinate->set_item(j,0,Rring(0)*MAC::cos(theta));
+           surface.coordinate->set_item(j,1,Rring(0)*MAC::sin(theta));
+           surface.coordinate->set_item(j,2,1.);
+           surface.area->set_item(j,0.5*d_theta*pow(Ri,2));
+           // For bottom disk
+           surface.coordinate->set_item(k(Nring-1)+j,0,Rring(0)*MAC::cos(theta));
+           surface.coordinate->set_item(k(Nring-1)+j,1,Rring(0)*MAC::sin(theta));
+           surface.coordinate->set_item(k(Nring-1)+j,2,-1.);
+           surface.area->set_item(k(Nring-1)+j,0.5*d_theta*pow(Ri,2.));
+	   // Create surface normal vectors
+	   surface.normal->set_item(j,0,0.);
+	   surface.normal->set_item(j,1,0.);
+	   surface.normal->set_item(j,2,1.);
+	   surface.normal->set_item(k(Nring-1)+j,0,0.);
+	   surface.normal->set_item(k(Nring-1)+j,1,0.);
+	   surface.normal->set_item(k(Nring-1)+j,2,-1.);
+/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
+           outputFile << surface.coordinate->item(k(Nring-1)+j,0) << "," << surface.coordinate->item(k(Nring-1)+j,1) << "," << surface.coordinate->item(k(Nring-1)+j,2) << "," << surface.area->item(k(Nring-1)+j) << "," << surface.normal->item(k(Nring-1)+j,0) << "," << surface.normal->item(k(Nring-1)+j,1) << "," << surface.normal->item(k(Nring-1)+j,2) << endl;*/
+        }
+     } else {
+	// For top disk
+        surface.coordinate->set_item(0,0,0.);
+        surface.coordinate->set_item(0,1,0.);
+        surface.coordinate->set_item(0,2,1.);
+        surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
+	// For bottom disk
+        surface.coordinate->set_item(k(Nring-1),0,0.);
+        surface.coordinate->set_item(k(Nring-1),1,0.);
+        surface.coordinate->set_item(k(Nring-1),2,-1.);
+        surface.area->set_item(k(Nring-1),0.5*d_theta*pow(Ri,2.));
+        // Create surface normal vectors
+        surface.normal->set_item(0,0,0.);
+        surface.normal->set_item(0,1,0.);
+        surface.normal->set_item(0,2,1.);
+        surface.normal->set_item(k(Nring-1),0,0.);
+        surface.normal->set_item(k(Nring-1),1,0.);
+        surface.normal->set_item(k(Nring-1),2,-1.);
+/*        outputFile << surface.coordinate->item(0,0) << "," << surface.coordinate->item(0,1) << "," << surface.coordinate->item(0,2) << "," << surface.area->item(0) << "," << surface.normal->item(0,0) << "," << surface.normal->item(0,1) << "," << surface.normal->item(0,2) << endl;
+        outputFile << surface.coordinate->item(k(Nring-1),0) << "," << surface.coordinate->item(k(Nring-1),1) << "," << surface.coordinate->item(k(Nring-1),2) << "," << surface.area->item(k(Nring-1)) << "," << surface.normal->item(k(Nring-1),0) << "," << surface.normal->item(k(Nring-1),1) << "," << surface.normal->item(k(Nring-1),2) << endl;*/
+     }
+
+     // Generating one ring of points on cylindrical surface
+     // Can be used to calculate stress on whole surface by a constant shift of points
+
+     // Estimating number of points on cylindrical surface
+     size_t pts_1_ring = (k(Nring-1) - k(Nring-2));
+     size_t cyl_rings = round(2./(1-MAC::sqrt(k(Nring-2)/k(Nring-1))));
+     double cell_area = 2.*MAC::pi()/pts_1_ring*(2./cyl_rings);
+
+     d_theta = 2.*MAC::pi()/pts_1_ring;
+     for (int j=0; j<cyl_rings; j++) {
+        theta = 0.01*d_theta;
+	for (int ij=0; ij<pts_1_ring; ij++) {
+           theta = theta + d_theta;
+	   int n = 2*k(Nring-1) + j*pts_1_ring + ij;
+           surface.coordinate->set_item(n,0,MAC::cos(theta));
+           surface.coordinate->set_item(n,1,MAC::sin(theta));
+           surface.coordinate->set_item(n,2,-1.+ 2.*(j+0.5)/cyl_rings);
+           surface.area->set_item(n,cell_area);
+           surface.normal->set_item(n,0,MAC::cos(theta));
+           surface.normal->set_item(n,1,MAC::sin(theta));
+           surface.normal->set_item(n,2,0.);
+
+//           outputFile << surface.coordinate->item(2*k(Nring-1)+j*ij,0) << "," << surface.coordinate->item(2*k(Nring-1)+j*ij,1) << "," << surface.coordinate->item(2*k(Nring-1)+j*ij,2) << "," << surface.area->item(2*k(Nring-1)+j*ij) << "," << surface.normal->item(2*k(Nring-1)+j*ij,0) << "," << surface.normal->item(2*k(Nring-1)+j*ij,1) << "," << surface.normal->item(2*k(Nring-1)+j*ij,2) << endl;
+	}
+     }
+  }
+//  outputFile.close();
+}
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nring)
@@ -3063,7 +3244,7 @@ DDS_NavierStokes:: generate_surface_discretization()
 
      double theta_ref = MAC::pi()/2.;
 
-     double p = MAC::pi()*ar;
+     double p = MAC::pi()/ar;
 
      double eta_temp = MAC::pi()/2.;
      size_t k_temp = kmax;
@@ -3111,6 +3292,35 @@ DDS_NavierStokes:: generate_surface_discretization()
      }
   } else if (level_set_type == "Cube") {
      compute_surface_points_on_cube(kmax);
+  } else if (level_set_type == "Cylinder") {
+     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into 
+     // equal-area cells, Computational Geometry 45 (2012) 275-283
+
+     double p = MAC::pi()/ar;
+     size_t k_temp = kmax;
+     size_t counter = 0; 
+
+     // Estimating the number of rings on either of the disc
+     while (k_temp > (Pmin+2)) {
+        k_temp = round(pow(MAC::sqrt(k_temp) - MAC::sqrt(p),2.));
+        counter++;
+     }
+
+     size_t Nrings = counter+1;
+
+     // Summation of total discretized points with increase in number of rings radially
+     doubleVector k(Nrings,0.);
+     // Assigning the maximum number of discretized points to the last element of the array
+     k(Nrings-1) = kmax;
+
+     for (int i=Nrings-2; i>=0; --i) {
+	k(i) = round(pow(MAC::sqrt(k(i+1)) - MAC::sqrt(p),2.));
+        if (i==0) k(0) = Pmin;
+     } 
+
+     if (dim == 3) {
+        compute_surface_points_on_cylinder(k, Nrings);
+     } 
   }
 
 }
@@ -3527,8 +3737,8 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
               stress(i,4) = stress(i,4) + dfdy;
               stress(i,5) = stress(i,5) + dfdx;
            }
-/*
-           if (comp == 0) {
+
+/*           if (comp == 0) {
               outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(0) << "," << finy(0) << endl;
               outputFile << xpoint(1) << "," << ypoint(0) << "," << zpoint(0) << "," << finx(1) << endl;
               outputFile << xpoint(2) << "," << ypoint(0) << "," << zpoint(0) << "," << finx(2) << endl;
