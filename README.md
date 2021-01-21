@@ -109,3 +109,10 @@ cd $MACWORLD_ROOT/MAC
 
 ## II. Usage
 To be completed soon.
+
+## III. Useful tips
+* If you are running MPI jobs on `r8k1-wachs1.math.ubc.ca`, you may want to run your mpirun command with the option `--bind-to none` to let the operating system decide how to spread the jobs on the available cores. Otherwise, you may end up with all your MPI jobs sharing the same N cores instead of making full use of the 64 cores.
+* You may want to run a lot of simulations at once, and a good knowledge of bash commands will help you automatize this process. Once you have N simulation folders named "folder1", ..., "folderN" ready to go, consider "stuffing" instructions in a detached screen as follows:
+ `for i in {1..N}; do screen -S simu$i -d -m; screen -r simu$i -X stuff " cd folder$i \n source [path to pacific environment file] \n grains_mpi 3 Grains/Init/insert.xml \n grains_mpi 3 Grains/Simu/simul.xml \n "; sleep 30.; done`
+  where in this example, the code Grains3D is used in MPI on 3 cores twice in a row - using the `insert.xml` input file first, then the `simul.xml` input file. The `sleep` command is not necessary, but in case your simulations use a clock-generated seed for randomness (as it is the case with Grains3D in the "Aleatoire total" particle insertion mode), it ensures the same seed won't be used twice and you won't end up with N times the same simulation.
+  Good practice is to be more descriptive than this example for the name of your screen session and simulation folders, for instance "dam_break_aspect_ratio_$i" instead of "simu$i" and "folder$i".
