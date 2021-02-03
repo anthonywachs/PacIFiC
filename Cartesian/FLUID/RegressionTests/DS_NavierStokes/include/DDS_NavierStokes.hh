@@ -200,6 +200,8 @@ public SolverComputingTime
       /** @brief Initialize the velocity on the velocity nodes in MAC grid*/
       void nodes_field_initialization ( size_t const& level );
 
+      void ugradu_initialization ( );
+
       void impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
       void impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID );
 
@@ -211,7 +213,6 @@ public SolverComputingTime
       void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
       void compute_surface_points_on_cube(size_t const& Np);
       void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
-
 
       /** @brief Find the interpolation considering the solids affect on the face, used for 2D/3D systems */
       double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);

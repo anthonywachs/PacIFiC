@@ -30,7 +30,8 @@ DDS_NSWithHeatTransferSystem*
 DDS_NSWithHeatTransferSystem:: create( MAC_Object* a_owner,
 	MAC_ModuleExplorer const* exp,
 	FV_DiscreteField* mac_UF,
-  FV_DiscreteField* mac_PF )
+        FV_DiscreteField* mac_PF,
+        struct NavierStokes2System const& transfer )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NSWithHeatTransferSystem:: create" ) ;
@@ -38,7 +39,7 @@ DDS_NSWithHeatTransferSystem:: create( MAC_Object* a_owner,
    MAC_CHECK_PRE( mac_UF != 0 ) ;
 
    DDS_NSWithHeatTransferSystem* result =
-         new DDS_NSWithHeatTransferSystem( a_owner, exp, mac_UF, mac_PF ) ;
+         new DDS_NSWithHeatTransferSystem( a_owner, exp, mac_UF, mac_PF, transfer ) ;
 
    MAC_CHECK_POST( result != 0 ) ;
    MAC_CHECK_POST( result->owner() == a_owner ) ;
@@ -55,13 +56,19 @@ DDS_NSWithHeatTransferSystem:: DDS_NSWithHeatTransferSystem(
 	MAC_Object* a_owner,
 	MAC_ModuleExplorer const* exp,
 	FV_DiscreteField* mac_UF,
-  FV_DiscreteField* mac_PF )
+        FV_DiscreteField* mac_PF,
+        struct NavierStokes2System const& fromNS )
 //----------------------------------------------------------------------
    : MAC_Object( a_owner )
    , UF( mac_UF )
    , PF( mac_PF )
    , MAT_velocityUnsteadyPlusDiffusion_1D( 0 )
-   , is_solids (false)
+   , is_solids ( fromNS.is_solids_ )
+   , is_stressCal (fromNS.is_stressCal_ )
+   , Npart (fromNS.Npart_ )
+   , level_set_type (fromNS.level_set_type_ )
+   , Nmax (fromNS.Npoints_ )
+   , ar (fromNS.ar_ ) 
 {
    MAC_LABEL( "DDS_NSWithHeatTransferSystem:: DDS_NSWithHeatTransferSystem" ) ;
 
@@ -85,13 +92,6 @@ DDS_NSWithHeatTransferSystem:: DDS_NSWithHeatTransferSystem(
    dim = UF->primary_grid()->nb_space_dimensions() ;
    nb_comps[0] = PF->nb_components() ;
    nb_comps[1] = UF->nb_components() ;
-
-   if ( exp->has_entry( "Particles" ) )
-     is_solids = exp->bool_data( "Particles" ) ;
-
-   if (is_solids) {
-      Npart = exp->int_data( "NParticles" ) ;
-   }
 
    // Periodic boundary condition check for velocity
    U_periodic_comp = UF->primary_grid()->get_periodic_directions();
@@ -146,11 +146,17 @@ DDS_NSWithHeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
    // Direction splitting matrices
    MAT_velocityUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
 
+   // Structure for the particle surface discretization
+   surface.coordinate = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
+   surface.area = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
+   surface.normal = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
+
    for (size_t field = 0; field < 2; field++) {
 
       // Structure for the particle input data
       solid[field].coord = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
       solid[field].size = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
+      solid[field].thetap = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
       solid[field].vel = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
       solid[field].ang_vel = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
       solid[field].temp = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
@@ -214,7 +220,7 @@ DDS_NSWithHeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
 
          for (size_t comp = 0; comp < nb_comps[field]; comp++) {
             size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
-            size_t nb_index;
+            size_t nb_index=0;
             for (size_t l=0;l<dim;++l) {
                if (field == 0) {
                   nb_unknowns_handled_by_proc( l ) =
@@ -282,6 +288,10 @@ DDS_NSWithHeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
       }
    }
 
+   surface.coordinate = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+   surface.area = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   surface.normal = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
          for (size_t comp=0;comp<nb_comps[field];++comp) {
@@ -299,6 +309,7 @@ DDS_NSWithHeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
             if (dir == 0) {
                solid[field].coord[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
                solid[field].size[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               solid[field].thetap[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
                solid[field].temp[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                solid[field].vel[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
                solid[field].ang_vel[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
@@ -365,6 +376,39 @@ DDS_NSWithHeatTransferSystem:: re_initialize( void )
    // Initialize Direction splitting matrices & vectors for pressure 
    size_t nb_procs, proc_pos;
 
+   if (is_solids && is_stressCal) {
+      if (dim == 3) {
+         if (level_set_type == "Sphere") {
+            surface.coordinate->re_initialize(2*(size_t)Nmax,3);
+            surface.area->re_initialize(2*(size_t)Nmax);
+            surface.normal->re_initialize(2*(size_t)Nmax,3);
+	 } else if (level_set_type == "Cube") {
+            surface.coordinate->re_initialize(6*(size_t)pow(Nmax,2),3);
+            surface.area->re_initialize(6*(size_t)pow(Nmax,2));
+            surface.normal->re_initialize(6*(size_t)pow(Nmax,2),3);
+	 } else if (level_set_type == "Cylinder") {
+            double Npm1 = round(pow(MAC::sqrt(Nmax) - MAC::sqrt(MAC::pi()/ar),2.));
+            double dh = 1. - MAC::sqrt(Npm1/Nmax);
+            double Nr = round(2./dh);
+	    size_t Ncyl = (size_t) (2*Nmax + Nr*(Nmax - Npm1));
+            surface.coordinate->re_initialize(Ncyl,3);
+            surface.area->re_initialize(Ncyl);
+            surface.normal->re_initialize(Ncyl,3);
+	 }
+      } else {
+	 if (level_set_type == "Sphere") {
+            surface.coordinate->re_initialize((size_t)Nmax,3);
+            surface.area->re_initialize((size_t)Nmax);
+            surface.normal->re_initialize((size_t)Nmax,3);
+	 } else if (level_set_type == "Cube") {
+            surface.coordinate->re_initialize(4*(size_t)Nmax,3);
+            surface.area->re_initialize(4*(size_t)Nmax);
+            surface.normal->re_initialize(4*(size_t)Nmax,3);
+	 }
+      }
+   }
+
+
    for (size_t field = 0; field < 2; field++) {
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
          size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
@@ -388,7 +432,7 @@ DDS_NSWithHeatTransferSystem:: re_initialize( void )
 
          for (size_t l = 0;l < dim; l++) {
             nb_total_unknown *= (2+nb_unknowns_on_proc(l));
-            size_t nb_index;
+            size_t nb_index=0;
             if (l == 0) {
                if (dim == 2) {
                   nb_index = nb_unknowns_handled_by_proc(1);
@@ -412,6 +456,7 @@ DDS_NSWithHeatTransferSystem:: re_initialize( void )
                // Presence of solid and only once
                solid[field].coord[comp]->re_initialize(Npart,3);
                solid[field].size[comp]->re_initialize(Npart);
+               solid[field].thetap[comp]->re_initialize(Npart,3);
                solid[field].vel[comp]->re_initialize(Npart,3);
                solid[field].ang_vel[comp]->re_initialize(Npart,3);
                solid[field].temp[comp]->re_initialize(Npart);
@@ -720,6 +765,15 @@ DDS_NSWithHeatTransferSystem::get_solid(size_t const& field)
 }
 
 //----------------------------------------------------------------------
+SurfaceDiscretize
+DDS_NSWithHeatTransferSystem::get_surface()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NSWithHeatTransferSystem:: get_surface" ) ;
+   return (surface) ;
+}
+
+//----------------------------------------------------------------------
 BoundaryBisec*
 DDS_NSWithHeatTransferSystem::get_b_intersect(size_t const& field, size_t const& level)
 //----------------------------------------------------------------------
@@ -921,10 +975,6 @@ DDS_NSWithHeatTransferSystem::compute_product_matrix_interior(struct TDMatrix *a
 
   // Get product of Aei*inv(Aii)*Aie for appropriate column
   arr[dir].ei[comp][r_index]->multiply_vec_then_add(prr[dir].result[comp],prr[dir].ii_ie[comp]);
-
-  size_t nb_procs;
-
-  nb_procs = nb_procs_in_i[dir];
 
   size_t int_unknown = prr[dir].ii_ie[comp]->nb_rows();
 

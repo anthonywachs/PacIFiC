@@ -29,7 +29,8 @@
 DDS_HeatTransferSystem*
 DDS_HeatTransferSystem:: create( MAC_Object* a_owner,
 	MAC_ModuleExplorer const* exp,
-	FV_DiscreteField* mac_tf )
+	FV_DiscreteField* mac_tf,
+        struct HeatTransfer2System const& transfer )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_HeatTransferSystem:: create" ) ;
@@ -37,7 +38,7 @@ DDS_HeatTransferSystem:: create( MAC_Object* a_owner,
    MAC_CHECK_PRE( mac_tf != 0 ) ;
 
    DDS_HeatTransferSystem* result =
-         new DDS_HeatTransferSystem( a_owner, exp, mac_tf ) ;
+         new DDS_HeatTransferSystem( a_owner, exp, mac_tf, transfer ) ;
 
    MAC_CHECK_POST( result != 0 ) ;
    MAC_CHECK_POST( result->owner() == a_owner ) ;
@@ -53,12 +54,18 @@ DDS_HeatTransferSystem:: create( MAC_Object* a_owner,
 DDS_HeatTransferSystem:: DDS_HeatTransferSystem(
 	MAC_Object* a_owner,
 	MAC_ModuleExplorer const* exp,
-	FV_DiscreteField* mac_tf )
+	FV_DiscreteField* mac_tf,
+        struct HeatTransfer2System const& fromHE )
 //----------------------------------------------------------------------
    : MAC_Object( a_owner )
    , TF( mac_tf )
    , MAT_TemperatureUnsteadyPlusDiffusion_1D( 0 )
-   , is_solids (false)
+   , is_solids ( fromHE.is_solids_ )
+   , is_stressCal (fromHE.is_stressCal_ )
+   , Npart (fromHE.Npart_ )
+   , level_set_type (fromHE.level_set_type_ )
+   , Nmax (fromHE.Npoints_ )
+   , ar (fromHE.ar_ ) 
 {
    MAC_LABEL( "DDS_HeatTransferSystem:: DDS_HeatTransferSystem" ) ;
 
@@ -78,13 +85,6 @@ DDS_HeatTransferSystem:: DDS_HeatTransferSystem(
 
    dim = TF->primary_grid()->nb_space_dimensions() ;
    nb_comps = TF->nb_components() ;
-
-   if ( exp->has_entry( "Particles" ) )
-     is_solids = exp->bool_data( "Particles" ) ;
-
-   if (is_solids) {
-      Npart = exp->int_data( "NParticles" ) ;
-   }
 
    periodic_comp = TF->primary_grid()->get_periodic_directions();
    is_iperiodic[0] = periodic_comp->operator()( 0 );
@@ -127,9 +127,17 @@ DDS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
    MAT_TemperatureUnsteadyPlusDiffusion_1D =
    	LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
 
+   // Structure for the particle surface discretization
+   surface.coordinate = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
+   surface.area = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
+   surface.normal = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
+
    // Structure for the particle input data
    solid.coord = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
    solid.size = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
+   solid.thetap = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+   solid.vel = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
+   solid.ang_vel = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
    solid.temp = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
    solid.inside = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
 
@@ -160,7 +168,7 @@ DDS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
 
       for (size_t comp = 0; comp < nb_comps; comp++) {
          size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
-         size_t nb_index;
+         size_t nb_index=0;
          for (size_t l=0;l<dim;++l) {
             nb_unknowns_handled_by_proc( l ) =
                             1 + TF->get_max_index_unknown_handled_by_proc( comp, l )
@@ -251,6 +259,10 @@ DDS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
       }
    }
 
+   surface.coordinate = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+   surface.area = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   surface.normal = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+
    for (size_t dir=0;dir<dim;++dir) {
       for (size_t comp=0;comp<nb_comps;++comp) {
          Ap[dir].ei_ii_ie[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
@@ -267,7 +279,10 @@ DDS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
          if (dir == 0) {
             solid.coord[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
             solid.size[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            solid.thetap[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
             solid.temp[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+            solid.vel[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
+            solid.ang_vel[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
             solid.inside[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             node.void_frac[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             node.parID[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -320,6 +335,38 @@ DDS_HeatTransferSystem:: re_initialize( void )
    // Direction splitting matrices & vectors
    size_t nb_procs, proc_pos;
 
+   if (is_solids && is_stressCal) {
+      if (dim == 3) {
+         if (level_set_type == "Sphere") {
+            surface.coordinate->re_initialize(2*(size_t)Nmax,3);
+            surface.area->re_initialize(2*(size_t)Nmax);
+            surface.normal->re_initialize(2*(size_t)Nmax,3);
+	 } else if (level_set_type == "Cube") {
+            surface.coordinate->re_initialize(6*(size_t)pow(Nmax,2),3);
+            surface.area->re_initialize(6*(size_t)pow(Nmax,2));
+            surface.normal->re_initialize(6*(size_t)pow(Nmax,2),3);
+	 } else if (level_set_type == "Cylinder") {
+            double Npm1 = round(pow(MAC::sqrt(Nmax) - MAC::sqrt(MAC::pi()/ar),2.));
+            double dh = 1. - MAC::sqrt(Npm1/Nmax);
+            double Nr = round(2./dh);
+	    size_t Ncyl = (size_t) (2*Nmax + Nr*(Nmax - Npm1));
+            surface.coordinate->re_initialize(Ncyl,3);
+            surface.area->re_initialize(Ncyl);
+            surface.normal->re_initialize(Ncyl,3);
+	 }
+      } else {
+	 if (level_set_type == "Sphere") {
+            surface.coordinate->re_initialize((size_t)Nmax,3);
+            surface.area->re_initialize((size_t)Nmax);
+            surface.normal->re_initialize((size_t)Nmax,3);
+	 } else if (level_set_type == "Cube") {
+            surface.coordinate->re_initialize(4*(size_t)Nmax,3);
+            surface.area->re_initialize(4*(size_t)Nmax);
+            surface.normal->re_initialize(4*(size_t)Nmax,3);
+	 }
+      }
+   }
+
    for (size_t comp=0;comp<nb_comps;++comp) {
       size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
       size_t_vector nb_unknowns_on_proc( dim, 0 );
@@ -339,7 +386,7 @@ DDS_HeatTransferSystem:: re_initialize( void )
       for (size_t l=0;l<dim;++l) {
          nb_total_unknown *= (2+nb_unknowns_on_proc(l));
 
-         size_t nb_index;
+         size_t nb_index=0;
          if (l == 0) {
             if (dim == 2) {
                nb_index = nb_unknowns_handled_by_proc(1);
@@ -363,6 +410,9 @@ DDS_HeatTransferSystem:: re_initialize( void )
             // Presence of solid and only once
             solid.coord[comp]->re_initialize(Npart,3);
             solid.size[comp]->re_initialize(Npart);
+            solid.thetap[comp]->re_initialize(Npart,3);
+            solid.vel[comp]->re_initialize(Npart,3);
+            solid.ang_vel[comp]->re_initialize(Npart,3);
             solid.temp[comp]->re_initialize(Npart);
             solid.inside[comp]->re_initialize(Npart);
          }
@@ -560,10 +610,6 @@ void
 DDS_HeatTransferSystem::pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr, size_t const& r_index)
 //----------------------------------------------------------------------
 {
-   size_t nb_procs;
-
-   nb_procs = nb_procs_in_i[dir];
-
    size_t nrows = arr[dir].ii_main[comp][r_index]->nb_rows() ;
 
    double temp = arr[dir].ii_main[comp][r_index]->item(0);
@@ -680,6 +726,14 @@ DDS_HeatTransferSystem::get_solid()
    return (solid) ;
 }
 
+//----------------------------------------------------------------------
+SurfaceDiscretize
+DDS_HeatTransferSystem::get_surface()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_HeatTransferSystem:: get_surface" ) ;
+   return (surface) ;
+}
 
 //----------------------------------------------------------------------
 ProdMatrix*
@@ -844,10 +898,6 @@ DDS_HeatTransferSystem::compute_product_matrix_interior(struct TDMatrix *arr,str
 
   // Get product of Aei*inv(Aii)*Aie for appropriate column
   arr[dir].ei[comp][r_index]->multiply_vec_then_add(prr[dir].result[comp],prr[dir].ii_ie[comp]);
-
-  size_t nb_procs;
-
-  nb_procs = nb_procs_in_i[dir];
 
   size_t int_unknown = prr[dir].ii_ie[comp]->nb_rows();
 

@@ -359,6 +359,9 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    GLOBAL_EQ->initialize_DS_velocity();
    GLOBAL_EQ->initialize_DS_pressure();
 
+   // Setting ugradu as zero at start of simulation
+   if (b_restart == false) ugradu_initialization ( );
+
    // Generate solid particles if required
    if (is_solids) {
       Solids_generation(0);
@@ -723,6 +726,41 @@ DDS_NavierStokes:: error_with_analytical_solution_poiseuille ( )
 
 //---------------------------------------------------------------------------
 void
+DDS_NavierStokes:: ugradu_initialization ( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes:: ugradu_initialization" ) ;
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  for (size_t comp=0;comp<nb_comps[1];comp++) {
+     // Get local min and max indices
+     for (size_t l=0;l<dim;++l) {
+        min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l );
+        max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l );
+     }
+
+     size_t local_min_k = 0;
+     size_t local_max_k = 0;
+
+     if (dim == 3) {
+        local_min_k = min_unknown_index(2);
+        local_max_k = max_unknown_index(2);
+     }
+
+     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+        for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+           for (size_t k=local_min_k;k<=local_max_k;++k) {
+              UF->set_DOF_value( i, j, k, comp, 2, 0.);
+           }
+        }
+     }
+  }
+}
+
+//---------------------------------------------------------------------------
+void
 DDS_NavierStokes:: nodes_field_initialization ( size_t const& level )
 //---------------------------------------------------------------------------
 {
@@ -865,9 +903,10 @@ DDS_NavierStokes:: return_node_index (
    size_t_vector i_length(dim,0);
    for (size_t l=0;l<dim;++l) {
       // To include knowns at dirichlet boundary in the indexing as well, wherever required
-//      min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
-//                                                                                                     (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
-      min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) - 1;                                                                                                     
+/*      min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
+                                                                                                     (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
+      max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;*/
+      min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) - 1;  
       max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
       i_length(l) = 1 + max_unknown_index(l) - min_unknown_index(l);
    }
@@ -2909,7 +2948,7 @@ void
 DDS_NavierStokes:: compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nring)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: compute_surface_points_on_sphere" ) ;
+  MAC_LABEL("DDS_NavierStokes:: compute_surface_points_on_cylinder" ) ;
 /*
   ofstream outputFile ;
   std::ostringstream os2;
@@ -3226,9 +3265,8 @@ DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, cla
      }
   }
 //  outputFile.close();
-     
-
 }
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: generate_surface_discretization()
@@ -3322,8 +3360,8 @@ DDS_NavierStokes:: generate_surface_discretization()
         compute_surface_points_on_cylinder(k, Nrings);
      } 
   }
-
 }
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np )
@@ -6360,23 +6398,6 @@ DDS_NavierStokes:: assemble_advection_Upwind(
          ur = 0.5 * ( AdvectorValueC + AdvectorValueRi );
          if ( ur > 0. ) fri = ur * AdvectedValueC;
          else fri = ur * AdvectedValueRi;
-         if (act_solids) {
-            size_t p = return_node_index(UF,component,i,j,k);
-            if (node.void_frac[component]->item(p) == 0.) {
-               if ((b_intersect[0].offset[component]->item(p,1) == 1)) {
-                  double xb = b_intersect[0].value[component]->item(p,1);
-                  double ub = b_intersect[0].field_var[component]->item(p,1);
-                  ur = (dxC/2.*ub + (xb - dxC/2.)*AdvectorValueC)/xb;
-                  if (xb > dxC/2.) {
-                     if ( ur > 0. ) fri = ur * AdvectedValueC;
-                     else fri = ur * ub;
-                  } else {
-                     if ( ur > 0. ) fri = ur * ub;
-                     else fri = ur * AdvectedValueRi;
-                  }
-               }
-            }
-         }
       }
            
       // Left (U_X)
@@ -6388,23 +6409,6 @@ DDS_NavierStokes:: assemble_advection_Upwind(
          ul = 0.5 * ( AdvectorValueC + AdvectorValueLe );
          if ( ul > 0. ) fle = ul * AdvectedValueLe;
          else fle = ul * AdvectedValueC;
-         if (act_solids) {
-            size_t p = return_node_index(UF,component,i,j,k);
-            if (node.void_frac[component]->item(p) == 0.) {
-               if ((b_intersect[0].offset[component]->item(p,0) == 1)) {
-                  double xb = b_intersect[0].value[component]->item(p,0);
-                  double ub = b_intersect[0].field_var[component]->item(p,0);
-                  ul = (dxC/2.*ub + (xb - dxC/2.)*AdvectorValueC)/xb;
-                  if (xb > dxC/2.) {
-                     if ( ul > 0. ) fle = ul * ub;
-                     else fle = ul * AdvectedValueC;
-                  } else {
-                     if ( ul > 0. ) fle = ul * AdvectedValueLe;
-                     else fle = ul * ub;
-                  }
-               }
-            }
-         }
       }
       
       // Top (U_Y)
@@ -6415,44 +6419,6 @@ DDS_NavierStokes:: assemble_advection_Upwind(
       if ( vt > 0. ) fto = vt * AdvectedValueC;
       else fto = vt * AdvectedValueTo;
 
-      if (act_solids) {
-         size_t p = return_node_index(UF,1,i+shift.i,j+shift.j,k);
-         if (node.void_frac[1]->item(p) == 0.) {
-            if ((b_intersect[0].offset[1]->item(p,0) == 1)) {
-               double ub = b_intersect[0].field_var[1]->item(p,0);
-               double xb = b_intersect[0].value[1]->item(p,0);
-               //vt = 0.5 * (AdvectorValueToRi + ub);
-               vt = 0.5 * (AdvectorValueToLe + ub + (AdvectorValueToRi - AdvectorValueToLe)*xb/dxC);
-            }
-         }
-         p = return_node_index(UF,1,i+shift.i-1,j+shift.j,k);
-         if (node.void_frac[1]->item(p) == 0.) {
-            if ((b_intersect[0].offset[1]->item(p,1) == 1)) {
-               double ub = b_intersect[0].field_var[1]->item(p,1);
-               double xb = b_intersect[0].value[1]->item(p,1);
-               //vt = 0.5 * (AdvectorValueToLe + ub);
-               vt = 0.5 * (AdvectorValueToRi + ub + (AdvectorValueToLe - AdvectorValueToRi)*xb/dxC);
-            }
-         }
-         p = return_node_index(UF,component,i,j,k);
-         if (node.void_frac[component]->item(p) == 0) {
-            if ((b_intersect[1].offset[component]->item(p,1) == 1)) {
-               double xb = b_intersect[1].value[component]->item(p,1);
-               double ub = b_intersect[1].field_var[component]->item(p,1);
-               if (xb > dyC/2.) {
-                  if ( vt > 0. ) fto = vt * AdvectedValueC;
-                  else fto = vt * ub;
-               } else {
-                  if ( vt > 0. ) fto = vt * ub;
-                  else fto = vt * AdvectedValueTo;
-               }
-            } else {
-               if ( vt > 0. ) fto = vt * AdvectedValueC;
-               else fto = vt * AdvectedValueTo;
-            } 
-         }   
-      }
-   
       // Bottom (U_Y)
       AdvectedValueBo = UF->DOF_value(i, j-1, k, component, advected_level );
       AdvectorValueBoLe = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, 1, advecting_level );
@@ -6460,44 +6426,6 @@ DDS_NavierStokes:: assemble_advection_Upwind(
       vb = 0.5 * ( AdvectorValueBoLe + AdvectorValueBoRi );
       if ( vb > 0. ) fbo = vb * AdvectedValueBo;
       else fbo = vb * AdvectedValueC;
-
-      if (act_solids) {
-         size_t p = return_node_index(UF,1,i+shift.i,j+shift.j-1,k);
-         if (node.void_frac[1]->item(p) == 0.) {
-            if ((b_intersect[0].offset[1]->item(p,0) == 1)) {
-               double ub = b_intersect[0].field_var[1]->item(p,0);
-               double xb = b_intersect[0].value[1]->item(p,0);
-               //vb = 0.5 * (AdvectorValueBoRi + ub);
-               vb = 0.5 * (AdvectorValueBoLe + ub + (AdvectorValueBoRi - AdvectorValueBoLe)*xb/dxC);
-            }
-         }
-         p = return_node_index(UF,1,i+shift.i-1,j+shift.j-1,k);
-         if (node.void_frac[1]->item(p) == 0.) {
-            if ((b_intersect[0].offset[1]->item(p,1) == 1)) {
-               double ub = b_intersect[0].field_var[1]->item(p,1);
-               double xb = b_intersect[0].value[1]->item(p,1);
-               //vb = 0.5 * (AdvectorValueBoLe + ub);
-               vb = 0.5 * (AdvectorValueBoRi + ub + (AdvectorValueBoLe - AdvectorValueBoRi)*xb/dxC);
-            }
-         }
-         p = return_node_index(UF,component,i,j,k);
-         if (node.void_frac[component]->item(p) == 0) {
-            if ((b_intersect[1].offset[component]->item(p,0) == 1)) {
-               double xb = b_intersect[1].value[component]->item(p,0);
-               double ub = b_intersect[1].field_var[component]->item(p,0);
-               if (xb > dyC/2.) {
-                  if ( vb > 0. ) fbo = vb * ub;
-                  else fbo = vb * AdvectedValueC;
-               } else {
-                  if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-                  else fbo = vb * ub;
-               }
-            } else {
-               if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-               else fbo = vb * AdvectedValueC;
-            }   
-         }   
-      }
 
       if (dim == 3) {
          // Front (U_Z)
@@ -6526,44 +6454,6 @@ DDS_NavierStokes:: assemble_advection_Upwind(
       if ( ur > 0. ) fri = ur * AdvectedValueC;
       else fri = ur * AdvectedValueRi;
 
-      if (act_solids) {
-         size_t p = return_node_index(UF,0,i+shift.i,j+shift.j,k);
-         if (node.void_frac[0]->item(p) == 0.) {
-            if ((b_intersect[1].offset[0]->item(p,0) == 1)) {
-               double ub = b_intersect[1].field_var[0]->item(p,0);
-               double xb = b_intersect[1].value[0]->item(p,0);
-               //ur = 0.5 * (AdvectorValueToRi + ub);
-               ur = 0.5 * (AdvectorValueBoRi + ub + (AdvectorValueToRi - AdvectorValueBoRi)*xb/dyC);
-            }
-         }
-         p = return_node_index(UF,0,i+shift.i,j+shift.j-1,k);
-         if (node.void_frac[0]->item(p) == 0.) {
-            if ((b_intersect[1].offset[0]->item(p,1) == 1)) {
-               double ub = b_intersect[1].field_var[0]->item(p,1);
-               double xb = b_intersect[1].value[0]->item(p,1);
-               //ur = 0.5 * (AdvectorValueBoRi + ub);
-               ur = 0.5 * (AdvectorValueToRi + ub + (AdvectorValueBoRi - AdvectorValueToRi)*xb/dyC);
-            }
-         }
-         p = return_node_index(UF,component,i,j,k);
-         if (node.void_frac[component]->item(p) == 0) {
-            if ((b_intersect[0].offset[component]->item(p,1) == 1)) {
-               double xb = b_intersect[0].value[component]->item(p,1);
-               double ub = b_intersect[0].field_var[component]->item(p,1);
-               if (xb > dxC/2.) {
-                  if ( ur > 0. ) fri = ur * AdvectedValueC;
-                  else fri = ur * ub;
-               } else {
-                  if ( ur > 0. ) fri = ur * ub;
-                  else fri = ur * AdvectedValueRi;
-               }
-            } else {
-               if ( ur > 0. ) fri = ur * AdvectedValueC;
-               else fri = ur * AdvectedValueRi;
-            }
-         }
-      }
-           
       // Left (V_X)
       AdvectedValueLe = UF->DOF_value(i-1, j, k, component, advected_level );
       AdvectorValueToLe = UF->DOF_value(i+shift.i-1, j+shift.j, k, 0, advecting_level );
@@ -6572,44 +6462,6 @@ DDS_NavierStokes:: assemble_advection_Upwind(
       if ( ul > 0. ) fle = ul * AdvectedValueLe;
       else fle = ul * AdvectedValueC;
  
-      if (act_solids) {
-         size_t p = return_node_index(UF,0,i+shift.i-1,j+shift.j,k);
-         if (node.void_frac[0]->item(p) == 0.) {
-            if ((b_intersect[1].offset[0]->item(p,0) == 1)) {
-               double ub = b_intersect[1].field_var[0]->item(p,0);
-               double xb = b_intersect[1].value[0]->item(p,0);
-               //ul = 0.5 * (AdvectorValueToLe + ub);
-               ul = 0.5 * (AdvectorValueBoLe + ub + (AdvectorValueToLe - AdvectorValueBoLe)*xb/dyC);
-            }
-         }
-         p = return_node_index(UF,0,i+shift.i-1,j+shift.j-1,k);
-         if (node.void_frac[0]->item(p) == 0.) {
-            if ((b_intersect[1].offset[0]->item(p,1) == 1)) {
-               double ub = b_intersect[1].field_var[0]->item(p,1);
-               double xb = b_intersect[1].value[0]->item(p,1);
-               //ul = 0.5 * (AdvectorValueBoLe + ub);
-               ul = 0.5 * (AdvectorValueToLe + ub + (AdvectorValueBoLe - AdvectorValueToLe)*xb/dyC);
-            }
-         }
-         p = return_node_index(UF,component,i,j,k);
-         if (node.void_frac[component]->item(p) == 0) {
-            if ((b_intersect[0].offset[component]->item(p,0) == 1)) {
-               double xb = b_intersect[0].value[component]->item(p,0);
-               double ub = b_intersect[0].field_var[component]->item(p,0);
-               if (xb > dxC/2.) {
-                  if ( ul > 0. ) fle = ul * ub;
-                  else fle = ul * AdvectedValueC;
-               } else {
-                  if ( ul > 0. ) fle = ul * AdvectedValueLe;
-                  else fle = ul * ub;
-               }
-            } else {
-               if ( ul > 0. ) fle = ul * AdvectedValueLe;
-               else fle = ul * AdvectedValueC;
-            }
-         }
-      }
-
       // Top (V_Y)
       if ( UF->DOF_color(i, j, k, component ) == FV_BC_TOP )
          fto = AdvectorValueC * AdvectedValueC;
@@ -6619,23 +6471,6 @@ DDS_NavierStokes:: assemble_advection_Upwind(
          vt = 0.5 * ( AdvectorValueTo + AdvectorValueC );
          if ( vt > 0. ) fto = vt * AdvectedValueC;
          else fto = vt * AdvectedValueTo;
-         if (act_solids) {
-            size_t p = return_node_index(UF,component,i,j,k);
-            if (node.void_frac[component]->item(p) == 0.) {
-               if ((b_intersect[1].offset[component]->item(p,1) == 1)) {
-                  double xb = b_intersect[1].value[component]->item(p,1);
-                  double ub = b_intersect[1].field_var[component]->item(p,1);
-                  vt = (dyC/2.*ub + (xb - dyC/2.)*AdvectorValueC)/xb;
-                  if (xb > dyC/2.) {
-                     if ( vt > 0. ) fto = vt * AdvectedValueC;
-                     else fto = vt * ub;
-                  } else {
-                     if ( vt > 0. ) fto = vt * ub;
-                     else fto = vt * AdvectedValueTo;
-                  }
-               }
-            }
-         }
       }
    
       // Bottom (V_Y)
@@ -6647,23 +6482,6 @@ DDS_NavierStokes:: assemble_advection_Upwind(
          vb = 0.5 * ( AdvectorValueBo + AdvectorValueC );
          if ( vb > 0. ) fbo = vb * AdvectedValueBo;
          else fbo = vb * AdvectedValueC;
-         if (act_solids) {
-            size_t p = return_node_index(UF,component,i,j,k);
-            if (node.void_frac[component]->item(p) == 0.) {
-               if ((b_intersect[1].offset[component]->item(p,0) == 1)) {
-                  double xb = b_intersect[1].value[component]->item(p,0);
-                  double ub = b_intersect[1].field_var[component]->item(p,0);
-                  vb = (dyC/2.*ub + (xb - dyC/2.)*AdvectorValueC)/xb;
-                  if (xb > dxC/2.) {
-                     if ( vb > 0. ) fbo = vb * ub;
-                     else fbo = vb * AdvectedValueC;
-                  } else {
-                     if ( vb > 0. ) fbo = vb * AdvectedValueBo;
-                     else fbo = vb * ub;
-                  }
-               }
-            }
-         }
       }
 
       if (dim == 3) {
@@ -6740,46 +6558,8 @@ DDS_NavierStokes:: assemble_advection_Upwind(
       }
    }  
 
-   double beta_x=1., beta_y=1., beta_z=1.;
-
-   // Volume correction in x
-   if (act_solids) {
-      size_t p = return_node_index(UF,component,i,j,k);
-      if (node.void_frac[component]->item(p) == 0.) {
-         double xb = dxC;
-         if ((b_intersect[0].offset[component]->item(p,0) == 1)) {
-            xb = b_intersect[0].value[component]->item(p,0) + dxC/2.;
-         } 
-         if ((b_intersect[0].offset[component]->item(p,1) == 1)) {
-            xb = b_intersect[0].value[component]->item(p,1) + dxC/2.;
-         }
-         if ((b_intersect[0].offset[component]->item(p,0) == 1) && (b_intersect[0].offset[component]->item(p,1) == 1)) {
-            xb = b_intersect[0].value[component]->item(p,0) + b_intersect[0].value[component]->item(p,1);
-         }
-         beta_x = min(xb,dxC)/dxC;
-      }
-   }
-
-   // Volume correction in y
-   if (act_solids) {
-      size_t p = return_node_index(UF,component,i,j,k);
-      if (node.void_frac[component]->item(p) == 0.) {
-         double xb = dyC;
-         if ((b_intersect[1].offset[component]->item(p,0) == 1)) {
-            xb = b_intersect[1].value[component]->item(p,0) + dyC/2.;
-         } 
-         if ((b_intersect[1].offset[component]->item(p,1) == 1)) {
-            xb = b_intersect[1].value[component]->item(p,1) + dyC/2.;
-         }
-         if ((b_intersect[1].offset[component]->item(p,0) == 1) && (b_intersect[1].offset[component]->item(p,1) == 1)) {
-            xb = b_intersect[1].value[component]->item(p,0) + b_intersect[1].value[component]->item(p,1);
-         }
-         beta_y = min(xb,dyC)/dyC;
-      }
-   }
-
    if (dim == 2) { 
-      flux = ((fto - fbo) * dxC + (fri - fle) * dyC)*beta_x*beta_y;
+      flux = ((fto - fbo) * dxC + (fri - fle) * dyC);
    } else if (dim == 3) {
       flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
    }   

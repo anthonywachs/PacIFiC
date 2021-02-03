@@ -24,6 +24,17 @@ class FV_SystemNumbering ;
 class FV_DiscreteField ;
 class FV_TimeIterator ;
 
+/** For set of variables to pass from NavierStokes to System */
+struct HeatTransfer2System
+{
+  bool is_solids_ ;
+  size_t Npart_ ;
+  string level_set_type_ ;
+  bool is_stressCal_ ;
+  double Npoints_ ;
+  double ar_ ;
+};
+
 /** @brief TDMatrix include all elements of block matrices (ii,ie,ei,ee) */
 struct TDMatrix {
    LA_SeqVector *** ii_main;
@@ -53,6 +64,9 @@ struct LocalVector {
 struct PartInput {
    LA_SeqMatrix ** coord;               // Coordinates
    LA_SeqVector ** size;                // Size of the sphere
+   LA_SeqMatrix ** thetap;               // yaw, pitch, roll
+   LA_SeqMatrix ** vel;                 // Velocity of the sphere
+   LA_SeqMatrix ** ang_vel;                 // Angular velocity of the sphere
    LA_SeqVector ** temp;                // Temperature of the sphere
    LA_SeqVector ** inside;              // 1 if solid only from inside; -1 if solid only from outside
 };
@@ -61,6 +75,13 @@ struct PartInput {
 struct NodeProp {
    LA_SeqVector ** void_frac;               // void_fraction of the node due to particle
    LA_SeqVector ** parID;                   // ID of solid particle on the node
+};
+
+/** @brief SurfaceDiscretize to be used to store the coordinates and area of discretize particle surface */
+struct SurfaceDiscretize {
+   LA_SeqMatrix * coordinate;                  // coordinates
+   LA_SeqVector * area;                        // area
+   LA_SeqMatrix * normal;	               // normal
 };
 
 /** @brief BoundaryBisec to be used to store the intersection of solids with grids in each direction */
@@ -103,7 +124,8 @@ class DDS_HeatTransferSystem : public MAC_Object
       @param mac_tf FV temperature field */
       DDS_HeatTransferSystem ( MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
-            FV_DiscreteField* mac_tf );
+            FV_DiscreteField* mac_tf,
+            struct HeatTransfer2System const& fromHE );
       //@}
 
 
@@ -120,7 +142,8 @@ class DDS_HeatTransferSystem : public MAC_Object
       static DDS_HeatTransferSystem* create(
             MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
-            FV_DiscreteField* mac_tf ) ;
+            FV_DiscreteField* mac_tf,
+            struct HeatTransfer2System const& fromHE );
       //@}
 
 
@@ -154,6 +177,8 @@ class DDS_HeatTransferSystem : public MAC_Object
       NodeProp get_node_property();
       /** @brief Return the particle input properties */
       PartInput get_solid();
+      /** @brief Return the surface discretization from input files */
+      SurfaceDiscretize get_surface();
 
    //-- Basic operations on matrices & vectors
 
@@ -246,6 +271,7 @@ class DDS_HeatTransferSystem : public MAC_Object
       // Particle structures
       struct PartInput solid;
       struct NodeProp node;
+      struct SurfaceDiscretize surface;
       struct BoundaryBisec b_intersect[2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid)
 
       // Schur complement matrices
@@ -264,9 +290,12 @@ class DDS_HeatTransferSystem : public MAC_Object
       size_t dim;
       MAC_Communicator const* pelCOMM;
       size_t nb_comps;
-      size_t Npart;
-      double Rpart;
       bool is_solids;
+      bool is_stressCal;
+      size_t Npart;
+      string level_set_type;
+      double Nmax;
+      double Rpart,ar;
 
       size_t proc_pos_in_i[3];
       size_t nb_procs_in_i[3];

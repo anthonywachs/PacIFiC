@@ -48,7 +48,6 @@ struct NavierStokes2Temperature
   bool is_stressCal_ ;
   double Npoints_ ;
   double ar_ ;
-  size_t Nrings_ ;
   size_t Pmin_ ;
   size_t pole_loc_ ;
 };
@@ -260,10 +259,13 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       void output_l2norm ( void ) ;
       //@}
 
-      void compute_fluid_particle_interaction( FV_TimeIterator const* t_it, double const& Np);
-      void generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& k0, size_t const& Nring);
-      void compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nring);
-      void compute_temperature_gradient_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleVector& force, size_t const& parID, size_t const& Np );
+      void generate_surface_discretization();
+      void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
+      void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
+      void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
+      void compute_surface_points_on_cube(size_t const& Np);
+      void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
+      void compute_temperature_gradient_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np );
       double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);
 
 
@@ -323,7 +325,7 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       bool is_solids;
       bool is_stressCal;
       double Npoints;
-      size_t Nrings, Pmin, pole_loc;
+      size_t Pmin, pole_loc;
       double ar;
       bool b_restart ;
       bool is_iperiodic[3];

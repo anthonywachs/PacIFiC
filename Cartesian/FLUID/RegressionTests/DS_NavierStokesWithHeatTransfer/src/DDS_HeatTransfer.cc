@@ -89,7 +89,8 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
 
 
    // Is the run a follow up of a previous job
-   b_restart = MAC_Application::is_follow();
+//   b_restart = MAC_Application::is_follow();
+   b_restart = fromNS.b_restart_ ;
    // Clear results directory in case of a new run
    if( !b_restart ) PAC_Misc::clearAllFiles( "Res", "Savings", my_rank ) ;
 
@@ -128,22 +129,30 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
       level_set_type = fromNS.level_set_type_ ;
 
       if (is_stressCal) {
-         if (dim == 2) {
-            Npoints = fromNS.Npoints_ ;
-         } else {
-            Npoints = 1.;
-            Nrings = fromNS.Nrings_ ;
-            Pmin = fromNS.Pmin_ ;
-            ar = fromNS.ar_ ;
-            pole_loc = fromNS.pole_loc_ ;
+         Npoints = fromNS.Npoints_ ;
+         if (dim == 3) {
+            if ((level_set_type == "Sphere") || (level_set_type == "Cylinder")) {
+               Pmin = fromNS.Pmin_ ;
+               ar = fromNS.ar_ ;
+               pole_loc = fromNS.pole_loc_ ;
+            }
          }
       }         
    }
 
+   // Create structure to input in the solver system
+   struct HeatTransfer2System inputDataHE;
+   inputDataHE.is_solids_ = is_solids ; 
+   inputDataHE.is_stressCal_ = is_stressCal ;
+   inputDataHE.Npart_ = Npart ;
+   inputDataHE.level_set_type_ = level_set_type ;
+   inputDataHE.Npoints_ = Npoints ;
+   inputDataHE.ar_ = ar ;
+
    // Build the matrix system
    MAC_ModuleExplorer* se =
 	exp->create_subexplorer( 0,"DDS_HeatTransferSystem" ) ;
-   GLOBAL_EQ = DDS_HeatTransferSystem::create( this, se, TF ) ;
+   GLOBAL_EQ = DDS_HeatTransferSystem::create( this, se, TF, inputDataHE ) ;
    se->destroy() ;
 
 
@@ -211,6 +220,10 @@ DDS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
       nodes_temperature_initialization(1);
       nodes_temperature_initialization(3);
       if (dim == 3) nodes_temperature_initialization(4);
+      if (is_stressCal) {
+         // Generate discretization of surface in approximate equal area
+         generate_surface_discretization ();
+      }     
    }
 
    GLOBAL_EQ->initialize_temperature();
@@ -267,7 +280,7 @@ DDS_HeatTransfer:: do_after_inner_iterations_stage(
 //   FV_OneStepIteration::do_after_inner_iterations_stage( t_it ) ;
 
    if (is_stressCal) {
-      compute_fluid_particle_interaction(t_it,Npoints);
+      compute_fluid_particle_interaction(t_it);
    }
 
    // Compute temperature change over the time step
@@ -1686,7 +1699,7 @@ DDS_HeatTransfer:: Solids_generation ()
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid();
 
-  double xp,yp,zp,Rp,vx,vy,vz,wx,wy,wz,Tp,off;
+  double xp,yp,zp,Rp,tx,ty,tz,vx,vy,vz,wx,wy,wz,Tp,off;
 
   for (size_t comp=0;comp<nb_comps;comp++) {
      ifstream inFile;
@@ -1698,11 +1711,20 @@ DDS_HeatTransfer:: Solids_generation ()
      string line;
      getline(inFile,line);
      for (size_t i=0;i<Npart;i++) {
-        inFile >> xp >> yp >> zp >> Rp >> vx >> vy >> vz >> wx >> wy >> wz >> Tp >> off;
+        inFile >> xp >> yp >> zp >> Rp >> tx >> ty >> tz >> vx >> vy >> vz >> wx >> wy >> wz >> Tp >> off;
         solid.coord[comp]->set_item(i,0,xp);
         solid.coord[comp]->set_item(i,1,yp);
         solid.coord[comp]->set_item(i,2,zp);
         solid.size[comp]->set_item(i,Rp);
+        solid.thetap[comp]->set_item(i,0,tx);
+        solid.thetap[comp]->set_item(i,1,ty);
+        solid.thetap[comp]->set_item(i,2,tz);
+        solid.vel[comp]->set_item(i,0,vx);
+        solid.vel[comp]->set_item(i,1,vy);
+        solid.vel[comp]->set_item(i,2,vz);
+        solid.ang_vel[comp]->set_item(i,0,wx);
+        solid.ang_vel[comp]->set_item(i,1,wy);
+        solid.ang_vel[comp]->set_item(i,2,wz);
         solid.temp[comp]->set_item(i,Tp);
         solid.inside[comp]->set_item(i,off);
      }
@@ -1796,56 +1818,39 @@ DDS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator const* t_it, double const& Np)
+DDS_HeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_HeatTransfer:: compute_fluid_particle_interaction" ) ;
 
-  // Np: number of points in the surface of particle, required in 2D case of cylinders
-  // For 3D case (i.e. sphere)Aspect ratio of cells (ar);
-  // Number of rings to include while discretization (Nrings); number of points at the
-  // pole of the particle
-
-  size_t Nmax = (int) Np;
-
-  string fileName = "DS_results/particle_Tstress.csv" ;
-
-  if (dim == 2) Nrings = 1;
-  // Summation of total discretized points with increase in number of rings radially
-  doubleVector k(Nrings+1,0.);
-  // Zenithal angle for the sphere
-  doubleVector eta(Nrings+1,0.);
-  // Radius of the rings in lamber projection plane
-  doubleVector Rring(Nrings+1,0.);
-
-  if (dim == 3) {
-     // Generate parameters to discretize spherical surface in approximate equal area
-     generate_discretization_parameter (eta, k, Rring, Pmin, Nrings);
-     Nmax = 2*(int)k(Nrings);
-  }
-
-  doubleArray2D point_coord(Nmax,3,0);
-  doubleVector cell_area(Nmax,0);
-
-  // Discretize the parID particle surface into approximate equal area cells
-  if (dim == 3) {
-     compute_surface_points(eta, k, Rring, point_coord, cell_area, Nrings);
-  } else {
-     compute_surface_points(eta, k, Rring, point_coord, cell_area, Nmax);
-  }
+  string fileName = "./DS_results/particle_Tstress.csv" ;
 
   doubleVector temp_force(Npart,0);
+
+  size_t Nmax = 0.;
+  if (level_set_type == "Sphere") {
+     Nmax = (dim == 2) ? Npoints : 2*Npoints ;
+  } else if (level_set_type == "Cube") {
+     Nmax = (dim == 2) ? 4*Npoints : 6*pow(Npoints,2) ;
+  } else if (level_set_type == "Cylinder") {
+     size_t Npm1 = round(pow(MAC::sqrt(Npoints) - MAC::sqrt(MAC::pi()/ar),2.));
+     size_t Ncyl = (Npoints - Npm1);
+     double dh = 1. - MAC::sqrt(Npm1/Npoints);
+     size_t Nr = round(2./dh);
+     Nmax = (dim == 3) ? 2*Npoints + Nr*Ncyl : 0 ;
+  }
+
   for (size_t parID = 0; parID < Npart; parID++) {
      // Contribution of stress tensor
-     compute_temperature_gradient_on_particle(point_coord, cell_area, temp_force, parID, Nmax);
+     compute_temperature_gradient_on_particle(temp_force, parID, Nmax);
      // Gathering information from all procs
      temp_force(parID) = pelCOMM->sum(temp_force(parID)) ;
 
      if (my_rank == 0) {
-        cout << "Dimensional Nusselt number for Np " << Np << " : " << temp_force(parID) <<endl;
+        cout << "Dimensional Nusselt number for Np " << Nmax << " : " << temp_force(parID) <<endl;
 
         ofstream MyFile( fileName.c_str(), ios::app ) ;
-        MyFile << t_it -> time() << "," << parID << "," << Np << "," << temp_force(parID) << endl;
+        MyFile << t_it -> time() << "," << parID << "," << Nmax << "," << temp_force(parID) << endl;
         MyFile.close( ) ;
      }
   }
@@ -1853,7 +1858,7 @@ DDS_HeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleVector& force, size_t const& parID, size_t const& Np )
+DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_HeatTransfer:: compute_temperature_gradient_on_particle" ) ;
@@ -1864,6 +1869,8 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
 
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid();
+  // Structure of particle surface input data
+  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
   // comp won't matter as the particle position is independent of comp
   double xp = solid.coord[comp]->item(parID,0);
@@ -1886,7 +1893,6 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
   size_t_vector in_parID(2,0);         //Store particle ID if level_set becomes negative
   boolArray2D found(3,dim,false);
   size_t_array2D i0(3,dim,0);
-  doubleVector norm_vec(3,0);           // Normal vector on the surface
   vector<double> net_vel(3,0.);
 
   size_t_vector min_unknown_index(dim,0);
@@ -1894,6 +1900,8 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
 
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
+  doubleVector rotated_coord(dim,0);
+  doubleVector rotated_normal(dim,0);
 
   for (size_t i=0;i<Np;i++) {
      // Get local min and max indices
@@ -1911,9 +1919,28 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
         }
      }
 
-     ipoint(0,0) = xp + ri*point_coord(i,0);
-     ipoint(0,1) = yp + ri*point_coord(i,1);
-     ipoint(0,2) = zp + ri*point_coord(i,2);
+     // Rotating surface points
+     rotated_coord(0) = ri*surface.coordinate->item(i,0);
+     rotated_coord(1) = ri*surface.coordinate->item(i,1);
+     rotated_coord(2) = ri*surface.coordinate->item(i,2);
+
+     doubleVector angle(3,0.);
+     angle(0) = solid.thetap[comp]->item(parID,0);
+     angle(1) = solid.thetap[comp]->item(parID,1);
+     angle(2) = solid.thetap[comp]->item(parID,2);
+
+     rotation_matrix(parID,rotated_coord,angle);
+
+     ipoint(0,0) = xp + rotated_coord(0);
+     ipoint(0,1) = yp + rotated_coord(1);
+     ipoint(0,2) = zp + rotated_coord(2);
+
+     // Rotating surface normal
+     rotated_normal(0) = surface.normal->item(i,0);
+     rotated_normal(1) = surface.normal->item(i,1);
+     rotated_normal(2) = surface.normal->item(i,2);
+
+     rotation_matrix(parID,rotated_normal,angle);
 
      // Correction in case of periodic boundary condition in any direction
      if (is_iperiodic[0]) {
@@ -1945,16 +1972,14 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
                               ((ipoint(0,0) > Dmin(0)) && (ipoint(0,0) <= Dmax(0)) && (ipoint(0,1) > Dmin(1)) && (ipoint(0,1) <= Dmax(1))
                                                                                    && (ipoint(0,2) > Dmin(2)) && (ipoint(0,2) <= Dmax(2)));
 
+     double threshold = pow(loc_thres,0.5)*dh;
      double dfdi=0.;
 
      if (status) {
         for (size_t l=0;l<dim;++l) {
-           // Normal vector on the surface, can be changed based on particle shape
-           norm_vec(l) = point_coord(i,l);
-
            // Ghost points in normal direction at the particle surface
-           ipoint(1,l) = ipoint(0,l) + dh*norm_vec(l);
-           ipoint(2,l) = ipoint(0,l) + 2.*dh*norm_vec(l);
+           ipoint(1,l) = ipoint(0,l) + dh*rotated_normal(l);
+           ipoint(2,l) = ipoint(0,l) + 2.*dh*rotated_normal(l);
 
            // Periocid boundary conditions
            if (is_iperiodic[l]) {
@@ -2056,7 +2081,7 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleArray2D&
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID) = force(parID) + dfdi*(cell_area(i)*scale);
+     force(parID) = force(parID) + dfdi*(surface.area->item(i)*scale);
   }
 //  outputFile.close();  
 }
@@ -2537,14 +2562,273 @@ DDS_HeatTransfer:: impose_solid_temperature_for_ghost (size_t const& comp, doubl
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nring)
+DDS_HeatTransfer:: compute_surface_points_on_cube(size_t const& Np)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: compute_surface_points" ) ;
+  MAC_LABEL("DDS_HeatTransfer:: compute_surface_points_on_cube" ) ;
+/*
+  ofstream outputFile ;
+  std::ostringstream os2;
+  os2 << "./DS_results/point_data_" << my_rank << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+  outputFile << "x,y,z,area,nx,ny,nz" << endl;
+*/
+  // Structure of particle input data
+  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
+
+  double dp = 2./(Np);
+
+  if (dim == 3) {
+     // Generating discretization on surface
+     doubleVector lsp(Np,0.);
+     for (size_t i=0; i<Np; i++) lsp(i) = -1. + dp*(i+0.5);
+
+     size_t counter = 0;
+
+     for (size_t i=0; i<Np; i++) {
+	for (size_t j=0; j<Np; j++) {
+           //Front
+           surface.coordinate->set_item(counter,0,lsp(i));
+           surface.coordinate->set_item(counter,1,lsp(j));
+           surface.coordinate->set_item(counter,2,1.);
+           surface.area->set_item(counter,dp*dp);
+           surface.normal->set_item(counter,2,1.);
+           //Behind
+           surface.coordinate->set_item(Np*Np+counter,0,lsp(i));
+           surface.coordinate->set_item(Np*Np+counter,1,lsp(j));
+           surface.coordinate->set_item(Np*Np+counter,2,-1.);
+           surface.area->set_item(Np*Np+counter,dp*dp);
+           surface.normal->set_item(Np*Np+counter,2,-1.);
+           //Top
+           surface.coordinate->set_item(2*Np*Np+counter,0,lsp(i));
+           surface.coordinate->set_item(2*Np*Np+counter,2,lsp(j));
+           surface.coordinate->set_item(2*Np*Np+counter,1,1.);
+           surface.area->set_item(2*Np*Np+counter,dp*dp);
+           surface.normal->set_item(2*Np*Np+counter,1,1.);
+           //Bottom
+           surface.coordinate->set_item(3*Np*Np+counter,0,lsp(i));
+           surface.coordinate->set_item(3*Np*Np+counter,2,lsp(j));
+           surface.coordinate->set_item(3*Np*Np+counter,1,-1.);
+           surface.area->set_item(3*Np*Np+counter,dp*dp);
+           surface.normal->set_item(3*Np*Np+counter,1,-1.);
+           //Right
+           surface.coordinate->set_item(4*Np*Np+counter,1,lsp(i));
+           surface.coordinate->set_item(4*Np*Np+counter,2,lsp(j));
+           surface.coordinate->set_item(4*Np*Np+counter,0,1.);
+           surface.area->set_item(4*Np*Np+counter,dp*dp);
+           surface.normal->set_item(4*Np*Np+counter,0,1.);
+           //Left
+           surface.coordinate->set_item(5*Np*Np+counter,1,lsp(i));
+           surface.coordinate->set_item(5*Np*Np+counter,2,lsp(j));
+           surface.coordinate->set_item(5*Np*Np+counter,0,-1.);
+           surface.area->set_item(5*Np*Np+counter,dp*dp);
+           surface.normal->set_item(5*Np*Np+counter,0,-1.);
+
+/*	   outputFile << surface.coordinate->item(counter,0) << "," << surface.coordinate->item(counter,1) << "," << surface.coordinate->item(counter,2) << "," << surface.area->item(counter) << "," << surface.normal->item(counter,0) << "," << surface.normal->item(counter,1) << "," << surface.normal->item(counter,2) << endl; 
+           outputFile << surface.coordinate->item(Np*Np+counter,0) << "," << surface.coordinate->item(Np*Np+counter,1) << "," << surface.coordinate->item(Np*Np+counter,2) << "," << surface.area->item(Np*Np+counter) << "," << surface.normal->item(Np*Np+counter,0) << "," << surface.normal->item(Np*Np+counter,1) << "," << surface.normal->item(Np*Np+counter,2) << endl; 
+           outputFile << surface.coordinate->item(2*Np*Np+counter,0) << "," << surface.coordinate->item(2*Np*Np+counter,1) << "," << surface.coordinate->item(2*Np*Np+counter,2) << "," << surface.area->item(2*Np*Np+counter) << "," << surface.normal->item(2*Np*Np+counter,0) << "," << surface.normal->item(2*Np*Np+counter,1) << "," << surface.normal->item(2*Np*Np+counter,2) << endl; 
+           outputFile << surface.coordinate->item(3*Np*Np+counter,0) << "," << surface.coordinate->item(3*Np*Np+counter,1) << "," << surface.coordinate->item(3*Np*Np+counter,2) << "," << surface.area->item(3*Np*Np+counter) << "," << surface.normal->item(3*Np*Np+counter,0) << "," << surface.normal->item(3*Np*Np+counter,1) << "," << surface.normal->item(3*Np*Np+counter,2) << endl; 
+           outputFile << surface.coordinate->item(4*Np*Np+counter,0) << "," << surface.coordinate->item(4*Np*Np+counter,1) << "," << surface.coordinate->item(4*Np*Np+counter,2) << "," << surface.area->item(4*Np*Np+counter) << "," << surface.normal->item(4*Np*Np+counter,0) << "," << surface.normal->item(4*Np*Np+counter,1) << "," << surface.normal->item(4*Np*Np+counter,2) << endl; 
+           outputFile << surface.coordinate->item(5*Np*Np+counter,0) << "," << surface.coordinate->item(5*Np*Np+counter,1) << "," << surface.coordinate->item(5*Np*Np+counter,2) << "," << surface.area->item(5*Np*Np+counter) << "," << surface.normal->item(5*Np*Np+counter,0) << "," << surface.normal->item(5*Np*Np+counter,1) << "," << surface.normal->item(5*Np*Np+counter,2) << endl; */
+           counter++;
+	}
+     }
+  } else if (dim == 2) {
+     // Generating discretization on surface
+     double lsp=0.;
+     for (size_t i=0; i<Np; i++) {
+        lsp = -1. + dp*(i+0.5);
+	//Bottom
+	surface.coordinate->set_item(i,0,lsp);
+	surface.coordinate->set_item(i,1,-1.);
+	surface.area->set_item(i,dp);
+	surface.normal->set_item(i,1,-1.);
+	//Top
+	surface.coordinate->set_item(Np+i,0,lsp);
+	surface.coordinate->set_item(Np+i,1,1.);
+	surface.area->set_item(Np+i,dp);
+	surface.normal->set_item(Np+i,1,1.);
+	//Left
+	surface.coordinate->set_item(2*Np+i,0,-1.);
+	surface.coordinate->set_item(2*Np+i,1,lsp);
+	surface.area->set_item(2*Np+i,dp);
+	surface.normal->set_item(2*Np+i,0,-1.);
+	//Right
+	surface.coordinate->set_item(3*Np+i,0,1.);
+	surface.coordinate->set_item(3*Np+i,1,lsp);
+	surface.area->set_item(3*Np+i,dp);
+	surface.normal->set_item(3*Np+i,0,1.);
+/*  
+  	outputFile << surface.coordinate->item(i,0) << "," << surface.coordinate->item(i,1) << "," << surface.area->item(i) << "," << surface.normal->item(i,0) << "," << surface.normal->item(i,1) << endl; 
+  	outputFile << surface.coordinate->item(1*Np+i,0) << "," << surface.coordinate->item(1*Np+i,1) << "," << surface.area->item(1*Np+i) << "," << surface.normal->item(1*Np+i,0) << "," << surface.normal->item(1*Np+i,1) << endl; 
+  	outputFile << surface.coordinate->item(2*Np+i,0) << "," << surface.coordinate->item(2*Np+i,1) << "," << surface.area->item(2*Np+i) << "," << surface.normal->item(2*Np+i,0) << "," << surface.normal->item(2*Np+i,1) << endl; 
+  	outputFile << surface.coordinate->item(3*Np+i,0) << "," << surface.coordinate->item(3*Np+i,1) << "," << surface.area->item(3*Np+i) << "," << surface.normal->item(3*Np+i,0) << "," << surface.normal->item(3*Np+i,1) << endl; */
+     }
+  }
+//  outputFile.close();
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_HeatTransfer:: compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nring)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_HeatTransfer:: compute_surface_points_on_cylinder" ) ;
+/*
+  ofstream outputFile ;
+  std::ostringstream os2;
+  os2 << "./DS_results/point_data_" << my_rank << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+  outputFile << "x,y,z,area,nx,ny,nz" << endl;
+*/
+
+  // Structure of particle input data
+  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
+
+  // Radius of the rings in lamber projection plane
+  doubleVector Rring(Nring,0.);
+
+  Rring(Nring-1) = 1.;
 
   if (dim == 3) {
      // Calculation for all rings except at the pole
-     for (int i=Nring; i>0; --i) {
+     for (int i=Nring-1; i>0; --i) {
+        double Ri = Rring(i);
+        Rring(i-1) = MAC::sqrt(k(i-1)/k(i))*Rring(i);
+        Rring(i) = (Rring(i) + Rring(i-1))/2.;
+        double d_theta = 2.*MAC::pi()/(k(i)-k(i-1));
+        // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
+        double theta = 0.01*d_theta;
+        for (int j=k(i-1); j<k(i); j++) {
+	   // For top disk
+           theta = theta + d_theta;
+           surface.coordinate->set_item(j,0,Rring(i)*MAC::cos(theta));
+           surface.coordinate->set_item(j,1,Rring(i)*MAC::sin(theta));
+           surface.coordinate->set_item(j,2,1.);
+           surface.area->set_item(j,0.5*d_theta*(pow(Ri,2)-pow(Rring(i-1),2)));
+	   // For bottom disk
+	   surface.coordinate->set_item(k(Nring-1)+j,0,Rring(i)*MAC::cos(theta));
+           surface.coordinate->set_item(k(Nring-1)+j,1,Rring(i)*MAC::sin(theta));
+           surface.coordinate->set_item(k(Nring-1)+j,2,-1.);
+           surface.area->set_item(k(Nring-1)+j,0.5*d_theta*(pow(Ri,2)-pow(Rring(i-1),2)));
+	   // Create surface normal vectors
+	   surface.normal->set_item(j,0,0.);
+	   surface.normal->set_item(j,1,0.);
+	   surface.normal->set_item(j,2,1.);
+	   surface.normal->set_item(k(Nring-1)+j,0,0.);
+	   surface.normal->set_item(k(Nring-1)+j,1,0.);
+	   surface.normal->set_item(k(Nring-1)+j,2,-1.);
+
+/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," 
+		      << surface.area->item(j) << "," 
+		      << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
+           outputFile << surface.coordinate->item(k(Nring-1)+j,0) << "," << surface.coordinate->item(k(Nring-1)+j,1) << "," << surface.coordinate->item(k(Nring-1)+j,2) << "," << surface.area->item(k(Nring-1)+j) << "," << surface.normal->item(k(Nring-1)+j,0) << "," << surface.normal->item(k(Nring-1)+j,1) << "," << surface.normal->item(k(Nring-1)+j,2) << endl;*/
+        }
+     } 
+
+     // Calculation at the ring on pole (i=0)
+     double Ri = Rring(0);
+     Rring(0) = Rring(0)/2.;
+     double d_theta = 2.*MAC::pi()/(k(0));
+     // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
+     double theta = 0.01*d_theta;
+     if (k(0)>1) {
+        for (int j=0; j < k(0); j++) {
+	   // For top disk
+           theta = theta + d_theta;
+           surface.coordinate->set_item(j,0,Rring(0)*MAC::cos(theta));
+           surface.coordinate->set_item(j,1,Rring(0)*MAC::sin(theta));
+           surface.coordinate->set_item(j,2,1.);
+           surface.area->set_item(j,0.5*d_theta*pow(Ri,2));
+           // For bottom disk
+           surface.coordinate->set_item(k(Nring-1)+j,0,Rring(0)*MAC::cos(theta));
+           surface.coordinate->set_item(k(Nring-1)+j,1,Rring(0)*MAC::sin(theta));
+           surface.coordinate->set_item(k(Nring-1)+j,2,-1.);
+           surface.area->set_item(k(Nring-1)+j,0.5*d_theta*pow(Ri,2.));
+	   // Create surface normal vectors
+	   surface.normal->set_item(j,0,0.);
+	   surface.normal->set_item(j,1,0.);
+	   surface.normal->set_item(j,2,1.);
+	   surface.normal->set_item(k(Nring-1)+j,0,0.);
+	   surface.normal->set_item(k(Nring-1)+j,1,0.);
+	   surface.normal->set_item(k(Nring-1)+j,2,-1.);
+/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
+           outputFile << surface.coordinate->item(k(Nring-1)+j,0) << "," << surface.coordinate->item(k(Nring-1)+j,1) << "," << surface.coordinate->item(k(Nring-1)+j,2) << "," << surface.area->item(k(Nring-1)+j) << "," << surface.normal->item(k(Nring-1)+j,0) << "," << surface.normal->item(k(Nring-1)+j,1) << "," << surface.normal->item(k(Nring-1)+j,2) << endl;*/
+        }
+     } else {
+	// For top disk
+        surface.coordinate->set_item(0,0,0.);
+        surface.coordinate->set_item(0,1,0.);
+        surface.coordinate->set_item(0,2,1.);
+        surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
+	// For bottom disk
+        surface.coordinate->set_item(k(Nring-1),0,0.);
+        surface.coordinate->set_item(k(Nring-1),1,0.);
+        surface.coordinate->set_item(k(Nring-1),2,-1.);
+        surface.area->set_item(k(Nring-1),0.5*d_theta*pow(Ri,2.));
+        // Create surface normal vectors
+        surface.normal->set_item(0,0,0.);
+        surface.normal->set_item(0,1,0.);
+        surface.normal->set_item(0,2,1.);
+        surface.normal->set_item(k(Nring-1),0,0.);
+        surface.normal->set_item(k(Nring-1),1,0.);
+        surface.normal->set_item(k(Nring-1),2,-1.);
+/*        outputFile << surface.coordinate->item(0,0) << "," << surface.coordinate->item(0,1) << "," << surface.coordinate->item(0,2) << "," << surface.area->item(0) << "," << surface.normal->item(0,0) << "," << surface.normal->item(0,1) << "," << surface.normal->item(0,2) << endl;
+        outputFile << surface.coordinate->item(k(Nring-1),0) << "," << surface.coordinate->item(k(Nring-1),1) << "," << surface.coordinate->item(k(Nring-1),2) << "," << surface.area->item(k(Nring-1)) << "," << surface.normal->item(k(Nring-1),0) << "," << surface.normal->item(k(Nring-1),1) << "," << surface.normal->item(k(Nring-1),2) << endl;*/
+     }
+
+     // Generating one ring of points on cylindrical surface
+     // Can be used to calculate stress on whole surface by a constant shift of points
+
+     // Estimating number of points on cylindrical surface
+     size_t pts_1_ring = (k(Nring-1) - k(Nring-2));
+     size_t cyl_rings = round(2./(1-MAC::sqrt(k(Nring-2)/k(Nring-1))));
+     double cell_area = 2.*MAC::pi()/pts_1_ring*(2./cyl_rings);
+
+     d_theta = 2.*MAC::pi()/pts_1_ring;
+     for (int j=0; j<cyl_rings; j++) {
+        theta = 0.01*d_theta;
+	for (int ij=0; ij<pts_1_ring; ij++) {
+           theta = theta + d_theta;
+	   int n = 2*k(Nring-1) + j*pts_1_ring + ij;
+           surface.coordinate->set_item(n,0,MAC::cos(theta));
+           surface.coordinate->set_item(n,1,MAC::sin(theta));
+           surface.coordinate->set_item(n,2,-1.+ 2.*(j+0.5)/cyl_rings);
+           surface.area->set_item(n,cell_area);
+           surface.normal->set_item(n,0,MAC::cos(theta));
+           surface.normal->set_item(n,1,MAC::sin(theta));
+           surface.normal->set_item(n,2,0.);
+
+//           outputFile << surface.coordinate->item(2*k(Nring-1)+j*ij,0) << "," << surface.coordinate->item(2*k(Nring-1)+j*ij,1) << "," << surface.coordinate->item(2*k(Nring-1)+j*ij,2) << "," << surface.area->item(2*k(Nring-1)+j*ij) << "," << surface.normal->item(2*k(Nring-1)+j*ij,0) << "," << surface.normal->item(2*k(Nring-1)+j*ij,1) << "," << surface.normal->item(2*k(Nring-1)+j*ij,2) << endl;
+	}
+     }
+  }
+//  outputFile.close();
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_HeatTransfer:: compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nring)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_HeatTransfer:: compute_surface_points_on_sphere" ) ;
+/*
+  ofstream outputFile ;
+  std::ostringstream os2;
+  os2 << "./DS_results/point_data_" << my_rank << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+  outputFile << "x,y,z,area,nx,ny,nz" << endl;
+*/
+
+  // Structure of particle input data
+  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
+
+  if (dim == 3) {
+     // Calculation for all rings except at the pole
+     for (int i=Nring-1; i>0; --i) {
         double Ri = Rring(i);
         Rring(i) = (Rring(i) + Rring(i-1))/2.;
         eta(i) = (eta(i) + eta(i-1))/2.;
@@ -2554,38 +2838,50 @@ DDS_HeatTransfer:: compute_surface_points(class doubleVector& eta, class doubleV
         for (int j=k(i-1); j<k(i); j++) {
            theta = theta + d_theta;
            if (pole_loc == 2) {
-              point_coord(j,0) = MAC::cos(theta)*MAC::sin(eta(i));
-              point_coord(j,1) = MAC::sin(theta)*MAC::sin(eta(i));
-              point_coord(j,2) = MAC::cos(eta(i));
-              cell_area(j) = 0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.));
+              surface.coordinate->set_item(j,0,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(j,1,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(j,2,MAC::cos(eta(i)));
+              surface.area->set_item(j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
               // For second half of sphere
-              point_coord(k(Nring)+j,0) = point_coord(j,0);
-              point_coord(k(Nring)+j,1) = point_coord(j,1);
-              point_coord(k(Nring)+j,2) = -point_coord(j,2);
-              cell_area(k(Nring)+j) = cell_area(j);
+              surface.coordinate->set_item(k(Nring-1)+j,0,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(k(Nring-1)+j,1,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(k(Nring-1)+j,2,-MAC::cos(eta(i)));
+              surface.area->set_item(k(Nring-1)+j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
            } else if (pole_loc == 1) {
-              point_coord(j,2) = MAC::cos(theta)*MAC::sin(eta(i));
-              point_coord(j,0) = MAC::sin(theta)*MAC::sin(eta(i));
-              point_coord(j,1) = MAC::cos(eta(i));
-              cell_area(j) = 0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.));
+              surface.coordinate->set_item(j,2,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(j,0,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(j,1,MAC::cos(eta(i)));
+              surface.area->set_item(j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
               // For second half of sphere
-              point_coord(k(Nring)+j,2) = point_coord(j,2);
-              point_coord(k(Nring)+j,0) = point_coord(j,0);
-              point_coord(k(Nring)+j,1) = -point_coord(j,1);
-              cell_area(k(Nring)+j) = cell_area(j);
+              surface.coordinate->set_item(k(Nring-1)+j,2,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(k(Nring-1)+j,0,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(k(Nring-1)+j,1,-MAC::cos(eta(i)));
+              surface.area->set_item(k(Nring-1)+j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
            } else if (pole_loc == 0) {
-              point_coord(j,1) = MAC::cos(theta)*MAC::sin(eta(i));
-              point_coord(j,2) = MAC::sin(theta)*MAC::sin(eta(i));
-              point_coord(j,0) = MAC::cos(eta(i));
-              cell_area(j) = 0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.));
+              surface.coordinate->set_item(j,1,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(j,2,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(j,0,MAC::cos(eta(i)));
+              surface.area->set_item(j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
               // For second half of sphere
-              point_coord(k(Nring)+j,1) = point_coord(j,1);
-              point_coord(k(Nring)+j,2) = point_coord(j,2);
-              point_coord(k(Nring)+j,0) = -point_coord(j,0);
-              cell_area(k(Nring)+j) = cell_area(j);
+              surface.coordinate->set_item(k(Nring-1)+j,1,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(k(Nring-1)+j,2,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate->set_item(k(Nring-1)+j,0,-MAC::cos(eta(i)));
+              surface.area->set_item(k(Nring-1)+j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
            }
+	   // Create surface normal vectors
+	   surface.normal->set_item(j,0,surface.coordinate->item(j,0));
+	   surface.normal->set_item(j,1,surface.coordinate->item(j,1));
+	   surface.normal->set_item(j,2,surface.coordinate->item(j,2));
+	   surface.normal->set_item(k(Nring-1)+j,0,surface.coordinate->item(k(Nring-1)+j,0));
+	   surface.normal->set_item(k(Nring-1)+j,1,surface.coordinate->item(k(Nring-1)+j,1));
+	   surface.normal->set_item(k(Nring-1)+j,2,surface.coordinate->item(k(Nring-1)+j,2));
+
+/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," 
+		      << surface.area->item(j) << "," 
+		      << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
+           outputFile << surface.coordinate->item(k(Nring-1)+j,0) << "," << surface.coordinate->item(k(Nring-1)+j,1) << "," << surface.coordinate->item(k(Nring-1)+j,2) << "," << surface.area->item(k(Nring-1)+j) << "," << surface.normal->item(k(Nring-1)+j,0) << "," << surface.normal->item(k(Nring-1)+j,1) << "," << surface.normal->item(k(Nring-1)+j,2) << endl;*/
         }
-     }
+     } 
 
      // Calculation at the ring on pole (i=0)
      double Ri = Rring(0);
@@ -2598,117 +2894,196 @@ DDS_HeatTransfer:: compute_surface_points(class doubleVector& eta, class doubleV
         for (int j=0; j < k(0); j++) {
            theta = theta + d_theta;
            if (pole_loc == 2) {
-              point_coord(j,0) = MAC::cos(theta)*MAC::sin(eta(0));
-              point_coord(j,1) = MAC::sin(theta)*MAC::sin(eta(0));
-              point_coord(j,2) = MAC::cos(eta(0));
-              cell_area(j) = 0.5*d_theta*pow(Ri,2.);
+              surface.coordinate->set_item(j,0,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(j,1,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(j,2,MAC::cos(eta(0)));
+              surface.area->set_item(j,0.5*d_theta*pow(Ri,2.));
               // For second half of sphere
-              point_coord(k(Nring)+j,0) = point_coord(j,0);
-              point_coord(k(Nring)+j,1) = point_coord(j,1);
-              point_coord(k(Nring)+j,2) = -point_coord(j,2);
-              cell_area(k(Nring)+j) = cell_area(j);
+              surface.coordinate->set_item(k(Nring-1)+j,0,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(k(Nring-1)+j,1,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(k(Nring-1)+j,2,-MAC::cos(eta(0)));
+              surface.area->set_item(k(Nring-1)+j,0.5*d_theta*pow(Ri,2.));
            } else if (pole_loc == 1) {
-              point_coord(j,2) = MAC::cos(theta)*MAC::sin(eta(0));
-              point_coord(j,0) = MAC::sin(theta)*MAC::sin(eta(0));
-              point_coord(j,1) = MAC::cos(eta(0));
-              cell_area(j) = 0.5*d_theta*pow(Ri,2.);
+              surface.coordinate->set_item(j,2,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(j,0,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(j,1,MAC::cos(eta(0)));
+              surface.area->set_item(j,0.5*d_theta*pow(Ri,2.));
               // For second half of sphere
-              point_coord(k(Nring)+j,2) = point_coord(j,2);
-              point_coord(k(Nring)+j,0) = point_coord(j,0);
-              point_coord(k(Nring)+j,1) = -point_coord(j,1);
-              cell_area(k(Nring)+j) = cell_area(j);
+              surface.coordinate->set_item(k(Nring-1)+j,2,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(k(Nring-1)+j,0,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(k(Nring-1)+j,1,-MAC::cos(eta(0)));
+              surface.area->set_item(k(Nring-1)+j,0.5*d_theta*pow(Ri,2.));
            } else if (pole_loc == 0) {
-              point_coord(j,1) = MAC::cos(theta)*MAC::sin(eta(0));
-              point_coord(j,2) = MAC::sin(theta)*MAC::sin(eta(0));
-              point_coord(j,0) = MAC::cos(eta(0));
-              cell_area(j) = 0.5*d_theta*pow(Ri,2.);
+              surface.coordinate->set_item(j,1,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(j,2,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(j,0,MAC::cos(eta(0)));
+              surface.area->set_item(j,0.5*d_theta*pow(Ri,2.));
               // For second half of sphere
-              point_coord(k(Nring)+j,1) = point_coord(j,1);
-              point_coord(k(Nring)+j,2) = point_coord(j,2);
-              point_coord(k(Nring)+j,0) = -point_coord(j,0);
-              cell_area(k(Nring)+j) = cell_area(j);
-           }
+              surface.coordinate->set_item(k(Nring-1)+j,1,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(k(Nring-1)+j,2,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate->set_item(k(Nring-1)+j,0,-MAC::cos(eta(0)));
+              surface.area->set_item(k(Nring-1)+j,0.5*d_theta*pow(Ri,2.));
+           } 
+	   // Create surface normal vectors
+	   surface.normal->set_item(j,0,surface.coordinate->item(j,0));
+	   surface.normal->set_item(j,1,surface.coordinate->item(j,1));
+	   surface.normal->set_item(j,2,surface.coordinate->item(j,2));
+	   surface.normal->set_item(k(Nring-1)+j,0,surface.coordinate->item(k(Nring-1)+j,0));
+	   surface.normal->set_item(k(Nring-1)+j,1,surface.coordinate->item(k(Nring-1)+j,1));
+	   surface.normal->set_item(k(Nring-1)+j,2,surface.coordinate->item(k(Nring-1)+j,2));
+/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
+           outputFile << surface.coordinate->item(k(Nring-1)+j,0) << "," << surface.coordinate->item(k(Nring-1)+j,1) << "," << surface.coordinate->item(k(Nring-1)+j,2) << "," << surface.area->item(k(Nring-1)+j) << "," << surface.normal->item(k(Nring-1)+j,0) << "," << surface.normal->item(k(Nring-1)+j,1) << "," << surface.normal->item(k(Nring-1)+j,2) << endl;*/
         }
      } else {
-        if (pole_loc == 2) {
-           point_coord(0,0) = 0.;
-           point_coord(0,1) = 0.;
-           point_coord(0,2) = 1.;
-           cell_area(0) = 0.5*d_theta*pow(Ri,2.);
+        if (pole_loc == 2) { 
+           surface.coordinate->set_item(0,0,0.);
+           surface.coordinate->set_item(0,1,0.);
+           surface.coordinate->set_item(0,2,1.);
+           surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
            // For second half of sphere
-           point_coord(k(Nring),0) = point_coord(0,0);
-           point_coord(k(Nring),1) = point_coord(0,1);
-           point_coord(k(Nring),2) = -point_coord(0,2);
-           cell_area(k(Nring)) = cell_area(0);
+           surface.coordinate->set_item(k(Nring-1),0,0.);
+           surface.coordinate->set_item(k(Nring-1),1,0.);
+           surface.coordinate->set_item(k(Nring-1),2,-1.);
+           surface.area->set_item(k(Nring-1),0.5*d_theta*pow(Ri,2.));
         } else if (pole_loc == 1) {
-           point_coord(0,2) = 0.;
-           point_coord(0,0) = 0.;
-           point_coord(0,1) = 1.;
-           cell_area(0) = 0.5*d_theta*pow(Ri,2.);
+           surface.coordinate->set_item(0,2,0.);
+           surface.coordinate->set_item(0,0,0.);
+           surface.coordinate->set_item(0,1,1.);
+           surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
            // For second half of sphere
-           point_coord(k(Nring),2) = point_coord(0,2);
-           point_coord(k(Nring),0) = point_coord(0,0);
-           point_coord(k(Nring),1) = -point_coord(0,1);
-           cell_area(k(Nring)) = cell_area(0);
+           surface.coordinate->set_item(k(Nring-1),2,0.);
+           surface.coordinate->set_item(k(Nring-1),0,0.);
+           surface.coordinate->set_item(k(Nring-1),1,-1.);
+           surface.area->set_item(k(Nring-1),0.5*d_theta*pow(Ri,2.));
         } else if (pole_loc == 0) {
-           point_coord(0,1) = 0.;
-           point_coord(0,2) = 0.;
-           point_coord(0,0) = 1.;
-           cell_area(0) = 0.5*d_theta*pow(Ri,2.);
+           surface.coordinate->set_item(0,1,0.);
+           surface.coordinate->set_item(0,2,0.);
+           surface.coordinate->set_item(0,0,1.);
+           surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
            // For second half of sphere
-           point_coord(k(Nring),1) = point_coord(0,1);
-           point_coord(k(Nring),2) = point_coord(0,2);
-           point_coord(k(Nring),0) = -point_coord(0,0);
-           cell_area(k(Nring)) = cell_area(0);
-        }
+           surface.coordinate->set_item(k(Nring-1),1,0.);
+           surface.coordinate->set_item(k(Nring-1),2,0.);
+           surface.coordinate->set_item(k(Nring-1),0,-1.);
+           surface.area->set_item(k(Nring-1),0.5*d_theta*pow(Ri,2.));
+        } 
+        // Create surface normal vectors
+        surface.normal->set_item(0,0,surface.coordinate->item(0,0));
+        surface.normal->set_item(0,1,surface.coordinate->item(0,1));
+        surface.normal->set_item(0,2,surface.coordinate->item(0,2));
+        surface.normal->set_item(k(Nring-1),0,surface.coordinate->item(k(Nring-1),0));
+        surface.normal->set_item(k(Nring-1),1,surface.coordinate->item(k(Nring-1),1));
+        surface.normal->set_item(k(Nring-1),2,surface.coordinate->item(k(Nring-1),2));
+/*        outputFile << surface.coordinate->item(0,0) << "," << surface.coordinate->item(0,1) << "," << surface.coordinate->item(0,2) << "," << surface.area->item(0) << "," << surface.normal->item(0,0) << "," << surface.normal->item(0,1) << "," << surface.normal->item(0,2) << endl;
+        outputFile << surface.coordinate->item(k(Nring-1),0) << "," << surface.coordinate->item(k(Nring-1),1) << "," << surface.coordinate->item(k(Nring-1),2) << "," << surface.area->item(k(Nring-1)) << "," << surface.normal->item(k(Nring-1),0) << "," << surface.normal->item(k(Nring-1),1) << "," << surface.normal->item(k(Nring-1),2) << endl;*/
      }
   } else if (dim == 2) {
      double d_theta = 2.*MAC::pi()/Nring;
      double theta = 0.01*d_theta;
      for (int j=0; j < Nring; j++) {
         theta = theta + d_theta;
-        point_coord(j,0) = MAC::cos(theta);
-        point_coord(j,1) = MAC::sin(theta);
-        cell_area(j) = d_theta;
+        surface.coordinate->set_item(j,0,MAC::cos(theta));
+        surface.coordinate->set_item(j,1,MAC::sin(theta));
+        surface.area->set_item(j,d_theta);
+        // Create surface normal vectors
+        surface.normal->set_item(j,0,surface.coordinate->item(j,0));
+        surface.normal->set_item(j,1,surface.coordinate->item(j,1));
+//        outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
      }
   }
+//  outputFile.close();
 }
-
 //---------------------------------------------------------------------------
-void
-DDS_HeatTransfer:: generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& k0, size_t const& Nring)
+void DDS_HeatTransfer:: generate_surface_discretization()
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: generate_discretization_parameter" ) ;
+  MAC_LABEL("DDS_HeatTransfer:: generate_surface_discretization" ) ;
 
-  // Returns the delta eta (i.e. change in zenithal angle) with provided
-  // number of rings for discretization(Nring), number of cell at poles(k0)
-  // and the approximate aspect ratio of individual cells
-  // NOTE: If the desired rings are 10, then the algorithm return 11 rings.
-  // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into
-  // equal-area cells, Computational Geometry 45 (2012) 275-283
+  size_t kmax = (int) Npoints;
 
-  double theta_ref = MAC::pi()/2.;
+  if ( level_set_type == "Sphere" ) {
+     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into 
+     // equal-area cells, Computational Geometry 45 (2012) 275-283
 
-  double p = MAC::pi()*ar;
-  size_t kmax = k0;
+     double theta_ref = MAC::pi()/2.;
 
-  for (size_t i=1; i<Nring; i++) kmax = round(pow(MAC::sqrt(kmax)+MAC::sqrt(p),2.));
+     double p = MAC::pi()/ar;
 
-  // Assigning the maximum number of discretized points to the last element of the array
-  k(Nring) = kmax;
-  // Zenithal angle for the last must be pi/2.
-  eta(Nring) = MAC::pi()/2.;
-  // Radius of last ring in lamber projection plane
-  Rring(Nring) = MAC::sqrt(2.);
+     double eta_temp = MAC::pi()/2.;
+     size_t k_temp = kmax;
+     double Ro_temp = MAC::sqrt(2);
+     double Rn_temp = MAC::sqrt(2);
+     size_t counter = 0; 
 
-  for (int i=Nring-1; i>=0; --i) {
-     eta(i) = eta(i+1) - 2./ar*MAC::sqrt(MAC::pi()/k(i+1))*MAC::sin(eta(i+1)/2.);
-     Rring(i) = 2.*MAC::sin(eta(i)/2.);
-     k(i) = round(k(i+1)*pow(Rring(i)/Rring(i+1),2.));
-     if (i==0) k(0) = k0;
+     // Estimating the number of rings on the hemisphere
+     while (k_temp > (Pmin+2)) {
+        eta_temp = eta_temp - 2./ar*MAC::sqrt(MAC::pi()/k_temp)*MAC::sin(eta_temp/2.);
+        Rn_temp = 2.*MAC::sin(eta_temp/2.);
+        k_temp = round(k_temp*pow(Rn_temp/Ro_temp,2.));
+        Ro_temp = Rn_temp;
+        counter++;
+     }
+
+     size_t Nrings = counter+1;
+
+     // Summation of total discretized points with increase in number of rings radially
+     doubleVector k(Nrings,0.);
+     // Zenithal angle for the sphere
+     doubleVector eta(Nrings,0.);
+     // Radius of the rings in lamber projection plane
+     doubleVector Rring(Nrings,0.);
+
+     // Assigning the maximum number of discretized points to the last element of the array
+     k(Nrings-1) = kmax;
+     // Zenithal angle for the last must be pi/2.
+     eta(Nrings-1) = MAC::pi()/2.;
+     // Radius of last ring in lamber projection plane
+     Rring(Nrings-1) = MAC::sqrt(2.);
+
+     for (int i=Nrings-2; i>=0; --i) {
+        eta(i) = eta(i+1) - 2./ar*MAC::sqrt(MAC::pi()/k(i+1))*MAC::sin(eta(i+1)/2.);
+        Rring(i) = 2.*MAC::sin(eta(i)/2.);
+        k(i) = round(k(i+1)*pow(Rring(i)/Rring(i+1),2.));
+        if (i==0) k(0) = Pmin;
+     } 
+
+     // Discretize the particle surface into approximate equal area cells
+     if (dim == 3) {
+        compute_surface_points_on_sphere(eta, k, Rring, Nrings);
+     } else {
+        compute_surface_points_on_sphere(eta, k, Rring, kmax);
+     }
+  } else if (level_set_type == "Cube") {
+     compute_surface_points_on_cube(kmax);
+  } else if (level_set_type == "Cylinder") {
+     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into 
+     // equal-area cells, Computational Geometry 45 (2012) 275-283
+
+     double p = MAC::pi()/ar;
+     size_t k_temp = kmax;
+     size_t counter = 0; 
+
+     // Estimating the number of rings on either of the disc
+     while (k_temp > (Pmin+2)) {
+        k_temp = round(pow(MAC::sqrt(k_temp) - MAC::sqrt(p),2.));
+        counter++;
+     }
+
+     size_t Nrings = counter+1;
+
+     // Summation of total discretized points with increase in number of rings radially
+     doubleVector k(Nrings,0.);
+     // Assigning the maximum number of discretized points to the last element of the array
+     k(Nrings-1) = kmax;
+
+     for (int i=Nrings-2; i>=0; --i) {
+	k(i) = round(pow(MAC::sqrt(k(i+1)) - MAC::sqrt(p),2.));
+        if (i==0) k(0) = Pmin;
+     } 
+
+     if (dim == 3) {
+        compute_surface_points_on_cylinder(k, Nrings);
+     } 
   }
-
 }
 
 //---------------------------------------------------------------------------
@@ -2740,18 +3115,98 @@ DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, doub
      }
   }
 
+  // Try to add continuous level set function; solver performs better in this case for nodes at interface
   double level_set = 0.;
-  // Type 0 is for circular/spherical solids in 2D/3D system
   if (type == "Sphere") {
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
+  } else if (type == "Ellipsoid") {
+     // Solid object rotation, if any     
+     doubleVector angle(3,0.);
+     angle(0) = -solid.thetap[comp]->item(m,0);
+     angle(1) = -solid.thetap[comp]->item(m,1);
+     angle(2) = -solid.thetap[comp]->item(m,2);
+     rotation_matrix(m,delta,angle);
+     level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
+  } else if (type == "Superquadric") {
+     // Solid object rotation, if any     
+     doubleVector angle(3,0.);
+     angle(0) = -solid.thetap[comp]->item(m,0);
+     angle(1) = -solid.thetap[comp]->item(m,1);
+     angle(2) = -solid.thetap[comp]->item(m,2);
+     rotation_matrix(m,delta,angle);
+     level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
+  } else if (type == "Cube") {
+     // Solid object rotation, if any     
+     doubleVector angle(3,0.);
+     angle(0) = -solid.thetap[comp]->item(m,0);
+     angle(1) = -solid.thetap[comp]->item(m,1);
+     angle(2) = -solid.thetap[comp]->item(m,2);
+     rotation_matrix(m,delta,angle);
+     delta(0) = MAC::abs(delta(0)) - Rp;
+     delta(1) = MAC::abs(delta(1)) - Rp;
+     delta(2) = MAC::abs(delta(2)) - Rp;
+
+     if ((delta(0) < 0.) && (delta(1) < 0.) && (delta(2) < 0.)) {
+        level_set = MAC::min(delta(0),MAC::min(delta(1),delta(2)));
+     } else {
+        level_set = MAC::max(delta(0),MAC::max(delta(1),delta(2)));
+     }
+  } else if (type == "Cylinder") {
+     // Solid object rotation, if any     
+     doubleVector angle(3,0.);
+     angle(0) = -solid.thetap[comp]->item(m,0);
+     angle(1) = -solid.thetap[comp]->item(m,1);
+     angle(2) = -solid.thetap[comp]->item(m,2);
+     rotation_matrix(m,delta,angle);
+
+     level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
+     if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
+        level_set = MAC::abs(MAC::abs(delta(2))-Rp)*level_set;
+     } else {
+        level_set = MAC::max(MAC::abs(MAC::abs(delta(2))-Rp),MAC::abs(level_set));
+     }
   }
 
   return(level_set);
-
 }
 
+//---------------------------------------------------------------------------
+void
+DDS_HeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_HeatTransfer:: rotation_matrix" ) ;
+
+//  PartInput solid = GLOBAL_EQ->get_solid(field);
+
+  double roll = (MAC::pi()/180.)*angle(0);//solid.thetap[comp]->item(m,0);
+  double pitch = (MAC::pi()/180.)*angle(1);//solid.thetap[comp]->item(m,1);
+  double yaw = (MAC::pi()/180.)*angle(2);//solid.thetap[comp]->item(m,2);
+
+  // yaw along z-axis; pitch along y-axis; roll along x-axis
+  doubleArray2D rot_matrix(3,3,0);
+
+  // Rotation matrix assemble
+  rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+  rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+  rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+  rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
+  rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+  rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+  rot_matrix(2,0) = -MAC::sin(pitch);
+  rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
+  rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+
+  double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
+  double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
+  double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
+
+  delta(0) = delta_x;
+  delta(1) = delta_y;
+  delta(2) = delta_z;
+}
 
 //---------------------------------------------------------------------------
 void

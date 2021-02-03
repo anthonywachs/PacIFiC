@@ -117,7 +117,7 @@ public SolverComputingTime
       //@{
       /** @brief Error compared to analytical solution */
       void error_with_analytical_solution_poiseuille ( ) ;
-
+      void error_with_analytical_solution_poiseuille3D ( ) ;
       void error_with_analytical_solution_couette (FV_DiscreteField const* FF, size_t const& field) ;
 
       /** @brief Call the function to assemble 1D matrices for both velocity and pressure field*/
@@ -166,7 +166,6 @@ public SolverComputingTime
 
       double divergence_of_U( size_t const& i, size_t const& j, size_t const& k, size_t const& component, size_t const& level);
 
-
       /** @brief Call functions to assemble rhs for pressure or velocity fields in any direction */
       double assemble_local_rhs(size_t const& j,size_t const& k,double const& gamma,FV_TimeIterator const* t_it,size_t const& comp,size_t const& dir,size_t const& field);
       
@@ -200,11 +199,14 @@ public SolverComputingTime
       void impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
       void impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID );
 
-      void compute_velocity_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np);
-      void compute_fluid_particle_interaction( FV_TimeIterator const* t_it, double const& Np);
-      void compute_pressure_force_on_particle(class doubleArray2D& point_coord, class doubleVector& cell_area, class doubleArray2D& force, size_t const& parID, size_t const& Np);
-      void generate_discretization_parameter(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& k0, size_t const& Nrings);
-      void compute_surface_points(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, class doubleArray2D& point_coord, class doubleVector& cell_area, size_t const& Nrings);
+      void compute_velocity_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
+      void compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void generate_surface_discretization();
+      void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
+      void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
+      void compute_surface_points_on_cube(size_t const& Np);
+      void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
 
       /** @brief Find the interpolation considering the solids affect on the face, used for 2D/3D systems */
       double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);
@@ -227,7 +229,7 @@ public SolverComputingTime
       /** @brief Solve interface unknowns for both fields in any particular direction */
       void solve_interface_unknowns( FV_DiscreteField* FF, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field );
       /** @brief Unpack the interface variable sent by master processor to slave processor */
-      void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p, size_t const& field);
+      void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, size_t const& p, size_t const& field);
       /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */
       void unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p, size_t const& field);
 
@@ -292,6 +294,9 @@ public SolverComputingTime
 
       FV_DiscreteField* PF;
 
+      // Temperature
+      FV_DiscreteField const* TF;
+
       DDS_NSWithHeatTransferSystem* GLOBAL_EQ ;
 
       size_t nb_procs;
@@ -310,24 +315,25 @@ public SolverComputingTime
       struct MPIVar first_pass[2][3];           // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
       struct MPIVar second_pass[2][3];          // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
 
+
       double peclet ;
-      double rho;
       double mu;
       double kai;
       string AdvectionScheme;
-      string DivergenceScheme;
       size_t AdvectionTimeAccuracy;
-
+      double rho;
       bool b_restart ;
-      bool is_firstorder ;
       bool is_solids;
-
+      bool is_par_motion;
       bool is_stressCal;
+      string DivergenceScheme;
+
+      bool is_firstorder ;
+
       double Npoints;
-      size_t Nrings, Pmin, pole_loc;
+      size_t Pmin, pole_loc;
       double ar;
 
-      bool is_par_motion;
       double Amp, freq;
 
       boolVector const* P_periodic_comp;
@@ -338,8 +344,6 @@ public SolverComputingTime
       string level_set_type;
       double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
 
-      // Temperature
-      FV_DiscreteField const* TF;
       DDS_HeatTransfer* Solver_Temperature ;
 
 } ;
