@@ -2641,14 +2641,14 @@ DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle(class doubleArray2D&
   size_t i0_temp;
   double ri=0.;
   bool found = 0;
-
+/*
   ofstream outputFile ;
   std::ostringstream os2;
   os2 << "./DS_results/pressure_drag_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
   outputFile << "x,y,z,p_stress,area,nx,ny,nz" << endl;
-
+*/
   doubleVector point(3,0);
   doubleVector stress(Np,0);
   size_t i0, j0, k0=0;
@@ -2798,9 +2798,9 @@ DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle(class doubleArray2D&
      force(parID,2) = force(parID,2) + stress(i)*rotated_normal(2)*(s_area*scale);
 
 //     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (surface.area->item(i)*scale) << endl;
-     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (s_area*scale) << "," << rotated_normal(0) << "," << rotated_normal(1) << "," << rotated_normal(2) << endl;
+//     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (s_area*scale) << "," << rotated_normal(0) << "," << rotated_normal(1) << "," << rotated_normal(2) << endl;
   }
-  outputFile.close();
+//  outputFile.close();
 }
   
 //---------------------------------------------------------------------------
