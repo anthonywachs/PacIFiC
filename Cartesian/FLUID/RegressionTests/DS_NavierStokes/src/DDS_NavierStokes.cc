@@ -2,6 +2,9 @@
 #include <FV_DomainAndFields.hh>
 #include <FV_DomainBuilder.hh>
 #include <FV_DiscreteField.hh>
+#include "ReaderXML.hh"
+#include "Grains_BuilderFactory.H"
+#include "GrainsCoupledWithFluid.hh"
 #include <DDS_NavierStokesSystem.hh>
 #include <FV_SystemNumbering.hh>
 #include <FV_Mesh.hh>
@@ -153,8 +156,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    if (is_solids) {
       Npart = exp->int_data( "NParticles" ) ;
       insertion_type = exp->string_data( "InsertionType" ) ;
-      MAC_ASSERT( insertion_type == "file" ) ;
-      solid_filename = exp->string_data( "Particle_FileName" ) ;
+      MAC_ASSERT( insertion_type == "file" || insertion_type == "GRAINS" ) ;
       loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
@@ -162,6 +164,15 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
          string error_message="- Cube\n   - Sphere\n   - Cylinder\n   - Superquadric\n   - Ellipsoid\n   - PipeX";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
       }
+
+      // Read the solids filename
+      if (insertion_type == "GRAINS") {
+	 solid_filename = "Grains/Init/insert.xml";
+      } else if (insertion_type == "file") {
+         solid_filename = exp->string_data( "Particle_FileName" );
+      }
+
+      cout << "Particle file name: " << solid_filename << endl;
 
       // Read weather the sress calculation on particle is ON/OFF
       if ( exp->has_entry( "Stress_calculation" ) )
@@ -364,8 +375,17 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    // Generate solid particles if required
    if (is_solids) {
-      Solids_generation(0);
-      Solids_generation(1);
+      if (insertion_type == "file") {
+         Solids_generation(0);
+         Solids_generation(1);
+      } else if (insertion_type == "GRAINS") {
+	 ReaderXML::initialize();
+//         grains = Grains_BuilderFactory::create(0);
+//         grains = Grains_BuilderFactory::createCoupledWithFluid(0,1000,0.1);
+//         string simulation_file_exe = Grains_BuilderFactory::init( solid_filename, my_rank, 1);
+         string simulation_file_exe = Grains_BuilderFactory::init( "Grains/Init/insert.xml", 0, 1);
+
+      }
       node_property_calculation(PF,0);
       node_property_calculation(UF,1);
       nodes_field_initialization(0);

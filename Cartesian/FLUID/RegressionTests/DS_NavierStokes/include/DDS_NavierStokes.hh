@@ -3,6 +3,7 @@
 
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
+#include "Grains.H"
 #include <geomVector.hh>
 #include <computingtime.hh>
 #include <boolVector.hh>
@@ -20,6 +21,7 @@ class FV_DiscreteField ;
 class LA_Vector ;
 class LA_SeqVector ;
 class DDS_NavierStokesSystem ;
+class GrainsCoupledWithFluid ;
 class LA_SeqMatrix ;
 
 /** @brief The Class DDS_NavierStokes.
@@ -338,6 +340,8 @@ public SolverComputingTime
 
       bool is_par_motion;
       double Amp, freq;
+
+      Grains* grains;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;
