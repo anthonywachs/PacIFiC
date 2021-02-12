@@ -994,28 +994,28 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
   } else if (type == "Ellipsoid") {
      // Solid object rotation, if any     
      doubleVector angle(3,0.);
-     angle(0) = -solid.thetap[comp]->item(m,0);
-     angle(1) = -solid.thetap[comp]->item(m,1);
-     angle(2) = -solid.thetap[comp]->item(m,2);
-     rotation_matrix(m,delta,angle);
+     angle(0) = solid.thetap[comp]->item(m,0);
+     angle(1) = solid.thetap[comp]->item(m,1);
+     angle(2) = solid.thetap[comp]->item(m,2);
+     trans_rotation_matrix(m,delta,angle);
      level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
   } else if (type == "Superquadric") {
      // Solid object rotation, if any     
      doubleVector angle(3,0.);
-     angle(0) = -solid.thetap[comp]->item(m,0);
-     angle(1) = -solid.thetap[comp]->item(m,1);
-     angle(2) = -solid.thetap[comp]->item(m,2);
-     rotation_matrix(m,delta,angle);
+     angle(0) = solid.thetap[comp]->item(m,0);
+     angle(1) = solid.thetap[comp]->item(m,1);
+     angle(2) = solid.thetap[comp]->item(m,2);
+     trans_rotation_matrix(m,delta,angle);
      level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Cube") {
      // Solid object rotation, if any     
      doubleVector angle(3,0.);
-     angle(0) = -solid.thetap[comp]->item(m,0);
-     angle(1) = -solid.thetap[comp]->item(m,1);
-     angle(2) = -solid.thetap[comp]->item(m,2);
-     rotation_matrix(m,delta,angle);
+     angle(0) = solid.thetap[comp]->item(m,0);
+     angle(1) = solid.thetap[comp]->item(m,1);
+     angle(2) = solid.thetap[comp]->item(m,2);
+     trans_rotation_matrix(m,delta,angle);
      delta(0) = MAC::abs(delta(0)) - Rp;
      delta(1) = MAC::abs(delta(1)) - Rp;
      delta(2) = MAC::abs(delta(2)) - Rp;
@@ -1028,10 +1028,10 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
   } else if (type == "Cylinder") {
      // Solid object rotation, if any     
      doubleVector angle(3,0.);
-     angle(0) = -solid.thetap[comp]->item(m,0);
-     angle(1) = -solid.thetap[comp]->item(m,1);
-     angle(2) = -solid.thetap[comp]->item(m,2);
-     rotation_matrix(m,delta,angle);
+     angle(0) = solid.thetap[comp]->item(m,0);
+     angle(1) = solid.thetap[comp]->item(m,1);
+     angle(2) = solid.thetap[comp]->item(m,2);
+     trans_rotation_matrix(m,delta,angle);
 
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
      if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
@@ -1047,16 +1047,48 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
 
 //---------------------------------------------------------------------------
 void
+DDS_NSWithHeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: trans_rotation_matrix" ) ;
+
+  double roll = (MAC::pi()/180.)*angle(0);
+  double pitch = (MAC::pi()/180.)*angle(1);
+  double yaw = (MAC::pi()/180.)*angle(2);
+
+  // yaw along z-axis; pitch along y-axis; roll along x-axis
+  doubleArray2D rot_matrix(3,3,0);
+
+  // Rotation matrix assemble
+  rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+  rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+  rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+  rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
+  rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+  rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+  rot_matrix(0,2) = -MAC::sin(pitch);
+  rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
+  rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+
+  double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
+  double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
+  double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
+
+  delta(0) = delta_x;
+  delta(1) = delta_y;
+  delta(2) = delta_z;
+}
+
+//---------------------------------------------------------------------------
+void
 DDS_NSWithHeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NSWithHeatTransfer:: rotation_matrix" ) ;
 
-//  PartInput solid = GLOBAL_EQ->get_solid(field);
-
-  double roll = (MAC::pi()/180.)*angle(0);//solid.thetap[comp]->item(m,0);
-  double pitch = (MAC::pi()/180.)*angle(1);//solid.thetap[comp]->item(m,1);
-  double yaw = (MAC::pi()/180.)*angle(2);//solid.thetap[comp]->item(m,2);
+  double roll = (MAC::pi()/180.)*angle(0);
+  double pitch = (MAC::pi()/180.)*angle(1);
+  double yaw = (MAC::pi()/180.)*angle(2);
 
   // yaw along z-axis; pitch along y-axis; roll along x-axis
   doubleArray2D rot_matrix(3,3,0);

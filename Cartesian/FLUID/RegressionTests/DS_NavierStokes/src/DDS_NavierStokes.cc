@@ -5,6 +5,7 @@
 #include "ReaderXML.hh"
 #include "Grains_BuilderFactory.H"
 #include "GrainsCoupledWithFluid.hh"
+//#include "InterfaceGrains.h"
 #include <DDS_NavierStokesSystem.hh>
 #include <FV_SystemNumbering.hh>
 #include <FV_Mesh.hh>
@@ -375,17 +376,17 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    // Generate solid particles if required
    if (is_solids) {
-      if (insertion_type == "file") {
+//      if (insertion_type == "file") {
          Solids_generation(0);
          Solids_generation(1);
-      } else if (insertion_type == "GRAINS") {
-	 ReaderXML::initialize();
+//      } else if (insertion_type == "GRAINS") {
+//	 ReaderXML::initialize();
 //         grains = Grains_BuilderFactory::create(0);
 //         grains = Grains_BuilderFactory::createCoupledWithFluid(0,1000,0.1);
 //         string simulation_file_exe = Grains_BuilderFactory::init( solid_filename, my_rank, 1);
-         string simulation_file_exe = Grains_BuilderFactory::init( "Grains/Init/insert.xml", 0, 1);
-
-      }
+//	 Init_Grains(100,0,0,0.1,0,0,1);
+//	 Simu_Grains(0,0,0);
+//      }
       node_property_calculation(PF,0);
       node_property_calculation(UF,1);
       nodes_field_initialization(0);
@@ -973,32 +974,31 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
   double level_set = 0.;
   if (type == "Sphere") {
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
-//     level_set = pow(delta(0)/0.4,2.)+pow(delta(1)/0.3,2.)-1.;
   } else if (type == "Ellipsoid") {
      // Solid object rotation, if any	  
      doubleVector angle(3,0.);
-     angle(0) = -solid.thetap[comp]->item(m,0);
-     angle(1) = -solid.thetap[comp]->item(m,1);
-     angle(2) = -solid.thetap[comp]->item(m,2);
-     rotation_matrix(m,delta,angle);
+     angle(0) = solid.thetap[comp]->item(m,0);
+     angle(1) = solid.thetap[comp]->item(m,1);
+     angle(2) = solid.thetap[comp]->item(m,2);
+     trans_rotation_matrix(m,delta,angle);
      level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
   } else if (type == "Superquadric") {
      // Solid object rotation, if any	  
      doubleVector angle(3,0.);
-     angle(0) = -solid.thetap[comp]->item(m,0);
-     angle(1) = -solid.thetap[comp]->item(m,1);
-     angle(2) = -solid.thetap[comp]->item(m,2);
-     rotation_matrix(m,delta,angle);
+     angle(0) = solid.thetap[comp]->item(m,0);
+     angle(1) = solid.thetap[comp]->item(m,1);
+     angle(2) = solid.thetap[comp]->item(m,2);
+     trans_rotation_matrix(m,delta,angle);
      level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Cube") {
      // Solid object rotation, if any	  
      doubleVector angle(3,0.);
-     angle(0) = -solid.thetap[comp]->item(m,0);
-     angle(1) = -solid.thetap[comp]->item(m,1);
-     angle(2) = -solid.thetap[comp]->item(m,2);
-     rotation_matrix(m,delta,angle);
+     angle(0) = solid.thetap[comp]->item(m,0);
+     angle(1) = solid.thetap[comp]->item(m,1);
+     angle(2) = solid.thetap[comp]->item(m,2);
+     trans_rotation_matrix(m,delta,angle);
      delta(0) = MAC::abs(delta(0)) - Rp;
      delta(1) = MAC::abs(delta(1)) - Rp;
      delta(2) = MAC::abs(delta(2)) - Rp;
@@ -1011,10 +1011,10 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
   } else if (type == "Cylinder") {
      // Solid object rotation, if any	  
      doubleVector angle(3,0.);
-     angle(0) = -solid.thetap[comp]->item(m,0);
-     angle(1) = -solid.thetap[comp]->item(m,1);
-     angle(2) = -solid.thetap[comp]->item(m,2);
-     rotation_matrix(m,delta,angle);
+     angle(0) = solid.thetap[comp]->item(m,0);
+     angle(1) = solid.thetap[comp]->item(m,1);
+     angle(2) = solid.thetap[comp]->item(m,2);
+     trans_rotation_matrix(m,delta,angle);
 
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
      if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
@@ -1026,6 +1026,40 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
 
   return(level_set);
 
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes:: trans_rotation_matrix" ) ;
+
+  double roll = (MAC::pi()/180.)*angle(0);
+  double pitch = (MAC::pi()/180.)*angle(1);
+  double yaw = (MAC::pi()/180.)*angle(2);
+
+  // yaw along z-axis; pitch along y-axis; roll along x-axis
+  doubleArray2D rot_matrix(3,3,0);
+
+  // Rotation matrix assemble
+  rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+  rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+  rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+  rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
+  rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+  rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+  rot_matrix(0,2) = -MAC::sin(pitch);
+  rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
+  rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+
+  double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
+  double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
+  double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
+
+  delta(0) = delta_x;
+  delta(1) = delta_y;
+  delta(2) = delta_z;
 }
 
 //---------------------------------------------------------------------------
