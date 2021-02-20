@@ -874,7 +874,9 @@ void GrainsMPI::setPositionParticulesFichier( const PullMode& mode )
     // ulterieurement
     if ( App::isInLocalDomain( &position ) )
     {
-      newPart = new Particule( *particuleClasse );
+      newPart = particuleClasse->createCloneCopy();
+      // Previous implementation: not compatible with the compParticule
+      // newPart = new Particule( *particuleClasse );
       newPart->setPosition( position );
       newPart->setID( id );
       m_composants.Ajouter( newPart );
@@ -1105,7 +1107,9 @@ void GrainsMPI::setPositionParticulesBloc( const PullMode& mode )
 		true );
 
         // Creation de la particule pour insertion ulterieure
-	newPart = new Particule( *particuleClasse );
+        newPart = particuleClasse->createCloneCopy();
+        // Previous implementation: not compatible with the compParticule
+        // newPart = new Particule( *particuleClasse );
         newPart->setPosition( position );
         newPart->setID( id );
         m_composants.Ajouter( newPart );
