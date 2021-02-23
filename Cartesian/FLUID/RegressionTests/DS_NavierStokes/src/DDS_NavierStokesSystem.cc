@@ -456,7 +456,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
                // Presence of solid and only once
                solid[field].coord[comp]->re_initialize(Npart,3);
                solid[field].size[comp]->re_initialize(Npart);
-               solid[field].thetap[comp]->re_initialize(Npart,3);
+               solid[field].thetap[comp]->re_initialize(Npart,9);
                solid[field].vel[comp]->re_initialize(Npart,3);
                solid[field].ang_vel[comp]->re_initialize(Npart,3);
                solid[field].temp[comp]->re_initialize(Npart);

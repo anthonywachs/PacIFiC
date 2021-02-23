@@ -3,7 +3,7 @@
 
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
-#include "Grains.H"
+#include "GrainsCoupledWithFluid.hh"
 #include <geomVector.hh>
 #include <computingtime.hh>
 #include <boolVector.hh>
@@ -189,6 +189,8 @@ public SolverComputingTime
       size_t return_row_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
 
       void Solids_generation (size_t const& field);
+      void initialize_GRAINS( void );
+      void import_par_info( size_t const& field, istringstream &is );
 
       void node_property_calculation (FV_DiscreteField const* FF, size_t const& field );
 
@@ -214,8 +216,8 @@ public SolverComputingTime
       void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
       void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
       void compute_surface_points_on_cube(size_t const& Np);
-      void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
-      void trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
+      void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field);
+      void trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field);
 
       /** @brief Find the interpolation considering the solids affect on the face, used for 2D/3D systems */
       double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);
@@ -342,7 +344,7 @@ public SolverComputingTime
       bool is_par_motion;
       double Amp, freq;
 
-      Grains* grains;
+      GrainsCoupledWithFluid* grains;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;

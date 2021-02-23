@@ -120,6 +120,14 @@ public:
 void WriteParticulesInFluid(list<Particule*> const& particules,
            list<Obstacle*> const& obstaclesToFluid, BasiliskDataStructure * b) const;
 
+   /**
+   @brief Method outputs the particle details in istringstream 
+   @param particules vecteur contenant l'ensemble des particules sur tous
+   les processeurs
+   @param is structure Direction Splitting
+*/
+void WriteParticulesInDSFluid(list<Particule*> const& particules,
+	istringstream &is ) const;
 
 
 /**

@@ -767,6 +767,14 @@ void GrainsCoupledWithFluid::WriteParticulesInFluid( istringstream &is ) const
     	m_composants.getObstaclesToFluid(), is );
 }
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+void GrainsCoupledWithFluid::WriteParticulesInDSFluid( istringstream &is ) const
+{
+  if ( m_processorIsActiv )
+    m_InterfaceFluide->WriteParticulesInDSFluid(
+    	*m_composants.getParticulesActives(), is );
+}
+
 
 
 

@@ -541,6 +541,58 @@ void InterfaceFluide2D::WritePVGCInFluid(
   is.str( particles_velpos.rdbuf()->str() );
 }
 
+// ============================================================================
+// Sequential version to write particle data in istringstream for the 
+// use in Direction Splitting solver
+// Added by Aashish Goyal, Feb 2021
+void InterfaceFluide2D::WriteParticulesInDSFluid(
+	list<Particule*> const& particules,
+	istringstream &is ) const
+{
+  ostringstream particles_features;
+
+  particles_features.precision(10);
+  list<Particule*>::const_iterator particule;
+  Vecteur const* vitesseT;
+  Vecteur const* vitesseR;
+  Point const* centre;
+//  Quaternion const* qrot;
+  Matrix orient;
+  Scalar masseVol, masse;
+
+  for (particule=particules.begin();
+      particule!=particules.end(); particule++)
+  {
+    if ( (*particule)->getActivity() == COMPUTE
+    	&& (*particule)->getID() >= 0 )
+    {
+      // Informations : donnees de la particule
+      vitesseT = (*particule)->getVitesseTranslation();
+      vitesseR = (*particule)->getVitesseRotation();
+      masseVol = (*particule)->getMasseVolumique();
+      masse    = (*particule)->getMasse();
+      centre   = (*particule)->getPosition();
+//      qrot     = (*particule)->getRotation();
+      orient   = (*particule)->getForme()->getOrientation();      
+
+      particles_features << "P" << '\t'
+	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'
+	<< masseVol       <<'\t'<< masse          <<'\t'
+//	<< (*qrot)[0]     <<'\t'<< (*qrot)[1]     <<'\t'<< (*qrot)[2]     <<'\t'<< (*qrot)[3]    <<'\t'
+	<< (*vitesseT)[X] <<'\t'<< (*vitesseT)[Y] <<'\t'
+	<< (*vitesseR)[Z] <<
+	endl;
+
+      particles_features << "O" << '\t'
+        << (orient)[0][0]   <<'\t'<< (orient)[0][1]   <<'\t'<< (orient)[0][2]   <<'\t'
+        << (orient)[1][0]   <<'\t'<< (orient)[1][1]   <<'\t'<< (orient)[1][2]   <<'\t'
+        << (orient)[2][0]   <<'\t'<< (orient)[2][1]   <<'\t'<< (orient)[2][2]   <<'\t'
+        << endl;
+
+    }
+  }
+  is.str( particles_features.rdbuf()->str() );
+}
 
 // ============================================================================
 // Version sequentielle avec ecriture dans une structure de donne

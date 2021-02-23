@@ -4,8 +4,6 @@
 #include <FV_DiscreteField.hh>
 #include "ReaderXML.hh"
 #include "Grains_BuilderFactory.H"
-#include "GrainsCoupledWithFluid.hh"
-//#include "InterfaceGrains.h"
 #include <DDS_NavierStokesSystem.hh>
 #include <FV_SystemNumbering.hh>
 #include <FV_Mesh.hh>
@@ -168,12 +166,12 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
 
       // Read the solids filename
       if (insertion_type == "GRAINS") {
-	 solid_filename = "Grains/Init/insert.xml";
+	 solid_filename = "Grains/simul.xml";
       } else if (insertion_type == "file") {
          solid_filename = exp->string_data( "Particle_FileName" );
       }
 
-      cout << "Particle file name: " << solid_filename << endl;
+//      cout << "Particle file name: " << solid_filename << endl;
 
       // Read weather the sress calculation on particle is ON/OFF
       if ( exp->has_entry( "Stress_calculation" ) )
@@ -376,17 +374,33 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    // Generate solid particles if required
    if (is_solids) {
-//      if (insertion_type == "file") {
+      if (insertion_type == "file") {
          Solids_generation(0);
          Solids_generation(1);
-//      } else if (insertion_type == "GRAINS") {
-//	 ReaderXML::initialize();
-//         grains = Grains_BuilderFactory::create(0);
-//         grains = Grains_BuilderFactory::createCoupledWithFluid(0,1000,0.1);
-//         string simulation_file_exe = Grains_BuilderFactory::init( solid_filename, my_rank, 1);
-//	 Init_Grains(100,0,0,0.1,0,0,1);
-//	 Simu_Grains(0,0,0);
-//      }
+      } else if (insertion_type == "GRAINS") {
+         // Create a stringstream to store particle information
+	 string temp_string;
+
+	 if (my_rank == 0) {
+	    // Calls all the required function to activate GRAINS and insert particle        	      
+            initialize_GRAINS();
+            // Storing the particle data from GRAINS in particle_info
+            istringstream local_par_info;
+            grains->WriteParticulesInDSFluid(local_par_info);
+//	    cout << "Output: " << "\n" << local_par_info.str() << endl;
+	    // Convert to string for MPI
+	    temp_string = local_par_info.str();
+	 }
+
+	 // Broadcasting the particle info from root(0) to rest of the processor
+	 pelCOMM->broadcast(temp_string,0);
+
+	 // Convert string to istringstream
+	 istringstream global_par_info(temp_string);
+	 // Import particle information in FLUID
+	 import_par_info(0,global_par_info);
+	 import_par_info(1,global_par_info);
+      }
       node_property_calculation(PF,0);
       node_property_calculation(UF,1);
       nodes_field_initialization(0);
@@ -394,8 +408,8 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
       nodes_field_initialization(3);
       if (dim == 3) nodes_field_initialization(4);
       if (is_stressCal) {
-        // Generate discretization of surface in approximate equal area
-        generate_surface_discretization ();
+         // Generate discretization of surface in approximate equal area
+         generate_surface_discretization ();
       }
    }
 
@@ -406,6 +420,182 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
 
    stop_total_timer() ;
+
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: import_par_info( size_t const& field, istringstream &is )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokes:: import_par_info" ) ;
+
+   // Structure of particle input data
+   PartInput solid = GLOBAL_EQ->get_solid(field);
+
+   string line;
+   istringstream lineStream;
+   string cell;
+   int counter = -1;
+   double Rp,Tp;
+
+   // Ensure that the getline ALWAYS reads from start of the string
+   is.clear();
+   is.seekg(0);
+
+   // read lines
+   while (getline(is, line)) {
+      lineStream.clear();
+      lineStream.str(line);
+
+      // read first word in a line
+      getline(lineStream, cell, '\t');
+
+      if (cell == "P") {
+         counter++;
+
+         // Extracting position
+         getline(lineStream, cell, '\t');
+         double xp = stod(cell);
+         getline(lineStream, cell, '\t');
+         double yp = stod(cell);
+         getline(lineStream, cell, '\t');
+         double zp = stod(cell);
+         // Extracting Density
+         getline(lineStream, cell, '\t');
+         double par_rho = stod(cell);
+         // Extracting mass
+         getline(lineStream, cell, '\t');
+         double par_mass = stod(cell);
+         // Extracting velocity
+         getline(lineStream, cell, '\t');
+         double vx = stod(cell);
+         getline(lineStream, cell, '\t');
+         double vy = stod(cell);
+         getline(lineStream, cell, '\t');
+         double vz = stod(cell);
+         // Extracting rotational velocity
+         getline(lineStream, cell, '\t');
+         double wx = stod(cell);
+         getline(lineStream, cell, '\t');
+         double wy = stod(cell);
+         getline(lineStream, cell, '\t');
+         double wz = stod(cell);
+
+	 // Radius calculation
+         if (level_set_type == "Sphere") {
+            Rp = pow((3./4./MAC::pi())*(par_mass/par_rho),1./3.);
+	 } else if (level_set_type == "Cube") {
+            Rp = pow(par_mass/par_rho,1./3.)/2.;
+	 }
+/*
+	 cout << "Particle info: " << xp << "," << yp << "," << zp << "," 
+		 		   << vx << "," << vy << "," << vz << "," 
+		 		   << wx << "," << wy << "," << wz << "," 
+		 		   << Rp << endl; 
+*/
+	 // Storing the information in particle structure
+         for (size_t comp=0;comp<nb_comps[field];comp++) {
+            solid.coord[comp]->set_item(counter,0,xp);
+            solid.coord[comp]->set_item(counter,1,yp);
+            solid.coord[comp]->set_item(counter,2,zp);
+            solid.size[comp]->set_item(counter,Rp);
+            solid.vel[comp]->set_item(counter,0,vx);
+            solid.vel[comp]->set_item(counter,1,vy);
+            solid.vel[comp]->set_item(counter,2,vz);
+            solid.ang_vel[comp]->set_item(counter,0,wx);
+            solid.ang_vel[comp]->set_item(counter,1,wy);
+            solid.ang_vel[comp]->set_item(counter,2,wz);
+            solid.temp[comp]->set_item(counter,Tp);
+            solid.inside[comp]->set_item(counter,1);
+         }
+      } else if (cell == "O") {
+         // Extracting Orientation Matrix
+         getline(lineStream, cell, '\t');
+         double txx = stod(cell);
+         getline(lineStream, cell, '\t');
+         double txy = stod(cell);
+         getline(lineStream, cell, '\t');
+         double txz = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tyx = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tyy = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tyz = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tzx = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tzy = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tzz = stod(cell);
+/*
+	 cout << "Orientation info: " << txx << "," << txy << "," << txz << "," 
+		 	              << tyx << "," << tyy << "," << tyz << "," 
+		 	              << tzx << "," << tzy << "," << tzz << endl; 
+*/
+         // Storing the information in particle structure
+         for (size_t comp=0;comp<nb_comps[field];comp++) {
+            solid.thetap[comp]->set_item(counter,0,txx);
+            solid.thetap[comp]->set_item(counter,1,txy);
+            solid.thetap[comp]->set_item(counter,2,txz);
+            solid.thetap[comp]->set_item(counter,3,tyx);
+            solid.thetap[comp]->set_item(counter,4,tyy);
+            solid.thetap[comp]->set_item(counter,5,tyz);
+            solid.thetap[comp]->set_item(counter,6,tzx);
+            solid.thetap[comp]->set_item(counter,7,tzy);
+            solid.thetap[comp]->set_item(counter,8,tzz);
+         }
+      }
+   }
+
+   // Make sure the number of particle in GRAINS and FLUID are same
+   MAC_ASSERT( (counter+1) == Npart ) ;
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: initialize_GRAINS( void )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokes:: initialize_GRAINS" ) ;
+
+   // Initialize the XML reader
+   ReaderXML::initialize();
+
+   // Initialize the grains builder factory
+   string simulation_file_exe = Grains_BuilderFactory::init( solid_filename, my_rank, 1);
+
+   // Start reading the inputs
+   DOMElement* rootNode = ReaderXML::getRoot (simulation_file_exe);
+
+   // Create an object of derived createCoupledWithFluid
+   grains = Grains_BuilderFactory::createCoupledWithFluid (rootNode, rho, 0.01);
+
+   //	 if ( b_restart ) grains->setReloadSame();
+
+   // Construct the DEM 
+   grains->Construction (rootNode);
+
+   // Force activation 
+   grains->Forces (rootNode);
+	
+   // DEM events, if any
+   grains->Chargement (rootNode);
+
+   // Initialize post processing to store output files
+   grains->InitialPostProcessing();
+
+   // Do particle simulation
+   grains->Simulation (0,1,0);
+
+   // Store the data in Paraview output
+   grains->doPostProcessing();
+
+   // Terminate XML reader
+   ReaderXML::terminate();
+
+//   grains->checkParaviewPostProcessing( "grains", "./Grains/Res", true ) ;
 
 }
 
@@ -980,7 +1170,7 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      angle(0) = solid.thetap[comp]->item(m,0);
      angle(1) = solid.thetap[comp]->item(m,1);
      angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta,angle,comp,field);
      level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
   } else if (type == "Superquadric") {
      // Solid object rotation, if any	  
@@ -988,7 +1178,7 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      angle(0) = solid.thetap[comp]->item(m,0);
      angle(1) = solid.thetap[comp]->item(m,1);
      angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta,angle,comp,field);
      level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
@@ -998,7 +1188,7 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      angle(0) = solid.thetap[comp]->item(m,0);
      angle(1) = solid.thetap[comp]->item(m,1);
      angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta,angle,comp,field);
      delta(0) = MAC::abs(delta(0)) - Rp;
      delta(1) = MAC::abs(delta(1)) - Rp;
      delta(2) = MAC::abs(delta(2)) - Rp;
@@ -1014,7 +1204,7 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      angle(0) = solid.thetap[comp]->item(m,0);
      angle(1) = solid.thetap[comp]->item(m,1);
      angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta,angle,comp,field);
 
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
      if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
@@ -1030,28 +1220,41 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
+DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: trans_rotation_matrix" ) ;
 
-  double roll = (MAC::pi()/180.)*angle(0);
-  double pitch = (MAC::pi()/180.)*angle(1);
-  double yaw = (MAC::pi()/180.)*angle(2);
+  PartInput solid = GLOBAL_EQ->get_solid(field);
 
   // yaw along z-axis; pitch along y-axis; roll along x-axis
   doubleArray2D rot_matrix(3,3,0);
 
   // Rotation matrix assemble
-  rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-  rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-  rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
-  rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
-  rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-  rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
-  rot_matrix(0,2) = -MAC::sin(pitch);
-  rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
-  rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  if (insertion_type == "file") {
+     double roll = (MAC::pi()/180.)*solid.thetap[comp]->item(m,0);
+     double pitch = (MAC::pi()/180.)*solid.thetap[comp]->item(m,1);
+     double yaw = (MAC::pi()/180.)*solid.thetap[comp]->item(m,2);
+     rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+     rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+     rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+     rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
+     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+     rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+     rot_matrix(0,2) = -MAC::sin(pitch);
+     rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
+     rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  } else if (insertion_type == "GRAINS") {
+     rot_matrix(0,0) = solid.thetap[comp]->item(m,0);
+     rot_matrix(1,0) = solid.thetap[comp]->item(m,1);
+     rot_matrix(2,0) = solid.thetap[comp]->item(m,2);
+     rot_matrix(0,1) = solid.thetap[comp]->item(m,3);
+     rot_matrix(1,1) = solid.thetap[comp]->item(m,4);
+     rot_matrix(2,1) = solid.thetap[comp]->item(m,5);
+     rot_matrix(0,2) = solid.thetap[comp]->item(m,6);
+     rot_matrix(1,2) = solid.thetap[comp]->item(m,7);
+     rot_matrix(2,2) = solid.thetap[comp]->item(m,8);
+  }
 
   double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
   double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
@@ -1064,30 +1267,41 @@ DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& d
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
+DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: rotation_matrix" ) ;
 
-//  PartInput solid = GLOBAL_EQ->get_solid(field);
-
-  double roll = (MAC::pi()/180.)*angle(0);//solid.thetap[comp]->item(m,0);
-  double pitch = (MAC::pi()/180.)*angle(1);//solid.thetap[comp]->item(m,1);
-  double yaw = (MAC::pi()/180.)*angle(2);//solid.thetap[comp]->item(m,2);
+  PartInput solid = GLOBAL_EQ->get_solid(field);
 
   // yaw along z-axis; pitch along y-axis; roll along x-axis
   doubleArray2D rot_matrix(3,3,0);
 
   // Rotation matrix assemble
-  rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-  rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-  rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
-  rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
-  rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-  rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
-  rot_matrix(2,0) = -MAC::sin(pitch);
-  rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
-  rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  if (insertion_type == "file") {
+     double roll = (MAC::pi()/180.)*solid.thetap[comp]->item(m,0);
+     double pitch = (MAC::pi()/180.)*solid.thetap[comp]->item(m,1);
+     double yaw = (MAC::pi()/180.)*solid.thetap[comp]->item(m,2);
+     rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+     rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+     rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+     rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
+     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+     rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+     rot_matrix(2,0) = -MAC::sin(pitch);
+     rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
+     rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  } else if (insertion_type == "GRAINS") {
+     rot_matrix(0,0) = solid.thetap[comp]->item(m,0);
+     rot_matrix(0,1) = solid.thetap[comp]->item(m,1);
+     rot_matrix(0,2) = solid.thetap[comp]->item(m,2);
+     rot_matrix(1,0) = solid.thetap[comp]->item(m,3);
+     rot_matrix(1,1) = solid.thetap[comp]->item(m,4);
+     rot_matrix(1,2) = solid.thetap[comp]->item(m,5);
+     rot_matrix(2,0) = solid.thetap[comp]->item(m,6);
+     rot_matrix(2,1) = solid.thetap[comp]->item(m,7);
+     rot_matrix(2,2) = solid.thetap[comp]->item(m,8);
+  }
 
   double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
   double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
@@ -2737,7 +2951,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
         angle(1) = solid.thetap[comp]->item(parID,1);
         angle(2) = solid.thetap[comp]->item(parID,2);
 
-        rotation_matrix(parID,rotated_coord,angle);
+        rotation_matrix(parID,rotated_coord,angle,comp,0);
 
         point(0) = xp + rotated_coord(0);
         point(1) = yp + rotated_coord(1);
@@ -2747,7 +2961,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
 	rotated_normal(0) = s_nx;
 	rotated_normal(1) = s_ny;
 	rotated_normal(2) = s_nz;
-        rotation_matrix(parID,rotated_normal,angle);
+        rotation_matrix(parID,rotated_normal,angle,comp,0);
 
       	// Displacement correction in case of periodic boundary condition in any or all directions
         for (size_t dir=0;dir<dim;dir++) {
@@ -3498,7 +3712,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
         angle(1) = solid.thetap[comp]->item(parID,1);
         angle(2) = solid.thetap[comp]->item(parID,2);
 
-        rotation_matrix(parID,rotated_coord,angle);
+        rotation_matrix(parID,rotated_coord,angle,comp,1);
 
         xpoint(0) = xp + rotated_coord(0);
         ypoint(0) = yp + rotated_coord(1);
@@ -3509,7 +3723,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
 	rotated_normal(1) = surface.normal->item(i,1);
 	rotated_normal(2) = surface.normal->item(i,2);
 
-	rotation_matrix(parID,rotated_normal,angle);
+	rotation_matrix(parID,rotated_normal,angle,comp,1);
 
         if (is_periodic[1][0]) {
            double isize = UF->primary_grid()->get_main_domain_max_coordinate(0) - UF->primary_grid()->get_main_domain_min_coordinate(0);

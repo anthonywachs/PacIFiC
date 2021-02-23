@@ -117,6 +117,14 @@ public:
 
   virtual void WriteParticulesInFluid(list<Particule*> const& particules,list<Obstacle*> const& obstaclesToFluid, BasiliskDataStructure * b) const = 0;
 
+  /**
+  @brief Write particle data from grains to Direction Splitting NS solver
+  @param particules vecteur contenant l'ensemble des particules sur tous
+   les processeurs
+  @param is structure DS
+  */
+
+  virtual void WriteParticulesInDSFluid(list<Particule*> const& particules, istringstream &is ) const = 0;
 
   /** @brief Mise � jour de la vitesse des particules par Basilisk.
   @param particules liste des particules

@@ -93,6 +93,9 @@ public:
   @param is flux d'entr�e */
   virtual void WriteParticulesInFluid( istringstream &is ) const;
 
+  /** @brief Ecriture des particules dans un flux for direction splitting
+  @param is flux d'entr�e */
+  virtual void WriteParticulesInDSFluid( istringstream &is ) const;
 
   /** @brief Ecriture des particules dans une structure Basilisk
   @param is structure Basilisk d'entr�e */
