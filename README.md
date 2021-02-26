@@ -47,9 +47,10 @@ To install HYPRE 2.10.1, copy and paste the following:
 cd $MACWORLD_ROOT
 wget https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods/download/hypre-2.10.1.tar.gz
 tar -zxvf hypre-2.10.1.tar.gz
-cd hypre-2.10.1/src
-./configure
-make install
+cd hypre-2.10.1/
+cp ../extra_files/*hypre* ./
+source ${PACIFIC_HOME}/Env/PacIFiC-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+./install-hypre.sh
 ```
 
 Now, to install PETSc 3.2.0, copy and paste the following:
@@ -59,18 +60,9 @@ wget http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.2-p7.tar.gz
 tar -zxvf petsc-3.2-p7.tar.gz
 mv petsc-3.2-p7 petsc-3.2.0-p7
 cd petsc-3.2.0-p7
-./configure
-```
-The bulding command for PETSc is being provided by the output of the `./configure`, it should look like: 
-```
-Configure stage complete. Now build PETSc libraries with (cmake build):
-    make PETSC_DIR=[your path to PETSc] PETSC_ARCH=arch-linux2-c-debug all
-```
-   
-Follow the instruction: copy and paste the second line. After this is completed, copy and paste the test to make sure the installation was successful:
-
-```
-make PETSC_DIR=[your path to PETSc] PETSC_ARCH=arch-linux2-c-debug test
+cp ../extra_files/*petsc* ./
+source ${PACIFIC_HOME}/Env/PacIFiC-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+./install-petsc.sh
 ```
 
 If no error arises, you just installed the two state-of-the-art libraries for high-performance linear algebra manipulations! Just remove the compressed files:
@@ -90,7 +82,7 @@ cd $BASILISK
 ```
 
 
-### 4. Build everything!
+### 4. Install Grains3D
 * To build the DEM solver Grains3D, assuming you do not already have Xerces 2.8.0, type:
 ```
 cd $GRAINS_HOME
@@ -100,12 +92,19 @@ make install
 It is possible that you get an error during the make install due to the missing file `zlib.h`. On Ubuntu (18.04), the development package of the zlib library can be installed with the command `sudo apt install zlib1g-dev`. Once the installation is complete, simply run the `make` command (there is no need for a make install at this point). It is also possible that the `mpicxx` executable is not found. In that case, it is most likely that the installed mpi libraries are standard. Grains3D requires the development package instead. If you use openmpi on Ubuntu (18.04), type `sudo apt install libopenmpi-dev`, and then try `make install` again.
 
 
-* To build the Cartesian solver, type:
+### 5. Install Cartesian solver:
+* Build the MAC library required for fluid solver using following commands:
 ```
 cd $MACWORLD_ROOT/MAC
-[to be completed]
+./install-mac.sh
 ```
 
+* After the successful installation of MAC library, now let's install multiple numerical schemes to solve fluid:
+```
+cd ${PACIFIC_HOME}/Cartesian/FLUID
+./compil
+```
+It's done, now we have a fully functional PacIFiC.
 
 ## II. Usage
 To be completed soon.
