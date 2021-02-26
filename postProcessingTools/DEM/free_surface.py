@@ -1,9 +1,11 @@
 import os
 import sys
 import numpy as np
+from math import *
 import skimage
 from skimage import *
 from scipy import ndimage
+import scipy
 import matplotlib.pyplot as plt
 from cmdLineArguments import *
 
@@ -11,10 +13,10 @@ sys.path.append('./')
 
 # Some variable that could change from one application to another
 WIDTH = 20  # the width of the channel is 20cm
-MIN_INTENSITY_DEFAULT = 0.01
+MIN_INTENSITY_DEFAULT = 0.1
 pvpython_path = ('/home/damien/softwares/ParaView-5.8.0-RC1-MPI-Linux-Python3.7'
     +'-64bit/bin/pvpython')
-generate_frames_path = '$PP_HOME/DEM/generate_first_last_frames.py'
+generate_frames_path = '/home/damien/phd/pacific/postProcessingTools/DEM/generate_first_last_frames.py'
 
 def smooth(y, box_pts):
     box = np.ones(box_pts)/box_pts
@@ -86,6 +88,24 @@ def set_origin_axes(first_frame):
     x_origin=np.argmax(first_frame[y_origin-1,:])+1
     return(x_origin,y_origin)
 
+def set_origin_axes_depth(first_frame):
+    first_frame = first_frame[:,:,0]
+    nbr,nbc=np.shape(first_frame)
+    negative_x=True
+    c=0
+    color=False
+    while negative_x and c<nbc:
+        c+=1
+        pixel_i = nbr-1
+        while color==False and pixel_i>=0:
+            if first_frame[pixel_i,c]>0:
+                negative_x = False
+                color = True
+            pixel_i-=1
+    x_origin = c
+    y_origin = pixel_i+1
+    return(x_origin,y_origin)
+
 def set_unit_length(first_frame,x0,y0,length,direction="side"):
     first_frame = first_frame[:y0,x0:,0]
     nbr,nbc=np.shape(first_frame)
@@ -125,6 +145,46 @@ def analyze_first_frame(first_frame_side_path,L0):
     H0=(y0-np.mean(y_t0))*pixel_length
     return(x0, y0, pixel_length, H0, my_initial_first_frame, x_t0, y_t0)
 
+def analyze_frame_depth(first_frame_depth_path,L0,plot):
+    my_first_frame=io.imread(first_frame_depth_path)
+    (x0,y0)=set_origin_axes_depth(my_first_frame)
+    pixel_length,nb_white_pixels_t0=set_unit_length(my_first_frame,x0,y0,L0)
+    #
+    my_first_frame = my_first_frame[:,:,0]
+    nbc,nbr = np.shape(my_first_frame)
+
+    xmax = int(x0+L0/pixel_length)
+    raw_heights = []
+    x_t0 = []
+    for c in range(x0+1, xmax-1):
+        r = 0
+        color = False
+        while r<y0+1 and color==False:
+            if (my_first_frame[r,c])>0:
+                color = True
+            r+=1
+        raw_heights.append(r-1)
+        x_t0.append(c)
+    x_t0 = np.array(x_t0)-x0
+    raw_heights = np.array(raw_heights)
+    H0 = (y0-np.mean(raw_heights))*pixel_length
+    Q1 = np.percentile(raw_heights,25)
+    Q3 = np.percentile(raw_heights,75)
+    H0_min = (y0-(Q1))*pixel_length
+    H0_max = (y0-(Q3))*pixel_length
+    if plot:
+        frame_size = 50
+        f, (ax1) = plt.subplots(1,1)
+        # ax1.imshow(my_first_frame[:y0+frame_size,x0-frame_size:xmax+frame_size],cmap='gray',extent=[-frame_size*pixel_length,width*pixel_length,-frame_size*pixel_length,(y0)*pixel_length])
+        ax1.imshow(my_first_frame[:y0+frame_size,x0-frame_size:xmax+frame_size],cmap='gray',extent=[-frame_size*pixel_length,width+frame_size*pixel_length,-frame_size*pixel_length,(y0)*pixel_length])
+        # ax1.plot(x_t0,raw_heights,color='red')
+        ax1.plot((x_t0+1)*pixel_length,np.ones(len(x_t0))*H0,'-',color='red')
+        ax1.plot((x_t0+1)*pixel_length,np.ones(len(x_t0))*H0_min,':',color='red')
+        ax1.plot((x_t0+1)*pixel_length,np.ones(len(x_t0))*H0_max,':',color='red')
+        plt.xlabel("depth (cm)")
+        plt.ylabel("height (cm)")
+    return(x0, y0, pixel_length, H0, H0_min, H0_max)
+
 def analyze_first_frame_top(first_frame_top_path):
     my_first_frame=io.imread(first_frame_top_path)
     v_intensity,c0,cf = compute_vertical_intensity(my_first_frame)
@@ -134,7 +194,7 @@ def analyze_first_frame_top(first_frame_top_path):
     return(c0,cf,r0,rf,pixel_length_top,L0_top)
 
 def analyze_last_frame_top(last_frame_top_path, pixel_length, c0, r0, rf,
-    rootfolderpath):
+    rootfolderpath, plot):
     my_last_frame=io.imread(last_frame_top_path)[r0:rf,c0:,0]
     nbr,nbc = np.shape(my_last_frame)
     intensity = np.zeros(nbc)
@@ -149,14 +209,28 @@ def analyze_last_frame_top(last_frame_top_path, pixel_length, c0, r0, rf,
             L_infinity = col*pixel_length
         col += 1
 
-    f, (ax1) = plt.subplots(1,1)
-    x = np.linspace(0,nbc*pixel_length,nbc)
-    ax1.imshow(my_last_frame,cmap='gray',extent=[0,nbc*pixel_length,0,width])
-    ax1.plot(x, intensity*width,color='red')
-    ax1.plot([L_infinity,L_infinity], [0,width],color='red',linestyle="--")
-    ax1.set_xlabel("x (cm)")
-    ax1.set_ylabel("y (cm)")
-    plt.suptitle(rootfolderpath)
+    if plot:
+        # f, (ax1) = plt.subplots(1,1)
+        # x = np.linspace(0,nbc*pixel_length,nbc)
+        # ax1.imshow(my_last_frame,cmap='gray',extent=[0,nbc*pixel_length,0,width])
+        # ax1.set_xlabel("x (cm)")
+        # ax1.set_ylabel("y (cm)")
+        # ax2=ax1.twinx()
+        # # ax2.plot(x, intensity*width,color='red')
+        # ax2.plot(x, 100*intensity,color='red')
+        # ax2.plot([L_infinity,L_infinity], [0,100],color='red',linestyle="--")
+        # ax2.yaxis.label.set_color('red')
+        # ax2.tick_params(colors='red', which='both')
+        # ax2.set_ylabel("Intensity")
+        # plt.suptitle(rootfolderpath)
+        f, (ax1) = plt.subplots(1,1)
+        x = np.linspace(0,nbc*pixel_length,nbc)
+        ax1.imshow(my_last_frame,cmap='gray',extent=[0,nbc*pixel_length,0,width])
+        ax1.plot(x, intensity*width,color='red',linewidth=1)
+        ax1.plot([L_infinity,L_infinity], [0,width],color='red',linestyle="--")
+        ax1.set_xlabel("width (cm)")
+        ax1.set_ylabel("depth (cm)")
+        plt.suptitle(rootfolderpath)
     return L_infinity
 
 
@@ -230,35 +304,41 @@ def plot_free_surfaces(initial_image,my_initial_first_frame,x_t0,y_t0,x,y,
 my_args = cmdLineArgs()
 my_args.add_cmd_arg("run_paraview","run_pv")
 my_args.add_cmd_arg("width","width")
+my_args.add_cmd_arg("quiet","quiet")
+my_args.add_cmd_arg("plot","plot")
 my_args.add_cmd_arg("runout_intensity","runout_intensity")
 my_args.read_cmd_args()
 run_pv = True if my_args.get_attribute("run_paraview")=="yes" else False
+quiet = True if my_args.get_attribute("quiet")=="yes" else False
 width = float(my_args.get_attribute("width")) if my_args.get_attribute("width")!=None else WIDTH
 runout_intensity =  float(my_args.get_attribute("runout_intensity")) if my_args.get_attribute("runout_intensity")!=None else MIN_INTENSITY_DEFAULT
+plot = True if my_args.get_attribute("plot")=="yes" else False
 
-output_file_path1 = "/home/damien/phd/dem/physics/fig3.10/damien.csv"
-output_file1 = open(output_file_path1,"w")
+# output_file_path1 = "/home/damien/phd/dem/physics/fig3.10/damien.csv"
+# output_file1 = open(output_file_path1,"w")
+#
+# output_file_path2 = "/home/damien/phd/dem/physics/fig3.11/damien_Hinf.csv"
+# output_file2 = open(output_file_path2,"w")
 
-output_file_path2 = "/home/damien/phd/dem/physics/fig3.11/damien_Hinf.csv"
-output_file2 = open(output_file_path2,"w")
-
-print("Parameters of this application")
-print("Cannel width:",width,"cm")
-print("Intensity threshold for run-out length:",100*runout_intensity,"%")
-print("\n---------------------------------------------------------------\n")
+if not quiet:
+    print("Parameters of this application")
+    print("Cannel width:",width,"cm")
+    print("Intensity threshold for run-out length:",100*runout_intensity,"%")
+    print("\n---------------------------------------------------------------\n")
 
 aspect_ratios = []
 runouts = []
 free_surfaces = []
 for rootfolderpath in my_args.get_attributes("root_path"):
-    print("Entering "+rootfolderpath+"...")
+    if not quiet:
+        print("Entering "+rootfolderpath+"...")
     if rootfolderpath[-1]=='/':
         rootfolderpath.strip('/')
     folderpath = rootfolderpath + '/Grains/Simu/'
 
     L0 = find_L0_from_file(rootfolderpath)
 
-    cmd = pvpython_path + ' ' + generate_frames_path + ' ' + folderpath
+    cmd = pvpython_path + ' ' + generate_frames_path + ' ' + folderpath + ' > /dev/null 2>&1'
 
     if run_pv:
         os.system(cmd)
@@ -267,30 +347,42 @@ for rootfolderpath in my_args.get_attributes("root_path"):
     last_frame_side_path=(folderpath+'last_frame_side.png')
     first_frame_top_path=(folderpath+'initial_frame_top.png')
     last_frame_top_path=(folderpath+'last_frame_top.png')
+    first_frame_depth_path=(folderpath+'initial_frame_width.png')
+    last_frame_depth_path=(folderpath+'last_frame_width.png')
+
+    (x0,y0,pixel_length,H0,H0_min,H0_max) = analyze_frame_depth(first_frame_depth_path,WIDTH,plot)
+    (x0,y0,pixel_length,H_infinity,H_inf_min,H_inf_max) = analyze_frame_depth(last_frame_depth_path,WIDTH,plot)
+    H_ratio_min = H0_min/H_inf_max
+    H_ratio_max = H0_max/H_inf_min
 
     c0_top, cf_top, r0_top, rf_top, pixel_length_top, L0_top =\
     analyze_first_frame_top(first_frame_top_path)
 
     L_infinity = analyze_last_frame_top(last_frame_top_path,
-        pixel_length_top,c0_top,r0_top,rf_top,rootfolderpath)
+        pixel_length_top,c0_top,r0_top,rf_top,rootfolderpath,plot)
 
-    print("L_infinity from top frame =", L_infinity)
+    if not quiet:
+        print("L_infinity from top frame =", L_infinity)
+        print("L0 from file:",L0)
+        print("L0 from top frame:",L0_top)
 
-    print("L0 from file:",L0)
-    print("L0 from top frame:",L0_top)
+    if L0=="":
+        L0 = floor(L0_top)
 
-    (x0,y0,pixel_length,H0,my_initial_first_frame,
+    (x0,y0,pixel_length,H0_inaccurate,my_initial_first_frame,
         x_t0,y_t0) = analyze_first_frame(first_frame_side_path,L0)
     (x,y,L_infinity_wrong,initial_image,runout) = analyze_last_frame(
                                 last_frame_side_path, pixel_length,x0,y0)
 
-    print("H0 =",H0)
-    print("L0 =",L0)
-    print("L_infinity =", L_infinity)
-    print("L_infinity from the side (over estimated) =", L_infinity_wrong)
+    if not quiet:
+        print("H0 =",H0)
+        print("L0 =",L0)
+        print("L_infinity =", L_infinity)
+        print("L_infinity from the side (over estimated) =", L_infinity_wrong)
 
-    plot_free_surfaces(initial_image, my_initial_first_frame,x_t0,y_t0,x,y,
-    rootfolderpath,pixel_length,runout)
+    if plot:
+        plot_free_surfaces(initial_image, my_initial_first_frame,x_t0,y_t0,x,y,
+        rootfolderpath,pixel_length,runout)
 
     aspect_ratios.append(H0/L0)
     runouts.append(L_infinity)
@@ -300,43 +392,54 @@ for rootfolderpath in my_args.get_attributes("root_path"):
     # particle width away from the wall, since the image is blurry and the
     # y function is smoothed out: we need this margin.
     nb_pixels_per_particle_width = round(3 * 0.3/pixel_length)
-    print("nb_pixels_per_particle_width =",nb_pixels_per_particle_width)
     x=np.array(x[:runout])
     y=y0-np.array(y[:runout])
     y_hinf=y[nb_pixels_per_particle_width:runout]
-    H_infinity = np.max(y_hinf)*pixel_length
-    print("H_infinity =",H_infinity)
+    H_infinity_inaccurate = np.max(y_hinf)*pixel_length
+    if not quiet:
+        print("nb_pixels_per_particle_width =",nb_pixels_per_particle_width)
+        print("H_infinity =",H_infinity)
+        print("H0_inaccurate =",H0_inaccurate)
+        print("H_infinity_inaccurate =",H_infinity_inaccurate)
+        print("H_ratio_min =", H_ratio_min)
+        print("H_ratio_max =", H_ratio_max)
+
 
     aspect_ratio = H0 / L0
     nd_runout = (L_infinity - L0) / L0
     nd_height = H0 / H_infinity
 
-    print("aspect ratio a="+str(aspect_ratio)+", (L_inf-L0)/L0="+str(nd_runout)
-        +", H_inf/H0="+str(H0/H_infinity))
-    output_file1.write(str(aspect_ratio)+", "+str(nd_runout)+"\n")
-    output_file2.write(str(aspect_ratio)+", "+str(nd_height)+"\n")
+    if not quiet:
+        print("aspect ratio a="+str(aspect_ratio)+", (L_inf-L0)/L0="+str(nd_runout)
+            +", H_inf/H0="+str(H0/H_infinity))
+    else:
+        print(aspect_ratio,nd_runout,H0/H_infinity, H_ratio_min, H_ratio_max)
+    # output_file1.write(str(aspect_ratio)+", "+str(nd_runout)+"\n")
+    # output_file2.write(str(aspect_ratio)+", "+str(nd_height)+"\n")
 
 
     # free_surfaces.append(((x*pixel_length-L0)/(L_infinity-L0),y/np.max(y),
     #                 rootfolderpath))
     free_surfaces.append(((x*pixel_length)/(H_infinity),(y*pixel_length)/H_infinity,rootfolderpath))
-    print("\n---------------------------------------------------------------\n")
+    if not quiet:
+        print("\n---------------------------------------------------------------\n")
 
-output_file1.close()
-output_file2.close()
+# output_file1.close()
+# output_file2.close()
 
 fig = plt.figure()
 
-for case in free_surfaces:
-    color = my_args.get_attribute("color",case[2])
-    linestyle = my_args.get_attribute("linestyle",case[2])
-    linewidth = my_args.get_attribute("linewidth",case[2])
-    label = my_args.get_attribute("label",case[2])
-    plt.plot(case[0],case[1],label=label,c=color,ls=linestyle,lw=linewidth)
-# plt.xlabel(r'$\frac{L-L_0}{L_\infty-L_0}$')
-# plt.ylabel(r'$\frac{h}{H_\infty}$')
-plt.xlabel(r'$\frac{x}{H_\infty}$')
-plt.ylabel(r'$\frac{h}{H_\infty}$')
-if my_args.is_legend():
-    plt.legend(loc='best')
-plt.show()
+if plot:
+    for case in free_surfaces:
+        color = my_args.get_attribute("color",case[2])
+        linestyle = my_args.get_attribute("linestyle",case[2])
+        linewidth = my_args.get_attribute("linewidth",case[2])
+        label = my_args.get_attribute("label",case[2])
+        plt.plot(case[0],case[1],label=label,c=color,ls=linestyle,lw=linewidth)
+    # plt.xlabel(r'$\frac{L-L_0}{L_\infty-L_0}$')
+    # plt.ylabel(r'$\frac{h}{H_\infty}$')
+    plt.xlabel(r'$\frac{x}{H_\infty}$')
+    plt.ylabel(r'$\frac{h}{H_\infty}$')
+    if my_args.is_legend():
+        plt.legend(loc='best')
+    plt.show()

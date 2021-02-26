@@ -472,6 +472,34 @@ renderView1.CameraFocalPoint = [0.36931967543544053, 0.10000158547700266, 0.1433
 renderView1.CameraViewUp = [0.0, 0.0, 1.0]
 renderView1.CameraParallelScale = 0.2708691132059057
 
+
+#### SAVE WIDTH VIEW FROM HERE
+# reset view to fit data
+renderView1.ResetCamera()
+
+animationScene1.GoToFirst()
+
+# current camera placement for renderView1
+renderView1.CameraPosition = [-0.5884626256622852, 0.0999999653067789, 0.12173497098410735]
+renderView1.CameraFocalPoint = [0.0400000148001709, 0.0999999653067789, 0.12173497098410735]
+renderView1.CameraViewUp = [0.0, 0.0, 1.0]
+renderView1.CameraParallelScale = 0.16265810048710172
+
+# save screenshot
+SaveScreenshot(filepath+'initial_frame_width.png', magnification=1, quality=100, view=renderView1)
+
+animationScene1.GoToLast()
+
+# current camera placement for renderView1
+renderView1.CameraPosition = [-0.5884626256622852, 0.0999999653067789, 0.12173497098410735]
+renderView1.CameraFocalPoint = [0.0400000148001709, 0.0999999653067789, 0.12173497098410735]
+renderView1.CameraViewUp = [0.0, 0.0, 1.0]
+renderView1.CameraParallelScale = 0.16265810048710172
+
+# save screenshot
+SaveScreenshot(filepath+'last_frame_width.png', magnification=1, quality=100, view=renderView1)
+
+
 #### uncomment the following to render all views
 # RenderAllViews()
 # alternatively, if you want to write images, you can use SaveScreenshot(...).
