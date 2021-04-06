@@ -228,8 +228,8 @@ public SolverComputingTime
       double quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class doubleVector& sign, size_t const& level);
       double third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class doubleVector& sign, size_t const& level);
 
-      void ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, double const& sign, size_t const& comp, size_t const& dir );
-      void gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class doubleVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g);
+      void ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, double const& sign, size_t const& comp, size_t const& dir, class boolArray2D& point_in_domain );
+      void gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class doubleVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain);
 
 
 

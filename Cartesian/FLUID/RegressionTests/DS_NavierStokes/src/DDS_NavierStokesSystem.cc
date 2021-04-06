@@ -431,7 +431,8 @@ DDS_NavierStokesSystem:: re_initialize( void )
          }
 
          for (size_t l = 0;l < dim; l++) {
-            nb_total_unknown *= (2+nb_unknowns_on_proc(l));
+            // Changed from 2 to 3 on 29Mar2021 by Goyal
+            nb_total_unknown *= (3+nb_unknowns_on_proc(l));
             size_t nb_index;
             if (l == 0) {
                if (dim == 2) {
