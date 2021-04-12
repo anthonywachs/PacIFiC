@@ -3775,7 +3775,7 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
   double yp = solid.coord[0]->item(parID,1);
   double zp = solid.coord[0]->item(parID,2);
   double ri = solid.size[0]->item(parID);
-  
+/*  
   ofstream outputFile ;
   std::ostringstream os2;
   os2 << "./DS_results/velocity_drag_" << my_rank << "_" << parID << ".csv";
@@ -3783,7 +3783,7 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
   outputFile.open(filename.c_str());
 //  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
   outputFile << "x,y,z,id" << endl;
-
+*/
   doubleArray2D point(3,3,0);
   doubleArray2D fini(3,3,0);
   doubleArray2D stress(Np,6,0);         //xx,yy,zz,xy,yz,zx
@@ -4060,7 +4060,7 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
               stress(i,4) = stress(i,4) + dfdy;
               stress(i,5) = stress(i,5) + dfdx;
            }
-
+/*
            if (comp == 0) {
               outputFile << point(0,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(0,0) << endl;
               if (point_in_domain(0,0)) outputFile << point(1,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(1,0) << endl;
@@ -4069,7 +4069,7 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
               if (point_in_domain(1,1)) outputFile << point(0,0) << "," << point(2,1) << "," << point(0,2) << "," << fini(2,1) << endl;
               if (point_in_domain(0,2)) outputFile << point(0,0) << "," << point(0,1) << "," << point(1,2) << "," << fini(1,2) << endl;
               if (point_in_domain(1,2)) outputFile << point(0,0) << "," << point(0,1) << "," << point(2,2) << "," << fini(2,2) << endl;
-	   }
+	   }*/
 	}
      }
 
@@ -4087,7 +4087,7 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
                                      + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
                                      + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
   }
-  outputFile.close();
+//  outputFile.close();
 }
 //---------------------------------------------------------------------------
 void
