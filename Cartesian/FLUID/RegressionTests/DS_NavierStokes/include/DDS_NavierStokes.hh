@@ -35,7 +35,7 @@ Equation: dT/dt = ( 1 / Pe ) * lap(T) + bodyterm, where Pe is the Peclet number.
 
 /** @brief MPIVar include all vectors required while message passing */
 struct MPIVar {
-   int *size;
+   size_t *size;
    double ***send;
    double ***receive;
 };
@@ -179,7 +179,6 @@ public SolverComputingTime
       
       /** @brief Assemble rhs for pressure in any direction */
       double pressure_local_rhs_FD( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
-      double pressure_local_rhs_FDmod( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
       double pressure_local_rhs_FV( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
@@ -224,13 +223,12 @@ public SolverComputingTime
 
       /** @brief Find the interpolation considering the solids affect on the face, used for 2D/3D systems */
       double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);
-      double quadratic_interpolation2D ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& i0, size_t const& j0, size_t const& k0, size_t const& interpol_dir, class doubleVector& sign, size_t const& level);
-      double quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class doubleVector& sign, size_t const& level);
-      double third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class doubleVector& sign, size_t const& level);
+      double quadratic_interpolation2D ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& i0, size_t const& j0, size_t const& k0, size_t const& interpol_dir, class intVector& sign, size_t const& level);
+      double quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level);
+      double third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level);
 
-      void ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, double const& sign, size_t const& comp, size_t const& dir, class boolArray2D& point_in_domain );
-      void gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class doubleVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain);
-
+      void ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& comp, size_t const& dir, class boolArray2D& point_in_domain );
+      void gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp);
 
 
       /** @brief Find the interpolation considering the solids affect inside the box, used for 3D systems */
@@ -251,7 +249,7 @@ public SolverComputingTime
       /** @brief Solve interface unknowns for both fields in any particular direction */
       void solve_interface_unknowns( FV_DiscreteField* FF, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field );
       /** @brief Unpack the interface variable sent by master processor to slave processor */
-      void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p, size_t const& field);
+      void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, size_t const& p, size_t const& field);
       /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */
       void unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p, size_t const& field);
 
@@ -336,24 +334,24 @@ public SolverComputingTime
 
 
       double peclet ;
-      double rho;
       double mu;
       double kai;
       string AdvectionScheme;
+      size_t AdvectionTimeAccuracy;
+      double rho;
+      bool b_restart ;
+      bool is_solids;
+      bool is_par_motion;
+      bool is_stressCal;
       string DivergenceScheme;
       string ViscousStressOrder;
-      size_t AdvectionTimeAccuracy;
 
-      bool b_restart ;
       bool is_firstorder ;
-      bool is_solids;
 
-      bool is_stressCal;
       double Npoints;
       size_t Pmin, pole_loc;
       double ar;
 
-      bool is_par_motion;
       double Amp, freq;
 
       GrainsCoupledWithFluid* grains;

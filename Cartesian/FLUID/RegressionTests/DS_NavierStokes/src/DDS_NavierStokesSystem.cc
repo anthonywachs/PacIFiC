@@ -220,7 +220,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 
          for (size_t comp = 0; comp < nb_comps[field]; comp++) {
             size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
-            size_t nb_index;
+            size_t nb_index = 0;
             for (size_t l=0;l<dim;++l) {
                if (field == 0) {
                   nb_unknowns_handled_by_proc( l ) =
@@ -379,31 +379,31 @@ DDS_NavierStokesSystem:: re_initialize( void )
    if (is_solids && is_stressCal) {
       if (dim == 3) {
          if (level_set_type == "Sphere") {
-            surface.coordinate->re_initialize(2*Nmax,3);
-            surface.area->re_initialize(2*Nmax);
-            surface.normal->re_initialize(2*Nmax,3);
+            surface.coordinate->re_initialize(2*(size_t)Nmax,3);
+            surface.area->re_initialize(2*(size_t)Nmax);
+            surface.normal->re_initialize(2*(size_t)Nmax,3);
 	 } else if (level_set_type == "Cube") {
-            surface.coordinate->re_initialize(6*pow(Nmax,2),3);
-            surface.area->re_initialize(6*pow(Nmax,2));
-            surface.normal->re_initialize(6*pow(Nmax,2),3);
+            surface.coordinate->re_initialize(6*(size_t)pow(Nmax,2),3);
+            surface.area->re_initialize(6*(size_t)pow(Nmax,2));
+            surface.normal->re_initialize(6*(size_t)pow(Nmax,2),3);
 	 } else if (level_set_type == "Cylinder") {
             double Npm1 = round(pow(MAC::sqrt(Nmax) - MAC::sqrt(MAC::pi()/ar),2.));
             double dh = 1. - MAC::sqrt(Npm1/Nmax);
-            size_t Nr = round(2./dh);
-	    size_t Ncyl = 2*Nmax + Nr*(Nmax - Npm1);
+            double Nr = round(2./dh);
+	    size_t Ncyl = (size_t) (2*Nmax + Nr*(Nmax - Npm1));
             surface.coordinate->re_initialize(Ncyl,3);
             surface.area->re_initialize(Ncyl);
             surface.normal->re_initialize(Ncyl,3);
 	 }
       } else {
 	 if (level_set_type == "Sphere") {
-            surface.coordinate->re_initialize(Nmax,3);
-            surface.area->re_initialize(Nmax);
-            surface.normal->re_initialize(Nmax,3);
+            surface.coordinate->re_initialize((size_t)Nmax,3);
+            surface.area->re_initialize((size_t)Nmax);
+            surface.normal->re_initialize((size_t)Nmax,3);
 	 } else if (level_set_type == "Cube") {
-            surface.coordinate->re_initialize(4*Nmax,3);
-            surface.area->re_initialize(4*Nmax);
-            surface.normal->re_initialize(4*Nmax,3);
+            surface.coordinate->re_initialize(4*(size_t)Nmax,3);
+            surface.area->re_initialize(4*(size_t)Nmax);
+            surface.normal->re_initialize(4*(size_t)Nmax,3);
 	 }
       }
    }
@@ -412,7 +412,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
    for (size_t field = 0; field < 2; field++) {
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
          size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
-         size_t_vector nb_unknowns_on_proc( dim, 0 );
+         size_t_vector nb_dof_on_proc( dim, 0 );
 
          size_t nb_total_unknown = 1;
 
@@ -420,20 +420,18 @@ DDS_NavierStokesSystem:: re_initialize( void )
             if (field == 0) {
                nb_unknowns_handled_by_proc( l ) = 1 + PF->get_max_index_unknown_handled_by_proc( comp, l )
                                                     - PF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-               nb_unknowns_on_proc( l ) = 1 + PF->get_max_index_unknown_on_proc( comp, l )
-                                            - PF->get_min_index_unknown_on_proc( comp, l ) ;
+               nb_dof_on_proc( l ) = PF->get_local_nb_dof( comp, l ) ;
             } else if (field == 1) {
                nb_unknowns_handled_by_proc( l ) = 1 + UF->get_max_index_unknown_handled_by_proc( comp, l )
                                                     - UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-               nb_unknowns_on_proc( l ) = 1 + UF->get_max_index_unknown_on_proc( comp, l )
-                                            - UF->get_min_index_unknown_on_proc( comp, l ) ;
+               nb_dof_on_proc( l ) = UF->get_local_nb_dof( comp, l );
             }
          }
 
          for (size_t l = 0;l < dim; l++) {
-            // Changed from 2 to 3 on 29Mar2021 by Goyal
-            nb_total_unknown *= (3+nb_unknowns_on_proc(l));
-            size_t nb_index;
+            // Changed from 2 to 1 on 8Apr2021 by Goyal
+            nb_total_unknown *= 1+nb_dof_on_proc(l);
+            size_t nb_index = 0;
             if (l == 0) {
                if (dim == 2) {
                   nb_index = nb_unknowns_handled_by_proc(1);
@@ -976,10 +974,6 @@ DDS_NavierStokesSystem::compute_product_matrix_interior(struct TDMatrix *arr, st
 
   // Get product of Aei*inv(Aii)*Aie for appropriate column
   arr[dir].ei[comp][r_index]->multiply_vec_then_add(prr[dir].result[comp],prr[dir].ii_ie[comp]);
-
-  size_t nb_procs;
-
-  nb_procs = nb_procs_in_i[dir];
 
   size_t int_unknown = prr[dir].ii_ie[comp]->nb_rows();
 

@@ -311,12 +311,13 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** Number of Processors in x,y,z */
       size_t nb_procs_in_i[3];
 
-      size_t Npart, Nmax;
-      double Rpart,ar;
       bool is_solids;
       bool is_stressCal;
-
+      size_t Npart;
       string level_set_type;
+      double Nmax;
+      double Rpart,ar;
+
 
       bool is_periodic[2][3];
       boolVector const* U_periodic_comp;
