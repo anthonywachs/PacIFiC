@@ -3857,7 +3857,7 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
                                                                                     && (point(0,2) > Dmin(2)) && (point(0,2) <= Dmax(2)));
         double threshold = pow(loc_thres,0.5)*dh;
 
-        if ((status) && (i==135)) {
+        if (status) {
            for (size_t dir=0;dir<dim;dir++) {
               sign(dir) = (rotated_normal(dir) > 0.) ? 1 : -1;
 
