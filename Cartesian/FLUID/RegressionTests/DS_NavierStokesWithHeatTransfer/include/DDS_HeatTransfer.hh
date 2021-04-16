@@ -39,10 +39,10 @@ struct NavierStokes2Temperature
   FV_DomainAndFields const* dom_ ;
   FV_DiscreteField const* UF_ ;
   string AdvectionScheme_ ;
+  string ViscousStressOrder_ ;
   size_t AdvectionTimeAccuracy_ ;
   bool is_solids_ ;
   size_t Npart_ ;
-  string solid_filename_ ;
   double loc_thres_ ; 
   string level_set_type_ ;
   bool is_stressCal_ ;
@@ -50,11 +50,13 @@ struct NavierStokes2Temperature
   double ar_ ;
   size_t Pmin_ ;
   size_t pole_loc_ ;
+  bool is_par_motion_ ;
+  string* particle_information_ ;
 };
 
 /** @brief MPIVar include all vectors required while message passing */
 struct MPIVar {
-   int *size;
+   size_t *size;
    double ***send;
    double ***receive;
 };
@@ -196,7 +198,7 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       void unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p);
 
       /** @brief Unpack the interface variable sent by master processor to slave processor */ 
-      void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p);
+      void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, size_t const& p);
 
       /** @brief Call the appropriate functions to solve local variable and interface unknown */ 
       void solve_interface_unknowns(double const& gamma,FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir);
@@ -259,6 +261,7 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       void output_l2norm ( void ) ;
       //@}
 
+      void import_par_info( istringstream &is );
       void generate_surface_discretization();
       void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
       void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
@@ -267,6 +270,17 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
       void trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
       void compute_temperature_gradient_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np );
+      void first_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np );
+      void second_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np );
+      void ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& major_dir, class boolVector& point_in_domain, class doubleVector& rotated_vector );
+      double third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level);
+      double quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level);
+      double quadratic_interpolation2D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& i0, size_t const& j0, size_t const& k0, size_t const& interpol_dir, class intVector& sign, size_t const& level);
+      void gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp);
+
+
+
+
       double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);
 
 
@@ -320,8 +334,14 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       struct MPIVar first_pass[3];
       struct MPIVar second_pass[3];
       
-      double rho, heat_capacity, thermal_conductivity;
-      double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
+      // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
+      double loc_thres; 
+
+      double rho; 
+      string AdvectionScheme;
+      size_t AdvectionTimeAccuracy;
+      string ViscousStressOrder;
+      double heat_capacity, thermal_conductivity;
       bool b_bodyterm ;
       bool is_solids;
       bool is_stressCal;
@@ -331,10 +351,9 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       bool b_restart ;
       bool is_iperiodic[3];
       boolVector const* periodic_comp;
-      string solid_filename;
-      string AdvectionScheme;
-      size_t AdvectionTimeAccuracy;
       string level_set_type;
+      bool is_par_motion;
+      string* particle_information;
 } ;
 
 #endif

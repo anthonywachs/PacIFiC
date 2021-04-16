@@ -369,7 +369,7 @@ DDS_HeatTransferSystem:: re_initialize( void )
 
    for (size_t comp=0;comp<nb_comps;++comp) {
       size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
-      size_t_vector nb_unknowns_on_proc( dim, 0 );
+      size_t_vector nb_dof_on_proc( dim, 0 );
 
       size_t nb_total_unknown = 1;
 
@@ -377,14 +377,12 @@ DDS_HeatTransferSystem:: re_initialize( void )
          nb_unknowns_handled_by_proc( l ) =
                             1 + TF->get_max_index_unknown_handled_by_proc( comp, l )
                               - TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-         nb_unknowns_on_proc( l ) =
-                            1 + TF->get_max_index_unknown_on_proc( comp, l )
-                              - TF->get_min_index_unknown_on_proc( comp, l ) ;
+	 nb_dof_on_proc( l ) = TF->get_local_nb_dof( comp, l ) ;
       }
 
     
       for (size_t l=0;l<dim;++l) {
-         nb_total_unknown *= (2+nb_unknowns_on_proc(l));
+         nb_total_unknown *= 1+nb_dof_on_proc(l);
 
          size_t nb_index=0;
          if (l == 0) {
@@ -410,7 +408,7 @@ DDS_HeatTransferSystem:: re_initialize( void )
             // Presence of solid and only once
             solid.coord[comp]->re_initialize(Npart,3);
             solid.size[comp]->re_initialize(Npart);
-            solid.thetap[comp]->re_initialize(Npart,3);
+            solid.thetap[comp]->re_initialize(Npart,9);
             solid.vel[comp]->re_initialize(Npart,3);
             solid.ang_vel[comp]->re_initialize(Npart,3);
             solid.temp[comp]->re_initialize(Npart);

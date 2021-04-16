@@ -2,6 +2,8 @@
 #include <FV_DomainAndFields.hh>
 #include <FV_DomainBuilder.hh>
 #include <FV_DiscreteField.hh>
+#include "ReaderXML.hh"
+#include "Grains_BuilderFactory.H"
 #include <DDS_NSWithHeatTransferSystem.hh>
 #include <FV_SystemNumbering.hh>
 #include <FV_Mesh.hh>
@@ -53,7 +55,7 @@ DDS_NSWithHeatTransfer:: create_replica( MAC_Object* a_owner,
    MAC_CHECK( create_replica_PRE( a_owner, dom, exp ) ) ;
 
    DDS_NSWithHeatTransfer* result =
-                        new DDS_NSWithHeatTransfer( a_owner, dom, exp ) ;
+                        new DDS_NSWithHeatTransfer( a_owner, dom, exp );
 
    MAC_CHECK( create_replica_POST( result, a_owner, dom, exp ) ) ;
    return( result ) ;
@@ -156,14 +158,22 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    if (is_solids) {
       Npart = exp->int_data( "NParticles" ) ;
       insertion_type = exp->string_data( "InsertionType" ) ;
-      MAC_ASSERT( insertion_type == "file" ) ;
-      solid_filename = exp->string_data( "Particle_FileName" ) ;
+      MAC_ASSERT( insertion_type == "file" || insertion_type == "GRAINS" ) ;
       loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
-      if ( level_set_type != "Cube" && level_set_type != "Cylinder" && level_set_type != "Sphere" && level_set_type != "Ellipsoid" && level_set_type != "PipeX" && level_set_type != "Superquadric") {
+      if ( level_set_type != "Cube" && level_set_type != "Cylinder" && 
+           level_set_type != "Sphere" && level_set_type != "Ellipsoid" && 
+	   level_set_type != "PipeX" && level_set_type != "Superquadric") {
          string error_message="- Cube\n   - Sphere\n   - Cylinder\n   - Superquadric\n   - Ellipsoid\n   - PipeX";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
+      }
+
+      // Read the solids filename
+      if (insertion_type == "GRAINS") {
+	 solid_filename = "Grains/simul.xml";
+      } else if (insertion_type == "file") {
+         solid_filename = exp->string_data( "Particle_FileName" );
       }
 
       // Read weather the sress calculation on particle is ON/OFF
@@ -174,14 +184,20 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
       if ( exp->has_entry( "Particle_motion" ) )
         is_par_motion = exp->bool_data( "Particle_motion" ) ;
 
-      if (is_par_motion) {
+      if (is_par_motion && (insertion_type=="file")) {
          Amp = exp->double_data( "Amplitude" ) ;
          freq = exp->double_data( "Frequency" ) ;
       }
 
       if (is_stressCal) {
+	 ViscousStressOrder = exp->string_data( "ViscousStressOrder" );
+         if ( ViscousStressOrder != "first" && ViscousStressOrder != "second") {
+            string error_message="- first\n   - second";
+            MAC_Error::object()->raise_bad_data_value( exp,"ViscousStressOrder", error_message );
+         }
          Npoints = exp->double_data( "Npoints" ) ;
-         if (dim == 3) {
+
+	 if (dim == 3) {
             if ((level_set_type == "Sphere") || (level_set_type == "Cylinder")) {
                Pmin = exp->int_data( "Pmin" ) ;
                ar = exp->double_data( "aspect_ratio" ) ;
@@ -280,17 +296,18 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    inputData.dom_ = dom ;
    inputData.UF_ = UF ;
    inputData.AdvectionScheme_ = AdvectionScheme ;
+   inputData.ViscousStressOrder_ = ViscousStressOrder;
    inputData.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
    inputData.is_solids_ = is_solids ;
    inputData.is_stressCal_ = is_stressCal ;
    inputData.Npart_ = Npart ;
-   inputData.solid_filename_ = solid_filename ;
    inputData.loc_thres_ = loc_thres ;
    inputData.level_set_type_ = level_set_type ;
    inputData.Npoints_ = Npoints ;
    inputData.Pmin_ = Pmin ;
    inputData.ar_ = ar ;
    inputData.pole_loc_ = pole_loc ;
+   inputData.particle_information_ = &particle_information ;
 
    MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DDS_HeatTransfer" ) ;
    Solver_Temperature = DDS_HeatTransfer::create( this, set, inputData ) ;
@@ -333,7 +350,7 @@ DDS_NSWithHeatTransfer:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
    start_total_timer( "DDS_NSWithHeatTransfer:: do_one_inner_iteration" ) ;
    start_solving_timer() ;
-
+/*
    if ( my_rank == is_master ) SCT_set_start("Pressure predictor");
    NS_first_step(t_it);
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Pressure predictor" );
@@ -358,14 +375,11 @@ DDS_NSWithHeatTransfer:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
    // Temperature solver
    Solver_Temperature->do_one_inner_iteration( t_it ) ;
-
+*/
    stop_solving_timer() ;
    stop_total_timer() ;
 
 }
-
-
-
 
 //---------------------------------------------------------------------------
 void
@@ -393,8 +407,31 @@ DDS_NSWithHeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    // Generate solid particles if required
    if (is_solids) {
-      Solids_generation(0);
-      Solids_generation(1);
+      if (insertion_type == "file") {
+         Solids_generation(0);
+         Solids_generation(1);
+         WriteSolidsInString();
+      } else if (insertion_type == "GRAINS") {
+
+	 if (my_rank == 0) {
+	    // Calls all the required function to activate GRAINS and insert particle        	      
+            initialize_GRAINS();
+            // Storing the particle data from GRAINS in particle_info
+            istringstream local_par_info;
+            grains->WriteParticulesInDSFluid(local_par_info);
+	    // Convert to string for MPI
+	    particle_information = local_par_info.str();
+	 }
+
+	 // Broadcasting the particle info from root(0) to rest of the processor
+	 pelCOMM->broadcast(particle_information,0);
+
+	 // Convert string to istringstream
+	 istringstream global_par_info(particle_information);
+	 // Import particle information in FLUID
+	 import_par_info(0,global_par_info);
+	 import_par_info(1,global_par_info);
+      }
       node_property_calculation(PF,0);
       node_property_calculation(UF,1);
       nodes_field_initialization(0);
@@ -417,6 +454,196 @@ DDS_NSWithHeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
 
    stop_total_timer() ;
+
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NSWithHeatTransfer:: import_par_info( size_t const& field, istringstream &is )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: import_par_info" ) ;
+
+   // Structure of particle input data
+   PartInput solid = GLOBAL_EQ->get_solid(field);
+
+   string line;
+   istringstream lineStream;
+   string cell;
+   int cntr = -1;
+   double Rp=0.,Tp=0.;
+
+   // Ensure that the getline ALWAYS reads from start of the string
+   is.clear();
+   is.seekg(0);
+
+   // read lines
+   while (getline(is, line)) {
+      lineStream.clear();
+      lineStream.str(line);
+
+      // read first word in a line
+      getline(lineStream, cell, '\t');
+
+      if (cell == "P") {
+         cntr++;
+
+         // Extracting position
+         getline(lineStream, cell, '\t');
+         double xp = stod(cell);
+         getline(lineStream, cell, '\t');
+         double yp = stod(cell);
+         getline(lineStream, cell, '\t');
+         double zp = stod(cell);
+         // Extracting Density
+         getline(lineStream, cell, '\t');
+         double par_rho = stod(cell);
+         // Extracting mass
+         getline(lineStream, cell, '\t');
+         double par_mass = stod(cell);
+         // Extracting velocity
+         getline(lineStream, cell, '\t');
+         double vx = stod(cell);
+         getline(lineStream, cell, '\t');
+         double vy = stod(cell);
+         getline(lineStream, cell, '\t');
+         double vz = stod(cell);
+         // Extracting rotational velocity
+         getline(lineStream, cell, '\t');
+         double wx = stod(cell);
+         getline(lineStream, cell, '\t');
+         double wy = stod(cell);
+         getline(lineStream, cell, '\t');
+         double wz = stod(cell);
+
+	 // Radius calculation
+         if (level_set_type == "Sphere") {
+            Rp = pow((3./4./MAC::pi())*(par_mass/par_rho),1./3.);
+	 } else if (level_set_type == "Cube") {
+            Rp = pow(par_mass/par_rho,1./3.)/2.;
+	 }
+/*
+	 cout << "Particle info: " << xp << "," << yp << "," << zp << "," 
+		 		   << vx << "," << vy << "," << vz << "," 
+		 		   << wx << "," << wy << "," << wz << "," 
+		 		   << Rp << endl; 
+*/
+	 // Storing the information in particle structure
+         for (size_t comp=0;comp<nb_comps[field];comp++) {
+            solid.coord[comp]->set_item(cntr,0,xp);
+            solid.coord[comp]->set_item(cntr,1,yp);
+            solid.coord[comp]->set_item(cntr,2,zp);
+            solid.size[comp]->set_item(cntr,Rp);
+            solid.vel[comp]->set_item(cntr,0,vx);
+            solid.vel[comp]->set_item(cntr,1,vy);
+            solid.vel[comp]->set_item(cntr,2,vz);
+            solid.ang_vel[comp]->set_item(cntr,0,wx);
+            solid.ang_vel[comp]->set_item(cntr,1,wy);
+            solid.ang_vel[comp]->set_item(cntr,2,wz);
+            solid.temp[comp]->set_item(cntr,Tp);
+            solid.inside[comp]->set_item(cntr,1);
+         }
+      } else if (cell == "O") {
+         // Extracting Orientation Matrix
+         getline(lineStream, cell, '\t');
+         double txx = stod(cell);
+         getline(lineStream, cell, '\t');
+         double txy = stod(cell);
+         getline(lineStream, cell, '\t');
+         double txz = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tyx = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tyy = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tyz = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tzx = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tzy = stod(cell);
+         getline(lineStream, cell, '\t');
+         double tzz = stod(cell);
+/*
+	 cout << "Orientation info: " << txx << "," << txy << "," << txz << "," 
+		 	              << tyx << "," << tyy << "," << tyz << "," 
+		 	              << tzx << "," << tzy << "," << tzz << endl; 
+*/
+         // Storing the information in particle structure
+         for (size_t comp=0;comp<nb_comps[field];comp++) {
+            solid.thetap[comp]->set_item(cntr,0,txx);
+            solid.thetap[comp]->set_item(cntr,1,txy);
+            solid.thetap[comp]->set_item(cntr,2,txz);
+            solid.thetap[comp]->set_item(cntr,3,tyx);
+            solid.thetap[comp]->set_item(cntr,4,tyy);
+            solid.thetap[comp]->set_item(cntr,5,tyz);
+            solid.thetap[comp]->set_item(cntr,6,tzx);
+            solid.thetap[comp]->set_item(cntr,7,tzy);
+            solid.thetap[comp]->set_item(cntr,8,tzz);
+         }
+      }
+   }
+
+   // Make sure the number of particle in GRAINS and FLUID are same
+   MAC_ASSERT( (size_t)(cntr+1) == Npart ) ;
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NSWithHeatTransfer:: simulate_GRAINS( void )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: simulate_GRAINS" ) ;
+
+   // Do particle simulation
+   grains->Simulation (1,1,0);
+
+   // Store the data in Paraview output
+   grains->doPostProcessing();
+
+}
+//---------------------------------------------------------------------------
+void
+DDS_NSWithHeatTransfer:: initialize_GRAINS( void )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: initialize_GRAINS" ) ;
+
+   // Initialize the XML reader
+   ReaderXML::initialize();
+
+   // Initialize the grains builder factory
+   string simulation_file_exe = Grains_BuilderFactory::init( solid_filename, (int) my_rank, 1);
+
+   // Start reading the inputs
+   DOMElement* rootNode = ReaderXML::getRoot (simulation_file_exe);
+
+   // Create an object of derived createCoupledWithFluid
+   grains = Grains_BuilderFactory::createCoupledWithFluid (rootNode, rho, 0.01);
+
+   //	 if ( b_restart ) grains->setReloadSame();
+
+   // Construct the DEM 
+   grains->Construction (rootNode);
+
+   // Force activation 
+   grains->Forces (rootNode);
+	
+   // DEM events, if any
+   grains->Chargement (rootNode);
+
+   // Initialize post processing to store output files
+   grains->InitialPostProcessing();
+
+   // Do particle simulation
+   grains->Simulation (1,1,0);
+
+   // Store the data in Paraview output
+   grains->doPostProcessing();
+
+   // Terminate XML reader
+   ReaderXML::terminate();
+
+//   grains->checkParaviewPostProcessing( "grains", "./Grains/Res", true ) ;
 
 }
 
@@ -469,6 +696,7 @@ DDS_NSWithHeatTransfer:: do_before_inner_iterations_stage(
 
    if ((is_par_motion) && (is_solids)) {
       update_particle_system(t_it);
+      WriteSolidsInString();
       node_property_calculation(PF,0);
       node_property_calculation(UF,1);
       nodes_field_initialization(0);
@@ -655,14 +883,12 @@ DDS_NSWithHeatTransfer:: error_with_analytical_solution_poiseuille3D ( )
       if (is_solids) {
          PartInput solid = GLOBAL_EQ->get_solid(1);
          NodeProp node = GLOBAL_EQ->get_node_property(1);
-//         double xp = solid.coord[comp]->item(0,0);
          double yp = solid.coord[comp]->item(0,1);
          double zp = solid.coord[comp]->item(0,2);
          double rp = solid.size[comp]->item(0);
 
          // Compute error
          for (size_t i=0;i<local_dof_number(0);++i) {
-//            x = UF->get_DOF_coordinate( i, comp, 0 ) ;
             for (size_t j=0;j<local_dof_number(1);++j) {
                double y = UF->get_DOF_coordinate( j, comp, 1 ) - yp ;
                for (size_t k=0;k<local_dof_number(2);++k) {
@@ -837,7 +1063,7 @@ DDS_NSWithHeatTransfer:: nodes_field_initialization ( size_t const& level )
            for (size_t k=local_min_k;k<=local_max_k;++k) {
               size_t p = return_node_index(UF,comp,i,j,k);
               if (node.void_frac[comp]->item(p) == 1.) {
-                 size_t par_id = (size_t) (node.parID[comp]->item(p));
+                 size_t par_id = (size_t) node.parID[comp]->item(p);
                  impose_solid_velocity(UF,net_vel,comp,0,10,i,j,k,0.,par_id);
                  UF->set_DOF_value( i, j, k, comp, level,net_vel[comp]);
               }
@@ -854,31 +1080,56 @@ DDS_NSWithHeatTransfer:: update_particle_system(FV_TimeIterator const* t_it)
 {
   MAC_LABEL( "DDS_NSWithHeatTransfer:: update_particle_system" ) ;
 
-  for (size_t field=0;field<2;field++) {
-     // Structure of particle input data
-     PartInput solid = GLOBAL_EQ->get_solid(field);
-     for (size_t comp=0;comp<nb_comps[field];comp++) {
-        for (size_t i=0;i<Npart;i++) {
-           double xp = solid.coord[comp]->item(i,0);
-           double yp = solid.coord[comp]->item(i,1);
-           double zp = solid.coord[comp]->item(i,2);
+  if (insertion_type == "file") {
+     for (size_t field=0;field<2;field++) {
+        // Structure of particle input data
+        PartInput solid = GLOBAL_EQ->get_solid(field);
+        for (size_t comp=0;comp<nb_comps[field];comp++) {
+           for (size_t i=0;i<Npart;i++) {
+              double xp = solid.coord[comp]->item(i,0);
+              double yp = solid.coord[comp]->item(i,1);
+              double zp = solid.coord[comp]->item(i,2);
 
-           double vx = solid.vel[comp]->item(i,0);
-           double vy = solid.vel[comp]->item(i,1);
-           double vz = solid.vel[comp]->item(i,2);
+              double vx = solid.vel[comp]->item(i,0);
+              double vy = solid.vel[comp]->item(i,1);
+              double vz = solid.vel[comp]->item(i,2);
 
-           vy = Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
-           yp = yp + vy*t_it->time_step();
+              vy = Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
+              yp = yp + vy*t_it->time_step();
 
-           solid.coord[comp]->set_item(i,0,xp);
-           solid.coord[comp]->set_item(i,1,yp);
-           solid.coord[comp]->set_item(i,2,zp);
+              solid.coord[comp]->set_item(i,0,xp);
+              solid.coord[comp]->set_item(i,1,yp);
+              solid.coord[comp]->set_item(i,2,zp);
 
-           solid.vel[comp]->set_item(i,0,vx);
-           solid.vel[comp]->set_item(i,1,vy);
-           solid.vel[comp]->set_item(i,2,vz);
+              solid.vel[comp]->set_item(i,0,vx);
+              solid.vel[comp]->set_item(i,1,vy);
+              solid.vel[comp]->set_item(i,2,vz);
+           }
         }
      }
+  } else if (insertion_type == "GRAINS") {
+
+     if (my_rank == 0) {
+        istringstream local_par_info;
+        grains->ReadParticulesFromDSFluid(local_par_info);
+        // Calls all the required function to activate GRAINS and insert particle        	      
+        simulate_GRAINS();
+        // Storing the particle data from GRAINS in particle_info
+//        istringstream local_par_info;
+        grains->WriteParticulesInDSFluid(local_par_info);
+//	    cout << "Output: " << "\n" << local_par_info.str() << endl;
+        // Convert to string for MPI
+        particle_information = local_par_info.str();
+     }
+
+     // Broadcasting the particle info from root(0) to rest of the processor
+     pelCOMM->broadcast(particle_information,0);
+
+     // Convert string to istringstream
+     istringstream global_par_info(particle_information);
+     // Import particle information in FLUID
+     import_par_info(0,global_par_info);
+     import_par_info(1,global_par_info);
   }
 }
 
@@ -936,23 +1187,22 @@ DDS_NSWithHeatTransfer:: return_node_index (
    MAC_LABEL( "DDS_NSWithHeatTransfer:: return_node_index" ) ;
 
    // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
+   size_t_vector min_index(dim,0);
+   size_t_vector max_index(dim,0);
    size_t_vector i_length(dim,0);
    for (size_t l=0;l<dim;++l) {
-      // To include knowns at dirichlet boundary in the indexing as well, wherever required
-/*      min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
-                                                                                                     (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
-      max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;*/
-      min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) - 1;
-      max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
-      i_length(l) = 1 + max_unknown_index(l) - min_unknown_index(l);
+      // To include knowns at dirichlet boundary in the indexing as well, wherever required pow(2,64)
+//      min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) - 1;
+//      max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
+      min_index(l) = 0;
+      max_index(l) = FF->get_local_nb_dof( comp, l );
+      i_length(l) = 1 + max_index(l) - min_index(l);
    }
 
    size_t local_min_k = 0;
-   if (dim == 3) local_min_k = min_unknown_index(2);
+   if (dim == 3) local_min_k = min_index(2);
 
-   size_t p = (j-min_unknown_index(1)) + i_length(1)*(i-min_unknown_index(0)) + i_length(0)*i_length(1)*(k-local_min_k);
+   size_t p = (j-min_index(1)) + i_length(1)*(i-min_index(0)) + i_length(0)*i_length(1)*(k-local_min_k);
 
    return(p);
 
@@ -997,7 +1247,7 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
      angle(0) = solid.thetap[comp]->item(m,0);
      angle(1) = solid.thetap[comp]->item(m,1);
      angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta,angle,comp,field);
      level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
   } else if (type == "Superquadric") {
      // Solid object rotation, if any     
@@ -1005,7 +1255,7 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
      angle(0) = solid.thetap[comp]->item(m,0);
      angle(1) = solid.thetap[comp]->item(m,1);
      angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta,angle,comp,field);
      level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
@@ -1015,7 +1265,7 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
      angle(0) = solid.thetap[comp]->item(m,0);
      angle(1) = solid.thetap[comp]->item(m,1);
      angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta,angle,comp,field);
      delta(0) = MAC::abs(delta(0)) - Rp;
      delta(1) = MAC::abs(delta(1)) - Rp;
      delta(2) = MAC::abs(delta(2)) - Rp;
@@ -1031,7 +1281,7 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
      angle(0) = solid.thetap[comp]->item(m,0);
      angle(1) = solid.thetap[comp]->item(m,1);
      angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta,angle,comp,field);
 
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
      if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
@@ -1047,28 +1297,88 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
 
 //---------------------------------------------------------------------------
 void
-DDS_NSWithHeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
+DDS_NSWithHeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NSWithHeatTransfer:: trans_rotation_matrix" ) ;
 
-  double roll = (MAC::pi()/180.)*angle(0);
-  double pitch = (MAC::pi()/180.)*angle(1);
-  double yaw = (MAC::pi()/180.)*angle(2);
+  PartInput solid = GLOBAL_EQ->get_solid(field);
 
   // yaw along z-axis; pitch along y-axis; roll along x-axis
   doubleArray2D rot_matrix(3,3,0);
 
   // Rotation matrix assemble
-  rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-  rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-  rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
-  rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
-  rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-  rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
-  rot_matrix(0,2) = -MAC::sin(pitch);
-  rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
-  rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  if (insertion_type == "file") {
+     double roll = (MAC::pi()/180.)*solid.thetap[comp]->item(m,0);
+     double pitch = (MAC::pi()/180.)*solid.thetap[comp]->item(m,1);
+     double yaw = (MAC::pi()/180.)*solid.thetap[comp]->item(m,2);
+     rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+     rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+     rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+     rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
+     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+     rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+     rot_matrix(0,2) = -MAC::sin(pitch);
+     rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
+     rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  } else if (insertion_type == "GRAINS") {
+     rot_matrix(0,0) = solid.thetap[comp]->item(m,0);
+     rot_matrix(1,0) = solid.thetap[comp]->item(m,1);
+     rot_matrix(2,0) = solid.thetap[comp]->item(m,2);
+     rot_matrix(0,1) = solid.thetap[comp]->item(m,3);
+     rot_matrix(1,1) = solid.thetap[comp]->item(m,4);
+     rot_matrix(2,1) = solid.thetap[comp]->item(m,5);
+     rot_matrix(0,2) = solid.thetap[comp]->item(m,6);
+     rot_matrix(1,2) = solid.thetap[comp]->item(m,7);
+     rot_matrix(2,2) = solid.thetap[comp]->item(m,8);
+  }
+ 
+  double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
+  double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
+  double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
+
+  delta(0) = delta_x;
+  delta(1) = delta_y;
+  delta(2) = delta_z;
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NSWithHeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: rotation_matrix" ) ;
+
+  PartInput solid = GLOBAL_EQ->get_solid(field);
+
+  // yaw along z-axis; pitch along y-axis; roll along x-axis
+  doubleArray2D rot_matrix(3,3,0);
+
+  // Rotation matrix assemble
+  if (insertion_type == "file") {
+     double roll = (MAC::pi()/180.)*solid.thetap[comp]->item(m,0);
+     double pitch = (MAC::pi()/180.)*solid.thetap[comp]->item(m,1);
+     double yaw = (MAC::pi()/180.)*solid.thetap[comp]->item(m,2);
+     rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+     rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+     rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+     rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
+     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+     rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+     rot_matrix(2,0) = -MAC::sin(pitch);
+     rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
+     rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  } else if (insertion_type == "GRAINS") {
+     rot_matrix(0,0) = solid.thetap[comp]->item(m,0);
+     rot_matrix(0,1) = solid.thetap[comp]->item(m,1);
+     rot_matrix(0,2) = solid.thetap[comp]->item(m,2);
+     rot_matrix(1,0) = solid.thetap[comp]->item(m,3);
+     rot_matrix(1,1) = solid.thetap[comp]->item(m,4);
+     rot_matrix(1,2) = solid.thetap[comp]->item(m,5);
+     rot_matrix(2,0) = solid.thetap[comp]->item(m,6);
+     rot_matrix(2,1) = solid.thetap[comp]->item(m,7);
+     rot_matrix(2,2) = solid.thetap[comp]->item(m,8);
+  }
 
   double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
   double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
@@ -1081,36 +1391,49 @@ DDS_NSWithHeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVec
 
 //---------------------------------------------------------------------------
 void
-DDS_NSWithHeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
+DDS_NSWithHeatTransfer:: WriteSolidsInString ()
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NSWithHeatTransfer:: rotation_matrix" ) ;
+  MAC_LABEL( "DDS_NSWithHeatTransfer:: WriteSolidsInString" ) ;
 
-  double roll = (MAC::pi()/180.)*angle(0);
-  double pitch = (MAC::pi()/180.)*angle(1);
-  double yaw = (MAC::pi()/180.)*angle(2);
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
-  // yaw along z-axis; pitch along y-axis; roll along x-axis
-  doubleArray2D rot_matrix(3,3,0);
+  double xp,yp,zp,Rp,tx,ty,tz,vx,vy,vz,wx,wy,wz,Tp,off;
 
-  // Rotation matrix assemble
-  rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-  rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-  rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
-  rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
-  rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-  rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
-  rot_matrix(2,0) = -MAC::sin(pitch);
-  rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
-  rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  std::ostringstream particles_features;
+  particles_features.precision(10);
 
-  double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
-  double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
-  double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
+  for (size_t i=0;i<Npart;i++) {
+     xp = solid.coord[0]->item(i,0);
+     yp = solid.coord[0]->item(i,1);
+     zp = solid.coord[0]->item(i,2);
+     Rp = solid.size[0]->item(i);
+     tx = solid.thetap[0]->item(i,0);
+     ty = solid.thetap[0]->item(i,1);
+     tz = solid.thetap[0]->item(i,2);
+     vx = solid.vel[0]->item(i,0);
+     vy = solid.vel[0]->item(i,1);
+     vz = solid.vel[0]->item(i,2);
+     wx = solid.ang_vel[0]->item(i,0);
+     wy = solid.ang_vel[0]->item(i,1);
+     wz = solid.ang_vel[0]->item(i,2);
+     Tp = solid.temp[0]->item(i);
+     off = solid.inside[0]->item(i);
+     particles_features << "P" << '\t'
+        << xp <<'\t'<< yp <<'\t'<< zp <<'\t' << Rp <<'\t'
+        << vx <<'\t'<< vy <<'\t'<< vz <<'\t'
+        << wx <<'\t'<< wy <<'\t'<< wz <<'\t'
+        << Tp <<'\t'<< off <<'\t'<< endl;
 
-  delta(0) = delta_x;
-  delta(1) = delta_y;
-  delta(2) = delta_z;
+     particles_features << "O" << '\t'
+        << tx <<'\t'<< ty <<'\t'<< tz <<'\t'
+        << tx <<'\t'<< ty <<'\t'<< tz <<'\t'
+        << tx <<'\t'<< ty <<'\t'<< tz <<'\t'
+        << endl;
+  }
+
+  particle_information = particles_features.str();
 }
 
 //---------------------------------------------------------------------------
@@ -1125,17 +1448,18 @@ DDS_NSWithHeatTransfer:: Solids_generation (size_t const& field)
 
   double xp,yp,zp,Rp,tx,ty,tz,vx,vy,vz,wx,wy,wz,Tp,off;
 
-  for (size_t comp=0;comp<nb_comps[field];comp++) {
-     ifstream inFile;
-     std::ostringstream os2;
-     os2 << "./InputFiles/" << solid_filename;
-     std::string filename = os2.str();
+  ifstream inFile;
+  std::ostringstream os2;
+  os2 << "./InputFiles/" << solid_filename;
+  std::string filename = os2.str();
 
-     inFile.open(filename.c_str());
-     string line;
-     getline(inFile,line);
-     for (size_t i=0;i<Npart;i++) {
-        inFile >> xp >> yp >> zp >> Rp >> tx >> ty >> tz >> vx >> vy >> vz >> wx >> wy >> wz >> Tp >> off;
+  inFile.open(filename.c_str());
+  string line;
+  getline(inFile,line);
+
+  for (size_t i=0;i<Npart;i++) {
+     inFile >> xp >> yp >> zp >> Rp >> tx >> ty >> tz >> vx >> vy >> vz >> wx >> wy >> wz >> Tp >> off;
+     for (size_t comp=0;comp<nb_comps[field];comp++) {
         solid.coord[comp]->set_item(i,0,xp);
         solid.coord[comp]->set_item(i,1,yp);
         solid.coord[comp]->set_item(i,2,zp);
@@ -1152,8 +1476,9 @@ DDS_NSWithHeatTransfer:: Solids_generation (size_t const& field)
         solid.temp[comp]->set_item(i,Tp);
         solid.inside[comp]->set_item(i,off);
      }
-     inFile.close();
   }
+
+  inFile.close();
 }
 
 //---------------------------------------------------------------------------
@@ -1197,10 +1522,19 @@ DDS_NSWithHeatTransfer:: impose_solid_velocity (FV_DiscreteField const* FF, vect
      omega(m) = solid.ang_vel[comp]->item(parID,m);
      linear_vel(m) = solid.vel[comp]->item(parID,m);
   }
-
-  net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
+/*
+  net_vel[0] = pow(grid_coord(0),4) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4);
+  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3);
+  net_vel[2] = 0.;*/
+  net_vel[0] = pow(grid_coord(0),1) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4)*pow(grid_coord(2),3);
+  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3)*pow(grid_coord(2),2);
+  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2.)*pow(grid_coord(0)+grid_coord(2),2.)*pow(grid_coord(2)+grid_coord(1),2.);
+/*  net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
+  net_vel[0] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1));
+  net_vel[1] = MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
+  net_vel[2] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(2));*/
 }
 
 //---------------------------------------------------------------------------
@@ -1234,10 +1568,19 @@ DDS_NSWithHeatTransfer:: impose_solid_velocity_for_ghost (vector<double> &net_ve
      omega(m) = solid.ang_vel[comp]->item(parID,m);
      linear_vel(m) = solid.vel[comp]->item(parID,m);
   }
-
-  net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
+/*
+  net_vel[0] = pow(grid_coord(0),4) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4);
+  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3);
+  net_vel[2] = 0.;*/
+  net_vel[0] = pow(grid_coord(0),1) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4)*pow(grid_coord(2),3);
+  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3)*pow(grid_coord(2),2);
+  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2.)*pow(grid_coord(0)+grid_coord(2),2.)*pow(grid_coord(2)+grid_coord(1),2.);
+/*  net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
+  net_vel[0] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1));
+  net_vel[1] = MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
+  net_vel[2] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(2));*/
 }
 
 //---------------------------------------------------------------------------
@@ -1327,10 +1670,12 @@ DDS_NSWithHeatTransfer:: assemble_intersection_matrix ( FV_DiscreteField const* 
 {
   MAC_LABEL( "DDS_NSWithHeatTransfer:: assemble_intersection_matrix" ) ;
 
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
+  size_t_vector min_index(dim,0);
+  size_t_vector max_index(dim,0);
+//  size_t_vector min_unknown_index(dim,0);
+//  size_t_vector max_unknown_index(dim,0);
   size_t_vector ipos(3,0);
-  size_t_array2D local_unknown_extents(dim,2,0);
+  size_t_array2D local_extents(dim,2,0);
   size_t_array2D node_neigh(dim,2,0);
   vector<double> net_vel(3,0.);
 
@@ -1338,22 +1683,21 @@ DDS_NSWithHeatTransfer:: assemble_intersection_matrix ( FV_DiscreteField const* 
   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,level);
 
   for (size_t l=0;l<dim;++l) {
-     // To include knowns at dirichlet boundary in the intersection calculation as well, important in cases where the particle is close to domain boundary
-/*     min_unknown_index(l) = ((FF->get_min_index_unknown_on_proc( comp, l ) - 1) == (pow(2,64)-1)) ? (FF->get_min_index_unknown_on_proc( comp, l )) :
-                                                                                                    (FF->get_min_index_unknown_on_proc( comp, l )-1) ; 
-     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;*/
-     min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
-     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
-     local_unknown_extents(l,0) = 0;
-     local_unknown_extents(l,1) = (max_unknown_index(l)-min_unknown_index(l));
+      // To include knowns at dirichlet boundary in the intersection calculation as well, important in cases where the particle is close to domain boundary pow(2,64)
+//     min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) ; 
+//     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) ;
+     min_index(l) = 0 ; 
+     max_index(l) = FF->get_local_nb_dof( comp, l ) ;
+     local_extents(l,0) = 0;
+     local_extents(l,1) = (max_index(l)-min_index(l));
   }
 
   size_t local_min_k = 0;
   size_t local_max_k = 0;
 
   if (dim == 3) {
-     local_min_k = min_unknown_index(2);
-     local_max_k = max_unknown_index(2);
+     local_min_k = min_index(2);
+     local_max_k = max_index(2);
   }
 
   // Clearing the matrices to store new time step value
@@ -1363,11 +1707,11 @@ DDS_NSWithHeatTransfer:: assemble_intersection_matrix ( FV_DiscreteField const* 
      b_intersect[dir].field_var[comp]->nullify();            
   }
 
-  for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-     ipos(0) = i - min_unknown_index(0);
-     for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-        ipos(1) = j - min_unknown_index(1);
-        for (size_t k=local_min_k;k<=local_max_k;++k) {
+  for (size_t i=min_index(0);i<max_index(0);++i) {
+     ipos(0) = i - min_index(0);
+     for (size_t j=min_index(1);j<max_index(1);++j) {
+        ipos(1) = j - min_index(1);
+        for (size_t k=local_min_k;k<local_max_k;++k) {
            ipos(2) = k - local_min_k;
            size_t p = return_node_index(FF,comp,i,j,k);
 
@@ -1398,42 +1742,46 @@ DDS_NSWithHeatTransfer:: assemble_intersection_matrix ( FV_DiscreteField const* 
                     ii = k;jj = i; kk = j;
                  }
 
-                 for (size_t off=0;off<2;off++) {
-                    size_t left, right;
-                    if (off == 0) {
-                       left = ii-1; right = ii;
-                    } else if (off == 1) {
-                       left = ii; right = ii+1;
-                    }
-
-                    if ((node.void_frac[comp]->item(node_neigh(dir,off)) != node.void_frac[comp]->item(p)) && (ipos(dir) != local_unknown_extents(dir,off))) {
-                       double xb = find_intersection(FF,left,right,jj,kk,comp,dir,off,field,level);
-                       // Updating the relative direction of intersection from the node i
-                       b_intersect[dir].offset[comp]->set_item(p,off,1);
-                       // Storing the distance of intersection point from the node i
-                       b_intersect[dir].value[comp]->set_item(p,off,xb);
-                       // ID of particle having the intersection with node i
-                       // If level==0, then the neighbour node is present in the particle
-                       // If level==1, then the reference node is present in the particle
-                       size_t par_id;
-                       if (level == 0) {
-                          par_id = (size_t) node.parID[comp]->item(node_neigh(dir,off));
-                       } else if ( level == 1) {
-                          par_id = (size_t) node.parID[comp]->item(p);
+		 for (size_t off=0;off<2;off++) {
+		    // Checking if the nodes are on domain boundary or not, 
+		    // if so, the check the intersection only on one side
+		    if (ipos(dir) != local_extents(dir,off)) {
+                       size_t left, right;
+                       if (off == 0) {
+                          left = ii-1; right = ii;
+                       } else if (off == 1) {
+                          left = ii; right = ii+1;
                        }
-                       // Calculate the variable values on the intersection of grid and solid
-                       impose_solid_velocity (FF,net_vel,comp,dir,off,i,j,k,xb,par_id);
-                       // Value of variable at the surface of particle
-                       if (field == 0) {
-                          b_intersect[dir].field_var[comp]->set_item(p,off,net_vel[dir]);
-                       } else if (field == 1) {
-                          b_intersect[dir].field_var[comp]->set_item(p,off,net_vel[comp]);
+
+                       if (node.void_frac[comp]->item(node_neigh(dir,off)) != node.void_frac[comp]->item(p)) {
+                          double xb = find_intersection(FF,left,right,jj,kk,comp,dir,off,field,level);
+                          // Updating the relative direction of intersection from the node i
+                          b_intersect[dir].offset[comp]->set_item(p,off,1);
+                          // Storing the distance of intersection point from the node i
+                          b_intersect[dir].value[comp]->set_item(p,off,xb);
+                          // ID of particle having the intersection with node i
+                          // If level==0, then the neighbour node is present in the particle
+                          // If level==1, then the reference node is present in the particle
+                          size_t par_id;
+                          if (level == 0) {
+                             par_id = (size_t)node.parID[comp]->item(node_neigh(dir,off));
+                          } else if ( level == 1) {
+                             par_id = (size_t)node.parID[comp]->item(p);
+                          }
+                          // Calculate the variable values on the intersection of grid and solid
+                          impose_solid_velocity (FF,net_vel,comp,dir,off,i,j,k,xb,par_id);
+                          // Value of variable at the surface of particle
+                          if (field == 0) {
+                             b_intersect[dir].field_var[comp]->set_item(p,off,net_vel[dir]);
+                          } else if (field == 1) {
+                             b_intersect[dir].field_var[comp]->set_item(p,off,net_vel[comp]);
+                          }
                        }
                     }
                  }
-              }
-           }             
-        }
+              }             
+           }
+	}
      }
   }
 }
@@ -1502,7 +1850,7 @@ DDS_NSWithHeatTransfer:: find_intersection ( FV_DiscreteField const* FF, size_t 
      }
   }
 
-  size_t id = (size_t) node.parID[comp]->item(p);
+  size_t id = (size_t)node.parID[comp]->item(p);
 
   double xcenter;
 
@@ -1520,12 +1868,13 @@ DDS_NSWithHeatTransfer:: find_intersection ( FV_DiscreteField const* FF, size_t 
   // In case both the points are on the same side of solid interface
   // This will occur when the point just outside the solid interface will be considered inside the solid
   // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid 
+  // by shifting the point by 5% of grid size 
   if (funl*funr > 0.) {
      double dx = FF->get_cell_size(side(off),comp,dir) ;
      if (off == level) {
-        xleft = xleft - dx;
+        xleft = xleft - 0.05*dx;
      } else {
-        xright = xright + dx;
+        xright = xright + 0.05*dx;
      }
   }
 
@@ -1609,12 +1958,13 @@ DDS_NSWithHeatTransfer:: find_intersection_for_ghost ( FV_DiscreteField const* F
 
   // In case both the points are on the same side of solid interface
   // This will occur when the point just outside the solid interface will be considered inside the solid
-  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid 
+  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL point in the solid 
+  // by shifting the point by 5% of grid size 
   if (funl*funr > 0.) {
      if (off == level) {
-        xleft = xleft - dx;
+        xleft = xleft - 0.05*dx;
      } else {
-        xright = xright + dx;
+        xright = xright + 0.05*dx;
      }
   }
 
@@ -1629,26 +1979,31 @@ DDS_NSWithHeatTransfer:: find_intersection_for_ghost ( FV_DiscreteField const* F
      funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
   }
 
-  // Bisection method algorithm
-  while (MAC::abs(xright-xleft) > 1.E-14) {
-     xcenter = (xleft+xright)/2.;
-     if (dir == 0) {
-        funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-        func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
-     } else if (dir == 1) {
-        funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-        func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
-     } else if (dir == 2) {
-        funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-        func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
-     }
+  // If the shifted point is also physically outside the solid then xb = dx
+  if (funl*funr > 0.) {
+     xcenter = side(off) ;
+  } else {
+     // Bisection method algorithm
+     while (MAC::abs(xright-xleft) > 1.E-14) {
+        xcenter = (xleft+xright)/2.;
+        if (dir == 0) {
+           funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+           func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
+        } else if (dir == 1) {
+           funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+           func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
+        } else if (dir == 2) {
+           funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+           func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
+        }
 
-     if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
+        if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
 
-     if (func*funl >= 1.E-16) {
-        xleft = xcenter;
-     } else {
-        xright = xcenter;
+        if (func*funl >= 1.E-16) {
+           xleft = xcenter;
+        } else {
+           xright = xcenter;
+        }
      }
   }
 
@@ -1769,18 +2124,18 @@ DDS_NSWithHeatTransfer:: assemble_field_matrix (
 
       // Since, this function is used in all directions; 
       // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
-      size_t ii=0,jj=0,kk=0;
+      int ii=0,jj=0,kk=0;
 
       // Condition for handling the pressure neumann conditions at wall
       if (i==min_unknown_index(dir) && l_bound) {
          if (dir == 0) {
-            ii = i-1; jj = min_unknown_index(1); kk = k_min;
+            ii = (int)i-1; jj = (int)min_unknown_index(1); kk = (int)k_min;
          } else if (dir == 1) {
-            ii = min_unknown_index(0); jj = i-1; kk = k_min;
+            ii = (int)min_unknown_index(0); jj = (int)i-1; kk = (int)k_min;
          } else if (dir == 2) {
-            ii = min_unknown_index(0); jj = min_unknown_index(1); kk = i-1;
+            ii = (int)min_unknown_index(0); jj = (int)min_unknown_index(1); kk = (int)i-1;
          }
-         if (FF->DOF_in_domain((int)ii,(int)jj,(int)kk,comp) && FF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+         if (FF->DOF_in_domain(ii,jj,kk,comp) && FF->DOF_has_imposed_Dirichlet_value((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
             // For Dirichlet boundary condition
             value = center;
          } else {
@@ -1789,13 +2144,13 @@ DDS_NSWithHeatTransfer:: assemble_field_matrix (
          }
       } else if (i==max_unknown_index(dir) && r_bound) {
          if (dir == 0) {
-            ii = i+1; jj = max_unknown_index(1); kk = k_max;
+            ii = (int)i+1; jj = (int)max_unknown_index(1); kk = (int)k_max;
          } else if (dir == 1) {
-            ii = max_unknown_index(0); jj = i+1; kk = k_max;
+            ii = (int)max_unknown_index(0); jj = (int)i+1; kk = (int)k_max;
          } else if (dir == 2) {
-            ii = max_unknown_index(0); jj = max_unknown_index(1); kk = i+1;
+            ii = (int)max_unknown_index(0); jj = (int)max_unknown_index(1); kk = (int)i+1;
          }
-         if (FF->DOF_in_domain((int)ii,(int)jj,(int)kk,comp) && FF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
+         if (FF->DOF_in_domain(ii,jj,kk,comp) && FF->DOF_has_imposed_Dirichlet_value((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
             // For Dirichlet boundary condition
             value = center;
          } else {
@@ -1895,28 +2250,27 @@ DDS_NSWithHeatTransfer:: assemble_field_schur_matrix (struct TDMatrix *A, size_t
 
       if ( rank_in_i[dir] == 0 ) {
          A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
-   	 for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
+   	 for (size_t i=1;i<(size_t)nb_ranks_comm_i[dir];++i) {
 
             // Create the container to receive
             size_t nbrows = product_matrix->nb_rows();
-            size_t nb_received_data = (size_t) (pow(nbrows,2)+1);
+            size_t nb_received_data = (size_t)pow(nbrows,2)+1;
             double * received_data = new double [nb_received_data];
 
             // Receive the data
             static MPI_Status status ;
-            MPI_Recv( received_data, (int) nb_received_data, MPI_DOUBLE,(int) i, 0,
-                            DDS_Comm_i[dir], &status ) ;
+            MPI_Recv( received_data, (int)nb_received_data, MPI_DOUBLE,(int) i, 0, DDS_Comm_i[dir], &status ) ;
 
             // Transfer the received data to the receive matrix
-            for (size_t k=0;k<nbrows;k++) {
-               for (size_t j=0;j<nbrows;j++) {
+            for (int k=0;k<(int)nbrows;k++) {
+               for (int j=0;j<(int)nbrows;j++) {
                   // Assemble the global product matrix by adding contributions from all the procs
                   receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
                }
             }
 
   	    if (is_periodic[field][dir] == 0) {
-               if (i<nb_ranks_comm_i[dir]-1) {
+               if (i<(size_t)nb_ranks_comm_i[dir]-1) {
                   // Assemble the global Aee matrix 
                   // No periodic condition in x. So no fe contribution from last proc
                   A[dir].ee[comp][r_index]->set_item(i,i,received_data[nb_received_data-1]);
@@ -1931,7 +2285,7 @@ DDS_NSWithHeatTransfer:: assemble_field_schur_matrix (struct TDMatrix *A, size_t
       } else {
          // Create the packed data container
          size_t nbrows = product_matrix->nb_rows();
-         size_t nb_send_data =(size_t) (pow(nbrows,2)+1);
+         size_t nb_send_data = (size_t)pow(nbrows,2)+1;
          double * packed_data = new double [nb_send_data];
 
          // Fill the packed data container with Aie
@@ -1949,7 +2303,7 @@ DDS_NSWithHeatTransfer:: assemble_field_schur_matrix (struct TDMatrix *A, size_t
          packed_data[nb_send_data-1] = Aee_diagcoef;
 
          // Send the data
-         MPI_Send( packed_data,(int) nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
+         MPI_Send( packed_data, (int)nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
 
          delete [] packed_data;
       }
@@ -1959,9 +2313,9 @@ DDS_NSWithHeatTransfer:: assemble_field_schur_matrix (struct TDMatrix *A, size_t
       if (rank_in_i[dir] == 0){
          TDMatrix* Schur = GLOBAL_EQ-> get_Schur(field);
          size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
-         for (size_t p = 0; p < nb_row; p++) {
+         for (int p = 0; p < (int)nb_row; p++) {
             Schur[dir].ii_main[comp][r_index]->set_item(p,A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
-            if (p < nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,-receive_matrix->item(p,p+1));
+            if (p < (int)nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,-receive_matrix->item(p,p+1));
             if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,-receive_matrix->item(p,p-1));
             // In case of periodic and multi-processor, there will be a variant of Tridiagonal matrix instead of normal format
             if (is_periodic[field][dir] == 1) {
@@ -1996,9 +2350,9 @@ DDS_NSWithHeatTransfer:: assemble_field_schur_matrix (struct TDMatrix *A, size_t
 
       TDMatrix* Schur = GLOBAL_EQ-> get_Schur(field);
       size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
-      for (size_t p = 0; p < nb_row; p++) {
+      for (int p = 0; p < (int)nb_row; p++) {
          Schur[dir].ii_main[comp][r_index]->set_item(p,A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
-         if (p < nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,-receive_matrix->item(p,p+1));
+         if (p < (int)nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,-receive_matrix->item(p,p+1));
          if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,-receive_matrix->item(p,p-1));
       }
       GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index); 
@@ -2147,9 +2501,9 @@ DDS_NSWithHeatTransfer:: compute_un_component ( size_t const& comp, size_t const
       }
 
       //xvalue = xright/xhr - xleft/xhl;
-      if (UF->DOF_in_domain((int)(i-1),(int)j,(int)k, comp) && UF->DOF_in_domain((int)(i+1),(int)j,(int)k, comp))
+      if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp) && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp))
          value = xright/xhr - xleft/xhl;
-      else if (UF->DOF_in_domain((int)(i-1),(int)j,(int)k, comp))
+      else if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp))
          value = - xleft/xhl;
       else
          value = xright/xhr;
@@ -2176,9 +2530,9 @@ DDS_NSWithHeatTransfer:: compute_un_component ( size_t const& comp, size_t const
       }
 
       //yvalue = yright/yhr - yleft/yhl;
-      if (UF->DOF_in_domain((int)i,(int)(j-1),(int)k, comp) && UF->DOF_in_domain((int)i,(int)(j+1),(int)k, comp))
+      if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp) && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp))
          value = yright/yhr - yleft/yhl;
-      else if(UF->DOF_in_domain((int)i,(int)(j-1),(int)k, comp))
+      else if(UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp))
          value = - yleft/yhl;
       else
          value = yright/yhr;
@@ -2205,9 +2559,9 @@ DDS_NSWithHeatTransfer:: compute_un_component ( size_t const& comp, size_t const
       }
 
       //zvalue = zright/zhr - zleft/zhl;
-      if (UF->DOF_in_domain((int)i,(int)j,(int)(k-1), comp) && UF->DOF_in_domain((int)i,(int)j,(int)(k+1), comp))
+      if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp) && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp))
          value = zright/zhr - zleft/zhl;
-      else if(UF->DOF_in_domain((int)i,(int)j,(int)(k-1), comp))
+      else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp))
          value = - zleft/zhl;
       else
          value = zright/zhr;
@@ -2404,8 +2758,8 @@ DDS_NSWithHeatTransfer:: unpack_compute_ue_pack(size_t const& comp, size_t const
 
    // Vec_temp might contain previous values
 
-   for (size_t i=1;i<nb_ranks_comm_i[dir];i++) {
-      if (i!=nb_ranks_comm_i[dir]-1) {
+   for (size_t i=1;i<(size_t)nb_ranks_comm_i[dir];i++) {
+      if (i!=(size_t)nb_ranks_comm_i[dir]-1) {
          VEC[dir].T[comp]->add_to_item(i-1,first_pass[field][dir].receive[comp][i][3*p]);
          VEC[dir].T[comp]->add_to_item(i,first_pass[field][dir].receive[comp][i][3*p+1]);
          VEC[dir].interface_T[comp]->set_item(i,first_pass[field][dir].receive[comp][i][3*p+2]);  // Assemble the interface rhs fe
@@ -2428,8 +2782,8 @@ DDS_NSWithHeatTransfer:: unpack_compute_ue_pack(size_t const& comp, size_t const
    // Solve for ue (interface unknowns) in the master proc
    DS_interface_unknown_solver(VEC[dir].interface_T[comp],comp,dir,field,p);
 
-   for (size_t i=1;i<nb_ranks_comm_i[dir];++i) {
-      if (i != nb_ranks_comm_i[dir]-1) {
+   for (size_t i=1;i<(size_t)nb_ranks_comm_i[dir];++i) {
+      if (i != (size_t)nb_ranks_comm_i[dir]-1) {
          second_pass[field][dir].send[comp][i][2*p+0]=VEC[dir].interface_T[comp]->item(i-1);
          second_pass[field][dir].send[comp][i][2*p+1]=VEC[dir].interface_T[comp]->item(i);
       } else {
@@ -2564,10 +2918,10 @@ DDS_NSWithHeatTransfer:: solve_interface_unknowns ( FV_DiscreteField* FF, double
    // Send and receive the data first pass
    if ( rank_in_i[dir] == 0 ) {
       if (nb_ranks_comm_i[dir] != 1) {      
-         for (i=1;i<nb_ranks_comm_i[dir];++i) {
+         for (i=1;i<(size_t)nb_ranks_comm_i[dir];++i) {
             // Receive the data
             static MPI_Status status;
-            MPI_Recv( first_pass[field][dir].receive[comp][i],(int) first_pass[field][dir].size[comp], MPI_DOUBLE,(int) i, 0, DDS_Comm_i[dir], &status ) ;
+            MPI_Recv( first_pass[field][dir].receive[comp][i], (int) first_pass[field][dir].size[comp], MPI_DOUBLE, (int) i, 0, DDS_Comm_i[dir], &status ) ;
          }
       }
 
@@ -2616,13 +2970,13 @@ DDS_NSWithHeatTransfer:: solve_interface_unknowns ( FV_DiscreteField* FF, double
    // Send the data from master iff multi processor are used
    if (nb_ranks_comm_i[dir] != 1) {
       if ( rank_in_i[dir] == 0 ) {
-         for (i=1;i<nb_ranks_comm_i[dir];++i) {
-            MPI_Send( second_pass[field][dir].send[comp][i], (int) second_pass[field][dir].size[comp], MPI_DOUBLE, (int) i, 0, DDS_Comm_i[dir] ) ;
+         for (i=1;i<(size_t)nb_ranks_comm_i[dir];++i) {
+            MPI_Send( second_pass[field][dir].send[comp][i],(int) second_pass[field][dir].size[comp], MPI_DOUBLE,(int) i, 0, DDS_Comm_i[dir] ) ;
          }
       } else {
          // Receive the data
          static MPI_Status status ;
-         MPI_Recv( second_pass[field][dir].send[comp][rank_in_i[dir]], (int) first_pass[field][dir].size[comp], MPI_DOUBLE, 0, 0, DDS_Comm_i[dir], &status ) ;
+         MPI_Recv( second_pass[field][dir].send[comp][rank_in_i[dir]],(int) first_pass[field][dir].size[comp], MPI_DOUBLE, 0, 0, DDS_Comm_i[dir], &status ) ;
 
          // Solve the system of equations in each proc
 
@@ -2716,13 +3070,8 @@ DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle(class doubleArray2D&
         for (size_t l=0;l<dim;++l) {
            min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l );
            max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l );
-           if (rank_in_i[l] == 0) {
-              Dmin(l) = PF->get_DOF_coordinate( min_unknown_index(l), comp, l ) - PF->get_cell_size(min_unknown_index(l),comp,l);
-              Dmax(l) = PF->get_DOF_coordinate( max_unknown_index(l), comp, l ) + PF->get_cell_size(max_unknown_index(l),comp,l);
-           } else  {
-              Dmin(l) = PF->get_DOF_coordinate( min_unknown_index(l), comp, l );
-              Dmax(l) = PF->get_DOF_coordinate( max_unknown_index(l), comp, l ) + PF->get_cell_size(max_unknown_index(l),comp,l);
-           }
+	   Dmin(l) = PF->primary_grid()->get_min_coordinate_on_current_processor(l);
+	   Dmax(l) = PF->primary_grid()->get_max_coordinate_on_current_processor(l);
         }
 
         double xp = solid.coord[comp]->item(parID,0);
@@ -2740,7 +3089,7 @@ DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle(class doubleArray2D&
         angle(1) = solid.thetap[comp]->item(parID,1);
         angle(2) = solid.thetap[comp]->item(parID,2);
 
-        rotation_matrix(parID,rotated_coord,angle);
+        rotation_matrix(parID,rotated_coord,angle,comp,0);
 
         point(0) = xp + rotated_coord(0);
         point(1) = yp + rotated_coord(1);
@@ -2750,7 +3099,7 @@ DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle(class doubleArray2D&
         rotated_normal(0) = s_nx;
         rotated_normal(1) = s_ny;
         rotated_normal(2) = s_nz;
-        rotation_matrix(parID,rotated_normal,angle);
+        rotation_matrix(parID,rotated_normal,angle,comp,0);
 
         // Displacement correction in case of periodic boundary condition in any or all directions
         for (size_t dir=0;dir<dim;dir++) {
@@ -2846,6 +3195,7 @@ DDS_NSWithHeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator con
 
   doubleArray2D vel_force(Npart,3,0);
   doubleArray2D press_force(Npart,3,0);
+  doubleArray2D avg_force(3,2,0);
 
   size_t Nmax = 0.;
   if (level_set_type == "Sphere") {
@@ -2857,7 +3207,7 @@ DDS_NSWithHeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator con
      double Ncyl = (Npoints - Npm1);
      double dh = 1. - MAC::sqrt(Npm1/Npoints);
      double Nr = round(2./dh);
-     Nmax = (dim == 3) ? ((size_t) (2*Npoints + Nr*Ncyl)) : 0 ;
+     Nmax = (dim == 3) ? ((size_t)(2*Npoints + Nr*Ncyl)) : 0 ;
   }
 
   for (size_t parID = 0; parID < Npart; parID++) {
@@ -2876,9 +3226,13 @@ DDS_NSWithHeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator con
      press_force(parID,2) = pelCOMM->sum(press_force(parID,2)) ;
 
      if (my_rank == 0) {
-        cout << "Total force for Np " << Nmax << " : " << press_force(parID,0)+vel_force(parID,0)
-                                              << " , " << press_force(parID,1)+vel_force(parID,1)
-                                              << " , " << press_force(parID,2)+vel_force(parID,2) <<endl;
+   	avg_force(0,0) += press_force(parID,0);
+	avg_force(1,0) += press_force(parID,1);
+	avg_force(2,0) += press_force(parID,2);
+	avg_force(0,1) += vel_force(parID,0);
+	avg_force(1,1) += vel_force(parID,1);
+	avg_force(2,1) += vel_force(parID,2);
+
         ofstream MyFile( fileName.c_str(), ios::app ) ;
         MyFile << t_it -> time() << "," << parID << "," << Nmax << "," << press_force(parID,0)
                                                                 << "," << press_force(parID,1)
@@ -2889,6 +3243,13 @@ DDS_NSWithHeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator con
         MyFile.close( ) ;
      }
   }
+  if (my_rank == 0) cout << "Average pressure force with " << Nmax << " surface points: " << avg_force(0,0)/double(Npart)
+                                                                                 << "," << avg_force(1,0)/double(Npart) 
+                                                                                 << "," << avg_force(2,0)/double(Npart) <<endl;
+  if (my_rank == 0) cout << "Average viscous force with " << Nmax << " surface points: " << avg_force(0,1)/double(Npart)
+                                                                                << "," << avg_force(1,1)/double(Npart) 
+                                                                                << "," << avg_force(2,1)/double(Npart) <<endl;
+
 }
 
 //---------------------------------------------------------------------------
@@ -2913,7 +3274,7 @@ DDS_NSWithHeatTransfer:: compute_surface_points_on_cube(size_t const& Np)
   if (dim == 3) {
      // Generating discretization on surface
      doubleVector lsp(Np,0.);
-     for (size_t i=0; i<Np; i++) lsp(i) = -1. + dp*((double)i+0.5);
+     for (size_t i=0; i<Np; i++) lsp(i) = -1. + dp*(double(i)+0.5);
 
      size_t cntr = 0;
 
@@ -3027,14 +3388,14 @@ DDS_NSWithHeatTransfer:: compute_surface_points_on_cylinder(class doubleVector& 
 
   if (dim == 3) {
      // Calculation for all rings except at the pole
-     for (size_t i=Nring-1; i>0; --i) {
+     for (int i=(int)Nring-1; i>0; --i) {
         double Ri = Rring(i);
         Rring(i-1) = MAC::sqrt(k(i-1)/k(i))*Rring(i);
         Rring(i) = (Rring(i) + Rring(i-1))/2.;
         double d_theta = 2.*MAC::pi()/(k(i)-k(i-1));
         // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
         double theta = 0.01*d_theta;
-        for (size_t j= ((size_t)k(i-1)); j<(size_t)k(i); j++) {
+        for (int j=(int)k(i-1); j<k(i); j++) {
 	   // For top disk
            theta = theta + d_theta;
            surface.coordinate->set_item(j,0,Rring(i)*MAC::cos(theta));
@@ -3116,19 +3477,19 @@ DDS_NSWithHeatTransfer:: compute_surface_points_on_cylinder(class doubleVector& 
      // Can be used to calculate stress on whole surface by a constant shift of points
 
      // Estimating number of points on cylindrical surface
-     double pts_1_ring = (k(Nring-1) - k(Nring-2));
-     double cyl_rings = round(2./(1-MAC::sqrt(k(Nring-2)/k(Nring-1))));
-     double cell_area = 2.*MAC::pi()/pts_1_ring*(2./cyl_rings);
+     int pts_1_ring = (int)(k(Nring-1) - k(Nring-2));
+     int cyl_rings = (int)round(2./(1-MAC::sqrt(k(Nring-2)/k(Nring-1))));
+     double cell_area = 2.*MAC::pi()/(double(pts_1_ring))*(2./(double(cyl_rings)));
 
      d_theta = 2.*MAC::pi()/pts_1_ring;
-     for (size_t j=0; j<(size_t)cyl_rings; j++) {
+     for (int j=0; j<cyl_rings; j++) {
         theta = 0.01*d_theta;
-	for (size_t ij=0; ij<(size_t)pts_1_ring; ij++) {
+	for (int ij=0; ij<pts_1_ring; ij++) {
            theta = theta + d_theta;
-	   size_t n = 2*(size_t)k(Nring-1) + j*(size_t)pts_1_ring + ij;
+	   int n = 2*(int)k(Nring-1) + j*pts_1_ring + ij;
            surface.coordinate->set_item(n,0,MAC::cos(theta));
            surface.coordinate->set_item(n,1,MAC::sin(theta));
-           surface.coordinate->set_item(n,2,-1.+ 2.*((double)j+0.5)/cyl_rings);
+           surface.coordinate->set_item(n,2,-1.+ 2.*(j+0.5)/(double(cyl_rings)));
            surface.area->set_item(n,cell_area);
            surface.normal->set_item(n,0,MAC::cos(theta));
            surface.normal->set_item(n,1,MAC::sin(theta));
@@ -3163,14 +3524,14 @@ DDS_NSWithHeatTransfer:: compute_surface_points_on_sphere(class doubleVector& et
 
   if (dim == 3) {
      // Calculation for all rings except at the pole
-     for (size_t i=Nring-1; i>0; --i) {
+     for (int i=(int)Nring-1; i>0; --i) {
         double Ri = Rring(i);
         Rring(i) = (Rring(i) + Rring(i-1))/2.;
         eta(i) = (eta(i) + eta(i-1))/2.;
         double d_theta = 2.*MAC::pi()/(k(i)-k(i-1));
         // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
         double theta = 0.01*d_theta;
-        for (size_t j=((size_t) k(i-1)); j<((size_t)k(i)); j++) {
+        for (int j=(int)k(i-1); j<k(i); j++) {
            theta = theta + d_theta;
            if (pole_loc == 2) {
               surface.coordinate->set_item(j,0,MAC::cos(theta)*MAC::sin(eta(i)));
@@ -3312,7 +3673,7 @@ DDS_NSWithHeatTransfer:: compute_surface_points_on_sphere(class doubleVector& et
         outputFile << surface.coordinate->item(maxby2,0) << "," << surface.coordinate->item(maxby2,1) << "," << surface.coordinate->item(maxby2,2) << "," << surface.area->item(maxby2) << "," << surface.normal->item(maxby2,0) << "," << surface.normal->item(maxby2,1) << "," << surface.normal->item(maxby2,2) << endl;*/
      }
   } else if (dim == 2) {
-     double d_theta = 2.*MAC::pi()/((double)Nring);
+     double d_theta = 2.*MAC::pi()/(double(Nring));
      double theta = 0.01*d_theta;
      for (int j=0; j < (int) Nring; j++) {
         theta = theta + d_theta;
@@ -3348,7 +3709,7 @@ DDS_NSWithHeatTransfer:: generate_surface_discretization()
      size_t cntr = 0; 
 
      // Estimating the number of rings on the hemisphere
-     while (k_temp > (double) (Pmin+2)) {
+     while (k_temp > double(Pmin+2)) {
         eta_temp = eta_temp - 2./ar*MAC::sqrt(MAC::pi()/k_temp)*MAC::sin(eta_temp/2.);
         Rn_temp = 2.*MAC::sin(eta_temp/2.);
         k_temp = round(k_temp*pow(Rn_temp/Ro_temp,2.));
@@ -3372,7 +3733,7 @@ DDS_NSWithHeatTransfer:: generate_surface_discretization()
      // Radius of last ring in lamber projection plane
      Rring(Nrings-1) = MAC::sqrt(2.);
 
-     for (int i = (int)(Nrings-2); i>=0; --i) {
+     for (int i=int(Nrings)-2; i>=0; --i) {
         eta(i) = eta(i+1) - 2./ar*MAC::sqrt(MAC::pi()/k(i+1))*MAC::sin(eta(i+1)/2.);
         Rring(i) = 2.*MAC::sin(eta(i)/2.);
         k(i) = round(k(i+1)*pow(Rring(i)/Rring(i+1),2.));
@@ -3396,7 +3757,7 @@ DDS_NSWithHeatTransfer:: generate_surface_discretization()
      size_t cntr = 0; 
 
      // Estimating the number of rings on either of the disc
-     while (k_temp > (double)(Pmin+2)) {
+     while (k_temp > double(Pmin+2)) {
         k_temp = round(pow(MAC::sqrt(k_temp) - MAC::sqrt(p),2.));
         cntr++;
      }
@@ -3408,7 +3769,7 @@ DDS_NSWithHeatTransfer:: generate_surface_discretization()
      // Assigning the maximum number of discretized points to the last element of the array
      k(Nrings-1) = (double) kmax;
 
-     for (int i=(int)(Nrings-2); i>=0; --i) {
+     for (int i=(int)Nrings-2; i>=0; --i) {
 	k(i) = round(pow(MAC::sqrt(k(i+1)) - MAC::sqrt(p),2.));
         if (i==0) k(0) = (double) Pmin;
      } 
@@ -3422,10 +3783,411 @@ DDS_NSWithHeatTransfer:: generate_surface_discretization()
 
 //---------------------------------------------------------------------------
 void
+DDS_NSWithHeatTransfer:: ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& comp,size_t const& dir, class boolArray2D& point_in_domain )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NSWithHeatTransfer:: ghost_points_generation" ) ;
+
+  intVector i0_temp(2,0);
+/*  size_t_vector const* global_min_index;
+  size_t_vector const* global_max_index;
+  size_t_vector const* local_min_index;
+
+  global_min_index = UF->primary_grid()->get_global_min_index_in_domain();
+  global_max_index = UF->primary_grid()->get_global_max_index_in_domain();
+  local_min_index = UF->primary_grid()->get_local_min_index_in_global();
+*/
+  // Ghost points in i for the calculation of i-derivative of field
+  i0_temp(0) = (sign == 1) ? (int(i0(0,dir)) + 1*sign) : (int(i0(0,dir)) + 0*sign);
+  i0_temp(1) = (sign == 1) ? (int(i0(0,dir)) + 2*sign) : (int(i0(0,dir)) + 1*sign);
+
+  point(1,dir) = UF->get_DOF_coordinate(i0_temp(0), comp, dir);
+  point(2,dir) = UF->get_DOF_coordinate(i0_temp(1), comp, dir);
+
+  if (MAC::abs(point(0,dir)-point(1,dir)) < MAC::abs(point(1,dir)-point(2,dir))) {
+     i0_temp(0) = (sign == 1) ? (int(i0(0,dir)) + 2*sign) : (int(i0(0,dir)) + 1*sign);
+     i0_temp(1) = (sign == 1) ? (int(i0(0,dir)) + 3*sign) : (int(i0(0,dir)) + 2*sign);
+
+     point(1,dir) = UF->get_DOF_coordinate(i0_temp(0), comp, dir);
+     point(2,dir) = UF->get_DOF_coordinate(i0_temp(1), comp, dir);
+  }
+
+  // Checking the ghost points in domain or not
+//  if (((i0_temp(0) + (*local_min_index)(dir)) < (*global_min_index)(dir)) || 
+//      ((i0_temp(0) + (*local_min_index)(dir)) > (*global_max_index)(dir))) {
+  if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)UF->get_local_nb_dof(comp,dir))) {
+     point_in_domain(0,dir) = 0;
+  } else {
+     point_in_domain(0,dir) = 1;
+  }
+
+//  if (((i0_temp(1) + (*local_min_index)(dir)) < (*global_min_index)(dir)) || 
+//      ((i0_temp(1) + (*local_min_index)(dir)) > (*global_max_index)(dir))) { 
+  if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)UF->get_local_nb_dof(comp,dir))) {
+     point_in_domain(1,dir) = 0;
+  } else {
+     point_in_domain(1,dir) = 1;
+  }
+
+  i0(1,dir) = i0_temp(0);
+  i0(2,dir) = i0_temp(1);
+}
+
+//---------------------------------------------------------------------------
+void
 DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle" ) ;
+
+  if (ViscousStressOrder == "first") {
+     first_order_viscous_stress(force, parID, Np );
+  } else if (ViscousStressOrder == "second") {
+     second_order_viscous_stress(force, parID, Np );
+  }
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NSWithHeatTransfer:: second_order_viscous_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NSWithHeatTransfer:: second_order_viscous_stress" ) ;
+
+  size_t i0_temp;
+  double dfdx=0.,dfdy=0., dfdz=0.;
+
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid(1);
+  // Structure of particle surface input data
+  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
+
+  // comp won't matter as the particle position is independent of comp
+  double xp = solid.coord[0]->item(parID,0);
+  double yp = solid.coord[0]->item(parID,1);
+  double zp = solid.coord[0]->item(parID,2);
+  double ri = solid.size[0]->item(parID);
+/*  
+  ofstream outputFile ;
+  std::ostringstream os2;
+  os2 << "./DS_results/velocity_drag_" << my_rank << "_" << parID << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+//  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
+  outputFile << "x,y,z,id" << endl;
+*/
+  doubleArray2D point(3,3,0);
+  doubleArray2D fini(3,3,0);
+  doubleArray2D stress(Np,6,0);         //xx,yy,zz,xy,yz,zx
+  doubleArray2D level_set(dim,2,1.);          
+  size_t_array2D in_parID(dim,2,0);         //Store particle ID if level_set becomes negative
+  boolArray2D found(dim,3,false);
+  size_t_array2D i0(3,3,0);
+  vector<double> net_vel(3,0.);
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  doubleVector Dmin(dim,0);
+  doubleVector Dmax(dim,0);
+  doubleVector rotated_coord(dim,0);
+  doubleVector rotated_normal(dim,0);
+  intVector sign(dim,0);
+  boolArray2D point_in_domain(2,dim,1);
+
+  for (size_t i=0;i<Np;i++) {
+     for (size_t comp=0;comp<nb_comps[1];comp++) {
+        // Get local min and max indices
+	// Get min and max coordinates in the current processor
+        for (size_t l=0;l<dim;++l) {
+           min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l );
+           max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l );
+	   Dmin(l) = UF->primary_grid()->get_min_coordinate_on_current_processor(l);
+	   Dmax(l) = UF->primary_grid()->get_max_coordinate_on_current_processor(l);
+        }
+
+	// Rotating surface points
+	rotated_coord(0) = ri*surface.coordinate->item(i,0);
+	rotated_coord(1) = ri*surface.coordinate->item(i,1);
+	rotated_coord(2) = ri*surface.coordinate->item(i,2);
+
+   	doubleVector angle(3,0.);
+        angle(0) = solid.thetap[comp]->item(parID,0);
+        angle(1) = solid.thetap[comp]->item(parID,1);
+        angle(2) = solid.thetap[comp]->item(parID,2);
+
+        rotation_matrix(parID,rotated_coord,angle,comp,1);
+
+        point(0,0) = xp + rotated_coord(0);
+        point(0,1) = yp + rotated_coord(1);
+        point(0,2) = zp + rotated_coord(2);
+
+        // Rotating surface normal
+	rotated_normal(0) = surface.normal->item(i,0);
+	rotated_normal(1) = surface.normal->item(i,1);
+	rotated_normal(2) = surface.normal->item(i,2);
+
+	rotation_matrix(parID,rotated_normal,angle,comp,1);
+
+        for (size_t dir=0;dir<dim;dir++) {
+	   // PBC on rotated surface points
+	   if (is_periodic[1][dir]) {
+              double isize = UF->primary_grid()->get_main_domain_max_coordinate(dir) - UF->primary_grid()->get_main_domain_min_coordinate(dir);
+              double imin = UF->primary_grid()->get_main_domain_min_coordinate(dir);
+              point(0,dir) = point(0,dir) - MAC::floor((point(0,dir)-imin)/isize)*isize;
+           }
+           // Finding the grid indexes next to ghost points
+           found(dir,0) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,dir), point(0,dir), i0_temp);
+           if (found(dir,0) == 1) i0(0,dir) = i0_temp;
+	}
+
+	// Accessing the smallest grid size in domain
+        double dh = UF->primary_grid()->get_smallest_grid_size();
+
+        bool status = (dim==2) ? ((point(0,0) > Dmin(0)) && (point(0,0) <= Dmax(0)) && (point(0,1) > Dmin(1)) && (point(0,1) <= Dmax(1))) :
+                                 ((point(0,0) > Dmin(0)) && (point(0,0) <= Dmax(0)) && (point(0,1) > Dmin(1)) && (point(0,1) <= Dmax(1))
+                                                                                    && (point(0,2) > Dmin(2)) && (point(0,2) <= Dmax(2)));
+        double threshold = pow(loc_thres,0.5)*dh;
+
+        if (status) {
+           for (size_t dir=0;dir<dim;dir++) {
+              sign(dir) = (rotated_normal(dir) > 0.) ? 1 : -1;
+
+              // Ghost points in i for the calculation of i-derivative of field
+              ghost_points_generation( point, i0, sign(dir), comp, dir, point_in_domain);
+
+	      // Assuming all ghost points are in fluid
+              level_set(dir,0) = 1.; level_set(dir,1) = 1.;
+	   }
+
+           // Checking all the ghost points in the solid/fluid, and storing the parID if present in solid
+           for (size_t m=0;m<Npart;m++) {
+	      // In X
+              if (level_set(0,0) > threshold) {
+                 level_set(0,0) = level_set_function(UF,m,comp,point(1,0),point(0,1),point(0,2),level_set_type,1);
+                 level_set(0,0) *= solid.inside[comp]->item(m);
+                 if (level_set(0,0) < threshold) in_parID(0,0) = m;
+              }
+              if (level_set(0,1) > threshold) {
+                 level_set(0,1) = level_set_function(UF,m,comp,point(2,0),point(0,1),point(0,2),level_set_type,1);
+                 level_set(0,1) *= solid.inside[comp]->item(m);
+                 if (level_set(0,1) < threshold) in_parID(0,1) = m;
+              }
+	      // In Y
+              if (level_set(1,0) > threshold) {
+                 level_set(1,0) = level_set_function(UF,m,comp,point(0,0),point(1,1),point(0,2),level_set_type,1);
+                 level_set(1,0) *= solid.inside[comp]->item(m);
+                 if (level_set(1,0) < threshold) in_parID(1,0) = m;
+              }
+              if (level_set(1,1) > threshold) {
+                 level_set(1,1) = level_set_function(UF,m,comp,point(0,0),point(2,1),point(0,2),level_set_type,1);
+                 level_set(1,1) *= solid.inside[comp]->item(m);
+                 if (level_set(1,1) < threshold) in_parID(1,1) = m;
+              }
+	      // In Z
+	      if (dim == 3) {
+                 if (level_set(2,0) > threshold) {
+                    level_set(2,0) = level_set_function(UF,m,comp,point(0,0),point(0,1),point(1,2),level_set_type,1);
+                    level_set(2,0) *= solid.inside[comp]->item(m);
+                    if (level_set(2,0) < threshold) in_parID(2,0) = m;
+                 }
+                 if (level_set(2,1) > threshold) {
+                    level_set(2,1) = level_set_function(UF,m,comp,point(0,0),point(0,1),point(2,2),level_set_type,1);
+                    level_set(2,1) *= solid.inside[comp]->item(m);
+                    if (level_set(2,1) < threshold) in_parID(2,1) = m;
+                 }
+	      }
+           }
+
+           // Calculation of field variable on ghost point(0,0)
+           impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(0,1),point(0,2),parID);
+           fini(0,0) = net_vel[comp];
+           fini(0,1) = net_vel[comp];
+           fini(0,2) = net_vel[comp];
+
+           // Calculation of field variable on ghost point(1,0)
+           if (level_set(0,0) > threshold) {
+              fini(1,0) = third_order_ghost_field_estimate(UF, comp, point(1,0), point(0,1), point(0,2), i0(1,0), i0(0,1), i0(0,2), 0, sign,0);
+           } else if (level_set(0,0) <= threshold) {
+              impose_solid_velocity_for_ghost(net_vel,comp,point(1,0),point(0,1),point(0,2),in_parID(0,0));
+              fini(1,0) = net_vel[comp];
+           }
+           // Calculation of field variable on ghost point(2,0)
+           if (level_set(0,1) > threshold) {
+              fini(2,0) = third_order_ghost_field_estimate(UF, comp, point(2,0), point(0,1), point(0,2), i0(2,0), i0(0,1), i0(0,2), 0, sign,0);
+           } else if (level_set(0,1) <= threshold) {
+              impose_solid_velocity_for_ghost(net_vel,comp,point(2,0),point(0,1),point(0,2),in_parID(0,1));
+              fini(2,0) = net_vel[comp];
+           }
+           // Calculation of field variable on ghost point(1,1)
+           if (level_set(1,0) > threshold) {
+	      fini(1,1) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(1,1), point(0,2), i0(0,0), i0(1,1), i0(0,2), 1, sign,0);
+           } else if (level_set(1,0) <= threshold) {
+              impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(1,1),point(0,2),in_parID(1,0));
+              fini(1,1) = net_vel[comp];
+	   }
+           // Calculation of field variable on ghost point(2,1)
+           if (level_set(1,1) > threshold) {
+              fini(2,1) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(2,1), point(0,2), i0(0,0), i0(2,1), i0(0,2), 1, sign,0);
+	   } else if (level_set(1,1) <= threshold) {
+              impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(2,1),point(0,2),in_parID(1,1));
+	      fini(2,1) = net_vel[comp];
+           }
+
+	   if (dim == 3) {
+              // Calculation of field variable on ghost point(1,2)
+              if (level_set(2,0) > threshold) {
+                fini(1,2) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(0,1), point(1,2), i0(0,0), i0(0,1), i0(1,2), 2, sign, 0);
+              } else if (level_set(2,0) <= threshold) {
+                 impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(0,1),point(1,2),in_parID(2,0));
+                 fini(1,2) = net_vel[comp];
+              }
+              // Calculation of field variable on ghost point(2,2)
+              if (level_set(2,1) > threshold) {
+                fini(2,2) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(0,1), point(2,2), i0(0,0), i0(0,1), i0(2,2), 2, sign, 0);
+	      } else if (level_set(2,1) <= threshold) {
+                 impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(0,1),point(2,2),in_parID(2,1));
+	         fini(2,2) = net_vel[comp];
+              }
+ 	   }
+
+           // Derivative in x 
+           // Point 1 and 2 in computational domain
+	   if (point_in_domain(0,0) && point_in_domain(1,0)) {
+              if ((level_set(0,0) > threshold) && (level_set(0,1) > threshold)) {
+	         double dx1 = (point(1,0)-point(0,0));
+                 double dx2 = (point(2,0)-point(0,0));
+                 dfdx = mu*((fini(1,0) - fini(0,0))*dx2/dx1 - (fini(2,0) - fini(0,0))*dx1/dx2)/(dx2-dx1);
+              // Point 1 in fluid and 2 in the solid
+              } else if ((level_set(0,0) > threshold) && (level_set(0,1) <= threshold)) {
+                 double dx1 = (point(1,0)-point(0,0));
+                 dfdx = mu*(fini(1,0) - fini(0,0))/dx1;
+              // Point 1 is present in solid 
+              } else if (level_set(0,0) <= threshold) {
+	         double dx1 = (point(1,0)-point(0,0));
+                 dfdx = mu*(fini(1,0) - fini(0,0))/dx1;
+	      }
+           // Point 1 in computational domain
+	   } else if (point_in_domain(0,0) && !point_in_domain(1,0)) {
+              double dx1 = (point(1,0)-point(0,0));
+              dfdx = mu*(fini(1,0) - fini(0,0))/dx1;
+           // Particle close to wall
+           } else if (!point_in_domain(0,0)) {
+              i0(1,0) = (sign(0) == 1) ? (i0(0,0) + 1*sign(0)) : (i0(0,0) + 0*sign(0));
+              point(1,0) = UF->get_DOF_coordinate(i0(1,0), comp, 0);
+              fini(1,0) = third_order_ghost_field_estimate(UF, comp, point(1,0), point(0,1), point(0,2), i0(1,0), i0(0,1), i0(0,2), 0, sign,0);
+              double dx1 = (point(1,0)-point(0,0));
+              dfdx = mu*(fini(1,0) - fini(0,0))/dx1;
+	   }
+
+           // Derivative in y
+           // Point 1 and 2 in computational domain
+           if (point_in_domain(0,1) && point_in_domain(1,1)) {
+              if ((level_set(1,0) > threshold) && (level_set(1,1) > threshold)) {
+                 double dy1 = (point(1,1)-point(0,1));
+	         double dy2 = (point(2,1)-point(0,1));
+                 dfdy = mu*((fini(1,1) - fini(0,1))*dy2/dy1 - (fini(2,1) - fini(0,1))*dy1/dy2)/(dy2-dy1);
+              // Point 1 in fluid and 2 in the solid
+              } else if ((level_set(1,0) > threshold) && (level_set(1,1) <= threshold)) {
+	         double dy1 = (point(1,1)-point(0,1));
+                 dfdy = mu*(fini(1,1) - fini(0,1))/dy1;
+              // Point 1 is present in solid 
+              } else if (level_set(1,0) <= threshold) {
+                 double dy1 = (point(1,1)-point(0,1));
+                 dfdy = mu*(fini(1,1) - fini(0,1))/dy1;
+	      }
+           // Point 1 in computational domain
+	   } else if (point_in_domain(0,1) && !point_in_domain(1,1)) {
+              double dy1 = (point(1,1)-point(0,1));
+              dfdy = mu*(fini(1,1) - fini(0,1))/dy1;
+           // Particle close to wall
+           } else if (!point_in_domain(0,1)) {
+              i0(1,1) = (sign(1) == 1) ? (i0(0,1) + 1*sign(1)) : (i0(0,1) + 0*sign(1));
+              point(1,1) = UF->get_DOF_coordinate(i0(1,1), comp, 1);
+	      fini(1,1) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(1,1), point(0,2), i0(0,0), i0(1,1), i0(0,2), 1, sign,0);
+              double dy1 = (point(1,1)-point(0,1));
+              dfdy = mu*(fini(1,1) - fini(0,1))/dy1;
+           }
+
+           // Derivative in z
+	   if (dim == 3) {
+              // Point 1 and 2 in computational domain
+              if (point_in_domain(0,2) && point_in_domain(1,2)) {
+                 if ((level_set(2,0) > threshold) && (level_set(2,1) > threshold)) {
+                    double dz1 = (point(1,2)-point(0,2));
+                    double dz2 = (point(2,2)-point(0,2));
+                    dfdz = mu*((fini(1,2) - fini(0,2))*dz2/dz1 - (fini(2,2) - fini(0,2))*dz1/dz2)/(dz2-dz1);
+                 // Point 1 in fluid and 2 in solid 
+                 } else if ((level_set(2,0) > threshold) && (level_set(2,1) <= threshold)) {
+	            double dz1 = (point(1,2)-point(0,2));
+                    dfdz = mu*(fini(1,2) - fini(0,2))/dz1;
+                 // Point 1 is present in solid 
+                 } else if (level_set(2,0) <= threshold) {
+                    double dz1 = (point(1,2)-point(0,2));
+                    dfdz = mu*(fini(1,2) - fini(0,2))/dz1;
+                 }
+              // Point 1 in computational domain
+	      } else if (point_in_domain(0,2) && !point_in_domain(1,2)) {
+                 double dz1 = (point(1,2)-point(0,2));
+                 dfdz = mu*(fini(1,2) - fini(0,2))/dz1;
+              // Particle close to wall
+              } else if (!point_in_domain(0,2)) {
+                 i0(1,2) = (sign(2) == 1) ? (i0(0,2) + 1*sign(2)) : (i0(0,2) + 0*sign(2));
+                 point(1,2) = UF->get_DOF_coordinate(i0(1,2), comp, 2);
+                fini(1,2) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(0,1), point(1,2), i0(0,0), i0(0,1), i0(1,2), 2, sign, 0);
+                 double dz1 = (point(1,2)-point(0,2));
+                 dfdz = mu*(fini(1,2) - fini(0,2))/dz1;
+	      }
+	   }
+
+           if (comp == 0) {
+              stress(i,0) = 2.*dfdx;
+              stress(i,3) = stress(i,3) + dfdy;
+              stress(i,5) = stress(i,5) + dfdz;
+           } else if (comp == 1) {
+              stress(i,1) = 2.*dfdy;
+              stress(i,3) = stress(i,3) + dfdx;
+              stress(i,4) = stress(i,4) + dfdz;
+           } else if (comp == 2) {
+              stress(i,2) = 2.*dfdz;
+              stress(i,4) = stress(i,4) + dfdy;
+              stress(i,5) = stress(i,5) + dfdx;
+           }
+/*
+           if (comp == 0) {
+              outputFile << point(0,0) << "," << point(0,1) << "," << point(0,2) << "," << dfdx << "," << dfdy << "," << dfdz << endl;
+              if (point_in_domain(0,0)) outputFile << point(1,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(1,0) << endl;
+              if (point_in_domain(1,0)) outputFile << point(2,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(2,0) << endl;
+              if (point_in_domain(0,1)) outputFile << point(0,0) << "," << point(1,1) << "," << point(0,2) << "," << fini(1,1) << endl;
+              if (point_in_domain(1,1)) outputFile << point(0,0) << "," << point(2,1) << "," << point(0,2) << "," << fini(2,1) << endl;
+              if (point_in_domain(0,2)) outputFile << point(0,0) << "," << point(0,1) << "," << point(1,2) << "," << fini(1,2) << endl;
+              if (point_in_domain(1,2)) outputFile << point(0,0) << "," << point(0,1) << "," << point(2,2) << "," << fini(2,2) << endl;
+	   }*/
+	}
+     }
+
+     double scale = (dim == 2) ? ri : ri*ri;
+
+     // Ref: Keating thesis Pg-85
+     // point_coord*(area) --> Component of area in particular direction
+     force(parID,0) = force(parID,0) + stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale)
+                                     + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
+                                     + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(parID,1) = force(parID,1) + stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale) 
+                                     + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
+                                     + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(parID,2) = force(parID,2) + stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale) 
+                                     + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
+                                     + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
+  }
+//  outputFile.close();
+}
+//---------------------------------------------------------------------------
+void
+DDS_NSWithHeatTransfer:: first_order_viscous_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NSWithHeatTransfer:: first_order_visous_stress" ) ;
 
   size_t i0_temp;
   double dfdx=0.,dfdy=0., dfdz=0., dzh=0.;
@@ -3501,7 +4263,7 @@ DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D&
         angle(1) = solid.thetap[comp]->item(parID,1);
         angle(2) = solid.thetap[comp]->item(parID,2);
 
-        rotation_matrix(parID,rotated_coord,angle);
+        rotation_matrix(parID,rotated_coord,angle,comp,1);
 
         xpoint(0) = xp + rotated_coord(0);
         ypoint(0) = yp + rotated_coord(1);
@@ -3512,7 +4274,7 @@ DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D&
 	rotated_normal(1) = surface.normal->item(i,1);
 	rotated_normal(2) = surface.normal->item(i,2);
 
-	rotation_matrix(parID,rotated_normal,angle);
+	rotation_matrix(parID,rotated_normal,angle,comp,1);
 
         if (is_periodic[1][0]) {
            double isize = UF->primary_grid()->get_main_domain_max_coordinate(0) - UF->primary_grid()->get_main_domain_min_coordinate(0);
@@ -3864,6 +4626,521 @@ DDS_NSWithHeatTransfer:: compute_velocity_force_on_particle(class doubleArray2D&
 
 //---------------------------------------------------------------------------
 double
+DDS_NSWithHeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NSWithHeatTransfer:: quadratic_interpolation3D" ) ;
+
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid(1);
+
+  doubleArray2D point(3,3,0);
+  // Directional indexes of ghost points
+  size_t_vector index(3,0);
+  // Directional indexes of secondary ghost points
+  size_t_array2D index_g(3,3,0);
+  // Coordinates of secondary ghost points
+  doubleArray2D coord_g(3,3,0.);
+  // level set value of the secondary ghost points
+  doubleVector level_set(3,1.);          
+  // Store particle ID if level_set becomes negative
+  size_t_vector in_parID(3,0);         
+  // Presence in solid or not
+  boolVector point_in_solid(3,0);
+  // Presence in domain or not
+  boolVector point_in_domain(3,1);
+  vector<double> net_vel(3,0.);
+  // Decide which scheme to use
+  string scheme = "quadratic";
+
+  size_t sec_ghost_dir = 0;
+  size_t sec_interpol_dir = 0;
+
+  point(0,0) = xp; point(0,1) = yp; point(0,2) = zp;
+  index(0) = ii; index(1) = ji; index(2) = ki;
+
+  // Ghost points generated in y and then quadratic interpolation in z will generate the same
+  // stencil if ghost points are generated in z and the quadratic interpolation done in y
+  if (ghost_points_dir == 0) {
+     sec_ghost_dir = 1;
+     sec_interpol_dir = 2;
+  } else if (ghost_points_dir == 1) {
+     sec_ghost_dir = 0;
+     sec_interpol_dir = 2;
+  } else if (ghost_points_dir == 2) {
+     sec_ghost_dir = 0;
+     sec_interpol_dir = 1;
+  }
+
+  // Generate indexes of secondary ghost points in sec_ghost_dir direction 
+  gen_dir_index_of_secondary_ghost_points(index, sign, sec_ghost_dir, index_g, point_in_domain, comp);
+
+  // Assume all secondary ghost points in fluid
+  double x0 = FF->get_DOF_coordinate(index_g(0,sec_ghost_dir), comp, sec_ghost_dir);
+  double x1 = FF->get_DOF_coordinate(index_g(1,sec_ghost_dir), comp, sec_ghost_dir);
+  double x2 = FF->get_DOF_coordinate(index_g(2,sec_ghost_dir), comp, sec_ghost_dir);
+
+  if (sec_ghost_dir == 0) {
+     coord_g(0,0) = x0; coord_g(0,1) = point(0,1); coord_g(0,2) = point(0,2);
+     coord_g(1,0) = x1; coord_g(1,1) = point(0,1); coord_g(1,2) = point(0,2);
+     coord_g(2,0) = x2; coord_g(2,1) = point(0,1); coord_g(2,2) = point(0,2);
+  } else if (sec_ghost_dir == 1) {
+     coord_g(0,0) = point(0,0); coord_g(0,1) = x0; coord_g(0,2) = point(0,2);
+     coord_g(1,0) = point(0,0); coord_g(1,1) = x1; coord_g(1,2) = point(0,2);
+     coord_g(2,0) = point(0,0); coord_g(2,1) = x2; coord_g(2,2) = point(0,2);
+  } else if (sec_ghost_dir == 2) {
+     coord_g(0,0) = point(0,0); coord_g(0,1) = point(0,1); coord_g(0,2) = x0;
+     coord_g(1,0) = point(0,0); coord_g(1,1) = point(0,1); coord_g(1,2) = x1;
+     coord_g(2,0) = point(0,0); coord_g(2,1) = point(0,1); coord_g(2,2) = x2;
+  }
+
+  double dh = FF->primary_grid()->get_smallest_grid_size();
+
+  double threshold = pow(loc_thres,0.5)*dh;
+  // Checking the secondary ghost points in the solid/fluid, and storing the parID if present in solid
+  for (size_t m=0;m<Npart;m++) {
+     // x0
+     if (level_set(0) > threshold) {
+        level_set(0) = level_set_function(FF,m,comp,coord_g(0,0),coord_g(0,1),coord_g(0,2),level_set_type,1);
+        level_set(0) *= solid.inside[comp]->item(m);
+        if (level_set(0) < threshold) { in_parID(0) = m; point_in_solid(0) = 1; }
+     }
+     // x1
+     if (level_set(1) > threshold) {
+        level_set(1) = level_set_function(FF,m,comp,coord_g(1,0),coord_g(1,1),coord_g(1,2),level_set_type,1);
+        level_set(1) *= solid.inside[comp]->item(m);
+        if (level_set(1) < threshold) { in_parID(1) = m; point_in_solid(1) = 1; }
+     }
+     // x2
+     if (level_set(2) > threshold) {
+        level_set(2) = level_set_function(FF,m,comp,coord_g(2,0),coord_g(2,1),coord_g(2,2),level_set_type,1);
+        level_set(2) *= solid.inside[comp]->item(m);
+        if (level_set(2) < threshold) { in_parID(2) = m; point_in_solid(2) = 1; }
+     }
+  }
+
+  double f0 = 0., f1 = 0., f2 = 0., del = 0.;
+
+  // Estimate the field values at the secondary ghost points 
+  f0=quadratic_interpolation2D(FF,comp,coord_g(0,0),coord_g(0,1),coord_g(0,2),index_g(0,0),index_g(0,1),index_g(0,2),sec_interpol_dir,sign,level);
+  f1=quadratic_interpolation2D(FF,comp,coord_g(1,0),coord_g(1,1),coord_g(1,2),index_g(1,0),index_g(1,1),index_g(1,2),sec_interpol_dir,sign,level);
+  f2=quadratic_interpolation2D(FF,comp,coord_g(2,0),coord_g(2,1),coord_g(2,2),index_g(2,0),index_g(2,1),index_g(2,2),sec_interpol_dir,sign,level);
+
+  // Ghost points corrections
+  if (point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
+     // 0 in solid, rest in fluid
+     if (point_in_solid(0) && !point_in_solid(1) && !point_in_solid(2)) {
+        if (sec_ghost_dir == 0) {
+           del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,x1-del,yp,zp,in_parID(0));
+        } else if (sec_ghost_dir == 1) {
+           del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1-del,zp,in_parID(0));
+        } else if (sec_ghost_dir == 2) {
+           del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1-del,in_parID(0));
+        }
+        x0 = x1 - del;
+        f0 = net_vel[comp];
+     // 2 in solid, rest in fluid
+     } else if (!point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
+        if (sec_ghost_dir == 0) {
+           del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,x1+del,yp,zp,in_parID(2));
+        } else if (sec_ghost_dir == 1) {
+           del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1+del,zp,in_parID(2));
+        } else if (sec_ghost_dir == 2) {
+           del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1+del,in_parID(2));
+        }
+        x2 = x1 + del;
+        f2 = net_vel[comp];
+     // 0, 2 in solid; 1 in fluid
+     } else if (point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
+        if (sec_ghost_dir == 0) {
+           del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,x1-del,yp,zp,in_parID(0));
+        } else if (sec_ghost_dir == 1) {
+           del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1-del,zp,in_parID(0));
+        } else if (sec_ghost_dir == 2) {
+           del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1-del,in_parID(0));
+        }
+        x0 = x1 - del;
+        f0 = net_vel[comp];
+
+        if (sec_ghost_dir == 0) {
+           del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,x1+del,yp,zp,in_parID(2));
+        } else if (sec_ghost_dir == 1) {
+           del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1+del,zp,in_parID(2));
+        } else if (sec_ghost_dir == 2) {
+           del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1+del,in_parID(2));
+        }
+        x2 = x1 + del;
+        f2 = net_vel[comp];
+
+     // 0, 1 in solid; 2 in fluid
+     } else if (point_in_solid(0) && point_in_solid(1) && !point_in_solid(2)) {
+        if (sec_ghost_dir == 0) {
+           del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,x2-del,yp,zp,in_parID(1));
+        } else if (sec_ghost_dir == 1) {
+           del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,x2-del,zp,in_parID(1));
+        } else if (sec_ghost_dir == 2) {
+           del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x2-del,in_parID(1));
+        }
+        x1 = x2 - del;
+        f1 = net_vel[comp];
+        scheme = "linear12";
+     // 1, 2 in solid; 0 in fluid
+     } else if (!point_in_solid(0) && point_in_solid(1) && point_in_solid(2)) {
+        if (sec_ghost_dir == 0) {
+           del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,x0+del,yp,zp,in_parID(1));
+        } else if (sec_ghost_dir == 1) {
+           del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,x0+del,zp,in_parID(1));
+        } else if (sec_ghost_dir == 2) {
+           del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x0+del,in_parID(1));
+        }
+        x1 = x0 + del;
+        f1 = net_vel[comp];
+        scheme = "linear01";
+     }
+  // Point 0 and 1 are in domain, 2 not in domain
+  } else if (point_in_domain(0) && point_in_domain(1) && !point_in_domain(2)) {
+     scheme = "linear01";
+     // 0 in fluid; 1 in solid
+     if (!point_in_solid(0) && point_in_solid(1)) {
+        if (sec_ghost_dir == 0) {
+           del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,x0+del,yp,zp,in_parID(1));
+        } else if (sec_ghost_dir == 1) {
+           del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,x0+del,zp,in_parID(1));
+        } else if (sec_ghost_dir == 2) {
+           del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x0+del,in_parID(1));
+        }
+        x1 = x0 + del;
+        f1 = net_vel[comp];
+     // 0 in solid, 1 in fluid
+     } else if (point_in_solid(0) && !point_in_solid(1)) {
+        if (sec_ghost_dir == 0) {
+           del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,x1-del,yp,zp,in_parID(0));
+        } else if (sec_ghost_dir == 1) {
+           del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1-del,zp,in_parID(0));
+        } else if (sec_ghost_dir == 2) {
+           del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1-del,in_parID(0));
+        }
+        x0 = x1 - del;
+        f0 = net_vel[comp];
+     }
+  // Point 1 and 2 are in domain, 0 not in domain
+  } else if (!point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
+     scheme = "linear12";
+     // 1 in fluid; 2 in solid
+     if (!point_in_solid(1) && point_in_solid(2)) {
+        if (sec_ghost_dir == 0) {
+           del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,x1+del,yp,zp,in_parID(2));
+        } else if (sec_ghost_dir == 1) {
+           del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1+del,zp,in_parID(2));
+        } else if (sec_ghost_dir == 2) {
+           del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1+del,in_parID(2));
+        }
+        x2 = x1 + del;
+        f2 = net_vel[comp];
+     // 1 in solid, 2 in fluid
+     } else if (point_in_solid(1) && !point_in_solid(2)) {
+        if (sec_ghost_dir == 0) {
+           del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,x2-del,yp,zp,in_parID(1));
+        } else if (sec_ghost_dir == 1) {
+           del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,x2-del,zp,in_parID(1));
+        } else if (sec_ghost_dir == 2) {
+           del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x2-del,in_parID(1));
+        }
+        x1 = x2 - del;
+        f1 = net_vel[comp];
+     }
+  }
+
+  double l0 = 0., l1 = 0., l2 = 0.;
+  double result = 0.;
+
+  if (scheme == "quadratic") {
+     l0 = (point(0,sec_ghost_dir) - x1)*(point(0,sec_ghost_dir) - x2)/(x0 - x1)/(x0 - x2);
+     l1 = (point(0,sec_ghost_dir) - x0)*(point(0,sec_ghost_dir) - x2)/(x1 - x0)/(x1 - x2);
+     l2 = (point(0,sec_ghost_dir) - x0)*(point(0,sec_ghost_dir) - x1)/(x2 - x0)/(x2 - x1);
+     result = f0*l0 + f1*l1 + f2*l2;
+  } else if (scheme == "linear01") {
+     l0 = (point(0,sec_ghost_dir) - x1)/(x0 - x1);
+     l1 = (point(0,sec_ghost_dir) - x0)/(x1 - x0);
+     result = f0*l0 + f1*l1;
+  } else if (scheme == "linear12") {
+     l1 = (point(0,sec_ghost_dir) - x2)/(x1 - x2);
+     l2 = (point(0,sec_ghost_dir) - x1)/(x2 - x1);
+     result = f1*l1 + f2*l2;
+  }
+
+  return(result);
+}
+
+//---------------------------------------------------------------------------
+double
+DDS_NSWithHeatTransfer:: third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DDS_NSWithHeatTransfer:: third_order_ghost_field_estimate" ) ;
+
+// Call respective functions based on 2D or 3D domain
+
+   double result = 0.;
+
+   if (dim == 2) {
+      result = (ghost_points_dir == 0) ? quadratic_interpolation2D(FF, comp, xp, yp, zp, ii, ji, ki, 1, sign, level) :
+                                         quadratic_interpolation2D(FF, comp, xp, yp, zp, ii, ji, ki, 0, sign, level) ;
+   } else if (dim == 3) {
+      result = quadratic_interpolation3D(FF, comp, xp, yp, zp, ii, ji, ki, ghost_points_dir, sign, level) ;
+   }
+
+   return(result);
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NSWithHeatTransfer:: gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NSWithHeatTransfer:: gen_dir_index_of_secondary_ghost_points" ) ;
+
+  intVector i0_temp(3,0);
+/*  size_t_vector const* global_min_index;
+  size_t_vector const* global_max_index;
+  size_t_vector const* local_min_index;
+
+  global_min_index = UF->primary_grid()->get_global_min_index_in_domain();
+  global_max_index = UF->primary_grid()->get_global_max_index_in_domain();
+  local_min_index = UF->primary_grid()->get_local_min_index_in_global();
+*/
+  for (size_t dir=0;dir<dim;dir++) {
+     index_g(0,dir) = index(dir);
+     index_g(1,dir) = index(dir);
+     index_g(2,dir) = index(dir);
+  }
+
+  if (sign(interpol_dir) > 0.) {
+     i0_temp(0) = int(index(interpol_dir));	
+     i0_temp(1) = int(index(interpol_dir)) + 1;
+     i0_temp(2) = int(index(interpol_dir)) + 2;
+  } else if (sign(interpol_dir) <= 0.) {
+     i0_temp(0) = int(index(interpol_dir)) - 1;	
+     i0_temp(1) = int(index(interpol_dir));
+     i0_temp(2) = int(index(interpol_dir)) + 1;
+  }
+
+  // Checking the ghost points in domain or not
+//  if (((i0_temp(0) + (*local_min_index)(interpol_dir)) < (*global_min_index)(interpol_dir)) || 
+//      ((i0_temp(0) + (*local_min_index)(interpol_dir)) > (*global_max_index)(interpol_dir))) {
+  if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)UF->get_local_nb_dof(comp,interpol_dir))) {
+     point_in_domain(0) = 0;
+  } else {
+     point_in_domain(0) = 1;
+  }
+
+//  if (((i0_temp(1) + (*local_min_index)(interpol_dir)) < (*global_min_index)(interpol_dir)) || 
+//      ((i0_temp(1) + (*local_min_index)(interpol_dir)) > (*global_max_index)(interpol_dir))) { 
+  if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)UF->get_local_nb_dof(comp,interpol_dir))) {
+     point_in_domain(1) = 0;
+  } else {
+     point_in_domain(1) = 1;
+  }
+
+//  if (((i0_temp(2) + (*local_min_index)(interpol_dir)) < (*global_min_index)(interpol_dir)) || 
+//      ((i0_temp(2) + (*local_min_index)(interpol_dir)) > (*global_max_index)(interpol_dir))) { 
+  if ((i0_temp(2) < 0) || (i0_temp(2) >= (int)UF->get_local_nb_dof(comp,interpol_dir))) {
+     point_in_domain(2) = 0;
+  } else {
+     point_in_domain(2) = 1;
+  }
+
+  index_g(0,interpol_dir) = i0_temp(0);
+  index_g(1,interpol_dir) = i0_temp(1);
+  index_g(2,interpol_dir) = i0_temp(2);
+
+}
+//---------------------------------------------------------------------------
+double
+DDS_NSWithHeatTransfer:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& i0, size_t const& j0, size_t const& k0, size_t const& interpol_dir, class intVector& sign, size_t const& level)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DDS_NSWithHeatTransfer:: quadratic_interpolation2D" ) ;
+
+// Calculates the field value at the ghost points 
+// near the particle boundary using the quadratic interpolation 
+// inspired from Johansen 1998;
+// xp,yp,zp are the ghost point coordinated; interpol_dir is the direction 
+// in which the additional points will be used for quadratic interpolation
+/*
+   ofstream outputFile ;
+   std::ostringstream os2;
+   os2 << "./DS_results/velocity_drag_extras.csv";
+   std::string filename = os2.str();
+   outputFile.open(filename.c_str(), ios::app);
+*/
+   // Node information for field(1)
+   NodeProp node = GLOBAL_EQ->get_node_property(1);
+   // Intersection information for field(1) in fluid(0)
+   BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(1,0);
+
+   // Directional index of point
+   size_t_vector index(3,0);
+   boolVector point_in_solid(3,0);
+   boolVector point_in_domain(3,1);
+   doubleVector xi(3,0.);
+   // Directional indexes of ghost points
+   size_t_array2D index_g(3,3,0);
+   // Local node index of ghost points
+   size_t_vector node_index(3,0);
+   // Decide which scheme to use
+   string scheme = "quadratic";
+
+   xi(0) = xp; xi(1) = yp; xi(2) = zp;
+   index(0) = i0; index(1) = j0; index(2) = k0;
+
+   double f0=0.,f1=0.,f2=0.;
+   double x0=0.,x1=0.,x2=0.;
+   double l0=0.,l1=0.,l2=0.;
+
+   // Creating ghost points for quadratic interpolation
+   gen_dir_index_of_secondary_ghost_points(index, sign, interpol_dir, index_g, point_in_domain, comp);
+
+   // Check weather the ghost points are in solid or not; TRUE if they are   
+   node_index(0) = return_node_index(FF,comp,index_g(0,0),index_g(0,1),index_g(0,2));
+   point_in_solid(0) = node.void_frac[comp]->item(node_index(0));
+   node_index(1) = return_node_index(FF,comp,index_g(1,0),index_g(1,1),index_g(1,2));
+   point_in_solid(1) = node.void_frac[comp]->item(node_index(1));
+   node_index(2) = return_node_index(FF,comp,index_g(2,0),index_g(2,1),index_g(2,2));
+   point_in_solid(2) = node.void_frac[comp]->item(node_index(2));
+
+   // Assume all the ghost points in fluid
+   x0 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir);
+   x1 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir);
+   x2 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir);
+
+   // Storing the field values assuming all ghost points in fluid and domain
+   f0 = FF->DOF_value( index_g(0,0), index_g(0,1), index_g(0,2), comp, level );
+   f1 = FF->DOF_value( index_g(1,0), index_g(1,1), index_g(1,2), comp, level );
+   f2 = FF->DOF_value( index_g(2,0), index_g(2,1), index_g(2,2), comp, level );
+
+   // Ghost points corrections
+   // All points in domain
+   if (point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
+      // 0 in solid, rest in fluid
+      if (point_in_solid(0) && !point_in_solid(1) && !point_in_solid(2)) {
+         x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
+         f0 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),0);
+      // 2 in solid, rest in fluid
+      } else if (!point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
+         x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
+         f2 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),1);
+      // 0, 2 in solid; 1 in fluid
+      } else if (point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
+         x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
+         f0 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),0);
+         x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
+         f2 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),1);
+      // 0, 1 in solid; 2 in fluid
+      } else if (point_in_solid(0) && point_in_solid(1) && !point_in_solid(2)) {
+         x1 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(2),0);
+         f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(2),0);
+         scheme = "linear12";
+      // 1, 2 in solid; 0 in fluid
+      } else if (!point_in_solid(0) && point_in_solid(1) && point_in_solid(2)) {
+         x1 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(0),1);
+         f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(0),1);
+         scheme = "linear01";
+      }
+   // Point 0 and 1 are in domain, 2 not in domain
+   } else if (point_in_domain(0) && point_in_domain(1) && !point_in_domain(2)) {
+      scheme = "linear01";
+      // 0 in fluid; 1 in solid
+      if (!point_in_solid(0) && point_in_solid(1)) {
+         x1 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(0),1);
+         f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(0),1);
+      // 0 in solid, 1 in fluid
+      } else if (point_in_solid(0) && !point_in_solid(1)) {
+         x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
+         f0 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),0);
+      }
+   // Point 1 and 2 are in domain, 0 not in domain
+   } else if (!point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
+      scheme = "linear12";
+      // 1 in fluid; 2 in solid
+      if (!point_in_solid(1) && point_in_solid(2)) {
+         x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
+         f2 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),1);
+      // 1 in solid, 2 in fluid
+      } else if (point_in_solid(1) && !point_in_solid(2)) {
+         x1 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(2),0);
+         f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(2),0);
+      }
+   }
+
+/*   
+   if (comp == 0) {
+      if (interpol_dir == 0) {
+         double yt = FF->get_DOF_coordinate(index(1), comp, 1); 
+         outputFile << x0 << "," << yt << "," << 0. << "," << f0 << endl;
+         outputFile << x1 << "," << yt << "," << 0. << "," << f1 << endl;
+         outputFile << x2 << "," << yt << "," << 0. << "," << f2 << endl;
+      } else if (interpol_dir == 1) {
+         double xt = FF->get_DOF_coordinate(index(0), comp, 0);
+         outputFile << xt << "," << x0 << "," << 0. << "," << f0 << endl;
+         outputFile << xt << "," << x1 << "," << 0. << "," << f1 << endl;
+         outputFile << xt << "," << x2 << "," << 0. << "," << f2 << endl;
+      }
+   }
+*/
+   double result = 0.;
+
+   if (scheme == "quadratic") {
+      l0 = (xi(interpol_dir) - x1)*(xi(interpol_dir) - x2)/(x0 - x1)/(x0 - x2);
+      l1 = (xi(interpol_dir) - x0)*(xi(interpol_dir) - x2)/(x1 - x0)/(x1 - x2);
+      l2 = (xi(interpol_dir) - x0)*(xi(interpol_dir) - x1)/(x2 - x0)/(x2 - x1);
+      result = f0*l0 + f1*l1 + f2*l2;
+   } else if (scheme == "linear01") {
+      l0 = (xi(interpol_dir) - x1)/(x0 - x1);
+      l1 = (xi(interpol_dir) - x0)/(x1 - x0);
+      result = f0*l0 + f1*l1;
+   } else if (scheme == "linear12") {
+      l1 = (xi(interpol_dir) - x2)/(x1 - x2);
+      l2 = (xi(interpol_dir) - x1)/(x2 - x1);
+      result = f1*l1 + f2*l2;
+   }
+
+   return(result);
+}
+
+
+//---------------------------------------------------------------------------
+double
 DDS_NSWithHeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID)
 //---------------------------------------------------------------------------
 {
@@ -4066,11 +5343,11 @@ DDS_NSWithHeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, si
       } else if ((node.void_frac[comp]->item(p(i,0)) == 0) && (bf_intersect[dir2].offset[comp]->item(p(i,0),1) == 1)) {
          double yint = bf_intersect[dir2].value[comp]->item(p(i,0),1);
          // Condition where intersection distance is more than ghost point distance, it means that the ghost 
-         // point can be projected on the wall
+         // point can be projected on the particle wall
          if (yint >= (xghost(dir2)-extents(dir2,0))) {
             fwall(0,i) = ((extents(dir2,0)+yint-xghost(dir2))*f(i,0)+(xghost(dir2)-extents(dir2,0))*bf_intersect[dir2].field_var[comp]->item(p(i,0),1))/yint;
             del_wall(0,i) = MAC::abs(extents(dir1,i) - xghost(dir1));
-         // Ghost point cannot be projected on the wall, as the solid surface come first
+         // Ghost point cannot be projected on the particle wall, as the solid surface come first
          } else {
             size_t id = (size_t) node.parID[comp]->item(p(i,1));
             if (face_vec > dir2) {
@@ -4504,7 +5781,7 @@ DDS_NSWithHeatTransfer:: assemble_DS_un_at_rhs (
 
    double dxC,dyC,dzC;
    double pvalue =0., xvalue=0.,yvalue=0.,zvalue=0.,rhs=0.,bodyterm=0.,adv_value = 0.;
-   size_t cpp=10;
+   size_t cpp = 10;
 
    // Periodic pressure gradient
    if ( UF->primary_grid()->is_periodic_flow() ) {
@@ -5659,10 +6936,9 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
 
   size_t i,j,k;
   outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv,behind,bev,front,fv" << endl;
-//  outputFile << "x,y,z,par_ID,void_frac,ugradu,error" << endl;
 
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
+  size_t_vector min_index(dim,0);
+  size_t_vector max_index(dim,0);
 
   NodeProp node = GLOBAL_EQ->get_node_property(field);
   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,0);
@@ -5670,23 +6946,25 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l );
-        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l );
+//        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l );
+//        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l );
+        min_index(l) = 0; 
+        max_index(l) = FF->get_local_nb_dof( comp, l );
      }
 
      size_t local_min_k = 0;
      size_t local_max_k = 0;
 
      if (dim == 3) {
-        local_min_k = min_unknown_index(2);
-        local_max_k = max_unknown_index(2);
+        local_min_k = min_index(2);
+        local_max_k = max_index(2);
      }
 
-     for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+     for (i=min_index(0);i<max_index(0);++i) {
         double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
-        for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+        for (j=min_index(1);j<max_index(1);++j) {
            double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
-           for (k=local_min_k;k<=local_max_k;++k) {
+           for (k=local_min_k;k<local_max_k;++k) {
               double zC = 0.;
               if (dim == 3) zC = FF->get_DOF_coordinate( k, comp, 2 ) ;
               size_t p = return_node_index(FF,comp,i,j,k);
@@ -5694,6 +6972,7 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
               double voidf = node.void_frac[comp]->item(p);
 
               outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
+//              outputFile << xC << "," << yC << "," << zC << "," << FF->DOF_value(i,j,k,comp,0) << "," << voidf;
               for (size_t dir = 0; dir < dim; dir++) {
                   for (size_t off = 0; off < 2; off++) {
                       outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off);
@@ -6077,8 +7356,8 @@ DDS_NSWithHeatTransfer:: allocate_mpi_variables (FV_DiscreteField const* FF, siz
 {
 
    for (size_t dir = 0; dir < dim; dir++) {
-      first_pass[field][dir].size = new int [nb_comps[field]];
-      second_pass[field][dir].size = new int [nb_comps[field]];
+      first_pass[field][dir].size = new size_t [nb_comps[field]];
+      second_pass[field][dir].size = new size_t [nb_comps[field]];
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
          size_t local_min_j=0, local_max_j=0;
          size_t local_min_k=0, local_max_k=0;

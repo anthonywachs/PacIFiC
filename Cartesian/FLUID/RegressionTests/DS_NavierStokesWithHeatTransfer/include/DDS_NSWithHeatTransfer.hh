@@ -3,6 +3,7 @@
 
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
+#include "GrainsCoupledWithFluid.hh"
 #include <geomVector.hh>
 #include <computingtime.hh>
 #include <boolVector.hh>
@@ -21,6 +22,7 @@ class FV_DiscreteField ;
 class LA_Vector ;
 class LA_SeqVector ;
 class DDS_NSWithHeatTransferSystem ;
+class GrainsCoupledWithFluid ;
 class LA_SeqMatrix ;
 
 /** @brief The Class DDS_NSWithHeatTransfer.
@@ -171,7 +173,6 @@ public SolverComputingTime
       
       /** @brief Assemble rhs for pressure in any direction */
       double pressure_local_rhs_FD( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
-      double pressure_local_rhs_FDmod( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
       double pressure_local_rhs_FV( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
@@ -181,6 +182,9 @@ public SolverComputingTime
       size_t return_row_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
 
       void Solids_generation (size_t const& field);
+      void initialize_GRAINS( void );
+      void simulate_GRAINS( void );
+      void import_par_info( size_t const& field, istringstream &is );
 
       void node_property_calculation (FV_DiscreteField const* FF, size_t const& field );
 
@@ -200,17 +204,27 @@ public SolverComputingTime
       void impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID );
 
       void compute_velocity_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void first_order_viscous_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void second_order_viscous_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
       void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
       void compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
       void generate_surface_discretization();
       void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
       void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
       void compute_surface_points_on_cube(size_t const& Np);
-      void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
-      void trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
+      void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field);
+      void trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field);
 
       /** @brief Find the interpolation considering the solids affect on the face, used for 2D/3D systems */
       double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);
+      double quadratic_interpolation2D ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& i0, size_t const& j0, size_t const& k0, size_t const& interpol_dir, class intVector& sign, size_t const& level);
+      double quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level);
+      double third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level);
+
+      void ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& comp, size_t const& dir, class boolArray2D& point_in_domain );
+      void gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp);
+      void WriteSolidsInString ();
+
 
       /** @brief Find the interpolation considering the solids affect inside the box, used for 3D systems */
       double ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID);
@@ -328,6 +342,7 @@ public SolverComputingTime
       bool is_par_motion;
       bool is_stressCal;
       string DivergenceScheme;
+      string ViscousStressOrder;
 
       bool is_firstorder ;
 
@@ -337,12 +352,15 @@ public SolverComputingTime
 
       double Amp, freq;
 
+      GrainsCoupledWithFluid* grains;
+
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;
       bool is_periodic[2][3];
       string insertion_type;
       string solid_filename;
       string level_set_type;
+      string particle_information; // stringstream to store particle information
       double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
 
       DDS_HeatTransfer* Solver_Temperature ;
