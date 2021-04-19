@@ -1201,29 +1201,17 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Ellipsoid") {
      // Solid object rotation, if any	  
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle,comp,field);
+     trans_rotation_matrix(m,delta,comp,field);
      level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
   } else if (type == "Superquadric") {
      // Solid object rotation, if any	  
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle,comp,field);
+     trans_rotation_matrix(m,delta,comp,field);
      level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Cube") {
      // Solid object rotation, if any	  
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle,comp,field);
+     trans_rotation_matrix(m,delta,comp,field);
      delta(0) = MAC::abs(delta(0)) - Rp;
      delta(1) = MAC::abs(delta(1)) - Rp;
      delta(2) = MAC::abs(delta(2)) - Rp;
@@ -1235,11 +1223,7 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
      }
   } else if (type == "Cylinder") {
      // Solid object rotation, if any	  
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle,comp,field);
+     trans_rotation_matrix(m,delta,comp,field);
 
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
      if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
@@ -1255,7 +1239,7 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field)
+DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, size_t const& comp, size_t const& field)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: trans_rotation_matrix" ) ;
@@ -1302,7 +1286,7 @@ DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& d
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field)
+DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, size_t const& comp, size_t const& field)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: rotation_matrix" ) ;
@@ -2995,12 +2979,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
 	rotated_coord(1) = ri*sy;
 	rotated_coord(2) = ri*sz;
 
-	doubleVector angle(3,0.);
-        angle(0) = solid.thetap[comp]->item(parID,0);
-        angle(1) = solid.thetap[comp]->item(parID,1);
-        angle(2) = solid.thetap[comp]->item(parID,2);
-
-        rotation_matrix(parID,rotated_coord,angle,comp,0);
+        rotation_matrix(parID,rotated_coord,comp,0);
 
         point(0) = xp + rotated_coord(0);
         point(1) = yp + rotated_coord(1);
@@ -3010,7 +2989,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
 	rotated_normal(0) = s_nx;
 	rotated_normal(1) = s_ny;
 	rotated_normal(2) = s_nz;
-        rotation_matrix(parID,rotated_normal,angle,comp,0);
+        rotation_matrix(parID,rotated_normal,comp,0);
 
       	// Displacement correction in case of periodic boundary condition in any or all directions
         for (size_t dir=0;dir<dim;dir++) {
@@ -3819,12 +3798,7 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
 	rotated_coord(1) = ri*surface.coordinate->item(i,1);
 	rotated_coord(2) = ri*surface.coordinate->item(i,2);
 
-   	doubleVector angle(3,0.);
-        angle(0) = solid.thetap[comp]->item(parID,0);
-        angle(1) = solid.thetap[comp]->item(parID,1);
-        angle(2) = solid.thetap[comp]->item(parID,2);
-
-        rotation_matrix(parID,rotated_coord,angle,comp,1);
+        rotation_matrix(parID,rotated_coord,comp,1);
 
         point(0,0) = xp + rotated_coord(0);
         point(0,1) = yp + rotated_coord(1);
@@ -3835,7 +3809,7 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
 	rotated_normal(1) = surface.normal->item(i,1);
 	rotated_normal(2) = surface.normal->item(i,2);
 
-	rotation_matrix(parID,rotated_normal,angle,comp,1);
+	rotation_matrix(parID,rotated_normal,comp,1);
 
         for (size_t dir=0;dir<dim;dir++) {
 	   // PBC on rotated surface points
@@ -4165,12 +4139,7 @@ DDS_NavierStokes:: first_order_viscous_stress(class doubleArray2D& force, size_t
 	rotated_coord(1) = ri*surface.coordinate->item(i,1);
 	rotated_coord(2) = ri*surface.coordinate->item(i,2);
 
-   	doubleVector angle(3,0.);
-        angle(0) = solid.thetap[comp]->item(parID,0);
-        angle(1) = solid.thetap[comp]->item(parID,1);
-        angle(2) = solid.thetap[comp]->item(parID,2);
-
-        rotation_matrix(parID,rotated_coord,angle,comp,1);
+        rotation_matrix(parID,rotated_coord,comp,1);
 
         xpoint(0) = xp + rotated_coord(0);
         ypoint(0) = yp + rotated_coord(1);
@@ -4181,7 +4150,7 @@ DDS_NavierStokes:: first_order_viscous_stress(class doubleArray2D& force, size_t
 	rotated_normal(1) = surface.normal->item(i,1);
 	rotated_normal(2) = surface.normal->item(i,2);
 
-	rotation_matrix(parID,rotated_normal,angle,comp,1);
+	rotation_matrix(parID,rotated_normal,comp,1);
 
         if (is_periodic[1][0]) {
            double isize = UF->primary_grid()->get_main_domain_max_coordinate(0) - UF->primary_grid()->get_main_domain_min_coordinate(0);
