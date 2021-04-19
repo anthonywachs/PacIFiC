@@ -1602,7 +1602,7 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
   }
 
   size_t local_min_k = 0;
-  size_t local_max_k = 0;
+  size_t local_max_k = 1;
 
   if (dim == 3) {
      local_min_k = min_index(2);
@@ -6860,7 +6860,7 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
      }
 
      size_t local_min_k = 0;
-     size_t local_max_k = 0;
+     size_t local_max_k = 1;
 
      if (dim == 3) {
         local_min_k = min_index(2);
