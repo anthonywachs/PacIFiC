@@ -155,7 +155,7 @@ $$
 $$
 */
 
-# include "navier-stokes/centered.h"
+# include "dlmfd-ns-centered.h"
 
 
 /* Adding this small macro because dv() breaks the compability with embed.h */
@@ -224,7 +224,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
   
   double DLM_alpha = 0., DLM_beta = 0.;
   double DLM_tol = 1.e-5, DLM_nr2 = 0., DLM_nr2_km1 = 0., DLM_wv = 0.;
-  int ki = 0, DLM_maxiter = 100, allpts = 0, lm = 0, tcells = 0;
+  int ki = 0, DLM_maxiter = 200, allpts = 0, lm = 0, tcells = 0;
   coord ppshift = {0, 0, 0};
 # if ( _MPI && DLM_Moving_particle )
     int counter = 0;

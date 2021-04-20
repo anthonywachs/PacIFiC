@@ -46,6 +46,9 @@ int restarted_simu = 0;
 char vtk_times_series[100000] = "";
 int init_cycle_number = 0;
 double maxtime = 0.;
+double trestart = 0.;
+double dtrestart = 0.;
+bool save_data_restart = false;
 scalar u_previoustime[];
 
 
@@ -193,6 +196,10 @@ event init (i = 0)
       
       /* Restore particle data */
       restore_particle( particles );
+
+      // Read restart time
+      printf( "Read t and dt from time restart file\n" );
+      read_t_restart( dump_dir, &trestart, &dtrestart );  
 
       // Re-initialize the VTK writer
 #if Paraview
@@ -375,11 +382,31 @@ event logfile ( i=0; i++ )
   {
     // Close all DLMFD files
     close_file_pointers( pdata, fdata, converge, cellvstime ); 
+
+    // Write the dump time and time step for restart
+    printf( "Write t and dt in time restart file\n" );
+    save_t_dt_restart( dump_dir, t, dt );  
     
     // Stop simulation
     return 1; 
   }
-//  if ( t > maxtime ) return 1; 
+//  if ( t > maxtime ) return 1;   
+}
+
+
+
+
+/** Write the dump time and time step for restart */
+// -------------------------------------------------
+event start_timestep (i++)
+{
+  if ( save_data_restart && i )
+  {
+    printf( "Write t and dt in time restart file\n" );
+    save_t_dt_restart( dump_dir, t, dt );        
+    save_data_restart = false;
+  } 
+  if ( i == 0 ) save_data_restart = false;  
 }
 
 
@@ -488,7 +515,7 @@ event adapt (i++) {
 #else
   astats s = adapt_wavelet ((scalar *){flagfield, u}, 
 	(double[]){FlagAdaptCrit, UxAdaptCrit, UyAdaptCrit, UzAdaptCrit}, 
-	maxlevel = MAXLEVEL);
+	maxlevel = MAXLEVEL, minlevel=LEVEL );
 #endif
   if ( pid() == 0 ) 
     printf( "      Refined %d cells, coarsened %d cells\n", s.nf, s.nc );
