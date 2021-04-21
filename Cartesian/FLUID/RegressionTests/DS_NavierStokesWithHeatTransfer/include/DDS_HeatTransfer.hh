@@ -52,6 +52,7 @@ struct NavierStokes2Temperature
   size_t pole_loc_ ;
   bool is_par_motion_ ;
   string* particle_information_ ;
+  string insertion_type_ ;
 };
 
 /** @brief MPIVar include all vectors required while message passing */
@@ -261,14 +262,14 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       void output_l2norm ( void ) ;
       //@}
 
-      void import_par_info( istringstream &is );
+      void ReadStringofSolids( istringstream &is );
       void generate_surface_discretization();
       void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
       void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
       void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
       void compute_surface_points_on_cube(size_t const& Np);
-      void rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
-      void trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle);
+      void rotation_matrix (size_t const& m, class doubleVector& delta);
+      void trans_rotation_matrix (size_t const& m, class doubleVector& delta);
       void compute_temperature_gradient_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np );
       void first_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np );
       void second_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np );
@@ -354,6 +355,7 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       string level_set_type;
       bool is_par_motion;
       string* particle_information;
+      string insertion_type;
 } ;
 
 #endif

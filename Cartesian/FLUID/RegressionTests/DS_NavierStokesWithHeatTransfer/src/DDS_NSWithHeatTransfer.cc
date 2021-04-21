@@ -308,6 +308,7 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    inputData.ar_ = ar ;
    inputData.pole_loc_ = pole_loc ;
    inputData.particle_information_ = &particle_information ;
+   inputData.insertion_type_ = insertion_type ;
 
    MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DDS_HeatTransfer" ) ;
    Solver_Temperature = DDS_HeatTransfer::create( this, set, inputData ) ;
@@ -431,6 +432,8 @@ DDS_NSWithHeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
 	 // Import particle information in FLUID
 	 import_par_info(0,global_par_info);
 	 import_par_info(1,global_par_info);
+	 // Write the particle data to string to transfer to HE solver
+         WriteSolidsInString();
       }
       node_property_calculation(PF,0);
       node_property_calculation(UF,1);
@@ -1243,29 +1246,17 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Ellipsoid") {
      // Solid object rotation, if any     
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle,comp,field);
+     trans_rotation_matrix(m,delta,comp,field);
      level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
   } else if (type == "Superquadric") {
      // Solid object rotation, if any     
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle,comp,field);
+     trans_rotation_matrix(m,delta,comp,field);
      level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Cube") {
      // Solid object rotation, if any     
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle,comp,field);
+     trans_rotation_matrix(m,delta,comp,field);
      delta(0) = MAC::abs(delta(0)) - Rp;
      delta(1) = MAC::abs(delta(1)) - Rp;
      delta(2) = MAC::abs(delta(2)) - Rp;
@@ -1277,11 +1268,7 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
      }
   } else if (type == "Cylinder") {
      // Solid object rotation, if any     
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle,comp,field);
+     trans_rotation_matrix(m,delta,comp,field);
 
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
      if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
@@ -1297,7 +1284,7 @@ DDS_NSWithHeatTransfer:: level_set_function (FV_DiscreteField const* FF, size_t 
 
 //---------------------------------------------------------------------------
 void
-DDS_NSWithHeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field)
+DDS_NSWithHeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, size_t const& comp, size_t const& field)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NSWithHeatTransfer:: trans_rotation_matrix" ) ;
@@ -1344,7 +1331,7 @@ DDS_NSWithHeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVec
 
 //---------------------------------------------------------------------------
 void
-DDS_NSWithHeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle, size_t const& comp, size_t const& field)
+DDS_NSWithHeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta, size_t const& comp, size_t const& field)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NSWithHeatTransfer:: rotation_matrix" ) ;
@@ -1693,7 +1680,7 @@ DDS_NSWithHeatTransfer:: assemble_intersection_matrix ( FV_DiscreteField const* 
   }
 
   size_t local_min_k = 0;
-  size_t local_max_k = 0;
+  size_t local_max_k = 1;
 
   if (dim == 3) {
      local_min_k = min_index(2);
@@ -3084,12 +3071,7 @@ DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle(class doubleArray2D&
         rotated_coord(1) = ri*sy;
         rotated_coord(2) = ri*sz;
 
-        doubleVector angle(3,0.);
-        angle(0) = solid.thetap[comp]->item(parID,0);
-        angle(1) = solid.thetap[comp]->item(parID,1);
-        angle(2) = solid.thetap[comp]->item(parID,2);
-
-        rotation_matrix(parID,rotated_coord,angle,comp,0);
+        rotation_matrix(parID,rotated_coord,comp,0);
 
         point(0) = xp + rotated_coord(0);
         point(1) = yp + rotated_coord(1);
@@ -3099,7 +3081,7 @@ DDS_NSWithHeatTransfer:: compute_pressure_force_on_particle(class doubleArray2D&
         rotated_normal(0) = s_nx;
         rotated_normal(1) = s_ny;
         rotated_normal(2) = s_nz;
-        rotation_matrix(parID,rotated_normal,angle,comp,0);
+        rotation_matrix(parID,rotated_normal,comp,0);
 
         // Displacement correction in case of periodic boundary condition in any or all directions
         for (size_t dir=0;dir<dim;dir++) {
@@ -3911,12 +3893,7 @@ DDS_NSWithHeatTransfer:: second_order_viscous_stress(class doubleArray2D& force,
 	rotated_coord(1) = ri*surface.coordinate->item(i,1);
 	rotated_coord(2) = ri*surface.coordinate->item(i,2);
 
-   	doubleVector angle(3,0.);
-        angle(0) = solid.thetap[comp]->item(parID,0);
-        angle(1) = solid.thetap[comp]->item(parID,1);
-        angle(2) = solid.thetap[comp]->item(parID,2);
-
-        rotation_matrix(parID,rotated_coord,angle,comp,1);
+        rotation_matrix(parID,rotated_coord,comp,1);
 
         point(0,0) = xp + rotated_coord(0);
         point(0,1) = yp + rotated_coord(1);
@@ -3927,7 +3904,7 @@ DDS_NSWithHeatTransfer:: second_order_viscous_stress(class doubleArray2D& force,
 	rotated_normal(1) = surface.normal->item(i,1);
 	rotated_normal(2) = surface.normal->item(i,2);
 
-	rotation_matrix(parID,rotated_normal,angle,comp,1);
+	rotation_matrix(parID,rotated_normal,comp,1);
 
         for (size_t dir=0;dir<dim;dir++) {
 	   // PBC on rotated surface points
@@ -4258,12 +4235,7 @@ DDS_NSWithHeatTransfer:: first_order_viscous_stress(class doubleArray2D& force, 
 	rotated_coord(1) = ri*surface.coordinate->item(i,1);
 	rotated_coord(2) = ri*surface.coordinate->item(i,2);
 
-   	doubleVector angle(3,0.);
-        angle(0) = solid.thetap[comp]->item(parID,0);
-        angle(1) = solid.thetap[comp]->item(parID,1);
-        angle(2) = solid.thetap[comp]->item(parID,2);
-
-        rotation_matrix(parID,rotated_coord,angle,comp,1);
+        rotation_matrix(parID,rotated_coord,comp,1);
 
         xpoint(0) = xp + rotated_coord(0);
         ypoint(0) = yp + rotated_coord(1);
@@ -4274,7 +4246,7 @@ DDS_NSWithHeatTransfer:: first_order_viscous_stress(class doubleArray2D& force, 
 	rotated_normal(1) = surface.normal->item(i,1);
 	rotated_normal(2) = surface.normal->item(i,2);
 
-	rotation_matrix(parID,rotated_normal,angle,comp,1);
+	rotation_matrix(parID,rotated_normal,comp,1);
 
         if (is_periodic[1][0]) {
            double isize = UF->primary_grid()->get_main_domain_max_coordinate(0) - UF->primary_grid()->get_main_domain_min_coordinate(0);
@@ -6953,7 +6925,7 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
      }
 
      size_t local_min_k = 0;
-     size_t local_max_k = 0;
+     size_t local_max_k = 1;
 
      if (dim == 3) {
         local_min_k = min_index(2);

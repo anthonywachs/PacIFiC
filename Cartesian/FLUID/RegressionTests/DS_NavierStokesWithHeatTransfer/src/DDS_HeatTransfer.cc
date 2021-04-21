@@ -125,6 +125,7 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
    is_stressCal = fromNS.is_stressCal_;
    is_par_motion = fromNS.is_par_motion_;
    particle_information = fromNS.particle_information_;
+   insertion_type = fromNS.insertion_type_;
 
    if (is_solids) {
       Npart = fromNS.Npart_ ;
@@ -359,7 +360,7 @@ DDS_HeatTransfer::write_output_field()
   outputFile.open(filename.c_str());
 
 
-//  outputFile.open("/home/goyal001/Documents/Computing/MAC-Test/DS_results/output_" << my_rank << ".txt", std::ios_base::out | std::ios_base::trunc) ;
+//  outputFile.open("./DS_results/output_" << my_rank << ".txt", std::ios_base::out | std::ios_base::trunc) ;
   size_t i,j,k;
   outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv,behind,bev,front,fv" << endl;
 //  outputFile << "x,y,z,par_ID,void_frac,ugradu,error" << endl;
@@ -1706,16 +1707,16 @@ DDS_HeatTransfer:: Solids_generation ()
   // Convert string to istringstream
   istringstream global_par_info(*particle_information);
   // Import particle information in Heat Transfer solver
-  import_par_info(global_par_info);
+  ReadStringofSolids(global_par_info);
 
 } 
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: import_par_info( istringstream &is )
+DDS_HeatTransfer:: ReadStringofSolids( istringstream &is )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NSWithHeatTransfer:: import_par_info" ) ;
+   MAC_LABEL( "DDS_NSWithHeatTransfer:: ReadStringofSolids" ) ;
 
    // Structure of particle input data
    PartInput solid = GLOBAL_EQ->get_solid();
@@ -1773,7 +1774,7 @@ DDS_HeatTransfer:: import_par_info( istringstream &is )
 	 cout << "Particle info: " << xp << "," << yp << "," << zp << "," 
 		 		   << vx << "," << vy << "," << vz << "," 
 		 		   << wx << "," << wy << "," << wz << "," 
-		 		   << Rp << endl; 
+		 		   << Rp << "," << Tp << endl; 
 */
 	 // Storing the information in particle structure
          for (size_t comp=0;comp<nb_comps;comp++) {
@@ -1958,7 +1959,7 @@ DDS_HeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
      }
   }
 
-  if (my_rank == 0) cout << "Average dimensional Nusselt number for Np " << Nmax << " : " << avg_force <<endl;
+  if (my_rank == 0) cout << "Average dimensional Nusselt number for Np " << Nmax << " : " << avg_force/double(Npart) <<endl;
 }
 
 //---------------------------------------------------------------------------
@@ -2036,12 +2037,7 @@ DDS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, 
      rotated_coord(1) = ri*surface.coordinate->item(i,1);
      rotated_coord(2) = ri*surface.coordinate->item(i,2);
 
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(parID,0);
-     angle(1) = solid.thetap[comp]->item(parID,1);
-     angle(2) = solid.thetap[comp]->item(parID,2);
-
-     rotation_matrix(parID,rotated_coord,angle);
+     rotation_matrix(parID,rotated_coord);
 
      point(0,0) = xp + rotated_coord(0);
      point(0,1) = yp + rotated_coord(1);
@@ -2052,7 +2048,7 @@ DDS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, 
      rotated_normal(1) = surface.normal->item(i,1);
      rotated_normal(2) = surface.normal->item(i,2);
 
-     rotation_matrix(parID,rotated_normal,angle);
+     rotation_matrix(parID,rotated_normal);
 
      for (size_t dir=0;dir<dim;dir++) {
         // PBC on rotated surface points
@@ -2803,12 +2799,7 @@ DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, s
      rotated_coord(1) = ri*surface.coordinate->item(i,1);
      rotated_coord(2) = ri*surface.coordinate->item(i,2);
 
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(parID,0);
-     angle(1) = solid.thetap[comp]->item(parID,1);
-     angle(2) = solid.thetap[comp]->item(parID,2);
-
-     rotation_matrix(parID,rotated_coord,angle);
+     rotation_matrix(parID,rotated_coord);
 
      ipoint(0,0) = xp + rotated_coord(0);
      ipoint(0,1) = yp + rotated_coord(1);
@@ -2819,7 +2810,7 @@ DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, s
      rotated_normal(1) = surface.normal->item(i,1);
      rotated_normal(2) = surface.normal->item(i,2);
 
-     rotation_matrix(parID,rotated_normal,angle);
+     rotation_matrix(parID,rotated_normal);
 
      // Correction in case of periodic boundary condition in any direction
      for (size_t dir=0;dir<dim;dir++) {
@@ -4006,29 +3997,17 @@ DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, doub
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Ellipsoid") {
      // Solid object rotation, if any     
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta);
      level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
   } else if (type == "Superquadric") {
      // Solid object rotation, if any     
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta);
      level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Cube") {
      // Solid object rotation, if any     
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta);
      delta(0) = MAC::abs(delta(0)) - Rp;
      delta(1) = MAC::abs(delta(1)) - Rp;
      delta(2) = MAC::abs(delta(2)) - Rp;
@@ -4040,11 +4019,7 @@ DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, doub
      }
   } else if (type == "Cylinder") {
      // Solid object rotation, if any     
-     doubleVector angle(3,0.);
-     angle(0) = solid.thetap[comp]->item(m,0);
-     angle(1) = solid.thetap[comp]->item(m,1);
-     angle(2) = solid.thetap[comp]->item(m,2);
-     trans_rotation_matrix(m,delta,angle);
+     trans_rotation_matrix(m,delta);
 
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
      if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
@@ -4059,28 +4034,41 @@ DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, doub
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
+DDS_HeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& delta)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_HeatTransfer:: trans_rotation_matrix" ) ;
 
-  double roll = (MAC::pi()/180.)*angle(0);
-  double pitch = (MAC::pi()/180.)*angle(1);
-  double yaw = (MAC::pi()/180.)*angle(2);
+  PartInput solid = GLOBAL_EQ->get_solid();
 
   // yaw along z-axis; pitch along y-axis; roll along x-axis
   doubleArray2D rot_matrix(3,3,0);
 
   // Rotation matrix assemble
-  rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-  rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-  rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
-  rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
-  rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-  rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
-  rot_matrix(0,2) = -MAC::sin(pitch);
-  rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
-  rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  if (insertion_type == "file") {
+     double roll = (MAC::pi()/180.)*solid.thetap[0]->item(m,0);
+     double pitch = (MAC::pi()/180.)*solid.thetap[0]->item(m,1);
+     double yaw = (MAC::pi()/180.)*solid.thetap[0]->item(m,2);
+     rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+     rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+     rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+     rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
+     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+     rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+     rot_matrix(0,2) = -MAC::sin(pitch);
+     rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
+     rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  } else if (insertion_type == "GRAINS") {
+     rot_matrix(0,0) = solid.thetap[0]->item(m,0);
+     rot_matrix(1,0) = solid.thetap[0]->item(m,1);
+     rot_matrix(2,0) = solid.thetap[0]->item(m,2);
+     rot_matrix(0,1) = solid.thetap[0]->item(m,3);
+     rot_matrix(1,1) = solid.thetap[0]->item(m,4);
+     rot_matrix(2,1) = solid.thetap[0]->item(m,5);
+     rot_matrix(0,2) = solid.thetap[0]->item(m,6);
+     rot_matrix(1,2) = solid.thetap[0]->item(m,7);
+     rot_matrix(2,2) = solid.thetap[0]->item(m,8);
+  }
 
   double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
   double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
@@ -4093,29 +4081,42 @@ DDS_HeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& d
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta, class doubleVector& angle)
+DDS_HeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_HeatTransfer:: rotation_matrix" ) ;
 
-  double roll = (MAC::pi()/180.)*angle(0);
-  double pitch = (MAC::pi()/180.)*angle(1);
-  double yaw = (MAC::pi()/180.)*angle(2);
+  PartInput solid = GLOBAL_EQ->get_solid();
 
   // yaw along z-axis; pitch along y-axis; roll along x-axis
   doubleArray2D rot_matrix(3,3,0);
 
   // Rotation matrix assemble
-  rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-  rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-  rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
-  rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
-  rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-  rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
-  rot_matrix(2,0) = -MAC::sin(pitch);
-  rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
-  rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
-
+  if (insertion_type == "file") {
+     double roll = (MAC::pi()/180.)*solid.thetap[0]->item(m,0);
+     double pitch = (MAC::pi()/180.)*solid.thetap[0]->item(m,1);
+     double yaw = (MAC::pi()/180.)*solid.thetap[0]->item(m,2);
+     rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
+     rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
+     rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+     rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
+     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
+     rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+     rot_matrix(2,0) = -MAC::sin(pitch);
+     rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
+     rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
+  } else if (insertion_type == "GRAINS") {
+     rot_matrix(0,0) = solid.thetap[0]->item(m,0);
+     rot_matrix(0,1) = solid.thetap[0]->item(m,1);
+     rot_matrix(0,2) = solid.thetap[0]->item(m,2);
+     rot_matrix(1,0) = solid.thetap[0]->item(m,3);
+     rot_matrix(1,1) = solid.thetap[0]->item(m,4);
+     rot_matrix(1,2) = solid.thetap[0]->item(m,5);
+     rot_matrix(2,0) = solid.thetap[0]->item(m,6);
+     rot_matrix(2,1) = solid.thetap[0]->item(m,7);
+     rot_matrix(2,2) = solid.thetap[0]->item(m,8);
+  }
+     
   double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
   double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
   double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
@@ -4231,7 +4232,7 @@ DDS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t con
   }
 
   size_t local_min_k = 0;
-  size_t local_max_k = 0;
+  size_t local_max_k = 1;
 
   if (dim == 3) {
      local_min_k = min_index(2);
