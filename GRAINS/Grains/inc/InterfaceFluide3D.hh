@@ -129,6 +129,15 @@ void WriteParticulesInFluid(list<Particule*> const& particules,
 void WriteParticulesInDSFluid(list<Particule*> const& particules,
 	istringstream &is ) const;
 
+   /**
+   @brief Method outputs the particle details in istringstream 
+   @param particules vecteur contenant l'ensemble des particules sur tous
+   les processeurs
+   @param is structure Direction Splitting
+*/
+void ReadParticulesFromDSFluid(list<Particule*> const& particules,
+	istringstream &is ) const;
+
 
 /**
   @brief Mise � jour de la vitesse des particules par Basilisk.

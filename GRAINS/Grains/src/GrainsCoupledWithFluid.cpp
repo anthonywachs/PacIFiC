@@ -775,6 +775,14 @@ void GrainsCoupledWithFluid::WriteParticulesInDSFluid( istringstream &is ) const
     	*m_composants.getParticulesActives(), is );
 }
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+void GrainsCoupledWithFluid::ReadParticulesFromDSFluid( istringstream &is ) const
+{
+  if ( m_processorIsActiv )
+    m_InterfaceFluide->ReadParticulesFromDSFluid(
+    	*m_composants.getParticulesActives(), is );
+}
+
 
 
 

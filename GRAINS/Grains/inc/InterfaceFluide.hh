@@ -126,6 +126,15 @@ public:
 
   virtual void WriteParticulesInDSFluid(list<Particule*> const& particules, istringstream &is ) const = 0;
 
+  /**
+  @brief Read particle data to grains from Direction Splitting NS solver
+  @param particules vecteur contenant l'ensemble des particules sur tous
+   les processeurs
+  @param is structure DS
+  */
+
+  virtual void ReadParticulesFromDSFluid(list<Particule*> const& particules, istringstream &is ) const = 0;
+
   /** @brief Mise � jour de la vitesse des particules par Basilisk.
   @param particules liste des particules
   @param dt Valeur de l'increment de temps

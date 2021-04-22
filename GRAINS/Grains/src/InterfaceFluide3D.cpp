@@ -609,6 +609,61 @@ void InterfaceFluide3D::WritePVGCInFluid(
 }
 
 // ============================================================================
+// Sequential version to read particle data in istringstream from  
+// Direction Splitting solver on fluid side
+// Added by Aashish Goyal, Feb 2021
+void InterfaceFluide3D::ReadParticulesFromDSFluid(
+	list<Particule*> const& particules,
+	istringstream &is ) const
+{
+  ostringstream particles_features;
+
+  particles_features.precision(10);
+  list<Particule*>::const_iterator particule;
+  Vecteur bodyF;
+  Point const* centre;
+
+  for (particule=particules.begin();
+      particule!=particules.end(); particule++)
+  {
+    if ( (*particule)->getActivity() == COMPUTE
+    	&& (*particule)->getID() >= 0 )
+    {
+
+      centre   = (*particule)->getPosition();
+      bodyF = Vecteur(100000.,100000.,0.);
+
+//      (*particule)->addBodyForce(bodyF);
+//      (*particule)->addForceMoment(1000,1000,0,0,0,0);
+      (*particule)->addForce(*centre,bodyF);
+/*
+      // Informations : donnees de la particule
+      vitesseT = (*particule)->getVitesseTranslation();
+      vitesseR = (*particule)->getVitesseRotation();
+      masseVol = (*particule)->getMasseVolumique();
+      masse    = (*particule)->getMasse();
+      centre   = (*particule)->getPosition();
+      orient   = (*particule)->getForme()->getOrientation();      
+
+      particles_features << "P" << '\t'
+	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'
+	<< masseVol       <<'\t'<< masse          <<'\t'
+	<< (*vitesseT)[X] <<'\t'<< (*vitesseT)[Y] <<'\t'
+	<< (*vitesseR)[Z] <<
+	endl;
+
+      particles_features << "O" << '\t'
+        << (orient)[0][0]   <<'\t'<< (orient)[0][1]   <<'\t'<< (orient)[0][2]   <<'\t'
+        << (orient)[1][0]   <<'\t'<< (orient)[1][1]   <<'\t'<< (orient)[1][2]   <<'\t'
+        << (orient)[2][0]   <<'\t'<< (orient)[2][1]   <<'\t'<< (orient)[2][2]   <<'\t'
+        << endl;
+*/
+    }
+  }
+  is.str( particles_features.rdbuf()->str() );
+}
+
+// ============================================================================
 // Sequential version to write particle data in istringstream for the 
 // use in Direction Splitting solver
 // Added by Aashish Goyal, Feb 2021

@@ -120,6 +120,14 @@ public:
    void WriteParticulesInDSFluid(list<Particule*> const& particules,
 	istringstream &is ) const;
 
+   /**
+   @brief Method outputs the particle details in istringstream 
+   @param particules vecteur contenant l'ensemble des particules sur tous
+   les processeurs
+   @param is structure Direction Splitting
+*/
+   void ReadParticulesFromDSFluid(list<Particule*> const& particules,
+	istringstream &is ) const;
 
 
   /**
