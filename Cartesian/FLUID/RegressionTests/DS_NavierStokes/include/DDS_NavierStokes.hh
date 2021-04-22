@@ -204,6 +204,9 @@ public SolverComputingTime
       /** @brief Initialize the velocity on the velocity nodes in MAC grid*/
       void nodes_field_initialization ( size_t const& level );
 
+      void generate_list_of_local_particles (FV_DiscreteField const* FF, size_t const& field );
+
+
       void ugradu_initialization ( );
 
       void impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
@@ -322,6 +325,7 @@ public SolverComputingTime
       size_t dim;
       size_t nb_comps[2];               // 0th element for P and 1st element for U
       size_t Npart;
+      size_t Npart_local;
 
       MAC_Communicator const* pelCOMM;
       MPI_Comm DDS_Comm_i[3];

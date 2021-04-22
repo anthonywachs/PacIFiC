@@ -64,11 +64,12 @@ struct LocalVector {
 struct PartInput {
    LA_SeqMatrix ** coord;               // Coordinates
    LA_SeqVector ** size;                // Size of the sphere
-   LA_SeqMatrix ** thetap;               // yaw, pitch, roll
+   LA_SeqMatrix ** thetap;              // yaw, pitch, roll
    LA_SeqMatrix ** vel;                 // Velocity of the sphere
-   LA_SeqMatrix ** ang_vel;                 // Angular velocity of the sphere
+   LA_SeqMatrix ** ang_vel;             // Angular velocity of the sphere
    LA_SeqVector ** temp;                // Temperature of the sphere
    LA_SeqVector ** inside;              // 1 if solid only from inside; -1 if solid only from outside
+   LA_SeqVector ** local_parID;         // list of ID's present in the current processor
 };
 
 /** @brief NodeProp to be used to store the nodes properties due to presence of solid particles in the domian */

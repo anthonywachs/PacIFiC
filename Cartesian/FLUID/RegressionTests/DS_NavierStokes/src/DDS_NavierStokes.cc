@@ -1478,6 +1478,43 @@ DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel, siz
 
 //---------------------------------------------------------------------------
 void
+DDS_NavierStokes:: generate_list_of_local_particles (FV_DiscreteField const* FF, size_t const& field )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes:: generate_list_of_local_particles" ) ;
+
+  PartInput solid = GLOBAL_EQ->get_solid(field);
+
+  doubleVector Dmin(dim,0);
+  doubleVector Dmax(dim,0);
+
+  for (size_t l=0;l<dim;++l) {
+     Dmin(l) = FF->primary_grid()->get_min_coordinate_on_current_processor(l);
+     Dmax(l) = FF->primary_grid()->get_max_coordinate_on_current_processor(l);
+  }
+
+  for (size_t comp=0;comp<nb_comps[field];comp++) {
+     size_t cntr = 0;
+     for (size_t m = 0; m < Npart; m++) {
+
+        double x0 = solid.coord[comp]->item(m,0);
+        double y0 = solid.coord[comp]->item(m,1);
+        double z0 = solid.coord[comp]->item(m,2);
+	double Dp = 2.*solid.size[comp]->item(m);
+
+        bool status = (dim==2) ? ((x0 > (Dmin(0)-Dp)) && (x0 <= (Dmax(0)+Dp)) 
+			       && (y0 > (Dmin(1)-Dp)) && (y0 <= (Dmax(1)+Dp))) :
+                                 ((x0 > (Dmin(0)-Dp)) && (x0 <= (Dmax(0)+Dp)) 
+                               && (y0 > (Dmin(1)-Dp)) && (y0 <= (Dmax(1)+Dp))
+                               && (z0 > (Dmin(2)-Dp)) && (z0 <= (Dmax(2)+Dp))) ;
+
+	if (status) { solid.local_parID[comp]->set_item(cntr,(double)m); cntr++; }
+     }
+     Npart_local = cntr;
+  }
+}
+//---------------------------------------------------------------------------
+void
 DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t const& field )
 //---------------------------------------------------------------------------
 {

@@ -161,6 +161,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       solid[field].ang_vel = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
       solid[field].temp = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
       solid[field].inside = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
+      solid[field].local_parID = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
 
       // Vector to store the presence/absence of particle on the field variable
       node[field].void_frac = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
@@ -314,6 +315,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
                solid[field].vel[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
                solid[field].ang_vel[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
                solid[field].inside[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               solid[field].local_parID[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field].void_frac[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field].parID[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field].bound_cell[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -460,6 +462,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
                solid[field].ang_vel[comp]->re_initialize(Npart,3);
                solid[field].temp[comp]->re_initialize(Npart);
                solid[field].inside[comp]->re_initialize(Npart);
+               solid[field].local_parID[comp]->re_initialize(Npart);
             }
 
             if (is_periodic[field][l] != 1) {
