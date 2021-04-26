@@ -82,6 +82,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , is_par_motion( false )
    , is_stressCal( false )
    , DivergenceScheme ( "FD" )
+   , IntersectionMethod ( "Bisection" )
+   , tolerance ( 1.e-6 ) 
 {
    MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -146,6 +148,13 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    {
      mu = exp->double_data( "Viscosity" ) ;
      exp->test_data( "Viscosity", "Viscosity>0." ) ;
+   }
+
+   // Read Intersection tolerance
+   if ( exp->has_entry( "IntersectionTolerance" ) )
+   {
+     rho = exp->double_data( "IntersectionTolerance" ) ;
+     exp->test_data( "IntersectionTolerance", "IntersectionTolerance>0." ) ;
    }
 
    // Read the presence of particles
@@ -244,6 +253,17 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
         string error_message="   - FD\n   - FV";
         MAC_Error::object()->raise_bad_data_value( exp,
            "DivergenceScheme", error_message );
+     }
+   }
+
+   // Method for calculating intersections 
+   if ( exp->has_entry( "IntersectionMethod" ) )
+   {
+     IntersectionMethod = exp->string_data( "IntersectionMethod" ) ;
+     if ( IntersectionMethod != "Bisection" && IntersectionMethod != "Newton") {
+        string error_message="   - Bisection\n   - Newton";
+        MAC_Error::object()->raise_bad_data_value( exp,
+           "IntersectionMethod", error_message );
      }
    }
 
@@ -403,6 +423,11 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 	 import_par_info(0,global_par_info);
 	 import_par_info(1,global_par_info);
       }
+
+      // Generating list of particle local to current processor
+      generate_list_of_local_particles(PF,0);
+      generate_list_of_local_particles(UF,1);
+
       node_property_calculation(PF,0);
       node_property_calculation(UF,1);
       nodes_field_initialization(0);
@@ -1238,6 +1263,80 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
 }
 
 //---------------------------------------------------------------------------
+double
+DDS_NavierStokes:: level_set_derivative (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field, size_t const& partial_dir)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes:: level_set_derivative" ) ;
+
+  PartInput solid = GLOBAL_EQ->get_solid(field);
+
+  double xp = solid.coord[comp]->item(m,0);
+  double yp = solid.coord[comp]->item(m,1);
+  double zp = solid.coord[comp]->item(m,2);
+//  double Rp = solid.size[comp]->item(m);
+
+  doubleVector delta(3,0);
+  doubleVector derivative(3,0);
+
+  delta(0) = xC-xp;
+  delta(1) = yC-yp;
+  delta(2) = 0;
+  if (dim == 3) delta(2) = zC-zp;
+
+  // Displacement correction in case of periodic boundary condition in any or all directions
+  for (size_t dir=0;dir<dim;dir++) {
+     if (is_periodic[field][dir]) {
+        double isize = FF->primary_grid()->get_main_domain_max_coordinate(dir) - FF->primary_grid()->get_main_domain_min_coordinate(dir);
+        delta(dir) = delta(dir) - round(delta(dir)/isize)*isize;
+     }
+  }
+
+  // Try to add continuous level set function; solver performs better in this case for nodes at interface
+  if (type == "Sphere") {
+     derivative(0) = delta(0)/pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5);
+     derivative(1) = delta(1)/pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5);
+     if (dim == 3) derivative(2) = delta(2)/pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5);
+/*  } else if (type == "Ellipsoid") {
+     // Solid object rotation, if any	  
+     trans_rotation_matrix(m,delta,comp,field);
+     level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
+  } else if (type == "Superquadric") {
+     // Solid object rotation, if any	  
+     trans_rotation_matrix(m,delta,comp,field);
+     level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
+  } else if (type == "PipeX") {
+     level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
+  } else if (type == "Cube") {
+     // Solid object rotation, if any	  
+     trans_rotation_matrix(m,delta,comp,field);
+     delta(0) = MAC::abs(delta(0)) - Rp;
+     delta(1) = MAC::abs(delta(1)) - Rp;
+     delta(2) = MAC::abs(delta(2)) - Rp;
+
+     if ((delta(0) < 0.) && (delta(1) < 0.) && (delta(2) < 0.)) {
+        level_set = MAC::min(delta(0),MAC::min(delta(1),delta(2)));
+     } else {
+        level_set = MAC::max(delta(0),MAC::max(delta(1),delta(2)));
+     }
+  } else if (type == "Cylinder") {
+     // Solid object rotation, if any	  
+     trans_rotation_matrix(m,delta,comp,field);
+
+     level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
+     if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
+	level_set = MAC::abs(MAC::abs(delta(2))-Rp)*level_set;
+     } else {
+	level_set = MAC::max(MAC::abs(MAC::abs(delta(2))-Rp),MAC::abs(level_set));
+     }*/
+  }
+
+  return(derivative(partial_dir));
+
+}
+
+
+//---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, size_t const& comp, size_t const& field)
 //---------------------------------------------------------------------------
@@ -1500,13 +1599,13 @@ DDS_NavierStokes:: generate_list_of_local_particles (FV_DiscreteField const* FF,
         double x0 = solid.coord[comp]->item(m,0);
         double y0 = solid.coord[comp]->item(m,1);
         double z0 = solid.coord[comp]->item(m,2);
-	double Dp = 2.*solid.size[comp]->item(m);
+	double Rp = solid.size[comp]->item(m);
 
-        bool status = (dim==2) ? ((x0 > (Dmin(0)-Dp)) && (x0 <= (Dmax(0)+Dp)) 
-			       && (y0 > (Dmin(1)-Dp)) && (y0 <= (Dmax(1)+Dp))) :
-                                 ((x0 > (Dmin(0)-Dp)) && (x0 <= (Dmax(0)+Dp)) 
-                               && (y0 > (Dmin(1)-Dp)) && (y0 <= (Dmax(1)+Dp))
-                               && (z0 > (Dmin(2)-Dp)) && (z0 <= (Dmax(2)+Dp))) ;
+        bool status = (dim==2) ? ((x0 > (Dmin(0)-Rp)) && (x0 <= (Dmax(0)+Rp)) 
+			       && (y0 > (Dmin(1)-Rp)) && (y0 <= (Dmax(1)+Rp))) :
+                                 ((x0 > (Dmin(0)-Rp)) && (x0 <= (Dmax(0)+Rp)) 
+                               && (y0 > (Dmin(1)-Rp)) && (y0 <= (Dmax(1)+Rp))
+                               && (z0 > (Dmin(2)-Rp)) && (z0 <= (Dmax(2)+Rp))) ;
 
 	if (status) { solid.local_parID[comp]->set_item(cntr,(double)m); cntr++; }
      }
@@ -1823,27 +1922,56 @@ DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const&
   if (funl*funr > 0.) {
      xcenter = FF->get_DOF_coordinate( side(off), comp, dir ) ;
   } else {
-     // Bisection method algorithm
-     while (MAC::abs(xright-xleft) > 1.E-14) {
-        xcenter = (xleft+xright)/2.;
-        if (dir == 0) {
-           funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-           func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
-        } else if (dir == 1) {
-           funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-           func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
-        } else if (dir == 2) {
-           funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-           func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
-        }
+     if (IntersectionMethod == "Bisection") {
+        // Bisection method algorithm
+        while (MAC::abs(xright-xleft) > 1.E-14) {
+           xcenter = (xleft+xright)/2.;
+           if (dir == 0) {
+              funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+              func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
+           } else if (dir == 1) {
+              funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+              func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
+           } else if (dir == 2) {
+              funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+              func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
+           }
 
-        if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
+           if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
 
-        if (func*funl >= 1.E-16) {
-           xleft = xcenter;
-        } else {
-           xright = xcenter;
-        }
+           if (func*funl >= 1.E-16) {
+              xleft = xcenter;
+           } else {
+              xright = xcenter;
+           }
+	}
+     } else if (IntersectionMethod == "Newton") {
+	// Apr 21: Just implemented, not tested
+	// Newton-Rapson method
+	double eps = MAC::abs(xright-xleft);
+	double xright_old = xright;
+        while (eps > tolerance) {
+           if (dir == 0) {
+              xright = xleft - level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field) /
+	                       level_set_derivative(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field,dir) ;
+	   } else if (dir == 1) {
+              xright = xleft - level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field) /
+	                       level_set_derivative(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field,dir) ;
+	   } else if (dir == 2) {
+              xright = xleft - level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field) /
+	                       level_set_derivative(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field,dir) ;
+	   }
+
+	   if (MAC::abs(xright_old) > 1.e-12) {
+	      eps = MAC::abs(xright - xright_old)/MAC::abs(xright_old);
+	   } else {
+	      eps = MAC::abs(xright - xright_old);
+	   }
+
+	   xleft = xright;
+	   xright_old = xright;
+	}
+	xcenter = xleft;
      }
   }
 
