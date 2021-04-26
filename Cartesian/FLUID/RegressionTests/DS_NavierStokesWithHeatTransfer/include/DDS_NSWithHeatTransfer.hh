@@ -351,6 +351,7 @@ public SolverComputingTime
       double ar;
 
       double Amp, freq;
+      double Tpart;
 
       GrainsCoupledWithFluid* grains;
 

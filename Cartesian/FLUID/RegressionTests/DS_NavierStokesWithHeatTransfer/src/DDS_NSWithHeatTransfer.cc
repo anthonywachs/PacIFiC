@@ -169,9 +169,10 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
       }
 
-      // Read the solids filename
+      // Read the solids filename and particle temperature if required
       if (insertion_type == "GRAINS") {
 	 solid_filename = "Grains/simul.xml";
+         Tpart = exp->double_data( "Particle_temperature" ) ;
       } else if (insertion_type == "file") {
          solid_filename = exp->string_data( "Particle_FileName" );
       }
@@ -474,7 +475,7 @@ DDS_NSWithHeatTransfer:: import_par_info( size_t const& field, istringstream &is
    istringstream lineStream;
    string cell;
    int cntr = -1;
-   double Rp=0.,Tp=0.;
+   double Rp=0.;
 
    // Ensure that the getline ALWAYS reads from start of the string
    is.clear();
@@ -543,7 +544,7 @@ DDS_NSWithHeatTransfer:: import_par_info( size_t const& field, istringstream &is
             solid.ang_vel[comp]->set_item(cntr,0,wx);
             solid.ang_vel[comp]->set_item(cntr,1,wy);
             solid.ang_vel[comp]->set_item(cntr,2,wz);
-            solid.temp[comp]->set_item(cntr,Tp);
+            solid.temp[comp]->set_item(cntr,Tpart);
             solid.inside[comp]->set_item(cntr,1);
          }
       } else if (cell == "O") {
