@@ -3394,9 +3394,9 @@ DDS_HeatTransfer:: impose_solid_temperature (size_t const& comp, size_t const& d
      delta(m) = grid_coord(m) - par_coord(m);
   }
 
-//  double ghost_temp = solid.temp[comp]->item(parID);
+  double ghost_temp = solid.temp[comp]->item(parID);
 //  double ghost_temp = pow((grid_coord(0)-0.5)*(grid_coord(1)-0.5)*(grid_coord(2)-0.5),2.) + pow((grid_coord(0)-0.5),4.)*pow((grid_coord(1)-0.5),4.)*pow((grid_coord(2)-0.5),4.);
-  double ghost_temp = 3.*MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
+//  double ghost_temp = 3.*MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
 
   return(ghost_temp);
 }
@@ -3429,9 +3429,9 @@ DDS_HeatTransfer:: impose_solid_temperature_for_ghost (size_t const& comp, doubl
      delta(m) = grid_coord(m) - par_coord(m);
   }
 
-//  double ghost_temp = solid.temp[comp]->item(parID);
+  double ghost_temp = solid.temp[comp]->item(parID);
 //  double ghost_temp = pow((grid_coord(0)-0.5)*(grid_coord(1)-0.5)*(grid_coord(2)-0.5),2.) + pow((grid_coord(0)-0.5),4.)*pow((grid_coord(1)-0.5),4.)*pow((grid_coord(2)-0.5),4.);
-  double ghost_temp = 3.*MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
+//  double ghost_temp = 3.*MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
 
   return(ghost_temp);
 }

@@ -351,7 +351,7 @@ DDS_NSWithHeatTransfer:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
    start_total_timer( "DDS_NSWithHeatTransfer:: do_one_inner_iteration" ) ;
    start_solving_timer() ;
-/*
+
    if ( my_rank == is_master ) SCT_set_start("Pressure predictor");
    NS_first_step(t_it);
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Pressure predictor" );
@@ -376,7 +376,7 @@ DDS_NSWithHeatTransfer:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
    // Temperature solver
    Solver_Temperature->do_one_inner_iteration( t_it ) ;
-*/
+
    stop_solving_timer() ;
    stop_total_timer() ;
 
@@ -1386,7 +1386,8 @@ DDS_NSWithHeatTransfer:: WriteSolidsInString ()
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(0);
 
-  double xp,yp,zp,Rp,tx,ty,tz,vx,vy,vz,wx,wy,wz,Tp,off;
+  double xp,yp,zp,Rp,vx,vy,vz,wx,wy,wz,Tp,off;
+  double txx,txy,txz,tyx,tyy,tyz,tzx,tzy,tzz;
 
   std::ostringstream particles_features;
   particles_features.precision(10);
@@ -1396,9 +1397,15 @@ DDS_NSWithHeatTransfer:: WriteSolidsInString ()
      yp = solid.coord[0]->item(i,1);
      zp = solid.coord[0]->item(i,2);
      Rp = solid.size[0]->item(i);
-     tx = solid.thetap[0]->item(i,0);
-     ty = solid.thetap[0]->item(i,1);
-     tz = solid.thetap[0]->item(i,2);
+     txx = solid.thetap[0]->item(i,0);
+     txy = solid.thetap[0]->item(i,1);
+     txz = solid.thetap[0]->item(i,2);
+     tyx = solid.thetap[0]->item(i,3);
+     tyy = solid.thetap[0]->item(i,4);
+     tyz = solid.thetap[0]->item(i,5);
+     tzx = solid.thetap[0]->item(i,6);
+     tzy = solid.thetap[0]->item(i,7);
+     tzz = solid.thetap[0]->item(i,8);
      vx = solid.vel[0]->item(i,0);
      vy = solid.vel[0]->item(i,1);
      vz = solid.vel[0]->item(i,2);
@@ -1414,9 +1421,9 @@ DDS_NSWithHeatTransfer:: WriteSolidsInString ()
         << Tp <<'\t'<< off <<'\t'<< endl;
 
      particles_features << "O" << '\t'
-        << tx <<'\t'<< ty <<'\t'<< tz <<'\t'
-        << tx <<'\t'<< ty <<'\t'<< tz <<'\t'
-        << tx <<'\t'<< ty <<'\t'<< tz <<'\t'
+        << txx <<'\t'<< txy <<'\t'<< txz <<'\t'
+        << tyx <<'\t'<< tyy <<'\t'<< tyz <<'\t'
+        << tzx <<'\t'<< tzy <<'\t'<< tzz <<'\t'
         << endl;
   }
 
@@ -1512,14 +1519,14 @@ DDS_NSWithHeatTransfer:: impose_solid_velocity (FV_DiscreteField const* FF, vect
 /*
   net_vel[0] = pow(grid_coord(0),4) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4);
   net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3);
-  net_vel[2] = 0.;*/
+  net_vel[2] = 0.;
   net_vel[0] = pow(grid_coord(0),1) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4)*pow(grid_coord(2),3);
   net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3)*pow(grid_coord(2),2);
-  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2.)*pow(grid_coord(0)+grid_coord(2),2.)*pow(grid_coord(2)+grid_coord(1),2.);
-/*  net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
+  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2.)*pow(grid_coord(0)+grid_coord(2),2.)*pow(grid_coord(2)+grid_coord(1),2.);*/
+  net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
-  net_vel[0] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1));
+/*  net_vel[0] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1));
   net_vel[1] = MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
   net_vel[2] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(2));*/
 }
@@ -1558,14 +1565,14 @@ DDS_NSWithHeatTransfer:: impose_solid_velocity_for_ghost (vector<double> &net_ve
 /*
   net_vel[0] = pow(grid_coord(0),4) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4);
   net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3);
-  net_vel[2] = 0.;*/
+  net_vel[2] = 0.;
   net_vel[0] = pow(grid_coord(0),1) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4)*pow(grid_coord(2),3);
   net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3)*pow(grid_coord(2),2);
-  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2.)*pow(grid_coord(0)+grid_coord(2),2.)*pow(grid_coord(2)+grid_coord(1),2.);
-/*  net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
+  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2.)*pow(grid_coord(0)+grid_coord(2),2.)*pow(grid_coord(2)+grid_coord(1),2.);*/
+  net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
-  net_vel[0] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1));
+/*  net_vel[0] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1));
   net_vel[1] = MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
   net_vel[2] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(2));*/
 }
