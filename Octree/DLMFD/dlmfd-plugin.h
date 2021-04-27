@@ -88,17 +88,17 @@ event init (i = 0)
     printf( "==================================\n" );        
   }
 
-#ifndef rhoval
-# define rhoval 1.
-#endif
+# ifndef rhoval
+#   define rhoval 1.
+# endif
   
   /* Initialize the density field */
   const scalar rhoc[] = rhoval;
   rho = rhoc;
 
-#ifndef tval
-# define tval 1.
-#endif
+# ifndef tval
+#   define tval 1.
+# endif
   
   /* Initialize the viscosity field */
   const face vector muc[] = {tval, tval, tval};
@@ -117,94 +117,25 @@ event init (i = 0)
   // Initialize all DLMFD fields
   initialize_DLMFD_fields_to_zero();
 
-  // If new simulation: set fluid initial condition and initialise data file 
-  // pointers 
+  // If new simulation: set fluid initial condition from user defined case file
   if ( ! restore ( file = fluid_dump_filename ) ) 
   {
     // Set the restarted simulation boolean to 1
     restarted_simu = 0;
-
-    /* Generic particle parameters, will be overwritten by the
-       GranularSolver_init event if need be */
-    for (int k = 0; k < NPARTICLES; k++) 
-    {
-      /* particle id */
-      particles[k].pnum = k;
-      
-# if DLM_Moving_particle    
-      /* density rho_s of the particle */
-# ifndef rhosolid
-# define rhosolid  HUGE
-# endif
-      particles[k].rho_s = rhosolid;
-	
-      /* DLMFD coupling factor */
-      /* If explicit add mass, DLMFD_couplingFactor = 1 */
-      /* otherwise DLMFD_couplingFactor = ( 1 - rhoval / rho_s ) */
-    
-      particles[k].DLMFD_couplingfactor = 1. ;
-
-#if (!b_explicit_added_mass) 
-      particles[k].DLMFD_couplingfactor -= rhoval / particles[k].rho_s ;
-#endif
-      
-      if ( particles[k].shape == SPHERE 
-      		|| particles[k].shape == CIRCULARCYLINDER2D ) 
-      {
-	GeomParameter gp = particles[k].g;
-# if dimension == 2 
-	/* Surface of the particle for a circle  */
-	particles[k].Vp = pi*sq(gp.radius);
-
-	/* total weight of the particle */
-	particles[k].M = rhosolid*(particles[k].Vp);
-
-	/* The inertia tensor is: */
-	/* For a solid disk: */
-	particles[k].Ip[0] = (particles[k].M)*sq(gp.radius)/4; /* Ip[0] = Ixx */
-	particles[k].Ip[1] = particles[k].Ip[0];               /* Ip[1] = Iyy */
-	particles[k].Ip[2] = (particles[k].M)*sq(gp.radius)/2; /* Ip[2] = Izz */
-	particles[k].Ip[3] = 0.;                               /* Ip[3] = Ixy */
-	particles[k].Ip[4] = 0.;                               /* Ip[4] = Ixz */
-	particles[k].Ip[5] = 0.;                               /* Ip[5] = Iyz */
-# endif
-# if dimension == 3
-	/* Volume  of the particle (sphere) */
-	particles[k].Vp = 4.*pi*pow(gp.radius,3)/3.;
-
-	/* total weight of the particle */
-	particles[k].M = rhosolid*(particles[k].Vp);
-
-	/* For a sphere it comes: I_xx = I_yy = I_zz = 2/5 M R^2 
-	with R the radius */
-	particles[k].Ip[0] = 2.*(particles[k].M)*sq(gp.radius)/5.; 
-		/* Ip[0] = Ixx */
-	particles[k].Ip[1] = particles[k].Ip[0]; /* Ip[1] = Iyy */
-	particles[k].Ip[2] = particles[k].Ip[0]; /* Ip[2] = Izz */
-	particles[k].Ip[3] = 0.; /* Ip[3] = Ixy */
-	particles[k].Ip[4] = 0.; /* Ip[4] = Ixz */
-	particles[k].Ip[5] = 0.; /* Ip[5] = Iyz */
-# endif
-      }
-#endif
-    }
   }
   else // Restart of a simulation 
   {
-      /* Set the restarted simulation boolean to 1 */
-      restarted_simu = 1;
-      
-      /* Restore particle data */
-      restore_particle( particles );
+    // Set the restarted simulation boolean to 1
+    restarted_simu = 1;
 
-      // Read restart time
-      printf( "Read t and dt from time restart file\n" );
-      read_t_restart( dump_dir, &trestart, &dtrestart );  
+    // Read restart time
+    if ( pid() == 0 ) printf( "Read t and dt from time restart file\n" );
+    read_t_restart( dump_dir, &trestart, &dtrestart );  
 
-      // Re-initialize the VTK writer
-#if Paraview
+    // Re-initialize the VTK writer
+#   if Paraview
       reinitialize_vtk_restart();	
-#endif	
+#   endif	
   }
 
 
@@ -225,21 +156,11 @@ event init (i = 0)
 # endif     
 
       
-  // Special case of cubes
-  for (int k = 0; k < NPARTICLES; k++) 
-  {
-#if DLM_Moving_particle
-    // Compute the inverse of the moment of inertia matrix
-    compute_inv_inertia( &(particles[k]) );
-#endif     
-
-    // Special case of cubes 
-    if ( (particles[k].g).ncorners == 8 ) 
-    {
-	particles[k].shape = CUBE;
-	compute_principal_vectors_Cubes( &(particles[k]) );
-    }
-  }
+  // Compute the inverse of the moment of inertia matrix of each particle
+# if DLM_Moving_particle  
+    for (int k = 0; k < NPARTICLES; k++) 
+      compute_inv_inertia( &(particles[k]) );
+# endif     
 
 
   // Perform initial refinement around particles and write particle data
@@ -384,7 +305,7 @@ event logfile ( i=0; i++ )
     close_file_pointers( pdata, fdata, converge, cellvstime ); 
 
     // Write the dump time and time step for restart
-    printf( "Write t and dt in time restart file\n" );
+    if ( pid() == 0 ) printf( "Write t and dt in time restart file\n" );
     save_t_dt_restart( dump_dir, t, dt );  
     
     // Stop simulation
@@ -402,7 +323,7 @@ event start_timestep (i++)
 {
   if ( save_data_restart && i )
   {
-    printf( "Write t and dt in time restart file\n" );
+    if ( pid() == 0 ) printf( "Write t and dt in time restart file\n" );
     save_t_dt_restart( dump_dir, t, dt );        
     save_data_restart = false;
   } 
@@ -418,11 +339,10 @@ that improves the coupling between the fluid problem and the DLMFD problem */
 #if DLM_alpha_coupling
 event viscous_term (i++) 
 {
-  foreach() {
-    foreach_dimension() {
+  foreach()
+    foreach_dimension()
       u.x[] += -dt*DLM_explicit.x[]/(rhoval*dlmfd_dv());
-    }
-  }
+
   boundary((scalar*){u});
 }
 #endif

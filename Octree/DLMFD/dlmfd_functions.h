@@ -27,7 +27,7 @@
 
 
 // Define the factor alpha (generally between 1 and 2) that is involved 
-// in the inter- boundary point distance on the rigid body surface
+// in the inter-boundary point distance on the rigid body surface
 # ifndef INTERBPCOEF
 #   define INTERBPCOEF 2.
 # endif 
@@ -39,8 +39,7 @@
 enum RigidBodyShape {
   SPHERE,
   CIRCULARCYLINDER2D,
-  CUBE,
-  WALL
+  CUBE
 };
 
 
@@ -94,7 +93,6 @@ typedef struct {
 #endif
 #endif
   size_t pnum;
-  coord wallmax, wallmin, wallpos;
   coord imposedU, imposedw;
   Cache Interior;
   Cache reduced_domain;
@@ -167,80 +165,6 @@ void allocate_Cache (Cache * p)
   if (p->n >= p->nm) {
     p->p = (Index *) calloc (5, sizeof(int));
   }
-}
-
-
-
-
-/** Set of functions for the walls as fictitious domain */
-void create_FD_Interior_Wall (particle *p, vector index, scalar flag)
-{
-  coord wallmin, wallmax; 
-  Cache * c;
-  
-  /** Create the cache of the interior points for a wall*/
-  
-  c = &(p->Interior);
-  wallmin = p->wallmin;
-  wallmax = p->wallmax;
-  foreach() {	   
-#if dimension == 2
-    if ((x >= wallmin.x) && (y >= wallmin.y) && (x <= wallmax.x) 
-    	&& (y <= wallmax.y)) 
-    {
-      index.y[] = p->pnum;
-      cache_append (c, point, 0);
-    }
-#elif dimension == 3
-    if ((x > wallmin.x) && (y > wallmin.y) && (z > wallmin.z) 
-    	&& (x < wallmax.x) && (y < wallmax.y) && (z < wallmax.z)) 
-    {
-      if ((int)index.y[] == -1 && flag[] < 1)
-	index.y[] = p->pnum;
-      cache_append (c, point, 0);
-    }
-#endif
-  }
-  cache_shrink (c);    
-}
-
-
-
-
-void create_FD_Boundary_Wall (particle *p) 
-{  
-  SolidBodyBoundary * sbm;
-  int m = 0;
-  coord  wallpos;
-
-  double h = 0;
-  foreach_level(depth())
-    h = Delta;
-  
-  sbm = &(p->s);
-  m = sbm->m;
-  wallpos = p->wallpos;
-  for (int i = 0; i < m; i++) {
-
-    sbm->x[i] = (3.*h/4.) + i*h;
-    sbm->y[i] = wallpos.y;
-  }
-
-  for (int i = m/2; i < m; i++) {
-    sbm->x[i] -= h/2.;
-  }
-}
-
-
-
-
-void compute_nboundary_Wall (coord wallpos, int * nb) 
-{
-  double mindelta = 0.;
-  foreach_level(depth())
-    mindelta = Delta;
-
-  *nb = floor(wallpos.x/mindelta);    
 }
 
 
@@ -334,14 +258,6 @@ void create_index_lambda_scalar (const SolidBodyBoundary dlm_bd,
 
 #include "weights_functions_backup.h"
 
-# ifndef STENCIL_EXTERIOR
-# define STENCIL_EXTERIOR 0
-# endif
-
-# ifndef STENCIL_INTERIOR
-# define STENCIL_INTERIOR 0
-# endif
-
 /** Function that returns the weight associated to a Lagrange
    multipliers for a cell within a foreach() loop (ie for a "real" or
    local cell) associated to a Lagrange multiplier in it's
@@ -379,57 +295,17 @@ double reversed_weight (particle * pp, const coord weightcellpos,
 
   /* assign fictitious-boundary's normal (use boundary's analytical position)*/
   assign_dial_fd_boundary (pp, lambdapos, gcbdum, delta, &NCX);
-
-  if ( pp->shape == WALL ) {
-#if STENCIL_EXTERIOR
-    /* Stencils oriented toward the wall */
-    if (lambdapos.y > 0) {
-      if (lambdapos.x < L0/2)
-	NCX = 1;
-      if (lambdapos.x > L0/2)
-	NCX = 2;
-    }
-	
-    if (lambdapos.y < 0) {
-      if (lambdapos.x < L0/2)
-	NCX = 4;
-      if (lambdapos.x > L0/2)
-	NCX = 3;
-    }
-#endif
-#if STENCIL_INTERIOR
-    /* Second normal oriented toward the fluid */
-    if (lambdapos.y > 0) {
-      if (lambdapos.x < L0/2) {
-	NCX = 4;
-      }
-      if (lambdapos.x > L0/2) {
-	NCX = 3;
-      }
-    }
-	
-    if (lambdapos.y < 0) {
-      if (lambdapos.x < L0/2) {
-	NCX = 1;
-      }
-      if (lambdapos.x > L0/2) {
-	NCX = 2;
-      }
-    }
-#endif
-  }
   
   /* compute relative vector from the neighbor cell to the local cell */
   compute_relative_vector (weightcellpos, lambdacellpos , &relnl);
 
   /* Assign weight ids. */
   assign_weight_id_quad_outward (NCX, CX, relnl, delta, &weight_id, &goflag);
-  
-  
-  if (goflag == 1) {
+    
+  /* Compute weight */
+  if ( goflag == 1 ) 
     weight = compute_weight_Quad (weight_id, lambdapos, lambdacellpos, 
     	NCX, CX, delta);
-  }
   
   return weight;
 }
@@ -726,47 +602,7 @@ void reverse_fill_flagfield (particle * p, scalar f, vector index_lambda,
 	    gcbdum.center.x += pshift.x[];
 	  
 	  /* assign fictitious-boundary's normal (use boundary's position) */
-	  assign_dial_fd_boundary (&p[k], lambdapos, gcbdum, Delta, &NCX);
-	  
-	  if ( p->shape == WALL ) {
-		  
-#if STENCIL_EXTERIOR
-	    /* Stencils oriented toward the wall */
-	    if (lambdapos.y > 0) {
-	      if (lambdapos.x < L0/2)
-		NCX = 1;
-	      if (lambdapos.x > L0/2)
-		NCX = 2;
-	    }
-	
-	    if (lambdapos.y <0) {
-	      if (lambdapos.x < L0/2)
-		NCX = 4;
-	      if (lambdapos.x > L0/2)
-		NCX = 3;
-	    }
-#endif
-	
-#if STENCIL_INTERIOR
-	    /* Stencils oriented toward the fluid */
-	    if ((lambdapos.y) > 0) {
-	      if (lambdapos.x < L0/2)
-		NCX = 4;
-	      if (lambdapos.x > L0/2)
-		NCX = 3;
-	    }
-	
-	    if (lambdapos.y <0) {
-	      if (lambdapos.x < L0/2) {
-		NCX = 1;
-	      }
-	  
-	      if (lambdapos.x > L0/2)
-		NCX = 2;
-	    }
-#endif
-	    
-	  }
+	  assign_dial_fd_boundary (&p[k], lambdapos, gcbdum, Delta, &NCX);	  
 	
 	  /* compute relative vector neighbor to the local cell */
 	  compute_relative_vector (localcellpos, lambdacellpos , &relnl);
@@ -823,7 +659,6 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
     GeomParameter gci = p[k].g;
     int m = 0;
     int lN = 0;
-    coord wallpos;
     
     switch( p[k].shape )
     {
@@ -845,13 +680,6 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
         create_FD_Boundary_Cube_v2( &gci, &(p[k].s), m, lN, pshift );
 	break;
 	  
-      case WALL:
-        wallpos = p[k].wallmax;
-        compute_nboundary_Wall( wallpos, &m );
-        allocate_SolidBodyBoundary( &(p[k].s), m );
-        create_FD_Boundary_Wall( &p[k] );
-	break;
-	  
       default:
         fprintf( stderr, "Unknown Rigid Body shape !!\n" );
     }    
@@ -866,306 +694,6 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
 #endif
   }
 }
-
-
-
-
-#if DLM_Moving_particle
-#if TRANSLATION
-void compute_contact_distance (particle * p, const coord gci, double * delta) 
-{
-  GeomParameter gc = p->g;
-  double radius = gc.radius;
-  *delta = gci.y - radius;
-}
-
-
-
-
-double compute_fwo (const double en, const double v, const double wo) 
-{
-
-  double k = log(en)/sqrt(sq(pi) + sq(log(en)));
-  double g = atan(-sqrt(1 - sq(k))/k);
-  double val;
-  return val = v*exp(k*g/sqrt(1- sq(k)))*sin(g)/(wo*sqrt(1 - sq(k)));
-}
-
-
-
-
-double derivative_fwo (const double en, const double v, const double wo) 
-{
-  double k = log(en)/sqrt(sq(pi) + sq(log(en)));
-  double g = atan(-sqrt(1 - sq(k))/k);
-  double val;
-  return val = -v*exp(k*g/sqrt(1 - sq(k)))*sin(g)/(sqrt(1 - sq(k))*sq(wo)); 
-}
-
-
-
-
-void compute_wo (particle * p) 
-{  
-  /* compute an estimate of (kn,gamman) derived from (deltamax,en) */
-
-  /* Guess value for wo */
-  double wo = 100.;
-  double epsilo = 1e-2;
-  int maxiter = 200;
-  double aa = 0.;
-  double bb = 0.;
-  GeomParameter g = p->g;
-  double r = g.radius;
-  double deltamax = (p->wished_ratio)*r;
-  double en = p->en;
-  double v = p->vzero;
-    
-  /* Newton iteration to find the root of delta(w0) */
-  if (en < 1) {
-    for (int pp = 1; pp <= maxiter; pp++) {
-
-      aa = compute_fwo (wo, v, en) - deltamax;
-      bb = derivative_fwo (wo, v, en);
-
-      if (abs(aa-deltamax)/deltamax < epsilo) {
-	break;
-	  }
-      wo += -aa/bb;
-    }
-    p->kn = (p->M)*sq(wo);
-  }
-  else {
-    /* if en = 1 the formula simplifies as such */
-    p->kn = (p->M)*sq(p->vzero)/(sq(deltamax));
-  }  
-}
-
-
-
-
-void compute_Fontact (coord * Fc, particle * p, coord * gci, coord * U, 
-	const double gamman) 
-{
-  double delta_colision = 0.;
-
-  foreach_dimension() {
-    (*Fc).x = 0.;
-  }
-  
-  compute_contact_distance(p, *gci, &delta_colision);
-    
-  if (delta_colision < 0.) {
-    double kn = p->kn;
-    double M = p->M;
-    coord vrel = *U;
-    coord Fel = {0., 0., 0.};
-    coord Fdm = {0., 0., 0.};
-    coord normalvec = p->normalvector;
-
-    foreach_dimension() {
-      /* compute Hookean elastic restoring force */
-      Fel.x = -kn*delta_colision*normalvec.x;
-    
-      /* compute viscous dynamic force */
-      Fdm.x = -2.*gamman*M*fabs(vrel.x);
-    
-      /* Fc is the sum of these two forces */
-      (*Fc).x = Fel.x + Fdm.x;
-    }
-  }
-}
-
-
-
-
-void granular_subproblem (particle * p, const int gravity_flag, 
-	const double dt, const double rho_f) 
-{
-  // Mini Granular solver, which solves 
-  //   (1 - rho_f/rho_s)MdU/dt = (1-rho_f/rho_s)Mg + sum_all_particles F_c
-  //   (1 - rho_f/rho_s) Ip dw/dt = sum_all_particles (r x F_c) 
-  //					- (1 - rho_f/rho_s)w x Ip w
-  // where F_c is the contact force, g the gravity acceleration and 
-  // M the particle's mass and Ip the inertia tensor
-
-  double wo = 0. ;
-  double gamman = 0.;
-  
-  double T_c = 0., dtg = 0., M = 0., kn = 0., en = 0.;
-  
-  int miter, gi;
-  coord Uold, Xold;
-  coord k1, k2, k3, k4, Xtemp, Utemp;
-  double fsf;
-
-  /* particle's structure pointers  */
-  GeomParameter * gci;
-  GeomParameter * gcinm1;
-  coord * U;
-  coord * Unm1;
- 
-  coord * gravity;
-  coord decal = {X0, Y0, Z0};
-  
-  for (int k = 0; k < NPARTICLES; k++) {
-    fsf = (1. - (rho_f)/(p[k].rho_s));
-   
-    miter = 0;
-    M = p[k].M;
-    kn = p[k].kn;
-    en = p[k].en;
-    
-    
-    /* compute wo and gamman */
-    wo = sqrt(kn/M); // wo = sqrt(2kn/M) for sphere-sphere contact and 
-    		     // wo = sqrt(kn/M) for sphere-wall contact 
-		     // (Powder tech. Rakotonirina 2018)
-    gamman = -wo*log(en)/sqrt(sq(pi) + sq(log(en)));
-
-    /* compute the contact time Tc */
-    T_c = pi/(sqrt(sq(wo) - sq(gamman)));
-
-    /* set granular timestep */
-    dtg = T_c/20.;
-    miter = ceil(dt/dtg);
-    dtg = dt/miter;
-    
-    if (k == 0) fprintf (stderr,"Tc = %g, dt = %20.18f, dtg = %20.18f, "
-    	"Tc/dtg = %g, miter = %d, particle = %d\n",T_c, dt, dtg, T_c/dtg, 
-	miter, k);
-    
-    /* get particle structure pointers */
-
-    /* position */
-    gcinm1 = &(p[k].gnm1);
-    gci = &(p[k].g);
-
-    /* translational velocity */
-    U = &(p[k].U);
-    Unm1 = &(p[k].Unm1);
-
-    gravity = &(p[k].gravity);
-    
-    /* fprintf (stderr,"gravity = (%f,%f,%f)\n",(*gravity).x,(*gravity).y,
-    	(*gravity).z); */
-    
-    if (gravity_flag) {
-      /* Before solving the granular problem: save previous particle's
-	 position and velocity (predictor step
-	 with gravity, first subproblem after N-S) */
-      
-      foreach_dimension() {
-	(*Unm1).x = (*U).x;
-
-	
-	/* Check if the domain is periodic, if yes shift the particle's
-	   position when the end of the domain is reached */
-	if (Period.x) {
-	  if ((*gci).center.x > (L0 + decal.x)) {
-	    (*gci).center.x -= L0;
-	  }
-	  if ((*gci).center.x < (0. + decal.x)) {
-	    (*gci).center.x += L0;
-	  }
-	}
-
-	
-	(*gcinm1).center.x = (*gci).center.x;
-      }
-    }
-    
-    else {
-      /* corrector step without gravity: fourth subproblem after the
-	 fictitious domain problem (correction step) */
-      foreach_dimension() { 
-	(*gci).center.x = (*gcinm1).center.x;
-      }
-    }
-    
-
-    /*  integrating in time with rk4 */
-    for (gi = 1; gi <= miter; gi++) {
-      Uold = (*U);
-      Xold = (*gci).center;
-
-      /* compute k1 */
-      compute_Fontact (&k1, &p[k], &Xold, &Uold, gamman);
-      foreach_dimension() {
-	k1.x /= (fsf*M);
-	k1.x += gravity_flag*(*gravity).x;
-	Xtemp.x = Xold.x + 0.5*dtg*Uold.x;
-	Utemp.x = Uold.x + 0.5*dtg*k1.x;
-      }
-	
-      /* compute k2 */
-      compute_Fontact (&k2, &p[k], &Xtemp, &Utemp, gamman);
-      foreach_dimension() {
-	k2.x /= (fsf*M);
-	k2.x += gravity_flag*(*gravity).x;
-	Xtemp.x = Xold.x + 0.5*dtg*Uold.x + 0.25*sq(dtg)*k1.x;
-	Utemp.x = Uold.x + 0.5*dtg*k2.x;
-      }
-	
-      /* compute k3 */
-      compute_Fontact (&k3, &p[k], &Xtemp, &Utemp, gamman);
-      foreach_dimension() {
-	k3.x /= (fsf*M);
-	k3.x += gravity_flag*(*gravity).x;
-	Xtemp.x = Xold.x + dtg*Uold.x + 0.5*sq(dtg)*k2.x;
-	Utemp.x = Uold.x + dtg*k3.x;
-      }
-	
-      /* compute k4 */
-      compute_Fontact (&k4, &p[k], &Xtemp, &Utemp, gamman);
-      foreach_dimension() {
-	k4.x /= (fsf*M);
-	k4.x += gravity_flag*(*gravity).x;
-      }
-
-      
-      foreach_dimension () {
-	(*gci).center.x = Xold.x + dtg*Uold.x + sq(dtg)*(k1.x + k2.x + k3.x)/6.;
-	
-	/* Check if the domain is periodic, if yes shift the particle's
-	   position when the end of the domain is reached */
-	if (Period.x) {
-	  if ((*gci).center.x > (L0 + decal.x)) {
-	    (*gci).center.x -= L0;
-	  }
-	  if ((*gci).center.x < (0. + decal.x)) {
-	    (*gci).center.x += L0;
-	  }
-	}
-
-
-
-	(*U).x = Uold.x + dtg*(k1.x + 2*k2.x + 2*k3.x + k4.x)/6.;
-      }
-    }
-    if (k == 0) {
-      if (gravity_flag) {
-	fprintf (stderr,"Prediction: particle-0's velocity on thread %d "
-		"is (%20.18f, %20.18f, %20.18f)\n",pid(), (*U).x, (*U).y, 
-		(*U).z);
-	fprintf (stderr,"Prediction: particle-0's position on thread %d "
-		"is (%20.18f, %20.18f, %20.18f)\n",pid(), (*gci).center.x, 
-		(*gci).center.y, (*gci).center.z);
-      
-      }
-      else {
-	fprintf(stderr,"Correction: particle-0's velocity on thread %d "
-		"is (%20.18f, %20.18f, %20.18f)\n",pid(), (*U).x, (*U).y, 
-		(*U).z);
-	fprintf(stderr,"Correction: particle-0's position on thread %d "
-		"is (%20.18f, %20.18f, %20.18f)\n",pid(), (*gci).center.x, 
-		(*gci).center.y, (*gci).center.z);
-      }
-    }
-  }
-}
-#endif
-#endif
 
 
 
@@ -1735,46 +1263,6 @@ void pressure_law (scalar pres, FILE * ppf, const coord hv, const double t)
     fprintf(ppf, "%20.18f\t %20.18f\n", t, plaw);
     fflush(ppf);
   }
-}
-
-
-
-
-/** dump/resto particle's structure functions */
-void dump_particle (particle * p) {
-
-  FILE * fp;
-  char * file = particle_dump_filename ;
-
-  if (file && (fp = fopen (file, "w")) == NULL) {
-    perror (file);
-    exit (1);
-  }
-  assert (fp);
-
-  fwrite(p, sizeof(*p), NPARTICLES, fp);
-  fclose(fp);
-}
-
-
-
-
-bool restore_particle (particle * p) 
-{
-
-  FILE * fp;
-  char * file = "dump_particle";
-  if (file && (fp = fopen (file, "r")) == NULL)
-    return false;
-  assert (fp);
-
-  if (fread (p, sizeof(*p), NPARTICLES, fp) < 1) {
-    fprintf (ferr, "restore_particle(): error reading particle data\n");
-    exit (1);
-  }
-  fclose(fp);
-
-  return true;
 }
 
 

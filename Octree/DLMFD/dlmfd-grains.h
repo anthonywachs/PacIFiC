@@ -1,4 +1,4 @@
-/* The general DLMFD plugin */ 
+/* The Grains3D plugin */ 
 # include "dlmfd-plugin.h"
 
 /* File names definition */

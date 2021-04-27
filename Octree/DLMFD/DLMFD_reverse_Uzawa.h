@@ -230,8 +230,8 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
     int counter = 0;
 # endif 
 # if !DLM_Moving_particle
-  coord imposedU;
-  coord imposedw;
+    coord imposedU;
+    coord imposedw;
 # endif  
 
 
@@ -314,29 +314,27 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
   	DLM_periodic_shift );
 #   endif
   
-#   if !POISEUILLE
-      /* Consider fictitious domain's boundary points only if they are far
-       enough of the domain's boundary (i.e a distance greater than
-       2*Delta, with Delta being the smallest cell size) */
-      double twodelta;
+    /* Consider fictitious domain's boundary points only if they are far
+    enough of the domain's boundary (i.e a distance greater than
+    2*Delta, with Delta being the smallest cell size) */
+    double twodelta;
 
-      foreach_level (depth()) 
-      {
-        twodelta = 2.*Delta;
+    foreach_level (depth()) 
+    {
+      twodelta = 2.*Delta;
 
-#       if dimension == 2
-          if (( x > (L0 - twodelta + X0)) || (x  < (twodelta + X0)) 
+#     if dimension == 2
+        if (( x > (L0 - twodelta + X0)) || (x  < (twodelta + X0)) 
 		|| ( y > (L0 - twodelta + Y0)) || (y < (twodelta + Y0)))
-#       elif dimension == 3
-          if ((x  > (L0 - twodelta + X0)) ||  (x  < (twodelta + X0)) 
+#     elif dimension == 3
+        if ((x  > (L0 - twodelta + X0)) ||  (x  < (twodelta + X0)) 
       		|| (y > (L0 - twodelta + Y0)) || (y < (twodelta + Y0)) 
 		|| (z > (L0 - twodelta +Z0)) || (z  < (twodelta + Z0)))
-#       endif
-	    if (index_lambda.x[] > -1.) 
-	      index_lambda.x[] = -1.;
-      }
-      boundary((scalar*) {index_lambda});
-#   endif // !POISEUILLE
+#     endif
+	  if (index_lambda.x[] > -1.) 
+	    index_lambda.x[] = -1.;
+    }
+    boundary((scalar*) {index_lambda});
 
     reverse_fill_flagfield( p, flagfield, index_lambda, 1, DLM_periodic_shift );
 # endif
@@ -360,10 +358,6 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
 	  
 	case CUBE:
 	  create_FD_Interior_Cube_v2( &p[k], index_lambda, DLM_periodic_shift );
-	  break;
-	  
-	case WALL:
-	  create_FD_Interior_Wall( &p[k], index_lambda, flagfield );
 	  break;
 	  
 	default:
@@ -1928,18 +1922,11 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
 #     endif
     
 #     if debugInterior == 0
-#       if POISEUILLE
-          /* For the poiseuille flow, the explicit forcing term is too sharp
-          and needs to be "smoothed" */
-#         define smooth 0.5
-#       else
-#         define smooth 1.
-#       endif
         foreach_cache ((*Interior[k])) 
         {
           if ((flagfield[]  < 1) && ((int)index_lambda.y[] == k))
 	    foreach_dimension() 
-	      DLM_explicit.x[] = smooth * DLM_lambda.x[];
+	      DLM_explicit.x[] = DLM_lambda.x[];
         }
 #     endif
     }
