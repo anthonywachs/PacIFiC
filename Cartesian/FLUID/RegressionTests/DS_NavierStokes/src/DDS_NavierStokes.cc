@@ -202,8 +202,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
             MAC_Error::object()->raise_bad_data_value( exp,"ViscousStressOrder", error_message );
          }
 	 PressureStressOrder = exp->string_data( "PressureStressOrder" );
-         if ( PressureStressOrder != "first" && PressureStressOrder != "second") {
-            string error_message="- first\n   - second";
+         if ( PressureStressOrder != "first" && PressureStressOrder != "second" && PressureStressOrder != "second_withNeumannBC") {
+            string error_message="- first\n   - second\n   - second_withNeumannBC";
             MAC_Error::object()->raise_bad_data_value( exp,"PressureStressOrder", error_message );
          }
 
@@ -3085,10 +3085,169 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: second_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np)
+DDS_NavierStokes:: second_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: second_order_pressure_stress" ) ;
+
+  size_t i0_temp;
+  size_t comp = 0;
+
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid(0);
+  // Structure of particle surface input data
+  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
+
+  // comp won't matter as the particle position is independent of comp
+  double xp = solid.coord[comp]->item(parID,0);
+  double yp = solid.coord[comp]->item(parID,1);
+  double zp = solid.coord[comp]->item(parID,2);
+  double ri = solid.size[comp]->item(parID);
+/*  
+  ofstream outputFile ;
+  std::ostringstream os2;
+  os2 << "./DS_results/temp_grad_" << my_rank << "_" << parID << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+  outputFile << "x,y,z,id" << endl;*/
+//  outputFile << "i,Nu" << endl;
+
+  doubleArray2D ipoint(3,3,0.);         
+  doubleVector fini(3,0);
+  doubleVector stress(Np,0);         
+  boolVector in_domain(2,true);        //true if ghost point in the computational domain
+  size_t_vector in_parID(2,0);         //Store particle ID if level_set becomes negative
+  boolArray2D found(3,dim,false);
+  size_t_array2D i0(3,dim,0);
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  doubleVector Dmin(dim,0);
+  doubleVector Dmax(dim,0);
+  doubleVector rotated_coord(dim,0);
+  doubleVector rotated_normal(dim,0);
+
+  for (size_t i=0;i<Np;i++) {
+     // Get local min and max indices
+     for (size_t l=0;l<dim;++l) {
+        min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l );
+        max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l );
+        Dmin(l) = PF->primary_grid()->get_min_coordinate_on_current_processor(l);
+        Dmax(l) = PF->primary_grid()->get_max_coordinate_on_current_processor(l);
+     }
+
+     // Rotating surface points
+     rotated_coord(0) = ri*surface.coordinate->item(i,0);
+     rotated_coord(1) = ri*surface.coordinate->item(i,1);
+     rotated_coord(2) = ri*surface.coordinate->item(i,2);
+
+     rotation_matrix(parID,rotated_coord,comp,0);
+
+     ipoint(0,0) = xp + rotated_coord(0);
+     ipoint(0,1) = yp + rotated_coord(1);
+     ipoint(0,2) = zp + rotated_coord(2);
+
+     // Rotating surface normal
+     rotated_normal(0) = surface.normal->item(i,0);
+     rotated_normal(1) = surface.normal->item(i,1);
+     rotated_normal(2) = surface.normal->item(i,2);
+
+     rotation_matrix(parID,rotated_normal,comp,0);
+
+     // Correction in case of periodic boundary condition in any direction
+     for (size_t dir=0;dir<dim;dir++) {
+        // PBC on rotated surface points
+        if (is_periodic[0][dir]) {
+           double isize = PF->primary_grid()->get_main_domain_max_coordinate(dir) - PF->primary_grid()->get_main_domain_min_coordinate(dir);
+           double imin = PF->primary_grid()->get_main_domain_min_coordinate(dir);
+           ipoint(0,dir) = ipoint(0,dir) - MAC::floor((ipoint(0,dir)-imin)/isize)*isize;
+        }
+        // Finding the grid indexes next to ghost points
+        found(0,dir) = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,dir), ipoint(0,dir), i0_temp) ;
+        if (found(0,dir) == 1) i0(0,dir) = i0_temp ;
+     }
+
+     // Accessing the smallest grid size in domain
+     double dh = PF->primary_grid()->get_smallest_grid_size();
+
+     bool status = (dim==2) ? ((ipoint(0,0) > Dmin(0)) && (ipoint(0,0) <= Dmax(0)) && (ipoint(0,1) > Dmin(1)) && (ipoint(0,1) <= Dmax(1))) :
+                              ((ipoint(0,0) > Dmin(0)) && (ipoint(0,0) <= Dmax(0)) && (ipoint(0,1) > Dmin(1)) && (ipoint(0,1) <= Dmax(1))
+                                                                                   && (ipoint(0,2) > Dmin(2)) && (ipoint(0,2) <= Dmax(2)));
+
+     if (status) {
+        for (size_t l=0;l<dim;++l) {
+           // Ghost points in normal direction at the particle surface
+           ipoint(1,l) = ipoint(0,l) + dh*rotated_normal(l);
+           ipoint(2,l) = ipoint(0,l) + 2.*dh*rotated_normal(l);
+
+           // Periocid boundary conditions
+           if (is_periodic[0][l]) {
+              double isize = PF->primary_grid()->get_main_domain_max_coordinate(l) - PF->primary_grid()->get_main_domain_min_coordinate(l);
+              double imin = PF->primary_grid()->get_main_domain_min_coordinate(l);
+              ipoint(1,l) = ipoint(1,l) - MAC::floor((ipoint(1,l)-imin)/isize)*isize;
+              ipoint(2,l) = ipoint(2,l) - MAC::floor((ipoint(2,l)-imin)/isize)*isize;
+           }
+
+           // Finding the grid indexes next to ghost points
+           found(1,l) = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,l), ipoint(1,l), i0_temp);
+           if (found(1,l) == 1) i0(1,l) = i0_temp;
+           found(2,l) = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,l), ipoint(2,l), i0_temp);
+           if (found(2,l) == 1) i0(2,l) = i0_temp;
+        }
+
+	// Check the points in doamin or not
+        in_domain(0) = (dim == 2) ? found(1,0) && found(1,1) :
+                                    found(1,0) && found(1,1) && found(1,2) ;
+        in_domain(1) = (dim == 2) ? found(2,0) && found(2,1) :
+                                    found(2,0) && found(2,1) && found(2,2) ;
+
+	// Calculation of field variable on ghost point(0,0)
+        for (size_t level=2; level<4;level++) {
+           // Calculation of field variable on ghost point(1)
+           if (in_domain(0)) 
+              fini(1) = (dim == 2) ? ghost_field_estimate_on_face (PF,comp,i0(1,0),i0(1,1),0, ipoint(1,0), ipoint(1,1),0, 0.,2,level) :
+                        ghost_field_estimate_in_box (PF,comp,i0(1,0),i0(1,1),i0(1,2),ipoint(1,0),ipoint(1,1),ipoint(1,2),0.,level,parID) ;
+           // Calculation of field variable on ghost point(2)
+           if (in_domain(1)) 
+              fini(2) = (dim == 2) ? ghost_field_estimate_on_face (PF,comp,i0(2,0),i0(2,1),0, ipoint(2,0), ipoint(2,1),0, 0.,2,level) :
+                        ghost_field_estimate_in_box (PF,comp,i0(2,0),i0(2,1),i0(2,2),ipoint(2,0),ipoint(2,1),ipoint(2,2),0.,level,parID) ;
+
+           // Both points 1 and 2 in the computational domain
+           if (in_domain(0) && in_domain(1)) {
+              fini(0) = 2.*fini(1) - fini(2);
+           // Point 1 in the computational domain
+           } else if (in_domain(0)) {
+              fini(0) = fini(1);
+           // Point 2 in the computational domain
+           } else if (in_domain(1)) { 
+              fini(0) = fini(2);
+           }
+           stress(i) = stress(i) - fini(0)/2.;
+	}
+/*
+        outputFile << ipoint(0,0) << "," << ipoint(0,1) << "," << ipoint(0,2) << "," << fini(0) << endl;
+        outputFile << ipoint(1,0) << "," << ipoint(1,1) << "," << ipoint(1,2) << "," << fini(1) << endl;
+        outputFile << ipoint(2,0) << "," << ipoint(2,1) << "," << ipoint(2,2) << "," << fini(2) << endl;*/
+     }
+
+     double scale = (dim == 2) ? ri : ri*ri;
+
+     // Ref: Keating thesis Pg-85
+     // point_coord*(area) --> Component of area in particular direction
+     force(parID,0) = force(parID,0) + stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
+     force(parID,1) = force(parID,1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
+     force(parID,2) = force(parID,2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
+  }
+//  outputFile.close();  
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleArray2D& force, size_t const& parID, size_t const& Np)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC" ) ;
 
   size_t i0_temp;
   size_t comp = 0;
@@ -3349,43 +3508,13 @@ DDS_NavierStokes:: first_order_pressure_stress(class doubleArray2D& force, size_
               if (found == 1) k0 = i0_temp;
            }
 
-           double temp =0.;
            // Calculation of field variable on ghost point(0,0)
            for (size_t level=2; level<4;level++) {
               if (dim == 2) {
                  double press0 = ghost_field_estimate_on_face (PF,comp,i0,j0,0,point(0),point(1),0,0.,2,level);
                  stress(i) = stress(i) - press0/2.;
               } else if (dim == 3) {
-                 doubleArray2D press(dim,2,0);
-                 doubleArray2D del(dim,2,0);
-                 // Behind face
-                 temp = PF->get_DOF_coordinate(k0, comp, 2);
-                 press(2,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,point(0),point(1),temp,0.,2,level);
-                 del(2,0) = MAC::abs(temp - point(2));
-                 // Front face
-                 temp = PF->get_DOF_coordinate(k0+1, comp, 2);
-                 press(2,1) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0+1,point(0),point(1),temp,0.,2,level);
-                 del(2,1) = MAC::abs(temp - point(2));
-                 // Left face
-                 temp = PF->get_DOF_coordinate(i0, comp, 0);
-                 press(0,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,temp,point(1),point(2),0.,0,level);
-                 del(0,0) = MAC::abs(temp - point(0));
-                 // Right face
-                 temp = PF->get_DOF_coordinate(i0+1, comp, 0);
-                 press(0,1) = ghost_field_estimate_on_face (PF,comp,i0+1,j0,k0,temp,point(1),point(2),0.,0,level);
-                 del(0,1) = MAC::abs(temp - point(0));
-                 // Bottom face
-                 temp = PF->get_DOF_coordinate(j0, comp, 1);
-                 press(1,0) = ghost_field_estimate_on_face (PF,comp,i0,j0,k0,point(0),temp,point(2),0.,1,level);
-                 del(1,0) = MAC::abs(temp - point(1));
-                 // Bottom face
-                 temp = PF->get_DOF_coordinate(j0+1, comp, 1);
-                 press(1,1) = ghost_field_estimate_on_face (PF,comp,i0,j0+1,k0,point(0),temp,point(2),0.,1,level);
-                 del(1,1) = MAC::abs(temp - point(1));
-
-                 double press0 = (1./3.)*((del(0,0)*press(0,1)+del(0,1)*press(0,0))/(del(0,0)+del(0,1)) +
-                                          (del(1,0)*press(1,1)+del(1,1)*press(1,0))/(del(1,0)+del(1,1)) +
-                                          (del(2,0)*press(2,1)+del(2,1)*press(2,0))/(del(2,0)+del(2,1)));
+                 double press0 = ghost_field_estimate_in_box (PF,comp,i0,j0,k0,point(0),point(1),point(2),0.,level,0);
                  stress(i) = stress(i) - press0/2.;
               }
            }
@@ -4093,6 +4222,8 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
      first_order_pressure_stress(force, parID, Np );
   } else if (PressureStressOrder == "second") {
      second_order_pressure_stress(force, parID, Np );
+  } else if (PressureStressOrder == "second_withNeumannBC") {
+     second_order_pressure_stress_withNeumannBC(force, parID, Np );
   }
 }
 
@@ -5475,90 +5606,119 @@ DDS_NavierStokes:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t co
 
    doubleArray2D vel(dim,2,0);
    doubleArray2D del(dim,2,0);
-   vector<double> net_vel(3,0.);
+   double temp = 0.;
 
-   // Behind face
-   double temp = FF->get_DOF_coordinate(k0,comp , 2); 
-   double face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
-                       level_set_function (FF,parID,comp,x0,y0,temp,level_set_type,1);
+   if (FF == UF) {
+      vector<double> net_vel(3,0.);
 
-   if (face_solid > 0) {
-      vel(2,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,x0,y0,temp,dh,2,0);
+      // Behind face
+      temp = FF->get_DOF_coordinate(k0,comp , 2); 
+      double face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                          level_set_function (FF,parID,comp,x0,y0,temp,level_set_type,1);
+
+      if (face_solid > 0) {
+         vel(2,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,x0,y0,temp,dh,2,0);
+         del(2,0) = MAC::abs(temp - z0);
+      } else {
+         del(2,0) = find_intersection_for_ghost(FF, temp, z0, x0, y0, parID, comp, 2, dh, 1, 0, 0);    
+         impose_solid_velocity_for_ghost(net_vel,comp,x0,y0,z0-del(2,0),parID);
+         vel(2,0) = net_vel[comp];
+      }
+
+      // Front face
+      temp = FF->get_DOF_coordinate(k0+1,comp , 2); 
+      face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                   level_set_function (FF,parID,comp,x0,y0,temp,level_set_type,1);
+
+      if (face_solid > 0) {
+         vel(2,1) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0+1,x0,y0,temp,dh,2,0);
+         del(2,1) = MAC::abs(temp - z0);
+      } else {
+         del(2,1) = find_intersection_for_ghost(FF, z0, temp, x0, y0, parID, comp, 2, dh, 1, 0, 1);    
+         impose_solid_velocity_for_ghost(net_vel,comp,x0,y0,z0+del(2,1),parID);
+         vel(2,1) = net_vel[comp];
+      }
+
+      // Left face
+      temp = FF->get_DOF_coordinate(i0,comp, 0); 
+      face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                   level_set_function (FF,parID,comp,temp,y0,z0,level_set_type,1);
+
+      if (face_solid > 0) {
+         vel(0,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,temp,y0,z0,dh,0,0);
+         del(0,0) = MAC::abs(temp - x0);
+      } else {
+         del(0,0) = find_intersection_for_ghost(FF, temp, x0, y0, z0, parID, comp, 0, dh, 1, 0, 0);    
+         impose_solid_velocity_for_ghost(net_vel,comp,x0-del(0,0),y0,z0,parID);
+         vel(0,0) = net_vel[comp];
+      }
+
+      // Right face
+      temp = FF->get_DOF_coordinate(i0+1,comp, 0); 
+      face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                   level_set_function (FF,parID,comp,temp,y0,z0,level_set_type,1);
+
+      if (face_solid > 0) {
+         vel(0,1) = ghost_field_estimate_on_face (FF,comp,i0+1,j0,k0,temp,y0,z0,dh,0,0);
+         del(0,1) = MAC::abs(temp - x0);
+      } else {
+         del(0,1) = find_intersection_for_ghost(FF, x0, temp, y0, z0, parID, comp, 0, dh, 1, 0, 1);    
+         impose_solid_velocity_for_ghost(net_vel,comp,x0+del(0,1),y0,z0,parID);
+         vel(0,1) = net_vel[comp];
+      }
+
+      // Bottom face
+      temp = FF->get_DOF_coordinate(j0,comp, 1); 
+      face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                   level_set_function (FF,parID,comp,x0,temp,z0,level_set_type,1);
+
+      if (face_solid > 0) {
+         vel(1,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,x0,temp,z0,dh,1,0);
+         del(1,0) = MAC::abs(temp - y0);
+      } else {
+         del(1,0) = find_intersection_for_ghost(FF, temp, y0, x0, z0, parID, comp, 1, dh, 1, 0, 0);    
+         impose_solid_velocity_for_ghost(net_vel,comp,x0,y0-del(1,0),z0,parID);
+         vel(1,0) = net_vel[comp];
+      }
+
+      // Top face
+      temp = FF->get_DOF_coordinate(j0+1,comp, 1); 
+      face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
+                   level_set_function (FF,parID,comp,x0,temp,z0,level_set_type,1);
+
+      if (face_solid > 0) {
+         vel(1,1) = ghost_field_estimate_on_face (FF,comp,i0,j0+1,k0,x0,temp,z0,dh,1,0);
+         del(1,1) = MAC::abs(temp - y0);
+      } else {
+         del(1,1) = find_intersection_for_ghost(FF, y0, temp, x0, z0, parID, comp, 1, dh, 1, 0, 1);    
+         impose_solid_velocity_for_ghost(net_vel,comp,x0,y0+del(1,1),z0,parID);
+         vel(1,1) = net_vel[comp];
+      }
+   } else if (FF == PF) {
+      // Behind face
+      temp = FF->get_DOF_coordinate(k0, comp, 2);
+      vel(2,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,x0,y0,temp,0.,2,level);
       del(2,0) = MAC::abs(temp - z0);
-   } else {
-      del(2,0) = find_intersection_for_ghost(FF, temp, z0, x0, y0, parID, comp, 2, dh, 1, 0, 0);    
-      impose_solid_velocity_for_ghost(net_vel,comp,x0,y0,z0-del(2,0),parID);
-      vel(2,0) = net_vel[comp];
-   }
-
-   // Front face
-   temp = FF->get_DOF_coordinate(k0+1,comp , 2); 
-   face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
-                level_set_function (FF,parID,comp,x0,y0,temp,level_set_type,1);
-
-   if (face_solid > 0) {
-      vel(2,1) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0+1,x0,y0,temp,dh,2,0);
+      // Front face
+      temp = FF->get_DOF_coordinate(k0+1, comp, 2);
+      vel(2,1) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0+1,x0,y0,temp,0.,2,level);
       del(2,1) = MAC::abs(temp - z0);
-   } else {
-      del(2,1) = find_intersection_for_ghost(FF, z0, temp, x0, y0, parID, comp, 2, dh, 1, 0, 1);    
-      impose_solid_velocity_for_ghost(net_vel,comp,x0,y0,z0+del(2,1),parID);
-      vel(2,1) = net_vel[comp];
-   }
-
-   // Left face
-   temp = FF->get_DOF_coordinate(i0,comp, 0); 
-   face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
-                level_set_function (FF,parID,comp,temp,y0,z0,level_set_type,1);
-
-   if (face_solid > 0) {
-      vel(0,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,temp,y0,z0,dh,0,0);
+      // Left face
+      temp = FF->get_DOF_coordinate(i0, comp, 0);
+      vel(0,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,temp,y0,z0,0.,0,level);
       del(0,0) = MAC::abs(temp - x0);
-   } else {
-      del(0,0) = find_intersection_for_ghost(FF, temp, x0, y0, z0, parID, comp, 0, dh, 1, 0, 0);    
-      impose_solid_velocity_for_ghost(net_vel,comp,x0-del(0,0),y0,z0,parID);
-      vel(0,0) = net_vel[comp];
-   }
-
-   // Right face
-   temp = FF->get_DOF_coordinate(i0+1,comp, 0); 
-   face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
-                level_set_function (FF,parID,comp,temp,y0,z0,level_set_type,1);
-
-   if (face_solid > 0) {
-      vel(0,1) = ghost_field_estimate_on_face (FF,comp,i0+1,j0,k0,temp,y0,z0,dh,0,0);
+      // Right face
+      temp = FF->get_DOF_coordinate(i0+1, comp, 0);
+      vel(0,1) = ghost_field_estimate_on_face (FF,comp,i0+1,j0,k0,temp,y0,z0,0.,0,level);
       del(0,1) = MAC::abs(temp - x0);
-   } else {
-      del(0,1) = find_intersection_for_ghost(FF, x0, temp, y0, z0, parID, comp, 0, dh, 1, 0, 1);    
-      impose_solid_velocity_for_ghost(net_vel,comp,x0+del(0,1),y0,z0,parID);
-      vel(0,1) = net_vel[comp];
-   }
-
-   // Bottom face
-   temp = FF->get_DOF_coordinate(j0,comp, 1); 
-   face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
-                level_set_function (FF,parID,comp,x0,temp,z0,level_set_type,1);
-
-   if (face_solid > 0) {
-      vel(1,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,x0,temp,z0,dh,1,0);
+      // Bottom face
+      temp = FF->get_DOF_coordinate(j0, comp, 1);
+      vel(1,0) = ghost_field_estimate_on_face (FF,comp,i0,j0,k0,x0,temp,z0,0.,1,level);
       del(1,0) = MAC::abs(temp - y0);
-   } else {
-      del(1,0) = find_intersection_for_ghost(FF, temp, y0, x0, z0, parID, comp, 1, dh, 1, 0, 0);    
-      impose_solid_velocity_for_ghost(net_vel,comp,x0,y0-del(1,0),z0,parID);
-      vel(1,0) = net_vel[comp];
-   }
-
-   // Top face
-   temp = FF->get_DOF_coordinate(j0+1,comp, 1); 
-   face_solid = level_set_function (FF,parID,comp,x0,y0,z0,level_set_type,1)*
-                level_set_function (FF,parID,comp,x0,temp,z0,level_set_type,1);
-
-   if (face_solid > 0) {
-      vel(1,1) = ghost_field_estimate_on_face (FF,comp,i0,j0+1,k0,x0,temp,z0,dh,1,0);
+      // Bottom face
+      temp = FF->get_DOF_coordinate(j0+1, comp, 1);
+      vel(1,1) = ghost_field_estimate_on_face (FF,comp,i0,j0+1,k0,x0,temp,z0,0.,1,level);
       del(1,1) = MAC::abs(temp - y0);
-   } else {
-      del(1,1) = find_intersection_for_ghost(FF, y0, temp, x0, z0, parID, comp, 1, dh, 1, 0, 1);    
-      impose_solid_velocity_for_ghost(net_vel,comp,x0,y0+del(1,1),z0,parID);
-      vel(1,1) = net_vel[comp];
    }
 
    double value = (1./3.)*((vel(0,1)*del(0,0)+vel(0,0)*del(0,1))/(del(0,0)+del(0,1)) + 

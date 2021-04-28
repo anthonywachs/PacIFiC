@@ -219,6 +219,7 @@ public SolverComputingTime
       void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
       void compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
       void first_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void second_order_pressure_stress_withNeumannBC(class doubleArray2D& force, size_t const& parID, size_t const& Np);
       void second_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
       void generate_surface_discretization();
       void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
