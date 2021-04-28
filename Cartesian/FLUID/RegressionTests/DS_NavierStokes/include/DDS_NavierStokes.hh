@@ -218,6 +218,8 @@ public SolverComputingTime
       void second_order_viscous_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
       void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
       void compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void first_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void second_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
       void generate_surface_discretization();
       void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
       void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
@@ -231,8 +233,8 @@ public SolverComputingTime
       double quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level);
       double third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& x0, double const& y0, double const& z0, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level);
 
-      void ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& comp, size_t const& dir, class boolArray2D& point_in_domain );
-      void gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp);
+      void ghost_points_generation( FV_DiscreteField* FF, class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& comp,size_t const& major_dir, class boolArray2D& point_in_domain, class doubleVector& rotated_vector);
+      void gen_dir_index_of_secondary_ghost_points ( FV_DiscreteField* FF, class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp);
 
 
       /** @brief Find the interpolation considering the solids affect inside the box, used for 3D systems */
@@ -351,6 +353,7 @@ public SolverComputingTime
       string DivergenceScheme;
       string IntersectionMethod;
       string ViscousStressOrder;
+      string PressureStressOrder;
       double tolerance;
 
       bool is_firstorder ;

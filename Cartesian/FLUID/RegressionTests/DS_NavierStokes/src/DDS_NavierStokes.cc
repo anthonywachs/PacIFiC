@@ -201,6 +201,12 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
             string error_message="- first\n   - second";
             MAC_Error::object()->raise_bad_data_value( exp,"ViscousStressOrder", error_message );
          }
+	 PressureStressOrder = exp->string_data( "PressureStressOrder" );
+         if ( PressureStressOrder != "first" && PressureStressOrder != "second") {
+            string error_message="- first\n   - second";
+            MAC_Error::object()->raise_bad_data_value( exp,"PressureStressOrder", error_message );
+         }
+
          Npoints = exp->double_data( "Npoints" ) ;
 
 	 if (dim == 3) {
@@ -3079,10 +3085,171 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np)
+DDS_NavierStokes:: second_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: compute_pressure_force_on_particle" ) ;
+  MAC_LABEL("DDS_NavierStokes:: second_order_pressure_stress" ) ;
+
+  size_t i0_temp;
+  size_t comp = 0;
+
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid(0);
+  // Structure of particle surface input data
+  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
+
+  // comp won't matter as the particle position is independent of comp
+  double xp = solid.coord[comp]->item(parID,0);
+  double yp = solid.coord[comp]->item(parID,1);
+  double zp = solid.coord[comp]->item(parID,2);
+  double ri = solid.size[comp]->item(parID);
+/*
+  ofstream outputFile ;
+  std::ostringstream os2;
+  os2 << "./DS_results/pressure_drag_" << my_rank << ".csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+  outputFile << "x,y,z,p_stress" << endl;
+*/
+
+  doubleArray2D point(3,3,0);
+  doubleVector fini(3,0);
+  doubleVector level_set(2,1.);          
+  boolArray2D point_in_domain(1,2,true);
+  size_t_vector in_parID(2,0);         //Store particle ID if level_set becomes negative
+  boolArray2D found(dim,3,false);
+  size_t_array2D i0(3,3,0);
+  doubleVector stress(Np,0);         
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  doubleVector Dmin(dim,0);
+  doubleVector Dmax(dim,0);
+  doubleVector rotated_coord(dim,0);
+  doubleVector rotated_normal(dim,0);
+  intVector sign(dim,0);
+
+  for (size_t i=0;i<Np;i++) {
+     // Get local min and max indices
+     // Get min and max coordinates in the current processor
+     for (size_t l=0;l<dim;++l) {
+         min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l );
+         max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l );
+         Dmin(l) = PF->primary_grid()->get_min_coordinate_on_current_processor(l);
+         Dmax(l) = PF->primary_grid()->get_max_coordinate_on_current_processor(l);
+     }
+
+     // Rotating surface points
+     rotated_coord(0) = ri*surface.coordinate->item(i,0);
+     rotated_coord(1) = ri*surface.coordinate->item(i,1);
+     rotated_coord(2) = ri*surface.coordinate->item(i,2);
+
+     rotation_matrix(parID,rotated_coord,comp,0);
+
+     point(0,0) = xp + rotated_coord(0);
+     point(0,1) = yp + rotated_coord(1);
+     point(0,2) = zp + rotated_coord(2);
+
+     // Rotating surface normal
+     rotated_normal(0) = surface.normal->item(i,0);
+     rotated_normal(1) = surface.normal->item(i,1);
+     rotated_normal(2) = surface.normal->item(i,2);
+
+     rotation_matrix(parID,rotated_normal,comp,0);
+
+     for (size_t dir=0;dir<dim;dir++) {
+        // PBC on rotated surface points
+        if (is_periodic[0][dir]) {
+           double isize = PF->primary_grid()->get_main_domain_max_coordinate(dir) - PF->primary_grid()->get_main_domain_min_coordinate(dir);
+           double imin = PF->primary_grid()->get_main_domain_min_coordinate(dir);
+           point(0,dir) = point(0,dir) - MAC::floor((point(0,dir)-imin)/isize)*isize;
+        }
+        // Finding the grid indexes next to ghost points
+        found(dir,0) = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,dir), point(0,dir), i0_temp);
+        if (found(dir,0) == 1) i0(0,dir) = i0_temp;
+     }
+
+     // Accessing the smallest grid size in domain
+     double dh = PF->primary_grid()->get_smallest_grid_size();
+
+     bool status = (dim==2) ? ((point(0,0) > Dmin(0)) && (point(0,0) <= Dmax(0)) && (point(0,1) > Dmin(1)) && (point(0,1) <= Dmax(1))) :
+                              ((point(0,0) > Dmin(0)) && (point(0,0) <= Dmax(0)) && (point(0,1) > Dmin(1)) && (point(0,1) <= Dmax(1))
+                                                                                 && (point(0,2) > Dmin(2)) && (point(0,2) <= Dmax(2)));
+     double threshold = pow(loc_thres,0.5)*dh;
+     size_t major_dir=4;
+
+     if (status) {
+        for (size_t dir=0;dir<dim;dir++) {
+           sign(dir) = (rotated_normal(dir) > 0.) ? 1 : -1;
+	   if (dim == 2) {
+              if (MAC::abs(rotated_normal(dir)) == MAC::max(MAC::abs(rotated_normal(0)),MAC::abs(rotated_normal(1)))) 
+                 major_dir = dir;
+	   } else if (dim == 3) {
+	      if (MAC::abs(rotated_normal(dir)) == MAC::max(MAC::abs(rotated_normal(0)),
+				                   MAC::max(MAC::abs(rotated_normal(1)),MAC::abs(rotated_normal(2)))))
+		 major_dir = dir;
+	   }
+	}
+
+	// Ghost points in i for the calculation of i-derivative of field
+        ghost_points_generation( PF, point, i0, sign(major_dir), comp, major_dir, point_in_domain, rotated_normal);
+
+        // Assuming all ghost points are in fluid
+        level_set(0) = 1.; level_set(1) = 1.;
+
+        // Checking all the ghost points in the solid/fluid, and storing the parID if present in solid
+        for (size_t m=0;m<Npart;m++) {
+           // In Normal direction
+           if (level_set(0) > threshold) {
+              level_set(0) = level_set_function(PF,m,comp,point(1,0),point(1,1),point(1,2),level_set_type,0);
+              level_set(0) *= solid.inside[comp]->item(m);
+              if (level_set(0) < threshold) in_parID(0) = m;
+           }
+           if (level_set(1) > threshold) {
+              level_set(1) = level_set_function(PF,m,comp,point(2,0),point(2,1),point(2,2),level_set_type,0);
+              level_set(1) *= solid.inside[comp]->item(m);
+              if (level_set(1) < threshold) in_parID(1) = m;
+           }
+        }
+
+        double dx1 = pow(pow(point(1,0)-point(0,0),2) + pow(point(1,1)-point(0,1),2) + pow(point(1,2)-point(0,2),2),0.5);
+        double dx2 = pow(pow(point(2,0)-point(0,0),2) + pow(point(2,1)-point(0,1),2) + pow(point(2,2)-point(0,2),2),0.5);
+
+        // Calculation of field variable on ghost point(0,0)
+        for (size_t level=2; level<4;level++) {
+           // Calculation of field variable on ghost point(1)
+           if (level_set(0) > threshold) fini(1) = third_order_ghost_field_estimate(PF, comp, point(1,0), point(1,1), point(1,2), i0(1,0), i0(1,1), i0(1,2), major_dir, sign, level);
+           // Calculation of field variable on ghost point(2)
+           if (level_set(1) > threshold) fini(2) = third_order_ghost_field_estimate(PF, comp, point(2,0), point(2,1), point(2,2), i0(2,0), i0(2,1), i0(2,2), major_dir, sign, level);
+           // Extrapolation of point on surface using point(1) and point(2), assuming Neumann BC on particle boundary
+           fini(0) = ((dx2/dx1)*fini(1) - (dx1/dx2)*fini(2))/(dx2/dx1 - dx1/dx2);
+           // Stress accumulation
+           stress(i) = stress(i) - fini(0)/2.;
+        }
+     }
+
+     double scale = (dim == 2) ? ri : ri*ri;
+
+     // Ref: Keating thesis Pg-85
+     // point_coord*(area) --> Component of area in particular direction
+     force(parID,0) = force(parID,0) + stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
+     force(parID,1) = force(parID,1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
+     force(parID,2) = force(parID,2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
+
+//     outputFile << point(0,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(0) << endl;
+//     outputFile << point(1,0) << "," << point(1,1) << "," << point(1,2) << "," << fini(1) << endl;
+//     outputFile << point(2,0) << "," << point(2,1) << "," << point(2,2) << "," << fini(2) << endl;
+  }
+//  outputFile.close();
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: first_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NavierStokes:: first_order_pressure_stress" ) ;
 
   size_t i0_temp;
   double ri=0.;
@@ -3835,54 +4002,98 @@ DDS_NavierStokes:: generate_surface_discretization()
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& comp,size_t const& dir, class boolArray2D& point_in_domain )
+DDS_NavierStokes:: ghost_points_generation( FV_DiscreteField* FF, class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& comp,size_t const& major_dir, class boolArray2D& point_in_domain, class doubleVector& rotated_vector )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: ghost_points_generation" ) ;
 
   intVector i0_temp(2,0);
-/*  size_t_vector const* global_min_index;
-  size_t_vector const* global_max_index;
-  size_t_vector const* local_min_index;
+  size_t i0_t;
 
-  global_min_index = UF->primary_grid()->get_global_min_index_in_domain();
-  global_max_index = UF->primary_grid()->get_global_max_index_in_domain();
-  local_min_index = UF->primary_grid()->get_local_min_index_in_global();
-*/
   // Ghost points in i for the calculation of i-derivative of field
-  i0_temp(0) = (sign == 1) ? (int(i0(0,dir)) + 1*sign) : (int(i0(0,dir)) + 0*sign);
-  i0_temp(1) = (sign == 1) ? (int(i0(0,dir)) + 2*sign) : (int(i0(0,dir)) + 1*sign);
+  i0_temp(0) = (sign == 1) ? (int(i0(0,major_dir)) + 1*sign) : (int(i0(0,major_dir)) + 0*sign);
+  i0_temp(1) = (sign == 1) ? (int(i0(0,major_dir)) + 2*sign) : (int(i0(0,major_dir)) + 1*sign);
 
-  point(1,dir) = UF->get_DOF_coordinate(i0_temp(0), comp, dir);
-  point(2,dir) = UF->get_DOF_coordinate(i0_temp(1), comp, dir);
+  point(1,major_dir) = FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
+  point(2,major_dir) = FF->get_DOF_coordinate(i0_temp(1), comp, major_dir);
 
-  if (MAC::abs(point(0,dir)-point(1,dir)) < MAC::abs(point(1,dir)-point(2,dir))) {
-     i0_temp(0) = (sign == 1) ? (int(i0(0,dir)) + 2*sign) : (int(i0(0,dir)) + 1*sign);
-     i0_temp(1) = (sign == 1) ? (int(i0(0,dir)) + 3*sign) : (int(i0(0,dir)) + 2*sign);
+  if (MAC::abs(point(0,major_dir)-point(1,major_dir)) < MAC::abs(point(1,major_dir)-point(2,major_dir))) {
+     i0_temp(0) = (sign == 1) ? (int(i0(0,major_dir)) + 2*sign) : (int(i0(0,major_dir)) + 1*sign);
+     i0_temp(1) = (sign == 1) ? (int(i0(0,major_dir)) + 3*sign) : (int(i0(0,major_dir)) + 2*sign);
 
-     point(1,dir) = UF->get_DOF_coordinate(i0_temp(0), comp, dir);
-     point(2,dir) = UF->get_DOF_coordinate(i0_temp(1), comp, dir);
+     point(1,major_dir) = FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
+     point(2,major_dir) = FF->get_DOF_coordinate(i0_temp(1), comp, major_dir);
   }
 
-  // Checking the ghost points in domain or not; OR modification for PBC
-//  if (((i0_temp(0) + (*local_min_index)(dir)) < (*global_min_index)(dir)) || 
-//      ((i0_temp(0) + (*local_min_index)(dir)) > (*global_max_index)(dir))) {
-  if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)UF->get_local_nb_dof(comp,dir))) {
-     point_in_domain(0,dir) = 0;
+  // Velocity field
+  if (FF == UF) {
+     if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)FF->get_local_nb_dof(comp,major_dir))) {
+        point_in_domain(0,major_dir) = 0;
+     } else {
+        point_in_domain(0,major_dir) = 1;
+     }
+
+     if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)FF->get_local_nb_dof(comp,major_dir))) {
+        point_in_domain(1,major_dir) = 0;
+     } else {
+        point_in_domain(1,major_dir) = 1;
+     }
+
+     i0(1,major_dir) = i0_temp(0);
+     i0(2,major_dir) = i0_temp(1);
+  // Pressure field
   } else {
-     point_in_domain(0,dir) = 1;
-  }
+     double t1 = (point(1,major_dir) - point(0,major_dir))/rotated_vector(major_dir);
+     double t2 = (point(2,major_dir) - point(0,major_dir))/rotated_vector(major_dir);
 
-//  if (((i0_temp(1) + (*local_min_index)(dir)) < (*global_min_index)(dir)) || 
-//      ((i0_temp(1) + (*local_min_index)(dir)) > (*global_max_index)(dir))) { 
-  if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)UF->get_local_nb_dof(comp,dir))) {
-     point_in_domain(1,dir) = 0;
-  } else {
-     point_in_domain(1,dir) = 1;
-  }
+     for (size_t dir=0; dir<dim; dir++) {
+        if (dir != major_dir) {
+           point(1,dir) = point(0,dir) + rotated_vector(dir)*t1;
+           point(2,dir) = point(0,dir) + rotated_vector(dir)*t2;
+        }
+     }
 
-  i0(1,dir) = i0_temp(0);
-  i0(2,dir) = i0_temp(1);
+     boolArray2D found(2,dim,true);
+
+     for (size_t dir=0; dir<dim; dir++) {
+        if (dir == major_dir) {
+           // Checking the points in domain or not	     
+           if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)FF->get_local_nb_dof(0,dir))) {
+              found(0,dir) = 0;
+           }
+           if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)FF->get_local_nb_dof(0,dir))) {
+              found(1,dir) = 0;
+           }
+           i0(1,dir) = i0_temp(0);
+           i0(2,dir) = i0_temp(1);
+        } else {
+           found(0,dir) = FV_Mesh::between(FF->get_DOF_coordinates_vector(0,dir), point(1,dir), i0_t);
+           if (found(0,dir)) i0(1,dir) = i0_t; 
+           found(1,dir) = FV_Mesh::between(FF->get_DOF_coordinates_vector(0,dir), point(2,dir), i0_t);
+           if (found(1,dir)) i0(2,dir) = i0_t; 
+        }
+     }
+
+     // Checking the ghost points in domain or not
+     point_in_domain(0,0) = (dim == 2) ? found(0,0) && found(0,1) :
+                                         found(0,0) && found(0,1) && found(0,2) ;
+     point_in_domain(0,1) = (dim == 2) ? found(1,0) && found(1,1) :
+                                         found(1,0) && found(1,1) && found(1,2) ;
+  }
+}
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NavierStokes:: compute_pressure_force_on_particle" ) ;
+
+  if (PressureStressOrder == "first") {
+     first_order_pressure_stress(force, parID, Np );
+  } else if (PressureStressOrder == "second") {
+     second_order_pressure_stress(force, parID, Np );
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -4001,7 +4212,7 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
               sign(dir) = (rotated_normal(dir) > 0.) ? 1 : -1;
 
               // Ghost points in i for the calculation of i-derivative of field
-              ghost_points_generation( point, i0, sign(dir), comp, dir, point_in_domain);
+              ghost_points_generation( UF, point, i0, sign(dir), comp, dir, point_in_domain, rotated_normal);
 	      // Assuming all ghost points are in fluid
               level_set(dir,0) = 1.; level_set(dir,1) = 1.;
 	   }
@@ -4714,7 +4925,7 @@ DDS_NavierStokes:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
   }
 
   // Generate indexes of secondary ghost points in sec_ghost_dir direction 
-  gen_dir_index_of_secondary_ghost_points(index, sign, sec_ghost_dir, index_g, point_in_domain, comp);
+  gen_dir_index_of_secondary_ghost_points(FF, index, sign, sec_ghost_dir, index_g, point_in_domain, comp);
 
   // Assume all secondary ghost points in fluid
   double x0 = FF->get_DOF_coordinate(index_g(0,sec_ghost_dir), comp, sec_ghost_dir);
@@ -4735,7 +4946,7 @@ DDS_NavierStokes:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
      coord_g(2,0) = point(0,0); coord_g(2,1) = point(0,1); coord_g(2,2) = x2;
   }
 
-  double dh = UF->primary_grid()->get_smallest_grid_size();
+  double dh = FF->primary_grid()->get_smallest_grid_size();
 
   double threshold = pow(loc_thres,0.5)*dh;
   // Checking the secondary ghost points in the solid/fluid, and storing the parID if present in solid
@@ -4771,154 +4982,189 @@ DDS_NavierStokes:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
   if (point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
      // 0 in solid, rest in fluid
      if (point_in_solid(0) && !point_in_solid(1) && !point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,x1-del,yp,zp,in_parID(0));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1-del,zp,in_parID(0));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1-del,in_parID(0));
-        }
-        x0 = x1 - del;
-        f0 = net_vel[comp];
+	if (FF == UF) {
+           if (sec_ghost_dir == 0) {
+              del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,x1-del,yp,zp,in_parID(0));
+           } else if (sec_ghost_dir == 1) {
+              del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,x1-del,zp,in_parID(0));
+           } else if (sec_ghost_dir == 2) {
+              del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1-del,in_parID(0));
+           }
+           x0 = x1 - del;
+           f0 = net_vel[comp];
+	} else {
+           scheme = "linear12";
+	}
      // 2 in solid, rest in fluid
      } else if (!point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,x1+del,yp,zp,in_parID(2));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1+del,zp,in_parID(2));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1+del,in_parID(2));
-        }
-        x2 = x1 + del;
-        f2 = net_vel[comp];
+	if (FF == UF) {
+           if (sec_ghost_dir == 0) {
+              del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,x1+del,yp,zp,in_parID(2));
+           } else if (sec_ghost_dir == 1) {
+              del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,x1+del,zp,in_parID(2));
+           } else if (sec_ghost_dir == 2) {
+              del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1+del,in_parID(2));
+           }
+           x2 = x1 + del;
+           f2 = net_vel[comp];
+	} else {
+           scheme = "linear01";
+	}
      // 0, 2 in solid; 1 in fluid
      } else if (point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,x1-del,yp,zp,in_parID(0));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1-del,zp,in_parID(0));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1-del,in_parID(0));
-        }
-        x0 = x1 - del;
-        f0 = net_vel[comp];
+	if (FF == UF) {
+           if (sec_ghost_dir == 0) {
+              del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,x1-del,yp,zp,in_parID(0));
+           } else if (sec_ghost_dir == 1) {
+              del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,x1-del,zp,in_parID(0));
+           } else if (sec_ghost_dir == 2) {
+              del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1-del,in_parID(0));
+           }
+           x0 = x1 - del;
+           f0 = net_vel[comp];
 
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,x1+del,yp,zp,in_parID(2));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1+del,zp,in_parID(2));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1+del,in_parID(2));
-        }
-        x2 = x1 + del;
-        f2 = net_vel[comp];
-
+           if (sec_ghost_dir == 0) {
+              del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,x1+del,yp,zp,in_parID(2));
+           } else if (sec_ghost_dir == 1) {
+              del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,x1+del,zp,in_parID(2));
+           } else if (sec_ghost_dir == 2) {
+              del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1+del,in_parID(2));
+           }
+           x2 = x1 + del;
+           f2 = net_vel[comp];
+	} else {
+	   scheme = "linear1";
+	}
      // 0, 1 in solid; 2 in fluid
      } else if (point_in_solid(0) && point_in_solid(1) && !point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,x2-del,yp,zp,in_parID(1));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,x2-del,zp,in_parID(1));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x2-del,in_parID(1));
-        }
-        x1 = x2 - del;
-        f1 = net_vel[comp];
-        scheme = "linear12";
+	if (FF == UF) {
+           if (sec_ghost_dir == 0) {
+              del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,x2-del,yp,zp,in_parID(1));
+           } else if (sec_ghost_dir == 1) {
+              del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,x2-del,zp,in_parID(1));
+           } else if (sec_ghost_dir == 2) {
+              del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x2-del,in_parID(1));
+           }
+           x1 = x2 - del;
+           f1 = net_vel[comp];
+           scheme = "linear12";
+	} else {
+	   scheme = "linear2";
+	}
      // 1, 2 in solid; 0 in fluid
      } else if (!point_in_solid(0) && point_in_solid(1) && point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,x0+del,yp,zp,in_parID(1));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,x0+del,zp,in_parID(1));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x0+del,in_parID(1));
-        }
-        x1 = x0 + del;
-        f1 = net_vel[comp];
-        scheme = "linear01";
+	if (FF == UF) {
+           if (sec_ghost_dir == 0) {
+              del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,x0+del,yp,zp,in_parID(1));
+           } else if (sec_ghost_dir == 1) {
+              del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,x0+del,zp,in_parID(1));
+           } else if (sec_ghost_dir == 2) {
+              del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x0+del,in_parID(1));
+           }
+           x1 = x0 + del;
+           f1 = net_vel[comp];
+           scheme = "linear01";
+	} else {
+	   scheme = "linear0";
+	}
      }
   // Point 0 and 1 are in domain, 2 not in domain
   } else if (point_in_domain(0) && point_in_domain(1) && !point_in_domain(2)) {
      scheme = "linear01";
      // 0 in fluid; 1 in solid
      if (!point_in_solid(0) && point_in_solid(1)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,x0+del,yp,zp,in_parID(1));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,x0+del,zp,in_parID(1));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x0+del,in_parID(1));
-        }
-        x1 = x0 + del;
-        f1 = net_vel[comp];
+	if (FF == UF) {
+           if (sec_ghost_dir == 0) {
+              del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,x0+del,yp,zp,in_parID(1));
+           } else if (sec_ghost_dir == 1) {
+              del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,x0+del,zp,in_parID(1));
+           } else if (sec_ghost_dir == 2) {
+              del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x0+del,in_parID(1));
+           }
+           x1 = x0 + del;
+           f1 = net_vel[comp];
+	} else {
+	   scheme = "linear0";
+	}
      // 0 in solid, 1 in fluid
      } else if (point_in_solid(0) && !point_in_solid(1)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,x1-del,yp,zp,in_parID(0));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1-del,zp,in_parID(0));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1-del,in_parID(0));
-        }
-        x0 = x1 - del;
-        f0 = net_vel[comp];
+	if (FF == UF) {
+           if (sec_ghost_dir == 0) {
+              del = find_intersection_for_ghost(FF, x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,x1-del,yp,zp,in_parID(0));
+           } else if (sec_ghost_dir == 1) {
+              del = find_intersection_for_ghost(FF, x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,x1-del,zp,in_parID(0));
+           } else if (sec_ghost_dir == 2) {
+              del = find_intersection_for_ghost(FF, x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1-del,in_parID(0));
+           }
+           x0 = x1 - del;
+           f0 = net_vel[comp];
+	} else {
+	   scheme = "linear1";
+	}
      }
   // Point 1 and 2 are in domain, 0 not in domain
   } else if (!point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
      scheme = "linear12";
      // 1 in fluid; 2 in solid
      if (!point_in_solid(1) && point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,x1+del,yp,zp,in_parID(2));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,x1+del,zp,in_parID(2));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1+del,in_parID(2));
-        }
-        x2 = x1 + del;
-        f2 = net_vel[comp];
+	if (FF == UF) {
+           if (sec_ghost_dir == 0) {
+              del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,x1+del,yp,zp,in_parID(2));
+           } else if (sec_ghost_dir == 1) {
+              del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,x1+del,zp,in_parID(2));
+           } else if (sec_ghost_dir == 2) {
+              del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 1, 0, 1);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x1+del,in_parID(2));
+           }
+           x2 = x1 + del;
+           f2 = net_vel[comp];
+	} else {
+	   scheme = "linear1";
+	}
      // 1 in solid, 2 in fluid
      } else if (point_in_solid(1) && !point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,x2-del,yp,zp,in_parID(1));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,x2-del,zp,in_parID(1));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
-           impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x2-del,in_parID(1));
-        }
-        x1 = x2 - del;
-        f1 = net_vel[comp];
+	if (FF == UF) {
+           if (sec_ghost_dir == 0) {
+              del = find_intersection_for_ghost(FF, x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,x2-del,yp,zp,in_parID(1));
+           } else if (sec_ghost_dir == 1) {
+              del = find_intersection_for_ghost(FF, x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,x2-del,zp,in_parID(1));
+           } else if (sec_ghost_dir == 2) {
+              del = find_intersection_for_ghost(FF, x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 1, 0, 0);    
+              impose_solid_velocity_for_ghost(net_vel,comp,xp,yp,x2-del,in_parID(1));
+           }
+           x1 = x2 - del;
+           f1 = net_vel[comp];
+	} else {
+           scheme = "linear2";
+	}
      }
   }
 
@@ -4938,6 +5184,12 @@ DDS_NavierStokes:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
      l1 = (point(0,sec_ghost_dir) - x2)/(x1 - x2);
      l2 = (point(0,sec_ghost_dir) - x1)/(x2 - x1);
      result = f1*l1 + f2*l2;
+  } else if (scheme == "linear0") {
+     result = f0;
+  } else if (scheme == "linear1") {
+     result = f1;
+  } else if (scheme == "linear2") {
+     result = f2;
   }
 
   return(result);
@@ -4966,20 +5218,13 @@ DDS_NavierStokes:: third_order_ghost_field_estimate ( FV_DiscreteField* FF, size
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp)
+DDS_NavierStokes:: gen_dir_index_of_secondary_ghost_points (FV_DiscreteField* FF, class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: gen_dir_index_of_secondary_ghost_points" ) ;
 
   intVector i0_temp(3,0);
-/*  size_t_vector const* global_min_index;
-  size_t_vector const* global_max_index;
-  size_t_vector const* local_min_index;
 
-  global_min_index = UF->primary_grid()->get_global_min_index_in_domain();
-  global_max_index = UF->primary_grid()->get_global_max_index_in_domain();
-  local_min_index = UF->primary_grid()->get_local_min_index_in_global();
-*/
   for (size_t dir=0;dir<dim;dir++) {
      index_g(0,dir) = index(dir);
      index_g(1,dir) = index(dir);
@@ -4997,25 +5242,19 @@ DDS_NavierStokes:: gen_dir_index_of_secondary_ghost_points ( class size_t_vector
   }
 
   // Checking the ghost points in domain or not
-//  if (((i0_temp(0) + (*local_min_index)(interpol_dir)) < (*global_min_index)(interpol_dir)) || 
-//      ((i0_temp(0) + (*local_min_index)(interpol_dir)) > (*global_max_index)(interpol_dir))) {
-  if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)UF->get_local_nb_dof(comp,interpol_dir))) {
+  if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)FF->get_local_nb_dof(comp,interpol_dir))) {
      point_in_domain(0) = 0;
   } else {
      point_in_domain(0) = 1;
   }
 
-//  if (((i0_temp(1) + (*local_min_index)(interpol_dir)) < (*global_min_index)(interpol_dir)) || 
-//      ((i0_temp(1) + (*local_min_index)(interpol_dir)) > (*global_max_index)(interpol_dir))) { 
-  if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)UF->get_local_nb_dof(comp,interpol_dir))) {
+  if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)FF->get_local_nb_dof(comp,interpol_dir))) {
      point_in_domain(1) = 0;
   } else {
      point_in_domain(1) = 1;
   }
 
-//  if (((i0_temp(2) + (*local_min_index)(interpol_dir)) < (*global_min_index)(interpol_dir)) || 
-//      ((i0_temp(2) + (*local_min_index)(interpol_dir)) > (*global_max_index)(interpol_dir))) { 
-  if ((i0_temp(2) < 0) || (i0_temp(2) >= (int)UF->get_local_nb_dof(comp,interpol_dir))) {
+  if ((i0_temp(2) < 0) || (i0_temp(2) >= (int)FF->get_local_nb_dof(comp,interpol_dir))) {
      point_in_domain(2) = 0;
   } else {
      point_in_domain(2) = 1;
@@ -5045,10 +5284,11 @@ DDS_NavierStokes:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t cons
    std::string filename = os2.str();
    outputFile.open(filename.c_str(), ios::app);
 */
+   size_t field = (FF == UF) ? 1 : 0;
    // Node information for field(1)
-   NodeProp node = GLOBAL_EQ->get_node_property(1);
-   // Intersection information for field(1) in fluid(0)
-   BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(1,0);
+   NodeProp node = GLOBAL_EQ->get_node_property(field);
+   // Intersection information for field in fluid(0)
+   BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(field,0);
 
    // Directional index of point
    size_t_vector index(3,0);
@@ -5070,7 +5310,7 @@ DDS_NavierStokes:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t cons
    double l0=0.,l1=0.,l2=0.;
 
    // Creating ghost points for quadratic interpolation
-   gen_dir_index_of_secondary_ghost_points(index, sign, interpol_dir, index_g, point_in_domain, comp);
+   gen_dir_index_of_secondary_ghost_points(FF, index, sign, interpol_dir, index_g, point_in_domain, comp);
 
    // Check weather the ghost points are in solid or not; TRUE if they are   
    node_index(0) = return_node_index(FF,comp,index_g(0,0),index_g(0,1),index_g(0,2));
@@ -5095,55 +5335,91 @@ DDS_NavierStokes:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t cons
    if (point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
       // 0 in solid, rest in fluid
       if (point_in_solid(0) && !point_in_solid(1) && !point_in_solid(2)) {
-         x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
-         f0 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),0);
+	 if (FF == UF) {
+            x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
+            f0 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),0);
+	 } else {
+            scheme = "linear12";
+	 }
       // 2 in solid, rest in fluid
       } else if (!point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
-         x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
-         f2 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),1);
+	 if (FF == UF) {
+            x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
+            f2 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),1);
+	 } else {
+            scheme = "linear01";
+	 }
       // 0, 2 in solid; 1 in fluid
       } else if (point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
-         x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
-         f0 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),0);
-         x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
-         f2 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),1);
+	 if (FF == UF) {
+            x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
+            f0 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),0);
+            x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
+            f2 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),1);
+	 } else {
+            scheme = "linear1";
+	 }
       // 0, 1 in solid; 2 in fluid
       } else if (point_in_solid(0) && point_in_solid(1) && !point_in_solid(2)) {
-         x1 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(2),0);
-         f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(2),0);
-         scheme = "linear12";
+         if (FF == UF) {
+            x1 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(2),0);
+            f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(2),0);
+            scheme = "linear12";
+	 } else {
+            scheme = "linear2";
+	 }
       // 1, 2 in solid; 0 in fluid
       } else if (!point_in_solid(0) && point_in_solid(1) && point_in_solid(2)) {
-         x1 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(0),1);
-         f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(0),1);
-         scheme = "linear01";
+	 if (FF == UF) {
+            x1 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(0),1);
+            f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(0),1);
+            scheme = "linear01";
+	 } else {
+            scheme = "linear0";
+	 }
       }
    // Point 0 and 1 are in domain, 2 not in domain
    } else if (point_in_domain(0) && point_in_domain(1) && !point_in_domain(2)) {
       scheme = "linear01";
       // 0 in fluid; 1 in solid
       if (!point_in_solid(0) && point_in_solid(1)) {
-         x1 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(0),1);
-         f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(0),1);
+	 if (FF == UF) {
+            x1 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(0),1);
+            f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(0),1);
+	 } else {
+            scheme = "linear0";
+	 }
       // 0 in solid, 1 in fluid
       } else if (point_in_solid(0) && !point_in_solid(1)) {
-         x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
-         f0 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),0);
+	 if (FF == UF) {
+            x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
+            f0 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),0);
+	 } else {
+            scheme = "linear1";
+	 }
       }
    // Point 1 and 2 are in domain, 0 not in domain
    } else if (!point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
       scheme = "linear12";
       // 1 in fluid; 2 in solid
       if (!point_in_solid(1) && point_in_solid(2)) {
-         x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
-         f2 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),1);
+	 if (FF == UF) {
+            x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
+            f2 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(1),1);
+	 } else {
+            scheme = "linear1";
+	 }
       // 1 in solid, 2 in fluid
       } else if (point_in_solid(1) && !point_in_solid(2)) {
-         x1 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(2),0);
-         f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(2),0);
+	 if (FF == UF) {
+            x1 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(2),0);
+            f1 = bf_intersect[interpol_dir].field_var[comp]->item(node_index(2),0);
+	 } else {
+            scheme = "linear2";
+	 }
       }
    }
-
+ 
 /*   
    if (comp == 0) {
       if (interpol_dir == 0) {
@@ -5174,6 +5450,12 @@ DDS_NavierStokes:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t cons
       l1 = (xi(interpol_dir) - x2)/(x1 - x2);
       l2 = (xi(interpol_dir) - x1)/(x2 - x1);
       result = f1*l1 + f2*l2;
+   } else if (scheme == "linear0") {
+      result = f0;
+   } else if (scheme == "linear1") {
+      result = f1;
+   } else if (scheme == "linear2") {
+      result = f2;
    }
 
    return(result);
