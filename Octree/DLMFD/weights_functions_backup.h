@@ -3159,8 +3159,10 @@ size_t is_it_in_cube (const double x, const double y, const double z, const Geom
   return isin;
 }
 
-void assign_dial_fd_boundary (particle * p, const coord posb, const GeomParameter gp, const double Delta,  int * NCX) {
-// find the normal to the fictitious domain and assign the dial accordingly
+void assign_dial_fd_boundary (particle * p, const coord posb, 
+	const GeomParameter gp, const double Delta,  int * NCX) 
+{
+  // find the normal to the fictitious domain and assign the dial accordingly
   
   size_t  isin_xp = 0, isin_yp = 0;
   double RDelta = Delta / 100.;
@@ -3172,12 +3174,14 @@ void assign_dial_fd_boundary (particle * p, const coord posb, const GeomParamete
 
   if ( p->shape == CUBE ) {
     coord checkpt = {posb.x + RDelta, posb.y, posb.z};
-    isin_xp = is_it_in_cube_v2 (&(p->g.u1), &(p->g.v1), &(p->g.w1), &(p->g.mins), &(p->g.maxs), &checkpt);
+    isin_xp = is_it_in_cube_v2 (&(p->g.pgp->u1), &(p->g.pgp->v1), 
+    	&(p->g.pgp->w1), &(p->g.pgp->mins), &(p->g.pgp->maxs), &checkpt);
 
     checkpt.x = posb.x;
     checkpt.y = posb.y + RDelta;
     checkpt.z = posb.z;
-    isin_yp = is_it_in_cube_v2 (&(p->g.u1), &(p->g.v1), &(p->g.w1), &(p->g.mins), &(p->g.maxs), &checkpt);
+    isin_yp = is_it_in_cube_v2 (&(p->g.pgp->u1), &(p->g.pgp->v1), 
+    	&(p->g.pgp->w1), &(p->g.pgp->mins), &(p->g.pgp->maxs), &checkpt);
   }
   
 #if dimension == 2
@@ -3213,7 +3217,8 @@ void assign_dial_fd_boundary (particle * p, const coord posb, const GeomParamete
   checkpt.z  = posb.z + RDelta;
   
   if ( p->shape == CUBE )
-    isin_zp = is_it_in_cube_v2 (&(p->g.u1), &(p->g.v1), &(p->g.w1), &(p->g.mins), &(p->g.maxs), &checkpt);
+    isin_zp = is_it_in_cube_v2 (&(p->g.pgp->u1), &(p->g.pgp->v1), 
+    	&(p->g.pgp->w1), &(p->g.pgp->mins), &(p->g.pgp->maxs), &checkpt);
   
   if (isin_zp) {
     // fictitious-boundary's normal is oriented z-.  

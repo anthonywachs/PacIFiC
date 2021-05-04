@@ -4,6 +4,9 @@
 
 #include "Grains_BuilderFactory.H"
 #include "InterfaceGrains.h"
+#include <iostream>
+#include <cstring>
+#include <string>
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,6 +56,29 @@ extern "C" {
   {
     grains->WriteParticulesInFluid( b );
   }
+  
+  char* GrainsToBasilisk( int* pstrsize )
+  {
+    // We use the interface function of PeliGRIFF
+    istringstream iss;
+    grains->WriteParticulesInFluid( iss );
+
+    // Temporary: we remove the formatting and separate each entry by " "
+    string buff;
+    *pstrsize = int(iss.str().size()) + 1;    
+    char* pstr = new char [*pstrsize];
+    int pos = 0;
+    while ( iss >> buff )
+    {
+      std::strcpy( &pstr[pos], buff.c_str() );
+      pos += int(buff.size());
+      std::strcpy( &pstr[pos], " " ); 
+      pos += 1;     
+    }    
+    
+    // Return the pointer to the char
+    return pstr;
+  }
 
 
   void Data_CstructToGrains( struct BasiliskDataStructure * b ) {}
@@ -97,6 +123,20 @@ extern "C" {
   {
     grains->UpdateParticulesVelocities( b, explicit_added_mass );
   }
+  
+  void UpdateVelocityGrains( double arrayv[][6], const int m, 
+  	bool explicit_added_mass ) 
+  {
+    // Transfer into a vector< vector<double> >
+    vector<double> buf( 6, 0.);
+    vector< vector<double> > vecv( m, buf );
+    for (size_t i=0;i<size_t(m);++i)
+      for (size_t j=0;j<6;++j)
+        vecv[i][j] = arrayv[i][j];
+
+    // We use the interface function of PeliGRIFF
+    grains->UpdateParticulesVelocities( vecv, explicit_added_mass );
+  }  
 
   
   void ActivateExplicitAddedMass( bool restart ) 

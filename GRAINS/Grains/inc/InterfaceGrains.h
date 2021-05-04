@@ -20,30 +20,36 @@ extern "C" {
 	const bool is_solidsolver_parallel,
 	const int my_rank, const int nb_procs );
   
-  void Simu_Grains (bool predictor, const bool isPredictorCorrector, const bool explicit_added_mass);
+  void Simu_Grains( bool predictor, const bool isPredictorCorrector, 
+  	const bool explicit_added_mass );
   
-  void Data_GrainsToCstruct (struct BasiliskDataStructure * b, const int m);
-
-  void Data_CstructToGrains (struct BasiliskDataStructure * b);
-
-  void SetInitialTime ( double tinit );
+  void Data_GrainsToCstruct( struct BasiliskDataStructure* b, const int m );
   
-  void Setdt_Grains (double const dtfluid);  
-  
-  void Setdt_AddedMassGrains ( double dtfluid );
+  char* GrainsToBasilisk( int* pstrsize );
 
-  void Setviscosity_Grains (double const viscosity);
+  void Data_CstructToGrains( struct BasiliskDataStructure* b );
+
+  void SetInitialTime( double tinit );
+  
+  void Setdt_Grains( double const dtfluid );  
+  
+  void Setdt_AddedMassGrains( double dtfluid );
+
+  void Setviscosity_Grains( double const viscosity );
 
   void SaveResults_Grains();
 
-  void checkParaviewPostProcessing_Grains ( char * solid_resDir );
+  void checkParaviewPostProcessing_Grains( char* solid_resDir );
 
-  void Update_Velocity_Grains( struct BasiliskDataStructure * b, 
+  void Update_Velocity_Grains( struct BasiliskDataStructure* b, 
   	bool explicit_added_mass );
+	
+  void UpdateVelocityGrains( double arrayv[][6], const int m, 
+  	bool explicit_added_mass );	
   
   void ActivateExplicitAddedMass( bool restart );
   
-  void InitializeExplicitAddedMass( bool b_restart, char * rootfilename );
+  void InitializeExplicitAddedMass( bool b_restart, char* rootfilename );
   
   void SetInitialCycleNumber( int cycle0 );
 

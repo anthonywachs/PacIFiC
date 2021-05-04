@@ -204,3 +204,23 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
   
   boundary((scalar*){pshift});
 }
+
+
+
+
+// Read geometric parameters of the 2D circular cylinder
+void update_CircularCylinder2D( GeomParameter* gcp ) 
+{  
+//  char* token = NULL;
+  
+  // TO DO
+}
+
+
+
+
+// Free the geometric parameters of the 2D circular cylinder
+void free_CircularCylinder2D( GeomParameter* gcp ) 
+{  
+  // Nothing to do
+}

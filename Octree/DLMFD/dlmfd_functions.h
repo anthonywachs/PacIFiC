@@ -58,47 +58,67 @@ typedef struct {
 
 
 
-/** Geometric parameters of the particle. */
+/** Additional geometric parameters for polygons/polyhedrons */
 typedef struct {
-  coord  center;
-  double radius;
-  int ncorners, allPoints, allFaces;
+  int allPoints, allFaces;
   double ** cornersCoord;
   long int ** cornersIndex;
   long int * numPointsOnFaces;
   
-  /*3 principals vectors of the cube */
+  /* Special Cube: 3 principal vectors */
   coord u1, v1, w1;
   coord mins, maxs;
   
+} PolyGeomParameter;
+
+
+
+
+
+/** Particle's geometric parameters */
+typedef struct {
+  coord center;
+  double radius;
+  int ncorners;
+  PolyGeomParameter* pgp;  
 } GeomParameter;
 
 
 
 
+/** Structure for the toy granular solver */
 typedef struct {
-  SolidBodyBoundary s;
-  GeomParameter g;
-  GeomParameter gnm1;
-#if DLM_Moving_particle
   double kn, en, vzero, wished_ratio;
   coord normalvector;
-  coord gravity;
-  double M, Ip[6], Ip_inv[3][3], rho_s, Vp, DLMFD_couplingfactor;
-#if TRANSLATION
-  coord U, Unm1, qU, tU;
-#endif
-#if ROTATION
-  coord w, wnm1, qw, tw;
-#endif
-#endif
+  GeomParameter gnm1;  
+} ToyGSParameter;
+
+
+
+
+typedef struct {
   size_t pnum;
-  coord imposedU, imposedw;
+  enum RigidBodyShape shape;  
+  SolidBodyBoundary s;
+  GeomParameter g;
+  double M, Ip[6], rho_s, Vp, DLMFD_couplingfactor;  
+# if DLM_Moving_particle
+    ToyGSParameter *toygsp;
+    coord gravity;
+    double Ip_inv[3][3];
+    coord addforce;    
+#   if TRANSLATION
+      coord U, Unm1, qU, tU;
+#   endif
+#   if ROTATION
+      coord w, wnm1, qw, tw;
+#   endif
+# else
+    coord imposedU, imposedw;    
+# endif
   Cache Interior;
   Cache reduced_domain;
-  coord adforce;
   long tcells, tmultipliers;
-  enum RigidBodyShape shape;
 } particle;
 
 
@@ -111,11 +131,10 @@ typedef struct {
 
 /** Function that allocates in memory the SolidBodyBoundary
     structure. */
-void allocate_SolidBodyBoundary (SolidBodyBoundary *sbm, const int m) 
+void allocate_SolidBodyBoundary( SolidBodyBoundary* sbm, const int m ) 
 {
   sbm->x = (double*) calloc( m, sizeof(double)); 
   sbm->y = (double*) calloc( m, sizeof(double));
-
 # if dimension == 3  
     sbm->z = (double*) calloc( m, sizeof(double));
 # else
@@ -128,11 +147,10 @@ void allocate_SolidBodyBoundary (SolidBodyBoundary *sbm, const int m)
 
 
 
-void reallocate_SolidBodyBoundary (SolidBodyBoundary *sbm, const int m) 
+void reallocate_SolidBodyBoundary( SolidBodyBoundary* sbm, const int m ) 
 {
   sbm->x = (double*) realloc (sbm->x, m*sizeof(double)); 
-  sbm->y = (double*) realloc (sbm->y, m*sizeof(double));
-  
+  sbm->y = (double*) realloc (sbm->y, m*sizeof(double));  
 # if dimension == 3 
     sbm->z = (double*) realloc (sbm->z, m*sizeof(double));
 # endif    
@@ -145,12 +163,12 @@ void reallocate_SolidBodyBoundary (SolidBodyBoundary *sbm, const int m)
 
 /** Function that de-allocates in memory the SolidBodyBoundary
     structure. */
-void free_SolidBodyBoundary (SolidBodyBoundary *sbm) 
+void free_SolidBodyBoundary( SolidBodyBoundary* sbm ) 
 {
-  free(sbm->x); sbm->x = NULL;
-  free(sbm->y); sbm->y = NULL;
+  free( sbm->x ); sbm->x = NULL;
+  free( sbm->y ); sbm->y = NULL;
 # if dimension == 3 
-    free(sbm->z); sbm->z = NULL;
+    free( sbm->z ); sbm->z = NULL;
 # endif 
 }
 
@@ -158,48 +176,114 @@ void free_SolidBodyBoundary (SolidBodyBoundary *sbm)
 
 
 /** Function that allocates an initial Cache structure */
-void allocate_Cache (Cache * p) 
+void allocate_Cache( Cache* p ) 
 {
   p->n = 0;
   p->nm = 0;
-  if (p->n >= p->nm) {
-    p->p = (Index *) calloc (5, sizeof(int));
-  }
+  if ( p->n >= p->nm )
+    p->p = (Index *) calloc( 5, sizeof(int) );
 }
 
 
 
 
-void free_particles (particle * pp, const int n) 
+// Free the particle data that were dynamically allocated
+void free_particles( particle* pp, const int n ) 
 {
-  for (int k = 0; k < n; k++) {
+  for (size_t k=0;k<n;k++) 
+  {        
+    // Free the boudnary point coordinate arrays
+    SolidBodyBoundary* sbm = &(pp[k].s);
+    free_SolidBodyBoundary( sbm );
     
-    SolidBodyBoundary * sbm = &(pp[k].s);
-    free_SolidBodyBoundary(sbm);
-    Cache * c = &(pp[k].Interior);
-    free(c->p);
+    // Free the caches 
+    Cache* c = &(pp[k].Interior);
+    free( c->p );
+    c->p = NULL;
     c = &(pp[k].reduced_domain);
-    free(c->p);
+    free( c->p );
+    c->p = NULL;    
+    
+    // Free the toy granular solver parameter structure
+# if DLM_Moving_particle
+    if ( pp[k].toygsp )
+    {
+      free( pp[k].toygsp );
+      pp[k].toygsp = NULL;
+    }     
+# endif
 
-    /* free corner coordinates tables */
-    double * cc;
-    GeomParameter * gg = &(pp[k].g);
-    for (int i = 0; i < gg->ncorners; i++) {
-      cc = &(gg->cornersCoord[i][0]);
-      if(cc) {
-	free(cc);
-      }
-    }
-    free(gg->cornersCoord);
-
-    /* free corner's indices tables */
-    for (int i = 0; i < gg->allFaces; i++) {
-      free(gg->cornersIndex[i]);
-    }
-    free(gg->cornersIndex);
-    free(gg->numPointsOnFaces);
+    // Free the additional geometric features of the particle
+    switch ( pp[k].shape )
+    {
+      case SPHERE:
+        free_Sphere( &(pp[k].g) );
+	break;
+	  
+      case CIRCULARCYLINDER2D:
+        free_CircularCylinder2D( &(pp[k].g) );
+	break;
+	  
+      case CUBE:
+        free_Cube( &(pp[k].g) );
+	break;
+	  
+      default:
+        fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+    }                               
   }
 }
+
+
+
+
+// Print a particle data
+void print_particle( particle const* pp )
+{
+  printf( "  Number = %lu\n", pp->pnum ); 
+  printf( "  Shape = " );
+  switch ( pp->shape )
+  {
+    case SPHERE:
+      printf( "SPHERE" );
+      break;
+	  
+    case CIRCULARCYLINDER2D:
+      printf( "CIRCULARCYLINDER2D" );
+      break;
+	  
+    case CUBE:
+      printf( "CUBE" );
+      break;
+	  
+    default:
+      fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+  }
+  printf( "\n" );
+  printf( "  Center of mass = %e %e", pp->g.center.x, pp->g.center.y );
+# if dimension == 3
+    printf( " %e", pp->g.center.z );
+# endif
+  printf( "\n" );
+  printf( "  Radius = %e\n", pp->g.radius );  
+  printf( "  Mass = %e\n", pp->M ); 
+  printf( "  Volume = %e\n", pp->Vp );     
+  printf( "  Density = %e\n", pp->rho_s );     
+} 
+
+
+
+
+// Print a particle data
+void print_all_particles( particle const* allpart )
+{
+  printf( "Total number of particles = %d\n", NPARTICLES );
+  for (size_t k=0;k<NPARTICLES;k++)
+  { 
+    printf( "Particle %lu\n", k );    
+    print_particle( &(allpart[k]) );
+  }
+} 
 
 
 
@@ -341,11 +425,11 @@ void remove_too_close_multipliers(particle * p, vector index_lambda)
       	    /* Check particle's type */
       	    if ( other_particle->shape == CUBE ) {
       	      compute_principal_vectors_Cubes (other_particle);
-      	      coord u = other_particle->g.u1;
-      	      coord v = other_particle->g.v1;
-      	      coord w = other_particle->g.w1;
-      	      coord mins = other_particle->g.mins;
-      	      coord maxs = other_particle->g.maxs;
+      	      coord u = other_particle->g.pgp->u1;
+      	      coord v = other_particle->g.pgp->v1;
+      	      coord w = other_particle->g.pgp->w1;
+      	      coord mins = other_particle->g.pgp->mins;
+      	      coord maxs = other_particle->g.pgp->maxs;
 
       	      /* current cell's position */
       	      coord checkpt = {x, y, z};

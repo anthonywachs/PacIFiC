@@ -1,3 +1,4 @@
+#include "Grains_Exec.hh"
 #include "InterfaceFluide2D.hh"
 #include "Particule.H"
 #include "MonObstacle.H"
@@ -278,12 +279,34 @@ void InterfaceFluide2D::WriteParticulesInFluid(
       if (nclonesper) particuleType = "PP";
 
       particles_features << id << '\t' << ncorners << endl;
-      particles_features << particuleType << '\t'
-		   << (*vitesseT)[X] << '\t' << (*vitesseT)[Y] << '\t'
-		   << (*vitesseR)[Z] << '\t'
-		   << masseVol    << '\t' << masse << '\t'
-		   << inertie[5]  << '\t'
-		   << (*centre)[X]   << '\t' << (*centre)[Y] << '\n';
+
+//       particles_features << particuleType << '\t'
+// 		   << (*vitesseT)[X] << '\t' << (*vitesseT)[Y] << '\t'
+// 		   << (*vitesseR)[Z] << '\t'
+// 		   << masseVol    << '\t' << masse << '\t'
+// 		   << inertie[5]  << '\t'
+// 		   << (*centre)[X]   << '\t' << (*centre)[Y] << '\n';
+		   
+      particles_features
+	<< particuleType <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*vitesseT)[X] ) <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*vitesseT)[Y] ) <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*vitesseR)[Z] ) <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		masseVol )    <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		masse )       <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		inertie[5] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*centre)[X] )   <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*centre)[Y] )   <<'\t'
+	<< endl;
+		   
       if ( particuleType == "PP" )
       {
         particles_features << nclonesper << endl;

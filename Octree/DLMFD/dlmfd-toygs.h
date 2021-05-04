@@ -49,9 +49,9 @@ void compute_wo (particle * p)
   double bb = 0.;
   GeomParameter gc = p->g;
   double r = gc.radius;
-  double deltamax = (p->wished_ratio)*r;
-  double en = p->en;
-  double v = p->vzero;
+  double deltamax = (p->toygsp->wished_ratio)*r;
+  double en = p->toygsp->en;
+  double v = p->toygsp->vzero;
     
   /* Newton iteration to find the root of delta(w0) */
   if (en < 1) {
@@ -65,11 +65,11 @@ void compute_wo (particle * p)
 	  }
       wo += -aa/bb;
     }
-    p->kn = (p->M)*sq(wo);
+    p->toygsp->kn = (p->M)*sq(wo);
   }
   else {
     /* if en = 1 the formula simplifies as such */
-    p->kn = (p->M)*sq(p->vzero)/(sq(deltamax));
+    p->toygsp->kn = (p->M)*sq(p->toygsp->vzero)/(sq(deltamax));
   }  
 }
 
@@ -88,12 +88,12 @@ void compute_Fontact (coord * Fc, particle * p, coord * gci, coord * U,
   compute_contact_distance(p, *gci, &delta_colision);
     
   if (delta_colision < 0.) {
-    double kn = p->kn;
+    double kn = p->toygsp->kn;
     double M = p->M;
     coord vrel = *U;
     coord Fel = {0., 0., 0.};
     coord Fdm = {0., 0., 0.};
-    coord normalvec = p->normalvector;
+    coord normalvec = p->toygsp->normalvector;
 
     foreach_dimension() {
       /* compute Hookean elastic restoring force */
@@ -145,8 +145,8 @@ void granular_subproblem (particle * p, const int gravity_flag,
    
     miter = 0;
     M = p[k].M;
-    kn = p[k].kn;
-    en = p[k].en;
+    kn = p[k].toygsp->kn;
+    en = p[k].toygsp->en;
     
     
     /* compute wo and gamman */
@@ -170,7 +170,7 @@ void granular_subproblem (particle * p, const int gravity_flag,
     /* get particle structure pointers */
 
     /* position */
-    gcinm1 = &(p[k].gnm1);
+    gcinm1 = &(p[k].toygsp->gnm1);
     gci = &(p[k].g);
 
     /* translational velocity */
@@ -312,15 +312,15 @@ event GranularSolver_init (t < -1.) {
   particle * pp = particles;
   for (int k = 0; k < NPARTICLES; k++) {
     /* Contact model parameters needed to setup the granular time-step */
-    pp[k].wished_ratio = 0.1;
-    pp[k].en = 1;
-    pp[k].vzero = 1;
+    pp[k].toygsp->wished_ratio = 0.1;
+    pp[k].toygsp->en = 1;
+    pp[k].toygsp->vzero = 1;
     compute_wo (&pp[k]);
 
     /* add this term to make sure that the gravity is added only once in 
     the granular subproblem (it is already present in the granular solver) */
     foreach_dimension()
-      pp[k].adforce.x = -pp[k].gravity.x;
+      pp[k].addforce.x = -pp[k].gravity.x;
   }
 } 
 

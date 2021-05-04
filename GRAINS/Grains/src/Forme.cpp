@@ -560,7 +560,11 @@ void Forme::writePositionInFluid( ostream &fluid )
     for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
       pointEnvelop = m_position(*point);
-      fluid << pointEnvelop[X] << " " << pointEnvelop[Y] << "\n";
+//      fluid << pointEnvelop[X] << " " << pointEnvelop[Y] << "\n";
+      fluid << Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+      		pointEnvelop[X] ) << " "
+      	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelop[Y] ) << "\n";      
     }
   }
   // Cas 3D
@@ -570,14 +574,14 @@ void Forme::writePositionInFluid( ostream &fluid )
     for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
       pointEnvelop = m_position(*point);
-      fluid << pointEnvelop[X] << " " << pointEnvelop[Y] << " "
-	<< pointEnvelop[Z] << "\n";
-//       fluid << Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-//       		pointEnvelop[X] ) << " "
-//       	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		pointEnvelop[Y] ) << " "
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		pointEnvelop[Z] ) << "\n";
+//       fluid << pointEnvelop[X] << " " << pointEnvelop[Y] << " "
+// 	<< pointEnvelop[Z] << "\n";
+      fluid << Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+      		pointEnvelop[X] ) << " "
+      	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelop[Y] ) << " "
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelop[Z] ) << "\n";
     }
 
     // Faces du polyedre

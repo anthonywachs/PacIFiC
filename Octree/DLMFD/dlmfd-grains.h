@@ -31,6 +31,8 @@ event GranularSolver_init (t < -1.)
   bool is_solidsolver_parallel = false;
   int my_rank = pid();
   int nb_procs = npe();
+  char* pstr = NULL;
+  int pstrsize = 0;  
 
   // Grains runs in sequential 
   if ( pid() == 0 )
@@ -58,7 +60,11 @@ event GranularSolver_init (t < -1.)
     }
     
     // Transfer the data to the common C structure
-    Data_GrainsToCstruct( &BasiliskData[0], NPARTICLES );
+//    Data_GrainsToCstruct( &BasiliskData[0], NPARTICLES );
+    
+    pstr = GrainsToBasilisk( &pstrsize ); 
+//     printf("Length of string = %d %lu\n",pstrsize,strlen(pstr));    
+//     printf("%s\n",pstr);    
 
     // Check that Paraview writer is activated
     checkParaviewPostProcessing_Grains( grains_result_dir );
@@ -75,15 +81,21 @@ event GranularSolver_init (t < -1.)
     }
     else SetInitialCycleNumber( init_cycle_number );    
   }
-
-  // Update Basilisk particle structure
-  UpdateParticlesBasilisk( &BasiliskData[0], particles, NPARTICLES,
-  	b_explicit_added_mass, rhoval );
+// 
+//   // Update Basilisk particle structure
+//   UpdateParticlesBasilisk( &BasiliskData[0], particles, NPARTICLES,
+//   	b_explicit_added_mass, rhoval );
 
   // Unallocate the BasiliskDataStructure used for Grains-Basilisk
   // communication.  At this point Basilisk has all the particle data
   // in the structure particles 
-  unallocateBasiliskDataStructure( &BasiliskData[0], NPARTICLES );  
+//  unallocateBasiliskDataStructure( &BasiliskData[0], NPARTICLES );
+
+  pstr = UpdateParticlesBasilisk2( pstr, pstrsize, particles, NPARTICLES,
+  	b_explicit_added_mass, rhoval );  
+  free( pstr ); 
+  
+  if ( pid() == 0 ) print_all_particles( particles );     
 } 
 
 
@@ -93,6 +105,9 @@ event GranularSolver_init (t < -1.)
 // ------------------------------------------------------
 event GranularSolver_predictor (t < -1.)
 {
+  char* pstr = NULL;
+  int pstrsize = 0;
+  
   // Predictor step: pure granular problem solved by Grains (Grains works
   // in serial only )
   if ( pid() == 0 ) 
@@ -107,15 +122,23 @@ event GranularSolver_predictor (t < -1.)
     Simu_Grains( true, false, b_explicit_added_mass );
 
     // Transfer the data to the common C structure
-    Data_GrainsToCstruct( &BasiliskData[0], NPARTICLES );
+//    Data_GrainsToCstruct( &BasiliskData[0], NPARTICLES );
+    
+    pstr = GrainsToBasilisk( &pstrsize ); 
+//     printf("Length of string = %d %lu\n",pstrsize,strlen(pstr));    
+//     printf("%s\n",pstr);    
     
     // Set dt for explicit mass calculation in Grains3D at next time step
     if ( b_explicit_added_mass ) Setdt_AddedMassGrains( dt ) ;
   }
     
   // Update Basilisk particle structure
-  UpdateParticlesBasilisk( &BasiliskData[0], particles, NPARTICLES, 
-  	b_explicit_added_mass, rhoval );
+//    UpdateParticlesBasilisk( &BasiliskData[0], particles, NPARTICLES, 
+//    	b_explicit_added_mass, rhoval );
+	
+    pstr = UpdateParticlesBasilisk2( pstr, pstrsize, particles, NPARTICLES,
+    	b_explicit_added_mass, rhoval );  
+    free( pstr ); 
 }
 
 
@@ -129,12 +152,18 @@ event GranularSolver_updateVelocity (t < -1.)
   if ( pid() == 0 ) printf ("Grains3D\n");
 
   // Update Basilisk particle structure  
-  UpdateBasiliskStructure( &BasiliskData[0], particles, NPARTICLES );
+//  UpdateBasiliskStructure( &BasiliskData[0], particles, NPARTICLES );
 
   // Update particles velocity on the granular side
+//  if ( pid() == 0 )
+//    Update_Velocity_Grains( &BasiliskData[0], b_explicit_added_mass );
+    
   if ( pid() == 0 )
-    Update_Velocity_Grains( &BasiliskData[0], b_explicit_added_mass );
+  {
+    UpdateDLMFDtoGS_vel( DLMFDtoGS_vel, particles, NPARTICLES );  
+    UpdateVelocityGrains( DLMFDtoGS_vel, NPARTICLES, b_explicit_added_mass );
+  }
 
   // Unallocate the BasiliskDataStructure used for Grains-Basilisk communication
-  unallocateBasiliskDataStructure( &BasiliskData[0], NPARTICLES );
+//  unallocateBasiliskDataStructure( &BasiliskData[0], NPARTICLES );
 }

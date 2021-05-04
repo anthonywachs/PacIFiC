@@ -9,11 +9,11 @@ void compute_nboundary_Cube_v2( GeomParameter* gcp, int* nb, int* lN )
 
   while ( *nb == 0 ) 
   {
-    pos.x = gcp->cornersCoord[ip][0];
-    pos.y = gcp->cornersCoord[ip][1];
+    pos.x = gcp->pgp->cornersCoord[ip][0];
+    pos.y = gcp->pgp->cornersCoord[ip][1];
     
 #if dimension == 3
-    pos.z = gcp->cornersCoord[ip][2];
+    pos.z = gcp->pgp->cornersCoord[ip][2];
     lpoint = locate( pos.x, pos.y, pos.z );
 #elif dimension ==2
     lpoint = locate( pos.x, pos.y );
@@ -149,7 +149,7 @@ bool is_it_in_cube_v2 (coord * u, coord * v, coord * w, coord * mins,
 void compute_principal_vectors_Cubes (particle * p) 
 {
   GeomParameter * gcp = &(p->g);
-  int nfaces = gcp->allFaces;
+  int nfaces = gcp->pgp->allFaces;
   int npoints;
 
   /* get the 3 directions u1, u2, u3 of the cube with such that */
@@ -164,41 +164,41 @@ void compute_principal_vectors_Cubes (particle * p)
   /* find the coordinates of these 4 corners */
   for (int i = 0; i < nfaces; i++) 
   {
-    npoints = gcp->numPointsOnFaces[i];
+    npoints = gcp->pgp->numPointsOnFaces[i];
     
     for (int j = 0; j < npoints; j++) 
     {
       /* printf("index = %lu\n", gcp->cornersIndex[i][j]); */
-      if (gcp->cornersIndex[i][j] == 0) 
+      if (gcp->pgp->cornersIndex[i][j] == 0) 
       {
-	long int ii = gcp->cornersIndex[i][j];
-	corner0.x = gcp->cornersCoord[ii][0];
-	corner0.y = gcp->cornersCoord[ii][1];
-	corner0.z = gcp->cornersCoord[ii][2];
+	long int ii = gcp->pgp->cornersIndex[i][j];
+	corner0.x = gcp->pgp->cornersCoord[ii][0];
+	corner0.y = gcp->pgp->cornersCoord[ii][1];
+	corner0.z = gcp->pgp->cornersCoord[ii][2];
       }
       
-      if (gcp->cornersIndex[i][j] == 1) 
+      if (gcp->pgp->cornersIndex[i][j] == 1) 
       {
-	long int ii = gcp->cornersIndex[i][j];
-	corner1.x = gcp->cornersCoord[ii][0];
-	corner1.y = gcp->cornersCoord[ii][1];
-	corner1.z = gcp->cornersCoord[ii][2];
+	long int ii = gcp->pgp->cornersIndex[i][j];
+	corner1.x = gcp->pgp->cornersCoord[ii][0];
+	corner1.y = gcp->pgp->cornersCoord[ii][1];
+	corner1.z = gcp->pgp->cornersCoord[ii][2];
       }
       
-      if (gcp->cornersIndex[i][j] == 3) 
+      if (gcp->pgp->cornersIndex[i][j] == 3) 
       {
-	long int ii = gcp->cornersIndex[i][j];
-	corner3.x = gcp->cornersCoord[ii][0];
-	corner3.y = gcp->cornersCoord[ii][1];
-	corner3.z = gcp->cornersCoord[ii][2];
+	long int ii = gcp->pgp->cornersIndex[i][j];
+	corner3.x = gcp->pgp->cornersCoord[ii][0];
+	corner3.y = gcp->pgp->cornersCoord[ii][1];
+	corner3.z = gcp->pgp->cornersCoord[ii][2];
       }
       
-      if (gcp->cornersIndex[i][j] == 4) 
+      if (gcp->pgp->cornersIndex[i][j] == 4) 
       {
-	long int ii = gcp->cornersIndex[i][j];
-	corner4.x = gcp->cornersCoord[ii][0];
-	corner4.y = gcp->cornersCoord[ii][1];
-	corner4.z = gcp->cornersCoord[ii][2];
+	long int ii = gcp->pgp->cornersIndex[i][j];
+	corner4.x = gcp->pgp->cornersCoord[ii][0];
+	corner4.y = gcp->pgp->cornersCoord[ii][1];
+	corner4.z = gcp->pgp->cornersCoord[ii][2];
       }
     }  
   }
@@ -212,9 +212,9 @@ void compute_principal_vectors_Cubes (particle * p)
     maxs.x = 0.;
   }
   
-  gcp->u1 = u1;
-  gcp->v1 = v1;
-  gcp->w1 = w1;
+  gcp->pgp->u1 = u1;
+  gcp->pgp->v1 = v1;
+  gcp->pgp->w1 = w1;
   
   double minval = 0., maxval = 0.;
 
@@ -244,8 +244,8 @@ void compute_principal_vectors_Cubes (particle * p)
   mins.z = (minval); maxs.z = (maxval);
 
 
-  gcp->mins = mins;
-  gcp->maxs = maxs;  
+  gcp->pgp->mins = mins;
+  gcp->pgp->maxs = maxs;  
 }
 
 
@@ -254,7 +254,7 @@ void compute_principal_vectors_Cubes (particle * p)
 void create_FD_Boundary_Cube_v2 (GeomParameter * gcp, 
 	SolidBodyBoundary * dlm_bd, const int m, const int lN, vector pshift) 
 {
-  int nfaces = gcp->allFaces;
+  int nfaces = gcp->pgp->allFaces;
   int iref, i1, i2, ichoice;
 
   ichoice = 0;
@@ -264,20 +264,23 @@ void create_FD_Boundary_Cube_v2 (GeomParameter * gcp,
   /* Add first interrior points on surfaces */
   for (int i = 0; i < nfaces; i++) 
   {
-    npoints = gcp->numPointsOnFaces[i];
+    npoints = gcp->pgp->numPointsOnFaces[i];
     
-    iref = gcp->cornersIndex[i][ichoice];
-    i1 = gcp->cornersIndex[i][ichoice + 1];
-    i2 = gcp->cornersIndex[i][npoints-1];
+    iref = gcp->pgp->cornersIndex[i][ichoice];
+    i1 = gcp->pgp->cornersIndex[i][ichoice + 1];
+    i2 = gcp->pgp->cornersIndex[i][npoints-1];
 
-    coord refcorner = {gcp->cornersCoord[iref][0], gcp->cornersCoord[iref][1],
-    	gcp->cornersCoord[iref][2]} ; 
+    coord refcorner = {gcp->pgp->cornersCoord[iref][0], 
+    	gcp->pgp->cornersCoord[iref][1],
+    	gcp->pgp->cornersCoord[iref][2]} ; 
 
-    coord dir1 = {gcp->cornersCoord[i1][0], gcp->cornersCoord[i1][1],
-    	gcp->cornersCoord[i1][2]};
+    coord dir1 = {gcp->pgp->cornersCoord[i1][0], 
+    	gcp->pgp->cornersCoord[i1][1],
+    	gcp->pgp->cornersCoord[i1][2]};
 
-    coord dir2 = {gcp->cornersCoord[i2][0], gcp->cornersCoord[i2][1],
-    	gcp->cornersCoord[i2][2]};
+    coord dir2 = {gcp->pgp->cornersCoord[i2][0], 
+    	gcp->pgp->cornersCoord[i2][1],
+    	gcp->pgp->cornersCoord[i2][2]};
     
     foreach_dimension() 
     {
@@ -311,22 +314,24 @@ void create_FD_Boundary_Cube_v2 (GeomParameter * gcp,
   /* Add points on the edges without the corners*/
   for (int i = 0; i < nfaces; i++) 
   {
-    npoints = gcp->numPointsOnFaces[i];
-    i1 = gcp->cornersIndex[i][1];
+    npoints = gcp->pgp->numPointsOnFaces[i];
+    i1 = gcp->pgp->cornersIndex[i][1];
 
     for (int j = 1; j < npoints; j++) 
     {
-      jm1 = gcp->cornersIndex[i][j-1];
-      j1 = gcp->cornersIndex[i][j];
+      jm1 = gcp->pgp->cornersIndex[i][j-1];
+      j1 = gcp->pgp->cornersIndex[i][j];
       
       if (jm1 > j1) 
       {
 	if (allindextable[jm1][j1] == 0) 
 	{
-	  coord c1 = {gcp->cornersCoord[jm1][0], gcp->cornersCoord[jm1][1], 
-	  	gcp->cornersCoord[jm1][2]};
-	  coord c2 = {gcp->cornersCoord[j1][0], gcp->cornersCoord[j1][1], 
-	  	gcp->cornersCoord[j1][2]};
+	  coord c1 = {gcp->pgp->cornersCoord[jm1][0], 
+	  	gcp->pgp->cornersCoord[jm1][1], 
+	  	gcp->pgp->cornersCoord[jm1][2]};
+	  coord c2 = {gcp->pgp->cornersCoord[j1][0], 
+	  	gcp->pgp->cornersCoord[j1][1], 
+	  	gcp->pgp->cornersCoord[j1][2]};
 	  distribute_points_edge_Cube_v2 (c1, c2, dlm_bd, lN, isb);
 	  allindextable[jm1][j1] = 1;
 	  isb +=lN-2;
@@ -336,10 +341,12 @@ void create_FD_Boundary_Cube_v2 (GeomParameter * gcp,
       {
 	if (allindextable[j1][jm1] == 0) 
 	{
-	  coord c1 = {gcp->cornersCoord[j1][0], gcp->cornersCoord[j1][1], 
-	  	gcp->cornersCoord[j1][2]};
-	  coord c2 = {gcp->cornersCoord[jm1][0], gcp->cornersCoord[jm1][1], 
-	  	gcp->cornersCoord[jm1][2]};
+	  coord c1 = {gcp->pgp->cornersCoord[j1][0], 
+	  	gcp->pgp->cornersCoord[j1][1], 
+	  	gcp->pgp->cornersCoord[j1][2]};
+	  coord c2 = {gcp->pgp->cornersCoord[jm1][0], 
+	  	gcp->pgp->cornersCoord[jm1][1], 
+	  	gcp->pgp->cornersCoord[jm1][2]};
 	  distribute_points_edge_Cube_v2 (c1, c2, dlm_bd, lN, isb);
 	  allindextable[j1][jm1] = 1;
 	  isb +=lN-2;
@@ -351,9 +358,9 @@ void create_FD_Boundary_Cube_v2 (GeomParameter * gcp,
   /* Add the final 8 corners points */
   for (int i = 0; i  < gcp->ncorners; i++) 
   {
-    dlm_bd->x[isb] = gcp->cornersCoord[i][0];
-    dlm_bd->y[isb] = gcp->cornersCoord[i][1];
-    dlm_bd->z[isb] = gcp->cornersCoord[i][2];
+    dlm_bd->x[isb] = gcp->pgp->cornersCoord[i][0];
+    dlm_bd->y[isb] = gcp->pgp->cornersCoord[i][1];
+    dlm_bd->z[isb] = gcp->pgp->cornersCoord[i][2];
     isb++;
   }
 }
@@ -378,17 +385,17 @@ void create_FD_Interior_Cube_v2 (particle *p, vector Index_lambda,
   /* 2- v.p0 <= v.x <= v.p1 */
   /* 3- w.p0 <= w.w <= w.p4  */
   coord checkpt;
-  coord u1 = p->g.u1;
-  coord v1 = p->g.v1;
-  coord w1 = p->g.w1;
-  coord mins = p->g.mins;
-  coord maxs = p->g.maxs;
+  coord u1 = p->g.pgp->u1;
+  coord v1 = p->g.pgp->v1;
+  coord w1 = p->g.pgp->w1;
+  coord mins = p->g.pgp->mins;
+  coord maxs = p->g.pgp->maxs;
 
   /* Min/Max coordinates for the AABB (Axed-Aligned-Bounding-Box) */
   coord mincoord = {HUGE, HUGE, HUGE};
   coord maxcoord = {-HUGE, -HUGE, -HUGE};
 
-  double ** table = p->g.cornersCoord;
+  double ** table = p->g.pgp->cornersCoord;
   for (int ii = 0; ii < p->g.ncorners; ii++) 
   {
     if (mincoord.x > table[ii][0])
@@ -432,4 +439,110 @@ void create_FD_Interior_Cube_v2 (particle *p, vector Index_lambda,
   }
  
   cache_shrink (c);    
+}
+
+
+
+
+// Read geometric parameters of the cube
+void update_Cube( GeomParameter* gcp ) 
+{  
+  char* token = NULL;
+  
+  // Read number of corners, check that it is 8
+  size_t nc = 0;
+  token = strtok(NULL, " " );
+  sscanf( token, "%lu", &nc ); 
+  if ( nc != 8 )
+    printf ("Error in number of corners in update_Cube\n");
+
+  // Allocate the PolyGeomParameter structure
+  gcp->pgp = (PolyGeomParameter*) malloc( sizeof(PolyGeomParameter) );
+  gcp->pgp->allPoints = nc;
+    
+  // Allocate the array of corner coordinates
+  gcp->pgp->cornersCoord = (double**) malloc( nc * sizeof(double*) );
+  for (size_t i=0;i<nc;i++) 
+    gcp->pgp->cornersCoord[i] = (double*) malloc( 3 * sizeof(double) );
+    
+  // Read the point/corner coordinates
+  for (size_t i=0;i<nc;++i) 
+    for (size_t j=0;j<3;++j)     
+    {
+      token = strtok(NULL, " " );
+      sscanf( token, "%lf", &(gcp->pgp->cornersCoord[i][j]) );       
+    }
+
+  // Read number of faces, check that it is 6
+  size_t nf = 0;
+  token = strtok(NULL, " " );
+  sscanf( token, "%lu", &nf ); 
+  if ( nf != 6 )
+    printf ("Error in number of faces in update_Cube\n");
+  gcp->pgp->allFaces = nf;     
+
+  // Allocate the array of number of points/corners on each face
+  gcp->pgp->numPointsOnFaces = (long int*) malloc( nf * sizeof(long int) );
+  
+  // Allocate the array of point/corner indices on each face
+  gcp->pgp->cornersIndex = (long int**) malloc( nf * sizeof(long int*) ); 
+  
+  // Read the face indices
+  long int nppf = 0;
+  for (size_t i=0;i<nf;++i)
+  {
+    // Read the number of points/corners on the face, check that it is 4
+    token = strtok(NULL, " " );
+    sscanf( token, "%ld", &nppf );
+    if ( nppf != 4 )
+      printf ("Error in number of corners per face in update_Cube\n");
+    gcp->pgp->numPointsOnFaces[i] = nppf;
+      
+    // Allocate the point/corner index vector on the face
+    gcp->pgp->cornersIndex[i] = (long int*) malloc( nppf * sizeof(long int) );
+    
+    // Read the point/corner indices
+    for (size_t j=0;j<4;++j)
+    {
+      token = strtok(NULL, " " );
+      sscanf( token, "%ld", &(gcp->pgp->cornersIndex[i][j]));
+    }    
+  }    
+}
+
+
+
+
+// Free the geometric parameters of the sphere
+void free_Cube( GeomParameter* gcp ) 
+{  
+  // Free the point/corner coordinate array
+  double* cc = NULL;
+  for (size_t i=0;i<gcp->pgp->allPoints;++i) 
+  {
+    cc = &(gcp->pgp->cornersCoord[i][0]);
+    free( cc );
+    cc = NULL;
+  }
+  free( gcp->pgp->cornersCoord );
+  gcp->pgp->cornersCoord = NULL;
+  gcp->pgp->allPoints = 0;
+
+  // Free the point/corner arrays
+  long int* in = NULL;
+  for (size_t i=0;i<gcp->pgp->allFaces;++i) 
+  {
+    in = &(gcp->pgp->cornersIndex[i][0]);   
+    free( in );
+    in = NULL;
+  }
+  free( gcp->pgp->cornersIndex );
+  gcp->pgp->cornersIndex = NULL;
+  free( gcp->pgp->numPointsOnFaces );
+  gcp->pgp->numPointsOnFaces = NULL;
+  gcp->pgp->allFaces = 0;
+  
+  // Free the PolyGeomParameter structure
+  free( gcp->pgp );
+  gcp->pgp = NULL;
 }

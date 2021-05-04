@@ -108,7 +108,8 @@ vector tu[];
     vector DLM_explicit[];
 # endif
 
-particle particles[NPARTICLES] = {{{0}}};
+particle particles[NPARTICLES] = {{0}};
+double DLMFDtoGS_vel[NPARTICLES][6] = {{0}};
 # if ( TRANSLATION && ROTATION )
 #   if dimension == 3
 #     define npartdata 6
@@ -819,7 +820,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
             /* Add here fU to qU */
 	    foreach_dimension()
               (*qU[k]).x += ( 1. - ( rho_f / p[k].rho_s ) ) *
-    		p[k].M * ( p[k].gravity.x + p[k].adforce.x ) 
+    		p[k].M * ( p[k].gravity.x + p[k].addforce.x ) 
 		+ p[k].DLMFD_couplingfactor * p[k].M * (*U[k]).x / dt ;
 	
             /* Solution of M * DLMFD_couplingfactor * U / dt = qU */

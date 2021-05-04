@@ -275,3 +275,28 @@ void create_FD_Boundary_Sphere( GeomParameter gcp,
 
   boundary((scalar*){pshift});
 }
+
+
+
+
+// Read geometric parameters of the sphere
+void update_Sphere( GeomParameter* gcp ) 
+{  
+//  char* token = NULL;
+  
+  // We already have all parameters for the sphere but the input array of
+  // characters contains again a "1", the gravity center coordinates and 
+  // a "0", hence we need to read five tokens but we do not do
+  // anything with them
+  for (size_t i=0;i<5;++i)
+    strtok( NULL, " " );
+}
+
+
+
+
+// Free the geometric parameters of the sphere
+void free_Sphere( GeomParameter* gcp ) 
+{  
+  // Nothing to do
+}
