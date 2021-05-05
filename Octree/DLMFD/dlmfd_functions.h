@@ -237,51 +237,99 @@ void free_particles( particle* pp, const int n )
 
 
 
-// Print a particle data
-void print_particle( particle const* pp )
+// Print data of a particle
+void print_particle( particle const* pp, char const* poshift )
 {
-  printf( "  Number = %lu\n", pp->pnum ); 
-  printf( "  Shape = " );
-  switch ( pp->shape )
+  if ( pid() == 0 ) 
   {
-    case SPHERE:
-      printf( "SPHERE" );
-      break;
+    printf( "%sNumber = %lu\n", poshift, pp->pnum ); 
+    printf( "%sShape = ", poshift );
+    switch ( pp->shape )
+    {
+      case SPHERE:
+        printf( "SPHERE" );
+        break;
 	  
-    case CIRCULARCYLINDER2D:
-      printf( "CIRCULARCYLINDER2D" );
-      break;
+      case CIRCULARCYLINDER2D:
+        printf( "CIRCULARCYLINDER2D" );
+        break;
 	  
-    case CUBE:
-      printf( "CUBE" );
-      break;
+      case CUBE:
+        printf( "CUBE" );
+        break;
 	  
-    default:
-      fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+      default:
+        fprintf( stderr,"Unknown Rigid Body shape !!\n" );
+    }
+    printf( "\n" );
+    printf( "%sCenter of mass = %e %e", poshift, pp->g.center.x, 
+    	pp->g.center.y );
+#   if dimension == 3
+      printf( " %e", pp->g.center.z );
+#   endif
+    printf( "\n" );
+    printf( "%sRadius = %e\n", poshift, pp->g.radius );  
+    printf( "%sMass = %e\n", poshift, pp->M ); 
+    printf( "%sVolume = %e\n", poshift, pp->Vp );     
+    printf( "%sDensity = %e\n", poshift, pp->rho_s ); 
+#   if DLM_Moving_particle
+#     if TRANSLATION
+        printf( "%sTranslational velocity = %e %e", poshift, pp->U.x, pp->U.y );
+#       if dimension == 3
+          printf( " %e", pp->U.z );
+#       endif
+        printf( "\n" );
+#     endif
+#     if ROTATION
+        printf( "%sAngular velocity = ", poshift );
+#       if dimension == 3
+          printf( "%e %e", pp->w.x, pp->w.y );
+#       endif
+        printf( " %e\n", pp->w.z );
+#     endif
+#   else
+      printf( "%sImposed translational velocity = %e %e", 
+    	poshift, pp->imposedU.x, pp->imposedU.y );
+#     if dimension == 3
+        printf( " %e", pp->imposedU.z );
+#     endif
+      printf( "\n" );
+      printf( "%sImposed angular velocity = ", poshift );
+#     if dimension == 3
+        printf( "%e %e", pp->imposedw.x, pp->imposedw.y );
+#     endif
+      printf( " %e\n", pp->imposedw.z );    
+#   endif
   }
-  printf( "\n" );
-  printf( "  Center of mass = %e %e", pp->g.center.x, pp->g.center.y );
-# if dimension == 3
-    printf( " %e", pp->g.center.z );
+  int intpts = pp->Interior.n;
+  int bdpts = pp->reduced_domain.n;  
+# if _MPI
+    mpi_all_reduce( intpts, MPI_INTEGER, MPI_SUM );
+    mpi_all_reduce( bdpts, MPI_INTEGER, MPI_SUM );
 # endif
-  printf( "\n" );
-  printf( "  Radius = %e\n", pp->g.radius );  
-  printf( "  Mass = %e\n", pp->M ); 
-  printf( "  Volume = %e\n", pp->Vp );     
-  printf( "  Density = %e\n", pp->rho_s );     
+  if ( pid() == 0 )
+  {   
+    printf( "%sNumber of interior DLM points = %d\n", poshift, intpts ); 
+    printf( "%sNumber of boundary DLM points = %d\n", poshift, pp->s.m ); 
+    printf( "%sNumber of cells in boundary DLM point stencils = %d\n", poshift, 
+    	bdpts );
+  }
 } 
 
 
 
 
-// Print a particle data
-void print_all_particles( particle const* allpart )
+// Print all particle data
+void print_all_particles( particle const* allpart, char const* oshift )
 {
-  printf( "Total number of particles = %d\n", NPARTICLES );
+  if ( pid() == 0 ) printf( "%sTotal number of particles = %d\n", oshift, 
+  	NPARTICLES );
+  char poshift[10]="   ";
+  strcat( poshift, oshift );
   for (size_t k=0;k<NPARTICLES;k++)
   { 
-    printf( "Particle %lu\n", k );    
-    print_particle( &(allpart[k]) );
+    if ( pid() == 0 ) printf( "%sParticle %lu\n", oshift, k );    
+    print_particle( &(allpart[k]), &poshift[0] );
   }
 } 
 

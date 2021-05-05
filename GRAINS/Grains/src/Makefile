@@ -161,7 +161,7 @@ MPIFLAGS    = -L$(MPILIB) $(LIBMPI_FOR_GRAINS___)
 ZLIB = /usr/lib$(GRAINS_BITS_EXT)
 ZFLAGS = -L$(ZLIB) -lz
 
-INCFLAGS  = $(INCDIR:%=-I%) -I$(OCTREE_HOME)/DLMFD  $(XERCESINC:%=-I%) $(MPIINC:%=-I%)
+INCFLAGS  = $(INCDIR:%=-I%) $(XERCESINC:%=-I%) $(MPIINC:%=-I%)
 COMPFLAGS = $(DEBUG) $(INCFLAGS) -fPIC
 
 #------------------------------------------------------------------------------

@@ -86,6 +86,10 @@ solve them successively. We chose here a two-steps time-spliting.
 #   define DLMFD_OPT 1     // use optimized version of DLMFD below
 # endif
 
+# ifndef PARTICLE_VERBOSE
+#   define PARTICLE_VERBOSE 0     // print particle features
+# endif
+
 
 /** Functions and structures needed for the implementation of
     fictitious domain method. */
@@ -227,6 +231,9 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
   double DLM_tol = 1.e-5, DLM_nr2 = 0., DLM_nr2_km1 = 0., DLM_wv = 0.;
   int ki = 0, DLM_maxiter = 200, allpts = 0, lm = 0, tcells = 0;
   coord ppshift = {0, 0, 0};
+# if PARTICLE_VERBOSE
+    char outputshift[6]="      ";
+# endif
 # if ( _MPI && DLM_Moving_particle )
     int counter = 0;
 # endif 
@@ -367,6 +374,9 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
     }
 # endif
 
+# if PARTICLE_VERBOSE
+    print_all_particles( p, &outputshift[0] );
+# endif
 
 # if DLMFD_OPT
     // Create the caches to loop over cells involved in DLMFD scalar products  
@@ -2003,9 +2013,9 @@ void initialize_DLMFD_fields_to_zero( void )
       DLM_v.x[] = 0. ;
       qu.x[] = 0. ;
       tu.x[] = 0. ;
-# if DLM_alpha_coupling
-      DLM_explicit.x[] = 0. ;
-# endif    
+#     if DLM_alpha_coupling
+        DLM_explicit.x[] = 0. ;
+#     endif    
     }
   }
 }

@@ -15,7 +15,6 @@
 /* Additional helper functions for the coupling with Grains3D */
 # include "BasiliskGrainsCouplingFunctions.h"
 
-struct BasiliskDataStructure BasiliskData[NPARTICLES];
 
 /* Here we overload the generic events defined in the general DLMFD plugin
    DLMFD.h such that it uses Grains3D as a granular solver */
@@ -59,12 +58,8 @@ event GranularSolver_init (t < -1.)
       InitializeExplicitAddedMass( restarted_simu, rootfilename );
     }
     
-    // Transfer the data to the common C structure
-//    Data_GrainsToCstruct( &BasiliskData[0], NPARTICLES );
-    
+    // Transfer the data from Grains to an array of characters
     pstr = GrainsToBasilisk( &pstrsize ); 
-//     printf("Length of string = %d %lu\n",pstrsize,strlen(pstr));    
-//     printf("%s\n",pstr);    
 
     // Check that Paraview writer is activated
     checkParaviewPostProcessing_Grains( grains_result_dir );
@@ -81,21 +76,11 @@ event GranularSolver_init (t < -1.)
     }
     else SetInitialCycleNumber( init_cycle_number );    
   }
-// 
-//   // Update Basilisk particle structure
-//   UpdateParticlesBasilisk( &BasiliskData[0], particles, NPARTICLES,
-//   	b_explicit_added_mass, rhoval );
 
-  // Unallocate the BasiliskDataStructure used for Grains-Basilisk
-  // communication.  At this point Basilisk has all the particle data
-  // in the structure particles 
-//  unallocateBasiliskDataStructure( &BasiliskData[0], NPARTICLES );
-
-  pstr = UpdateParticlesBasilisk2( pstr, pstrsize, particles, NPARTICLES,
+  // Update all particle data 
+  pstr = UpdateParticlesBasilisk( pstr, pstrsize, particles, NPARTICLES,
   	b_explicit_added_mass, rhoval );  
-  free( pstr ); 
-  
-  if ( pid() == 0 ) print_all_particles( particles );     
+  free( pstr );      
 } 
 
 
@@ -121,24 +106,17 @@ event GranularSolver_predictor (t < -1.)
     // Run the granular simulation
     Simu_Grains( true, false, b_explicit_added_mass );
 
-    // Transfer the data to the common C structure
-//    Data_GrainsToCstruct( &BasiliskData[0], NPARTICLES );
-    
-    pstr = GrainsToBasilisk( &pstrsize ); 
-//     printf("Length of string = %d %lu\n",pstrsize,strlen(pstr));    
-//     printf("%s\n",pstr);    
+    // Transfer the data from Grains to an array of characters
+    pstr = GrainsToBasilisk( &pstrsize );     
     
     // Set dt for explicit mass calculation in Grains3D at next time step
     if ( b_explicit_added_mass ) Setdt_AddedMassGrains( dt ) ;
   }
     
-  // Update Basilisk particle structure
-//    UpdateParticlesBasilisk( &BasiliskData[0], particles, NPARTICLES, 
-//    	b_explicit_added_mass, rhoval );
-	
-    pstr = UpdateParticlesBasilisk2( pstr, pstrsize, particles, NPARTICLES,
+  // Update all particle data 
+  pstr = UpdateParticlesBasilisk( pstr, pstrsize, particles, NPARTICLES,
     	b_explicit_added_mass, rhoval );  
-    free( pstr ); 
+  free( pstr ); 
 }
 
 
@@ -147,23 +125,16 @@ event GranularSolver_predictor (t < -1.)
 /** Overloading of the granular solver velocity update event */
 // ------------------------------------------------------------
 event GranularSolver_updateVelocity (t < -1.)
-{
-  // Output the call to Grains3D
-  if ( pid() == 0 ) printf ("Grains3D\n");
-
-  // Update Basilisk particle structure  
-//  UpdateBasiliskStructure( &BasiliskData[0], particles, NPARTICLES );
-
-  // Update particles velocity on the granular side
-//  if ( pid() == 0 )
-//    Update_Velocity_Grains( &BasiliskData[0], b_explicit_added_mass );
-    
+{    
   if ( pid() == 0 )
   {
+    // Output the call to Grains3D
+    printf ("Grains3D\n");
+
+    // Copy velocity in a 2D array
     UpdateDLMFDtoGS_vel( DLMFDtoGS_vel, particles, NPARTICLES );  
+
+    // Update particle velocity in Grains using the 2D array
     UpdateVelocityGrains( DLMFDtoGS_vel, NPARTICLES, b_explicit_added_mass );
   }
-
-  // Unallocate the BasiliskDataStructure used for Grains-Basilisk communication
-//  unallocateBasiliskDataStructure( &BasiliskData[0], NPARTICLES );
 }

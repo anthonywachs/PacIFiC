@@ -9,10 +9,6 @@
 extern "C" {
 #endif
 
-#ifndef __cplusplus
-#include "BasiliskInterfaceDataStructure.h"
-#endif
-
   void Init_Grains ( char const* inputfile,
   	double fluid_density, const bool b_restart,
         const bool b_initializeClonePer,
@@ -23,11 +19,7 @@ extern "C" {
   void Simu_Grains( bool predictor, const bool isPredictorCorrector, 
   	const bool explicit_added_mass );
   
-  void Data_GrainsToCstruct( struct BasiliskDataStructure* b, const int m );
-  
   char* GrainsToBasilisk( int* pstrsize );
-
-  void Data_CstructToGrains( struct BasiliskDataStructure* b );
 
   void SetInitialTime( double tinit );
   
@@ -40,9 +32,6 @@ extern "C" {
   void SaveResults_Grains();
 
   void checkParaviewPostProcessing_Grains( char* solid_resDir );
-
-  void Update_Velocity_Grains( struct BasiliskDataStructure* b, 
-  	bool explicit_added_mass );
 	
   void UpdateVelocityGrains( double arrayv[][6], const int m, 
   	bool explicit_added_mass );	

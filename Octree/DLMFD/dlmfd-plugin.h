@@ -156,11 +156,11 @@ event init (i = 0)
 # endif     
 
       
-  // Compute the inverse of the moment of inertia matrix of each particle
-# if DLM_Moving_particle  
-    for (int k = 0; k < NPARTICLES; k++) 
-      compute_inv_inertia( &(particles[k]) );
-# endif     
+//   // Compute the inverse of the moment of inertia matrix of each particle
+// # if DLM_Moving_particle  
+//     for (int k = 0; k < NPARTICLES; k++) 
+//       compute_inv_inertia( &(particles[k]) );
+// # endif     
 
 
   // Perform initial refinement around particles and write particle data
@@ -286,7 +286,11 @@ event init (i = 0)
 #if DLM_alpha_coupling
     DLM_explicit.x.nodump = false ;
 #endif    
-  }   
+  } 
+  
+  
+  // Free particles
+  free_particles( particles, NPARTICLES );  
 }
 
 

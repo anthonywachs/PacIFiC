@@ -93,19 +93,6 @@ public:
   @param is flux d'entr�e */
   virtual void WriteParticulesInFluid( istringstream &is ) const;
 
-
-  /** @brief Ecriture des particules dans une structure Basilisk
-  @param is structure Basilisk d'entr�e */
-  virtual void WriteParticulesInFluid (BasiliskDataStructure * is) const;
-
-  /** @brief Modification de la vitesse des particules de Grains par Basilisk
-      @param is structure de donnee basilisk contenant les vitesses de translation et rotation
-*/
-  virtual void UpdateParticulesVelocities (
-	BasiliskDataStructure * is,
-	const bool &b_set_velocity_nm1_and_diff);
-
-
   /** @brief Ecriture de la vitesse et du centre de gravite des particules dans
   un fichier
   @param filename nom du fichier */
@@ -185,13 +172,13 @@ public:
   void checkParaviewPostProcessing( const string &name_, const string &root_,
   	const bool &isBinary );
 
-  /** @brief Verifie que le post processing Paraview est actif pour Basilisk, sinon le cree
+  /** @brief Verifie que le post processing Paraview est actif pour Basilisk, 
+  sinon le cree
   @param name_ nom des fichiers
   @param root_ racine du nom des fichiers
   @param isBinary ecriture en mode binaire */
   void checkParaviewPostProcessing( const char * name_, const char * root_,
   	const bool &isBinary );
-
 
   /** @brief Verifie que le post processing Matlab est actif, sinon le cree
   @param name_ nom des fichiers
@@ -199,7 +186,6 @@ public:
   @param isBinary ecriture en mode binaire */
   void checkMatlabPostProcessing( const string &name_, const string &root_,
   	const bool &isBinary );
-
 
   /** @brief Force le code a activer le mode reload "same" */
   void setReloadSame() { m_forceReloadSame = true ; } ;

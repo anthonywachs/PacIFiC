@@ -13,6 +13,7 @@ extern "C" {
 #endif
   
   static GrainsCoupledWithFluid * grains = NULL;
+
   
   void Init_Grains ( char const* inputfile, 
   	double fluid_density, const bool b_restart,
@@ -51,11 +52,6 @@ extern "C" {
     grains->Simulation( predictor, isPredictorCorrector, explicit_added_mass );	
   }
 
-
-  void Data_GrainsToCstruct( struct BasiliskDataStructure * b, const int m ) 
-  {
-    grains->WriteParticulesInFluid( b );
-  }
   
   char* GrainsToBasilisk( int* pstrsize )
   {
@@ -81,9 +77,6 @@ extern "C" {
   }
 
 
-  void Data_CstructToGrains( struct BasiliskDataStructure * b ) {}
-
-
   void Setdt_Grains( double const dtfluid ) 
   {
     grains->set_timeStep( dtfluid );
@@ -94,6 +87,7 @@ extern "C" {
   {
     grains->set_ExplicitAddedMasstimeStep( dtfluid );
   }  
+
 
   void Setviscosity_Grains( double const viscosity ) 
   {
@@ -117,12 +111,6 @@ extern "C" {
     grains->checkParaviewPostProcessing( "grains", solid_resDir, true );
   }
 
-
-  void Update_Velocity_Grains( struct BasiliskDataStructure * b, 
-  	bool explicit_added_mass ) 
-  {
-    grains->UpdateParticulesVelocities( b, explicit_added_mass );
-  }
   
   void UpdateVelocityGrains( double arrayv[][6], const int m, 
   	bool explicit_added_mass ) 
