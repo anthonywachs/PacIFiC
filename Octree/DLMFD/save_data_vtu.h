@@ -1,7 +1,7 @@
 /** 
 # Wrapper for output functions with Paraview
 */
-# include "dlmfd-output_vtu_foreach.h"
+# include "DLMFD_Output_vtu_foreach.h"
 
 
 //----------------------------------------------------------------------------

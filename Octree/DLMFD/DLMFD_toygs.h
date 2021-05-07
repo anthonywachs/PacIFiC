@@ -1,5 +1,5 @@
 /* The ToyGS plugin */ 
-# include "dlmfd-plugin.h"
+# include "DLMFD_Plugin.h"
 
 
 #if DLM_Moving_particle

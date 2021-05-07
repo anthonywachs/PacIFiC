@@ -2,7 +2,7 @@
 # The Grains3D plugin 
 */
  
-# include "dlmfd-plugin.h"
+# include "DLMFD_Plugin.h"
 
 /** File names definition */
 # ifndef grains_result_dir
@@ -20,7 +20,7 @@
 
 
 /** Here we overload the generic events defined in the general DLMFD plugin 
-dlmfd-plugin.h such that it uses Grains3D as a granular solver */
+DLMFD_Plugin.h such that it uses Grains3D as a granular solver */
 
 
 /** Overloading of the granular solver init event */

@@ -93,7 +93,7 @@ solve them successively. We chose here a two-steps time-spliting.
 
 /** Functions and structures needed for the implementation of
     fictitious domain method. */
-# include "dlmfd_functions.h"
+# include "DLMFD_Functions.h"
 
 
 /** Basilisk scalars and vectors needed for the implementation of the
@@ -160,7 +160,7 @@ $$
 $$
 */
 
-# include "dlmfd-ns-centered.h"
+# include "DLMFD_ns-centered.h"
 
 
 /* Adding this small macro because dv() breaks the compability with embed.h */
@@ -209,9 +209,9 @@ This leads to a saddle-point problem which is solved with an iterative solver
 /* Timers and Timings */
 timing dlmfd_globaltiming = {0.};
 
-# include "dlmfd_perf.h"
+# include "DLMFD_Perf.h"
 # if DLMFD_OPT
-#   include "dlmfd-fast.h"
+#   include "DLMFD_Fast.h"
 # endif 
 
 

@@ -25,7 +25,7 @@ solver. If embedded boundaries are used, a different scheme is used
 for viscosity. */
 
 #include "run.h"
-#include "dlmfd_timestep.h"
+#include "DLMFD_timestep.h"
 #include "bcg.h"
 #if EMBED
 # include "viscosity-embed.h"
