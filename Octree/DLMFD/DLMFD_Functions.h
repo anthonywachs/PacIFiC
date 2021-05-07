@@ -403,7 +403,7 @@ void create_index_lambda_scalar (const SolidBodyBoundary dlm_bd,
 
 
 
-#include "DLMFD_weight_functions.h"
+#include "DLMFD_Weight_functions.h"
 
 /** Returns the weight associated to a Lagrange 
 multipliers for a cell within a foreach() loop (ie for a "real" or local cell) 

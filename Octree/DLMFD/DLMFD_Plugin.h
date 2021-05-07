@@ -54,7 +54,7 @@ scalar u_previoustime[];
 
 
 /** Fictitious domain implementation */
-# include "DLMFD_reverse_Uzawa.h"
+# include "DLMFD_Uzawa_velocity.h"
 
 /** Paraview output functions */
 # include "save_data_vtu.h"

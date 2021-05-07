@@ -2,8 +2,8 @@
 # Interface functions for Grains/Basilisk
 */
 
-#ifndef INTERFACEGRAINS_H 
-#define INTERFACEGRAINS_H 
+#ifndef _INTERFACEGRAINS3DBASILISK_H_ 
+#define _INTERFACEGRAINS3DBASILISK_H_ 
 
 #ifdef __cplusplus
 extern "C" {

@@ -13,10 +13,10 @@
 # endif
 
 /** Coupling Interface for Grains3D */
-# include "InterfaceGrains.h"
+# include "InterfaceGrains3DBasilisk.h"
 
 /** Additional functions for the coupling with Grains3D */
-# include "BasiliskGrainsCouplingFunctions.h"
+# include "BasiliskGrains3DCouplingFunctions.h"
 
 
 /** Here we overload the generic events defined in the general DLMFD plugin 

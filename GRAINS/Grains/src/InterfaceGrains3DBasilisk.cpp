@@ -3,7 +3,7 @@
 */
 
 #include "Grains_BuilderFactory.H"
-#include "InterfaceGrains.h"
+#include "InterfaceGrains3DBasilisk.h"
 #include <iostream>
 #include <cstring>
 #include <string>
