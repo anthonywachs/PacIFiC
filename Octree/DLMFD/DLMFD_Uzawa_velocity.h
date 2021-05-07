@@ -370,6 +370,11 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
 	  create_FD_Interior_Cube( &p[k], index_lambda, DLM_periodic_shift );
 	  break;
 	  
+        case TETRAHEDRON:
+	  create_FD_Interior_Tetrahedron( &p[k], index_lambda, 
+	  	DLM_periodic_shift );
+	  break;		  
+	  
 	default:
           fprintf( stderr,"Unknown Rigid Body shape !!\n" );
       }

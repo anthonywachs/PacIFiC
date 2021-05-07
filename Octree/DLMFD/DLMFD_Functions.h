@@ -40,7 +40,8 @@ in the inter-boundary point distance on the rigid body surface. */
 enum RigidBodyShape {
   SPHERE,
   CIRCULARCYLINDER2D,
-  CUBE
+  CUBE,
+  TETRAHEDRON
 };
 
 
@@ -128,6 +129,7 @@ typedef struct {
 # include "CircularCylinder2D.h"
 # include "Sphere.h"
 # include "Cube.h"
+# include "Tetrahedron.h"
 
 
 /** Allocates memory for m points in the SolidBodyBoundary structure. */
@@ -236,6 +238,10 @@ void free_particles( particle* pp, const int n )
       case CUBE:
         free_Cube( &(pp[k].g) );
 	break;
+
+      case TETRAHEDRON:
+        free_Tetrahedron( &(pp[k].g) );
+	break;
 	  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -268,6 +274,10 @@ void print_particle( particle const* pp, char const* poshift )
       case CUBE:
         printf( "CUBE" );
         break;
+	
+      case TETRAHEDRON:
+        printf( "TETRAHEDRON" );
+	break;	
 	  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -833,6 +843,12 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
         allocate_SolidBodyBoundary( &(p[k].s), m );
         create_FD_Boundary_Cube( &gci, &(p[k].s), m, lN, pshift );
 	break;
+	
+      case TETRAHEDRON:
+	compute_nboundary_Tetrahedron( &gci, &m, &lN );
+        allocate_SolidBodyBoundary( &(p[k].s), m );
+        create_FD_Boundary_Tetrahedron( &gci, &(p[k].s), m, lN, pshift );
+	break;	
 	  
       default:
         fprintf( stderr, "Unknown Rigid Body shape !!\n" );

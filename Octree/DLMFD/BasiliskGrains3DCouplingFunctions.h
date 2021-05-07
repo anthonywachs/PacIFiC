@@ -280,6 +280,12 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
           allpart[k].shape = SPHERE;
 	  update_Sphere( gg ); 
           break;
+
+        // For now, we assume that all 4-corner polyhedrons are tetrahedrons
+	case 4: 
+          allpart[k].shape = TETRAHEDRON;
+	  update_Tetrahedron( gg );
+          break;
 	  
         // For now, we assume that all 8-corner polyhedrons are cubes
 	case 8: 

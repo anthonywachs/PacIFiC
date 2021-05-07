@@ -3534,6 +3534,12 @@ void assign_dial_fd_boundary( particle* p, const coord posb,
       isin_zp = is_in_Cube( &(p->g.pgp->u1), &(p->g.pgp->v1), 
     	&(p->g.pgp->w1), &(p->g.pgp->mins), &(p->g.pgp->maxs), &checkpt );
       break;
+
+    case TETRAHEDRON:
+      isin_xp = is_in_Tetrahedron( posb.x + RDelta, posb.y, posb.z, gp );
+      isin_yp = is_in_Tetrahedron( posb.x, posb.y + RDelta, posb.z, gp );
+      isin_zp = is_in_Tetrahedron( posb.x, posb.y, posb.z + RDelta, gp );
+      break;
 	  
     default:
       fprintf( stderr,"Unknown Rigid Body shape !!\n" );
