@@ -221,7 +221,9 @@ timing dlmfd_globaltiming = {0.};
 // Important comments:
 // 1) only u, tu, DLM_lambda and DLM_w need to be synchronized with boundary, 
 // all other fields are local to each thread
+//----------------------------------------------------------------------------
 void DLMFD_subproblem( particle * p, const int i, const double rho_f ) 
+//----------------------------------------------------------------------------
 {
   /* Timers and Timings */
   timer dlmfd_timer = timer_start ();
@@ -365,7 +367,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
 	  break;
 	  
 	case CUBE:
-	  create_FD_Interior_Cube_v2( &p[k], index_lambda, DLM_periodic_shift );
+	  create_FD_Interior_Cube( &p[k], index_lambda, DLM_periodic_shift );
 	  break;
 	  
 	default:
@@ -384,7 +386,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
     Cache Traversal_rvwlambda;
     int bbb = 0;
     Point ppp;
-    allocate_Cache( &Traversal_rvwlambda );
+    initialize_and_allocate_Cache( &Traversal_rvwlambda );
     // Interior points
     for (int m = 0; m < NPARTICLES; m++)
     {     
@@ -422,7 +424,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
   
     // Cache for u, qu and tu
     Cache Traversal_uqutu;
-    allocate_Cache( &Traversal_uqutu );
+    initialize_and_allocate_Cache( &Traversal_uqutu );
     // Interior points
     for (int m = 0; m < NPARTICLES; m++)
     {     
@@ -1996,8 +1998,10 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
 
 
 
-// Initialize all DLMFD fields
+/** Initialize all DLMFD fields */
+//----------------------------------------------------------------------------
 void initialize_DLMFD_fields_to_zero( void )
+//----------------------------------------------------------------------------
 {
   foreach()
   {

@@ -1,11 +1,10 @@
 /**
-# Helper functions for the fictitious-domain method with distributed
-  Lagrangian multipliers.
+# General functions for the DLMFD implementation.
 */
 
-// Define NSDF, the number of significant digits after the decimal point
-// to output data in files in text mode
-// NSDF cannot be lower than 3, larger than 15 and 9 (for formatting reasons)
+/** Define NSDF, the number of significant digits after the decimal point
+to output data in files in text mode. NSDF cannot be lower than 3, larger 
+than 15 and 9 (for formatting reasons). */
 # ifndef NSDF
 #   define NSDF 7
 # else 
@@ -26,8 +25,10 @@
 # endif
 
 
-// Define the factor alpha (generally between 1 and 2) that is involved 
-// in the inter-boundary point distance on the rigid body surface
+
+
+/** Define the factor alpha (generally between 1 and 2) that is involved 
+in the inter-boundary point distance on the rigid body surface. */
 # ifndef INTERBPCOEF
 #   define INTERBPCOEF 2.
 # endif 
@@ -35,7 +36,7 @@
 
 
 
-// Different rigid body shapes supported       
+/** Different rigid body shapes supported */      
 enum RigidBodyShape {
   SPHERE,
   CIRCULARCYLINDER2D,
@@ -45,8 +46,7 @@ enum RigidBodyShape {
 
  
 
-/** Structure for the coordinates of the fictitious domain's
-    boundary. */
+/** Structure for the coordinates of a rigid body boundary. */
 typedef struct {
   double *x;
   double *y;
@@ -75,7 +75,7 @@ typedef struct {
 
 
 
-/** Particle's geometric parameters */
+/** Rigid body geometric parameters */
 typedef struct {
   coord center;
   double radius;
@@ -86,7 +86,7 @@ typedef struct {
 
 
 
-/** Structure for the toy granular solver */
+/** Rigid body parameters for the toy granular solver */
 typedef struct {
   double kn, en, vzero, wished_ratio;
   coord normalvector;
@@ -96,6 +96,7 @@ typedef struct {
 
 
 
+/** Set of parameters describing a rigid body (also named particle) */
 typedef struct {
   size_t pnum;
   enum RigidBodyShape shape;  
@@ -129,9 +130,10 @@ typedef struct {
 # include "Cube.h"
 
 
-/** Function that allocates in memory the SolidBodyBoundary
-    structure. */
+/** Allocates memory for m points in the SolidBodyBoundary structure. */
+//----------------------------------------------------------------------------
 void allocate_SolidBodyBoundary( SolidBodyBoundary* sbm, const int m ) 
+//----------------------------------------------------------------------------
 {
   sbm->x = (double*) calloc( m, sizeof(double)); 
   sbm->y = (double*) calloc( m, sizeof(double));
@@ -147,7 +149,10 @@ void allocate_SolidBodyBoundary( SolidBodyBoundary* sbm, const int m )
 
 
 
+/** Re-allocates memory for m points in the SolidBodyBoundary structure. */
+//----------------------------------------------------------------------------
 void reallocate_SolidBodyBoundary( SolidBodyBoundary* sbm, const int m ) 
+//----------------------------------------------------------------------------
 {
   sbm->x = (double*) realloc (sbm->x, m*sizeof(double)); 
   sbm->y = (double*) realloc (sbm->y, m*sizeof(double));  
@@ -161,9 +166,10 @@ void reallocate_SolidBodyBoundary( SolidBodyBoundary* sbm, const int m )
 
 
 
-/** Function that de-allocates in memory the SolidBodyBoundary
-    structure. */
+/** Frees memory associated to the points in the SolidBodyBoundary structure. */
+//----------------------------------------------------------------------------
 void free_SolidBodyBoundary( SolidBodyBoundary* sbm ) 
+//----------------------------------------------------------------------------
 {
   free( sbm->x ); sbm->x = NULL;
   free( sbm->y ); sbm->y = NULL;
@@ -175,20 +181,23 @@ void free_SolidBodyBoundary( SolidBodyBoundary* sbm )
 
 
 
-/** Function that allocates an initial Cache structure */
-void allocate_Cache( Cache* p ) 
+/** Allocates an initial Cache structure */
+//----------------------------------------------------------------------------
+void initialize_and_allocate_Cache( Cache* p ) 
+//----------------------------------------------------------------------------
 {
   p->n = 0;
-  p->nm = 0;
-  if ( p->n >= p->nm )
-    p->p = (Index *) calloc( 5, sizeof(int) );
+  p->nm = 1;
+  p->p = (Index *) calloc( 1, sizeof(Index) );
 }
 
 
 
 
-// Free the particle data that were dynamically allocated
+/** Frees the particle data that were dynamically allocated */
+//----------------------------------------------------------------------------
 void free_particles( particle* pp, const int n ) 
+//----------------------------------------------------------------------------
 {
   for (size_t k=0;k<n;k++) 
   {        
@@ -237,8 +246,10 @@ void free_particles( particle* pp, const int n )
 
 
 
-// Print data of a particle
+/** Prints data of a particle */
+//----------------------------------------------------------------------------
 void print_particle( particle const* pp, char const* poshift )
+//----------------------------------------------------------------------------
 {
   if ( pid() == 0 ) 
   {
@@ -319,8 +330,10 @@ void print_particle( particle const* pp, char const* poshift )
 
 
 
-// Print all particle data
+/** Prints all particle data */
+//----------------------------------------------------------------------------
 void print_all_particles( particle const* allpart, char const* oshift )
+//----------------------------------------------------------------------------
 {
   if ( pid() == 0 ) printf( "%sTotal number of particles = %d\n", oshift, 
   	NPARTICLES );
@@ -336,11 +349,13 @@ void print_all_particles( particle const* allpart, char const* oshift )
 
 
 
-/** Function that creates the scalar field where the cells contain the
-    indices of the dlmfd points. If there is no dlmfd point it is
-    tagged -1. */
+/** Ceates the scalar field where the cells contain the
+indices of the dlmfd points. If there is no dlmfd point it is
+tagged -1. */
+//----------------------------------------------------------------------------
 void create_index_lambda_scalar (const SolidBodyBoundary dlm_bd, 
 	vector Index_lambda, const int kk) 
+//----------------------------------------------------------------------------
 {  
   Point lpoint;
   int i;
@@ -390,14 +405,15 @@ void create_index_lambda_scalar (const SolidBodyBoundary dlm_bd,
 
 #include "weights_functions_backup.h"
 
-/** Function that returns the weight associated to a Lagrange
-   multipliers for a cell within a foreach() loop (ie for a "real" or
-   local cell) associated to a Lagrange multiplier in it's
-   neighborhood. The neighboor can be in another process (i.e be a
-   ghost cell for the current thread). */
+/** Returns the weight associated to a Lagrange 
+multipliers for a cell within a foreach() loop (ie for a "real" or local cell) 
+associated to a Lagrange multiplier in it's neighborhood. The neighboor can be 
+in another process (i.e be a ghost cell for the current thread). */
+//----------------------------------------------------------------------------
 double reversed_weight (particle * pp, const coord weightcellpos, 
 	const coord lambdacellpos, const coord lambdapos, const double delta, 
 	const coord pshift) 
+//----------------------------------------------------------------------------
 {
   /* this function has to be embedded within a double foreach_cache() and 
   foreach_neighbor() loop  */
@@ -445,7 +461,9 @@ double reversed_weight (particle * pp, const coord weightcellpos,
 
 
 
+//----------------------------------------------------------------------------
 void remove_too_close_multipliers(particle * p, vector index_lambda) 
+//----------------------------------------------------------------------------
 {   
   for (int k = 0; k < NPARTICLES; k++) {
 
@@ -472,7 +490,7 @@ void remove_too_close_multipliers(particle * p, vector index_lambda)
 
       	    /* Check particle's type */
       	    if ( other_particle->shape == CUBE ) {
-      	      compute_principal_vectors_Cubes (other_particle);
+      	      compute_principal_vectors_Cube( other_particle );
       	      coord u = other_particle->g.pgp->u1;
       	      coord v = other_particle->g.pgp->v1;
       	      coord w = other_particle->g.pgp->w1;
@@ -481,7 +499,7 @@ void remove_too_close_multipliers(particle * p, vector index_lambda)
 
       	      /* current cell's position */
       	      coord checkpt = {x, y, z};
-      	      if (is_it_in_cube_v2 (&u, &v, &w, &mins, &maxs, &checkpt)) {
+      	      if ( is_in_Cube( &u, &v, &w, &mins, &maxs, &checkpt ) ) {
       		is_in_other_particle = 1; other_part =  other_particle->pnum;
 		break;
       	      }
@@ -489,7 +507,7 @@ void remove_too_close_multipliers(particle * p, vector index_lambda)
       	    /* if sphere */
       	    else {
       	      GeomParameter gp = other_particle->g;
-      	      if (is_it_in_sphere (x, y, z, gp)) {
+      	      if (is_in_Sphere (x, y, z, gp)) {
       		is_in_other_particle = 1; other_part =  other_particle->pnum;
 		break;
       	      }
@@ -676,13 +694,15 @@ void remove_too_close_multipliers(particle * p, vector index_lambda)
 
 
 
-/** Function that tags cells associated to a Lagrange multiplier on
-    the boundary of the fictitious domain. */
+/** Tgs cells associated to a Lagrange multiplier on the boundary of the 
+fictitious domain. */
+//----------------------------------------------------------------------------
 void reverse_fill_flagfield (particle * p, scalar f, vector index_lambda, 
 	const int cacheflag, vector pshift) 
+//----------------------------------------------------------------------------
 {
-  for (int k = 0; k < NPARTICLES; k++) {
-  
+  for (int k = 0; k < NPARTICLES; k++) 
+  {  
     coord rel = {0., 0., 0.};
     coord relnl = {0., 0., 0.};
     int NCX, CX, weight_id;
@@ -761,10 +781,12 @@ void reverse_fill_flagfield (particle * p, scalar f, vector index_lambda,
 
 
 
-/** Function that initialize the particles and the scalar/vector
-fields needed to the method */
+/** Initializes the particles and the scalar/vector fields needed to the 
+method */
+//----------------------------------------------------------------------------
 void allocate_and_init_particles (particle * p, const int n, vector e, 
 	scalar g, scalar h, vector pshift)
+//----------------------------------------------------------------------------
 {  
   foreach() {
     e.x[] = -1;// index_lambda.x => lambda indices
@@ -807,9 +829,9 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
 	break;
 	  
       case CUBE:
-	compute_nboundary_Cube_v2( &gci, &m, &lN );
+	compute_nboundary_Cube( &gci, &m, &lN );
         allocate_SolidBodyBoundary( &(p[k].s), m );
-        create_FD_Boundary_Cube_v2( &gci, &(p[k].s), m, lN, pshift );
+        create_FD_Boundary_Cube( &gci, &(p[k].s), m, lN, pshift );
 	break;
 	  
       default:
@@ -818,11 +840,11 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
 
     create_index_lambda_scalar ((p[k].s), e, k);
     c = &(p[k].reduced_domain);
-    allocate_Cache(c);
+    initialize_and_allocate_Cache(c);
 #endif     
 #if debugInterior == 0
     c = &(p[k].Interior);
-    allocate_Cache(c);
+    initialize_and_allocate_Cache(c);
 #endif
   }
 }
@@ -830,8 +852,10 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
 
 
 
-/** Diagnostic functions. */
-void writer_headers (FILE * pdata, FILE * sl) 
+/** Writes headers in particle data output files */
+//----------------------------------------------------------------------------
+void writer_headers( FILE * pdata, FILE * sl ) 
+//----------------------------------------------------------------------------
 {
   // Comments: 
   // 1) we assume that initial time is always 0 when the simulation is 
@@ -891,80 +915,84 @@ void writer_headers (FILE * pdata, FILE * sl)
 
 
 
-// Write particle data
+/** Writes particle data in files */
+//----------------------------------------------------------------------------
 void particle_data( particle * p, const double t, const int i, FILE ** pdata ) 
+//----------------------------------------------------------------------------
 {  
   for (int k = 0; k < NPARTICLES; k++) 
   {
-    GeomParameter * GCi = &(p[k].g);
-#if DLM_Moving_particle
-#if TRANSLATION 
-    coord * U = &(p[k].U);
-#endif
-#if ROTATION
-    coord * w =  &(p[k].w);
-#endif
-#endif
-#if dimension == 2
-    if ( pid() == 0 ) 
-    {
-      fprintf( pdata[k], "%.*e\t", NSDF, t );
-      fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.x );
-      fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.y );         
-      fprintf( pdata[k], "%.*e\t%.*e\t%.*e\n"     
-#if DLM_Moving_particle
-#if TRANSLATION
-	, NSDF, (*U).x, NSDF, (*U).y 
-#elif TRANSLATION == 0
-	, NSDF, 0., NSDF, 0.
-#endif   
-#if ROTATION
-	, NSDF, (*w).z
-#elif ROTATION == 0
-	, NSDF, 0.
-#endif
-#elif DLM_Moving_particle == 0
-	, NSDF, 0., NSDF, 0., NSDF, 0.
-#endif
-      );      
-      fflush(pdata[k]);
-    }
-#elif dimension == 3
-    if ( pid() == 0 ) 
-    {
-      fprintf( pdata[k], "%.*e\t", NSDF, t );
-      fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.x );
-      fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.y );      
-      fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.z );      
-      fprintf( pdata[k], "%.*e\t%.*e\t%.*e\t%.*e\t%.*e\t%.*e\n"     
-#if DLM_Moving_particle
-#if TRANSLATION
-	, NSDF, (*U).x, NSDF, (*U).y, NSDF, (*U).z
-#elif TRANSLATION == 0
-	, NSDF, 0., NSDF, 0., NSDF, 0.
-#endif   
-#if ROTATION
-	, NSDF, (*w).x, NSDF, (*w).y, NSDF, (*w).z
-#elif ROTATION == 0
-	, NSDF, 0., NSDF, 0., NSDF, 0.
-#endif
-#elif DLM_Moving_particle == 0
-	, NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0.
-#endif
-      );      
-      fflush(pdata[k]);      	
-    }
-#endif
+    GeomParameter* GCi = &(p[k].g);
+#   if DLM_Moving_particle
+#     if TRANSLATION 
+        coord* U = &(p[k].U);
+#     endif
+#     if ROTATION
+        coord* w =  &(p[k].w);
+#     endif
+#   endif
+#   if dimension == 2
+      if ( pid() == 0 ) 
+      {
+        fprintf( pdata[k], "%.*e\t", NSDF, t );
+        fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.x );
+        fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.y );         
+        fprintf( pdata[k], "%.*e\t%.*e\t%.*e\n"     
+#       if DLM_Moving_particle
+#         if TRANSLATION
+	    , NSDF, (*U).x, NSDF, (*U).y 
+#         elif TRANSLATION == 0
+	    , NSDF, 0., NSDF, 0.
+#         endif   
+#         if ROTATION
+	    , NSDF, (*w).z
+#         elif ROTATION == 0
+	    , NSDF, 0.
+#         endif
+#       elif DLM_Moving_particle == 0
+	  , NSDF, 0., NSDF, 0., NSDF, 0.
+#       endif
+        );      
+        fflush(pdata[k]);
+      }
+#   elif dimension == 3
+      if ( pid() == 0 ) 
+      {
+        fprintf( pdata[k], "%.*e\t", NSDF, t );
+        fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.x );
+        fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.y );      
+        fprintf( pdata[k], "%.*e\t", NSDF, (*GCi).center.z );      
+        fprintf( pdata[k], "%.*e\t%.*e\t%.*e\t%.*e\t%.*e\t%.*e\n"     
+#       if DLM_Moving_particle
+#         if TRANSLATION
+	    , NSDF, (*U).x, NSDF, (*U).y, NSDF, (*U).z
+#         elif TRANSLATION == 0
+	    , NSDF, 0., NSDF, 0., NSDF, 0.
+#         endif   
+#         if ROTATION
+	    , NSDF, (*w).x, NSDF, (*w).y, NSDF, (*w).z
+#         elif ROTATION == 0
+	    , NSDF, 0., NSDF, 0., NSDF, 0.
+#         endif
+#       elif DLM_Moving_particle == 0
+	  , NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0., NSDF, 0.
+#       endif
+        );      
+        fflush(pdata[k]);      	
+      }
+#   endif
   }
 }
 
 
 
 
-// Compute and write hydrodynamic force & torque
-coord sumLambda (particle * p, FILE ** sl, const double t, const double dt, 
+/** Compute hydrodynamic force & torque and write the values in files */
+//----------------------------------------------------------------------------
+coord sumLambda( particle* p, FILE** sl, const double t, const double dt, 
 	scalar Flagfield, vector Lambda, vector Index_lambda, 
-	const double rho_f, vector pshift) 
+	const double rho_f, vector pshift ) 
+//----------------------------------------------------------------------------
 {
   /* Compute hydrodynamic force & torque and write to a file */
   /* Fh = <lambda,V>_P + (rho_f/rho_s)MdU/dt */
@@ -1191,108 +1219,115 @@ coord sumLambda (particle * p, FILE ** sl, const double t, const double dt,
 
 
 
-// Initialize/open all DLMFD file pointers
+/** Initialize/open all DLMFD file pointers */
+//----------------------------------------------------------------------------
 void init_file_pointers( FILE** p, FILE** d, FILE** UzawaCV, FILE** CVT, 
 	const size_t rflag ) 
+//----------------------------------------------------------------------------
 {
   char name[80] = "";
   char name2[80] = "";
   char suffix[80] = "";
   char buffer[80] = "";  
-#if _MPI
-  if ( pid() == 0 )
-#endif
-  {
-    // Particle data
-    for (int k = 0; k < NPARTICLES; k++) 
+# if _MPI
+    if ( pid() == 0 )
+# endif
     {
-      sprintf( suffix, "_%d.dat", k );
+      // Particle data
+      for (int k = 0; k < NPARTICLES; k++) 
+      {
+        sprintf( suffix, "_%d.dat", k );
 
-      strcpy( name, result_dir );
-      strcat( name, "/" );
-      strcat( name, result_particle_vp_rootfilename );
-      strcat( name, suffix );
+        strcpy( name, result_dir );
+        strcat( name, "/" );
+        strcat( name, result_particle_vp_rootfilename );
+        strcat( name, suffix );
       
-      strcpy( name2, result_dir );
-      strcat( name2, "/" );
-      strcat( name2, result_particle_hydroFaT_rootfilename );
-      strcat( name2, suffix );      
+        strcpy( name2, result_dir );
+        strcat( name2, "/" );
+        strcat( name2, result_particle_hydroFaT_rootfilename );
+        strcat( name2, suffix );      
 
-      if ( !rflag ) 
-      {
-	p[k] = fopen( name,  "w" ); 
-	d[k] = fopen( name2, "w" );
+        if ( !rflag ) 
+        {
+	  p[k] = fopen( name,  "w" ); 
+	  d[k] = fopen( name2, "w" );
 	
-	// Write headers in these files
-	writer_headers( p[k],  d[k] );
+	  // Write headers in these files
+	  writer_headers( p[k],  d[k] );
+        }
+        else 
+        {
+	  p[k] = fopen( name,  "a" );
+	  d[k] = fopen( name2, "a" );
+        }
       }
-      else 
+    
+      // Uzawa convergence
+      char converge_uzawa_filename_complete_name[80];
+      strcpy( buffer, result_dir );
+      strcat( buffer, "/" );
+      strcat( buffer, converge_uzawa_filename );
+      strcpy( converge_uzawa_filename_complete_name, buffer );
+      if ( !rflag )
       {
-	p[k] = fopen( name,  "a" );
-	d[k] = fopen( name2, "a" );
+        *UzawaCV = fopen( converge_uzawa_filename_complete_name, "w" ); 
+        fprintf( *UzawaCV, "# Iter \t Uzawa Iter \t ||u-u_imposed||\n" );
       }
-    }
+      else
+        *UzawaCV = fopen( converge_uzawa_filename_complete_name, "a" );   
     
-    // Uzawa convergence
-    char converge_uzawa_filename_complete_name[80];
-    strcpy( buffer, result_dir );
-    strcat( buffer, "/" );
-    strcat( buffer, converge_uzawa_filename );
-    strcpy( converge_uzawa_filename_complete_name, buffer );
-    if ( !rflag )
-    {
-      *UzawaCV = fopen( converge_uzawa_filename_complete_name, "w" ); 
-      fprintf( *UzawaCV, "# Iter \t Uzawa Iter \t ||u-u_imposed||\n" );
-    }
-    else
-      *UzawaCV = fopen( converge_uzawa_filename_complete_name, "a" );   
-    
-    // Cells, contrained cells and nb of multipliers 
-    char dlmfd_cells_filename_complete_name[80]; 
-    strcpy( buffer, result_dir );
-    strcat( buffer, "/" );
-    strcat( buffer, dlmfd_cells_filename );
-    strcpy( dlmfd_cells_filename_complete_name, buffer );
-    if ( !rflag )
-    {
-      *CVT = fopen ( dlmfd_cells_filename_complete_name, "w" ); 
-      fprintf ( *CVT,"# Iter \t LagMult \t ConstrainedCells \t "
-    	"TotalCells\n" );
-    }
-    else
-      *CVT = fopen( dlmfd_cells_filename_complete_name, "a" );          
-  }    
+      // Cells, contrained cells and nb of multipliers 
+      char dlmfd_cells_filename_complete_name[80]; 
+      strcpy( buffer, result_dir );
+      strcat( buffer, "/" );
+      strcat( buffer, dlmfd_cells_filename );
+      strcpy( dlmfd_cells_filename_complete_name, buffer );
+      if ( !rflag )
+      {
+        *CVT = fopen ( dlmfd_cells_filename_complete_name, "w" ); 
+        fprintf ( *CVT,"# Iter \t LagMult \t ConstrainedCells \t "
+    		"TotalCells\n" );
+      }
+      else
+        *CVT = fopen( dlmfd_cells_filename_complete_name, "a" );          
+    }    
 }
 
 
 
 
-// Close all DLMFD files
+/** Close all DLMFD files */
+//----------------------------------------------------------------------------
 void close_file_pointers( FILE** p, FILE** d, FILE* UzawaCV, FILE* CVT ) 
+//----------------------------------------------------------------------------
 { 
-#if _MPI
-  if ( pid() == 0 )
-#endif
-  {
-    // Particle data
-    for (int k = 0; k < NPARTICLES; k++) 
+# if _MPI
+    if ( pid() == 0 )
+# endif
     {
-      fclose( p[k] ); 
-      fclose( d[k] );
-    }
+      // Particle data
+      for (int k = 0; k < NPARTICLES; k++) 
+      {
+        fclose( p[k] ); 
+        fclose( d[k] );
+      }
     
-    // Uzawa convergence
-    fclose( UzawaCV );  
+      // Uzawa convergence
+      fclose( UzawaCV );  
     
-    // Cells, contrained cells and nb of multipliers 
-    fclose( CVT );               
-  }    
+      // Cells, contrained cells and nb of multipliers 
+      fclose( CVT );               
+    }    
 }
 
 
 
 
-void vorticity_3D (const vector u, vector omega) 
+/** Compute vorticity in 3D and store it in field omega */
+//----------------------------------------------------------------------------
+void vorticity_3D( const vector u, vector omega ) 
+//----------------------------------------------------------------------------
 {  
   foreach()
     foreach_dimension()
@@ -1305,7 +1340,11 @@ void vorticity_3D (const vector u, vector omega)
 
 
 
-void compute_flowrate_right (FILE * pf, const vector u, const int level) 
+/** Computes the flow rate on the right boundary and writes the value
+in a file */
+//----------------------------------------------------------------------------
+void compute_flowrate_right( FILE * pf, const vector u, const int level ) 
+//----------------------------------------------------------------------------
 {
   coord velo = {0., 0., 0.};
 
@@ -1375,7 +1414,10 @@ void compute_flowrate_right (FILE * pf, const vector u, const int level)
 
 
 
+/** Gets the pressure at a point and writes the value in a file */
+//----------------------------------------------------------------------------
 void pressure_law (scalar pres, FILE * ppf, const coord hv, const double t) 
+//----------------------------------------------------------------------------
 {
   double plaw = 0.;
   
@@ -1399,8 +1441,10 @@ void pressure_law (scalar pres, FILE * ppf, const coord hv, const double t)
 
 
 
-
-void inverse3by3matrix( double Matrix[3][3], double ** inversedMatrix ) 
+/** Inverts a 3 x 3 matrix and stores it in a double** */
+//----------------------------------------------------------------------------
+void inverse3by3matrix( double Matrix[3][3], double** inversedMatrix ) 
+//----------------------------------------------------------------------------
 {
   double block1 = Matrix[1][1] * Matrix[2][2] 
   	- Matrix[1][2] * Matrix[2][1];
@@ -1434,7 +1478,10 @@ void inverse3by3matrix( double Matrix[3][3], double ** inversedMatrix )
 
 
 
+/** Inverts a 3 x 3 matrix and stores it in a double[][] */
+//----------------------------------------------------------------------------
 void inverse3by3matrix__( double Matrix[3][3], double inversedMatrix[3][3] ) 
+//----------------------------------------------------------------------------
 {
   double block1 = Matrix[1][1] * Matrix[2][2] 
   	- Matrix[1][2] * Matrix[2][1];
@@ -1467,7 +1514,10 @@ void inverse3by3matrix__( double Matrix[3][3], double inversedMatrix[3][3] )
 
 
 #if DLM_Moving_particle
+/** Computes the inverse of the moment of inertia matrix of a rigid body */
+//----------------------------------------------------------------------------
 void compute_inv_inertia( particle *p )
+//----------------------------------------------------------------------------
 {
   /* The inertia tensor is */
   /*  Ixx  Ixy  Ixz */
@@ -1503,15 +1553,19 @@ void compute_inv_inertia( particle *p )
 
 
 
+
+/** Computes and returns the total number of cells of the grid */
+//----------------------------------------------------------------------------
 int totalcells() 
+//----------------------------------------------------------------------------
 {
   int t = 0;
-  foreach() {
-    t++;
-  }
-#if _MPI
-  mpi_all_reduce (t, MPI_INTEGER, MPI_SUM);
-#endif
+  
+  foreach() t++;
+  
+# if _MPI
+    mpi_all_reduce( t, MPI_INTEGER, MPI_SUM );
+# endif
   
   return t;
 }
@@ -1519,21 +1573,27 @@ int totalcells()
 
 
 
-int total_dlmfd_cells (particle * p, const int np) 
+/** Computes and returns the total number of cells related to Distributed
+Lagrange multiplier points for all rigid bodies */
+//----------------------------------------------------------------------------
+int total_dlmfd_cells( particle* allpart, const int np ) 
+//----------------------------------------------------------------------------
 {
   int apts = 0;
-  for (int k = 0; k < np; k++) {
-#if debugInterior == 0
-    apts += p[k].Interior.n;
-#endif
-#if debugBD == 0
-    apts += p[k].reduced_domain.n;
-#endif
+  
+  for (int k = 0; k < np; k++) 
+  {
+#   if debugInterior == 0
+      apts += allpart[k].Interior.n;
+#   endif
+#   if debugBD == 0
+      apts += allpart[k].reduced_domain.n;
+#   endif
   }
   
-#if _MPI
-  mpi_all_reduce (apts, MPI_INTEGER, MPI_SUM);
-#endif
+# if _MPI
+    mpi_all_reduce( apts, MPI_INTEGER, MPI_SUM );
+# endif
 
   return apts;
 }
@@ -1541,56 +1601,67 @@ int total_dlmfd_cells (particle * p, const int np)
 
 
 
-int total_dlmfd_multipliers (particle * p, const int np) 
+/** Computes and returns the total number of Ditributed Lagrange multiplier 
+points for all rigid bodies */
+//----------------------------------------------------------------------------
+int total_dlmfd_multipliers( particle* allpart, const int np ) 
+//----------------------------------------------------------------------------
 {
   int apts = 0;
-  for (int k = 0; k < np; k++) {
-#if debugInterior == 0
-    apts += p[k].Interior.n;
-#endif
-  }
   
-#if _MPI
-  mpi_all_reduce (apts, MPI_INTEGER, MPI_SUM);
-#endif
+# if debugInterior == 0
+    for (int k = 0; k < np; k++) 
+      apts += allpart[k].Interior.n;
   
-  for (int k = 0; k < np; k++) {
-#if debugBD == 0
-    SolidBodyBoundary * bla;
-    bla = &(p[k].s);
-    apts += bla->m;
-#endif
-  }
-
+#   if _MPI
+      mpi_all_reduce (apts, MPI_INTEGER, MPI_SUM);
+#   endif
+# endif
+  
+# if debugBD == 0
+    for (int k = 0; k < np; k++) 
+    {
+      SolidBodyBoundary * bla;
+      bla = &(allpart[k].s);
+      apts += bla->m;
+    }
+# endif
+  
   return apts;
 }
 
 
 
-/* Return the smallest grid size */
-/* ----------------------------- */
+
+/** Return the smallest grid size */
+//----------------------------------------------------------------------------
 double getDelta() 
+//----------------------------------------------------------------------------
 {
   int ii = 0;
   double dd = 0.;
-  foreach_level(depth()) {
+  
+  foreach_level(depth()) 
+  {
     ii++;
     dd = Delta;
-    if (ii > 0)
-      break;
+    if ( ii > 0 ) break;
   }
-#if _MPI
-  mpi_all_reduce (dd, MPI_DOUBLE, MPI_MIN);
-#endif
+
+# if _MPI
+    mpi_all_reduce( dd, MPI_DOUBLE, MPI_MIN );
+# endif
+  
   return dd;
 }
 
 
 
 
-/* Save the time and time step in a file */
-/* ------------------------------------- */
+/** Save the time and time step in a file */
+//----------------------------------------------------------------------------
 void save_t_dt_restart( char* dirname, double time, double deltat )
+//----------------------------------------------------------------------------
 {
   char dump_name[80] = "";
   strcpy( dump_name, dirname );
@@ -1603,9 +1674,10 @@ void save_t_dt_restart( char* dirname, double time, double deltat )
 
 
 
-/* Read the restart time and time step from a file */
-/* ----------------------------------------------- */
+/** Read the restart time and time step from a file */
+//----------------------------------------------------------------------------
 void read_t_restart( char* dirname, double* time, double* deltat )
+//----------------------------------------------------------------------------
 {
   char dump_name[80] = "";
   strcpy( dump_name, dirname );

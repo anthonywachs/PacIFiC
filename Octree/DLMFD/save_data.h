@@ -1,10 +1,12 @@
 /** 
-# Wrapper for output-functions with Paraview
+# Wrapper for output functions with Paraview
 */
 # include "dlmfd-output_vtu_foreach.h"
 
 
+//----------------------------------------------------------------------------
 void output_pvd( FILE * fp, char const* times_series )
+//----------------------------------------------------------------------------
 {
   fputs( "<?xml version=\"1.0\"?>\n"
   	"<VTKFile type=\"Collection\" version=\"1.0\" "
@@ -18,7 +20,9 @@ void output_pvd( FILE * fp, char const* times_series )
 
 
 
+//----------------------------------------------------------------------------
 void save_data( scalar * list, vector * vlist, double const time )
+//----------------------------------------------------------------------------
 {
   static int cycle_number = 0; 
   if ( !cycle_number ) cycle_number = init_cycle_number;
@@ -108,7 +112,9 @@ void save_data( scalar * list, vector * vlist, double const time )
 
 
 
+//----------------------------------------------------------------------------
 void reinitialize_vtk_restart( void )
+//----------------------------------------------------------------------------
 {
   // Get the last cycle cumber from previous simulation
   char filename_lcn[80] = "";

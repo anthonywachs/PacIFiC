@@ -1,152 +1,12 @@
-/** Set of functions for the cube as fictitious domain */
-void compute_nboundary_Cube_v2( GeomParameter* gcp, int* nb, int* lN ) 
-{
-  Cache poscache = {0};
-  Point lpoint;
-  *nb = 0;
-  coord pos = {0., 0., 0.};
-  int ip = 0;
-
-  while ( *nb == 0 ) 
-  {
-    pos.x = gcp->pgp->cornersCoord[ip][0];
-    pos.y = gcp->pgp->cornersCoord[ip][1];
-    
-#if dimension == 3
-    pos.z = gcp->pgp->cornersCoord[ip][2];
-    lpoint = locate( pos.x, pos.y, pos.z );
-#elif dimension ==2
-    lpoint = locate( pos.x, pos.y );
-#endif
-   
-    /** Only one thread has the point in its domain (works in serial
-	too). */
-    if ( lpoint.level > -1 ) 
-    {    
-      /** Only this thread creates the Cache ... */
-      cache_append(&poscache, lpoint, 0);
-
-      /** and only this thread computes the number of boundary points
-	  ... */
-    
-      /* Grains sends the cube circumscribed radius, so to get the cube edge
-      length we multiply by 2/sqrt(3) */
-      double lengthedge = 2. * gcp->radius / sqrt(3.);
-    
-      /* We compute the number of intervals on the cube edge */ 
-      foreach_cache (poscache) 
-      {
-	*lN = floor( lengthedge / ( INTERBPCOEF * Delta ) );
-
-//         double actual_INTERBPCOEF = ( lengthedge / *lN ) / Delta;
-//         fprintf( stderr, "actual inter-BP coef = %6.4f\n", actual_INTERBPCOEF );
-	
-        /* The numberof points on a cube edge is the number of intervals + 1 */
-        *lN += 1;      
-      }
-      
-#if dimension == 2
-      /* number of points required for the 4 edges of the square */
-      *nb += (*lN-2)*4;
-      /* number of points required for the face */
-      *nb += (*lN-2)*(*lN-2);
-      /* number of points required for the 4 corners */
-      *nb += 4;
-#elif dimension == 3
-      /* number of points required for the 12 edges of the cube */
-      *nb += (*lN-2)*12;
-      /* number of points required for the 6 faces of the cube */
-      *nb += 6*(*lN-2)*(*lN-2);
-      /* number of points required for the 8 corners */
-      *nb += 8;
-#endif
-      
-      /** and finally, this thread destroys the cache. */
-      free(poscache.p);
-    }
-  
-#if _MPI
-    MPI_Barrier(MPI_COMM_WORLD);
-    mpi_all_reduce(*nb, MPI_INT, MPI_MAX);
-    mpi_all_reduce(*lN, MPI_INT, MPI_MAX);
-#endif
-    if ( ip < gcp->ncorners )
-      ip++;
-    else
-      break;
-  }
-  
-  if ( *nb == 0 )
-    fprintf( stderr,"nboundary = 0: No boundary points for the"
-    	" cube/square !!!\n" );
-}
+/** 
+# Set of functions for a cube 
+*/
 
 
-
-
-void distribute_points_edge_Cube_v2 (coord const corner1, coord const corner2, 
-	SolidBodyBoundary * dlm_bd, int const lN, int const istart) 
-{
-# if dimension == 3 
-  if ( lN > 0 ) 
-  {
-    coord dinc; 
-
-    foreach_dimension()
-      dinc.x = (corner2.x - corner1.x)/(lN-1);
-
-    for (int i = 1; i <= lN-2; i++) 
-    {
-      dlm_bd->x[istart + i -1] = corner1.x + (double)i * dinc.x; 
-      dlm_bd->y[istart + i -1] = corner1.y + (double)i * dinc.y;
-      dlm_bd->z[istart + i -1] = corner1.z + (double)i * dinc.z;
-    }
-  }
-#endif
-}
-
-
-
-
-bool is_it_in_cube_v2 (coord * u, coord * v, coord * w, coord * mins, 
-	coord * maxs, coord * checkpt) 
-{
-  
-  /* a point x with coord (x,y,z) lies in the rectangle if the 3
-     following conditions are satisfied */
-  /* 1- u.p0 <= u.x <= u.p3 */
-  /* 2- v.p0 <= v.x <= v.p1 */
-  /* 3- w.p0 <= w.w <= w.p4 */
-  double x = checkpt->x;
-  double y = checkpt->y;
-  double z = checkpt->z;
-  double checkval = 0.;
-  coord u1 = *u;
-  coord v1 = *v;
-  coord w1 = *w;
-  coord cpt = {0., 0., 0.};
-  bool isin = false;
-  
-  checkval = u1.x*x + u1.y*y + u1.z*z;
-  cpt.x = checkval;
-
-  checkval = v1.x*x + v1.y*y + v1.z*z;
-  cpt.y = checkval; 
-
-  checkval = w1.x*x + w1.y*y + w1.z*z;
-  cpt.z = checkval;
-
-  if ((cpt.x >= maxs->x) && (cpt.x <= mins->x) && (cpt.y >= maxs->y) 
-  	&& (cpt.y <= mins->y) && (cpt.z >= maxs->z) && (cpt.z <= mins->z) )
-    isin = true;
-
-  return isin;
-}
-
-
-
-
-void compute_principal_vectors_Cubes (particle * p) 
+/** Computes the 3 principal vectors of the cube */
+//----------------------------------------------------------------------------
+void compute_principal_vectors_Cube( particle* p ) 
+//----------------------------------------------------------------------------
 {
   GeomParameter * gcp = &(p->g);
   int nfaces = gcp->pgp->allFaces;
@@ -168,7 +28,6 @@ void compute_principal_vectors_Cubes (particle * p)
     
     for (int j = 0; j < npoints; j++) 
     {
-      /* printf("index = %lu\n", gcp->cornersIndex[i][j]); */
       if (gcp->pgp->cornersIndex[i][j] == 0) 
       {
 	long int ii = gcp->pgp->cornersIndex[i][j];
@@ -251,8 +110,148 @@ void compute_principal_vectors_Cubes (particle * p)
 
 
 
-void create_FD_Boundary_Cube_v2 (GeomParameter * gcp, 
-	SolidBodyBoundary * dlm_bd, const int m, const int lN, vector pshift) 
+/** Distributes points on an edge of the cube */
+//----------------------------------------------------------------------------
+void distribute_points_edge_Cube( coord const corner1, coord const corner2, 
+	SolidBodyBoundary* dlm_bd, int const lN, int const istart ) 
+//----------------------------------------------------------------------------
+{
+  if ( lN > 0 ) 
+  {
+    coord dinc; 
+
+    foreach_dimension()
+      dinc.x = (corner2.x - corner1.x)/(lN-1);
+
+    for (int i = 1; i <= lN-2; i++) 
+    {
+      dlm_bd->x[istart + i -1] = corner1.x + (double)i * dinc.x; 
+      dlm_bd->y[istart + i -1] = corner1.y + (double)i * dinc.y;
+      dlm_bd->z[istart + i -1] = corner1.z + (double)i * dinc.z;
+    }
+  }
+}
+
+
+
+
+/** Tests whether a point lies inside the cube */
+//----------------------------------------------------------------------------
+bool is_in_Cube( coord* u, coord* v, coord* w, coord* mins, 
+	coord* maxs, coord* checkpt ) 
+//----------------------------------------------------------------------------
+{
+  
+  /* a point x with coord (x,y,z) lies in the rectangle if the 3
+     following conditions are satisfied */
+  /* 1- u.p0 <= u.x <= u.p3 */
+  /* 2- v.p0 <= v.x <= v.p1 */
+  /* 3- w.p0 <= w.w <= w.p4 */
+  double x = checkpt->x;
+  double y = checkpt->y;
+  double z = checkpt->z;
+  double checkval = 0.;
+  coord u1 = *u;
+  coord v1 = *v;
+  coord w1 = *w;
+  coord cpt = {0., 0., 0.};
+  bool isin = false;
+  
+  checkval = u1.x*x + u1.y*y + u1.z*z;
+  cpt.x = checkval;
+
+  checkval = v1.x*x + v1.y*y + v1.z*z;
+  cpt.y = checkval; 
+
+  checkval = w1.x*x + w1.y*y + w1.z*z;
+  cpt.z = checkval;
+
+  if ((cpt.x >= maxs->x) && (cpt.x <= mins->x) && (cpt.y >= maxs->y) 
+  	&& (cpt.y <= mins->y) && (cpt.z >= maxs->z) && (cpt.z <= mins->z) )
+    isin = true;
+
+  return isin;
+}
+
+
+
+
+/** Computes the number of boundary points on the surface of the cube */
+//----------------------------------------------------------------------------
+void compute_nboundary_Cube( GeomParameter* gcp, int* nb, int* lN ) 
+//----------------------------------------------------------------------------
+{
+  Cache poscache = {0};
+  Point lpoint;
+  *nb = 0;
+  coord pos = {0., 0., 0.};
+  int ip = 0;
+
+  while ( *nb == 0 ) 
+  {
+    pos.x = gcp->pgp->cornersCoord[ip][0];
+    pos.y = gcp->pgp->cornersCoord[ip][1];
+    pos.z = gcp->pgp->cornersCoord[ip][2];
+    lpoint = locate( pos.x, pos.y, pos.z );
+   
+    /** Only one thread has the point in its domain (works in serial
+	too). */
+    if ( lpoint.level > -1 ) 
+    {    
+      /** Only this thread creates the Cache ... */
+      cache_append(&poscache, lpoint, 0);
+
+      /** and only this thread computes the number of boundary points
+	  ... */
+    
+      /* Grains sends the cube circumscribed radius, so to get the cube edge
+      length we multiply by 2/sqrt(3) */
+      double lengthedge = 2. * gcp->radius / sqrt(3.);
+    
+      /* We compute the number of intervals on the cube edge */ 
+      foreach_cache (poscache) 
+      {
+	*lN = floor( lengthedge / ( INTERBPCOEF * Delta ) );
+	
+        /* The numberof points on a cube edge is the number of intervals + 1 */
+        *lN += 1;      
+      }
+      
+      /* number of points required for the 12 edges of the cube */
+      *nb += (*lN-2)*12;
+      /* number of points required for the 6 faces of the cube */
+      *nb += 6*(*lN-2)*(*lN-2);
+      /* number of points required for the 8 corners */
+      *nb += 8;
+      
+      /** and finally, this thread destroys the cache. */
+      free(poscache.p);
+    }
+  
+#if _MPI
+    MPI_Barrier(MPI_COMM_WORLD);
+    mpi_all_reduce(*nb, MPI_INT, MPI_MAX);
+    mpi_all_reduce(*lN, MPI_INT, MPI_MAX);
+#endif
+    if ( ip < gcp->ncorners )
+      ip++;
+    else
+      break;
+  }
+  
+  if ( *nb == 0 )
+    fprintf( stderr,"nboundary = 0: No boundary points for the"
+    	" cube/square !!!\n" );
+}
+
+
+
+
+/** Creates boundary points on the surface of the cube */
+//----------------------------------------------------------------------------
+void create_FD_Boundary_Cube( GeomParameter* gcp, 
+	SolidBodyBoundary* dlm_bd, const int m, const int lN, vector pshift ) 
+//----------------------------------------------------------------------------
 {
   int nfaces = gcp->pgp->allFaces;
   int iref, i1, i2, ichoice;
@@ -332,7 +331,7 @@ void create_FD_Boundary_Cube_v2 (GeomParameter * gcp,
 	  coord c2 = {gcp->pgp->cornersCoord[j1][0], 
 	  	gcp->pgp->cornersCoord[j1][1], 
 	  	gcp->pgp->cornersCoord[j1][2]};
-	  distribute_points_edge_Cube_v2 (c1, c2, dlm_bd, lN, isb);
+	  distribute_points_edge_Cube( c1, c2, dlm_bd, lN, isb );
 	  allindextable[jm1][j1] = 1;
 	  isb +=lN-2;
 	}
@@ -347,7 +346,7 @@ void create_FD_Boundary_Cube_v2 (GeomParameter * gcp,
 	  coord c2 = {gcp->pgp->cornersCoord[jm1][0], 
 	  	gcp->pgp->cornersCoord[jm1][1], 
 	  	gcp->pgp->cornersCoord[jm1][2]};
-	  distribute_points_edge_Cube_v2 (c1, c2, dlm_bd, lN, isb);
+	  distribute_points_edge_Cube( c1, c2, dlm_bd, lN, isb );
 	  allindextable[j1][jm1] = 1;
 	  isb +=lN-2;
 	}
@@ -368,8 +367,11 @@ void create_FD_Boundary_Cube_v2 (GeomParameter * gcp,
 
 
 
-void create_FD_Interior_Cube_v2 (particle *p, vector Index_lambda, 
-	vector pshift) 
+/** Finds cells lying inside the cube */
+//----------------------------------------------------------------------------
+void create_FD_Interior_Cube( particle* p, vector Index_lambda, 
+	vector pshift ) 
+//----------------------------------------------------------------------------
 {
   Cache * c;
   
@@ -377,7 +379,7 @@ void create_FD_Interior_Cube_v2 (particle *p, vector Index_lambda,
   c = &(p->Interior);
 
   /* compute the 3 principal vector of the cube */
-  compute_principal_vectors_Cubes (p);
+  compute_principal_vectors_Cube( p );
 
   /* a point x with coord (x,y,z) lies in the cube if the 3
      following conditions are satisfied */
@@ -429,7 +431,7 @@ void create_FD_Interior_Cube_v2 (particle *p, vector Index_lambda,
 	if ((z > mincoord.z) && (z < maxcoord.z))
 
 	  /* If yes: check if it is inside the cube now */
-    	  if (is_it_in_cube_v2 (&u1, &v1, &w1, &mins, &maxs, &checkpt)) 
+    	  if ( is_in_Cube( &u1, &v1, &w1, &mins, &maxs, &checkpt ) ) 
 	  {
 	    cache_append (c, point, 0);
 	    /* tagg cell with the number of the particle */
@@ -444,8 +446,10 @@ void create_FD_Interior_Cube_v2 (particle *p, vector Index_lambda,
 
 
 
-// Read geometric parameters of the cube
+// Reads geometric parameters of the cube
+//----------------------------------------------------------------------------
 void update_Cube( GeomParameter* gcp ) 
+//----------------------------------------------------------------------------
 {  
   char* token = NULL;
   
@@ -513,8 +517,10 @@ void update_Cube( GeomParameter* gcp )
 
 
 
-// Free the geometric parameters of the sphere
+// Frees the geometric parameters of the cube
+//----------------------------------------------------------------------------
 void free_Cube( GeomParameter* gcp ) 
+//----------------------------------------------------------------------------
 {  
   // Free the point/corner coordinate array
   double* cc = NULL;

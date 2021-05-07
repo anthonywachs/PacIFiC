@@ -1,28 +1,32 @@
-/* The Grains3D plugin */ 
+/** 
+# The Grains3D plugin 
+*/
+ 
 # include "dlmfd-plugin.h"
 
-/* File names definition */
+/** File names definition */
 # ifndef grains_result_dir
-# define grains_result_dir "Grains/Simu"
+#   define grains_result_dir "Grains/Simu"
 # endif
 # ifndef grains_inputfile
-# define grains_inputfile "Grains/Simu/simul.xml"
+#   define grains_inputfile "Grains/Simu/simul.xml"
 # endif
 
-/* Coupling Interface for Grains3D */
+/** Coupling Interface for Grains3D */
 # include "InterfaceGrains.h"
 
-/* Additional helper functions for the coupling with Grains3D */
+/** Additional functions for the coupling with Grains3D */
 # include "BasiliskGrainsCouplingFunctions.h"
 
 
-/* Here we overload the generic events defined in the general DLMFD plugin
-   DLMFD.h such that it uses Grains3D as a granular solver */
+/** Here we overload the generic events defined in the general DLMFD plugin 
+dlmfd-plugin.h such that it uses Grains3D as a granular solver */
 
 
 /** Overloading of the granular solver init event */
-// -------------------------------------------------
+//----------------------------------------------------------------------------
 event GranularSolver_init (t < -1.)
+//----------------------------------------------------------------------------
 {
   // Initialize Grains with its parameters 
   bool b_intitializeClonePer = false;
@@ -87,8 +91,9 @@ event GranularSolver_init (t < -1.)
 
 
 /** Overloading of the granular solver predictor event */
-// ------------------------------------------------------
+//----------------------------------------------------------------------------
 event GranularSolver_predictor (t < -1.)
+//----------------------------------------------------------------------------
 {
   char* pstr = NULL;
   int pstrsize = 0;
@@ -123,8 +128,9 @@ event GranularSolver_predictor (t < -1.)
 
 
 /** Overloading of the granular solver velocity update event */
-// ------------------------------------------------------------
+//----------------------------------------------------------------------------
 event GranularSolver_updateVelocity (t < -1.)
+//----------------------------------------------------------------------------
 {    
   if ( pid() == 0 )
   {

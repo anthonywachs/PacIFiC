@@ -1,5 +1,10 @@
+/** 
+# Set of structures and functions to loop through the boundary point stencils 
+and compute scalar products in a faster way.
+*/
+
 # ifndef DLMBLOCK 
-# define DLMBLOCK 5000
+#   define DLMBLOCK 5000
 # endif
 
 # if dimension == 2
@@ -9,9 +14,9 @@
 # endif
 
 
-// Structure and routines to store pointers and coefficients from the
-// initialization of the Uzawa algorithm and use them over the iterative process
-// to compute faster M_u^T*w = <DLM_w, v>_P(t) over the boundary points
+/** Structure and routines to store pointers and coefficients from the
+initialization of the Uzawa algorithm and use them over the iterative process
+to compute faster M_u^T*w = <DLM_w, v>_P(t) over the boundary points */
 typedef struct {
   int n;
   int nm;
@@ -29,8 +34,10 @@ typedef struct {
 
 
 
+//----------------------------------------------------------------------------
 void initialize_and_allocate_BPFastLoop_LambdaMom( BPFastLoop_LambdaMom* loop, 
 	const int nm ) 
+//----------------------------------------------------------------------------
 {
   loop->qux = (double**) calloc( nm, sizeof(double*) ); 
   loop->quy = (double**) calloc( nm, sizeof(double*) );  
@@ -48,7 +55,9 @@ void initialize_and_allocate_BPFastLoop_LambdaMom( BPFastLoop_LambdaMom* loop,
 
 
 
+//----------------------------------------------------------------------------
 void free_BPFastLoop_LambdaMom( BPFastLoop_LambdaMom* loop ) 
+//----------------------------------------------------------------------------
 {
   free(loop->qux); loop->qux = NULL;
   free(loop->quy); loop->quy = NULL;
@@ -66,9 +75,11 @@ void free_BPFastLoop_LambdaMom( BPFastLoop_LambdaMom* loop )
 
 
 
+//----------------------------------------------------------------------------
 void append_BPFastLoop_LambdaMom( BPFastLoop_LambdaMom* loop,
 	double* qux_, double* quy_,  double* quz_, 
 	double* dlmwx_, double* dlmwy_, double* dlmwz_, double weight_ )
+//----------------------------------------------------------------------------
 {
   if ( loop->n >= loop->nm )
   {
@@ -96,9 +107,11 @@ void append_BPFastLoop_LambdaMom( BPFastLoop_LambdaMom* loop,
 
 
 
+//----------------------------------------------------------------------------
 void append_BPFastLoop_LambdaMom_2D( BPFastLoop_LambdaMom* loop,
 	double* qux_, double* quy_, double* dlmwx_, double* dlmwy_, 
 	double weight_ )
+//----------------------------------------------------------------------------
 {
   if ( loop->n >= loop->nm )
   {
@@ -126,9 +139,9 @@ void append_BPFastLoop_LambdaMom_2D( BPFastLoop_LambdaMom* loop,
 
 
 
-// Structure and routines to store pointers and coefficients from the
-// initialization of the Uzawa algorithm and use them over the iterative process
-// to compute faster M_u*tu = <alpha, tu>_P(t) over the boundary points
+/** Structure and routines to store pointers and coefficients from the
+initialization of the Uzawa algorithm and use them over the iterative process
+to compute faster M_u*tu = <alpha, tu>_P(t) over the boundary points */
 typedef struct {
   int nv;
   int nvm;
@@ -149,8 +162,10 @@ typedef struct {
 
 
 
+//----------------------------------------------------------------------------
 void initialize_and_allocate_BPFastLoop_ResU( BPFastLoop_ResU* loop, 
 	const int nm ) 
+//----------------------------------------------------------------------------
 {
   loop->dlmvx = (double**) calloc( nm, sizeof(double*) ); 
   loop->dlmvy = (double**) calloc( nm, sizeof(double*) ); 
@@ -174,7 +189,9 @@ void initialize_and_allocate_BPFastLoop_ResU( BPFastLoop_ResU* loop,
 
 
 
+//----------------------------------------------------------------------------
 void free_BPFastLoop_ResU( BPFastLoop_ResU* loop ) 
+//----------------------------------------------------------------------------
 {
   free(loop->tux); loop->tux = NULL;
   free(loop->tuy); loop->tuy = NULL;
@@ -195,8 +212,10 @@ void free_BPFastLoop_ResU( BPFastLoop_ResU* loop )
 
 
 
+//----------------------------------------------------------------------------
 void append_BPFastLoop_ResU_tu( BPFastLoop_ResU* loop,
 	double* tux_, double* tuy_,  double* tuz_, double weight_ )
+//----------------------------------------------------------------------------
 {
   if ( loop->ntu >= loop->ntum )
   {
@@ -218,8 +237,10 @@ void append_BPFastLoop_ResU_tu( BPFastLoop_ResU* loop,
 
 
 
+//----------------------------------------------------------------------------
 void append_BPFastLoop_ResU_v( BPFastLoop_ResU* loop,
 	double* dlmvx_, double* dlmvy_,  double* dlmvz_, int ndof_ )
+//----------------------------------------------------------------------------
 {
   if ( loop->nv >= loop->nvm )
   {
@@ -241,8 +262,10 @@ void append_BPFastLoop_ResU_v( BPFastLoop_ResU* loop,
 
 
 
+//----------------------------------------------------------------------------
 void append_BPFastLoop_ResU_tu_2D( BPFastLoop_ResU* loop,
 	double* tux_, double* tuy_,  double weight_ )
+//----------------------------------------------------------------------------
 {
   if ( loop->ntu >= loop->ntum )
   {
@@ -262,8 +285,10 @@ void append_BPFastLoop_ResU_tu_2D( BPFastLoop_ResU* loop,
 
 
 
+//----------------------------------------------------------------------------
 void append_BPFastLoop_ResU_v_2D( BPFastLoop_ResU* loop,
 	double* dlmvx_, double* dlmvy_,  double* dlmvz_, int ndof_ )
+//----------------------------------------------------------------------------
 {
   if ( loop->nv >= loop->nvm )
   {

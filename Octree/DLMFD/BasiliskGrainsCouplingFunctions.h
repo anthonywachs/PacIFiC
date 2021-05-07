@@ -1,8 +1,14 @@
 /** 
 # Helper functions for interfacing Basilisk/Grains3D 
 */
+
+
+/** Transfers particles velocity into a 2D array to be sent to the 
+granular solver */
+//----------------------------------------------------------------------------
 void UpdateDLMFDtoGS_vel( double arrayv[][6], particle* p, 
-	const int m ) 
+	const int m )
+//---------------------------------------------------------------------------- 
 {
   coord U = {0., 0., 0.};
   coord w = {0., 0., 0.};
@@ -32,9 +38,13 @@ void UpdateDLMFDtoGS_vel( double arrayv[][6], particle* p,
 
 
 
+/** Updates particles through parsing and reading a C string coming
+from the granular solver */
+//----------------------------------------------------------------------------
 char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 	particle* allpart, const int npart_, bool explicit_added_mass_, 
 	double rhoval_ )
+//----------------------------------------------------------------------------
 {
 # if _MPI
     // Broadcast the size of the array of characters
@@ -58,7 +68,7 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
   int np = 0;
   sscanf( token, "%d", &np );
   if ( np != npart_ )
-    printf ("Error in number of particles in UpdateParticlesBasilisk2\n");
+    printf ("Error in number of particles in UpdateParticlesBasilisk\n");
   
   // Read the parsed array of character for each particle
   double Ux = 0., Uy = 0., Uz = 0., omx = 0., omy = 0., omz = 0., rhop = 0., 
@@ -260,6 +270,9 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 #   endif
     
     // Read the additional geometric features of the particle
+    // Note that the C function strtok keeps track of the pointer to 
+    // the last C string, which explains why we do not need to pass any
+    // parameter to the functions below 
     switch ( ncornersp )
     {
 #     if dimension == 3
@@ -272,7 +285,7 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 	case 8: 
           allpart[k].shape = CUBE;
 	  update_Cube( gg );
-	  compute_principal_vectors_Cubes( &(allpart[k]) ); 
+	  compute_principal_vectors_Cube( &(allpart[k]) ); 
           break;	  
 #     else
         case 1: 
@@ -282,7 +295,7 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
 #     endif	  	  
 	        
       default:
-        fprintf( stderr,"Unknown ncorners in UpdateParticlesBasilisk2!!\n" );
+        fprintf( stderr,"Unknown ncorners in UpdateParticlesBasilisk!!\n" );
     }                               
   }
   

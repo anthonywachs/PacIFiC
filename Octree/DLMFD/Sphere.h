@@ -1,6 +1,25 @@
-/** Set of functions for a sphere */
+/** 
+# Set of functions for a sphere 
+*/
 
+
+/** Tests whether a point lies inside the sphere */
+//----------------------------------------------------------------------------
+bool is_in_Sphere( const double x, const double y, const double z, 
+	const GeomParameter gp )
+//----------------------------------------------------------------------------
+{
+  return ( sqrt( sq( x - gp.center.x ) + sq( y - gp.center.y ) 
+    	+ sq( z - gp.center.z ) ) < gp.radius );
+}
+
+
+
+
+/** Computes the number of boundary points on the surface of the sphere */
+//----------------------------------------------------------------------------
 void compute_nboundary_Sphere( const GeomParameter gcp, int* nb ) 
+//----------------------------------------------------------------------------
 {
   coord pos[6];
   Cache poscache = {0};
@@ -73,106 +92,11 @@ void compute_nboundary_Sphere( const GeomParameter gcp, int* nb )
 
 
 
-// Find cells lying inside the sphere
-void create_FD_Interior_Sphere( particle * p, vector Index_lambda, 
-	vector shift, scalar flag ) 
-{
-  GeomParameter gci = p->g;
-  Cache * fd = &(p->Interior);
-  
-  /** Create the cache for the interior points */
-  foreach() 
-  {
-    if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0)) 
-    	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
-    {
-      cache_append (fd, point, 0);
-      /* tagg cell with the number of the particle */
-      if ((int)Index_lambda.y[] == -1)
-	Index_lambda.y[] = p->pnum;
-    }
-    if (Period.x) {
-      if ((sq(x - L0 - (gci.center.x + X0) ) + sq(y - (gci.center.y + Y0)) 
-      	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-    	/* tagg cell with the number of the particle */
-    	if ((int)Index_lambda.y[] == -1) 
-    	  Index_lambda.y[] = p->pnum;
-	if ((int)Index_lambda.y[] == p->pnum)
-	  shift.x[] = L0;
-      }
-	if ((sq(x + L0 - (gci.center.x + X0) ) + sq(y - (gci.center.y + Y0)) 
-	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-    	/* tagg cell with the number of the particle */
-    	if ((int)Index_lambda.y[] == -1) 
-    	  Index_lambda.y[] = p->pnum;
-	if ((int)Index_lambda.y[] == p->pnum)
-	  shift.x[] = -L0;
-      }
-    }
-   
-    if (Period.y) {
-      if ((sq(x - (gci.center.x + X0)) + sq(y - L0 - (gci.center.y + Y0)) 
-      	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	/* tagg cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.y[] = L0;
-	}
-      }
-      if ((sq(x - (gci.center.x + X0)) + sq(y + L0 - (gci.center.y + Y0)) 
-      	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	/* tagg cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.y[] = -L0;
-	}
-      }
-    }
-
-    if (Period.z) {
-      if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0)) 
-      	+ sq(z - L0 - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	/* tagg cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.z[] = L0;
-	}
-      }
-      if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0)) 
-      	+ sq(z + L0 - (gci.center.z + Z0))) < sq(gci.radius)) 
-      {
-    	cache_append (fd, point, 0);
-	/* tagg cell with the number of the particle */
-	if ((int)Index_lambda.y[] == -1) {
-	  Index_lambda.y[] = p->pnum;
-	  if (flag[] < 1)
-	    shift.z[] = -L0;
-	}
-      }
-    }    
-  }
-  cache_shrink( fd );
-}
-
-
-
-
-// Create boundary points on the surface of the sphere
+/** Creates boundary points on the surface of the sphere */
+//----------------------------------------------------------------------------
 void create_FD_Boundary_Sphere( GeomParameter gcp, 
 	SolidBodyBoundary * dlm_bd, const int nsphere, vector pshift ) 
+//----------------------------------------------------------------------------
 {
   coord pos;
   Point lpoint;
@@ -279,11 +203,110 @@ void create_FD_Boundary_Sphere( GeomParameter gcp,
 
 
 
-// Read geometric parameters of the sphere
-void update_Sphere( GeomParameter* gcp ) 
-{  
-//  char* token = NULL;
+/** Finds cells lying inside the sphere */
+//----------------------------------------------------------------------------
+void create_FD_Interior_Sphere( particle * p, vector Index_lambda, 
+	vector shift, scalar flag ) 
+//----------------------------------------------------------------------------
+{
+  GeomParameter gci = p->g;
+  Cache * fd = &(p->Interior);
   
+  /** Create the cache for the interior points */
+  foreach() 
+  {
+    if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0)) 
+    	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
+    {
+      cache_append (fd, point, 0);
+      /* tagg cell with the number of the particle */
+      if ((int)Index_lambda.y[] == -1)
+	Index_lambda.y[] = p->pnum;
+    }
+    if (Period.x) {
+      if ((sq(x - L0 - (gci.center.x + X0) ) + sq(y - (gci.center.y + Y0)) 
+      	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
+      {
+    	cache_append (fd, point, 0);
+    	/* tagg cell with the number of the particle */
+    	if ((int)Index_lambda.y[] == -1) 
+    	  Index_lambda.y[] = p->pnum;
+	if ((int)Index_lambda.y[] == p->pnum)
+	  shift.x[] = L0;
+      }
+	if ((sq(x + L0 - (gci.center.x + X0) ) + sq(y - (gci.center.y + Y0)) 
+	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
+      {
+    	cache_append (fd, point, 0);
+    	/* tagg cell with the number of the particle */
+    	if ((int)Index_lambda.y[] == -1) 
+    	  Index_lambda.y[] = p->pnum;
+	if ((int)Index_lambda.y[] == p->pnum)
+	  shift.x[] = -L0;
+      }
+    }
+   
+    if (Period.y) {
+      if ((sq(x - (gci.center.x + X0)) + sq(y - L0 - (gci.center.y + Y0)) 
+      	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
+      {
+    	cache_append (fd, point, 0);
+	/* tagg cell with the number of the particle */
+	if ((int)Index_lambda.y[] == -1) {
+	  Index_lambda.y[] = p->pnum;
+	  if (flag[] < 1)
+	    shift.y[] = L0;
+	}
+      }
+      if ((sq(x - (gci.center.x + X0)) + sq(y + L0 - (gci.center.y + Y0)) 
+      	+ sq(z - (gci.center.z + Z0))) < sq(gci.radius)) 
+      {
+    	cache_append (fd, point, 0);
+	/* tagg cell with the number of the particle */
+	if ((int)Index_lambda.y[] == -1) {
+	  Index_lambda.y[] = p->pnum;
+	  if (flag[] < 1)
+	    shift.y[] = -L0;
+	}
+      }
+    }
+
+    if (Period.z) {
+      if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0)) 
+      	+ sq(z - L0 - (gci.center.z + Z0))) < sq(gci.radius)) 
+      {
+    	cache_append (fd, point, 0);
+	/* tagg cell with the number of the particle */
+	if ((int)Index_lambda.y[] == -1) {
+	  Index_lambda.y[] = p->pnum;
+	  if (flag[] < 1)
+	    shift.z[] = L0;
+	}
+      }
+      if ((sq(x - (gci.center.x + X0)) + sq(y - (gci.center.y + Y0)) 
+      	+ sq(z + L0 - (gci.center.z + Z0))) < sq(gci.radius)) 
+      {
+    	cache_append (fd, point, 0);
+	/* tagg cell with the number of the particle */
+	if ((int)Index_lambda.y[] == -1) {
+	  Index_lambda.y[] = p->pnum;
+	  if (flag[] < 1)
+	    shift.z[] = -L0;
+	}
+      }
+    }    
+  }
+  cache_shrink( fd );
+}
+
+
+
+
+/** Reads geometric parameters of the sphere */
+//----------------------------------------------------------------------------
+void update_Sphere( GeomParameter* gcp ) 
+//----------------------------------------------------------------------------
+{  
   // We already have all parameters for the sphere but the input array of
   // characters contains again a "1", the gravity center coordinates and 
   // a "0", hence we need to read five tokens but we do not do
@@ -295,8 +318,10 @@ void update_Sphere( GeomParameter* gcp )
 
 
 
-// Free the geometric parameters of the sphere
+/** Frees the geometric parameters of the sphere */
+//----------------------------------------------------------------------------
 void free_Sphere( GeomParameter* gcp ) 
+//----------------------------------------------------------------------------
 {  
   // Nothing to do
 }

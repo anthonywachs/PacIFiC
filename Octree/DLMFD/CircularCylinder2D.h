@@ -1,7 +1,25 @@
-/** Set of functions for a 2D circular cylinder */
+/** 
+# Set of functions for a 2D circular cylinder 
+*/
 
-// Compute the number of boundary points
+
+/** Tests whether a point lies inside the 2D circular cylinder */
+//----------------------------------------------------------------------------
+bool is_in_CircularCylinder2D( const double x, const double y, 
+	const GeomParameter gp )
+//----------------------------------------------------------------------------
+{
+  return ( sqrt( sq( x - gp.center.x ) + sq( y - gp.center.y ) ) < gp.radius );
+}
+
+
+
+
+/** Computes the number of boundary points on the surface of the 2D circular 
+cylinder */
+//----------------------------------------------------------------------------
 void compute_nboundary_CircularCylinder2D( const GeomParameter gcp, int* nb ) 
+//----------------------------------------------------------------------------
 {
   coord pos[6];
   Cache poscache = {0};
@@ -61,9 +79,82 @@ void compute_nboundary_CircularCylinder2D( const GeomParameter gcp, int* nb )
 
 
 
-// Find cells lying inside the circular cylinder
-void create_FD_Interior_CircularCylinder2D( particle * p, vector Index_lambda, 
-	vector shift, scalar flag ) 
+/** Creates boundary points on the surface of the 2D circular cylinder */
+//----------------------------------------------------------------------------
+void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp, 
+	SolidBodyBoundary* dlm_bd, const int nsphere, vector pshift ) 
+//----------------------------------------------------------------------------
+{
+
+  int m = nsphere;
+  coord pos;
+  pos.z = 0.;
+  Point lpoint;
+  
+  coord shift = {0., 0., 0.};
+  coord ori = {X0, Y0, Z0};
+ 
+  int i;
+  double theta[m];
+  double radius  = gcp.radius;
+  coord fact_theta[m];
+  
+  for (i = 0; i < m; i++) 
+  {
+    theta[i] = (double)(i) * 2. * pi / (double)(m); 
+    fact_theta[i].x = cos( theta[i] );
+    fact_theta[i].y = sin( theta[i] );
+    
+    /* Assign positions x,y on a circle's boundary */ 
+    pos.x = radius * fact_theta[i].x + gcp.center.x + X0;
+    pos.y = radius * fact_theta[i].y + gcp.center.y + Y0;
+
+    /* Check if the point falls outside of the domain */
+    foreach_dimension() 
+    {
+      if ( Period.x ) 
+      {
+	shift.x = 0.;
+	if ( pos.x > L0 + ori.x ) 
+	{
+	  pos.x -= L0;
+	  shift.x = -L0;
+	} 
+	if ( pos.x < 0. + ori.x ) 
+	{
+	  pos.x += L0;
+	  shift.x = L0;
+	}
+      }
+      dlm_bd->x[i] = pos.x; 
+    }
+   
+    Cache poscache = {0};
+    lpoint = locate( pos.x, pos.y );
+
+    if ( lpoint.level > -1 ) 
+    {	
+      cache_append( &poscache, lpoint, 0 );
+
+      foreach_cache(poscache) 
+	foreach_dimension()
+	  pshift.x[] = shift.x;
+      
+      free( poscache.p );
+    }
+  }
+  
+  boundary((scalar*){pshift});
+}
+
+
+
+
+/** Finds cells lying inside the 2D circular cylinder */
+//----------------------------------------------------------------------------
+void create_FD_Interior_CircularCylinder2D( particle* p, vector Index_lambda, 
+	vector shift, scalar flag )
+//----------------------------------------------------------------------------
 {
   GeomParameter gci = p->g;
   Cache* fd = &(p->Interior);
@@ -139,88 +230,21 @@ void create_FD_Interior_CircularCylinder2D( particle * p, vector Index_lambda,
 
 
 
-// Create boundary points on the surface of the circular cylinder
-void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp, 
-	SolidBodyBoundary* dlm_bd, const int nsphere, vector pshift ) 
-{
-
-  int m = nsphere;
-  coord pos;
-  pos.z = 0.;
-  Point lpoint;
-  
-  coord shift = {0., 0., 0.};
-  coord ori = {X0, Y0, Z0};
- 
-  int i;
-  double theta[m];
-  double radius  = gcp.radius;
-  coord fact_theta[m];
-  
-  for (i = 0; i < m; i++) 
-  {
-    theta[i] = (double)(i) * 2. * pi / (double)(m); 
-    fact_theta[i].x = cos( theta[i] );
-    fact_theta[i].y = sin( theta[i] );
-    
-    /* Assign positions x,y on a circle's boundary */ 
-    pos.x = radius * fact_theta[i].x + gcp.center.x + X0;
-    pos.y = radius * fact_theta[i].y + gcp.center.y + Y0;
-
-    /* Check if the point falls outside of the domain */
-    foreach_dimension() 
-    {
-      if ( Period.x ) 
-      {
-	shift.x = 0.;
-	if ( pos.x > L0 + ori.x ) 
-	{
-	  pos.x -= L0;
-	  shift.x = -L0;
-	} 
-	if ( pos.x < 0. + ori.x ) 
-	{
-	  pos.x += L0;
-	  shift.x = L0;
-	}
-      }
-      dlm_bd->x[i] = pos.x; 
-    }
-   
-    Cache poscache = {0};
-    lpoint = locate( pos.x, pos.y );
-
-    if ( lpoint.level > -1 ) 
-    {	
-      cache_append( &poscache, lpoint, 0 );
-
-      foreach_cache(poscache) 
-	foreach_dimension()
-	  pshift.x[] = shift.x;
-      
-      free( poscache.p );
-    }
-  }
-  
-  boundary((scalar*){pshift});
-}
-
-
-
-
-// Read geometric parameters of the 2D circular cylinder
+/** Reads geometric parameters of the 2D circular cylinder */
+//----------------------------------------------------------------------------
 void update_CircularCylinder2D( GeomParameter* gcp ) 
-{  
-//  char* token = NULL;
-  
+//----------------------------------------------------------------------------
+{    
   // TO DO
 }
 
 
 
 
-// Free the geometric parameters of the 2D circular cylinder
+/** Frees the geometric parameters of the 2D circular cylinder */
+//----------------------------------------------------------------------------
 void free_CircularCylinder2D( GeomParameter* gcp ) 
+//----------------------------------------------------------------------------
 {  
   // Nothing to do
 }
