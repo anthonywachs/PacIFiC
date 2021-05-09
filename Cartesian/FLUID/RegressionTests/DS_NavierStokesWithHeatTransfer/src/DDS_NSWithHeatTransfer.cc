@@ -84,6 +84,7 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    , is_par_motion( false )
    , is_stressCal( false )
    , DivergenceScheme ( "FD" )
+   , IntersectionMethod ( "Bisection" )
    , Solver_Temperature ( 0 )
 {
    MAC_LABEL( "DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer" ) ;
@@ -5470,19 +5471,19 @@ DDS_NSWithHeatTransfer:: gen_dir_index_of_secondary_ghost_points (FV_DiscreteFie
   }
 
   // Checking the ghost points in domain or not
-  if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)UF->get_local_nb_dof(comp,interpol_dir))) {
+  if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)FF->get_local_nb_dof(comp,interpol_dir))) {
      point_in_domain(0) = 0;
   } else {
      point_in_domain(0) = 1;
   }
 
-  if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)UF->get_local_nb_dof(comp,interpol_dir))) {
+  if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)FF->get_local_nb_dof(comp,interpol_dir))) {
      point_in_domain(1) = 0;
   } else {
      point_in_domain(1) = 1;
   }
 
-  if ((i0_temp(2) < 0) || (i0_temp(2) >= (int)UF->get_local_nb_dof(comp,interpol_dir))) {
+  if ((i0_temp(2) < 0) || (i0_temp(2) >= (int)FF->get_local_nb_dof(comp,interpol_dir))) {
      point_in_domain(2) = 0;
   } else {
      point_in_domain(2) = 1;
@@ -5647,7 +5648,6 @@ DDS_NSWithHeatTransfer:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_
 	 }
       }
    }
- 
 /*   
    if (comp == 0) {
       if (interpol_dir == 0) {
@@ -7509,7 +7509,7 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
   ofstream outputFile ;
 
   std::ostringstream os2;
-  os2 << "./DS_results/output_" << my_rank << ".csv";
+  os2 << "./DS_results/outputNSHE_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 
@@ -7547,7 +7547,7 @@ DDS_NSWithHeatTransfer::write_output_field(FV_DiscreteField const* FF, size_t co
               double zC = 0.;
               if (dim == 3) zC = FF->get_DOF_coordinate( k, comp, 2 ) ;
               size_t p = return_node_index(FF,comp,i,j,k);
-              size_t id = (size_t) node.parID[comp]->item(p);
+              double id = node.parID[comp]->item(p);
               double voidf = node.void_frac[comp]->item(p);
 
               outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;

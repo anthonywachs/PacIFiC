@@ -5550,7 +5550,6 @@ DDS_NavierStokes:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t cons
 	 }
       }
    }
- 
 /*   
    if (comp == 0) {
       if (interpol_dir == 0) {
@@ -7413,7 +7412,7 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
   ofstream outputFile ;
 
   std::ostringstream os2;
-  os2 << "./DS_results/output_" << my_rank << ".csv";
+  os2 << "./DS_results/outputNS_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 
