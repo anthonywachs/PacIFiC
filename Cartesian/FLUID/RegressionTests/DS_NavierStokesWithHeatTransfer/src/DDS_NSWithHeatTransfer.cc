@@ -335,6 +335,7 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    inputData.pole_loc_ = pole_loc ;
    inputData.particle_information_ = &particle_information ;
    inputData.insertion_type_ = insertion_type ;
+   inputData.is_par_motion_ = is_par_motion ;
 
    MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DDS_HeatTransfer" ) ;
    Solver_Temperature = DDS_HeatTransfer::create( this, set, inputData ) ;
