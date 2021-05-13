@@ -66,7 +66,7 @@ class Contact:
         """This function returns the angle of the contact line projected onto the xz plane (perpendicular to the ground and to the gate).
         """
         if (abs(self.pts[0][0] - self.pts[1][0]) < EPS):
-            return 0.
+            return pi/2
         else:
             angle = atan((self.pts[0][2] - self.pts[1][2])/
             (self.pts[0][0] - self.pts[1][0]))
@@ -89,6 +89,13 @@ class Contact:
         [self.pts[i][1] for i in range(2)],[self.pts[i][2] for i in range(2)],
         color = my_color)
 
+    def is_admissible(self, zmin):
+        admissible = True
+        for i in range(2):
+            if self.pts[i][2] <= zmin:
+                admissible = False
+        return admissible
+
 class ContactNetwork:
     """In this class we store all the contact lines and define some functions useful to the analysis of the contact network.
 
@@ -103,7 +110,10 @@ class ContactNetwork:
     def add_contact(self, Contact):
         self.allContacts.append(Contact)
 
-    def read_vtp(self, filePath, nb_procs = 1, no_obs = False):
+    def rm_contact(self, index):
+        self.allContacts.pop(index)
+
+    def read_vtp(self, filePath, nb_procs = 1, no_obs = False, zmin = -1.e10):
         """This function reads the VTP files storing contact informations written by Grains3D.
 
         For now, this function only reads line 7 of these files, which stores the coordinates of the centers of the colliding particles (or the contact point if the contact occurs with a wall).
@@ -128,17 +138,19 @@ class ContactNetwork:
                         nb_obs = 0
                 if line_nb == 6:
                     if no_obs:
-                        coord_i = np.array((line.strip(' \n')).split(" "))[:-(nb_obs)]
+                        coord_i = np.array((line.strip(' \n')).split(" "))[:-(nb_obs)*6]
                     else:
                         coord_i = np.array((line.strip(' \n')).split(" "))
                     break
                 line_nb += 1
             coord = np.hstack((coord,coord_i))
         coord = coord.astype(np.float)
-        self.nbContacts = int(len(coord)/6)
-        for i in range(0,self.nbContacts):
-            self.add_contact(Contact(Point(coord[6*i], coord[6*i+1],
-            coord[6*i+2]), Point(coord[6*i+3], coord[6*i+4], coord[6*i+5])))
+        for i in range(0,int(len(coord)/6)):
+            current_contact = Contact(Point(coord[6*i], coord[6*i+1],
+            coord[6*i+2]), Point(coord[6*i+3], coord[6*i+4], coord[6*i+5]))
+            if current_contact.is_admissible(zmin):
+                self.add_contact(current_contact)
+        self.nbContacts = len(self.allContacts)
 
     def draw_network(self):
         """This function builds on Contact.draw() to output the contact network in a 3D plot. We use the function set_axes_equal provided by Karlo (see at the very top of this file).
@@ -163,7 +175,7 @@ class ContactNetwork:
         fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
         ax.plot(np.array([(i*pi/nbSamples)%(2*nbSamples) for i in range(int(2*nbSamples+1))]), np.transpose(np.hstack((nbTheta, nbTheta, np.array([[nbTheta[0,0]]])))))
         plt.title("Fabric anisotropy, t="+str(time))
-        ax.set_yticklabels([])
+        # ax.set_yticklabels([])
         plt.show()
 
 # Example:
@@ -192,6 +204,7 @@ draw_network = True if my_args.get_attribute("draw-network") != None else False
 for i_file in range(nb_out):
     myContacts = ContactNetwork()
     myContacts.read_vtp(file_path, nb_procs, no_obs)
+    print("Nb of considered contacts =", myContacts.nbContacts)
     myContacts.fabric_anisotropy(nbSamples = nbSamples)
 
 if draw_network:
