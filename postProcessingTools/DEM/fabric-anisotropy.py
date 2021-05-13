@@ -3,6 +3,11 @@ import matplotlib as mpl
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+import sys
+from cmdLineArguments import *
+from celluloid import Camera
+
 EPS = 1.e-6
 
 ### --- Set equal axis for 3D plots. Code provided by Karlo on StackOverflow:
@@ -98,20 +103,28 @@ class ContactNetwork:
     def add_contact(self, Contact):
         self.allContacts.append(Contact)
 
-    def read_vtp(self, filePath):
+    def read_vtp(self, filePath, nb_procs = 1):
         """This function reads the VTP files storing contact informations written by Grains3D.
 
         For now, this function only reads line 7 of these files, which stores the coordinates of the centers of the colliding particles (or the contact point if the contact occurs with a wall).
 
         The data are simply a long line of floats separated by spaces, and they correspond to x, y, z coordinates of each contact points.
         """
-        myFile = open(filePath,'r')
-        line_nb = 0
-        for line in myFile:
-            if line_nb == 6:
-                coord = np.array((line.strip(' \n')).split(" "))
-                break
-            line_nb += 1
+        coord = np.array([])
+        for i in range(nb_procs):
+            current_file_path = filePath[:-5]+str(i)+filePath[-4:]
+            try:
+                myFile = open(current_file_path, "r")
+            except IOError:
+                print("Could not open file " + current_file_path)
+
+            line_nb = 0
+            for line in myFile:
+                if line_nb == 6:
+                    coord_i = np.array((line.strip(' \n')).split(" "))
+                    break
+                line_nb += 1
+            coord = np.hstack((coord,coord_i))
         coord = coord.astype(np.float)
         self.nbContacts = int(len(coord)/6)
         for i in range(0,self.nbContacts):
@@ -128,7 +141,7 @@ class ContactNetwork:
         set_axes_equal(ax)
         plt.show()
 
-    def fabric_anisotropy(self, nbSamples = 51):
+    def fabric_anisotropy(self, nbSamples = 51, time = 0):
         """This function computes and draw the probability density function P_n(theta) = Nc(theta)/Nc, where Nc(theta) is the number of contact which orientation is between theta and theta+dtheta, and Nc is the total number of contacts. See, e.g., D. Cantor et al., "Rheology and structure of polydisperse three-dimensional packings of spheres", Phys. Rev. E., 2018.
 
         This function allows to tune through the argument nbSamples, since dtheta = pi/nbSamples.
@@ -141,7 +154,7 @@ class ContactNetwork:
             # and vertical directions, we try to sort them out with this if
             # statement. The idea is that if a contact line is exactly
             # horizontal or vertical, it is very likely that it is a contact
-            # with a wall.
+            # with a wall... But this only works with spherical particles.
             # Interestingly, the spikes in the normal direction are very
             # sensitive to the value of EPS.
             if (abs(theta) > EPS and abs(theta - pi) > EPS and
@@ -151,11 +164,34 @@ class ContactNetwork:
         nbTheta /= nbRelevantContacts
         fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
         ax.plot(np.array([(i*pi/nbSamples)%(2*nbSamples) for i in range(int(2*nbSamples+1))]), np.transpose(np.hstack((nbTheta, nbTheta, np.array([[nbTheta[0,0]]])))))
+        plt.title("Fabric anisotropy, t="+str(time))
+        ax.set_yticklabels([])
         plt.show()
 
-# Example
-file_path = "test-cases/fabric_anisotropy_test2.vtp"
-myContacts = ContactNetwork()
-myContacts.read_vtp(file_path)
-myContacts.fabric_anisotropy()
-myContacts.draw_network()
+# Example:
+# Command to type in $PACIFIC_HOME/postProcessingTools:
+# python DEM/fabric-anisotropy.py -file=./test-cases/crosses_10_procs/simul_ForceChain_T1_0.vtp -nb-procs=10
+my_args = cmdLineArgs()
+my_args.add_cmd_arg("file","file")
+my_args.add_cmd_arg("nb-outputs","nb-outputs")
+my_args.add_cmd_arg("nb-procs","nb-procs")
+my_args.add_cmd_arg("nb-samples","nb-samples")
+my_args.add_cmd_arg("draw-network","draw-network")
+my_args.read_cmd_args()
+file_path = my_args.get_attribute("file")
+nb_out = my_args.get_attribute("nb-outputs")
+nb_out = int(nb_out) if (nb_out != None) else 1
+nb_procs = my_args.get_attribute("nb-procs")
+nb_procs = int(nb_procs) if (nb_procs != None) else 1
+nbSamples = my_args.get_attribute("nb-samples")
+nbSamples = int(nbSamples) if (nbSamples != None) else 51
+
+draw_network = True if my_args.get_attribute("draw-network") != None else False
+
+for i_file in range(nb_out):
+    myContacts = ContactNetwork()
+    myContacts.read_vtp(file_path, nb_procs)
+    myContacts.fabric_anisotropy(nbSamples = nbSamples)
+
+if draw_network:
+    myContacts.draw_network()
