@@ -103,7 +103,7 @@ class ContactNetwork:
     def add_contact(self, Contact):
         self.allContacts.append(Contact)
 
-    def read_vtp(self, filePath, nb_procs = 1):
+    def read_vtp(self, filePath, nb_procs = 1, no_obs = False):
         """This function reads the VTP files storing contact informations written by Grains3D.
 
         For now, this function only reads line 7 of these files, which stores the coordinates of the centers of the colliding particles (or the contact point if the contact occurs with a wall).
@@ -111,6 +111,7 @@ class ContactNetwork:
         The data are simply a long line of floats separated by spaces, and they correspond to x, y, z coordinates of each contact points.
         """
         coord = np.array([])
+        nb_obs = 0
         for i in range(nb_procs):
             current_file_path = filePath[:-5]+str(i)+filePath[-4:]
             try:
@@ -120,8 +121,16 @@ class ContactNetwork:
 
             line_nb = 0
             for line in myFile:
+                if line_nb == 3:
+                    if no_obs:
+                        nb_obs = int(line.split('=')[-1].split('\"')[1])
+                    else:
+                        nb_obs = 0
                 if line_nb == 6:
-                    coord_i = np.array((line.strip(' \n')).split(" "))
+                    if no_obs:
+                        coord_i = np.array((line.strip(' \n')).split(" "))[:-(nb_obs)]
+                    else:
+                        coord_i = np.array((line.strip(' \n')).split(" "))
                     break
                 line_nb += 1
             coord = np.hstack((coord,coord_i))
@@ -147,21 +156,10 @@ class ContactNetwork:
         This function allows to tune through the argument nbSamples, since dtheta = pi/nbSamples.
         """
         nbTheta = np.zeros((1,nbSamples))
-        nbRelevantContacts = 0
         for i in range(self.nbContacts):
             theta = self.allContacts[i].get_xz_angle()
-            # Because the contacts with walls add huge spikes in the horizontal
-            # and vertical directions, we try to sort them out with this if
-            # statement. The idea is that if a contact line is exactly
-            # horizontal or vertical, it is very likely that it is a contact
-            # with a wall... But this only works with spherical particles.
-            # Interestingly, the spikes in the normal direction are very
-            # sensitive to the value of EPS.
-            if (abs(theta) > EPS and abs(theta - pi) > EPS and
-            abs(theta - pi/2) > EPS):
-                nbTheta[0,int(nbSamples*theta/pi)] += 1
-                nbRelevantContacts += 1
-        nbTheta /= nbRelevantContacts
+            nbTheta[0,int(nbSamples*theta/pi)] += 1
+        nbTheta /= self.nbContacts
         fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
         ax.plot(np.array([(i*pi/nbSamples)%(2*nbSamples) for i in range(int(2*nbSamples+1))]), np.transpose(np.hstack((nbTheta, nbTheta, np.array([[nbTheta[0,0]]])))))
         plt.title("Fabric anisotropy, t="+str(time))
@@ -177,6 +175,7 @@ my_args.add_cmd_arg("nb-outputs","nb-outputs")
 my_args.add_cmd_arg("nb-procs","nb-procs")
 my_args.add_cmd_arg("nb-samples","nb-samples")
 my_args.add_cmd_arg("draw-network","draw-network")
+my_args.add_cmd_arg("no-obstacle","no-obstacle")
 my_args.read_cmd_args()
 file_path = my_args.get_attribute("file")
 nb_out = my_args.get_attribute("nb-outputs")
@@ -185,12 +184,14 @@ nb_procs = my_args.get_attribute("nb-procs")
 nb_procs = int(nb_procs) if (nb_procs != None) else 1
 nbSamples = my_args.get_attribute("nb-samples")
 nbSamples = int(nbSamples) if (nbSamples != None) else 51
+no_obs = my_args.get_attribute("no-obstacle")
+no_obs = True if (no_obs != None) else False
 
 draw_network = True if my_args.get_attribute("draw-network") != None else False
 
 for i_file in range(nb_out):
     myContacts = ContactNetwork()
-    myContacts.read_vtp(file_path, nb_procs)
+    myContacts.read_vtp(file_path, nb_procs, no_obs)
     myContacts.fabric_anisotropy(nbSamples = nbSamples)
 
 if draw_network:
