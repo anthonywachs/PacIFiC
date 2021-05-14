@@ -49,6 +49,9 @@ class Point:
         return self.coord[i]
     def __setitem__(self, i, x):
         self.coord[i] = x
+    def __str__(self):
+        return ("(" + str(self.coord[0]) + ", " + str(self.coord[1]) +
+        ", " + str(self.coord[2]) + ")")
 
 class Contact:
     """This class gathers information about a specific contact for post-processing purposes. For now, it only has information about the centers of the two colliding particles (or the center of the particle and the point of contact in case of a collision with a wall).
@@ -92,7 +95,10 @@ class Contact:
     def is_admissible(self, zmin):
         admissible = True
         for i in range(2):
-            if self.pts[i][2] <= zmin:
+            if (self.pts[i][2] <= zmin or self.pts[i][0]<=0.015+EPS or
+                self.pts[i][0]>=0.145-EPS):
+            # if (self.pts[i][2] <= zmin or self.pts[i][0]<=0.0015 or
+            #     self.pts[i][0]>=0.0515):
                 admissible = False
         return admissible
 
@@ -170,12 +176,16 @@ class ContactNetwork:
         nbTheta = np.zeros((1,nbSamples))
         for i in range(self.nbContacts):
             theta = self.allContacts[i].get_xz_angle()
+            if abs(theta - pi/2) < EPS:
+                print("theta =", theta, "pt0 =",
+                self.allContacts[i].pts[0], ", pt1 =",
+                self.allContacts[i].pts[1])
             nbTheta[0,int(nbSamples*theta/pi)] += 1
         nbTheta /= self.nbContacts
         fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
         ax.plot(np.array([(i*pi/nbSamples)%(2*nbSamples) for i in range(int(2*nbSamples+1))]), np.transpose(np.hstack((nbTheta, nbTheta, np.array([[nbTheta[0,0]]])))))
-        plt.title("Fabric anisotropy, t="+str(time))
-        # ax.set_yticklabels([])
+        plt.title("Fabric anisotropy, crosses, t="+str(time))
+        ax.set_yticklabels([])
         plt.show()
 
 # Example:
@@ -201,9 +211,10 @@ no_obs = True if (no_obs != None) else False
 
 draw_network = True if my_args.get_attribute("draw-network") != None else False
 
+radius = 0.0015
 for i_file in range(nb_out):
     myContacts = ContactNetwork()
-    myContacts.read_vtp(file_path, nb_procs, no_obs)
+    myContacts.read_vtp(file_path, nb_procs, no_obs, zmin=radius+EPS)
     print("Nb of considered contacts =", myContacts.nbContacts)
     myContacts.fabric_anisotropy(nbSamples = nbSamples)
 
