@@ -45,8 +45,8 @@ HYPRE and PETSc are high-performace libraries that offer a wide range of state-o
 To install HYPRE 2.10.1, copy and paste the following:
 ```
 cd $MACWORLD_ROOT
-wget https://computing.llnl.gov/projects/hypre-scalable-linear-solvers-multigrid-methods/download/hypre-2.10.1.tar.gz
-tar -zxvf hypre-2.10.1.tar.gz
+wget https://github.com/hypre-space/hypre/archive/refs/tags/v2.10.1.zip
+unzip hypre-2.10.1.zip
 cd hypre-2.10.1/
 cp ../extra_files/*hypre* ./
 source ${PACIFIC_HOME}/Env/PacIFiC-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
