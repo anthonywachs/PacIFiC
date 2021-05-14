@@ -28,7 +28,7 @@ make clean
 make distclean
 
 # Configure
-configure CC="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_C}" CXX="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_CXX}" F77="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_F77}" CFLAGS="-fPIC ${HYPRE_OPT_FLAGS}" CXXFLAGS="-fPIC ${HYPRE_OPT_FLAGS}" FFLAGS="-fPIC ${HYPRE_OPT_FLAGS}" CPPFLAGS="-fPIC ${HYPRE_OPT_FLAGS}" --prefix=${HYPRE_DIR}/${HYPRE_ARCH} --libdir=${HYPRE_DIR}/${HYPRE_ARCH}/lib --includedir=${HYPRE_DIR}/${HYPRE_ARCH}/include --with-MPI-include=${MACWORLD_MPI_INCDIR} --with-MPI-libs="${MACWORLD_MPI_LIBS}" --with-MPI-lib-dirs=${MACWORLD_MPI_LIBDIR} --with-blas-lib-dirs="${MACWORLD_BLAS_LIBDIR} ${MACWORLD_ATLAS_LIBDIR}" --with-lapack-lib-dirs=${MACWORLD_LAPACK_LIBDIR} --with-blas-libs="${MACWORLD_BLAS_LIBS} ${MACWORLD_ATLAS_LIBS}" --with-lapack-libs="${MACWORLD_LAPACK_LIBS}" LDFLAGS="${LIBINTEL_FOR_HYPRE___}" $shared
+./configure CC="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_C}" CXX="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_CXX}" F77="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_F77}" CFLAGS="-fPIC ${HYPRE_OPT_FLAGS}" CXXFLAGS="-fPIC ${HYPRE_OPT_FLAGS}" FFLAGS="-fPIC ${HYPRE_OPT_FLAGS}" CPPFLAGS="-fPIC ${HYPRE_OPT_FLAGS}" --prefix=${HYPRE_DIR}/${HYPRE_ARCH} --libdir=${HYPRE_DIR}/${HYPRE_ARCH}/lib --includedir=${HYPRE_DIR}/${HYPRE_ARCH}/include --with-MPI-include=${MACWORLD_MPI_INCDIR} --with-MPI-libs="${MACWORLD_MPI_LIBS}" --with-MPI-lib-dirs=${MACWORLD_MPI_LIBDIR} --with-blas-lib-dirs="${MACWORLD_BLAS_LIBDIR} ${MACWORLD_ATLAS_LIBDIR}" --with-lapack-lib-dirs=${MACWORLD_LAPACK_LIBDIR} --with-blas-libs="${MACWORLD_BLAS_LIBS} ${MACWORLD_ATLAS_LIBS}" --with-lapack-libs="${MACWORLD_LAPACK_LIBS}" LDFLAGS="${LIBINTEL_FOR_HYPRE___}" $shared
 
 # Compile and install
 make install | tee -a compil.log
