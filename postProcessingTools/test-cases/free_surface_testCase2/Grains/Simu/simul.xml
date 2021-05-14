@@ -1,0 +1,34 @@
+<Grains3D Type="Standard">
+  <Construction>    
+    <Recipient LX="0.64" LY="0.2" LZ="0.3"/>
+    <Origine OX="0." OY="0." OZ="0."/>    
+    <DomainDecomposition NX="1" NY="1" NZ="1"/>
+    <MPI Strategie="SRLocalCommOpt" VerbosityLevel="0"/>
+    <Reload Fichier="Grains/Init/insertB" Type="new"/>                                                                                                   
+  </Construction>                                                                                                           
+                                                                                                                            
+  <Forces>                                                                                                                  
+    <Gravite GX="0.0" GY="0." GZ="-9.81"/>                                                                                  
+  </Forces>                                                                                                                 
+                                                                                                                            
+  <Simulation>                                                                                                              
+    <Temps Debut="0." Fin="10."/>                                                                                         
+    <IncreTemps dt="2.5e-6"/>                                                                                                
+    <TempsSave Debut="0." Fin="150." Dt="0.01"/>
+    <Fichier>Grains/Simu/simul</Fichier>      
+    <LinkUpdate frequence="1"/>
+    <ModeEcriture>Hybride</ModeEcriture>
+    
+    <Chargements>
+      <Chargement NomObstacle="Gate" Mode="Translation">
+        <Temps Debut="0." Fin="2.5e-6"/>
+        <Vecteur X="0.000" Y="0.000" Z="0.3"/>
+      </Chargement>
+    </Chargements>
+    
+    <PostProcessingWriters>
+      <Paraview Name="simul" Root="Grains/Simu" InitialCycleNumber="1" Mode="binary" Network=""/>
+      <PositionVitesse Name="Grains/Simu/simul"/>   
+    </PostProcessingWriters>   
+  </Simulation>
+</Grains3D>

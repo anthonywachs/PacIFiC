@@ -26,7 +26,7 @@ export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PACIFIC_MPI_LIBDIR}"
 export PACIFIC_MPI_C="mpicc"
 export PACIFIC_MPI_CXX="mpicxx"
 export PACIFIC_MPI_F77="mpifort"
-export PACIFIC_MPI_F90="mpifort" 
+export PACIFIC_MPI_F90="mpifort"
 export PACIFIC_MPI_LIBS="mpi mpi_mpifh"
 export PACIFIC_MPI_CPPLIBS="mpi"
 export PACIFIC_MPI_CFLIBS="mpi mpi_mpifh"
@@ -51,17 +51,17 @@ echo -e '  '
 # Serial compiler and low level librairies
 export PACIFIC_SERCOMPIL_ENV="GNU"
 export PACIFIC_SERCOMPIL_VERSION=#Your GNU version compiler, ex "4.8.5"#
-if [ $PACIFIC_SERCOMPIL_ENV = "GNU" ] 
+if [ $PACIFIC_SERCOMPIL_ENV = "GNU" ]
 then
   PACIFIC_SERCOMPIL_C=$(which gcc)
-  PACIFIC_SERCOMPIL_CPP=$(which g++)  
-else if [ $PACIFIC_SERCOMPIL_ENV = "Intel" ]  
+  PACIFIC_SERCOMPIL_CPP=$(which g++)
+else if [ $PACIFIC_SERCOMPIL_ENV = "Intel" ]
   then
     PACIFIC_SERCOMPIL_C=$(which icc)
-    PACIFIC_SERCOMPIL_CPP=$(which icpc)    
+    PACIFIC_SERCOMPIL_CPP=$(which icpc)
   else
     PACIFIC_SERCOMPIL_C="C compiler undefined"
-    PACIFIC_SERCOMPIL_CPP="C++ compiler undefined"    
+    PACIFIC_SERCOMPIL_CPP="C++ compiler undefined"
   fi
 fi
 export PACIFIC_SERCOMPIL_C
@@ -114,3 +114,16 @@ echo -e '  '
 
 # Basilisk
 source ${PACIFIC_HOME}/Octree/Env/octree.env.sh
+
+
+# Post processing
+echo -e '  '
+export PP_HOME=$PACIFIC_HOME/postProcessingTools
+echo -e '\033[94m*** Post processing shell variables\033[0m'
+echo -e '\033[94mPP_HOME\033[0m =' $PP_HOME
+
+# Print current branch name:
+echo -e '  '
+cd $PACIFIC_HOME
+echo -e '\033[32m*** You are currently on branch\033[32m' $(git rev-parse --abbrev-ref HEAD) '\033[32m***\033[0m'
+cd -

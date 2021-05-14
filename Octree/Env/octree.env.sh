@@ -1,6 +1,6 @@
 # Basilisk variables
 export OCTREE_HOME=${PACIFIC_HOME}/Octree
-export BASILISK=${OCTREE_HOME}/Basilisk/src
+export BASILISK=${OCTREE_HOME}/basilisk/src
 export BASILISK_DLMFD=${OCTREE_HOME}/DLMFD
 export PATH="${BASILISK}:${PATH}"
 export BASILISK_BITS_DEFAULT=${PACIFIC_BITS_DEFAULT}
