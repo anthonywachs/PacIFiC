@@ -1,1 +1,1 @@
-/zfs/users/huet/huet/Documents/pacific/GRAINS/Grains/inc/InterfaceGrains.h
+../../GRAINS/Grains/inc/InterfaceGrains.h
