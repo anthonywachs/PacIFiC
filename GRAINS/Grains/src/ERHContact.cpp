@@ -457,6 +457,8 @@ void ERHContact::computeForcesPostProcessing( Composant* p0_,
   // Ajout des pointeurs des composants en contact pour le reseau de forces
   pfpp.comp0 = ref_p0_;
   pfpp.comp1 = ref_p1_;
+  // fills the boolean informing if the contact is happening with an obstacle
+  pfpp.contactWithObstacle = p1_->isObstacle();
 
   if ( Grains_Exec::m_ContactDissipation )   pfpp.contactDissip = diss;
   listOfContacts->push_back(pfpp);

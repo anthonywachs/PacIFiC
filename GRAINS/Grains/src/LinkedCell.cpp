@@ -1295,7 +1295,16 @@ list<struct PointForcePostProcessing>* LinkedCell::CalculerForcesPostProcessing(
 	reference->InterActionPostProcessing( *voisine, dt, listOfContacts );
 
     voisines.clear();
-
+  }
+  // We loop through all particles *twice* because for data analysis purposes,
+  // it is convenient to write all the contacts with obstacles last. Therefore
+  // they need to be at the end of listOfContacts.
+  for (particule=particules->begin(); particule!=particules->end();
+       particule++) {
+    reference = *particule;
+    centre = *(*particule)->getPosition();
+    Cellule::GetCellule( centre, id );
+    cellule = getCellule( id[X], id[Y], id[Z] );
     // Evaluation des contacts avec les obstacles
     // Inversion de l'appel dans le cas de particule composite
     list<MonObstacle*>::iterator myObs;
