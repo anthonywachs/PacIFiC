@@ -462,24 +462,34 @@ DDS_NSWithHeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
 	 // Write the particle data to string to transfer to HE solver
          WriteSolidsInString();
       }
+      if (my_rank == 0) cout << "NS: Finished particle generation... \n" << endl;
+
       node_property_calculation(PF,0);
       node_property_calculation(UF,1);
+      if (my_rank == 0) cout << "NS: Finished intersection calculations... \n" << endl;
+
       nodes_field_initialization(0);
       nodes_field_initialization(1);
       nodes_field_initialization(3);
       if (dim == 3) nodes_field_initialization(4);
+      if (my_rank == 0) cout << "NS: Finished field initializations... \n" << endl;
       if (is_stressCal) {
          // Generate discretization of surface in approximate equal area
          generate_surface_discretization ();
       }
+      if (my_rank == 0) cout << "NS: Finished particle surface discretizations... \n" << endl;
    }
 
    // Direction splitting
    // Assemble 1D tridiagonal matrices
    assemble_1D_matrices(t_it);
 
+   if (my_rank == 0) cout << "NS: Finished assembling pre-coefficient matrix... \n" << endl;
+
    // Temperature solver
    Solver_Temperature->do_before_time_stepping( t_it, basename ) ;
+
+   if (my_rank == 0) cout << "Finished Assembly and initialization for both NS and HE solver. \n" << endl;
 
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
 
@@ -1748,19 +1758,16 @@ DDS_NSWithHeatTransfer:: node_property_calculation (FV_DiscreteField const* FF, 
      node.void_frac[comp]->nullify();
      node.parID[comp]->nullify();
 
+     double dh = FF->primary_grid()->get_smallest_grid_size();
+
      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
         double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
-        double dx = FF->get_cell_size(i,comp,0) ;
         for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
            double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
-           double dy = FF->get_cell_size(j,comp,1) ;
            for (size_t k=local_min_k;k<=local_max_k;++k) {
               double zC = 0.;
-              double dC = min(dx,dy);
               if (dim == 3) {
                  zC = FF->get_DOF_coordinate( k, comp, 2 ) ;
-                 double dz = FF->get_cell_size(k,comp,2) ;
-                 dC = min(dC,dz);
               }
               size_t p = return_node_index(FF,comp,i,j,k);
               for (size_t m=0;m<Npart;m++) {
@@ -1769,9 +1776,9 @@ DDS_NSWithHeatTransfer:: node_property_calculation (FV_DiscreteField const* FF, 
 
                  // level_set is xb, if local critical time scale is 0.01 of the global time scale 
                  // then the node is considered inside the solid object
-                 // (xb/dC)^2 = 0.01 --> (xb/xC) = 0.1
-                 if (level_set <= pow(loc_thres,0.5)*dC) {
-                 //if (level_set <= 1.E-1*dC) {
+                 // (xb/dh)^2 = 0.01 --> (xb/xC) = 0.1
+                 if (level_set <= pow(loc_thres,0.5)*dh) {
+                 //if (level_set <= 1.E-1*dh) {
                     node.void_frac[comp]->set_item(p,1.);
                     node.parID[comp]->set_item(p,(double)m);
                     break;
@@ -1783,10 +1790,10 @@ DDS_NSWithHeatTransfer:: node_property_calculation (FV_DiscreteField const* FF, 
      // Level 0 is for the intersection matrix corresponding to fluid side
      if (field == 0) {
         assemble_intersection_matrix(PF,comp,0,field);
-        assemble_intersection_matrix(PF,comp,1,field);
+        if (DivergenceScheme == "FV") assemble_intersection_matrix(PF,comp,1,field);
      } else if (field == 1) {
         assemble_intersection_matrix(UF,comp,0,field);
-        assemble_intersection_matrix(UF,comp,1,field);
+        if (DivergenceScheme == "FV") assemble_intersection_matrix(UF,comp,1,field);
      }
 
 //     BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
@@ -2001,7 +2008,8 @@ DDS_NSWithHeatTransfer:: find_intersection ( FV_DiscreteField const* FF, size_t 
   // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid 
   // by shifting the point by 5% of grid size 
   if (funl*funr > 0.) {
-     double dx = FF->get_cell_size(side(off),comp,dir) ;
+     double dx = FF->primary_grid()->get_smallest_grid_size();
+//     double dx = FF->get_cell_size(side(off),comp,dir) ;
      if (off == level) {
         xleft = xleft - 0.05*dx;
      } else {
@@ -3472,9 +3480,9 @@ DDS_NSWithHeatTransfer:: second_order_pressure_stress_withNeumannBC(class double
         // Calculation of field variable on ghost point(0,0)
         for (size_t level=2; level<4;level++) {
            // Calculation of field variable on ghost point(1)
-           if (level_set(0) > threshold) fini(1) = third_order_ghost_field_estimate(PF, comp, point(1,0), point(1,1), point(1,2), i0(1,0), i0(1,1), i0(1,2), major_dir, sign, level);
+           if ((level_set(0) > threshold) && point_in_domain(0,0)) fini(1) = third_order_ghost_field_estimate(PF, comp, point(1,0), point(1,1), point(1,2), i0(1,0), i0(1,1), i0(1,2), major_dir, sign, level);
            // Calculation of field variable on ghost point(2)
-           if (level_set(1) > threshold) fini(2) = third_order_ghost_field_estimate(PF, comp, point(2,0), point(2,1), point(2,2), i0(2,0), i0(2,1), i0(2,2), major_dir, sign, level);
+           if ((level_set(1) > threshold) && point_in_domain(0,1)) fini(2) = third_order_ghost_field_estimate(PF, comp, point(2,0), point(2,1), point(2,2), i0(2,0), i0(2,1), i0(2,2), major_dir, sign, level);
            // Extrapolation of point on surface using point(1) and point(2), assuming Neumann BC on particle boundary
            fini(0) = ((dx2/dx1)*fini(1) - (dx1/dx2)*fini(2))/(dx2/dx1 - dx1/dx2);
            // Stress accumulation
@@ -4241,15 +4249,19 @@ DDS_NSWithHeatTransfer:: ghost_points_generation( FV_DiscreteField* FF, class do
   i0_temp(0) = (sign == 1) ? (int(i0(0,major_dir)) + 1*sign) : (int(i0(0,major_dir)) + 0*sign);
   i0_temp(1) = (sign == 1) ? (int(i0(0,major_dir)) + 2*sign) : (int(i0(0,major_dir)) + 1*sign);
 
-  point(1,major_dir) = FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
-  point(2,major_dir) = FF->get_DOF_coordinate(i0_temp(1), comp, major_dir);
+  if ((i0_temp(0) >= 0) && (i0_temp(0) < (int)FF->get_local_nb_dof(comp,major_dir))) 
+     point(1,major_dir) = FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
+  if ((i0_temp(1) >= 0) && (i0_temp(1) < (int)FF->get_local_nb_dof(comp,major_dir)))
+     point(2,major_dir) = FF->get_DOF_coordinate(i0_temp(1), comp, major_dir);
 
   if (MAC::abs(point(0,major_dir)-point(1,major_dir)) < MAC::abs(point(1,major_dir)-point(2,major_dir))) {
      i0_temp(0) = (sign == 1) ? (int(i0(0,major_dir)) + 2*sign) : (int(i0(0,major_dir)) + 1*sign);
      i0_temp(1) = (sign == 1) ? (int(i0(0,major_dir)) + 3*sign) : (int(i0(0,major_dir)) + 2*sign);
 
-     point(1,major_dir) = FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
-     point(2,major_dir) = FF->get_DOF_coordinate(i0_temp(1), comp, major_dir);
+     if ((i0_temp(0) >= 0) && (i0_temp(0) < (int)FF->get_local_nb_dof(comp,major_dir))) 
+        point(1,major_dir) = FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
+     if ((i0_temp(1) >= 0) && (i0_temp(1) < (int)FF->get_local_nb_dof(comp,major_dir)))
+        point(2,major_dir) = FF->get_DOF_coordinate(i0_temp(1), comp, major_dir);
   }
 
   // Velocity field
@@ -4493,28 +4505,28 @@ DDS_NSWithHeatTransfer:: second_order_viscous_stress(class doubleArray2D& force,
            fini(0,2) = net_vel[comp];
 
            // Calculation of field variable on ghost point(1,0)
-           if (level_set(0,0) > threshold) {
+           if ((level_set(0,0) > threshold) && point_in_domain(0,0)) {
               fini(1,0) = third_order_ghost_field_estimate(UF, comp, point(1,0), point(0,1), point(0,2), i0(1,0), i0(0,1), i0(0,2), 0, sign,0);
            } else if (level_set(0,0) <= threshold) {
               impose_solid_velocity_for_ghost(net_vel,comp,point(1,0),point(0,1),point(0,2),in_parID(0,0));
               fini(1,0) = net_vel[comp];
            }
            // Calculation of field variable on ghost point(2,0)
-           if (level_set(0,1) > threshold) {
+           if ((level_set(0,1) > threshold) && point_in_domain(1,0)) {
               fini(2,0) = third_order_ghost_field_estimate(UF, comp, point(2,0), point(0,1), point(0,2), i0(2,0), i0(0,1), i0(0,2), 0, sign,0);
            } else if (level_set(0,1) <= threshold) {
               impose_solid_velocity_for_ghost(net_vel,comp,point(2,0),point(0,1),point(0,2),in_parID(0,1));
               fini(2,0) = net_vel[comp];
            }
            // Calculation of field variable on ghost point(1,1)
-           if (level_set(1,0) > threshold) {
+           if ((level_set(1,0) > threshold) && point_in_domain(0,1)) {
 	      fini(1,1) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(1,1), point(0,2), i0(0,0), i0(1,1), i0(0,2), 1, sign,0);
            } else if (level_set(1,0) <= threshold) {
               impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(1,1),point(0,2),in_parID(1,0));
               fini(1,1) = net_vel[comp];
 	   }
            // Calculation of field variable on ghost point(2,1)
-           if (level_set(1,1) > threshold) {
+           if ((level_set(1,1) > threshold) && point_in_domain(1,1)) {
               fini(2,1) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(2,1), point(0,2), i0(0,0), i0(2,1), i0(0,2), 1, sign,0);
 	   } else if (level_set(1,1) <= threshold) {
               impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(2,1),point(0,2),in_parID(1,1));
@@ -4523,14 +4535,14 @@ DDS_NSWithHeatTransfer:: second_order_viscous_stress(class doubleArray2D& force,
 
 	   if (dim == 3) {
               // Calculation of field variable on ghost point(1,2)
-              if (level_set(2,0) > threshold) {
+              if ((level_set(2,0) > threshold) && point_in_domain(0,2)) {
                 fini(1,2) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(0,1), point(1,2), i0(0,0), i0(0,1), i0(1,2), 2, sign, 0);
               } else if (level_set(2,0) <= threshold) {
                  impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(0,1),point(1,2),in_parID(2,0));
                  fini(1,2) = net_vel[comp];
               }
               // Calculation of field variable on ghost point(2,2)
-              if (level_set(2,1) > threshold) {
+              if ((level_set(2,1) > threshold) && point_in_domain(1,2)) {
                 fini(2,2) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(0,1), point(2,2), i0(0,0), i0(0,1), i0(2,2), 2, sign, 0);
 	      } else if (level_set(2,1) <= threshold) {
                  impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(0,1),point(2,2),in_parID(2,1));
@@ -5158,9 +5170,9 @@ DDS_NSWithHeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_
   gen_dir_index_of_secondary_ghost_points(FF, index, sign, sec_ghost_dir, index_g, point_in_domain, comp);
 
   // Assume all secondary ghost points in fluid
-  double x0 = FF->get_DOF_coordinate(index_g(0,sec_ghost_dir), comp, sec_ghost_dir);
-  double x1 = FF->get_DOF_coordinate(index_g(1,sec_ghost_dir), comp, sec_ghost_dir);
-  double x2 = FF->get_DOF_coordinate(index_g(2,sec_ghost_dir), comp, sec_ghost_dir);
+  double x0 = (point_in_domain(0)) ? FF->get_DOF_coordinate(index_g(0,sec_ghost_dir), comp, sec_ghost_dir) : 0. ;
+  double x1 = (point_in_domain(1)) ? FF->get_DOF_coordinate(index_g(1,sec_ghost_dir), comp, sec_ghost_dir) : 0. ;
+  double x2 = (point_in_domain(2)) ? FF->get_DOF_coordinate(index_g(2,sec_ghost_dir), comp, sec_ghost_dir) : 0. ;
 
   if (sec_ghost_dir == 0) {
      coord_g(0,0) = x0; coord_g(0,1) = point(0,1); coord_g(0,2) = point(0,2);
@@ -5203,10 +5215,10 @@ DDS_NSWithHeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_
 
   double f0 = 0., f1 = 0., f2 = 0., del = 0.;
 
-  // Estimate the field values at the secondary ghost points 
-  f0=quadratic_interpolation2D(FF,comp,coord_g(0,0),coord_g(0,1),coord_g(0,2),index_g(0,0),index_g(0,1),index_g(0,2),sec_interpol_dir,sign,level);
-  f1=quadratic_interpolation2D(FF,comp,coord_g(1,0),coord_g(1,1),coord_g(1,2),index_g(1,0),index_g(1,1),index_g(1,2),sec_interpol_dir,sign,level);
-  f2=quadratic_interpolation2D(FF,comp,coord_g(2,0),coord_g(2,1),coord_g(2,2),index_g(2,0),index_g(2,1),index_g(2,2),sec_interpol_dir,sign,level);
+  // Estimate the field values at the secondary ghost points
+  f0 = (point_in_domain(0)) ? quadratic_interpolation2D(FF,comp,coord_g(0,0),coord_g(0,1),coord_g(0,2),index_g(0,0),index_g(0,1),index_g(0,2),sec_interpol_dir,sign,level) : 0.;
+  f1 = (point_in_domain(1)) ? quadratic_interpolation2D(FF,comp,coord_g(1,0),coord_g(1,1),coord_g(1,2),index_g(1,0),index_g(1,1),index_g(1,2),sec_interpol_dir,sign,level) : 0.;
+  f2 = (point_in_domain(2)) ? quadratic_interpolation2D(FF,comp,coord_g(2,0),coord_g(2,1),coord_g(2,2),index_g(2,0),index_g(2,1),index_g(2,2),sec_interpol_dir,sign,level) : 0.;
 
   // Ghost points corrections
   if (point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
@@ -5542,23 +5554,29 @@ DDS_NSWithHeatTransfer:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_
    // Creating ghost points for quadratic interpolation
    gen_dir_index_of_secondary_ghost_points(FF, index, sign, interpol_dir, index_g, point_in_domain, comp);
 
-   // Check weather the ghost points are in solid or not; TRUE if they are   
-   node_index(0) = return_node_index(FF,comp,index_g(0,0),index_g(0,1),index_g(0,2));
-   point_in_solid(0) = node.void_frac[comp]->item(node_index(0));
-   node_index(1) = return_node_index(FF,comp,index_g(1,0),index_g(1,1),index_g(1,2));
-   point_in_solid(1) = node.void_frac[comp]->item(node_index(1));
-   node_index(2) = return_node_index(FF,comp,index_g(2,0),index_g(2,1),index_g(2,2));
-   point_in_solid(2) = node.void_frac[comp]->item(node_index(2));
-
    // Assume all the ghost points in fluid
-   x0 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir);
-   x1 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir);
-   x2 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir);
-
    // Storing the field values assuming all ghost points in fluid and domain
-   f0 = FF->DOF_value( index_g(0,0), index_g(0,1), index_g(0,2), comp, level );
-   f1 = FF->DOF_value( index_g(1,0), index_g(1,1), index_g(1,2), comp, level );
-   f2 = FF->DOF_value( index_g(2,0), index_g(2,1), index_g(2,2), comp, level );
+   // Check weather the ghost points are in solid or not; TRUE if they are   
+   if (point_in_domain(0)) {
+      x0 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir);
+      f0 = FF->DOF_value( index_g(0,0), index_g(0,1), index_g(0,2), comp, level );
+      node_index(0) = return_node_index(FF,comp,index_g(0,0),index_g(0,1),index_g(0,2));
+      point_in_solid(0) = node.void_frac[comp]->item(node_index(0));
+   }
+
+   if (point_in_domain(1)) {
+      x1 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir);
+      f1 = FF->DOF_value( index_g(1,0), index_g(1,1), index_g(1,2), comp, level );
+      node_index(1) = return_node_index(FF,comp,index_g(1,0),index_g(1,1),index_g(1,2));
+      point_in_solid(1) = node.void_frac[comp]->item(node_index(1));
+   }
+
+   if (point_in_domain(2)) {
+      x2 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir);
+      f2 = FF->DOF_value( index_g(2,0), index_g(2,1), index_g(2,2), comp, level );
+      node_index(2) = return_node_index(FF,comp,index_g(2,0),index_g(2,1),index_g(2,2));
+      point_in_solid(2) = node.void_frac[comp]->item(node_index(2));
+   }
 
    // Ghost points corrections
    // All points in domain
