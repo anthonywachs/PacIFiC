@@ -358,6 +358,8 @@ class DDS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverC
       bool is_par_motion;
       string* particle_information;
       string insertion_type;
+      string IntersectionMethod;
+      double tolerance;
 } ;
 
 #endif

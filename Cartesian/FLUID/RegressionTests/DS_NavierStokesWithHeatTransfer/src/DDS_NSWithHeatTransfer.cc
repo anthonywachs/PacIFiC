@@ -2037,8 +2037,18 @@ DDS_NSWithHeatTransfer:: find_intersection ( FV_DiscreteField const* FF, size_t 
   } else {
      if (IntersectionMethod == "Bisection") {
         // Bisection method algorithm
-        while (MAC::abs(xright-xleft) > 1.E-14) {
+	double eps = MAC::abs(xright-xleft);
+	double xcenter_old = eps/2.;
+	size_t max_iter = 500, iter = 0;
+        while ((eps > tolerance) && (iter < max_iter)) {
            xcenter = (xleft+xright)/2.;
+
+	   if (MAC::abs(xcenter_old) > 1.e-12) {
+	      eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
+	   } else {
+	      eps = MAC::abs(xcenter - xcenter_old);
+	   }
+
            if (dir == 0) {
               funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
               func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
@@ -2050,13 +2060,18 @@ DDS_NSWithHeatTransfer:: find_intersection ( FV_DiscreteField const* FF, size_t 
               func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
            }
 
-           if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
+	   iter = iter + 1;
+           if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
 
            if (func*funl >= 1.E-16) {
               xleft = xcenter;
-           } else {
+           } else if (func == 1.E-16) {
+	      break;
+	   } else {
               xright = xcenter;
            }
+
+	   xcenter_old = xcenter;
 	}
      } else if (IntersectionMethod == "Newton") {
 	// Apr 21: Just implemented, not tested
@@ -2154,28 +2169,73 @@ DDS_NSWithHeatTransfer:: find_intersection_for_ghost ( FV_DiscreteField const* F
   if (funl*funr > 0.) {
      xcenter = side(off) ;
   } else {
-     // Bisection method algorithm
-     while (MAC::abs(xright-xleft) > 1.E-14) {
-        xcenter = (xleft+xright)/2.;
-        if (dir == 0) {
-           funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-           func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
-        } else if (dir == 1) {
-           funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-           func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
-        } else if (dir == 2) {
-           funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-           func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
-        }
+     if (IntersectionMethod == "Bisection") {
+        // Bisection method algorithm
+	double eps = MAC::abs(xright-xleft);
+	double xcenter_old = eps/2.;
+	size_t max_iter = 500, iter = 0;
+        while ((eps > tolerance) && (iter < max_iter)) {
+           xcenter = (xleft+xright)/2.;
 
-        if ((func == 1.E-16) || ((xcenter-xleft)/2. <= 1.E-16)) break;
+	   if (MAC::abs(xcenter_old) > 1.e-12) {
+	      eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
+	   } else {
+	      eps = MAC::abs(xcenter - xcenter_old);
+	   }
 
-        if (func*funl >= 1.E-16) {
-           xleft = xcenter;
-        } else {
-           xright = xcenter;
-        }
+           if (dir == 0) {
+              funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+              func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
+           } else if (dir == 1) {
+              funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+              func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
+           } else if (dir == 2) {
+              funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+              func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
+           }
+
+	   iter = iter + 1;
+           if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
+
+           if (func*funl >= 1.E-16) {
+              xleft = xcenter;
+           } else if (func == 1.E-16) {
+	      break;
+	   } else {
+              xright = xcenter;
+           }
+
+	   xcenter_old = xcenter;
+	}
+     } else if (IntersectionMethod == "Newton") {
+	// Apr 21: Just implemented, not tested
+	// Newton-Rapson method
+	double eps = MAC::abs(xright-xleft);
+	double xright_old = xright;
+        while (eps > tolerance) {
+           if (dir == 0) {
+              xright = xleft - level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field) /
+	                       level_set_derivative(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field,dir) ;
+	   } else if (dir == 1) {
+              xright = xleft - level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field) /
+	                       level_set_derivative(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field,dir) ;
+	   } else if (dir == 2) {
+              xright = xleft - level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field) /
+	                       level_set_derivative(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field,dir) ;
+	   }
+
+	   if (MAC::abs(xright_old) > 1.e-12) {
+	      eps = MAC::abs(xright - xright_old)/MAC::abs(xright_old);
+	   } else {
+	      eps = MAC::abs(xright - xright_old);
+	   }
+
+	   xleft = xright;
+	   xright_old = xright;
+	}
+	xcenter = xleft;
      }
+
   }
 
   if (off == 0) {
