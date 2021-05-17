@@ -85,6 +85,7 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    , is_stressCal( false )
    , DivergenceScheme ( "FD" )
    , IntersectionMethod ( "Bisection" )
+   , tolerance ( 1.e-6 )
    , Solver_Temperature ( 0 )
 {
    MAC_LABEL( "DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer" ) ;
@@ -155,7 +156,7 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    // Read Intersection tolerance
    if ( exp->has_entry( "IntersectionTolerance" ) )
    {
-     rho = exp->double_data( "IntersectionTolerance" ) ;
+     tolerance = exp->double_data( "IntersectionTolerance" ) ;
      exp->test_data( "IntersectionTolerance", "IntersectionTolerance>0." ) ;
    }
 
@@ -336,6 +337,8 @@ DDS_NSWithHeatTransfer:: DDS_NSWithHeatTransfer( MAC_Object* a_owner,
    inputData.particle_information_ = &particle_information ;
    inputData.insertion_type_ = insertion_type ;
    inputData.is_par_motion_ = is_par_motion ;
+   inputData.IntersectionMethod_ = IntersectionMethod ;
+   inputData.tolerance_ = tolerance ;
 
    MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DDS_HeatTransfer" ) ;
    Solver_Temperature = DDS_HeatTransfer::create( this, set, inputData ) ;

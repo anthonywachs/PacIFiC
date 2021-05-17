@@ -153,7 +153,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    // Read Intersection tolerance
    if ( exp->has_entry( "IntersectionTolerance" ) )
    {
-     rho = exp->double_data( "IntersectionTolerance" ) ;
+     tolerance = exp->double_data( "IntersectionTolerance" ) ;
      exp->test_data( "IntersectionTolerance", "IntersectionTolerance>0." ) ;
    }
 

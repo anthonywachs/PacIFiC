@@ -51,6 +51,8 @@ struct NavierStokes2Temperature
   size_t Pmin_ ;
   size_t pole_loc_ ;
   bool is_par_motion_ ;
+  string IntersectionMethod_ ;
+  double tolerance_ ;
   string* particle_information_ ;
   string insertion_type_ ;
 };
