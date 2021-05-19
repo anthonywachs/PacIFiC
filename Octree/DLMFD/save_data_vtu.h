@@ -158,3 +158,83 @@ void reinitialize_vtk_restart( void )
     fclose( fpvtk ); 
   }         
 }
+
+
+
+
+//----------------------------------------------------------------------------
+void output_vtu_dlmfd_bpts( particle const* allpart, const int np,
+	char const* fname )
+//----------------------------------------------------------------------------
+{
+# if debugBD == 0
+    if ( pid() == 0 ) 
+    {
+      char filename[80] = ""; 
+      sprintf( filename, "%s", result_dir );
+      strcat( filename, "/" );  
+      strcat( filename, fname );
+      strcat( filename, ".vtu" );
+    
+      int total_boundary_points = 0;
+      for (int k = 0; k < np; k++) 
+      {
+        SolidBodyBoundary const* sbb = &(allpart[k].s);
+        total_boundary_points += sbb->m;
+      }     
+  
+      FILE* fdlm = fopen( filename, "w" ); 
+
+      fputs( "<?xml version=\"1.0\"?>\n"
+  	"<VTKFile type=\"UnstructuredGrid\" version=\"1.0\" "
+	"byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fdlm );
+      fputs( "<UnstructuredGrid>\n", fdlm );
+      fprintf( fdlm, "<Piece NumberOfPoints=\"%d\" NumberOfCells=\"%d\">\n", 
+      	total_boundary_points, total_boundary_points ); 
+      fputs( "<Points>\n", fdlm );  
+      fputs( "<DataArray type=\"Float64\" NumberOfComponents=\"3\" "
+      	"format=\"ascii\">\n", fdlm );
+      for (int k = 0; k < np; k++) 
+      {
+        SolidBodyBoundary const* sbb = &(allpart[k].s);
+	int m = sbb->m;
+	for (int j = 0; j < m; j++)
+	{  
+	  fprintf( fdlm, "%g %g", sbb->x[j], sbb->y[j] );
+#         if dimension == 3  
+            fprintf( fdlm, " %g\n", sbb->z[j] );
+#         else
+            fprintf( fdlm, " 0.\n" );
+#         endif	
+        }
+      }
+      fputs( "</DataArray>\n", fdlm );  
+      fputs( "</Points>\n", fdlm );
+      fputs( "<Cells>\n", fdlm );
+      fputs( "<DataArray type=\"Int64\" Name=\"connectivity\" "
+      	"format=\"ascii\">\n", fdlm );
+      for (int j = 0; j < total_boundary_points; j++)
+        fprintf( fdlm, "%d ", j );
+      fprintf( fdlm, "\n" );
+      fputs( "</DataArray>\n", fdlm ); 
+      fputs( "<DataArray type=\"Int64\" Name=\"offsets\" "
+      	"format=\"ascii\">\n", fdlm );
+      for (int j = 0; j < total_boundary_points; j++)
+        fprintf( fdlm, "%d ", j+1 );
+      fprintf( fdlm, "\n" );		
+      fputs( "</DataArray>\n", fdlm );
+      fputs( "<DataArray type=\"Int64\" Name=\"types\" "
+      	"format=\"ascii\">\n", fdlm );
+      for (int j = 0; j < total_boundary_points; j++)
+        fprintf( fdlm, "1 " );
+      fprintf( fdlm, "\n" ); 	
+      fputs( "</DataArray>\n", fdlm ); 
+      fputs( "</Cells>\n", fdlm );
+      fputs( "</Piece>\n", fdlm );
+      fputs( "</UnstructuredGrid>\n", fdlm );            
+      fputs( "</VTKFile>\n", fdlm );
+                 	              	       
+      fclose( fdlm );
+    }
+# endif     
+}

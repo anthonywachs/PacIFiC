@@ -292,11 +292,7 @@ event init (i = 0)
 #   if DLM_alpha_coupling
       DLM_explicit.x.nodump = false ;
 #   endif    
-  } 
-  
-  
-  // Free particles
-  free_particles( particles, NPARTICLES );  
+  }   
 }
 
 
@@ -328,7 +324,8 @@ event logfile ( i=0; i++ )
 
 
 
-/** Write the dump time and time step for restart */
+/** Write the dump time and time step for restart, and free dynamic features 
+of particles */
 //----------------------------------------------------------------------------
 event start_timestep (i++)
 //----------------------------------------------------------------------------
@@ -339,7 +336,27 @@ event start_timestep (i++)
     save_t_dt_restart( dump_dir, t, dt );        
     save_data_restart = false;
   } 
-  if ( i == 0 ) save_data_restart = false;  
+  if ( i == 0 ) save_data_restart = false;
+  
+  // We free dynamic features of particles from the previous time step
+  // or from initialization at the start of the current time step 
+  // (run with -events to understand)
+  free_particles( particles, NPARTICLES ); 
+}
+
+
+
+
+/** Fee dynamic features of particles at the very end */
+//----------------------------------------------------------------------------
+event cleanup (t = end)
+//----------------------------------------------------------------------------
+{
+  // This is because we free dynamic features of particles from the previous 
+  // time step at the start of the current time step (see above start_timestep)
+  // Since at the very end, there is no next time step, dynamic features 
+  // of particles are not freed by start_timestep and hence are freed here
+  free_particles( particles, NPARTICLES ); 
 }
 
 
@@ -395,9 +412,6 @@ event end_timestep (i++)
   /* Save the forces acting on particles before adapting the mesh  */
   sumLambda( particles, fdata, t + dt, dt, flagfield, DLM_lambda, index_lambda, 
 	rhoval, DLM_periodic_shift );
-
-  /* Free particle's dlmfd points (we dont need them anymore) */
-  free_particles( particles, NPARTICLES );
   
   /* Save all particles trajectories */
   particle_data( particles, t + dt, i, pdata );

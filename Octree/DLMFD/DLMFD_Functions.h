@@ -203,7 +203,7 @@ void free_particles( particle* pp, const int n )
 {
   for (size_t k=0;k<n;k++) 
   {        
-    // Free the boudnary point coordinate arrays
+    // Free the boundary point coordinate arrays
     SolidBodyBoundary* sbm = &(pp[k].s);
     free_SolidBodyBoundary( sbm );
     
