@@ -19,23 +19,22 @@ graph TD;
 
 
 ## I. Installation
-There is a few steps that need to be done before you can enjoy a functional installation of Pacific. Just follow the guide!
+There are few steps that need to be done before you can enjoy a functional installation of Pacific. First, check the installation of OpenMPI, GCC, GFORTAN, libfortran, libblas, libaltas, liblapack and libm before providing the correct path in environment file. It's important to install libfortran before building OpenMPI.
+Some ARC systems may require special commands for the environemnt variables. Please refer to Wiki page to check few examples for setting-up a environment variables. Now follow the guide once completing the preliminary steps !!!
 
 ### 1. Provide paths for your libraries in the environment file
 ```
 cp Env/PacIFiC_env_template.env.sh Env/PacIFiC-temporary-env-file.env.sh
 ```
 
-Modify the file `Env/PacIFiC-temporary-env-file.env.sh` by replacing every part in between the `#`. Note that if there is a space in the path leading to the pacific foler, the routines below will most likely fail.
+Modify the file `Env/PacIFiC-temporary-env-file.env.sh` by replacing every part in between the `#`. Note that if there is a space in the path leading to the pacific folder, the routines below will most likely fail.
+
 Having modified the `Env/PacIFiC-temporary-env-file.env.sh` file, type the following:
 
 ```
 cd Env
 source PacIFiC-temporary-env-file.env.sh
 mv PacIFiC-temporary-env-file.env.sh PacIFiC-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
-cp ${PACIFIC_HOME}/GRAINS/Env/grains_env_template.env.sh ${PACIFIC_HOME}/GRAINS/Env/grains-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
-cp ${PACIFIC_HOME}/Cartesian/MacWorld/Env/macworld_env_template.env.sh ${PACIFIC_HOME}/Cartesian/MacWorld/Env/macworld-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
-cp ${PACIFIC_HOME}/Cartesian/FLUID/Env/fluid_env_template.env.sh ${PACIFIC_HOME}/Cartesian/FLUID/Env/fluid-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
 source PacIFiC-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
 ```
 
@@ -46,7 +45,7 @@ To install HYPRE 2.10.1, copy and paste the following:
 ```
 cd $MACWORLD_ROOT
 wget https://github.com/hypre-space/hypre/archive/refs/tags/v2.10.1.zip
-unzip hypre-2.10.1.zip
+unzip v2.10.1.zip
 cd hypre-2.10.1/
 cp ../extra_files/*hypre* ./
 source ${PACIFIC_HOME}/Env/PacIFiC-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
@@ -68,7 +67,7 @@ source ${PACIFIC_HOME}/Env/PacIFiC-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}
 If no error arises, you just installed the two state-of-the-art libraries for high-performance linear algebra manipulations! Just remove the compressed files:
 ```
 cd $MACWORLD_ROOT
-rm hypre-2.10.1.tar.gz petsc-3.2-p7.tar.gz
+rm -rf v2.10.1.zip petsc-3.2-p7.tar.gz
 ```
 
 
@@ -95,7 +94,8 @@ It is possible that you get an error during the make install due to the missing 
 ### 5. Install Cartesian solver:
 * Build the MAC library required for fluid solver using following commands:
 ```
-cd $MACWORLD_ROOT/MAC
+cd $MACWORLD_ROOT/MAC/
+source ${PACIFIC_HOME}/Env/PacIFiC-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
 ./install-mac.sh
 ```
 

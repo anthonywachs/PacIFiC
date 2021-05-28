@@ -2,20 +2,16 @@
 # PacIFiC 64 bits + OpenMPI + GNU
 #
 
-## Modules for Niagara
-#module --force purge
-#module load CCEnv arch/avx512 StdEnv/2018.3
-#module load gcc/7.3.0
-#module load openmpi/3.1.2
-#module load imkl/2018.3.222
+# Modules
+module --force purge
+module load CCEnv arch/avx512 StdEnv/2018.3
+module load gcc/7.3.0
+module load openmpi/3.1.2
+module load imkl/2018.3.222
 
-## Modules for Cedar
-#module load StdEnv/2016.4
-#module load gcc/5.4.0
-#module load openmpi/2.1.1
 
 # PacIFiC home
-export PACIFIC_HOME=#Path to your Pacific root folder#
+export PACIFIC_HOME=/home/a/awachs/goyal001/GIT_new/pacific
 export PACIFIC_EXE_SCRIPTS=${PACIFIC_HOME}/ExeScripts
 export PATH="${PACIFIC_EXE_SCRIPTS}:${PATH}"
 export PACIFIC_BITS_DEFAULT="64"
@@ -28,9 +24,9 @@ echo -e '  '
 
 
 # MPI
-export PACIFIC_MPI_ROOT=#Path to your MPI root folder#
+export PACIFIC_MPI_ROOT=/cvmfs/soft.computecanada.ca/easybuild/software/2017/avx2/Compiler/gcc7.3/openmpi/3.1.2
 export PACIFIC_MPI_DISTRIB=OpenMPI
-export PACIFIC_MPI_VERSION=#Your MPI version, ex "1.10.7" (with quotes)#
+export PACIFIC_MPI_VERSION="3.1.2"
 export PACIFIC_MPI_INCDIR="${PACIFIC_MPI_ROOT}/include"
 export PACIFIC_MPI_GFORTRAN_INCDIR="${PACIFIC_MPI_ROOT}/include"
 export PACIFIC_MPI_BINDIR="${PACIFIC_MPI_ROOT}/bin"
@@ -64,7 +60,7 @@ echo -e '  '
 
 # Serial compiler and low level librairies
 export PACIFIC_SERCOMPIL_ENV="GNU"
-export PACIFIC_SERCOMPIL_VERSION=#Your GNU version compiler, ex "4.8.5"#
+export PACIFIC_SERCOMPIL_VERSION="7.3.0"
 if [[ "${PACIFIC_SERCOMPIL_ENV}" == "GNU" ]] 
 then
   PACIFIC_SERCOMPIL_C=$(which gcc)
@@ -81,23 +77,23 @@ fi
 export PACIFIC_SERCOMPIL_C
 export PACIFIC_SERCOMPIL_CPP
 export PACIFIC_OPT_FLAGS="-O3"
-export PACIFIC_BLAS_LIBDIR=#Your mkl library path#
+export PACIFIC_BLAS_LIBDIR=/cvmfs/soft.computecanada.ca/easybuild/software/2017/Core/imkl/2018.3.222/mkl/lib/intel64
 export PACIFIC_BLAS_LIBS="mkl_blas95_lp64 mkl_intel_lp64 mkl_sequential mkl_core mkl_gf_lp64"
-export PACIFIC_ATLAS_LIBDIR=#Your mkl library path#
+export PACIFIC_ATLAS_LIBDIR=/cvmfs/soft.computecanada.ca/easybuild/software/2017/Core/imkl/2018.3.222/mkl/lib/intel64
 export PACIFIC_ATLAS_LIBS="mkl_blas95_lp64 mkl_intel_lp64 mkl_sequential mkl_core mkl_gf_lp64"
-export PACIFIC_LAPACK_LIBDIR=#Your mkl library path#
+export PACIFIC_LAPACK_LIBDIR=/cvmfs/soft.computecanada.ca/easybuild/software/2017/Core/imkl/2018.3.222/mkl/lib/intel64
 export PACIFIC_LAPACK_LIBS="mkl_lapack95_lp64 mkl_intel_lp64 mkl_sequential mkl_core mkl_gf_lp64"
-export PACIFIC_GFORTRAN_LIBDIR=#Your gfortran library path#
+export PACIFIC_GFORTRAN_LIBDIR=/cvmfs/soft.computecanada.ca/nix/var/nix/profiles/gcc-7.3.0/lib64
 export PACIFIC_GFORTRAN_LIBS="gfortran"
-export PACIFIC_INTEL_LIBDIR=#Your gfortran library path#
+export PACIFIC_INTEL_LIBDIR=/cvmfs/soft.computecanada.ca/nix/var/nix/profiles/gcc-7.3.0/lib64
 export PACIFIC_INTEL_LIBS="gfortran"
 export PACIFIC_INTEL_LIBDIR=""
 export PACIFIC_INTEL_LIBS=""
-export PACIFIC_M_LIBDIR=#Your M directory path#
-export PACIFIC_Z_DIR=#Your Z directory path#
+export PACIFIC_M_LIBDIR=/cvmfs/soft.computecanada.ca/nix/var/nix/profiles/16.09/lib64
+export PACIFIC_Z_DIR=/cvmfs/soft.computecanada.ca/nix/var/nix/profiles/16.09
 export PACIFIC_Z_INCDIR="${PACIFIC_Z_DIR}/include"
 export PACIFIC_Z_LIBDIR="${PACIFIC_Z_DIR}/lib"
-export PACIFIC_X11_DIR=#Your X11 directory path#
+export PACIFIC_X11_DIR=/cvmfs/soft.computecanada.ca/nix/var/nix/profiles/16.09
 export PACIFIC_X11_INCDIR="${PACIFIC_X11_DIR}/include/X11"
 export PACIFIC_X11_LIBDIR="${PACIFIC_X11_DIR}/lib"
 
