@@ -51,11 +51,11 @@ echo -e '  '
 # Serial compiler and low level librairies
 export PACIFIC_SERCOMPIL_ENV="GNU"
 export PACIFIC_SERCOMPIL_VERSION=#Your GNU version compiler, ex "4.8.5"#
-if [ $PACIFIC_SERCOMPIL_ENV = "GNU" ] 
+if [[ "${PACIFIC_SERCOMPIL_ENV}" == "GNU" ]] 
 then
   PACIFIC_SERCOMPIL_C=$(which gcc)
   PACIFIC_SERCOMPIL_CPP=$(which g++)  
-else if [ $PACIFIC_SERCOMPIL_ENV = "Intel" ]  
+else if [[ "${PACIFIC_SERCOMPIL_ENV}" == "Intel" ]]  
   then
     PACIFIC_SERCOMPIL_C=$(which icc)
     PACIFIC_SERCOMPIL_CPP=$(which icpc)    
@@ -73,10 +73,17 @@ export PACIFIC_ATLAS_LIBDIR=/usr/lib64/atlas
 export PACIFIC_ATLAS_LIBS="satlas tatlas"
 export PACIFIC_LAPACK_LIBDIR=/usr/lib64
 export PACIFIC_LAPACK_LIBS="lapack"
-export PACIFIC_GFORTRAN_LIBDIR=/usr/lib/gcc/x86_64-redhat-linux/4.8.2
+export PACIFIC_GFORTRAN_LIBDIR=/usr/lib/gcc/x86_64-redhat-linux/4.8.5
 export PACIFIC_GFORTRAN_LIBS=gfortran
-export PACIFIC_INTEL_LIBDIR=/usr/lib/gcc/x86_64-redhat-linux/4.8.2
-export PACIFIC_INTEL_LIBS=gfortran
+export PACIFIC_INTEL_LIBDIR=""
+export PACIFIC_INTEL_LIBS=""
+export PACIFIC_M_LIBDIR=/usr/lib64
+export PACIFIC_Z_DIR=/usr
+export PACIFIC_Z_INCDIR="${PACIFIC_Z_DIR}/include"
+export PACIFIC_Z_LIBDIR="${PACIFIC_Z_DIR}/lib64"
+export PACIFIC_X11_DIR=/usr
+export PACIFIC_X11_INCDIR="${PACIFIC_X11_DIR}/include/X11"
+export PACIFIC_X11_LIBDIR="${PACIFIC_X11_DIR}/lib64"
 
 echo -e '\033[32m*** Serial compiler and low level librairies shell variables\033[0m'
 echo -e '\033[32mPACIFIC_SERCOMPIL_ENV\033[0m =' $PACIFIC_SERCOMPIL_ENV
@@ -94,20 +101,53 @@ echo -e '\033[32mPACIFIC_GFORTRAN_LIBDIR\033[0m =' $PACIFIC_GFORTRAN_LIBDIR
 echo -e '\033[32mPACIFIC_GFORTRAN_LIBS\033[0m =' $PACIFIC_GFORTRAN_LIBS
 echo -e '\033[32mPACIFIC_INTEL_LIBDIR\033[0m =' $PACIFIC_INTEL_LIBDIR
 echo -e '\033[32mPACIFIC_INTEL_LIBS\033[0m =' $PACIFIC_INTEL_LIBS
+echo -e '\033[32mPACIFIC_M_LIBDIR\033[0m =' $PACIFIC_M_LIBDIR
+echo -e '\033[32mPACIFIC_Z_DIR\033[0m =' $PACIFIC_Z_DIR
+echo -e '\033[32mPACIFIC_Z_INCDIR\033[0m =' $PACIFIC_Z_INCDIR
+echo -e '\033[32mPACIFIC_Z_LIBDIR\033[0m =' $PACIFIC_Z_LIBDIR
+echo -e '\033[32mPACIFIC_X11_DIR\033[0m =' $PACIFIC_X11_DIR
+echo -e '\033[32mPACIFIC_X11_INCDIR\033[0m =' $PACIFIC_X11_INCDIR
+echo -e '\033[32mPACIFIC_X11_LIBDIR\033[0m =' $PACIFIC_X11_LIBDIR
+echo -e '  '
+
+
+# Other
+export PACIFIC_AUTO_CONFIG=1
+export PACIFIC_PETSC_WITH_MUMPS=0
+export PACIFIC_CMAKE=$(which cmake)
+echo -e '\033[37m*** Other variables\033[0m'
+echo -e '\033[37mPACIFIC_AUTO_CONFIG\033[0m =' $PACIFIC_AUTO_CONFIG
+echo -e '\033[37mPACIFIC_PETSC_WITH_MUMPS\033[0m =' $PACIFIC_PETSC_WITH_MUMPS
+echo -e '\033[37mPACIFIC_CMAKE\033[0m =' $PACIFIC_CMAKE
 echo -e '  '
 
 
 # Grains
+if [[ ${PACIFIC_AUTO_CONFIG} -eq 1 ]]
+then
+  echo -e '\033[31mUsing grains_env_template.env.sh as env file\033[0m'
+  cp ${PACIFIC_HOME}/GRAINS/Env/grains_env_template.env.sh ${PACIFIC_HOME}/GRAINS/Env/grains-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+fi
 source ${PACIFIC_HOME}/GRAINS/Env/grains-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
 echo -e '  '
 
 
 # MacWorld
+if [[ ${PACIFIC_AUTO_CONFIG} -eq 1 ]]
+then
+  echo -e '\033[93mUsing macworld_env_template.env.sh as env file\033[0m'
+  cp ${PACIFIC_HOME}/Cartesian/MacWorld/Env/macworld_env_template.env.sh ${PACIFIC_HOME}/Cartesian/MacWorld/Env/macworld-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+fi
 source ${PACIFIC_HOME}/Cartesian/MacWorld/Env/macworld-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
 echo -e '  '
 
 
 # Fluid MAC
+if [[ ${PACIFIC_AUTO_CONFIG} -eq 1 ]]
+then
+  echo -e '\033[90mUsing fluid_env_template.env.sh as env file\033[0m'
+  cp ${PACIFIC_HOME}/Cartesian/FLUID/Env/fluid_env_template.env.sh ${PACIFIC_HOME}/Cartesian/FLUID/Env/fluid-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+fi
 source ${PACIFIC_HOME}/Cartesian/FLUID/Env/fluid-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
 echo -e '  '
 

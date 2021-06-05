@@ -17,7 +17,8 @@ CC       = ${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_C}
 CXX      = ${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_CXX}
 CPP      = ${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_C}
 CXXFLAGS += $(OPT) -fPIC -Wall -Wno-long-long -Wno-ctor-dtor-privacy -pedantic -W -Wcast-qual -Wwrite-strings -Wconversion -Wshadow -Wno-unused-parameter
-CXXFLAGS +=-DMPICH_IGNORE_CXX_SEEK=1
+CXXFLAGS += -DMPICH_IGNORE_CXX_SEEK=1
+CXXFLAGS += -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11
 
 FC       = ${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_F77}
 FFLAGS  += $(OPT) -fPIC
