@@ -34,7 +34,7 @@
 # Others
 *.dtd
 *.so.*
-PacIFiC-*.env.sh
+#PacIFiC-*.env.sh
 
 # Folders
 Cartesian/MacWorld/hypre-2.10.1/*
