@@ -560,11 +560,7 @@ void Forme::writePositionInFluid( ostream &fluid )
     for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
       pointEnvelop = m_position(*point);
-//      fluid << pointEnvelop[X] << " " << pointEnvelop[Y] << "\n";
-      fluid << Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-      		pointEnvelop[X] ) << " "
-      	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Y] ) << "\n";      
+      fluid << pointEnvelop[X] << " " << pointEnvelop[Y] << "\n";
     }
   }
   // Cas 3D
@@ -574,14 +570,14 @@ void Forme::writePositionInFluid( ostream &fluid )
     for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
       pointEnvelop = m_position(*point);
-//       fluid << pointEnvelop[X] << " " << pointEnvelop[Y] << " "
-// 	<< pointEnvelop[Z] << "\n";
-      fluid << Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-      		pointEnvelop[X] ) << " "
-      	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Y] ) << " "
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Z] ) << "\n";
+      fluid << pointEnvelop[X] << " " << pointEnvelop[Y] << " "
+	<< pointEnvelop[Z] << "\n";
+//       fluid << Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+//       		pointEnvelop[X] ) << " "
+//       	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		pointEnvelop[Y] ) << " "
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		pointEnvelop[Z] ) << "\n";
     }
 
     // Faces du polyedre
@@ -600,6 +596,110 @@ void Forme::writePositionInFluid( ostream &fluid )
       }
     }
     else fluid << "0" << '\n';
+  }
+  else
+  {
+    cout << "!!! Warning: Physical dimension undefined (DIM_2 or DIM_3)"
+    	<< endl;
+    exit(0);
+  }
+}
+
+
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Ecriture de l'information de position pour Basilisk (Fluide)
+// ATTENTION: valide pour des polygones, polyedres, spheres et cylindres
+// circulaires seulement !!
+void Forme::writePositionInFluid( BasiliskDataStructure * b )
+{
+  Point     pointEnvelop;
+  vector<Point> allPoints = m_convex->getEnveloppe();
+  vector<Point>::iterator point;
+
+  long int r;
+  r = allPoints.size();
+  b->allPoints  = r;
+
+
+  // Cas 2D
+  if ( Grains_BuilderFactory::getContext() == DIM_2 )
+  {
+    // alloue un tableau de allPoints.size()x2 dans la structure Basilisk
+    b->PointsCoord = (double **)malloc(r*sizeof(double *));
+    for (long int i = 0; i < r; i++) {
+      b->PointsCoord[i] = (double *)malloc(2 * sizeof(double));
+      // printf("Form.cpp 2D case\n");
+    }
+    long int i = 0;
+    // Points du polygone
+    for (point=allPoints.begin(); point!=allPoints.end(); point++)
+    {
+      pointEnvelop = m_position(*point);
+      b->PointsCoord[i][0] = pointEnvelop[X];
+      b->PointsCoord[i][1] = pointEnvelop[Y];
+      i++;
+    }
+  }
+  // Cas 3D
+  else if ( Grains_BuilderFactory::getContext() == DIM_3 )
+  {
+    // alloue un tableau de allPoints.size()x3 dans la structure Basilisk
+    b->PointsCoord = (double **)malloc(r*sizeof(double *));
+    // printf ("Can debugging pointer  b->PointsCoord = %p\n", (void *) b->PointsCoord);
+    for (long int i = 0; i < r; i++) {
+      b->PointsCoord[i] = (double *)malloc(3 * sizeof(double));
+      // printf ("Can debugging pointer c++ b->PointsCoord[i] = %p\n", (void *) b->PointsCoord[i]);
+    }
+    long int i = 0;
+    // Points du polyedre
+    for (point=allPoints.begin(); point!=allPoints.end(); point++)
+    {
+      pointEnvelop = m_position(*point);
+      b->PointsCoord[i][0] = pointEnvelop[X];
+      b->PointsCoord[i][1] = pointEnvelop[Y];
+      b->PointsCoord[i][2] = pointEnvelop[Z];
+      i++;
+    }
+
+    // Faces du polyedre
+    vector< vector<int> > const* allFaces  = m_convex->getFaces();
+    vector< vector<int> >::const_iterator face;
+    if ( allFaces )
+    {
+      // Nombre total de faces
+      r = allFaces->size();
+      b->allFaces  = r;
+
+      // Alloue un tableau dynamique de r "lignes"
+      b->FacesIndex = (long int **)malloc(r*sizeof(long int *));
+
+      // Alloue un vecteur de 1 ligne r collones
+      b->numPointsOnFaces = (long int *)malloc(r * sizeof(long int));
+
+      i = 0;
+      for (face=allFaces->begin(); face!=allFaces->end(); face++)
+      {
+        vector<int>::const_iterator index;
+
+	// nombre de points sur la face
+	long int rr = (*face).size();
+
+	// qu'on stock dans la Structure Basilisk
+	b->numPointsOnFaces[i] = rr;
+
+	// Alloue le tableau dynamique
+	b->FacesIndex[i] = (long int *)malloc(rr * sizeof(long int));
+
+	long int j = 0;
+	for (index=(*face).begin(); index!=(*face).end(); index++)
+	  {
+	    b->FacesIndex[i][j] = (*index);
+	    j++;
+	  }
+	i++;
+      }
+    }
   }
   else
   {

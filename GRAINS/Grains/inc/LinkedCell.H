@@ -20,7 +20,6 @@ struct PointForcePostProcessing
   Scalar contactDissip;
   Composant* comp0;
   Composant* comp1;
-  bool contactWithObstacle;
 };
 
 

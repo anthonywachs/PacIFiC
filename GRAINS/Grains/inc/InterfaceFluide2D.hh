@@ -112,7 +112,7 @@ public:
              list<Obstacle*> const& obstaclesToFluid, BasiliskDataStructure * b) const;
 
    /**
-   @brief Method outputs the particle details in istringstream
+   @brief Method outputs the particle details in istringstream 
    @param particules vecteur contenant l'ensemble des particules sur tous
    les processeurs
    @param is structure Direction Splitting
@@ -121,7 +121,7 @@ public:
 	istringstream &is ) const;
 
    /**
-   @brief Method outputs the particle details in istringstream
+   @brief Method outputs the particle details in istringstream 
    @param particules vecteur contenant l'ensemble des particules sur tous
    les processeurs
    @param is structure Direction Splitting

@@ -1,4 +1,3 @@
-#include "Grains_Exec.hh"
 #include "InterfaceFluide2D.hh"
 #include "Particule.H"
 #include "MonObstacle.H"
@@ -279,34 +278,12 @@ void InterfaceFluide2D::WriteParticulesInFluid(
       if (nclonesper) particuleType = "PP";
 
       particles_features << id << '\t' << ncorners << endl;
-
-//       particles_features << particuleType << '\t'
-// 		   << (*vitesseT)[X] << '\t' << (*vitesseT)[Y] << '\t'
-// 		   << (*vitesseR)[Z] << '\t'
-// 		   << masseVol    << '\t' << masse << '\t'
-// 		   << inertie[5]  << '\t'
-// 		   << (*centre)[X]   << '\t' << (*centre)[Y] << '\n';
-
-      particles_features
-	<< particuleType <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*vitesseT)[X] ) <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*vitesseT)[Y] ) <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*vitesseR)[Z] ) <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		masseVol )    <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		masse )       <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		inertie[5] )  <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*centre)[X] )   <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*centre)[Y] )   <<'\t'
-	<< endl;
-
+      particles_features << particuleType << '\t'
+		   << (*vitesseT)[X] << '\t' << (*vitesseT)[Y] << '\t'
+		   << (*vitesseR)[Z] << '\t'
+		   << masseVol    << '\t' << masse << '\t'
+		   << inertie[5]  << '\t'
+		   << (*centre)[X]   << '\t' << (*centre)[Y] << '\n';
       if ( particuleType == "PP" )
       {
         particles_features << nclonesper << endl;
@@ -565,7 +542,7 @@ void InterfaceFluide2D::WritePVGCInFluid(
 }
 
 // ============================================================================
-// Sequential version to read particle data in istringstream from
+// Sequential version to read particle data in istringstream from  
 // Direction Splitting solver on fluid side
 // Added by Aashish Goyal, Feb 2021
 void InterfaceFluide2D::ReadParticulesFromDSFluid(
@@ -595,7 +572,7 @@ void InterfaceFluide2D::ReadParticulesFromDSFluid(
       masseVol = (*particule)->getMasseVolumique();
       masse    = (*particule)->getMasse();
       centre   = (*particule)->getPosition();
-      orient   = (*particule)->getForme()->getOrientation();
+      orient   = (*particule)->getForme()->getOrientation();      
 
       particles_features << "P" << '\t'
 	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'
@@ -617,7 +594,7 @@ void InterfaceFluide2D::ReadParticulesFromDSFluid(
 
 
 // ============================================================================
-// Sequential version to write particle data in istringstream for the
+// Sequential version to write particle data in istringstream for the 
 // use in Direction Splitting solver
 // Added by Aashish Goyal, Feb 2021
 void InterfaceFluide2D::WriteParticulesInDSFluid(
@@ -648,7 +625,7 @@ void InterfaceFluide2D::WriteParticulesInDSFluid(
       masse    = (*particule)->getMasse();
       centre   = (*particule)->getPosition();
 //      qrot     = (*particule)->getRotation();
-      orient   = (*particule)->getForme()->getOrientation();
+      orient   = (*particule)->getForme()->getOrientation();      
 
       particles_features << "P" << '\t'
 	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'

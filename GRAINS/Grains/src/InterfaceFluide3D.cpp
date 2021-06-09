@@ -277,53 +277,53 @@ void InterfaceFluide3D::WriteParticulesInFluid(
 
       particles_features << id <<'\t'<< ncorners <<endl;
 
-//       particles_features
-//         << particuleType <<'\t'
-//         << (*vitesseT)[X] <<'\t'<< (*vitesseT)[Y] <<'\t'<< (*vitesseT)[Z] <<'\t'
-//         << (*vitesseR)[X] <<'\t'<< (*vitesseR)[Y] <<'\t'<< (*vitesseR)[Z] <<'\t'
-//         << masseVol    <<'\t'<< masse       <<'\t'
-//         << inertie[0]  <<'\t'<< inertie[1]  <<'\t'<< inertie[2]  <<'\t'
-//         << inertie[3]  <<'\t'<< inertie[4]  <<'\t'<< inertie[5]  <<'\t'
-//         << (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z]   <<'\t'
-//         << endl;
-
       particles_features
-	<< particuleType <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*vitesseT)[X] ) <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*vitesseT)[Y] ) <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*vitesseT)[Z] ) <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*vitesseR)[X] ) <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*vitesseR)[Y] ) <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*vitesseR)[Z] ) <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		masseVol )    <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		masse )       <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		inertie[0] )  <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		inertie[1] )  <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		inertie[2] )  <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		inertie[3] )  <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		inertie[4] )  <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		inertie[5] )  <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*centre)[X] )   <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*centre)[Y] )   <<'\t'
-	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-		(*centre)[Z] )   <<'\t'
-	<< endl;
+        << particuleType <<'\t'
+        << (*vitesseT)[X] <<'\t'<< (*vitesseT)[Y] <<'\t'<< (*vitesseT)[Z] <<'\t'
+        << (*vitesseR)[X] <<'\t'<< (*vitesseR)[Y] <<'\t'<< (*vitesseR)[Z] <<'\t'
+        << masseVol    <<'\t'<< masse       <<'\t'
+        << inertie[0]  <<'\t'<< inertie[1]  <<'\t'<< inertie[2]  <<'\t'
+        << inertie[3]  <<'\t'<< inertie[4]  <<'\t'<< inertie[5]  <<'\t'
+        << (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z]   <<'\t'
+        << endl;
+
+//       particles_features
+// 	<< particuleType <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		(*vitesseT)[X] ) <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		(*vitesseT)[Y] ) <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		(*vitesseT)[Z] ) <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		(*vitesseR)[X] ) <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		(*vitesseR)[Y] ) <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		(*vitesseR)[Z] ) <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		masseVol )    <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		masse )       <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		inertie[0] )  <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		inertie[1] )  <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		inertie[2] )  <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		inertie[3] )  <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		inertie[4] )  <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		inertie[5] )  <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		(*centre)[X] )   <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		(*centre)[Y] )   <<'\t'
+// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+// 		(*centre)[Z] )   <<'\t'
+// 	<< endl;
 
       if ( particuleType == "PP" )
       {
@@ -609,7 +609,7 @@ void InterfaceFluide3D::WritePVGCInFluid(
 }
 
 // ============================================================================
-// Sequential version to read particle data in istringstream from
+// Sequential version to read particle data in istringstream from  
 // Direction Splitting solver on fluid side
 // Added by Aashish Goyal, Feb 2021
 void InterfaceFluide3D::ReadParticulesFromDSFluid(
@@ -643,7 +643,7 @@ void InterfaceFluide3D::ReadParticulesFromDSFluid(
       masseVol = (*particule)->getMasseVolumique();
       masse    = (*particule)->getMasse();
       centre   = (*particule)->getPosition();
-      orient   = (*particule)->getForme()->getOrientation();
+      orient   = (*particule)->getForme()->getOrientation();      
 
       particles_features << "P" << '\t'
 	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'
@@ -664,7 +664,7 @@ void InterfaceFluide3D::ReadParticulesFromDSFluid(
 }
 
 // ============================================================================
-// Sequential version to write particle data in istringstream for the
+// Sequential version to write particle data in istringstream for the 
 // use in Direction Splitting solver
 // Added by Aashish Goyal, Feb 2021
 void InterfaceFluide3D::WriteParticulesInDSFluid(
@@ -697,7 +697,7 @@ void InterfaceFluide3D::WriteParticulesInDSFluid(
 //      qrot     = (*particule)->getRotation();
       orient   = (*particule)->getForme()->getOrientation();
 
-      particles_features << "P" << '\t'
+      particles_features << "P" << '\t' 
 	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z]   <<'\t'
 	<< masseVol       <<'\t'<< masse          <<'\t'
 //	<< (*qrot)[0]     <<'\t'<< (*qrot)[1]     <<'\t'<< (*qrot)[2]     <<'\t'<< (*qrot)[3]    <<'\t'
