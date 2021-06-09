@@ -16,5 +16,5 @@ sed -i 's|PETSC_DIR=${MACWORLD_ROOT}/petsc-${PETSC_VERSION_PATCH}|PETSC_DIR=/hom
 
 source Env/PacIFiC-CI-RUNNER-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
 
-mv ${MAC_HOME}/etc/Linux- ${MAC_HOME}/etc/Linux-${MAC_FULL_EXT}.mak
-mv ${MAC_HOME}/etc/extra-Linux- ${MAC_HOME}/etc/extra-Linux-${MAC_FULL_EXT}.mak
+mv ${MAC_HOME}/etc/Linux_template.mak ${MAC_HOME}/etc/Linux-${MAC_FULL_EXT}.mak
+mv ${MAC_HOME}/etc/extra-Linux_template.mak ${MAC_HOME}/etc/extra-Linux-${MAC_FULL_EXT}.mak
