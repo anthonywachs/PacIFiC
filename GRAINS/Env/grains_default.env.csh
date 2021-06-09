@@ -11,7 +11,7 @@ setenv LIBMPI_FOR_GRAINS___ `echo ${GRAINS_MPI_LIBS} | sed 's%[^ ][^ ]*%-l&%g'`
 # End MPI linking libs
 
 # Xerces definition
-setenv XERCESCROOT ${GRAINS_HOME}/XERCES-2.8.0
+setenv XERCESCROOT /home/gitlab-runner/dependencies/XERCES-2.8.0
 setenv XERCESC_ROOT ${XERCESCROOT}
 # End Xerces definition
 
