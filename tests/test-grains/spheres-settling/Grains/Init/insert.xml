@@ -1,0 +1,130 @@
+<Grains3D Type="Standard">
+  <Construction>
+    <Recipient LX="1." LY="0.3" LZ="0.6"/>
+    <Origine OX="0." OY="0." OZ="0."/>
+    <DomainDecomposition NX="1" NY="2" NZ="5"/>
+    <MPI Strategie="SRLocalCommOpt" VerbosityLevel="0"/>
+
+    <Contacts>
+      <Contact>
+        <Material materiauA="matP" materiauB="matP"/>
+        <ERHContact>
+          <stiff>4.5e+5</stiff>
+          <muc>0.46</muc>
+          <en>0.85</en>
+          <mut>1.e+3</mut>
+          <ks>3.e+2</ks>
+	  <kms>0.</kms>
+	  <mur>0.2</mur>
+	  <eps>1.e-10</eps>
+          <color>0</color>
+        </ERHContact>
+      </Contact>
+
+      <Contact>
+        <Material materiauA="matP" materiauB="matW"/>
+        <ERHContact>
+          <stiff>4.5e+5</stiff>
+          <muc>0.62</muc>
+          <en>0.85</en>
+          <mut>1.e+3</mut>
+          <ks>3.e+2</ks>
+	  <kms>0.</kms>
+	  <mur>0.2</mur>
+          <eps>1.e-10</eps>
+          <color>0</color>
+        </ERHContact>
+      </Contact>
+  </Contacts>
+
+  <Particules>
+    <Particule Nombre="20" MasseVolumique="2500.">
+      <Convex RayonInteraction="5.e-5">
+        <Sphere Radius="0.005"/>
+      </Convex>
+      <Orientation Type="Unite"></Orientation>
+      <Materiau>matP</Materiau>
+      <Couleur R="1." V=".1" B=".1"/>
+    </Particule>
+  </Particules>
+
+  <Obstacles>
+    <Composite name="container">
+        <Obstacle name="container_Front">
+          <Convex RayonInteraction="5e-05">
+            <Box LX="0.031" LY="0.031" LZ="0.0005"/>
+          </Convex>
+          <Centre X="0.015" Y="0.015" Z="0.035250000000000004"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matP</Materiau>
+        </Obstacle>
+        <Obstacle name="container_Behind">
+          <Convex RayonInteraction="5e-05">
+            <Box LX="0.031" LY="0.031" LZ="0.0005"/>
+          </Convex>
+          <Centre X="0.015" Y="0.015" Z="-0.00025"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matP</Materiau>
+        </Obstacle>
+        <Obstacle name="container_Left">
+          <Convex RayonInteraction="5e-05">
+            <Box LX="0.0005" LY="0.031" LZ="0.036000000000000004"/>
+          </Convex>
+          <Centre X="-0.00025" Y="0.015" Z="0.0175"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matP</Materiau>
+        </Obstacle>
+        <Obstacle name="container_Right">
+          <Convex RayonInteraction="5e-05">
+            <Box LX="0.0005" LY="0.031" LZ="0.036000000000000004"/>
+          </Convex>
+          <Centre X="0.03025" Y="0.015" Z="0.0175"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matP</Materiau>
+        </Obstacle>
+        <Obstacle name="container_Bottom">
+          <Convex RayonInteraction="5e-05">
+            <Box LX="0.031" LY="0.0005" LZ="0.036000000000000004"/>
+          </Convex>
+          <Centre X="0.015" Y="-0.00025" Z="0.0175"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matP</Materiau>
+        </Obstacle>
+        <Obstacle name="container_Top">
+          <Convex RayonInteraction="5e-05">
+            <Box LX="0.031" LY="0.0005" LZ="0.036000000000000004"/>
+          </Convex>
+          <Centre X="0.015" Y="0.03025" Z="0.0175"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matP</Materiau>
+        </Obstacle>
+      </Composite>
+  </Obstacles>
+
+
+  <Forces>
+    <Gravite GX="0.0" GY="0." GZ="-9.81"/>
+  </Forces>
+
+
+  <Simulation>
+    <Temps Debut="0." Fin="1.5"/>
+    <IncreTemps dt="2.5e-6"/>
+    <TempsSave Debut="0." Fin="60." Dt="0.01"/>
+    <Fichier>Grains/Init/insert</Fichier>
+    <VitesseRelative value="2.2"/>
+    <ModeEcriture>Hybride</ModeEcriture>
+
+    <Insertion Mode="Sequentiel" Method="Preinstall">
+      <Position>Grains/Init/initial_position.result</Position>
+      <InitVitesse Mode="Constant">
+        <TranslationVelocity VX="0." VY="0." VZ="0."/>
+        <RotationVelocity RX="0." RY="0." RZ="0."/>
+      </InitVitesse>
+    </Insertion>
+
+    <PostProcessingWriters>
+        <PositionVitesse Name="Grains/Init/insert"/>
+    </PostProcessingWriters>
+  </Simulation>
+</Grains3D>
