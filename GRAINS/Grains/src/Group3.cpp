@@ -17,7 +17,7 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // Constructeur avec initialisation.
-  Group3::Group3( const Scalar x, const Scalar y, const Scalar z ) 
+  Group3::Group3( const Scalar x, const Scalar y, const Scalar z )
   {
     comp[X] = x;
     comp[Y] = y;
@@ -42,7 +42,7 @@ namespace solid
   // --------------------------------------------------------------------------
   // D.PETIT - Juin. 2000 - Creation
   // Destructeur.
-  Group3::~Group3() 
+  Group3::~Group3()
   {
   }
 
@@ -52,7 +52,7 @@ namespace solid
   // --------------------------------------------------------------------------
   // D.PETIT - Juin. 2000 - Creation
   // Renvoi l'element.
-  const Scalar* Group3::getValue() const 
+  const Scalar* Group3::getValue() const
   {
     return comp;
   }
@@ -63,7 +63,7 @@ namespace solid
   // --------------------------------------------------------------------------
   // D.PETIT - Juin. 2000 - Creation
   // Renvoi l'element.
-  Scalar* Group3::getValue() 
+  Scalar* Group3::getValue()
   {
     return comp;
   }
@@ -73,7 +73,7 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // D.PETIT - Juin. 2000 - Creation
-  // Modifie les composantes d'un element. 
+  // Modifie les composantes d'un element.
   void Group3::setValue( const Scalar x, const Scalar y, const Scalar z )
   {
     comp[X] = x;
@@ -86,7 +86,7 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // D.PETIT - Juin. 2000 - Creation
-  // Modifie les composantes d'un element. 
+  // Modifie les composantes d'un element.
   void Group3::setValue( const Scalar* g )
   {
     comp[X] = g[X];
@@ -99,7 +99,7 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // A.WACHS - Oct. 2009 - Creation
-  // Annule toutes les composantes d'un element. 
+  // Annule toutes les composantes d'un element.
   void Group3::reset()
   {
     comp[X] = comp[Y] = comp[Z] = 0.;
@@ -110,15 +110,15 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // D.PETIT - Juin. 2000 - Creation
-  // nombre de composantes d'un element. 
-  int Group3::size() const 
+  // nombre de composantes d'un element.
+  int Group3::size() const
   {
     return 3;
   }
 
 
 
- 
+
   // --------------------------------------------------------------------------
   // D.PETIT - Juin. 2000 - Creation
   // surcharge de l'operateur d'indexation (pour affecter).
@@ -133,7 +133,7 @@ namespace solid
   // --------------------------------------------------------------------------
   // D.PETIT - Juin. 2000 - Creation
   // surcharge de l'operateur d'indexation (pour affecter).
-  const Scalar& Group3::operator[]( const int i ) const 
+  const Scalar& Group3::operator[]( const int i ) const
   {
     return comp[i];
   }
@@ -142,7 +142,7 @@ namespace solid
 
 
   // --------------------------------------------------------------------------
-  // Operateur unaire - 
+  // Operateur unaire -
   Group3 Group3::operator - () const
   {
     return Group3(-comp[X], -comp[Y], -comp[Z]);
@@ -222,12 +222,12 @@ namespace solid
 
 
   // --------------------------------------------------------------------------
-  // Egalite d'affectation d'un vecteur 
+  // Egalite d'affectation d'un vecteur
   // F.PRADEL - Janvier 2000 - Creation
   Group3& Group3::operator = ( const Group3 &g2 )
   {
     if ( &g2 != this )
-    {      
+    {
       comp[X] = g2.comp[X];
       comp[Y] = g2.comp[Y];
       comp[Z] = g2.comp[Z];
@@ -282,7 +282,7 @@ namespace solid
     comp[X] += g2.comp[X];
     comp[Y] += g2.comp[Y];
     comp[Z] += g2.comp[Z];
-    return *this;  
+    return *this;
   }
 
 
@@ -295,7 +295,7 @@ namespace solid
     comp[X] -= g2.comp[X];
     comp[Y] -= g2.comp[Y];
     comp[Z] -= g2.comp[Z];
-    return *this;  
+    return *this;
   }
 
 
@@ -328,9 +328,9 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // Operateur d'ecriture.
-  ostream &operator << ( ostream &fileOut, const Group3 &g ) 
+  ostream &operator << ( ostream &fileOut, const Group3 &g )
   {
-    fileOut << g[X] << '\t' 
+    fileOut << g[X] << '\t'
 	    << g[Y] << '\t'
 	    << g[Z] << '\n';
     return (fileOut);
@@ -341,53 +341,53 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // Operateur de lecture.
-  istream &operator >> ( istream &fileIn,Group3 &g ) 
+  istream &operator >> ( istream &fileIn,Group3 &g )
   {
-    fileIn >> g[X] 
-	   >> g[Y] 
+    fileIn >> g[X]
+	   >> g[Y]
 	   >> g[Z];
     return (fileIn);
   }
-  
 
 
-  
+
+
   // --------------------------------------------------------------------------
   // Operateur d'ecriture
   // A.WACHS - Janv.2011 - Creation.
   void Group3::writeGroup3( ostream &fileOut ) const
   {
     fileOut << Grains_Exec::doubleToString(ios::scientific,POSITIONFORMAT,
-  	comp[X]) << " " << 
+  	comp[X]) << " " <<
 	Grains_Exec::doubleToString(ios::scientific,POSITIONFORMAT,
-  	comp[Y]) << " " << 
+  	comp[Y]) << " " <<
 	Grains_Exec::doubleToString(ios::scientific,POSITIONFORMAT,
   	comp[Z]);
   }
-  
-  
 
-  
+
+
+
   // --------------------------------------------------------------------------
   // Operateur d'ecriture en binaire
   // A.WACHS - Dec.2014 - Creation.
   void Group3::writeGroup3_binary( ostream &fileOut )
   {
     fileOut.write( reinterpret_cast<char*>( &comp[X] ), sizeof(double) );
-    fileOut.write( reinterpret_cast<char*>( &comp[Y] ), sizeof(double) );  
-    fileOut.write( reinterpret_cast<char*>( &comp[Z] ), sizeof(double) );     
+    fileOut.write( reinterpret_cast<char*>( &comp[Y] ), sizeof(double) );
+    fileOut.write( reinterpret_cast<char*>( &comp[Z] ), sizeof(double) );
   }
-  
 
 
-  
+
+
   // --------------------------------------------------------------------------
   // Operateur de lecture en binaire
   // A.WACHS - Dec.2014 - Creation.
   void Group3::readGroup3_binary( istream &StreamIN )
   {
     StreamIN.read( reinterpret_cast<char*>( &comp[X] ), sizeof(double) );
-    StreamIN.read( reinterpret_cast<char*>( &comp[Y] ), sizeof(double) );  
-    StreamIN.read( reinterpret_cast<char*>( &comp[Z] ), sizeof(double) );     
-  }        
+    StreamIN.read( reinterpret_cast<char*>( &comp[Y] ), sizeof(double) );
+    StreamIN.read( reinterpret_cast<char*>( &comp[Z] ), sizeof(double) );
+  }
 }

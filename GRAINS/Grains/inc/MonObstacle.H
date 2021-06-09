@@ -234,36 +234,45 @@ public:
   Vecteur vitesseMaxPerDirection() const;
 
   /** @brief Update contact map */
-  void updateContactMap();
+  virtual void updateContactMap();
+
+  virtual void setContactMapToFalse();
 
   /** @brief Does the contact exist in the map, if yes return the pointer to the
   cumulative tangential displacement
   @param tangentialDepl pointer to the cumulative tangential displacement
   @param id id number of the other component */
-  bool ContactInMapIsActive( int const& id, int* &nbCumulTangent,
-    Vecteur* &tangent, double* &tangentialDepl, Vecteur* &cumulSpringTorque );
+  virtual bool getContactMemory( std::tuple<int,int,int> const& id,
+    Vecteur* &tangent, Vecteur* &prev_normal, Vecteur* &cumulSpringTorque );
 
   /** @brief Add new contact in the map
   @param tangentialDepl initial tangential displacement
   @param id id number of the other component */
-  void addNewContactInMap( int const& id, int const& nbCumulTangent,
-    Vecteur const& tangent, double const& tangentialDepl,
+  virtual void addNewContactInMap( std::tuple<int,int,int> const& id,
+    Vecteur const& tangent, Vecteur const& prev_normal,
     Vecteur const& cumulSpringTorque );
 
   /** @brief Increase cumulative tangential displacement with component id
   @param tangentialDepl additional tangential displacement
   @param id id number of the other component */
-  void addDeplContactInMap( int const& id, int const& nbCumulTangent,
-    Vecteur const& tangent, double const& tangentialDepl,
+  virtual void addDeplContactInMap( std::tuple<int,int,int> const& id,
+    Vecteur const& tangent, Vecteur const& prev_normal,
     Vecteur const& cumulSpringTorque );
+
   //@}
 
+  void updateContactMapId( int prev_id, int new_id);
 
-  /** @name Methods Set */
-  //@{
-  /** @brief Initialize all contact map entries to false */
-  virtual void setContactMapToFalse();
-  //@}
+
+  virtual void copyHistoryContacts( double* &destination, int start_index );
+
+
+  // Copy existing contact in the map
+  virtual void copyContactInMap( std::tuple<int,int,int> const& id,
+    bool const& isActive, Vecteur const& tangent, Vecteur const& prev_normal,
+    Vecteur const& cumulSpringTorque );
+
+  virtual int getContactMapSize();
 
 
   /** @name Processus de restauration */

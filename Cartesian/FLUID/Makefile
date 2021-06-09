@@ -87,6 +87,12 @@ $(libdir)/%/Makefile:
 	mac depend -verbose -l $(MACLIB) \
 	-I $(XERCESCROOT)/include \
 	-I $(MACWORLD_MPI_INCDIR) \
+<<<<<<< HEAD
+=======
+	-I $(BASILISK_DLMFD) \
+	-I $(GRAINS_HOME)/Grains/inc \
+	-path $(GRAINS_HOME)/Grains/lib$(GRAINS_FULL_EXT) -l grains \
+>>>>>>> origin/compilation_update
 	-path $(XERCESCROOT)/lib$(GRAINS_BITS_EXT)-$(GRAINS_SERCOMPIL_ENV)-$(GRAINS_SERCOMPIL_VERSION) -l xerces-c -l xerces-depdom \
 	-path $(MACWORLD_GFORTRAN_LIBDIR) -l $(MACWORLD_GFORTRAN_LIBS) \
 	-compiler $(CCC) $* $(@D) $(SRC)

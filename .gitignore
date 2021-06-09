@@ -31,10 +31,18 @@
 *.out
 *.app
 
+# Python files
+*.pyc
+*.pyo
+
 #Others
 *.dtd
 *.so.*
 PacIFiC-*.env.sh
+GRAINS/Env/grains-*.env.sh
+Cartesian/FLUID/Env/fluid-*.env.sh
+Cartesian/MacWorld/Env/macworld-*.env.sh
+.tags*
 
 # Folders
 Cartesian/MacWorld/hypre-2.10.1/*

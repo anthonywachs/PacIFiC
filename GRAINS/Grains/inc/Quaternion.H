@@ -34,9 +34,9 @@ public:
   @param d Scalaire du Quaternion */
   Quaternion( const Scalar q, const Scalar d=0.0 );
 
-  /** @brief Construction a partir d'un 
-  @param vecteur Le vecteur et avec 
-  @param d scalaire par defaut nul */ 
+  /** @brief Construction a partir d'un
+  @param vecteur Le vecteur et avec
+  @param d scalaire par defaut nul */
   Quaternion( const Vecteur& vecteur, const Scalar d=0.0 );
 
   /** @brief Constructeur avec initialisation
@@ -57,46 +57,57 @@ public:
 
   /**@name Methods */
   //@{
-  /** @brief Creation du conjugue du quaternion 
+  /** @brief Creation du conjugue du quaternion
   @return Le quaternion conjugue. */
   Quaternion Conjugate() const;
 
   /** @brief Creation de l'inverse du quaternion.
   @return Le quaternion inverse. */
   Quaternion Inverse() const;
-  
-  /** @brief Produit d'un vecteur avec un quaternion (le vecteur lhs correspond 
-  à un quaternion [0,lhs]) 
+
+  /** @brief Produit d'un vecteur avec un quaternion (le vecteur lhs correspond
+  ï¿½ un quaternion [0,lhs])
   @return Le produit du vecteur et du quaternion
   @param lhs Le vecteur */
   Quaternion multLeftVec( const Vecteur& lhs ) const;
-  
+
   /** @brief Produit de 2 quaternions dont on renvoie la partie vectorielle
-  @param rhs quaternion à multiplier */  
-  Vecteur multToVecteur( const Quaternion& rhs ) const; 
-  
+  @param rhs quaternion ï¿½ multiplier */
+  Vecteur multToVecteur( const Quaternion& rhs ) const;
+
   /** @brief Produit d'un quaternion q par le conjugue du second quaternion q',
   c.a.d. q*conjufue(q'), dont on renvoie la partie vectorielle
-  @param rhs quaternion à multiplier */  
-  Vecteur multConjugateToVecteur( const Quaternion& rhs ) const; 
-  
+  @param rhs quaternion ï¿½ multiplier */
+  Vecteur multConjugateToVecteur( const Quaternion& rhs ) const;
+
+  /** @brief Builds a unit quaternion representing the rotation,from u to v.
+  The input vectors need not be normalised.
+  @param u First vector
+  @param v Second vector */
+  void setFromRotTwoVectors(const Vecteur& u, const Vecteur& v);
+
+  /** @brief Rotates a vector using the quaternion *this
+  @param v The vector to be rotated */
+  Vecteur rotateVector(const Vecteur v);
+
+
   /** @brief Ecriture de l'objet sur le flux de sortie avec un format de
   precision elevee
   @param fileOut Flux de sortie. */
   void writeQuaternion( ostream &fileOut ) const;
-  
+
   /** @brief Ecriture de l'objet en binaire sur le flux de sortie
   @param fileOut Flux de sortie. */
-  void writeQuaternion_binary( ostream &fileOut ); 
+  void writeQuaternion_binary( ostream &fileOut );
 
   /** @brief Lecture de l'objet en binaire sur le flux d'entree
   @param StreamIN Flux d'entree. */
-  void readQuaternion_binary( istream &StreamIN );              
+  void readQuaternion_binary( istream &StreamIN );
   //@}
 
 
   /**@name Methods Get */
-  //@{ 
+  //@{
   /** @brief Acces au scalaire composant le Quaternion
   @return le scalaire demande. */
   Scalar getScalaire() const;
@@ -105,15 +116,15 @@ public:
   @return Le vecteur demande. */
   Vecteur const* getVecteur() const;
 
-  /** @brief Prend le quaternion et construit le vecteur rotation associe 
-  qui est renvoye 
+  /** @brief Prend le quaternion et construit le vecteur rotation associe
+  qui est renvoye
   @return Vecteur */
-  Vecteur getVecteurRotation() const;    
+  Vecteur getVecteurRotation() const;
   //@}
 
 
   /**@name Methods Set */
-  //@{ 
+  //@{
   /** @brief Modification du quaternion.
   @param vecteur  Composante du vecteur.
   @param scalaire Composante du scalaire. */
@@ -128,9 +139,9 @@ public:
   @param vecteur1 Composante 1 du vecteur
   @param vecteur2 Composante 2 du vecteur
   @param scalaire Composante du scalaire */
-  void setQuaternion( const Scalar &vecteur0, 
-	const Scalar &vecteur1, 
-	const Scalar &vecteur2, 
+  void setQuaternion( const Scalar &vecteur0,
+	const Scalar &vecteur1,
+	const Scalar &vecteur2,
 	Scalar scalaire );
 
   /** @brief Modification du quaternion.
@@ -141,7 +152,7 @@ public:
   @param vecteur Composante du vecteur. */
   void setVecteur( const Vecteur &vecteur );
   //@}
-  
+
 
   /**@name Operators */
   //@{
@@ -155,46 +166,46 @@ public:
   @param i index */
   Scalar operator[]( int i ) const;
 
-  /** @brief Produit de deux quaternions 
+  /** @brief Produit de deux quaternions
   @return Le produit des deux quaternions
   @param rhs Le deuxieme quaternion */
   Quaternion operator*( const Quaternion& rhs ) const;
 
-  /** @brief Produit d'un quaternion avec un vecteur (le vecteur rhs correspond 
-  à un quaternion [0,rhs]) 
+  /** @brief Produit d'un quaternion avec un vecteur (le vecteur rhs correspond
+  ï¿½ un quaternion [0,rhs])
   @return Le produit du quaternion et du vecteur
   @param rhs Le vecteur */
   Quaternion operator,( const Vecteur& rhs ) const;
 
-  /** @brief Multiplication par un scalaire 
+  /** @brief Multiplication par un scalaire
   @param d scalaire */
   Quaternion operator*( Scalar d );
 
-  /** @brief Operateur - unaire */ 
+  /** @brief Operateur - unaire */
   Quaternion operator-();
 
-  /** @brief Addition de deux quaternions composante par composante 
-  @param rhs quaternion à ajouter */
+  /** @brief Addition de deux quaternions composante par composante
+  @param rhs quaternion ï¿½ ajouter */
   Quaternion operator+( const Quaternion& rhs ) const;
 
-  /** @brief Soustraction de deux quaternions composante par composante 
-  @param rhs quaternion à soustraire */
+  /** @brief Soustraction de deux quaternions composante par composante
+  @param rhs quaternion ï¿½ soustraire */
   Quaternion operator-( const Quaternion& rhs );
 
-  /** @brief operateur de comparaison pour les valeurs 
-  @param rhs quaternion à comparer */
+  /** @brief operateur de comparaison pour les valeurs
+  @param rhs quaternion ï¿½ comparer */
   bool operator == ( const Quaternion& rhs );
 
-  /** @brief operateur de difference pour les valeurs 
-  @param rhs quaternion à comparer */
+  /** @brief operateur de difference pour les valeurs
+  @param rhs quaternion ï¿½ comparer */
   bool operator != ( const Quaternion& rhs );
 
-  /** @brief operateur d'affectation 
-  @param rhs quaternion à affecter */
+  /** @brief operateur d'affectation
+  @param rhs quaternion ï¿½ affecter */
   Quaternion& operator = ( const Quaternion& rhs );
 
-  /** @brief operateur d'affectation des composantes d'un quaternion a un 
-  scalaire 
+  /** @brief operateur d'affectation des composantes d'un quaternion a un
+  scalaire
   @param rhs scalaire */
   Quaternion operator = ( const Scalar rhs );
 
@@ -203,25 +214,25 @@ public:
   Quaternion& operator*=( Scalar d );
 
   /** @brief operateur d'addition d'un point et d'affectation
-  @param rhs quaternion à ajouter */
+  @param rhs quaternion ï¿½ ajouter */
   Quaternion& operator+=( const Quaternion& rhs );
 
   /** @brief operateur de soustraction d'un point et d'affectation
-  @param rhs quaternion à soustraire */
+  @param rhs quaternion ï¿½ soustraire */
   Quaternion& operator-=( const Quaternion& rhs );
   //@}
 
 
   /**@name Methods Friend */
   //@{
-  /** @brief Operateur d'ecriture 
+  /** @brief Operateur d'ecriture
   @param fileOut flux de sortie
-  @param objet le quaternion */ 
+  @param objet le quaternion */
   friend ostream &operator << ( ostream &fileOut, const Quaternion &objet );
-  
-  /** @brief Operateur de lecture 
-  @param fileIn flux d'entrée
-  @param objet le quaternion */   
+
+  /** @brief Operateur de lecture
+  @param fileIn flux d'entrï¿½e
+  @param objet le quaternion */
   friend istream &operator >> ( istream &fileIn, Quaternion &objet );
 
   /** @brief Norme du Quaternion.
@@ -243,30 +254,29 @@ public:
 
 protected:
   /**@name Parameters */
-  //@{  
-  Scalar w; /**< Scalaire du quaternion */  
+  //@{
+  Scalar w; /**< Scalaire du quaternion */
   Vecteur vqt; /**< Composante du vecteur du quaternion */
   //@}
 };
 
 /**@name Quaternion : Methods external */
 //@{
-/** @brief Multiplication d'un scalaire par un quaternion 
-@param d scalaire 
-@param rhs quaternion à multiplier */
+/** @brief Multiplication d'un scalaire par un quaternion
+@param d scalaire
+@param rhs quaternion ï¿½ multiplier */
 Quaternion operator*( Scalar d, const Quaternion& rhs );
 
-/** @brief Produit d'un vecteur avec un quaternion (le vecteur lhs correspond 
-à un quaternion [0,lhs]) 
+/** @brief Produit d'un vecteur avec un quaternion (le vecteur lhs correspond
+ï¿½ un quaternion [0,lhs])
 @return Le produit du vecteur et du quaternion
-@param lhs Le vecteur 
+@param lhs Le vecteur
 @param q Le quaternion */
 Quaternion operator,( const Vecteur& lhs, const Quaternion& q );
 
-/** @brief Valeur absolue d'un quaternion 
+/** @brief Valeur absolue d'un quaternion
 @param qt le quaternion */
 Scalar ABS( const Quaternion& qt );
 //@}
 
 #endif
-
