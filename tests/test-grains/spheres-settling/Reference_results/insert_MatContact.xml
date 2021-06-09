@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<GRAINS>
+
+  <Materiaux>
+    <Materiau value="1">matP</Materiau>
+    <Materiau value="0">matW</Materiau>
+  </Materiaux>
+
+  <Contacts>
+    <Contact type="3" value="1">
+      <Parameters>
+        <Parameter name="color">0</Parameter>
+        <Parameter name="en">0.85</Parameter>
+        <Parameter name="eps">1e-10</Parameter>
+        <Parameter name="f">0</Parameter>
+        <Parameter name="kms">0</Parameter>
+        <Parameter name="ks">300</Parameter>
+        <Parameter name="muc">0.62</Parameter>
+        <Parameter name="mur">0.2</Parameter>
+        <Parameter name="mut">1000</Parameter>
+        <Parameter name="nr">0</Parameter>
+        <Parameter name="stiff">450000</Parameter>
+      </Parameters>
+    </Contact>
+  </Contacts>
+
+</GRAINS>
