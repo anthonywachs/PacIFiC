@@ -5,7 +5,7 @@
 
 # Sets here the directories where the mac scripts will recursively
 # find the source files of the application
-SRC = RegressionTests Misc Solvers Grains_file
+SRC = RegressionTests Misc Solvers 
 
 # default compilation system (used to find the architecture)
 CCC := gcc
@@ -87,12 +87,9 @@ $(libdir)/%/Makefile:
 	mac depend -verbose -l $(MACLIB) \
 	-I $(XERCESCROOT)/include \
 	-I $(MACWORLD_MPI_INCDIR) \
-<<<<<<< HEAD
-=======
 	-I $(BASILISK_DLMFD) \
 	-I $(GRAINS_HOME)/Grains/inc \
 	-path $(GRAINS_HOME)/Grains/lib$(GRAINS_FULL_EXT) -l grains \
->>>>>>> origin/compilation_update
 	-path $(XERCESCROOT)/lib$(GRAINS_BITS_EXT)-$(GRAINS_SERCOMPIL_ENV)-$(GRAINS_SERCOMPIL_VERSION) -l xerces-c -l xerces-depdom \
 	-path $(MACWORLD_GFORTRAN_LIBDIR) -l $(MACWORLD_GFORTRAN_LIBS) \
 	-compiler $(CCC) $* $(@D) $(SRC)
