@@ -4,7 +4,7 @@
 
 # Clean all
 make allclean
-if [ -d ${PETSC_ARCH} ] 
+if [ -d ${PETSC_ARCH} ]
 then
   rm -rf ${PETSC_ARCH}
 fi
@@ -65,7 +65,7 @@ if [[ "${PETSC_SHARED_LIB}" == "yes" ]]
 then
   boolshared="1"
 else
-  boolshared="0"  
+  boolshared="0"
 fi
 echo 'Petsc as shared library =' ${boolshared}
 
@@ -74,7 +74,7 @@ if [[ "${MACWORLD_SERCOMPIL_ENV}" == "GNU" ]]
 then
   boolgnucompilers="1"
 else
-  boolgnucompilers="0"    
+  boolgnucompilers="0"
 fi
 echo 'Petsc compiled with GNU =' ${boolgnucompilers}
 
@@ -83,27 +83,23 @@ if [[ "${HYPRE_SHARED_LIB}" == "yes" ]]
 then
   hyprelibext="so"
 else
-  hyprelibext="a"  
+  hyprelibext="a"
 fi
 echo 'HYPRE lib extension =' ${hyprelibext}
 
 
 # Configure
-# Script with
-# - HYPRE installed manually 
-# - MUMPS, Parmetis, PTScotch, Scalapck and Blacs downloaded from the Petsc website http://ftp.mcs.anl.gov/pub/petsc/externalpackages/
-config/configure.py --with-fortran --with-pic=1 --CC="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_C}" --CXX="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_CXX}" --FC="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_F90}" --COPTFLAGS="${PETSC_OPT_FLAGS}" --CXXOPTFLAGS="${PETSC_OPT_FLAGS}" --FOPTFLAGS="${PETSC_OPT_FLAGS}" --with-debugging=0 --with-mpi=1 --with-shared-libraries=${boolshared} --with-mpi-compilers=1 --with-gnu-compilers=${boolgnucompilers} --with-mpiexec="${MACWORLD_MPI_BINDIR}/mpiexec" --with-blas-lapack-lib="${LIBLAS_FOR_PETSC___} ${LIBATLAS_FOR_PETSC___} ${LIBLAPACK_FOR_PETSC___}" --with-hypre=1  --with-hypre-include="${HYPRE_DIR}/${HYPRE_ARCH}/include" --with-hypre-lib="${HYPRE_DIR}/${HYPRE_ARCH}/lib/libHYPRE.${hyprelibext}" --with-mpi-include="[${MACWORLD_MPI_INCDIR},${MACWORLD_MPI_GFORTRAN_INCDIR}]" --with-mpi-lib="${LIBMPI_FOR_PETSC___}" --LDFLAGS="${LIBINTEL_FOR_PETSC___} ${LIBGNU_FOR_PETSC___}" --with-blacs=1 --download-blacs="yes" --with-scalapack=1 --download-scalapack="yes" --with-ptscotch=1 --download-ptscotch="yes" --with-parmetis=1 --download-parmetis="yes" --with-mumps=1 --download-mumps="yes"
+# Options assumed that
+# - HYPRE installed manually
+# - if with MUMPS: MUMPS, Parmetis, PTScotch, Scalapack and Blacs downloaded from the Petsc website http://ftp.mcs.anl.gov/pub/petsc/externalpackages/
+if [[ "${MACWORLD_PETSC_WITH_MUMPS}" == "1" ]]
+then
+  MUMPS_OPTS="--with-blacs=1 --download-blacs=yes --with-scalapack=1 --download-scalapack=yes --with-ptscotch=1 --download-ptscotch=yes --with-parmetis=1 --download-parmetis=yes --with-mumps=1 --download-mumps=yes"
+else
+  MUMPS_OPTS=""
+fi
+./configure --with-fortran --with-pic=1 --with-cmake=${PACIFIC_CMAKE} --CC="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_C}" --CXX="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_CXX}" --FC="${MACWORLD_MPI_BINDIR}/${MACWORLD_MPI_F90}" --COPTFLAGS="${PETSC_OPT_FLAGS}" --CXXOPTFLAGS="${PETSC_OPT_FLAGS}" --FOPTFLAGS="${PETSC_OPT_FLAGS}" --CFLAGS="-pthread" --CXXFLAGS="-pthread" --FFLAGS="-pthread" --with-debugging=0 --with-mpi=1 --with-shared-libraries=${boolshared} --with-mpi-compilers=1 --with-gnu-compilers=${boolgnucompilers} --with-mpiexec="${MACWORLD_MPI_BINDIR}/mpiexec" --with-blas-lapack-lib="${LIBLAS_FOR_PETSC___} ${LIBATLAS_FOR_PETSC___} ${LIBLAPACK_FOR_PETSC___}" --with-hypre=1  --with-hypre-include="${HYPRE_DIR}/${HYPRE_ARCH}/include" --with-hypre-lib="${HYPRE_DIR}/${HYPRE_ARCH}/lib/libHYPRE.${hyprelibext}" --with-mpi-include="[${MACWORLD_MPI_INCDIR},${MACWORLD_MPI_GFORTRAN_INCDIR}]" --with-mpi-lib="${LIBMPI_FOR_PETSC___}" --LDFLAGS="${LIBINTEL_FOR_PETSC___} ${LIBGNU_FOR_PETSC___}" ${MUMPS_OPTS}
 
-
-
-# Original script with only manually installed HYPRE and shared libraries
-#config/configure.py --with-fortran --with-pic=1 --CC="${PELIPACK_MPI_BINDIR}/${PELIPACK_MPI_C}" --CXX="${PELIPACK_MPI_BINDIR}/${PELIPACK_MPI_CXX}" --FC="${PELIPACK_MPI_BINDIR}/${PELIPACK_MPI_F90}" --CFLAGS="-O3" --CXXFLAGS="-O3" --FFLAGS="-O3" --with-debugging=0 --with-mpi=1 --with-shared-libraries=1 --with-mpi-compilers=1 --with-gnu-compilers=1 --with-mpiexec="${PELIPACK_MPI_BINDIR}/mpiexec" --with-blas-lapack-lib="${LIBLAS_FOR_PETSC___} ${LIBATLAS_FOR_PETSC___} ${LIBLAPACK_FOR_PETSC___}" --with-hypre=1  --with-hypre-include="${HYPRE_DIR}/${HYPRE_ARCH}/include" --with-hypre-lib="${HYPRE_DIR}/${HYPRE_ARCH}/lib/libHYPRE.so" --with-mpi-include="[${PELIPACK_MPI_INCDIR},${PELIPACK_MPI_GFORTRAN_INCDIR}]" --with-mpi-lib="${LIBMPI_FOR_PETSC___}" --LDFLAGS="${LIBINTEL_FOR_PETSC___}"
-
-# This script tries to use manually installed MUMPS, scalapack and blacs
-# But fails as Petsc forces --with-parmetis=1 and my version of MUMPS is not compiled with Parmetis
-# Interesting things to learn about --with-xxx-dir: Petsc configure script expects libraries lib or lib 
-# config/configure.py --with-fortran --with-pic=1 --CC="${PELIPACK_MPI_BINDIR}/${PELIPACK_MPI_C}" --CXX="${PELIPACK_MPI_BINDIR}/${PELIPACK_MPI_CXX}" --FC="${PELIPACK_MPI_BINDIR}/${PELIPACK_MPI_F90}" --CFLAGS="-O3 -DAdd_" --CXXFLAGS="-O3 -DAdd_" --FFLAGS="-O3 -DAdd_" --with-debugging=0 --with-mpi=1 --with-shared-libraries=1 --with-mpi-compilers=1 --with-gnu-compilers=1 --with-mpiexec="${PELIPACK_MPI_BINDIR}/mpiexec" --with-blas-lapack-lib="${LIBLAS_FOR_PETSC___} ${LIBATLAS_FOR_PETSC___} ${LIBLAPACK_FOR_PETSC___}" --with-hypre=1  --with-hypre-include="${HYPRE_DIR}/${HYPRE_ARCH}/include" --with-hypre-lib="${HYPRE_DIR}/${HYPRE_ARCH}/lib/libHYPRE.so" --with-mpi-include="[${PELIPACK_MPI_INCDIR},${PELIPACK_MPI_GFORTRAN_INCDIR}]" --with-mpi-lib="${LIBMPI_FOR_PETSC___}" --LDFLAGS="${LIBINTEL_FOR_PETSC___}" --with-mumps=1 --with-mumps-include="${MUMPS_DIR}/include" --with-mumps-lib="-L${MUMPS_DIR}/lib -ldmumps-${PETSC_ARCH} -lmumps_common-${PETSC_ARCH} -lpord-${PETSC_ARCH}"  --with-scalapack=1 --with-scalapack-dir="${PELIPACK_SCALAPACK_LIBDIR}" --with-blacs=1 --with-blacs-dir="/home/wachs/local/blacs-dev"
- 
 # Compile and test
 make
 make test

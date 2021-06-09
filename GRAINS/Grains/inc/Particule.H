@@ -858,11 +858,6 @@ public:
   /** @brief Restauration de l'etat */
   void restaureState();
 
-
-  /** @brief Ecriture de l'information de position pour Basilisk */
-  virtual void writePositionInFluid (struct BasiliskDataStructure * b);
-
-
   /** @brief Restauration de l'etat
   @param Pmemento_ configuration
   @param Cmemento_ cinematique

@@ -41,8 +41,8 @@ public:
   /** @brief Defini le pas temps (couplage avec Basilisk).
   @param dtfluid Le pas de temps fluide */
   virtual void set_timeStep( double const dtfluid );
-  virtual void set_ExplicitAddedMasstimeStep( double dtfluid ); 
-  
+  virtual void set_ExplicitAddedMasstimeStep( double dtfluid );
+
   /** @brief Construction du probleme.
   @param rootElement Le noeud racine */
   virtual void Construction( DOMElement* rootElement );
@@ -134,13 +134,14 @@ public:
   @param dirRes repertoire de resultats
   @param fluidsolver nom du solveur fluide (PeliGRIFF ou Basilisk) */
   void InitializeExplicitAddedMassRestart( bool const& restart,
-  	string const& dirRes, string const& fluidsolver = "PeliGRIFF" );
+  	string const& dirRes_Or_rootfilename,
+	string const& fluidsolver = "PeliGRIFF" );
 
   /** @brief Sauvegarde par defaut de l'etat initial pour post-processing */
-  virtual void InitialPostProcessing();
+  virtual void InitialPostProcessing( size_t indent_width = 0 );
 
   /** @brief Sauvegarde pour post-processing et restart */
-  virtual void doPostProcessing();
+  virtual void doPostProcessing( size_t indent_width = 0 );
 
   /** @brief Sauvegarde pour post-processing evolution et restart */
   virtual void doPostProcessingEvo( const double &time );
@@ -191,13 +192,13 @@ public:
   void checkParaviewPostProcessing( const string &name_, const string &root_,
   	const bool &isBinary );
 
-  /** @brief Verifie que le post processing Paraview est actif pour Basilisk, sinon le cree
+  /** @brief Verifie que le post processing Paraview est actif pour Basilisk,
+  sinon le cree
   @param name_ nom des fichiers
   @param root_ racine du nom des fichiers
   @param isBinary ecriture en mode binaire */
   void checkParaviewPostProcessing( const char * name_, const char * root_,
   	const bool &isBinary );
-
 
   /** @brief Verifie que le post processing Matlab est actif, sinon le cree
   @param name_ nom des fichiers
@@ -205,7 +206,6 @@ public:
   @param isBinary ecriture en mode binaire */
   void checkMatlabPostProcessing( const string &name_, const string &root_,
   	const bool &isBinary );
-
 
   /** @brief Force le code a activer le mode reload "same" */
   void setReloadSame() { m_forceReloadSame = true ; } ;

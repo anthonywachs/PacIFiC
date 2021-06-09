@@ -6,7 +6,6 @@
 #include <sstream>
 #include <vector>
 #include <list>
-#include "BasiliskInterfaceDataStructure.h"
 using namespace std;
 
 class Particule;
@@ -108,7 +107,7 @@ public:
   //@}
 
   /**
-  @brief Ecriture des particules dans le BasiliskDataStructure 
+  @brief Ecriture des particules dans le BasiliskDataStructure
   @param allProcParticules vecteur contenant l'ensemble des particules sur tous
    les processeurs
   @param obstaclesToFluid liste des particules

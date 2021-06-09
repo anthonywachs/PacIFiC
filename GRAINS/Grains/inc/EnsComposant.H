@@ -192,7 +192,8 @@ public:
 	LinkedCell const* LC, vector<Fenetre> const& insert_windows,
 	int rang = 0,
 	int nprocs = 1,
-  	MPIWrapperGrains const* wrapper = NULL );
+  	MPIWrapperGrains const* wrapper = NULL,
+	size_t indent_width = 0 );
 
   /** @brief Ecriture des composants pour Post-Processing (Ecriture
   d'evolution)
@@ -206,7 +207,8 @@ public:
 	LinkedCell const* LC,
 	int rang = 0,
   	int nprocs = 1,
-	MPIWrapperGrains const* wrapper = NULL );
+	MPIWrapperGrains const* wrapper = NULL,
+	size_t indent_width = 0 );
 
   /** @brief Ecriture des composants pour Post-Processing GrainsCompFeatures */
   void PostProcessing();
@@ -490,7 +492,7 @@ public:
   void setVelocityAndVelocityDifferencePreviousTimeRestart(
   	string const& PelDirRes );
   double setVelocityAndVelocityDifferencePreviousTimeRestart_Basilisk(
-  	string const& dirRes );
+  	string const& rootfilename );
 
   /** @brief Mouvement aleatoire sur les particules actives
   @param coefTrans amplitude max du mouvement translationnel
