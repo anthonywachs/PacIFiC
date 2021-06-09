@@ -12,7 +12,7 @@ export LIBMPI_FOR_GRAINS___=$(echo -e ${GRAINS_MPI_LIBS} | sed 's%[^ ][^ ]*%-l&%
 # End MPI linking libs
 
 # Xerces definition
-export XERCESCROOT=/home/gitlab-runner/dependencies/XERCES-2.8.0
+export XERCESCROOT=${GRAINS_HOME}/XERCES-2.8.0
 export XERCESC_ROOT=${XERCESCROOT}
 # End Xerces definition
 
