@@ -178,6 +178,8 @@ public SolverComputingTime
       double assemble_local_rhs(size_t const& j,size_t const& k,double const& gamma,FV_TimeIterator const* t_it,size_t const& comp,size_t const& dir,size_t const& field);
       
       /** @brief Assemble rhs for pressure in any direction */
+      double calculate_velocity_divergence ( size_t const& i, size_t const& j, size_t const& k, size_t const& level, FV_TimeIterator const* t_it);
+
       double pressure_local_rhs_FD( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
       double pressure_local_rhs_FV( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
@@ -186,6 +188,7 @@ public SolverComputingTime
       void update_particle_system(FV_TimeIterator const* t_it);
 
       size_t return_row_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
+      double return_divergence_weighting (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k, FV_TimeIterator const* t_it );
 
       void Solids_generation (size_t const& field);
       void initialize_GRAINS( void );
@@ -204,6 +207,9 @@ public SolverComputingTime
 
       /** @brief Initialize the velocity on the velocity nodes in MAC grid*/
       void nodes_field_initialization ( size_t const& level );
+
+      /** @brief Initialize the fresh nodes emerged out of solid*/
+      void fresh_nodes_in_fluid_initialization ( );
 
       void generate_list_of_local_particles (FV_DiscreteField const* FF, size_t const& field );
 
@@ -283,9 +289,9 @@ public SolverComputingTime
       /** Pressure correction */
       void NS_final_step( FV_TimeIterator const* t_it ) ;
 
-      void write_output_field( FV_DiscreteField const* FF, size_t const& field );
+      void write_output_field( FV_DiscreteField const* FF, size_t const& field, FV_TimeIterator const* t_it );
 
-      double get_velocity_divergence(void);
+      double get_velocity_divergence(FV_TimeIterator const* t_it);
       
       void output_L2norm_pressure( size_t const& level );
 
@@ -346,6 +352,7 @@ public SolverComputingTime
       double kai;
       string AdvectionScheme;
       size_t AdvectionTimeAccuracy;
+      size_t DivRelax;
       double rho;
       bool b_restart ;
       bool is_solids;
