@@ -282,7 +282,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
 	"AdvectionTimeAccuracy", error_message );
    }
 
-   // Number of interation to relax the change in divergence stencil
+   // Number of iteration to relax the change in divergence stencil
    if ( exp->has_entry( "DivRelax" ) ) {
      DivRelax = exp->int_data( "DivRelax" );
      exp->test_data( "DivRelax", "DivRelax>=0" ) ;
@@ -747,14 +747,14 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
    if (level_set_type == "PipeX") error_with_analytical_solution_poiseuille3D();
 
    double vel_divergence = get_velocity_divergence(t_it);
-/*
+
    if ( my_rank == is_master ) {
       string fileName = "./DS_results/max_divergence.csv" ;
       ofstream MyFile( fileName.c_str(), ios::app ) ;
       MyFile << t_it -> time() << "," << vel_divergence << endl;
       MyFile.close( ) ;
    }
-*/
+
 //   write_output_field(PF,0,t_it);
 
    double cfl = UF->compute_CFL( t_it, 0 );
@@ -1329,7 +1329,6 @@ DDS_NavierStokes:: return_divergence_weighting (
    }
 
    return(lambda);
-//   return(1.);
 
 }
 
@@ -1867,7 +1866,7 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t
 	      }
 
 	      // If the fresh node is past DivRelax iterations then removed as a fresh cell with counter reset
-	      if ((fresh.niter[comp]->item(p) >= 2.*(double)DivRelax)) {
+	      if ((fresh.niter[comp]->item(p) >= 1.1*(double)DivRelax)) {
 		 fresh.flag[comp]->set_item(p,0);
                  fresh.niter[comp]->set_item(p,0);
 	      }
@@ -7548,8 +7547,8 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
   outputFile.open(filename.c_str());
 
   size_t i,j,k;
-//  outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv,behind,bev,front,fv" << endl;
-  outputFile << "x,y,z,lambda,void_frac,fresh,counter" << endl;//,behind,bev,front,fv" << endl;
+  outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv" << endl;//,behind,bev,front,fv" << endl;
+//  outputFile << "x,y,z,lambda,void_frac,fresh,counter" << endl;//,behind,bev,front,fv" << endl;
 
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
