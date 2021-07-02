@@ -1278,45 +1278,44 @@ DDS_NavierStokes:: return_divergence_weighting (
 
    size_t p = return_node_index(FF,comp,i,j,k);
 
-   if (node.void_frac[comp]->item(p) == 0) {
-      for ( size_t dir = 0; dir < dim ; dir++) {
-         if ((bf_intersect[dir].offset[comp]->item(p,0) == 1)) {
-            xi(dir) = bf_intersect[dir].value[comp]->item(p,0);
-            vi(dir) = bf_intersect[dir].field_var[comp]->item(p,0);
-         }	  
-         if ((bf_intersect[dir].offset[comp]->item(p,1) == 1)) {
-            xi(dir) = bf_intersect[dir].value[comp]->item(p,1);
-            vi(dir) = bf_intersect[dir].field_var[comp]->item(p,1);
-         }
-         if ((bf_intersect[dir].offset[comp]->item(p,1) == 1) && (bf_intersect[dir].offset[comp]->item(p,0) == 1)) {
-            xi(dir) = min(bf_intersect[dir].value[comp]->item(p,0),bf_intersect[dir].value[comp]->item(p,1));  
-            vi(dir) = max(bf_intersect[dir].field_var[comp]->item(p,0),bf_intersect[dir].field_var[comp]->item(p,1));
-	 }
-      }
-   } else if (node.void_frac[comp]->item(p) == 1) {
-      for ( size_t dir = 0; dir < dim ; dir++) {
-         if ((bs_intersect[dir].offset[comp]->item(p,0) == 1)) {
-            xi(dir) = bs_intersect[dir].value[comp]->item(p,0);
-            vi(dir) = bs_intersect[dir].field_var[comp]->item(p,0);
-         }	  
-         if ((bs_intersect[dir].offset[comp]->item(p,1) == 1)) {
-            xi(dir) = bs_intersect[dir].value[comp]->item(p,1);
-            vi(dir) = bs_intersect[dir].field_var[comp]->item(p,1);
-         }
-         if ((bs_intersect[dir].offset[comp]->item(p,1) == 1) && (bs_intersect[dir].offset[comp]->item(p,0) == 1)) {
-            xi(dir) = min(bs_intersect[dir].value[comp]->item(p,0),bs_intersect[dir].value[comp]->item(p,1));  
-            vi(dir) = max(bs_intersect[dir].field_var[comp]->item(p,0),bs_intersect[dir].field_var[comp]->item(p,1));
-	 }
-      }
-   }
-
-   double r = (dim == 2) ? min(xi(0),xi(1)) : min(xi(0),min(xi(1),xi(2)));
-   double vbound = (dim == 2) ? max(vi(0),vi(1)) : max(vi(0),max(vi(1),vi(2)));
-
-   double local_cfl = (double)DivRelax*t_it->time_step()*vbound;
-
-   // Differentiable transition function
    if (fresh.flag[comp]->item(p) != 0) {
+      if (node.void_frac[comp]->item(p) == 0) {
+         for ( size_t dir = 0; dir < dim ; dir++) {
+            if ((bf_intersect[dir].offset[comp]->item(p,0) == 1)) {
+               xi(dir) = bf_intersect[dir].value[comp]->item(p,0);
+               vi(dir) = bf_intersect[dir].field_var[comp]->item(p,0);
+            } else if ((bf_intersect[dir].offset[comp]->item(p,1) == 1)) {
+               xi(dir) = bf_intersect[dir].value[comp]->item(p,1);
+               vi(dir) = bf_intersect[dir].field_var[comp]->item(p,1);
+            } 
+            if ((bf_intersect[dir].offset[comp]->item(p,1) == 1) && (bf_intersect[dir].offset[comp]->item(p,0) == 1)) {
+               xi(dir) = min(bf_intersect[dir].value[comp]->item(p,0),bf_intersect[dir].value[comp]->item(p,1));  
+               vi(dir) = max(bf_intersect[dir].field_var[comp]->item(p,0),bf_intersect[dir].field_var[comp]->item(p,1));
+	    }
+         }
+      } else if (node.void_frac[comp]->item(p) == 1) {
+         for ( size_t dir = 0; dir < dim ; dir++) {
+            if ((bs_intersect[dir].offset[comp]->item(p,0) == 1)) {
+               xi(dir) = bs_intersect[dir].value[comp]->item(p,0);
+               vi(dir) = bs_intersect[dir].field_var[comp]->item(p,0);
+            } else if ((bs_intersect[dir].offset[comp]->item(p,1) == 1)) {
+               xi(dir) = bs_intersect[dir].value[comp]->item(p,1);
+               vi(dir) = bs_intersect[dir].field_var[comp]->item(p,1);
+            } 
+            if ((bs_intersect[dir].offset[comp]->item(p,1) == 1) && (bs_intersect[dir].offset[comp]->item(p,0) == 1)) {
+               xi(dir) = min(bs_intersect[dir].value[comp]->item(p,0),bs_intersect[dir].value[comp]->item(p,1));  
+               vi(dir) = max(bs_intersect[dir].field_var[comp]->item(p,0),bs_intersect[dir].field_var[comp]->item(p,1));
+            }
+         }
+      }
+
+      double r = (dim == 2) ? min(xi(0),xi(1)) : min(xi(0),min(xi(1),xi(2)));
+      double vbound = (dim == 2) ? max(MAC::abs(vi(0)),MAC::abs(vi(1))) 
+	                         : max(MAC::abs(vi(0)),max(MAC::abs(vi(1)),MAC::abs(vi(2))));
+
+      double local_cfl = (double)DivRelax*t_it->time_step()*vbound;
+
+      // Differentiable transition function
       if (r < 0.) {
          lambda = 0;
       } else if ((r >= 0.) && (r <= local_cfl)) {
@@ -7547,15 +7546,15 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
   outputFile.open(filename.c_str());
 
   size_t i,j,k;
-  outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv" << endl;//,behind,bev,front,fv" << endl;
-//  outputFile << "x,y,z,lambda,void_frac,fresh,counter" << endl;//,behind,bev,front,fv" << endl;
+//  outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv" << endl;//,behind,bev,front,fv" << endl;
+  outputFile << "x,y,z,lambda,void_frac,fresh,counter" << endl;//,behind,bev,front,fv" << endl;
 
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
 
   NodeProp node = GLOBAL_EQ->get_node_property(field,0);
-//  FreshNode fresh = GLOBAL_EQ->get_fresh_node(field);
-  BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,0);
+  FreshNode fresh = GLOBAL_EQ->get_fresh_node(field);
+//  BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,0);
 
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices
@@ -7585,15 +7584,15 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
               double id = node.parID[comp]->item(p);
               double voidf = node.void_frac[comp]->item(p);
 
-//              double lambda = return_divergence_weighting(PF,comp,i,j,k,t_it);
-              outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
-//              outputFile << xC << "," << yC << "," << zC << "," << lambda << "," << voidf << "," << fresh.flag[comp]->item(p) << "," << fresh.niter[comp]->item(p) << endl;
-              for (size_t dir = 0; dir < dim; dir++) {
+              double lambda = return_divergence_weighting(PF,comp,i,j,k,t_it);
+//              outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
+              outputFile << xC << "," << yC << "," << zC << "," << lambda << "," << voidf << "," << fresh.flag[comp]->item(p) << "," << fresh.niter[comp]->item(p) << endl;
+/*              for (size_t dir = 0; dir < dim; dir++) {
                   for (size_t off = 0; off < 2; off++) {
                       outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off);
                   }
               }
-              outputFile << endl;
+              outputFile << endl;*/
            }
         }
      }
