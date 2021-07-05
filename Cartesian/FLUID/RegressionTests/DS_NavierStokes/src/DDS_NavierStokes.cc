@@ -7007,22 +7007,26 @@ DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i, size_t const
 
    double value = beta*div2;
 
-   if (fresh.flag[comp]->item(return_node_index(PF,comp,i,j,k)) != 0) {
-      value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i,j,k,t_it);
-   } else if (fresh.flag[comp]->item(return_node_index(PF,comp,i-1,j,k)) != 0) {
-      value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i-1,j,k,t_it);
-   } else if (fresh.flag[comp]->item(return_node_index(PF,comp,i+1,j,k)) != 0) {
-      value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i+1,j,k,t_it);
-   } else if (fresh.flag[comp]->item(return_node_index(PF,comp,i,j-1,k)) != 0) {
-      value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i,j-1,k,t_it);
-   } else if (fresh.flag[comp]->item(return_node_index(PF,comp,i,j+1,k)) != 0) {
-      value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i,j+1,k,t_it);
-   } else if (dim == 3) {
-      if (fresh.flag[comp]->item(return_node_index(PF,comp,i,j,k-1)) != 0) {
-         value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i,j,k-1,t_it);
-      } else if (fresh.flag[comp]->item(return_node_index(PF,comp,i,j,k+1)) != 0) {
-         value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i,j,k+1,t_it);
+   if (node.void_frac[comp]->item(p) == 0) {
+      if (fresh.flag[comp]->item(return_node_index(PF,comp,i,j,k)) != 0) {
+         value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i,j,k,t_it);
+      } else if (fresh.flag[comp]->item(return_node_index(PF,comp,i-1,j,k)) != 0) {
+         value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i-1,j,k,t_it);
+      } else if (fresh.flag[comp]->item(return_node_index(PF,comp,i+1,j,k)) != 0) {
+         value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i+1,j,k,t_it);
+      } else if (fresh.flag[comp]->item(return_node_index(PF,comp,i,j-1,k)) != 0) {
+         value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i,j-1,k,t_it);
+      } else if (fresh.flag[comp]->item(return_node_index(PF,comp,i,j+1,k)) != 0) {
+         value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i,j+1,k,t_it);
+      } else if (dim == 3) {
+         if (fresh.flag[comp]->item(return_node_index(PF,comp,i,j,k-1)) != 0) {
+            value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i,j,k-1,t_it);
+         } else if (fresh.flag[comp]->item(return_node_index(PF,comp,i,j,k+1)) != 0) {
+            value  = divergence_ref.div->item(p) + (value - divergence_ref.div->item(p))*return_divergence_weighting(PF,comp,i,j,k+1,t_it);
+         }
       }
+   } else {
+      value = 0.;
    }
 
    return(value);
