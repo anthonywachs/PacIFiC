@@ -75,12 +75,14 @@ struct PartInput {
 /** @brief FreshNode to be used to store the fresh nodes coming in the fluid */
 struct FreshNode {
    LA_SeqVector ** flag;               // 1 if the node is considered as fresh, -1 if the node went just inside solid and 0 otherwise
-   LA_SeqVector ** niter;              // Iteration till the node was considered fresh
+   LA_SeqVector ** neigh;              // TRUE for neighbours of freash or dead cells
+   LA_SeqVector ** niter;              // Iteration till the node was considered fresh OR the neigh is considered
 };
 
 /** @brief DivNode to be used to store the divergence on pressure node */
 struct DivNode {
-   LA_SeqVector * div;
+   LA_SeqVector * div;			    // Stores divergence of all nodes in the domain
+   LA_SeqMatrix * stencil;                  // Stores the stencil components in each direction
 };
 
 /** @brief NodeProp to be used to store the nodes properties due to presence of solid particles in the domian */
@@ -315,7 +317,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       struct PartInput solid[2];
       struct NodeProp node[2][2];			       // 2 rows are for fields; 2 columns are for time level (current and last)
       struct FreshNode fresh[2];			       // 2 rows are for fields;
-      struct DivNode divergence[3];			       // 0 current timestep, 1 last time step, 2 reference time step for divergence relaxation
+      struct DivNode divergence[3];			       // 0 current timestep, 1 last time step. 2 for reference state
       struct SurfaceDiscretize surface;
       struct BoundaryBisec b_intersect[2][2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid); 2 are fields (PF,UF)
 

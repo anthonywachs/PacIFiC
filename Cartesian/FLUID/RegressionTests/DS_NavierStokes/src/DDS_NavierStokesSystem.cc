@@ -153,6 +153,9 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    divergence[0].div = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
    divergence[1].div = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
    divergence[2].div = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
+   divergence[0].stencil = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
+   divergence[1].stencil = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
+   divergence[2].stencil = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
 
    for (size_t field = 0; field < 2; field++) {
 
@@ -176,6 +179,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 
       // Vector to store the fresh nodes in the fluid emerging from solid
       fresh[field].flag = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
+      fresh[field].neigh = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
       fresh[field].niter = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
 
       for (size_t dir = 0; dir < dim; dir++) {
@@ -304,6 +308,9 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    divergence[0].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    divergence[1].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    divergence[2].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   divergence[0].stencil = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+   divergence[1].stencil = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+   divergence[2].stencil = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
 
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
@@ -335,6 +342,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
                node[field][1].parID[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field][1].bound_cell[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                fresh[field].flag[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+               fresh[field].neigh[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                fresh[field].niter[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             }
 
@@ -596,11 +604,15 @@ DDS_NavierStokesSystem:: re_initialize( void )
             node[field][1].parID[comp]->re_initialize( nb_total_unknown ) ;
             node[field][1].bound_cell[comp]->re_initialize( nb_total_unknown ) ;
             fresh[field].flag[comp]->re_initialize( nb_total_unknown ) ;
+            fresh[field].neigh[comp]->re_initialize( nb_total_unknown ) ;
             fresh[field].niter[comp]->re_initialize( nb_total_unknown ) ;
             if ((field==0)&&(comp==0)) {
                divergence[0].div->re_initialize( nb_total_unknown ) ;
                divergence[1].div->re_initialize( nb_total_unknown ) ;
                divergence[2].div->re_initialize( nb_total_unknown ) ;
+               divergence[0].stencil->re_initialize( nb_total_unknown,3 ) ;
+               divergence[1].stencil->re_initialize( nb_total_unknown,3 ) ;
+               divergence[2].stencil->re_initialize( nb_total_unknown,3 ) ;
 	    }
             for (size_t i=0;i<dim;i++) {
                for (size_t j=0;j<2;j++) {

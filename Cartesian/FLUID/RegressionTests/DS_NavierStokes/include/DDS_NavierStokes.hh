@@ -180,6 +180,10 @@ public SolverComputingTime
       /** @brief Assemble rhs for pressure in any direction */
       double calculate_velocity_divergence ( size_t const& i, size_t const& j, size_t const& k, size_t const& level, FV_TimeIterator const* t_it);
 
+      double assemble_velocity_gradients ( size_t const& i, size_t const& j, size_t const& k, size_t const& level, bool const& div_ref);
+
+      void detect_fresh_cells_and_neighbours();
+
       double pressure_local_rhs_FD( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
       double pressure_local_rhs_FV( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
