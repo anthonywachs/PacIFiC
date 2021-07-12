@@ -72,11 +72,11 @@ struct PartInput {
    LA_SeqVector ** local_parID;         // list of ID's present in the current processor
 };
 
-/** @brief FreshNode to be used to store the fresh nodes coming in the fluid */
+/** @brief FreshNode to be used to store the fresh nodes coming in the fluid (only for pressure field)*/
 struct FreshNode {
-   LA_SeqVector ** flag;               // 1 if the node is considered as fresh, -1 if the node went just inside solid and 0 otherwise
-   LA_SeqVector ** neigh;              // TRUE for neighbours of freash or dead cells
-   LA_SeqVector ** niter;              // Iteration till the node was considered fresh OR the neigh is considered
+   LA_SeqVector * flag;               // 1 if the node is considered as fresh, -1 if the node went just inside solid and 0 otherwise
+   LA_SeqVector * neigh;              // TRUE for neighbours of freash or dead cells
+   LA_SeqVector * niter;              // Iteration till the node was considered fresh OR the neigh is considered
 };
 
 /** @brief DivNode to be used to store the divergence on pressure node */
@@ -185,7 +185,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @brief Return the (presence/absence) of particle vector */
       NodeProp get_node_property(size_t const& field, size_t const& time_level);
       /** @brief Return the fresh node emerging out of solid */
-      FreshNode get_fresh_node(size_t const& field);
+      FreshNode get_fresh_node(size_t const& time_level);
       /** @brief Return the divergence on pressure node */
       DivNode get_node_divergence(size_t const& time_level);
       /** @brief Return information of intersection with solid boundary */
@@ -316,7 +316,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       // Particle structures
       struct PartInput solid[2];
       struct NodeProp node[2][2];			       // 2 rows are for fields; 2 columns are for time level (current and last)
-      struct FreshNode fresh[2];			       // 2 rows are for fields;
+      struct FreshNode Pfresh[2];			       // defined for pressure nodes; 2 columns are for time level (current and last)
       struct DivNode divergence[3];			       // 0 current timestep, 1 last time step. 2 for reference state
       struct SurfaceDiscretize surface;
       struct BoundaryBisec b_intersect[2][2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid); 2 are fields (PF,UF)
