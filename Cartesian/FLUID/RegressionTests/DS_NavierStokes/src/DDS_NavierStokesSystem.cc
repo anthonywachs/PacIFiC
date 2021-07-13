@@ -161,9 +161,13 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    Pfresh[0].flag = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
    Pfresh[0].neigh = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
    Pfresh[0].niter = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
+   Pfresh[0].parID = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
+   Pfresh[0].sep_vel = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
    Pfresh[1].flag = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
    Pfresh[1].neigh = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
    Pfresh[1].niter = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
+   Pfresh[1].parID = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
+   Pfresh[1].sep_vel = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
 
    for (size_t field = 0; field < 2; field++) {
 
@@ -317,9 +321,13 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    Pfresh[0].flag = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    Pfresh[0].neigh = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    Pfresh[0].niter = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   Pfresh[0].parID = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   Pfresh[0].sep_vel = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
    Pfresh[1].flag = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    Pfresh[1].neigh = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    Pfresh[1].niter = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   Pfresh[1].parID = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   Pfresh[1].sep_vel = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
 
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
@@ -619,9 +627,13 @@ DDS_NavierStokesSystem:: re_initialize( void )
                Pfresh[0].flag->re_initialize( nb_total_unknown ) ;
                Pfresh[0].neigh->re_initialize( nb_total_unknown ) ;
                Pfresh[0].niter->re_initialize( nb_total_unknown ) ;
+               Pfresh[0].parID->re_initialize( nb_total_unknown ) ;
+               Pfresh[0].sep_vel->re_initialize( nb_total_unknown ) ;
                Pfresh[1].flag->re_initialize( nb_total_unknown ) ;
                Pfresh[1].neigh->re_initialize( nb_total_unknown ) ;
                Pfresh[1].niter->re_initialize( nb_total_unknown ) ;
+               Pfresh[1].parID->re_initialize( nb_total_unknown ) ;
+               Pfresh[1].sep_vel->re_initialize( nb_total_unknown ) ;
 	    }
             for (size_t i=0;i<dim;i++) {
                for (size_t j=0;j<2;j++) {

@@ -1312,10 +1312,11 @@ DDS_NavierStokes:: return_divergence_weighting (
       }
 
       double r = (dim == 2) ? min(xi(0),xi(1)) : min(xi(0),min(xi(1),xi(2)));
-      double vbound = (dim == 2) ? max(MAC::abs(vi(0)),MAC::abs(vi(1))) 
-	                         : max(MAC::abs(vi(0)),max(MAC::abs(vi(1)),MAC::abs(vi(2))));
+//      double vbound = (dim == 2) ? max(MAC::abs(vi(0)),MAC::abs(vi(1))) 
+//	                         : max(MAC::abs(vi(0)),max(MAC::abs(vi(1)),MAC::abs(vi(2))));
 
-      double local_cfl = (double)DivRelax*t_it->time_step()*vbound;
+//      double local_cfl = (double)DivRelax*t_it->time_step()*vbound;
+      double local_cfl = (double)DivRelax*t_it->time_step()*fresh.sep_vel->item(p);
 
       // Differentiable transition function
       if (r < 0.) {
@@ -1834,13 +1835,15 @@ DDS_NavierStokes:: detect_fresh_cells_and_neighbours()
            size_t p = return_node_index(PF,comp,i,j,k);
 
            // When the node first came in fluid, assign it to be fresh and counter increment
-           if ((node.void_frac[comp]->item(p) == 0) && (node_old.void_frac[comp]->item(p) == 1) && (fresh.niter->item(p) == 0)) {
+           if ((node.void_frac[comp]->item(p) == 0) && (node_old.void_frac[comp]->item(p) == 1)) {
               fresh.flag->set_item(p,1.);
-              fresh.niter->set_item(p,fresh.niter->item(p)+1);
+              fresh.niter->set_item(p,1);
+	      fresh.parID->set_item(p,node_old.parID[comp]->item(p));
            // When the node first came in solid, assign it to be dead and counter increment
-           } else if ((node.void_frac[comp]->item(p) == 1) && (node_old.void_frac[comp]->item(p) == 0) && (fresh.niter->item(p) == 0)) {
+           } else if ((node.void_frac[comp]->item(p) == 1) && (node_old.void_frac[comp]->item(p) == 0)) {
               fresh.flag->set_item(p,-1.);
-              fresh.niter->set_item(p,fresh.niter->item(p)+1);
+              fresh.niter->set_item(p,1);
+	      fresh.parID->set_item(p,node.parID[comp]->item(p));
            // If counter is no zero then keep the node fresh and +1 to counter
            } else if ((fresh.flag->item(p) != 0) && (fresh.niter->item(p) != 0)) {
               fresh.niter->set_item(p,fresh.niter->item(p)+1);
@@ -1907,6 +1910,37 @@ DDS_NavierStokes:: detect_fresh_cells_and_neighbours()
               fresh.flag->set_item(p,0);
               fresh.neigh->set_item(p,0);
               fresh.niter->set_item(p,0);
+              fresh.parID->set_item(p,0);
+	   }
+	}
+     }
+  }
+
+  PartInput solid = GLOBAL_EQ->get_solid(0);
+
+  // Surface normal vector calculation on fresh/dead or neighbouring nodes
+  for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+     double xC = PF->get_DOF_coordinate( i, comp, 0 ) ;
+     for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+        double yC = PF->get_DOF_coordinate( j, comp, 1 ) ;
+        for (size_t k=local_min_k;k<=local_max_k;++k) {
+	   double zC = 0.;
+	   if (dim == 3) zC = PF->get_DOF_coordinate( k, comp, 2 ) ;
+
+           size_t p = return_node_index(PF,comp,i,j,k);
+               
+           if (fresh.niter->item(p) != 0) {
+	      size_t parID = (size_t) fresh.parID->item(p);
+	      double vec_mag = pow(pow(xC-solid.coord[comp]->item(parID,0),2) 
+			         + pow(yC-solid.coord[comp]->item(parID,1),2) 
+				 + pow(zC-solid.coord[comp]->item(parID,2),2),0.5); 
+	      double vx = (xC-solid.coord[comp]->item(parID,0))/vec_mag * solid.vel[comp]->item(parID,0);
+	      double vy = (yC-solid.coord[comp]->item(parID,1))/vec_mag * solid.vel[comp]->item(parID,1);
+	      double vz = (zC-solid.coord[comp]->item(parID,2))/vec_mag * solid.vel[comp]->item(parID,2);
+	      double sep_mag = pow(pow(vx,2)+pow(vy,2)+pow(vz,2),0.5);
+              fresh.sep_vel->set_item(p,sep_mag);
+           } else {
+              fresh.sep_vel->set_item(p,0.);
 	   }
 	}
      }
@@ -7264,10 +7298,10 @@ DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i, size_t const
       if (node.void_frac[comp]->item(p) == 0) {
          double ref_value = assemble_velocity_gradients(i,j,k,level,1);
 
-//	 if (p == 18973) {
-//            cout << "ref_div: " << ref_value << "," << value << "," << wmin << endl;
-//	    cout << "ref_stencil: " << divergence_ref.stencil->item(p,0) << "," << divergence_ref.stencil->item(p,1) << endl;
-//	 }
+/*	 if (p == 18370) {
+            cout << "ref_div: " << ref_value << "," << value << "," << wmin << endl;
+	    cout << "ref_stencil: " << divergence_ref.stencil->item(p,0) << "," << divergence_ref.stencil->item(p,1) << endl;
+	 }*/
 
 	 // Reference value is zero for the fresh cells, but not for 
 	 // the neighbouring cells to the fresh/dead cells
@@ -7279,7 +7313,7 @@ DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i, size_t const
       }
    }
 
-//   if (p == 18973) cout << "value: " << value << endl;
+//   if (p == 18370) cout << "value: " << value << endl;
    return(value);
 }
 
@@ -7789,7 +7823,7 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
 
   size_t i,j,k;
 //  outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv" << endl;//,behind,bev,front,fv" << endl;
-  outputFile << "x,y,z,id,lambda,void_frac,fresh,neigh,counter,div" << endl;//,behind,bev,front,fv" << endl;
+  outputFile << "x,y,z,id,lambda,void_frac,fresh,neigh,counter,div,vel" << endl;//,behind,bev,front,fv" << endl;
 
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
@@ -7830,7 +7864,7 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
               double lambda = return_divergence_weighting(PF,comp,i,j,k,t_it);
 	      double div = divergence.div->item(p);
 //              outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
-              outputFile << xC << "," << yC << "," << zC << "," << p << "," << lambda << "," << voidf << "," << fresh.flag->item(p) << "," << fresh.neigh->item(p) << "," << fresh.niter->item(p) << "," << div << endl;
+              outputFile << xC << "," << yC << "," << zC << "," << p << "," << lambda << "," << voidf << "," << fresh.flag->item(p) << "," << fresh.neigh->item(p) << "," << fresh.niter->item(p) << "," << div << "," << fresh.sep_vel->item(p) << endl;
 /*              for (size_t dir = 0; dir < dim; dir++) {
                   for (size_t off = 0; off < 2; off++) {
                       outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off);
