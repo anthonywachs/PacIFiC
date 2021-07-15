@@ -1272,7 +1272,6 @@ DDS_NavierStokes:: return_divergence_weighting (
    double lambda = 0.;
 
    doubleVector xi(3,1.);
-   doubleVector vi(3,0.);
 
    xi(0) = 0.5*FF->get_cell_size(i,comp,0);
    xi(1) = 0.5*FF->get_cell_size(j,comp,1);
@@ -1285,37 +1284,27 @@ DDS_NavierStokes:: return_divergence_weighting (
          for ( size_t dir = 0; dir < dim ; dir++) {
             if ((bf_intersect[dir].offset[comp]->item(p,0) == 1)) {
                xi(dir) = bf_intersect[dir].value[comp]->item(p,0);
-               vi(dir) = bf_intersect[dir].field_var[comp]->item(p,0);
             } else if ((bf_intersect[dir].offset[comp]->item(p,1) == 1)) {
                xi(dir) = bf_intersect[dir].value[comp]->item(p,1);
-               vi(dir) = bf_intersect[dir].field_var[comp]->item(p,1);
             } 
             if ((bf_intersect[dir].offset[comp]->item(p,1) == 1) && (bf_intersect[dir].offset[comp]->item(p,0) == 1)) {
                xi(dir) = min(bf_intersect[dir].value[comp]->item(p,0),bf_intersect[dir].value[comp]->item(p,1));  
-               vi(dir) = max(bf_intersect[dir].field_var[comp]->item(p,0),bf_intersect[dir].field_var[comp]->item(p,1));
 	    }
          }
       } else if (node.void_frac[comp]->item(p) == 1) {
          for ( size_t dir = 0; dir < dim ; dir++) {
             if ((bs_intersect[dir].offset[comp]->item(p,0) == 1)) {
                xi(dir) = bs_intersect[dir].value[comp]->item(p,0);
-               vi(dir) = bs_intersect[dir].field_var[comp]->item(p,0);
             } else if ((bs_intersect[dir].offset[comp]->item(p,1) == 1)) {
                xi(dir) = bs_intersect[dir].value[comp]->item(p,1);
-               vi(dir) = bs_intersect[dir].field_var[comp]->item(p,1);
             } 
             if ((bs_intersect[dir].offset[comp]->item(p,1) == 1) && (bs_intersect[dir].offset[comp]->item(p,0) == 1)) {
                xi(dir) = min(bs_intersect[dir].value[comp]->item(p,0),bs_intersect[dir].value[comp]->item(p,1));  
-               vi(dir) = max(bs_intersect[dir].field_var[comp]->item(p,0),bs_intersect[dir].field_var[comp]->item(p,1));
             }
          }
       }
 
       double r = (dim == 2) ? min(xi(0),xi(1)) : min(xi(0),min(xi(1),xi(2)));
-//      double vbound = (dim == 2) ? max(MAC::abs(vi(0)),MAC::abs(vi(1))) 
-//	                         : max(MAC::abs(vi(0)),max(MAC::abs(vi(1)),MAC::abs(vi(2))));
-
-//      double local_cfl = (double)DivRelax*t_it->time_step()*vbound;
       double local_cfl = (double)DivRelax*t_it->time_step()*fresh.sep_vel->item(p);
 
       // Differentiable transition function
@@ -1897,7 +1886,8 @@ DDS_NavierStokes:: detect_fresh_cells_and_neighbours()
                
            // Reference stencil only valid for cells in neighbour with either fresh or dead cell
            if ((fresh.niter->item(p) == 1) && (fresh.neigh->item(p) == 1)) {
-              if (fresh.neigh->item(p) != fresh_old.neigh->item(p)) {
+//              if (fresh.neigh->item(p) != fresh_old.neigh->item(p)) {
+              if (fresh_old.neigh->item(p) == 0) {
                  divergence_ref.div->set_item(p,divergence_old.div->item(p));
                  divergence_ref.stencil->set_item(p,0,divergence_old.stencil->item(p,0));
                  divergence_ref.stencil->set_item(p,1,divergence_old.stencil->item(p,1));
