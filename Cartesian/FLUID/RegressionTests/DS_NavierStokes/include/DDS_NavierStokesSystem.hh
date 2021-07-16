@@ -75,7 +75,7 @@ struct PartInput {
 /** @brief FreshNode to be used to store the fresh nodes coming in the fluid (only for pressure field)*/
 struct FreshNode {
    LA_SeqVector * flag;               // 1 if the node is considered as fresh, -1 if the node went just inside solid and 0 otherwise
-   LA_SeqVector * neigh;              // TRUE for neighbours of freash or dead cells
+   LA_SeqMatrix * neigh;              // TRUE for neighbours of freash or dead cells
    LA_SeqVector * niter;              // Iteration till the node was considered fresh OR the neigh is considered
    LA_SeqVector * parID;              // ID of particle nearest to the fresh node
    LA_SeqVector * sep_vel;            // Separation velocity of solid surface in the fluid cell
@@ -85,6 +85,7 @@ struct FreshNode {
 struct DivNode {
    LA_SeqVector * div;			    // Stores divergence of all nodes in the domain
    LA_SeqMatrix * stencil;                  // Stores the stencil components in each direction
+   LA_SeqMatrix * lambda;                   // Stores the stencil components in each direction
 };
 
 /** @brief NodeProp to be used to store the nodes properties due to presence of solid particles in the domian */

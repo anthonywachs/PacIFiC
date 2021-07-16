@@ -712,6 +712,8 @@ DDS_NavierStokes:: do_before_inner_iterations_stage(
 
       detect_fresh_cells_and_neighbours();
 
+      calculate_divergence_weighting(t_it);
+
       // Direction splitting
       // Assemble 1D tridiagonal matrices
       assemble_1D_matrices(t_it);
@@ -1782,6 +1784,105 @@ DDS_NavierStokes:: generate_list_of_local_particles (FV_DiscreteField const* FF,
 
 //---------------------------------------------------------------------------
 void
+DDS_NavierStokes:: calculate_divergence_weighting(FV_TimeIterator const* t_it)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes:: calculate_divergence_weighting" ) ;
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  FreshNode fresh = GLOBAL_EQ->get_fresh_node(0);
+  DivNode divergence = GLOBAL_EQ->get_node_divergence(0);
+  DivNode divergence_old = GLOBAL_EQ->get_node_divergence(1);
+
+  size_t comp = 0;
+
+  // Get local min and max indices; 
+  // Calculation on the rows next to the unknown (i.e. not handled by the proc) as well
+  for (size_t l=0;l<dim;++l) {
+     // Calculations for solids on the total unknown on the proc
+     min_unknown_index(l) = PF->get_min_index_unknown_on_proc( comp, l );
+     max_unknown_index(l) = PF->get_max_index_unknown_on_proc( comp, l );
+  }
+
+  size_t local_min_k = 0;
+  size_t local_max_k = 0;
+
+  if (dim == 3) {
+     local_min_k = min_unknown_index(2);
+     local_max_k = max_unknown_index(2);
+  }
+
+  // Calculating weighting index for all fresh/dead nodes
+  for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+     for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+        for (size_t k=local_min_k;k<=local_max_k;++k) {
+           size_t p = return_node_index(PF,comp,i,j,k);
+	   double lamb = return_divergence_weighting(PF,comp,i,j,k,t_it);
+           divergence.lambda->set_item(p,0,lamb);
+           divergence.lambda->set_item(p,1,lamb);
+           divergence.lambda->set_item(p,2,lamb);
+	}
+     }
+  }
+
+  divergence_old.lambda->set(divergence.lambda);
+
+  // Calculating weighting index for nodes neighbours to fresh/dead nodes
+  for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+     for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+        for (size_t k=local_min_k;k<=local_max_k;++k) {
+           double wr=1.,wl=1.,wt=1.,wbo=1.,wf=1.,wbe=1.;
+
+           size_t p = return_node_index(PF,comp,i,j,k);
+           if ((is_solids) && (fresh.niter->item(p) != 0)) {
+	      if (fresh.neigh->item(p,0) != 0) {
+                 size_t pl = return_node_index(PF,comp,i-1,j,k);
+                 if (fresh.flag->item(pl) != 0) {
+                    wl = divergence_old.lambda->item(pl,0);
+                 }
+                 size_t pr = return_node_index(PF,comp,i+1,j,k);
+                 if (fresh.flag->item(pr) != 0) {
+                    wr = divergence_old.lambda->item(pr,0);
+                 } 
+                 divergence.lambda->set_item(p,0,MAC::min(wl,wr));
+	      }
+
+	      if (fresh.neigh->item(p,1) != 0) {
+                 size_t pbo = return_node_index(PF,comp,i,j-1,k);
+                 if (fresh.flag->item(pbo) != 0) {
+                    wbo = divergence_old.lambda->item(pbo,1);
+                 } 
+                 size_t pt = return_node_index(PF,comp,i,j+1,k);
+                 if (fresh.flag->item(pt) != 0) {
+                    wt = divergence_old.lambda->item(pt,1);
+                 } 
+                 divergence.lambda->set_item(p,1,MAC::min(wbo,wt));
+	      }
+
+              if (dim == 3) {
+	         if (fresh.neigh->item(p,2) != 0) {
+	            size_t pbe = return_node_index(PF,comp,i,j,k-1);
+                    if (fresh.flag->item(pbe) != 0) {
+                       wbe = divergence_old.lambda->item(pbe,2);
+                    } 
+	            size_t pf = return_node_index(PF,comp,i,j,k+1);
+                    if (fresh.flag->item(pf) != 0) {
+                       wf = divergence_old.lambda->item(pf,2);
+                    }
+		 }
+              }
+
+              divergence.lambda->set_item(p,2,MAC::min(wbe,wf));
+	   }
+	}
+     }
+  }
+}
+
+//---------------------------------------------------------------------------
+void
 DDS_NavierStokes:: detect_fresh_cells_and_neighbours()
 //---------------------------------------------------------------------------
 {
@@ -1865,7 +1966,7 @@ DDS_NavierStokes:: detect_fresh_cells_and_neighbours()
                  for (size_t off=0;off<2;off++) {
                     size_t pi = node_neigh(dir,off);
                     if ((fresh.flag->item(p) == 0) && (fresh.flag->item(pi) != 0)) {
-                       fresh.neigh->set_item(p,1);
+                       fresh.neigh->set_item(p,dir,1);
 		       if (fresh.niter->item(pi) < temp_count) {
                           fresh.niter->set_item(p,fresh.niter->item(pi));
 			  temp_count = fresh.niter->item(pi);
@@ -1885,20 +1986,35 @@ DDS_NavierStokes:: detect_fresh_cells_and_neighbours()
            size_t p = return_node_index(PF,comp,i,j,k);
                
            // Reference stencil only valid for cells in neighbour with either fresh or dead cell
-           if ((fresh.niter->item(p) == 1) && (fresh.neigh->item(p) == 1)) {
-//              if (fresh.neigh->item(p) != fresh_old.neigh->item(p)) {
-              if (fresh_old.neigh->item(p) == 0) {
-                 divergence_ref.div->set_item(p,divergence_old.div->item(p));
+           if (fresh.niter->item(p) == 1) { 
+              divergence_ref.div->set_item(p,divergence_old.div->item(p));
+	      if (((fresh.neigh->item(p,0) == 1) 
+                || (fresh.neigh->item(p,1) == 1) 
+		|| (fresh.neigh->item(p,2) == 1))
+                && (fresh_old.niter->item(p) == 0)) {
+
                  divergence_ref.stencil->set_item(p,0,divergence_old.stencil->item(p,0));
                  divergence_ref.stencil->set_item(p,1,divergence_old.stencil->item(p,1));
                  divergence_ref.stencil->set_item(p,2,divergence_old.stencil->item(p,2));
 	      }
+/*
+	      // If the node existed as neighbour in the last iteration but see changes in stencil any direction
+	      if (fresh.niter->item(p) < fresh_old.niter->item(p)) {
+	         if ((fresh.neigh->item(p,0) == 1) && (fresh.neigh->item(p,0) != fresh_old.neigh->item(p,0)))  
+                    divergence_ref.stencil->set_item(p,0,divergence_old.stencil->item(p,0));
+	         if ((fresh.neigh->item(p,1) == 1) && (fresh.neigh->item(p,1) != fresh_old.neigh->item(p,1)))  
+                    divergence_ref.stencil->set_item(p,1,divergence_old.stencil->item(p,1));
+	         if ((fresh.neigh->item(p,2) == 1) && (fresh.neigh->item(p,2) != fresh_old.neigh->item(p,2)))  
+                    divergence_ref.stencil->set_item(p,2,divergence_old.stencil->item(p,2));
+	      }*/
            }
 
            // If the fresh node is past DivRelax iterations then removed as a fresh cell with counter reset
            if (fresh.niter->item(p) >= 1.1*(double)DivRelax) {
               fresh.flag->set_item(p,0);
-              fresh.neigh->set_item(p,0);
+              fresh.neigh->set_item(p,0,0);
+              fresh.neigh->set_item(p,1,0);
+              fresh.neigh->set_item(p,2,0);
               fresh.niter->set_item(p,0);
               fresh.parID->set_item(p,0);
 	   }
@@ -7033,7 +7149,7 @@ double DDS_NavierStokes:: divergence_wall_flux ( size_t const& i, size_t const& 
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_velocity_gradients ( size_t const& i, size_t const& j, size_t const& k, size_t const& level, bool const& div_ref)
+DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad, size_t const& i, size_t const& j, size_t const& k, size_t const& level, bool const& div_ref)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: assemble_velocity_gradients" ) ;
@@ -7160,8 +7276,6 @@ DDS_NavierStokes:: assemble_velocity_gradients ( size_t const& i, size_t const& 
    bx = xh/bx;
    by = yh/by;
 
-   double div2 = xvalue/xh + yvalue/yh;
-
    double beta = min(1.,min(bx,by));
 
    if (dim == 3) {
@@ -7222,12 +7336,15 @@ DDS_NavierStokes:: assemble_velocity_gradients ( size_t const& i, size_t const& 
 
       bz = zh/bz;
 
-      div2 = xvalue/xh + yvalue/yh + zvalue/zh;
-         
+      grad(2) = zvalue/zh;
+
       beta = min(1.,min(bx,min(by,bz)));
    }
 
-   return(beta*div2);
+   grad(0) = xvalue/xh;
+   grad(1) = yvalue/yh;
+
+   return(beta);
 
 }
 
@@ -7240,70 +7357,49 @@ DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i, size_t const
    MAC_LABEL("DDS_NavierStokes:: calculate_velocity_divergence" ) ;
    NodeProp node = GLOBAL_EQ->get_node_property(0,0);
    FreshNode fresh = GLOBAL_EQ->get_fresh_node(0);
-//   DivNode divergence_ref = GLOBAL_EQ->get_node_divergence(2);
+   DivNode divergence_ref = GLOBAL_EQ->get_node_divergence(2);
+   DivNode divergence = GLOBAL_EQ->get_node_divergence(0);
+
+   doubleVector grad(3,0);
 
    size_t comp = 0;
 
    size_t p = return_node_index(PF,comp,i,j,k);
 
-   double value = assemble_velocity_gradients(i,j,k,level,0);
+   double beta = assemble_velocity_gradients(grad,i,j,k,level,0);
 
-   double wc=1.,wr=1.,wl=1.,wt=1.,wbo=1.,wf=1.,wbe=1.,wmin=1.;
+   double value = beta*(grad(0) + grad(1) + grad(2));
 
    if ((is_solids) && (fresh.niter->item(p) != 0)) {
-      if (fresh.flag->item(return_node_index(PF,comp,i,j,k)) != 0) {
-         wc = return_divergence_weighting(PF,comp,i,j,k,t_it);
-      } 
-      if (fresh.flag->item(return_node_index(PF,comp,i-1,j,k)) != 0) {
-         wl = return_divergence_weighting(PF,comp,i-1,j,k,t_it);
-      }
-      if (fresh.flag->item(return_node_index(PF,comp,i+1,j,k)) != 0) {
-         wr = return_divergence_weighting(PF,comp,i+1,j,k,t_it);
-      } 
-
-      double min_x = MAC::min(wl,wr);
-
-      if (fresh.flag->item(return_node_index(PF,comp,i,j-1,k)) != 0) {
-         wbo = return_divergence_weighting(PF,comp,i,j-1,k,t_it);
-      } 
-      if (fresh.flag->item(return_node_index(PF,comp,i,j+1,k)) != 0) {
-         wt = return_divergence_weighting(PF,comp,i,j+1,k,t_it);
-      } 
-     
-      double min_y = MAC::min(wbo,wt);
-
-      if (dim == 3) {
-         if (fresh.flag->item(return_node_index(PF,comp,i,j,k-1)) != 0) {
-            wbe = return_divergence_weighting(PF,comp,i,j,k-1,t_it);
-         } 
-	 if (fresh.flag->item(return_node_index(PF,comp,i,j,k+1)) != 0) {
-            wf = return_divergence_weighting(PF,comp,i,j,k+1,t_it);
-         }      
-      }
-
-      double min_z = MAC::min(wbe,wf);
-
-      wmin = MAC::min(min_z,MAC::min(min_y,MAC::min(wc,min_x)));
-
       if (node.void_frac[comp]->item(p) == 0) {
-         double ref_value = assemble_velocity_gradients(i,j,k,level,1);
 
-/*	 if (p == 18370) {
-            cout << "ref_div: " << ref_value << "," << value << "," << wmin << endl;
+	 doubleVector grad_ref(3,0);
+
+         double beta_ref = assemble_velocity_gradients(grad_ref,i,j,k,level,1);
+
+/*	 if (p == 18973) {
+            cout << "ref_div: " << beta_ref*(grad_ref(0)+grad_ref(1)+grad_ref(2)) << "," << value << "," << endl;
 	    cout << "ref_stencil: " << divergence_ref.stencil->item(p,0) << "," << divergence_ref.stencil->item(p,1) << endl;
 	 }*/
 
 	 // Reference value is zero for the fresh cells, but not for 
 	 // the neighbouring cells to the fresh/dead cells
-	 if (fresh.flag->item(p) != 0) ref_value = 0.;
+	 if (fresh.flag->item(p) != 0) { 
+            grad_ref(0) = 0.; grad_ref(1) = 0.; grad_ref(2) = 0.;
+	 }
 
-         value  = ref_value + (value - ref_value)*wmin;
+	 double lambda = MAC::min(divergence.lambda->item(p,2),MAC::min(divergence.lambda->item(p,1),
+				                                        divergence.lambda->item(p,0)));
+
+         value  = beta_ref*grad_ref(0) + (beta*grad(0) - beta_ref*grad_ref(0))*divergence.lambda->item(p,0)
+		+ beta_ref*grad_ref(1) + (beta*grad(1) - beta_ref*grad_ref(1))*divergence.lambda->item(p,1)
+		+ beta_ref*grad_ref(2) + (beta*grad(2) - beta_ref*grad_ref(2))*divergence.lambda->item(p,2);
       } else {
          value = 0.;
       }
    }
 
-//   if (p == 18370) cout << "value: " << value << endl;
+// if (p == 18973) cout << "value: " << value << endl;
    return(value);
 }
 
@@ -7813,7 +7909,7 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
 
   size_t i,j,k;
 //  outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv" << endl;//,behind,bev,front,fv" << endl;
-  outputFile << "x,y,z,id,lambda,void_frac,fresh,neigh,counter,div,vel" << endl;//,behind,bev,front,fv" << endl;
+  outputFile << "x,y,z,id,lambdax,lambday,void_frac,fresh,neighx,neighy,counter,div,vel" << endl;//,behind,bev,front,fv" << endl;
 
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
@@ -7851,10 +7947,11 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
 //              double id = node.parID[comp]->item(p);
               double voidf = node.void_frac[comp]->item(p);
 
-              double lambda = return_divergence_weighting(PF,comp,i,j,k,t_it);
+              double lambdax = divergence.lambda->item(p,0);
+              double lambday = divergence.lambda->item(p,1);
 	      double div = divergence.div->item(p);
 //              outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
-              outputFile << xC << "," << yC << "," << zC << "," << p << "," << lambda << "," << voidf << "," << fresh.flag->item(p) << "," << fresh.neigh->item(p) << "," << fresh.niter->item(p) << "," << div << "," << fresh.sep_vel->item(p) << endl;
+              outputFile << xC << "," << yC << "," << zC << "," << p << "," << lambdax << "," << lambday << "," << voidf << "," << fresh.flag->item(p) << "," << fresh.neigh->item(p,0) << "," << fresh.neigh->item(p,1) << "," << fresh.niter->item(p) << "," << div << "," << fresh.sep_vel->item(p) << endl;
 /*              for (size_t dir = 0; dir < dim; dir++) {
                   for (size_t off = 0; off < 2; off++) {
                       outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off);
