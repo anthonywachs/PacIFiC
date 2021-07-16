@@ -7357,7 +7357,7 @@ DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i, size_t const
    MAC_LABEL("DDS_NavierStokes:: calculate_velocity_divergence" ) ;
    NodeProp node = GLOBAL_EQ->get_node_property(0,0);
    FreshNode fresh = GLOBAL_EQ->get_fresh_node(0);
-   DivNode divergence_ref = GLOBAL_EQ->get_node_divergence(2);
+//   DivNode divergence_ref = GLOBAL_EQ->get_node_divergence(2);
    DivNode divergence = GLOBAL_EQ->get_node_divergence(0);
 
    doubleVector grad(3,0);
@@ -7387,9 +7387,6 @@ DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i, size_t const
 	 if (fresh.flag->item(p) != 0) { 
             grad_ref(0) = 0.; grad_ref(1) = 0.; grad_ref(2) = 0.;
 	 }
-
-	 double lambda = MAC::min(divergence.lambda->item(p,2),MAC::min(divergence.lambda->item(p,1),
-				                                        divergence.lambda->item(p,0)));
 
          value  = beta_ref*grad_ref(0) + (beta*grad(0) - beta_ref*grad_ref(0))*divergence.lambda->item(p,0)
 		+ beta_ref*grad_ref(1) + (beta*grad(1) - beta_ref*grad_ref(1))*divergence.lambda->item(p,1)
