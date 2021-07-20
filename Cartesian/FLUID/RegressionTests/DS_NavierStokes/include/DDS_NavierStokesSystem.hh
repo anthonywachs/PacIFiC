@@ -188,9 +188,9 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @brief Return the (presence/absence) of particle vector */
       NodeProp get_node_property(size_t const& field, size_t const& time_level);
       /** @brief Return the fresh node emerging out of solid */
-      FreshNode get_fresh_node(size_t const& time_level);
+      FreshNode* get_fresh_node();
       /** @brief Return the divergence on pressure node */
-      DivNode get_node_divergence(size_t const& time_level);
+      DivNode* get_node_divergence();
       /** @brief Return information of intersection with solid boundary */
       BoundaryBisec* get_b_intersect(size_t const& field, size_t const& level);
 

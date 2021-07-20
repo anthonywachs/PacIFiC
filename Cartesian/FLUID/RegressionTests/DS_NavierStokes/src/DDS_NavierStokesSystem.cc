@@ -150,27 +150,28 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    surface.coordinate = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
    surface.area = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
    surface.normal = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-   divergence[0].div = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   divergence[1].div = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   divergence[2].div = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   divergence[0].stencil = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-   divergence[1].stencil = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-   divergence[2].stencil = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-   divergence[0].lambda = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-   divergence[1].lambda = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-   divergence[2].lambda = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
+/*   divergence[0].div = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   divergence[1].div = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   divergence[2].div = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   divergence[0].stencil = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
+   divergence[1].stencil = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
+   divergence[2].stencil = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
+   divergence[0].lambda = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
+   divergence[1].lambda = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
+   divergence[2].lambda = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;*/
 
    // Vector to store the fresh nodes in the fluid emerging from solid
-   Pfresh[0].flag = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   Pfresh[0].neigh = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-   Pfresh[0].niter = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   Pfresh[0].parID = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   Pfresh[0].sep_vel = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   Pfresh[1].flag = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   Pfresh[1].neigh = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-   Pfresh[1].niter = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   Pfresh[1].parID = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   Pfresh[1].sep_vel = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
+/*   Pfresh[0].flag = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   Pfresh[0].neigh = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
+   Pfresh[0].niter = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   Pfresh[0].parID = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   Pfresh[0].sep_vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   Pfresh[1].flag = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   Pfresh[1].neigh = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
+   Pfresh[1].niter = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   Pfresh[1].parID = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   Pfresh[1].sep_vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;*/
+
 
    for (size_t field = 0; field < 2; field++) {
 
@@ -863,21 +864,21 @@ DDS_NavierStokesSystem::get_node_property(size_t const& field, size_t const& tim
 }
 
 //----------------------------------------------------------------------
-DivNode
-DDS_NavierStokesSystem::get_node_divergence(size_t const& time_level)
+DivNode*
+DDS_NavierStokesSystem::get_node_divergence()
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_node_divergence" ) ;
-   return (divergence[time_level]) ;
+   return (divergence) ;
 }
 
 //----------------------------------------------------------------------
-FreshNode
-DDS_NavierStokesSystem::get_fresh_node(size_t const& time_level)
+FreshNode*
+DDS_NavierStokesSystem::get_fresh_node()
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_fresh_node" ) ;
-   return (Pfresh[time_level]) ;
+   return (Pfresh) ;
 }
 
 
