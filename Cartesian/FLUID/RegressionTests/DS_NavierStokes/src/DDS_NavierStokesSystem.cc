@@ -150,28 +150,16 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    surface.coordinate = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
    surface.area = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
    surface.normal = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-/*   divergence[0].div = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   divergence[1].div = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   divergence[2].div = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   divergence[0].stencil = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
-   divergence[1].stencil = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
-   divergence[2].stencil = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
-   divergence[0].lambda = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
-   divergence[1].lambda = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
-   divergence[2].lambda = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;*/
+   divergence[0].stencil = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   divergence[1].stencil = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   divergence[2].stencil = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   divergence[0].lambda = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   divergence[1].lambda = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   divergence[2].lambda = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
 
    // Vector to store the fresh nodes in the fluid emerging from solid
-/*   Pfresh[0].flag = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   Pfresh[0].neigh = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
-   Pfresh[0].flag_count = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   Pfresh[0].parID = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   Pfresh[0].sep_vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   Pfresh[1].flag = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   Pfresh[1].neigh = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
-   Pfresh[1].flag_count = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   Pfresh[1].parID = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   Pfresh[1].sep_vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;*/
-
+   Pfresh[0].neigh = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   Pfresh[1].neigh = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
 
    for (size_t field = 0; field < 2; field++) {
 
@@ -316,27 +304,24 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    surface.coordinate = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
    surface.area = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    surface.normal = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   divergence[0].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   divergence[1].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   divergence[2].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   divergence[0].stencil = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   divergence[1].stencil = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   divergence[2].stencil = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   divergence[0].lambda = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   divergence[1].lambda = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   divergence[2].lambda = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   Pfresh[0].flag = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   Pfresh[0].neigh = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   Pfresh[0].flag_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   Pfresh[0].neigh_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   Pfresh[0].parID = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   Pfresh[0].sep_vel = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
-   Pfresh[1].flag = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   Pfresh[1].neigh = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   Pfresh[1].flag_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   Pfresh[1].neigh_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   Pfresh[1].parID = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   Pfresh[1].sep_vel = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
+
+   for (size_t level=0;level<3;level++) {
+      divergence[level].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+      for (size_t dir=0;dir<3;dir++) {
+         divergence[level].stencil[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+         divergence[level].lambda[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+      }
+   }
+   for (size_t level=0;level<2;level++) {
+      Pfresh[level].flag = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+      Pfresh[level].flag_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+      Pfresh[level].neigh_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+      Pfresh[level].parID = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+      Pfresh[level].sep_vel = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
+      for (size_t dir=0;dir<3;dir++) {
+         Pfresh[level].neigh[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
+      }
+   }
 
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
@@ -627,27 +612,24 @@ DDS_NavierStokesSystem:: re_initialize( void )
             node[field][1].parID[comp]->re_initialize( nb_total_unknown ) ;
             node[field][1].bound_cell[comp]->re_initialize( nb_total_unknown ) ;
             if ((field==0)&&(comp==0)) {
-               divergence[0].div->re_initialize( nb_total_unknown ) ;
-               divergence[1].div->re_initialize( nb_total_unknown ) ;
-               divergence[2].div->re_initialize( nb_total_unknown ) ;
-               divergence[0].stencil->re_initialize( nb_total_unknown,3 ) ;
-               divergence[1].stencil->re_initialize( nb_total_unknown,3 ) ;
-               divergence[2].stencil->re_initialize( nb_total_unknown,3 ) ;
-               divergence[0].lambda->re_initialize( nb_total_unknown,3 ) ;
-               divergence[1].lambda->re_initialize( nb_total_unknown,3 ) ;
-               divergence[2].lambda->re_initialize( nb_total_unknown,3 ) ;
-               Pfresh[0].flag->re_initialize( nb_total_unknown ) ;
-               Pfresh[0].neigh->re_initialize( nb_total_unknown,3 ) ;
-               Pfresh[0].flag_count->re_initialize( nb_total_unknown ) ;
-               Pfresh[0].neigh_count->re_initialize( nb_total_unknown ) ;
-               Pfresh[0].parID->re_initialize( nb_total_unknown ) ;
-               Pfresh[0].sep_vel->re_initialize( nb_total_unknown ) ;
-               Pfresh[1].flag->re_initialize( nb_total_unknown ) ;
-               Pfresh[1].neigh->re_initialize( nb_total_unknown,3 ) ;
-               Pfresh[1].flag_count->re_initialize( nb_total_unknown ) ;
-               Pfresh[1].neigh_count->re_initialize( nb_total_unknown ) ;
-               Pfresh[1].parID->re_initialize( nb_total_unknown ) ;
-               Pfresh[1].sep_vel->re_initialize( nb_total_unknown ) ;
+               for (size_t level=0;level<3;level++) {
+                  divergence[level].div->re_initialize( nb_total_unknown ) ;
+                  for (size_t dir=0;dir<3;dir++) {
+                     divergence[level].stencil[dir]->re_initialize( nb_total_unknown ) ;
+                     divergence[level].lambda[dir]->re_initialize( nb_total_unknown ) ;
+		  }
+	       }
+
+               for (size_t level=0;level<2;level++) {
+                  Pfresh[level].flag->re_initialize( nb_total_unknown ) ;
+                  Pfresh[level].flag_count->re_initialize( nb_total_unknown ) ;
+                  Pfresh[level].neigh_count->re_initialize( nb_total_unknown ) ;
+                  Pfresh[level].parID->re_initialize( nb_total_unknown ) ;
+                  Pfresh[level].sep_vel->re_initialize( nb_total_unknown ) ;
+                  for (size_t dir=0;dir<3;dir++) {
+                     Pfresh[level].neigh[dir]->re_initialize( nb_total_unknown ) ;
+		  }
+	       }
 	    }
             for (size_t i=0;i<dim;i++) {
                for (size_t j=0;j<2;j++) {
