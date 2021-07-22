@@ -163,12 +163,12 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    // Vector to store the fresh nodes in the fluid emerging from solid
 /*   Pfresh[0].flag = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    Pfresh[0].neigh = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
-   Pfresh[0].niter = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   Pfresh[0].flag_count = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    Pfresh[0].parID = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    Pfresh[0].sep_vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    Pfresh[1].flag = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    Pfresh[1].neigh = (LA_SeqMatrix**) malloc(sizeof(LA_SeqMatrix*)) ;
-   Pfresh[1].niter = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   Pfresh[1].flag_count = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    Pfresh[1].parID = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    Pfresh[1].sep_vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;*/
 
@@ -327,12 +327,14 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    divergence[2].lambda = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
    Pfresh[0].flag = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    Pfresh[0].neigh = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   Pfresh[0].niter = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   Pfresh[0].flag_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   Pfresh[0].neigh_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    Pfresh[0].parID = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    Pfresh[0].sep_vel = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
    Pfresh[1].flag = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    Pfresh[1].neigh = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-   Pfresh[1].niter = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   Pfresh[1].flag_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   Pfresh[1].neigh_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    Pfresh[1].parID = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    Pfresh[1].sep_vel = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
 
@@ -636,12 +638,14 @@ DDS_NavierStokesSystem:: re_initialize( void )
                divergence[2].lambda->re_initialize( nb_total_unknown,3 ) ;
                Pfresh[0].flag->re_initialize( nb_total_unknown ) ;
                Pfresh[0].neigh->re_initialize( nb_total_unknown,3 ) ;
-               Pfresh[0].niter->re_initialize( nb_total_unknown ) ;
+               Pfresh[0].flag_count->re_initialize( nb_total_unknown ) ;
+               Pfresh[0].neigh_count->re_initialize( nb_total_unknown ) ;
                Pfresh[0].parID->re_initialize( nb_total_unknown ) ;
                Pfresh[0].sep_vel->re_initialize( nb_total_unknown ) ;
                Pfresh[1].flag->re_initialize( nb_total_unknown ) ;
                Pfresh[1].neigh->re_initialize( nb_total_unknown,3 ) ;
-               Pfresh[1].niter->re_initialize( nb_total_unknown ) ;
+               Pfresh[1].flag_count->re_initialize( nb_total_unknown ) ;
+               Pfresh[1].neigh_count->re_initialize( nb_total_unknown ) ;
                Pfresh[1].parID->re_initialize( nb_total_unknown ) ;
                Pfresh[1].sep_vel->re_initialize( nb_total_unknown ) ;
 	    }
