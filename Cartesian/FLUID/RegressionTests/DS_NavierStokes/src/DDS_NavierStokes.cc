@@ -82,7 +82,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , is_solids( false )
    , is_par_motion( false )
    , is_stressCal( false )
-   , DivergenceScheme ( "FD" )
    , IntersectionMethod ( "Bisection" )
    , tolerance ( 1.e-6 ) 
 {
@@ -250,17 +249,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
      MAC_Error::object()->raise_bad_data_value( exp,
         "security_bandwidth", error_message );
    }
-/*
-   if ( exp->has_entry( "DivergenceScheme" ) )
-   {
-     DivergenceScheme = exp->string_data( "DivergenceScheme" ) ;
-     if ( DivergenceScheme != "FD" && DivergenceScheme != "FV") {
-        string error_message="   - FD\n   - FV";
-        MAC_Error::object()->raise_bad_data_value( exp,
-           "DivergenceScheme", error_message );
-     }
-   }
-*/
+
    // Method for calculating intersections 
    if ( exp->has_entry( "IntersectionMethod" ) )
    {
@@ -6981,11 +6970,7 @@ DDS_NavierStokes:: assemble_local_rhs ( size_t const& j, size_t const& k, double
    MAC_LABEL("DDS_NavierStokes:: assemble_local_rhs" ) ;
    double fe = 0.;
    if (field == 0) {
-      if (DivergenceScheme == "FD") {
-         fe = pressure_local_rhs_FD(j,k,t_it,dir);
-      } else {
-         fe = pressure_local_rhs_FV(j,k,t_it,dir);
-      }
+      fe = pressure_local_rhs(j,k,t_it,dir);
    } else if (field == 1) {
       fe = velocity_local_rhs(j,k,gamma,t_it,comp,dir);
    }
@@ -7034,79 +7019,6 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
       if (is_solids) nodes_field_initialization(0);
    }
 
-}
-
-//---------------------------------------------------------------------------
-double DDS_NavierStokes:: divergence_wall_flux ( size_t const& i, size_t const& j, size_t const& k, size_t const& comp, size_t const& wall_dir, double const& length, size_t const& level)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DDS_NavierStokes:: divergence_wall_flux" ) ;
-
-   double value;
-
-   BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(1,0);    // intersect information for velocity field(1) in fluid(0)
-   BoundaryBisec* bs_intersect = GLOBAL_EQ->get_b_intersect(1,1);    // intersect information for velocity field(1) in solid(1)
-   NodeProp node = GLOBAL_EQ->get_node_property(1,0);                 // node information for velocity field(1)
-
-   // Velocity of neighbouring nodes
-   double botVel=0., topVel=0.;
-   if (wall_dir == 1) {
-      botVel = UF->DOF_value( i, j-1, k, comp, level );
-      topVel = UF->DOF_value( i, j+1, k, comp, level );
-   } else if (wall_dir == 0) {
-      botVel = UF->DOF_value( i-1, j, k, comp, level );
-      topVel = UF->DOF_value( i+1, j, k, comp, level );
-   }
-
-   if (is_solids) {
-      value = 0.;
-
-      // Index of x component of velocity on right face
-      size_t p = return_node_index(UF,comp,i,j,k);
-
-      if (node.void_frac[comp]->item(p) == 0) {
-         // one side from node of velocity
-         if ((bf_intersect[wall_dir].offset[comp]->item(p,0) == 1)) {
-            double yb = bf_intersect[wall_dir].value[comp]->item(p,0);
-            if (yb <= length/2.) {
-               value = value + (bf_intersect[wall_dir].field_var[comp]->item(p,0) + UF->DOF_value( i, j, k, comp, level ))/2.*(yb);
-            } else {
-               value = value + ((length/4.)*bf_intersect[wall_dir].field_var[comp]->item(p,0) + (yb-length/4.)*UF->DOF_value( i, j, k, comp, level ))/yb*(length/2.);
-            }
-         } else {
-            value = value + ((length/4.)*botVel + (3.*length/4.)*UF->DOF_value( i, j, k, comp, level ))/length*(length/2.);
-         }
-
-         if ((bf_intersect[wall_dir].offset[comp]->item(p,1) == 1)) {
-            double yb = bf_intersect[wall_dir].value[comp]->item(p,1);
-            if (yb <= length/2.) {
-               value = value + (bf_intersect[wall_dir].field_var[comp]->item(p,1) + UF->DOF_value( i, j, k, comp, level ))/2.*(yb);
-            } else {
-               value = value + ((length/4.)*bf_intersect[wall_dir].field_var[comp]->item(p,1) + (yb-length/4.)*UF->DOF_value( i, j, k, comp, level ))/yb*(length/2.);
-            }
-         } else {
-            value = value + ((length/4.)*topVel + (3.*length/4.)*UF->DOF_value( i, j, k, comp, level ))/length*(length/2.);
-         }
-      } else if (node.void_frac[comp]->item(p) == 1) {
-         if ((bs_intersect[wall_dir].offset[comp]->item(p,0) == 1)) {
-            double yb = bs_intersect[wall_dir].value[comp]->item(p,0);
-            if (yb <= length/2.) {
-               value = value + ((3.*length/4.-yb/2.)*bs_intersect[wall_dir].field_var[comp]->item(p,0) + (length/4.-yb/2.)*botVel)/(length-yb)*(length/2.-yb);
-            }
-         }
-
-         if ((bs_intersect[wall_dir].offset[comp]->item(p,1) == 1)) {
-            double yb = bs_intersect[wall_dir].value[comp]->item(p,1);
-            if (yb <= length/2.) {
-               value = value + ((3.*length/4.-yb/2.)*bs_intersect[wall_dir].field_var[comp]->item(p,1) + (length/4.-yb/2.)*topVel)/(length-yb)*(length/2.-yb);
-            }
-         }
-      }
-   } else {
-      value = ((1./8.)*botVel + (6./8.)*UF->DOF_value( i, j, k, comp, level ) + (1./8.)*topVel)*length;
-   }
-
-   return(value);
 }
 
 //---------------------------------------------------------------------------
@@ -7369,7 +7281,7 @@ DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i, size_t const
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir)
+DDS_NavierStokes:: pressure_local_rhs ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: pressure_local_rhs" ) ;
@@ -7424,96 +7336,6 @@ DDS_NavierStokes:: pressure_local_rhs_FD ( size_t const& j, size_t const& k, FV_
       }
    }
 
-   return fe;
-}
-
-//---------------------------------------------------------------------------
-double
-DDS_NavierStokes:: pressure_local_rhs_FV ( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DDS_NavierStokes:: pressure_local_rhs_FV" ) ;
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-
-   for (size_t l=0;l<dim;++l) {
-      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-   }
-
-   size_t i,pos;
-   FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
-
-   // Compute VEC_rhs_x = rhs in x
-   double dx;
-   double right, left, top, bottom, front, behind;
-   double fe=0.;
-   double xvalue=0.,yvalue=0.,zvalue=0.,value=0.;
-
-   // Vector for fi
-   LocalVector* VEC = GLOBAL_EQ->get_VEC(0);
-
-   for (i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
-      dx = PF->get_cell_size( i, 0, dir );
-      if (dir == 0) {
-         double dy = PF->get_cell_size( j, 0, 1 );
-
-         // Dxx for un
-         // Right face flux calculation
-         right = divergence_wall_flux(shift.i+i,j,k,0,1,dy,0);
-         // Left face flux calculation
-         left = divergence_wall_flux(shift.i+i-1,j,k,0,1,dy,0);
-
-         // Dyy for un
-         // Top face flux calculation
-         top = divergence_wall_flux(i,shift.j+j,k,1,0,dx,0);
-         // Bottom face flux calculation
-         bottom = divergence_wall_flux(i,shift.j+j-1,k,1,0,dx,0);
-
-         xvalue = (right - left)/(dx*dy) ;
-         yvalue = (top - bottom)/(dx*dy) ;
-
-         if (dim == 3) {
-            double dz = PF->get_cell_size( k, 0, 2 );
-            // Dzz for un
-            front = UF->DOF_value( i, j, shift.k+k, 2, 0 );
-            behind = UF->DOF_value( i, j, shift.k+k-1, 2, 0 );
-            zvalue = front - behind ;
-
-            zvalue = zvalue/dz;
-         }
-
-         // Assemble the bodyterm
-         if (dim == 2) {
-            value = -(rho*(xvalue + yvalue)*dx)/(t_it -> time_step());
-         } else {
-            value = -(rho*(xvalue + yvalue + zvalue)*dx)/(t_it -> time_step());
-         }
-      } else if (dir == 1) {
-         value = PF->DOF_value( j, i, k, 0, 1 )*dx;
-      } else if (dir == 2) {
-         value = PF->DOF_value( j, k, i, 0, 1 )*dx;
-      }
-
-      pos = i - min_unknown_index(dir);
-
-      if (is_periodic[0][dir] == 0) {
-         if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
-            VEC[dir].local_T[0]->set_item( pos, value);
-         } else {
-            if (i == max_unknown_index(dir))
-               fe = value;
-            else
-               VEC[dir].local_T[0]->set_item( pos, value);
-         }  
-      } else {
-         if (i == max_unknown_index(dir))
-            fe = value;
-         else
-            VEC[dir].local_T[0]->set_item( pos, value);
-      }
-   }
    return fe;
 }
 

@@ -186,11 +186,8 @@ public SolverComputingTime
 
       void calculate_divergence_weighting (FV_TimeIterator const* t_it);
 
-      double pressure_local_rhs_FD( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
+      double pressure_local_rhs( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
-      double pressure_local_rhs_FV( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
-
-      double divergence_wall_flux( size_t const& i, size_t const& j, size_t const& k, size_t const& comp, size_t const& wall_dir, double const& length, size_t const& level);
       void update_particle_system(FV_TimeIterator const* t_it);
 
       size_t return_row_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
@@ -364,7 +361,6 @@ public SolverComputingTime
       bool is_solids;
       bool is_par_motion;
       bool is_stressCal;
-      string DivergenceScheme;
       string IntersectionMethod;
       string ViscousStressOrder;
       string PressureStressOrder;
