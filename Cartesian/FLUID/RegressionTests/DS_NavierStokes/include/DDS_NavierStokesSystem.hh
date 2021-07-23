@@ -98,9 +98,9 @@ struct NodeProp {
 
 /** @brief SurfaceDiscretize to be used to store the coordinates and area of discretize particle surface */
 struct SurfaceDiscretize {
-   LA_SeqMatrix * coordinate;                  // coordinates
-   LA_SeqVector * area;                        // area
-   LA_SeqMatrix * normal;	               // normal
+   LA_SeqVector ** coordinate;                  // coordinates
+   LA_SeqVector * area;                         // area
+   LA_SeqVector ** normal;	                // normal
 };
 
 /** @brief BoundaryBisec to be used to store the intersection of solids with grids in each direction */

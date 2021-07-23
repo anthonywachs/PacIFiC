@@ -3652,9 +3652,9 @@ DDS_NavierStokes:: second_order_pressure_stress(class doubleArray2D& force, size
      }
 
      // Rotating surface points
-     rotated_coord(0) = ri*surface.coordinate->item(i,0);
-     rotated_coord(1) = ri*surface.coordinate->item(i,1);
-     rotated_coord(2) = ri*surface.coordinate->item(i,2);
+     rotated_coord(0) = ri*surface.coordinate[0]->item(i);
+     rotated_coord(1) = ri*surface.coordinate[1]->item(i);
+     rotated_coord(2) = ri*surface.coordinate[2]->item(i);
 
      rotation_matrix(parID,rotated_coord,comp,0);
 
@@ -3663,9 +3663,9 @@ DDS_NavierStokes:: second_order_pressure_stress(class doubleArray2D& force, size
      ipoint(0,2) = zp + rotated_coord(2);
 
      // Rotating surface normal
-     rotated_normal(0) = surface.normal->item(i,0);
-     rotated_normal(1) = surface.normal->item(i,1);
-     rotated_normal(2) = surface.normal->item(i,2);
+     rotated_normal(0) = surface.normal[0]->item(i);
+     rotated_normal(1) = surface.normal[1]->item(i);
+     rotated_normal(2) = surface.normal[2]->item(i);
 
      rotation_matrix(parID,rotated_normal,comp,0);
 
@@ -3814,9 +3814,9 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleArray2
      }
 
      // Rotating surface points
-     rotated_coord(0) = ri*surface.coordinate->item(i,0);
-     rotated_coord(1) = ri*surface.coordinate->item(i,1);
-     rotated_coord(2) = ri*surface.coordinate->item(i,2);
+     rotated_coord(0) = ri*surface.coordinate[0]->item(i);
+     rotated_coord(1) = ri*surface.coordinate[1]->item(i);
+     rotated_coord(2) = ri*surface.coordinate[2]->item(i);
 
      rotation_matrix(parID,rotated_coord,comp,0);
 
@@ -3825,9 +3825,9 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleArray2
      point(0,2) = zp + rotated_coord(2);
 
      // Rotating surface normal
-     rotated_normal(0) = surface.normal->item(i,0);
-     rotated_normal(1) = surface.normal->item(i,1);
-     rotated_normal(2) = surface.normal->item(i,2);
+     rotated_normal(0) = surface.normal[0]->item(i);
+     rotated_normal(1) = surface.normal[1]->item(i);
+     rotated_normal(2) = surface.normal[2]->item(i);
 
      rotation_matrix(parID,rotated_normal,comp,0);
 
@@ -3953,13 +3953,13 @@ DDS_NavierStokes:: first_order_pressure_stress(class doubleArray2D& force, size_
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
   for (size_t i=0;i<Np;i++) {
-     double sx = surface.coordinate->item(i,0);
-     double sy = surface.coordinate->item(i,1);
-     double sz = surface.coordinate->item(i,2);
+     double sx = surface.coordinate[0]->item(i);
+     double sy = surface.coordinate[1]->item(i);
+     double sz = surface.coordinate[2]->item(i);
 
-     double s_nx = surface.normal->item(i,0);
-     double s_ny = surface.normal->item(i,1);
-     double s_nz = surface.normal->item(i,2);
+     double s_nx = surface.normal[0]->item(i);
+     double s_ny = surface.normal[1]->item(i);
+     double s_nz = surface.normal[2]->item(i);
 
      double s_area = surface.area->item(i);
 
@@ -4122,14 +4122,7 @@ DDS_NavierStokes:: compute_surface_points_on_cube(size_t const& Np)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_surface_points_on_cube" ) ;
-/*
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/point_data_" << my_rank << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-  outputFile << "x,y,z,area,nx,ny,nz" << endl;
-*/
+
   // Structure of particle input data
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
@@ -4145,48 +4138,42 @@ DDS_NavierStokes:: compute_surface_points_on_cube(size_t const& Np)
      for (size_t i=0; i<Np; i++) {
 	for (size_t j=0; j<Np; j++) {
            //Front
-           surface.coordinate->set_item(cntr,0,lsp(i));
-           surface.coordinate->set_item(cntr,1,lsp(j));
-           surface.coordinate->set_item(cntr,2,1.);
+           surface.coordinate[0]->set_item(cntr,lsp(i));
+           surface.coordinate[1]->set_item(cntr,lsp(j));
+           surface.coordinate[2]->set_item(cntr,1.);
            surface.area->set_item(cntr,dp*dp);
-           surface.normal->set_item(cntr,2,1.);
+           surface.normal[2]->set_item(cntr,1.);
            //Behind
-           surface.coordinate->set_item(Np*Np+cntr,0,lsp(i));
-           surface.coordinate->set_item(Np*Np+cntr,1,lsp(j));
-           surface.coordinate->set_item(Np*Np+cntr,2,-1.);
+           surface.coordinate[0]->set_item(Np*Np+cntr,lsp(i));
+           surface.coordinate[1]->set_item(Np*Np+cntr,lsp(j));
+           surface.coordinate[2]->set_item(Np*Np+cntr,-1.);
            surface.area->set_item(Np*Np+cntr,dp*dp);
-           surface.normal->set_item(Np*Np+cntr,2,-1.);
+           surface.normal[2]->set_item(Np*Np+cntr,-1.);
            //Top
-           surface.coordinate->set_item(2*Np*Np+cntr,0,lsp(i));
-           surface.coordinate->set_item(2*Np*Np+cntr,2,lsp(j));
-           surface.coordinate->set_item(2*Np*Np+cntr,1,1.);
+           surface.coordinate[0]->set_item(2*Np*Np+cntr,lsp(i));
+           surface.coordinate[2]->set_item(2*Np*Np+cntr,lsp(j));
+           surface.coordinate[1]->set_item(2*Np*Np+cntr,1.);
            surface.area->set_item(2*Np*Np+cntr,dp*dp);
-           surface.normal->set_item(2*Np*Np+cntr,1,1.);
+           surface.normal[1]->set_item(2*Np*Np+cntr,1.);
            //Bottom
-           surface.coordinate->set_item(3*Np*Np+cntr,0,lsp(i));
-           surface.coordinate->set_item(3*Np*Np+cntr,2,lsp(j));
-           surface.coordinate->set_item(3*Np*Np+cntr,1,-1.);
+           surface.coordinate[0]->set_item(3*Np*Np+cntr,lsp(i));
+           surface.coordinate[2]->set_item(3*Np*Np+cntr,lsp(j));
+           surface.coordinate[1]->set_item(3*Np*Np+cntr,-1.);
            surface.area->set_item(3*Np*Np+cntr,dp*dp);
-           surface.normal->set_item(3*Np*Np+cntr,1,-1.);
+           surface.normal[1]->set_item(3*Np*Np+cntr,-1.);
            //Right
-           surface.coordinate->set_item(4*Np*Np+cntr,1,lsp(i));
-           surface.coordinate->set_item(4*Np*Np+cntr,2,lsp(j));
-           surface.coordinate->set_item(4*Np*Np+cntr,0,1.);
+           surface.coordinate[1]->set_item(4*Np*Np+cntr,lsp(i));
+           surface.coordinate[2]->set_item(4*Np*Np+cntr,lsp(j));
+           surface.coordinate[0]->set_item(4*Np*Np+cntr,1.);
            surface.area->set_item(4*Np*Np+cntr,dp*dp);
-           surface.normal->set_item(4*Np*Np+cntr,0,1.);
+           surface.normal[0]->set_item(4*Np*Np+cntr,1.);
            //Left
-           surface.coordinate->set_item(5*Np*Np+cntr,1,lsp(i));
-           surface.coordinate->set_item(5*Np*Np+cntr,2,lsp(j));
-           surface.coordinate->set_item(5*Np*Np+cntr,0,-1.);
+           surface.coordinate[1]->set_item(5*Np*Np+cntr,lsp(i));
+           surface.coordinate[2]->set_item(5*Np*Np+cntr,lsp(j));
+           surface.coordinate[0]->set_item(5*Np*Np+cntr,-1.);
            surface.area->set_item(5*Np*Np+cntr,dp*dp);
-           surface.normal->set_item(5*Np*Np+cntr,0,-1.);
+           surface.normal[0]->set_item(5*Np*Np+cntr,-1.);
 
-/*	   outputFile << surface.coordinate->item(cntr,0) << "," << surface.coordinate->item(cntr,1) << "," << surface.coordinate->item(cntr,2) << "," << surface.area->item(cntr) << "," << surface.normal->item(cntr,0) << "," << surface.normal->item(cntr,1) << "," << surface.normal->item(cntr,2) << endl; 
-           outputFile << surface.coordinate->item(Np*Np+cntr,0) << "," << surface.coordinate->item(Np*Np+cntr,1) << "," << surface.coordinate->item(Np*Np+cntr,2) << "," << surface.area->item(Np*Np+cntr) << "," << surface.normal->item(Np*Np+cntr,0) << "," << surface.normal->item(Np*Np+cntr,1) << "," << surface.normal->item(Np*Np+cntr,2) << endl; 
-           outputFile << surface.coordinate->item(2*Np*Np+cntr,0) << "," << surface.coordinate->item(2*Np*Np+cntr,1) << "," << surface.coordinate->item(2*Np*Np+cntr,2) << "," << surface.area->item(2*Np*Np+cntr) << "," << surface.normal->item(2*Np*Np+cntr,0) << "," << surface.normal->item(2*Np*Np+cntr,1) << "," << surface.normal->item(2*Np*Np+cntr,2) << endl; 
-           outputFile << surface.coordinate->item(3*Np*Np+cntr,0) << "," << surface.coordinate->item(3*Np*Np+cntr,1) << "," << surface.coordinate->item(3*Np*Np+cntr,2) << "," << surface.area->item(3*Np*Np+cntr) << "," << surface.normal->item(3*Np*Np+cntr,0) << "," << surface.normal->item(3*Np*Np+cntr,1) << "," << surface.normal->item(3*Np*Np+cntr,2) << endl; 
-           outputFile << surface.coordinate->item(4*Np*Np+cntr,0) << "," << surface.coordinate->item(4*Np*Np+cntr,1) << "," << surface.coordinate->item(4*Np*Np+cntr,2) << "," << surface.area->item(4*Np*Np+cntr) << "," << surface.normal->item(4*Np*Np+cntr,0) << "," << surface.normal->item(4*Np*Np+cntr,1) << "," << surface.normal->item(4*Np*Np+cntr,2) << endl; 
-           outputFile << surface.coordinate->item(5*Np*Np+cntr,0) << "," << surface.coordinate->item(5*Np*Np+cntr,1) << "," << surface.coordinate->item(5*Np*Np+cntr,2) << "," << surface.area->item(5*Np*Np+cntr) << "," << surface.normal->item(5*Np*Np+cntr,0) << "," << surface.normal->item(5*Np*Np+cntr,1) << "," << surface.normal->item(5*Np*Np+cntr,2) << endl; */
            cntr++;
 	}
      }
@@ -4196,33 +4183,27 @@ DDS_NavierStokes:: compute_surface_points_on_cube(size_t const& Np)
      for (size_t i=0; i<Np; i++) {
         lsp = -1. + dp*((double)i+0.5);
 	//Bottom
-	surface.coordinate->set_item(i,0,lsp);
-	surface.coordinate->set_item(i,1,-1.);
+	surface.coordinate[0]->set_item(i,lsp);
+	surface.coordinate[1]->set_item(i,-1.);
 	surface.area->set_item(i,dp);
-	surface.normal->set_item(i,1,-1.);
+	surface.normal[1]->set_item(i,-1.);
 	//Top
-	surface.coordinate->set_item(Np+i,0,lsp);
-	surface.coordinate->set_item(Np+i,1,1.);
+	surface.coordinate[0]->set_item(Np+i,lsp);
+	surface.coordinate[1]->set_item(Np+i,1.);
 	surface.area->set_item(Np+i,dp);
-	surface.normal->set_item(Np+i,1,1.);
+	surface.normal[1]->set_item(Np+i,1.);
 	//Left
-	surface.coordinate->set_item(2*Np+i,0,-1.);
-	surface.coordinate->set_item(2*Np+i,1,lsp);
+	surface.coordinate[0]->set_item(2*Np+i,-1.);
+	surface.coordinate[1]->set_item(2*Np+i,lsp);
 	surface.area->set_item(2*Np+i,dp);
-	surface.normal->set_item(2*Np+i,0,-1.);
+	surface.normal[0]->set_item(2*Np+i,-1.);
 	//Right
-	surface.coordinate->set_item(3*Np+i,0,1.);
-	surface.coordinate->set_item(3*Np+i,1,lsp);
+	surface.coordinate[0]->set_item(3*Np+i,1.);
+	surface.coordinate[1]->set_item(3*Np+i,lsp);
 	surface.area->set_item(3*Np+i,dp);
-	surface.normal->set_item(3*Np+i,0,1.);
-/*  
-  	outputFile << surface.coordinate->item(i,0) << "," << surface.coordinate->item(i,1) << "," << surface.area->item(i) << "," << surface.normal->item(i,0) << "," << surface.normal->item(i,1) << endl; 
-  	outputFile << surface.coordinate->item(1*Np+i,0) << "," << surface.coordinate->item(1*Np+i,1) << "," << surface.area->item(1*Np+i) << "," << surface.normal->item(1*Np+i,0) << "," << surface.normal->item(1*Np+i,1) << endl; 
-  	outputFile << surface.coordinate->item(2*Np+i,0) << "," << surface.coordinate->item(2*Np+i,1) << "," << surface.area->item(2*Np+i) << "," << surface.normal->item(2*Np+i,0) << "," << surface.normal->item(2*Np+i,1) << endl; 
-  	outputFile << surface.coordinate->item(3*Np+i,0) << "," << surface.coordinate->item(3*Np+i,1) << "," << surface.area->item(3*Np+i) << "," << surface.normal->item(3*Np+i,0) << "," << surface.normal->item(3*Np+i,1) << endl; */
+	surface.normal[0]->set_item(3*Np+i,1.);
      }
   }
-//  outputFile.close();
 }
 
 //---------------------------------------------------------------------------
@@ -4231,14 +4212,6 @@ DDS_NavierStokes:: compute_surface_points_on_cylinder(class doubleVector& k, siz
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_surface_points_on_cylinder" ) ;
-/*
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/point_data_" << my_rank << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-  outputFile << "x,y,z,area,nx,ny,nz" << endl;
-*/
 
   // Structure of particle input data
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
@@ -4262,27 +4235,23 @@ DDS_NavierStokes:: compute_surface_points_on_cylinder(class doubleVector& k, siz
         for (int j=(int)k(i-1); j<k(i); j++) {
 	   // For top disk
            theta = theta + d_theta;
-           surface.coordinate->set_item(j,0,Rring(i)*MAC::cos(theta));
-           surface.coordinate->set_item(j,1,Rring(i)*MAC::sin(theta));
-           surface.coordinate->set_item(j,2,1.);
+           surface.coordinate[0]->set_item(j,Rring(i)*MAC::cos(theta));
+           surface.coordinate[1]->set_item(j,Rring(i)*MAC::sin(theta));
+           surface.coordinate[2]->set_item(j,1.);
            surface.area->set_item(j,0.5*d_theta*(pow(Ri,2)-pow(Rring(i-1),2)));
 	   // For bottom disk
-	   surface.coordinate->set_item(maxby2+j,0,Rring(i)*MAC::cos(theta));
-           surface.coordinate->set_item(maxby2+j,1,Rring(i)*MAC::sin(theta));
-           surface.coordinate->set_item(maxby2+j,2,-1.);
+	   surface.coordinate[0]->set_item(maxby2+j,Rring(i)*MAC::cos(theta));
+           surface.coordinate[1]->set_item(maxby2+j,Rring(i)*MAC::sin(theta));
+           surface.coordinate[2]->set_item(maxby2+j,-1.);
            surface.area->set_item(maxby2+j,0.5*d_theta*(pow(Ri,2)-pow(Rring(i-1),2)));
 	   // Create surface normal vectors
-	   surface.normal->set_item(j,0,0.);
-	   surface.normal->set_item(j,1,0.);
-	   surface.normal->set_item(j,2,1.);
-	   surface.normal->set_item(maxby2+j,0,0.);
-	   surface.normal->set_item(maxby2+j,1,0.);
-	   surface.normal->set_item(maxby2+j,2,-1.);
+	   surface.normal[0]->set_item(j,0.);
+	   surface.normal[1]->set_item(j,0.);
+	   surface.normal[2]->set_item(j,1.);
+	   surface.normal[0]->set_item(maxby2+j,0.);
+	   surface.normal[1]->set_item(maxby2+j,0.);
+	   surface.normal[2]->set_item(maxby2+j,-1.);
 
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," 
-		      << surface.area->item(j) << "," 
-		      << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
-           outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
         }
      } 
 
@@ -4296,45 +4265,41 @@ DDS_NavierStokes:: compute_surface_points_on_cylinder(class doubleVector& k, siz
         for (int j=0; j < k(0); j++) {
 	   // For top disk
            theta = theta + d_theta;
-           surface.coordinate->set_item(j,0,Rring(0)*MAC::cos(theta));
-           surface.coordinate->set_item(j,1,Rring(0)*MAC::sin(theta));
-           surface.coordinate->set_item(j,2,1.);
+           surface.coordinate[0]->set_item(j,Rring(0)*MAC::cos(theta));
+           surface.coordinate[1]->set_item(j,Rring(0)*MAC::sin(theta));
+           surface.coordinate[2]->set_item(j,1.);
            surface.area->set_item(j,0.5*d_theta*pow(Ri,2));
            // For bottom disk
-           surface.coordinate->set_item(maxby2+j,0,Rring(0)*MAC::cos(theta));
-           surface.coordinate->set_item(maxby2+j,1,Rring(0)*MAC::sin(theta));
-           surface.coordinate->set_item(maxby2+j,2,-1.);
+           surface.coordinate[0]->set_item(maxby2+j,Rring(0)*MAC::cos(theta));
+           surface.coordinate[1]->set_item(maxby2+j,Rring(0)*MAC::sin(theta));
+           surface.coordinate[2]->set_item(maxby2+j,-1.);
            surface.area->set_item(maxby2+j,0.5*d_theta*pow(Ri,2.));
 	   // Create surface normal vectors
-	   surface.normal->set_item(j,0,0.);
-	   surface.normal->set_item(j,1,0.);
-	   surface.normal->set_item(j,2,1.);
-	   surface.normal->set_item(maxby2+j,0,0.);
-	   surface.normal->set_item(maxby2+j,1,0.);
-	   surface.normal->set_item(maxby2+j,2,-1.);
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
-           outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
+	   surface.normal[0]->set_item(j,0.);
+	   surface.normal[1]->set_item(j,0.);
+	   surface.normal[2]->set_item(j,1.);
+	   surface.normal[0]->set_item(maxby2+j,0.);
+	   surface.normal[1]->set_item(maxby2+j,0.);
+	   surface.normal[2]->set_item(maxby2+j,-1.);
         }
      } else {
 	// For top disk
-        surface.coordinate->set_item(0,0,0.);
-        surface.coordinate->set_item(0,1,0.);
-        surface.coordinate->set_item(0,2,1.);
+        surface.coordinate[0]->set_item(0,0.);
+        surface.coordinate[1]->set_item(0,0.);
+        surface.coordinate[2]->set_item(0,1.);
         surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
 	// For bottom disk
-        surface.coordinate->set_item(maxby2,0,0.);
-        surface.coordinate->set_item(maxby2,1,0.);
-        surface.coordinate->set_item(maxby2,2,-1.);
+        surface.coordinate[0]->set_item(maxby2,0.);
+        surface.coordinate[1]->set_item(maxby2,0.);
+        surface.coordinate[2]->set_item(maxby2,-1.);
         surface.area->set_item(maxby2,0.5*d_theta*pow(Ri,2.));
         // Create surface normal vectors
-        surface.normal->set_item(0,0,0.);
-        surface.normal->set_item(0,1,0.);
-        surface.normal->set_item(0,2,1.);
-        surface.normal->set_item(maxby2,0,0.);
-        surface.normal->set_item(maxby2,1,0.);
-        surface.normal->set_item(maxby2,2,-1.);
-/*        outputFile << surface.coordinate->item(0,0) << "," << surface.coordinate->item(0,1) << "," << surface.coordinate->item(0,2) << "," << surface.area->item(0) << "," << surface.normal->item(0,0) << "," << surface.normal->item(0,1) << "," << surface.normal->item(0,2) << endl;
-        outputFile << surface.coordinate->item(maxby2,0) << "," << surface.coordinate->item(maxby2,1) << "," << surface.coordinate->item(maxby2,2) << "," << surface.area->item(maxby2) << "," << surface.normal->item(maxby2,0) << "," << surface.normal->item(maxby2,1) << "," << surface.normal->item(maxby2,2) << endl;*/
+        surface.normal[0]->set_item(0,0.);
+        surface.normal[1]->set_item(0,0.);
+        surface.normal[2]->set_item(0,1.);
+        surface.normal[0]->set_item(maxby2,0.);
+        surface.normal[1]->set_item(maxby2,0.);
+        surface.normal[2]->set_item(maxby2,-1.);
      }
 
      // Generating one ring of points on cylindrical surface
@@ -4351,19 +4316,17 @@ DDS_NavierStokes:: compute_surface_points_on_cylinder(class doubleVector& k, siz
 	for (int ij=0; ij<pts_1_ring; ij++) {
            theta = theta + d_theta;
 	   int n = 2*(int)k(Nring-1) + j*pts_1_ring + ij;
-           surface.coordinate->set_item(n,0,MAC::cos(theta));
-           surface.coordinate->set_item(n,1,MAC::sin(theta));
-           surface.coordinate->set_item(n,2,-1.+ 2.*(j+0.5)/(double(cyl_rings)));
+           surface.coordinate[0]->set_item(n,MAC::cos(theta));
+           surface.coordinate[1]->set_item(n,MAC::sin(theta));
+           surface.coordinate[2]->set_item(n,-1.+ 2.*(j+0.5)/(double(cyl_rings)));
            surface.area->set_item(n,cell_area);
-           surface.normal->set_item(n,0,MAC::cos(theta));
-           surface.normal->set_item(n,1,MAC::sin(theta));
-           surface.normal->set_item(n,2,0.);
+           surface.normal[0]->set_item(n,MAC::cos(theta));
+           surface.normal[1]->set_item(n,MAC::sin(theta));
+           surface.normal[2]->set_item(n,0.);
 
-//           outputFile << surface.coordinate->item(2*k(Nring-1)+j*ij,0) << "," << surface.coordinate->item(2*k(Nring-1)+j*ij,1) << "," << surface.coordinate->item(2*k(Nring-1)+j*ij,2) << "," << surface.area->item(2*k(Nring-1)+j*ij) << "," << surface.normal->item(2*k(Nring-1)+j*ij,0) << "," << surface.normal->item(2*k(Nring-1)+j*ij,1) << "," << surface.normal->item(2*k(Nring-1)+j*ij,2) << endl;
 	}
      }
   }
-//  outputFile.close();
 }
 
 //---------------------------------------------------------------------------
@@ -4372,14 +4335,6 @@ DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, cla
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_surface_points_on_sphere" ) ;
-/*
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/point_data_" << my_rank << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-  outputFile << "x,y,z,area,nx,ny,nz" << endl;
-*/
 
   // Structure of particle input data
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
@@ -4398,48 +4353,44 @@ DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, cla
         for (int j=(int)k(i-1); j<k(i); j++) {
            theta = theta + d_theta;
            if (pole_loc == 2) {
-              surface.coordinate->set_item(j,0,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,1,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,2,MAC::cos(eta(i)));
+              surface.coordinate[0]->set_item(j,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate[1]->set_item(j,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate[2]->set_item(j,MAC::cos(eta(i)));
               surface.area->set_item(j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
               // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,0,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,1,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,2,-MAC::cos(eta(i)));
+              surface.coordinate[0]->set_item(maxby2+j,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate[1]->set_item(maxby2+j,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate[2]->set_item(maxby2+j,-MAC::cos(eta(i)));
               surface.area->set_item(maxby2+j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
            } else if (pole_loc == 1) {
-              surface.coordinate->set_item(j,2,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,0,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,1,MAC::cos(eta(i)));
+              surface.coordinate[2]->set_item(j,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate[0]->set_item(j,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate[1]->set_item(j,MAC::cos(eta(i)));
               surface.area->set_item(j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
               // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,2,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,0,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,1,-MAC::cos(eta(i)));
+              surface.coordinate[2]->set_item(maxby2+j,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate[0]->set_item(maxby2+j,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate[1]->set_item(maxby2+j,-MAC::cos(eta(i)));
               surface.area->set_item(maxby2+j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
            } else if (pole_loc == 0) {
-              surface.coordinate->set_item(j,1,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,2,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,0,MAC::cos(eta(i)));
+              surface.coordinate[1]->set_item(j,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate[2]->set_item(j,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate[0]->set_item(j,MAC::cos(eta(i)));
               surface.area->set_item(j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
               // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,1,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,2,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,0,-MAC::cos(eta(i)));
+              surface.coordinate[1]->set_item(maxby2+j,MAC::cos(theta)*MAC::sin(eta(i)));
+              surface.coordinate[2]->set_item(maxby2+j,MAC::sin(theta)*MAC::sin(eta(i)));
+              surface.coordinate[0]->set_item(maxby2+j,-MAC::cos(eta(i)));
               surface.area->set_item(maxby2+j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
            }
 	   // Create surface normal vectors
-	   surface.normal->set_item(j,0,surface.coordinate->item(j,0));
-	   surface.normal->set_item(j,1,surface.coordinate->item(j,1));
-	   surface.normal->set_item(j,2,surface.coordinate->item(j,2));
-	   surface.normal->set_item(maxby2+j,0,surface.coordinate->item(maxby2+j,0));
-	   surface.normal->set_item(maxby2+j,1,surface.coordinate->item(maxby2+j,1));
-	   surface.normal->set_item(maxby2+j,2,surface.coordinate->item(maxby2+j,2));
+	   surface.normal[0]->set_item(j,surface.coordinate[0]->item(j));
+	   surface.normal[1]->set_item(j,surface.coordinate[1]->item(j));
+	   surface.normal[2]->set_item(j,surface.coordinate[2]->item(j));
+	   surface.normal[0]->set_item(maxby2+j,surface.coordinate[0]->item(maxby2+j));
+	   surface.normal[1]->set_item(maxby2+j,surface.coordinate[1]->item(maxby2+j));
+	   surface.normal[2]->set_item(maxby2+j,surface.coordinate[2]->item(maxby2+j));
 
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," 
-		      << surface.area->item(j) << "," 
-		      << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
-           outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
         }
      } 
 
@@ -4454,103 +4405,97 @@ DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, cla
         for (int j=0; j < k(0); j++) {
            theta = theta + d_theta;
            if (pole_loc == 2) {
-              surface.coordinate->set_item(j,0,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,1,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,2,MAC::cos(eta(0)));
+              surface.coordinate[0]->set_item(j,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate[1]->set_item(j,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate[2]->set_item(j,MAC::cos(eta(0)));
               surface.area->set_item(j,0.5*d_theta*pow(Ri,2.));
               // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,0,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,1,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,2,-MAC::cos(eta(0)));
+              surface.coordinate[0]->set_item(maxby2+j,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate[1]->set_item(maxby2+j,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate[2]->set_item(maxby2+j,-MAC::cos(eta(0)));
               surface.area->set_item(maxby2+j,0.5*d_theta*pow(Ri,2.));
            } else if (pole_loc == 1) {
-              surface.coordinate->set_item(j,2,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,0,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,1,MAC::cos(eta(0)));
+              surface.coordinate[2]->set_item(j,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate[0]->set_item(j,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate[1]->set_item(j,MAC::cos(eta(0)));
               surface.area->set_item(j,0.5*d_theta*pow(Ri,2.));
               // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,2,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,0,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,1,-MAC::cos(eta(0)));
+              surface.coordinate[2]->set_item(maxby2+j,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate[0]->set_item(maxby2+j,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate[1]->set_item(maxby2+j,-MAC::cos(eta(0)));
               surface.area->set_item(maxby2+j,0.5*d_theta*pow(Ri,2.));
            } else if (pole_loc == 0) {
-              surface.coordinate->set_item(j,1,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,2,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,0,MAC::cos(eta(0)));
+              surface.coordinate[1]->set_item(j,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate[2]->set_item(j,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate[0]->set_item(j,MAC::cos(eta(0)));
               surface.area->set_item(j,0.5*d_theta*pow(Ri,2.));
               // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,1,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,2,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,0,-MAC::cos(eta(0)));
+              surface.coordinate[1]->set_item(maxby2+j,MAC::cos(theta)*MAC::sin(eta(0)));
+              surface.coordinate[2]->set_item(maxby2+j,MAC::sin(theta)*MAC::sin(eta(0)));
+              surface.coordinate[0]->set_item(maxby2+j,-MAC::cos(eta(0)));
               surface.area->set_item(maxby2+j,0.5*d_theta*pow(Ri,2.));
            } 
 	   // Create surface normal vectors
-	   surface.normal->set_item(j,0,surface.coordinate->item(j,0));
-	   surface.normal->set_item(j,1,surface.coordinate->item(j,1));
-	   surface.normal->set_item(j,2,surface.coordinate->item(j,2));
-	   surface.normal->set_item(maxby2+j,0,surface.coordinate->item(maxby2+j,0));
-	   surface.normal->set_item(maxby2+j,1,surface.coordinate->item(maxby2+j,1));
-	   surface.normal->set_item(maxby2+j,2,surface.coordinate->item(maxby2+j,2));
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
-           outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
+	   surface.normal[0]->set_item(j,surface.coordinate[0]->item(j));
+	   surface.normal[1]->set_item(j,surface.coordinate[1]->item(j));
+	   surface.normal[2]->set_item(j,surface.coordinate[2]->item(j));
+	   surface.normal[0]->set_item(maxby2+j,surface.coordinate[0]->item(maxby2+j));
+	   surface.normal[1]->set_item(maxby2+j,surface.coordinate[1]->item(maxby2+j));
+	   surface.normal[2]->set_item(maxby2+j,surface.coordinate[2]->item(maxby2+j));
         }
      } else {
         if (pole_loc == 2) { 
-           surface.coordinate->set_item(0,0,0.);
-           surface.coordinate->set_item(0,1,0.);
-           surface.coordinate->set_item(0,2,1.);
+           surface.coordinate[0]->set_item(0,0.);
+           surface.coordinate[1]->set_item(0,0.);
+           surface.coordinate[2]->set_item(0,1.);
            surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
            // For second half of sphere
-           surface.coordinate->set_item(maxby2,0,0.);
-           surface.coordinate->set_item(maxby2,1,0.);
-           surface.coordinate->set_item(maxby2,2,-1.);
+           surface.coordinate[0]->set_item(maxby2,0.);
+           surface.coordinate[1]->set_item(maxby2,0.);
+           surface.coordinate[2]->set_item(maxby2,-1.);
            surface.area->set_item(maxby2,0.5*d_theta*pow(Ri,2.));
         } else if (pole_loc == 1) {
-           surface.coordinate->set_item(0,2,0.);
-           surface.coordinate->set_item(0,0,0.);
-           surface.coordinate->set_item(0,1,1.);
+           surface.coordinate[2]->set_item(0,0.);
+           surface.coordinate[0]->set_item(0,0.);
+           surface.coordinate[1]->set_item(0,1.);
            surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
            // For second half of sphere
-           surface.coordinate->set_item(maxby2,2,0.);
-           surface.coordinate->set_item(maxby2,0,0.);
-           surface.coordinate->set_item(maxby2,1,-1.);
+           surface.coordinate[2]->set_item(maxby2,0.);
+           surface.coordinate[0]->set_item(maxby2,0.);
+           surface.coordinate[1]->set_item(maxby2,-1.);
            surface.area->set_item(maxby2,0.5*d_theta*pow(Ri,2.));
         } else if (pole_loc == 0) {
-           surface.coordinate->set_item(0,1,0.);
-           surface.coordinate->set_item(0,2,0.);
-           surface.coordinate->set_item(0,0,1.);
+           surface.coordinate[1]->set_item(0,0.);
+           surface.coordinate[2]->set_item(0,0.);
+           surface.coordinate[0]->set_item(0,1.);
            surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
            // For second half of sphere
-           surface.coordinate->set_item(maxby2,1,0.);
-           surface.coordinate->set_item(maxby2,2,0.);
-           surface.coordinate->set_item(maxby2,0,-1.);
+           surface.coordinate[1]->set_item(maxby2,0.);
+           surface.coordinate[2]->set_item(maxby2,0.);
+           surface.coordinate[0]->set_item(maxby2,-1.);
            surface.area->set_item(maxby2,0.5*d_theta*pow(Ri,2.));
         } 
         // Create surface normal vectors
-        surface.normal->set_item(0,0,surface.coordinate->item(0,0));
-        surface.normal->set_item(0,1,surface.coordinate->item(0,1));
-        surface.normal->set_item(0,2,surface.coordinate->item(0,2));
-        surface.normal->set_item(maxby2,0,surface.coordinate->item(maxby2,0));
-        surface.normal->set_item(maxby2,1,surface.coordinate->item(maxby2,1));
-        surface.normal->set_item(maxby2,2,surface.coordinate->item(maxby2,2));
-/*        outputFile << surface.coordinate->item(0,0) << "," << surface.coordinate->item(0,1) << "," << surface.coordinate->item(0,2) << "," << surface.area->item(0) << "," << surface.normal->item(0,0) << "," << surface.normal->item(0,1) << "," << surface.normal->item(0,2) << endl;
-        outputFile << surface.coordinate->item(maxby2,0) << "," << surface.coordinate->item(maxby2,1) << "," << surface.coordinate->item(maxby2,2) << "," << surface.area->item(maxby2) << "," << surface.normal->item(maxby2,0) << "," << surface.normal->item(maxby2,1) << "," << surface.normal->item(maxby2,2) << endl;*/
+        surface.normal[0]->set_item(0,surface.coordinate[0]->item(0));
+        surface.normal[1]->set_item(0,surface.coordinate[1]->item(0));
+        surface.normal[2]->set_item(0,surface.coordinate[2]->item(0));
+        surface.normal[0]->set_item(maxby2,surface.coordinate[0]->item(maxby2));
+        surface.normal[1]->set_item(maxby2,surface.coordinate[1]->item(maxby2));
+        surface.normal[2]->set_item(maxby2,surface.coordinate[2]->item(maxby2));
      }
   } else if (dim == 2) {
      double d_theta = 2.*MAC::pi()/(double(Nring));
      double theta = 0.01*d_theta;
      for (int j=0; j < (int) Nring; j++) {
         theta = theta + d_theta;
-        surface.coordinate->set_item(j,0,MAC::cos(theta));
-        surface.coordinate->set_item(j,1,MAC::sin(theta));
+        surface.coordinate[0]->set_item(j,MAC::cos(theta));
+        surface.coordinate[1]->set_item(j,MAC::sin(theta));
         surface.area->set_item(j,d_theta);
         // Create surface normal vectors
-        surface.normal->set_item(j,0,surface.coordinate->item(j,0));
-        surface.normal->set_item(j,1,surface.coordinate->item(j,1));
-//        outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
+        surface.normal[0]->set_item(j,surface.coordinate[0]->item(j));
+        surface.normal[1]->set_item(j,surface.coordinate[1]->item(j));
      }
   }
-//  outputFile.close();
 }
 
 //---------------------------------------------------------------------------
@@ -4819,9 +4764,9 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
         }
 
 	// Rotating surface points
-	rotated_coord(0) = ri*surface.coordinate->item(i,0);
-	rotated_coord(1) = ri*surface.coordinate->item(i,1);
-	rotated_coord(2) = ri*surface.coordinate->item(i,2);
+	rotated_coord(0) = ri*surface.coordinate[0]->item(i);
+	rotated_coord(1) = ri*surface.coordinate[1]->item(i);
+	rotated_coord(2) = ri*surface.coordinate[2]->item(i);
 
         rotation_matrix(parID,rotated_coord,comp,1);
 
@@ -4830,9 +4775,9 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
         point(0,2) = zp + rotated_coord(2);
 
         // Rotating surface normal
-	rotated_normal(0) = surface.normal->item(i,0);
-	rotated_normal(1) = surface.normal->item(i,1);
-	rotated_normal(2) = surface.normal->item(i,2);
+	rotated_normal(0) = surface.normal[0]->item(i);
+	rotated_normal(1) = surface.normal[1]->item(i);
+	rotated_normal(2) = surface.normal[2]->item(i);
 
 	rotation_matrix(parID,rotated_normal,comp,1);
 
@@ -5160,9 +5105,9 @@ DDS_NavierStokes:: first_order_viscous_stress(class doubleArray2D& force, size_t
         }
 
 	// Rotating surface points
-	rotated_coord(0) = ri*surface.coordinate->item(i,0);
-	rotated_coord(1) = ri*surface.coordinate->item(i,1);
-	rotated_coord(2) = ri*surface.coordinate->item(i,2);
+	rotated_coord(0) = ri*surface.coordinate[0]->item(i);
+	rotated_coord(1) = ri*surface.coordinate[1]->item(i);
+	rotated_coord(2) = ri*surface.coordinate[2]->item(i);
 
         rotation_matrix(parID,rotated_coord,comp,1);
 
@@ -5171,9 +5116,9 @@ DDS_NavierStokes:: first_order_viscous_stress(class doubleArray2D& force, size_t
         zpoint(0) = zp + rotated_coord(2);
 
         // Rotating surface normal
-	rotated_normal(0) = surface.normal->item(i,0);
-	rotated_normal(1) = surface.normal->item(i,1);
-	rotated_normal(2) = surface.normal->item(i,2);
+	rotated_normal(0) = surface.normal[0]->item(i);
+	rotated_normal(1) = surface.normal[1]->item(i);
+	rotated_normal(2) = surface.normal[2]->item(i);
 
 	rotation_matrix(parID,rotated_normal,comp,1);
 

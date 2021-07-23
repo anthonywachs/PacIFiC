@@ -147,15 +147,13 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    MAT_velocityUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
 
    // Structure for the particle surface discretization
-   surface.coordinate = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-   surface.area = (LA_SeqVector*) malloc(sizeof(LA_SeqVector)) ;
-   surface.normal = (LA_SeqMatrix*) malloc(sizeof(LA_SeqMatrix)) ;
-   divergence[0].stencil = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   divergence[1].stencil = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   divergence[2].stencil = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   divergence[0].lambda = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   divergence[1].lambda = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   divergence[2].lambda = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   surface.coordinate = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   surface.normal = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   
+   for (size_t level = 0; level < 3; level++) {
+      divergence[level].stencil = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+      divergence[level].lambda = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   }
 
    // Vector to store the fresh nodes in the fluid emerging from solid
    Pfresh[0].neigh = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
@@ -301,9 +299,13 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       }
    }
 
-   surface.coordinate = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+   surface.coordinate[0] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   surface.coordinate[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   surface.coordinate[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    surface.area = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   surface.normal = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+   surface.normal[0] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   surface.normal[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   surface.normal[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
 
    for (size_t level=0;level<3;level++) {
       divergence[level].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -414,31 +416,51 @@ DDS_NavierStokesSystem:: re_initialize( void )
    if (is_solids && is_stressCal) {
       if (dim == 3) {
          if (level_set_type == "Sphere") {
-            surface.coordinate->re_initialize(2*(size_t)Nmax,3);
+            surface.coordinate[0]->re_initialize(2*(size_t)Nmax);
+            surface.coordinate[1]->re_initialize(2*(size_t)Nmax);
+            surface.coordinate[2]->re_initialize(2*(size_t)Nmax);
             surface.area->re_initialize(2*(size_t)Nmax);
-            surface.normal->re_initialize(2*(size_t)Nmax,3);
+            surface.normal[0]->re_initialize(2*(size_t)Nmax);
+            surface.normal[1]->re_initialize(2*(size_t)Nmax);
+            surface.normal[2]->re_initialize(2*(size_t)Nmax);
 	 } else if (level_set_type == "Cube") {
-            surface.coordinate->re_initialize(6*(size_t)pow(Nmax,2),3);
+            surface.coordinate[0]->re_initialize(6*(size_t)pow(Nmax,2));
+            surface.coordinate[1]->re_initialize(6*(size_t)pow(Nmax,2));
+            surface.coordinate[2]->re_initialize(6*(size_t)pow(Nmax,2));
             surface.area->re_initialize(6*(size_t)pow(Nmax,2));
-            surface.normal->re_initialize(6*(size_t)pow(Nmax,2),3);
+            surface.normal[0]->re_initialize(6*(size_t)pow(Nmax,2));
+            surface.normal[1]->re_initialize(6*(size_t)pow(Nmax,2));
+            surface.normal[2]->re_initialize(6*(size_t)pow(Nmax,2));
 	 } else if (level_set_type == "Cylinder") {
             double Npm1 = round(pow(MAC::sqrt(Nmax) - MAC::sqrt(MAC::pi()/ar),2.));
             double dh = 1. - MAC::sqrt(Npm1/Nmax);
             double Nr = round(2./dh);
 	    size_t Ncyl = (size_t) (2*Nmax + Nr*(Nmax - Npm1));
-            surface.coordinate->re_initialize(Ncyl,3);
+            surface.coordinate[0]->re_initialize(Ncyl);
+            surface.coordinate[1]->re_initialize(Ncyl);
+            surface.coordinate[2]->re_initialize(Ncyl);
             surface.area->re_initialize(Ncyl);
-            surface.normal->re_initialize(Ncyl,3);
+            surface.normal[0]->re_initialize(Ncyl);
+            surface.normal[1]->re_initialize(Ncyl);
+            surface.normal[2]->re_initialize(Ncyl);
 	 }
       } else {
 	 if (level_set_type == "Sphere") {
-            surface.coordinate->re_initialize((size_t)Nmax,3);
+            surface.coordinate[0]->re_initialize((size_t)Nmax);
+            surface.coordinate[1]->re_initialize((size_t)Nmax);
+            surface.coordinate[2]->re_initialize((size_t)Nmax);
             surface.area->re_initialize((size_t)Nmax);
-            surface.normal->re_initialize((size_t)Nmax,3);
+            surface.normal[0]->re_initialize((size_t)Nmax);
+            surface.normal[1]->re_initialize((size_t)Nmax);
+            surface.normal[2]->re_initialize((size_t)Nmax);
 	 } else if (level_set_type == "Cube") {
-            surface.coordinate->re_initialize(4*(size_t)Nmax,3);
+            surface.coordinate[0]->re_initialize(4*(size_t)Nmax);
+            surface.coordinate[1]->re_initialize(4*(size_t)Nmax);
+            surface.coordinate[2]->re_initialize(4*(size_t)Nmax);
             surface.area->re_initialize(4*(size_t)Nmax);
-            surface.normal->re_initialize(4*(size_t)Nmax,3);
+            surface.normal[0]->re_initialize(4*(size_t)Nmax);
+            surface.normal[1]->re_initialize(4*(size_t)Nmax);
+            surface.normal[2]->re_initialize(4*(size_t)Nmax);
 	 }
       }
    }
