@@ -626,6 +626,18 @@ DDS_NavierStokesSystem:: re_initialize( void )
                }
             }
          }
+
+
+         if ((field==0)&&(comp==0)) {
+            for (size_t level=0;level<3;level++) {
+               divergence[level].div->re_initialize( nb_total_unknown ) ;
+               for (size_t dir=0;dir<3;dir++) {
+                  divergence[level].stencil[dir]->re_initialize( nb_total_unknown ) ;
+                  divergence[level].lambda[dir]->re_initialize( nb_total_unknown ) ;
+               }
+            }
+	 }
+
          if (is_solids) {
             node[field][0].void_frac[comp]->re_initialize( nb_total_unknown ) ;
             node[field][0].parID[comp]->re_initialize( nb_total_unknown ) ;
@@ -634,14 +646,6 @@ DDS_NavierStokesSystem:: re_initialize( void )
             node[field][1].parID[comp]->re_initialize( nb_total_unknown ) ;
             node[field][1].bound_cell[comp]->re_initialize( nb_total_unknown ) ;
             if ((field==0)&&(comp==0)) {
-               for (size_t level=0;level<3;level++) {
-                  divergence[level].div->re_initialize( nb_total_unknown ) ;
-                  for (size_t dir=0;dir<3;dir++) {
-                     divergence[level].stencil[dir]->re_initialize( nb_total_unknown ) ;
-                     divergence[level].lambda[dir]->re_initialize( nb_total_unknown ) ;
-		  }
-	       }
-
                for (size_t level=0;level<2;level++) {
                   Pfresh[level].flag->re_initialize( nb_total_unknown ) ;
                   Pfresh[level].flag_count->re_initialize( nb_total_unknown ) ;

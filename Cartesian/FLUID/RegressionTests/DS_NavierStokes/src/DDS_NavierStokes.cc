@@ -2603,6 +2603,13 @@ DDS_NavierStokes:: assemble_field_matrix (
    // Parameters
    double dxr,dxl,dx,xR,xL,xC,right=0.,left=0.,center=0.;
 
+   bool r_bound = false;
+   bool l_bound = false;
+   // All the proc will have open right bound, except last proc for non periodic systems
+   if ((is_periodic[field][dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
+   // All the proc will have open left bound, except first proc for non periodic systems
+   if ((is_periodic[field][dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
+
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
@@ -2611,6 +2618,9 @@ DDS_NavierStokes:: assemble_field_matrix (
       max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
    }
 
+   size_t k_min = (dim == 3) ? min_unknown_index(2) : 0 ;
+   size_t k_max = (dim == 3) ? max_unknown_index(2) : 0 ;
+
    // Perform assembling
    size_t m, i;
    TDMatrix* A = GLOBAL_EQ-> get_A(field);
@@ -2618,16 +2628,36 @@ DDS_NavierStokes:: assemble_field_matrix (
    double Aee_diagcoef=0.;
 
    for (m=0,i=min_unknown_index(dir);i<=max_unknown_index(dir);++i,++m) {
+      int i_temp=0; int j_temp=0; int k_temp=0;
+      if (dir == 0) {
+         i_temp = (int)i; j_temp = (int)min_unknown_index(1); k_temp = (int)k_min;
+      } else if (dir == 1) {
+         i_temp = (int)min_unknown_index(0); j_temp = (int)i; k_temp = (int)k_min;
+      } else if (dir == 2) {
+         i_temp = (int)min_unknown_index(0); j_temp = (int)min_unknown_index(1); k_temp = (int)i;
+      }
+
       xC= FF->get_DOF_coordinate( i, comp, dir) ;
-      xR= FF->get_DOF_coordinate( i+1,comp, dir) ;
-      xL= FF->get_DOF_coordinate( i-1, comp, dir) ;
+
+      // Check if the index is at right domain boundary with neumann or dirichlet BC
+      if ((i==max_unknown_index(dir)) && r_bound && FF->DOF_on_BC(i_temp,j_temp,k_temp,comp)) {
+	 xR = 0.;
+      } else {
+         xR= FF->get_DOF_coordinate( i+1,comp, dir) ;
+      }
+
+      // Check if the index is at left domain boundary with neumann or dirichlet BC
+      if ((i==min_unknown_index(dir)) && l_bound && FF->DOF_on_BC(i_temp,j_temp,k_temp,comp)) {
+	 xL = 0.;
+      } else {
+         xL= FF->get_DOF_coordinate( i-1, comp, dir) ;
+      }
 
       dx = FF->get_cell_size( i,comp, dir);
 
       dxr= xR - xC;
       dxl= xC - xL;
 
-      size_t k_min, k_max;
       double value=0., unsteady_term=0.;
 
       if (field == 0) {
@@ -2676,19 +2706,6 @@ DDS_NavierStokes:: assemble_field_matrix (
       } else {
          center = - (right+left);
       }
-
-      if (dim == 2) {
-         k_min = 0; k_max = 0;
-      } else {
-         k_min = min_unknown_index(2); k_max = max_unknown_index(2);
-      }
-
-      bool r_bound = false;
-      bool l_bound = false;
-      // All the proc will have open right bound, except last proc for non periodic systems
-      if ((is_periodic[field][dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
-      // All the proc will have open left bound, except first proc for non periodic systems
-      if ((is_periodic[field][dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
 
       // Since, this function is used in all directions; 
       // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
@@ -2781,8 +2798,6 @@ DDS_NavierStokes:: assemble_field_matrix (
          }
       }
    } // End of for loop
-
-//   if ((dir == 0) && (r_index == 37) && (field == 0)) A[dir].ii_main[0][r_index]->print_items(MAC::out(),0);
 
    GLOBAL_EQ->pre_thomas_treatment(comp,dir,A,r_index);
 
@@ -3040,18 +3055,23 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, s
 {
    MAC_LABEL("DDS_NavierStokes:: compute_un_component" ) ;
 
-   double xhr,xhl,xright,xleft,yhr,yhl,yright,yleft;
-   double zhr,zhl,zright,zleft, value=0.;
+   double xhr=1.,xhl=1.,xright=0.,xleft=0.,yhr=1.,yhl=1.,yright=0.,yleft=0.;
+   double zhr=1.,zhl=1.,zright=0.,zleft=0., value=0.;
 
    BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(1,0);
    NodeProp node = GLOBAL_EQ->get_node_property(1,0);
    
 
    if (dir == 0) {
-      xhr= UF->get_DOF_coordinate( i+1,comp, 0 ) - UF->get_DOF_coordinate( i, comp, 0 ) ;
-      xhl= UF->get_DOF_coordinate( i, comp, 0 ) - UF->get_DOF_coordinate( i-1, comp, 0 ) ;
-      xright = UF->DOF_value( i+1, j, k, comp, level ) - UF->DOF_value( i, j, k, comp, level ) ;
-      xleft = UF->DOF_value( i, j, k, comp, level ) - UF->DOF_value( i-1, j, k, comp, level ) ;
+      if (UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
+         xright = UF->DOF_value( i+1, j, k, comp, level ) - UF->DOF_value( i, j, k, comp, level ) ;
+         xhr= UF->get_DOF_coordinate( i+1,comp, 0 ) - UF->get_DOF_coordinate( i, comp, 0 ) ;
+      }
+
+      if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)) {
+         xleft = UF->DOF_value( i, j, k, comp, level ) - UF->DOF_value( i-1, j, k, comp, level ) ;
+         xhl= UF->get_DOF_coordinate( i, comp, 0 ) - UF->get_DOF_coordinate( i-1, comp, 0 ) ;
+      }
 
       if (is_solids) {
          size_t p = return_node_index(UF,comp,i,j,k);
@@ -3077,10 +3097,15 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, s
       else
          value = xright/xhr;
    } else if (dir == 1) {
-      yhr= UF->get_DOF_coordinate( j+1,comp, 1 ) - UF->get_DOF_coordinate( j, comp, 1 ) ;
-      yhl= UF->get_DOF_coordinate( j, comp, 1 ) - UF->get_DOF_coordinate( j-1, comp, 1 ) ;
-      yright = UF->DOF_value( i, j+1, k, comp, level ) - UF->DOF_value( i, j, k, comp, level ) ;
-      yleft = UF->DOF_value( i, j, k, comp, level ) - UF->DOF_value( i, j-1, k, comp, level ) ;
+      if (UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
+         yright = UF->DOF_value( i, j+1, k, comp, level ) - UF->DOF_value( i, j, k, comp, level ) ;
+         yhr= UF->get_DOF_coordinate( j+1,comp, 1 ) - UF->get_DOF_coordinate( j, comp, 1 ) ;
+      }
+
+      if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)) {
+         yleft = UF->DOF_value( i, j, k, comp, level ) - UF->DOF_value( i, j-1, k, comp, level ) ;
+         yhl= UF->get_DOF_coordinate( j, comp, 1 ) - UF->get_DOF_coordinate( j-1, comp, 1 ) ;
+      }
 
       if (is_solids) {
          size_t p = return_node_index(UF,comp,i,j,k);
@@ -3106,10 +3131,15 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp, size_t const& i, s
       else
          value = yright/yhr;
    } else if (dir == 2) {
-      zhr= UF->get_DOF_coordinate( k+1,comp, 2 ) - UF->get_DOF_coordinate( k, comp, 2 ) ;
-      zhl= UF->get_DOF_coordinate( k, comp, 2 ) - UF->get_DOF_coordinate( k-1, comp, 2 ) ;
-      zright = UF->DOF_value( i, j, k+1, comp, level ) - UF->DOF_value( i, j, k, comp, level ) ;
-      zleft = UF->DOF_value( i, j, k, comp, level ) - UF->DOF_value( i, j, k-1, comp, level ) ;
+      if (UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
+         zright = UF->DOF_value( i, j, k+1, comp, level ) - UF->DOF_value( i, j, k, comp, level ) ;
+         zhr= UF->get_DOF_coordinate( k+1,comp, 2 ) - UF->get_DOF_coordinate( k, comp, 2 ) ;
+      }
+
+      if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
+         zleft = UF->DOF_value( i, j, k, comp, level ) - UF->DOF_value( i, j, k-1, comp, level ) ;
+         zhl= UF->get_DOF_coordinate( k, comp, 2 ) - UF->get_DOF_coordinate( k-1, comp, 2 ) ;
+      }
 
       if (is_solids) {
          size_t p = return_node_index(UF,comp,i,j,k);
@@ -4328,9 +4358,8 @@ DDS_NavierStokes:: compute_surface_points_on_sphere(class doubleVector& eta, cla
   // Structure of particle input data
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
-  size_t maxby2 = (size_t) k(Nring-1);
-
   if (dim == 3) {
+     size_t maxby2 = (size_t) k(Nring-1);
      // Calculation for all rings except at the pole
      for (int i=(int)Nring-1; i>0; --i) {
         double Ri = Rring(i);
@@ -7306,10 +7335,10 @@ DDS_NavierStokes:: pressure_local_rhs ( size_t const& j, size_t const& k, FV_Tim
 
    for (size_t i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
       double dx = PF->get_cell_size( i, 0, dir );
-      size_t p = return_node_index(PF,0,i,j,k);
       if (dir == 0) {
          double vel_div = calculate_velocity_divergence(i,j,k,0,t_it);
          value = -(rho*vel_div*dx)/(t_it -> time_step());
+         size_t p = return_node_index(PF,0,i,j,k);
 	 divergence[0].div->set_item(p,vel_div);
       } else if (dir == 1) {
          value = PF->DOF_value( j, i, k, 0, 1 )*dx;
@@ -7591,13 +7620,13 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
   GLOBAL_EQ->synchronize_DS_solution_vec_P();
   // Tranfer back to field
   PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
-  
+
   Solve_i_in_jk (PF,t_it,1,0,2,gamma,0);
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec_P();
   // Tranfer back to field
   PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
- 
+
   if (dim == 3) { 
      Solve_i_in_jk (PF,t_it,2,0,1,gamma,0);
      // Synchronize the distributed DS solution vector
