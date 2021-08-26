@@ -72,6 +72,13 @@ struct PartInput {
    LA_SeqVector ** local_parID;         // list of ID's present in the current processor
 };
 
+/** @brief PartForces to be used to store the hydrodynamic forces and torque on particles */
+struct PartForces {
+   LA_SeqVector ** press;               // Pressure stress force
+   LA_SeqVector ** vel;                // Viscous stress force
+   LA_SeqVector ** torque;              // Torque
+};
+
 /** @brief FreshNode to be used to store the fresh nodes coming in the fluid (only for pressure field)*/
 struct FreshNode {
    LA_SeqVector * flag;               // 1 if the node is considered as fresh, -1 if the node went just inside solid and 0 otherwise
@@ -186,6 +193,8 @@ class DDS_NavierStokesSystem : public MAC_Object
       PartInput get_solid(size_t const& field);
       /** @brief Return the surface discretization from input files */
       SurfaceDiscretize get_surface();
+      /** @brief Return the hydrodynamic forces */
+      PartForces get_forces();
       /** @brief Return the (presence/absence) of particle vector */
       NodeProp get_node_property(size_t const& field, size_t const& time_level);
       /** @brief Return the fresh node emerging out of solid */
@@ -323,6 +332,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       struct FreshNode Pfresh[2];			       // defined for pressure nodes; 2 columns are for time level (current and last)
       struct DivNode divergence[3];			       // 0 current timestep, 1 last time step. 2 for reference state
       struct SurfaceDiscretize surface;
+      struct PartForces hydro_forces;
       struct BoundaryBisec b_intersect[2][2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid); 2 are fields (PF,UF)
 
 

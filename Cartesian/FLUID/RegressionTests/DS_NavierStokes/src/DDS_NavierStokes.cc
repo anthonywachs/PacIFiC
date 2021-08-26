@@ -83,7 +83,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , is_par_motion( false )
    , is_stressCal( false )
    , IntersectionMethod ( "Bisection" )
-   , tolerance ( 1.e-6 ) 
+   , tolerance ( 1.e-6 )
+   , gravity_vector( 0 )	
 {
    MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -190,9 +191,25 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       if ( exp->has_entry( "Particle_motion" ) )
         is_par_motion = exp->bool_data( "Particle_motion" ) ;
 
+
       if (is_par_motion && (insertion_type=="file")) {
-         Amp = exp->double_data( "Amplitude" ) ;
-         freq = exp->double_data( "Frequency" ) ;
+         // Read the type for particle motion
+         if ( exp->has_entry( "Motion_type" ) ) {
+            motion_type = exp->string_data( "Motion_type" ) ;
+	    MAC_ASSERT( motion_type == "Sine" || motion_type == "Hydro" ) ;
+	 }
+	 // Read the gravity vector or direction of enforced motion
+         doubleVector gg( dim, 0 );
+         if ( exp->has_entry( "Gravity_vector" ) )
+            gg = exp->doubleVector_data( "Gravity_vector" );
+         gravity_vector = MAC_DoubleVector::create( this, gg );
+
+	 if (motion_type == "Sine") {
+            Amp = exp->double_data( "Amplitude" ) ;
+            freq = exp->double_data( "Frequency" ) ;
+	 } else if (motion_type == "Hydro") {
+            rho_s = exp->double_data( "Solid_Density" );
+	 }
       }
 
       if (is_stressCal) {
@@ -1156,30 +1173,40 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
 {
   MAC_LABEL( "DDS_NavierStokes:: update_particle_system" ) ;
 
+  // Structure of particle input data
+  PartForces hydro_forces = GLOBAL_EQ->get_forces();
+
+  doubleVector const& gg = gravity_vector->to_double_vector();
+
   if (insertion_type == "file") {
      for (size_t field=0;field<2;field++) {
         // Structure of particle input data
         PartInput solid = GLOBAL_EQ->get_solid(field);
         for (size_t comp=0;comp<nb_comps[field];comp++) {
            for (size_t i=0;i<Npart;i++) {
-              double xp = solid.coord[comp]->item(i,0);
-              double yp = solid.coord[comp]->item(i,1);
-              double zp = solid.coord[comp]->item(i,2);
+              double rp = solid.size[comp]->item(i);
+	      double mass_p = rho_s*(4./3.)*MAC::pi()*pow(rp,3.); 
+              doubleVector pos(dim,0);
+              doubleVector vel(dim,0);
+              doubleVector acc(dim,0);
 
-              double vx = solid.vel[comp]->item(i,0);
-              double vy = solid.vel[comp]->item(i,1);
-              double vz = solid.vel[comp]->item(i,2);
+              for (size_t dir=0;dir<dim;dir++) {
+                 pos(dir) = solid.coord[comp]->item(i,dir);
+                 vel(dir) = solid.vel[comp]->item(i,dir);
 
-              vy = Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
-              yp = yp + vy*t_it->time_step();
+                 if (motion_type == "Sine") {
+                    vel(dir) = gg(dir)*Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
+                    pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
+	         } else if (motion_type == "Hydro") {
+	  	    acc(dir) = gg(dir)*(rho_s/rho-1) + (hydro_forces.press[dir]->item(i)
+				                     +  hydro_forces.vel[dir]->item(i)) / mass_p ;
+                    vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+                    pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
+                 }
 
-              solid.coord[comp]->set_item(i,0,xp);
-              solid.coord[comp]->set_item(i,1,yp);
-              solid.coord[comp]->set_item(i,2,zp);
-
-              solid.vel[comp]->set_item(i,0,vx);
-              solid.vel[comp]->set_item(i,1,vy);
-              solid.vel[comp]->set_item(i,2,vz);
+                 solid.coord[comp]->set_item(i,dir,pos(dir));
+                 solid.vel[comp]->set_item(i,dir,vel(dir));
+	      }
            }
         }
      }
@@ -3618,7 +3645,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: second_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: second_order_pressure_stress(class doubleVector& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: second_order_pressure_stress" ) ;
@@ -3658,8 +3685,8 @@ DDS_NavierStokes:: second_order_pressure_stress(class doubleArray2D& force, size
 
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
-  doubleVector rotated_coord(dim,0);
-  doubleVector rotated_normal(dim,0);
+  doubleVector rotated_coord(3,0);
+  doubleVector rotated_normal(3,0);
 
   for (size_t i=0;i<Np;i++) {
      // Get local min and max indices
@@ -3768,16 +3795,16 @@ DDS_NavierStokes:: second_order_pressure_stress(class doubleArray2D& force, size
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
-     force(parID,1) = force(parID,1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
-     force(parID,2) = force(parID,2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(0) = force(0) + stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
+     force(1) = force(1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
+     force(2) = force(2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
   }
 //  outputFile.close();  
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleArray2D& force, size_t const& parID, size_t const& Np)
+DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleVector& force, size_t const& parID, size_t const& Np)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC" ) ;
@@ -3818,8 +3845,8 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleArray2
 
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
-  doubleVector rotated_coord(dim,0);
-  doubleVector rotated_normal(dim,0);
+  doubleVector rotated_coord(3,0);
+  doubleVector rotated_normal(3,0);
   intVector sign(dim,0);
 
   for (size_t i=0;i<Np;i++) {
@@ -3925,9 +3952,9 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleArray2
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
-     force(parID,1) = force(parID,1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
-     force(parID,2) = force(parID,2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(0) = force(0) + stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
+     force(1) = force(1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
+     force(2) = force(2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
 
 //     outputFile << point(0,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(0) << endl;
 //     outputFile << point(1,0) << "," << point(1,1) << "," << point(1,2) << "," << fini(1) << endl;
@@ -3938,7 +3965,7 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleArray2
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: first_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np)
+DDS_NavierStokes:: first_order_pressure_stress(class doubleVector& force, size_t const& parID, size_t const& Np)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: first_order_pressure_stress" ) ;
@@ -3963,8 +3990,8 @@ DDS_NavierStokes:: first_order_pressure_stress(class doubleArray2D& force, size_
 
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
-  doubleVector rotated_coord(dim,0);
-  doubleVector rotated_normal(dim,0);
+  doubleVector rotated_coord(3,0);
+  doubleVector rotated_normal(3,0);
 
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(0);
@@ -4058,9 +4085,9 @@ DDS_NavierStokes:: first_order_pressure_stress(class doubleArray2D& force, size_
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i)*rotated_normal(0)*(s_area*scale);
-     force(parID,1) = force(parID,1) + stress(i)*rotated_normal(1)*(s_area*scale);
-     force(parID,2) = force(parID,2) + stress(i)*rotated_normal(2)*(s_area*scale);
+     force(0) = force(0) + stress(i)*rotated_normal(0)*(s_area*scale);
+     force(1) = force(1) + stress(i)*rotated_normal(1)*(s_area*scale);
+     force(2) = force(2) + stress(i)*rotated_normal(2)*(s_area*scale);
 
 //     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (surface.area->item(i)*scale) << endl;
 //     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (s_area*scale) << "," << rotated_normal(0) << "," << rotated_normal(1) << "," << rotated_normal(2) << endl;
@@ -4077,9 +4104,16 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
 
   string fileName = "./DS_results/particle_forces.csv" ;
 
-  doubleArray2D vel_force(Npart,3,0);
-  doubleArray2D press_force(Npart,3,0);
+  ofstream MyFile( fileName.c_str(), ios::app ) ;
+  if ((t_it->time() == t_it->time_step()) && (my_rank == 0)) 
+     MyFile << "Time,parID,Npoints,x,y,z,vx,vy,vz,Fpx,Fpy,Fpz,Fvx,Fvy,Fvz" << endl;
+
   doubleArray2D avg_force(3,2,0);
+
+  // Structure of particle input data
+  PartForces hydro_forces = GLOBAL_EQ->get_forces();
+  // Structure of particle input data
+  PartInput solid = GLOBAL_EQ->get_solid(1);
 
   size_t Nmax = 0.;
   if (level_set_type == "Sphere") {
@@ -4095,36 +4129,46 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
   }
 
   for (size_t parID = 0; parID < Npart; parID++) {
+     // comp won't matter as the particle position is independent of comp
+     double xp = solid.coord[0]->item(parID,0);
+     double yp = solid.coord[0]->item(parID,1);
+     double zp = solid.coord[0]->item(parID,2);
+     double vx = solid.vel[0]->item(parID,0);
+     double vy = solid.vel[0]->item(parID,1);
+     double vz = solid.vel[0]->item(parID,2);
+ 
      // Contribution of stress tensor
+     doubleVector vel_force(3,0);
      compute_velocity_force_on_particle(vel_force, parID, Nmax); 
      // Gathering information from all procs
-     vel_force(parID,0) = pelCOMM->sum(vel_force(parID,0)) ;
-     vel_force(parID,1) = pelCOMM->sum(vel_force(parID,1)) ;
-     vel_force(parID,2) = pelCOMM->sum(vel_force(parID,2)) ;
+     hydro_forces.vel[0]->set_item(parID,pelCOMM->sum(vel_force(0))) ;
+     hydro_forces.vel[1]->set_item(parID,pelCOMM->sum(vel_force(1))) ;
+     hydro_forces.vel[2]->set_item(parID,pelCOMM->sum(vel_force(2))) ;
 
      // Contribution due to pressure tensor
+     doubleVector press_force(3,0);
      compute_pressure_force_on_particle(press_force, parID, Nmax); 
      // Gathering information from all procs
-     press_force(parID,0) = pelCOMM->sum(press_force(parID,0)) ;
-     press_force(parID,1) = pelCOMM->sum(press_force(parID,1)) ;
-     press_force(parID,2) = pelCOMM->sum(press_force(parID,2)) ;
+     hydro_forces.press[0]->set_item(parID,pelCOMM->sum(press_force(0))) ;
+     hydro_forces.press[1]->set_item(parID,pelCOMM->sum(press_force(1))) ;
+     hydro_forces.press[2]->set_item(parID,pelCOMM->sum(press_force(2))) ;
 
      if (my_rank == 0) {
-	avg_force(0,0) += press_force(parID,0);
-	avg_force(1,0) += press_force(parID,1);
-	avg_force(2,0) += press_force(parID,2);
-	avg_force(0,1) += vel_force(parID,0);
-	avg_force(1,1) += vel_force(parID,1);
-	avg_force(2,1) += vel_force(parID,2);
+	avg_force(0,0) += hydro_forces.press[0]->item(parID);
+	avg_force(1,0) += hydro_forces.press[1]->item(parID);
+	avg_force(2,0) += hydro_forces.press[2]->item(parID);
+	avg_force(0,1) += hydro_forces.vel[0]->item(parID);
+	avg_force(1,1) += hydro_forces.vel[1]->item(parID);
+	avg_force(2,1) += hydro_forces.vel[2]->item(parID);
 
-	ofstream MyFile( fileName.c_str(), ios::app ) ;
-        MyFile << t_it -> time() << "," << parID << "," << Nmax << "," << press_force(parID,0) 
-                                                                << "," << press_force(parID,1)
-                                                                << "," << press_force(parID,2)
-                                                                << "," << vel_force(parID,0) 
-                                                                << "," << vel_force(parID,1) 
-                                                                << "," << vel_force(parID,2) << endl;
-        MyFile.close( ) ;
+        MyFile << t_it -> time() << "," << parID << "," << Nmax << "," << xp << "," << yp << "," << zp
+	                                                        << "," << vx << "," << vy << "," << vz	
+					                        << "," << hydro_forces.press[0]->item(parID) 
+                                                                << "," << hydro_forces.press[1]->item(parID)
+                                                                << "," << hydro_forces.press[2]->item(parID)
+                                                                << "," << hydro_forces.vel[0]->item(parID) 
+                                                                << "," << hydro_forces.vel[1]->item(parID) 
+                                                                << "," << hydro_forces.vel[2]->item(parID) << endl;
      }
   }
   if (my_rank == 0) cout << "Average pressure force with " << Nmax << " surface points: " << avg_force(0,0)/double(Npart)
@@ -4133,6 +4177,7 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
   if (my_rank == 0) cout << "Average viscous force with " << Nmax << " surface points: " << avg_force(0,1)/double(Npart)
                                                                                 << "," << avg_force(1,1)/double(Npart) 
                                                                                 << "," << avg_force(2,1)/double(Npart) <<endl;
+  if (my_rank == 0) MyFile.close( ) ;
 }
 
 //---------------------------------------------------------------------------
@@ -4692,9 +4737,10 @@ DDS_NavierStokes:: ghost_points_generation( FV_DiscreteField* FF, class doubleAr
   }
 }
 
+
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_pressure_force_on_particle" ) ;
@@ -4710,7 +4756,7 @@ DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleArray2D& force
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_velocity_force_on_particle" ) ;
@@ -4724,7 +4770,7 @@ DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleArray2D& force
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: second_order_viscous_stress(class doubleVector& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: second_order_viscous_stress" ) ;
@@ -4765,8 +4811,8 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
 
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
-  doubleVector rotated_coord(dim,0);
-  doubleVector rotated_normal(dim,0);
+  doubleVector rotated_coord(3,0);
+  doubleVector rotated_normal(3,0);
   intVector sign(dim,0);
   boolArray2D point_in_domain(2,dim,1);
 
@@ -5039,21 +5085,21 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleArray2D& force, size_
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale)
-                                     + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
-                                     + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
-     force(parID,1) = force(parID,1) + stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale) 
-                                     + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
-                                     + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
-     force(parID,2) = force(parID,2) + stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale) 
-                                     + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
-                                     + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(0) = force(0) + stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale)
+                         + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
+                         + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(1) = force(1) + stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale) 
+                         + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
+                         + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(2) = force(2) + stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale) 
+                         + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
+                         + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
   }
 //  outputFile.close();
 }
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: first_order_viscous_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: first_order_viscous_stress(class doubleVector& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: first_order_viscous_stress" ) ;
@@ -5102,8 +5148,8 @@ DDS_NavierStokes:: first_order_viscous_stress(class doubleArray2D& force, size_t
 
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
-  doubleVector rotated_coord(dim,0);
-  doubleVector rotated_normal(dim,0);
+  doubleVector rotated_coord(3,0);
+  doubleVector rotated_normal(3,0);
 
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[1];comp++) {
@@ -5475,15 +5521,15 @@ DDS_NavierStokes:: first_order_viscous_stress(class doubleArray2D& force, size_t
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(parID,0) = force(parID,0) + stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale) 
-                                     + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
-                                     + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
-     force(parID,1) = force(parID,1) + stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale) 
-                                     + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
-                                     + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
-     force(parID,2) = force(parID,2) + stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale) 
-                                     + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
-                                     + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(0) = force(0) + stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale) 
+                         + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
+                         + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(1) = force(1) + stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale) 
+                         + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
+                         + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
+     force(2) = force(2) + stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale) 
+                         + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
+                         + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
   }
 //  outputFile.close();
 }

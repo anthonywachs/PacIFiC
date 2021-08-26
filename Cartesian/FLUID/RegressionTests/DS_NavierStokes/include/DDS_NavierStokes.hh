@@ -8,6 +8,7 @@
 #include <computingtime.hh>
 #include <boolVector.hh>
 #include <solvercomputingtime.hh>
+#include <MAC_DoubleVector.hh>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -222,14 +223,14 @@ public SolverComputingTime
       void impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
       void impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID );
 
-      void compute_velocity_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
-      void first_order_viscous_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
-      void second_order_viscous_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void compute_velocity_force_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np);
+      void first_order_viscous_stress(class doubleVector& force, size_t const& parID, size_t const& Np);
+      void second_order_viscous_stress(class doubleVector& force, size_t const& parID, size_t const& Np);
       void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
-      void compute_pressure_force_on_particle(class doubleArray2D& force, size_t const& parID, size_t const& Np);
-      void first_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
-      void second_order_pressure_stress_withNeumannBC(class doubleArray2D& force, size_t const& parID, size_t const& Np);
-      void second_order_pressure_stress(class doubleArray2D& force, size_t const& parID, size_t const& Np);
+      void compute_pressure_force_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np);
+      void first_order_pressure_stress(class doubleVector& force, size_t const& parID, size_t const& Np);
+      void second_order_pressure_stress_withNeumannBC(class doubleVector& force, size_t const& parID, size_t const& Np);
+      void second_order_pressure_stress(class doubleVector& force, size_t const& parID, size_t const& Np);
       void generate_surface_discretization();
       void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
       void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
@@ -356,7 +357,7 @@ public SolverComputingTime
       string AdvectionScheme;
       size_t AdvectionTimeAccuracy;
       size_t DivRelax;
-      double rho;
+      double rho, rho_s;
       bool b_restart ;
       bool is_solids;
       bool is_par_motion;
@@ -364,6 +365,7 @@ public SolverComputingTime
       string IntersectionMethod;
       string ViscousStressOrder;
       string PressureStressOrder;
+      string motion_type;
       double tolerance;
 
       bool is_firstorder ;
@@ -378,6 +380,7 @@ public SolverComputingTime
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;
+      MAC_DoubleVector* gravity_vector ;
       bool is_periodic[2][3];
       string insertion_type;
       string solid_filename;

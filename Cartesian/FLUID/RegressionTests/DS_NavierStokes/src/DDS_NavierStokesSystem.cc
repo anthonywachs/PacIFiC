@@ -150,6 +150,11 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    surface.coordinate = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    surface.normal = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    
+   // Structure for the particle force discretization
+   hydro_forces.press = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   hydro_forces.vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   hydro_forces.torque = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+
    for (size_t level = 0; level < 3; level++) {
       divergence[level].stencil = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
       divergence[level].lambda = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
@@ -307,6 +312,16 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    surface.normal[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    surface.normal[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
 
+   hydro_forces.press[0] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   hydro_forces.press[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   hydro_forces.press[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   hydro_forces.vel[0] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   hydro_forces.vel[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   hydro_forces.vel[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   hydro_forces.torque[0] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   hydro_forces.torque[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   hydro_forces.torque[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+
    for (size_t level=0;level<3;level++) {
       divergence[level].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
       for (size_t dir=0;dir<3;dir++) {
@@ -412,6 +427,18 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
    // Initialize Direction splitting matrices & vectors for pressure 
    size_t nb_procs, proc_pos;
+
+   if (is_solids) {
+      hydro_forces.press[0]->re_initialize(Npart);
+      hydro_forces.press[1]->re_initialize(Npart);
+      hydro_forces.press[2]->re_initialize(Npart);
+      hydro_forces.vel[0]->re_initialize(Npart);
+      hydro_forces.vel[1]->re_initialize(Npart);
+      hydro_forces.vel[2]->re_initialize(Npart);
+      hydro_forces.torque[0]->re_initialize(Npart);
+      hydro_forces.torque[1]->re_initialize(Npart);
+      hydro_forces.torque[2]->re_initialize(Npart);
+   }
 
    if (is_solids && is_stressCal) {
       if (dim == 3) {
@@ -857,6 +884,14 @@ DDS_NavierStokesSystem::get_surface()
    return (surface) ;
 }
 
+//----------------------------------------------------------------------
+PartForces
+DDS_NavierStokesSystem::get_forces()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokesSystem:: get_forces" ) ;
+   return (hydro_forces) ;
+}
 //----------------------------------------------------------------------
 BoundaryBisec*
 DDS_NavierStokesSystem::get_b_intersect(size_t const& field, size_t const& level)
