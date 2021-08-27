@@ -417,8 +417,7 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    // Generate solid particles if required
    if (is_solids) {
       if (insertion_type == "file") {
-         Solids_generation(0);
-         Solids_generation(1);
+         Solids_generation( );
       } else if (insertion_type == "GRAINS") {
          // Create a stringstream to store particle information
 	 string temp_string;
@@ -439,8 +438,7 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 	 // Convert string to istringstream
 	 istringstream global_par_info(temp_string);
 	 // Import particle information in FLUID
-	 import_par_info(0,global_par_info);
-	 import_par_info(1,global_par_info);
+	 import_par_info(global_par_info);
       }
       if (my_rank == 0) cout << "Finished particle generation... \n" << endl;
 
@@ -477,13 +475,13 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: import_par_info( size_t const& field, istringstream &is )
+DDS_NavierStokes:: import_par_info(istringstream &is)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokes:: import_par_info" ) ;
 
    // Structure of particle input data
-   PartInput solid = GLOBAL_EQ->get_solid(field);
+   PartInput solid = GLOBAL_EQ->get_solid(0);
 
    string line;
    istringstream lineStream;
@@ -547,20 +545,18 @@ DDS_NavierStokes:: import_par_info( size_t const& field, istringstream &is )
 		 		   << Rp << endl; 
 */
 	 // Storing the information in particle structure
-         for (size_t comp=0;comp<nb_comps[field];comp++) {
-            solid.coord[comp]->set_item(cntr,0,xp);
-            solid.coord[comp]->set_item(cntr,1,yp);
-            solid.coord[comp]->set_item(cntr,2,zp);
-            solid.size[comp]->set_item(cntr,Rp);
-            solid.vel[comp]->set_item(cntr,0,vx);
-            solid.vel[comp]->set_item(cntr,1,vy);
-            solid.vel[comp]->set_item(cntr,2,vz);
-            solid.ang_vel[comp]->set_item(cntr,0,wx);
-            solid.ang_vel[comp]->set_item(cntr,1,wy);
-            solid.ang_vel[comp]->set_item(cntr,2,wz);
-            solid.temp[comp]->set_item(cntr,Tp);
-            solid.inside[comp]->set_item(cntr,1);
-         }
+         solid.coord[0]->set_item(cntr,xp);
+         solid.coord[1]->set_item(cntr,yp);
+         solid.coord[2]->set_item(cntr,zp);
+         solid.size->set_item(cntr,Rp);
+         solid.vel[0]->set_item(cntr,vx);
+         solid.vel[1]->set_item(cntr,vy);
+         solid.vel[2]->set_item(cntr,vz);
+         solid.ang_vel[0]->set_item(cntr,wx);
+         solid.ang_vel[1]->set_item(cntr,wy);
+         solid.ang_vel[2]->set_item(cntr,wz);
+         solid.temp->set_item(cntr,Tp);
+         solid.inside->set_item(cntr,1);
       } else if (cell == "O") {
          // Extracting Orientation Matrix
          getline(lineStream, cell, '\t');
@@ -587,17 +583,15 @@ DDS_NavierStokes:: import_par_info( size_t const& field, istringstream &is )
 		 	              << tzx << "," << tzy << "," << tzz << endl; 
 */
          // Storing the information in particle structure
-         for (size_t comp=0;comp<nb_comps[field];comp++) {
-            solid.thetap[comp]->set_item(cntr,0,txx);
-            solid.thetap[comp]->set_item(cntr,1,txy);
-            solid.thetap[comp]->set_item(cntr,2,txz);
-            solid.thetap[comp]->set_item(cntr,3,tyx);
-            solid.thetap[comp]->set_item(cntr,4,tyy);
-            solid.thetap[comp]->set_item(cntr,5,tyz);
-            solid.thetap[comp]->set_item(cntr,6,tzx);
-            solid.thetap[comp]->set_item(cntr,7,tzy);
-            solid.thetap[comp]->set_item(cntr,8,tzz);
-         }
+         solid.thetap->set_item(cntr,0,txx);
+         solid.thetap->set_item(cntr,1,txy);
+         solid.thetap->set_item(cntr,2,txz);
+         solid.thetap->set_item(cntr,3,tyx);
+         solid.thetap->set_item(cntr,4,tyy);
+         solid.thetap->set_item(cntr,5,tyz);
+         solid.thetap->set_item(cntr,6,tzx);
+         solid.thetap->set_item(cntr,7,tzy);
+         solid.thetap->set_item(cntr,8,tzz);
       }
    }
 
@@ -809,7 +803,7 @@ DDS_NavierStokes:: error_with_analytical_solution_couette (FV_DiscreteField cons
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
  
-   PartInput solid = GLOBAL_EQ->get_solid(field);
+   PartInput solid = GLOBAL_EQ->get_solid(0);
    NodeProp node = GLOBAL_EQ->get_node_property(field,0);
 
    for (size_t comp=0;comp<nb_comps[field];++comp) {
@@ -821,12 +815,12 @@ DDS_NavierStokes:: error_with_analytical_solution_couette (FV_DiscreteField cons
          max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
       }
 
-      double xp = solid.coord[comp]->item(0,0);
-      double yp = solid.coord[comp]->item(0,1);
-      double r1 = solid.size[comp]->item(0);
-      double o1 = solid.ang_vel[comp]->item(0,2);
-      double r2 = solid.size[comp]->item(1);
-      double o2 = solid.ang_vel[comp]->item(1,2);
+      double xp = solid.coord[0]->item(0);
+      double yp = solid.coord[1]->item(0);
+      double r1 = solid.size->item(0);
+      double o1 = solid.ang_vel[2]->item(0);
+      double r2 = solid.size->item(1);
+      double o2 = solid.ang_vel[2]->item(1);
       double a = (o2*pow(r2,2.)-o1*pow(r1,2.))/(pow(r2,2.)-pow(r1,2.));
       double b = (o1-o2)*(pow(r1,2.)*pow(r2,2.))/(pow(r2,2.)-pow(r1,2.));
       //double mean_press = 1./(r2-r1)*(pow(a,2.)*(pow(r2,3.)-pow(r1,3.))/6. + 2.*a*b*((r2*log(r2)-r2)-(r1*log(r1)-r1)) + pow(b,2.)/2./r2 - pow(b,2.)/2./r1);
@@ -906,11 +900,11 @@ DDS_NavierStokes:: error_with_analytical_solution_poiseuille3D ( )
       double error_L2 = 0.;
 
       if (is_solids) {
-         PartInput solid = GLOBAL_EQ->get_solid(1);
+         PartInput solid = GLOBAL_EQ->get_solid(0);
          NodeProp node = GLOBAL_EQ->get_node_property(1,0);
-         double yp = solid.coord[comp]->item(0,1);
-         double zp = solid.coord[comp]->item(0,2);
-         double rp = solid.size[comp]->item(0);
+         double yp = solid.coord[1]->item(0);
+         double zp = solid.coord[2]->item(0);
+         double rp = solid.size->item(0);
 
          // Compute error
          for (size_t i=0;i<local_dof_number(0);++i) {
@@ -1168,31 +1162,71 @@ DDS_NavierStokes:: fresh_nodes_in_fluid_initialization ( )
 
 //---------------------------------------------------------------------------
 void
+DDS_NavierStokes:: correct_particle_system(FV_TimeIterator const* t_it)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes:: correct_particle_system" ) ;
+
+  // Structure of particle input data
+  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+  PartForces hydro_forces_old = GLOBAL_EQ->get_forces(1);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
+  PartInput solid_old = GLOBAL_EQ->get_solid(1);
+
+  doubleVector const& gg = gravity_vector->to_double_vector();
+
+  if (insertion_type == "file") {
+     for (size_t i=0;i<Npart;i++) {
+        double rp = solid.size->item(i);
+        double mass_p = rho_s*(4./3.)*MAC::pi()*pow(rp,3.); 
+        doubleVector pos(dim,0);
+        doubleVector vel(dim,0);
+        doubleVector acc(dim,0);
+
+        for (size_t dir=0;dir<dim;dir++) {
+           pos(dir) = solid_old.coord[dir]->item(i);
+           vel(dir) = solid_old.vel[dir]->item(i);
+
+           acc(dir) = gg(dir)*(rho_s/rho-1) + 0.5*(hydro_forces.press[dir]->item(i) + hydro_forces_old.press[dir]->item(i)
+                                            +      hydro_forces.vel[dir]->item(i) + hydro_forces_old.vel[dir]->item(i)) / mass_p ;
+           vel(dir) = solid_old.vel[dir]->item(i) + acc(dir)*t_it->time_step();
+           pos(dir) = solid_old.vel[dir]->item(i)*t_it->time_step() + 0.5*acc(dir)*pow(t_it->time_step(),2);
+
+           solid.coord[dir]->set_item(i,pos(dir));
+           solid.vel[dir]->set_item(i,vel(dir));
+        }
+     }
+  }
+}
+
+
+//---------------------------------------------------------------------------
+void
 DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: update_particle_system" ) ;
 
   // Structure of particle input data
-  PartForces hydro_forces = GLOBAL_EQ->get_forces();
+  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
 
   doubleVector const& gg = gravity_vector->to_double_vector();
 
   if (insertion_type == "file") {
      for (size_t field=0;field<2;field++) {
         // Structure of particle input data
-        PartInput solid = GLOBAL_EQ->get_solid(field);
+        PartInput solid = GLOBAL_EQ->get_solid(0);
         for (size_t comp=0;comp<nb_comps[field];comp++) {
            for (size_t i=0;i<Npart;i++) {
-              double rp = solid.size[comp]->item(i);
+              double rp = solid.size->item(i);
 	      double mass_p = rho_s*(4./3.)*MAC::pi()*pow(rp,3.); 
               doubleVector pos(dim,0);
               doubleVector vel(dim,0);
               doubleVector acc(dim,0);
 
               for (size_t dir=0;dir<dim;dir++) {
-                 pos(dir) = solid.coord[comp]->item(i,dir);
-                 vel(dir) = solid.vel[comp]->item(i,dir);
+                 pos(dir) = solid.coord[dir]->item(i);
+                 vel(dir) = solid.vel[dir]->item(i);
 
                  if (motion_type == "Sine") {
                     vel(dir) = gg(dir)*Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
@@ -1204,8 +1238,8 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
                     pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
                  }
 
-                 solid.coord[comp]->set_item(i,dir,pos(dir));
-                 solid.vel[comp]->set_item(i,dir,vel(dir));
+                 solid.coord[dir]->set_item(i,pos(dir));
+                 solid.vel[dir]->set_item(i,vel(dir));
 	      }
            }
         }
@@ -1233,8 +1267,7 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
      // Convert string to istringstream
      istringstream global_par_info(temp_string);
      // Import particle information in FLUID
-     import_par_info(0,global_par_info);
-     import_par_info(1,global_par_info);
+     import_par_info(global_par_info);
   }
 }
 
@@ -1391,12 +1424,12 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
 {
   MAC_LABEL( "DDS_NavierStokes:: level_set_solids" ) ;
 
-  PartInput solid = GLOBAL_EQ->get_solid(field);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
-  double xp = solid.coord[comp]->item(m,0);
-  double yp = solid.coord[comp]->item(m,1);
-  double zp = solid.coord[comp]->item(m,2);
-  double Rp = solid.size[comp]->item(m);
+  double xp = solid.coord[0]->item(m);
+  double yp = solid.coord[1]->item(m);
+  double zp = solid.coord[2]->item(m);
+  double Rp = solid.size->item(m);
 
   doubleVector delta(3,0);
 
@@ -1462,11 +1495,11 @@ DDS_NavierStokes:: level_set_derivative (FV_DiscreteField const* FF, size_t cons
 {
   MAC_LABEL( "DDS_NavierStokes:: level_set_derivative" ) ;
 
-  PartInput solid = GLOBAL_EQ->get_solid(field);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
-  double xp = solid.coord[comp]->item(m,0);
-  double yp = solid.coord[comp]->item(m,1);
-  double zp = solid.coord[comp]->item(m,2);
+  double xp = solid.coord[0]->item(m);
+  double yp = solid.coord[1]->item(m);
+  double zp = solid.coord[2]->item(m);
 //  double Rp = solid.size[comp]->item(m);
 
   doubleVector delta(3,0);
@@ -1536,16 +1569,16 @@ DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& d
 {
   MAC_LABEL( "DDS_NavierStokes:: trans_rotation_matrix" ) ;
 
-  PartInput solid = GLOBAL_EQ->get_solid(field);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
   // yaw along z-axis; pitch along y-axis; roll along x-axis
   doubleArray2D rot_matrix(3,3,0);
 
   // Rotation matrix assemble
   if (insertion_type == "file") {
-     double roll = (MAC::pi()/180.)*solid.thetap[comp]->item(m,0);
-     double pitch = (MAC::pi()/180.)*solid.thetap[comp]->item(m,1);
-     double yaw = (MAC::pi()/180.)*solid.thetap[comp]->item(m,2);
+     double roll = (MAC::pi()/180.)*solid.thetap->item(m,0);
+     double pitch = (MAC::pi()/180.)*solid.thetap->item(m,1);
+     double yaw = (MAC::pi()/180.)*solid.thetap->item(m,2);
      rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
      rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
      rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
@@ -1556,15 +1589,15 @@ DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& d
      rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
      rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
   } else if (insertion_type == "GRAINS") {
-     rot_matrix(0,0) = solid.thetap[comp]->item(m,0);
-     rot_matrix(1,0) = solid.thetap[comp]->item(m,1);
-     rot_matrix(2,0) = solid.thetap[comp]->item(m,2);
-     rot_matrix(0,1) = solid.thetap[comp]->item(m,3);
-     rot_matrix(1,1) = solid.thetap[comp]->item(m,4);
-     rot_matrix(2,1) = solid.thetap[comp]->item(m,5);
-     rot_matrix(0,2) = solid.thetap[comp]->item(m,6);
-     rot_matrix(1,2) = solid.thetap[comp]->item(m,7);
-     rot_matrix(2,2) = solid.thetap[comp]->item(m,8);
+     rot_matrix(0,0) = solid.thetap->item(m,0);
+     rot_matrix(1,0) = solid.thetap->item(m,1);
+     rot_matrix(2,0) = solid.thetap->item(m,2);
+     rot_matrix(0,1) = solid.thetap->item(m,3);
+     rot_matrix(1,1) = solid.thetap->item(m,4);
+     rot_matrix(2,1) = solid.thetap->item(m,5);
+     rot_matrix(0,2) = solid.thetap->item(m,6);
+     rot_matrix(1,2) = solid.thetap->item(m,7);
+     rot_matrix(2,2) = solid.thetap->item(m,8);
   }
 
   double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
@@ -1583,16 +1616,16 @@ DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, 
 {
   MAC_LABEL( "DDS_NavierStokes:: rotation_matrix" ) ;
 
-  PartInput solid = GLOBAL_EQ->get_solid(field);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
   // yaw along z-axis; pitch along y-axis; roll along x-axis
   doubleArray2D rot_matrix(3,3,0);
 
   // Rotation matrix assemble
   if (insertion_type == "file") {
-     double roll = (MAC::pi()/180.)*solid.thetap[comp]->item(m,0);
-     double pitch = (MAC::pi()/180.)*solid.thetap[comp]->item(m,1);
-     double yaw = (MAC::pi()/180.)*solid.thetap[comp]->item(m,2);
+     double roll = (MAC::pi()/180.)*solid.thetap->item(m,0);
+     double pitch = (MAC::pi()/180.)*solid.thetap->item(m,1);
+     double yaw = (MAC::pi()/180.)*solid.thetap->item(m,2);
      rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
      rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
      rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
@@ -1603,15 +1636,15 @@ DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, 
      rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
      rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
   } else if (insertion_type == "GRAINS") {
-     rot_matrix(0,0) = solid.thetap[comp]->item(m,0);
-     rot_matrix(0,1) = solid.thetap[comp]->item(m,1);
-     rot_matrix(0,2) = solid.thetap[comp]->item(m,2);
-     rot_matrix(1,0) = solid.thetap[comp]->item(m,3);
-     rot_matrix(1,1) = solid.thetap[comp]->item(m,4);
-     rot_matrix(1,2) = solid.thetap[comp]->item(m,5);
-     rot_matrix(2,0) = solid.thetap[comp]->item(m,6);
-     rot_matrix(2,1) = solid.thetap[comp]->item(m,7);
-     rot_matrix(2,2) = solid.thetap[comp]->item(m,8);
+     rot_matrix(0,0) = solid.thetap->item(m,0);
+     rot_matrix(0,1) = solid.thetap->item(m,1);
+     rot_matrix(0,2) = solid.thetap->item(m,2);
+     rot_matrix(1,0) = solid.thetap->item(m,3);
+     rot_matrix(1,1) = solid.thetap->item(m,4);
+     rot_matrix(1,2) = solid.thetap->item(m,5);
+     rot_matrix(2,0) = solid.thetap->item(m,6);
+     rot_matrix(2,1) = solid.thetap->item(m,7);
+     rot_matrix(2,2) = solid.thetap->item(m,8);
   }
 
   double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
@@ -1625,45 +1658,43 @@ DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, 
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: Solids_generation (size_t const& field)
+DDS_NavierStokes:: Solids_generation ()
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: Solids_generation" ) ;
 
   // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid(field);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
   double xp,yp,zp,Rp,tx,ty,tz,vx,vy,vz,wx,wy,wz,Tp,off;
 
-  for (size_t comp=0;comp<nb_comps[field];comp++) {
-     ifstream inFile;
-     std::ostringstream os2;
-     os2 << "./InputFiles/" << solid_filename;
-     std::string filename = os2.str();
+  ifstream inFile;
+  std::ostringstream os2;
+  os2 << "./InputFiles/" << solid_filename;
+  std::string filename = os2.str();
 
-     inFile.open(filename.c_str());
-     string line;
-     getline(inFile,line);
-     for (size_t i=0;i<Npart;i++) {
-        inFile >> xp >> yp >> zp >> Rp >> tx >> ty >> tz >> vx >> vy >> vz >> wx >> wy >> wz >> Tp >> off;
-        solid.coord[comp]->set_item(i,0,xp);
-        solid.coord[comp]->set_item(i,1,yp);
-        solid.coord[comp]->set_item(i,2,zp);
-        solid.size[comp]->set_item(i,Rp);
-        solid.thetap[comp]->set_item(i,0,tx);
-        solid.thetap[comp]->set_item(i,1,ty);
-        solid.thetap[comp]->set_item(i,2,tz);
-        solid.vel[comp]->set_item(i,0,vx);
-        solid.vel[comp]->set_item(i,1,vy);
-        solid.vel[comp]->set_item(i,2,vz);
-        solid.ang_vel[comp]->set_item(i,0,wx);
-        solid.ang_vel[comp]->set_item(i,1,wy);
-        solid.ang_vel[comp]->set_item(i,2,wz);
-        solid.temp[comp]->set_item(i,Tp);
-        solid.inside[comp]->set_item(i,off);
-     }
-     inFile.close();
+  inFile.open(filename.c_str());
+  string line;
+  getline(inFile,line);
+  for (size_t i=0;i<Npart;i++) {
+     inFile >> xp >> yp >> zp >> Rp >> tx >> ty >> tz >> vx >> vy >> vz >> wx >> wy >> wz >> Tp >> off;
+     solid.coord[0]->set_item(i,xp);
+     solid.coord[1]->set_item(i,yp);
+     solid.coord[2]->set_item(i,zp);
+     solid.size->set_item(i,Rp);
+     solid.thetap->set_item(i,0,tx);
+     solid.thetap->set_item(i,1,ty);
+     solid.thetap->set_item(i,2,tz);
+     solid.vel[0]->set_item(i,vx);
+     solid.vel[1]->set_item(i,vy);
+     solid.vel[2]->set_item(i,vz);
+     solid.ang_vel[0]->set_item(i,wx);
+     solid.ang_vel[1]->set_item(i,wy);
+     solid.ang_vel[2]->set_item(i,wz);
+     solid.temp->set_item(i,Tp);
+     solid.inside->set_item(i,off);
   }
+  inFile.close();
 }
 
 //---------------------------------------------------------------------------
@@ -1679,17 +1710,17 @@ DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<dou
   doubleVector omega(3,0.);
   doubleVector linear_vel(3,0.);
 
-  PartInput solid = GLOBAL_EQ->get_solid(1);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
   grid_coord(0) = FF->get_DOF_coordinate( i, comp, 0 ) ;
   grid_coord(1) = FF->get_DOF_coordinate( j, comp, 1 ) ;
 
-  par_coord(0) = solid.coord[comp]->item(parID,0);
-  par_coord(1) = solid.coord[comp]->item(parID,1);
+  par_coord(0) = solid.coord[0]->item(parID);
+  par_coord(1) = solid.coord[1]->item(parID);
 
   if (dim == 3) {
      grid_coord(2) = FF->get_DOF_coordinate( k, comp, 2 ) ;
-     par_coord(2) = solid.coord[comp]->item(parID,2);
+     par_coord(2) = solid.coord[2]->item(parID);
   }
 
   double sign = 0.;
@@ -1704,8 +1735,8 @@ DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<dou
 
   for (size_t m = 0; m < 3; m++) {
      delta(m) = grid_coord(m) - par_coord(m);
-     omega(m) = solid.ang_vel[comp]->item(parID,m);
-     linear_vel(m) = solid.vel[comp]->item(parID,m);
+     omega(m) = solid.ang_vel[m]->item(parID);
+     linear_vel(m) = solid.vel[m]->item(parID);
   }
 /*
   net_vel[0] = pow(grid_coord(0),4) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4);
@@ -1735,23 +1766,23 @@ DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel, siz
   doubleVector omega(3,0.);
   doubleVector linear_vel(3,0.);
 
-  PartInput solid = GLOBAL_EQ->get_solid(1);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
   grid_coord(0) = xg;
   grid_coord(1) = yg;
 
-  par_coord(0) = solid.coord[comp]->item(parID,0);
-  par_coord(1) = solid.coord[comp]->item(parID,1);
+  par_coord(0) = solid.coord[0]->item(parID);
+  par_coord(1) = solid.coord[1]->item(parID);
 
   if (dim == 3) {
      grid_coord(2) = zg;
-     par_coord(2) = solid.coord[comp]->item(parID,2);
+     par_coord(2) = solid.coord[2]->item(parID);
   }
 
   for (size_t m = 0; m < 3; m++) {
      delta(m) = grid_coord(m) - par_coord(m);
-     omega(m) = solid.ang_vel[comp]->item(parID,m);
-     linear_vel(m) = solid.vel[comp]->item(parID,m);
+     omega(m) = solid.ang_vel[m]->item(parID);
+     linear_vel(m) = solid.vel[m]->item(parID);
   }
 /*
   net_vel[0] = pow(grid_coord(0),4) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4);
@@ -1775,7 +1806,7 @@ DDS_NavierStokes:: generate_list_of_local_particles (FV_DiscreteField const* FF,
 {
   MAC_LABEL( "DDS_NavierStokes:: generate_list_of_local_particles" ) ;
 
-  PartInput solid = GLOBAL_EQ->get_solid(field);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
   doubleVector Dmin(dim,0);
   doubleVector Dmax(dim,0);
@@ -1789,10 +1820,10 @@ DDS_NavierStokes:: generate_list_of_local_particles (FV_DiscreteField const* FF,
      size_t cntr = 0;
      for (size_t m = 0; m < Npart; m++) {
 
-        double x0 = solid.coord[comp]->item(m,0);
-        double y0 = solid.coord[comp]->item(m,1);
-        double z0 = solid.coord[comp]->item(m,2);
-	double Rp = solid.size[comp]->item(m);
+        double x0 = solid.coord[0]->item(m);
+        double y0 = solid.coord[1]->item(m);
+        double z0 = solid.coord[2]->item(m);
+	double Rp = solid.size->item(m);
 
         bool status = (dim==2) ? ((x0 > (Dmin(0)-Rp)) && (x0 <= (Dmax(0)+Rp)) 
 			       && (y0 > (Dmin(1)-Rp)) && (y0 <= (Dmax(1)+Rp))) :
@@ -1800,7 +1831,7 @@ DDS_NavierStokes:: generate_list_of_local_particles (FV_DiscreteField const* FF,
                                && (y0 > (Dmin(1)-Rp)) && (y0 <= (Dmax(1)+Rp))
                                && (z0 > (Dmin(2)-Rp)) && (z0 <= (Dmax(2)+Rp))) ;
 
-	if (status) { solid.local_parID[comp]->set_item(cntr,(double)m); cntr++; }
+	if (status) { solid.local_parID->set_item(cntr,(double)m); cntr++; }
      }
      Npart_local = cntr;
   }
@@ -2070,12 +2101,12 @@ DDS_NavierStokes:: detect_fresh_cells_and_neighbours()
                
            if (fresh[0].flag_count->item(p) != 0) {
 	      size_t parID = (size_t) fresh[0].parID->item(p);
-	      double vec_mag = pow(pow(xC-solid.coord[comp]->item(parID,0),2) 
-			         + pow(yC-solid.coord[comp]->item(parID,1),2) 
-				 + pow(zC-solid.coord[comp]->item(parID,2),2),0.5); 
-	      double vx = (xC-solid.coord[comp]->item(parID,0))/vec_mag * solid.vel[comp]->item(parID,0);
-	      double vy = (yC-solid.coord[comp]->item(parID,1))/vec_mag * solid.vel[comp]->item(parID,1);
-	      double vz = (zC-solid.coord[comp]->item(parID,2))/vec_mag * solid.vel[comp]->item(parID,2);
+	      double vec_mag = pow(pow(xC-solid.coord[0]->item(parID),2) 
+			         + pow(yC-solid.coord[1]->item(parID),2) 
+				 + pow(zC-solid.coord[2]->item(parID),2),0.5); 
+	      double vx = (xC-solid.coord[0]->item(parID))/vec_mag * solid.vel[0]->item(parID);
+	      double vy = (yC-solid.coord[1]->item(parID))/vec_mag * solid.vel[1]->item(parID);
+	      double vz = (zC-solid.coord[2]->item(parID))/vec_mag * solid.vel[2]->item(parID);
 	      double sep_mag = pow(pow(vx,2)+pow(vy,2)+pow(vz,2),0.5);
               fresh[0].sep_vel->set_item(p,sep_mag);
            } else {
@@ -2097,7 +2128,7 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
 
-  PartInput solid = GLOBAL_EQ->get_solid(field);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
   NodeProp node = GLOBAL_EQ->get_node_property(field,0);
   NodeProp node_old = GLOBAL_EQ->get_node_property(field,1);
 
@@ -2138,7 +2169,7 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF, size_t
               size_t p = return_node_index(FF,comp,i,j,k);
               for (size_t m=0;m<Npart;m++) {
                  double level_set = level_set_function(FF,m,comp,xC,yC,zC,level_set_type,field);
-                 level_set *= solid.inside[comp]->item(m);
+                 level_set *= solid.inside->item(m);
 
                  // level_set is xb, if local critical time scale is 0.01 of the global time scale 
                  // then the node is considered inside the solid object
@@ -3659,10 +3690,10 @@ DDS_NavierStokes:: second_order_pressure_stress(class doubleVector& force, size_
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
   // comp won't matter as the particle position is independent of comp
-  double xp = solid.coord[comp]->item(parID,0);
-  double yp = solid.coord[comp]->item(parID,1);
-  double zp = solid.coord[comp]->item(parID,2);
-  double ri = solid.size[comp]->item(parID);
+  double xp = solid.coord[0]->item(parID);
+  double yp = solid.coord[1]->item(parID);
+  double zp = solid.coord[2]->item(parID);
+  double ri = solid.size->item(parID);
 /*  
   ofstream outputFile ;
   std::ostringstream os2;
@@ -3818,10 +3849,10 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleVector
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
   // comp won't matter as the particle position is independent of comp
-  double xp = solid.coord[comp]->item(parID,0);
-  double yp = solid.coord[comp]->item(parID,1);
-  double zp = solid.coord[comp]->item(parID,2);
-  double ri = solid.size[comp]->item(parID);
+  double xp = solid.coord[0]->item(parID);
+  double yp = solid.coord[1]->item(parID);
+  double zp = solid.coord[2]->item(parID);
+  double ri = solid.size->item(parID);
 /*
   ofstream outputFile ;
   std::ostringstream os2;
@@ -3922,12 +3953,12 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleVector
            // In Normal direction
            if (level_set(0) > threshold) {
               level_set(0) = level_set_function(PF,m,comp,point(1,0),point(1,1),point(1,2),level_set_type,0);
-              level_set(0) *= solid.inside[comp]->item(m);
+              level_set(0) *= solid.inside->item(m);
               if (level_set(0) < threshold) in_parID(0) = m;
            }
            if (level_set(1) > threshold) {
               level_set(1) = level_set_function(PF,m,comp,point(2,0),point(2,1),point(2,2),level_set_type,0);
-              level_set(1) *= solid.inside[comp]->item(m);
+              level_set(1) *= solid.inside->item(m);
               if (level_set(1) < threshold) in_parID(1) = m;
            }
         }
@@ -4020,10 +4051,10 @@ DDS_NavierStokes:: first_order_pressure_stress(class doubleVector& force, size_t
 	   Dmax(l) = PF->primary_grid()->get_max_coordinate_on_current_processor(l);
         }
 
-        double xp = solid.coord[comp]->item(parID,0);
-        double yp = solid.coord[comp]->item(parID,1);
-        double zp = solid.coord[comp]->item(parID,2);
-        ri = solid.size[comp]->item(parID);
+        double xp = solid.coord[0]->item(parID);
+        double yp = solid.coord[1]->item(parID);
+        double zp = solid.coord[2]->item(parID);
+        ri = solid.size->item(parID);
 
 	// Rotating surface points
 	rotated_coord(0) = ri*sx;
@@ -4111,9 +4142,9 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
   doubleArray2D avg_force(3,2,0);
 
   // Structure of particle input data
-  PartForces hydro_forces = GLOBAL_EQ->get_forces();
+  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
   // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid(1);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
   size_t Nmax = 0.;
   if (level_set_type == "Sphere") {
@@ -4130,12 +4161,12 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
 
   for (size_t parID = 0; parID < Npart; parID++) {
      // comp won't matter as the particle position is independent of comp
-     double xp = solid.coord[0]->item(parID,0);
-     double yp = solid.coord[0]->item(parID,1);
-     double zp = solid.coord[0]->item(parID,2);
-     double vx = solid.vel[0]->item(parID,0);
-     double vy = solid.vel[0]->item(parID,1);
-     double vz = solid.vel[0]->item(parID,2);
+     double xp = solid.coord[0]->item(parID);
+     double yp = solid.coord[1]->item(parID);
+     double zp = solid.coord[2]->item(parID);
+     double vx = solid.vel[0]->item(parID);
+     double vy = solid.vel[1]->item(parID);
+     double vz = solid.vel[2]->item(parID);
  
      // Contribution of stress tensor
      doubleVector vel_force(3,0);
@@ -4779,15 +4810,15 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleVector& force, size_t
   double dfdx=0.,dfdy=0., dfdz=0.;
 
   // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid(1);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
   // Structure of particle surface input data
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
   // comp won't matter as the particle position is independent of comp
-  double xp = solid.coord[0]->item(parID,0);
-  double yp = solid.coord[0]->item(parID,1);
-  double zp = solid.coord[0]->item(parID,2);
-  double ri = solid.size[0]->item(parID);
+  double xp = solid.coord[0]->item(parID);
+  double yp = solid.coord[1]->item(parID);
+  double zp = solid.coord[2]->item(parID);
+  double ri = solid.size->item(parID);
 /*  
   ofstream outputFile ;
   std::ostringstream os2;
@@ -4880,35 +4911,35 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleVector& force, size_t
 	      // In X
               if (level_set(0,0) > threshold) {
                  level_set(0,0) = level_set_function(UF,m,comp,point(1,0),point(0,1),point(0,2),level_set_type,1);
-                 level_set(0,0) *= solid.inside[comp]->item(m);
+                 level_set(0,0) *= solid.inside->item(m);
                  if (level_set(0,0) < threshold) in_parID(0,0) = m;
               }
               if (level_set(0,1) > threshold) {
                  level_set(0,1) = level_set_function(UF,m,comp,point(2,0),point(0,1),point(0,2),level_set_type,1);
-                 level_set(0,1) *= solid.inside[comp]->item(m);
+                 level_set(0,1) *= solid.inside->item(m);
                  if (level_set(0,1) < threshold) in_parID(0,1) = m;
               }
 	      // In Y
               if (level_set(1,0) > threshold) {
                  level_set(1,0) = level_set_function(UF,m,comp,point(0,0),point(1,1),point(0,2),level_set_type,1);
-                 level_set(1,0) *= solid.inside[comp]->item(m);
+                 level_set(1,0) *= solid.inside->item(m);
                  if (level_set(1,0) < threshold) in_parID(1,0) = m;
               }
               if (level_set(1,1) > threshold) {
                  level_set(1,1) = level_set_function(UF,m,comp,point(0,0),point(2,1),point(0,2),level_set_type,1);
-                 level_set(1,1) *= solid.inside[comp]->item(m);
+                 level_set(1,1) *= solid.inside->item(m);
                  if (level_set(1,1) < threshold) in_parID(1,1) = m;
               }
 	      // In Z
 	      if (dim == 3) {
                  if (level_set(2,0) > threshold) {
                     level_set(2,0) = level_set_function(UF,m,comp,point(0,0),point(0,1),point(1,2),level_set_type,1);
-                    level_set(2,0) *= solid.inside[comp]->item(m);
+                    level_set(2,0) *= solid.inside->item(m);
                     if (level_set(2,0) < threshold) in_parID(2,0) = m;
                  }
                  if (level_set(2,1) > threshold) {
                     level_set(2,1) = level_set_function(UF,m,comp,point(0,0),point(0,1),point(2,2),level_set_type,1);
-                    level_set(2,1) *= solid.inside[comp]->item(m);
+                    level_set(2,1) *= solid.inside->item(m);
                     if (level_set(2,1) < threshold) in_parID(2,1) = m;
                  }
 	      }
@@ -5108,15 +5139,15 @@ DDS_NavierStokes:: first_order_viscous_stress(class doubleVector& force, size_t 
   double dfdx=0.,dfdy=0., dfdz=0., dzh=0.;
 
   // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid(1);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
   // Structure of particle surface input data
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
   // comp won't matter as the particle position is independent of comp
-  double xp = solid.coord[0]->item(parID,0);
-  double yp = solid.coord[0]->item(parID,1);
-  double zp = solid.coord[0]->item(parID,2);
-  double ri = solid.size[0]->item(parID);
+  double xp = solid.coord[0]->item(parID);
+  double yp = solid.coord[1]->item(parID);
+  double zp = solid.coord[2]->item(parID);
+  double ri = solid.size->item(parID);
 
 /*  
   ofstream outputFile ;
@@ -5276,33 +5307,33 @@ DDS_NavierStokes:: first_order_viscous_stress(class doubleVector& force, size_t 
            for (size_t m=0;m<Npart;m++) {
               if (level_set(0,0) > threshold) {
                  level_set(0,0) = level_set_function(UF,m,comp,xpoint(1),ypoint(0),zpoint(0),level_set_type,1);
-                 level_set(0,0) *= solid.inside[comp]->item(m);
+                 level_set(0,0) *= solid.inside->item(m);
                  if (level_set(0,0) < threshold) in_parID(0,0) = m;
               }
               if (level_set(0,1) > threshold) {
                  level_set(0,1) = level_set_function(UF,m,comp,xpoint(2),ypoint(0),zpoint(0),level_set_type,1);
-                 level_set(0,1) *= solid.inside[comp]->item(m);
+                 level_set(0,1) *= solid.inside->item(m);
                  if (level_set(0,1) < threshold) in_parID(0,1) = m;
               }
               if (level_set(1,0) > threshold) {
                  level_set(1,0) = level_set_function(UF,m,comp,xpoint(0),ypoint(1),zpoint(0),level_set_type,1);
-                 level_set(1,0) *= solid.inside[comp]->item(m);
+                 level_set(1,0) *= solid.inside->item(m);
                  if (level_set(1,0) < threshold) in_parID(1,0) = m;
               }
               if (level_set(1,1) > threshold) {
                  level_set(1,1) = level_set_function(UF,m,comp,xpoint(0),ypoint(2),zpoint(0),level_set_type,1);
-                 level_set(1,1) *= solid.inside[comp]->item(m);
+                 level_set(1,1) *= solid.inside->item(m);
                  if (level_set(1,1) < threshold) in_parID(1,1) = m;
               }
               if (dim == 3) {
                  if (level_set(2,0) > threshold) {
                     level_set(2,0) = level_set_function(UF,m,comp,xpoint(0),ypoint(0),zpoint(1),level_set_type,1);
-                    level_set(2,0) *= solid.inside[comp]->item(m);
+                    level_set(2,0) *= solid.inside->item(m);
                     if (level_set(2,0) < threshold) in_parID(2,0) = m;
                  }
                  if (level_set(2,1) > threshold) {
                     level_set(2,1) = level_set_function(UF,m,comp,xpoint(0),ypoint(0),zpoint(2),level_set_type,1);
-                    level_set(2,1) *= solid.inside[comp]->item(m);
+                    level_set(2,1) *= solid.inside->item(m);
                     if (level_set(2,1) < threshold) in_parID(2,1) = m;
                  }
               }
@@ -5542,7 +5573,7 @@ DDS_NavierStokes:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
   MAC_LABEL("DDS_NavierStokes:: quadratic_interpolation3D" ) ;
 
   // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid(1);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
   doubleArray2D point(3,3,0);
   // Directional indexes of ghost points
@@ -5612,19 +5643,19 @@ DDS_NavierStokes:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
      // x0
      if (level_set(0) > threshold) {
         level_set(0) = level_set_function(FF,m,comp,coord_g(0,0),coord_g(0,1),coord_g(0,2),level_set_type,1);
-        level_set(0) *= solid.inside[comp]->item(m);
+        level_set(0) *= solid.inside->item(m);
         if (level_set(0) < threshold) { in_parID(0) = m; point_in_solid(0) = 1; }
      }
      // x1
      if (level_set(1) > threshold) {
         level_set(1) = level_set_function(FF,m,comp,coord_g(1,0),coord_g(1,1),coord_g(1,2),level_set_type,1);
-        level_set(1) *= solid.inside[comp]->item(m);
+        level_set(1) *= solid.inside->item(m);
         if (level_set(1) < threshold) { in_parID(1) = m; point_in_solid(1) = 1; }
      }
      // x2
      if (level_set(2) > threshold) {
         level_set(2) = level_set_function(FF,m,comp,coord_g(2,0),coord_g(2,1),coord_g(2,2),level_set_type,1);
-        level_set(2) *= solid.inside[comp]->item(m);
+        level_set(2) *= solid.inside->item(m);
         if (level_set(2) < threshold) { in_parID(2) = m; point_in_solid(2) = 1; }
      }
   }
@@ -7739,6 +7770,9 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
       correct_mean_pressure(0);
    }
 
+   if (motion_type == "Hydro") {
+      correct_particle_system(t_it);
+   }
    // Store the divergence to be used in the next time iteration
    divergence[1].div->set(divergence[0].div);
    divergence[1].stencil[0]->set(divergence[0].stencil[0]);
@@ -7750,6 +7784,22 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    fresh[1].neigh[1]->set(fresh[0].neigh[1]);
    fresh[1].neigh[2]->set(fresh[0].neigh[2]);
    fresh[1].neigh_count->set(fresh[0].neigh_count);
+
+   // Store particle forces and positions to last level
+   PartInput solid = GLOBAL_EQ->get_solid(0);
+   PartInput solid_old = GLOBAL_EQ->get_solid(1);
+   PartForces forces = GLOBAL_EQ->get_forces(0);
+   PartForces forces_old = GLOBAL_EQ->get_forces(1);
+
+   for (size_t dir=0;dir<3;dir++) {
+      solid_old.coord[dir]->set(solid.coord[dir]);
+      solid_old.vel[dir]->set(solid.vel[dir]);
+      solid_old.ang_vel[dir]->set(solid.ang_vel[dir]);
+
+      forces_old.press[dir]->set(forces.press[dir]);
+      forces_old.vel[dir]->set(forces.vel[dir]);
+      forces_old.torque[dir]->set(forces.torque[dir]);
+   }
 
    if (is_solids) {
       correct_pressure_1st_layer_solid(0);

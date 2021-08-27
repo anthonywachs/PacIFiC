@@ -149,11 +149,18 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    // Structure for the particle surface discretization
    surface.coordinate = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    surface.normal = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   
-   // Structure for the particle force discretization
-   hydro_forces.press = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   hydro_forces.vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   hydro_forces.torque = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+
+   for (size_t level = 0; level < 2; level++) {   
+      // Structure for the particle force discretization
+      hydro_forces[level].press = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+      hydro_forces[level].vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+      hydro_forces[level].torque = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+
+      // Structure for the particle input data
+      solid[level].coord = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+      solid[level].vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+      solid[level].ang_vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+   }
 
    for (size_t level = 0; level < 3; level++) {
       divergence[level].stencil = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
@@ -165,16 +172,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    Pfresh[1].neigh = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
 
    for (size_t field = 0; field < 2; field++) {
-
-      // Structure for the particle input data
-      solid[field].coord = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-      solid[field].size = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-      solid[field].thetap = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-      solid[field].vel = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-      solid[field].ang_vel = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-      solid[field].temp = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-      solid[field].inside = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-      solid[field].local_parID = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
 
       // Vector to store the presence/absence of particle on the field variable
       node[field][0].void_frac = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
@@ -312,15 +309,21 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    surface.normal[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    surface.normal[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
 
-   hydro_forces.press[0] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   hydro_forces.press[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   hydro_forces.press[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   hydro_forces.vel[0] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   hydro_forces.vel[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   hydro_forces.vel[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   hydro_forces.torque[0] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   hydro_forces.torque[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   hydro_forces.torque[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+   for (size_t level=0; level<2;level++) { 
+      solid[level].thetap = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+      for (size_t dir=0; dir<3; dir++) {
+         hydro_forces[level].press[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+         hydro_forces[level].vel[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+         hydro_forces[level].torque[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+         solid[level].coord[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
+         solid[level].size = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+         solid[level].temp = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+         solid[level].vel[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
+         solid[level].ang_vel[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
+         solid[level].inside = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+         solid[level].local_parID = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+      }
+   }
 
    for (size_t level=0;level<3;level++) {
       divergence[level].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -355,14 +358,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
             VEC[field][dir].interface_T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
 
             if (dir == 0) {
-               solid[field].coord[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-               solid[field].size[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               solid[field].thetap[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-               solid[field].temp[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               solid[field].vel[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-               solid[field].ang_vel[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-               solid[field].inside[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               solid[field].local_parID[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field][0].void_frac[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field][0].parID[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                node[field][0].bound_cell[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -429,15 +424,21 @@ DDS_NavierStokesSystem:: re_initialize( void )
    size_t nb_procs, proc_pos;
 
    if (is_solids) {
-      hydro_forces.press[0]->re_initialize(Npart);
-      hydro_forces.press[1]->re_initialize(Npart);
-      hydro_forces.press[2]->re_initialize(Npart);
-      hydro_forces.vel[0]->re_initialize(Npart);
-      hydro_forces.vel[1]->re_initialize(Npart);
-      hydro_forces.vel[2]->re_initialize(Npart);
-      hydro_forces.torque[0]->re_initialize(Npart);
-      hydro_forces.torque[1]->re_initialize(Npart);
-      hydro_forces.torque[2]->re_initialize(Npart);
+      for (size_t level=0;level<2;level++){ 
+         solid[level].thetap->re_initialize(Npart,9);
+         solid[level].size->re_initialize(Npart);
+         solid[level].temp->re_initialize(Npart);
+         solid[level].inside->re_initialize(Npart);
+         solid[level].local_parID->re_initialize(Npart);
+	 for (size_t dir=0;dir<3;dir++) {
+            hydro_forces[level].press[dir]->re_initialize(Npart);
+            hydro_forces[level].vel[dir]->re_initialize(Npart);
+            hydro_forces[level].torque[dir]->re_initialize(Npart);
+            solid[level].coord[dir]->re_initialize(Npart);
+            solid[level].vel[dir]->re_initialize(Npart);
+            solid[level].ang_vel[dir]->re_initialize(Npart);
+	 }
+      }
    }
 
    if (is_solids && is_stressCal) {
@@ -492,7 +493,6 @@ DDS_NavierStokesSystem:: re_initialize( void )
       }
    }
 
-
    for (size_t field = 0; field < 2; field++) {
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
          size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
@@ -534,18 +534,6 @@ DDS_NavierStokesSystem:: re_initialize( void )
              
             nb_procs = nb_procs_in_i[l];
             proc_pos = proc_pos_in_i[l];
-
-            if ((l == 0) && (is_solids)) {
-               // Presence of solid and only once
-               solid[field].coord[comp]->re_initialize(Npart,3);
-               solid[field].size[comp]->re_initialize(Npart);
-               solid[field].thetap[comp]->re_initialize(Npart,9);
-               solid[field].vel[comp]->re_initialize(Npart,3);
-               solid[field].ang_vel[comp]->re_initialize(Npart,3);
-               solid[field].temp[comp]->re_initialize(Npart);
-               solid[field].inside[comp]->re_initialize(Npart);
-               solid[field].local_parID[comp]->re_initialize(Npart);
-            }
 
             if (is_periodic[field][l] != 1) {
                if (proc_pos == nb_procs-1) {
@@ -886,11 +874,11 @@ DDS_NavierStokesSystem::get_surface()
 
 //----------------------------------------------------------------------
 PartForces
-DDS_NavierStokesSystem::get_forces()
+DDS_NavierStokesSystem::get_forces(size_t const& level)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_forces" ) ;
-   return (hydro_forces) ;
+   return (hydro_forces[level]) ;
 }
 //----------------------------------------------------------------------
 BoundaryBisec*

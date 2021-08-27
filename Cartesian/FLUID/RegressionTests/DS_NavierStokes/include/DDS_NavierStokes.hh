@@ -190,14 +190,15 @@ public SolverComputingTime
       double pressure_local_rhs( size_t const& j, size_t const& k, FV_TimeIterator const* t_it, size_t const& dir );
 
       void update_particle_system(FV_TimeIterator const* t_it);
+      void correct_particle_system(FV_TimeIterator const* t_it);
 
       size_t return_row_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
       double return_divergence_weighting (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k, FV_TimeIterator const* t_it );
 
-      void Solids_generation (size_t const& field);
+      void Solids_generation ( );
       void initialize_GRAINS( void );
       void simulate_GRAINS( void );
-      void import_par_info( size_t const& field, istringstream &is );
+      void import_par_info( istringstream &is );
 
       void node_property_calculation (FV_DiscreteField const* FF, size_t const& field );
 

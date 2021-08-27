@@ -62,14 +62,14 @@ struct LocalVector {
 
 /** @brief PartInput to be used to store the Input properties of particles in the domian */
 struct PartInput {
-   LA_SeqMatrix ** coord;               // Coordinates
-   LA_SeqVector ** size;                // Size of the sphere
-   LA_SeqMatrix ** thetap;              // yaw, pitch, roll
-   LA_SeqMatrix ** vel;                 // Velocity of the sphere
-   LA_SeqMatrix ** ang_vel;             // Angular velocity of the sphere
-   LA_SeqVector ** temp;                // Temperature of the sphere
-   LA_SeqVector ** inside;              // 1 if solid only from inside; -1 if solid only from outside
-   LA_SeqVector ** local_parID;         // list of ID's present in the current processor
+   LA_SeqVector ** coord;               // Coordinates
+   LA_SeqVector * size;                // Size of the sphere
+   LA_SeqMatrix * thetap;              // yaw, pitch, roll
+   LA_SeqVector ** vel;                 // Velocity of the sphere
+   LA_SeqVector ** ang_vel;             // Angular velocity of the sphere
+   LA_SeqVector * temp;                // Temperature of the sphere
+   LA_SeqVector * inside;              // 1 if solid only from inside; -1 if solid only from outside
+   LA_SeqVector * local_parID;         // list of ID's present in the current processor
 };
 
 /** @brief PartForces to be used to store the hydrodynamic forces and torque on particles */
@@ -194,7 +194,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @brief Return the surface discretization from input files */
       SurfaceDiscretize get_surface();
       /** @brief Return the hydrodynamic forces */
-      PartForces get_forces();
+      PartForces get_forces(size_t const& level);
       /** @brief Return the (presence/absence) of particle vector */
       NodeProp get_node_property(size_t const& field, size_t const& time_level);
       /** @brief Return the fresh node emerging out of solid */
@@ -327,12 +327,12 @@ class DDS_NavierStokesSystem : public MAC_Object
       struct TDMatrix DoubleSchur[2][3];
 
       // Particle structures
-      struct PartInput solid[2];
+      struct PartInput solid[2];			       // 0 current timestep, 1 last timestep
       struct NodeProp node[2][2];			       // 2 rows are for fields; 2 columns are for time level (current and last)
       struct FreshNode Pfresh[2];			       // defined for pressure nodes; 2 columns are for time level (current and last)
       struct DivNode divergence[3];			       // 0 current timestep, 1 last time step. 2 for reference state
       struct SurfaceDiscretize surface;
-      struct PartForces hydro_forces;
+      struct PartForces hydro_forces[2];                       // 0 current timestep, 1 last time step
       struct BoundaryBisec b_intersect[2][2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid); 2 are fields (PF,UF)
 
 
