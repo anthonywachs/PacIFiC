@@ -1213,35 +1213,33 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
   doubleVector const& gg = gravity_vector->to_double_vector();
 
   if (insertion_type == "file") {
-     for (size_t field=0;field<2;field++) {
-        // Structure of particle input data
-        PartInput solid = GLOBAL_EQ->get_solid(0);
-        for (size_t comp=0;comp<nb_comps[field];comp++) {
-           for (size_t i=0;i<Npart;i++) {
-              double rp = solid.size->item(i);
-	      double mass_p = rho_s*(4./3.)*MAC::pi()*pow(rp,3.); 
-              doubleVector pos(dim,0);
-              doubleVector vel(dim,0);
-              doubleVector acc(dim,0);
 
-              for (size_t dir=0;dir<dim;dir++) {
-                 pos(dir) = solid.coord[dir]->item(i);
-                 vel(dir) = solid.vel[dir]->item(i);
+     // Structure of particle input data
+     PartInput solid = GLOBAL_EQ->get_solid(0);
 
-                 if (motion_type == "Sine") {
-                    vel(dir) = gg(dir)*Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
-                    pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
-	         } else if (motion_type == "Hydro") {
-	  	    acc(dir) = gg(dir)*(1-rho/rho_s) + (hydro_forces.press[dir]->item(i)
-				                     +  hydro_forces.vel[dir]->item(i)) / mass_p ;
-                    vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-                    pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
-                 }
+     for (size_t i=0;i<Npart;i++) {
+        double rp = solid.size->item(i);
+        double mass_p = rho_s*(4./3.)*MAC::pi()*pow(rp,3.); 
+        doubleVector pos(dim,0);
+        doubleVector vel(dim,0);
+        doubleVector acc(dim,0);
 
-                 solid.coord[dir]->set_item(i,pos(dir));
-                 solid.vel[dir]->set_item(i,vel(dir));
-	      }
+        for (size_t dir=0;dir<dim;dir++) {
+           pos(dir) = solid.coord[dir]->item(i);
+           vel(dir) = solid.vel[dir]->item(i);
+
+           if (motion_type == "Sine") {
+              vel(dir) = gg(dir)*Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
+              pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
+           } else if (motion_type == "Hydro") {
+              acc(dir) = gg(dir)*(1-rho/rho_s) + (hydro_forces.press[dir]->item(i)
+	                                       +  hydro_forces.vel[dir]->item(i)) / mass_p ;
+              vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+              pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
            }
+
+           solid.coord[dir]->set_item(i,pos(dir));
+           solid.vel[dir]->set_item(i,vel(dir));
         }
      }
   } else if (insertion_type == "GRAINS") {
