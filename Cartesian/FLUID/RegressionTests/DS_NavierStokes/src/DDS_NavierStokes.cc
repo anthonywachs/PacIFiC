@@ -1187,7 +1187,7 @@ DDS_NavierStokes:: correct_particle_system(FV_TimeIterator const* t_it)
            pos(dir) = solid_old.coord[dir]->item(i);
            vel(dir) = solid_old.vel[dir]->item(i);
 
-           acc(dir) = gg(dir)*(rho_s/rho-1) + 0.5*(hydro_forces.press[dir]->item(i) + hydro_forces_old.press[dir]->item(i)
+           acc(dir) = gg(dir)*(1-rho/rho_s) + 0.5*(hydro_forces.press[dir]->item(i) + hydro_forces_old.press[dir]->item(i)
                                             +      hydro_forces.vel[dir]->item(i) + hydro_forces_old.vel[dir]->item(i)) / mass_p ;
            vel(dir) = solid_old.vel[dir]->item(i) + acc(dir)*t_it->time_step();
            pos(dir) = solid_old.vel[dir]->item(i)*t_it->time_step() + 0.5*acc(dir)*pow(t_it->time_step(),2);
@@ -1232,7 +1232,7 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
                     vel(dir) = gg(dir)*Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
                     pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
 	         } else if (motion_type == "Hydro") {
-	  	    acc(dir) = gg(dir)*(rho_s/rho-1) + (hydro_forces.press[dir]->item(i)
+	  	    acc(dir) = gg(dir)*(1-rho/rho_s) + (hydro_forces.press[dir]->item(i)
 				                     +  hydro_forces.vel[dir]->item(i)) / mass_p ;
                     vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
                     pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
@@ -7769,10 +7769,10 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    if (PF->all_BCs_nonDirichlet(0)) {
       correct_mean_pressure(0);
    }
-
+/*
    if (motion_type == "Hydro") {
       correct_particle_system(t_it);
-   }
+   }*/
    // Store the divergence to be used in the next time iteration
    divergence[1].div->set(divergence[0].div);
    divergence[1].stencil[0]->set(divergence[0].stencil[0]);
