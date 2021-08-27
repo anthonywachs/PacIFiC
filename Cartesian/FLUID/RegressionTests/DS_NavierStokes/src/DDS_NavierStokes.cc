@@ -1162,46 +1162,6 @@ DDS_NavierStokes:: fresh_nodes_in_fluid_initialization ( )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: correct_particle_system(FV_TimeIterator const* t_it)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NavierStokes:: correct_particle_system" ) ;
-
-  // Structure of particle input data
-  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
-  PartForces hydro_forces_old = GLOBAL_EQ->get_forces(1);
-  PartInput solid = GLOBAL_EQ->get_solid(0);
-  PartInput solid_old = GLOBAL_EQ->get_solid(1);
-
-  doubleVector const& gg = gravity_vector->to_double_vector();
-
-  if (insertion_type == "file") {
-     for (size_t i=0;i<Npart;i++) {
-        double rp = solid.size->item(i);
-        double mass_p = rho_s*(4./3.)*MAC::pi()*pow(rp,3.); 
-        doubleVector pos(dim,0);
-        doubleVector vel(dim,0);
-        doubleVector acc(dim,0);
-
-        for (size_t dir=0;dir<dim;dir++) {
-           pos(dir) = solid_old.coord[dir]->item(i);
-           vel(dir) = solid_old.vel[dir]->item(i);
-
-           acc(dir) = gg(dir)*(1-rho/rho_s) + 0.5*(hydro_forces.press[dir]->item(i) + hydro_forces_old.press[dir]->item(i)
-                                            +      hydro_forces.vel[dir]->item(i) + hydro_forces_old.vel[dir]->item(i)) / mass_p ;
-           vel(dir) = solid_old.vel[dir]->item(i) + acc(dir)*t_it->time_step();
-           pos(dir) = solid_old.vel[dir]->item(i)*t_it->time_step() + 0.5*acc(dir)*pow(t_it->time_step(),2);
-
-           solid.coord[dir]->set_item(i,pos(dir));
-           solid.vel[dir]->set_item(i,vel(dir));
-        }
-     }
-  }
-}
-
-
-//---------------------------------------------------------------------------
-void
 DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
@@ -7767,10 +7727,7 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    if (PF->all_BCs_nonDirichlet(0)) {
       correct_mean_pressure(0);
    }
-/*
-   if (motion_type == "Hydro") {
-      correct_particle_system(t_it);
-   }*/
+
    // Store the divergence to be used in the next time iteration
    divergence[1].div->set(divergence[0].div);
    divergence[1].stencil[0]->set(divergence[0].stencil[0]);
@@ -7782,22 +7739,6 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    fresh[1].neigh[1]->set(fresh[0].neigh[1]);
    fresh[1].neigh[2]->set(fresh[0].neigh[2]);
    fresh[1].neigh_count->set(fresh[0].neigh_count);
-
-   // Store particle forces and positions to last level
-   PartInput solid = GLOBAL_EQ->get_solid(0);
-   PartInput solid_old = GLOBAL_EQ->get_solid(1);
-   PartForces forces = GLOBAL_EQ->get_forces(0);
-   PartForces forces_old = GLOBAL_EQ->get_forces(1);
-
-   for (size_t dir=0;dir<3;dir++) {
-      solid_old.coord[dir]->set(solid.coord[dir]);
-      solid_old.vel[dir]->set(solid.vel[dir]);
-      solid_old.ang_vel[dir]->set(solid.ang_vel[dir]);
-
-      forces_old.press[dir]->set(forces.press[dir]);
-      forces_old.vel[dir]->set(forces.vel[dir]);
-      forces_old.torque[dir]->set(forces.torque[dir]);
-   }
 
    if (is_solids) {
       correct_pressure_1st_layer_solid(0);
