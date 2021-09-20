@@ -90,7 +90,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
    MAC_ASSERT( PF->discretization_type() == "centered" ) ;
    MAC_ASSERT( UF->storage_depth() == 5 ) ;
-   MAC_ASSERT( PF->storage_depth() == 4 ) ;
+   MAC_ASSERT( PF->storage_depth() == 2 ) ;
 
    // Call of MAC_Communicator routine to set the rank of each proces and
    // the number of processes during execution
@@ -368,8 +368,8 @@ DDS_NavierStokes:: do_one_inner_iteration( FV_TimeIterator const* t_it )
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Pressure predictor" );
 
    // Extra levels for the calculation of pressure force in the end of iteration cycle
-   PF->copy_DOFs_value( 0, 2 );
-   PF->copy_DOFs_value( 1, 3 );
+//   PF->copy_DOFs_value( 0, 2 );
+//   PF->copy_DOFs_value( 1, 3 );
 
    if ( my_rank == is_master ) SCT_set_start( "Velocity update" );
    NS_velocity_update(t_it);
@@ -754,7 +754,7 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
      	MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
 
    if (is_stressCal) {
-      compute_fluid_particle_interaction(t_it);
+      compute_fluid_velocity_particle_interaction(t_it);
    }
 
    if (level_set_type == "PipeX") error_with_analytical_solution_poiseuille3D();
@@ -1179,7 +1179,8 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
 
      for (size_t i=0;i<Npart;i++) {
         double rp = solid.size->item(i);
-        double mass_p = rho_s*(4./3.)*MAC::pi()*pow(rp,3.); 
+        double mass_p = (dim == 3) ? rho_s*(4./3.)*MAC::pi()*pow(rp,3.) : 
+                                     rho_s*MAC::pi()*pow(rp,2.)*1.; 
         doubleVector pos(dim,0);
         doubleVector vel(dim,0);
         doubleVector acc(dim,0);
@@ -3062,6 +3063,12 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
   PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
 
   PF->set_neumann_DOF_values();
+
+  // Calculate pressure forces on the solid particles
+  if (is_stressCal) {
+     compute_fluid_pressure_particle_interaction(t_it);
+  }
+
 }
 
 //---------------------------------------------------------------------------
@@ -3752,7 +3759,7 @@ DDS_NavierStokes:: second_order_pressure_stress(class doubleVector& force, size_
                                     found(2,0) && found(2,1) && found(2,2) ;
 
 	// Calculation of field variable on ghost point(0,0)
-        for (size_t level=2; level<4;level++) {
+        for (size_t level=0; level<2;level++) {
            // Calculation of field variable on ghost point(1)
            if (in_domain(0)) 
               fini(1) = (dim == 2) ? ghost_field_estimate_on_face (PF,comp,i0(1,0),i0(1,1),0, ipoint(1,0), ipoint(1,1),0, 0.,2,level) :
@@ -3925,7 +3932,7 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleVector
         double dx2 = pow(pow(point(2,0)-point(0,0),2) + pow(point(2,1)-point(0,1),2) + pow(point(2,2)-point(0,2),2),0.5);
 
         // Calculation of field variable on ghost point(0,0)
-        for (size_t level=2; level<4;level++) {
+        for (size_t level=0; level<2;level++) {
            // Calculation of field variable on ghost point(1)
            if ((level_set(0) > threshold) && point_in_domain(0,0)) fini(1) = third_order_ghost_field_estimate(PF, comp, point(1,0), point(1,1), point(1,2), i0(1,0), i0(1,1), i0(1,2), major_dir, sign, level);
            // Calculation of field variable on ghost point(2)
@@ -4058,7 +4065,7 @@ DDS_NavierStokes:: first_order_pressure_stress(class doubleVector& force, size_t
            }
 
            // Calculation of field variable on ghost point(0,0)
-           for (size_t level=2; level<4;level++) {
+           for (size_t level=0; level<2;level++) {
               if (dim == 2) {
                  double press0 = ghost_field_estimate_on_face (PF,comp,i0,j0,0,point(0),point(1),0,0.,2,level);
                  stress(i) = stress(i) - press0/2.;
@@ -4084,12 +4091,50 @@ DDS_NavierStokes:: first_order_pressure_stress(class doubleVector& force, size_t
 //  outputFile.close();
 }
 
+
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_it)
+DDS_NavierStokes:: compute_fluid_pressure_particle_interaction( FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: compute_fluid_particle_interaction" ) ;
+  MAC_LABEL("DDS_NavierStokes:: compute_fluid_pressure_particle_interaction" ) ;
+
+  // Structure of particle input data
+  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+
+  size_t Nmax = 0.;
+  if (level_set_type == "Sphere") {
+     Nmax = (dim == 2) ? ((size_t) Npoints) : ((size_t) (2*Npoints)) ;
+  } else if (level_set_type == "Cube") {
+     Nmax = (dim == 2) ? ((size_t) (4*Npoints)) : ((size_t) (6*pow(Npoints,2))) ;
+  } else if (level_set_type == "Cylinder") {
+     double Npm1 = round(pow(MAC::sqrt(Npoints) - MAC::sqrt(MAC::pi()/ar),2.));
+     double Ncyl = (Npoints - Npm1);
+     double dh = 1. - MAC::sqrt(Npm1/Npoints);
+     double Nr = round(2./dh);
+     Nmax = (dim == 3) ? ((size_t)(2*Npoints + Nr*Ncyl)) : 0 ;
+  }
+
+  for (size_t parID = 0; parID < Npart; parID++) {
+ 
+     // Contribution due to pressure tensor
+     doubleVector press_force(3,0);
+     compute_pressure_force_on_particle(press_force, parID, Nmax); 
+     // Gathering information from all procs
+     hydro_forces.press[0]->set_item(parID,pelCOMM->sum(press_force(0))) ;
+     hydro_forces.press[1]->set_item(parID,pelCOMM->sum(press_force(1))) ;
+     hydro_forces.press[2]->set_item(parID,pelCOMM->sum(press_force(2))) ;
+
+  }
+}
+
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: compute_fluid_velocity_particle_interaction( FV_TimeIterator const* t_it)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DDS_NavierStokes:: compute_fluid_velocity_particle_interaction" ) ;
 
   string fileName = "./DS_results/particle_forces.csv" ;
 
@@ -4133,14 +4178,6 @@ DDS_NavierStokes:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
      hydro_forces.vel[0]->set_item(parID,pelCOMM->sum(vel_force(0))) ;
      hydro_forces.vel[1]->set_item(parID,pelCOMM->sum(vel_force(1))) ;
      hydro_forces.vel[2]->set_item(parID,pelCOMM->sum(vel_force(2))) ;
-
-     // Contribution due to pressure tensor
-     doubleVector press_force(3,0);
-     compute_pressure_force_on_particle(press_force, parID, Nmax); 
-     // Gathering information from all procs
-     hydro_forces.press[0]->set_item(parID,pelCOMM->sum(press_force(0))) ;
-     hydro_forces.press[1]->set_item(parID,pelCOMM->sum(press_force(1))) ;
-     hydro_forces.press[2]->set_item(parID,pelCOMM->sum(press_force(2))) ;
 
      if (my_rank == 0) {
 	avg_force(0,0) += hydro_forces.press[0]->item(parID);

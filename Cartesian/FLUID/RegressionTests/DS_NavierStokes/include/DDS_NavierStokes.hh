@@ -226,7 +226,8 @@ public SolverComputingTime
       void compute_velocity_force_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np);
       void first_order_viscous_stress(class doubleVector& force, size_t const& parID, size_t const& Np);
       void second_order_viscous_stress(class doubleVector& force, size_t const& parID, size_t const& Np);
-      void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
+      void compute_fluid_pressure_particle_interaction( FV_TimeIterator const* t_it);
+      void compute_fluid_velocity_particle_interaction( FV_TimeIterator const* t_it);
       void compute_pressure_force_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np);
       void first_order_pressure_stress(class doubleVector& force, size_t const& parID, size_t const& Np);
       void second_order_pressure_stress_withNeumannBC(class doubleVector& force, size_t const& parID, size_t const& Np);
