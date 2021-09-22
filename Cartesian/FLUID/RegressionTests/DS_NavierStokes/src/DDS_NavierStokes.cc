@@ -84,13 +84,25 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , is_stressCal( false )
    , IntersectionMethod ( "Bisection" )
    , tolerance ( 1.e-6 )
+   , b_projection_translation( dom->primary_grid()->is_translation_active() )
+   , b_grid_has_been_translated_since_last_output( false )
+   , b_grid_has_been_translated_at_previous_time( false )
+   , critical_distance_translation( 0. )
+   , translation_direction( 0 )
+   , bottom_coordinate( 0. )
+   , translated_distance( 0. )
    , gravity_vector( 0 )	
 {
    MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
    MAC_ASSERT( PF->discretization_type() == "centered" ) ;
-   MAC_ASSERT( UF->storage_depth() == 5 ) ;
-   MAC_ASSERT( PF->storage_depth() == 2 ) ;
+   if (b_projection_translation) {
+      MAC_ASSERT( PF->storage_depth() == 3 ) ;
+      MAC_ASSERT( UF->storage_depth() == 6 ) ;
+   } else {
+      MAC_ASSERT( PF->storage_depth() == 2 ) ;
+      MAC_ASSERT( UF->storage_depth() == 5 ) ;
+   }
 
    // Call of MAC_Communicator routine to set the rank of each proces and
    // the number of processes during execution
@@ -267,6 +279,21 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
         "security_bandwidth", error_message );
    }
 
+   // Critical distance
+   if( b_projection_translation )
+   {
+     if( exp->has_entry( "Critical_Distance_Translation" ) )
+       critical_distance_translation=exp->double_data(
+           "Critical_Distance_Translation" );
+     else
+     {
+       string error_message=" Projection-Translation is active but ";
+       error_message+="Critical_Distance_Translation is NOT defined.";
+       MAC_Error::object()->raise_bad_data_value( exp,
+           "Projection_Translation", error_message );
+     }
+   }
+
    // Method for calculating intersections 
    if ( exp->has_entry( "IntersectionMethod" ) )
    {
@@ -367,10 +394,6 @@ DDS_NavierStokes:: do_one_inner_iteration( FV_TimeIterator const* t_it )
    NS_first_step(t_it);
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Pressure predictor" );
 
-   // Extra levels for the calculation of pressure force in the end of iteration cycle
-//   PF->copy_DOFs_value( 0, 2 );
-//   PF->copy_DOFs_value( 1, 3 );
-
    if ( my_rank == is_master ) SCT_set_start( "Velocity update" );
    NS_velocity_update(t_it);
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Velocity update" );
@@ -413,6 +436,20 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    // Setting ugradu as zero at start of simulation
    if (b_restart == false) ugradu_initialization ( );
+
+   // Projection-Translation
+   if ( b_projection_translation )
+   {
+     set_translation_vector() ;
+     if ( MVQ_translation_vector(translation_direction) < 0. )
+       bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
+                [translation_direction](0) ;
+     else
+       bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
+           [translation_direction]((*UF->primary_grid()->get_global_max_index())
+                                (translation_direction)) ;
+     build_links_translation() ;
+   }
 
    // Generate solid particles if required
    if (is_solids) {
@@ -703,6 +740,10 @@ DDS_NavierStokes:: do_before_inner_iterations_stage(
 
    FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
 
+   //  Projection_Translation
+   if ( b_projection_translation )
+     b_grid_has_been_translated_at_previous_time = false;
+
    if ((is_par_motion) && (is_solids)) {
       update_particle_system(t_it);
       node_property_calculation(PF,0);
@@ -711,9 +752,9 @@ DDS_NavierStokes:: do_before_inner_iterations_stage(
       nodes_field_initialization(1);
       nodes_field_initialization(3);
       if (dim == 3) nodes_field_initialization(4);
-      if ( my_rank == is_master ) SCT_set_start( "node_initialization");
-      fresh_nodes_in_fluid_initialization();
-      if ( my_rank == is_master ) SCT_get_elapsed_time( "node_initialization" );
+//      if ( my_rank == is_master ) SCT_set_start( "node_initialization");
+//      fresh_nodes_in_fluid_initialization();
+//      if ( my_rank == is_master ) SCT_get_elapsed_time( "node_initialization" );
 
       if ( my_rank == is_master ) SCT_set_start( "cell_detection");
       detect_fresh_cells_and_neighbours();
@@ -768,11 +809,48 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
       MyFile.close( ) ;
    }
 
-//   write_output_field(PF,0,t_it);
+//   write_output_field(UF,t_it);
 
    double cfl = UF->compute_CFL( t_it, 0 );
    if ( my_rank == is_master )
       MAC::out() << "CFL: "<< cfl <<endl;
+
+   // Projection translation
+   if ( b_projection_translation ) {
+
+      PartInput solid = GLOBAL_EQ->get_solid(0);
+
+      double distance_to_bottom = MAC::abs(solid.coord[translation_direction]->item(0)
+                                         - bottom_coordinate);
+
+      if ( distance_to_bottom < critical_distance_translation ) {
+
+         if ( my_rank == is_master )
+            MAC::out() << "         -> -> -> -> -> -> -> -> -> -> -> ->"
+               << endl << "         !!!     Domain Translation      !!!"
+               << endl << "         -> -> -> -> -> -> -> -> -> -> -> ->"
+               << endl;
+
+         b_grid_has_been_translated_at_previous_time = true;
+
+         translated_distance += MVQ_translation_vector( translation_direction );
+         if ( my_rank == is_master )
+            MAC::out() << "         Translated distance = " <<
+                translated_distance << endl;
+
+         fields_projection();
+
+         if ( MVQ_translation_vector(translation_direction) < 0. )
+            bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
+                                [translation_direction](0) ;
+         else
+            bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
+               [translation_direction]((*UF->primary_grid()->get_global_max_index())
+                                (translation_direction)) ;
+
+         b_grid_has_been_translated_since_last_output = true;
+      }
+   }
 
    stop_total_timer() ;
 
@@ -7787,7 +7865,7 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& field, FV_TimeIterator const* t_it)
+DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, FV_TimeIterator const* t_it)
 //----------------------------------------------------------------------
 {
   ofstream outputFile ;
@@ -7797,17 +7875,19 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 
+  size_t field = (FF == UF) ? 1 : 0 ;
+
   size_t i,j,k;
-//  outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv" << endl;//,behind,bev,front,fv" << endl;
-  outputFile << "x,y,z,id,lambdax,lambday,void_frac,fresh,neighx,neighy,count_fresh,counter_neigh,div,vel" << endl;//,behind,bev,front,fv" << endl;
+  outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv" << endl;//,behind,bev,front,fv" << endl;
+//  outputFile << "x,y,z,id,lambdax,lambday,void_frac,fresh,neighx,neighy,count_fresh,counter_neigh,div,vel" << endl;//,behind,bev,front,fv" << endl;
 
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
 
   NodeProp node = GLOBAL_EQ->get_node_property(field,0);
-  FreshNode* fresh = GLOBAL_EQ->get_fresh_node();
+//  FreshNode* fresh = GLOBAL_EQ->get_fresh_node();
   DivNode* divergence = GLOBAL_EQ->get_node_divergence();
-//  BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,0);
+  BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,0);
 
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices
@@ -7834,20 +7914,20 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, size_t const& f
               double zC = 0.;
               if (dim == 3) zC = FF->get_DOF_coordinate( k, comp, 2 ) ;
               size_t p = return_node_index(FF,comp,i,j,k);
-//              double id = node.parID[comp]->item(p);
+              double id = node.parID[comp]->item(p);
               double voidf = node.void_frac[comp]->item(p);
 
-              double lambdax = divergence[0].lambda[0]->item(p);
-              double lambday = divergence[0].lambda[1]->item(p);
-	      double div = divergence[0].div->item(p);
-//              outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
-              outputFile << xC << "," << yC << "," << zC << "," << p << "," << lambdax << "," << lambday << "," << voidf << "," << fresh[0].flag->item(p) << "," << fresh[0].neigh[0]->item(p) << "," << fresh[0].neigh[1]->item(p) << "," << fresh[0].flag_count->item(p) << "," << fresh[0].neigh_count->item(p) << "," << div << "," << fresh[0].sep_vel->item(p) << endl;
-/*              for (size_t dir = 0; dir < dim; dir++) {
+//              double lambdax = divergence[0].lambda[0]->item(p);
+//              double lambday = divergence[0].lambda[1]->item(p);
+//	      double div = divergence[0].div->item(p);
+              outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
+//              outputFile << xC << "," << yC << "," << zC << "," << p << "," << lambdax << "," << lambday << "," << voidf << "," << fresh[0].flag->item(p) << "," << fresh[0].neigh[0]->item(p) << "," << fresh[0].neigh[1]->item(p) << "," << fresh[0].flag_count->item(p) << "," << fresh[0].neigh_count->item(p) << "," << div << "," << fresh[0].sep_vel->item(p) << endl;
+              for (size_t dir = 0; dir < dim; dir++) {
                   for (size_t off = 0; off < 2; off++) {
                       outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off);
                   }
               }
-              outputFile << endl;*/
+              outputFile << endl;
            }
         }
      }
@@ -8237,6 +8317,150 @@ DDS_NavierStokes:: free_DDS_subcommunicators ( void )
 {
    MAC_LABEL( "DDS_NavierStokes:: free_DDS_subcommunicators" ) ;
 }
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: set_translation_vector()
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokes:: set_translation_vector" ) ;
+
+   MVQ_translation_vector.resize( dim );
+   translation_direction = UF->primary_grid()->get_translation_direction() ;
+   MVQ_translation_vector( translation_direction ) =
+        UF->primary_grid()->get_translation_magnitude() ;
+}
+
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes::build_links_translation()
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokes:: build_links_translation" ) ;
+
+   UF->create_transproj_interpolation() ;
+   PF->create_transproj_interpolation() ;
+
+}
+
+
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes::fields_projection()
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokes:: fields_projection" ) ;
+
+   FV_Mesh* pmesh = const_cast<FV_Mesh*>(UF->primary_grid()) ;
+
+   pmesh->translation() ;
+
+   UF->translation_projection( 0, 5, 0 ) ;
+   synchronize_velocity_field ( 0 ) ;
+
+   UF->translation_projection( 1, 5, 0 ) ;
+   synchronize_velocity_field ( 1 ) ;
+
+   UF->translation_projection( 2, 5, 0 ) ;
+   synchronize_velocity_field ( 2 ) ;
+
+   UF->translation_projection( 3, 5, 0 ) ;
+   synchronize_velocity_field ( 3 ) ;
+
+   UF->translation_projection( 4, 5 ) ;
+   synchronize_velocity_field ( 4 ) ;
+
+   PF->translation_projection( 0, 2, 0 ) ;
+   synchronize_pressure_field( 0 ) ;
+
+   PF->translation_projection( 1, 2 ) ;
+   synchronize_pressure_field( 1 ) ;
+
+}
+
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: synchronize_velocity_field ( size_t level )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokes:: synchronize_velocity_field" ) ;
+
+   size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
+
+   for (size_t comp=0;comp<nb_comps[1];++comp) {
+
+      // Get local min and max indices
+      for (size_t l=0;l<dim;++l) {
+         min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+         max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+      }
+
+      size_t local_min_k=0,local_max_k=0;
+
+      if (dim == 3) {
+         local_min_k = min_unknown_index(2);
+         local_max_k = max_unknown_index(2);
+      }
+
+      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+         for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+            for (size_t k=local_min_k;k<=local_max_k;++k) {
+               GLOBAL_EQ->update_global_U_vector(i,j,k,comp,UF->DOF_value(i, j, k, comp, level));
+            }
+         }
+      }
+   }
+
+   // Synchronize the distributed DS solution vector
+   GLOBAL_EQ->synchronize_DS_solution_vec();
+   // Tranfer back to field
+   UF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_velocity() ) ;
+
+}
+
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes:: synchronize_pressure_field ( size_t level )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokes:: synchronize_pressure_field" ) ;
+
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+
+  // Get local min and max indices
+  for (size_t l=0;l<dim;++l) {
+     min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
+     max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
+  }
+
+  size_t local_min_k=0,local_max_k=0;
+
+  if (dim == 3) {
+     local_min_k = min_unknown_index(2);
+     local_max_k = max_unknown_index(2);
+  }
+
+  for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+     for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+         for (size_t k=local_min_k;k<=local_max_k;++k) {
+            GLOBAL_EQ->update_global_P_vector(i,j,k,PF->DOF_value(i, j, k, 0, level));
+         }
+     }
+  }
+
+  // Synchronize the distributed DS solution vector
+  GLOBAL_EQ->synchronize_DS_solution_vec_P();
+  // Tranfer back to field
+  PF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+
+}
+
 
 //----------------------------------------------------------------------
 double

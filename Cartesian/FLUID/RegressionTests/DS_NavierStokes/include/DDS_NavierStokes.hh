@@ -294,7 +294,7 @@ public SolverComputingTime
       /** Pressure correction */
       void NS_final_step( FV_TimeIterator const* t_it ) ;
 
-      void write_output_field( FV_DiscreteField const* FF, size_t const& field, FV_TimeIterator const* t_it );
+      void write_output_field( FV_DiscreteField const* FF, FV_TimeIterator const* t_it );
 
       double get_velocity_divergence(FV_TimeIterator const* t_it);
       
@@ -319,6 +319,29 @@ public SolverComputingTime
 
 
       //@}
+
+      //-- Projection-Translation methods
+
+      /** @name Projection-Translation methods */
+      //@{
+      /** @brief Set translation vector and direction */
+      void set_translation_vector();
+
+      /** @brief Build the field projection-translation interpolations */
+      void build_links_translation();
+
+      /** @brief Projection of the field on the translated position of the grid
+      */
+      void fields_projection();
+
+      /** @brief Synchronize the global pressure variable at "level"
+      */
+      void synchronize_pressure_field ( size_t level );
+
+      /** @brief Synchronize the global velocity variable at "level"
+      */
+      void synchronize_velocity_field ( size_t level );
+
 
    private: //----------------------------------------------------------------
 
@@ -376,6 +399,17 @@ public SolverComputingTime
       double ar;
 
       double Amp, freq;
+
+      // Grid motion
+      bool b_projection_translation;
+      bool b_grid_has_been_translated_since_last_output;
+      bool b_grid_has_been_translated_at_previous_time;
+      double critical_distance_translation;
+      geomVector MVQ_translation_vector;
+      size_t translation_direction;
+      double bottom_coordinate;
+      double translated_distance;
+
 
       GrainsCoupledWithFluid* grains;
 

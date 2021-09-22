@@ -980,6 +980,21 @@ DDS_NavierStokesSystem::get_VEC(size_t const& field)
    return (VEC[field]) ;
 }
 
+
+//----------------------------------------------------------------------
+void
+DDS_NavierStokesSystem::update_global_U_vector(size_t const& i, size_t const& j, size_t const& k, size_t const& comp, double const& value)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokesSystem:: update_global_U_vector" ) ;
+
+   size_t global_number_in_distributed_vector = UF->DOF_global_number(i,j,k,comp);
+
+   VEC_DS_UF->set_item( global_number_in_distributed_vector, value);
+
+}
+
+
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::update_global_P_vector(size_t const& i, size_t const& j, size_t const& k, double const& value)
