@@ -4222,7 +4222,7 @@ DDS_NavierStokes:: compute_fluid_velocity_particle_interaction( FV_TimeIterator 
 
   doubleArray2D avg_force(3,2,0);
 
-  // Structure of particle input data
+  // Structure of hydrodynamic forces
   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(0);
@@ -4494,6 +4494,7 @@ DDS_NavierStokes:: compute_surface_points_on_cylinder(class doubleVector& k, siz
 
 	}
      }
+//     write_surface_discretization(2*maxby2 + pts_1_ring*cyl_rings);
   }
 }
 
@@ -4718,11 +4719,14 @@ DDS_NavierStokes:: generate_surface_discretization()
      // Discretize the particle surface into approximate equal area cells
      if (dim == 3) {
         compute_surface_points_on_sphere(eta, k, Rring, Nrings);
+//	write_surface_discretization(2*kmax);
      } else {
         compute_surface_points_on_sphere(eta, k, Rring, kmax);
+//	write_surface_discretization(kmax);
      }
   } else if (level_set_type == "Cube") {
      compute_surface_points_on_cube(kmax);
+//     write_surface_discretization((size_t)(6*pow(kmax,2)));
   } else if (level_set_type == "Cylinder") {
      // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into 
      // equal-area cells, Computational Geometry 45 (2012) 275-283
@@ -7863,6 +7867,33 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    PF->set_neumann_DOF_values();
 }
 
+
+//----------------------------------------------------------------------
+void
+DDS_NavierStokes::write_surface_discretization(size_t const& Np)
+//----------------------------------------------------------------------
+{
+  ofstream outputFile ;
+
+  std::ostringstream os2;
+  os2 << "./DS_results/surface_discretization.csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+
+  outputFile << "x,y,z" << endl;
+
+  // Structure of particle surface discretization
+  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
+
+  for (size_t i=0;i<Np;i++) {
+     outputFile << surface.coordinate[0]->item(i) << "," 
+		<< surface.coordinate[1]->item(i) << "," 
+		<< surface.coordinate[2]->item(i) << endl;
+  }
+  outputFile.close();
+}
+
+
 //----------------------------------------------------------------------
 void
 DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, FV_TimeIterator const* t_it)
@@ -7886,7 +7917,7 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, FV_TimeIterator
 
   NodeProp node = GLOBAL_EQ->get_node_property(field,0);
 //  FreshNode* fresh = GLOBAL_EQ->get_fresh_node();
-  DivNode* divergence = GLOBAL_EQ->get_node_divergence();
+//  DivNode* divergence = GLOBAL_EQ->get_node_divergence();
   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,0);
 
   for (size_t comp=0;comp<nb_comps[field];comp++) {

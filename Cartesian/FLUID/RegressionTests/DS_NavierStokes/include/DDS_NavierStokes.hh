@@ -296,6 +296,8 @@ public SolverComputingTime
 
       void write_output_field( FV_DiscreteField const* FF, FV_TimeIterator const* t_it );
 
+      void write_surface_discretization(size_t const& Np);
+
       double get_velocity_divergence(FV_TimeIterator const* t_it);
       
       void output_L2norm_pressure( size_t const& level );
