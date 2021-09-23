@@ -154,7 +154,8 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       // Structure for the particle force discretization
       hydro_forces[level].press = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
       hydro_forces[level].vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-      hydro_forces[level].torque = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+      hydro_torque[level].press = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
+      hydro_torque[level].vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
 
       // Structure for the particle input data
       solid[level].coord = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
@@ -314,7 +315,8 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       for (size_t dir=0; dir<3; dir++) {
          hydro_forces[level].press[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          hydro_forces[level].vel[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-         hydro_forces[level].torque[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+         hydro_torque[level].press[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+         hydro_torque[level].vel[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          solid[level].coord[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
          solid[level].size = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          solid[level].temp = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -433,7 +435,8 @@ DDS_NavierStokesSystem:: re_initialize( void )
 	 for (size_t dir=0;dir<3;dir++) {
             hydro_forces[level].press[dir]->re_initialize(Npart);
             hydro_forces[level].vel[dir]->re_initialize(Npart);
-            hydro_forces[level].torque[dir]->re_initialize(Npart);
+            hydro_torque[level].press[dir]->re_initialize(Npart);
+            hydro_torque[level].vel[dir]->re_initialize(Npart);
             solid[level].coord[dir]->re_initialize(Npart);
             solid[level].vel[dir]->re_initialize(Npart);
             solid[level].ang_vel[dir]->re_initialize(Npart);
@@ -874,12 +877,22 @@ DDS_NavierStokesSystem::get_surface()
 
 //----------------------------------------------------------------------
 PartForces
+DDS_NavierStokesSystem::get_torque(size_t const& level)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokesSystem:: get_forces" ) ;
+   return (hydro_torque[level]) ;
+}
+
+//----------------------------------------------------------------------
+PartForces
 DDS_NavierStokesSystem::get_forces(size_t const& level)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_forces" ) ;
    return (hydro_forces[level]) ;
 }
+
 //----------------------------------------------------------------------
 BoundaryBisec*
 DDS_NavierStokesSystem::get_b_intersect(size_t const& field, size_t const& level)

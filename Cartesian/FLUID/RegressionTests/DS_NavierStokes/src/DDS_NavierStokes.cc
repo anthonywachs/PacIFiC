@@ -794,6 +794,7 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
    if ( my_rank == is_master ) cout << "velocity change = " <<
      	MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
 
+   // Compute hydrodynamic forces by surface viscous stress
    if (is_stressCal) {
       compute_fluid_velocity_particle_interaction(t_it);
    }
@@ -1247,6 +1248,7 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
 
   // Structure of particle input data
   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+  PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
 
   doubleVector const& gg = gravity_vector->to_double_vector();
 
@@ -1259,9 +1261,16 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
         double rp = solid.size->item(i);
         double mass_p = (dim == 3) ? rho_s*(4./3.)*MAC::pi()*pow(rp,3.) : 
                                      rho_s*MAC::pi()*pow(rp,2.)*1.; 
+        double moi = 0.;
+	if (level_set_type == "Sphere") 
+           moi = (dim == 3) ? (2./5.)*mass_p*rp*rp :
+		              (1./2.)*mass_p*rp*rp ;
+
         doubleVector pos(dim,0);
         doubleVector vel(dim,0);
         doubleVector acc(dim,0);
+        doubleVector ang_vel(dim,0);
+        doubleVector ang_acc(dim,0);
 
         for (size_t dir=0;dir<dim;dir++) {
            pos(dir) = solid.coord[dir]->item(i);
@@ -1275,10 +1284,14 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
 	                                       +  hydro_forces.vel[dir]->item(i)) / mass_p ;
               vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
               pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
+	      ang_acc(dir) = (hydro_torque.press[dir]->item(i)
+                           +  hydro_torque.vel[dir]->item(i)) / moi ;
+              ang_vel(dir) = ang_vel(dir) + ang_acc(dir)*t_it->time_step();
            }
 
            solid.coord[dir]->set_item(i,pos(dir));
            solid.vel[dir]->set_item(i,vel(dir));
+           solid.ang_vel[dir]->set_item(i,ang_vel(dir));
         }
      }
   } else if (insertion_type == "GRAINS") {
@@ -3764,9 +3777,11 @@ DDS_NavierStokes:: second_order_pressure_stress(size_t const& parID, size_t cons
 
   // Structure of particle input data
   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+  PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
 
   // Force vector
   doubleVector force(3,0);
+  doubleVector torque(3,0);
 
   for (size_t i=0;i<Np;i++) {
      // Get local min and max indices
@@ -3875,14 +3890,26 @@ DDS_NavierStokes:: second_order_pressure_stress(size_t const& parID, size_t cons
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(0) = force(0) + stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
-     force(1) = force(1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
-     force(2) = force(2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
+     double fx = stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
+     double fy = stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
+     double fz = stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
+
+     force(0) = force(0) + fx ;
+     force(1) = force(1) + fy ;
+     force(2) = force(2) + fz ;
+
+     torque(0) = torque(0) + fz*rotated_coord(1) - fy*rotated_coord(2);
+     torque(1) = torque(1) + fx*rotated_coord(2) - fz*rotated_coord(0);
+     torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
   }
 
   hydro_forces.press[0]->set_item(parID,force(0)) ;
   hydro_forces.press[1]->set_item(parID,force(1)) ;
   hydro_forces.press[2]->set_item(parID,force(2)) ;
+  
+  hydro_torque.press[0]->set_item(parID,torque(0)) ;
+  hydro_torque.press[1]->set_item(parID,torque(1)) ;
+  hydro_torque.press[2]->set_item(parID,torque(2)) ;
 //  outputFile.close();  
 }
 
@@ -3935,9 +3962,11 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(size_t const& parI
 
   // Structure of particle input data
   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+  PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
 
   // Force vector
   doubleVector force(3,0);
+  doubleVector torque(3,0);
 
   for (size_t i=0;i<Np;i++) {
      // Get local min and max indices
@@ -4042,9 +4071,17 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(size_t const& parI
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(0) = force(0) + stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
-     force(1) = force(1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
-     force(2) = force(2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
+     double fx = stress(i)*rotated_normal(0)*(surface.area->item(i)*scale);
+     double fy = stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
+     double fz = stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
+
+     force(0) = force(0) + fx ;
+     force(1) = force(1) + fy ;
+     force(2) = force(2) + fz ;
+
+     torque(0) = torque(0) + fz*rotated_coord(1) - fy*rotated_coord(2);
+     torque(1) = torque(1) + fx*rotated_coord(2) - fz*rotated_coord(0);
+     torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
 
 //     outputFile << point(0,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(0) << endl;
 //     outputFile << point(1,0) << "," << point(1,1) << "," << point(1,2) << "," << fini(1) << endl;
@@ -4054,6 +4091,10 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(size_t const& parI
   hydro_forces.press[0]->set_item(parID,force(0)) ;
   hydro_forces.press[1]->set_item(parID,force(1)) ;
   hydro_forces.press[2]->set_item(parID,force(2)) ;
+  
+  hydro_torque.press[0]->set_item(parID,torque(0)) ;
+  hydro_torque.press[1]->set_item(parID,torque(1)) ;
+  hydro_torque.press[2]->set_item(parID,torque(2)) ;
 //  outputFile.close();
 }
 
@@ -4093,9 +4134,11 @@ DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
   // Structure of particle input data
   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+  PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
 
   // Force vector
   doubleVector force(3,0);
+  doubleVector torque(3,0);
 
   for (size_t i=0;i<Np;i++) {
      double sx = surface.coordinate[0]->item(i);
@@ -4184,9 +4227,17 @@ DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(0) = force(0) + stress(i)*rotated_normal(0)*(s_area*scale);
-     force(1) = force(1) + stress(i)*rotated_normal(1)*(s_area*scale);
-     force(2) = force(2) + stress(i)*rotated_normal(2)*(s_area*scale);
+     double fx = stress(i)*rotated_normal(0)*(s_area*scale);
+     double fy = stress(i)*rotated_normal(1)*(s_area*scale);
+     double fz = stress(i)*rotated_normal(2)*(s_area*scale);
+
+     force(0) = force(0) + fx ;
+     force(1) = force(1) + fy ;
+     force(2) = force(2) + fz ;
+
+     torque(0) = torque(0) + fz*rotated_coord(1) - fy*rotated_coord(2);
+     torque(1) = torque(1) + fx*rotated_coord(2) - fz*rotated_coord(0);
+     torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
 
 //     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (surface.area->item(i)*scale) << endl;
 //     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (s_area*scale) << "," << rotated_normal(0) << "," << rotated_normal(1) << "," << rotated_normal(2) << endl;
@@ -4195,6 +4246,10 @@ DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const
   hydro_forces.press[0]->set_item(parID,force(0)) ;
   hydro_forces.press[1]->set_item(parID,force(1)) ;
   hydro_forces.press[2]->set_item(parID,force(2)) ;
+  
+  hydro_torque.press[0]->set_item(parID,torque(0)) ;
+  hydro_torque.press[1]->set_item(parID,torque(1)) ;
+  hydro_torque.press[2]->set_item(parID,torque(2)) ;
 
 //  outputFile.close();
 }
@@ -4209,6 +4264,7 @@ DDS_NavierStokes:: compute_fluid_pressure_particle_interaction( FV_TimeIterator 
 
   // Structure of particle input data
   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+  PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
 
   size_t Nmax = 0.;
   if (level_set_type == "Sphere") {
@@ -4234,6 +4290,12 @@ DDS_NavierStokes:: compute_fluid_pressure_particle_interaction( FV_TimeIterator 
 		     pelCOMM->sum(hydro_forces.press[1]->item(parID))) ;
      hydro_forces.press[2]->set_item(parID,
 		     pelCOMM->sum(hydro_forces.press[2]->item(parID))) ;
+     hydro_torque.press[0]->set_item(parID,
+		     pelCOMM->sum(hydro_torque.press[0]->item(parID))) ;
+     hydro_torque.press[1]->set_item(parID,
+		     pelCOMM->sum(hydro_torque.press[1]->item(parID))) ;
+     hydro_torque.press[2]->set_item(parID,
+		     pelCOMM->sum(hydro_torque.press[2]->item(parID))) ;
 
   }
 }
@@ -4250,12 +4312,14 @@ DDS_NavierStokes:: compute_fluid_velocity_particle_interaction( FV_TimeIterator 
 
   ofstream MyFile( fileName.c_str(), ios::app ) ;
   if ((t_it->time() == t_it->time_step()) && (my_rank == 0)) 
-     MyFile << "Time,parID,Npoints,x,y,z,vx,vy,vz,Fpx,Fpy,Fpz,Fvx,Fvy,Fvz" << endl;
+     MyFile << "Time,parID,Npoints,x,y,z,vx,vy,vz,Fpx,Fpy,Fpz,Fvx,Fvy,Fvz,Tpx,Tpy,Tpz,Tvx,Tvy,Tvz" << endl;
 
   doubleArray2D avg_force(3,2,0);
+  doubleArray2D avg_torque(3,2,0);
 
   // Structure of hydrodynamic forces
   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+  PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(0);
 
@@ -4290,6 +4354,12 @@ DDS_NavierStokes:: compute_fluid_velocity_particle_interaction( FV_TimeIterator 
 		     pelCOMM->sum(hydro_forces.vel[1]->item(parID))) ;
      hydro_forces.vel[2]->set_item(parID,
 		     pelCOMM->sum(hydro_forces.vel[2]->item(parID))) ;
+     hydro_torque.vel[0]->set_item(parID,
+		     pelCOMM->sum(hydro_torque.vel[0]->item(parID))) ;
+     hydro_torque.vel[1]->set_item(parID,
+		     pelCOMM->sum(hydro_torque.vel[1]->item(parID))) ;
+     hydro_torque.vel[2]->set_item(parID,
+		     pelCOMM->sum(hydro_torque.vel[2]->item(parID))) ;
 
      if (my_rank == 0) {
 	avg_force(0,0) += hydro_forces.press[0]->item(parID);
@@ -4299,6 +4369,13 @@ DDS_NavierStokes:: compute_fluid_velocity_particle_interaction( FV_TimeIterator 
 	avg_force(1,1) += hydro_forces.vel[1]->item(parID);
 	avg_force(2,1) += hydro_forces.vel[2]->item(parID);
 
+	avg_torque(0,0) += hydro_torque.press[0]->item(parID);
+	avg_torque(1,0) += hydro_torque.press[1]->item(parID);
+	avg_torque(2,0) += hydro_torque.press[2]->item(parID);
+	avg_torque(0,1) += hydro_torque.vel[0]->item(parID);
+	avg_torque(1,1) += hydro_torque.vel[1]->item(parID);
+	avg_torque(2,1) += hydro_torque.vel[2]->item(parID);
+
         MyFile << t_it -> time() << "," << parID << "," << Nmax << "," << xp << "," << yp << "," << zp
 	                                                        << "," << vx << "," << vy << "," << vz	
 					                        << "," << hydro_forces.press[0]->item(parID) 
@@ -4306,15 +4383,21 @@ DDS_NavierStokes:: compute_fluid_velocity_particle_interaction( FV_TimeIterator 
                                                                 << "," << hydro_forces.press[2]->item(parID)
                                                                 << "," << hydro_forces.vel[0]->item(parID) 
                                                                 << "," << hydro_forces.vel[1]->item(parID) 
-                                                                << "," << hydro_forces.vel[2]->item(parID) << endl;
+                                                                << "," << hydro_forces.vel[2]->item(parID)
+					                        << "," << hydro_torque.press[0]->item(parID) 
+                                                                << "," << hydro_torque.press[1]->item(parID)
+                                                                << "," << hydro_torque.press[2]->item(parID)
+                                                                << "," << hydro_torque.vel[0]->item(parID) 
+                                                                << "," << hydro_torque.vel[1]->item(parID) 
+                                                                << "," << hydro_torque.vel[2]->item(parID) << endl;
      }
   }
-  if (my_rank == 0) cout << "Average pressure force with " << Nmax << " surface points: " << avg_force(0,0)/double(Npart)
-                                                                                 << "," << avg_force(1,0)/double(Npart) 
-                                                                                 << "," << avg_force(2,0)/double(Npart) <<endl;
-  if (my_rank == 0) cout << "Average viscous force with " << Nmax << " surface points: " << avg_force(0,1)/double(Npart)
-                                                                                << "," << avg_force(1,1)/double(Npart) 
-                                                                                << "," << avg_force(2,1)/double(Npart) <<endl;
+  if (my_rank == 0) cout << "Average force on particles: " << (avg_force(0,0) + avg_force(0,1))/double(Npart)
+                                                    << "," << (avg_force(1,0) + avg_force(1,1))/double(Npart) 
+                                                    << "," << (avg_force(2,0) + avg_force(2,1))/double(Npart) <<endl;
+  if (my_rank == 0) cout << "Average torque on particles: " << (avg_torque(0,0) + avg_torque(0,1))/double(Npart)
+                                                     << "," << (avg_torque(1,0) + avg_torque(1,1))/double(Npart) 
+                                                     << "," << (avg_torque(2,0) + avg_torque(2,1))/double(Npart) <<endl;
   if (my_rank == 0) MyFile.close( ) ;
 }
 
@@ -4960,9 +5043,11 @@ DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const
 
   // Structure of particle input data
   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+  PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
 
   // Force vector
   doubleVector force(3,0);
+  doubleVector torque(3,0);
 
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[1];comp++) {
@@ -5233,20 +5318,32 @@ DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(0) = force(0) + stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale)
-                         + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
-                         + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
-     force(1) = force(1) + stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale) 
-                         + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
-                         + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
-     force(2) = force(2) + stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale) 
-                         + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
-                         + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
+     double fx = stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale)
+               + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
+               + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
+     double fy = stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale)
+               + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
+               + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
+     double fz = stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale)
+               + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
+               + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
+
+     force(0) = force(0) + fx ;
+     force(1) = force(1) + fy ; 
+     force(2) = force(2) + fz ; 
+
+     torque(0) = torque(0) + fz*rotated_coord(1) - fy*rotated_coord(2);
+     torque(1) = torque(1) + fx*rotated_coord(2) - fz*rotated_coord(0);
+     torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
   }
 
   hydro_forces.vel[0]->set_item(parID,force(0)) ;
   hydro_forces.vel[1]->set_item(parID,force(1)) ;
   hydro_forces.vel[2]->set_item(parID,force(2)) ;
+
+  hydro_torque.vel[0]->set_item(parID,torque(0)) ;
+  hydro_torque.vel[1]->set_item(parID,torque(1)) ;
+  hydro_torque.vel[2]->set_item(parID,torque(2)) ;
 //  outputFile.close();
 }
 //---------------------------------------------------------------------------
@@ -5305,9 +5402,11 @@ DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const&
 
   // Structure of particle input data
   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+  PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
 
   // Force vector
   doubleVector force(3,0);
+  doubleVector torque(3,0);
 
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[1];comp++) {
@@ -5679,20 +5778,34 @@ DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const&
 
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
-     force(0) = force(0) + stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale) 
-                         + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
-                         + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
-     force(1) = force(1) + stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale) 
-                         + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
-                         + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
-     force(2) = force(2) + stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale) 
-                         + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
-                         + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
+     double fx = stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale)
+               + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
+               + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
+
+     double fy = stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale)
+               + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
+               + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
+
+     double fz = stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale)
+               + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
+               + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
+
+     force(0) = force(0) + fx ; 
+     force(1) = force(1) + fy ; 
+     force(2) = force(2) + fz ; 
+
+     torque(0) = torque(0) + fz*rotated_coord(1) - fy*rotated_coord(2);
+     torque(1) = torque(1) + fx*rotated_coord(2) - fz*rotated_coord(0);
+     torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
   }
 
   hydro_forces.vel[0]->set_item(parID,force(0)) ;
   hydro_forces.vel[1]->set_item(parID,force(1)) ;
   hydro_forces.vel[2]->set_item(parID,force(2)) ;
+
+  hydro_torque.vel[0]->set_item(parID,torque(0)) ;
+  hydro_torque.vel[1]->set_item(parID,torque(1)) ;
+  hydro_torque.vel[2]->set_item(parID,torque(2)) ;
 //  outputFile.close();
 }
 

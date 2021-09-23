@@ -76,7 +76,6 @@ struct PartInput {
 struct PartForces {
    LA_SeqVector ** press;               // Pressure stress force
    LA_SeqVector ** vel;                // Viscous stress force
-   LA_SeqVector ** torque;              // Torque
 };
 
 /** @brief FreshNode to be used to store the fresh nodes coming in the fluid (only for pressure field)*/
@@ -195,6 +194,8 @@ class DDS_NavierStokesSystem : public MAC_Object
       SurfaceDiscretize get_surface();
       /** @brief Return the hydrodynamic forces */
       PartForces get_forces(size_t const& level);
+      /** @brief Return the hydrodynamic torque */
+      PartForces get_torque(size_t const& level);
       /** @brief Return the (presence/absence) of particle vector */
       NodeProp get_node_property(size_t const& field, size_t const& time_level);
       /** @brief Return the fresh node emerging out of solid */
@@ -335,6 +336,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       struct DivNode divergence[3];			       // 0 current timestep, 1 last time step. 2 for reference state
       struct SurfaceDiscretize surface;
       struct PartForces hydro_forces[2];                       // 0 current timestep, 1 last time step
+      struct PartForces hydro_torque[2];                       // 0 current timestep, 1 last time step
       struct BoundaryBisec b_intersect[2][2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid); 2 are fields (PF,UF)
 
 
