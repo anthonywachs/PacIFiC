@@ -3719,7 +3719,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: second_order_pressure_stress(class doubleVector& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: second_order_pressure_stress(size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: second_order_pressure_stress" ) ;
@@ -3761,6 +3761,12 @@ DDS_NavierStokes:: second_order_pressure_stress(class doubleVector& force, size_
   doubleVector Dmax(dim,0);
   doubleVector rotated_coord(3,0);
   doubleVector rotated_normal(3,0);
+
+  // Structure of particle input data
+  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+
+  // Force vector
+  doubleVector force(3,0);
 
   for (size_t i=0;i<Np;i++) {
      // Get local min and max indices
@@ -3873,12 +3879,16 @@ DDS_NavierStokes:: second_order_pressure_stress(class doubleVector& force, size_
      force(1) = force(1) + stress(i)*rotated_normal(1)*(surface.area->item(i)*scale);
      force(2) = force(2) + stress(i)*rotated_normal(2)*(surface.area->item(i)*scale);
   }
+
+  hydro_forces.press[0]->set_item(parID,force(0)) ;
+  hydro_forces.press[1]->set_item(parID,force(1)) ;
+  hydro_forces.press[2]->set_item(parID,force(2)) ;
 //  outputFile.close();  
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleVector& force, size_t const& parID, size_t const& Np)
+DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(size_t const& parID, size_t const& Np)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC" ) ;
@@ -3922,6 +3932,12 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleVector
   doubleVector rotated_coord(3,0);
   doubleVector rotated_normal(3,0);
   intVector sign(dim,0);
+
+  // Structure of particle input data
+  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+
+  // Force vector
+  doubleVector force(3,0);
 
   for (size_t i=0;i<Np;i++) {
      // Get local min and max indices
@@ -4034,12 +4050,16 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(class doubleVector
 //     outputFile << point(1,0) << "," << point(1,1) << "," << point(1,2) << "," << fini(1) << endl;
 //     outputFile << point(2,0) << "," << point(2,1) << "," << point(2,2) << "," << fini(2) << endl;
   }
+
+  hydro_forces.press[0]->set_item(parID,force(0)) ;
+  hydro_forces.press[1]->set_item(parID,force(1)) ;
+  hydro_forces.press[2]->set_item(parID,force(2)) ;
 //  outputFile.close();
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: first_order_pressure_stress(class doubleVector& force, size_t const& parID, size_t const& Np)
+DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const& Np)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: first_order_pressure_stress" ) ;
@@ -4071,6 +4091,11 @@ DDS_NavierStokes:: first_order_pressure_stress(class doubleVector& force, size_t
   PartInput solid = GLOBAL_EQ->get_solid(0);
   // Structure of particle surface data
   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
+  // Structure of particle input data
+  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+
+  // Force vector
+  doubleVector force(3,0);
 
   for (size_t i=0;i<Np;i++) {
      double sx = surface.coordinate[0]->item(i);
@@ -4166,6 +4191,11 @@ DDS_NavierStokes:: first_order_pressure_stress(class doubleVector& force, size_t
 //     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (surface.area->item(i)*scale) << endl;
 //     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (s_area*scale) << "," << rotated_normal(0) << "," << rotated_normal(1) << "," << rotated_normal(2) << endl;
   }
+
+  hydro_forces.press[0]->set_item(parID,force(0)) ;
+  hydro_forces.press[1]->set_item(parID,force(1)) ;
+  hydro_forces.press[2]->set_item(parID,force(2)) ;
+
 //  outputFile.close();
 }
 
@@ -4196,12 +4226,14 @@ DDS_NavierStokes:: compute_fluid_pressure_particle_interaction( FV_TimeIterator 
   for (size_t parID = 0; parID < Npart; parID++) {
  
      // Contribution due to pressure tensor
-     doubleVector press_force(3,0);
-     compute_pressure_force_on_particle(press_force, parID, Nmax); 
+     compute_pressure_force_on_particle(parID, Nmax); 
      // Gathering information from all procs
-     hydro_forces.press[0]->set_item(parID,pelCOMM->sum(press_force(0))) ;
-     hydro_forces.press[1]->set_item(parID,pelCOMM->sum(press_force(1))) ;
-     hydro_forces.press[2]->set_item(parID,pelCOMM->sum(press_force(2))) ;
+     hydro_forces.press[0]->set_item(parID,
+		     pelCOMM->sum(hydro_forces.press[0]->item(parID))) ;
+     hydro_forces.press[1]->set_item(parID,
+		     pelCOMM->sum(hydro_forces.press[1]->item(parID))) ;
+     hydro_forces.press[2]->set_item(parID,
+		     pelCOMM->sum(hydro_forces.press[2]->item(parID))) ;
 
   }
 }
@@ -4250,12 +4282,14 @@ DDS_NavierStokes:: compute_fluid_velocity_particle_interaction( FV_TimeIterator 
      double vz = solid.vel[2]->item(parID);
  
      // Contribution of stress tensor
-     doubleVector vel_force(3,0);
-     compute_velocity_force_on_particle(vel_force, parID, Nmax); 
+     compute_velocity_force_on_particle(parID, Nmax); 
      // Gathering information from all procs
-     hydro_forces.vel[0]->set_item(parID,pelCOMM->sum(vel_force(0))) ;
-     hydro_forces.vel[1]->set_item(parID,pelCOMM->sum(vel_force(1))) ;
-     hydro_forces.vel[2]->set_item(parID,pelCOMM->sum(vel_force(2))) ;
+     hydro_forces.vel[0]->set_item(parID,
+		     pelCOMM->sum(hydro_forces.vel[0]->item(parID))) ;
+     hydro_forces.vel[1]->set_item(parID,
+		     pelCOMM->sum(hydro_forces.vel[1]->item(parID))) ;
+     hydro_forces.vel[2]->set_item(parID,
+		     pelCOMM->sum(hydro_forces.vel[2]->item(parID))) ;
 
      if (my_rank == 0) {
 	avg_force(0,0) += hydro_forces.press[0]->item(parID);
@@ -4848,37 +4882,37 @@ DDS_NavierStokes:: ghost_points_generation( FV_DiscreteField* FF, class doubleAr
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_pressure_force_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: compute_pressure_force_on_particle(size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_pressure_force_on_particle" ) ;
 
   if (PressureStressOrder == "first") {
-     first_order_pressure_stress(force, parID, Np );
+     first_order_pressure_stress(parID, Np );
   } else if (PressureStressOrder == "second") {
-     second_order_pressure_stress(force, parID, Np );
+     second_order_pressure_stress(parID, Np );
   } else if (PressureStressOrder == "second_withNeumannBC") {
-     second_order_pressure_stress_withNeumannBC(force, parID, Np );
+     second_order_pressure_stress_withNeumannBC(parID, Np );
   }
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_velocity_force_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: compute_velocity_force_on_particle(size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_velocity_force_on_particle" ) ;
 
   if (ViscousStressOrder == "first") {
-     first_order_viscous_stress(force, parID, Np );
+     first_order_viscous_stress(parID, Np );
   } else if (ViscousStressOrder == "second") {
-     second_order_viscous_stress(force, parID, Np );
+     second_order_viscous_stress(parID, Np );
   }
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: second_order_viscous_stress(class doubleVector& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: second_order_viscous_stress" ) ;
@@ -4923,6 +4957,12 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleVector& force, size_t
   doubleVector rotated_normal(3,0);
   intVector sign(dim,0);
   boolArray2D point_in_domain(2,dim,1);
+
+  // Structure of particle input data
+  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+
+  // Force vector
+  doubleVector force(3,0);
 
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[1];comp++) {
@@ -5203,11 +5243,15 @@ DDS_NavierStokes:: second_order_viscous_stress(class doubleVector& force, size_t
                          + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
                          + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
   }
+
+  hydro_forces.vel[0]->set_item(parID,force(0)) ;
+  hydro_forces.vel[1]->set_item(parID,force(1)) ;
+  hydro_forces.vel[2]->set_item(parID,force(2)) ;
 //  outputFile.close();
 }
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: first_order_viscous_stress(class doubleVector& force, size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: first_order_viscous_stress" ) ;
@@ -5258,6 +5302,12 @@ DDS_NavierStokes:: first_order_viscous_stress(class doubleVector& force, size_t 
   doubleVector Dmax(dim,0);
   doubleVector rotated_coord(3,0);
   doubleVector rotated_normal(3,0);
+
+  // Structure of particle input data
+  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+
+  // Force vector
+  doubleVector force(3,0);
 
   for (size_t i=0;i<Np;i++) {
      for (size_t comp=0;comp<nb_comps[1];comp++) {
@@ -5639,6 +5689,10 @@ DDS_NavierStokes:: first_order_viscous_stress(class doubleVector& force, size_t 
                          + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
                          + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
   }
+
+  hydro_forces.vel[0]->set_item(parID,force(0)) ;
+  hydro_forces.vel[1]->set_item(parID,force(1)) ;
+  hydro_forces.vel[2]->set_item(parID,force(2)) ;
 //  outputFile.close();
 }
 
