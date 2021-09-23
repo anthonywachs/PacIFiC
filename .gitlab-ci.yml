@@ -9,11 +9,10 @@ build:
   script:
     - cd tests
     - ./build_env.sh
-    # - ./build_grains.sh
-    # - ./build_mac.sh
-    # - ./build_fluid.sh
-    # - ./build_basilisk.sh
-    # - $(! grep -q "1" build_success.txt)
+    - ./build_grains.sh
+    - ./build_mac.sh
+    - ./build_fluid.sh
+    - $(! grep -q "1" build_success.txt)
   artifacts:
     untracked: true
     paths:
@@ -34,81 +33,10 @@ build:
       - Octree/Env/octree.env.sh
 
 
-# ### Tests for Grains3D
-# memory-model:
-#   stage: test-grains
-#   script:
-#     - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
-#     - cd tests/test-grains/spheres-settling
-#     - ./spheres-settling.sh
-#
-#
-#
-# ### Tests for FLUID (Cartesian solver)
-
-
-### Tests for basilisk
-extension scalar:
-  stage: test-basilisk
+### Tests for Grains3D
+memory-model:
+  stage: test-grains
   script:
     - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
-    - cd tests/test-basilisk/
-    - make scalar_extension.tst
-    - cd scalar_extension
-    - cat out
-    - gnuplot ../scalar_extension.p
-    - SUCCESS=$(python3 ../scalar_extension.py)
-    - echo "$SUCCESS" | grep -q "0"
-  artifacts:
-    paths:
-      - tests/test-basilisk/scalar_extension/scalar_extension.png
-      - tests/test-basilisk/scalar_extension/scalar_init.png
-      - tests/test-basilisk/scalar_extension/scalar_extended_coarse_normals.png
-      - tests/test-basilisk/scalar_extension/scalar_extended_exact_normals.png
-
-extension normal vector:
-  stage: test-basilisk
-  script:
-    - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
-    - cd tests/test-basilisk/
-    - make normal_vector_extension.tst
-    - cd normal_vector_extension
-    - cat out
-    - gnuplot ../normal_vector_extension.p
-    - SUCCESS=$(python3 ../normal_vector_extension.py)
-    - echo "$SUCCESS" | grep -q "0"
-  artifacts:
-    paths:
-      - tests/test-basilisk/normal_vector_extension/normal_vector_extension.png
-
-caps advection constant elongation 1/2:
-  stage: test-basilisk
-  script:
-    - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
-    - cd tests/test-basilisk/
-    - make constant_elongation_0.tst
-    - cd constant_elongation_0
-    - cat out
-    - gnuplot -e "theta='0'" ../constant_elongation.p
-    - SUCCESS=$(python3 ../constant_elongation.py out)
-    - echo "$SUCCESS" | grep -q "0"
-  artifacts:
-    paths:
-      - tests/test-basilisk/constant_elongation_0/constant_elongation_0.png
-      - tests/test-basilisk/constant_elongation_0/out
-
-caps advection constant elongation 2/2:
-  stage: test-basilisk
-  script:
-    - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
-    - cd tests/test-basilisk/
-    - make constant_elongation_30.tst
-    - cd constant_elongation_30
-    - cat out
-    - gnuplot -e "theta='30'" ../constant_elongation.p
-    - SUCCESS=$(python3 ../constant_elongation.py out)
-    - echo "$SUCCESS" | grep -q "0"
-  artifacts:
-    paths:
-      - tests/test-basilisk/constant_elongation_30/constant_elongation_30.png
-      - tests/test-basilisk/constant_elongation_30/out
+    - cd tests/test-grains/spheres-settling
+    - ./spheres-settling.sh
