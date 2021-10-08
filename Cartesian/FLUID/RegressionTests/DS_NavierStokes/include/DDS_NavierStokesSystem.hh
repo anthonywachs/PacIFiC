@@ -190,7 +190,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       TDMatrix* get_Schur(size_t const& field);
       /** @brief Return the solid information read from input files */
       PartInput get_solid(size_t const& field);
-      /** @brief Return the surface discretization from input files */
+      /** @brief Return the surface discretization */
       SurfaceDiscretize get_surface();
       /** @brief Return the hydrodynamic forces */
       PartForces get_forces(size_t const& level);

@@ -446,54 +446,32 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
    if (is_solids && is_stressCal) {
       if (dim == 3) {
-         if (level_set_type == "Sphere") {
-            surface.coordinate[0]->re_initialize(2*(size_t)Nmax);
-            surface.coordinate[1]->re_initialize(2*(size_t)Nmax);
-            surface.coordinate[2]->re_initialize(2*(size_t)Nmax);
-            surface.area->re_initialize(2*(size_t)Nmax);
-            surface.normal[0]->re_initialize(2*(size_t)Nmax);
-            surface.normal[1]->re_initialize(2*(size_t)Nmax);
-            surface.normal[2]->re_initialize(2*(size_t)Nmax);
+	 if (level_set_type == "Sphere") {
+	    Nmax = 2*Nmax;
 	 } else if (level_set_type == "Cube") {
-            surface.coordinate[0]->re_initialize(6*(size_t)pow(Nmax,2));
-            surface.coordinate[1]->re_initialize(6*(size_t)pow(Nmax,2));
-            surface.coordinate[2]->re_initialize(6*(size_t)pow(Nmax,2));
-            surface.area->re_initialize(6*(size_t)pow(Nmax,2));
-            surface.normal[0]->re_initialize(6*(size_t)pow(Nmax,2));
-            surface.normal[1]->re_initialize(6*(size_t)pow(Nmax,2));
-            surface.normal[2]->re_initialize(6*(size_t)pow(Nmax,2));
-	 } else if (level_set_type == "Cylinder") {
+            Nmax = 6*pow(Nmax,2); 
+ 	 } else if (level_set_type == "Cylinder") {
             double Npm1 = round(pow(MAC::sqrt(Nmax) - MAC::sqrt(MAC::pi()/ar),2.));
             double dh = 1. - MAC::sqrt(Npm1/Nmax);
             double Nr = round(2./dh);
-	    size_t Ncyl = (size_t) (2*Nmax + Nr*(Nmax - Npm1));
-            surface.coordinate[0]->re_initialize(Ncyl);
-            surface.coordinate[1]->re_initialize(Ncyl);
-            surface.coordinate[2]->re_initialize(Ncyl);
-            surface.area->re_initialize(Ncyl);
-            surface.normal[0]->re_initialize(Ncyl);
-            surface.normal[1]->re_initialize(Ncyl);
-            surface.normal[2]->re_initialize(Ncyl);
+	    Nmax = (2*Nmax + Nr*(Nmax - Npm1));
 	 }
       } else {
 	 if (level_set_type == "Sphere") {
-            surface.coordinate[0]->re_initialize((size_t)Nmax);
-            surface.coordinate[1]->re_initialize((size_t)Nmax);
-            surface.coordinate[2]->re_initialize((size_t)Nmax);
-            surface.area->re_initialize((size_t)Nmax);
-            surface.normal[0]->re_initialize((size_t)Nmax);
-            surface.normal[1]->re_initialize((size_t)Nmax);
-            surface.normal[2]->re_initialize((size_t)Nmax);
+	    Nmax = Nmax;
 	 } else if (level_set_type == "Cube") {
-            surface.coordinate[0]->re_initialize(4*(size_t)Nmax);
-            surface.coordinate[1]->re_initialize(4*(size_t)Nmax);
-            surface.coordinate[2]->re_initialize(4*(size_t)Nmax);
-            surface.area->re_initialize(4*(size_t)Nmax);
-            surface.normal[0]->re_initialize(4*(size_t)Nmax);
-            surface.normal[1]->re_initialize(4*(size_t)Nmax);
-            surface.normal[2]->re_initialize(4*(size_t)Nmax);
+            Nmax = 4*Nmax; 
 	 }
       }
+
+      surface.coordinate[0]->re_initialize((size_t)Nmax);
+      surface.coordinate[1]->re_initialize((size_t)Nmax);
+      surface.coordinate[2]->re_initialize((size_t)Nmax);
+      surface.area->re_initialize((size_t)Nmax);
+      surface.normal[0]->re_initialize((size_t)Nmax);
+      surface.normal[1]->re_initialize((size_t)Nmax);
+      surface.normal[2]->re_initialize((size_t)Nmax);
+     
    }
 
    for (size_t field = 0; field < 2; field++) {

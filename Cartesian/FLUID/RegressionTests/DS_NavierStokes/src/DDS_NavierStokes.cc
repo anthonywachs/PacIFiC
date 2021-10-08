@@ -800,7 +800,7 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
    }
 
    if (level_set_type == "PipeX") error_with_analytical_solution_poiseuille3D();
-
+/*
    double vel_divergence = get_velocity_divergence(t_it);
 
    if ( my_rank == is_master ) {
@@ -809,7 +809,7 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
       MyFile << t_it -> time() << "," << vel_divergence << endl;
       MyFile.close( ) ;
    }
-
+*/
 //   write_output_field(UF,t_it);
 
    double cfl = UF->compute_CFL( t_it, 0 );
@@ -4360,6 +4360,7 @@ DDS_NavierStokes:: compute_fluid_velocity_particle_interaction( FV_TimeIterator 
 		     pelCOMM->sum(hydro_torque.vel[1]->item(parID))) ;
      hydro_torque.vel[2]->set_item(parID,
 		     pelCOMM->sum(hydro_torque.vel[2]->item(parID))) ;
+
 
      if (my_rank == 0) {
 	avg_force(0,0) += hydro_forces.press[0]->item(parID);
