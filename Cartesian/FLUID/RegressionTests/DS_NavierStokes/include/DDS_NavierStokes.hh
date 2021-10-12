@@ -223,15 +223,15 @@ public SolverComputingTime
       void impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
       void impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID );
 
-      void compute_velocity_force_on_particle(size_t const& parID, size_t const& Np);
-      void first_order_viscous_stress(size_t const& parID, size_t const& Np);
-      void second_order_viscous_stress(size_t const& parID, size_t const& Np);
+      void compute_velocity_force_on_particle(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it);
+      void first_order_viscous_stress(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it);
+      void second_order_viscous_stress(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it);
       void compute_fluid_pressure_particle_interaction( FV_TimeIterator const* t_it);
       void compute_fluid_velocity_particle_interaction( FV_TimeIterator const* t_it);
-      void compute_pressure_force_on_particle(size_t const& parID, size_t const& Np);
-      void first_order_pressure_stress(size_t const& parID, size_t const& Np);
-      void second_order_pressure_stress_withNeumannBC(size_t const& parID, size_t const& Np);
-      void second_order_pressure_stress(size_t const& parID, size_t const& Np);
+      void compute_pressure_force_on_particle(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it);
+      void first_order_pressure_stress(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it);
+      void second_order_pressure_stress_withNeumannBC(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it);
+      void second_order_pressure_stress(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it);
       void generate_surface_discretization();
       void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
       void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
@@ -297,6 +297,14 @@ public SolverComputingTime
       void write_output_field( FV_DiscreteField const* FF, FV_TimeIterator const* t_it );
 
       void write_surface_discretization(size_t const& Np);
+
+      void write_surface_discretized_forces(
+		      FV_DiscreteField const* FF,
+                      size_t const& Np,
+                      size_t const& parID,
+                      class doubleArray2D& point,
+                      class doubleArray2D& force,
+		      FV_TimeIterator const* t_it);
 
       double get_velocity_divergence(FV_TimeIterator const* t_it);
       
@@ -388,6 +396,7 @@ public SolverComputingTime
       bool is_solids;
       bool is_par_motion;
       bool is_stressCal;
+      bool is_surfacestressOUT;
       string IntersectionMethod;
       string ViscousStressOrder;
       string PressureStressOrder;

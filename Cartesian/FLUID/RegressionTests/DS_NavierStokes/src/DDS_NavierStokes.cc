@@ -82,6 +82,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , is_solids( false )
    , is_par_motion( false )
    , is_stressCal( false )
+   , is_surfacestressOUT( false )
    , IntersectionMethod ( "Bisection" )
    , tolerance ( 1.e-6 )
    , b_projection_translation( dom->primary_grid()->is_translation_active() )
@@ -198,6 +199,12 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       // Read weather the sress calculation on particle is ON/OFF
       if ( exp->has_entry( "Stress_calculation" ) )
         is_stressCal = exp->bool_data( "Stress_calculation" ) ;
+
+      // Read if the discretized surface force output os ON/OFF
+      if (is_stressCal) {
+         if ( exp->has_entry( "Surface_Stress_Output" ))
+            is_surfacestressOUT = exp->bool_data( "Stress_calculation" ) ;
+      }
 
       // Read weather the particle motion is ON/OFF
       if ( exp->has_entry( "Particle_motion" ) )
@@ -3732,7 +3739,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF, double const
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: second_order_pressure_stress(size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: second_order_pressure_stress(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: second_order_pressure_stress" ) ;
@@ -3750,14 +3757,6 @@ DDS_NavierStokes:: second_order_pressure_stress(size_t const& parID, size_t cons
   double yp = solid.coord[1]->item(parID);
   double zp = solid.coord[2]->item(parID);
   double ri = solid.size->item(parID);
-/*  
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/temp_grad_" << my_rank << "_" << parID << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-  outputFile << "x,y,z,id" << endl;*/
-//  outputFile << "i,Nu" << endl;
 
   doubleArray2D ipoint(3,3,0.);         
   doubleVector fini(3,0);
@@ -3774,6 +3773,8 @@ DDS_NavierStokes:: second_order_pressure_stress(size_t const& parID, size_t cons
   doubleVector Dmax(dim,0);
   doubleVector rotated_coord(3,0);
   doubleVector rotated_normal(3,0);
+  doubleArray2D surface_force(Np,3,0);
+  doubleArray2D surface_point(Np,3,0);
 
   // Structure of particle input data
   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
@@ -3880,10 +3881,6 @@ DDS_NavierStokes:: second_order_pressure_stress(size_t const& parID, size_t cons
            }
            stress(i) = stress(i) - fini(0)/2.;
 	}
-/*
-        outputFile << ipoint(0,0) << "," << ipoint(0,1) << "," << ipoint(0,2) << "," << fini(0) << endl;
-        outputFile << ipoint(1,0) << "," << ipoint(1,1) << "," << ipoint(1,2) << "," << fini(1) << endl;
-        outputFile << ipoint(2,0) << "," << ipoint(2,1) << "," << ipoint(2,2) << "," << fini(2) << endl;*/
      }
 
      double scale = (dim == 2) ? ri : ri*ri;
@@ -3898,10 +3895,20 @@ DDS_NavierStokes:: second_order_pressure_stress(size_t const& parID, size_t cons
      force(1) = force(1) + fy ;
      force(2) = force(2) + fz ;
 
+     surface_point(i,0) = ipoint(0,0);
+     surface_point(i,1) = ipoint(0,1);
+     surface_point(i,2) = ipoint(0,2);
+
+     surface_force(i,0) = fx;
+     surface_force(i,1) = fy;
+     surface_force(i,2) = fz;
+
      torque(0) = torque(0) + fz*rotated_coord(1) - fy*rotated_coord(2);
      torque(1) = torque(1) + fx*rotated_coord(2) - fz*rotated_coord(0);
      torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
   }
+
+  write_surface_discretized_forces(PF,Np,parID,surface_point,surface_force,t_it);
 
   hydro_forces.press[0]->set_item(parID,force(0)) ;
   hydro_forces.press[1]->set_item(parID,force(1)) ;
@@ -3910,12 +3917,11 @@ DDS_NavierStokes:: second_order_pressure_stress(size_t const& parID, size_t cons
   hydro_torque.press[0]->set_item(parID,torque(0)) ;
   hydro_torque.press[1]->set_item(parID,torque(1)) ;
   hydro_torque.press[2]->set_item(parID,torque(2)) ;
-//  outputFile.close();  
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(size_t const& parID, size_t const& Np)
+DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC" ) ;
@@ -3933,14 +3939,6 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(size_t const& parI
   double yp = solid.coord[1]->item(parID);
   double zp = solid.coord[2]->item(parID);
   double ri = solid.size->item(parID);
-/*
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/pressure_drag_" << my_rank << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-  outputFile << "x,y,z,p_stress" << endl;
-*/
 
   doubleArray2D point(3,3,0);
   doubleVector fini(3,0);
@@ -3950,6 +3948,8 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(size_t const& parI
   boolArray2D found(dim,3,false);
   size_t_array2D i0(3,3,0);
   doubleVector stress(Np,0);         
+  doubleArray2D surface_force(Np,3,0);
+  doubleArray2D surface_point(Np,3,0);
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -4079,14 +4079,20 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(size_t const& parI
      force(1) = force(1) + fy ;
      force(2) = force(2) + fz ;
 
+     surface_point(i,0) = point(0,0);
+     surface_point(i,1) = point(0,1);
+     surface_point(i,2) = point(0,2);
+
+     surface_force(i,0) = fx;
+     surface_force(i,1) = fy;
+     surface_force(i,2) = fz;
+
      torque(0) = torque(0) + fz*rotated_coord(1) - fy*rotated_coord(2);
      torque(1) = torque(1) + fx*rotated_coord(2) - fz*rotated_coord(0);
      torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
-
-//     outputFile << point(0,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(0) << endl;
-//     outputFile << point(1,0) << "," << point(1,1) << "," << point(1,2) << "," << fini(1) << endl;
-//     outputFile << point(2,0) << "," << point(2,1) << "," << point(2,2) << "," << fini(2) << endl;
   }
+
+  write_surface_discretized_forces(PF,Np,parID,surface_point,surface_force,t_it);
 
   hydro_forces.press[0]->set_item(parID,force(0)) ;
   hydro_forces.press[1]->set_item(parID,force(1)) ;
@@ -4095,12 +4101,11 @@ DDS_NavierStokes:: second_order_pressure_stress_withNeumannBC(size_t const& parI
   hydro_torque.press[0]->set_item(parID,torque(0)) ;
   hydro_torque.press[1]->set_item(parID,torque(1)) ;
   hydro_torque.press[2]->set_item(parID,torque(2)) ;
-//  outputFile.close();
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const& Np)
+DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: first_order_pressure_stress" ) ;
@@ -4108,14 +4113,7 @@ DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const
   size_t i0_temp;
   double ri=0.;
   bool found = 0;
-/*
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/pressure_drag_" << my_rank << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-  outputFile << "x,y,z,p_stress,area,nx,ny,nz" << endl;
-*/
+
   doubleVector point(3,0);
   doubleVector stress(Np,0);         
   size_t i0, j0, k0=0;
@@ -4127,6 +4125,8 @@ DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const
   doubleVector Dmax(dim,0);
   doubleVector rotated_coord(3,0);
   doubleVector rotated_normal(3,0);
+  doubleArray2D surface_force(Np,3,0);
+  doubleArray2D surface_point(Np,3,0);
 
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid(0);
@@ -4231,6 +4231,14 @@ DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const
      double fy = stress(i)*rotated_normal(1)*(s_area*scale);
      double fz = stress(i)*rotated_normal(2)*(s_area*scale);
 
+     surface_point(i,0) = point(0);
+     surface_point(i,1) = point(1);
+     surface_point(i,2) = point(2);
+
+     surface_force(i,0) = fx;
+     surface_force(i,1) = fy;
+     surface_force(i,2) = fz;
+
      force(0) = force(0) + fx ;
      force(1) = force(1) + fy ;
      force(2) = force(2) + fz ;
@@ -4239,9 +4247,9 @@ DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const
      torque(1) = torque(1) + fx*rotated_coord(2) - fz*rotated_coord(0);
      torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
 
-//     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (surface.area->item(i)*scale) << endl;
-//     outputFile << point(0) << "," << point(1) << "," << point(2) << "," << -stress(i) << "," << (s_area*scale) << "," << rotated_normal(0) << "," << rotated_normal(1) << "," << rotated_normal(2) << endl;
   }
+
+  write_surface_discretized_forces(PF,Np,parID,surface_point,surface_force,t_it);
 
   hydro_forces.press[0]->set_item(parID,force(0)) ;
   hydro_forces.press[1]->set_item(parID,force(1)) ;
@@ -4251,7 +4259,6 @@ DDS_NavierStokes:: first_order_pressure_stress(size_t const& parID, size_t const
   hydro_torque.press[1]->set_item(parID,torque(1)) ;
   hydro_torque.press[2]->set_item(parID,torque(2)) ;
 
-//  outputFile.close();
 }
 
 
@@ -4282,7 +4289,7 @@ DDS_NavierStokes:: compute_fluid_pressure_particle_interaction( FV_TimeIterator 
   for (size_t parID = 0; parID < Npart; parID++) {
  
      // Contribution due to pressure tensor
-     compute_pressure_force_on_particle(parID, Nmax); 
+     compute_pressure_force_on_particle(parID, Nmax, t_it); 
      // Gathering information from all procs
      hydro_forces.press[0]->set_item(parID,
 		     pelCOMM->sum(hydro_forces.press[0]->item(parID))) ;
@@ -4346,7 +4353,7 @@ DDS_NavierStokes:: compute_fluid_velocity_particle_interaction( FV_TimeIterator 
      double vz = solid.vel[2]->item(parID);
  
      // Contribution of stress tensor
-     compute_velocity_force_on_particle(parID, Nmax); 
+     compute_velocity_force_on_particle(parID, Nmax, t_it); 
      // Gathering information from all procs
      hydro_forces.vel[0]->set_item(parID,
 		     pelCOMM->sum(hydro_forces.vel[0]->item(parID))) ;
@@ -4966,37 +4973,37 @@ DDS_NavierStokes:: ghost_points_generation( FV_DiscreteField* FF, class doubleAr
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_pressure_force_on_particle(size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: compute_pressure_force_on_particle(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_pressure_force_on_particle" ) ;
 
   if (PressureStressOrder == "first") {
-     first_order_pressure_stress(parID, Np );
+     first_order_pressure_stress(parID, Np, t_it );
   } else if (PressureStressOrder == "second") {
-     second_order_pressure_stress(parID, Np );
+     second_order_pressure_stress(parID, Np, t_it );
   } else if (PressureStressOrder == "second_withNeumannBC") {
-     second_order_pressure_stress_withNeumannBC(parID, Np );
+     second_order_pressure_stress_withNeumannBC(parID, Np, t_it );
   }
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_velocity_force_on_particle(size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: compute_velocity_force_on_particle(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: compute_velocity_force_on_particle" ) ;
 
   if (ViscousStressOrder == "first") {
-     first_order_viscous_stress(parID, Np );
+     first_order_viscous_stress(parID, Np, t_it );
   } else if (ViscousStressOrder == "second") {
-     second_order_viscous_stress(parID, Np );
+     second_order_viscous_stress(parID, Np, t_it );
   }
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: second_order_viscous_stress" ) ;
@@ -5014,15 +5021,7 @@ DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const
   double yp = solid.coord[1]->item(parID);
   double zp = solid.coord[2]->item(parID);
   double ri = solid.size->item(parID);
-/*  
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/velocity_drag_" << my_rank << "_" << parID << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-//  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
-  outputFile << "x,y,z,id" << endl;
-*/
+
   doubleArray2D point(3,3,0);
   doubleArray2D fini(3,3,0);
   doubleArray2D stress(Np,6,0);         //xx,yy,zz,xy,yz,zx
@@ -5031,6 +5030,8 @@ DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const
   boolArray2D found(dim,3,false);
   size_t_array2D i0(3,3,0);
   vector<double> net_vel(3,0.);
+  doubleArray2D surface_force(Np,3,0);
+  doubleArray2D surface_point(Np,3,0);
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -5302,16 +5303,6 @@ DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const
               stress(i,4) = stress(i,4) + dfdy;
               stress(i,5) = stress(i,5) + dfdx;
            }
-/*
-           if (comp == 0) {
-              outputFile << point(0,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(0,0) << endl;
-              if (point_in_domain(0,0)) outputFile << point(1,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(1,0) << endl;
-              if (point_in_domain(1,0)) outputFile << point(2,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(2,0) << endl;
-              if (point_in_domain(0,1)) outputFile << point(0,0) << "," << point(1,1) << "," << point(0,2) << "," << fini(1,1) << endl;
-              if (point_in_domain(1,1)) outputFile << point(0,0) << "," << point(2,1) << "," << point(0,2) << "," << fini(2,1) << endl;
-              if (point_in_domain(0,2)) outputFile << point(0,0) << "," << point(0,1) << "," << point(1,2) << "," << fini(1,2) << endl;
-              if (point_in_domain(1,2)) outputFile << point(0,0) << "," << point(0,1) << "," << point(2,2) << "," << fini(2,2) << endl;
-	   }*/
 	}
      }
 
@@ -5329,6 +5320,14 @@ DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const
                + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
                + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
 
+     surface_point(i,0) = point(0,0);
+     surface_point(i,1) = point(0,1);
+     surface_point(i,2) = point(0,2);
+
+     surface_force(i,0) = fx;
+     surface_force(i,1) = fy;
+     surface_force(i,2) = fz;
+
      force(0) = force(0) + fx ;
      force(1) = force(1) + fy ; 
      force(2) = force(2) + fz ; 
@@ -5338,6 +5337,8 @@ DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const
      torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
   }
 
+  write_surface_discretized_forces(UF,Np,parID,surface_point,surface_force,t_it);
+
   hydro_forces.vel[0]->set_item(parID,force(0)) ;
   hydro_forces.vel[1]->set_item(parID,force(1)) ;
   hydro_forces.vel[2]->set_item(parID,force(2)) ;
@@ -5345,11 +5346,10 @@ DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const
   hydro_torque.vel[0]->set_item(parID,torque(0)) ;
   hydro_torque.vel[1]->set_item(parID,torque(1)) ;
   hydro_torque.vel[2]->set_item(parID,torque(2)) ;
-//  outputFile.close();
 }
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const& Np )
+DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DDS_NavierStokes:: first_order_viscous_stress" ) ;
@@ -5368,15 +5368,6 @@ DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const&
   double zp = solid.coord[2]->item(parID);
   double ri = solid.size->item(parID);
 
-/*  
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/velocity_drag_" << my_rank << "_" << parID << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-//  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
-  outputFile << "x,y,z,id" << endl;
-*/
   doubleVector xpoint(3,0);
   doubleVector ypoint(3,0);
   doubleVector zpoint(3,0);
@@ -5392,6 +5383,8 @@ DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const&
   size_t_vector i0_y(3,0);
   size_t_vector i0_z(3,0);
   vector<double> net_vel(3,0.);
+  doubleArray2D surface_force(Np,3,0);
+  doubleArray2D surface_point(Np,3,0);
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -5763,15 +5756,6 @@ DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const&
               stress(i,5) = stress(i,5) + dfdx;
            }
 
-/*           if (comp == 0) {
-              outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(0) << "," << finy(0) << endl;
-              outputFile << xpoint(1) << "," << ypoint(0) << "," << zpoint(0) << "," << finx(1) << endl;
-              outputFile << xpoint(2) << "," << ypoint(0) << "," << zpoint(0) << "," << finx(2) << endl;
-              outputFile << xpoint(0) << "," << ypoint(1) << "," << zpoint(0) << "," << finy(1) << endl;
-              outputFile << xpoint(0) << "," << ypoint(2) << "," << zpoint(0) << "," << finy(2) << endl;
-              outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(1) << "," << finz(1) << endl;
-              outputFile << xpoint(0) << "," << ypoint(0) << "," << zpoint(2) << "," << finz(2) << endl;
-	   }*/
 	}
      }
 
@@ -5791,6 +5775,14 @@ DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const&
                + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
                + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
 
+     surface_force(i,0) = fx;
+     surface_force(i,1) = fy;
+     surface_force(i,2) = fz;
+
+     surface_point(i,0) = xpoint(0);
+     surface_point(i,1) = ypoint(0);
+     surface_point(i,2) = zpoint(0);
+
      force(0) = force(0) + fx ; 
      force(1) = force(1) + fy ; 
      force(2) = force(2) + fz ; 
@@ -5800,6 +5792,8 @@ DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const&
      torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
   }
 
+  write_surface_discretized_forces(UF,Np,parID,surface_point,surface_force,t_it);
+
   hydro_forces.vel[0]->set_item(parID,force(0)) ;
   hydro_forces.vel[1]->set_item(parID,force(1)) ;
   hydro_forces.vel[2]->set_item(parID,force(2)) ;
@@ -5807,7 +5801,6 @@ DDS_NavierStokes:: first_order_viscous_stress(size_t const& parID, size_t const&
   hydro_torque.vel[0]->set_item(parID,torque(0)) ;
   hydro_torque.vel[1]->set_item(parID,torque(1)) ;
   hydro_torque.vel[2]->set_item(parID,torque(2)) ;
-//  outputFile.close();
 }
 
 //---------------------------------------------------------------------------
@@ -8033,6 +8026,51 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    }
    // Propagate values to the boundaries depending on BC conditions
    PF->set_neumann_DOF_values();
+}
+
+
+//----------------------------------------------------------------------
+void
+DDS_NavierStokes::write_surface_discretized_forces(
+		FV_DiscreteField const* FF, 
+		size_t const& Np, 
+		size_t const& parID, 
+		class doubleArray2D& point,
+		class doubleArray2D& force,
+		FV_TimeIterator const* t_it)
+//----------------------------------------------------------------------
+{
+
+  if ((is_surfacestressOUT) && (t_it->iteration_number()%100 == 0)) {
+     // Collect particle data from all the procs, if any.
+     pelCOMM->sum_array(force);
+
+     if (my_rank == 0) {
+        ofstream outputFile ;
+
+        std::ostringstream os2;
+        if (FF == PF) {
+           os2 << "./DS_results/surface_press_force_parID_" << parID << ".csv";
+        } else {
+           os2 << "./DS_results/surface_visco_force_parID_" << parID << ".csv";
+        }
+        std::string filename = os2.str();
+        outputFile.open(filename.c_str());
+
+        outputFile << "Sid,x,y,z,Fx,Fy,Fz" << endl;
+
+        for (size_t i=0;i<Np;i++) {
+           outputFile << i << "," << point(i,0) << ","
+                                  << point(i,1) << "," 
+                                  << point(i,2) << ","
+				  << force(i,0) << ","
+                                  << force(i,1) << "," 
+                                  << force(i,2) << endl;
+        }
+        outputFile.close();
+     }
+  }
+
 }
 
 
