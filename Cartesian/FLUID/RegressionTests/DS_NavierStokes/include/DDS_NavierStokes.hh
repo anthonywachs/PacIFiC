@@ -148,12 +148,12 @@ public SolverComputingTime
       void assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& field, size_t const& r_index );
 
       /** @brief Assemble advection term for Upwind spacial scheme */
-      double assemble_advection_Upwind( size_t const& advecting_level, double const& coef, 
+      double assemble_advection_Upwind( size_t const& advecting_level, double const& coef,
          size_t const& advected_level,
          size_t const& i, size_t const& j, size_t const& k, size_t const& component) ;
 
       /** @brief Assemble advection term for Centered spacial scheme */
-      double assemble_advection_Centered( size_t const& advecting_level, double const& coef, 
+      double assemble_advection_Centered( size_t const& advecting_level, double const& coef,
          size_t const& advected_level,
          size_t const& i, size_t const& j, size_t const& k, size_t const& component );
 
@@ -173,11 +173,13 @@ public SolverComputingTime
       /** @brief Assemble rhs term after calling compute_**_component */
       void assemble_DS_un_at_rhs (FV_TimeIterator const* t_it, double const& gamma);
 
+      void assemble_velocity_diffusion_terms ( );
+
       double divergence_of_U( size_t const& i, size_t const& j, size_t const& k, size_t const& component, size_t const& level);
 
       /** @brief Call functions to assemble rhs for pressure or velocity fields in any direction */
       double assemble_local_rhs(size_t const& j,size_t const& k,double const& gamma,FV_TimeIterator const* t_it,size_t const& comp,size_t const& dir,size_t const& field);
-      
+
       /** @brief Assemble rhs for pressure in any direction */
       double calculate_velocity_divergence ( size_t const& i, size_t const& j, size_t const& k, size_t const& level, FV_TimeIterator const* t_it);
 
@@ -199,7 +201,7 @@ public SolverComputingTime
       void simulate_GRAINS( void );
       void import_par_info( istringstream &is );
 
-      void node_property_calculation (FV_DiscreteField const* FF, size_t const& field );
+      void node_property_calculation (FV_DiscreteField const* FF );
 
       size_t return_node_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& i, size_t const& j, size_t const& k );
 
@@ -214,9 +216,6 @@ public SolverComputingTime
 
       /** @brief Initialize the fresh nodes emerged out of solid*/
       void fresh_nodes_in_fluid_initialization ( );
-
-      void generate_list_of_local_particles (FV_DiscreteField const* FF, size_t const& field );
-
 
       void ugradu_initialization ( );
 
@@ -278,7 +277,7 @@ public SolverComputingTime
 
       /** @brief Solve interface unknown for all cases */
       void DS_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index ) ;
-      
+
       /** @brief Solve i in j and k; e.g. solve x in y ank z */
       void Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k, double const& gamma,size_t const& field );
 
@@ -287,10 +286,10 @@ public SolverComputingTime
 
       /** Velocity update */
       void NS_velocity_update( FV_TimeIterator const* t_it ) ;
-      
+
       /** Pressure update (penalty step) */
       void NS_pressure_update( FV_TimeIterator const* t_it ) ;
-      
+
       /** Pressure correction */
       void NS_final_step( FV_TimeIterator const* t_it ) ;
 
@@ -307,7 +306,7 @@ public SolverComputingTime
 		      FV_TimeIterator const* t_it);
 
       double get_velocity_divergence(FV_TimeIterator const* t_it);
-      
+
       void output_L2norm_pressure( size_t const& level );
 
       void output_L2norm_velocity( size_t const& level );
@@ -315,7 +314,7 @@ public SolverComputingTime
 
 
    // Direction splitting communicators
-     
+
       /** @name Direction splitting communicators */
       /** @brief Create the sub-communicators */
       void create_DDS_subcommunicators ( void ) ;

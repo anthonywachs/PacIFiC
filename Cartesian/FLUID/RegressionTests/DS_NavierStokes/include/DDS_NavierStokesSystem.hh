@@ -82,7 +82,7 @@ struct PartForces {
 struct FreshNode {
    LA_SeqVector * flag;               // 1 if the node is considered as fresh, -1 if the node went just inside solid and 0 otherwise
    LA_SeqVector ** neigh;              // TRUE for neighbours of fresh or dead cells
-   LA_SeqVector * flag_count;              // Iteration till the node is considered fresh 
+   LA_SeqVector * flag_count;              // Iteration till the node is considered fresh
    LA_SeqVector * neigh_count;             // Iteration till the node is considered neigh
    LA_SeqVector * parID;              // ID of particle nearest to the fresh node
    LA_SeqVector * sep_vel;            // Separation velocity of solid surface in the fluid cell
@@ -97,9 +97,9 @@ struct DivNode {
 
 /** @brief NodeProp to be used to store the nodes properties due to presence of solid particles in the domian */
 struct NodeProp {
-   LA_SeqVector ** void_frac;               // void_fraction of the node due to particle
-   LA_SeqVector ** parID;                   // ID of solid particle on the node
-   LA_SeqVector ** bound_cell;              // Stores the boundary cell presence in the solids; 1 == 1st boundary cell
+   LA_SeqVector * void_frac;               // void_fraction of the node due to particle
+   LA_SeqVector * parID;                   // ID of solid particle on the node
+   LA_SeqVector * bound_cell;              // Stores the boundary cell presence in the solids; 1 == 1st boundary cell
 };
 
 /** @brief SurfaceDiscretize to be used to store the coordinates and area of discretize particle surface */
@@ -111,9 +111,9 @@ struct SurfaceDiscretize {
 
 /** @brief BoundaryBisec to be used to store the intersection of solids with grids in each direction */
 struct BoundaryBisec {
-   LA_SeqMatrix ** offset;                  // Direction of intersection relative to node (Column 0 for left and Column 1 for right)
-   LA_SeqMatrix ** value;                   // Value of offset relative to node point
-   LA_SeqMatrix ** field_var;                   // Value of field variable at the intersection
+   LA_SeqMatrix * offset;                  // Direction of intersection relative to node (Column 0 for left and Column 1 for right)
+   LA_SeqMatrix * value;                   // Value of offset relative to node point
+   LA_SeqMatrix * field_var;                   // Value of field variable at the intersection
 };
 
 /** @brief The Class DDS_NavierStokesSystem.
@@ -202,6 +202,8 @@ class DDS_NavierStokesSystem : public MAC_Object
       FreshNode* get_fresh_node();
       /** @brief Return the divergence on pressure node */
       DivNode* get_node_divergence();
+      /** @brief Return the velocity diffusive terms */
+      LA_SeqVector** get_velocity_diffusion();
       /** @brief Return information of intersection with solid boundary */
       BoundaryBisec* get_b_intersect(size_t const& field, size_t const& level);
 
@@ -230,7 +232,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @brief Initialize the velocity unknown vector with field values */
       void initialize_DS_velocity( void );
       /** @brief Initialize the pressure unknown vector with field values */
-      void initialize_DS_pressure( void ); 
+      void initialize_DS_pressure( void );
       /** @brief Store velocity vector at previous time step */
       void at_each_time_step( void ) ;
       /** @brief Compute velocity change from one time step to the
@@ -292,7 +294,7 @@ class DDS_NavierStokesSystem : public MAC_Object
 
       //-- Attributes
       FV_DiscreteField* UF ;
-      FV_DiscreteField* PF ; 
+      FV_DiscreteField* PF ;
 
       // Local vectors
       LA_SeqVector * UF_DS_LOC ;
@@ -307,6 +309,9 @@ class DDS_NavierStokesSystem : public MAC_Object
       // Matrices & rhs
       LA_Matrix * MAT_D_velocityUnsteadyPlusDiffusion ;
       LA_Vector * VEC_rhs_D_velocityDiffusionPlusBodyTerm ;
+
+      // Local vector to store diffusive terms
+      LA_SeqVector * vel_diff_loc[3] ;
 
       // Unknowns numbering
       FV_SystemNumbering* UF_NUM ;

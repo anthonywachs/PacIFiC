@@ -68,7 +68,7 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
    , Npart (fromNS.Npart_ )
    , level_set_type (fromNS.level_set_type_ )
    , Nmax (fromNS.Npoints_ )
-   , ar (fromNS.ar_ ) 
+   , ar (fromNS.ar_ )
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DDS_NavierStokesSystem" ) ;
 
@@ -98,14 +98,14 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
    is_periodic[1][0] = U_periodic_comp->operator()( 0 );
    is_periodic[1][1] = U_periodic_comp->operator()( 1 );
    if(dim >2)
-      is_periodic[1][2] = U_periodic_comp->operator()( 2 ); 
+      is_periodic[1][2] = U_periodic_comp->operator()( 2 );
 
    // Periodic boundary condition check for pressure
    P_periodic_comp = PF->primary_grid()->get_periodic_directions();
    is_periodic[0][0] = P_periodic_comp->operator()( 0 );
    is_periodic[0][1] = P_periodic_comp->operator()( 1 );
    if(dim >2)
-      is_periodic[0][2] = P_periodic_comp->operator()( 2 ); 
+      is_periodic[0][2] = P_periodic_comp->operator()( 2 );
 
    // Build the matrices & vectors
    build_system(exp) ;
@@ -143,14 +143,43 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    UF_NUM = FV_SystemNumbering::create( this, UF ) ;
    PF_NUM = FV_SystemNumbering::create( this, PF ) ;
 
-   // Direction splitting matrices
-   MAT_velocityUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
+	// Local vectors to store diffusive terms
+	vel_diff_loc[0] = LA_SeqVector::create( this, 0 ) ;
+	vel_diff_loc[1] = LA_SeqVector::create( this, 0 ) ;
+	vel_diff_loc[2] = LA_SeqVector::create( this, 0 ) ;
+
+	divergence[0].div = LA_SeqVector::create( this, 0 ) ;
+	divergence[1].div = LA_SeqVector::create( this, 0 ) ;
+	divergence[2].div = LA_SeqVector::create( this, 0 ) ;
+
+	for (size_t field = 0; field < 2; field++) {
+		// Vector to store the presence/absence of particle on the field variable
+		node[field][0].void_frac = LA_SeqVector::create( this, 0 ) ;
+		node[field][0].parID = LA_SeqVector::create( this, 0 ) ;
+		node[field][0].bound_cell = LA_SeqVector::create( this, 0 ) ;
+		node[field][1].void_frac = LA_SeqVector::create( this, 0 ) ;
+		node[field][1].parID = LA_SeqVector::create( this, 0 ) ;
+		node[field][1].bound_cell = LA_SeqVector::create( this, 0 ) ;
+	}
+
+	// Direction splitting matrices
+	MAT_velocityUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
+
+	for (size_t field = 0; field < 2; field++) {
+      for (size_t dir = 0; dir < dim; dir++) {
+			for (size_t j=0;j<2;j++) {
+				b_intersect[field][j][dir].offset = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+				b_intersect[field][j][dir].value = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+				b_intersect[field][j][dir].field_var = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+			}
+		}
+	}
 
    // Structure for the particle surface discretization
    surface.coordinate = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    surface.normal = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
 
-   for (size_t level = 0; level < 2; level++) {   
+   for (size_t level = 0; level < 2; level++) {
       // Structure for the particle force discretization
       hydro_forces[level].press = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
       hydro_forces[level].vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
@@ -173,14 +202,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    Pfresh[1].neigh = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
 
    for (size_t field = 0; field < 2; field++) {
-
-      // Vector to store the presence/absence of particle on the field variable
-      node[field][0].void_frac = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-      node[field][0].parID = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-      node[field][0].bound_cell = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-      node[field][1].void_frac = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-      node[field][1].parID = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-      node[field][1].bound_cell = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
 
       for (size_t dir = 0; dir < dim; dir++) {
          // Spacial discretization matrices
@@ -223,14 +244,8 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
          // VEC to store local/interface solution and RHS for Schur complement
          Schur_VEC[field][dir].local_T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
          Schur_VEC[field][dir].local_solution_T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-         Schur_VEC[field][dir].T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ; 
+         Schur_VEC[field][dir].T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
          Schur_VEC[field][dir].interface_T = (LA_SeqVector**) malloc(nb_comps[field] * sizeof(LA_SeqVector*)) ;
-
-         for (size_t j=0;j<2;j++) {
-            b_intersect[field][j][dir].offset = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-            b_intersect[field][j][dir].value = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-            b_intersect[field][j][dir].field_var = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
-         }
 
          for (size_t comp = 0; comp < nb_comps[field]; comp++) {
             size_t_vector nb_unknowns_handled_by_proc( dim, 0 );
@@ -310,7 +325,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    surface.normal[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
    surface.normal[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
 
-   for (size_t level=0; level<2;level++) { 
+   for (size_t level=0; level<2;level++) {
       solid[level].thetap = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
       for (size_t dir=0; dir<3; dir++) {
          hydro_forces[level].press[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -328,7 +343,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    }
 
    for (size_t level=0;level<3;level++) {
-      divergence[level].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
+      // divergence[level].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
       for (size_t dir=0;dir<3;dir++) {
          divergence[level].stencil[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
          divergence[level].lambda[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -359,21 +374,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
             VEC[field][dir].T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
             VEC[field][dir].interface_T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
 
-            if (dir == 0) {
-               node[field][0].void_frac[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               node[field][0].parID[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               node[field][0].bound_cell[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               node[field][1].void_frac[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               node[field][1].parID[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-               node[field][1].bound_cell[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            }
-
-            for (size_t j=0;j<2;j++) {
-               b_intersect[field][j][dir].offset[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-               b_intersect[field][j][dir].value[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-               b_intersect[field][j][dir].field_var[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-            }
-
             if (proc_pos_in_i[dir] == 0) {
                SchurP[field][dir].ei_ii_ie[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
                SchurP[field][dir].result[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -383,7 +383,7 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
                Schur_VEC[field][dir].local_solution_T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                Schur_VEC[field][dir].T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
                Schur_VEC[field][dir].interface_T[comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            }         
+            }
          }
       }
    }
@@ -422,11 +422,44 @@ DDS_NavierStokesSystem:: re_initialize( void )
    UF_NUM->define_scatter( VEC_DS_UF ) ;
    PF_NUM->define_scatter( VEC_DS_PF ) ;
 
-   // Initialize Direction splitting matrices & vectors for pressure 
+	vel_diff_loc[0]->re_initialize( UF_loc );
+	vel_diff_loc[1]->re_initialize( UF_loc );
+	vel_diff_loc[2]->re_initialize( UF_loc );
+
+	divergence[0].div->re_initialize( pf_loc ) ;
+	divergence[1].div->re_initialize( pf_loc ) ;
+	divergence[2].div->re_initialize( pf_loc ) ;
+
+	if (is_solids) {
+		node[0][0].void_frac->re_initialize( pf_loc ) ;
+		node[0][0].parID->re_initialize( pf_loc ) ;
+		node[0][0].bound_cell->re_initialize( pf_loc ) ;
+		node[0][1].void_frac->re_initialize( pf_loc ) ;
+		node[0][1].parID->re_initialize( pf_loc ) ;
+		node[0][1].bound_cell->re_initialize( pf_loc ) ;
+		node[1][0].void_frac->re_initialize( UF_loc ) ;
+		node[1][0].parID->re_initialize( UF_loc ) ;
+		node[1][0].bound_cell->re_initialize( UF_loc ) ;
+		node[1][1].void_frac->re_initialize( UF_loc ) ;
+		node[1][1].parID->re_initialize( UF_loc ) ;
+		node[1][1].bound_cell->re_initialize( UF_loc ) ;
+
+		for (size_t i=0;i<dim;i++) {
+			for (size_t j=0;j<2;j++) {
+				b_intersect[0][j][i].offset->re_initialize( pf_loc,2 ) ;      // Column0 for left and Column1 for right
+				b_intersect[0][j][i].value->re_initialize( pf_loc,2 ) ;      // Column0 for left and Column1 for right
+				b_intersect[0][j][i].field_var->re_initialize( pf_loc,2 ) ;      // Column0 for left and Column1 for right
+				b_intersect[1][j][i].offset->re_initialize( UF_loc,2 ) ;      // Column0 for left and Column1 for right
+				b_intersect[1][j][i].value->re_initialize( UF_loc,2 ) ;      // Column0 for left and Column1 for right
+				b_intersect[1][j][i].field_var->re_initialize( UF_loc,2 ) ;      // Column0 for left and Column1 for right
+			}
+		}
+	}
+   // Initialize Direction splitting matrices & vectors for pressure
    size_t nb_procs, proc_pos;
 
    if (is_solids) {
-      for (size_t level=0;level<2;level++){ 
+      for (size_t level=0;level<2;level++){
          solid[level].thetap->re_initialize(Npart,9);
          solid[level].size->re_initialize(Npart);
          solid[level].temp->re_initialize(Npart);
@@ -449,7 +482,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
 	 if (level_set_type == "Sphere") {
 	    Nmax = 2*Nmax;
 	 } else if (level_set_type == "Cube") {
-            Nmax = 6*pow(Nmax,2); 
+            Nmax = 6*pow(Nmax,2);
  	 } else if (level_set_type == "Cylinder") {
             double Npm1 = round(pow(MAC::sqrt(Nmax) - MAC::sqrt(MAC::pi()/ar),2.));
             double dh = 1. - MAC::sqrt(Npm1/Nmax);
@@ -460,7 +493,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
 	 if (level_set_type == "Sphere") {
 	    Nmax = Nmax;
 	 } else if (level_set_type == "Cube") {
-            Nmax = 4*Nmax; 
+            Nmax = 4*Nmax;
 	 }
       }
 
@@ -471,7 +504,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
       surface.normal[0]->re_initialize((size_t)Nmax);
       surface.normal[1]->re_initialize((size_t)Nmax);
       surface.normal[2]->re_initialize((size_t)Nmax);
-     
+
    }
 
    for (size_t field = 0; field < 2; field++) {
@@ -512,7 +545,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
             } else if (l == 2) {
                nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
             }
-             
+
             nb_procs = nb_procs_in_i[l];
             proc_pos = proc_pos_in_i[l];
 
@@ -564,7 +597,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
                      }
                   }
                }
-   
+
             } else {
                // Periodic domain
                for (size_t index = 0; index < nb_index; index++) {
@@ -602,7 +635,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
                         Schur[field][l].ee[comp][index]->re_initialize(1,1);
                         DoubleSchur[field][l].ii_main[comp][index]->re_initialize(1);
                      }
- 
+
                      SchurP[field][l].result[comp]->re_initialize(nb_procs-1);
                      SchurP[field][l].ii_ie[comp]->re_initialize(1);
                      SchurP[field][l].ei_ii_ie[comp]->re_initialize(1,1);
@@ -626,21 +659,15 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
          if ((field==0)&&(comp==0)) {
             for (size_t level=0;level<3;level++) {
-               divergence[level].div->re_initialize( nb_total_unknown ) ;
+               // divergence[level].div->re_initialize( nb_total_unknown ) ;
                for (size_t dir=0;dir<3;dir++) {
                   divergence[level].stencil[dir]->re_initialize( nb_total_unknown ) ;
                   divergence[level].lambda[dir]->re_initialize( nb_total_unknown ) ;
                }
             }
-	 }
+	 		}
 
          if (is_solids) {
-            node[field][0].void_frac[comp]->re_initialize( nb_total_unknown ) ;
-            node[field][0].parID[comp]->re_initialize( nb_total_unknown ) ;
-            node[field][0].bound_cell[comp]->re_initialize( nb_total_unknown ) ;
-            node[field][1].void_frac[comp]->re_initialize( nb_total_unknown ) ;
-            node[field][1].parID[comp]->re_initialize( nb_total_unknown ) ;
-            node[field][1].bound_cell[comp]->re_initialize( nb_total_unknown ) ;
             if ((field==0)&&(comp==0)) {
                for (size_t level=0;level<2;level++) {
                   Pfresh[level].flag->re_initialize( nb_total_unknown ) ;
@@ -653,13 +680,6 @@ DDS_NavierStokesSystem:: re_initialize( void )
 		  }
 	       }
 	    }
-            for (size_t i=0;i<dim;i++) {
-               for (size_t j=0;j<2;j++) {
-                  b_intersect[field][j][i].offset[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
-                  b_intersect[field][j][i].value[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
-                  b_intersect[field][j][i].field_var[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
-               }
-            }
          }
       }
    }
@@ -681,7 +701,7 @@ DDS_NavierStokesSystem::initialize_DS_velocity( void )
 
    UF->extract_unknown_DOFs_value( 0, UF_DS_LOC ) ;
    UF_NUM->scatter()->set( UF_DS_LOC, VEC_DS_UF ) ;
-         
+
 }
 
 //----------------------------------------------------------------------
@@ -690,10 +710,10 @@ DDS_NavierStokesSystem::initialize_DS_pressure( void )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: initialize_DS_pressure" ) ;
-   
+
    PF->extract_unknown_DOFs_value( 0, PF_DS_LOC ) ;
    PF_NUM->scatter()->set( PF_DS_LOC, VEC_DS_PF ) ;
-         
+
 }
 
 //----------------------------------------------------------------------
@@ -898,6 +918,18 @@ DDS_NavierStokesSystem::get_node_divergence()
    return (divergence) ;
 }
 
+
+
+
+//----------------------------------------------------------------------
+LA_SeqVector**
+DDS_NavierStokesSystem::get_velocity_diffusion()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokesSystem:: get_velocity_diffusion" ) ;
+   return (vel_diff_loc) ;
+}
+
 //----------------------------------------------------------------------
 FreshNode*
 DDS_NavierStokesSystem::get_fresh_node()
@@ -1022,7 +1054,7 @@ DDS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
    // Since, this function is used in all directions;
    // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
    size_t ii=0,jj=0,kk=0;
-   
+
    size_t m, i, global_number_in_distributed_vector;
 
    for (m=0;m<nb_local_unk;++m) {
@@ -1034,12 +1066,12 @@ DDS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
          ii = j; jj = i; kk = k;
       } else if (dir == 2) {
          ii = j; jj = k; kk = i;
-      }      
+      }
 
       global_number_in_distributed_vector = FF->DOF_global_number( ii, jj, kk, comp );
       if (field == 0) {
          VEC_DS_PF->set_item( global_number_in_distributed_vector, rhs[dir].local_T[comp]->item( m ) );
-      } else if (field == 1) { 
+      } else if (field == 1) {
          VEC_DS_UF->set_item( global_number_in_distributed_vector, rhs[dir].local_T[comp]->item( m ) );
       }
    }
@@ -1144,6 +1176,9 @@ DDS_NavierStokesSystem::compute_product_matrix(struct TDMatrix *arr, struct Prod
       compute_product_matrix_interior(arr,prr,comp,proc_pos,dir,r_index);
    }
 }
+
+
+
 
 //----------------------------------------------------------------------
 void
