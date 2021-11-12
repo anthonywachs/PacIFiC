@@ -1061,10 +1061,17 @@ DDS_NavierStokesSystem::update_global_P_vector(size_t const& i, size_t const& j,
 //----------------------------------------------------------------------
 void
 DDS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
-	,size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index )
+															, size_t const& j
+															, size_t const& k
+															, size_t const& min_i
+															, size_t const& comp
+															, size_t const& dir
+															, size_t const& r_index )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DS_NavierStokes_solver" ) ;
+
+	size_t field = (FF == PF) ? 0 : 1 ;
 
    LocalVector* rhs = get_VEC(field);
    TDMatrix* arr = get_A(field);

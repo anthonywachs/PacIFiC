@@ -249,7 +249,13 @@ class DDS_NavierStokesSystem : public MAC_Object
       //@{
       /** @brief Solve the DS splitting problem in x by performing the
       matrix-vector product A_x^-1.Vx and transfer in the distributed vector */
-      void DS_NavierStokes_solver( FV_DiscreteField* FF, size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index) ;
+      void DS_NavierStokes_solver( FV_DiscreteField* FF
+                                 , size_t const& j
+                                 , size_t const& k
+                                 , size_t const& min_i
+                                 , size_t const& comp
+                                 , size_t const& dir
+                                 , size_t const& r_index) ;
 
       //@}
 

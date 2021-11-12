@@ -130,22 +130,25 @@ public SolverComputingTime
       void error_with_analytical_solution_couette (FV_DiscreteField const* FF, size_t const& field) ;
 
       /** @brief Call the function to assemble 1D matrices for both velocity and pressure field*/
-      void assemble_1D_matrices( FV_TimeIterator const* t_it ) ;
+      void assemble_1D_matrices( FV_DiscreteField const* FF
+                               , FV_TimeIterator const* t_it ) ;
 
       /** @brief Assemble 1D matrices for both velocity and pressure field in all directions */
-      double assemble_field_matrix (
-        FV_DiscreteField const* FF,
-        FV_TimeIterator const* t_it,
-        double const& gamma,
-        size_t const& comp,
-        size_t const& dir,
-        size_t const& field,
-        size_t const& j,
-        size_t const& k,
-        size_t const& r_index );
+      double assemble_field_matrix ( FV_DiscreteField const* FF,
+                                     FV_TimeIterator const* t_it,
+                                     double const& gamma,
+                                     size_t const& comp,
+                                     size_t const& dir,
+                                     size_t const& j,
+                                     size_t const& k,
+                                     size_t const& r_index );
 
       /** @brief Assemble 1D schur matrices for both velocity and pressure field in all directions */
-      void assemble_field_schur_matrix (struct TDMatrix *A, size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& field, size_t const& r_index );
+      void assemble_field_schur_matrix (size_t const& comp,
+                                        size_t const& dir,
+                                        double const& Aee_diagcoef,
+                                        size_t const& field,
+                                        size_t const& r_index );
 
       /** @brief Assemble advection term for Upwind spacial scheme */
       double assemble_advection_Upwind( size_t const& advecting_level, double const& coef,
@@ -206,8 +209,13 @@ public SolverComputingTime
 
       double level_set_function (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field);
 
-      /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */
-      void assemble_intersection_matrix (FV_DiscreteField const* FF, size_t const& comp, size_t const& level, size_t const& field);               // Here level:0 -> fluid; 1-> solid
+      /** @brief Correct the fluxes and variables on the
+          nodes due to presence of solid objects */
+      void assemble_intersection_matrix (FV_DiscreteField const* FF
+                                       , size_t const& comp
+                                       , size_t const& level
+                                       , size_t const& field);
+                                       // Here level:0 -> fluid; 1-> solid
 
       /** @brief Initialize the velocity on the velocity nodes in MAC grid*/
       void nodes_field_initialization ( size_t const& level );
@@ -253,7 +261,16 @@ public SolverComputingTime
 
 
       /** @brief Find the intersection using bisection method with the solid interface */
-      double find_intersection (FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field, size_t const& level);
+      double find_intersection (FV_DiscreteField const* FF
+                              , size_t const& left
+                              , size_t const& right
+                              , size_t const& yconst
+                              , size_t const& zconst
+                              , size_t const& comp
+                              , size_t const& dir
+                              , size_t const& off
+                              , size_t const& field
+                              , size_t const& level);
 
       void correct_pressure_1st_layer_solid (size_t const& level );
 
@@ -262,14 +279,19 @@ public SolverComputingTime
       void correct_mean_pressure (size_t const& level );
 
       /** @brief Solve interface unknowns for both fields in any particular direction */
-      void solve_interface_unknowns( FV_DiscreteField* FF, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir, size_t const& field );
+      void solve_interface_unknowns( FV_DiscreteField* FF, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir);
       /** @brief Unpack the interface variable sent by master processor to slave processor */
       void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, size_t const& p, size_t const& field);
       /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */
       void unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p, size_t const& field);
 
       /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */
-      void data_packing ( FV_DiscreteField const* FF, size_t const& j, size_t const& k, double const& fe, size_t const& comp, size_t const& dir, size_t const& field);
+      void data_packing ( FV_DiscreteField const* FF
+                        , size_t const& j
+                        , size_t const& k
+                        , double const& fe
+                        , size_t const& comp
+                        , size_t const& dir );
       /** @brief Compute Aei*(Aii)-1*fi required to compute interface unknown */
       void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index);
 
@@ -277,7 +299,12 @@ public SolverComputingTime
       void DS_interface_unknown_solver( LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index ) ;
 
       /** @brief Solve i in j and k; e.g. solve x in y ank z */
-      void Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* t_it, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k, double const& gamma,size_t const& field );
+      void Solve_i_in_jk ( FV_DiscreteField* FF
+                         , FV_TimeIterator const* t_it
+                         , size_t const& dir_i
+                         , size_t const& dir_j
+                         , size_t const& dir_k
+                         , double const& gamma );
 
       /** Pressure predictor */
       void NS_first_step( FV_TimeIterator const* t_it ) ;
@@ -318,8 +345,8 @@ public SolverComputingTime
       void create_DDS_subcommunicators ( void ) ;
       void processor_splitting ( int const& color, int const& key, size_t const& dir );
 
-      void allocate_mpi_variables (FV_DiscreteField const* FF, size_t const& field);
-      void deallocate_mpi_variables (size_t const& field);
+      void allocate_mpi_variables (FV_DiscreteField const* FF);
+      void deallocate_mpi_variables ();
 
       /** @brief Free the sub-communicators */
       void free_DDS_subcommunicators ( void ) ;
@@ -399,6 +426,7 @@ public SolverComputingTime
       string PressureStressOrder;
       string motion_type;
       double tolerance;
+      double grid_check_for_solid;
 
       bool is_firstorder ;
 
