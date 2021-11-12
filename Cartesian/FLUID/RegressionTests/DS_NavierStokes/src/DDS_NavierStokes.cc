@@ -3009,8 +3009,8 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
 {
   MAC_LABEL( "DDS_NavierStokes:: NS_first_step" ) ;
 
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
   // First Equation
 
   // Get local min and max indices
@@ -3019,16 +3019,9 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
-  size_t local_min_k=0,local_max_k=0;
-
-  if (dim == 3) {
-     local_min_k = min_unknown_index(2);
-     local_max_k = max_unknown_index(2);
-  }
-
-  for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-     for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-         for (size_t k=local_min_k;k<=local_max_k;++k) {
+  for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+     for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+         for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
             // Set P*_n as sum of P_(n-1/2)+phi_(n-1/2)
             double value = PF->DOF_value( i, j, k, 0, 0 )
                          + PF->DOF_value( i, j, k, 0, 1 );
@@ -3285,6 +3278,7 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
    // ii, jj, and kk are used to convert the passed
    // arguments corresponding to correct direction
    size_t ii=0,jj=0,kk=0;
+   size_t level=0;
 
    // Vector for fi
    LocalVector* VEC = GLOBAL_EQ->get_VEC(1);
@@ -3295,11 +3289,11 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
 
    for (size_t i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
       if (dir == 0) {
-         ii = i; jj = j; kk = k;
+         ii = i; jj = j; kk = k; level = 0;
       } else if (dir == 1) {
-         ii = j; jj = i; kk = k;
+         ii = j; jj = i; kk = k; level = 3;
       } else if (dir == 2) {
-         ii = j; jj = k; kk = i;
+         ii = j; jj = k; kk = i; level = 4;
       }
 
       size_t pos = i - min_unknown_index(dir);
@@ -3318,18 +3312,10 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
          }
       }
 
-      double temp_val=0.;
       double dC = UF->get_cell_size(i,comp,dir);
-      if (dir == 0) {
-        temp_val = UF->DOF_value(i,j,k,comp,0)*dC*rho/t_it->time_step()
-                  - gamma*value;
-      } else if (dir == 1) {
-        temp_val = UF->DOF_value(j,i,k,comp,3)*dC*rho/t_it->time_step()
-                  - gamma*value;
-      } else if (dir == 2) {
-        temp_val = UF->DOF_value(j,k,i,comp,4)*dC*rho/t_it->time_step()
-                  - gamma*value;
-      }
+
+      double temp_val = UF->DOF_value(ii,jj,kk,comp,level)
+                        *dC*rho/t_it->time_step() - gamma*value;
 
       if (is_periodic[1][dir] == 0) {
         if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
