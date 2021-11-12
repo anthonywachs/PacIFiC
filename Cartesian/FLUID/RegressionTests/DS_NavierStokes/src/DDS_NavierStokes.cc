@@ -444,6 +444,10 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    // Setting ugradu as zero at start of simulation
    if (b_restart == false) ugradu_initialization ( );
 
+   // Calculate row index for each field in each direction`
+   calculate_row_indexes ( PF );
+   calculate_row_indexes ( UF );
+
    // Projection-Translation
    if ( b_projection_translation )
    {
@@ -1307,55 +1311,72 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
   }
 }
 
+
+
+
 //---------------------------------------------------------------------------
-size_t
-DDS_NavierStokes:: return_row_index (
-  FV_DiscreteField const* FF,
-  size_t const& comp,
-  size_t const& dir,
-  size_t const& j,
-  size_t const& k )
+void
+DDS_NavierStokes:: calculate_row_indexes ( FV_DiscreteField const* FF)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: return_row_index" ) ;
+   MAC_LABEL( "DDS_NavierStokes:: calculate_row_indexes" ) ;
 
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
+   size_t field = (FF == PF) ? 0 : 1;
 
-   for (size_t l=0;l<dim;++l) {
-      min_unknown_index(l) =
-                        FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      max_unknown_index(l) =
-                        FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+   for (size_t comp = 0; comp < nb_comps[field]; comp++) {
+      // Get local min and max indices
+      size_t_vector min_unknown_index(3,0);
+      size_t_vector max_unknown_index(3,0);
+
+      for (size_t l=0;l<dim;++l) {
+         min_unknown_index(l) =
+                           FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+         max_unknown_index(l) =
+                           FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+      }
+
+      for (size_t dir = 0; dir < dim; dir++) {
+         LA_SeqMatrix* row_index = GLOBAL_EQ->get_row_indexes(field,dir,comp);
+         switch (dir) {
+            case 0:
+               for (size_t j=min_unknown_index(1); j<=max_unknown_index(1); j++) {
+                  for (size_t k=min_unknown_index(2); k<=max_unknown_index(2); k++) {
+                     size_t p = (j - min_unknown_index(1))
+                              + (1 + max_unknown_index(1) - min_unknown_index(1))
+                              * (k - min_unknown_index(2));
+                     row_index->set_item(j,k,(double)p);
+                  }
+               }
+               break;
+            case 1:
+               for (size_t i=min_unknown_index(0); i<=max_unknown_index(0); i++) {
+                  for (size_t k=min_unknown_index(2); k<=max_unknown_index(2); k++) {
+                     size_t p = (i - min_unknown_index(0))
+                              + (1 + max_unknown_index(0) - min_unknown_index(0))
+                              * (k - min_unknown_index(2));
+                     row_index->set_item(i,k,(double)p);
+                  }
+               }
+               break;
+            case 2:
+               for (size_t i=min_unknown_index(0); i<=max_unknown_index(0); i++) {
+                  for (size_t j=min_unknown_index(1); j<=max_unknown_index(1); j++) {
+                     size_t p = (i - min_unknown_index(0))
+                              + (1 + max_unknown_index(0) - min_unknown_index(0))
+                              * (j - min_unknown_index(1));
+                     row_index->set_item(i,j,(double)p);
+                  }
+               }
+               break;
+         }
+
+      }
    }
 
-   size_t p = 0;
-
-   if (dim == 2) {
-      if (dir == 0) {
-         p = j - min_unknown_index(1);
-      } else if (dir == 1) {
-         p = j - min_unknown_index(0);
-      }
-   } else if (dim == 3) {
-      if (dir == 0) {
-         p = (j - min_unknown_index(1))
-           + (1 + max_unknown_index(1) - min_unknown_index(1))
-           *(k-min_unknown_index(2));
-      } else if (dir == 1) {
-         p = (j - min_unknown_index(0))
-           + (1 + max_unknown_index(0) - min_unknown_index(0))
-           *(k-min_unknown_index(2));
-      } else if (dir == 2) {
-         p = (j - min_unknown_index(0))
-           + (1 + max_unknown_index(0) - min_unknown_index(0))
-           *(k-min_unknown_index(1));
-      }
-   }
-
-   return(p);
 }
+
+
+
 
 // //---------------------------------------------------------------------------
 // double
@@ -2896,15 +2917,17 @@ DDS_NavierStokes:: assemble_1D_matrices ( FV_TimeIterator const* t_it )
                local_max_k = max_unknown_index(dir_k);
             }
 
+            LA_SeqMatrix* row_index = GLOBAL_EQ->get_row_indexes(field,dir,comp);
+
             for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
                for (size_t k=local_min_k; k <= local_max_k; ++k) {
                   size_t r_index;
                   double Aee_diagcoef;
                   if (field == 0) {
-                     r_index = return_row_index (PF,comp,dir,j,k);
+                     r_index = row_index->item(j,k);
                      Aee_diagcoef = assemble_field_matrix (PF,t_it,gamma,comp,dir,0,j,k,r_index);
                   } else if (field == 1) {
-                     r_index = return_row_index (UF,comp,dir,j,k);
+                     r_index = row_index->item(j,k);
                      Aee_diagcoef = assemble_field_matrix (UF,t_it,gamma,comp,dir,1,j,k,r_index);
                   }
                   TDMatrix* A = GLOBAL_EQ-> get_A(field);
@@ -7043,12 +7066,13 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* 
 
      LocalVector* VEC = GLOBAL_EQ->get_VEC(field) ;
      TDMatrix* A = GLOBAL_EQ->get_A(field);
+     LA_SeqMatrix* row_index = GLOBAL_EQ->get_row_indexes(field,dir_i,comp);
 
      // Solve in i
      if ((nb_ranks_comm_i[dir_i]>1)||(is_periodic[field][dir_i] == 1)) {
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
-              size_t r_index = return_row_index (FF,comp,dir_i,j,k);
+              size_t r_index = row_index->item(j,k);
               // Assemble fi and return fe for each proc locally
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i,field);
               // Calculate Aei*ui in each proc locally
@@ -7062,7 +7086,7 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF, FV_TimeIterator const* 
      } else if (is_periodic[field][dir_i] == 0) {  // Serial mode with non-periodic condition
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
-              size_t r_index = return_row_index (FF,comp,dir_i,j,k);
+              size_t r_index = row_index->item(j,k);
               assemble_local_rhs(j,k,gamma,t_it,comp,dir_i,field);
               GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir_i),comp,dir_i,field,r_index);
            }

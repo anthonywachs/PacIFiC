@@ -204,6 +204,9 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    for (size_t field = 0; field < 2; field++) {
 
       for (size_t dir = 0; dir < dim; dir++) {
+			// Local vector to store the row index
+			row_index[field][dir] = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+
          // Spacial discretization matrices
          A[field][dir].ii_main = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
          A[field][dir].ii_super = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
@@ -277,6 +280,8 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
             } else if (dir == 2) {
                nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
             }
+
+				row_index[field][dir][comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
 
             A[field][dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
             A[field][dir].ii_super[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
@@ -430,6 +435,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
 	divergence[1].div->re_initialize( pf_loc ) ;
 	divergence[2].div->re_initialize( pf_loc ) ;
 
+	// Vectors to store void fractions and intersection information
 	if (is_solids) {
 		node[0][0].void_frac->re_initialize( pf_loc ) ;
 		node[0][0].parID->re_initialize( pf_loc ) ;
@@ -446,12 +452,12 @@ DDS_NavierStokesSystem:: re_initialize( void )
 
 		for (size_t i=0;i<dim;i++) {
 			for (size_t j=0;j<2;j++) {
-				b_intersect[0][j][i].offset->re_initialize( pf_loc,2 ) ;      // Column0 for left and Column1 for right
-				b_intersect[0][j][i].value->re_initialize( pf_loc,2 ) ;      // Column0 for left and Column1 for right
-				b_intersect[0][j][i].field_var->re_initialize( pf_loc,2 ) ;      // Column0 for left and Column1 for right
-				b_intersect[1][j][i].offset->re_initialize( UF_loc,2 ) ;      // Column0 for left and Column1 for right
-				b_intersect[1][j][i].value->re_initialize( UF_loc,2 ) ;      // Column0 for left and Column1 for right
-				b_intersect[1][j][i].field_var->re_initialize( UF_loc,2 ) ;      // Column0 for left and Column1 for right
+				b_intersect[0][j][i].offset->re_initialize( pf_loc,2 ) ;
+				b_intersect[0][j][i].value->re_initialize( pf_loc,2 ) ;
+				b_intersect[0][j][i].field_var->re_initialize( pf_loc,2 ) ;
+				b_intersect[1][j][i].offset->re_initialize( UF_loc,2 ) ;
+				b_intersect[1][j][i].value->re_initialize( UF_loc,2 ) ;
+				b_intersect[1][j][i].field_var->re_initialize( UF_loc,2 ) ;
 			}
 		}
 	}
@@ -465,7 +471,7 @@ DDS_NavierStokesSystem:: re_initialize( void )
          solid[level].temp->re_initialize(Npart);
          solid[level].inside->re_initialize(Npart);
          solid[level].local_parID->re_initialize(Npart);
-	 for (size_t dir=0;dir<3;dir++) {
+	 		for (size_t dir=0;dir<3;dir++) {
             hydro_forces[level].press[dir]->re_initialize(Npart);
             hydro_forces[level].vel[dir]->re_initialize(Npart);
             hydro_torque[level].press[dir]->re_initialize(Npart);
@@ -473,28 +479,28 @@ DDS_NavierStokesSystem:: re_initialize( void )
             solid[level].coord[dir]->re_initialize(Npart);
             solid[level].vel[dir]->re_initialize(Npart);
             solid[level].ang_vel[dir]->re_initialize(Npart);
-	 }
+	 		}
       }
    }
 
    if (is_solids && is_stressCal) {
       if (dim == 3) {
-	 if (level_set_type == "Sphere") {
-	    Nmax = 2*Nmax;
-	 } else if (level_set_type == "Cube") {
+	 		if (level_set_type == "Sphere") {
+	    		Nmax = 2*Nmax;
+	 		} else if (level_set_type == "Cube") {
             Nmax = 6*pow(Nmax,2);
- 	 } else if (level_set_type == "Cylinder") {
+ 	 		} else if (level_set_type == "Cylinder") {
             double Npm1 = round(pow(MAC::sqrt(Nmax) - MAC::sqrt(MAC::pi()/ar),2.));
             double dh = 1. - MAC::sqrt(Npm1/Nmax);
             double Nr = round(2./dh);
-	    Nmax = (2*Nmax + Nr*(Nmax - Npm1));
-	 }
+	    		Nmax = (2*Nmax + Nr*(Nmax - Npm1));
+	 		}
       } else {
-	 if (level_set_type == "Sphere") {
-	    Nmax = Nmax;
-	 } else if (level_set_type == "Cube") {
+	 		if (level_set_type == "Sphere") {
+	    		Nmax = Nmax;
+ 			} else if (level_set_type == "Cube") {
             Nmax = 4*Nmax;
-	 }
+	 		}
       }
 
       surface.coordinate[0]->re_initialize((size_t)Nmax);
@@ -533,17 +539,25 @@ DDS_NavierStokesSystem:: re_initialize( void )
             if (l == 0) {
                if (dim == 2) {
                   nb_index = nb_unknowns_handled_by_proc(1);
+						row_index[field][l][comp]->re_initialize(nb_dof_on_proc(1),1);
                } else if (dim == 3) {
                   nb_index = nb_unknowns_handled_by_proc(1)*nb_unknowns_handled_by_proc(2);
+						row_index[field][l][comp]->re_initialize(nb_dof_on_proc(1)
+																			 ,nb_dof_on_proc(2));
                }
             } else if (l == 1) {
                if (dim == 2) {
                   nb_index = nb_unknowns_handled_by_proc(0);
+						row_index[field][l][comp]->re_initialize(nb_dof_on_proc(0),1);
                } else if (dim == 3) {
                   nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(2);
+						row_index[field][l][comp]->re_initialize(nb_dof_on_proc(0)
+																			 ,nb_dof_on_proc(2));
                }
             } else if (l == 2) {
                nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
+					row_index[field][l][comp]->re_initialize(nb_dof_on_proc(0)
+																		 ,nb_dof_on_proc(1));
             }
 
             nb_procs = nb_procs_in_i[l];
@@ -677,9 +691,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
                   Pfresh[level].sep_vel->re_initialize( nb_total_unknown ) ;
                   for (size_t dir=0;dir<3;dir++) {
                      Pfresh[level].neigh[dir]->re_initialize( nb_total_unknown ) ;
-		  }
-	       }
-	    }
+		  				}
+	       		}
+	    		}
          }
       }
    }
@@ -916,6 +930,20 @@ DDS_NavierStokesSystem::get_node_divergence()
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_node_divergence" ) ;
    return (divergence) ;
+}
+
+
+
+
+//----------------------------------------------------------------------
+LA_SeqMatrix*
+DDS_NavierStokesSystem::get_row_indexes(size_t const& field
+											     , size_t const& dir
+												  , size_t const& comp )
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DDS_NavierStokesSystem:: get_row_index" ) ;
+   return (row_index[field][dir][comp]) ;
 }
 
 

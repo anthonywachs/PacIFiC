@@ -175,6 +175,8 @@ public SolverComputingTime
 
       void assemble_velocity_diffusion_terms ( );
 
+      void calculate_row_indexes ( FV_DiscreteField const* FF);
+
       double divergence_of_U( size_t const& i, size_t const& j, size_t const& k, size_t const& component, size_t const& level);
 
       /** @brief Call functions to assemble rhs for pressure or velocity fields in any direction */
@@ -193,7 +195,6 @@ public SolverComputingTime
 
       void update_particle_system(FV_TimeIterator const* t_it);
 
-      size_t return_row_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
       double return_divergence_weighting (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k, FV_TimeIterator const* t_it );
 
       void Solids_generation ( );

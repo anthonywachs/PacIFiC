@@ -204,6 +204,10 @@ class DDS_NavierStokesSystem : public MAC_Object
       DivNode* get_node_divergence();
       /** @brief Return the velocity diffusive terms */
       LA_SeqVector** get_velocity_diffusion();
+      /** @brief Return the local vector with a vector of row index */
+      LA_SeqMatrix* get_row_indexes(size_t const& field
+                                  , size_t const& dir
+                                  , size_t const& comp);
       /** @brief Return information of intersection with solid boundary */
       BoundaryBisec* get_b_intersect(size_t const& field, size_t const& level);
 
@@ -312,6 +316,11 @@ class DDS_NavierStokesSystem : public MAC_Object
 
       // Local vector to store diffusive terms
       LA_SeqVector * vel_diff_loc[3] ;
+
+      // Local vector to store row indexes for each
+      // field (i.e. 2)
+      // and direction (i.e. 3)
+      LA_SeqMatrix ** row_index[2][3] ;
 
       // Unknowns numbering
       FV_SystemNumbering* UF_NUM ;
