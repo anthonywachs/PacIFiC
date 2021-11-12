@@ -1699,19 +1699,11 @@ DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<dou
      omega(m) = solid.ang_vel[m]->item(parID);
      linear_vel(m) = solid.vel[m]->item(parID);
   }
-/*
-  net_vel[0] = pow(grid_coord(0),4) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4);
-  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3);
-  net_vel[2] = 0.;
-  net_vel[0] = pow(grid_coord(0),1) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4)*pow(grid_coord(2),3);
-  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3)*pow(grid_coord(2),2);
-  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2.)*pow(grid_coord(0)+grid_coord(2),2.)*pow(grid_coord(2)+grid_coord(1),2.);*/
+
   net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
-/*  net_vel[0] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1));
-  net_vel[1] = MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
-  net_vel[2] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(2));*/
+
 }
 
 //---------------------------------------------------------------------------
@@ -1745,19 +1737,11 @@ DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel, siz
      omega(m) = solid.ang_vel[m]->item(parID);
      linear_vel(m) = solid.vel[m]->item(parID);
   }
-/*
-  net_vel[0] = pow(grid_coord(0),4) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4);
-  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3);
-  net_vel[2] = 0.;
-  net_vel[0] = pow(grid_coord(0),1) + pow(grid_coord(0),2)*grid_coord(1) + pow(grid_coord(1),4)*pow(grid_coord(2),3);
-  net_vel[1] = pow(grid_coord(0),4)*pow(grid_coord(1),3)*pow(grid_coord(2),2);
-  net_vel[2] = pow(grid_coord(0)+grid_coord(1),2.)*pow(grid_coord(0)+grid_coord(2),2.)*pow(grid_coord(2)+grid_coord(1),2.);*/
+
   net_vel[0] = linear_vel(0) + omega(1)*delta(2) - omega(2)*delta(1);
   net_vel[1] = linear_vel(1) + omega(2)*delta(0) - omega(0)*delta(2);
   net_vel[2] = linear_vel(2) + omega(0)*delta(1) - omega(1)*delta(0);
-/*  net_vel[0] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1));
-  net_vel[1] = MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
-  net_vel[2] = MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(2));*/
+
 }
 
 
