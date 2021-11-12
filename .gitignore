@@ -47,6 +47,9 @@ Cartesian/MacWorld/Env/macworld-*.env.sh
 # Folders
 Cartesian/MacWorld/hypre-2.10.1/*
 Cartesian/MacWorld/petsc-3.2.0-p7/*
+Cartesian/FLUID/lib
+Cartesian/MacWorld/MAC/lib
+Cartesian/MacWorld/MAC/etc
 GRAINS/Main/bin64*
 GRAINS/diffGrains*
 GRAINS/Archives*
