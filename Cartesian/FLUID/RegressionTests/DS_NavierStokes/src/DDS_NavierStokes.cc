@@ -2139,6 +2139,18 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF)
   node.void_frac->nullify();
   node.parID->nullify();
 
+  // Clearing the matrices to store new time step value
+  BoundaryBisec* b_intersect0 = GLOBAL_EQ->get_b_intersect(field,0);
+  BoundaryBisec* b_intersect1 = GLOBAL_EQ->get_b_intersect(field,1);
+  for (size_t dir=0;dir<dim;dir++) {
+     b_intersect0[dir].offset->nullify();
+     b_intersect0[dir].value->nullify();
+     b_intersect0[dir].field_var->nullify();
+     b_intersect1[dir].offset->nullify();
+     b_intersect1[dir].value->nullify();
+     b_intersect1[dir].field_var->nullify();
+  }
+
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices;
      // Calculation on the rows next to the unknown (i.e. not handled by the proc) as well
@@ -2194,7 +2206,10 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF)
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, size_t const& comp, size_t const& level, size_t const& field)
+DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF
+                                                , size_t const& comp
+                                                , size_t const& level
+                                                , size_t const& field)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: assemble_intersection_matrix" ) ;
@@ -2212,7 +2227,8 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,level);
 
   for (size_t l=0;l<dim;++l) {
-     // To include knowns at dirichlet boundary in the intersection calculation as well, important in cases where the particle is close to domain boundary pow(2,64)
+     // To include knowns at dirichlet boundary in the intersection calculation
+     // as well, modification to the looping extents are required
      min_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) ;
      max_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) ;
      // min_index(l) = 0 ;
@@ -2223,13 +2239,6 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
 
   size_t local_min_k = (dim == 2) ? 0 : min_index(2) ;
   size_t local_max_k = (dim == 2) ? 1 : max_index(2);
-
-  // Clearing the matrices to store new time step value
-  for (size_t dir=0;dir<dim;dir++) {
-     b_intersect[dir].offset->nullify();
-     b_intersect[dir].value->nullify();
-     b_intersect[dir].field_var->nullify();
-  }
 
   for (size_t i=min_index(0);i<max_index(0);++i) {
      ipos(0) = i - min_index(0);
@@ -2247,14 +2256,6 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
            }
 
            if (node.void_frac->item(p) != center_void_frac) {
-              node_neigh(0,0) = FF->DOF_local_number(i-1,j,k,comp);
-              node_neigh(0,1) = FF->DOF_local_number(i+1,j,k,comp);
-              node_neigh(1,0) = FF->DOF_local_number(i,j-1,k,comp);
-              node_neigh(1,1) = FF->DOF_local_number(i,j+1,k,comp);
-              node_neigh(2,0) = (dim == 3) ? FF->DOF_local_number(i,j,k-1,comp)
-                                           : 0 ;
-              node_neigh(2,1) = (dim == 3) ? FF->DOF_local_number(i,j,k+1,comp)
-                                           : 0 ;
 
               for (size_t dir=0;dir<dim;dir++) {
                  size_t ii,jj,kk;
@@ -2275,6 +2276,21 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF, si
                           left = ii-1; right = ii;
                        } else if (off == 1) {
                           left = ii; right = ii+1;
+                       }
+
+                       switch (dir) {
+                          case 0:
+                             node_neigh(dir,off) = (off == 0) ? FF->DOF_local_number(left,j,k,comp)
+                                                              : FF->DOF_local_number(right,j,k,comp);
+                             break;
+                          case 1:
+                             node_neigh(dir,off) = (off == 0) ? FF->DOF_local_number(i,left,k,comp)
+                                                              : FF->DOF_local_number(i,right,k,comp);
+                             break;
+                          case 2:
+                             node_neigh(dir,off) = (off == 0) ? FF->DOF_local_number(i,j,left,comp)
+                                                              : FF->DOF_local_number(i,j,right,comp);
+                             break;
                        }
 
                        if (node.void_frac->item(node_neigh(dir,off)) != node.void_frac->item(p)) {
