@@ -203,11 +203,8 @@ public SolverComputingTime
 
       void node_property_calculation (FV_DiscreteField const* FF );
 
-      size_t return_node_index (FV_DiscreteField const* FF, size_t const& comp, size_t const& i, size_t const& j, size_t const& k );
-
       double level_set_function (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field);
 
-      double level_set_derivative (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field, size_t const& partial_dir);
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */
       void assemble_intersection_matrix (FV_DiscreteField const* FF, size_t const& comp, size_t const& level, size_t const& field);               // Here level:0 -> fluid; 1-> solid
 

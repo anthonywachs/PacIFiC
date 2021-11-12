@@ -1322,12 +1322,15 @@ DDS_NavierStokes:: return_row_index (
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
+
    for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+      min_unknown_index(l) =
+                        FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+      max_unknown_index(l) =
+                        FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
    }
 
-   size_t p=0;
+   size_t p = 0;
 
    if (dim == 2) {
       if (dir == 0) {
@@ -1337,11 +1340,17 @@ DDS_NavierStokes:: return_row_index (
       }
    } else if (dim == 3) {
       if (dir == 0) {
-         p = (j-min_unknown_index(1))+(1+max_unknown_index(1)-min_unknown_index(1))*(k-min_unknown_index(2));
+         p = (j - min_unknown_index(1))
+           + (1 + max_unknown_index(1) - min_unknown_index(1))
+           *(k-min_unknown_index(2));
       } else if (dir == 1) {
-         p = (j-min_unknown_index(0))+(1+max_unknown_index(0)-min_unknown_index(0))*(k-min_unknown_index(2));
+         p = (j - min_unknown_index(0))
+           + (1 + max_unknown_index(0) - min_unknown_index(0))
+           *(k-min_unknown_index(2));
       } else if (dir == 2) {
-         p = (j-min_unknown_index(0))+(1+max_unknown_index(0)-min_unknown_index(0))*(k-min_unknown_index(1));
+         p = (j - min_unknown_index(0))
+           + (1 + max_unknown_index(0) - min_unknown_index(0))
+           *(k-min_unknown_index(1));
       }
    }
 
@@ -1420,36 +1429,6 @@ DDS_NavierStokes:: return_row_index (
 // }
 
 //---------------------------------------------------------------------------
-size_t
-DDS_NavierStokes:: return_node_index (
-  FV_DiscreteField const* FF,
-  size_t const& comp,
-  size_t const& i,
-  size_t const& j,
-  size_t const& k )
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokes:: return_node_index" ) ;
-
-   // Get local min and max indices
-   size_t_vector min_index(dim,0);
-   size_t_vector max_index(dim,0);
-   size_t_vector i_length(dim,0);
-   for (size_t l=0;l<dim;++l) {
-      min_index(l) = 0;
-      max_index(l) = FF->get_local_nb_dof( comp, l );
-      i_length(l) = 1 + max_index(l) - min_index(l);
-   }
-
-   size_t local_min_k = (dim == 3) ? min_index(2) : 0;
-
-   size_t p = (j-min_index(1)) + i_length(1)*(i-min_index(0)) + i_length(0)*i_length(1)*(k-local_min_k);
-
-   return(p);
-
-}
-
-//---------------------------------------------------------------------------
 double
 DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field)
 //---------------------------------------------------------------------------
@@ -1523,78 +1502,7 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
 
 }
 
-//---------------------------------------------------------------------------
-double
-DDS_NavierStokes:: level_set_derivative (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field, size_t const& partial_dir)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NavierStokes:: level_set_derivative" ) ;
 
-  PartInput solid = GLOBAL_EQ->get_solid(0);
-
-  double xp = solid.coord[0]->item(m);
-  double yp = solid.coord[1]->item(m);
-  double zp = solid.coord[2]->item(m);
-//  double Rp = solid.size[comp]->item(m);
-
-  doubleVector delta(3,0);
-  doubleVector derivative(3,0);
-
-  delta(0) = xC-xp;
-  delta(1) = yC-yp;
-  delta(2) = 0;
-  if (dim == 3) delta(2) = zC-zp;
-
-  // Displacement correction in case of periodic boundary condition in any or all directions
-  for (size_t dir=0;dir<dim;dir++) {
-     if (is_periodic[field][dir]) {
-        double isize = FF->primary_grid()->get_main_domain_max_coordinate(dir) - FF->primary_grid()->get_main_domain_min_coordinate(dir);
-        delta(dir) = delta(dir) - round(delta(dir)/isize)*isize;
-     }
-  }
-
-  // Try to add continuous level set function; solver performs better in this case for nodes at interface
-  if (type == "Sphere") {
-     derivative(0) = delta(0)/pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5);
-     derivative(1) = delta(1)/pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5);
-     if (dim == 3) derivative(2) = delta(2)/pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5);
-/*  } else if (type == "Ellipsoid") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta,comp,field);
-     level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
-  } else if (type == "Superquadric") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta,comp,field);
-     level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
-  } else if (type == "PipeX") {
-     level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
-  } else if (type == "Cube") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta,comp,field);
-     delta(0) = MAC::abs(delta(0)) - Rp;
-     delta(1) = MAC::abs(delta(1)) - Rp;
-     delta(2) = MAC::abs(delta(2)) - Rp;
-
-     if ((delta(0) < 0.) && (delta(1) < 0.) && (delta(2) < 0.)) {
-        level_set = MAC::min(delta(0),MAC::min(delta(1),delta(2)));
-     } else {
-        level_set = MAC::max(delta(0),MAC::max(delta(1),delta(2)));
-     }
-  } else if (type == "Cylinder") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta,comp,field);
-
-     level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
-     if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
-	level_set = MAC::abs(MAC::abs(delta(2))-Rp)*level_set;
-     } else {
-	level_set = MAC::max(MAC::abs(MAC::abs(delta(2))-Rp),MAC::abs(level_set));
-     }*/
-  }
-
-  return(derivative(partial_dir));
-
-}
 
 
 //---------------------------------------------------------------------------
@@ -2431,71 +2339,43 @@ DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const&
   if (funl*funr > 0.) {
      xcenter = FF->get_DOF_coordinate( side(off), comp, dir ) ;
   } else {
-     if (IntersectionMethod == "Bisection") {
-        // Bisection method algorithm
-	    double eps = MAC::abs(xright-xleft);
-       double xcenter_old = eps/2.;
-       size_t max_iter = 500, iter = 0;
-        while ((eps > tolerance) && (iter < max_iter)) {
-           xcenter = (xleft+xright)/2.;
+     // Bisection method algorithm
+     double eps = MAC::abs(xright-xleft);
+     double xcenter_old = eps/2.;
+     size_t max_iter = 500, iter = 0;
+     while ((eps > tolerance) && (iter < max_iter)) {
+        xcenter = (xleft+xright)/2.;
 
-	   if (MAC::abs(xcenter_old) > 1.e-12) {
-	      eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
-	   } else {
-	      eps = MAC::abs(xcenter - xcenter_old);
-	   }
+	     if (MAC::abs(xcenter_old) > 1.e-12) {
+	        eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
+        } else {
+	        eps = MAC::abs(xcenter - xcenter_old);
+	     }
 
-     if (dir == 0) {
-        funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-        func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
-     } else if (dir == 1) {
-        funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-        func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
-     } else if (dir == 2) {
-        funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-        func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
-     }
+        if (dir == 0) {
+           funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+           func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
+        } else if (dir == 1) {
+           funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+           func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
+        } else if (dir == 2) {
+           funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+           func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
+        }
 
-	   iter = iter + 1;
-           if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
+        iter = iter + 1;
 
-           if (func*funl >= 1.E-16) {
-              xleft = xcenter;
-           } else if (func == 1.E-16) {
-	      break;
-	   } else {
-              xright = xcenter;
-           }
+        if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
 
-	   xcenter_old = xcenter;
-	}
-     } else if (IntersectionMethod == "Newton") {
-	// Apr 21: Just implemented, not tested
-	// Newton-Rapson method
-	double eps = MAC::abs(xright-xleft);
-	double xright_old = xright;
-        while (eps > tolerance) {
-           if (dir == 0) {
-              xright = xleft - level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field) /
-	                       level_set_derivative(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field,dir) ;
-	   } else if (dir == 1) {
-              xright = xleft - level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field) /
-	                       level_set_derivative(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field,dir) ;
-	   } else if (dir == 2) {
-              xright = xleft - level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field) /
-	                       level_set_derivative(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field,dir) ;
-	   }
+        if (func*funl >= 1.E-16) {
+           xleft = xcenter;
+        } else if (func == 1.E-16) {
+           break;
+        } else {
+           xright = xcenter;
+        }
 
-	   if (MAC::abs(xright_old) > 1.e-12) {
-	      eps = MAC::abs(xright - xright_old)/MAC::abs(xright_old);
-	   } else {
-	      eps = MAC::abs(xright - xright_old);
-	   }
-
-	   xleft = xright;
-	   xright_old = xright;
-	}
-	xcenter = xleft;
+        xcenter_old = xcenter;
      }
   }
 
@@ -2566,73 +2446,43 @@ DDS_NavierStokes:: find_intersection_for_ghost ( FV_DiscreteField const* FF, dou
   if (funl*funr > 0.) {
      xcenter = side(off) ;
   } else {
-     if (IntersectionMethod == "Bisection") {
-        // Bisection method algorithm
-	double eps = MAC::abs(xright-xleft);
-	double xcenter_old = eps/2.;
-	size_t max_iter = 500, iter = 0;
-        while ((eps > tolerance) && (iter < max_iter)) {
-           xcenter = (xleft+xright)/2.;
+     // Bisection method algorithm
+     double eps = MAC::abs(xright-xleft);
+     double xcenter_old = eps/2.;
+     size_t max_iter = 500, iter = 0;
+     while ((eps > tolerance) && (iter < max_iter)) {
+        xcenter = (xleft+xright)/2.;
 
-	   if (MAC::abs(xcenter_old) > 1.e-12) {
-	      eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
-	   } else {
-	      eps = MAC::abs(xcenter - xcenter_old);
-	   }
+        if (MAC::abs(xcenter_old) > 1.e-12) {
+	        eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
+        } else {
+           eps = MAC::abs(xcenter - xcenter_old);
+        }
 
-           if (dir == 0) {
-              funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-              func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
-           } else if (dir == 1) {
-              funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-              func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
-           } else if (dir == 2) {
-              funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-              func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
-           }
+        if (dir == 0) {
+           funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+           func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
+        } else if (dir == 1) {
+           funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+           func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
+        } else if (dir == 2) {
+           funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+           func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
+        }
 
-	   iter = iter + 1;
-           if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
+        iter = iter + 1;
+        if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
 
-           if (func*funl >= 1.E-16) {
-              xleft = xcenter;
-           } else if (func == 1.E-16) {
-	      break;
-	   } else {
-              xright = xcenter;
-           }
+        if (func*funl >= 1.E-16) {
+           xleft = xcenter;
+        } else if (func == 1.E-16) {
+           break;
+        } else {
+           xright = xcenter;
+        }
 
-	   xcenter_old = xcenter;
-	}
-     } else if (IntersectionMethod == "Newton") {
-	// Apr 21: Just implemented, not tested
-	// Newton-Rapson method
-	double eps = MAC::abs(xright-xleft);
-	double xright_old = xright;
-        while (eps > tolerance) {
-           if (dir == 0) {
-              xright = xleft - level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field) /
-	                       level_set_derivative(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field,dir) ;
-	   } else if (dir == 1) {
-              xright = xleft - level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field) /
-	                       level_set_derivative(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field,dir) ;
-	   } else if (dir == 2) {
-              xright = xleft - level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field) /
-	                       level_set_derivative(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field,dir) ;
-	   }
-
-	   if (MAC::abs(xright_old) > 1.e-12) {
-	      eps = MAC::abs(xright - xright_old)/MAC::abs(xright_old);
-	   } else {
-	      eps = MAC::abs(xright - xright_old);
-	   }
-
-	   xleft = xright;
-	   xright_old = xright;
-	}
-	xcenter = xleft;
+        xcenter_old = xcenter;
      }
-
   }
 
   if (off == 0) {
@@ -3188,126 +3038,130 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
 
    size_t p = UF->DOF_local_number(i,j,k,comp);
 
-   if (dir == 0) {
-      if (UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
-         xright = UF->DOF_value( i+1, j, k, comp, level )
-                - UF->DOF_value( i, j, k, comp, level ) ;
-         xhr = UF->get_DOF_coordinate( i+1,comp, 0 )
-             - UF->get_DOF_coordinate( i, comp, 0 ) ;
-      }
-
-      if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)) {
-         xleft = UF->DOF_value( i, j, k, comp, level )
-               - UF->DOF_value( i-1, j, k, comp, level ) ;
-         xhl = UF->get_DOF_coordinate( i, comp, 0 )
-             - UF->get_DOF_coordinate( i-1, comp, 0 ) ;
-      }
-
-      if (is_solids) {
-         if (node.void_frac->item(p) == 0) {
-            if ((b_intersect[dir].offset->item(p,0) == 1)) {
-               xleft = UF->DOF_value( i, j, k, comp, level )
-                     - b_intersect[dir].field_var->item(p,0);
-               xhl = b_intersect[dir].value->item(p,0);
-            }
-            if ((b_intersect[dir].offset->item(p,1) == 1)) {
-               xright = b_intersect[dir].field_var->item(p,1)
-                      - UF->DOF_value( i, j, k, comp, level );
-               xhr = b_intersect[dir].value->item(p,1);
-            }
-         } else {
-            xright = 0.; xleft = 0.;
+   switch (dir) {
+      case 0:
+         if (UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
+            xright = UF->DOF_value( i+1, j, k, comp, level )
+                   - UF->DOF_value( i, j, k, comp, level ) ;
+            xhr = UF->get_DOF_coordinate( i+1,comp, 0 )
+                - UF->get_DOF_coordinate( i, comp, 0 ) ;
          }
-      }
 
-      //xvalue = xright/xhr - xleft/xhl;
-      if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)
-         && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp))
-         value = xright/xhr - xleft/xhl;
-      else if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp))
-         value = - xleft/xhl;
-      else
-         value = xright/xhr;
-   } else if (dir == 1) {
-      if (UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
-         yright = UF->DOF_value( i, j+1, k, comp, level )
-                - UF->DOF_value( i, j, k, comp, level ) ;
-         yhr = UF->get_DOF_coordinate( j+1,comp, 1 )
-             - UF->get_DOF_coordinate( j, comp, 1 ) ;
-      }
-
-      if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)) {
-         yleft = UF->DOF_value( i, j, k, comp, level )
-               - UF->DOF_value( i, j-1, k, comp, level ) ;
-         yhl = UF->get_DOF_coordinate( j, comp, 1 )
-             - UF->get_DOF_coordinate( j-1, comp, 1 ) ;
-      }
-
-      if (is_solids) {
-         if (node.void_frac->item(p) == 0) {
-            if ((b_intersect[dir].offset->item(p,0) == 1)) {
-               yleft = UF->DOF_value( i, j, k, comp, level )
-                     - b_intersect[dir].field_var->item(p,0);
-               yhl = b_intersect[dir].value->item(p,0);
-            }
-            if ((b_intersect[dir].offset->item(p,1) == 1)) {
-               yright = b_intersect[dir].field_var->item(p,1)
-                      - UF->DOF_value( i, j, k, comp, level );
-               yhr = b_intersect[dir].value->item(p,1);
-            }
-         } else {
-            yleft = 0.; yright = 0.;
+         if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)) {
+            xleft = UF->DOF_value( i, j, k, comp, level )
+                  - UF->DOF_value( i-1, j, k, comp, level ) ;
+            xhl = UF->get_DOF_coordinate( i, comp, 0 )
+                - UF->get_DOF_coordinate( i-1, comp, 0 ) ;
          }
-      }
 
-      //yvalue = yright/yhr - yleft/yhl;
-      if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)
-         && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp))
-         value = yright/yhr - yleft/yhl;
-      else if(UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp))
-         value = - yleft/yhl;
-      else
-         value = yright/yhr;
-   } else if (dir == 2) {
-      if (UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
-         zright = UF->DOF_value( i, j, k+1, comp, level )
-                - UF->DOF_value( i, j, k, comp, level ) ;
-         zhr = UF->get_DOF_coordinate( k+1,comp, 2 )
-             - UF->get_DOF_coordinate( k, comp, 2 ) ;
-      }
-
-      if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
-         zleft = UF->DOF_value( i, j, k, comp, level )
-               - UF->DOF_value( i, j, k-1, comp, level ) ;
-         zhl = UF->get_DOF_coordinate( k, comp, 2 )
-             - UF->get_DOF_coordinate( k-1, comp, 2 ) ;
-      }
-
-      if (is_solids) {
-         if (node.void_frac->item(p) == 0) {
-            if ((b_intersect[dir].offset->item(p,0) == 1)) {
-               zleft = UF->DOF_value( i, j, k, comp, level )
-                     - b_intersect[dir].field_var->item(p,0);
-               zhl = b_intersect[dir].value->item(p,0);
+         if (is_solids) {
+            if (node.void_frac->item(p) == 0) {
+               if ((b_intersect[dir].offset->item(p,0) == 1)) {
+                  xleft = UF->DOF_value( i, j, k, comp, level )
+                        - b_intersect[dir].field_var->item(p,0);
+                  xhl = b_intersect[dir].value->item(p,0);
+               }
+               if ((b_intersect[dir].offset->item(p,1) == 1)) {
+                  xright = b_intersect[dir].field_var->item(p,1)
+                         - UF->DOF_value( i, j, k, comp, level );
+                  xhr = b_intersect[dir].value->item(p,1);
+               }
+            } else {
+               xright = 0.; xleft = 0.;
             }
-            if ((b_intersect[dir].offset->item(p,1) == 1)) {
-               zright = b_intersect[dir].field_var->item(p,1)
-                      - UF->DOF_value( i, j, k, comp, level );
-               zhr = b_intersect[dir].value->item(p,1);
-            }
-         } else {
-            zleft = 0.; zright = 0.;
          }
-      }
 
-      //zvalue = zright/zhr - zleft/zhl;
-      if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)
-         && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp))
-         value = zright/zhr - zleft/zhl;
-      else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp))
-         value = - zleft/zhl;
-      else
-         value = zright/zhr;
+         //xvalue = xright/xhr - xleft/xhl;
+         if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)
+            && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp))
+            value = xright/xhr - xleft/xhl;
+         else if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp))
+            value = - xleft/xhl;
+         else
+            value = xright/xhr;
+         break;
+      case 1:
+         if (UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
+            yright = UF->DOF_value( i, j+1, k, comp, level )
+                   - UF->DOF_value( i, j, k, comp, level ) ;
+            yhr = UF->get_DOF_coordinate( j+1,comp, 1 )
+                - UF->get_DOF_coordinate( j, comp, 1 ) ;
+         }
+
+         if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)) {
+            yleft = UF->DOF_value( i, j, k, comp, level )
+                  - UF->DOF_value( i, j-1, k, comp, level ) ;
+            yhl = UF->get_DOF_coordinate( j, comp, 1 )
+                - UF->get_DOF_coordinate( j-1, comp, 1 ) ;
+         }
+
+         if (is_solids) {
+            if (node.void_frac->item(p) == 0) {
+               if ((b_intersect[dir].offset->item(p,0) == 1)) {
+                  yleft = UF->DOF_value( i, j, k, comp, level )
+                        - b_intersect[dir].field_var->item(p,0);
+                  yhl = b_intersect[dir].value->item(p,0);
+               }
+               if ((b_intersect[dir].offset->item(p,1) == 1)) {
+                  yright = b_intersect[dir].field_var->item(p,1)
+                         - UF->DOF_value( i, j, k, comp, level );
+                  yhr = b_intersect[dir].value->item(p,1);
+               }
+            } else {
+               yleft = 0.; yright = 0.;
+            }
+         }
+
+         //yvalue = yright/yhr - yleft/yhl;
+         if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)
+            && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp))
+            value = yright/yhr - yleft/yhl;
+         else if(UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp))
+            value = - yleft/yhl;
+         else
+            value = yright/yhr;
+         break;
+      case 2:
+         if (UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
+            zright = UF->DOF_value( i, j, k+1, comp, level )
+                   - UF->DOF_value( i, j, k, comp, level ) ;
+            zhr = UF->get_DOF_coordinate( k+1,comp, 2 )
+                - UF->get_DOF_coordinate( k, comp, 2 ) ;
+         }
+
+         if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
+            zleft = UF->DOF_value( i, j, k, comp, level )
+                  - UF->DOF_value( i, j, k-1, comp, level ) ;
+            zhl = UF->get_DOF_coordinate( k, comp, 2 )
+                - UF->get_DOF_coordinate( k-1, comp, 2 ) ;
+         }
+
+         if (is_solids) {
+            if (node.void_frac->item(p) == 0) {
+               if ((b_intersect[dir].offset->item(p,0) == 1)) {
+                  zleft = UF->DOF_value( i, j, k, comp, level )
+                        - b_intersect[dir].field_var->item(p,0);
+                  zhl = b_intersect[dir].value->item(p,0);
+               }
+               if ((b_intersect[dir].offset->item(p,1) == 1)) {
+                  zright = b_intersect[dir].field_var->item(p,1)
+                         - UF->DOF_value( i, j, k, comp, level );
+                  zhr = b_intersect[dir].value->item(p,1);
+               }
+            } else {
+               zleft = 0.; zright = 0.;
+            }
+         }
+
+         //zvalue = zright/zhr - zleft/zhl;
+         if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)
+            && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp))
+            value = zright/zhr - zleft/zhl;
+         else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp))
+            value = - zleft/zhl;
+         else
+            value = zright/zhr;
+         break;
    }
 
    return(value);
