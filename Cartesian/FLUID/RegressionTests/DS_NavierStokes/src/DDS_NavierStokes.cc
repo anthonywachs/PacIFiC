@@ -185,7 +185,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
          level_set_type = exp->string_data( "LevelSetType" );
       if ( level_set_type != "Cube" && level_set_type != "Cylinder" &&
            level_set_type != "Sphere" && level_set_type != "Ellipsoid" &&
-	   level_set_type != "PipeX" && level_set_type != "Superquadric") {
+           level_set_type != "PipeX" && level_set_type != "Superquadric") {
          string error_message="- Cube\n   - Sphere\n   - Cylinder\n   - Superquadric\n   - Ellipsoid\n   - PipeX";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
       }
@@ -239,12 +239,16 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
          ViscousStressOrder = exp->string_data( "ViscousStressOrder" );
          if ( ViscousStressOrder != "first" && ViscousStressOrder != "second") {
             string error_message="- first\n   - second";
-            MAC_Error::object()->raise_bad_data_value( exp,"ViscousStressOrder", error_message );
+            MAC_Error::object()->
+               raise_bad_data_value( exp,"ViscousStressOrder", error_message );
          }
          PressureStressOrder = exp->string_data( "PressureStressOrder" );
-         if ( PressureStressOrder != "first" && PressureStressOrder != "second" && PressureStressOrder != "second_withNeumannBC") {
+         if ( PressureStressOrder != "first"
+           && PressureStressOrder != "second"
+           && PressureStressOrder != "second_withNeumannBC") {
             string error_message="- first\n   - second\n   - second_withNeumannBC";
-            MAC_Error::object()->raise_bad_data_value( exp,"PressureStressOrder", error_message );
+            MAC_Error::object()->
+               raise_bad_data_value( exp,"PressureStressOrder", error_message );
          }
 
          Npoints = exp->double_data( "Npoints" ) ;
@@ -269,7 +273,9 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    // Advection scheme
    if ( exp->has_entry( "AdvectionScheme" ) )
      AdvectionScheme = exp->string_data( "AdvectionScheme" );
-   if ( AdvectionScheme != "Upwind" && AdvectionScheme != "TVD" && AdvectionScheme != "Centered" )
+   if ( AdvectionScheme != "Upwind"
+     && AdvectionScheme != "TVD"
+     && AdvectionScheme != "Centered" )
    {
      string error_message="   - Upwind\n   - TVD\n   - Centered";
      MAC_Error::object()->raise_bad_data_value( exp,
@@ -283,7 +289,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
         "security_bandwidth", error_message );
    }
 
-   if ( is_stressCal == true && UF->primary_grid()->get_security_bandwidth() < 4 )
+   if ( is_stressCal == true &&
+        UF->primary_grid()->get_security_bandwidth() < 4 )
    {
      string error_message="   >= 4 for correct stress calculations on solids";
      MAC_Error::object()->raise_bad_data_value( exp,
@@ -469,7 +476,8 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
          string temp_string;
 
    	   if (my_rank == 0) {
-   	      // Calls all the required function to activate GRAINS and insert particle
+   	      // Calls all the required function to
+            // activate GRAINS and insert particle
             initialize_GRAINS();
             // Storing the particle data from GRAINS in particle_info
             istringstream local_par_info;
@@ -478,7 +486,8 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    	      temp_string = local_par_info.str();
    	   }
 
-   	   // Broadcasting the particle info from root(0) to rest of the processor
+   	   // Broadcasting the particle info from
+         // root(0) to rest of the processor
    	   pelCOMM->broadcast(temp_string,0);
 
    	   // Convert string to istringstream
@@ -487,20 +496,29 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    	   import_par_info(global_par_info);
       }
 
-      if (my_rank == 0) cout << "Finished particle generation... \n" << endl;
+      if (my_rank == 0)
+         cout << "Finished particle generation... \n" << endl;
+
       node_property_calculation(PF);
       node_property_calculation(UF);
-      if (my_rank == 0) cout << "Finished intersection calculations... \n" << endl;
+
+      if (my_rank == 0)
+         cout << "Finished intersection calculations... \n" << endl;
+
       nodes_field_initialization(0);
       nodes_field_initialization(1);
       nodes_field_initialization(3);
       if (dim == 3) nodes_field_initialization(4);
-      if (my_rank == 0) cout << "Finished field initializations... \n" << endl;
+
+      if (my_rank == 0)
+         cout << "Finished field initializations... \n" << endl;
+
       if (is_stressCal) {
          // Generate discretization of surface in approximate equal area
          generate_surface_discretization ();
       }
-      if (my_rank == 0) cout << "Finished particle surface discretizations... \n" << endl;
+      if (my_rank == 0)
+         cout << "Finished particle surface discretizations... \n" << endl;
    }
 
    // Direction splitting
@@ -508,9 +526,11 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    assemble_1D_matrices(PF,t_it);
    assemble_1D_matrices(UF,t_it);
 
-   if (my_rank == 0) cout << "Finished assembling pre-coefficient matrix... \n" << endl;
+   if (my_rank == 0)
+      cout << "Finished assembling pre-coefficient matrix... \n" << endl;
 
-   if ( my_rank == is_master ) SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
+   if ( my_rank == is_master )
+      SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
 
    stop_total_timer() ;
 
@@ -575,19 +595,14 @@ DDS_NavierStokes:: import_par_info(istringstream &is)
          getline(lineStream, cell, '\t');
          double wz = stod(cell);
 
-	 // Radius calculation
+         // Radius calculation
          if (level_set_type == "Sphere") {
             Rp = pow((3./4./MAC::pi())*(par_mass/par_rho),1./3.);
-	 } else if (level_set_type == "Cube") {
+         } else if (level_set_type == "Cube") {
             Rp = pow(par_mass/par_rho,1./3.)/2.;
-	 }
-/*
-	 cout << "Particle info: " << xp << "," << yp << "," << zp << ","
-		 		   << vx << "," << vy << "," << vz << ","
-		 		   << wx << "," << wy << "," << wz << ","
-		 		   << Rp << endl;
-*/
-	 // Storing the information in particle structure
+      	}
+
+         // Storing the information in particle structure
          solid.coord[0]->set_item(cntr,xp);
          solid.coord[1]->set_item(cntr,yp);
          solid.coord[2]->set_item(cntr,zp);
@@ -620,11 +635,7 @@ DDS_NavierStokes:: import_par_info(istringstream &is)
          double tzy = stod(cell);
          getline(lineStream, cell, '\t');
          double tzz = stod(cell);
-/*
-	 cout << "Orientation info: " << txx << "," << txy << "," << txz << ","
-		 	              << tyx << "," << tyy << "," << tyz << ","
-		 	              << tzx << "," << tzy << "," << tzz << endl;
-*/
+
          // Storing the information in particle structure
          solid.thetap->set_item(cntr,0,txx);
          solid.thetap->set_item(cntr,1,txy);
@@ -828,8 +839,8 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
 
       PartInput solid = GLOBAL_EQ->get_solid(0);
 
-      double distance_to_bottom = MAC::abs(solid.coord[translation_direction]->item(0)
-                                         - bottom_coordinate);
+      double distance_to_bottom =
+       MAC::abs(solid.coord[translation_direction]->item(0)-bottom_coordinate);
 
       if ( distance_to_bottom < critical_distance_translation ) {
 
@@ -1161,8 +1172,8 @@ DDS_NavierStokes:: fresh_nodes_in_fluid_initialization ( )
 {
   MAC_LABEL( "DDS_NavierStokes:: fresh_nodes_in_fluid_initialization" ) ;
 
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
 
   // Vector for solid presence
   NodeProp node = GLOBAL_EQ->get_node_property(1,0);
@@ -1175,25 +1186,21 @@ DDS_NavierStokes:: fresh_nodes_in_fluid_initialization ( )
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
         if (is_periodic[1][l]) {
-           min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-           max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+           min_unknown_index(l) =
+                     UF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
+           max_unknown_index(l) =
+                     UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
         } else {
-           min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l );
-           max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l );
+           min_unknown_index(l) =
+                     UF->get_min_index_unknown_handled_by_proc( comp, l );
+           max_unknown_index(l) =
+                     UF->get_max_index_unknown_handled_by_proc( comp, l );
         }
-     }
-
-     size_t local_min_k = 0;
-     size_t local_max_k = 0;
-
-     if (dim == 3) {
-        local_min_k = min_unknown_index(2);
-        local_max_k = max_unknown_index(2);
      }
 
      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
         for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-           for (size_t k=local_min_k;k<=local_max_k;++k) {
+           for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
               size_t p = UF->DOF_local_number(i,j,k,comp);
               if ((node.void_frac->item(p) != 1.)
                && (node_old.void_frac->item(p) == 1.)) {
@@ -1204,20 +1211,21 @@ DDS_NavierStokes:: fresh_nodes_in_fluid_initialization ( )
                                   - UF->get_DOF_coordinate(i,comp,l);
                         double xl = b_intersect[l].value->item(p,0);
                         value = value + (b_intersect[l].field_var->item(p,0)*xr
-                                       + UF->DOF_value(i+1,j,k,comp,l)*xl)/(xl+xr);
+                                    + UF->DOF_value(i+1,j,k,comp,l)*xl)/(xl+xr);
                      }
                      if ((b_intersect[l].offset->item(p,1) == 1)) {
                         double xl = UF->get_DOF_coordinate(i,comp,l)
                                   - UF->get_DOF_coordinate(i-1,comp,l);
                         double xr = b_intersect[l].value->item(p,1);
                         value = value + (b_intersect[l].field_var->item(p,1)*xl
-                                       + UF->DOF_value(i-1,j,k,comp,l)*xr)/(xl+xr);
+                                    + UF->DOF_value(i-1,j,k,comp,l)*xr)/(xl+xr);
                      }
 		           }
                  UF->set_DOF_value( i, j, k, comp, 0,value/double(dim));
                  UF->set_DOF_value( i, j, k, comp, 1,value/double(dim));
                  UF->set_DOF_value( i, j, k, comp, 3,value/double(dim));
-                 if (dim == 3) UF->set_DOF_value( i, j, k, comp, 4,value/double(dim));
+                 if (dim == 3)
+                    UF->set_DOF_value( i, j, k, comp, 4,value/double(dim));
               }
            }
         }
@@ -1336,40 +1344,38 @@ DDS_NavierStokes:: calculate_row_indexes ( FV_DiscreteField const* FF)
          LA_SeqMatrix* row_index = GLOBAL_EQ->get_row_indexes(field,dir,comp);
          switch (dir) {
             case 0:
-               for (size_t j=min_unknown_index(1); j<=max_unknown_index(1); j++) {
-                  for (size_t k=min_unknown_index(2); k<=max_unknown_index(2); k++) {
-                     size_t p = (j - min_unknown_index(1))
-                              + (1 + max_unknown_index(1) - min_unknown_index(1))
-                              * (k - min_unknown_index(2));
-                     row_index->set_item(j,k,(double)p);
-                  }
-               }
-               break;
+             for (size_t j=min_unknown_index(1); j<=max_unknown_index(1); j++) {
+              for (size_t k=min_unknown_index(2); k<=max_unknown_index(2); k++) {
+                  size_t p = (j - min_unknown_index(1))
+                           + (1 + max_unknown_index(1) - min_unknown_index(1))
+                           * (k - min_unknown_index(2));
+                  row_index->set_item(j,k,(double)p);
+              }
+             }
+             break;
             case 1:
-               for (size_t i=min_unknown_index(0); i<=max_unknown_index(0); i++) {
-                  for (size_t k=min_unknown_index(2); k<=max_unknown_index(2); k++) {
-                     size_t p = (i - min_unknown_index(0))
-                              + (1 + max_unknown_index(0) - min_unknown_index(0))
-                              * (k - min_unknown_index(2));
-                     row_index->set_item(i,k,(double)p);
-                  }
-               }
-               break;
+             for (size_t i=min_unknown_index(0); i<=max_unknown_index(0); i++) {
+              for (size_t k=min_unknown_index(2); k<=max_unknown_index(2); k++) {
+                  size_t p = (i - min_unknown_index(0))
+                           + (1 + max_unknown_index(0) - min_unknown_index(0))
+                           * (k - min_unknown_index(2));
+                  row_index->set_item(i,k,(double)p);
+              }
+             }
+             break;
             case 2:
-               for (size_t i=min_unknown_index(0); i<=max_unknown_index(0); i++) {
-                  for (size_t j=min_unknown_index(1); j<=max_unknown_index(1); j++) {
-                     size_t p = (i - min_unknown_index(0))
-                              + (1 + max_unknown_index(0) - min_unknown_index(0))
-                              * (j - min_unknown_index(1));
-                     row_index->set_item(i,j,(double)p);
-                  }
-               }
-               break;
+             for (size_t i=min_unknown_index(0); i<=max_unknown_index(0); i++) {
+              for (size_t j=min_unknown_index(1); j<=max_unknown_index(1); j++) {
+                  size_t p = (i - min_unknown_index(0))
+                           + (1 + max_unknown_index(0) - min_unknown_index(0))
+                           * (j - min_unknown_index(1));
+                  row_index->set_item(i,j,(double)p);
+              }
+             }
+             break;
          }
-
       }
    }
-
 }
 
 
@@ -1525,7 +1531,10 @@ DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const&
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& delta, size_t const& comp, size_t const& field)
+DDS_NavierStokes:: trans_rotation_matrix (size_t const& m
+                                        , class doubleVector& delta
+                                        , size_t const& comp
+                                        , size_t const& field)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: trans_rotation_matrix" ) ;
@@ -1541,11 +1550,15 @@ DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& d
      double pitch = (MAC::pi()/180.)*solid.thetap->item(m,1);
      double yaw = (MAC::pi()/180.)*solid.thetap->item(m,2);
      rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-     rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-     rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+     rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+                                    - MAC::sin(yaw)*MAC::cos(roll);
+     rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+                                    + MAC::sin(yaw)*MAC::sin(roll);
      rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
-     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-     rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+                                    + MAC::cos(yaw)*MAC::cos(roll);
+     rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+                                    - MAC::cos(yaw)*MAC::sin(roll);
      rot_matrix(0,2) = -MAC::sin(pitch);
      rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
      rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
@@ -1561,9 +1574,15 @@ DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& d
      rot_matrix(2,2) = solid.thetap->item(m,8);
   }
 
-  double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
-  double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
-  double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
+  double delta_x = delta(0)*rot_matrix(0,0)
+                 + delta(1)*rot_matrix(0,1)
+                 + delta(2)*rot_matrix(0,2);
+  double delta_y = delta(0)*rot_matrix(1,0)
+                 + delta(1)*rot_matrix(1,1)
+                 + delta(2)*rot_matrix(1,2);
+  double delta_z = delta(0)*rot_matrix(2,0)
+                 + delta(1)*rot_matrix(2,1)
+                 + delta(2)*rot_matrix(2,2);
 
   delta(0) = delta_x;
   delta(1) = delta_y;
@@ -1572,7 +1591,10 @@ DDS_NavierStokes:: trans_rotation_matrix (size_t const& m, class doubleVector& d
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, size_t const& comp, size_t const& field)
+DDS_NavierStokes:: rotation_matrix (size_t const& m
+                                  , class doubleVector& delta
+                                  , size_t const& comp
+                                  , size_t const& field)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: rotation_matrix" ) ;
@@ -1588,11 +1610,15 @@ DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, 
      double pitch = (MAC::pi()/180.)*solid.thetap->item(m,1);
      double yaw = (MAC::pi()/180.)*solid.thetap->item(m,2);
      rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-     rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-     rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+     rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+                                    - MAC::sin(yaw)*MAC::cos(roll);
+     rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+                                    + MAC::sin(yaw)*MAC::sin(roll);
      rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
-     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-     rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+                                    + MAC::cos(yaw)*MAC::cos(roll);
+     rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+                                    - MAC::cos(yaw)*MAC::sin(roll);
      rot_matrix(2,0) = -MAC::sin(pitch);
      rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
      rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
@@ -1608,9 +1634,15 @@ DDS_NavierStokes:: rotation_matrix (size_t const& m, class doubleVector& delta, 
      rot_matrix(2,2) = solid.thetap->item(m,8);
   }
 
-  double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
-  double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
-  double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
+  double delta_x = delta(0)*rot_matrix(0,0)
+                 + delta(1)*rot_matrix(0,1)
+                 + delta(2)*rot_matrix(0,2);
+  double delta_y = delta(0)*rot_matrix(1,0)
+                 + delta(1)*rot_matrix(1,1)
+                 + delta(2)*rot_matrix(1,2);
+  double delta_z = delta(0)*rot_matrix(2,0)
+                 + delta(1)*rot_matrix(2,1)
+                 + delta(2)*rot_matrix(2,2);
 
   delta(0) = delta_x;
   delta(1) = delta_y;
@@ -1660,7 +1692,16 @@ DDS_NavierStokes:: Solids_generation ()
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<double> &net_vel, size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID )
+DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF
+                                        , vector<double> &net_vel
+                                        , size_t const& comp
+                                        , size_t const& dir
+                                        , size_t const& off
+                                        , size_t const& i
+                                        , size_t const& j
+                                        , size_t const& k
+                                        , double const& xb
+                                        , size_t const& parID )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: impose_solid_velocity" ) ;
@@ -1708,7 +1749,12 @@ DDS_NavierStokes:: impose_solid_velocity (FV_DiscreteField const* FF, vector<dou
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel, size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID )
+DDS_NavierStokes:: impose_solid_velocity_for_ghost (vector<double> &net_vel
+                                                  , size_t const& comp
+                                                  , double const& xg
+                                                  , double const& yg
+                                                  , double const& zg
+                                                  , size_t const& parID )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: impose_solid_velocity_for_ghost" ) ;

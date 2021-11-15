@@ -68,7 +68,7 @@ FS_Interface_Test:: FS_Interface_Test( MAC_Object* a_owner,
 //---------------------------------------------------------------------------
    : FV_OneStepIteration( a_owner, dom, exp )
    , PP ( dom->discrete_field( "pressure" ) )
-   , UU ( dom->discrete_field( "velocity" ) )   
+   , UU ( dom->discrete_field( "velocity" ) )
    , solidSolver( NULL )
    , solidFluid_transferStream( NULL )
    , allrigidbodies( NULL )
@@ -82,26 +82,26 @@ FS_Interface_Test:: FS_Interface_Test( MAC_Object* a_owner,
    my_rank = macCOMM->rank();
    nb_ranks = macCOMM->nb_ranks();
    is_master = 0;
-   
+
    // Get space dimension
    dimension = PP->primary_grid()->nb_space_dimensions() ;
 
    // Treat all particles as fixed obstacles
-   if ( exp->has_entry( "Particles_as_FixedObstacles" ) ) 
-     b_particles_as_fixed_obstacles = exp->bool_data( 
+   if ( exp->has_entry( "Particles_as_FixedObstacles" ) )
+     b_particles_as_fixed_obstacles = exp->bool_data(
      	"Particles_as_FixedObstacles" ) ;
-   
+
    // Solid solver type is Grains3D
    solidSolverType = "Grains3D";
    b_solidSolver_parallel = false;
    solidSolver_insertionFile = "Grains/Init/insert.xml";
    solidSolver_simulationFile = "Grains/Res/simul.xml";
-   int error = 0;   
+   int error = 0;
    solidSolver = FS_SolidPlugIn_BuilderFactory:: create( solidSolverType,
 	solidSolver_insertionFile, solidSolver_simulationFile,
-        1., false, b_particles_as_fixed_obstacles, 1., b_solidSolver_parallel, 
+        1., false, b_particles_as_fixed_obstacles, 1., b_solidSolver_parallel,
 	error );
-	
+
 }
 
 
@@ -124,8 +124,8 @@ FS_Interface_Test:: ~FS_Interface_Test( void )
 
 //---------------------------------------------------------------------------
 void
-FS_Interface_Test:: do_one_inner_iteration( 
-	FV_TimeIterator const* t_it ) 
+FS_Interface_Test:: do_one_inner_iteration(
+	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "FS_Interface_Test:: do_one_inner_iteration" ) ;
@@ -144,10 +144,10 @@ FS_Interface_Test:: do_one_inner_iteration(
      for (size_t i = 0; i < nb_ranks; ++i)
      {
        if ( i == my_rank )
-       {       
+       {
          MAC::out() << space << "Rank " << my_rank << endl ;
          allrigidbodies->display_geometric( MAC::out(), 3 );
-         MAC::out() << endl;      
+         MAC::out() << endl;
        }
        macCOMM->barrier();
      }
@@ -156,18 +156,18 @@ FS_Interface_Test:: do_one_inner_iteration(
      for (size_t i = 0; i < nb_ranks; ++i)
      {
        if ( i == my_rank )
-       {       
+       {
          MAC::out() << space << "Rank " << my_rank << endl ;
          allrigidbodies->display( MAC::out(), 3 );
-         MAC::out() << endl;      
+         MAC::out() << endl;
        }
        macCOMM->barrier();
      }
    }
-      
+
    stop_solving_timer() ;
-   stop_total_timer() ;   	
-   
+   stop_total_timer() ;
+
 }
 
 
@@ -175,30 +175,30 @@ FS_Interface_Test:: do_one_inner_iteration(
 
 //---------------------------------------------------------------------------
 void
-FS_Interface_Test:: do_before_time_stepping( 
-	FV_TimeIterator const* t_it, 
+FS_Interface_Test:: do_before_time_stepping(
+	FV_TimeIterator const* t_it,
       	std::string const& basename )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "FS_Interface_Test:: do_before_time_stepping" ) ;
-   
-   start_total_timer( "FS_Interface_Test:: do_before_time_stepping" ) ; 
+
+   start_total_timer( "FS_Interface_Test:: do_before_time_stepping" ) ;
 
    solidFluid_transferStream = NULL;
    solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
 
-   allrigidbodies = new DS_AllRigidBodies( dimension, 
+   allrigidbodies = new DS_AllRigidBodies( dimension,
    	*solidFluid_transferStream, b_particles_as_fixed_obstacles );
-	
+
    // Display the geometric features of all rigid bodies
    string space( 3, ' ' ) ;
    for (size_t i = 0; i < nb_ranks; ++i)
    {
      if ( i == my_rank )
-     {       
+     {
        MAC::out() << space << "Rank " << my_rank << endl ;
        allrigidbodies->display_geometric( MAC::out(), 3 );
-       MAC::out() << endl;      
+       MAC::out() << endl;
      }
      macCOMM->barrier();
    }
@@ -207,16 +207,16 @@ FS_Interface_Test:: do_before_time_stepping(
    for (size_t i = 0; i < nb_ranks; ++i)
    {
      if ( i == my_rank )
-     {       
+     {
        MAC::out() << space << "Rank " << my_rank << endl ;
        allrigidbodies->display( MAC::out(), 3 );
-       MAC::out() << endl;      
+       MAC::out() << endl;
      }
      macCOMM->barrier();
-   }  
-        
-   stop_total_timer() ;  
-      
+   }
+
+   stop_total_timer() ;
+
 }
 
 
@@ -227,15 +227,15 @@ void
 FS_Interface_Test:: do_after_time_stepping( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "FS_Interface_Test:: do_after_time_stepping" ) ;  
+   MAC_LABEL( "FS_Interface_Test:: do_after_time_stepping" ) ;
 
-   start_total_timer( 
+   start_total_timer(
    	"FS_Interface_Test:: do_after_time_stepping" ) ;
 
    // Compute the hydro force and torque on all rigid bodies
    allrigidbodies->compute_hydro_force_torque( PP, UU );
-   
-   stop_total_timer() ;     
+
+   stop_total_timer() ;
 
 }
 
@@ -244,18 +244,18 @@ FS_Interface_Test:: do_after_time_stepping( void )
 
 //---------------------------------------------------------------------------
 void
-FS_Interface_Test:: do_before_inner_iterations_stage( 
+FS_Interface_Test:: do_before_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( 
+   MAC_LABEL(
    	"FS_Interface_Test:: do_before_inner_iterations_stage" ) ;
 
-   start_total_timer( 
+   start_total_timer(
    	"FS_Interface_Test:: do_before_inner_iterations_stage" ) ;
-   
+
    stop_total_timer() ;
-      
+
 }
 
 
@@ -263,16 +263,15 @@ FS_Interface_Test:: do_before_inner_iterations_stage(
 
 //---------------------------------------------------------------------------
 void
-FS_Interface_Test:: do_after_inner_iterations_stage( 
+FS_Interface_Test:: do_after_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "FS_Interface_Test:: do_after_inner_iterations_stage" ) ;
-   
-   start_total_timer( 
-   	"FS_Interface_Test:: do_after_inner_iterations_stage" ) ;	
-   
+
+   start_total_timer(
+   	"FS_Interface_Test:: do_after_inner_iterations_stage" ) ;
+
    stop_total_timer() ;
-   
+
 }
-  
