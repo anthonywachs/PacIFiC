@@ -3,7 +3,6 @@
 
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
-#include "GrainsCoupledWithFluid.hh"
 #include <geomVector.hh>
 #include <computingtime.hh>
 #include <boolVector.hh>
@@ -22,8 +21,9 @@ class FV_DiscreteField ;
 class LA_Vector ;
 class LA_SeqVector ;
 class DDS_NavierStokesSystem ;
-class GrainsCoupledWithFluid ;
 class LA_SeqMatrix ;
+class FS_SolidPlugIn ;
+class DS_AllRigidBodies ;
 
 /** @brief The Class DDS_NavierStokes.
 
@@ -201,8 +201,6 @@ public SolverComputingTime
       double return_divergence_weighting (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k, FV_TimeIterator const* t_it );
 
       void Solids_generation ( );
-      void initialize_GRAINS( void );
-      void simulate_GRAINS( void );
       void import_par_info( istringstream &is );
 
       void node_property_calculation (FV_DiscreteField const* FF );
@@ -399,7 +397,7 @@ public SolverComputingTime
       size_t Npart;
       size_t Npart_local;
 
-      MAC_Communicator const* pelCOMM;
+      MAC_Communicator const* macCOMM;
       MPI_Comm DDS_Comm_i[3];
 
       int rank_in_i[3];
@@ -436,6 +434,18 @@ public SolverComputingTime
 
       double Amp, freq;
 
+      // Grains3D variable
+      string solidSolverType;
+      FS_SolidPlugIn* solidSolver;
+      bool b_solidSolver_parallel;
+      string solidSolver_insertionFile;
+      string solidSolver_simulationFile;
+      istringstream* solidFluid_transferStream;
+      DS_AllRigidBodies* allrigidbodies;
+      bool b_particles_as_fixed_obstacles;
+
+
+
       // Grid motion
       bool b_projection_translation;
       bool b_grid_has_been_translated_since_last_output;
@@ -445,9 +455,6 @@ public SolverComputingTime
       size_t translation_direction;
       double bottom_coordinate;
       double translated_distance;
-
-
-      GrainsCoupledWithFluid* grains;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;

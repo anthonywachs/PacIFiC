@@ -2,8 +2,6 @@
 #include <FV_DomainAndFields.hh>
 #include <FV_DomainBuilder.hh>
 #include <FV_DiscreteField.hh>
-#include "ReaderXML.hh"
-#include "Grains_BuilderFactory.H"
 #include <DDS_NavierStokesSystem.hh>
 #include <FV_SystemNumbering.hh>
 #include <FV_Mesh.hh>
@@ -25,6 +23,11 @@
 #include <time.h>
 #include <sys/time.h>
 #include <math.h>
+#include <FS_SolidPlugIn_BuilderFactory.hh>
+#include <FS_SolidPlugIn.hh>
+#include <FS_Grains3DPlugIn.hh>
+#include <DS_AllRigidBodies.hh>
+
 
 
 DDS_NavierStokes const* DDS_NavierStokes::PROTOTYPE
@@ -84,6 +87,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , is_stressCal( false )
    , is_surfacestressOUT( false )
    , IntersectionMethod ( "Bisection" )
+   , ViscousStressOrder ( "second" )
+   , PressureStressOrder ( "first" )
    , tolerance ( 1.e-6 )
    , grid_check_for_solid ( 1.5 )
    , b_projection_translation( dom->primary_grid()->is_translation_active() )
@@ -94,6 +99,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , bottom_coordinate( 0. )
    , translated_distance( 0. )
    , gravity_vector( 0 )
+   , b_particles_as_fixed_obstacles( true )
 {
    MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -108,9 +114,9 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
 
    // Call of MAC_Communicator routine to set the rank of each proces and
    // the number of processes during execution
-   pelCOMM = MAC_Exec::communicator();
-   my_rank = pelCOMM->rank();
-   nb_procs = pelCOMM->nb_ranks();
+   macCOMM = MAC_Exec::communicator();
+   my_rank = macCOMM->rank();
+   nb_procs = macCOMM->nb_ranks();
    is_master = 0;
 
    is_periodic[0][0] = false;
@@ -179,21 +185,25 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    if (is_solids) {
       Npart = exp->int_data( "NParticles" ) ;
       insertion_type = exp->string_data( "InsertionType" ) ;
-      MAC_ASSERT( insertion_type == "file" || insertion_type == "GRAINS" ) ;
+      MAC_ASSERT( insertion_type == "file" || insertion_type == "Grains3D" ) ;
       loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
       if ( level_set_type != "Cube" && level_set_type != "Cylinder" &&
            level_set_type != "Sphere" && level_set_type != "Ellipsoid" &&
            level_set_type != "PipeX" && level_set_type != "Superquadric") {
-         string error_message="- Cube\n   - Sphere\n   - Cylinder\n   - Superquadric\n   - Ellipsoid\n   - PipeX";
-         MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
+         string error_message="- Cube\n   - Sphere\n   - Cylinder\n   "
+                              "- Superquadric\n   - Ellipsoid\n   - PipeX";
+         MAC_Error::object()->raise_bad_data_value( exp,
+                                       "LevelSetType", error_message );
       }
 
       // Read the solids filename
-      if (insertion_type == "GRAINS") {
-         solid_filename = "Grains/simul.xml";
-      } else if (insertion_type == "file") {
+      if (insertion_type == "file") {
+         solidSolverType = "Grains3D";
+         b_solidSolver_parallel = false;
+         solidSolver_insertionFile = "Grains/Init/insert.xml";
+         solidSolver_simulationFile = "Grains/Res/simul.xml";
          solid_filename = exp->string_data( "Particle_FileName" );
       }
 
@@ -236,19 +246,27 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       }
 
       if (is_stressCal) {
-         ViscousStressOrder = exp->string_data( "ViscousStressOrder" );
-         if ( ViscousStressOrder != "first" && ViscousStressOrder != "second") {
-            string error_message="- first\n   - second";
-            MAC_Error::object()->
-               raise_bad_data_value( exp,"ViscousStressOrder", error_message );
+         if ( exp->has_entry( "ViscousStressOrder" ) ) {
+            ViscousStressOrder = exp->string_data( "ViscousStressOrder" );
+            if ( ViscousStressOrder != "first"
+              && ViscousStressOrder != "second") {
+                string error_message="- first\n   - second";
+                MAC_Error::object()->raise_bad_data_value( exp,
+                                    "ViscousStressOrder", error_message );
+            }
          }
-         PressureStressOrder = exp->string_data( "PressureStressOrder" );
-         if ( PressureStressOrder != "first"
-           && PressureStressOrder != "second"
-           && PressureStressOrder != "second_withNeumannBC") {
-            string error_message="- first\n   - second\n   - second_withNeumannBC";
-            MAC_Error::object()->
-               raise_bad_data_value( exp,"PressureStressOrder", error_message );
+
+         if ( exp->has_entry( "PressureStressOrder" ) ) {
+            PressureStressOrder = exp->string_data( "PressureStressOrder" );
+            if ( PressureStressOrder != "first"
+              && PressureStressOrder != "second"
+              && PressureStressOrder != "second_withNeumannBC") {
+               string error_message="- first\n   "
+                                    "- second\n   "
+                                    "- second_withNeumannBC";
+               MAC_Error::object()->raise_bad_data_value( exp,
+                                    "PressureStressOrder", error_message );
+            }
          }
 
          Npoints = exp->double_data( "Npoints" ) ;
@@ -367,6 +385,16 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    GLOBAL_EQ = DDS_NavierStokesSystem::create( this, se, UF, PF, inputData ) ;
    se->destroy() ;
 
+   // Create Grains3D if solidSolverType is Grains3D;
+   int error = 0;
+   solidSolver = FS_SolidPlugIn_BuilderFactory:: create( solidSolverType,
+	                                            solidSolver_insertionFile,
+                                               solidSolver_simulationFile,
+                                               1., false,
+                                               b_particles_as_fixed_obstacles,
+                                               1., b_solidSolver_parallel,
+                                               error );
+
    // Timing routines
    if ( my_rank == is_master )
    {
@@ -386,6 +414,10 @@ DDS_NavierStokes:: ~DDS_NavierStokes( void )
    MAC_LABEL( "DDS_NavierStokes:: ~DDS_NavierStokes" ) ;
 
    free_DDS_subcommunicators() ;
+
+   if ( solidSolver ) delete solidSolver;
+   if ( solidFluid_transferStream ) delete solidFluid_transferStream;
+   if ( allrigidbodies ) delete allrigidbodies;
 
 }
 
@@ -469,32 +501,39 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    // Generate solid particles if required
    if (is_solids) {
-      if (insertion_type == "file") {
-         Solids_generation( );
-      } else if (insertion_type == "GRAINS") {
-         // Create a stringstream to store particle information
-         string temp_string;
 
-   	   if (my_rank == 0) {
-   	      // Calls all the required function to
-            // activate GRAINS and insert particle
-            initialize_GRAINS();
-            // Storing the particle data from GRAINS in particle_info
-            istringstream local_par_info;
-            grains->WriteParticulesInDSFluid(local_par_info);
-   	      // Convert to string for MPI
-   	      temp_string = local_par_info.str();
-   	   }
+      solidFluid_transferStream = NULL;
+      solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
 
-   	   // Broadcasting the particle info from
-         // root(0) to rest of the processor
-   	   pelCOMM->broadcast(temp_string,0);
+      allrigidbodies = new DS_AllRigidBodies( dim,
+      	*solidFluid_transferStream, b_particles_as_fixed_obstacles );
 
-   	   // Convert string to istringstream
-   	   istringstream global_par_info(temp_string);
-   	   // Import particle information in FLUID
-   	   import_par_info(global_par_info);
+      // Display the geometric features of all rigid bodies
+      string space( 3, ' ' ) ;
+      for (size_t i = 0; i < nb_procs; ++i)
+      {
+        if ( i == my_rank )
+        {
+          MAC::out() << space << "Rank " << my_rank << endl ;
+          allrigidbodies->display_geometric( MAC::out(), 3 );
+          MAC::out() << endl;
+        }
+        macCOMM->barrier();
       }
+
+      // Display the features of all rigid bodies
+      for (size_t i = 0; i < nb_procs; ++i)
+      {
+        if ( i == my_rank )
+        {
+          MAC::out() << space << "Rank " << my_rank << endl ;
+          allrigidbodies->display( MAC::out(), 3 );
+          MAC::out() << endl;
+        }
+        macCOMM->barrier();
+      }
+
+      Solids_generation( );
 
       if (my_rank == 0)
          cout << "Finished particle generation... \n" << endl;
@@ -536,182 +575,8 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
 }
 
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: import_par_info(istringstream &is)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokes:: import_par_info" ) ;
 
-   // Structure of particle input data
-   PartInput solid = GLOBAL_EQ->get_solid(0);
 
-   string line;
-   istringstream lineStream;
-   string cell;
-   int cntr = -1;
-   double Rp=0.,Tp=0.;
-
-   // Ensure that the getline ALWAYS reads from start of the string
-   is.clear();
-   is.seekg(0);
-
-   // read lines
-   while (getline(is, line)) {
-      lineStream.clear();
-      lineStream.str(line);
-
-      // read first word in a line
-      getline(lineStream, cell, '\t');
-
-      if (cell == "P") {
-         cntr++;
-
-         // Extracting position
-         getline(lineStream, cell, '\t');
-         double xp = stod(cell);
-         getline(lineStream, cell, '\t');
-         double yp = stod(cell);
-         getline(lineStream, cell, '\t');
-         double zp = stod(cell);
-         // Extracting Density
-         getline(lineStream, cell, '\t');
-         double par_rho = stod(cell);
-         // Extracting mass
-         getline(lineStream, cell, '\t');
-         double par_mass = stod(cell);
-         // Extracting velocity
-         getline(lineStream, cell, '\t');
-         double vx = stod(cell);
-         getline(lineStream, cell, '\t');
-         double vy = stod(cell);
-         getline(lineStream, cell, '\t');
-         double vz = stod(cell);
-         // Extracting rotational velocity
-         getline(lineStream, cell, '\t');
-         double wx = stod(cell);
-         getline(lineStream, cell, '\t');
-         double wy = stod(cell);
-         getline(lineStream, cell, '\t');
-         double wz = stod(cell);
-
-         // Radius calculation
-         if (level_set_type == "Sphere") {
-            Rp = pow((3./4./MAC::pi())*(par_mass/par_rho),1./3.);
-         } else if (level_set_type == "Cube") {
-            Rp = pow(par_mass/par_rho,1./3.)/2.;
-      	}
-
-         // Storing the information in particle structure
-         solid.coord[0]->set_item(cntr,xp);
-         solid.coord[1]->set_item(cntr,yp);
-         solid.coord[2]->set_item(cntr,zp);
-         solid.size->set_item(cntr,Rp);
-         solid.vel[0]->set_item(cntr,vx);
-         solid.vel[1]->set_item(cntr,vy);
-         solid.vel[2]->set_item(cntr,vz);
-         solid.ang_vel[0]->set_item(cntr,wx);
-         solid.ang_vel[1]->set_item(cntr,wy);
-         solid.ang_vel[2]->set_item(cntr,wz);
-         solid.temp->set_item(cntr,Tp);
-         solid.inside->set_item(cntr,1);
-      } else if (cell == "O") {
-         // Extracting Orientation Matrix
-         getline(lineStream, cell, '\t');
-         double txx = stod(cell);
-         getline(lineStream, cell, '\t');
-         double txy = stod(cell);
-         getline(lineStream, cell, '\t');
-         double txz = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tyx = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tyy = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tyz = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tzx = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tzy = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tzz = stod(cell);
-
-         // Storing the information in particle structure
-         solid.thetap->set_item(cntr,0,txx);
-         solid.thetap->set_item(cntr,1,txy);
-         solid.thetap->set_item(cntr,2,txz);
-         solid.thetap->set_item(cntr,3,tyx);
-         solid.thetap->set_item(cntr,4,tyy);
-         solid.thetap->set_item(cntr,5,tyz);
-         solid.thetap->set_item(cntr,6,tzx);
-         solid.thetap->set_item(cntr,7,tzy);
-         solid.thetap->set_item(cntr,8,tzz);
-      }
-   }
-
-   // Make sure the number of particle in GRAINS and FLUID are same
-   MAC_ASSERT( (size_t)(cntr+1) == Npart ) ;
-}
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: simulate_GRAINS( void )
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokes:: simulate_GRAINS" ) ;
-
-   // Do particle simulation
-   grains->Simulation (1,1,0);
-
-   // Store the data in Paraview output
-   grains->doPostProcessing();
-
-}
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: initialize_GRAINS( void )
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokes:: initialize_GRAINS" ) ;
-
-   // Initialize the XML reader
-   ReaderXML::initialize();
-
-   // Initialize the grains builder factory
-   string simulation_file_exe = Grains_BuilderFactory::init( solid_filename, (int) my_rank, 1);
-
-   // Start reading the inputs
-   DOMElement* rootNode = ReaderXML::getRoot (simulation_file_exe);
-
-   // Create an object of derived createCoupledWithFluid
-   grains = Grains_BuilderFactory::createCoupledWithFluid (rootNode, rho, 0.01);
-
-   //	 if ( b_restart ) grains->setReloadSame();
-
-   // Construct the DEM
-   grains->Construction (rootNode);
-
-   // Force activation
-   grains->Forces (rootNode);
-
-   // DEM events, if any
-   grains->Chargement (rootNode);
-
-   // Initialize post processing to store output files
-   grains->InitialPostProcessing();
-
-   // Do particle simulation
-   grains->Simulation (1,1,0);
-
-   // Store the data in Paraview output
-   grains->doPostProcessing();
-
-   // Terminate XML reader
-   ReaderXML::terminate();
-
-//   grains->checkParaviewPostProcessing( "grains", "./Grains/Res", true ) ;
-
-}
 
 //---------------------------------------------------------------------------
 void
@@ -960,7 +825,7 @@ DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
 //          }
 //       }
 //
-//       error_L2 = pelCOMM->sum( error_L2 );
+//       error_L2 = macCOMM->sum( error_L2 );
 //       error_L2 = MAC::sqrt(error_L2);
 //
 //       if ( my_rank == 0 )
@@ -1026,7 +891,7 @@ DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
 //          }
 //       }
 //
-//       error_L2 = pelCOMM->sum( error_L2 );
+//       error_L2 = macCOMM->sum( error_L2 );
 //       error_L2 = MAC::sqrt(error_L2);
 //
 //       if ( my_rank == 0 )
@@ -1097,7 +962,7 @@ DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
 //          }
 //       }
 //
-//       error_L2 = pelCOMM->sum( error_L2 );
+//       error_L2 = macCOMM->sum( error_L2 );
 //       error_L2 = MAC::sqrt(error_L2);
 //
 //       if ( my_rank == 0 )
@@ -1289,30 +1154,6 @@ DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
            solid.ang_vel[dir]->set_item(i,ang_vel(dir));
         }
      }
-  } else if (insertion_type == "GRAINS") {
-     // Create a stringstream to store particle information
-     string temp_string;
-
-     if (my_rank == 0) {
-        istringstream local_par_info;
-        grains->ReadParticulesFromDSFluid(local_par_info);
-        // Calls all the required function to activate GRAINS and insert particle
-        simulate_GRAINS();
-        // Storing the particle data from GRAINS in particle_info
-//        istringstream local_par_info;
-        grains->WriteParticulesInDSFluid(local_par_info);
-//	    cout << "Output: " << "\n" << local_par_info.str() << endl;
-        // Convert to string for MPI
-        temp_string = local_par_info.str();
-     }
-
-     // Broadcasting the particle info from root(0) to rest of the processor
-     pelCOMM->broadcast(temp_string,0);
-
-     // Convert string to istringstream
-     istringstream global_par_info(temp_string);
-     // Import particle information in FLUID
-     import_par_info(global_par_info);
   }
 }
 
@@ -1562,7 +1403,7 @@ DDS_NavierStokes:: trans_rotation_matrix (size_t const& m
      rot_matrix(0,2) = -MAC::sin(pitch);
      rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
      rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
-  } else if (insertion_type == "GRAINS") {
+  } else if (insertion_type == "Grains3D") {
      rot_matrix(0,0) = solid.thetap->item(m,0);
      rot_matrix(1,0) = solid.thetap->item(m,1);
      rot_matrix(2,0) = solid.thetap->item(m,2);
@@ -1622,7 +1463,7 @@ DDS_NavierStokes:: rotation_matrix (size_t const& m
      rot_matrix(2,0) = -MAC::sin(pitch);
      rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
      rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
-  } else if (insertion_type == "GRAINS") {
+  } else if (insertion_type == "Grains3D") {
      rot_matrix(0,0) = solid.thetap->item(m,0);
      rot_matrix(0,1) = solid.thetap->item(m,1);
      rot_matrix(0,2) = solid.thetap->item(m,2);
@@ -4272,17 +4113,17 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
 //      compute_pressure_force_on_particle(parID, Nmax, t_it);
 //      // Gathering information from all procs
 //      hydro_forces.press[0]->set_item(parID,
-// 		     pelCOMM->sum(hydro_forces.press[0]->item(parID))) ;
+// 		     macCOMM->sum(hydro_forces.press[0]->item(parID))) ;
 //      hydro_forces.press[1]->set_item(parID,
-// 		     pelCOMM->sum(hydro_forces.press[1]->item(parID))) ;
+// 		     macCOMM->sum(hydro_forces.press[1]->item(parID))) ;
 //      hydro_forces.press[2]->set_item(parID,
-// 		     pelCOMM->sum(hydro_forces.press[2]->item(parID))) ;
+// 		     macCOMM->sum(hydro_forces.press[2]->item(parID))) ;
 //      hydro_torque.press[0]->set_item(parID,
-// 		     pelCOMM->sum(hydro_torque.press[0]->item(parID))) ;
+// 		     macCOMM->sum(hydro_torque.press[0]->item(parID))) ;
 //      hydro_torque.press[1]->set_item(parID,
-// 		     pelCOMM->sum(hydro_torque.press[1]->item(parID))) ;
+// 		     macCOMM->sum(hydro_torque.press[1]->item(parID))) ;
 //      hydro_torque.press[2]->set_item(parID,
-// 		     pelCOMM->sum(hydro_torque.press[2]->item(parID))) ;
+// 		     macCOMM->sum(hydro_torque.press[2]->item(parID))) ;
 //
 //   }
 // }
@@ -4336,17 +4177,17 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
 //      compute_velocity_force_on_particle(parID, Nmax, t_it);
 //      // Gathering information from all procs
 //      hydro_forces.vel[0]->set_item(parID,
-// 		     pelCOMM->sum(hydro_forces.vel[0]->item(parID))) ;
+// 		     macCOMM->sum(hydro_forces.vel[0]->item(parID))) ;
 //      hydro_forces.vel[1]->set_item(parID,
-// 		     pelCOMM->sum(hydro_forces.vel[1]->item(parID))) ;
+// 		     macCOMM->sum(hydro_forces.vel[1]->item(parID))) ;
 //      hydro_forces.vel[2]->set_item(parID,
-// 		     pelCOMM->sum(hydro_forces.vel[2]->item(parID))) ;
+// 		     macCOMM->sum(hydro_forces.vel[2]->item(parID))) ;
 //      hydro_torque.vel[0]->set_item(parID,
-// 		     pelCOMM->sum(hydro_torque.vel[0]->item(parID))) ;
+// 		     macCOMM->sum(hydro_torque.vel[0]->item(parID))) ;
 //      hydro_torque.vel[1]->set_item(parID,
-// 		     pelCOMM->sum(hydro_torque.vel[1]->item(parID))) ;
+// 		     macCOMM->sum(hydro_torque.vel[1]->item(parID))) ;
 //      hydro_torque.vel[2]->set_item(parID,
-// 		     pelCOMM->sum(hydro_torque.vel[2]->item(parID))) ;
+// 		     macCOMM->sum(hydro_torque.vel[2]->item(parID))) ;
 //
 //
 //      if (my_rank == 0) {
@@ -7895,8 +7736,8 @@ DDS_NavierStokes:: correct_mean_pressure (size_t const& level )
      }
   }
 
-  mean = pelCOMM->sum( mean ) ;
-  nb_global_unknown = pelCOMM->sum( nb_global_unknown ) ;
+  mean = macCOMM->sum( mean ) ;
+  nb_global_unknown = macCOMM->sum( nb_global_unknown ) ;
 
   mean = mean/nb_global_unknown;
 
@@ -8038,7 +7879,7 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 //
 //   if ((is_surfacestressOUT) && (t_it->iteration_number()%100 == 0)) {
 //      // Collect particle data from all the procs, if any.
-//      pelCOMM->sum_array(force);
+//      macCOMM->sum_array(force);
 //
 //      if (my_rank == 0) {
 //         ofstream outputFile ;
@@ -8215,9 +8056,9 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 //      }
 //   }
 //
-//   div_velocity = pelCOMM->sum( div_velocity ) ;
+//   div_velocity = macCOMM->sum( div_velocity ) ;
 // //  div_velocity = MAC::sqrt( div_velocity );
-//   max_divu = pelCOMM->max( max_divu ) ;
+//   max_divu = macCOMM->max( max_divu ) ;
 //   if ( my_rank == is_master )
 //     MAC::out() << "Norm L2 div(u) = "<< MAC::doubleToString( ios::scientific, 12, div_velocity ) << " Max div(u) = " << MAC::doubleToString( ios::scientific, 12, max_divu ) << endl;
 //
@@ -8266,9 +8107,9 @@ DDS_NavierStokes::output_L2norm_pressure( size_t const& level )
      }
   }
 
-  L2normP = pelCOMM->sum( L2normP ) ;
+  L2normP = macCOMM->sum( L2normP ) ;
   L2normP = MAC::sqrt( L2normP );
-  max_P = pelCOMM->max( max_P ) ;
+  max_P = macCOMM->max( max_P ) ;
   if ( my_rank == is_master )
      MAC::out() << "Norm L2 P = "
                 << MAC::doubleToString( ios::scientific, 12, L2normP )
@@ -8321,9 +8162,9 @@ DDS_NavierStokes::output_L2norm_velocity( size_t const& level )
         }
      }
 
-     L2normU = pelCOMM->sum( L2normU ) ;
+     L2normU = macCOMM->sum( L2normU ) ;
      L2normU = MAC::sqrt( L2normU );
-     max_U = pelCOMM->max( max_U ) ;
+     max_U = macCOMM->max( max_U ) ;
      if ( my_rank == is_master )
         MAC::out() << "Component: " << comp
                    << " Norm L2 U = "
