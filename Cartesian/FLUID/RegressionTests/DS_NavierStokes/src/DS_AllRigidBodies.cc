@@ -158,6 +158,36 @@ void DS_AllRigidBodies:: compute_hydro_force_torque( FV_DiscreteField const* PP,
 
 
 //---------------------------------------------------------------------------
+bool DS_AllRigidBodies:: isIn( size_t const& parID,
+		                         geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: isIn(pt)" ) ;
+
+  return (m_allDSrigidbodies[parID]->isIn( pt ));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+bool DS_AllRigidBodies:: isIn( size_t const& parID,
+		                         double const& x,
+                               double const& y,
+                               double const& z ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: isIn(x,y,z)" ) ;
+
+  return (m_allDSrigidbodies[parID]->isIn( x, y, z ));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 FS_AllRigidBodies const* DS_AllRigidBodies:: get_ptr_FS_AllRigidBodies() const
 //---------------------------------------------------------------------------
 {
