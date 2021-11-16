@@ -92,11 +92,13 @@ class DS_AllRigidBodies
       @param indent_width indentation width */
       void display( ostream& out, size_t const& indent_width ) const;
 
-      /** @brief Returns whether a point is inside the rigid body
+      /** @brief Returns whether a point is inside a rigid body
+      @param parID particle ID to check for isIn
       @param pt the point */
       bool isIn( size_t const& parID, geomVector const& pt ) const;
 
-      /** @brief Returns whether a point is inside the rigid body
+      /** @brief Returns whether a point is inside a rigid body
+      @param parID particle ID to check for isIn
       @param x x-coordinate of the point
       @param y x-coordinate of the point
       @param z x-coordinate of the point */
@@ -104,6 +106,21 @@ class DS_AllRigidBodies
                  double const& x,
                  double const& y,
                  double const& z ) const;
+
+      /** @brief Returns the level set value of a point from a rigid body
+      @param parID particle ID to check for isIn
+      @param pt the point */
+      double level_set_value( size_t const& parID, geomVector const& pt ) const;
+
+      /** @brief Returns the level set value of a point from a rigid body
+      @param parID particle ID to check for isIn
+      @param x x-coordinate of the point
+      @param y x-coordinate of the point
+      @param z x-coordinate of the point */
+      double level_set_value( size_t const& parID,
+                              double const& x,
+                              double const& y,
+                              double const& z ) const;
 
 
       /** @brief Computes the hydrodynamic force and torque acting on each rigid

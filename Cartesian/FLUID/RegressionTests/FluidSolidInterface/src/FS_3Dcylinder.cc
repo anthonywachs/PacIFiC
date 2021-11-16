@@ -224,6 +224,42 @@ bool FS_3Dcylinder:: isIn( double const& x, double const& y, double const& z )
 
 
 //---------------------------------------------------------------------------
+double FS_3Dcylinder:: level_set_value( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_3Dcylinder:: level_set_value(pt)" ) ;
+
+  double value = 0;
+
+  // TO DO
+
+  return ( value );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double FS_3Dcylinder:: level_set_value( double const& x
+                                      , double const& y
+                                      , double const& z ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_3Dcylinder:: level_set_value(x,y,z)" ) ;
+
+  double value = 0;
+
+  // TO DO
+
+  return ( value );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 tuple<bool,double,size_t> FS_3Dcylinder:: distanceTo( geomVector const& pt,
       	size_t const& direction,
       	bool const& positive ) const

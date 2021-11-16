@@ -90,7 +90,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , ViscousStressOrder ( "second" )
    , PressureStressOrder ( "first" )
    , tolerance ( 1.e-6 )
-   , grid_check_for_solid ( 1.5 )
+   , grid_check_for_solid ( 3.0 )
    , b_projection_translation( dom->primary_grid()->is_translation_active() )
    , b_grid_has_been_translated_since_last_output( false )
    , b_grid_has_been_translated_at_previous_time( false )
@@ -625,32 +625,32 @@ DDS_NavierStokes:: do_before_inner_iterations_stage(
    if ( b_projection_translation )
      b_grid_has_been_translated_at_previous_time = false;
 
-   if ((is_par_motion) && (is_solids)) {
-      update_particle_system(t_it);
-      node_property_calculation(PF);
-      node_property_calculation(UF);
-      nodes_field_initialization(0);
-      nodes_field_initialization(1);
-      nodes_field_initialization(3);
-      if (dim == 3) nodes_field_initialization(4);
-
-      // if ( my_rank == is_master ) SCT_set_start( "node_initialization");
-      // fresh_nodes_in_fluid_initialization();
-      // if ( my_rank == is_master ) SCT_get_elapsed_time( "node_initialization" );
-
-      // if ( my_rank == is_master ) SCT_set_start( "cell_detection");
-      // detect_fresh_cells_and_neighbours();
-      // if ( my_rank == is_master ) SCT_get_elapsed_time( "cell_detection" );
-
-      // if ( my_rank == is_master ) SCT_set_start( "divergence_weighting");
-      // calculate_divergence_weighting(t_it);
-      // if ( my_rank == is_master ) SCT_get_elapsed_time( "divergence_weighting" );
-
-      // Direction splitting
-      // Assemble 1D tridiagonal matrices
-      assemble_1D_matrices(PF,t_it);
-      assemble_1D_matrices(UF,t_it);
-   }
+   // if ((is_par_motion) && (is_solids)) {
+   //    update_particle_system(t_it);
+   //    node_property_calculation(PF);
+   //    node_property_calculation(UF);
+   //    nodes_field_initialization(0);
+   //    nodes_field_initialization(1);
+   //    nodes_field_initialization(3);
+   //    if (dim == 3) nodes_field_initialization(4);
+   //
+   //    // if ( my_rank == is_master ) SCT_set_start( "node_initialization");
+   //    // fresh_nodes_in_fluid_initialization();
+   //    // if ( my_rank == is_master ) SCT_get_elapsed_time( "node_initialization" );
+   //
+   //    // if ( my_rank == is_master ) SCT_set_start( "cell_detection");
+   //    // detect_fresh_cells_and_neighbours();
+   //    // if ( my_rank == is_master ) SCT_get_elapsed_time( "cell_detection" );
+   //
+   //    // if ( my_rank == is_master ) SCT_set_start( "divergence_weighting");
+   //    // calculate_divergence_weighting(t_it);
+   //    // if ( my_rank == is_master ) SCT_get_elapsed_time( "divergence_weighting" );
+   //
+   //    // Direction splitting
+   //    // Assemble 1D tridiagonal matrices
+   //    assemble_1D_matrices(PF,t_it);
+   //    assemble_1D_matrices(UF,t_it);
+   // }
 
    // Perform matrix level operations before each time step
    GLOBAL_EQ->at_each_time_step( );
@@ -1098,65 +1098,65 @@ DDS_NavierStokes:: fresh_nodes_in_fluid_initialization ( )
   }
 }
 
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NavierStokes:: update_particle_system" ) ;
-
-  // Structure of particle input data
-  PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
-  PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
-
-  doubleVector const& gg = gravity_vector->to_double_vector();
-
-  if (insertion_type == "file") {
-
-     // Structure of particle input data
-     PartInput solid = GLOBAL_EQ->get_solid(0);
-
-     for (size_t i=0;i<Npart;i++) {
-        double rp = solid.size->item(i);
-        double mass_p = (dim == 3) ? rho_s*(4./3.)*MAC::pi()*pow(rp,3.) :
-                                     rho_s*MAC::pi()*pow(rp,2.)*1.;
-        double moi = 0.;
-	if (level_set_type == "Sphere")
-           moi = (dim == 3) ? (2./5.)*mass_p*rp*rp :
-		              (1./2.)*mass_p*rp*rp ;
-
-        doubleVector pos(dim,0);
-        doubleVector vel(dim,0);
-        doubleVector acc(dim,0);
-        doubleVector ang_vel(dim,0);
-        doubleVector ang_acc(dim,0);
-
-        for (size_t dir=0;dir<dim;dir++) {
-           pos(dir) = solid.coord[dir]->item(i);
-           vel(dir) = solid.vel[dir]->item(i);
-
-           if (motion_type == "Sine") {
-              vel(dir) = gg(dir)*Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
-              pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
-           } else if (motion_type == "Hydro") {
-              acc(dir) = gg(dir)*(1-rho/rho_s) + (hydro_forces.press[dir]->item(i)
-	                                       +  hydro_forces.vel[dir]->item(i)) / mass_p ;
-              vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-              pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
-	      ang_acc(dir) = (hydro_torque.press[dir]->item(i)
-                           +  hydro_torque.vel[dir]->item(i)) / moi ;
-              ang_vel(dir) = ang_vel(dir) + ang_acc(dir)*t_it->time_step();
-           }
-
-           solid.coord[dir]->set_item(i,pos(dir));
-           solid.vel[dir]->set_item(i,vel(dir));
-           solid.ang_vel[dir]->set_item(i,ang_vel(dir));
-        }
-     }
-  }
-}
-
+//
+// //---------------------------------------------------------------------------
+// void
+// DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
+// //---------------------------------------------------------------------------
+// {
+//   MAC_LABEL( "DDS_NavierStokes:: update_particle_system" ) ;
+//
+//   // Structure of particle input data
+//   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
+//   PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
+//
+//   doubleVector const& gg = gravity_vector->to_double_vector();
+//
+//   if (insertion_type == "file") {
+//
+//      // Structure of particle input data
+//      PartInput solid = GLOBAL_EQ->get_solid(0);
+//
+//      for (size_t i=0;i<Npart;i++) {
+//         double rp = solid.size->item(i);
+//         double mass_p = (dim == 3) ? rho_s*(4./3.)*MAC::pi()*pow(rp,3.) :
+//                                      rho_s*MAC::pi()*pow(rp,2.)*1.;
+//         double moi = 0.;
+// 	if (level_set_type == "Sphere")
+//            moi = (dim == 3) ? (2./5.)*mass_p*rp*rp :
+// 		              (1./2.)*mass_p*rp*rp ;
+//
+//         doubleVector pos(dim,0);
+//         doubleVector vel(dim,0);
+//         doubleVector acc(dim,0);
+//         doubleVector ang_vel(dim,0);
+//         doubleVector ang_acc(dim,0);
+//
+//         for (size_t dir=0;dir<dim;dir++) {
+//            pos(dir) = solid.coord[dir]->item(i);
+//            vel(dir) = solid.vel[dir]->item(i);
+//
+//            if (motion_type == "Sine") {
+//               vel(dir) = gg(dir)*Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
+//               pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
+//            } else if (motion_type == "Hydro") {
+//               acc(dir) = gg(dir)*(1-rho/rho_s) + (hydro_forces.press[dir]->item(i)
+// 	                                       +  hydro_forces.vel[dir]->item(i)) / mass_p ;
+//               vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+//               pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
+//               ang_acc(dir) = (hydro_torque.press[dir]->item(i)
+//                            +  hydro_torque.vel[dir]->item(i)) / moi ;
+//               ang_vel(dir) = ang_vel(dir) + ang_acc(dir)*t_it->time_step();
+//            }
+//
+//            solid.coord[dir]->set_item(i,pos(dir));
+//            solid.vel[dir]->set_item(i,vel(dir));
+//            solid.ang_vel[dir]->set_item(i,ang_vel(dir));
+//         }
+//      }
+//   }
+// }
+//
 
 
 
@@ -1292,80 +1292,6 @@ DDS_NavierStokes:: calculate_row_indexes ( FV_DiscreteField const* FF)
 //    return(lambda);
 //
 // }
-
-//---------------------------------------------------------------------------
-double
-DDS_NavierStokes:: level_set_function (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NavierStokes:: level_set_solids" ) ;
-
-  PartInput solid = GLOBAL_EQ->get_solid(0);
-
-  double xp = solid.coord[0]->item(m);
-  double yp = solid.coord[1]->item(m);
-  double zp = solid.coord[2]->item(m);
-  double Rp = solid.size->item(m);
-
-  doubleVector delta(3,0);
-
-  delta(0) = xC-xp;
-  delta(1) = yC-yp;
-  delta(2) = 0;
-  if (dim == 3) delta(2) = zC-zp;
-
-  // Displacement correction in case of periodic boundary condition
-  // in any or all directions
-  for (size_t dir=0;dir<dim;dir++) {
-     if (is_periodic[field][dir]) {
-        double isize = FF->primary_grid()->get_main_domain_max_coordinate(dir)
-                     - FF->primary_grid()->get_main_domain_min_coordinate(dir);
-        delta(dir) = delta(dir) - round(delta(dir)/isize)*isize;
-     }
-  }
-
-  // Try to add continuous level set function;
-  // solver performs better in this case for nodes at interface
-  double level_set = 0.;
-  if (type == "Sphere") {
-     level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
-  } else if (type == "Ellipsoid") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta,comp,field);
-     level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
-  } else if (type == "Superquadric") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta,comp,field);
-     level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
-  } else if (type == "PipeX") {
-     level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
-  } else if (type == "Cube") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta,comp,field);
-     delta(0) = MAC::abs(delta(0)) - Rp;
-     delta(1) = MAC::abs(delta(1)) - Rp;
-     delta(2) = MAC::abs(delta(2)) - Rp;
-
-     if ((delta(0) < 0.) && (delta(1) < 0.) && (delta(2) < 0.)) {
-        level_set = MAC::min(delta(0),MAC::min(delta(1),delta(2)));
-     } else {
-        level_set = MAC::max(delta(0),MAC::max(delta(1),delta(2)));
-     }
-  } else if (type == "Cylinder") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta,comp,field);
-
-     level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
-     if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
-	level_set = MAC::abs(MAC::abs(delta(2))-Rp)*level_set;
-     } else {
-	level_set = MAC::max(MAC::abs(MAC::abs(delta(2))-Rp),MAC::abs(level_set));
-     }
-  }
-
-  return(level_set);
-
-}
 
 
 
@@ -1947,7 +1873,7 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF)
      b_intersect1[dir].field_var->nullify();
   }
 
-  double dh = FF->primary_grid()->get_smallest_grid_size();
+  // double dh = FF->primary_grid()->get_smallest_grid_size();
 
   for (size_t parID = 0; parID < Npart; parID++) {
 
@@ -1956,7 +1882,8 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF)
         size_t_vector min_unknown_index(3,0);
         size_t_vector max_unknown_index(3,0);
 
-        // Calculation on the rows next to the unknown (i.e. not handled by the proc) as well
+        // Calculation on the rows next to the unknown
+        // (i.e. not handled by the proc) as well
         for (size_t l=0;l<dim;++l) {
            // Calculations for solids on the total unknown on the proc
            min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
@@ -2010,10 +1937,10 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF)
         // Level 0 is for the intersection matrix corresponding to fluid side
         if (field == 0) {
            assemble_intersection_matrix(PF,comp,0,field);
-           assemble_intersection_matrix(PF,comp,1,field);
+           // assemble_intersection_matrix(PF,comp,1,field);
         } else if (field == 1) {
            assemble_intersection_matrix(UF,comp,0,field);
-           assemble_intersection_matrix(UF,comp,1,field);
+           // assemble_intersection_matrix(UF,comp,1,field);
         }
      }
   }
@@ -2029,112 +1956,128 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF
 {
   MAC_LABEL( "DDS_NavierStokes:: assemble_intersection_matrix" ) ;
 
-  size_t_vector min_index(dim,0);
-  size_t_vector max_index(dim,0);
- // size_t_vector min_unknown_index(dim,0);
- // size_t_vector max_unknown_index(dim,0);
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
+  size_t_vector min_nearest_index(3,0);
+  size_t_vector max_nearest_index(3,0);
   size_t_vector ipos(3,0);
-  size_t_array2D local_extents(dim,2,0);
+  size_t_array2D local_extents(3,2,0);
   size_t_array2D node_neigh(dim,2,0);
   vector<double> net_vel(3,0.);
+  size_t i0_temp = 0;
 
   NodeProp node = GLOBAL_EQ->get_node_property(field,0);
   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,level);
+  PartInput solid = GLOBAL_EQ->get_solid(0);
 
-  for (size_t l=0;l<dim;++l) {
-     // To include knowns at dirichlet boundary in the intersection calculation
-     // as well, modification to the looping extents are required
-     min_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) ;
-     max_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) ;
-     // min_index(l) = 0 ;
-     // max_index(l) = FF->get_local_nb_dof( comp, l ) ;
-     // local_extents(l,0) = 0;
-     // local_extents(l,1) = (max_index(l)-min_index(l));
-  }
+  for (size_t parID = 0; parID < Npart; parID++) {
 
-  size_t local_min_k = (dim == 2) ? 0 : min_index(2) ;
-  size_t local_max_k = (dim == 2) ? 1 : max_index(2);
+     for (size_t l=0;l<dim;++l) {
+        // To include knowns at dirichlet boundary in the intersection calculation
+        // as well, modification to the looping extents are required
+        min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) ;
+        max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) ;
+        local_extents(l,0) = 0;
+        local_extents(l,1) = max_unknown_index(l) - min_unknown_index(l);
 
-  for (size_t i=min_index(0);i<max_index(0);++i) {
-     ipos(0) = i - min_index(0);
-     for (size_t j=min_index(1);j<max_index(1);++j) {
-        ipos(1) = j - min_index(1);
-        for (size_t k=local_min_k;k<local_max_k;++k) {
-           ipos(2) = k - local_min_k;
-           size_t p = FF->DOF_local_number(i,j,k,comp);
+        double imin = FF->primary_grid()->get_main_domain_min_coordinate(l);
+        double delta_min = solid.coord[l]->item(parID)
+                         - grid_check_for_solid*solid.size->item(parID);
+        bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, l ),
+                                                         delta_min , i0_temp) ;
+        size_t index_min = (found) ? i0_temp : min_unknown_index(l);
 
-           double center_void_frac = 0.;
-           if (level == 0) {
-              center_void_frac = 1.;
-           } else if (level == 1) {
-              center_void_frac = 0.;
-           }
+        double imax = FF->primary_grid()->get_main_domain_max_coordinate(l);
+        double delta_max = solid.coord[l]->item(parID)
+                         + grid_check_for_solid*solid.size->item(parID);
+        found = FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, l ),
+                                                         delta_max , i0_temp) ;
+        size_t index_max = (found) ? i0_temp : max_unknown_index(l);
 
-           if (node.void_frac->item(p) != center_void_frac) {
+        if (is_periodic[field][l] && ((delta_max > imax) || (delta_min < imin))) {
+           index_min = min_unknown_index(l);
+           index_max = max_unknown_index(l);
+        }
 
-              for (size_t dir=0;dir<dim;dir++) {
-                 size_t ii,jj,kk;
-                 if (dir == 0) {
-                    ii = i;jj = j; kk = k;
-                 } else if (dir == 1) {
-                    ii = j;jj = i; kk = k;
-                 } else if (dir == 2) {
-                    ii = k;jj = i; kk = j;
-                 }
+        min_nearest_index(l) = MAC::max(min_unknown_index(l),index_min);
+        max_nearest_index(l) = MAC::min(max_unknown_index(l),index_max);
 
-                 for (size_t off=0;off<2;off++) {
-         		    // Checking if the nodes are on domain boundary or not,
-         		    // if so, the check the intersection only on one side
-         		    if (ipos(dir) != local_extents(dir,off)) {
-                       size_t left, right;
-                       if (off == 0) {
-                          left = ii-1; right = ii;
-                       } else if (off == 1) {
-                          left = ii; right = ii+1;
-                       }
+     }
 
-                       switch (dir) {
-                          case 0:
-                             node_neigh(dir,off) = (off == 0) ? FF->DOF_local_number(left,j,k,comp)
-                                                              : FF->DOF_local_number(right,j,k,comp);
-                             break;
-                          case 1:
-                             node_neigh(dir,off) = (off == 0) ? FF->DOF_local_number(i,left,k,comp)
-                                                              : FF->DOF_local_number(i,right,k,comp);
-                             break;
-                          case 2:
-                             node_neigh(dir,off) = (off == 0) ? FF->DOF_local_number(i,j,left,comp)
-                                                              : FF->DOF_local_number(i,j,right,comp);
-                             break;
-                       }
+     max_nearest_index(2) = (dim == 2) ? 1 : max_nearest_index(2);
 
-                       if (node.void_frac->item(node_neigh(dir,off)) != node.void_frac->item(p)) {
-                          double xb = find_intersection(FF,left,right,jj,kk,comp,dir,off,field,level);
-                          // Updating the relative direction of intersection from the node i
-                          b_intersect[dir].offset->set_item(p,off,1);
-                          // Storing the distance of intersection point from the node i
-                          b_intersect[dir].value->set_item(p,off,xb);
-                          // ID of particle having the intersection with node i
-                          // If level==0, then the neighbour node is present in the particle
-                          // If level==1, then the reference node is present in the particle
-                          size_t par_id;
-                          if (level == 0) {
-                             par_id = (size_t)node.parID->item(node_neigh(dir,off));
-                          } else if ( level == 1) {
-                             par_id = (size_t)node.parID->item(p);
+     for (size_t i = min_nearest_index(0); i < max_nearest_index(0); ++i) {
+        ipos(0) = i - min_unknown_index(0);
+        for (size_t j = min_nearest_index(1); j < max_nearest_index(1); ++j) {
+           ipos(1) = j - min_unknown_index(1);
+           for (size_t k = min_nearest_index(2);k < max_nearest_index(2); ++k) {
+              ipos(2) = k - min_unknown_index(2);
+              size_t p = FF->DOF_local_number(i,j,k,comp);
+
+              double center_void_frac = 0.;
+              if (level == 0) {
+                 center_void_frac = 1.;
+              } else if (level == 1) {
+                 center_void_frac = 0.;
+              }
+
+              if (node.void_frac->item(p) != center_void_frac) {
+
+                 for (size_t dir=0;dir<dim;dir++) {
+                    size_t ii,jj,kk;
+                    if (dir == 0) {
+                       ii = i;jj = j; kk = k;
+                    } else if (dir == 1) {
+                       ii = j;jj = i; kk = k;
+                    } else if (dir == 2) {
+                       ii = k;jj = i; kk = j;
+                    }
+
+                    for (size_t off=0;off<2;off++) {
+            		    // Checking if the nodes are on domain boundary or not,
+            		    // if so, the check the intersection only on one side
+            		    if (ipos(dir) != local_extents(dir,off)) {
+                          size_t left, right;
+                          if (off == 0) {
+                             left = ii-1; right = ii;
+                          } else if (off == 1) {
+                             left = ii; right = ii+1;
                           }
-                          // Calculate the variable values on the intersection of grid and solid
-                          impose_solid_velocity (FF,net_vel,comp,dir,off,i,j,k,xb,par_id);
-                          // Value of variable at the surface of particle
-                          if (field == 0) {
-                             b_intersect[dir].field_var->set_item(p,off,net_vel[dir]);
-                          } else if (field == 1) {
-                             b_intersect[dir].field_var->set_item(p,off,net_vel[comp]);
+
+                          switch (dir) {
+                             case 0:
+                                node_neigh(dir,off) = (off == 0) ? FF->DOF_local_number(left,j,k,comp)
+                                                                 : FF->DOF_local_number(right,j,k,comp);
+                                break;
+                             case 1:
+                                node_neigh(dir,off) = (off == 0) ? FF->DOF_local_number(i,left,k,comp)
+                                                                 : FF->DOF_local_number(i,right,k,comp);
+                                break;
+                             case 2:
+                                node_neigh(dir,off) = (off == 0) ? FF->DOF_local_number(i,j,left,comp)
+                                                                 : FF->DOF_local_number(i,j,right,comp);
+                                break;
+                          }
+
+                          if (node.void_frac->item(node_neigh(dir,off)) != node.void_frac->item(p)) {
+                             double xb = find_intersection(FF,left,right,jj,kk,comp,dir,off,field,level,parID);
+                             // Updating the relative direction of intersection from the node i
+                             b_intersect[dir].offset->set_item(p,off,1);
+                             // Storing the distance of intersection point from the node i
+                             b_intersect[dir].value->set_item(p,off,xb);
+                             // Calculate the variable values on the intersection of grid and solid
+                             impose_solid_velocity (FF,net_vel,comp,dir,off,i,j,k,xb,parID);
+                             // Value of variable at the surface of particle
+                             if (field == 0) {
+                                b_intersect[dir].field_var->set_item(p,off,net_vel[dir]);
+                             } else if (field == 1) {
+                                b_intersect[dir].field_var->set_item(p,off,net_vel[comp]);
+                             }
                           }
                        }
                     }
-                 }
-	           }
+   	           }
+              }
            }
         }
      }
@@ -2143,24 +2086,25 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& field, size_t const& level)
+DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF
+                                     , size_t const& left
+                                     , size_t const& right
+                                     , size_t const& yconst
+                                     , size_t const& zconst
+                                     , size_t const& comp
+                                     , size_t const& dir
+                                     , size_t const& off
+                                     , size_t const& field
+                                     , size_t const& level
+                                     , size_t const& parID)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NavierStokes:: find_intersection" ) ;
 
-  NodeProp node = GLOBAL_EQ->get_node_property(field,0);
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
   size_t_vector side(2,0);
 
   side(0) = left;
   side(1) = right;
-
-  for (size_t l=0;l<dim;++l) {
-     min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-     max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
-  }
 
   double funl=0., func=0., funr=0.;
 
@@ -2168,62 +2112,38 @@ DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const&
   double xright = FF->get_DOF_coordinate( side(1), comp, dir ) ;
 
   double yvalue=0.,zvalue=0.;
-  size_t p=0;
 
   if (dir == 0) {
      yvalue = FF->get_DOF_coordinate( yconst, comp, 1 ) ;
      if (dim == 3) zvalue = FF->get_DOF_coordinate( zconst, comp, 2 ) ;
-     // If level==0, then the neighbour node is present in the particle
-     // If level==1, then the reference node is present in the particle
-     if (off != level) {
-        p = FF->DOF_local_number(side(1),yconst,zconst,comp);
-     } else if (off == level) {
-        p = FF->DOF_local_number(side(0),yconst,zconst,comp);
-     }
   } else if (dir == 1) {
      yvalue = FF->get_DOF_coordinate( yconst, comp, 0 ) ;
      if (dim == 3) zvalue = FF->get_DOF_coordinate( zconst, comp, 2 ) ;
-     // If level==0, then the neighbour node is present in the particle
-     // If level==1, then the reference node is present in the particle
-     if (off != level) {
-        p = FF->DOF_local_number(yconst,side(1),zconst,comp);
-     } else if ( off == level) {
-        p = FF->DOF_local_number(yconst,side(0),zconst,comp);
-     }
   } else if (dir == 2) {
      yvalue = FF->get_DOF_coordinate( yconst, comp, 0 ) ;
      if (dim == 3) zvalue = FF->get_DOF_coordinate( zconst, comp, 1 ) ;
-     // If level==0, then the neighbour node is present in the particle
-     // If level==1, then the reference node is present in the particle
-     if (off != level) {
-        p = FF->DOF_local_number(yconst,zconst,side(1),comp);
-     } else if ( off == level) {
-        p = FF->DOF_local_number(yconst,zconst,side(0),comp);
-     }
   }
-
-  size_t id = (size_t)node.parID->item(p);
 
   double xcenter;
 
   if (dir == 0) {
-     funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-     funr = level_set_function(FF,id,comp,xright,yvalue,zvalue,level_set_type,field);
+     funl = allrigidbodies->level_set_value(parID,xleft,yvalue,zvalue);
+     funr = allrigidbodies->level_set_value(parID,xright,yvalue,zvalue);
   } else if (dir == 1) {
-     funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-     funr = level_set_function(FF,id,comp,yvalue,xright,zvalue,level_set_type,field);
+     funl = allrigidbodies->level_set_value(parID,yvalue,xleft,zvalue);
+     funr = allrigidbodies->level_set_value(parID,yvalue,xright,zvalue);
   } else if (dir == 2) {
-     funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-     funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
+     funl = allrigidbodies->level_set_value(parID,yvalue,zvalue,xleft);
+     funr = allrigidbodies->level_set_value(parID,yvalue,zvalue,xright);
   }
 
   // In case both the points are on the same side of solid interface
-  // This will occur when the point just outside the solid interface will be considered inside the solid
-  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid
-  // by shifting the point by 5% of grid size
+  // This will occur when the point just outside the solid interface
+  // will be considered inside the solid. This condition enables the
+  // intersection with the interface using the point in fluid and the
+  // ACTUAL node in the solid by shifting the point by 5% of grid size
   if (funl*funr > 0.) {
      double dx = FF->primary_grid()->get_smallest_grid_size();
-//     double dx = FF->get_cell_size(side(off),comp,dir) ;
      if (off == level) {
         xleft = xleft - 0.05*dx;
      } else {
@@ -2232,14 +2152,14 @@ DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const&
   }
 
   if (dir == 0) {
-     funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-     funr = level_set_function(FF,id,comp,xright,yvalue,zvalue,level_set_type,field);
+     funl = allrigidbodies->level_set_value(parID,xleft,yvalue,zvalue);
+     funr = allrigidbodies->level_set_value(parID,xright,yvalue,zvalue);
   } else if (dir == 1) {
-     funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-     funr = level_set_function(FF,id,comp,yvalue,xright,zvalue,level_set_type,field);
+     funl = allrigidbodies->level_set_value(parID,yvalue,xleft,zvalue);
+     funr = allrigidbodies->level_set_value(parID,yvalue,xright,zvalue);
   } else if (dir == 2) {
-     funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-     funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
+     funl = allrigidbodies->level_set_value(parID,yvalue,zvalue,xleft);
+     funr = allrigidbodies->level_set_value(parID,yvalue,zvalue,xright);
   }
 
   // If the shifted point is also physically outside the solid then xb = dx
@@ -2260,19 +2180,21 @@ DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const&
 	     }
 
         if (dir == 0) {
-           funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-           func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
+           funl = allrigidbodies->level_set_value(parID,xleft,yvalue,zvalue);
+           func = allrigidbodies->level_set_value(parID,xcenter,yvalue,zvalue);
         } else if (dir == 1) {
-           funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-           func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
+           funl = allrigidbodies->level_set_value(parID,yvalue,xleft,zvalue);
+           func = allrigidbodies->level_set_value(parID,yvalue,xcenter,zvalue);
         } else if (dir == 2) {
-           funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-           func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
+           funl = allrigidbodies->level_set_value(parID,yvalue,zvalue,xleft);
+           func = allrigidbodies->level_set_value(parID,yvalue,zvalue,xcenter);
         }
 
         iter = iter + 1;
 
-        if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
+        if (iter == max_iter)
+           cout << "WARNING: Maxmimum iteration reached for intersection"
+                << " calculation. Proceed with Caution !!!" << endl;
 
         if (func*funl >= 1.E-16) {
            xleft = xcenter;
@@ -2295,111 +2217,111 @@ DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF, size_t const&
   return (xcenter);
 }
 
-//---------------------------------------------------------------------------
-double
-DDS_NavierStokes:: find_intersection_for_ghost ( FV_DiscreteField const* FF, double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& field, size_t const& level, size_t const& off)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NavierStokes:: find_intersection_for_ghost" ) ;
-
-  doubleVector side(2,0);
-
-  double xleft = xl;
-  double xright = xr;
-
-  side(0) = xleft;
-  side(1) = xright;
-
-  double funl=0., func=0., funr=0.;
-
-  double xcenter;
-
-  if (dir == 0) {
-     funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-     funr = level_set_function(FF,id,comp,xright,yvalue,zvalue,level_set_type,field);
-  } else if (dir == 1) {
-     funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-     funr = level_set_function(FF,id,comp,yvalue,xright,zvalue,level_set_type,field);
-  } else if (dir == 2) {
-     funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-     funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
-  }
-
-  // In case both the points are on the same side of solid interface
-  // This will occur when the point just outside the solid interface will be considered inside the solid
-  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL point in the solid
-  // by shifting the point by 5% of grid size
-  if (funl*funr > 0.) {
-     if (off == level) {
-        xleft = xleft - 0.05*dx;
-     } else {
-        xright = xright + 0.05*dx;
-     }
-  }
-
-  // Updating the values using new points
-  if (dir == 0) {
-     funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-     funr = level_set_function(FF,id,comp,xright,yvalue,zvalue,level_set_type,field);
-  } else if (dir == 1) {
-     funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-     funr = level_set_function(FF,id,comp,yvalue,xright,zvalue,level_set_type,field);
-  } else if (dir == 2) {
-     funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-     funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
-  }
-
-  // If the shifted point is also physically outside the solid then xb = dx
-  if (funl*funr > 0.) {
-     xcenter = side(off) ;
-  } else {
-     // Bisection method algorithm
-     double eps = MAC::abs(xright-xleft);
-     double xcenter_old = eps/2.;
-     size_t max_iter = 500, iter = 0;
-     while ((eps > tolerance) && (iter < max_iter)) {
-        xcenter = (xleft+xright)/2.;
-
-        if (MAC::abs(xcenter_old) > 1.e-12) {
-	        eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
-        } else {
-           eps = MAC::abs(xcenter - xcenter_old);
-        }
-
-        if (dir == 0) {
-           funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-           func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
-        } else if (dir == 1) {
-           funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-           func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
-        } else if (dir == 2) {
-           funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-           func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
-        }
-
-        iter = iter + 1;
-        if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
-
-        if (func*funl >= 1.E-16) {
-           xleft = xcenter;
-        } else if (func == 1.E-16) {
-           break;
-        } else {
-           xright = xcenter;
-        }
-
-        xcenter_old = xcenter;
-     }
-  }
-
-  if (off == 0) {
-     xcenter = MAC::abs(xcenter - side(1));
-  } else if (off == 1) {
-     xcenter = MAC::abs(xcenter - side(0));
-  }
-
-  return (xcenter);
-}
+// //---------------------------------------------------------------------------
+// double
+// DDS_NavierStokes:: find_intersection_for_ghost ( FV_DiscreteField const* FF, double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& field, size_t const& level, size_t const& off)
+// //---------------------------------------------------------------------------
+// {
+//   MAC_LABEL( "DDS_NavierStokes:: find_intersection_for_ghost" ) ;
+//
+//   doubleVector side(2,0);
+//
+//   double xleft = xl;
+//   double xright = xr;
+//
+//   side(0) = xleft;
+//   side(1) = xright;
+//
+//   double funl=0., func=0., funr=0.;
+//
+//   double xcenter;
+//
+//   if (dir == 0) {
+//      funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+//      funr = level_set_function(FF,id,comp,xright,yvalue,zvalue,level_set_type,field);
+//   } else if (dir == 1) {
+//      funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+//      funr = level_set_function(FF,id,comp,yvalue,xright,zvalue,level_set_type,field);
+//   } else if (dir == 2) {
+//      funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+//      funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
+//   }
+//
+//   // In case both the points are on the same side of solid interface
+//   // This will occur when the point just outside the solid interface will be considered inside the solid
+//   // This condition enables the intersection with the interface using the point in fluid and the ACTUAL point in the solid
+//   // by shifting the point by 5% of grid size
+//   if (funl*funr > 0.) {
+//      if (off == level) {
+//         xleft = xleft - 0.05*dx;
+//      } else {
+//         xright = xright + 0.05*dx;
+//      }
+//   }
+//
+//   // Updating the values using new points
+//   if (dir == 0) {
+//      funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+//      funr = level_set_function(FF,id,comp,xright,yvalue,zvalue,level_set_type,field);
+//   } else if (dir == 1) {
+//      funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+//      funr = level_set_function(FF,id,comp,yvalue,xright,zvalue,level_set_type,field);
+//   } else if (dir == 2) {
+//      funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+//      funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
+//   }
+//
+//   // If the shifted point is also physically outside the solid then xb = dx
+//   if (funl*funr > 0.) {
+//      xcenter = side(off) ;
+//   } else {
+//      // Bisection method algorithm
+//      double eps = MAC::abs(xright-xleft);
+//      double xcenter_old = eps/2.;
+//      size_t max_iter = 500, iter = 0;
+//      while ((eps > tolerance) && (iter < max_iter)) {
+//         xcenter = (xleft+xright)/2.;
+//
+//         if (MAC::abs(xcenter_old) > 1.e-12) {
+// 	        eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
+//         } else {
+//            eps = MAC::abs(xcenter - xcenter_old);
+//         }
+//
+//         if (dir == 0) {
+//            funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
+//            func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
+//         } else if (dir == 1) {
+//            funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
+//            func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
+//         } else if (dir == 2) {
+//            funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
+//            func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
+//         }
+//
+//         iter = iter + 1;
+//         if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
+//
+//         if (func*funl >= 1.E-16) {
+//            xleft = xcenter;
+//         } else if (func == 1.E-16) {
+//            break;
+//         } else {
+//            xright = xcenter;
+//         }
+//
+//         xcenter_old = xcenter;
+//      }
+//   }
+//
+//   if (off == 0) {
+//      xcenter = MAC::abs(xcenter - side(1));
+//   } else if (off == 1) {
+//      xcenter = MAC::abs(xcenter - side(0));
+//   }
+//
+//   return (xcenter);
+// }
 
 //---------------------------------------------------------------------------
 double

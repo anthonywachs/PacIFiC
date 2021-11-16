@@ -205,8 +205,6 @@ public SolverComputingTime
 
       void node_property_calculation (FV_DiscreteField const* FF );
 
-      double level_set_function (FV_DiscreteField const* FF, size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type, size_t const& field);
-
       /** @brief Correct the fluxes and variables on the
           nodes due to presence of solid objects */
       void assemble_intersection_matrix (FV_DiscreteField const* FF
@@ -268,7 +266,8 @@ public SolverComputingTime
                               , size_t const& dir
                               , size_t const& off
                               , size_t const& field
-                              , size_t const& level);
+                              , size_t const& level
+                              , size_t const& parID);
 
       void correct_pressure_1st_layer_solid (size_t const& level );
 

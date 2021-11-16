@@ -188,6 +188,35 @@ bool DS_AllRigidBodies:: isIn( size_t const& parID,
 
 
 //---------------------------------------------------------------------------
+double DS_AllRigidBodies:: level_set_value( size_t const& parID,
+		                         geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: isIn(pt)" ) ;
+
+  return (m_allDSrigidbodies[parID]->level_set_value( pt ));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_AllRigidBodies:: level_set_value( size_t const& parID,
+		                         double const& x,
+                               double const& y,
+                               double const& z ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: isIn(x,y,z)" ) ;
+
+  return (m_allDSrigidbodies[parID]->level_set_value( x, y, z ));
+
+}
+
+
+
+//---------------------------------------------------------------------------
 FS_AllRigidBodies const* DS_AllRigidBodies:: get_ptr_FS_AllRigidBodies() const
 //---------------------------------------------------------------------------
 {

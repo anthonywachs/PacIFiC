@@ -182,6 +182,34 @@ bool FS_Sphere:: isIn( double const& x, double const& y, double const& z )
 
 
 //---------------------------------------------------------------------------
+double FS_Sphere:: level_set_value( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Sphere:: level_set_value(pt)" ) ;
+
+  return ( m_gravity_center.calcDist( pt ) - m_agp_sphere.radius );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double FS_Sphere:: level_set_value( double const& x
+                                , double const& y
+                                , double const& z ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Sphere:: level_set_value(x,y,z)" ) ;
+
+  return ( m_gravity_center.calcDist( x, y, z ) - m_agp_sphere.radius );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 tuple<bool,double,size_t> FS_Sphere:: distanceTo( geomVector const& pt,
       	size_t const& direction,
       	bool const& positive ) const
