@@ -2,6 +2,7 @@
 #define _DS_RIGIDBODY__
 
 #include <geomVector.hh>
+#include <size_t_vector.hh>
 #include <MAC_assertions.hh>
 #include <vector>
 #include <iostream>
@@ -11,7 +12,6 @@ using std::vector;
 using std::tuple;
 class FS_RigidBody;
 class FV_DiscreteField;
-
 
 /** @brief The class DS_RigidBody.
 
@@ -47,7 +47,6 @@ class DS_RigidBody
       geometric rigid body */
       virtual void update() = 0;
       //@}
-
 
    //-- Methods
 
@@ -98,7 +97,16 @@ class DS_RigidBody
       @param PP the pressure field
       @param UU the velocity field */
       virtual void compute_hydro_force_torque( FV_DiscreteField const* PP,
-	FV_DiscreteField const* UU ) = 0;
+	                                         FV_DiscreteField const* UU ) = 0;
+
+      /** @brief Computes the void fraction on the fluid grid nodes
+      and store the values in its corresponding void fraction variable
+      @param FF the fluid field */
+      void compute_void_fraction_on_grid( FV_DiscreteField const* FF
+                                        , size_t_vector* void_fraction
+                                        , size_t_vector* rb_ID
+                                        , size_t const& parID );
+
       //@}
 
 
@@ -125,8 +133,8 @@ class DS_RigidBody
       @param PP the pressure field
       @param UU the velocity field */
       void compute_surface_integrals_hydro_force_torque(
-      	FV_DiscreteField const* PP,
-	FV_DiscreteField const* UU );
+      	                                   FV_DiscreteField const* PP,
+                                            FV_DiscreteField const* UU );
       //@}
 
 

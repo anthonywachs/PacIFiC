@@ -2,6 +2,7 @@
 #define _DS_ALLRIGIDBODIES__
 
 #include <geomVector.hh>
+#include <size_t_vector.hh>
 #include <vector>
 #include <iostream>
 #include <sstream>
@@ -14,7 +15,6 @@ using std::string;
 class DS_RigidBody;
 class FS_AllRigidBodies;
 class FV_DiscreteField;
-
 
 /** @brief The class DS_AllRigidBodies.
 
@@ -38,8 +38,11 @@ class DS_AllRigidBodies
       @param in input stream where features of rigid bodies are read
       @param b_particles_as_fixed_obstacles treat all rigid bodies as fixed
       obstacles */
-      DS_AllRigidBodies( size_t& dimens, istream& in,
-      	bool const& b_particles_as_fixed_obstacles );
+      DS_AllRigidBodies( size_t& dimens
+                       , istream& in
+                       , bool const& b_particles_as_fixed_obstacles
+                       , FV_DiscreteField const* arb_UF
+                       , FV_DiscreteField const* arb_PF );
 
       /** @brief Destructor */
       ~DS_AllRigidBodies();
@@ -65,6 +68,14 @@ class DS_AllRigidBodies
 
       /** @brief Returns a pointer to the ith DS rigid body */
       DS_RigidBody* get_ptr_rigid_body( size_t i );
+
+      /** @brief Returns the void_fraction on field FF */
+      size_t_vector* get_void_fraction_on_grid( FV_DiscreteField const* FF );
+
+      /** @brief Returns the ID of rigid body present on the field FF */
+      size_t_vector* get_rigidbodyIDs_on_grid( FV_DiscreteField const* FF );
+
+
       //@}
 
 
@@ -128,12 +139,26 @@ class DS_AllRigidBodies
       @param PP the pressure field
       @param UU the velocity field */
       void compute_hydro_force_torque( FV_DiscreteField const* PP,
-	FV_DiscreteField const* UU );
+	                                    FV_DiscreteField const* UU );
+
+      /** @brief Computes the void fraction on the grid nodes
+      of a given fluid field */
+      void compute_void_fraction_on_grid( );
+
+      /** @brief Build the variable associated with the rigid bodies
+      on the Cartesian computational grid */
+      void build_solid_variables_on_grid( );
       //@}
 
 
    protected: //--------------------------------------------------------------
 
+   //-- Attributes
+
+      /**@name Parameters */
+      //@{
+
+      //@}
 
    private: //----------------------------------------------------------------
 
@@ -145,12 +170,20 @@ class DS_AllRigidBodies
       size_t m_npart; /**< number of particles */
       size_t m_nrb; /**< total number of rigid bodies = number of
       	particles + number of obstacles, npart first rigid bodies are always
-	particles while ( m_nrb - m_npart ) last rigid bodies are obstacles */
+         particles while ( m_nrb - m_npart ) last rigid bodies are obstacles */
       vector<DS_RigidBody*> m_allDSrigidbodies; /**< the vector of all
     	Direction Splitting rigid bodies */
       FS_AllRigidBodies* m_FSallrigidbodies; /**< the pointer to the
     	FS_AllRigidBodies object that contains the vector of all
     	corresponding geometric rigid bodies */
+
+      // Pointers to the constant velocity and pressure field
+      FV_DiscreteField const* UF ;
+      FV_DiscreteField const* PF ;
+
+      vector<size_t_vector*> void_fraction;
+      vector<size_t_vector*> rb_ID;
+
       //@}
 
 

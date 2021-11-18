@@ -21,10 +21,15 @@ DS_AllRigidBodies:: DS_AllRigidBodies()
 
 
 //---------------------------------------------------------------------------
-DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens, istream& in,
-	bool const& b_particles_as_fixed_obstacles )
+DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
+                                  , istream& in
+                                  , bool const& b_particles_as_fixed_obstacles
+                                  , FV_DiscreteField const* arb_UF
+                                  , FV_DiscreteField const* arb_PF )
 //---------------------------------------------------------------------------
   : m_space_dimension( dimens )
+  , UF ( arb_UF )
+  , PF ( arb_PF )
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
@@ -40,6 +45,10 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens, istream& in,
     m_allDSrigidbodies[i] = DS_RigidBody_BuilderFactory::create(
     	m_FSallrigidbodies->get_ptr_rigid_body(i) );
   }
+
+  build_solid_variables_on_grid();
+
+  compute_void_fraction_on_grid();
 
 }
 
@@ -249,5 +258,88 @@ DS_RigidBody const* DS_AllRigidBodies:: get_ptr_rigid_body( size_t i ) const
   MAC_LABEL( "DS_AllRigidBodies:: get_ptr_rigid_body" ) ;
 
   return ( m_allDSrigidbodies[i] );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: compute_void_fraction_on_grid( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: compute_void_fraction_on_grid" ) ;
+
+  for (size_t i = 0; i < m_nrb; ++i) {
+     m_allDSrigidbodies[i]->
+            compute_void_fraction_on_grid(PF,void_fraction[0],rb_ID[0],i);
+     m_allDSrigidbodies[i]->
+            compute_void_fraction_on_grid(UF,void_fraction[1],rb_ID[1],i);
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: build_solid_variables_on_grid(  )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_AllRigidBodies:: build_solid_variables_on_grid" ) ;
+
+   // void fraction on the computational grid
+   // For PF and UF
+   void_fraction.reserve(2);
+   void_fraction.push_back(new size_t_vector(1,0));
+   void_fraction.push_back(new size_t_vector(1,0));
+
+   void_fraction[0]->re_initialize(PF->nb_local_unknowns());
+   void_fraction[1]->re_initialize(UF->nb_local_unknowns());
+
+   // ID of rigid body on the computational grid, if present
+   // For PF and UF
+   rb_ID.reserve(2);
+   rb_ID.push_back(new size_t_vector(1,0));
+   rb_ID.push_back(new size_t_vector(1,0));
+
+   rb_ID[0]->re_initialize(PF->nb_local_unknowns());
+   rb_ID[1]->re_initialize(UF->nb_local_unknowns());
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+size_t_vector* DS_AllRigidBodies:: get_void_fraction_on_grid(
+                                                FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: get_void_fraction_on_grid" ) ;
+
+  if ( FF == PF ) {
+    return (void_fraction[0]);
+  } else if (FF == UF ) {
+    return (void_fraction[1]);
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+size_t_vector* DS_AllRigidBodies:: get_rigidbodyIDs_on_grid(
+                                                FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: get_void_fraction_on_grid" ) ;
+
+  if ( FF == PF ) {
+    return (rb_ID[0]);
+  } else if (FF == UF ) {
+    return (rb_ID[1]);
+  }
 
 }

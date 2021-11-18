@@ -93,9 +93,8 @@ void FS_RigidBody:: display_general( ostream& out,
   out << space << three << "Jyz = " << m_inertia[1][2] << endl;
   out << space << three << "Jzz = " << m_inertia[2][2] << endl;
   out << space << "Gravity center = " << m_gravity_center(0)
-  												  << three << m_gravity_center(1)
-												  << three << m_gravity_center(2)
-												  << endl;
+  									  << three << m_gravity_center(1)
+									  << three << m_gravity_center(2) << endl;
   out << space << "Rotation matrix M" << endl;
   out << space << three << "Mxx = " << m_rotation_matrix[0][0] << endl;
   out << space << three << "Mxy = " << m_rotation_matrix[0][1] << endl;

@@ -1,5 +1,7 @@
 #include <DS_RigidBody.hh>
 #include <FS_RigidBody.hh>
+#include <FV_DiscreteField.hh>
+#include <FV_Mesh.hh>
 using std::endl;
 
 
@@ -128,5 +130,85 @@ void DS_RigidBody:: compute_surface_integrals_hydro_force_torque(
   // Store the values in the corresponding geometric sphere
   m_geometric_rigid_body->set_hydro_force( hydro_force );
   m_geometric_rigid_body->set_hydro_torque( hydro_torque );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_RigidBody:: compute_void_fraction_on_grid( FV_DiscreteField const* FF
+                                                 , size_t_vector* void_fraction
+                                                 , size_t_vector* rb_ID
+                                                 , size_t const& parID )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBodies:: compute_void_fraction_on_grid" ) ;
+
+  size_t nb_comps = FF->nb_components() ;
+  size_t dim = FF->primary_grid()->nb_space_dimensions() ;
+
+  boolVector const* periodic_comp = FF->primary_grid()->get_periodic_directions();
+
+  // Get local min and max indices;
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
+
+  // Calculation on the indexes near the rigid body
+  for (size_t comp = 0; comp < nb_comps; ++comp) {
+     for (size_t dir = 0; dir < dim; ++dir) {
+        // Calculations for solids on the total unknown on the proc
+        min_unknown_index(dir) = FF->get_min_index_unknown_on_proc( comp, dir );
+        max_unknown_index(dir) = FF->get_max_index_unknown_on_proc( comp, dir );
+
+        // bool is_periodic = periodic_comp->operator()( dir );
+         // double domain_min =
+         //        FF->primary_grid()->get_main_domain_min_coordinate( dir );
+         // double domain_max =
+         //        FF->primary_grid()->get_main_domain_max_coordinate( dir );
+         // double delta_min = solid.coord[dir]->item(m) - 1.5*solid.size->item(m);
+         // bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+         //                                             , delta_min , i0_temp) ;
+         // size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
+         //
+         //
+         // double delta_max = solid.coord[dir]->item(m) + 1.5*solid.size->item(m);
+         // found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+         //                                             , delta_max , i0_temp) ;
+         // size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
+         //
+         // if (is_periodic &&
+         //     ((delta_max > domain_max) || (delta_min < domain_min))) {
+         //    index_min = min_unknown_index(dir);
+         //    index_max = max_unknown_index(dir);
+         // }
+         //
+         // min_unknown_index(l) = MAC::max(min_unknown_index(dir),index_min);
+         // max_unknown_index(l) = MAC::min(max_unknown_index(dir),index_max);
+
+     }
+
+     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+        double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
+        for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+           double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
+           for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+              double zC = (dim == 2) ? 0.
+                                  : FF->get_DOF_coordinate( k, comp, 2 ) ;
+              size_t p = FF->DOF_local_number(i,j,k,comp);
+
+              // level_set is xb, if local critical time scale
+              // is 0.01 of the global time scale
+              // then the node is considered inside the solid object
+              // (xb/dh)^2 = 0.01 --> (xb/xC) = 0.1
+              // if (level_set <= pow(loc_thres,0.5)*dh) {
+              if (isIn(xC,yC,zC)) {
+                 void_fraction->operator()(p) = 1;
+                 rb_ID->operator()(p) = parID;
+              }
+           }
+        }
+     }
+ }
 
 }
