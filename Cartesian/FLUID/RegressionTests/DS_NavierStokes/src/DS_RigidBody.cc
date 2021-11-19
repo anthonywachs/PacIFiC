@@ -157,8 +157,6 @@ void DS_RigidBody:: compute_void_fraction_on_grid( FV_DiscreteField const* FF
 
   size_t i0_temp = 0;
 
-  doubleArray2D* haloZone = compute_rigid_body_halozone();
-
   // Calculation on the indexes near the rigid body
   for (size_t comp = 0; comp < nb_comps; ++comp) {
      for (size_t dir = 0; dir < dim; ++dir) {
@@ -173,19 +171,19 @@ void DS_RigidBody:: compute_void_fraction_on_grid( FV_DiscreteField const* FF
                 FF->primary_grid()->get_main_domain_max_coordinate( dir );
 
         bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-                                    , haloZone->operator()(dir,0)
+                                    , m_halo_zone->operator()(dir,0)
                                     , i0_temp) ;
         size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
 
 
         found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-                                , haloZone->operator()(dir,1)
+                                , m_halo_zone->operator()(dir,1)
                                 , i0_temp) ;
         size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
 
         if (is_periodic &&
-           ((haloZone->operator()(dir,1) > domain_max)
-         || (haloZone->operator()(dir,0) < domain_min))) {
+           ((m_halo_zone->operator()(dir,1) > domain_max)
+         || (m_halo_zone->operator()(dir,0) < domain_min))) {
            index_min = min_unknown_index(dir);
            index_max = max_unknown_index(dir);
         }

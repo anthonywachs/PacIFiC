@@ -25,6 +25,7 @@ DS_Sphere:: DS_Sphere( FS_RigidBody* pgrb )
   MAC_LABEL( "DS_RigidBody:: DS_RigidBody" ) ;
 
   m_halo_zone = new doubleArray2D (3,2,0);
+  compute_rigid_body_halozone();
 
 }
 
@@ -73,7 +74,7 @@ void DS_Sphere:: display( ostream& out, size_t const& indent_width ) const
 
 
 //---------------------------------------------------------------------------
-doubleArray2D* DS_Sphere:: compute_rigid_body_halozone( )
+void DS_Sphere:: compute_rigid_body_halozone( )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_Sphere:: compute_rigid_body_halozone" ) ;
@@ -93,8 +94,6 @@ doubleArray2D* DS_Sphere:: compute_rigid_body_halozone( )
 
   m_halo_zone->operator()(2,0) = pgs->operator()(2) - 1.5*pagp->radius;
   m_halo_zone->operator()(2,1) = pgs->operator()(2) + 1.5*pagp->radius;
-
-  return(m_halo_zone);
 
 }
 
