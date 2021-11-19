@@ -24,6 +24,8 @@ DS_Sphere:: DS_Sphere( FS_RigidBody* pgrb )
 {
   MAC_LABEL( "DS_RigidBody:: DS_RigidBody" ) ;
 
+  m_halo_zone = new doubleArray2D (3,2,0);
+
 }
 
 
@@ -64,6 +66,35 @@ void DS_Sphere:: display( ostream& out, size_t const& indent_width ) const
   m_geometric_rigid_body->display( out, indent_width + 3 );
   out << space << "Direction splitting specific features" << endl;
   out << space << three << "None so far" << endl;
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+doubleArray2D* DS_Sphere:: compute_rigid_body_halozone( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_Sphere:: compute_rigid_body_halozone" ) ;
+
+  struct FS_Sphere_Additional_Param const* pagp =
+   dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
+      ->get_ptr_FS_Sphere_Additional_Param();
+
+  geomVector const* pgs = dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
+                              ->get_ptr_FS_Sphere_gravity_centre();
+
+  m_halo_zone->operator()(0,0) = pgs->operator()(0) - 1.5*pagp->radius;
+  m_halo_zone->operator()(0,1) = pgs->operator()(0) + 1.5*pagp->radius;
+
+  m_halo_zone->operator()(1,0) = pgs->operator()(1) - 1.5*pagp->radius;
+  m_halo_zone->operator()(1,1) = pgs->operator()(1) + 1.5*pagp->radius;
+
+  m_halo_zone->operator()(2,0) = pgs->operator()(2) - 1.5*pagp->radius;
+  m_halo_zone->operator()(2,1) = pgs->operator()(2) + 1.5*pagp->radius;
+
+  return(m_halo_zone);
 
 }
 

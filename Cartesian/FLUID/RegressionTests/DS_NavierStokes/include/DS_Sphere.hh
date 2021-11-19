@@ -58,6 +58,9 @@ class DS_Sphere: public DS_RigidBody
       void compute_hydro_force_torque( FV_DiscreteField const* PP,
 	                                    FV_DiscreteField const* UU );
 
+      /** @brief Computes the min and max extents of the sphere halozone
+      , required for the computation of void fraction */
+      doubleArray2D* compute_rigid_body_halozone( );
       //@}
 
 

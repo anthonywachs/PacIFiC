@@ -148,11 +148,16 @@ void DS_RigidBody:: compute_void_fraction_on_grid( FV_DiscreteField const* FF
   size_t nb_comps = FF->nb_components() ;
   size_t dim = FF->primary_grid()->nb_space_dimensions() ;
 
-  boolVector const* periodic_comp = FF->primary_grid()->get_periodic_directions();
+  boolVector const* periodic_comp =
+                        FF->primary_grid()->get_periodic_directions();
 
   // Get local min and max indices;
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
+
+  size_t i0_temp = 0;
+
+  doubleArray2D* haloZone = compute_rigid_body_halozone();
 
   // Calculation on the indexes near the rigid body
   for (size_t comp = 0; comp < nb_comps; ++comp) {
@@ -161,30 +166,32 @@ void DS_RigidBody:: compute_void_fraction_on_grid( FV_DiscreteField const* FF
         min_unknown_index(dir) = FF->get_min_index_unknown_on_proc( comp, dir );
         max_unknown_index(dir) = FF->get_max_index_unknown_on_proc( comp, dir );
 
-        // bool is_periodic = periodic_comp->operator()( dir );
-         // double domain_min =
-         //        FF->primary_grid()->get_main_domain_min_coordinate( dir );
-         // double domain_max =
-         //        FF->primary_grid()->get_main_domain_max_coordinate( dir );
-         // double delta_min = solid.coord[dir]->item(m) - 1.5*solid.size->item(m);
-         // bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-         //                                             , delta_min , i0_temp) ;
-         // size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
-         //
-         //
-         // double delta_max = solid.coord[dir]->item(m) + 1.5*solid.size->item(m);
-         // found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-         //                                             , delta_max , i0_temp) ;
-         // size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
-         //
-         // if (is_periodic &&
-         //     ((delta_max > domain_max) || (delta_min < domain_min))) {
-         //    index_min = min_unknown_index(dir);
-         //    index_max = max_unknown_index(dir);
-         // }
-         //
-         // min_unknown_index(l) = MAC::max(min_unknown_index(dir),index_min);
-         // max_unknown_index(l) = MAC::min(max_unknown_index(dir),index_max);
+        bool is_periodic = periodic_comp->operator()( dir );
+        double domain_min =
+                FF->primary_grid()->get_main_domain_min_coordinate( dir );
+        double domain_max =
+                FF->primary_grid()->get_main_domain_max_coordinate( dir );
+
+        bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+                                    , haloZone->operator()(dir,0)
+                                    , i0_temp) ;
+        size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
+
+
+        found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+                                , haloZone->operator()(dir,1)
+                                , i0_temp) ;
+        size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
+
+        if (is_periodic &&
+           ((haloZone->operator()(dir,1) > domain_max)
+         || (haloZone->operator()(dir,0) < domain_min))) {
+           index_min = min_unknown_index(dir);
+           index_max = max_unknown_index(dir);
+        }
+
+        min_unknown_index(dir) = MAC::max(min_unknown_index(dir),index_min);
+        max_unknown_index(dir) = MAC::min(max_unknown_index(dir),index_max);
 
      }
 
@@ -197,11 +204,6 @@ void DS_RigidBody:: compute_void_fraction_on_grid( FV_DiscreteField const* FF
                                   : FF->get_DOF_coordinate( k, comp, 2 ) ;
               size_t p = FF->DOF_local_number(i,j,k,comp);
 
-              // level_set is xb, if local critical time scale
-              // is 0.01 of the global time scale
-              // then the node is considered inside the solid object
-              // (xb/dh)^2 = 0.01 --> (xb/xC) = 0.1
-              // if (level_set <= pow(loc_thres,0.5)*dh) {
               if (isIn(xC,yC,zC)) {
                  void_fraction->operator()(p) = 1;
                  rb_ID->operator()(p) = parID;

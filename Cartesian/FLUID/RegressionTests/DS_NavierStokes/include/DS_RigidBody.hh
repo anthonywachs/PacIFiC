@@ -3,6 +3,7 @@
 
 #include <geomVector.hh>
 #include <size_t_vector.hh>
+#include <doubleArray2D.hh>
 #include <MAC_assertions.hh>
 #include <vector>
 #include <iostream>
@@ -57,6 +58,11 @@ class DS_RigidBody
       @param indent_width indentation width */
       virtual void display( ostream& out, size_t const& indent_width )
       	const = 0;
+
+      /** @brief Compute the halozone of a rigid body
+      @param out output stream
+      @param indent_width indentation width */
+      virtual doubleArray2D* compute_rigid_body_halozone( ) = 0;
 
       /** @brief Returns whether a point is inside the rigid body
       @param pt the point */
@@ -120,6 +126,9 @@ class DS_RigidBody
     	geometric rigid body */
       vector<geomVector> m_surface_points; /**< vector of points distributed on
       	the surface of the particle to compute surface integrals */
+      //@}
+      doubleArray2D* m_halo_zone; /**< vector of min and max extents
+         of rigid body halozone, required for void fraction detection */
       //@}
 
 
