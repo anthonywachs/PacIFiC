@@ -210,6 +210,19 @@ double FS_Sphere:: level_set_value( double const& x
 
 
 //---------------------------------------------------------------------------
+geomVector FS_Sphere:: rigid_body_velocity( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Sphere:: rigid_body_velocity(pt)" ) ;
+
+  return (m_translational_velocity
+        + (m_angular_velocity^(pt-m_gravity_center)));
+
+}
+
+
+
+//---------------------------------------------------------------------------
 struct FS_Sphere_Additional_Param const* FS_Sphere::
 	get_ptr_FS_Sphere_Additional_Param() const
 //---------------------------------------------------------------------------
