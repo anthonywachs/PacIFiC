@@ -50,6 +50,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   compute_void_fraction_on_grid();
 
+  compute_grid_intersection_with_rigidbody();
+
 }
 
 
@@ -283,28 +285,73 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid( )
 
 
 //---------------------------------------------------------------------------
+void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody" ) ;
+
+  for (size_t i = 0; i < m_nrb; ++i) {
+     m_allDSrigidbodies[i]->
+      compute_grid_intersection_with_rigidbody(PF
+                                              ,void_fraction[0]
+                                              ,intersect_vector[0]
+                                              ,intersect_distance[0]
+                                              ,intersect_fieldValue[0]);
+     m_allDSrigidbodies[i]->
+      compute_grid_intersection_with_rigidbody(UF
+                                              ,void_fraction[1]
+                                              ,intersect_vector[1]
+                                              ,intersect_distance[1]
+                                              ,intersect_fieldValue[1]);
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_AllRigidBodies:: build_solid_variables_on_grid(  )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_AllRigidBodies:: build_solid_variables_on_grid" ) ;
+
+   size_t PF_LOC_UNK = PF->nb_local_unknowns();
+   size_t UF_LOC_UNK = UF->nb_local_unknowns();
 
    // void fraction on the computational grid
    // For PF and UF
    void_fraction.reserve(2);
    void_fraction.push_back(new size_t_vector(1,0));
    void_fraction.push_back(new size_t_vector(1,0));
-
-   void_fraction[0]->re_initialize(PF->nb_local_unknowns());
-   void_fraction[1]->re_initialize(UF->nb_local_unknowns());
+   void_fraction[0]->re_initialize(PF_LOC_UNK);
+   void_fraction[1]->re_initialize(UF_LOC_UNK);
 
    // ID of rigid body on the computational grid, if present
    // For PF and UF
    rb_ID.reserve(2);
    rb_ID.push_back(new size_t_vector(1,0));
    rb_ID.push_back(new size_t_vector(1,0));
+   rb_ID[0]->re_initialize(PF_LOC_UNK);
+   rb_ID[1]->re_initialize(UF_LOC_UNK);
 
-   rb_ID[0]->re_initialize(PF->nb_local_unknowns());
-   rb_ID[1]->re_initialize(UF->nb_local_unknowns());
+   // Intersection parameters on the computational grid
+   // For PF and UF
+   intersect_vector.reserve(2);
+   intersect_vector.push_back(new size_t_array2D(1,1,0));
+   intersect_vector.push_back(new size_t_array2D(1,1,0));
+   intersect_vector[0]->re_initialize(PF_LOC_UNK,6);
+   intersect_vector[1]->re_initialize(UF_LOC_UNK,6);
+   intersect_distance.reserve(2);
+   intersect_distance.push_back(new doubleArray2D(1,1,0.));
+   intersect_distance.push_back(new doubleArray2D(1,1,0.));
+   intersect_distance[0]->re_initialize(PF_LOC_UNK,6);
+   intersect_distance[1]->re_initialize(UF_LOC_UNK,6);
+   intersect_fieldValue.reserve(2);
+   intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
+   intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
+   intersect_fieldValue[0]->re_initialize(PF_LOC_UNK,6);
+   intersect_fieldValue[1]->re_initialize(UF_LOC_UNK,6);
 
 }
 
@@ -316,13 +363,9 @@ size_t_vector* DS_AllRigidBodies:: get_void_fraction_on_grid(
                                                 FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_AllRigidBodies:: get_void_fraction_on_grid" ) ;
+  size_t field = (FF == PF) ? 0 : 1;
 
-  if ( FF == PF ) {
-    return (void_fraction[0]);
-  } else if (FF == UF ) {
-    return (void_fraction[1]);
-  }
+  return (void_fraction[field]);
 
 }
 
@@ -334,12 +377,36 @@ size_t_vector* DS_AllRigidBodies:: get_rigidbodyIDs_on_grid(
                                                 FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_AllRigidBodies:: get_void_fraction_on_grid" ) ;
+  size_t field = (FF == PF) ? 0 : 1;
 
-  if ( FF == PF ) {
-    return (rb_ID[0]);
-  } else if (FF == UF ) {
-    return (rb_ID[1]);
-  }
+  return (rb_ID[field]);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+size_t_array2D* DS_AllRigidBodies:: get_intersect_vector_on_grid(
+                                                FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+  size_t field = (FF == PF) ? 0 : 1;
+
+  return (intersect_vector[field]);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+doubleArray2D* DS_AllRigidBodies:: get_intersect_distance_on_grid(
+                                                FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+  size_t field = (FF == PF) ? 0 : 1;
+
+  return (intersect_distance[field]);
 
 }

@@ -1880,61 +1880,37 @@ DDS_NavierStokes:: node_property_calculation (FV_DiscreteField const* FF)
 
      for (size_t comp=0;comp<nb_comps[field];comp++) {
         // Get local min and max indices;
-        size_t_vector min_unknown_index(3,0);
-        size_t_vector max_unknown_index(3,0);
-
-        // Calculation on the rows next to the unknown
-        // (i.e. not handled by the proc) as well
-        for (size_t l=0;l<dim;++l) {
-           // Calculations for solids on the total unknown on the proc
-           min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
-           max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
-
-           double imin = FF->primary_grid()->get_main_domain_min_coordinate(l);
-           double delta_min = solid.coord[l]->item(parID)
-                            - grid_check_for_solid*solid.size->item(parID);
-           bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,l)
-                                                       , delta_min , i0_temp) ;
-           size_t index_min = (found) ? i0_temp : min_unknown_index(l);
-
-           double imax = FF->primary_grid()->get_main_domain_max_coordinate(l);
-           double delta_max = solid.coord[l]->item(parID)
-                            + grid_check_for_solid*solid.size->item(parID);
-           found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,l)
-                                                       , delta_max , i0_temp) ;
-           size_t index_max = (found) ? i0_temp : max_unknown_index(l);
-
-           if (is_periodic[field][l] &&
-               ((delta_max > imax) || (delta_min < imin))) {
-              index_min = min_unknown_index(l);
-              index_max = max_unknown_index(l);
-           }
-
-           min_unknown_index(l) = MAC::max(min_unknown_index(l),index_min);
-           max_unknown_index(l) = MAC::min(max_unknown_index(l),index_max);
-
-        }
-
-        for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-           double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
-           for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-              double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
-              for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-                 double zC = (dim == 2) ? 0.
-                                        : FF->get_DOF_coordinate( k, comp, 2 ) ;
-                 size_t p = FF->DOF_local_number(i,j,k,comp);
-
-                 // level_set is xb, if local critical time scale is 0.01 of the global time scale
-                 // then the node is considered inside the solid object
-                 // (xb/dh)^2 = 0.01 --> (xb/xC) = 0.1
-                 // if (level_set <= pow(loc_thres,0.5)*dh) {
-                 if (allrigidbodies->isIn(parID,xC,yC,zC)) {
-                    node.void_frac->set_item(p,1.);
-                    node.parID->set_item(p,(double)parID);
-                 }
-              }
-           }
-        }
+        // size_t_vector min_unknown_index(3,0);
+        // size_t_vector max_unknown_index(3,0);
+        //
+        // // Calculation on the rows next to the unknown
+        // // (i.e. not handled by the proc) as well
+        // for (size_t l=0;l<dim;++l) {
+        //    // Calculations for solids on the total unknown on the proc
+        //    min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l );
+        //    max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l );
+        // }
+        //
+        // for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+        //    double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
+        //    for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+        //       double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
+        //       for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+        //          double zC = (dim == 2) ? 0.
+        //                                 : FF->get_DOF_coordinate( k, comp, 2 ) ;
+        //          size_t p = FF->DOF_local_number(i,j,k,comp);
+        //
+        //          // level_set is xb, if local critical time scale is 0.01 of the global time scale
+        //          // then the node is considered inside the solid object
+        //          // (xb/dh)^2 = 0.01 --> (xb/xC) = 0.1
+        //          // if (level_set <= pow(loc_thres,0.5)*dh) {
+        //          if (allrigidbodies->isIn(parID,xC,yC,zC)) {
+        //             node.void_frac->set_item(p,1.);
+        //             node.parID->set_item(p,(double)parID);
+        //          }
+        //       }
+        //    }
+        // }
         // Level 0 is for the intersection matrix corresponding to fluid side
         if (field == 0) {
            assemble_intersection_matrix(PF,comp,0,field);
@@ -1971,6 +1947,8 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF
   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,level);
   PartInput solid = GLOBAL_EQ->get_solid(0);
   size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(FF);
+  size_t_array2D* intersect_vector = allrigidbodies->get_intersect_vector_on_grid(FF);
+  doubleArray2D* intersect_distance = allrigidbodies->get_intersect_distance_on_grid(FF);
 
   for (size_t parID = 0; parID < Npart; parID++) {
 
@@ -2061,8 +2039,10 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF
                                 break;
                           }
 
+                          size_t col = 2*dir + off;
+
                           if (void_frac->operator()(node_neigh(dir,off)) != void_frac->operator()(p)) {
-                             double xb = find_intersection(FF,left,right,jj,kk,comp,dir,off,field,level,parID);
+                             double xb = intersect_distance->operator()(p,col);
                              // Updating the relative direction of intersection from the node i
                              b_intersect[dir].offset->set_item(p,off,1);
                              // Storing the distance of intersection point from the node i
@@ -2086,244 +2066,8 @@ DDS_NavierStokes:: assemble_intersection_matrix ( FV_DiscreteField const* FF
   }
 }
 
-//---------------------------------------------------------------------------
-double
-DDS_NavierStokes:: find_intersection ( FV_DiscreteField const* FF
-                                     , size_t const& left
-                                     , size_t const& right
-                                     , size_t const& yconst
-                                     , size_t const& zconst
-                                     , size_t const& comp
-                                     , size_t const& dir
-                                     , size_t const& off
-                                     , size_t const& field
-                                     , size_t const& level
-                                     , size_t const& parID)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NavierStokes:: find_intersection" ) ;
 
-  size_t_vector side(2,0);
 
-  side(0) = left;
-  side(1) = right;
-
-  double funl=0., func=0., funr=0.;
-
-  double xleft = FF->get_DOF_coordinate( side(0), comp, dir ) ;
-  double xright = FF->get_DOF_coordinate( side(1), comp, dir ) ;
-
-  double yvalue=0.,zvalue=0.;
-
-  if (dir == 0) {
-     yvalue = FF->get_DOF_coordinate( yconst, comp, 1 ) ;
-     if (dim == 3) zvalue = FF->get_DOF_coordinate( zconst, comp, 2 ) ;
-  } else if (dir == 1) {
-     yvalue = FF->get_DOF_coordinate( yconst, comp, 0 ) ;
-     if (dim == 3) zvalue = FF->get_DOF_coordinate( zconst, comp, 2 ) ;
-  } else if (dir == 2) {
-     yvalue = FF->get_DOF_coordinate( yconst, comp, 0 ) ;
-     if (dim == 3) zvalue = FF->get_DOF_coordinate( zconst, comp, 1 ) ;
-  }
-
-  double xcenter;
-
-  if (dir == 0) {
-     funl = allrigidbodies->level_set_value(parID,xleft,yvalue,zvalue);
-     funr = allrigidbodies->level_set_value(parID,xright,yvalue,zvalue);
-  } else if (dir == 1) {
-     funl = allrigidbodies->level_set_value(parID,yvalue,xleft,zvalue);
-     funr = allrigidbodies->level_set_value(parID,yvalue,xright,zvalue);
-  } else if (dir == 2) {
-     funl = allrigidbodies->level_set_value(parID,yvalue,zvalue,xleft);
-     funr = allrigidbodies->level_set_value(parID,yvalue,zvalue,xright);
-  }
-
-  // In case both the points are on the same side of solid interface
-  // This will occur when the point just outside the solid interface
-  // will be considered inside the solid. This condition enables the
-  // intersection with the interface using the point in fluid and the
-  // ACTUAL node in the solid by shifting the point by 5% of grid size
-  if (funl*funr > 0.) {
-     double dx = FF->primary_grid()->get_smallest_grid_size();
-     if (off == level) {
-        xleft = xleft - 0.05*dx;
-     } else {
-        xright = xright + 0.05*dx;
-     }
-  }
-
-  if (dir == 0) {
-     funl = allrigidbodies->level_set_value(parID,xleft,yvalue,zvalue);
-     funr = allrigidbodies->level_set_value(parID,xright,yvalue,zvalue);
-  } else if (dir == 1) {
-     funl = allrigidbodies->level_set_value(parID,yvalue,xleft,zvalue);
-     funr = allrigidbodies->level_set_value(parID,yvalue,xright,zvalue);
-  } else if (dir == 2) {
-     funl = allrigidbodies->level_set_value(parID,yvalue,zvalue,xleft);
-     funr = allrigidbodies->level_set_value(parID,yvalue,zvalue,xright);
-  }
-
-  // If the shifted point is also physically outside the solid then xb = dx
-  if (funl*funr > 0.) {
-     xcenter = FF->get_DOF_coordinate( side(off), comp, dir ) ;
-  } else {
-     // Bisection method algorithm
-     double eps = MAC::abs(xright-xleft);
-     double xcenter_old = eps/2.;
-     size_t max_iter = 500, iter = 0;
-     while ((eps > tolerance) && (iter < max_iter)) {
-        xcenter = (xleft+xright)/2.;
-
-	     if (MAC::abs(xcenter_old) > 1.e-12) {
-	        eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
-        } else {
-	        eps = MAC::abs(xcenter - xcenter_old);
-	     }
-
-        if (dir == 0) {
-           funl = allrigidbodies->level_set_value(parID,xleft,yvalue,zvalue);
-           func = allrigidbodies->level_set_value(parID,xcenter,yvalue,zvalue);
-        } else if (dir == 1) {
-           funl = allrigidbodies->level_set_value(parID,yvalue,xleft,zvalue);
-           func = allrigidbodies->level_set_value(parID,yvalue,xcenter,zvalue);
-        } else if (dir == 2) {
-           funl = allrigidbodies->level_set_value(parID,yvalue,zvalue,xleft);
-           func = allrigidbodies->level_set_value(parID,yvalue,zvalue,xcenter);
-        }
-
-        iter = iter + 1;
-
-        if (iter == max_iter)
-           cout << "WARNING: Maxmimum iteration reached for intersection"
-                << " calculation. Proceed with Caution !!!" << endl;
-
-        if (func*funl >= 1.E-16) {
-           xleft = xcenter;
-        } else if (func == 1.E-16) {
-           break;
-        } else {
-           xright = xcenter;
-        }
-
-        xcenter_old = xcenter;
-     }
-  }
-
-  if (off == 0) {
-     xcenter = MAC::abs(xcenter - FF->get_DOF_coordinate( side(1), comp, dir ));
-  } else if (off == 1) {
-     xcenter = MAC::abs(xcenter - FF->get_DOF_coordinate( side(0), comp, dir ));
-  }
-
-  return (xcenter);
-}
-
-// //---------------------------------------------------------------------------
-// double
-// DDS_NavierStokes:: find_intersection_for_ghost ( FV_DiscreteField const* FF, double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& field, size_t const& level, size_t const& off)
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL( "DDS_NavierStokes:: find_intersection_for_ghost" ) ;
-//
-//   doubleVector side(2,0);
-//
-//   double xleft = xl;
-//   double xright = xr;
-//
-//   side(0) = xleft;
-//   side(1) = xright;
-//
-//   double funl=0., func=0., funr=0.;
-//
-//   double xcenter;
-//
-//   if (dir == 0) {
-//      funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-//      funr = level_set_function(FF,id,comp,xright,yvalue,zvalue,level_set_type,field);
-//   } else if (dir == 1) {
-//      funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-//      funr = level_set_function(FF,id,comp,yvalue,xright,zvalue,level_set_type,field);
-//   } else if (dir == 2) {
-//      funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-//      funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
-//   }
-//
-//   // In case both the points are on the same side of solid interface
-//   // This will occur when the point just outside the solid interface will be considered inside the solid
-//   // This condition enables the intersection with the interface using the point in fluid and the ACTUAL point in the solid
-//   // by shifting the point by 5% of grid size
-//   if (funl*funr > 0.) {
-//      if (off == level) {
-//         xleft = xleft - 0.05*dx;
-//      } else {
-//         xright = xright + 0.05*dx;
-//      }
-//   }
-//
-//   // Updating the values using new points
-//   if (dir == 0) {
-//      funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-//      funr = level_set_function(FF,id,comp,xright,yvalue,zvalue,level_set_type,field);
-//   } else if (dir == 1) {
-//      funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-//      funr = level_set_function(FF,id,comp,yvalue,xright,zvalue,level_set_type,field);
-//   } else if (dir == 2) {
-//      funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-//      funr = level_set_function(FF,id,comp,yvalue,zvalue,xright,level_set_type,field);
-//   }
-//
-//   // If the shifted point is also physically outside the solid then xb = dx
-//   if (funl*funr > 0.) {
-//      xcenter = side(off) ;
-//   } else {
-//      // Bisection method algorithm
-//      double eps = MAC::abs(xright-xleft);
-//      double xcenter_old = eps/2.;
-//      size_t max_iter = 500, iter = 0;
-//      while ((eps > tolerance) && (iter < max_iter)) {
-//         xcenter = (xleft+xright)/2.;
-//
-//         if (MAC::abs(xcenter_old) > 1.e-12) {
-// 	        eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
-//         } else {
-//            eps = MAC::abs(xcenter - xcenter_old);
-//         }
-//
-//         if (dir == 0) {
-//            funl = level_set_function(FF,id,comp,xleft,yvalue,zvalue,level_set_type,field);
-//            func = level_set_function(FF,id,comp,xcenter,yvalue,zvalue,level_set_type,field);
-//         } else if (dir == 1) {
-//            funl = level_set_function(FF,id,comp,yvalue,xleft,zvalue,level_set_type,field);
-//            func = level_set_function(FF,id,comp,yvalue,xcenter,zvalue,level_set_type,field);
-//         } else if (dir == 2) {
-//            funl = level_set_function(FF,id,comp,yvalue,zvalue,xleft,level_set_type,field);
-//            func = level_set_function(FF,id,comp,yvalue,zvalue,xcenter,level_set_type,field);
-//         }
-//
-//         iter = iter + 1;
-//         if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
-//
-//         if (func*funl >= 1.E-16) {
-//            xleft = xcenter;
-//         } else if (func == 1.E-16) {
-//            break;
-//         } else {
-//            xright = xcenter;
-//         }
-//
-//         xcenter_old = xcenter;
-//      }
-//   }
-//
-//   if (off == 0) {
-//      xcenter = MAC::abs(xcenter - side(1));
-//   } else if (off == 1) {
-//      xcenter = MAC::abs(xcenter - side(0));
-//   }
-//
-//   return (xcenter);
-// }
 
 //---------------------------------------------------------------------------
 double

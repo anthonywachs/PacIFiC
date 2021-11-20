@@ -3,6 +3,8 @@
 
 #include <geomVector.hh>
 #include <size_t_vector.hh>
+#include <size_t_array2D.hh>
+#include <doubleArray2D.hh>
 #include <vector>
 #include <iostream>
 #include <sstream>
@@ -19,6 +21,7 @@ class FV_DiscreteField;
 /** @brief The class DS_AllRigidBodies.
 
 The array of all rigid bodies in the Direction Splitting solver.
+
 
 @author A. Wachs - Pacific project 2021 */
 
@@ -75,6 +78,11 @@ class DS_AllRigidBodies
       /** @brief Returns the ID of rigid body present on the field FF */
       size_t_vector* get_rigidbodyIDs_on_grid( FV_DiscreteField const* FF );
 
+      /** @brief Returns the ID of rigid body present on the field FF */
+      size_t_array2D* get_intersect_vector_on_grid( FV_DiscreteField const* FF );
+
+      /** @brief Returns the ID of rigid body present on the field FF */
+      doubleArray2D* get_intersect_distance_on_grid( FV_DiscreteField const* FF );
 
       //@}
 
@@ -145,6 +153,10 @@ class DS_AllRigidBodies
       of a given fluid field */
       void compute_void_fraction_on_grid( );
 
+      /** @brief Computes the intersection of grid nodes of a given fluid field
+      with the nearest rigid body of a given fluid field */
+      void compute_grid_intersection_with_rigidbody( );
+
       /** @brief Build the variable associated with the rigid bodies
       on the Cartesian computational grid */
       void build_solid_variables_on_grid( );
@@ -181,8 +193,20 @@ class DS_AllRigidBodies
       FV_DiscreteField const* UF ;
       FV_DiscreteField const* PF ;
 
-      vector<size_t_vector*> void_fraction;
-      vector<size_t_vector*> rb_ID;
+      vector<size_t_vector*> void_fraction; /**< vector of void fraction the
+      field grid nodes */
+      vector<size_t_vector*> rb_ID; /**< vector of rigid body ID on the
+      field grid node, if any */
+
+      vector<struct BoundaryBisec*> rb_intersect; /**< 2DArray of intersection
+      of field grid node near the rigid body with the rigid */
+
+      // Columns in each variable are (left,right,bottom,top,behind,front)
+      vector<size_t_array2D*> intersect_vector;  /**<Direction of intersection*/
+      vector<doubleArray2D*> intersect_distance; /**< Value of offset relative
+      to node point */
+      vector<doubleArray2D*> intersect_fieldValue; /**< Value of field variable
+      at the intersection */
 
       //@}
 

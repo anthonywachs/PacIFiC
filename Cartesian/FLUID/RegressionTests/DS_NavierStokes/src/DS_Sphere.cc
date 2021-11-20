@@ -86,14 +86,14 @@ void DS_Sphere:: compute_rigid_body_halozone( )
   geomVector const* pgs = dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
                               ->get_ptr_FS_Sphere_gravity_centre();
 
-  m_halo_zone->operator()(0,0) = pgs->operator()(0) - 1.5*pagp->radius;
-  m_halo_zone->operator()(0,1) = pgs->operator()(0) + 1.5*pagp->radius;
+  m_halo_zone->operator()(0,0) = pgs->operator()(0) - 3.0*pagp->radius;
+  m_halo_zone->operator()(0,1) = pgs->operator()(0) + 3.0*pagp->radius;
 
-  m_halo_zone->operator()(1,0) = pgs->operator()(1) - 1.5*pagp->radius;
-  m_halo_zone->operator()(1,1) = pgs->operator()(1) + 1.5*pagp->radius;
+  m_halo_zone->operator()(1,0) = pgs->operator()(1) - 3.0*pagp->radius;
+  m_halo_zone->operator()(1,1) = pgs->operator()(1) + 3.0*pagp->radius;
 
-  m_halo_zone->operator()(2,0) = pgs->operator()(2) - 1.5*pagp->radius;
-  m_halo_zone->operator()(2,1) = pgs->operator()(2) + 1.5*pagp->radius;
+  m_halo_zone->operator()(2,0) = pgs->operator()(2) - 3.0*pagp->radius;
+  m_halo_zone->operator()(2,1) = pgs->operator()(2) + 3.0*pagp->radius;
 
 }
 

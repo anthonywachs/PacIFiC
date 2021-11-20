@@ -3,6 +3,7 @@
 
 #include <geomVector.hh>
 #include <size_t_vector.hh>
+#include <size_t_array2D.hh>
 #include <doubleArray2D.hh>
 #include <MAC_assertions.hh>
 #include <vector>
@@ -100,6 +101,16 @@ class DS_RigidBody
                                         , size_t_vector* void_fraction
                                         , size_t_vector* rb_ID
                                         , size_t const& parID );
+
+      /** @brief Computes the intersection of field (FF) grid nodes
+      with the surface of rigid body
+      @param FF the fluid field */
+      void compute_grid_intersection_with_rigidbody (
+                                          FV_DiscreteField const* FF
+                                        , size_t_vector const* void_fraction
+                                        , size_t_array2D* intersect_vector
+                                        , doubleArray2D* intersect_distance
+                                        , doubleArray2D* intersect_fieldValue);
 
       //@}
 

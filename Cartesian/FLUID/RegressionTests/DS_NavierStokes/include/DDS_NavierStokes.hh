@@ -253,22 +253,6 @@ public SolverComputingTime
       /** @brief Find the interpolation considering the solids affect inside the box, used for 3D systems */
       double ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID);
 
-      double find_intersection_for_ghost ( FV_DiscreteField const* FF, double const& xleft, double const& xright, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& field, size_t const& level, size_t const& off);
-
-
-      /** @brief Find the intersection using bisection method with the solid interface */
-      double find_intersection (FV_DiscreteField const* FF
-                              , size_t const& left
-                              , size_t const& right
-                              , size_t const& yconst
-                              , size_t const& zconst
-                              , size_t const& comp
-                              , size_t const& dir
-                              , size_t const& off
-                              , size_t const& field
-                              , size_t const& level
-                              , size_t const& parID);
-
       void correct_pressure_1st_layer_solid (size_t const& level );
 
       void correct_pressure_2nd_layer_solid (size_t const& level );
