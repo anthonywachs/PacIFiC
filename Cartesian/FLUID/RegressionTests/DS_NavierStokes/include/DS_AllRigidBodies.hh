@@ -81,8 +81,11 @@ class DS_AllRigidBodies
       /** @brief Returns the ID of rigid body present on the field FF */
       size_t_array2D* get_intersect_vector_on_grid( FV_DiscreteField const* FF );
 
-      /** @brief Returns the ID of rigid body present on the field FF */
+      /** @brief Returns the intersection distance with the rigid body for FF*/
       doubleArray2D* get_intersect_distance_on_grid( FV_DiscreteField const* FF );
+
+      /** @brief Returns the Dirichlet BC on the near rigid body on FF */
+      doubleArray2D* get_intersect_fieldValue_on_grid( FV_DiscreteField const* FF );
 
       //@}
 

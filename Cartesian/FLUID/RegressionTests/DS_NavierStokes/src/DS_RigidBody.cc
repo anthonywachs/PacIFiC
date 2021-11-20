@@ -303,20 +303,21 @@ DS_RigidBody:: compute_grid_intersection_with_rigidbody (
 
                           if (void_fraction->operator()(neigh_num)
                            != void_fraction->operator()(p)) {
-                             double xb = m_geometric_rigid_body
+                             double t = m_geometric_rigid_body
                                           ->distanceTo( source, rayDir, delta );
                              // Storing the direction with RB intersection
                              intersect_vector->operator()(p,col) = 1;
                              // Storing the intersection distance
-                             intersect_distance->operator()(p,col) = xb;
+                             intersect_distance->operator()(p,col) = t;
                              // Calculate the variable values on the intersection of grid and solid
-                             // impose_solid_velocity (FF,net_vel,comp,dir,off,i,j,k,xb,parID);
+                             geomVector netVel = m_geometric_rigid_body->
+                                       rigid_body_velocity(source + t * rayDir);
                              // Value of variable at the surface of particle
-                             // if ( FF == PF) {
-                             //    intersect_fieldValue->operator()(p,col) = net_vel[dir];
-                             // } else if (FF == UF) {
-                             //    intersect_fieldValue->operator()(p,col) = net_vel[comp];
-                             // }
+                             if ( nb_comps == 1) { // i.e. PF
+                                intersect_fieldValue->operator()(p,col) = net_vel[dir];
+                             } else { // i.e. UF
+                                intersect_fieldValue->operator()(p,col) = net_vel[comp];
+                             }
                           }
                        }
                     }

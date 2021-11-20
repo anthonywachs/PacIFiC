@@ -410,3 +410,17 @@ doubleArray2D* DS_AllRigidBodies:: get_intersect_distance_on_grid(
   return (intersect_distance[field]);
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+doubleArray2D* DS_AllRigidBodies:: get_intersect_fieldValue_on_grid(
+                                                FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+  size_t field = (FF == PF) ? 0 : 1;
+
+  return (intersect_fieldValue[field]);
+
+}
