@@ -206,9 +206,6 @@ public SolverComputingTime
       /** @brief Initialize the velocity on the velocity nodes in MAC grid*/
       void nodes_field_initialization ( size_t const& level );
 
-      /** @brief Initialize the fresh nodes emerged out of solid*/
-      void fresh_nodes_in_fluid_initialization ( );
-
       void ugradu_initialization ( );
 
       void compute_velocity_force_on_particle(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it);

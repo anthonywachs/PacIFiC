@@ -634,10 +634,6 @@ DDS_NavierStokes:: do_before_inner_iterations_stage(
    //    nodes_field_initialization(3);
    //    if (dim == 3) nodes_field_initialization(4);
    //
-   //    // if ( my_rank == is_master ) SCT_set_start( "node_initialization");
-   //    // fresh_nodes_in_fluid_initialization();
-   //    // if ( my_rank == is_master ) SCT_get_elapsed_time( "node_initialization" );
-   //
    //    // if ( my_rank == is_master ) SCT_set_start( "cell_detection");
    //    // detect_fresh_cells_and_neighbours();
    //    // if ( my_rank == is_master ) SCT_get_elapsed_time( "cell_detection" );
@@ -1031,73 +1027,8 @@ DDS_NavierStokes:: nodes_field_initialization ( size_t const& level )
   }
 }
 
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: fresh_nodes_in_fluid_initialization ( )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NavierStokes:: fresh_nodes_in_fluid_initialization" ) ;
 
-  size_t_vector min_unknown_index(3,0);
-  size_t_vector max_unknown_index(3,0);
 
-  // Vector for solid presence
-  NodeProp node = GLOBAL_EQ->get_node_property(1,0);
-  NodeProp node_old = GLOBAL_EQ->get_node_property(1,1);
-
-  // Intersection information of fluid nodes with solid boundary
-  BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(1,0);
-
-  for (size_t comp=0;comp<nb_comps[1];comp++) {
-     // Get local min and max indices
-     for (size_t l=0;l<dim;++l) {
-        if (is_periodic[1][l]) {
-           min_unknown_index(l) =
-                     UF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-           max_unknown_index(l) =
-                     UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
-        } else {
-           min_unknown_index(l) =
-                     UF->get_min_index_unknown_handled_by_proc( comp, l );
-           max_unknown_index(l) =
-                     UF->get_max_index_unknown_handled_by_proc( comp, l );
-        }
-     }
-
-     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-        for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-           for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-              size_t p = UF->DOF_local_number(i,j,k,comp);
-              if ((node.void_frac->item(p) != 1.)
-               && (node_old.void_frac->item(p) == 1.)) {
-		           double value = 0.;
-                 for (size_t l=0;l<dim;++l) {
-                     if ((b_intersect[l].offset->item(p,0) == 1)) {
-                        double xr = UF->get_DOF_coordinate(i+1,comp,l)
-                                  - UF->get_DOF_coordinate(i,comp,l);
-                        double xl = b_intersect[l].value->item(p,0);
-                        value = value + (b_intersect[l].field_var->item(p,0)*xr
-                                    + UF->DOF_value(i+1,j,k,comp,l)*xl)/(xl+xr);
-                     }
-                     if ((b_intersect[l].offset->item(p,1) == 1)) {
-                        double xl = UF->get_DOF_coordinate(i,comp,l)
-                                  - UF->get_DOF_coordinate(i-1,comp,l);
-                        double xr = b_intersect[l].value->item(p,1);
-                        value = value + (b_intersect[l].field_var->item(p,1)*xl
-                                    + UF->DOF_value(i-1,j,k,comp,l)*xr)/(xl+xr);
-                     }
-		           }
-                 UF->set_DOF_value( i, j, k, comp, 0,value/double(dim));
-                 UF->set_DOF_value( i, j, k, comp, 1,value/double(dim));
-                 UF->set_DOF_value( i, j, k, comp, 3,value/double(dim));
-                 if (dim == 3)
-                    UF->set_DOF_value( i, j, k, comp, 4,value/double(dim));
-              }
-           }
-        }
-     }
-  }
-}
 
 //
 // //---------------------------------------------------------------------------
