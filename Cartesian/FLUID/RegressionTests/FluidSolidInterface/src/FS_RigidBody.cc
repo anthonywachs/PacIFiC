@@ -184,3 +184,58 @@ void FS_RigidBody:: change_from_particle_to_obstacle()
   else if ( m_type == "PP" ) m_type = "PO";
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+double FS_RigidBody:: distanceTo( geomVector const& source,
+											 geomVector const& rayDir,
+				        				    double const& delta )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: distanceTo" ) ;
+
+  tuple<bool,double,size_t> dist( false, 0., 0 );
+
+  double t = 0.;
+  double threshold = delta;
+
+  geomVector rayVec = source + t * rayDir;
+
+  // Find the point inside the rigid body
+  while (level_set_value (rayVec) > 0.) {
+	  t += delta;
+	  rayVec = source + t * rayDir;
+  }
+
+  geomVector a = source, b = rayVec;
+  geomVector c = source + delta * rayDir;
+
+  size_t max_iter = 500, iter = 0;
+
+  // Bisection method
+  while (((a.calcDist(b)/delta) >= threshold) && (iter <= max_iter)) {
+	  // Find middle point
+	 c = 0.5 * ( a + b );
+
+	 // Check if middle point is root
+	 if (level_set_value (c) == 0.)
+		 break;
+
+	 // Decide the side to repeat the steps
+	 else if (level_set_value (c) * level_set_value (a) < 0)
+		  b = c;
+	 else
+		  a = c;
+
+  	 iter += 1;
+
+	 if (iter == max_iter)
+		 std::cout << "WARNING: Maxmimum iteration reached for intersection"
+					  << " calculation. Proceed with Caution !!!" << endl;
+  }
+
+  return (source.calcDist(c));
+
+}

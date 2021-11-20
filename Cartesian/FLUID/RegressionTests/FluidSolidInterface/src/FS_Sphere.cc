@@ -210,29 +210,6 @@ double FS_Sphere:: level_set_value( double const& x
 
 
 //---------------------------------------------------------------------------
-tuple<bool,double,size_t> FS_Sphere:: distanceTo( geomVector const& pt,
-      	size_t const& direction,
-      	bool const& positive ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "FS_Sphere:: distanceTo( pt, direction, positive )" ) ;
-
-  tuple<bool,double,size_t> dist( false, 0., 0 );
-
-  // TO DO
-  // Example to assign values
-  std::get<0>(dist) = true;
-  std::get<1>(dist) = 0.1;
-  std::get<2>(dist) = m_Id;
-
-  return ( dist );
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
 struct FS_Sphere_Additional_Param const* FS_Sphere::
 	get_ptr_FS_Sphere_Additional_Param() const
 //---------------------------------------------------------------------------

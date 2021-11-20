@@ -98,21 +98,6 @@ double DS_RigidBody:: level_set_value( double const& x
 
 
 //---------------------------------------------------------------------------
-tuple<bool,double,size_t> DS_RigidBody:: distanceTo( geomVector const& pt,
-      	size_t const& direction,
-      	bool const& positive ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: distanceTo( pt, direction, positive )" ) ;
-
-  return ( m_geometric_rigid_body->distanceTo( pt, direction, positive ) );
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
 void DS_RigidBody:: compute_surface_integrals_hydro_force_torque(
       	FV_DiscreteField const* PP,
 	FV_DiscreteField const* UU )

@@ -86,18 +86,6 @@ class DS_RigidBody
                             , double const& y
                             , double const& z ) const;
 
-
-      /** @brief Returns whether a line originating from a point intersects the
-      rigid body, and if it does the distance from the point to the rigid body
-      surface
-      @param pt the point
-      @param direction x, y or z (=0, 1 or 2)
-      @param positive true if search in the positive direction of the coordiante
-      axis and false otherwise */
-      tuple<bool,double,size_t> distanceTo( geomVector const& pt,
-      	size_t const& direction,
-      	bool const& positive ) const;
-
       /** @brief Computes the hydrodynamic force and torque and stores the
       values in the corresponding geometric rigid body
       @param PP the pressure field

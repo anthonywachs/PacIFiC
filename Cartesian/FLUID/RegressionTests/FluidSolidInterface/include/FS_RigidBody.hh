@@ -128,9 +128,9 @@ class FS_RigidBody
       @param direction x, y or z (=0, 1 or 2)
       @param positive true if search in the positive direction of the coordinate
       axis and false otherwise */
-      virtual tuple<bool,double,size_t> distanceTo( geomVector const& pt,
-      	size_t const& direction,
-      	bool const& positive ) const = 0;
+      double distanceTo( geomVector const& source,
+				             geomVector const& rayDir,
+								 double const& delta );
       //@}
 
 
