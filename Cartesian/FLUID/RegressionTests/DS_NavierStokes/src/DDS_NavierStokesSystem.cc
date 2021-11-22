@@ -144,9 +144,10 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
    PF_NUM = FV_SystemNumbering::create( this, PF ) ;
 
 	// Local vectors to store diffusive terms
-	vel_diff_loc[0] = LA_SeqVector::create( this, 0 ) ;
-	vel_diff_loc[1] = LA_SeqVector::create( this, 0 ) ;
-	vel_diff_loc[2] = LA_SeqVector::create( this, 0 ) ;
+	vel_diffusion.reserve(3);
+	vel_diffusion.push_back(new doubleVector(1,0.));
+	vel_diffusion.push_back(new doubleVector(1,0.));
+	vel_diffusion.push_back(new doubleVector(1,0.));
 
 	divergence.reserve(2);
 	divergence.push_back(new doubleVector(1,0.));
@@ -390,9 +391,9 @@ DDS_NavierStokesSystem:: re_initialize( void )
    UF_NUM->define_scatter( VEC_DS_UF ) ;
    PF_NUM->define_scatter( VEC_DS_PF ) ;
 
-	vel_diff_loc[0]->re_initialize( UF_loc );
-	vel_diff_loc[1]->re_initialize( UF_loc );
-	vel_diff_loc[2]->re_initialize( UF_loc );
+	vel_diffusion[0]->re_initialize( UF_loc );
+	vel_diffusion[1]->re_initialize( UF_loc );
+	vel_diffusion[2]->re_initialize( UF_loc );
 
 	divergence[0]->re_initialize( pf_loc ) ;
 	divergence[1]->re_initialize( pf_loc ) ;
@@ -870,12 +871,12 @@ DDS_NavierStokesSystem::get_row_indexes(size_t const& field
 
 
 //----------------------------------------------------------------------
-LA_SeqVector**
+vector<doubleVector*>
 DDS_NavierStokesSystem::get_velocity_diffusion()
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_velocity_diffusion" ) ;
-   return (vel_diff_loc) ;
+   return (vel_diffusion) ;
 }
 
 

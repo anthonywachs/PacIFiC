@@ -178,7 +178,7 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @brief Return the divergence on pressure node */
       doubleVector* get_node_divergence(size_t const& level);
       /** @brief Return the velocity diffusive terms */
-      LA_SeqVector** get_velocity_diffusion();
+      vector<doubleVector*> get_velocity_diffusion();
       /** @brief Return the local vector with a vector of row index */
       LA_SeqMatrix* get_row_indexes(size_t const& field
                                   , size_t const& dir
@@ -293,9 +293,6 @@ class DDS_NavierStokesSystem : public MAC_Object
       LA_Matrix * MAT_D_velocityUnsteadyPlusDiffusion ;
       LA_Vector * VEC_rhs_D_velocityDiffusionPlusBodyTerm ;
 
-      // Local vector to store diffusive terms
-      LA_SeqVector * vel_diff_loc[3] ;
-
       // Local vector to store row indexes for each
       // field (i.e. 2)
       // and direction (i.e. 3)
@@ -329,6 +326,8 @@ class DDS_NavierStokesSystem : public MAC_Object
       struct SurfaceDiscretize surface;
       struct PartForces hydro_forces[2];                       // 0 current timestep, 1 last time step
       struct PartForces hydro_torque[2];                       // 0 current timestep, 1 last time step
+      // Local vector to store diffusive terms
+      vector<doubleVector*> vel_diffusion;
 
       size_t dim;
       MAC_Communicator const* pelCOMM;

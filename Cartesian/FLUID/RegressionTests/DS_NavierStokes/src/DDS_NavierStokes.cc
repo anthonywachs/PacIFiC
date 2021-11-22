@@ -1788,7 +1788,7 @@ DDS_NavierStokes:: assemble_velocity_diffusion_terms ( )
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
 
-   LA_SeqVector** vel_diff_loc = GLOBAL_EQ->get_velocity_diffusion();
+   vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
 
    for (size_t comp=0;comp<nb_comps[1];comp++) {
       // Get local min and max indices
@@ -1804,20 +1804,20 @@ DDS_NavierStokes:: assemble_velocity_diffusion_terms ( )
             for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                size_t p = UF->DOF_local_number(i,j,k,comp);
                // dxx of level3
-               vel_diff_loc[0]->set_item(p,
-                                    compute_un_component(comp,i,j,k,0,3));
+               vel_diffusion[0]->operator()(p) =
+                                    compute_un_component(comp,i,j,k,0,3);
                // dyy of level1(2D) or level4(3D)
                if (dim == 2) {
-                  vel_diff_loc[1]->set_item(p,
-                                    compute_un_component(comp,i,j,k,1,1));
+                  vel_diffusion[1]->operator()(p) =
+                                    compute_un_component(comp,i,j,k,1,1);
                } else {
-                  vel_diff_loc[1]->set_item(p,
-                                    compute_un_component(comp,i,j,k,1,4));
+                  vel_diffusion[1]->operator()(p) =
+                                    compute_un_component(comp,i,j,k,1,4);
                }
                // dzz of level3
                if (dim == 3)
-                  vel_diff_loc[2]->set_item(p,
-                                    compute_un_component(comp,i,j,k,2,1));
+                  vel_diffusion[2]->operator()(p) =
+                                    compute_un_component(comp,i,j,k,2,1);
 
             }
          }
@@ -2021,7 +2021,7 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
    // Vector for fi
    LocalVector* VEC = GLOBAL_EQ->get_VEC(1);
 
-   LA_SeqVector** vel_diff_loc = GLOBAL_EQ->get_velocity_diffusion();
+   vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
    size_t_array2D* intersect_vector =
                            allrigidbodies->get_intersect_vector_on_grid(UF);
    doubleArray2D* intersect_distance =
@@ -2041,7 +2041,7 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
       size_t pos = i - min_unknown_index(dir);
       size_t p = UF->DOF_local_number(ii,jj,kk,comp);
 
-      double value= vel_diff_loc[dir]->item(p);
+      double value= vel_diffusion[dir]->operator()(p);
 
       if (is_solids) {
          if (intersect_vector->operator()(p,2*dir+0) == 1) {
@@ -5806,7 +5806,7 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    min_unknown_index(2) = (dim == 3) ? 0 : 0;
    max_unknown_index(2) = (dim == 3) ? 0 : 1;
 
-   LA_SeqVector** vel_diff_loc = GLOBAL_EQ->get_velocity_diffusion();
+   vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
    size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
 
    for (size_t comp=0;comp<nb_comps[1];comp++) {
@@ -5827,11 +5827,11 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
 
                size_t p = UF->DOF_local_number(i,j,k,comp);
                // Dxx for un
-               double xvalue = vel_diff_loc[0]->item(p);
+               double xvalue = vel_diffusion[0]->operator()(p);
                // Dyy for un
-               double yvalue = vel_diff_loc[1]->item(p);
+               double yvalue = vel_diffusion[1]->operator()(p);
                // Dzz for un
-               double zvalue = (dim == 3) ? vel_diff_loc[2]->item(p) : 0;
+               double zvalue = (dim == 3) ? vel_diffusion[2]->operator()(p) : 0;
                // Pressure contribution
                double pvalue = compute_p_component(comp,i,j,k);
                // Advection contribution
