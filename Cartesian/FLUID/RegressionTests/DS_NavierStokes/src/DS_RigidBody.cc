@@ -309,14 +309,16 @@ DS_RigidBody:: compute_grid_intersection_with_rigidbody (
                              intersect_vector->operator()(p,col) = 1;
                              // Storing the intersection distance
                              intersect_distance->operator()(p,col) = t;
-                             // Calculate the variable values on the intersection of grid and solid
-                             geomVector netVel = m_geometric_rigid_body->
-                                       rigid_body_velocity(source + t * rayDir);
+                             // Calculate the variable values on the
+                             // intersection of grid and solid
+                             geomVector netVel = rigid_body_velocity(source + t * rayDir);
                              // Value of variable at the surface of particle
                              if ( nb_comps == 1) { // i.e. PF
-                                intersect_fieldValue->operator()(p,col) = net_vel[dir];
+                                intersect_fieldValue->operator()(p,col)
+                                                                 = net_vel[dir];
                              } else { // i.e. UF
-                                intersect_fieldValue->operator()(p,col) = net_vel[comp];
+                                intersect_fieldValue->operator()(p,col)
+                                                                 = net_vel[comp];
                              }
                           }
                        }
@@ -327,4 +329,17 @@ DS_RigidBody:: compute_grid_intersection_with_rigidbody (
         }
      }
   }
+}
+
+
+
+
+//---------------------------------------------------------------------------
+geomVector DS_RigidBody:: rigid_body_velocity( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: rigid_body_velocity(pt)" ) ;
+
+  return (m_geometric_rigid_body->rigid_body_velocity(pt));
+
 }

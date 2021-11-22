@@ -204,7 +204,7 @@ public SolverComputingTime
       void import_par_info( istringstream &is );
 
       /** @brief Initialize the velocity on the velocity nodes in MAC grid*/
-      void nodes_field_initialization ( size_t const& level );
+      void initialize_grid_nodes_on_rigidbody( vector<size_t> const& list );
 
       void ugradu_initialization ( );
 

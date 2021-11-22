@@ -227,6 +227,21 @@ double DS_AllRigidBodies:: level_set_value( size_t const& parID,
 
 
 
+
+//---------------------------------------------------------------------------
+geomVector DS_AllRigidBodies:: rigid_body_velocity( size_t const& parID,
+                                             geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: rigid_body_velocity(pt)" ) ;
+
+  return (m_allDSrigidbodies[parID]->rigid_body_velocity(pt));
+
+}
+
+
+
+
 //---------------------------------------------------------------------------
 FS_AllRigidBodies const* DS_AllRigidBodies:: get_ptr_FS_AllRigidBodies() const
 //---------------------------------------------------------------------------

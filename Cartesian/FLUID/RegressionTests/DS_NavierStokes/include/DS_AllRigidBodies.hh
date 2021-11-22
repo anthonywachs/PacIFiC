@@ -160,6 +160,12 @@ class DS_AllRigidBodies
       with the nearest rigid body of a given fluid field */
       void compute_grid_intersection_with_rigidbody( );
 
+      /** @brief Computes the rigid body velocity including the rotation speed
+      at a given geometric vector pt
+      @param pt a point in space*/
+      geomVector rigid_body_velocity( size_t const& parID,
+                                          geomVector const& pt ) const;
+
       /** @brief Build the variable associated with the rigid bodies
       on the Cartesian computational grid */
       void build_solid_variables_on_grid( );

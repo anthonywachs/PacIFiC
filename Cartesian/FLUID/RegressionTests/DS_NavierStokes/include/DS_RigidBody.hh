@@ -112,6 +112,8 @@ class DS_RigidBody
                                         , doubleArray2D* intersect_distance
                                         , doubleArray2D* intersect_fieldValue);
 
+      geomVector rigid_body_velocity( geomVector const& pt ) const;
+
       //@}
 
 

@@ -538,16 +538,13 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
       if (my_rank == 0)
          cout << "Finished particle generation... \n" << endl;
 
-      node_property_calculation(PF);
-      node_property_calculation(UF);
-
       if (my_rank == 0)
          cout << "Finished intersection calculations... \n" << endl;
 
-      nodes_field_initialization(0);
-      nodes_field_initialization(1);
-      nodes_field_initialization(3);
-      if (dim == 3) nodes_field_initialization(4);
+      vector<size_t> vec{ 0, 1, 3};
+      if (dim == 3) vec.push_back(4);
+
+      initialize_grid_nodes_on_rigidbody(vec);
 
       if (my_rank == 0)
          cout << "Finished field initializations... \n" << endl;
@@ -977,56 +974,6 @@ DDS_NavierStokes:: ugradu_initialization ( )
   for (size_t comp=0;comp<nb_comps[1];comp++) UF->set_DOFs_value( comp, 2, 0.);
 
 }
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: nodes_field_initialization ( size_t const& level )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NavierStokes:: nodes_field_initialization" ) ;
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-  vector<double> net_vel(3,0.);
-
-  // Vector for solid presence
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-  size_t_vector* parID = allrigidbodies->get_rigidbodyIDs_on_grid(UF);
-
-  for (size_t comp=0;comp<nb_comps[1];comp++) {
-     // Get local min and max indices
-     for (size_t l=0;l<dim;++l) {
-        if (is_periodic[1][l]) {
-           min_unknown_index(l) =
-                     UF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-           max_unknown_index(l) =
-                     UF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
-        } else {
-           min_unknown_index(l) =
-                     UF->get_min_index_unknown_handled_by_proc( comp, l );
-           max_unknown_index(l) =
-                     UF->get_max_index_unknown_handled_by_proc( comp, l );
-        }
-     }
-
-     size_t local_min_k = (dim == 2) ? 0 : min_unknown_index(2);
-     size_t local_max_k = (dim == 2) ? 0 : max_unknown_index(2);
-
-     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-        for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-           for (size_t k=local_min_k;k<=local_max_k;++k) {
-              size_t p = UF->DOF_local_number(i,j,k,comp);
-              if (void_frac->operator()(p) == 1) {
-                 size_t par_id = parID->operator()(p);
-                 impose_solid_velocity(UF,net_vel,comp,0,10,i,j,k,0.,par_id);
-                 UF->set_DOF_value( i, j, k, comp, level,net_vel[comp]);
-              }
-           }
-        }
-     }
-  }
-}
-
 
 
 
@@ -6489,7 +6436,7 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    GLOBAL_EQ->synchronize_DS_solution_vec();
    // Tranfer back to field
    UF->update_free_DOFs_value( 3, GLOBAL_EQ->get_solution_DS_velocity() ) ;
-   if (is_solids) nodes_field_initialization(3);
+   if (is_solids) initialize_grid_nodes_on_rigidbody({3});
 
    Solve_i_in_jk(UF,t_it,1,0,2,gamma);
    // Synchronize the distributed DS solution vector
@@ -6497,10 +6444,10 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    // Tranfer back to field
    if (dim == 2) {
       UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ;
-      if (is_solids) nodes_field_initialization(0);
+      if (is_solids) initialize_grid_nodes_on_rigidbody({0});
    } else if (dim == 3) {
       UF->update_free_DOFs_value( 4 , GLOBAL_EQ->get_solution_DS_velocity() ) ;
-      if (is_solids) nodes_field_initialization(4);
+      if (is_solids) initialize_grid_nodes_on_rigidbody({4});
    }
 
    if (dim == 3) {
@@ -6509,10 +6456,66 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
       GLOBAL_EQ->synchronize_DS_solution_vec();
       // Tranfer back to field
       UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
-      if (is_solids) nodes_field_initialization(0);
+      if (is_solids) initialize_grid_nodes_on_rigidbody({0});
    }
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+void
+DDS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DDS_NavierStokes::initialize_grid_nodes_on_rigidbody" ) ;
+
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
+
+  // Vector for solid presence
+  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+  size_t_vector* parID = allrigidbodies->get_rigidbodyIDs_on_grid(UF);
+
+  for (size_t comp = 0; comp < nb_comps[1]; comp++) {
+     // Get local min and max indices
+     for (size_t dir = 0; dir < dim; dir++) {
+        if (is_periodic[1][dir]) {
+           min_unknown_index(dir) =
+                     UF->get_min_index_unknown_handled_by_proc( comp, dir ) - 1;
+           max_unknown_index(dir) =
+                     UF->get_max_index_unknown_handled_by_proc( comp, dir ) + 1;
+        } else {
+           min_unknown_index(dir) =
+                     UF->get_min_index_unknown_handled_by_proc( comp, dir );
+           max_unknown_index(dir) =
+                     UF->get_max_index_unknown_handled_by_proc( comp, dir );
+        }
+     }
+
+     for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+        double xC = UF->get_DOF_coordinate( i, comp, 0 ) ;
+        for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+           double yC = UF->get_DOF_coordinate( j, comp, 1 ) ;
+           for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+              double zC = (dim == 2) ? 0 : UF->get_DOF_coordinate( k, comp, 2 );
+              geomVector pt(xC,yC,zC);
+              size_t p = UF->DOF_local_number(i,j,k,comp);
+              if (void_frac->operator()(p) == 1) {
+                 size_t par_id = parID->operator()(p);
+                 geomVector rb_vel = allrigidbodies->rigid_body_velocity(par_id,pt);
+                 for (size_t level : list)
+                  UF->set_DOF_value( i, j, k, comp, level,rb_vel(comp));
+              }
+           }
+        }
+     }
+  }
+}
+
+
+
 
 //---------------------------------------------------------------------------
 double
