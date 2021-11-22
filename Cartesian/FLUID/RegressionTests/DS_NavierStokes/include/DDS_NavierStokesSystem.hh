@@ -109,13 +109,6 @@ struct SurfaceDiscretize {
    LA_SeqVector ** normal;	                // normal
 };
 
-/** @brief BoundaryBisec to be used to store the intersection of solids with grids in each direction */
-struct BoundaryBisec {
-   LA_SeqMatrix * offset;                  // Direction of intersection relative to node (Column 0 for left and Column 1 for right)
-   LA_SeqMatrix * value;                   // Value of offset relative to node point
-   LA_SeqMatrix * field_var;                   // Value of field variable at the intersection
-};
-
 /** @brief The Class DDS_NavierStokesSystem.
 
 Matrix systems for the resolution of the heat equation.
@@ -208,8 +201,6 @@ class DDS_NavierStokesSystem : public MAC_Object
       LA_SeqMatrix* get_row_indexes(size_t const& field
                                   , size_t const& dir
                                   , size_t const& comp);
-      /** @brief Return information of intersection with solid boundary */
-      BoundaryBisec* get_b_intersect(size_t const& field, size_t const& level);
 
       void update_global_P_vector(size_t const& i, size_t const& j, size_t const& k, double const& value);
 
@@ -357,9 +348,6 @@ class DDS_NavierStokesSystem : public MAC_Object
       struct SurfaceDiscretize surface;
       struct PartForces hydro_forces[2];                       // 0 current timestep, 1 last time step
       struct PartForces hydro_torque[2];                       // 0 current timestep, 1 last time step
-      struct BoundaryBisec b_intersect[2][2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid); 2 are fields (PF,UF)
-
-
       size_t dim;
       MAC_Communicator const* pelCOMM;
       size_t nb_comps[2];

@@ -165,16 +165,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 	// Direction splitting matrices
 	MAT_velocityUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
 
-	for (size_t field = 0; field < 2; field++) {
-      for (size_t dir = 0; dir < dim; dir++) {
-			for (size_t j=0;j<2;j++) {
-				b_intersect[field][j][dir].offset = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-				b_intersect[field][j][dir].value = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-				b_intersect[field][j][dir].field_var = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
-			}
-		}
-	}
-
    // Structure for the particle surface discretization
    surface.coordinate = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    surface.normal = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
@@ -450,16 +440,6 @@ DDS_NavierStokesSystem:: re_initialize( void )
 		node[1][1].parID->re_initialize( UF_loc ) ;
 		node[1][1].bound_cell->re_initialize( UF_loc ) ;
 
-		for (size_t i=0;i<dim;i++) {
-			for (size_t j=0;j<2;j++) {
-				b_intersect[0][j][i].offset->re_initialize( pf_loc,2 ) ;
-				b_intersect[0][j][i].value->re_initialize( pf_loc,2 ) ;
-				b_intersect[0][j][i].field_var->re_initialize( pf_loc,2 ) ;
-				b_intersect[1][j][i].offset->re_initialize( UF_loc,2 ) ;
-				b_intersect[1][j][i].value->re_initialize( UF_loc,2 ) ;
-				b_intersect[1][j][i].field_var->re_initialize( UF_loc,2 ) ;
-			}
-		}
 	}
    // Initialize Direction splitting matrices & vectors for pressure
    size_t nb_procs, proc_pos;
@@ -905,14 +885,8 @@ DDS_NavierStokesSystem::get_forces(size_t const& level)
    return (hydro_forces[level]) ;
 }
 
-//----------------------------------------------------------------------
-BoundaryBisec*
-DDS_NavierStokesSystem::get_b_intersect(size_t const& field, size_t const& level)
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_b_intersect" ) ;
-   return (b_intersect[field][level]) ;
-}
+
+
 
 //----------------------------------------------------------------------
 NodeProp
