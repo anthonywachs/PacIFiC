@@ -91,6 +91,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , PressureStressOrder ( "first" )
    , tolerance ( 1.e-6 )
    , grid_check_for_solid ( 3.0 )
+   , b_particles_as_fixed_obstacles( true )
    , b_projection_translation( dom->primary_grid()->is_translation_active() )
    , b_grid_has_been_translated_since_last_output( false )
    , b_grid_has_been_translated_at_previous_time( false )
@@ -99,7 +100,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , bottom_coordinate( 0. )
    , translated_distance( 0. )
    , gravity_vector( 0 )
-   , b_particles_as_fixed_obstacles( true )
 {
    MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -508,31 +508,6 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
       allrigidbodies = new DS_AllRigidBodies( dim,
       	*solidFluid_transferStream, b_particles_as_fixed_obstacles, UF, PF );
 
-      // // Display the geometric features of all rigid bodies
-      // string space( 3, ' ' ) ;
-      // for (size_t i = 0; i < nb_procs; ++i)
-      // {
-      //   if ( i == my_rank )
-      //   {
-      //     MAC::out() << space << "Rank " << my_rank << endl ;
-      //     allrigidbodies->display_geometric( MAC::out(), 3 );
-      //     MAC::out() << endl;
-      //   }
-      //   macCOMM->barrier();
-      // }
-      //
-      // // Display the features of all rigid bodies
-      // for (size_t i = 0; i < nb_procs; ++i)
-      // {
-      //   if ( i == my_rank )
-      //   {
-      //     MAC::out() << space << "Rank " << my_rank << endl ;
-      //     allrigidbodies->display( MAC::out(), 3 );
-      //     MAC::out() << endl;
-      //   }
-      //   macCOMM->barrier();
-      // }
-
       Solids_generation( );
 
       if (my_rank == 0)
@@ -630,14 +605,6 @@ DDS_NavierStokes:: do_before_inner_iterations_stage(
    //    nodes_field_initialization(1);
    //    nodes_field_initialization(3);
    //    if (dim == 3) nodes_field_initialization(4);
-   //
-   //    // if ( my_rank == is_master ) SCT_set_start( "cell_detection");
-   //    // detect_fresh_cells_and_neighbours();
-   //    // if ( my_rank == is_master ) SCT_get_elapsed_time( "cell_detection" );
-   //
-   //    // if ( my_rank == is_master ) SCT_set_start( "divergence_weighting");
-   //    // calculate_divergence_weighting(t_it);
-   //    // if ( my_rank == is_master ) SCT_get_elapsed_time( "divergence_weighting" );
    //
    //    // Direction splitting
    //    // Assemble 1D tridiagonal matrices
@@ -1101,80 +1068,6 @@ DDS_NavierStokes:: calculate_row_indexes ( FV_DiscreteField const* FF)
 
 
 
-// //---------------------------------------------------------------------------
-// double
-// DDS_NavierStokes:: return_divergence_weighting (
-//   FV_DiscreteField const* FF,
-//   size_t const& comp,
-//   size_t const& i,
-//   size_t const& j,
-//   size_t const& k,
-//   FV_TimeIterator const* t_it)
-// //---------------------------------------------------------------------------
-// {
-//    MAC_LABEL( "DDS_NavierStokes:: return_divergence_weighting" ) ;
-//
-//    BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(0,0);
-//    BoundaryBisec* bs_intersect = GLOBAL_EQ->get_b_intersect(0,1);
-//    NodeProp node = GLOBAL_EQ->get_node_property(0,0);
-//    FreshNode* fresh = GLOBAL_EQ->get_fresh_node();
-//    double lambda = 0.;
-//
-//    doubleVector xi(3,1.);
-//
-//    xi(0) = 0.5*FF->get_cell_size(i,comp,0);
-//    xi(1) = 0.5*FF->get_cell_size(j,comp,1);
-//    if (dim == 3) xi(2) = 0.5*FF->get_cell_size(k,comp,2);
-//
-//    size_t p = return_node_index(FF,comp,i,j,k);
-//
-//    if (fresh[0].flag->item(p) != 0) {
-//       if (node.void_frac[comp]->item(p) == 0) {
-//          for ( size_t dir = 0; dir < dim ; dir++) {
-//             if ((bf_intersect[dir].offset[comp]->item(p,0) == 1)) {
-//                xi(dir) = bf_intersect[dir].value[comp]->item(p,0);
-//             } else if ((bf_intersect[dir].offset[comp]->item(p,1) == 1)) {
-//                xi(dir) = bf_intersect[dir].value[comp]->item(p,1);
-//             }
-//             if ((bf_intersect[dir].offset[comp]->item(p,1) == 1) && (bf_intersect[dir].offset[comp]->item(p,0) == 1)) {
-//                xi(dir) = min(bf_intersect[dir].value[comp]->item(p,0),bf_intersect[dir].value[comp]->item(p,1));
-// 	    }
-//          }
-//       } else if (node.void_frac[comp]->item(p) == 1) {
-//          for ( size_t dir = 0; dir < dim ; dir++) {
-//             if ((bs_intersect[dir].offset[comp]->item(p,0) == 1)) {
-//                xi(dir) = bs_intersect[dir].value[comp]->item(p,0);
-//             } else if ((bs_intersect[dir].offset[comp]->item(p,1) == 1)) {
-//                xi(dir) = bs_intersect[dir].value[comp]->item(p,1);
-//             }
-//             if ((bs_intersect[dir].offset[comp]->item(p,1) == 1) && (bs_intersect[dir].offset[comp]->item(p,0) == 1)) {
-//                xi(dir) = min(bs_intersect[dir].value[comp]->item(p,0),bs_intersect[dir].value[comp]->item(p,1));
-//             }
-//          }
-//       }
-//
-//       double r = (dim == 2) ? min(xi(0),xi(1)) : min(xi(0),min(xi(1),xi(2)));
-//       double local_cfl = (double)DivRelax*t_it->time_step()*fresh[0].sep_vel->item(p);
-//
-//       // Differentiable transition function
-//       if (r < 0.) {
-//          lambda = 0;
-//       } else if ((r >= 0.) && (r <= local_cfl)) {
-//          lambda = 3.*pow(r/local_cfl,2.) - 2.*pow(r/local_cfl,3.);
-//       } else if (r > local_cfl) {
-//          lambda = 1.;
-//       }
-//    } else {
-//       lambda = 1.;
-//    }
-//
-//    return(lambda);
-//
-// }
-
-
-
-
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: trans_rotation_matrix (size_t const& m
@@ -1339,289 +1232,6 @@ DDS_NavierStokes:: Solids_generation ()
 
 
 
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: calculate_divergence_weighting(FV_TimeIterator const* t_it)
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL( "DDS_NavierStokes:: calculate_divergence_weighting" ) ;
-//
-//   size_t_vector min_unknown_index(dim,0);
-//   size_t_vector max_unknown_index(dim,0);
-//
-//   FreshNode* fresh = GLOBAL_EQ->get_fresh_node();
-//   DivNode* divergence = GLOBAL_EQ->get_node_divergence();
-//
-//   size_t comp = 0;
-//
-//   // Get local min and max indices;
-//   // Calculation on the rows next to the unknown (i.e. not handled by the proc) as well
-//   for (size_t l=0;l<dim;++l) {
-//      // Calculations for solids on the total unknown on the proc
-//      min_unknown_index(l) = PF->get_min_index_unknown_on_proc( comp, l );
-//      max_unknown_index(l) = PF->get_max_index_unknown_on_proc( comp, l );
-//   }
-//
-//   size_t local_min_k = 0;
-//   size_t local_max_k = 0;
-//
-//   if (dim == 3) {
-//      local_min_k = min_unknown_index(2);
-//      local_max_k = max_unknown_index(2);
-//   }
-//
-//   // Calculating weighting index for all fresh/dead nodes
-//   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-//      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-//         for (size_t k=local_min_k;k<=local_max_k;++k) {
-//            size_t p = return_node_index(PF,comp,i,j,k);
-// 	   double lamb = return_divergence_weighting(PF,comp,i,j,k,t_it);
-//            divergence[0].lambda[0]->set_item(p,lamb);
-//            divergence[0].lambda[1]->set_item(p,lamb);
-//            divergence[0].lambda[2]->set_item(p,lamb);
-// 	}
-//      }
-//   }
-//
-//   divergence[1].lambda[0]->set(divergence[0].lambda[0]);
-//   divergence[1].lambda[1]->set(divergence[0].lambda[1]);
-//   divergence[1].lambda[2]->set(divergence[0].lambda[2]);
-//
-//   // Calculating weighting index for nodes neighbours to fresh/dead nodes
-//   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-//      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-//         for (size_t k=local_min_k;k<=local_max_k;++k) {
-//            double wr=1.,wl=1.,wt=1.,wbo=1.,wf=1.,wbe=1.;
-//
-//            size_t p = return_node_index(PF,comp,i,j,k);
-//            if ((is_solids) && (fresh[0].neigh_count->item(p) != 0)
-// 			   && (fresh[0].flag->item(p) == 0)) {
-// 	      if (fresh[0].neigh[0]->item(p) != 0) {
-//                  size_t pl = return_node_index(PF,comp,i-1,j,k);
-//                  if (fresh[0].flag->item(pl) != 0) {
-//                     wl = divergence[1].lambda[0]->item(pl);
-//                  }
-//                  size_t pr = return_node_index(PF,comp,i+1,j,k);
-//                  if (fresh[0].flag->item(pr) != 0) {
-//                     wr = divergence[1].lambda[0]->item(pr);
-//                  }
-//                  divergence[0].lambda[0]->set_item(p,MAC::min(wl,wr));
-// 	      }
-//
-// 	      if (fresh[0].neigh[1]->item(p) != 0) {
-//                  size_t pbo = return_node_index(PF,comp,i,j-1,k);
-//                  if (fresh[0].flag->item(pbo) != 0) {
-//                     wbo = divergence[1].lambda[1]->item(pbo);
-//                  }
-//                  size_t pt = return_node_index(PF,comp,i,j+1,k);
-//                  if (fresh[0].flag->item(pt) != 0) {
-//                     wt = divergence[1].lambda[1]->item(pt);
-//                  }
-//                  divergence[0].lambda[1]->set_item(p,MAC::min(wbo,wt));
-// 	      }
-//
-//               if (dim == 3) {
-// 	         if (fresh[0].neigh[2]->item(p) != 0) {
-// 	            size_t pbe = return_node_index(PF,comp,i,j,k-1);
-//                     if (fresh[0].flag->item(pbe) != 0) {
-//                        wbe = divergence[1].lambda[2]->item(pbe);
-//                     }
-// 	            size_t pf = return_node_index(PF,comp,i,j,k+1);
-//                     if (fresh[0].flag->item(pf) != 0) {
-//                        wf = divergence[1].lambda[2]->item(pf);
-//                     }
-// 		 }
-//               }
-//
-//               divergence[0].lambda[2]->set_item(p,MAC::min(wbe,wf));
-// 	   }
-// 	}
-//      }
-//   }
-// }
-//
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: detect_fresh_cells_and_neighbours()
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL( "DDS_NavierStokes:: detect_fresh_cells_and_neighbours" ) ;
-//
-//   size_t_vector min_unknown_index(dim,0);
-//   size_t_vector max_unknown_index(dim,0);
-//
-//   FreshNode* fresh = GLOBAL_EQ->get_fresh_node();
-//   DivNode* divergence = GLOBAL_EQ->get_node_divergence();
-//   NodeProp node = GLOBAL_EQ->get_node_property(0,0);
-//   NodeProp node_old = GLOBAL_EQ->get_node_property(0,1);
-//
-//   size_t comp = 0;
-//
-//   size_t_array2D node_neigh(dim,2,0);
-//
-//   // Get local min and max indices;
-//   // Calculation on the rows next to the unknown (i.e. not handled by the proc) as well
-//   for (size_t l=0;l<dim;++l) {
-//      // Calculations for solids on the total unknown on the proc
-//      min_unknown_index(l) = PF->get_min_index_unknown_on_proc( comp, l );
-//      max_unknown_index(l) = PF->get_max_index_unknown_on_proc( comp, l );
-//   }
-//
-//   size_t local_min_k = 0;
-//   size_t local_max_k = 0;
-//
-//   if (dim == 3) {
-//      local_min_k = min_unknown_index(2);
-//      local_max_k = max_unknown_index(2);
-//   }
-//
-//   // Fresh and dead cell detection
-//   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-//      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-//         for (size_t k=local_min_k;k<=local_max_k;++k) {
-//            size_t p = return_node_index(PF,comp,i,j,k);
-//
-//            // When the node first came in fluid, assign it to be fresh and counter increment
-//            if ((node.void_frac[comp]->item(p) == 0) && (node_old.void_frac[comp]->item(p) == 1)) {
-//               fresh[0].flag->set_item(p,1.);
-//               fresh[0].flag_count->set_item(p,1);
-// 	      fresh[0].parID->set_item(p,node_old.parID[comp]->item(p));
-//            // When the node first came in solid, assign it to be dead and counter increment
-//            } else if ((node.void_frac[comp]->item(p) == 1) && (node_old.void_frac[comp]->item(p) == 0)) {
-//               fresh[0].flag->set_item(p,-1.);
-//               fresh[0].flag_count->set_item(p,1);
-// 	      fresh[0].parID->set_item(p,node.parID[comp]->item(p));
-//            // If counter is no zero then keep the node fresh and +1 to counter
-//            } else if ((fresh[0].flag->item(p) != 0) && (fresh[0].flag_count->item(p) != 0)) {
-//               fresh[0].flag_count->set_item(p,fresh[0].flag_count->item(p)+1);
-//            }
-// 	}
-//      }
-//   }
-//
-//   // Detection of neighbouring cell to the fresh and dead cell
-//   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-//      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-//         for (size_t k=local_min_k;k<=local_max_k;++k) {
-//            size_t p = return_node_index(PF,comp,i,j,k);
-//
-//            // Checking if any neihbouring cell is either a fresh or dead cell
-// 	   if (node.void_frac[comp]->item(p) == 0) {
-//               node_neigh(0,0) = return_node_index(PF,comp,i-1,j,k);
-//               node_neigh(0,1) = return_node_index(PF,comp,i+1,j,k);
-//               node_neigh(1,0) = return_node_index(PF,comp,i,j-1,k);
-//               node_neigh(1,1) = return_node_index(PF,comp,i,j+1,k);
-//               if (dim == 3) {
-//                  node_neigh(2,0) = return_node_index(PF,comp,i,j,k-1);
-//                  node_neigh(2,1) = return_node_index(PF,comp,i,j,k+1);
-//               }
-//
-// 	      double temp_count = 2.*(double)DivRelax;
-//
-//               // Neighbour is fresh and checked for the first time with counter increment
-//               for (size_t dir=0;dir<dim;dir++) {
-//                  for (size_t off=0;off<2;off++) {
-//                     size_t pi = node_neigh(dir,off);
-// 		    if ((fresh[0].flag_count->item(p) == 0) || (fresh[0].flag_count->item(p) > fresh[0].flag_count->item(pi))) {
-//                        if (fresh[0].flag->item(pi) != 0) {
-//                           if (fresh[0].neigh[dir]->item(p) == 0) {
-//                              fresh[0].neigh[dir]->set_item(p,1);
-//                              fresh[0].neigh_count->set_item(p,1);
-//                           } else {
-// 	                     if (fresh[0].flag_count->item(pi) < temp_count) {
-//                                 fresh[0].neigh_count->set_item(p,fresh[0].flag_count->item(pi));
-//                                 temp_count = fresh[0].flag_count->item(pi);
-//                              }
-//                           }
-// 		       }
-// 		    }
-//                  }
-// 	      }
-// 	   }
-//         }
-//      }
-//   }
-//
-//   // Clearing the fresh/dead cells and neighbour
-//   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-//      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-//         for (size_t k=local_min_k;k<=local_max_k;++k) {
-//            size_t p = return_node_index(PF,comp,i,j,k);
-//
-//            // Reference stencil only valid for cells in neighbour with either fresh or dead cell
-//            if (fresh[0].neigh_count->item(p) == 1) {
-//               divergence[2].div->set_item(p,divergence[1].div->item(p));
-// 	      if (((fresh[0].neigh[0]->item(p) == 1)
-//                 || (fresh[0].neigh[1]->item(p) == 1)
-// 		|| (fresh[0].neigh[2]->item(p) == 1))
-//                 && (fresh[1].neigh_count->item(p) == 0)) {
-//
-//                  divergence[2].stencil[0]->set_item(p,divergence[1].stencil[0]->item(p));
-//                  divergence[2].stencil[1]->set_item(p,divergence[1].stencil[1]->item(p));
-//                  divergence[2].stencil[2]->set_item(p,divergence[1].stencil[2]->item(p));
-// 	      }
-// 	   // When node was both fresh and neighbour, and shift to only neighbour
-//            } else if ((fresh[1].flag_count->item(p) > fresh[0].flag_count->item(p))
-// 		  &&  (fresh[0].neigh_count != 0)) {
-//
-//               divergence[2].stencil[0]->set_item(p,divergence[1].stencil[0]->item(p));
-//               divergence[2].stencil[1]->set_item(p,divergence[1].stencil[1]->item(p));
-//               divergence[2].stencil[2]->set_item(p,divergence[1].stencil[2]->item(p));
-// 	   }
-//
-//            // If the fresh node is past DivRelax iterations then removed as a fresh cell with counter reset
-//            if (fresh[0].flag_count->item(p) >= 1.1*(double)DivRelax) {
-//               fresh[0].flag->set_item(p,0);
-//               fresh[0].flag_count->set_item(p,0);
-//               fresh[0].parID->set_item(p,0);
-// 	   }
-//
-// 	   // If the fresh node is past DivRelax iterations then removed as a fresh cell with counter reset
-//            if (fresh[0].neigh_count->item(p) >= 1.1*(double)DivRelax) {
-//               fresh[0].neigh[0]->set_item(p,0);
-//               fresh[0].neigh[1]->set_item(p,0);
-//               fresh[0].neigh[2]->set_item(p,0);
-//               fresh[0].neigh_count->set_item(p,0);
-// 	   }
-// 	}
-//      }
-//   }
-//
-//   PartInput solid = GLOBAL_EQ->get_solid(0);
-//
-//   // Surface normal vector calculation on fresh/dead or neighbouring nodes
-//   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-//      double xC = PF->get_DOF_coordinate( i, comp, 0 ) ;
-//      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-//         double yC = PF->get_DOF_coordinate( j, comp, 1 ) ;
-//         for (size_t k=local_min_k;k<=local_max_k;++k) {
-// 	   double zC = 0.;
-// 	   if (dim == 3) zC = PF->get_DOF_coordinate( k, comp, 2 ) ;
-//
-//            size_t p = return_node_index(PF,comp,i,j,k);
-//
-//            if (fresh[0].flag_count->item(p) != 0) {
-// 	      size_t parID = (size_t) fresh[0].parID->item(p);
-// 	      double vec_mag = pow(pow(xC-solid.coord[0]->item(parID),2)
-// 			         + pow(yC-solid.coord[1]->item(parID),2)
-// 				 + pow(zC-solid.coord[2]->item(parID),2),0.5);
-// 	      double vx = (xC-solid.coord[0]->item(parID))/vec_mag * solid.vel[0]->item(parID);
-// 	      double vy = (yC-solid.coord[1]->item(parID))/vec_mag * solid.vel[1]->item(parID);
-// 	      double vz = (zC-solid.coord[2]->item(parID))/vec_mag * solid.vel[2]->item(parID);
-// 	      double sep_mag = pow(pow(vx,2)+pow(vy,2)+pow(vz,2),0.5);
-//               fresh[0].sep_vel->set_item(p,sep_mag);
-//            } else {
-//               fresh[0].sep_vel->set_item(p,0.);
-// 	   }
-// 	}
-//      }
-//   }
-//
-// }
-
-
-
-
 //---------------------------------------------------------------------------
 double
 DDS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
@@ -1738,12 +1348,14 @@ DDS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
             p = FF->DOF_local_number(j,k,i,comp);
          }
 
-         size_t_array2D* intersect_vector = allrigidbodies->get_intersect_vector_on_grid(FF);
-         doubleArray2D* intersect_distance = allrigidbodies->get_intersect_distance_on_grid(FF);
-         NodeProp node = GLOBAL_EQ->get_node_property(field,0);
-         size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(FF);
+         size_t_array2D* intersect_vector =
+                           allrigidbodies->get_intersect_vector_on_grid(FF);
+         doubleArray2D* intersect_distance =
+                           allrigidbodies->get_intersect_distance_on_grid(FF);
+         size_t_vector* void_frac =
+                           allrigidbodies->get_void_fraction_on_grid(FF);
 
-         if (void_frac->operator()(p) == 0.) {
+         if (void_frac->operator()(p) == 0) {
             // if left node is inside the solid particle
             if (intersect_vector->operator()(p,2*dir+0) == 1) {
                left = -gamma/intersect_distance->operator()(p,2*dir+0);
@@ -1752,7 +1364,7 @@ DDS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
             if (intersect_vector->operator()(p,2*dir+1) == 1) {
                right = -gamma/intersect_distance->operator()(p,2*dir+1);
             }
-         } else if (void_frac->operator()(p) == 1.) {
+         } else if (void_frac->operator()(p) == 1) {
             // if center node is inside the solid particle
             left = 0.;
             right = 0.;
@@ -2237,7 +1849,6 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
                            allrigidbodies->get_intersect_distance_on_grid(UF);
    doubleArray2D* intersect_fieldVal =
                            allrigidbodies->get_intersect_fieldValue_on_grid(UF);
-   NodeProp node = GLOBAL_EQ->get_node_property(1,0);
 
    size_t p = UF->DOF_local_number(i,j,k,comp);
 
@@ -2266,7 +1877,7 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
                   xhl = intersect_distance->operator()(p,2*dir+0);
                }
                if (intersect_vector->operator()(p,2*dir+1) == 1) {
-                  xright = intersect_fieldVal->operator()(p,2*dir+1);
+                  xright = intersect_fieldVal->operator()(p,2*dir+1)
                          - UF->DOF_value( i, j, k, comp, level );
                   xhr = intersect_distance->operator()(p,2*dir+1);
                }
@@ -2308,7 +1919,7 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
                   yhl = intersect_distance->operator()(p,2*dir+0);
                }
                if (intersect_vector->operator()(p,2*dir+1) == 1) {
-                  yright = intersect_fieldVal->operator()(p,2*dir+1);
+                  yright = intersect_fieldVal->operator()(p,2*dir+1)
                          - UF->DOF_value( i, j, k, comp, level );
                   yhr = intersect_distance->operator()(p,2*dir+1);
                }
@@ -2350,7 +1961,7 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
                   zhl = intersect_distance->operator()(p,2*dir+0);
                }
                if (intersect_vector->operator()(p,2*dir+1) == 1) {
-                  zright = intersect_fieldVal->operator()(p,2*dir+1);
+                  zright = intersect_fieldVal->operator()(p,2*dir+1)
                          - UF->DOF_value( i, j, k, comp, level );
                   zhr = intersect_distance->operator()(p,2*dir+1);
                }
@@ -2417,7 +2028,6 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
                            allrigidbodies->get_intersect_distance_on_grid(UF);
    doubleArray2D* intersect_fieldVal =
                            allrigidbodies->get_intersect_fieldValue_on_grid(UF);
-   NodeProp node = GLOBAL_EQ->get_node_property(1,0);
 
    for (size_t i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
       if (dir == 0) {
@@ -6196,7 +5806,6 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    min_unknown_index(2) = (dim == 3) ? 0 : 0;
    max_unknown_index(2) = (dim == 3) ? 0 : 1;
 
-   NodeProp node = GLOBAL_EQ->get_node_property(1,0);
    LA_SeqVector** vel_diff_loc = GLOBAL_EQ->get_velocity_diffusion();
    size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
 
@@ -6531,7 +6140,11 @@ DDS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad, size_t const& i, size_t const& j, size_t const& k, size_t const& level, bool const& div_ref)
+DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
+                                              , size_t const& i
+                                              , size_t const& j
+                                              , size_t const& k
+                                              , size_t const& level)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: assemble_velocity_gradients" ) ;
@@ -6546,7 +6159,6 @@ DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad, size_t
                            allrigidbodies->get_intersect_distance_on_grid(PF);
    doubleArray2D* intersect_fieldVal =
                            allrigidbodies->get_intersect_fieldValue_on_grid(PF);
-   DivNode* divergence = GLOBAL_EQ->get_node_divergence();
    size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
 
    size_t p = PF->DOF_local_number(i,j,k,comp);
@@ -6557,65 +6169,35 @@ DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad, size_t
    double xvalue = UF->DOF_value( shift.i+i, j, k, 0, level )
                  - UF->DOF_value( shift.i+i-1, j, k, 0, level) ;
    // Dyy for un
+   double yvalue = UF->DOF_value( i, shift.j+j, k, 1, level)
+                 - UF->DOF_value( i, shift.j+j-1, k, 1, level) ;
    double yh= UF->get_DOF_coordinate( shift.j+j,1, 1 )
             - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-   double yvalue = UF->DOF_value( i, shift.j+j, k, 1, level)
-            - UF->DOF_value( i, shift.j+j-1, k, 1, level) ;
 
    double bx = xh;
    double by = yh;
 
    if (is_solids) {
       if (void_frac->operator()(p) == 0) {
-        // Calculating the divergence using the current stencil
-        // if (div_ref == 0) {
-            // divergence[0].stencil[0]->set_item(p,0);
-            if (intersect_vector->operator()(p,2*0+0) == 1) {
-               xvalue = UF->DOF_value( shift.i+i, j, k, 0, level)
-                      - intersect_fieldVal->operator()(p,2*0+0);
-               xh = intersect_distance->operator()(p,2*0+0)
-                  + PF->get_cell_size( i, 0, 0 )/2.;
-               // divergence[0].stencil[0]->set_item(p,-1);
-            }
-            if (intersect_vector->operator()(p,2*0+1) == 1) {
-               xvalue = intersect_fieldVal->operator()(p,2*0+1)
-                      - UF->DOF_value( shift.i+i-1, j, k, 0, level);
-               xh = intersect_distance->operator()(p,2*0+1)
-                  + PF->get_cell_size( i, 0, 0 )/2.;
-               // divergence[0].stencil[0]->set_item(p,1);
-            }
-            if ((intersect_vector->operator()(p,2*0+1) == 1)
-             && (intersect_vector->operator()(p,2*0+0) == 1)) {
-               xvalue = intersect_fieldVal->operator()(p,2*0+1)
-                      - intersect_fieldVal->operator()(p,2*0+0);
-               xh = intersect_distance->operator()(p,2*0+1)
-                  + intersect_distance->operator()(p,2*0+0);
-            }
-	 // Calculating the divergence using the reference stencil
-	    // Calculating the divergence if current and reference stencil is different
-    // } else {
-    //         if (divergence[2].stencil[0]->item(p) != divergence[0].stencil[0]->item(p)) {
-    //            if (divergence[2].stencil[0]->item(p) == -1) {
-    //               size_t pi = return_node_index(PF,comp,i-1,j,k);
-    //               xvalue = UF->DOF_value( shift.i+i, j, k, 0, level) - b_intersect[0].field_var->item(pi,0);
-    //               xh = b_intersect[0].value->item(pi,0) + PF->get_cell_size( i-1, 0, 0 )/2. + PF->get_cell_size( i, 0, 0 );
-    //            } else if (divergence[2].stencil[0]->item(p) == 1) {
-    //               size_t pi = return_node_index(PF,comp,i+1,j,k);
-    //               xvalue = b_intersect[0].field_var->item(pi,1) - UF->DOF_value( shift.i+i-1, j, k, 0, level);
-    //               xh = b_intersect[0].value->item(pi,1) + PF->get_cell_size( i+1, 0, 0 )/2. + PF->get_cell_size( i, 0, 0 );
-    //            }
-	 //    // Calculating the divergence if current and reference stencil is same
-	 //    } else {
-    //            if ((b_intersect[0].offset->item(p,0) == 1)) {
-    //               xvalue = UF->DOF_value( shift.i+i, j, k, 0, level) - b_intersect[0].field_var->item(p,0);
-    //               xh = b_intersect[0].value->item(p,0) + PF->get_cell_size( i, 0, 0 )/2.;
-    //            }
-    //            if ((b_intersect[0].offset->item(p,1) == 1)) {
-    //               xvalue = b_intersect[0].field_var->item(p,1) - UF->DOF_value( shift.i+i-1, j, k, 0, level);
-    //               xh = b_intersect[0].value->item(p,1) + PF->get_cell_size( i, 0, 0 )/2.;
-    //            }
-	 //    }
-	 // }
+         if (intersect_vector->operator()(p,2*0+0) == 1) {
+            xvalue = UF->DOF_value( shift.i+i, j, k, 0, level)
+                   - intersect_fieldVal->operator()(p,2*0+0);
+            xh = intersect_distance->operator()(p,2*0+0)
+               + PF->get_cell_size( i, 0, 0 )/2.;
+         }
+         if (intersect_vector->operator()(p,2*0+1) == 1) {
+            xvalue = intersect_fieldVal->operator()(p,2*0+1)
+                   - UF->DOF_value( shift.i+i-1, j, k, 0, level);
+            xh = intersect_distance->operator()(p,2*0+1)
+               + PF->get_cell_size( i, 0, 0 )/2.;
+         }
+         if ((intersect_vector->operator()(p,2*0+1) == 1)
+          && (intersect_vector->operator()(p,2*0+0) == 1)) {
+            xvalue = intersect_fieldVal->operator()(p,2*0+1)
+                   - intersect_fieldVal->operator()(p,2*0+0);
+            xh = intersect_distance->operator()(p,2*0+1)
+               + intersect_distance->operator()(p,2*0+0);
+         }
       } else {
          xvalue = 0.;
       }
@@ -6623,55 +6205,25 @@ DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad, size_t
 
    if (is_solids) {
       if (void_frac->operator()(p) == 0) {
-	 // Calculating the divergence using the current stencil
-	 // if (div_ref == 0) {
-            // divergence[0].stencil[1]->set_item(p,0);
-            if (intersect_vector->operator()(p,2*1+0) == 1) {
-               yvalue = UF->DOF_value( i, shift.j+j, k, 1, level)
-                      - intersect_fieldVal->operator()(p,2*1+0);
-               yh = intersect_distance->operator()(p,2*1+0)
-                  + PF->get_cell_size( j, 0, 1 )/2.;
-               // divergence[0].stencil[1]->set_item(p,-1);
-            }
-            if (intersect_vector->operator()(p,2*1+1) == 1) {
-               yvalue = intersect_fieldVal->operator()(p,2*1+1)
-                      - UF->DOF_value( i,shift.j+j-1, k, 1, level);
-               yh = intersect_distance->operator()(p,2*1+1)
-                  + PF->get_cell_size( j, 0, 1 )/2.;
-               // divergence[0].stencil[1]->set_item(p,1);
-            }
-            if ((intersect_vector->operator()(p,2*1+1) == 1)
-             && (intersect_vector->operator()(p,2*1+0) == 1)) {
-               yvalue = intersect_fieldVal->operator()(p,2*1+1)
-                      - intersect_fieldVal->operator()(p,2*1+0);
-               yh = intersect_distance->operator()(p,2*1+1)
-                  + intersect_distance->operator()(p,2*1+0);
-            }
-	 // Calculating the divergence using the reference stencil
-	 // } else {
-	 //    // Calculating the divergence if current and reference stencil is different
-    //         if (divergence[2].stencil[1]->item(p) != divergence[0].stencil[1]->item(p)) {
-    //            if (divergence[2].stencil[1]->item(p) == -1) {
-    //               size_t pi = return_node_index(PF,comp,i,j-1,k);
-    //               yvalue = UF->DOF_value( i, shift.j+j, k, 1, level) - b_intersect[1].field_var[comp]->item(pi,0);
-    //               yh = b_intersect[1].value[comp]->item(pi,0) + PF->get_cell_size( j-1, 0, 1 )/2. + PF->get_cell_size( j, 0, 1 );
-    //            } else if (divergence[2].stencil[1]->item(p) == 1) {
-    //               size_t pi = return_node_index(PF,comp,i,j+1,k);
-    //               yvalue = b_intersect[1].field_var[comp]->item(pi,1) - UF->DOF_value( i,shift.j+j-1, k, 1, level);
-    //               yh = b_intersect[1].value[comp]->item(pi,1) + PF->get_cell_size( j+1, 0, 1 )/2. + PF->get_cell_size( j, 0, 1 );
-    //            }
-	 //    // Calculating the divergence if current and reference stencil is same
-	 //    } else {
-    //            if ((b_intersect[1].offset[comp]->item(p,0) == 1)) {
-    //               yvalue = UF->DOF_value( i, shift.j+j, k, 1, level) - b_intersect[1].field_var[comp]->item(p,0);
-    //               yh = b_intersect[1].value[comp]->item(p,0) + PF->get_cell_size( j, 0, 1 )/2.;
-    //            }
-    //            if ((b_intersect[1].offset[comp]->item(p,1) == 1)) {
-    //               yvalue = b_intersect[1].field_var[comp]->item(p,1) - UF->DOF_value( i,shift.j+j-1, k, 1, level);
-    //               yh = b_intersect[1].value[comp]->item(p,1) + PF->get_cell_size( j, 0, 1 )/2.;
-    //            }
-	 //    }
-	 // }
+         if (intersect_vector->operator()(p,2*1+0) == 1) {
+            yvalue = UF->DOF_value( i, shift.j+j, k, 1, level)
+                   - intersect_fieldVal->operator()(p,2*1+0);
+            yh = intersect_distance->operator()(p,2*1+0)
+               + PF->get_cell_size( j, 0, 1 )/2.;
+         }
+         if (intersect_vector->operator()(p,2*1+1) == 1) {
+            yvalue = intersect_fieldVal->operator()(p,2*1+1)
+                   - UF->DOF_value( i,shift.j+j-1, k, 1, level);
+            yh = intersect_distance->operator()(p,2*1+1)
+               + PF->get_cell_size( j, 0, 1 )/2.;
+         }
+         if ((intersect_vector->operator()(p,2*1+1) == 1)
+          && (intersect_vector->operator()(p,2*1+0) == 1)) {
+            yvalue = intersect_fieldVal->operator()(p,2*1+1)
+                   - intersect_fieldVal->operator()(p,2*1+0);
+            yh = intersect_distance->operator()(p,2*1+1)
+               + intersect_distance->operator()(p,2*1+0);
+         }
       } else {
          yvalue = 0.;
       }
@@ -6693,55 +6245,25 @@ DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad, size_t
 
       if (is_solids) {
          if (void_frac->operator()(p) == 0) {
-	    // Calculating the divergence using the current stencil
-            // if (div_ref == 0) {
-               // divergence[0].stencil[2]->set_item(p,0);
-               if (intersect_vector->operator()(p,2*2+0) == 1) {
-                  zvalue = UF->DOF_value( i, j, shift.k+k, 2, level)
-                         - intersect_fieldVal->operator()(p,2*2+0);
-                  zh = intersect_distance->operator()(p,2*2+0)
-                     + PF->get_cell_size( k, 0, 2 )/2.;
-                  // divergence[0].stencil[2]->set_item(p,-1);
-               }
-               if (intersect_vector->operator()(p,2*2+1) == 1) {
-                  zvalue = intersect_fieldVal->operator()(p,2*2+1)
-                         - UF->DOF_value( i, j,shift.k+k-1, 2, level);
-                  zh = intersect_distance->operator()(p,2*2+1)
-                     + PF->get_cell_size( k, 0, 2 )/2.;
-                  // divergence[0].stencil[2]->set_item(p,1);
-               }
-               if ((intersect_vector->operator()(p,2*2+1) == 1)
-                && (intersect_vector->operator()(p,2*2+0) == 1)) {
-                  zvalue = intersect_fieldVal->operator()(p,2*2+1)
-                         - intersect_fieldVal->operator()(p,2*2+0);
-                  zh = intersect_distance->operator()(p,2*2+1)
-                     + intersect_distance->operator()(p,2*2+0);
-               }
-	    // Calculating the divergence using the reference stencil
-	    // } else {
-	    //    // Calculating the divergence if current and reference stencil is different
-       //         if (divergence[2].stencil[2]->item(p) != divergence[0].stencil[2]->item(p)) {
-       //            if (divergence[2].stencil[2]->item(p) == -1) {
-       //               size_t pi = return_node_index(PF,comp,i,j,k-1);
-       //               zvalue = UF->DOF_value( i, j, shift.k+k, 2, level) - b_intersect[2].field_var[comp]->item(pi,0);
-       //               zh = b_intersect[2].value[comp]->item(pi,0) + PF->get_cell_size( k-1, 0, 2 )/2. + PF->get_cell_size( k, 0, 2 );
-	    //       } else if (divergence[2].stencil[2]->item(p) == 1) {
-       //               size_t pi = return_node_index(PF,comp,i,j,k+1);
-       //               zvalue = b_intersect[2].field_var[comp]->item(pi,1) - UF->DOF_value( i, j,shift.k+k-1, 2, level);
-       //               zh = b_intersect[2].value[comp]->item(pi,1) + PF->get_cell_size( k+1, 0, 2 )/2. + PF->get_cell_size( k, 0, 2 );
-       //            }
-	    //    // Calculating the divergence if current and reference stencil is same
-	    //    } else {
-       //            if ((b_intersect[2].offset[comp]->item(p,0) == 1)) {
-       //               zvalue = UF->DOF_value( i, j, shift.k+k, 2, level) - b_intersect[2].field_var[comp]->item(p,0);
-       //               zh = b_intersect[2].value[comp]->item(p,0) + PF->get_cell_size( k, 0, 2 )/2.;
-       //            }
-       //            if ((b_intersect[2].offset[comp]->item(p,1) == 1)) {
-       //               zvalue = b_intersect[2].field_var[comp]->item(p,1) - UF->DOF_value( i, j,shift.k+k-1, 2, level);
-       //               zh = b_intersect[2].value[comp]->item(p,1) + PF->get_cell_size( k, 0, 2 )/2.;
-       //            }
-	    //    }
-	    // }
+            if (intersect_vector->operator()(p,2*2+0) == 1) {
+               zvalue = UF->DOF_value( i, j, shift.k+k, 2, level)
+                      - intersect_fieldVal->operator()(p,2*2+0);
+               zh = intersect_distance->operator()(p,2*2+0)
+                  + PF->get_cell_size( k, 0, 2 )/2.;
+            }
+            if (intersect_vector->operator()(p,2*2+1) == 1) {
+               zvalue = intersect_fieldVal->operator()(p,2*2+1)
+                      - UF->DOF_value( i, j,shift.k+k-1, 2, level);
+               zh = intersect_distance->operator()(p,2*2+1)
+                  + PF->get_cell_size( k, 0, 2 )/2.;
+            }
+            if ((intersect_vector->operator()(p,2*2+1) == 1)
+             && (intersect_vector->operator()(p,2*2+0) == 1)) {
+               zvalue = intersect_fieldVal->operator()(p,2*2+1)
+                      - intersect_fieldVal->operator()(p,2*2+0);
+               zh = intersect_distance->operator()(p,2*2+1)
+                  + intersect_distance->operator()(p,2*2+0);
+            }
          } else {
             zvalue = 0.;
          }
@@ -6768,41 +6290,12 @@ DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i, size_t const
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: calculate_velocity_divergence" ) ;
-   NodeProp node = GLOBAL_EQ->get_node_property(0,0);
-   FreshNode* fresh = GLOBAL_EQ->get_fresh_node();
-   DivNode* divergence = GLOBAL_EQ->get_node_divergence();
 
    doubleVector grad(3,0);
 
-   size_t comp = 0;
-
-   size_t p = PF->DOF_local_number(i,j,k,comp);
-
-   double beta = assemble_velocity_gradients(grad,i,j,k,level,0);
+   double beta = assemble_velocity_gradients(grad,i,j,k,level);
 
    double value = beta*(grad(0) + grad(1) + grad(2));
-
-   // if (is_solids) {
-   //    if (node.void_frac->item(p) == 0) {
-   //       // Node is fresh but not considered as neighbour
-   //       if ((fresh[0].flag_count->item(p) != 0) && (fresh[0].neigh_count->item(p) == 0)) {
-   //          value  = beta*grad(0)*divergence[0].lambda[0]->item(p)
-   //                 + beta*grad(1)*divergence[0].lambda[1]->item(p)
-	//                 + beta*grad(2)*divergence[0].lambda[2]->item(p);
-   //       // Node is neighbour irrespective of fresh or not
-   //       } else if (fresh[0].neigh_count->item(p) != 0) {
-   //          doubleVector grad_ref(3,0);
-   //
-   //          double beta_ref = assemble_velocity_gradients(grad_ref,i,j,k,level,1);
-   //
-   //          value  = beta_ref*grad_ref(0) + (beta*grad(0) - beta_ref*grad_ref(0))*divergence[0].lambda[0]->item(p)
-   //                 + beta_ref*grad_ref(1) + (beta*grad(1) - beta_ref*grad_ref(1))*divergence[0].lambda[1]->item(p)
-	//                 + beta_ref*grad_ref(2) + (beta*grad(2) - beta_ref*grad_ref(2))*divergence[0].lambda[2]->item(p);
-   //       }
-   //    } else {
-   //       value = 0.;
-   //    }
-   // }
 
    return(value);
 }
@@ -6833,7 +6326,7 @@ DDS_NavierStokes:: pressure_local_rhs ( size_t const& j
 
    // Vector for fi
    LocalVector* VEC = GLOBAL_EQ->get_VEC(0);
-   DivNode* divergence = GLOBAL_EQ->get_node_divergence();
+   doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
 
    for (size_t i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
       double dx = PF->get_cell_size( i, 0, dir );
@@ -6841,7 +6334,7 @@ DDS_NavierStokes:: pressure_local_rhs ( size_t const& j
          double vel_div = calculate_velocity_divergence(i,j,k,0,t_it);
          value = -(rho*vel_div*dx)/(t_it -> time_step());
          size_t p = PF->DOF_local_number(i,j,k,0);
-         divergence[0].div->set_item(p,vel_div);
+         divergence->operator()(p) = vel_div;
       } else if (dir == 1) {
          value = PF->DOF_value( j, i, k, 0, 1 )*dx;
       } else if (dir == 2) {
@@ -7139,8 +6632,8 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
 
-   DivNode* divergence = GLOBAL_EQ->get_node_divergence();
-   FreshNode* fresh = GLOBAL_EQ->get_fresh_node();
+   doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
+   doubleVector* divergence_old = GLOBAL_EQ->get_node_divergence(1);
 
    for (size_t l=0;l<dim;++l) {
       min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
@@ -7151,8 +6644,8 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
       for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
          for (size_t k = min_unknown_index(2);k <= max_unknown_index(2); ++k) {
             size_t p = PF->DOF_local_number(i,j,k,0);
-            double vel_div0 = divergence[0].div->item(p);
-            double vel_div1 = divergence[1].div->item(p);
+            double vel_div0 = divergence->operator()(p);
+            double vel_div1 = divergence_old->operator()(p);
 
             // Assemble the bodyterm
             double value = PF->DOF_value( i, j, k, 0, 0 )
@@ -7173,16 +6666,8 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    }
 
    // Store the divergence to be used in the next time iteration
-   divergence[1].div->set(divergence[0].div);
-   divergence[1].stencil[0]->set(divergence[0].stencil[0]);
-   divergence[1].stencil[1]->set(divergence[0].stencil[1]);
-   divergence[1].stencil[2]->set(divergence[0].stencil[2]);
-   fresh[1].flag->set(fresh[0].flag);
-   fresh[1].flag_count->set(fresh[0].flag_count);
-   fresh[1].neigh[0]->set(fresh[0].neigh[0]);
-   fresh[1].neigh[1]->set(fresh[0].neigh[1]);
-   fresh[1].neigh[2]->set(fresh[0].neigh[2]);
-   fresh[1].neigh_count->set(fresh[0].neigh_count);
+   for (size_t i = 0; i < divergence->size(); i++)
+      divergence_old->operator()(i) = divergence->operator()(i);
 
    if (is_solids) {
       correct_pressure_1st_layer_solid(0);

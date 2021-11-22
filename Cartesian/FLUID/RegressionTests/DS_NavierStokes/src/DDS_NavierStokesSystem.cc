@@ -148,9 +148,9 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 	vel_diff_loc[1] = LA_SeqVector::create( this, 0 ) ;
 	vel_diff_loc[2] = LA_SeqVector::create( this, 0 ) ;
 
-	divergence[0].div = LA_SeqVector::create( this, 0 ) ;
-	divergence[1].div = LA_SeqVector::create( this, 0 ) ;
-	divergence[2].div = LA_SeqVector::create( this, 0 ) ;
+	divergence.reserve(2);
+	divergence.push_back(new doubleVector(1,0.));
+	divergence.push_back(new doubleVector(1,0.));
 
 	for (size_t field = 0; field < 2; field++) {
 		// Vector to store the presence/absence of particle on the field variable
@@ -181,15 +181,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       solid[level].vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
       solid[level].ang_vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
    }
-
-   for (size_t level = 0; level < 3; level++) {
-      divergence[level].stencil = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-      divergence[level].lambda = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   }
-
-   // Vector to store the fresh nodes in the fluid emerging from solid
-   Pfresh[0].neigh = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   Pfresh[1].neigh = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
 
    for (size_t field = 0; field < 2; field++) {
 
@@ -337,24 +328,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       }
    }
 
-   for (size_t level=0;level<3;level++) {
-      // divergence[level].div = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-      for (size_t dir=0;dir<3;dir++) {
-         divergence[level].stencil[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-         divergence[level].lambda[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-      }
-   }
-   for (size_t level=0;level<2;level++) {
-      Pfresh[level].flag = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-      Pfresh[level].flag_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-      Pfresh[level].neigh_count = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-      Pfresh[level].parID = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-      Pfresh[level].sep_vel = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
-      for (size_t dir=0;dir<3;dir++) {
-         Pfresh[level].neigh[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this );
-      }
-   }
-
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
          for (size_t comp=0;comp<nb_comps[field];++comp) {
@@ -421,9 +394,8 @@ DDS_NavierStokesSystem:: re_initialize( void )
 	vel_diff_loc[1]->re_initialize( UF_loc );
 	vel_diff_loc[2]->re_initialize( UF_loc );
 
-	divergence[0].div->re_initialize( pf_loc ) ;
-	divergence[1].div->re_initialize( pf_loc ) ;
-	divergence[2].div->re_initialize( pf_loc ) ;
+	divergence[0]->re_initialize( pf_loc ) ;
+	divergence[1]->re_initialize( pf_loc ) ;
 
 	// Vectors to store void fractions and intersection information
 	if (is_solids) {
@@ -649,32 +621,6 @@ DDS_NavierStokesSystem:: re_initialize( void )
                }
             }
          }
-
-
-         if ((field==0)&&(comp==0)) {
-            for (size_t level=0;level<3;level++) {
-               // divergence[level].div->re_initialize( nb_total_unknown ) ;
-               for (size_t dir=0;dir<3;dir++) {
-                  divergence[level].stencil[dir]->re_initialize( nb_total_unknown ) ;
-                  divergence[level].lambda[dir]->re_initialize( nb_total_unknown ) ;
-               }
-            }
-	 		}
-
-         if (is_solids) {
-            if ((field==0)&&(comp==0)) {
-               for (size_t level=0;level<2;level++) {
-                  Pfresh[level].flag->re_initialize( nb_total_unknown ) ;
-                  Pfresh[level].flag_count->re_initialize( nb_total_unknown ) ;
-                  Pfresh[level].neigh_count->re_initialize( nb_total_unknown ) ;
-                  Pfresh[level].parID->re_initialize( nb_total_unknown ) ;
-                  Pfresh[level].sep_vel->re_initialize( nb_total_unknown ) ;
-                  for (size_t dir=0;dir<3;dir++) {
-                     Pfresh[level].neigh[dir]->re_initialize( nb_total_unknown ) ;
-		  				}
-	       		}
-	    		}
-         }
       }
    }
 }
@@ -898,12 +844,12 @@ DDS_NavierStokesSystem::get_node_property(size_t const& field, size_t const& tim
 }
 
 //----------------------------------------------------------------------
-DivNode*
-DDS_NavierStokesSystem::get_node_divergence()
+doubleVector*
+DDS_NavierStokesSystem::get_node_divergence(size_t const& level)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_node_divergence" ) ;
-   return (divergence) ;
+   return (divergence[level]) ;
 }
 
 
@@ -932,14 +878,7 @@ DDS_NavierStokesSystem::get_velocity_diffusion()
    return (vel_diff_loc) ;
 }
 
-//----------------------------------------------------------------------
-FreshNode*
-DDS_NavierStokesSystem::get_fresh_node()
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_fresh_node" ) ;
-   return (Pfresh) ;
-}
+
 
 
 //----------------------------------------------------------------------

@@ -188,7 +188,7 @@ public SolverComputingTime
       /** @brief Assemble rhs for pressure in any direction */
       double calculate_velocity_divergence ( size_t const& i, size_t const& j, size_t const& k, size_t const& level, FV_TimeIterator const* t_it);
 
-      double assemble_velocity_gradients (class doubleVector& grad, size_t const& i, size_t const& j, size_t const& k, size_t const& level, bool const& div_ref);
+      double assemble_velocity_gradients (class doubleVector& grad, size_t const& i, size_t const& j, size_t const& k, size_t const& level);
 
       void detect_fresh_cells_and_neighbours();
 

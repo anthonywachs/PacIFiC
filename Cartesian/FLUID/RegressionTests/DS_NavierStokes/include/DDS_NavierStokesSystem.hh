@@ -4,6 +4,7 @@
 #include <MAC_Object.hh>
 #include <utility>
 #include <boolVector.hh>
+#include <vector>
 using namespace std;
 
 
@@ -76,23 +77,6 @@ struct PartInput {
 struct PartForces {
    LA_SeqVector ** press;               // Pressure stress force
    LA_SeqVector ** vel;                // Viscous stress force
-};
-
-/** @brief FreshNode to be used to store the fresh nodes coming in the fluid (only for pressure field)*/
-struct FreshNode {
-   LA_SeqVector * flag;               // 1 if the node is considered as fresh, -1 if the node went just inside solid and 0 otherwise
-   LA_SeqVector ** neigh;              // TRUE for neighbours of fresh or dead cells
-   LA_SeqVector * flag_count;              // Iteration till the node is considered fresh
-   LA_SeqVector * neigh_count;             // Iteration till the node is considered neigh
-   LA_SeqVector * parID;              // ID of particle nearest to the fresh node
-   LA_SeqVector * sep_vel;            // Separation velocity of solid surface in the fluid cell
-};
-
-/** @brief DivNode to be used to store the divergence on pressure node */
-struct DivNode {
-   LA_SeqVector * div;			    // Stores divergence of all nodes in the domain
-   LA_SeqVector ** stencil;                  // Stores the stencil components in each direction
-   LA_SeqVector ** lambda;                   // Stores the stencil components in each direction
 };
 
 /** @brief NodeProp to be used to store the nodes properties due to presence of solid particles in the domian */
@@ -191,10 +175,8 @@ class DDS_NavierStokesSystem : public MAC_Object
       PartForces get_torque(size_t const& level);
       /** @brief Return the (presence/absence) of particle vector */
       NodeProp get_node_property(size_t const& field, size_t const& time_level);
-      /** @brief Return the fresh node emerging out of solid */
-      FreshNode* get_fresh_node();
       /** @brief Return the divergence on pressure node */
-      DivNode* get_node_divergence();
+      doubleVector* get_node_divergence(size_t const& level);
       /** @brief Return the velocity diffusive terms */
       LA_SeqVector** get_velocity_diffusion();
       /** @brief Return the local vector with a vector of row index */
@@ -343,11 +325,11 @@ class DDS_NavierStokesSystem : public MAC_Object
       // Particle structures
       struct PartInput solid[2];			       // 0 current timestep, 1 last timestep
       struct NodeProp node[2][2];			       // 2 rows are for fields; 2 columns are for time level (current and last)
-      struct FreshNode Pfresh[2];			       // defined for pressure nodes; 2 columns are for time level (current and last)
-      struct DivNode divergence[3];			       // 0 current timestep, 1 last time step. 2 for reference state
+      vector<doubleVector*> divergence;			       // 0 current timestep, 1 last time step
       struct SurfaceDiscretize surface;
       struct PartForces hydro_forces[2];                       // 0 current timestep, 1 last time step
       struct PartForces hydro_torque[2];                       // 0 current timestep, 1 last time step
+
       size_t dim;
       MAC_Communicator const* pelCOMM;
       size_t nb_comps[2];
