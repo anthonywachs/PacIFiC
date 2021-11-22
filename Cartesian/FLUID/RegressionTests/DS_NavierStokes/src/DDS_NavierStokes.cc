@@ -1737,18 +1737,20 @@ DDS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
          } else if (dir == 2) {
             p = FF->DOF_local_number(j,k,i,comp);
          }
-         BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,0);
+
+         size_t_array2D* intersect_vector = allrigidbodies->get_intersect_vector_on_grid(FF);
+         doubleArray2D* intersect_distance = allrigidbodies->get_intersect_distance_on_grid(FF);
          NodeProp node = GLOBAL_EQ->get_node_property(field,0);
          size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(FF);
 
          if (void_frac->operator()(p) == 0.) {
             // if left node is inside the solid particle
-            if ((b_intersect[dir].offset->item(p,0) == 1)) {
-               left = -gamma/(b_intersect[dir].value->item(p,0));
+            if (intersect_vector->operator()(p,2*dir+0) == 1) {
+               left = -gamma/intersect_distance->operator()(p,2*dir+0);
             }
             // if right node is inside the solid particle
-            if ((b_intersect[dir].offset->item(p,1) == 1)) {
-               right = -gamma/(b_intersect[dir].value->item(p,1));
+            if (intersect_vector->operator()(p,2*dir+1) == 1) {
+               right = -gamma/intersect_distance->operator()(p,2*dir+1);
             }
          } else if (void_frac->operator()(p) == 1.) {
             // if center node is inside the solid particle
@@ -1758,8 +1760,8 @@ DDS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
 
          center = -(right+left);
 
-         if ((b_intersect[dir].offset->item(p,0) == 1)) left = 0.;
-         if ((b_intersect[dir].offset->item(p,1) == 1)) right = 0.;
+         if (intersect_vector->operator()(p,2*dir+0) == 1) left = 0.;
+         if (intersect_vector->operator()(p,2*dir+1) == 1) right = 0.;
       } else {
          center = - (right+left);
       }
@@ -2229,7 +2231,12 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
    double xhr=1.,xhl=1.,xright=0.,xleft=0.,yhr=1.,yhl=1.,yright=0.,yleft=0.;
    double zhr=1.,zhl=1.,zright=0.,zleft=0., value=0.;
 
-   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(1,0);
+   size_t_array2D* intersect_vector =
+                           allrigidbodies->get_intersect_vector_on_grid(UF);
+   doubleArray2D* intersect_distance =
+                           allrigidbodies->get_intersect_distance_on_grid(UF);
+   doubleArray2D* intersect_fieldVal =
+                           allrigidbodies->get_intersect_fieldValue_on_grid(UF);
    NodeProp node = GLOBAL_EQ->get_node_property(1,0);
 
    size_t p = UF->DOF_local_number(i,j,k,comp);
@@ -2253,15 +2260,15 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
          if (is_solids) {
             size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
             if (void_frac->operator()(p) == 0) {
-               if ((b_intersect[dir].offset->item(p,0) == 1)) {
+               if (intersect_vector->operator()(p,2*dir+0) == 1) {
                   xleft = UF->DOF_value( i, j, k, comp, level )
-                        - b_intersect[dir].field_var->item(p,0);
-                  xhl = b_intersect[dir].value->item(p,0);
+                        - intersect_fieldVal->operator()(p,2*dir+0);
+                  xhl = intersect_distance->operator()(p,2*dir+0);
                }
-               if ((b_intersect[dir].offset->item(p,1) == 1)) {
-                  xright = b_intersect[dir].field_var->item(p,1)
+               if (intersect_vector->operator()(p,2*dir+1) == 1) {
+                  xright = intersect_fieldVal->operator()(p,2*dir+1);
                          - UF->DOF_value( i, j, k, comp, level );
-                  xhr = b_intersect[dir].value->item(p,1);
+                  xhr = intersect_distance->operator()(p,2*dir+1);
                }
             } else {
                xright = 0.; xleft = 0.;
@@ -2295,15 +2302,15 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
          if (is_solids) {
             size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
             if (void_frac->operator()(p) == 0) {
-               if ((b_intersect[dir].offset->item(p,0) == 1)) {
+               if (intersect_vector->operator()(p,2*dir+0) == 1) {
                   yleft = UF->DOF_value( i, j, k, comp, level )
-                        - b_intersect[dir].field_var->item(p,0);
-                  yhl = b_intersect[dir].value->item(p,0);
+                        - intersect_fieldVal->operator()(p,2*dir+0);
+                  yhl = intersect_distance->operator()(p,2*dir+0);
                }
-               if ((b_intersect[dir].offset->item(p,1) == 1)) {
-                  yright = b_intersect[dir].field_var->item(p,1)
+               if (intersect_vector->operator()(p,2*dir+1) == 1) {
+                  yright = intersect_fieldVal->operator()(p,2*dir+1);
                          - UF->DOF_value( i, j, k, comp, level );
-                  yhr = b_intersect[dir].value->item(p,1);
+                  yhr = intersect_distance->operator()(p,2*dir+1);
                }
             } else {
                yleft = 0.; yright = 0.;
@@ -2337,15 +2344,15 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
          if (is_solids) {
             size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
             if (void_frac->operator()(p) == 0) {
-               if ((b_intersect[dir].offset->item(p,0) == 1)) {
+               if (intersect_vector->operator()(p,2*dir+0) == 1) {
                   zleft = UF->DOF_value( i, j, k, comp, level )
-                        - b_intersect[dir].field_var->item(p,0);
-                  zhl = b_intersect[dir].value->item(p,0);
+                        - intersect_fieldVal->operator()(p,2*dir+0);
+                  zhl = intersect_distance->operator()(p,2*dir+0);
                }
-               if ((b_intersect[dir].offset->item(p,1) == 1)) {
-                  zright = b_intersect[dir].field_var->item(p,1)
+               if (intersect_vector->operator()(p,2*dir+1) == 1) {
+                  zright = intersect_fieldVal->operator()(p,2*dir+1);
                          - UF->DOF_value( i, j, k, comp, level );
-                  zhr = b_intersect[dir].value->item(p,1);
+                  zhr = intersect_distance->operator()(p,2*dir+1);
                }
             } else {
                zleft = 0.; zright = 0.;
@@ -2404,7 +2411,12 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
    LocalVector* VEC = GLOBAL_EQ->get_VEC(1);
 
    LA_SeqVector** vel_diff_loc = GLOBAL_EQ->get_velocity_diffusion();
-   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(1,0);
+   size_t_array2D* intersect_vector =
+                           allrigidbodies->get_intersect_vector_on_grid(UF);
+   doubleArray2D* intersect_distance =
+                           allrigidbodies->get_intersect_distance_on_grid(UF);
+   doubleArray2D* intersect_fieldVal =
+                           allrigidbodies->get_intersect_fieldValue_on_grid(UF);
    NodeProp node = GLOBAL_EQ->get_node_property(1,0);
 
    for (size_t i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
@@ -2422,13 +2434,13 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
       double value= vel_diff_loc[dir]->item(p);
 
       if (is_solids) {
-         if ((b_intersect[dir].offset->item(p,0) == 1)) {
-            value = value - b_intersect[dir].field_var->item(p,0)
-                           /b_intersect[dir].value->item(p,0);
+         if (intersect_vector->operator()(p,2*dir+0) == 1) {
+            value = value - intersect_fieldVal->operator()(p,2*dir+0)
+                           /intersect_distance->operator()(p,2*dir+0);
          }
-         if ((b_intersect[dir].offset->item(p,1) == 1)) {
-            value = value - b_intersect[dir].field_var->item(p,1)
-                           /b_intersect[dir].value->item(p,1);
+         if (intersect_vector->operator()(p,2*dir+1) == 1) {
+            value = value - intersect_fieldVal->operator()(p,2*dir+1)
+                           /intersect_distance->operator()(p,2*dir+1);
          }
       }
 
@@ -6528,7 +6540,12 @@ DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad, size_t
 
    size_t comp = 0;
 
-   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0,0);
+   size_t_array2D* intersect_vector =
+                           allrigidbodies->get_intersect_vector_on_grid(PF);
+   doubleArray2D* intersect_distance =
+                           allrigidbodies->get_intersect_distance_on_grid(PF);
+   doubleArray2D* intersect_fieldVal =
+                           allrigidbodies->get_intersect_fieldValue_on_grid(PF);
    DivNode* divergence = GLOBAL_EQ->get_node_divergence();
    size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
 
@@ -6553,23 +6570,26 @@ DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad, size_t
         // Calculating the divergence using the current stencil
         // if (div_ref == 0) {
             // divergence[0].stencil[0]->set_item(p,0);
-            if ((b_intersect[0].offset->item(p,0) == 1)) {
+            if (intersect_vector->operator()(p,2*0+0) == 1) {
                xvalue = UF->DOF_value( shift.i+i, j, k, 0, level)
-                      - b_intersect[0].field_var->item(p,0);
-               xh = b_intersect[0].value->item(p,0)
+                      - intersect_fieldVal->operator()(p,2*0+0);
+               xh = intersect_distance->operator()(p,2*0+0)
                   + PF->get_cell_size( i, 0, 0 )/2.;
                // divergence[0].stencil[0]->set_item(p,-1);
             }
-            if ((b_intersect[0].offset->item(p,1) == 1)) {
-               xvalue = b_intersect[0].field_var->item(p,1)
+            if (intersect_vector->operator()(p,2*0+1) == 1) {
+               xvalue = intersect_fieldVal->operator()(p,2*0+1)
                       - UF->DOF_value( shift.i+i-1, j, k, 0, level);
-               xh = b_intersect[0].value->item(p,1)
+               xh = intersect_distance->operator()(p,2*0+1)
                   + PF->get_cell_size( i, 0, 0 )/2.;
                // divergence[0].stencil[0]->set_item(p,1);
             }
-            if (((b_intersect[0].offset->item(p,1) == 1) && (b_intersect[0].offset->item(p,0) == 1))) {
-               xvalue = b_intersect[0].field_var->item(p,1) - b_intersect[0].field_var->item(p,0);
-               xh = b_intersect[0].value->item(p,1) + b_intersect[0].value->item(p,0);
+            if ((intersect_vector->operator()(p,2*0+1) == 1)
+             && (intersect_vector->operator()(p,2*0+0) == 1)) {
+               xvalue = intersect_fieldVal->operator()(p,2*0+1)
+                      - intersect_fieldVal->operator()(p,2*0+0);
+               xh = intersect_distance->operator()(p,2*0+1)
+                  + intersect_distance->operator()(p,2*0+0);
             }
 	 // Calculating the divergence using the reference stencil
 	    // Calculating the divergence if current and reference stencil is different
@@ -6606,26 +6626,26 @@ DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad, size_t
 	 // Calculating the divergence using the current stencil
 	 // if (div_ref == 0) {
             // divergence[0].stencil[1]->set_item(p,0);
-            if ((b_intersect[1].offset->item(p,0) == 1)) {
+            if (intersect_vector->operator()(p,2*1+0) == 1) {
                yvalue = UF->DOF_value( i, shift.j+j, k, 1, level)
-                      - b_intersect[1].field_var->item(p,0);
-               yh = b_intersect[1].value->item(p,0)
+                      - intersect_fieldVal->operator()(p,2*1+0);
+               yh = intersect_distance->operator()(p,2*1+0)
                   + PF->get_cell_size( j, 0, 1 )/2.;
                // divergence[0].stencil[1]->set_item(p,-1);
             }
-            if ((b_intersect[1].offset->item(p,1) == 1)) {
-               yvalue = b_intersect[1].field_var->item(p,1)
+            if (intersect_vector->operator()(p,2*1+1) == 1) {
+               yvalue = intersect_fieldVal->operator()(p,2*1+1)
                       - UF->DOF_value( i,shift.j+j-1, k, 1, level);
-               yh = b_intersect[1].value->item(p,1)
+               yh = intersect_distance->operator()(p,2*1+1)
                   + PF->get_cell_size( j, 0, 1 )/2.;
                // divergence[0].stencil[1]->set_item(p,1);
             }
-            if (((b_intersect[1].offset->item(p,1) == 1)
-              && (b_intersect[1].offset->item(p,0) == 1))) {
-               yvalue = b_intersect[1].field_var->item(p,1)
-                      - b_intersect[1].field_var->item(p,0);
-               yh = b_intersect[1].value->item(p,1)
-                  + b_intersect[1].value->item(p,0);
+            if ((intersect_vector->operator()(p,2*1+1) == 1)
+             && (intersect_vector->operator()(p,2*1+0) == 1)) {
+               yvalue = intersect_fieldVal->operator()(p,2*1+1)
+                      - intersect_fieldVal->operator()(p,2*1+0);
+               yh = intersect_distance->operator()(p,2*1+1)
+                  + intersect_distance->operator()(p,2*1+0);
             }
 	 // Calculating the divergence using the reference stencil
 	 // } else {
@@ -6676,26 +6696,26 @@ DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad, size_t
 	    // Calculating the divergence using the current stencil
             // if (div_ref == 0) {
                // divergence[0].stencil[2]->set_item(p,0);
-               if ((b_intersect[2].offset->item(p,0) == 1)) {
+               if (intersect_vector->operator()(p,2*2+0) == 1) {
                   zvalue = UF->DOF_value( i, j, shift.k+k, 2, level)
-                         - b_intersect[2].field_var->item(p,0);
-                  zh = b_intersect[2].value->item(p,0)
+                         - intersect_fieldVal->operator()(p,2*2+0);
+                  zh = intersect_distance->operator()(p,2*2+0)
                      + PF->get_cell_size( k, 0, 2 )/2.;
                   // divergence[0].stencil[2]->set_item(p,-1);
                }
-               if ((b_intersect[2].offset->item(p,1) == 1)) {
-                  zvalue = b_intersect[2].field_var->item(p,1)
+               if (intersect_vector->operator()(p,2*2+1) == 1) {
+                  zvalue = intersect_fieldVal->operator()(p,2*2+1)
                          - UF->DOF_value( i, j,shift.k+k-1, 2, level);
-                  zh = b_intersect[2].value->item(p,1)
+                  zh = intersect_distance->operator()(p,2*2+1)
                      + PF->get_cell_size( k, 0, 2 )/2.;
                   // divergence[0].stencil[2]->set_item(p,1);
                }
-               if (((b_intersect[2].offset->item(p,1) == 1)
-                 && (b_intersect[2].offset->item(p,0) == 1))) {
-                  zvalue = b_intersect[2].field_var->item(p,1)
-                         - b_intersect[2].field_var->item(p,0);
-                  zh = b_intersect[2].value->item(p,1)
-                     + b_intersect[2].value->item(p,0);
+               if ((intersect_vector->operator()(p,2*2+1) == 1)
+                && (intersect_vector->operator()(p,2*2+0) == 1)) {
+                  zvalue = intersect_fieldVal->operator()(p,2*2+1)
+                         - intersect_fieldVal->operator()(p,2*2+0);
+                  zh = intersect_distance->operator()(p,2*2+1)
+                     + intersect_distance->operator()(p,2*2+0);
                }
 	    // Calculating the divergence using the reference stencil
 	    // } else {
