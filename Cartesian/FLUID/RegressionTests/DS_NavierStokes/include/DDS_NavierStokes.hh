@@ -200,7 +200,6 @@ public SolverComputingTime
 
       double return_divergence_weighting (FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k, FV_TimeIterator const* t_it );
 
-      void Solids_generation ( );
       void import_par_info( istringstream &is );
 
       /** @brief Initialize the velocity on the velocity nodes in MAC grid*/
@@ -428,7 +427,6 @@ public SolverComputingTime
       MAC_DoubleVector* gravity_vector ;
       bool is_periodic[2][3];
       string insertion_type;
-      string solid_filename;
       string level_set_type;
       double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
 

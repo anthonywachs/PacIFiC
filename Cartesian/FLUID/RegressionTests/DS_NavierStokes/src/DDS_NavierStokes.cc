@@ -185,7 +185,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    if (is_solids) {
       Npart = exp->int_data( "NParticles" ) ;
       insertion_type = exp->string_data( "InsertionType" ) ;
-      MAC_ASSERT( insertion_type == "file" || insertion_type == "Grains3D" ) ;
+      MAC_ASSERT( insertion_type == "Grains3D" ) ;
       loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
@@ -199,12 +199,11 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       }
 
       // Read the solids filename
-      if (insertion_type == "file") {
+      if (insertion_type == "Grains3D") {
          solidSolverType = "Grains3D";
          b_solidSolver_parallel = false;
          solidSolver_insertionFile = "Grains/Init/insert.xml";
          solidSolver_simulationFile = "Grains/Res/simul.xml";
-         solid_filename = exp->string_data( "Particle_FileName" );
       }
 
       // Read weather the sress calculation on particle is ON/OFF
@@ -507,8 +506,6 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
       allrigidbodies = new DS_AllRigidBodies( dim,
       	*solidFluid_transferStream, b_particles_as_fixed_obstacles, UF, PF );
-
-      Solids_generation( );
 
       if (my_rank == 0)
          cout << "Finished particle generation... \n" << endl;
@@ -1186,47 +1183,6 @@ DDS_NavierStokes:: rotation_matrix (size_t const& m
   delta(0) = delta_x;
   delta(1) = delta_y;
   delta(2) = delta_z;
-}
-
-//---------------------------------------------------------------------------
-void
-DDS_NavierStokes:: Solids_generation ()
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NavierStokes:: Solids_generation" ) ;
-
-  // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid(0);
-
-  double xp,yp,zp,Rp,tx,ty,tz,vx,vy,vz,wx,wy,wz,Tp,off;
-
-  ifstream inFile;
-  std::ostringstream os2;
-  os2 << "./InputFiles/" << solid_filename;
-  std::string filename = os2.str();
-
-  inFile.open(filename.c_str());
-  string line;
-  getline(inFile,line);
-  for (size_t i=0;i<Npart;i++) {
-     inFile >> xp >> yp >> zp >> Rp >> tx >> ty >> tz >> vx >> vy >> vz >> wx >> wy >> wz >> Tp >> off;
-     solid.coord[0]->set_item(i,xp);
-     solid.coord[1]->set_item(i,yp);
-     solid.coord[2]->set_item(i,zp);
-     solid.size->set_item(i,Rp);
-     solid.thetap->set_item(i,0,tx);
-     solid.thetap->set_item(i,1,ty);
-     solid.thetap->set_item(i,2,tz);
-     solid.vel[0]->set_item(i,vx);
-     solid.vel[1]->set_item(i,vy);
-     solid.vel[2]->set_item(i,vz);
-     solid.ang_vel[0]->set_item(i,wx);
-     solid.ang_vel[1]->set_item(i,wy);
-     solid.ang_vel[2]->set_item(i,wz);
-     solid.temp->set_item(i,Tp);
-     solid.inside->set_item(i,off);
-  }
-  inFile.close();
 }
 
 
