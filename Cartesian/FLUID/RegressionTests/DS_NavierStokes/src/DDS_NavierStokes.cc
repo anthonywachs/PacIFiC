@@ -183,20 +183,9 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
      is_solids = exp->bool_data( "Particles" ) ;
 
    if (is_solids) {
-      Npart = exp->int_data( "NParticles" ) ;
       insertion_type = exp->string_data( "InsertionType" ) ;
       MAC_ASSERT( insertion_type == "Grains3D" ) ;
       loc_thres = exp->double_data( "Local_threshold" ) ;
-      if ( exp->has_entry( "LevelSetType" ) )
-         level_set_type = exp->string_data( "LevelSetType" );
-      if ( level_set_type != "Cube" && level_set_type != "Cylinder" &&
-           level_set_type != "Sphere" && level_set_type != "Ellipsoid" &&
-           level_set_type != "PipeX" && level_set_type != "Superquadric") {
-         string error_message="- Cube\n   - Sphere\n   - Cylinder\n   "
-                              "- Superquadric\n   - Ellipsoid\n   - PipeX";
-         MAC_Error::object()->raise_bad_data_value( exp,
-                                       "LevelSetType", error_message );
-      }
 
       // Read the solids filename
       if (insertion_type == "Grains3D") {
@@ -374,8 +363,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    struct NavierStokes2System inputData;
    inputData.is_solids_ = is_solids ;
    inputData.is_stressCal_ = is_stressCal ;
-   inputData.Npart_ = Npart ;
-   inputData.level_set_type_ = level_set_type ;
    inputData.Npoints_ = Npoints ;
    inputData.ar_ = ar ;
 
@@ -523,7 +510,7 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
       if (is_stressCal) {
          // Generate discretization of surface in approximate equal area
-         generate_surface_discretization ();
+         //generate_surface_discretization ();
       }
       if (my_rank == 0)
          cout << "Finished particle surface discretizations... \n" << endl;
@@ -3462,89 +3449,89 @@ DDS_NavierStokes:: generate_surface_discretization()
   MAC_LABEL("DDS_NavierStokes:: generate_surface_discretization" ) ;
 
   size_t kmax = (int) Npoints;
-
-  if ( level_set_type == "Sphere" ) {
-     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into
-     // equal-area cells, Computational Geometry 45 (2012) 275-283
-     double eta_temp = MAC::pi()/2.;
-     double k_temp = (double) kmax;
-     double Ro_temp = MAC::sqrt(2);
-     double Rn_temp = MAC::sqrt(2);
-     size_t cntr = 0;
-
-     // Estimating the number of rings on the hemisphere
-     while (k_temp > double(Pmin+2)) {
-        eta_temp = eta_temp - 2./ar*MAC::sqrt(MAC::pi()/k_temp)*MAC::sin(eta_temp/2.);
-        Rn_temp = 2.*MAC::sin(eta_temp/2.);
-        k_temp = round(k_temp*pow(Rn_temp/Ro_temp,2.));
-        Ro_temp = Rn_temp;
-        cntr++;
-     }
-
-     size_t Nrings = cntr+1;
-
-     // Summation of total discretized points with increase in number of rings radially
-     doubleVector k(Nrings,0.);
-     // Zenithal angle for the sphere
-     doubleVector eta(Nrings,0.);
-     // Radius of the rings in lamber projection plane
-     doubleVector Rring(Nrings,0.);
-
-     // Assigning the maximum number of discretized points to the last element of the array
-     k(Nrings-1) = (double) kmax;
-     // Zenithal angle for the last must be pi/2.
-     eta(Nrings-1) = MAC::pi()/2.;
-     // Radius of last ring in lamber projection plane
-     Rring(Nrings-1) = MAC::sqrt(2.);
-
-     for (int i=int(Nrings)-2; i>=0; --i) {
-        eta(i) = eta(i+1) - 2./ar*MAC::sqrt(MAC::pi()/k(i+1))*MAC::sin(eta(i+1)/2.);
-        Rring(i) = 2.*MAC::sin(eta(i)/2.);
-        k(i) = round(k(i+1)*pow(Rring(i)/Rring(i+1),2.));
-        if (i==0) k(0) = (double) Pmin;
-     }
-
-     // Discretize the particle surface into approximate equal area cells
-     if (dim == 3) {
-        compute_surface_points_on_sphere(eta, k, Rring, Nrings);
-        //	write_surface_discretization(2*kmax);
-     } else {
-        compute_surface_points_on_sphere(eta, k, Rring, kmax);
-        //	write_surface_discretization(kmax);
-     }
-  } else if (level_set_type == "Cube") {
-     compute_surface_points_on_cube(kmax);
-     //  write_surface_discretization((size_t)(6*pow(kmax,2)));
-  } else if (level_set_type == "Cylinder") {
-     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into
-     // equal-area cells, Computational Geometry 45 (2012) 275-283
-
-     double p = MAC::pi()/ar;
-     double k_temp = (double) kmax;
-     size_t cntr = 0;
-
-     // Estimating the number of rings on either of the disc
-     while (k_temp > double(Pmin+2)) {
-        k_temp = round(pow(MAC::sqrt(k_temp) - MAC::sqrt(p),2.));
-        cntr++;
-     }
-
-     size_t Nrings = cntr+1;
-
-     // Summation of total discretized points with increase in number of rings radially
-     doubleVector k(Nrings,0.);
-     // Assigning the maximum number of discretized points to the last element of the array
-     k(Nrings-1) = (double) kmax;
-
-     for (int i=(int)Nrings-2; i>=0; --i) {
-        k(i) = round(pow(MAC::sqrt(k(i+1)) - MAC::sqrt(p),2.));
-        if (i==0) k(0) = (double) Pmin;
-     }
-
-     if (dim == 3) {
-        compute_surface_points_on_cylinder(k, Nrings);
-     }
-  }
+  //
+  // if ( level_set_type == "Sphere" ) {
+  //    // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into
+  //    // equal-area cells, Computational Geometry 45 (2012) 275-283
+  //    double eta_temp = MAC::pi()/2.;
+  //    double k_temp = (double) kmax;
+  //    double Ro_temp = MAC::sqrt(2);
+  //    double Rn_temp = MAC::sqrt(2);
+  //    size_t cntr = 0;
+  //
+  //    // Estimating the number of rings on the hemisphere
+  //    while (k_temp > double(Pmin+2)) {
+  //       eta_temp = eta_temp - 2./ar*MAC::sqrt(MAC::pi()/k_temp)*MAC::sin(eta_temp/2.);
+  //       Rn_temp = 2.*MAC::sin(eta_temp/2.);
+  //       k_temp = round(k_temp*pow(Rn_temp/Ro_temp,2.));
+  //       Ro_temp = Rn_temp;
+  //       cntr++;
+  //    }
+  //
+  //    size_t Nrings = cntr+1;
+  //
+  //    // Summation of total discretized points with increase in number of rings radially
+  //    doubleVector k(Nrings,0.);
+  //    // Zenithal angle for the sphere
+  //    doubleVector eta(Nrings,0.);
+  //    // Radius of the rings in lamber projection plane
+  //    doubleVector Rring(Nrings,0.);
+  //
+  //    // Assigning the maximum number of discretized points to the last element of the array
+  //    k(Nrings-1) = (double) kmax;
+  //    // Zenithal angle for the last must be pi/2.
+  //    eta(Nrings-1) = MAC::pi()/2.;
+  //    // Radius of last ring in lamber projection plane
+  //    Rring(Nrings-1) = MAC::sqrt(2.);
+  //
+  //    for (int i=int(Nrings)-2; i>=0; --i) {
+  //       eta(i) = eta(i+1) - 2./ar*MAC::sqrt(MAC::pi()/k(i+1))*MAC::sin(eta(i+1)/2.);
+  //       Rring(i) = 2.*MAC::sin(eta(i)/2.);
+  //       k(i) = round(k(i+1)*pow(Rring(i)/Rring(i+1),2.));
+  //       if (i==0) k(0) = (double) Pmin;
+  //    }
+  //
+  //    // Discretize the particle surface into approximate equal area cells
+  //    if (dim == 3) {
+  //       compute_surface_points_on_sphere(eta, k, Rring, Nrings);
+  //       //	write_surface_discretization(2*kmax);
+  //    } else {
+  //       compute_surface_points_on_sphere(eta, k, Rring, kmax);
+  //       //	write_surface_discretization(kmax);
+  //    }
+  // } else if (level_set_type == "Cube") {
+  //    compute_surface_points_on_cube(kmax);
+  //    //  write_surface_discretization((size_t)(6*pow(kmax,2)));
+  // } else if (level_set_type == "Cylinder") {
+  //    // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into
+  //    // equal-area cells, Computational Geometry 45 (2012) 275-283
+  //
+  //    double p = MAC::pi()/ar;
+  //    double k_temp = (double) kmax;
+  //    size_t cntr = 0;
+  //
+  //    // Estimating the number of rings on either of the disc
+  //    while (k_temp > double(Pmin+2)) {
+  //       k_temp = round(pow(MAC::sqrt(k_temp) - MAC::sqrt(p),2.));
+  //       cntr++;
+  //    }
+  //
+  //    size_t Nrings = cntr+1;
+  //
+  //    // Summation of total discretized points with increase in number of rings radially
+  //    doubleVector k(Nrings,0.);
+  //    // Assigning the maximum number of discretized points to the last element of the array
+  //    k(Nrings-1) = (double) kmax;
+  //
+  //    for (int i=(int)Nrings-2; i>=0; --i) {
+  //       k(i) = round(pow(MAC::sqrt(k(i+1)) - MAC::sqrt(p),2.));
+  //       if (i==0) k(0) = (double) Pmin;
+  //    }
+  //
+  //    if (dim == 3) {
+  //       compute_surface_points_on_cylinder(k, Nrings);
+  //    }
+  // }
 }
 
 // //---------------------------------------------------------------------------

@@ -360,8 +360,6 @@ public SolverComputingTime
       size_t is_master;
       size_t dim;
       size_t nb_comps[2];               // 0th element for P and 1st element for U
-      size_t Npart;
-      size_t Npart_local;
 
       MAC_Communicator const* macCOMM;
       MPI_Comm DDS_Comm_i[3];

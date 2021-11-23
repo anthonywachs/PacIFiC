@@ -29,8 +29,6 @@ class FV_TimeIterator ;
 struct NavierStokes2System
 {
   bool is_solids_ ;
-  size_t Npart_ ;
-  string level_set_type_ ;
   bool is_stressCal_ ;
   double Npoints_ ;
   double ar_ ;
