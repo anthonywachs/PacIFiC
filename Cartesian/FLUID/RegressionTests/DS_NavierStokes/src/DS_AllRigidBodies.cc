@@ -328,13 +328,15 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody( )
                                               ,void_fraction[0]
                                               ,intersect_vector[0]
                                               ,intersect_distance[0]
-                                              ,intersect_fieldValue[0]);
+                                              ,intersect_fieldValue[0]
+                                              ,i);
      m_allDSrigidbodies[i]->
       compute_grid_intersection_with_rigidbody(UF
                                               ,void_fraction[1]
                                               ,intersect_vector[1]
                                               ,intersect_distance[1]
-                                              ,intersect_fieldValue[1]);
+                                              ,intersect_fieldValue[1]
+                                              ,i);
   }
 
 }

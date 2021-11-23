@@ -76,22 +76,25 @@ void DS_3Dcylinder:: compute_rigid_body_halozone( )
 {
   MAC_LABEL( "DS_3Dcylinder:: compute_rigid_body_halozone" ) ;
 
-  // struct FS_Sphere_Additional_Param const* pagp =
-  //  dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
-  //     ->get_ptr_FS_Sphere_Additional_Param();
-  //
-  // geomVector const* pgs = dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
-  //                             ->get_ptr_FS_Sphere_gravity_centre();
-  //
-  // m_halo_zone->operator()(0,0) = pgs->operator()(0) - 1.5*pagp->radius;
-  // m_halo_zone->operator()(0,1) = pgs->operator()(0) + 1.5*pagp->radius;
-  //
-  // m_halo_zone->operator()(1,0) = pgs->operator()(1) - 1.5*pagp->radius;
-  // m_halo_zone->operator()(1,1) = pgs->operator()(1) + 1.5*pagp->radius;
-  //
-  // m_halo_zone->operator()(2,0) = pgs->operator()(2) - 1.5*pagp->radius;
-  // m_halo_zone->operator()(2,1) = pgs->operator()(2) + 1.5*pagp->radius;
-  //
+  struct FS_3Dcylinder_Additional_Param const* pagp =
+   dynamic_cast<FS_3Dcylinder*>(m_geometric_rigid_body)
+      ->get_ptr_FS_3Dcylinder_Additional_Param();
+
+  geomVector const* pgs = dynamic_cast<FS_3Dcylinder*>(m_geometric_rigid_body)
+                              ->get_ptr_to_gravity_centre();
+
+  double radius_equivalent = 3.0 *
+                     MAC::sqrt(pagp->cylinder_radius * pagp->cylinder_radius
+                             + pagp->cylinder_height * pagp->cylinder_height);
+
+  m_halo_zone[0]->operator()(0) = pgs->operator()(0) - radius_equivalent;
+  m_halo_zone[0]->operator()(1) = pgs->operator()(1) - radius_equivalent;
+  m_halo_zone[0]->operator()(2) = pgs->operator()(2) - radius_equivalent;
+
+  m_halo_zone[1]->operator()(0) = pgs->operator()(0) + radius_equivalent;
+  m_halo_zone[1]->operator()(1) = pgs->operator()(1) + radius_equivalent;
+  m_halo_zone[1]->operator()(2) = pgs->operator()(2) + radius_equivalent;
+
 
 }
 
@@ -105,6 +108,29 @@ void DS_3Dcylinder:: compute_surface_points( size_t const& Np )
   MAC_LABEL( "DS_3Dcylinder:: compute_surface_points" ) ;
 
 
+
+}
+
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_3Dcylinder:: initialize_variable_for_each_rigidBody( size_t const& Np )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_Sphere:: initialize_variable_for_each_rigidBody" ) ;
+
+  size_t Ntot = 2*Np;
+
+  m_surface_points.reserve( Ntot );
+  m_surface_area.reserve( Ntot );
+  m_surface_normal.reserve( Ntot );
+   for (size_t i = 0; i < Ntot; ++i) {
+      m_surface_points.push_back( new geomVector(3) );
+      m_surface_area.push_back( new geomVector(3) );
+      m_surface_normal.push_back( new geomVector(3) );
+   }
 
 }
 
@@ -125,15 +151,15 @@ void DS_3Dcylinder:: compute_hydro_force_torque( FV_DiscreteField const* PP,
   MAC::out() << pagp->cylinder_height << endl; // example, delete later
 
   // Determine the number of surface points and allocate the vector if empty
-  if ( m_surface_points.empty() )
-  {
-    size_t npts = 0, i;
-    geomVector vvv(3);
-
-    npts = 1; // NEEDS TO BE SET TO THE PROPER VALUE
-    m_surface_points.reserve( npts );
-    for (i = 0; i < npts; ++i) m_surface_points.push_back( vvv );
-  }
+  // if ( m_surface_points.empty() )
+  // {
+  //   size_t npts = 0, i;
+  //   geomVector vvv(3);
+  //
+  //   npts = 1; // NEEDS TO BE SET TO THE PROPER VALUE
+  //   m_surface_points.reserve( npts );
+  //   for (i = 0; i < npts; ++i) m_surface_points.push_back( vvv );
+  // }
 
   // Determine the surface point coordinates
   MAC::out() << "DS_3Dcylinder:: compute_hydro_force_torque - "

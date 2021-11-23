@@ -116,7 +116,8 @@ class DS_RigidBody
                                         , size_t_vector const* void_fraction
                                         , size_t_array2D* intersect_vector
                                         , doubleArray2D* intersect_distance
-                                        , doubleArray2D* intersect_fieldValue);
+                                        , doubleArray2D* intersect_fieldValue
+                                        , size_t const& parID);
 
       geomVector rigid_body_velocity( geomVector const& pt ) const;
 

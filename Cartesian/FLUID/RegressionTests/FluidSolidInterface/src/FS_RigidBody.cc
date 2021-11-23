@@ -205,8 +205,8 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
 
   // Find the point inside the rigid body
   while (level_set_value (rayVec) > 0.) {
-	  t += delta;
 	  rayVec = source + t * rayDir;
+	  t += delta;
   }
 
   geomVector a = source, b = rayVec;

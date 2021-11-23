@@ -236,11 +236,10 @@ struct FS_Sphere_Additional_Param const* FS_Sphere::
 
 
 //---------------------------------------------------------------------------
-geomVector const* FS_Sphere::
-   get_ptr_FS_Sphere_gravity_centre() const
+geomVector const* FS_Sphere:: get_ptr_to_gravity_centre() const
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "FS_Sphere:: get_ptr_FS_Sphere_gravity_centre" ) ;
+  MAC_LABEL( "FS_Sphere:: get_ptr_to_gravity_centre" ) ;
 
   return ( &m_gravity_center );
 

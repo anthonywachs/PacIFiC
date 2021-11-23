@@ -192,7 +192,7 @@ void DS_RigidBody:: compute_void_fraction_on_grid( FV_DiscreteField const* FF
               size_t p = FF->DOF_local_number(i,j,k,comp);
 
               if (isIn(xC,yC,zC)) {
-                 void_fraction->operator()(p) = 1;
+                 void_fraction->operator()(p) = 1 + parID;
                  rb_ID->operator()(p) = parID;
               }
            }
@@ -212,7 +212,8 @@ DS_RigidBody:: compute_grid_intersection_with_rigidbody (
                                         , size_t_vector const* void_fraction
                                         , size_t_array2D* intersect_vector
                                         , doubleArray2D* intersect_distance
-                                        , doubleArray2D* intersect_fieldValue)
+                                        , doubleArray2D* intersect_fieldValue
+                                        , size_t const& parID)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_RigidBody:: compute_grid_intersection_with_rigidbody" ) ;
@@ -286,7 +287,7 @@ DS_RigidBody:: compute_grid_intersection_with_rigidbody (
               size_t p = FF->DOF_local_number(i,j,k,comp);
               geomVector source(xC,yC,zC);
 
-              if (void_fraction->operator()(p) != 1) {
+              if (void_fraction->operator()(p) == 0) {
                  for (size_t dir = 0; dir < dim; dir++) {
                     for (size_t off = 0; off < 2; off++) {
                        size_t col = 2*dir + off;
@@ -305,8 +306,7 @@ DS_RigidBody:: compute_grid_intersection_with_rigidbody (
                            (size_t)ineigh(0),(size_t)ineigh(1),(size_t)ineigh(2)
                                                                          ,comp);
 
-                          if (void_fraction->operator()(neigh_num)
-                           != void_fraction->operator()(p)) {
+                          if (void_fraction->operator()(neigh_num) == parID+1) {
                              double t = m_geometric_rigid_body
                                           ->distanceTo( source, rayDir, delta );
                              // Storing the direction with RB intersection

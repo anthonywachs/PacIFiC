@@ -196,7 +196,14 @@ bool FS_3Dcylinder:: isIn( geomVector const& pt ) const
 
   bool b_isIn = false;
 
-  // TO DO
+  geomVector BottomToPoint( pt - m_agp_3dcyl.BottomCenter );
+  double dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
+	                        /  m_agp_3dcyl.cylinder_height ;
+
+  if ( dot < m_agp_3dcyl.cylinder_height && dot > 0. )
+    if ( BottomToPoint.calcNormSquare() - dot * dot <
+         m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
+      b_isIn = true ;
 
   return ( b_isIn );
 
@@ -214,7 +221,20 @@ bool FS_3Dcylinder:: isIn( double const& x, double const& y, double const& z )
 
   bool b_isIn = false;
 
-  // TO DO
+  double dot = ( ( x - m_agp_3dcyl.BottomCenter(0) )
+		                         * m_agp_3dcyl.BottomToTopVec(0)
+               + ( y - m_agp_3dcyl.BottomCenter(1) )
+	                                 * m_agp_3dcyl.BottomToTopVec(1)
+               + ( z - m_agp_3dcyl.BottomCenter(2) )
+	                                 * m_agp_3dcyl.BottomToTopVec(2)
+	       ) / m_agp_3dcyl.cylinder_height ;
+
+  if ( dot < m_agp_3dcyl.cylinder_height && dot > 0. )
+    if ( ( x - m_agp_3dcyl.BottomCenter(0) )*( x - m_agp_3dcyl.BottomCenter(0) )
+       + ( y - m_agp_3dcyl.BottomCenter(1) )*( y - m_agp_3dcyl.BottomCenter(1) )
+       + ( z - m_agp_3dcyl.BottomCenter(2) )*( z - m_agp_3dcyl.BottomCenter(2) )
+       - dot * dot < m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
+       b_isIn = true ;
 
   return ( b_isIn );
 
@@ -229,9 +249,12 @@ double FS_3Dcylinder:: level_set_value( geomVector const& pt ) const
 {
   MAC_LABEL( "FS_3Dcylinder:: level_set_value(pt)" ) ;
 
-  double value = 0;
+  geomVector BottomToPoint( pt - m_agp_3dcyl.BottomCenter );
+  double dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
+	                        /  m_agp_3dcyl.cylinder_height ;
 
-  // TO DO
+  double value = BottomToPoint.calcNormSquare() - dot * dot -
+         m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius;
 
   return ( value );
 
@@ -248,9 +271,19 @@ double FS_3Dcylinder:: level_set_value( double const& x
 {
   MAC_LABEL( "FS_3Dcylinder:: level_set_value(x,y,z)" ) ;
 
-  double value = 0;
+  double dot = ( ( x - m_agp_3dcyl.BottomCenter(0) )
+		                         * m_agp_3dcyl.BottomToTopVec(0)
+               + ( y - m_agp_3dcyl.BottomCenter(1) )
+	                                 * m_agp_3dcyl.BottomToTopVec(1)
+               + ( z - m_agp_3dcyl.BottomCenter(2) )
+	                                 * m_agp_3dcyl.BottomToTopVec(2)
+	       ) / m_agp_3dcyl.cylinder_height ;
 
-  // TO DO
+  double value =
+      ( x - m_agp_3dcyl.BottomCenter(0) ) * ( x - m_agp_3dcyl.BottomCenter(0) )
+    + ( y - m_agp_3dcyl.BottomCenter(1) ) * ( y - m_agp_3dcyl.BottomCenter(1) )
+    + ( z - m_agp_3dcyl.BottomCenter(2) ) * ( z - m_agp_3dcyl.BottomCenter(2) )
+    - dot * dot - m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius;
 
   return ( value );
 
@@ -281,5 +314,18 @@ struct FS_3Dcylinder_Additional_Param const* FS_3Dcylinder::
   MAC_LABEL( "FS_3Dcylinder:: isIn(x,y,z)" ) ;
 
   return( &m_agp_3dcyl );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+geomVector const* FS_3Dcylinder:: get_ptr_to_gravity_centre() const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_3Dcylinder:: get_ptr_to_gravity_centre" ) ;
+
+  return ( &m_gravity_center );
 
 }
