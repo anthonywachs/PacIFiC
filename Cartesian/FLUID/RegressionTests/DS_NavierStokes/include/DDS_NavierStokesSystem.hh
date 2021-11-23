@@ -72,13 +72,6 @@ struct NodeProp {
    LA_SeqVector * bound_cell;              // Stores the boundary cell presence in the solids; 1 == 1st boundary cell
 };
 
-/** @brief SurfaceDiscretize to be used to store the coordinates and area of discretize particle surface */
-struct SurfaceDiscretize {
-   LA_SeqVector ** coordinate;                  // coordinates
-   LA_SeqVector * area;                         // area
-   LA_SeqVector ** normal;	                // normal
-};
-
 /** @brief The Class DDS_NavierStokesSystem.
 
 Matrix systems for the resolution of the heat equation.
@@ -151,8 +144,6 @@ class DDS_NavierStokesSystem : public MAC_Object
       TDMatrix* get_A(size_t const& field);
       /** @brief Return the Schur complement of spacial discretization */
       TDMatrix* get_Schur(size_t const& field);
-      /** @brief Return the surface discretization */
-      SurfaceDiscretize get_surface();
       /** @brief Return the hydrodynamic forces */
       PartForces get_forces(size_t const& level);
       /** @brief Return the hydrodynamic torque */
@@ -306,7 +297,6 @@ class DDS_NavierStokesSystem : public MAC_Object
       // Particle structures
       struct NodeProp node[2][2];			       // 2 rows are for fields; 2 columns are for time level (current and last)
       vector<doubleVector*> divergence;			       // 0 current timestep, 1 last time step
-      struct SurfaceDiscretize surface;
       struct PartForces hydro_forces[2];                       // 0 current timestep, 1 last time step
       struct PartForces hydro_torque[2];                       // 0 current timestep, 1 last time step
       // Local vector to store diffusive terms

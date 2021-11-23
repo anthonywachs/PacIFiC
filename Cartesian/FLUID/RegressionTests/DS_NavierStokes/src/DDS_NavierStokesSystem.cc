@@ -164,10 +164,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 	// Direction splitting matrices
 	MAT_velocityUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
 
-   // Structure for the particle surface discretization
-   surface.coordinate = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   surface.normal = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-
    for (size_t level = 0; level < 2; level++) {
       // Structure for the particle force discretization
       hydro_forces[level].press = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
@@ -297,14 +293,6 @@ DDS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       }
    }
 
-   surface.coordinate[0] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   surface.coordinate[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   surface.coordinate[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   surface.area = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   surface.normal[0] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   surface.normal[1] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-   surface.normal[2] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-
    for (size_t level=0; level<2;level++) {
       for (size_t dir=0; dir<3; dir++) {
          hydro_forces[level].press[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
@@ -433,13 +421,6 @@ DDS_NavierStokesSystem:: re_initialize( void )
 	//  		}
    //    }
 	//
-   //    surface.coordinate[0]->re_initialize((size_t)Nmax);
-   //    surface.coordinate[1]->re_initialize((size_t)Nmax);
-   //    surface.coordinate[2]->re_initialize((size_t)Nmax);
-   //    surface.area->re_initialize((size_t)Nmax);
-   //    surface.normal[0]->re_initialize((size_t)Nmax);
-   //    surface.normal[1]->re_initialize((size_t)Nmax);
-   //    surface.normal[2]->re_initialize((size_t)Nmax);
 	//
    // }
 
@@ -771,15 +752,6 @@ DDS_NavierStokesSystem::get_A(size_t const& field)
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: get_A" ) ;
    return (A[field]) ;
-}
-
-//----------------------------------------------------------------------
-SurfaceDiscretize
-DDS_NavierStokesSystem::get_surface()
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokesSystem:: get_surface" ) ;
-   return (surface) ;
 }
 
 //----------------------------------------------------------------------
