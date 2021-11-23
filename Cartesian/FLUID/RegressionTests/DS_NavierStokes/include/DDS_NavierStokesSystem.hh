@@ -59,18 +59,6 @@ struct LocalVector {
    LA_SeqVector** interface_T;
 };
 
-/** @brief PartInput to be used to store the Input properties of particles in the domian */
-struct PartInput {
-   LA_SeqVector ** coord;               // Coordinates
-   LA_SeqVector * size;                // Size of the sphere
-   LA_SeqMatrix * thetap;              // yaw, pitch, roll
-   LA_SeqVector ** vel;                 // Velocity of the sphere
-   LA_SeqVector ** ang_vel;             // Angular velocity of the sphere
-   LA_SeqVector * temp;                // Temperature of the sphere
-   LA_SeqVector * inside;              // 1 if solid only from inside; -1 if solid only from outside
-   LA_SeqVector * local_parID;         // list of ID's present in the current processor
-};
-
 /** @brief PartForces to be used to store the hydrodynamic forces and torque on particles */
 struct PartForces {
    LA_SeqVector ** press;               // Pressure stress force
@@ -163,8 +151,6 @@ class DDS_NavierStokesSystem : public MAC_Object
       TDMatrix* get_A(size_t const& field);
       /** @brief Return the Schur complement of spacial discretization */
       TDMatrix* get_Schur(size_t const& field);
-      /** @brief Return the solid information read from input files */
-      PartInput get_solid(size_t const& field);
       /** @brief Return the surface discretization */
       SurfaceDiscretize get_surface();
       /** @brief Return the hydrodynamic forces */
@@ -318,7 +304,6 @@ class DDS_NavierStokesSystem : public MAC_Object
       struct TDMatrix DoubleSchur[2][3];
 
       // Particle structures
-      struct PartInput solid[2];			       // 0 current timestep, 1 last timestep
       struct NodeProp node[2][2];			       // 2 rows are for fields; 2 columns are for time level (current and last)
       vector<doubleVector*> divergence;			       // 0 current timestep, 1 last time step
       struct SurfaceDiscretize surface;
