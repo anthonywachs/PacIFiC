@@ -99,6 +99,19 @@ void DS_3Dcylinder:: compute_rigid_body_halozone( )
 
 
 //---------------------------------------------------------------------------
+void DS_3Dcylinder:: compute_surface_points( size_t const& Np )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dcylinder:: compute_surface_points" ) ;
+
+
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_3Dcylinder:: compute_hydro_force_torque( FV_DiscreteField const* PP,
 	FV_DiscreteField const* UU )
 //---------------------------------------------------------------------------

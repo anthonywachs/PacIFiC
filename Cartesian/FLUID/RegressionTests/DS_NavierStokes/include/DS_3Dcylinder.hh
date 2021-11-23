@@ -63,6 +63,11 @@ class DS_3Dcylinder: public DS_RigidBody
       , required for the computation of void fraction */
       void compute_rigid_body_halozone( );
 
+      /** @brief Compute the surface points by discretizing the 3D cylinder
+      surface in approximately equal areas (if possible)
+      @param Np number of points on 3D cylinder surface */
+      void compute_surface_points( size_t const& Np );
+
       //@}
 
 

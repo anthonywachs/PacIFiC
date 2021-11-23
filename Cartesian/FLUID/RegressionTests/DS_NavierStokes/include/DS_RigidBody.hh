@@ -94,6 +94,12 @@ class DS_RigidBody
       virtual void compute_hydro_force_torque( FV_DiscreteField const* PP,
 	                                         FV_DiscreteField const* UU ) = 0;
 
+
+      /** @brief Compute the surface points by discretizing the rigid body
+      surface in approximately equal areas (if possible)
+      @param Np number of points on rigid body surface */
+      virtual void compute_surface_points( size_t const& Np ) = 0;
+
       /** @brief Computes the void fraction on the fluid grid nodes
       and store the values in its corresponding void fraction variable
       @param FF the fluid field */

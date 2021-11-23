@@ -61,6 +61,13 @@ class DS_Sphere: public DS_RigidBody
       /** @brief Computes the min and max extents of the sphere halozone
       , required for the computation of void fraction */
       void compute_rigid_body_halozone( );
+
+      /** @brief Compute the surface points by discretizing the sphere
+      surface in approximately equal areas (if possible)
+      @param Np number of points on sphere surface */
+      void compute_surface_points( size_t const& Np );
+
+
       //@}
 
 

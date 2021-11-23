@@ -2,6 +2,7 @@
 #include <FS_RigidBody.hh>
 #include <FS_Sphere.hh>
 #include <FV_DiscreteField.hh>
+#include <math.h>
 using std::endl;
 
 
