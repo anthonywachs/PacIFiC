@@ -24,9 +24,6 @@ DS_3Dcylinder:: DS_3Dcylinder( FS_RigidBody* pgrb )
 {
   MAC_LABEL( "DS_RigidBody:: DS_RigidBody" ) ;
 
-  m_halo_zone = new doubleArray2D (3,2,0);
-  compute_rigid_body_halozone();
-
 }
 
 

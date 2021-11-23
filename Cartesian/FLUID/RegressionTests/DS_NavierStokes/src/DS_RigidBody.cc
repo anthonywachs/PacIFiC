@@ -24,6 +24,10 @@ DS_RigidBody:: DS_RigidBody( FS_RigidBody* pgrb )
 {
   MAC_LABEL( "DS_RigidBody:: DS_RigidBody" ) ;
 
+  m_halo_zone.reserve(2);
+  m_halo_zone.push_back(new geomVector(3));
+  m_halo_zone.push_back(new geomVector(3));
+
 }
 
 
@@ -156,19 +160,19 @@ void DS_RigidBody:: compute_void_fraction_on_grid( FV_DiscreteField const* FF
                 FF->primary_grid()->get_main_domain_max_coordinate( dir );
 
         bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-                                    , m_halo_zone->operator()(dir,0)
+                                    , m_halo_zone[0]->operator()(dir)
                                     , i0_temp) ;
         size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
 
 
         found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-                                , m_halo_zone->operator()(dir,1)
+                                , m_halo_zone[1]->operator()(dir)
                                 , i0_temp) ;
         size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
 
         if (is_periodic &&
-           ((m_halo_zone->operator()(dir,1) > domain_max)
-         || (m_halo_zone->operator()(dir,0) < domain_min))) {
+           ((m_halo_zone[1]->operator()(dir) > domain_max)
+         || (m_halo_zone[0]->operator()(dir) < domain_min))) {
            index_min = min_unknown_index(dir);
            index_max = max_unknown_index(dir);
         }
@@ -247,17 +251,17 @@ DS_RigidBody:: compute_grid_intersection_with_rigidbody (
         double domain_max =
                FF->primary_grid()->get_main_domain_max_coordinate(dir);
         bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir )
-                                    , m_halo_zone->operator()(dir,0)
+                                    , m_halo_zone[0]->operator()(dir)
                                     , i0_temp) ;
         size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
         found = FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir )
-                               , m_halo_zone->operator()(dir,1)
+                               , m_halo_zone[1]->operator()(dir)
                                , i0_temp) ;
         size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
 
         if (is_periodic &&
-           ((m_halo_zone->operator()(dir,1) > domain_max)
-        || (m_halo_zone->operator()(dir,0) < domain_min))) {
+           ((m_halo_zone[1]->operator()(dir) > domain_max)
+        || (m_halo_zone[0]->operator()(dir) < domain_min))) {
            index_min = min_unknown_index(dir);
            index_max = max_unknown_index(dir);
         }

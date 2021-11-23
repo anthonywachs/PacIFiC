@@ -24,9 +24,6 @@ DS_Sphere:: DS_Sphere( FS_RigidBody* pgrb )
 {
   MAC_LABEL( "DS_RigidBody:: DS_RigidBody" ) ;
 
-  m_halo_zone = new doubleArray2D (3,2,0);
-  compute_rigid_body_halozone();
-
 }
 
 
@@ -86,14 +83,75 @@ void DS_Sphere:: compute_rigid_body_halozone( )
   geomVector const* pgs = dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
                               ->get_ptr_FS_Sphere_gravity_centre();
 
-  m_halo_zone->operator()(0,0) = pgs->operator()(0) - 3.0*pagp->radius;
-  m_halo_zone->operator()(0,1) = pgs->operator()(0) + 3.0*pagp->radius;
+  m_halo_zone[0]->operator()(0) = pgs->operator()(0) - 3.0*pagp->radius;
+  m_halo_zone[0]->operator()(1) = pgs->operator()(1) - 3.0*pagp->radius;
+  m_halo_zone[0]->operator()(2) = pgs->operator()(2) - 3.0*pagp->radius;
 
-  m_halo_zone->operator()(1,0) = pgs->operator()(1) - 3.0*pagp->radius;
-  m_halo_zone->operator()(1,1) = pgs->operator()(1) + 3.0*pagp->radius;
+  m_halo_zone[1]->operator()(0) = pgs->operator()(0) + 3.0*pagp->radius;
+  m_halo_zone[1]->operator()(1) = pgs->operator()(1) + 3.0*pagp->radius;
+  m_halo_zone[1]->operator()(2) = pgs->operator()(2) + 3.0*pagp->radius;
 
-  m_halo_zone->operator()(2,0) = pgs->operator()(2) - 3.0*pagp->radius;
-  m_halo_zone->operator()(2,1) = pgs->operator()(2) + 3.0*pagp->radius;
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_Sphere:: compute_surface_points( size_t const& Np )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_Sphere:: compute_surface_points" ) ;
+
+  size_t kmax = Np;
+
+  // Reference: Becker and Becker, Computational Geometry 45 (2012) 275-283
+  double eta_temp = MAC::pi()/2.;
+  double k_temp = (double) kmax;
+  double Ro_temp = MAC::sqrt(2);
+  double Rn_temp = MAC::sqrt(2);
+  size_t cntr = 0;
+  size_t Pmin = 3;
+  double ar = 1.;
+
+  // Estimating the number of rings on the hemisphere, assuming Pmin=3
+  // and aspect ratio(ar) as 1
+  while (k_temp > double(Pmin+2)) {
+     eta_temp = eta_temp - (2./ar)
+                         * MAC::sqrt(MAC::pi()/k_temp)
+                         * MAC::sin(eta_temp/2.);
+     Rn_temp = 2.*MAC::sin(eta_temp/2.);
+     k_temp = round(k_temp*MAC::pow(Rn_temp/Ro_temp,2.));
+     Ro_temp = Rn_temp;
+     cntr++;
+  }
+
+  size_t Nrings = cntr+1;
+
+  // Summation of total discretized points
+  // with increase in number of rings radially
+  doubleVector k(Nrings,0.);
+  // Zenithal angle for the sphere
+  doubleVector eta(Nrings,0.);
+  // Radius of the rings in lamber projection plane
+  doubleVector Rring(Nrings,0.);
+
+  // Assigning the maximum number of discretized
+  // points to the last element of the array
+  k(Nrings-1) = (double) kmax;
+  // Zenithal angle for the last must be pi/2.
+  eta(Nrings-1) = MAC::pi()/2.;
+  // Radius of last ring in lamber projection plane
+  Rring(Nrings-1) = MAC::sqrt(2.);
+
+  for (int i=int(Nrings)-2; i>=0; --i) {
+     eta(i) = eta(i+1) - (2./ar)
+                       * MAC::sqrt(MAC::pi()/k(i+1))
+                       * MAC::sin(eta(i+1)/2.);
+     Rring(i) = 2.*MAC::sin(eta(i)/2.);
+     k(i) = round(k(i+1)*MAC::pow(Rring(i)/Rring(i+1),2.));
+     if (i==0) k(0) = (double) Pmin;
+  }
+
 
 }
 

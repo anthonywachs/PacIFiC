@@ -48,6 +48,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   build_solid_variables_on_grid();
 
+  compute_halo_zones_for_all_rigid_body();
+
   compute_void_fraction_on_grid();
 
   compute_grid_intersection_with_rigidbody();
@@ -292,6 +294,21 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid( )
             compute_void_fraction_on_grid(PF,void_fraction[0],rb_ID[0],i);
      m_allDSrigidbodies[i]->
             compute_void_fraction_on_grid(UF,void_fraction[1],rb_ID[1],i);
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: compute_halo_zones_for_all_rigid_body( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: compute_halo_zones_for_all_rigid_body" ) ;
+
+  for (size_t i = 0; i < m_nrb; ++i) {
+     m_allDSrigidbodies[i]->compute_rigid_body_halozone();
   }
 
 }

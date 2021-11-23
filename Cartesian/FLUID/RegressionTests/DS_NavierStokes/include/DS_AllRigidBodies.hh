@@ -152,6 +152,10 @@ class DS_AllRigidBodies
       void compute_hydro_force_torque( FV_DiscreteField const* PP,
 	                                    FV_DiscreteField const* UU );
 
+      /** @brief Computes the halo zone for all rigid bodies, required for
+      void fraction and intersection calculation on the grid nodes */
+      void compute_halo_zones_for_all_rigid_body( );
+
       /** @brief Computes the void fraction on the grid nodes
       of a given fluid field */
       void compute_void_fraction_on_grid( );

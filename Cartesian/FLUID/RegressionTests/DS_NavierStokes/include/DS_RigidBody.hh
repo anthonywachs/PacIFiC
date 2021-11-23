@@ -127,8 +127,12 @@ class DS_RigidBody
     	geometric rigid body */
       vector<geomVector> m_surface_points; /**< vector of points distributed on
       	the surface of the particle to compute surface integrals */
+      vector<geomVector> m_surface_area; /**< vector of the area associated
+         with the points distributed on the surface of the particle */
+      vector<geomVector> m_surface_normal; /**< vector of the normal associated
+         with the points distributed on the surface of the particle */
       //@}
-      doubleArray2D* m_halo_zone; /**< vector of min and max extents
+      vector<geomVector*> m_halo_zone; /**< vector of min and max extents
          of rigid body halozone, required for void fraction detection */
       //@}
 
