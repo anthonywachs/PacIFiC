@@ -63,7 +63,7 @@ class FS_RigidBody
       string get_type() const;
 
       /** @brief Returns a constant pointer to the gravity center of the sphere */
-      virtual geomVector const* get_ptr_to_gravity_centre() const = 0;
+      geomVector const* get_ptr_to_gravity_centre() const;
       //@}
 
 

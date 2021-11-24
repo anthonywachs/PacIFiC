@@ -239,3 +239,16 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
   return (source.calcDist(c));
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+geomVector const* FS_RigidBody:: get_ptr_to_gravity_centre() const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: get_ptr_to_gravity_centre" ) ;
+
+  return ( &m_gravity_center );
+
+}

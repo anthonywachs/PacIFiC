@@ -316,16 +316,3 @@ struct FS_3Dcylinder_Additional_Param const* FS_3Dcylinder::
   return( &m_agp_3dcyl );
 
 }
-
-
-
-
-//---------------------------------------------------------------------------
-geomVector const* FS_3Dcylinder:: get_ptr_to_gravity_centre() const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "FS_3Dcylinder:: get_ptr_to_gravity_centre" ) ;
-
-  return ( &m_gravity_center );
-
-}

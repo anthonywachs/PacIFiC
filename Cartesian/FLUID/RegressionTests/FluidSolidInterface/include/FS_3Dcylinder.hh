@@ -55,10 +55,6 @@ class FS_3Dcylinder: public FS_RigidBody
       struct FS_3Dcylinder_Additional_Param const*
       	get_ptr_FS_3Dcylinder_Additional_Param() const;
 
-      /** @brief Returns a constant pointer to the gravity
-      center of the 3DCylinder */
-      geomVector const* get_ptr_to_gravity_centre() const;
-
       //@}
 
 

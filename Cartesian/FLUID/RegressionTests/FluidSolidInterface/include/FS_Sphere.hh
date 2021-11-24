@@ -48,11 +48,7 @@ class FS_Sphere: public FS_RigidBody
       additional geometric parameters for the sphere */
       struct FS_Sphere_Additional_Param const*
       	get_ptr_FS_Sphere_Additional_Param() const;
-
-      /** @brief Returns a constant pointer to the gravity
-      center of the sphere */
-      geomVector const* get_ptr_to_gravity_centre() const;
-
+         
       //@}
 
 
