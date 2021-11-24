@@ -252,3 +252,16 @@ geomVector const* FS_RigidBody:: get_ptr_to_gravity_centre() const
   return ( &m_gravity_center );
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+Matrix3D const* FS_RigidBody:: get_ptr_to_rotation_matrix() const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: get_ptr_to_rotation_matrix" ) ;
+
+  return ( &m_rotation_matrix );
+
+}

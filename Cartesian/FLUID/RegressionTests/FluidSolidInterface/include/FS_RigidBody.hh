@@ -62,8 +62,11 @@ class FS_RigidBody
       /** @brief Returns the rigid body type */
       string get_type() const;
 
-      /** @brief Returns a constant pointer to the gravity center of the sphere */
+      /** @brief Returns a constant pointer to the gravity center of RB */
       geomVector const* get_ptr_to_gravity_centre() const;
+
+      /** @brief Returns a constant pointer to the rotation matrix of RB */
+      Matrix3D const* get_ptr_to_rotation_matrix() const;
       //@}
 
 
