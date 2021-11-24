@@ -238,10 +238,10 @@ DS_RigidBody:: compute_grid_intersection_with_rigidbody (
   for (size_t comp = 0; comp < nb_comps; comp++) {
 
      for (size_t dir = 0; dir < dim; dir++) {
-        // To include knowns at dirichlet boundary in the intersection calculation
-        // as well, modification to the looping extents are required
-        min_unknown_index(dir) = FF->get_min_index_unknown_on_proc( comp, dir ) ;
-        max_unknown_index(dir) = FF->get_max_index_unknown_on_proc( comp, dir ) ;
+        // To include knowns at dirichlet boundary in the intersection
+        // calculation as well, modification to the looping extents are required
+        min_unknown_index(dir) = FF->get_min_index_unknown_on_proc( comp, dir );
+        max_unknown_index(dir) = FF->get_max_index_unknown_on_proc( comp, dir );
         local_extents(dir,0) = 0;
         local_extents(dir,1) = max_unknown_index(dir) - min_unknown_index(dir);
 
@@ -251,7 +251,7 @@ DS_RigidBody:: compute_grid_intersection_with_rigidbody (
                FF->primary_grid()->get_main_domain_min_coordinate(dir);
         double domain_max =
                FF->primary_grid()->get_main_domain_max_coordinate(dir);
-        bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir )
+        bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir)
                                     , m_halo_zone[0]->operator()(dir)
                                     , i0_temp) ;
         size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
@@ -315,14 +315,15 @@ DS_RigidBody:: compute_grid_intersection_with_rigidbody (
                              intersect_distance->operator()(p,col) = t;
                              // Calculate the variable values on the
                              // intersection of grid and solid
-                             geomVector netVel = rigid_body_velocity(source + t * rayDir);
+                             geomVector netVel =
+                                       rigid_body_velocity(source + t * rayDir);
                              // Value of variable at the surface of particle
                              if ( nb_comps == 1) { // i.e. PF
                                 intersect_fieldValue->operator()(p,col)
-                                                                 = net_vel[dir];
+                                                              = net_vel[dir];
                              } else { // i.e. UF
                                 intersect_fieldValue->operator()(p,col)
-                                                                 = net_vel[comp];
+                                                              = net_vel[comp];
                              }
                           }
                        }

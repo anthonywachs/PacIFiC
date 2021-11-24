@@ -257,11 +257,23 @@ geomVector const* FS_RigidBody:: get_ptr_to_gravity_centre() const
 
 
 //---------------------------------------------------------------------------
-Matrix3D const* FS_RigidBody:: get_ptr_to_rotation_matrix() const
+void FS_RigidBody:: rotate(geomVector& pt)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "FS_RigidBody:: get_ptr_to_rotation_matrix" ) ;
+  MAC_LABEL( "FS_RigidBody:: rotate" ) ;
 
-  return ( &m_rotation_matrix );
+  double delta_x = pt(0)*m_rotation_matrix[0][0]
+                 + pt(1)*m_rotation_matrix[0][1]
+                 + pt(2)*m_rotation_matrix[0][2];
+  double delta_y = pt(0)*m_rotation_matrix[1][0]
+                 + pt(1)*m_rotation_matrix[1][1]
+                 + pt(2)*m_rotation_matrix[1][2];
+  double delta_z = pt(0)*m_rotation_matrix[2][0]
+                 + pt(1)*m_rotation_matrix[2][1]
+                 + pt(2)*m_rotation_matrix[2][2];
+
+  pt(0) = delta_x;
+  pt(1) = delta_y;
+  pt(2) = delta_z;
 
 }

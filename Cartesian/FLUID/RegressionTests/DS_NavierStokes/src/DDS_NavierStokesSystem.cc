@@ -65,8 +65,6 @@ DDS_NavierStokesSystem:: DDS_NavierStokesSystem(
    , MAT_velocityUnsteadyPlusDiffusion_1D( 0 )
    , is_solids ( fromNS.is_solids_ )
    , is_stressCal (fromNS.is_stressCal_ )
-   , Nmax (fromNS.Npoints_ )
-   , ar (fromNS.ar_ )
 {
    MAC_LABEL( "DDS_NavierStokesSystem:: DDS_NavierStokesSystem" ) ;
 

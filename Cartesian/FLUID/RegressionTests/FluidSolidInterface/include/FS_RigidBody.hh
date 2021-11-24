@@ -64,9 +64,6 @@ class FS_RigidBody
 
       /** @brief Returns a constant pointer to the gravity center of RB */
       geomVector const* get_ptr_to_gravity_centre() const;
-
-      /** @brief Returns a constant pointer to the rotation matrix of RB */
-      Matrix3D const* get_ptr_to_rotation_matrix() const;
       //@}
 
 
@@ -141,6 +138,10 @@ class FS_RigidBody
       double distanceTo( geomVector const& source,
 				             geomVector const& rayDir,
 								 double const& delta );
+
+      /** @brief Rotate the pt using the rigid body rotation matrix
+      @param pt the point to rotate */
+      void rotate(geomVector& pt);
       //@}
 
 

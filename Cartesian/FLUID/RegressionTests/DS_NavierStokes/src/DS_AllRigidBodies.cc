@@ -3,6 +3,7 @@
 #include <DS_RigidBody.hh>
 #include <DS_RigidBody_BuilderFactory.hh>
 #include <FV_DiscreteField.hh>
+#include <FV_Mesh.hh>
 using std::endl;
 
 
@@ -25,11 +26,13 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , istream& in
                                   , bool const& b_particles_as_fixed_obstacles
                                   , FV_DiscreteField const* arb_UF
-                                  , FV_DiscreteField const* arb_PF )
+                                  , FV_DiscreteField const* arb_PF
+                                  , double const& arb_scs)
 //---------------------------------------------------------------------------
   : m_space_dimension( dimens )
   , UF ( arb_UF )
   , PF ( arb_PF )
+  , surface_cell_scale ( arb_scs )
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
@@ -47,6 +50,10 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   }
 
   build_solid_variables_on_grid();
+
+  initialize_surface_variables_for_all_RB();
+
+  compute_surface_variables_for_all_RB();
 
   compute_halo_zones_for_all_rigid_body();
 
@@ -338,6 +345,38 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody( )
                                               ,intersect_fieldValue[1]
                                               ,i);
   }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: initialize_surface_variables_for_all_RB( )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_AllRigidBodies:: initialize_surface_variables_for_all_RB" ) ;
+
+   double dx = UF->primary_grid()->get_smallest_grid_size();
+
+   for (size_t i = 0; i < m_nrb; ++i) {
+      m_allDSrigidbodies[i]->initialize_surface_variables(surface_cell_scale
+                                                        , dx);
+   }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: compute_surface_variables_for_all_RB( )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_AllRigidBodies:: compute_surface_variables_for_all_RB" ) ;
+
+   for (size_t i = 0; i < m_nrb; ++i)
+      m_allDSrigidbodies[i]->compute_surface_points( );
 
 }
 

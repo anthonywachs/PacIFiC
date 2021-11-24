@@ -81,18 +81,18 @@ void DS_Sphere:: compute_rigid_body_halozone( )
    dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
       ->get_ptr_FS_Sphere_Additional_Param();
 
-  geomVector const* pgs = dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
+  geomVector const* pgc = dynamic_cast<FS_RigidBody*>(m_geometric_rigid_body)
                               ->get_ptr_to_gravity_centre();
 
-  double radius_equivalent = 3.0*pagp->radius;
+  double r_equi = 3.0*pagp->radius;
 
-  m_halo_zone[0]->operator()(0) = pgs->operator()(0) - radius_equivalent;
-  m_halo_zone[0]->operator()(1) = pgs->operator()(1) - radius_equivalent;
-  m_halo_zone[0]->operator()(2) = pgs->operator()(2) - radius_equivalent;
+  geomVector delta(r_equi, r_equi, r_equi);
 
-  m_halo_zone[1]->operator()(0) = pgs->operator()(0) + radius_equivalent;
-  m_halo_zone[1]->operator()(1) = pgs->operator()(1) + radius_equivalent;
-  m_halo_zone[1]->operator()(2) = pgs->operator()(2) + radius_equivalent;
+  m_halo_zone[0]->operator=(*pgc);
+  m_halo_zone[1]->operator=(*pgc);
+
+  m_halo_zone[0]->operator-=(delta);
+  m_halo_zone[1]->operator+=(delta);
 
 }
 
@@ -100,12 +100,20 @@ void DS_Sphere:: compute_rigid_body_halozone( )
 
 
 //---------------------------------------------------------------------------
-void DS_Sphere:: compute_surface_points( size_t const& Np )
+void DS_Sphere:: compute_surface_points( )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_Sphere:: compute_surface_points" ) ;
 
-  size_t kmax = Np;
+  // Pointers to location and additional parameters
+  struct FS_Sphere_Additional_Param const* pagp =
+   dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
+      ->get_ptr_FS_Sphere_Additional_Param();
+
+  geomVector const* pgc = dynamic_cast<FS_RigidBody*>(m_geometric_rigid_body)
+                            ->get_ptr_to_gravity_centre();
+
+  size_t kmax = m_surface_area.size()/2;
 
   // Reference: Becker and Becker, Computational Geometry 45 (2012) 275-283
   double eta_temp = MAC::pi()/2.;
@@ -113,11 +121,11 @@ void DS_Sphere:: compute_surface_points( size_t const& Np )
   double Ro_temp = MAC::sqrt(2);
   double Rn_temp = MAC::sqrt(2);
   size_t cntr = 0;
-  size_t Pmin = 3;
-  double ar = 1.;
 
   // Estimating the number of rings on the hemisphere, assuming Pmin=3
   // and aspect ratio(ar) as 1
+  size_t Pmin = 3;
+  double ar = 1.;
   while (k_temp > double(Pmin+2)) {
      eta_temp = eta_temp - (2./ar)
                          * MAC::sqrt(MAC::pi()/k_temp)
@@ -155,6 +163,130 @@ void DS_Sphere:: compute_surface_points( size_t const& Np )
      if (i==0) k(0) = (double) Pmin;
   }
 
+  size_t maxby2 = (size_t) k(Nrings-1);
+  // Calculation for all rings except at the pole
+  for (int i=(int)Nrings-1; i>0; --i) {
+     double Ri = Rring(i);
+     Rring(i) = (Rring(i) + Rring(i-1))/2.;
+     eta(i) = (eta(i) + eta(i-1))/2.;
+     double d_theta = 2.*MAC::pi()/(k(i)-k(i-1));
+     // Initialize theta as 1% of the d_theta to avoid
+     // point overlap with mesh gridlines
+     double theta = 0.01*d_theta;
+
+     for (int j=(int)k(i-1); j<k(i); j++) {
+        theta = theta + d_theta;
+
+        geomVector point( pagp->radius*MAC::cos(eta(i))
+                        , pagp->radius*MAC::cos(theta)*MAC::sin(eta(i))
+                        , pagp->radius*MAC::sin(theta)*MAC::sin(eta(i)) );
+
+        geomVector mirror_point(-pagp->radius*MAC::cos(eta(i))
+                               , pagp->radius*MAC::cos(theta)*MAC::sin(eta(i))
+                               , pagp->radius*MAC::sin(theta)*MAC::sin(eta(i)));
+
+        m_surface_points[j] = point;
+        m_surface_area[j] = pagp->radius*pagp->radius*
+                            (0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
+        // For second half of sphere
+        m_surface_points[maxby2+j] = mirror_point;
+        m_surface_area[maxby2+j] = m_surface_area[j];
+
+  	     // Create surface normal vectors
+        m_surface_normal[j] = m_surface_points[j];
+  	     m_surface_normal[maxby2+j] = m_surface_points[maxby2+j];
+     }
+  }
+
+  // Calculation at the ring on pole (i=0)
+  double Ri = Rring(0);
+  Rring(0) = Rring(0)/2.;
+  eta(0) = eta(0)/2.;
+  double d_theta = 2.*MAC::pi()/(k(0));
+
+  // Initialize theta as 1% of the d_theta to avoid
+  // point overlap with mesh gridlines
+  double theta = 0.01*d_theta;
+  if (k(0)>1) {
+     for (int j=0; j < k(0); j++) {
+        theta = theta + d_theta;
+
+        geomVector point( pagp->radius*MAC::cos(eta(0))
+                        , pagp->radius*MAC::cos(theta)*MAC::sin(eta(0))
+                        , pagp->radius*MAC::sin(theta)*MAC::sin(eta(0)) );
+
+        geomVector mirror_point(-pagp->radius*MAC::cos(eta(0))
+                               , pagp->radius*MAC::cos(theta)*MAC::sin(eta(0))
+                               , pagp->radius*MAC::sin(theta)*MAC::sin(eta(0)));
+
+        m_surface_points[j] = point;
+        m_surface_area[j] = pagp->radius*pagp->radius*0.5*d_theta*pow(Ri,2.);
+
+        // For second half of sphere
+        m_surface_points[maxby2+j] = mirror_point;
+        m_surface_area[maxby2+j] = m_surface_area[j];
+
+        // Create surface normal vectors
+        m_surface_normal[j] = m_surface_points[j];
+        m_surface_normal[maxby2+j] = m_surface_points[maxby2+j];
+     }
+  } else {
+     geomVector point( pagp->radius*1., 0., 0.);
+     geomVector mirror_point( -pagp->radius*1., 0., 0.);
+
+     m_surface_points[0] = point;
+     m_surface_area[0] = pagp->radius*pagp->radius*0.5*d_theta*pow(Ri,2.);
+
+     //  For second half of sphere
+     m_surface_points[maxby2] = mirror_point;
+     m_surface_area[maxby2] = m_surface_area[0];
+
+     // Create surface normal vectors
+     m_surface_normal[0] = m_surface_points[0];
+     m_surface_normal[maxby2] = m_surface_points[maxby2];
+  }
+
+  // Translate and rotate (if required)
+  for (size_t i = 0; i < m_surface_area.size(); i++) {
+     m_geometric_rigid_body->rotate(m_surface_points[i]);
+     m_surface_points[i].translate(*pgc);
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_Sphere:: initialize_surface_variables(
+                                          double const& surface_cell_scale
+                                        , double const& dx)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_Sphere:: initialize_variable_for_each_rigidBody" ) ;
+
+  struct FS_Sphere_Additional_Param const* pagp =
+   dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
+      ->get_ptr_FS_Sphere_Additional_Param();
+
+  size_t Ntot = (size_t) (round(1./surface_cell_scale)
+               *(4.*MAC::pi()*pagp->radius*pagp->radius)
+               /(dx*dx));
+
+  // Getting the nearest even number
+  Ntot = (size_t) (round((double)Ntot * 0.5) * 2.);
+
+  m_surface_points.reserve( Ntot );
+  m_surface_area.reserve( Ntot );
+  m_surface_normal.reserve( Ntot );
+
+  geomVector vvv(3);
+
+   for (size_t i = 0; i < Ntot; ++i) {
+      m_surface_points.push_back( vvv );
+      m_surface_area.push_back( 0. );
+      m_surface_normal.push_back( vvv );
+   }
 
 }
 
@@ -173,17 +305,6 @@ void DS_Sphere:: compute_hydro_force_torque( FV_DiscreteField const* PP,
   	dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
 		->get_ptr_FS_Sphere_Additional_Param();
   MAC::out() << pagp->radius << endl; // example, delete later
-
-  // Determine the number of surface points and allocate the vector if empty
-  if ( m_surface_points.empty() )
-  {
-    size_t npts = 0, i;
-    geomVector vvv(3);
-
-    npts = 1; // NEEDS TO BE SET TO THE PROPER VALUE
-    m_surface_points.reserve( npts );
-    for (i = 0; i < npts; ++i) m_surface_points.push_back( vvv );
-  }
 
   // Determine the surface point coordinates
   MAC::out() << "DS_Sphere:: compute_hydro_force_torque - "

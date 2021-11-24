@@ -392,11 +392,7 @@ public SolverComputingTime
 
       bool is_firstorder ;
 
-      double Npoints;
-      size_t Pmin, pole_loc;
-      double ar;
-
-      double Amp, freq;
+      double surface_cell_scale;
 
       // Grains3D variable
       string solidSolverType;

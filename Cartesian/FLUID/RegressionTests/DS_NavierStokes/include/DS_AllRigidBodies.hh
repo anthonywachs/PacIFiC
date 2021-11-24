@@ -40,12 +40,17 @@ class DS_AllRigidBodies
       @param dimens number of space dimensions
       @param in input stream where features of rigid bodies are read
       @param b_particles_as_fixed_obstacles treat all rigid bodies as fixed
-      obstacles */
+      obstacles
+      @param arb_UF Pointer to flow field UF
+      @param arb_PF Pointer to flow field PF
+      @param surface_cell_scale scale of cell on the rigid body surface as
+      compared with the cell of computational grid */
       DS_AllRigidBodies( size_t& dimens
                        , istream& in
                        , bool const& b_particles_as_fixed_obstacles
                        , FV_DiscreteField const* arb_UF
-                       , FV_DiscreteField const* arb_PF );
+                       , FV_DiscreteField const* arb_PF
+                       , double const& arb_scs);
 
       /** @brief Destructor */
       ~DS_AllRigidBodies();
@@ -173,6 +178,12 @@ class DS_AllRigidBodies
       /** @brief Build the variable associated with the rigid bodies
       on the Cartesian computational grid */
       void build_solid_variables_on_grid( );
+
+      /** @brief Intialize the surface variables for each rigid body */
+      void initialize_surface_variables_for_all_RB( );
+
+      /** @brief Compute the surface variables for each rigid body */
+      void compute_surface_variables_for_all_RB( );
       //@}
 
 
@@ -205,6 +216,9 @@ class DS_AllRigidBodies
       // Pointers to the constant velocity and pressure field
       FV_DiscreteField const* UF ;
       FV_DiscreteField const* PF ;
+
+      double surface_cell_scale; /**< a variable to store the scale of surface
+      cell on the RB as compared with computational grid cell size */
 
       vector<size_t_vector*> void_fraction; /**< vector of void fraction the
       field grid nodes */

@@ -30,8 +30,6 @@ struct NavierStokes2System
 {
   bool is_solids_ ;
   bool is_stressCal_ ;
-  double Npoints_ ;
-  double ar_ ;
 };
 
 /** @brief TDMatrix include all elements of block matrices (ii,ie,ei,ee) */
