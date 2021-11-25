@@ -348,3 +348,30 @@ geomVector DS_RigidBody:: rigid_body_velocity( geomVector const& pt ) const
   return (m_geometric_rigid_body->rigid_body_velocity(pt));
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_RigidBody:: write_surface_discretization( const std::string& file )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: write_surface_discretization()" ) ;
+
+  std::ofstream out;
+  out.open(file.c_str());
+  out << "x ,y ,z ,nx ,ny ,nz ,area" << endl;
+
+  for (size_t i = 0; i < m_surface_area.size(); i++) {
+     out << m_surface_points[i](0) << " ,"
+         << m_surface_points[i](1) << " ,"
+         << m_surface_points[i](2) << " ,"
+         << m_surface_normal[i](0) << " ,"
+         << m_surface_normal[i](1) << " ,"
+         << m_surface_normal[i](2) << " ,"
+         << m_surface_area[i] << endl;
+  }
+
+  out.close();
+
+}

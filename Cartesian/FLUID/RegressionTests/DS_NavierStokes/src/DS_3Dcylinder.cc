@@ -164,8 +164,8 @@ void DS_3Dcylinder:: compute_surface_points(  )
                         , pagp->cylinder_height*1./2.
                         , pagp->cylinder_radius*Rring(i)*MAC::sin(theta) );
         geomVector point_mirror (pagp->cylinder_radius*Rring(i)*MAC::cos(theta)
-                               , pagp->cylinder_height*-1./2.
-                               , pagp->cylinder_radius*Rring(i)*MAC::sin(theta) );
+                              , pagp->cylinder_height*-1./2.
+                              , pagp->cylinder_radius*Rring(i)*MAC::sin(theta));
         // For top disk
         m_surface_points[j] = point;
         m_surface_area[j] = 0.5*pagp->cylinder_radius
@@ -198,8 +198,8 @@ void DS_3Dcylinder:: compute_surface_points(  )
                         , pagp->cylinder_height*1./2.
                         , pagp->cylinder_radius*Rring(0)*MAC::sin(theta) );
         geomVector point_mirror (pagp->cylinder_radius*Rring(0)*MAC::cos(theta)
-                               , pagp->cylinder_height*-1./2.
-                               , pagp->cylinder_radius*Rring(0)*MAC::sin(theta));
+                              , pagp->cylinder_height*-1./2.
+                              , pagp->cylinder_radius*Rring(0)*MAC::sin(theta));
         // For top disk
         m_surface_points[j] = point;
         m_surface_area[j] = 0.5*pagp->cylinder_radius
@@ -235,7 +235,7 @@ void DS_3Dcylinder:: compute_surface_points(  )
   int pts_1_ring = (int)(k(Nrings-1) - k(Nrings-2));
   int cyl_rings = (int)round((pagp->cylinder_height/pagp->cylinder_radius)
                                /(1-MAC::sqrt(k(Nrings-2)/k(Nrings-1))));
-  double cell_area = 2. * pagp->cylinder_radius * pagp->cylinder_height * MAC::pi()
+  double cell_area = 2.*pagp->cylinder_radius*pagp->cylinder_height*MAC::pi()
                    / ((double) pts_1_ring*cyl_rings);
 
   d_theta = 2.*MAC::pi()/pts_1_ring;
@@ -257,8 +257,10 @@ void DS_3Dcylinder:: compute_surface_points(  )
      }
   }
 
+  // Translate and rotate
   for (size_t i = 0; i < m_surface_area.size(); i++) {
      m_geometric_rigid_body->rotate(m_surface_points[i]);
+     m_geometric_rigid_body->rotate(m_surface_normal[i]);
      m_surface_points[i].translate(*pgc);
   }
 

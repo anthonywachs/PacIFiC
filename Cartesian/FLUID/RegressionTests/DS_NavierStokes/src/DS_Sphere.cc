@@ -246,9 +246,10 @@ void DS_Sphere:: compute_surface_points( )
      m_surface_normal[maxby2] = m_surface_points[maxby2];
   }
 
-  // Translate and rotate (if required)
+  // Translate and rotate
   for (size_t i = 0; i < m_surface_area.size(); i++) {
      m_geometric_rigid_body->rotate(m_surface_points[i]);
+     m_geometric_rigid_body->rotate(m_surface_normal[i]);
      m_surface_points[i].translate(*pgc);
   }
 

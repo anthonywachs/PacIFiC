@@ -9,6 +9,8 @@
 #include <vector>
 #include <iostream>
 #include <map>
+#include <iostream>
+#include <fstream>
 using std::ostream;
 using std::vector;
 using std::tuple;
@@ -125,8 +127,13 @@ class DS_RigidBody
                                         , doubleArray2D* intersect_distance
                                         , doubleArray2D* intersect_fieldValue
                                         , size_t const& parID);
-
+      /** @brief Returns rigid body velocity including rotation speed at pt
+      @param pt the point */
       geomVector rigid_body_velocity( geomVector const& pt ) const;
+
+      /** @brief Write the surface discretization points of all RB in
+      respective CSV files */
+      void write_surface_discretization( const std::string& file );
 
       //@}
 

@@ -55,6 +55,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   compute_surface_variables_for_all_RB();
 
+  write_surface_discretization_for_all_RB();
+
   compute_halo_zones_for_all_rigid_body();
 
   compute_void_fraction_on_grid();
@@ -377,6 +379,24 @@ void DS_AllRigidBodies:: compute_surface_variables_for_all_RB( )
 
    for (size_t i = 0; i < m_nrb; ++i)
       m_allDSrigidbodies[i]->compute_surface_points( );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: write_surface_discretization_for_all_RB( )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_AllRigidBodies:: write_surface_discretization_for_all_RB" ) ;
+
+   for (size_t i = 0; i < m_nrb; ++i) {
+      std::ostringstream os2;
+      os2 << "./DS_results/discretized_surface_parID_" << i << ".csv";
+      std::string file = os2.str();
+      m_allDSrigidbodies[i]->write_surface_discretization( file );
+   }
 
 }
 

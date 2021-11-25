@@ -7,6 +7,7 @@
 #include <doubleArray2D.hh>
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <string>
 using std::vector;
@@ -179,11 +180,14 @@ class DS_AllRigidBodies
       on the Cartesian computational grid */
       void build_solid_variables_on_grid( );
 
-      /** @brief Intialize the surface variables for each rigid body */
+      /** @brief Intialize the surface variables for all rigid bodies */
       void initialize_surface_variables_for_all_RB( );
 
-      /** @brief Compute the surface variables for each rigid body */
+      /** @brief Compute the surface variables for all rigid bodies */
       void compute_surface_variables_for_all_RB( );
+
+      /** @brief Write the surface variables for all rigid bodies */
+      void write_surface_discretization_for_all_RB( );
       //@}
 
 
