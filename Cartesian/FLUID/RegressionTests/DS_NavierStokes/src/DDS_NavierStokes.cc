@@ -6261,33 +6261,6 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 //
 // }
 //
-//
-// //----------------------------------------------------------------------
-// void
-// DDS_NavierStokes::write_surface_discretization(size_t const& Np)
-// //----------------------------------------------------------------------
-// {
-//   ofstream outputFile ;
-//
-//   std::ostringstream os2;
-//   os2 << "./DS_results/surface_discretization.csv";
-//   std::string filename = os2.str();
-//   outputFile.open(filename.c_str());
-//
-//   outputFile << "x,y,z" << endl;
-//
-//   // Structure of particle surface discretization
-//   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
-//
-//   for (size_t i=0;i<Np;i++) {
-//      outputFile << surface.coordinate[0]->item(i) << ","
-// 		<< surface.coordinate[1]->item(i) << ","
-// 		<< surface.coordinate[2]->item(i) << endl;
-//   }
-//   outputFile.close();
-// }
-//
-//
 // //----------------------------------------------------------------------
 // void
 // DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, FV_TimeIterator const* t_it)

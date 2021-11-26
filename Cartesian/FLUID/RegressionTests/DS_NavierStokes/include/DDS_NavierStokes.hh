@@ -217,8 +217,6 @@ public SolverComputingTime
       void second_order_pressure_stress_withNeumannBC(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it);
       void second_order_pressure_stress(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it);
       void generate_surface_discretization();
-      void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
-      void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
       void compute_surface_points_on_cube(size_t const& Np);
       void rotation_matrix (size_t const& m, class doubleVector& delta, size_t const& comp, size_t const& field);
       void trans_rotation_matrix (size_t const& m, class doubleVector& delta, size_t const& comp, size_t const& field);

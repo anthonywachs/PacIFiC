@@ -280,6 +280,8 @@ void DS_Sphere:: initialize_surface_variables(
   m_surface_points.reserve( Ntot );
   m_surface_area.reserve( Ntot );
   m_surface_normal.reserve( Ntot );
+  m_surface_Pforce.reserve( Ntot );
+  m_surface_Vforce.reserve( Ntot );
 
   geomVector vvv(3);
 
@@ -287,6 +289,8 @@ void DS_Sphere:: initialize_surface_variables(
       m_surface_points.push_back( vvv );
       m_surface_area.push_back( 0. );
       m_surface_normal.push_back( vvv );
+      m_surface_Pforce.push_back( vvv );
+      m_surface_Vforce.push_back( vvv );
    }
 
 }
