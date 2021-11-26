@@ -58,6 +58,22 @@ class DS_RigidBody
       //@{
       /** @brief Return the halo zones of the rigid body */
       vector<geomVector*> get_rigid_body_haloZone( ) const;
+
+      /** @brief Returns rigid body velocity including rotation speed at pt
+      @param pt the point */
+      geomVector get_rigid_body_velocity( geomVector const& pt ) const;
+
+      /** @brief Returns the distance of a point with the rigid body
+      with a given ray vector and source
+      @param pt the point
+      @param direction x, y or z (=0, 1 or 2)
+      @param positive true if search in the positive direction of the coordinate
+      axis and false otherwise */
+      double get_distanceTo( geomVector const& source,
+                             geomVector const& rayDir,
+                             double const& delta ) const;
+
+
       //@}
 
    //-- Methods
@@ -116,20 +132,6 @@ class DS_RigidBody
       surface in approximately equal areas (if possible)
       @param Np number of points on rigid body surface */
       virtual void compute_surface_points( ) = 0;
-
-      /** @brief Computes the intersection of field (FF) grid nodes
-      with the surface of rigid body
-      @param FF the fluid field */
-      void compute_grid_intersection_with_rigidbody (
-                                          FV_DiscreteField const* FF
-                                        , size_t_vector const* void_fraction
-                                        , size_t_array2D* intersect_vector
-                                        , doubleArray2D* intersect_distance
-                                        , doubleArray2D* intersect_fieldValue
-                                        , size_t const& parID);
-      /** @brief Returns rigid body velocity including rotation speed at pt
-      @param pt the point */
-      geomVector rigid_body_velocity( geomVector const& pt ) const;
 
       /** @brief Write the surface discretization points of all RB in
       respective CSV files */

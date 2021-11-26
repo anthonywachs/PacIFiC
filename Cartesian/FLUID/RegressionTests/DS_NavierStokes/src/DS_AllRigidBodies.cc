@@ -62,7 +62,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   compute_void_fraction_on_grid(PF);
   compute_void_fraction_on_grid(UF);
 
-  compute_grid_intersection_with_rigidbody();
+  compute_grid_intersection_with_rigidbody(PF);
+  compute_grid_intersection_with_rigidbody(UF);
 
 }
 
@@ -247,7 +248,7 @@ geomVector DS_AllRigidBodies:: rigid_body_velocity( size_t const& parID,
 {
   MAC_LABEL( "DS_RigidBody:: rigid_body_velocity(pt)" ) ;
 
-  return (m_allDSrigidbodies[parID]->rigid_body_velocity(pt));
+  return (m_allDSrigidbodies[parID]->get_rigid_body_velocity(pt));
 
 }
 
@@ -391,26 +392,137 @@ void DS_AllRigidBodies:: compute_halo_zones_for_all_rigid_body( )
 
 
 //---------------------------------------------------------------------------
-void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody( )
+void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
+                                                   FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody" ) ;
 
-  for (size_t i = 0; i < m_nrb; ++i) {
-     m_allDSrigidbodies[i]->
-      compute_grid_intersection_with_rigidbody(PF
-                                              ,void_fraction[0]
-                                              ,intersect_vector[0]
-                                              ,intersect_distance[0]
-                                              ,intersect_fieldValue[0]
-                                              ,i);
-     m_allDSrigidbodies[i]->
-      compute_grid_intersection_with_rigidbody(UF
-                                              ,void_fraction[1]
-                                              ,intersect_vector[1]
-                                              ,intersect_distance[1]
-                                              ,intersect_fieldValue[1]
-                                              ,i);
+  size_t nb_comps = FF->nb_components() ;
+  size_t dim = FF->primary_grid()->nb_space_dimensions() ;
+  size_t field = (FF == PF) ? 0 : 1 ;
+
+  boolVector const* periodic_comp =
+                        FF->primary_grid()->get_periodic_directions();
+
+  for (size_t parID = 0; parID < m_nrb; ++parID) {
+     vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
+                                                   ->get_rigid_body_haloZone();
+     size_t_vector min_unknown_index(3,0);
+     size_t_vector max_unknown_index(3,0);
+     size_t_vector min_nearest_index(3,0);
+     size_t_vector max_nearest_index(3,0);
+     size_t_vector ipos(3,0);
+     size_t_array2D local_extents(3,2,0);
+     size_t i0_temp = 0;
+
+     double delta = FF->primary_grid()->get_smallest_grid_size();
+
+     for (size_t comp = 0; comp < nb_comps; comp++) {
+
+        for (size_t dir = 0; dir < dim; dir++) {
+          // To include knowns at dirichlet boundary in the intersection
+          // calculation as well, modification to the looping extents are required
+          min_unknown_index(dir) =
+                              FF->get_min_index_unknown_on_proc( comp, dir );
+          max_unknown_index(dir) =
+                              FF->get_max_index_unknown_on_proc( comp, dir );
+          local_extents(dir,0) = 0;
+          local_extents(dir,1) = max_unknown_index(dir)
+                               - min_unknown_index(dir);
+
+          bool is_periodic = periodic_comp->operator()( dir );
+
+          double domain_min =
+                  FF->primary_grid()->get_main_domain_min_coordinate(dir);
+          double domain_max =
+                  FF->primary_grid()->get_main_domain_max_coordinate(dir);
+          bool found =
+                  FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir)
+                                 , haloZone[0]->operator()(dir)
+                                 , i0_temp) ;
+          size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
+          found = FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir )
+                                  , haloZone[1]->operator()(dir)
+                                  , i0_temp) ;
+          size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
+
+          if (is_periodic &&
+              ((haloZone[1]->operator()(dir) > domain_max)
+          || (haloZone[0]->operator()(dir) < domain_min))) {
+              index_min = min_unknown_index(dir);
+              index_max = max_unknown_index(dir);
+          }
+
+          min_nearest_index(dir) = MAC::max(min_unknown_index(dir),index_min);
+          max_nearest_index(dir) = MAC::min(max_unknown_index(dir),index_max);
+
+        }
+
+        max_nearest_index(2) = (dim == 2) ? 1 : max_nearest_index(2);
+
+        for (size_t i = min_nearest_index(0); i < max_nearest_index(0); ++i) {
+          ipos(0) = i - min_unknown_index(0);
+          double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
+          for (size_t j = min_nearest_index(1); j < max_nearest_index(1); ++j) {
+              ipos(1) = j - min_unknown_index(1);
+              double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
+              for (size_t k = min_nearest_index(2);k < max_nearest_index(2); ++k) {
+                 ipos(2) = k - min_unknown_index(2);
+                 double zC = (dim == 2) ? 0
+                                        : FF->get_DOF_coordinate( k, comp, 2 );
+
+                 size_t p = FF->DOF_local_number(i,j,k,comp);
+                 geomVector source(xC,yC,zC);
+
+                 if (void_fraction[field]->operator()(p) == 0) {
+                    for (size_t dir = 0; dir < dim; dir++) {
+                       for (size_t off = 0; off < 2; off++) {
+                          size_t col = 2*dir + off;
+
+                          geomVector rayDir(0.,0.,0.);
+                          rayDir(dir) = (off == 0) ? -1 : 1 ;
+
+                          // Checking if the nodes are on domain boundary or not,
+                          // if so, the check the intersection only on one side
+                          if (ipos(dir) != local_extents(dir,off)) {
+                            geomVector ineigh((double)i,(double)j,(double)k);
+
+                            ineigh += rayDir;
+
+                            size_t neigh_num = FF->DOF_local_number(
+                           (size_t)ineigh(0),(size_t)ineigh(1),(size_t)ineigh(2)
+                                                                         ,comp);
+
+                            if (void_fraction[field]->operator()(neigh_num)
+                                                                  == parID+1) {
+                               double t = m_allDSrigidbodies[parID]
+                                    ->get_distanceTo( source, rayDir, delta );
+                               // Storing the direction with RB intersection
+                               intersect_vector[field]->operator()(p,col) = 1;
+                               // Storing the intersection distance
+                               intersect_distance[field]->operator()(p,col) = t;
+                               // Calculate the variable values on the
+                               // intersection of grid and solid
+                               geomVector netVel =
+                                rigid_body_velocity(parID, source + t * rayDir);
+                               // Value of variable at the surface of particle
+                               if ( nb_comps == 1) { // i.e. PF
+                                  intersect_fieldValue[field]->operator()(p,col)
+                                                                 = netVel(dir);
+                               } else { // i.e. UF
+                                  intersect_fieldValue[field]->operator()(p,col)
+                                                                 = netVel(comp);
+                               }
+                            }
+                          }
+                       }
+                    }
+                 }
+              }
+           }
+        }
+     }
   }
 
 }
