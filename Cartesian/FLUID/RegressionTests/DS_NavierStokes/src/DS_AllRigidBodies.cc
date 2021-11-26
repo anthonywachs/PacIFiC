@@ -51,15 +51,16 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   build_solid_variables_on_grid();
 
-  initialize_surface_variables_for_all_RB();
-
-  compute_surface_variables_for_all_RB();
-
-  write_surface_discretization_for_all_RB();
+  // initialize_surface_variables_for_all_RB();
+  //
+  // compute_surface_variables_for_all_RB();
+  //
+  // write_surface_discretization_for_all_RB();
 
   compute_halo_zones_for_all_rigid_body();
 
-  compute_void_fraction_on_grid();
+  compute_void_fraction_on_grid(PF);
+  compute_void_fraction_on_grid(UF);
 
   compute_grid_intersection_with_rigidbody();
 
@@ -293,18 +294,82 @@ DS_RigidBody const* DS_AllRigidBodies:: get_ptr_rigid_body( size_t i ) const
 
 
 //---------------------------------------------------------------------------
-void DS_AllRigidBodies:: compute_void_fraction_on_grid( )
+void DS_AllRigidBodies:: compute_void_fraction_on_grid(
+                                                FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_AllRigidBodies:: compute_void_fraction_on_grid" ) ;
 
-  for (size_t i = 0; i < m_nrb; ++i) {
-     m_allDSrigidbodies[i]->
-            compute_void_fraction_on_grid(PF,void_fraction[0],i);
-     m_allDSrigidbodies[i]->
-            compute_void_fraction_on_grid(UF,void_fraction[1],i);
-  }
+  size_t nb_comps = FF->nb_components() ;
+  size_t field = (FF == PF) ? 0 : 1 ;
+  size_t dim = FF->primary_grid()->nb_space_dimensions() ;
 
+  boolVector const* periodic_comp =
+                        FF->primary_grid()->get_periodic_directions();
+
+  // Get local min and max indices;
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
+
+  size_t i0_temp = 0;
+
+  for (size_t parID = 0; parID < m_nrb; ++parID) {
+     vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
+                                                   ->get_rigid_body_haloZone();
+     // Calculation on the indexes near the rigid body
+     for (size_t comp = 0; comp < nb_comps; ++comp) {
+        for (size_t dir = 0; dir < dim; ++dir) {
+           // Calculations for solids on the total unknown on the proc
+           min_unknown_index(dir) =
+                   FF->get_min_index_unknown_on_proc( comp, dir );
+           max_unknown_index(dir) =
+                   FF->get_max_index_unknown_on_proc( comp, dir );
+
+           bool is_periodic = periodic_comp->operator()( dir );
+           double domain_min =
+                   FF->primary_grid()->get_main_domain_min_coordinate( dir );
+           double domain_max =
+                   FF->primary_grid()->get_main_domain_max_coordinate( dir );
+
+           bool found =FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+                                       , haloZone[0]->operator()(dir)
+                                       , i0_temp) ;
+           size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
+
+
+           found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+                                   , haloZone[1]->operator()(dir)
+                                   , i0_temp) ;
+           size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
+
+           if (is_periodic &&
+              ((haloZone[1]->operator()(dir) > domain_max)
+            || (haloZone[0]->operator()(dir) < domain_min))) {
+              index_min = min_unknown_index(dir);
+              index_max = max_unknown_index(dir);
+           }
+
+           min_unknown_index(dir) = MAC::max(min_unknown_index(dir),index_min);
+           max_unknown_index(dir) = MAC::min(max_unknown_index(dir),index_max);
+
+        }
+
+        for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+           double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
+           for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+             double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
+             for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+                 double zC = (dim == 2) ? 0.
+                                     : FF->get_DOF_coordinate( k, comp, 2 ) ;
+                 size_t p = FF->DOF_local_number(i,j,k,comp);
+
+                 if (m_allDSrigidbodies[parID]->isIn(xC,yC,zC))
+                    void_fraction[field]->operator()(p) = 1 + parID;
+             }
+           }
+        }
+     }
+  }
 }
 
 

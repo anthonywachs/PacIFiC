@@ -163,8 +163,9 @@ class DS_AllRigidBodies
       void compute_halo_zones_for_all_rigid_body( );
 
       /** @brief Computes the void fraction on the grid nodes
-      of a given fluid field */
-      void compute_void_fraction_on_grid( );
+      of a given fluid field
+      @param FF the fluid field (PF, UF) */
+      void compute_void_fraction_on_grid( FV_DiscreteField const* FF );
 
       /** @brief Computes the intersection of grid nodes of a given fluid field
       with the nearest rigid body of a given fluid field */

@@ -53,6 +53,13 @@ class DS_RigidBody
       virtual void update() = 0;
       //@}
 
+   //-- Get Methods
+      /**@name Get methods */
+      //@{
+      /** @brief Return the halo zones of the rigid body */
+      vector<geomVector*> get_rigid_body_haloZone( ) const;
+      //@}
+
    //-- Methods
 
       /**@name Methods */
@@ -109,13 +116,6 @@ class DS_RigidBody
       surface in approximately equal areas (if possible)
       @param Np number of points on rigid body surface */
       virtual void compute_surface_points( ) = 0;
-
-      /** @brief Computes the void fraction on the fluid grid nodes
-      and store the values in its corresponding void fraction variable
-      @param FF the fluid field */
-      void compute_void_fraction_on_grid( FV_DiscreteField const* FF
-                                        , size_t_vector* void_fraction
-                                        , size_t const& parID );
 
       /** @brief Computes the intersection of field (FF) grid nodes
       with the surface of rigid body
