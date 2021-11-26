@@ -300,9 +300,9 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid( )
 
   for (size_t i = 0; i < m_nrb; ++i) {
      m_allDSrigidbodies[i]->
-            compute_void_fraction_on_grid(PF,void_fraction[0],rb_ID[0],i);
+            compute_void_fraction_on_grid(PF,void_fraction[0],i);
      m_allDSrigidbodies[i]->
-            compute_void_fraction_on_grid(UF,void_fraction[1],rb_ID[1],i);
+            compute_void_fraction_on_grid(UF,void_fraction[1],i);
   }
 
 }
@@ -420,14 +420,6 @@ void DS_AllRigidBodies:: build_solid_variables_on_grid(  )
    void_fraction[0]->re_initialize(PF_LOC_UNK);
    void_fraction[1]->re_initialize(UF_LOC_UNK);
 
-   // ID of rigid body on the computational grid, if present
-   // For PF and UF
-   rb_ID.reserve(2);
-   rb_ID.push_back(new size_t_vector(1,0));
-   rb_ID.push_back(new size_t_vector(1,0));
-   rb_ID[0]->re_initialize(PF_LOC_UNK);
-   rb_ID[1]->re_initialize(UF_LOC_UNK);
-
    // Intersection parameters on the computational grid
    // For PF and UF
    intersect_vector.reserve(2);
@@ -459,20 +451,6 @@ size_t_vector* DS_AllRigidBodies:: get_void_fraction_on_grid(
   size_t field = (FF == PF) ? 0 : 1;
 
   return (void_fraction[field]);
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-size_t_vector* DS_AllRigidBodies:: get_rigidbodyIDs_on_grid(
-                                                FV_DiscreteField const* FF )
-//---------------------------------------------------------------------------
-{
-  size_t field = (FF == PF) ? 0 : 1;
-
-  return (rb_ID[field]);
 
 }
 

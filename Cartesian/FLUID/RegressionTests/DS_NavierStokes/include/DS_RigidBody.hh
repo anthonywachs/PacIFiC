@@ -115,7 +115,6 @@ class DS_RigidBody
       @param FF the fluid field */
       void compute_void_fraction_on_grid( FV_DiscreteField const* FF
                                         , size_t_vector* void_fraction
-                                        , size_t_vector* rb_ID
                                         , size_t const& parID );
 
       /** @brief Computes the intersection of field (FF) grid nodes

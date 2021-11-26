@@ -128,7 +128,6 @@ void DS_RigidBody:: compute_surface_integrals_hydro_force_torque(
 //---------------------------------------------------------------------------
 void DS_RigidBody:: compute_void_fraction_on_grid( FV_DiscreteField const* FF
                                                  , size_t_vector* void_fraction
-                                                 , size_t_vector* rb_ID
                                                  , size_t const& parID )
 //---------------------------------------------------------------------------
 {
@@ -191,10 +190,8 @@ void DS_RigidBody:: compute_void_fraction_on_grid( FV_DiscreteField const* FF
                                   : FF->get_DOF_coordinate( k, comp, 2 ) ;
               size_t p = FF->DOF_local_number(i,j,k,comp);
 
-              if (isIn(xC,yC,zC)) {
+              if (isIn(xC,yC,zC))
                  void_fraction->operator()(p) = 1 + parID;
-                 rb_ID->operator()(p) = parID;
-              }
            }
         }
      }

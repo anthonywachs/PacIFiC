@@ -5636,7 +5636,6 @@ DDS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list
 
   // Vector for solid presence
   size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-  size_t_vector* parID = allrigidbodies->get_rigidbodyIDs_on_grid(UF);
 
   for (size_t comp = 0; comp < nb_comps[1]; comp++) {
      // Get local min and max indices
@@ -5663,7 +5662,7 @@ DDS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list
               geomVector pt(xC,yC,zC);
               size_t p = UF->DOF_local_number(i,j,k,comp);
               if (void_frac->operator()(p) != 0) {
-                 size_t par_id = parID->operator()(p);
+                 size_t par_id = void_frac->operator()(p) - 1;
                  geomVector rb_vel = allrigidbodies->rigid_body_velocity(par_id,pt);
                  for (size_t level : list)
                   UF->set_DOF_value( i, j, k, comp, level,rb_vel(comp));
