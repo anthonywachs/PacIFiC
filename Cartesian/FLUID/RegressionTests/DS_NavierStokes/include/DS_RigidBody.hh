@@ -73,6 +73,14 @@ class DS_RigidBody
                              geomVector const& rayDir,
                              double const& delta ) const;
 
+      /** @brief Return the surface points on the rigid body */
+      vector<geomVector*> get_rigid_body_surface_points( ) const;
+
+      /** @brief Return the area of the surface points on the rigid body */
+      vector<geomVector*> get_rigid_body_surface_areas( ) const;
+
+      /** @brief Return the normal of the surface points on the rigid body */
+      vector<geomVector*> get_rigid_body_surface_normals( ) const;
 
       //@}
 
@@ -126,6 +134,12 @@ class DS_RigidBody
       @param Np number of points on rigid body surface */
       virtual void compute_surface_points( ) = 0;
 
+      /** @brief Compute number of points on a rigid body
+      @param surface_cell_scale scale of surface cell compared with the grid
+      @param dx grid size */
+      virtual void compute_number_of_surface_variables(
+               double const& surface_cell_scale, double const& dx ) = 0;
+
       /** @brief Write the surface discretization points of all RB in
       respective CSV files */
       void write_surface_discretization( const std::string& file );
@@ -173,7 +187,7 @@ class DS_RigidBody
     	geometric rigid body */
       vector<geomVector*> m_surface_points; /**< vector of points distributed on
       	the surface of the particle to compute surface integrals */
-      vector<double> m_surface_area; /**< vector of the area associated
+      vector<geomVector*> m_surface_area; /**< vector of the area associated
          with the points distributed on the surface of the particle */
       vector<geomVector*> m_surface_normal; /**< vector of the normal associated
          with the points distributed on the surface of the particle */

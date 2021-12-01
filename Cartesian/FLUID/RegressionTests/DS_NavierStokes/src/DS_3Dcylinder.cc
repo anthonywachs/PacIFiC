@@ -168,9 +168,9 @@ void DS_3Dcylinder:: compute_surface_points(  )
                               , pagp->cylinder_radius*Rring(i)*MAC::sin(theta));
         // For top disk
         m_surface_points[j]->operator=(point);
-        m_surface_area[j] = 0.5*pagp->cylinder_radius
-                               *pagp->cylinder_radius
-                               *d_theta*(pow(Ri,2)-pow(Rring(i-1),2));
+        m_surface_area[j]->operator()(0) = 0.5*pagp->cylinder_radius
+                                        *pagp->cylinder_radius
+                                        *d_theta*(pow(Ri,2)-pow(Rring(i-1),2));
 
      	  // For bottom disk
         m_surface_points[maxby2+j]->operator=(point_mirror);
@@ -202,9 +202,9 @@ void DS_3Dcylinder:: compute_surface_points(  )
                               , pagp->cylinder_radius*Rring(0)*MAC::sin(theta));
         // For top disk
         m_surface_points[j]->operator=(point);
-        m_surface_area[j] = 0.5*pagp->cylinder_radius
-                               *pagp->cylinder_radius
-                               *d_theta*pow(Ri,2);
+        m_surface_area[j]->operator()(0) = 0.5*pagp->cylinder_radius
+                                          *pagp->cylinder_radius
+                                          *d_theta*pow(Ri,2);
         // For bottom disk
         m_surface_points[maxby2+j]->operator=(point_mirror);
         m_surface_area[maxby2+j] = m_surface_area[j];
@@ -217,9 +217,9 @@ void DS_3Dcylinder:: compute_surface_points(  )
      geomVector normal(0., pagp->cylinder_height*1./2., 0.);
      // For top disk
      m_surface_points[0]->operator=(normal);
-     m_surface_area[0] = 0.5*pagp->cylinder_radius
-                            *pagp->cylinder_radius
-                            *d_theta*pow(Ri,2.);
+     m_surface_area[0]->operator()(0) = 0.5*pagp->cylinder_radius
+                                       *pagp->cylinder_radius
+                                       *d_theta*pow(Ri,2.);
      // For bottom disk
      m_surface_points[maxby2]->operator=(-1.*normal);
      m_surface_area[maxby2] = m_surface_area[0];
@@ -252,7 +252,7 @@ void DS_3Dcylinder:: compute_surface_points(  )
                          , 0.
                          , pagp->cylinder_radius*MAC::sin(theta));
         m_surface_points[n]->operator=(point);
-        m_surface_area[n] = cell_area;
+        m_surface_area[n]->operator()(0) = cell_area;
         m_surface_normal[n]->operator=(normal);
      }
   }

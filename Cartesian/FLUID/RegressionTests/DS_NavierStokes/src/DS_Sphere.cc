@@ -186,8 +186,8 @@ void DS_Sphere:: compute_surface_points( )
                                , pagp->radius*MAC::sin(theta)*MAC::sin(eta(i)));
 
         m_surface_points[j]->operator=(point);
-        m_surface_area[j] = pagp->radius*pagp->radius*
-                            (0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
+        m_surface_area[j]->operator()(0) = pagp->radius*pagp->radius*
+                              (0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
         // For second half of sphere
         m_surface_points[maxby2+j]->operator=(mirror_point);
         m_surface_area[maxby2+j] = m_surface_area[j];
@@ -220,7 +220,8 @@ void DS_Sphere:: compute_surface_points( )
                                , pagp->radius*MAC::sin(theta)*MAC::sin(eta(0)));
 
         m_surface_points[j]->operator=(point);
-        m_surface_area[j] = pagp->radius*pagp->radius*0.5*d_theta*pow(Ri,2.);
+        m_surface_area[j]->operator()(0) =
+                              pagp->radius*pagp->radius*0.5*d_theta*pow(Ri,2.);
 
         // For second half of sphere
         m_surface_points[maxby2+j]->operator=(mirror_point);
@@ -235,7 +236,8 @@ void DS_Sphere:: compute_surface_points( )
      geomVector mirror_point( -pagp->radius*1., 0., 0.);
 
      m_surface_points[0]->operator=(point);
-     m_surface_area[0] = pagp->radius*pagp->radius*0.5*d_theta*pow(Ri,2.);
+     m_surface_area[0]->operator()(0) =
+                              pagp->radius*pagp->radius*0.5*d_theta*pow(Ri,2.);
 
      //  For second half of sphere
      m_surface_points[maxby2]->operator=(mirror_point);
