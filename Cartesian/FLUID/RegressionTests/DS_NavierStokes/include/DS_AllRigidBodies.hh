@@ -202,6 +202,41 @@ class DS_AllRigidBodies
 
       /** @brief Write the surface variables for all rigid bodies */
       void write_surface_discretization_for_all_RB( );
+
+      /** @brief Return the sum of interpolated field for all
+      given list of levels on a point in 2D plane including
+      the corrections near the solid interface
+      @param FF field to interpolate
+      @param comp component of the field to interpolate
+      @param point coordinate where the field is interpolated
+      @param face_vec Inplane vector of the 2D plane
+      @param level vector of field levels to be interpolated   */
+      double Bilinear_interpolation ( FV_DiscreteField const* FF
+                                    , size_t const& comp
+                                    , geomVector const* pt
+                                    , size_t_vector const& i0
+                                    , size_t_vector const& face_vec
+                                    , vector<size_t> const& list);
+
+      /** @brief Return the sum of interpolated field for all
+      given list of levels on a point in 3D box including
+      the corrections near the solid interface
+      @param FF field to interpolate
+      @param comp component of the field to interpolate
+      @param point coordinate where the field is interpolated
+      @param level vector of field levels to be interpolated   */
+      double Trilinear_interpolation ( FV_DiscreteField const* FF
+                                     , size_t const& comp
+                                     , geomVector const* pt
+                                     , size_t_vector const& i0
+                                     , vector<size_t> const& list);
+
+      /** @brief Calculate the first order pressure force and torque on parID
+      @param parID rigid body ID */
+      void first_order_pressure_stress( size_t const& parID );
+
+      /** @brief Calculate the pressure force and torque on all rigib bodies */
+      void compute_pressure_force_and_torque_for_allRB ();
       //@}
 
 
@@ -252,6 +287,14 @@ class DS_AllRigidBodies
       to node point */
       vector<doubleArray2D*> intersect_fieldValue; /**< Value of field variable
       at the intersection */
+      vector<geomVector> pressure_force; /**< Value of force due to
+      pressure stress on rigid bodies */
+      vector<geomVector> viscous_force; /**< Value of force due to
+      viscous stress on rigid bodies */
+      vector<geomVector> pressure_torque; /**< Value of torque due to
+      pressure stress on rigid bodies */
+      vector<geomVector> viscous_torque; /**< Value of torque due to
+      viscous stress on rigid bodies */
 
       //@}
 

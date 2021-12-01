@@ -144,35 +144,15 @@ class DS_RigidBody
       respective CSV files */
       void write_surface_discretization( const std::string& file );
 
-      /** @brief Calculates the first order pressure force on a rigid body
-      using bilinear(2D) or trilinear(3D) interpolation
-      @param FF pressure field
-      @param force pointer to the geomVector to store force on RB
-      @param torque pointer to the geomVector to store torque on RB */
-      void first_order_pressure_force( FV_DiscreteField const* FF
-                                      , geomVector* force
-                                      , geomVector* torque);
-
-      /** @brief Return the sum of interpolated field for all
-      given list of levels on a point in 2D plane including
-      the corrections near the solid interface
-      @param FF field to interpolate
-      @param comp component of the field to interpolate
-      @param point coordinate where the field is interpolated
-      @param face_vec Inplane vector of the 2D plane
-      @param level vector of field level to be interpolated   */
-      double Bilinear_interpolation ( FV_DiscreteField const* FF
-                                    , size_t const& comp
-                                    , geomVector const& point
-                                    , geomVector const& face_vec
-                                    , size_t_vector const* void_fraction
-                                    , size_t_array2D* intersect_vector
-                                    , doubleArray2D* intersect_distance
-                                    , doubleArray2D* intersect_fieldValue
-                                    , size_t const& level);
       /** @brief Initializa the surface variables for a rigid body
       such as points, normals, and area */
       void initialize_surface_variables( );
+
+      /** @brief Update the pressure force a surface point with the geomVector
+      @param i index of the surface point
+      @param value the value to assign for pressure force */
+      void update_Pforce_on_surface_point( size_t const& i
+                                         , geomVector const& value );
 
       //@}
 

@@ -55,7 +55,6 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   compute_surface_variables_for_all_RB();
 
-  write_surface_discretization_for_all_RB();
 
   compute_halo_zones_for_all_rigid_body();
 
@@ -65,6 +64,9 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   compute_grid_intersection_with_rigidbody(PF);
   compute_grid_intersection_with_rigidbody(UF);
 
+  compute_pressure_force_and_torque_for_allRB( );
+
+  write_surface_discretization_for_all_RB();
 }
 
 
@@ -181,6 +183,16 @@ void DS_AllRigidBodies:: compute_hydro_force_torque( FV_DiscreteField const* PP,
 
 
 
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: compute_pressure_force_and_torque_for_allRB( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: compute_pressure_force_and_torque" ) ;
+
+  for (size_t i = 0; i < m_nrb; ++i)
+    first_order_pressure_stress(i);
+
+}
 
 
 
@@ -341,7 +353,6 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
   size_t nb_comps = FF->nb_components() ;
   size_t field = (FF == PF) ? 0 : 1 ;
-  size_t dim = FF->primary_grid()->nb_space_dimensions() ;
 
   boolVector const* periodic_comp =
                         FF->primary_grid()->get_periodic_directions();
@@ -357,7 +368,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
                                                    ->get_rigid_body_haloZone();
      // Calculation on the indexes near the rigid body
      for (size_t comp = 0; comp < nb_comps; ++comp) {
-        for (size_t dir = 0; dir < dim; ++dir) {
+        for (size_t dir = 0; dir < m_space_dimension; ++dir) {
            // Calculations for solids on the total unknown on the proc
            min_unknown_index(dir) =
                    FF->get_min_index_unknown_on_proc( comp, dir );
@@ -398,7 +409,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
            for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
              double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
              for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-                 double zC = (dim == 2) ? 0.
+                 double zC = (m_space_dimension == 2) ? 0.
                                      : FF->get_DOF_coordinate( k, comp, 2 ) ;
                  size_t p = FF->DOF_local_number(i,j,k,comp);
 
@@ -437,7 +448,6 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
   MAC_LABEL( "DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody" ) ;
 
   size_t nb_comps = FF->nb_components() ;
-  size_t dim = FF->primary_grid()->nb_space_dimensions() ;
   size_t field = (FF == PF) ? 0 : 1 ;
 
   boolVector const* periodic_comp =
@@ -458,7 +468,7 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
 
      for (size_t comp = 0; comp < nb_comps; comp++) {
 
-        for (size_t dir = 0; dir < dim; dir++) {
+        for (size_t dir = 0; dir < m_space_dimension; dir++) {
           // To include knowns at dirichlet boundary in the intersection
           // calculation as well, modification to the looping extents are required
           min_unknown_index(dir) =
@@ -497,7 +507,8 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
 
         }
 
-        max_nearest_index(2) = (dim == 2) ? 1 : max_nearest_index(2);
+        max_nearest_index(2) = (m_space_dimension == 2) ? 1
+                                                        : max_nearest_index(2);
 
         for (size_t i = min_nearest_index(0); i < max_nearest_index(0); ++i) {
           ipos(0) = i - min_unknown_index(0);
@@ -507,14 +518,14 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
               double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
               for (size_t k = min_nearest_index(2);k < max_nearest_index(2); ++k) {
                  ipos(2) = k - min_unknown_index(2);
-                 double zC = (dim == 2) ? 0
+                 double zC = (m_space_dimension == 2) ? 0
                                         : FF->get_DOF_coordinate( k, comp, 2 );
 
                  size_t p = FF->DOF_local_number(i,j,k,comp);
                  geomVector source(xC,yC,zC);
 
                  if (void_fraction[field]->operator()(p) == 0) {
-                    for (size_t dir = 0; dir < dim; dir++) {
+                    for (size_t dir = 0; dir < m_space_dimension; dir++) {
                        for (size_t off = 0; off < 2; off++) {
                           size_t col = 2*dir + off;
 
@@ -588,6 +599,428 @@ void DS_AllRigidBodies:: initialize_surface_variables_for_all_RB( )
 
 
 //---------------------------------------------------------------------------
+void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DS_AllRigidBodies:: first_order_pressure_stress" ) ;
+
+  boolVector const* periodic_comp =
+                        PF->primary_grid()->get_periodic_directions();
+
+  size_t comp = 0;
+
+  size_t_vector min_unknown_index(m_space_dimension,0);
+  size_t_vector max_unknown_index(m_space_dimension,0);
+  // Domain length and minimum
+  geomVector domain_length(3), domain_min(3);
+  // Extents on the currect processor
+  geomVector Dmin(3), Dmax(3);
+  vector<geomVector*> surface_point = m_allDSrigidbodies[parID]
+                                          ->get_rigid_body_surface_points();
+  vector<geomVector*> surface_normal = m_allDSrigidbodies[parID]
+                                          ->get_rigid_body_surface_normals();
+  vector<geomVector*> surface_area = m_allDSrigidbodies[parID]
+                                          ->get_rigid_body_surface_areas();
+
+
+  // Get local min and max indices
+  // One extra grid cell needs to considered, since ghost points can be
+  // located in between the min/max index handled by the proc
+  for (size_t l = 0; l < m_space_dimension; l++) {
+     min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l );
+     max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l );
+     Dmin(l) = PF->primary_grid()->get_min_coordinate_on_current_processor( l );
+     Dmax(l) = PF->primary_grid()->get_max_coordinate_on_current_processor( l );
+     domain_length(l) = PF->primary_grid()->get_main_domain_max_coordinate( l )
+                      - PF->primary_grid()->get_main_domain_min_coordinate( l );
+     domain_min(l) = PF->primary_grid()->get_main_domain_min_coordinate( l );
+  }
+
+  for (size_t i = 0; i < surface_area.size(); i++) {
+     double stress = 0.;
+   	// Displacement correction in case of periodic
+      // boundary condition in any direction
+  //    for (size_t dir=0;dir<m_space_dimension;dir++) {
+  //       bool is_periodic = periodic_comp->operator()( dir );
+  //       if (is_periodic)
+  //          surface_point[i]->operator()(dir) = surface_point[i]->operator()(dir)
+  //                                - MAC::floor((surface_point[i]->operator()(dir)
+  //                                                             - domain_min(dir))
+  //                                   / domain_length(dir))*domain_length(dir);
+  //    }
+  //
+     // Check it the point is in the current domain
+     bool status = (surface_point[i]->operator()(0) > Dmin(0))
+                && (surface_point[i]->operator()(0) <= Dmax(0))
+                && (surface_point[i]->operator()(1) > Dmin(1))
+                && (surface_point[i]->operator()(1) <= Dmax(1))
+                && (surface_point[i]->operator()(2) > Dmin(2))
+                && (surface_point[i]->operator()(2) <= Dmax(2));
+
+     if (status) {
+        // Finding the grid indexes next to ghost point
+        size_t i0_temp;
+        size_t_vector i0(3,0);
+        bool found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,0)
+                                 , surface_point[i]->operator()(0), i0_temp);
+        if (found == 1) i0(0) = i0_temp;
+
+        found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,1)
+                                 , surface_point[i]->operator()(1), i0_temp);
+        if (found == 1) i0(1) = i0_temp;
+
+        if (m_space_dimension == 3) {
+           found = FV_Mesh::between(PF->get_DOF_coordinates_vector(comp,2)
+                                 , surface_point[i]->operator()(2), i0_temp);
+           if (found == 1) i0(2) = i0_temp;
+        }
+        // Calculation of field variable on ghost point
+        size_t_vector face_vector(3,0);
+        face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
+        double press = (m_space_dimension == 2) ?
+         Bilinear_interpolation(PF,comp,surface_point[i],i0,face_vector,{0,1}) :
+         Trilinear_interpolation(PF,comp,surface_point[i],i0,{0,1}) ;
+        stress = - press/2.;
+     }
+
+     // Ref: Keating thesis Pg-85
+     // point_coord*(area) --> Component of area in particular direction
+     geomVector value(3);
+     double norm = surface_normal[i]->calcNorm();
+     value(0) = stress*surface_normal[i]->operator()(0)/norm
+                      *surface_area[i]->operator()(0);
+     value(1) = stress*surface_normal[i]->operator()(1)/norm
+                      *surface_area[i]->operator()(0);
+     value(2) = stress*surface_normal[i]->operator()(2)/norm
+                      *surface_area[i]->operator()(0);
+
+     m_allDSrigidbodies[parID]->update_Pforce_on_surface_point(i,value);
+
+     pressure_force[parID] += value;
+
+     pressure_torque[parID] += surface_point[i]->operator^(value);
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
+                                                   , size_t const& comp
+                                                   , geomVector const* pt
+                                                   , size_t_vector const& i0
+                                                   , vector<size_t> const& list)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_AllRigidBodies:: Trilinear_interpolation" ) ;
+
+   vector<size_t_vector> face_vec;
+   face_vec.reserve(3);
+   size_t_vector vvv(3,0);
+   face_vec.push_back(vvv);
+   face_vec.push_back(vvv);
+   face_vec.push_back(vvv);
+   face_vec[0](0) = 0; face_vec[0](1) = 1; face_vec[0](2) = 1;
+   face_vec[1](0) = 1; face_vec[1](1) = 0; face_vec[1](2) = 1;
+   face_vec[2](0) = 1; face_vec[2](1) = 1; face_vec[2](2) = 0;
+   double dh = FF->primary_grid()->get_smallest_grid_size();
+   double value = 0.;
+   geomVector netVel(3);
+   geomVector pt_at_face(3);
+   int in_RB = -1;
+
+   for (size_t face_norm = 0; face_norm < 3; face_norm++) {
+      geomVector rayDir(3);
+      double dl = 0., dr = 0.;
+      double fl = 0., fr = 0.;
+
+      // Left face
+      size_t_vector i0_left = i0;
+      pt_at_face = *pt;
+      pt_at_face(face_norm) = FF->get_DOF_coordinate(i0_left(face_norm)
+                                                   , comp
+                                                   , face_norm);
+      rayDir(face_norm) = -1.;
+
+      in_RB = (FF == UF) ? isIn_any_RB(pt_at_face) : -1 ;
+
+      if (in_RB != -1) {
+         dl = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
+         netVel = rigid_body_velocity(in_RB, *pt + dl * rayDir);
+         fl = netVel(comp);
+      } else {
+         fl = Bilinear_interpolation(FF, comp, &pt_at_face, i0_left
+                                             , face_vec[face_norm], list);
+         dl = MAC::abs(pt_at_face(face_norm) - pt->operator()(face_norm));
+      }
+
+      // Right face
+      size_t_vector i0_right = i0;
+      i0_right(face_norm) += 1;
+      pt_at_face = *pt;
+      pt_at_face(face_norm) = FF->get_DOF_coordinate(i0_right(face_norm)
+                                                   , comp
+                                                   , face_norm);
+      rayDir(face_norm) = 1.;
+
+      in_RB = (FF == UF) ? isIn_any_RB(pt_at_face) : -1 ;
+
+      if (in_RB != -1) {
+         dr = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
+         netVel = rigid_body_velocity(in_RB, *pt + dr * rayDir);
+         fr = netVel(comp);
+      } else {
+         fr = Bilinear_interpolation(FF, comp, &pt_at_face, i0_right
+                                             , face_vec[face_norm], list);
+         dr = MAC::abs(pt_at_face(face_norm) - pt->operator()(face_norm));
+      }
+
+      value += (dr*fl + dl*fr)/(dl + dr);
+
+   }
+
+   value *= (1./3.);
+
+   return(value);
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
+                                                , size_t const& comp
+                                                , geomVector const* pt
+                                                , size_t_vector const& i0
+                                                , size_t_vector const& face_vec
+                                                , vector<size_t> const& list)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_RigidBody:: Bilinear_interpolation" ) ;
+
+   size_t field = (FF == PF) ? 0 : 1;
+   double dh = FF->primary_grid()->get_smallest_grid_size();
+
+
+   size_t_array2D p(2,2,0);
+   // arrays of vertex indexes of the cube/square
+   size_t_array2D ix(2,2,0);
+   size_t_array2D iy(2,2,0);
+   size_t_array2D iz(2,2,0);
+   // Min and max of the cell containing ghost point
+   doubleArray2D extents(m_space_dimension,2,0);
+   // Field value at vertex of face
+   doubleArray2D f(2,2,0);
+   // Interpolated values at the walls
+   doubleArray2D fwall(2,2,0);
+   // Distance of grid/particle walls from the ghost point
+   doubleArray2D del_wall(2,2,0);
+
+   // Direction in the plane of face
+   size_t dir1=0, dir2=0;
+
+   if (face_vec(0) == 0) {
+      ix(0,0) = i0(0),     iy(0,0) = i0(1),    iz(0,0) = i0(2);
+      ix(1,0) = i0(0),     iy(1,0) = i0(1),    iz(1,0) = i0(2)+1;
+      ix(0,1) = i0(0),     iy(0,1) = i0(1)+1,  iz(0,1) = i0(2);
+      ix(1,1) = i0(0),     iy(1,1) = i0(1)+1,  iz(1,1) = i0(2)+1;
+      dir1 = 2, dir2 = 1;
+   } else if (face_vec(1) == 0) {
+      ix(0,0) = i0(0),     iy(0,0) = i0(1),    iz(0,0) = i0(2);
+      ix(1,0) = i0(0)+1,   iy(1,0) = i0(1),    iz(1,0) = i0(2);
+      ix(0,1) = i0(0),     iy(0,1) = i0(1),    iz(0,1) = i0(2)+1;
+      ix(1,1) = i0(0)+1,   iy(1,1) = i0(1),    iz(1,1) = i0(2)+1;
+      dir1 = 0, dir2 = 2;
+   } else if (face_vec(2) == 0) {
+      ix(0,0) = i0(0),     iy(0,0) = i0(1),    iz(0,0) = i0(2);
+      ix(1,0) = i0(0)+1,   iy(1,0) = i0(1),    iz(1,0) = i0(2);
+      ix(0,1) = i0(0),     iy(0,1) = i0(1)+1,  iz(0,1) = i0(2);
+      ix(1,1) = i0(0)+1,   iy(1,1) = i0(1)+1,  iz(1,1) = i0(2);
+      dir1 = 0, dir2 = 1;
+   }
+
+   for (size_t i=0; i < 2; i++) {
+      for (size_t j=0; j < 2; j++) {
+         // Face vertex index
+         p(i,j) = FF->DOF_local_number( ix(i,j), iy(i,j), iz(i,j), comp);
+         // Vertex field values
+         for (size_t level : list)
+            f(i,j) += FF->DOF_value( ix(i,j), iy(i,j), iz(i,j), comp, level );
+      }
+   }
+
+   // Min and max coordinate in the grid cell
+   for (size_t dir = 0; dir < m_space_dimension; dir++) {
+      extents(dir,0) = FF->get_DOF_coordinate(i0(dir),comp,dir) ;
+      extents(dir,1) = FF->get_DOF_coordinate(i0(dir)+face_vec(dir),comp,dir) ;
+   }
+
+   // Contribution from left and right wall
+   for (size_t i = 0; i < 2; i++) {     // 0 --> left; 1 --> right
+      size_t col_top = 2*dir2 + 1;
+      size_t col_bot = 2*dir2 + 0;
+      if ((field == 0) || ((void_fraction[field]->operator()(p(i,0)) == 0)
+                        && (void_fraction[field]->operator()(p(i,1)) == 0))) {
+         fwall(0,i) = ((extents(dir2,1) - pt->operator()(dir2))*f(i,0)
+                     + (pt->operator()(dir2) - extents(dir2,0))*f(i,1))
+                     / (extents(dir2,1)-extents(dir2,0));
+         del_wall(0,i) = MAC::abs(extents(dir1,i) - pt->operator()(dir1));
+      // if bottom vertex is in fluid domain
+      } else if ((void_fraction[field]->operator()(p(i,0)) == 0)
+           && (intersect_vector[field]->operator()(p(i,0),col_top) == 1)) {
+         double yint = intersect_distance[field]->operator()(p(i,0),col_top);
+         // Condition where intersection distance is more than
+         // ghost point distance, it means that the ghost point
+         // can be projected on the cell wall
+         if (yint >= (pt->operator()(dir2)-extents(dir2,0))) {
+            fwall(0,i) = ((extents(dir2,0) + yint - pt->operator()(dir2))*f(i,0)
+                     + (pt->operator()(dir2) - extents(dir2,0))
+                     *intersect_fieldValue[field]->operator()(p(i,0),col_top))
+                     / yint;
+            del_wall(0,i) = MAC::abs(extents(dir1,i) - pt->operator()(dir1));
+         // Ghost point cannot be projected on the cell wall
+         // as the solid surface come first
+         } else {
+            size_t id = void_fraction[field]->operator()(p(i,1)) - 1;
+            geomVector rayDir(3);
+            rayDir(dir1) = (i == 0) ? -1 : 1 ;
+            del_wall(0,i) = m_allDSrigidbodies[id]
+                                       ->get_distanceTo( *pt, rayDir, dh );
+            geomVector surface_point = *pt + del_wall(0,i)*rayDir;
+            geomVector net_vel = rigid_body_velocity(id,surface_point);
+            fwall(0,i) = net_vel(comp);
+         }
+      // if top vertex is in fluid domain
+      } else if ((void_fraction[field]->operator()(p(i,1)) == 0)
+           && (intersect_vector[field]->operator()(p(i,1),col_bot) == 1)) {
+         double yint = intersect_distance[field]->operator()(p(i,1),col_bot);
+         // Condition where intersection distance is more than
+         // ghost point distance, it means that the ghost point
+         // can be projected on the cell wall
+         if (yint >= (extents(dir2,1)-pt->operator()(dir2))) {
+            fwall(0,i) = ((pt->operator()(dir2) + yint - extents(dir2,1))*f(i,1)
+                     + (extents(dir2,1) - pt->operator()(dir2))
+                     *intersect_fieldValue[field]->operator()(p(i,1),col_bot))
+                     / yint;
+            del_wall(0,i) = MAC::abs(extents(dir1,i) - pt->operator()(dir1));
+         // Ghost point cannot be projected on the cell wall
+         // as the solid surface come first
+         } else {
+            size_t id = void_fraction[field]->operator()(p(i,0)) - 1;
+            geomVector rayDir(3);
+            rayDir(dir1) = (i == 0) ? -1 : 1 ;
+            del_wall(0,i) = m_allDSrigidbodies[id]
+                                       ->get_distanceTo( *pt, rayDir, dh );
+            geomVector surface_point = *pt + del_wall(0,i)*rayDir;
+            geomVector net_vel = rigid_body_velocity(id,surface_point);
+            fwall(0,i) = net_vel(comp);
+         }
+      // if both vertex's are in solid domain
+      } else if ((void_fraction[field]->operator()(p(i,0)) != 0)
+              && (void_fraction[field]->operator()(p(i,1)) != 0)) {
+
+         size_t id = void_fraction[field]->operator()(p(i,0)) - 1;
+         geomVector rayDir(3);
+         rayDir(dir1) = (i == 0) ? -1 : 1 ;
+         del_wall(0,i) = m_allDSrigidbodies[id]
+                                       ->get_distanceTo( *pt, rayDir, dh );
+         geomVector surface_point = *pt + del_wall(0,i)*rayDir;
+         geomVector net_vel = rigid_body_velocity(id,surface_point);
+         fwall(0,i) = net_vel(comp);
+      }
+   }
+
+   // Contribution from top and bottom wall
+   for (size_t j = 0; j < 2; j++) {         // 0 --> bottom; 1 --> top
+      size_t col_right = 2*dir1 + 1;
+      size_t col_left = 2*dir1 + 0;
+      if ((field == 0) || ((void_fraction[field]->operator()(p(0,j)) == 0)
+                        && (void_fraction[field]->operator()(p(1,j)) == 0))) {
+         fwall(1,j) = ((extents(dir1,1) - pt->operator()(dir1)) * f(0,j)
+                     + (pt->operator()(dir1) - extents(dir1,0)) * f(1,j))
+                     / (extents(dir1,1) - extents(dir1,0));
+         del_wall(1,j) = MAC::abs(extents(dir2,j) - pt->operator()(dir2));
+      // if left vertex is in fluid domain
+      } else if ((void_fraction[field]->operator()(p(0,j)) == 0)
+           && (intersect_vector[field]->operator()(p(0,j),col_right) == 1)) {
+         double xint = intersect_distance[field]->operator()(p(0,j),col_right);
+         // Condition where intersection distance is more than
+         // ghost point distance, it means that the ghost point
+         // can be projected on the cell wall
+         if (xint >= (pt->operator()(dir1) - extents(dir1,0))) {
+            fwall(1,j) = ((extents(dir1,0) + xint - pt->operator()(dir1)) * f(0,j)
+                  + (pt->operator()(dir1) - extents(dir1,0))
+                  * intersect_fieldValue[field]->operator()(p(0,j),col_right))
+                  / xint;
+            del_wall(1,j) = MAC::abs(extents(dir2,j) - pt->operator()(dir2));
+         // Ghost point cannot be projected on the cell wall
+         // as the solid surface come first
+         } else {
+            size_t id = void_fraction[field]->operator()(p(1,j)) - 1;
+            geomVector rayDir(3);
+            rayDir(dir2) = (j == 0) ? -1 : 1 ;
+            del_wall(1,j) = m_allDSrigidbodies[id]
+                                       ->get_distanceTo( *pt, rayDir, dh );
+            geomVector surface_point = *pt + del_wall(1,j)*rayDir;
+            geomVector net_vel = rigid_body_velocity(id,surface_point);
+            fwall(1,j) = net_vel(comp);
+         }
+      // if right vertex is in fluid domain
+      } else if ((void_fraction[field]->operator()(p(1,j)) == 0)
+           && (intersect_vector[field]->operator()(p(1,j),col_left) == 1)) {
+
+         double xint = intersect_distance[field]->operator()(p(1,j),col_left);
+         // Condition where intersection distance is more than
+         // ghost point distance, it means that the ghost point
+         // can be projected on the cell wall
+         if (xint >= (extents(dir1,1) - pt->operator()(dir1))) {
+            fwall(1,j) = ((pt->operator()(dir1) + xint - extents(dir1,1)) * f(1,j)
+                     + (extents(dir1,1) - pt->operator()(dir1))
+                     * intersect_fieldValue[field]->operator()(p(1,j),col_left))
+                     / xint;
+            del_wall(1,j) = MAC::abs(extents(dir2,j) - pt->operator()(dir2));
+         // Ghost point cannot be projected on the cell wall
+         // as the solid surface come first
+         } else {
+            size_t id = void_fraction[field]->operator()(p(0,j)) - 1;
+            geomVector rayDir(3);
+            rayDir(dir2) = (j == 0) ? -1 : 1 ;
+            del_wall(1,j) = m_allDSrigidbodies[id]
+                                       ->get_distanceTo( *pt, rayDir, dh );
+            geomVector surface_point = *pt + del_wall(1,j)*rayDir;
+            geomVector net_vel = rigid_body_velocity(id,surface_point);
+            fwall(1,j) = net_vel(comp);
+         }
+      // if both vertex's are in solid domain
+   } else if ((void_fraction[field]->operator()(p(0,j)) != 0)
+              && (void_fraction[field]->operator()(p(1,j)) != 0)) {
+         size_t id = void_fraction[field]->operator()(p(0,j)) - 1 ;
+         geomVector rayDir(3);
+         rayDir(dir2) = (j == 0) ? -1 : 1 ;
+         del_wall(1,j) = m_allDSrigidbodies[id]
+                                       ->get_distanceTo( *pt, rayDir, dh );
+         geomVector surface_point = *pt + del_wall(1,j)*rayDir;
+         geomVector net_vel = rigid_body_velocity(id,surface_point);
+         fwall(1,j) = net_vel(comp);
+      }
+   }
+
+   double field_value = (1./2.)*((del_wall(0,1)*fwall(0,0)
+                                + del_wall(0,0)*fwall(0,1))
+                                / (del_wall(0,1)+del_wall(0,0))
+                               + (del_wall(1,0)*fwall(1,1)
+                                + del_wall(1,1)*fwall(1,0))
+                                / (del_wall(1,0)+del_wall(1,1)));
+
+   return (field_value);
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_AllRigidBodies:: compute_surface_variables_for_all_RB( )
 //---------------------------------------------------------------------------
 {
@@ -653,6 +1086,21 @@ void DS_AllRigidBodies:: build_solid_variables_on_grid(  )
    intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
    intersect_fieldValue[0]->re_initialize(PF_LOC_UNK,6);
    intersect_fieldValue[1]->re_initialize(UF_LOC_UNK,6);
+
+   // force variable for all the rigid bodies
+   viscous_force.reserve(m_nrb);
+   pressure_force.reserve(m_nrb);
+   viscous_torque.reserve(m_nrb);
+   pressure_torque.reserve(m_nrb);
+
+   geomVector vvv(3);
+
+   for (size_t i = 0; i < m_nrb; ++i) {
+      viscous_force.push_back( vvv );
+      pressure_force.push_back( vvv );
+      viscous_torque.push_back( vvv );
+      pressure_torque.push_back( vvv );
+   }
 
 }
 
