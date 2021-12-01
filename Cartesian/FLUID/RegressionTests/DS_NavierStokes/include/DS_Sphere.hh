@@ -66,11 +66,11 @@ class DS_Sphere: public DS_RigidBody
       surface in approximately equal areas (if possible) */
       void compute_surface_points( );
 
-      /** @brief Initiallize sphere variables
+      /** @brief Compute number of points on a sphere
       @param surface_cell_scale scale of surface cell compared with the grid
       @param dx grid size */
-      void initialize_surface_variables( double const& surface_cell_scale
-                                       , double const& dx );
+      void compute_number_of_surface_variables( double const& surface_cell_scale
+                                              , double const& dx );
 
 
       //@}

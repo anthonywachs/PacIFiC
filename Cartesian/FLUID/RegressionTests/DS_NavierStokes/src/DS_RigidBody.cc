@@ -154,119 +154,78 @@ geomVector DS_RigidBody:: get_rigid_body_velocity( geomVector const& pt ) const
 
 
 //---------------------------------------------------------------------------
+void DS_RigidBody:: initialize_surface_variables( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: initialize_surface_variables" ) ;
+
+  m_surface_points.reserve( Ntot );
+  m_surface_area.reserve( Ntot );
+  m_surface_normal.reserve( Ntot );
+  m_surface_Pforce.reserve( Ntot );
+  m_surface_Vforce.reserve( Ntot );
+
+  geomVector vvv(3);
+
+   for (size_t i = 0; i < Ntot; ++i) {
+      m_surface_points.push_back( new geomVector(3) );
+      m_surface_area.push_back( 0. );
+      m_surface_normal.push_back( new geomVector(3) );
+      m_surface_Pforce.push_back( vvv );
+      m_surface_Vforce.push_back( vvv );
+   }
+
+}
+
+
+
+
+// //---------------------------------------------------------------------------
+// vector<geomVector*> DS_RigidBody:: get_rigid_body_surface_points( ) const
+// //---------------------------------------------------------------------------
+// {
+//   MAC_LABEL( "DS_RigidBody:: get_rigid_body_surface_points" ) ;
+//
+//   return (&m_surface_points);
+//
+// }
+//
+//
+//
+//
+// //---------------------------------------------------------------------------
+// vector<geomVector*> DS_RigidBody:: get_rigid_body_surface_normals( ) const
+// //---------------------------------------------------------------------------
+// {
+//   MAC_LABEL( "DS_RigidBody:: get_rigid_body_surface_normals" ) ;
+//
+//   return (&m_surface_normal);
+//
+// }
+//
+//
+//
+//
+// //---------------------------------------------------------------------------
+// vector<double*> DS_RigidBody:: get_rigid_body_surface_areas( ) const
+// //---------------------------------------------------------------------------
+// {
+//   MAC_LABEL( "DS_RigidBody:: get_rigid_body_surface_areas" ) ;
+//
+//   return (&m_surface_area);
+//
+// }
+
+
+
+
+//---------------------------------------------------------------------------
 vector<geomVector*> DS_RigidBody:: get_rigid_body_haloZone( ) const
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_RigidBody:: get_rigid_body_haloZone" ) ;
 
   return (m_halo_zone);
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void DS_RigidBody:: write_surface_discretization( const std::string& file )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: write_surface_discretization()" ) ;
-
-  std::ofstream out;
-  out.open(file.c_str());
-  out << "x ,y ,z ,nx ,ny ,nz ,area" << endl;
-
-  for (size_t i = 0; i < m_surface_area.size(); i++) {
-     out << m_surface_points[i](0) << " ,"
-         << m_surface_points[i](1) << " ,"
-         << m_surface_points[i](2) << " ,"
-         << m_surface_normal[i](0) << " ,"
-         << m_surface_normal[i](1) << " ,"
-         << m_surface_normal[i](2) << " ,"
-         << m_surface_area[i] << endl;
-  }
-
-  out.close();
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void DS_RigidBody:: first_order_pressure_force( FV_DiscreteField const* FF
-                                               , geomVector* force
-                                               , geomVector* torque)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_RigidBody:: first_order_pressure_force" ) ;
-
-  size_t i0_temp;
-
-  size_t dim = FF->primary_grid()->nb_space_dimensions() ;
-  boolVector const* periodic_comp =
-                        FF->primary_grid()->get_periodic_directions();
-
-  size_t comp = 0;
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-  // Domain length and minimum
-  geomVector domain_length(3), domain_min(3);
-  // Extents on the currect processor
-  geomVector Dmin(3), Dmax(3);
-
-  // Get local min and max indices
-  // One extra grid cell needs to considered, since ghost points can be
-  // located in between the min/max index handled by the proc
-  for (size_t l = 0; l < dim; l++) {
-     min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l );
-     max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l );
-     Dmin(l) = FF->primary_grid()->get_min_coordinate_on_current_processor( l );
-     Dmax(l) = FF->primary_grid()->get_max_coordinate_on_current_processor( l );
-     domain_length(l) = FF->primary_grid()->get_main_domain_max_coordinate( l )
-                      - FF->primary_grid()->get_main_domain_min_coordinate( l );
-     domain_min(l) = FF->primary_grid()->get_main_domain_min_coordinate( l );
-  }
-
-  for (size_t i = 0; i < m_surface_area.size(); i++) {
-     double stress = 0.;
-   	// Displacement correction in case of periodic
-      // boundary condition in any direction
-     for (size_t dir=0;dir<dim;dir++) {
-        bool is_periodic = periodic_comp->operator()( dir );
-        if (is_periodic)
-           m_surface_points[i](dir) = m_surface_points[i](dir)
-                        - MAC::floor((m_surface_points[i](dir)
-                                    - domain_min(dir))
-                                    / domain_length(dir))*domain_length(dir);
-     }
-
-     // Check it the point is in the current domain
-     bool status = (m_surface_points[i](0) > Dmin(0))
-                && (m_surface_points[i](0) <= Dmax(0))
-                && (m_surface_points[i](1) > Dmin(1))
-                && (m_surface_points[i](1) <= Dmax(1))
-                && (m_surface_points[i](2) > Dmin(2))
-                && (m_surface_points[i](2) <= Dmax(2));
-
-     // if (status) {
-     //    // Calculation of field variable on ghost point(0,0)
-     //    size_t_vector face_vector(1,1,0);
-     //    // double press0 = (dim == 2) ?
-     //    double press0 = ghost_field_estimate_on_face (PF,comp,m_surface_points[i],face_vector,{0,1});
-     //    // ghost_field_estimate_in_box (PF,comp,m_surface_points[i],0.,{0,1},0);
-     //    stress = - press0/2.;
-     // }
-
-     // Ref: Keating thesis Pg-85
-     // point_coord*(area) --> Component of area in particular direction
-     m_surface_Pforce[i] = (stress,m_surface_normal[i])*m_surface_area[i];
-
-     *force += m_surface_Pforce[i];
-
-     *torque += m_surface_points[i]^m_surface_Pforce[i];
-  }
 
 }
 

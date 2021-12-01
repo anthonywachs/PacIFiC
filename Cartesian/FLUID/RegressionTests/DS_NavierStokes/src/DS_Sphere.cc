@@ -185,16 +185,16 @@ void DS_Sphere:: compute_surface_points( )
                                , pagp->radius*MAC::cos(theta)*MAC::sin(eta(i))
                                , pagp->radius*MAC::sin(theta)*MAC::sin(eta(i)));
 
-        m_surface_points[j] = point;
+        m_surface_points[j]->operator=(point);
         m_surface_area[j] = pagp->radius*pagp->radius*
                             (0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
         // For second half of sphere
-        m_surface_points[maxby2+j] = mirror_point;
+        m_surface_points[maxby2+j]->operator=(mirror_point);
         m_surface_area[maxby2+j] = m_surface_area[j];
 
   	     // Create surface normal vectors
-        m_surface_normal[j] = m_surface_points[j];
-  	     m_surface_normal[maxby2+j] = m_surface_points[maxby2+j];
+        m_surface_normal[j]->operator=(point);
+  	     m_surface_normal[maxby2+j]->operator=(mirror_point);
      }
   }
 
@@ -219,38 +219,38 @@ void DS_Sphere:: compute_surface_points( )
                                , pagp->radius*MAC::cos(theta)*MAC::sin(eta(0))
                                , pagp->radius*MAC::sin(theta)*MAC::sin(eta(0)));
 
-        m_surface_points[j] = point;
+        m_surface_points[j]->operator=(point);
         m_surface_area[j] = pagp->radius*pagp->radius*0.5*d_theta*pow(Ri,2.);
 
         // For second half of sphere
-        m_surface_points[maxby2+j] = mirror_point;
+        m_surface_points[maxby2+j]->operator=(mirror_point);
         m_surface_area[maxby2+j] = m_surface_area[j];
 
         // Create surface normal vectors
-        m_surface_normal[j] = m_surface_points[j];
-        m_surface_normal[maxby2+j] = m_surface_points[maxby2+j];
+        m_surface_normal[j]->operator=(point);
+        m_surface_normal[maxby2+j]->operator=(mirror_point);
      }
   } else {
      geomVector point( pagp->radius*1., 0., 0.);
      geomVector mirror_point( -pagp->radius*1., 0., 0.);
 
-     m_surface_points[0] = point;
+     m_surface_points[0]->operator=(point);
      m_surface_area[0] = pagp->radius*pagp->radius*0.5*d_theta*pow(Ri,2.);
 
      //  For second half of sphere
-     m_surface_points[maxby2] = mirror_point;
+     m_surface_points[maxby2]->operator=(mirror_point);
      m_surface_area[maxby2] = m_surface_area[0];
 
      // Create surface normal vectors
-     m_surface_normal[0] = m_surface_points[0];
-     m_surface_normal[maxby2] = m_surface_points[maxby2];
+     m_surface_normal[0]->operator=(point);
+     m_surface_normal[maxby2]->operator=(mirror_point);
   }
 
   // Translate and rotate
   for (size_t i = 0; i < m_surface_area.size(); i++) {
      m_geometric_rigid_body->rotate(m_surface_points[i]);
      m_geometric_rigid_body->rotate(m_surface_normal[i]);
-     m_surface_points[i].translate(*pgc);
+     m_surface_points[i]->translate(*pgc);
   }
 
 }
@@ -259,39 +259,23 @@ void DS_Sphere:: compute_surface_points( )
 
 
 //---------------------------------------------------------------------------
-void DS_Sphere:: initialize_surface_variables(
+void DS_Sphere:: compute_number_of_surface_variables(
                                           double const& surface_cell_scale
                                         , double const& dx)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_Sphere:: initialize_variable_for_each_rigidBody" ) ;
+  MAC_LABEL( "DS_Sphere:: compute_number_of_surface_variables" ) ;
 
   struct FS_Sphere_Additional_Param const* pagp =
    dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
       ->get_ptr_FS_Sphere_Additional_Param();
 
-  size_t Ntot = (size_t) (round(1./surface_cell_scale)
+  size_t temp = (size_t) (round(1./surface_cell_scale)
                *(4.*MAC::pi()*pagp->radius*pagp->radius)
                /(dx*dx));
 
   // Getting the nearest even number
-  Ntot = (size_t) (round((double)Ntot * 0.5) * 2.);
-
-  m_surface_points.reserve( Ntot );
-  m_surface_area.reserve( Ntot );
-  m_surface_normal.reserve( Ntot );
-  m_surface_Pforce.reserve( Ntot );
-  m_surface_Vforce.reserve( Ntot );
-
-  geomVector vvv(3);
-
-   for (size_t i = 0; i < Ntot; ++i) {
-      m_surface_points.push_back( vvv );
-      m_surface_area.push_back( 0. );
-      m_surface_normal.push_back( vvv );
-      m_surface_Pforce.push_back( vvv );
-      m_surface_Vforce.push_back( vvv );
-   }
+  Ntot = (size_t) (round((double)temp * 0.5) * 2.);
 
 }
 

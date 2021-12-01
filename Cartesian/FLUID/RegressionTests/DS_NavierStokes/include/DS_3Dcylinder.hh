@@ -67,11 +67,11 @@ class DS_3Dcylinder: public DS_RigidBody
       surface in approximately equal areas (if possible) */
       void compute_surface_points( );
 
-      /** @brief Initiallize 3D cylinder variables
+      /** @brief Compute number of points on a 3D cylinder
       @param surface_cell_scale scale of surface cell compared with the grid
       @param dx grid size */
-      void initialize_surface_variables( double const& surface_cell_scale
-                                       , double const& dx );
+      void compute_number_of_surface_variables( double const& surface_cell_scale
+                                              , double const& dx );
 
       //@}
 
@@ -83,7 +83,6 @@ class DS_3Dcylinder: public DS_RigidBody
       /**@name Parameters */
       //@{
       double Ndisk;
-      size_t Ntot;
       size_t Pmin = 3;
       double ar = 1.;
       //@}

@@ -91,13 +91,6 @@ class DS_RigidBody
       @param indent_width indentation width */
       virtual void compute_rigid_body_halozone( ) = 0;
 
-      /** @brief Initiallize rigid body variables, specfic to each rigid body
-      @param surface_cell_scale scale of surface cell compared with the grid
-      @param dx grid size */
-      virtual void initialize_surface_variables(
-                                       double const& surface_cell_scale
-                                     , double const& dx) = 0;
-
       /** @brief Returns whether a point is inside the rigid body
       @param pt the point */
       bool isIn( geomVector const& pt ) const;
@@ -163,6 +156,9 @@ class DS_RigidBody
                                     , doubleArray2D* intersect_distance
                                     , doubleArray2D* intersect_fieldValue
                                     , size_t const& level);
+      /** @brief Initializa the surface variables for a rigid body
+      such as points, normals, and area */
+      void initialize_surface_variables( );
 
       //@}
 
@@ -175,19 +171,20 @@ class DS_RigidBody
       //@{
       FS_RigidBody* m_geometric_rigid_body; /**< Pointer to the corresponding
     	geometric rigid body */
-      vector<geomVector> m_surface_points; /**< vector of points distributed on
+      vector<geomVector*> m_surface_points; /**< vector of points distributed on
       	the surface of the particle to compute surface integrals */
       vector<double> m_surface_area; /**< vector of the area associated
          with the points distributed on the surface of the particle */
-      vector<geomVector> m_surface_normal; /**< vector of the normal associated
+      vector<geomVector*> m_surface_normal; /**< vector of the normal associated
          with the points distributed on the surface of the particle */
       vector<geomVector> m_surface_Pforce; /**< vector of the pressure force
          on the points distributed on the surface of the particle */
       vector<geomVector> m_surface_Vforce; /**< vector of the viscous force
          on the points distributed on the surface of the particle */
-      //@}
       vector<geomVector*> m_halo_zone; /**< vector of min and max extents
          of rigid body halozone, required for void fraction detection */
+      size_t Ntot; /** < Stores the total number of surface points on a rigid
+         body */
       //@}
 
 

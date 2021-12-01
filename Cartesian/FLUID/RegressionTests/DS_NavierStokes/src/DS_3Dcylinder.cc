@@ -167,19 +167,19 @@ void DS_3Dcylinder:: compute_surface_points(  )
                               , pagp->cylinder_height*-1./2.
                               , pagp->cylinder_radius*Rring(i)*MAC::sin(theta));
         // For top disk
-        m_surface_points[j] = point;
+        m_surface_points[j]->operator=(point);
         m_surface_area[j] = 0.5*pagp->cylinder_radius
                                *pagp->cylinder_radius
                                *d_theta*(pow(Ri,2)-pow(Rring(i-1),2));
 
      	  // For bottom disk
-        m_surface_points[maxby2+j] = point_mirror;
+        m_surface_points[maxby2+j]->operator=(point_mirror);
         m_surface_area[maxby2+j] = m_surface_area[j];
 
         // Create surface normal vectors
         geomVector normal(0., pagp->cylinder_height*1./2., 0.);
-        m_surface_normal[j] = normal;
-        m_surface_normal[maxby2+j] = -1.*normal;
+        m_surface_normal[j]->operator=(normal);
+        m_surface_normal[maxby2+j]->operator=(-1.*normal);
      }
   }
 
@@ -201,31 +201,31 @@ void DS_3Dcylinder:: compute_surface_points(  )
                               , pagp->cylinder_height*-1./2.
                               , pagp->cylinder_radius*Rring(0)*MAC::sin(theta));
         // For top disk
-        m_surface_points[j] = point;
+        m_surface_points[j]->operator=(point);
         m_surface_area[j] = 0.5*pagp->cylinder_radius
                                *pagp->cylinder_radius
                                *d_theta*pow(Ri,2);
         // For bottom disk
-        m_surface_points[maxby2+j] = point_mirror;
+        m_surface_points[maxby2+j]->operator=(point_mirror);
         m_surface_area[maxby2+j] = m_surface_area[j];
         // Create surface normal vectors
         geomVector normal(0., pagp->cylinder_height*1./2., 0.);
-        m_surface_normal[j] = normal;
-        m_surface_normal[maxby2+j] = -1.*normal;
+        m_surface_normal[j]->operator=(normal);
+        m_surface_normal[maxby2+j]->operator=(-1.*normal);
      }
   } else {
      geomVector normal(0., pagp->cylinder_height*1./2., 0.);
      // For top disk
-     m_surface_points[0] = normal;
+     m_surface_points[0]->operator=(normal);
      m_surface_area[0] = 0.5*pagp->cylinder_radius
                             *pagp->cylinder_radius
                             *d_theta*pow(Ri,2.);
      // For bottom disk
-     m_surface_points[maxby2] = -1.*normal;
+     m_surface_points[maxby2]->operator=(-1.*normal);
      m_surface_area[maxby2] = m_surface_area[0];
      // Create surface normal vectors
-     m_surface_normal[0] = normal;
-     m_surface_normal[maxby2] = -1.*normal;
+     m_surface_normal[0]->operator=(normal);
+     m_surface_normal[maxby2]->operator=(-1.*normal);
   }
 
   // Generating one ring of points on cylindrical surface
@@ -251,9 +251,9 @@ void DS_3Dcylinder:: compute_surface_points(  )
         geomVector normal (pagp->cylinder_radius*MAC::cos(theta)
                          , 0.
                          , pagp->cylinder_radius*MAC::sin(theta));
-        m_surface_points[n] = point;
+        m_surface_points[n]->operator=(point);
         m_surface_area[n] = cell_area;
-        m_surface_normal[n] = normal;
+        m_surface_normal[n]->operator=(normal);
      }
   }
 
@@ -261,7 +261,7 @@ void DS_3Dcylinder:: compute_surface_points(  )
   for (size_t i = 0; i < m_surface_area.size(); i++) {
      m_geometric_rigid_body->rotate(m_surface_points[i]);
      m_geometric_rigid_body->rotate(m_surface_normal[i]);
-     m_surface_points[i].translate(*pgc);
+     m_surface_points[i]->translate(*pgc);
   }
 
 }
@@ -270,12 +270,12 @@ void DS_3Dcylinder:: compute_surface_points(  )
 
 
 //---------------------------------------------------------------------------
-void DS_3Dcylinder:: initialize_surface_variables(
+void DS_3Dcylinder:: compute_number_of_surface_variables(
                                           double const& surface_cell_scale
                                         , double const& dx )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_Sphere:: initialize_variable_for_each_rigidBody" ) ;
+  MAC_LABEL( "DS_3Dcylinder:: compute_number_of_surface_variables" ) ;
 
   struct FS_3Dcylinder_Additional_Param const* pagp =
    dynamic_cast<FS_3Dcylinder*>(m_geometric_rigid_body)
@@ -289,18 +289,6 @@ void DS_3Dcylinder:: initialize_surface_variables(
   double dh = 1. - MAC::sqrt(Npm1/Ndisk);
   double Nr = round((pagp->cylinder_height/pagp->cylinder_radius)/dh);
   Ntot = (size_t) (2*Ndisk + Nr*(Ndisk - Npm1));
-
-  m_surface_points.reserve( Ntot );
-  m_surface_area.reserve( Ntot );
-  m_surface_normal.reserve( Ntot );
-
-  geomVector vvv(3);
-
-  for (size_t i = 0; i < Ntot; ++i) {
-     m_surface_points.push_back( vvv );
-     m_surface_area.push_back( 0. );
-     m_surface_normal.push_back( vvv );
-  }
 
 }
 

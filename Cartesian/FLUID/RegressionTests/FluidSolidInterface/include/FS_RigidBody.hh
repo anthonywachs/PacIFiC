@@ -141,7 +141,7 @@ class FS_RigidBody
 
       /** @brief Rotate the pt using the rigid body rotation matrix
       @param pt the point to rotate */
-      void rotate(geomVector& pt);
+      void rotate(geomVector* pt);
       //@}
 
 
