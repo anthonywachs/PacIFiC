@@ -125,6 +125,18 @@ class DS_AllRigidBodies
       @param pt the point */
       bool isIn( size_t const& parID, geomVector const& pt ) const;
 
+      /** @brief Returns the parID if the point is inside parID
+      @param pt the point */
+      int isIn_any_RB( geomVector const& pt ) const;
+
+      /** @brief Returns the parID if the point is inside parID
+      @param x x-coordinate of the point
+      @param y x-coordinate of the point
+      @param z x-coordinate of the point */
+      int isIn_any_RB( double const& x,
+                        double const& y,
+                        double const& z ) const;
+
       /** @brief Returns whether a point is inside a rigid body
       @param parID particle ID to check for isIn
       @param x x-coordinate of the point

@@ -181,6 +181,44 @@ void DS_AllRigidBodies:: compute_hydro_force_torque( FV_DiscreteField const* PP,
 
 
 
+
+
+
+
+//---------------------------------------------------------------------------
+int DS_AllRigidBodies:: isIn_any_RB( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: isIn_any_RB(pt)" ) ;
+
+  for (size_t i = 0; i < m_nrb; ++i)
+     if (m_allDSrigidbodies[i]->isIn( pt )) return ((int)i);
+
+  return (-1);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+int DS_AllRigidBodies:: isIn_any_RB( double const& x,
+                                     double const& y,
+                                     double const& z ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: isIn_any_RB(x,y,z)" ) ;
+
+  for (size_t i = 0; i < m_nrb; ++i)
+     if (m_allDSrigidbodies[i]->isIn( x, y, z )) return ((int)i);
+
+  return (-1);
+
+}
+
+
+
+
 //---------------------------------------------------------------------------
 bool DS_AllRigidBodies:: isIn( size_t const& parID,
 		                         geomVector const& pt ) const
@@ -216,7 +254,7 @@ double DS_AllRigidBodies:: level_set_value( size_t const& parID,
 		                         geomVector const& pt ) const
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_AllRigidBodies:: isIn(pt)" ) ;
+  MAC_LABEL( "DS_AllRigidBodies:: level_set_value" ) ;
 
   return (m_allDSrigidbodies[parID]->level_set_value( pt ));
 
@@ -232,7 +270,7 @@ double DS_AllRigidBodies:: level_set_value( size_t const& parID,
                                double const& z ) const
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_AllRigidBodies:: isIn(x,y,z)" ) ;
+  MAC_LABEL( "DS_AllRigidBodies:: level_set_value" ) ;
 
   return (m_allDSrigidbodies[parID]->level_set_value( x, y, z ));
 
@@ -364,7 +402,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
                                      : FF->get_DOF_coordinate( k, comp, 2 ) ;
                  size_t p = FF->DOF_local_number(i,j,k,comp);
 
-                 if (m_allDSrigidbodies[parID]->isIn(xC,yC,zC))
+                 if (isIn(parID,xC,yC,zC))
                     void_fraction[field]->operator()(p) = 1 + parID;
              }
            }
@@ -539,8 +577,9 @@ void DS_AllRigidBodies:: initialize_surface_variables_for_all_RB( )
    double dx = UF->primary_grid()->get_smallest_grid_size();
 
    for (size_t i = 0; i < m_nrb; ++i) {
-      m_allDSrigidbodies[i]->initialize_surface_variables(surface_cell_scale
-                                                        , dx);
+      m_allDSrigidbodies[i]->compute_number_of_surface_variables(
+                                          surface_cell_scale, dx);
+      m_allDSrigidbodies[i]->initialize_surface_variables( );
    }
 
 }
