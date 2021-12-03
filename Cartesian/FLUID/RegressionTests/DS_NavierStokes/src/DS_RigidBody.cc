@@ -239,7 +239,21 @@ void DS_RigidBody:: update_Pforce_on_surface_point( size_t const& i
   MAC_LABEL( "DS_RigidBody:: update_Pforce_on_surface_point" ) ;
 
   m_surface_Pforce[i] = value;
-  
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_RigidBody:: update_Vforce_on_surface_point( size_t const& i
+                                                  , geomVector const& value )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: update_Vforce_on_surface_point" ) ;
+
+  m_surface_Vforce[i] = value;
+
 }
 
 
@@ -253,7 +267,7 @@ void DS_RigidBody:: write_surface_discretization( const std::string& file )
 
   std::ofstream out;
   out.open(file.c_str());
-  out << "x ,y ,z ,nx ,ny ,nz ,area ,Fpx ,Fpy ,Fpz " << endl;
+  out << "x ,y ,z ,nx ,ny ,nz ,area ,Fpx ,Fpy ,Fpz ,Fvx ,Fvy , Fvz " << endl;
 
   for (size_t i = 0; i < m_surface_area.size(); i++) {
      out << m_surface_points[i]->operator()(0) << " ,"
@@ -266,6 +280,9 @@ void DS_RigidBody:: write_surface_discretization( const std::string& file )
          << m_surface_Pforce[i](0) << " ,"
          << m_surface_Pforce[i](1) << " ,"
          << m_surface_Pforce[i](2) << " ,"
+         << m_surface_Vforce[i](0) << " ,"
+         << m_surface_Vforce[i](1) << " ,"
+         << m_surface_Vforce[i](2) << " ,"
          << endl;
   }
 

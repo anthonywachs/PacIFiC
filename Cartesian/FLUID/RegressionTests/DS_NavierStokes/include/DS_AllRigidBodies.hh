@@ -5,6 +5,7 @@
 #include <size_t_vector.hh>
 #include <size_t_array2D.hh>
 #include <doubleArray2D.hh>
+#include <boolArray2D.hh>
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -234,6 +235,10 @@ class DS_AllRigidBodies
       /** @brief Calculate the first order pressure force and torque on parID
       @param parID rigid body ID */
       void first_order_pressure_stress( size_t const& parID );
+
+      /** @brief Calculate the first order viscous force and torque on parID
+      @param parID rigid body ID */
+      void first_order_viscous_stress( size_t const& parID );
 
       /** @brief Calculate the pressure force and torque on all rigib bodies */
       void compute_pressure_force_and_torque_for_allRB ();

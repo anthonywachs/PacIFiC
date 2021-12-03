@@ -148,10 +148,16 @@ class DS_RigidBody
       such as points, normals, and area */
       void initialize_surface_variables( );
 
-      /** @brief Update the pressure force a surface point with the geomVector
+      /** @brief Update the pressure force on a surface point
       @param i index of the surface point
       @param value the value to assign for pressure force */
       void update_Pforce_on_surface_point( size_t const& i
+                                         , geomVector const& value );
+
+      /** @brief Update the viscous force on a surface point
+      @param i index of the surface point
+      @param value the value to assign for viscous force */
+      void update_Vforce_on_surface_point( size_t const& i
                                          , geomVector const& value );
 
       //@}
