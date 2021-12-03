@@ -203,16 +203,19 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
 
   geomVector rayVec = source + t * rayDir;
 
+  size_t max_iter = 100, iter = 0;
+
   // Find the point inside the rigid body
-  while (level_set_value (rayVec) > 0.) {
+  while ((level_set_value (rayVec) > 0.) && (iter <= max_iter)) {
+	  iter++;
 	  rayVec = source + t * rayDir;
-	  t += delta;
+	  t += delta/max_iter;
   }
 
   geomVector a = source, b = rayVec;
   geomVector c = source + delta * rayDir;
 
-  size_t max_iter = 500, iter = 0;
+  max_iter = 500; iter = 0;
 
   // Bisection method
   while (((a.calcDist(b)/delta) >= threshold) && (iter <= max_iter)) {
