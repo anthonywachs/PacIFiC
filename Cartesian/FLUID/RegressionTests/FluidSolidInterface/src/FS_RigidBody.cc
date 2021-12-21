@@ -196,24 +196,47 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
 {
   MAC_LABEL( "FS_RigidBody:: distanceTo" ) ;
 
-  tuple<bool,double,size_t> dist( false, 0., 0 );
-
   double t = 0.;
   double threshold = delta;
 
-  geomVector rayVec = source + t * rayDir;
+  geomVector rayVec(3);
+
+  // rayVec = source + t * rayDir;
+  rayVec(0) = source(0) + t * rayDir(0);
+  rayVec(1) = source(1) + t * rayDir(1);
+  rayVec(2) = source(2) + t * rayDir(2);
+
 
   size_t max_iter = 100, iter = 0;
 
   // Find the point inside the rigid body
   while ((level_set_value (rayVec) > 0.) && (iter <= max_iter)) {
 	  iter++;
-	  rayVec = source + t * rayDir;
+	  // rayVec = source + t * rayDir;
+	  rayVec(0) = source(0) + t * rayDir(0);
+	  rayVec(1) = source(1) + t * rayDir(1);
+	  rayVec(2) = source(2) + t * rayDir(2);
+
 	  t += delta/max_iter;
   }
 
-  geomVector a = source, b = rayVec;
-  geomVector c = source + delta * rayDir;
+  geomVector a(3), b(3), c(3);
+
+  // a = source;
+  a(0) = source(0);
+  a(1) = source(1);
+  a(2) = source(2);
+
+  // b = rayVec;
+  b(0) = rayVec(0);
+  b(1) = rayVec(1);
+  b(2) = rayVec(2);
+
+  // c = source + delta * rayDir ;
+  c(0) = source(0) + delta * rayDir(0);
+  c(1) = source(1) + delta * rayDir(1);
+  c(2) = source(2) + delta * rayDir(2);
+
 
   max_iter = 500; iter = 0;
 
@@ -225,7 +248,6 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
 	 // Check if middle point is root
 	 if (level_set_value (c) == 0.)
 		 break;
-
 	 // Decide the side to repeat the steps
 	 else if (level_set_value (c) * level_set_value (a) < 0)
 		  b = c;
@@ -239,7 +261,13 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
 					  << " calculation. Proceed with Caution !!!" << endl;
   }
 
-  return (source.calcDist(c));
+  double dist = 0.;
+  for (size_t i = 0; i < 3; ++i)
+	 dist += ( source(i) - c(i) ) * ( source(i) - c(i) );
+
+  return (MAC::sqrt(dist));
+
+  // return (source.calcDist(c));
 
 }
 
