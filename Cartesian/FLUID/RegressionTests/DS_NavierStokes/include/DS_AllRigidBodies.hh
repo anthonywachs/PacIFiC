@@ -163,14 +163,6 @@ class DS_AllRigidBodies
                               double const& y,
                               double const& z ) const;
 
-
-      /** @brief Computes the hydrodynamic force and torque acting on each rigid
-      body and store the values in its corresponding geometric rigid body
-      @param PP the pressure field
-      @param UU the velocity field */
-      void compute_hydro_force_torque( FV_DiscreteField const* PP,
-	                                    FV_DiscreteField const* UU );
-
       /** @brief Computes the halo zone for all rigid bodies, required for
       void fraction and intersection calculation on the grid nodes */
       void compute_halo_zones_for_all_rigid_body( );

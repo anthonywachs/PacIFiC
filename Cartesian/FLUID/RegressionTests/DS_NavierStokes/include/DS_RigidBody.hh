@@ -121,14 +121,6 @@ class DS_RigidBody
                             , double const& y
                             , double const& z ) const;
 
-      /** @brief Computes the hydrodynamic force and torque and stores the
-      values in the corresponding geometric rigid body
-      @param PP the pressure field
-      @param UU the velocity field */
-      virtual void compute_hydro_force_torque( FV_DiscreteField const* PP,
-	                                         FV_DiscreteField const* UU ) = 0;
-
-
       /** @brief Compute the surface points by discretizing the rigid body
       surface in approximately equal areas (if possible)
       @param Np number of points on rigid body surface */

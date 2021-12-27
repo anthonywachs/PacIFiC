@@ -169,21 +169,6 @@ void DS_AllRigidBodies:: display( ostream& out,
 
 
 //---------------------------------------------------------------------------
-void DS_AllRigidBodies:: compute_hydro_force_torque( FV_DiscreteField const* PP,
-	FV_DiscreteField const* UU )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_AllRigidBodies:: compute_hydro_force_torque" ) ;
-
-  for (size_t i = 0; i < m_nrb; ++i)
-    m_allDSrigidbodies[i]->compute_hydro_force_torque( PP, UU );
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
 void DS_AllRigidBodies:: compute_pressure_force_and_torque_for_allRB( )
 //---------------------------------------------------------------------------
 {
