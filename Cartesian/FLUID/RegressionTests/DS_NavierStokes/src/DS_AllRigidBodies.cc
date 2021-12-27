@@ -27,12 +27,14 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , bool const& b_particles_as_fixed_obstacles
                                   , FV_DiscreteField const* arb_UF
                                   , FV_DiscreteField const* arb_PF
-                                  , double const& arb_scs)
+                                  , double const& arb_scs
+                                  , MAC_Communicator const* arb_macCOMM)
 //---------------------------------------------------------------------------
   : m_space_dimension( dimens )
   , UF ( arb_UF )
   , PF ( arb_PF )
   , surface_cell_scale ( arb_scs )
+  , m_macCOMM ( arb_macCOMM )
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
@@ -179,6 +181,10 @@ void DS_AllRigidBodies:: compute_pressure_force_and_torque_for_allRB( )
   avg_pressure_force(2) = 0.;
 
   for (size_t i = 0; i < m_nrb; ++i) {
+     pressure_force[i](0) = 0.;
+     pressure_force[i](1) = 0.;
+     pressure_force[i](2) = 0.;
+
      first_order_pressure_stress(i);
 
      avg_pressure_force(0) += pressure_force[i](0);
@@ -203,25 +209,32 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
   avg_viscous_force(2) = 0.;
 
   for (size_t i = 0; i < m_nrb; ++i) {
+     viscous_force[i](0) = 0.;
+     viscous_force[i](1) = 0.;
+     viscous_force[i](2) = 0.;
+
      if (StressOrder == "first") {
         first_order_viscous_stress(i);
      } else if (StressOrder == "second") {
         second_order_viscous_stress(i);
      }
+
      avg_viscous_force(0) += viscous_force[i](0);
      avg_viscous_force(1) += viscous_force[i](1);
      avg_viscous_force(2) += viscous_force[i](2);
   }
 
-  std::cout << "Average pressure force on RB: "
-            << avg_pressure_force(0) / double(m_nrb) << " ,"
-            << avg_pressure_force(1) / double(m_nrb) << " ,"
-            << avg_pressure_force(2) / double(m_nrb) << endl;
+  if (m_macCOMM->rank() == 0) {
+     std::cout << "Average pressure force on RB: "
+               << avg_pressure_force(0) / double(m_nrb) << " ,"
+               << avg_pressure_force(1) / double(m_nrb) << " ,"
+               << avg_pressure_force(2) / double(m_nrb) << endl;
 
-  std::cout << "Average viscous force on RB: "
-            << avg_viscous_force(0) / double(m_nrb) << " ,"
-            << avg_viscous_force(1) / double(m_nrb) << " ,"
-            << avg_viscous_force(2) / double(m_nrb) << endl;
+     std::cout << "Average viscous force on RB: "
+               << avg_viscous_force(0) / double(m_nrb) << " ,"
+               << avg_viscous_force(1) / double(m_nrb) << " ,"
+               << avg_viscous_force(2) / double(m_nrb) << endl;
+  }
 
 }
 
@@ -727,6 +740,10 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
      // pressure_torque[parID] += surface_point[i]->operator^(value);
   }
 
+  pressure_force[parID](0) = m_macCOMM->sum(pressure_force[parID](0));
+  pressure_force[parID](1) = m_macCOMM->sum(pressure_force[parID](1));
+  pressure_force[parID](2) = m_macCOMM->sum(pressure_force[parID](2));
+
 }
 
 
@@ -1002,6 +1019,10 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
 
   }
 
+  viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
+  viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
+  viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
+
   // std::cout << parID << "," << viscous_force[parID](0)
   //                    << "," << viscous_force[parID](1)
   //                    << "," << viscous_force[parID](2) << endl;
@@ -1253,6 +1274,11 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
      // viscous_torque[parID] += surface_point[i]->operator^(value);
 
   }
+
+  viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
+  viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
+  viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
+
   // std::cout << parID << "," << viscous_force[parID](0)
   //                    << "," << viscous_force[parID](1)
   //                    << "," << viscous_force[parID](2) << endl;

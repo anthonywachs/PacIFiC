@@ -6,6 +6,7 @@
 #include <size_t_array2D.hh>
 #include <doubleArray2D.hh>
 #include <boolArray2D.hh>
+#include <MAC_Communicator.hh>
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -45,14 +46,16 @@ class DS_AllRigidBodies
       obstacles
       @param arb_UF Pointer to flow field UF
       @param arb_PF Pointer to flow field PF
-      @param surface_cell_scale scale of cell on the rigid body surface as
-      compared with the cell of computational grid */
+      @param arb_scs scale of cell on the rigid body surface as
+      compared with the cell of computational grid
+      @param arb_macCOMM communicator for MPI communications */
       DS_AllRigidBodies( size_t& dimens
                        , istream& in
                        , bool const& b_particles_as_fixed_obstacles
                        , FV_DiscreteField const* arb_UF
                        , FV_DiscreteField const* arb_PF
-                       , double const& arb_scs);
+                       , double const& arb_scs
+                       , MAC_Communicator const* arb_macCOMM);
 
       /** @brief Destructor */
       ~DS_AllRigidBodies();
@@ -329,6 +332,8 @@ class DS_AllRigidBodies
       pressure stress on rigid bodies */
       vector<geomVector> viscous_torque; /**< Value of torque due to
       viscous stress on rigid bodies */
+      MAC_Communicator const* m_macCOMM; /**< Variable for communication
+      between processors */
 
       //@}
 

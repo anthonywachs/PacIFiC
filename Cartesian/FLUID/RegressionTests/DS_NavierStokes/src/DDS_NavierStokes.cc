@@ -431,7 +431,8 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
                                             , b_particles_as_fixed_obstacles
                                             , UF
                                             , PF
-                                            , surface_cell_scale );
+                                            , surface_cell_scale
+                                            , macCOMM);
 
       if (my_rank == 0)
          cout << "Finished particle generation... \n" << endl;
