@@ -280,29 +280,3 @@ void DS_Sphere:: compute_number_of_surface_variables(
   Ntot = (size_t) (round((double)temp * 0.5) * 2.);
 
 }
-
-
-
-
-//---------------------------------------------------------------------------
-void DS_Sphere:: compute_hydro_force_torque( FV_DiscreteField const* PP,
-	FV_DiscreteField const* UU )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_Sphere:: compute_hydro_force_torque" ) ;
-
-  // Access additional geometric parameters of the sphere
-  struct FS_Sphere_Additional_Param const* pagp =
-  	dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
-		->get_ptr_FS_Sphere_Additional_Param();
-  MAC::out() << pagp->radius << endl; // example, delete later
-
-  // Determine the surface point coordinates
-  MAC::out() << "DS_Sphere:: compute_hydro_force_torque - "
-  	"Determining the set of surface points requires programming" << endl;
-
-  // Compute the surface integrals and stores the force & torque value in
-  // the corresponding geometric rigid body
-  compute_surface_integrals_hydro_force_torque( PP, UU );
-
-}

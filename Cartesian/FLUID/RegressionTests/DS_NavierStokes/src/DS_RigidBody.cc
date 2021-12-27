@@ -102,30 +102,6 @@ double DS_RigidBody:: level_set_value( double const& x
 
 
 //---------------------------------------------------------------------------
-void DS_RigidBody:: compute_surface_integrals_hydro_force_torque(
-      	FV_DiscreteField const* PP,
-	FV_DiscreteField const* UU )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: isIn(x,y,z)" ) ;
-
-  geomVector hydro_force(3), hydro_torque(3);
-
-  // Compute the surface intergals for the hydro force and torque
-  // based on the distributed surface points
-  MAC::out() << "DS_RigidBody:: compute_surface_integrals_hydro_force_torque - "
-  	"Actual computation requires programming" << endl;
-
-  // Store the values in the corresponding geometric sphere
-  m_geometric_rigid_body->set_hydro_force( hydro_force );
-  m_geometric_rigid_body->set_hydro_torque( hydro_torque );
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
 double DS_RigidBody:: get_distanceTo( geomVector const& source,
                                       geomVector const& rayDir,
                                       double const& delta ) const

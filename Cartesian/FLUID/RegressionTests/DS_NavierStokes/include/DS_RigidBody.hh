@@ -192,14 +192,7 @@ class DS_RigidBody
 
       /**@name Methods */
       //@{
-      /** @brief Performs numerical integration on the set of points distributed
-      on the surface to yield the hydrodynamic force and torque and stores the
-      values in the corresponding geometric rigid body
-      @param PP the pressure field
-      @param UU the velocity field */
-      void compute_surface_integrals_hydro_force_torque(
-      	                                   FV_DiscreteField const* PP,
-                                            FV_DiscreteField const* UU );
+
       //@}
 
 

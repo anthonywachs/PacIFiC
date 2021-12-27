@@ -51,13 +51,6 @@ class DS_Sphere: public DS_RigidBody
       @param indent_width indentation width */
       void display( ostream& out, size_t const& indent_width ) const;
 
-      /** @brief Computes the hydrodynamic force and torque and store the values
-      in the corresponding geometric sphere
-      @param PP the pressure field
-      @param UU the velocity field */
-      void compute_hydro_force_torque( FV_DiscreteField const* PP,
-	                                    FV_DiscreteField const* UU );
-
       /** @brief Computes the min and max extents of the sphere halozone
       , required for the computation of void fraction */
       void compute_rigid_body_halozone( );
