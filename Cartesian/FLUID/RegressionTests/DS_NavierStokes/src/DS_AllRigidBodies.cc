@@ -187,12 +187,56 @@ void DS_AllRigidBodies:: compute_hydro_force_torque( FV_DiscreteField const* PP,
 void DS_AllRigidBodies:: compute_pressure_force_and_torque_for_allRB( )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_AllRigidBodies:: compute_pressure_force_and_torque" ) ;
+  MAC_LABEL( "DS_AllRigidBodies::compute_pressure_force_and_torque_for_allRB") ;
+
+  avg_pressure_force(0) = 0.;
+  avg_pressure_force(1) = 0.;
+  avg_pressure_force(2) = 0.;
 
   for (size_t i = 0; i < m_nrb; ++i) {
      first_order_pressure_stress(i);
-     first_order_viscous_stress(i);
+
+     avg_pressure_force(0) += pressure_force[i](0);
+     avg_pressure_force(1) += pressure_force[i](1);
+     avg_pressure_force(2) += pressure_force[i](2);
   }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
+                                                string const& StressOrder )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB") ;
+
+  avg_viscous_force(0) = 0.;
+  avg_viscous_force(1) = 0.;
+  avg_viscous_force(2) = 0.;
+
+  for (size_t i = 0; i < m_nrb; ++i) {
+     if (StressOrder == "first") {
+        first_order_viscous_stress(i);
+     } else if (StressOrder == "second") {
+        second_order_viscous_stress(i);
+     }
+     avg_viscous_force(0) += viscous_force[i](0);
+     avg_viscous_force(1) += viscous_force[i](1);
+     avg_viscous_force(2) += viscous_force[i](2);
+  }
+
+  std::cout << "Average pressure force on RB: "
+            << avg_pressure_force(0) / double(m_nrb) << " ,"
+            << avg_pressure_force(1) / double(m_nrb) << " ,"
+            << avg_pressure_force(2) / double(m_nrb) << endl;
+
+  std::cout << "Average viscous force on RB: "
+            << avg_viscous_force(0) / double(m_nrb) << " ,"
+            << avg_viscous_force(1) / double(m_nrb) << " ,"
+            << avg_viscous_force(2) / double(m_nrb) << endl;
 
 }
 
@@ -472,7 +516,7 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
 
         for (size_t dir = 0; dir < m_space_dimension; dir++) {
           // To include knowns at dirichlet boundary in the intersection
-          // calculation as well, modification to the looping extents are required
+          // calculation as well, modification of the looping extents are required
           min_unknown_index(dir) =
                               FF->get_min_index_unknown_on_proc( comp, dir );
           max_unknown_index(dir) =
@@ -555,8 +599,13 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                                intersect_distance[field]->operator()(p,col) = t;
                                // Calculate the variable values on the
                                // intersection of grid and solid
+                               geomVector rayVec(3);
+                               rayVec(0) = source(0) + t * rayDir(0);
+                               rayVec(1) = source(1) + t * rayDir(1);
+                               rayVec(2) = source(2) + t * rayDir(2);
                                geomVector netVel =
-                                rigid_body_velocity(parID, source + t * rayDir);
+                                rigid_body_velocity(parID, rayVec);
+                                // rigid_body_velocity(parID, source + t * rayDir);
                                // Value of variable at the surface of particle
                                if ( nb_comps == 1) { // i.e. PF
                                   intersect_fieldValue[field]->operator()(p,col)
@@ -640,17 +689,7 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
 
   for (size_t i = 0; i < surface_area.size(); i++) {
      double stress = 0.;
-   	// Displacement correction in case of periodic
-      // boundary condition in any direction
-  //    for (size_t dir=0;dir<m_space_dimension;dir++) {
-  //       bool is_periodic = periodic_comp->operator()( dir );
-  //       if (is_periodic)
-  //          surface_point[i]->operator()(dir) = surface_point[i]->operator()(dir)
-  //                                - MAC::floor((surface_point[i]->operator()(dir)
-  //                                                             - domain_min(dir))
-  //                                   / domain_length(dir))*domain_length(dir);
-  //    }
-  //
+
      // Check it the point is in the current domain
      bool status = (surface_point[i]->operator()(0) > Dmin(0))
                 && (surface_point[i]->operator()(0) <= Dmax(0))
@@ -709,6 +748,285 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
 
 
 //---------------------------------------------------------------------------
+void
+DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DS_AllRigidBodies:: second_order_viscous_stress" ) ;
+
+  double mu = 1.;
+
+  size_t nb_comps = UF->nb_components() ;
+
+  vector<geomVector*> surface_point = m_allDSrigidbodies[parID]
+                                          ->get_rigid_body_surface_points();
+  vector<geomVector*> surface_normal = m_allDSrigidbodies[parID]
+                                          ->get_rigid_body_surface_normals();
+  vector<geomVector*> surface_area = m_allDSrigidbodies[parID]
+                                          ->get_rigid_body_surface_areas();
+
+  // 6 ghost points and 1 surface point
+  size_t_vector vvv(3,0);
+  vector<geomVector> ghost_pt(7,0);
+  vector<double> f(7,0.);
+  vector<size_t_vector> i0_new(7,vvv);
+  vector<int> in_parID(7,0);
+  vector<int> sign(3,0);
+  boolVector in_domain(7,true);
+  // Required for the call to Bisection in case of 2D domain
+  size_t_vector face_vector(3,0);
+  face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
+  vector<double> net_vel(3,0.);
+
+  size_t_vector min_unknown_index(m_space_dimension,0);
+  size_t_vector max_unknown_index(m_space_dimension,0);
+  // Domain length and minimum
+  geomVector domain_length(3), domain_min(3);
+  // Extents on the currect processor
+  geomVector Dmin(3), Dmax(3);
+
+  // Get local min and max indices
+  // One extra grid cell needs to considered, since ghost points can be
+  // located in between the min/max index handled by the proc
+  for (size_t l = 0; l < m_space_dimension; l++) {
+     Dmin(l) = UF->primary_grid()->get_min_coordinate_on_current_processor( l );
+     Dmax(l) = UF->primary_grid()->get_max_coordinate_on_current_processor( l );
+     domain_length(l) = UF->primary_grid()->get_main_domain_max_coordinate( l )
+                      - UF->primary_grid()->get_main_domain_min_coordinate( l );
+     domain_min(l) = UF->primary_grid()->get_main_domain_min_coordinate( l );
+  }
+
+  for (size_t i = 0; i < surface_area.size(); i++) {
+     ghost_pt[0] = *surface_point[i];
+     // Check it the point is in the current domain
+     in_domain(0) = (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
+                 && (ghost_pt[0](1) > Dmin(1)) && (ghost_pt[0](1) <= Dmax(1))
+                 && (ghost_pt[0](2) > Dmin(2)) && (ghost_pt[0](2) <= Dmax(2));
+
+     doubleVector stress(6,0.);
+
+     if (in_domain(0)) {
+
+        for (size_t l = 0; l < m_space_dimension; l++)
+           sign[l] = (surface_normal[i]->operator()(l) > 0.) ? 1 : -1 ;
+
+
+        for (size_t comp = 0; comp < nb_comps; comp++) {
+           // Finding the grid indexes next to ghost points
+           for (size_t l = 0; l < m_space_dimension; l++) {
+              size_t i0_temp;
+              bool found = FV_Mesh::between(
+                                 UF->get_DOF_coordinates_vector(comp,l),
+                                 ghost_pt[0](l),
+                                 i0_temp);
+              if (found) i0_new[0](l) = i0_temp;
+           }
+
+           // Ghost points generation in each direction
+           for (size_t dir = 0; dir < m_space_dimension; dir++) {
+              // 1,2,3,4,5,6 are x1, x2, y1, y2, z1, z2 points, respectively.
+              size_t col1 = 2*dir + 0 + 1;
+              size_t col2 = 2*dir + 1 + 1;
+              ghost_pt[col1] = *surface_point[i];
+              ghost_pt[col2] = *surface_point[i];
+
+              intVector i0_temp(2,0);
+
+              // Ghost points in i for the calculation of i-derivative of field
+              i0_temp(0) = (sign[dir] == 1) ? (int(i0_new[0](dir)) + 2*sign[dir])
+                                            : (int(i0_new[0](dir)) + 1*sign[dir]);
+              i0_temp(1) = (sign[dir] == 1) ? (int(i0_new[0](dir)) + 3*sign[dir])
+                                            : (int(i0_new[0](dir)) + 2*sign[dir]);
+
+              if ((i0_temp(0) >= 0) &&
+                  (i0_temp(0) < (int)UF->get_local_nb_dof(comp,dir))) {
+                 ghost_pt[col1](dir) = UF->get_DOF_coordinate(i0_temp(0), comp, dir);
+                 ghost_pt[col1](dir) += - MAC::floor((ghost_pt[col1](dir)
+                                                    -domain_min(dir))
+                                                   /domain_length(dir))
+                                       *domain_length(dir);
+                 in_domain(col1) = 1;
+              } else {
+                 in_domain(col1) = 0;
+              }
+              if ((i0_temp(1) >= 0) &&
+                  (i0_temp(1) < (int)UF->get_local_nb_dof(comp,dir))) {
+                 ghost_pt[col2](dir) = UF->get_DOF_coordinate(i0_temp(1), comp, dir);
+                 ghost_pt[col2](dir) += - MAC::floor((ghost_pt[col2](dir)
+                                                    -domain_min(dir))
+                                                   /domain_length(dir))
+                                       *domain_length(dir);
+                 in_domain(col2) = 1;
+              } else {
+                 in_domain(col2) = 0;
+              }
+
+              // Checking all the ghost points in the solid/fluid,
+              // and storing the parID if present in solid
+              in_parID[col1] = isIn_any_RB(ghost_pt[col1]);
+              in_parID[col2] = isIn_any_RB(ghost_pt[col2]);
+           }
+
+           // Get local min and max indices
+           for (size_t l = 0; l < m_space_dimension; l++) {
+              min_unknown_index(l) =
+                           UF->get_min_index_unknown_handled_by_proc( comp, l );
+              max_unknown_index(l) =
+                           UF->get_max_index_unknown_handled_by_proc( comp, l );
+           }
+
+           // Checking the grid indexes for each ghost point
+           for (size_t col = 1; col < 7; col++) {
+              for (size_t dir = 0; dir < m_space_dimension; dir++) {
+                 size_t i0_temp;
+                 bool found = FV_Mesh::between(
+                                       UF->get_DOF_coordinates_vector(comp,dir)
+                                     , ghost_pt[col](dir)
+                                     , i0_temp);
+                 if (found) i0_new[col](dir) = i0_temp;
+
+              }
+           }
+
+           // Calculation of field variable on the surface point i
+           geomVector netVel = rigid_body_velocity(parID, ghost_pt[0]);
+           f[0] = netVel(comp);
+
+           // Calculation of field variable on the ghost points
+           for (size_t dir = 0; dir < m_space_dimension; dir++) {
+              for (size_t ig = 0; ig < 2; ig++) {
+                 // 1,2,3,4,5,6 are x1, x2, y1, y2, z1, z2 points, respectively.
+                 size_t col = 2*dir + ig + 1;
+
+                 if ((in_parID[col] == -1) && in_domain(col)) {
+                    f[col] = (m_space_dimension == 2) ?
+                                       Biquadratic_interpolation(UF
+                                                           , comp
+                                                           , &ghost_pt[col]
+                                                           , i0_new[col]
+                                                           , (dir == 0) ? 1 : 0
+                                                           , sign[dir]
+                                                           , {0})
+                                     : Triquadratic_interpolation(UF
+                                                            , comp
+                                                            , &ghost_pt[col]
+                                                            , i0_new[col]
+                                                            , dir
+                                                            , sign
+                                                            , {0}) ;
+                 } else if ((in_parID[col] != -1) && in_domain(col)) {
+                    geomVector netVelg = rigid_body_velocity(in_parID[col]
+                                                           , ghost_pt[col]);
+                    f[col] = netVelg(comp);
+                 }
+              }
+           }
+
+           geomVector dfdi(3);
+
+           // Calculation of derivatives in each direction
+           for (size_t dir = 0; dir < m_space_dimension; dir++) {
+              size_t col1 = 2*dir + 1;
+              size_t col2 = 2*dir + 2;
+
+              // Point 1 and 2 in computational domain
+   	        if (in_domain(col1) && in_domain(col2)) {
+                 if ((in_parID[col1] == -1) && (in_parID[col2] == -1)) {
+                    double dx1 = ghost_pt[col1](dir) - ghost_pt[0](dir);
+                    double dx2 = ghost_pt[col2](dir) - ghost_pt[0](dir);
+                    dfdi(dir) = ((f[col1] - f[0])*dx2/dx1 - (f[col2] - f[0])*dx1/dx2)/(dx2-dx1);
+                 // Point 1 in fluid and 2 in the solid
+                 } else if ((in_parID[col1] == -1) && (in_parID[col2] != -1)) {
+                    double dx1 = ghost_pt[col1](dir) - ghost_pt[0](dir);
+                    dfdi(dir) = (f[col1] - f[0])/dx1;
+                 // Point 1 is present in solid
+                 } else if (in_parID[col1] != -1) {
+   	              double dx1 = ghost_pt[col1](dir) - ghost_pt[0](dir);
+                    dfdi(dir) = (f[col1] - f[0])/dx1;
+   	           }
+              // Point 1 in computational domain
+              } else if (in_domain(col1) && !in_domain(col2)) {
+                 double dx1 = ghost_pt[col1](dir) - ghost_pt[0](dir);
+                 dfdi(dir) = (f[col1] - f[0])/dx1;
+              // Particle close to wall
+              } else if (!in_domain(col1)) {
+                 i0_new[col1](dir) = (sign[dir] == 1) ? (i0_new[0](dir) + 1*sign[dir])
+                                                      : (i0_new[0](dir) + 0*sign[dir]);
+                 ghost_pt[col1](dir) = UF->get_DOF_coordinate(i0_new[col1](dir), comp, dir);
+                 f[col1] = (m_space_dimension == 2) ?
+                                         Biquadratic_interpolation(UF
+                                                             , comp
+                                                             , &ghost_pt[col1]
+                                                             , i0_new[col1]
+                                                             , (dir == 0) ? 1 : 0
+                                                             , sign[dir]
+                                                             , {0})
+                                       : Triquadratic_interpolation(UF
+                                                              , comp
+                                                              , &ghost_pt[col1]
+                                                              , i0_new[col1]
+                                                              , dir
+                                                              , sign
+                                                              , {0}) ;
+                 double dx1 = ghost_pt[col1](dir) - ghost_pt[0](dir);
+                 dfdi(dir) = (f[col1] - f[0])/dx1;
+              }
+
+              dfdi(dir) *= mu*sign[dir];
+           }
+
+           if (comp == 0) {
+              stress(0) = 2.*dfdi(0);
+              stress(3) = stress(3) + dfdi(1);
+              stress(5) = stress(5) + dfdi(2);
+           } else if (comp == 1) {
+              stress(1) = 2.*dfdi(1);
+              stress(3) = stress(3) + dfdi(0);
+              stress(4) = stress(4) + dfdi(2);
+           } else if (comp == 2) {
+              stress(2) = 2.*dfdi(2);
+              stress(4) = stress(4) + dfdi(1);
+              stress(5) = stress(5) + dfdi(0);
+           }
+        }
+     }
+
+     // Ref: Keating thesis Pg-85
+     // point_coord*(area) --> Component of area in particular direction
+     geomVector value(3);
+     value(0) = (stress(0)*surface_normal[i]->operator()(0)
+               + stress(3)*surface_normal[i]->operator()(1)
+               + stress(5)*surface_normal[i]->operator()(2))
+               * surface_area[i]->operator()(0);
+
+     value(1) = (stress(3)*surface_normal[i]->operator()(0)
+               + stress(1)*surface_normal[i]->operator()(1)
+               + stress(4)*surface_normal[i]->operator()(2))
+               * surface_area[i]->operator()(0);
+
+     value(2) = (stress(5)*surface_normal[i]->operator()(0)
+               + stress(4)*surface_normal[i]->operator()(1)
+               + stress(2)*surface_normal[i]->operator()(2))
+               * surface_area[i]->operator()(0);
+
+     m_allDSrigidbodies[parID]->update_Vforce_on_surface_point(i,value);
+
+     viscous_force[parID] += value;
+
+     // viscous_torque[parID] += surface_point[i]->operator^(value);
+
+  }
+
+  // std::cout << parID << "," << viscous_force[parID](0)
+  //                    << "," << viscous_force[parID](1)
+  //                    << "," << viscous_force[parID](2) << endl;
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
 //---------------------------------------------------------------------------
 {
@@ -727,10 +1045,10 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
                                           ->get_rigid_body_surface_areas();
 
   // 6 ghost points and 1 surface point
-  size_t_vector vvv(3,0);
   vector<geomVector> ghost_pt(7,0);
   vector<double> f(7,0.);
-  boolArray2D found_new(7,3,0);
+  boolArray2D found(7,3,0);
+  size_t_vector vvv(3,0);
   vector<size_t_vector> i0_new(7,vvv);
   vector<int> in_parID(7,0);
   boolVector in_domain(7,true);
@@ -760,12 +1078,13 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
 
   for (size_t i = 0; i < surface_area.size(); i++) {
      // Check it the point is in the current domain
-     bool status = (surface_point[i]->operator()(0) > Dmin(0))
-                && (surface_point[i]->operator()(0) <= Dmax(0))
-                && (surface_point[i]->operator()(1) > Dmin(1))
-                && (surface_point[i]->operator()(1) <= Dmax(1))
-                && (surface_point[i]->operator()(2) > Dmin(2))
-                && (surface_point[i]->operator()(2) <= Dmax(2));
+     ghost_pt[0] = *surface_point[i];
+     bool status = (ghost_pt[0](0) > Dmin(0))
+                && (ghost_pt[0](0) <= Dmax(0))
+                && (ghost_pt[0](1) > Dmin(1))
+                && (ghost_pt[0](1) <= Dmax(1))
+                && (ghost_pt[0](2) > Dmin(2))
+                && (ghost_pt[0](2) <= Dmax(2));
 
      doubleVector stress(6,0.);
 
@@ -803,11 +1122,11 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
            for (size_t col = 0; col < 7; col++) {
               for (size_t dir = 0; dir < m_space_dimension; dir++) {
                  size_t i0_temp;
-                 found_new(col,dir) = FV_Mesh::between(
+                 found(col,dir) = FV_Mesh::between(
                                        UF->get_DOF_coordinates_vector(comp,dir)
                                      , ghost_pt[col](dir)
                                      , i0_temp);
-                 if (found_new(col,dir) == 1) i0_new[col](dir) = i0_temp;
+                 if (found(col,dir) == 1) i0_new[col](dir) = i0_temp;
 
               }
            }
@@ -821,11 +1140,11 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
               for (size_t ig = 0; ig < 2; ig++) {
                  // 1,2,3,4,5,6 are x1, x2, y1, y2, z1, z2 points, respectively.
                  size_t col = 2*dir + ig + 1;
-                 in_domain(col) = (m_space_dimension == 2) ? found_new(col,0)
-                                                          && found_new(col,1)
-                                                           : found_new(col,0)
-                                                          && found_new(col,1)
-                                                          && found_new(col,2);
+                 in_domain(col) = (m_space_dimension == 2) ? found(col,0)
+                                                          && found(col,1)
+                                                           : found(col,0)
+                                                          && found(col,1)
+                                                          && found(col,2);
 
                  if ((in_parID[col] == -1) && in_domain(col)) {
                     f[col] = (m_space_dimension == 2) ?
@@ -885,11 +1204,11 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
 
                  for (size_t l = 0; l < m_space_dimension; l++) {
                     size_t i0_temp;
-                    bool found =
+                    bool found_temp =
                      FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,l)
                                     , pt(l)
                                     , i0_temp);
-                    if (found == 1) i0(l) = i0_temp;
+                    if (found_temp == 1) i0(l) = i0_temp;
                  }
                  f[col1] = (m_space_dimension == 2) ?
                                           Bilinear_interpolation(UF
@@ -949,9 +1268,9 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
      // viscous_torque[parID] += surface_point[i]->operator^(value);
 
   }
-  std::cout << parID << "," << viscous_force[parID](0)
-                     << "," << viscous_force[parID](1)
-                     << "," << viscous_force[parID](2) << endl;
+  // std::cout << parID << "," << viscous_force[parID](0)
+  //                    << "," << viscous_force[parID](1)
+  //                    << "," << viscous_force[parID](2) << endl;
 
 }
 
@@ -1001,7 +1320,12 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
 
       if (in_RB != -1) {
          dl = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
-         netVel = rigid_body_velocity(in_RB, *pt + dl * rayDir);
+         geomVector rayVec(3);
+         rayVec(0) = pt->operator()(0) + dl * rayDir(0);
+         rayVec(1) = pt->operator()(1) + dl * rayDir(1);
+         rayVec(2) = pt->operator()(2) + dl * rayDir(2);
+         netVel = rigid_body_velocity(in_RB, rayVec);
+         // rigid_body_velocity(in_RB, *pt + dl * rayDir);
          fl = netVel(comp);
       } else {
          fl = Bilinear_interpolation(FF, comp, &pt_at_face, i0_left
@@ -1022,7 +1346,12 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
 
       if (in_RB != -1) {
          dr = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
-         netVel = rigid_body_velocity(in_RB, *pt + dr * rayDir);
+         geomVector rayVec(3);
+         rayVec(0) = pt->operator()(0) + dr * rayDir(0);
+         rayVec(1) = pt->operator()(1) + dr * rayDir(1);
+         rayVec(2) = pt->operator()(2) + dr * rayDir(2);
+         netVel = rigid_body_velocity(in_RB, rayVec);
+         // rigid_body_velocity(in_RB, *pt + dr * rayDir);
          fr = netVel(comp);
       } else {
          fr = Bilinear_interpolation(FF, comp, &pt_at_face, i0_right
@@ -1141,7 +1470,10 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             rayDir(dir1) = (i == 0) ? -1 : 1 ;
             del_wall(0,i) = m_allDSrigidbodies[id]
                                        ->get_distanceTo( *pt, rayDir, dh );
-            geomVector surface_point = *pt + del_wall(0,i)*rayDir;
+            geomVector surface_point(3);// = *pt + del_wall(0,i)*rayDir;
+            surface_point(0) = pt->operator()(0) + del_wall(0,i)*rayDir(0);
+            surface_point(1) = pt->operator()(1) + del_wall(0,i)*rayDir(1);
+            surface_point(2) = pt->operator()(2) + del_wall(0,i)*rayDir(2);
             geomVector net_vel = rigid_body_velocity(id,surface_point);
             fwall(0,i) = net_vel(comp);
          }
@@ -1166,7 +1498,10 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             rayDir(dir1) = (i == 0) ? -1 : 1 ;
             del_wall(0,i) = m_allDSrigidbodies[id]
                                        ->get_distanceTo( *pt, rayDir, dh );
-            geomVector surface_point = *pt + del_wall(0,i)*rayDir;
+            geomVector surface_point(3);// = *pt + del_wall(0,i)*rayDir;
+            surface_point(0) = pt->operator()(0) + del_wall(0,i)*rayDir(0);
+            surface_point(1) = pt->operator()(1) + del_wall(0,i)*rayDir(1);
+            surface_point(2) = pt->operator()(2) + del_wall(0,i)*rayDir(2);
             geomVector net_vel = rigid_body_velocity(id,surface_point);
             fwall(0,i) = net_vel(comp);
          }
@@ -1179,7 +1514,10 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
          rayDir(dir1) = (i == 0) ? -1 : 1 ;
          del_wall(0,i) = m_allDSrigidbodies[id]
                                        ->get_distanceTo( *pt, rayDir, dh );
-         geomVector surface_point = *pt + del_wall(0,i)*rayDir;
+         geomVector surface_point(3);// = *pt + del_wall(0,i)*rayDir;
+         surface_point(0) = pt->operator()(0) + del_wall(0,i)*rayDir(0);
+         surface_point(1) = pt->operator()(1) + del_wall(0,i)*rayDir(1);
+         surface_point(2) = pt->operator()(2) + del_wall(0,i)*rayDir(2);
          geomVector net_vel = rigid_body_velocity(id,surface_point);
          fwall(0,i) = net_vel(comp);
       }
@@ -1216,7 +1554,10 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             rayDir(dir2) = (j == 0) ? -1 : 1 ;
             del_wall(1,j) = m_allDSrigidbodies[id]
                                        ->get_distanceTo( *pt, rayDir, dh );
-            geomVector surface_point = *pt + del_wall(1,j)*rayDir;
+            geomVector surface_point(3);// = *pt + del_wall(1,j)*rayDir;
+            surface_point(0) = pt->operator()(0) + del_wall(1,j)*rayDir(0);
+            surface_point(1) = pt->operator()(1) + del_wall(1,j)*rayDir(1);
+            surface_point(2) = pt->operator()(2) + del_wall(1,j)*rayDir(2);
             geomVector net_vel = rigid_body_velocity(id,surface_point);
             fwall(1,j) = net_vel(comp);
          }
@@ -1242,7 +1583,10 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             rayDir(dir2) = (j == 0) ? -1 : 1 ;
             del_wall(1,j) = m_allDSrigidbodies[id]
                                        ->get_distanceTo( *pt, rayDir, dh );
-            geomVector surface_point = *pt + del_wall(1,j)*rayDir;
+            geomVector surface_point(3);// = *pt + del_wall(1,j)*rayDir;
+            surface_point(0) = pt->operator()(0) + del_wall(1,j)*rayDir(0);
+            surface_point(1) = pt->operator()(1) + del_wall(1,j)*rayDir(1);
+            surface_point(2) = pt->operator()(2) + del_wall(1,j)*rayDir(2);
             geomVector net_vel = rigid_body_velocity(id,surface_point);
             fwall(1,j) = net_vel(comp);
          }
@@ -1254,7 +1598,10 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
          rayDir(dir2) = (j == 0) ? -1 : 1 ;
          del_wall(1,j) = m_allDSrigidbodies[id]
                                        ->get_distanceTo( *pt, rayDir, dh );
-         geomVector surface_point = *pt + del_wall(1,j)*rayDir;
+         geomVector surface_point(3);// = *pt + del_wall(1,j)*rayDir;
+         surface_point(0) = pt->operator()(0) + del_wall(1,j)*rayDir(0);
+         surface_point(1) = pt->operator()(1) + del_wall(1,j)*rayDir(1);
+         surface_point(2) = pt->operator()(2) + del_wall(1,j)*rayDir(2);
          geomVector net_vel = rigid_body_velocity(id,surface_point);
          fwall(1,j) = net_vel(comp);
       }
@@ -1268,6 +1615,638 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
                                 / (del_wall(1,0)+del_wall(1,1)));
 
    return (field_value);
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double
+DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
+                                             , size_t const& comp
+                                             , geomVector const* pt
+                                             , size_t_vector const& i0
+                                             , size_t const& interpol_dir
+                                             , int const& sign
+                                             , vector<size_t> const& list)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_AllRigidBodies:: Biquadratic_interpolation" ) ;
+
+// Calculates the field value at the ghost points
+// near the particle boundary using the quadratic interpolation
+// inspired from Johansen 1998;
+// xp,yp,zp are the ghost point coordinated; interpol_dir is the direction
+// in which the additional points will be used for quadratic interpolation
+
+   size_t field = (FF == UF) ? 1 : 0;
+
+   // Directional index of point
+   boolVector in_solid(3,0);
+   boolVector in_domain(3,1);
+   // Directional indexes of ghost points
+   vector<size_t_vector> i0_ghost(3,i0);
+   // Local node index of ghost points
+   size_t_vector node_index(3,0);
+   // Decide which scheme to use
+   string scheme = "quadratic";
+
+   geomVector xi(3), fi(3);
+
+   // Creating ghost points for quadratic interpolation
+   intVector i0_temp(3,0);
+
+   if (sign > 0) {
+      i0_temp(0) = int(i0(interpol_dir));
+      i0_temp(1) = int(i0(interpol_dir)) + 1;
+      i0_temp(2) = int(i0(interpol_dir)) + 2;
+   } else if (sign <= 0) {
+      i0_temp(0) = int(i0(interpol_dir)) - 1;
+      i0_temp(1) = int(i0(interpol_dir));
+      i0_temp(2) = int(i0(interpol_dir)) + 1;
+   }
+
+   // Checking the ghost points in domain or not
+   for (size_t l = 0; l < 3; l++) {
+      if ((i0_temp(l) < 0) ||
+          (i0_temp(l) >= (int)FF->get_local_nb_dof(comp,interpol_dir))) {
+         in_domain(l) = 0;
+      } else {
+         in_domain(l) = 1;
+      }
+      i0_ghost[l](interpol_dir) = i0_temp(l);
+   }
+
+   // Assume all the ghost points in fluid
+   // Storing the field values assuming all ghost points in fluid and domain
+   // Check weather the ghost points are in solid or not; TRUE if they are
+   for (size_t l = 0; l < 3; l++) {
+      if (in_domain(l)) {
+         xi(l) = FF->get_DOF_coordinate( i0_ghost[l](interpol_dir)
+                                       , comp
+                                       , interpol_dir);
+         for (size_t level : list)
+            fi(l) += FF->DOF_value( i0_ghost[l](0)
+                                  , i0_ghost[l](1)
+                                  , i0_ghost[l](2), comp, level );
+         fi(l) /= list.size();
+
+         node_index(l) = FF->DOF_local_number( i0_ghost[l](0)
+                                             , i0_ghost[l](1)
+                                             , i0_ghost[l](2),comp);
+         in_solid(l) = void_fraction[field]->operator()(node_index(l));
+      }
+   }
+
+   // Ghost points corrections
+   // All points in domain
+   if (in_domain(0) && in_domain(1) && in_domain(2)) {
+      // 0 in solid, rest in fluid
+      if ((in_solid(0) != 0) &&
+          (in_solid(1) == 0) &&
+          (in_solid(2) == 0)) {
+	      if (FF == UF) {
+            xi(0) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
+               - intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
+            fi(0) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 0);
+         } else {
+            scheme = "linear12";
+         }
+      // 2 in solid, rest in fluid
+      } else if ((in_solid(0) == 0) &&
+                 (in_solid(1) == 0) &&
+                 (in_solid(2) != 0)) {
+         if (FF == UF) {
+            xi(2) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
+               + intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
+            fi(2) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 1);
+         } else {
+            scheme = "linear01";
+         }
+      // 0, 2 in solid; 1 in fluid
+      } else if ((in_solid(0) != 0) &&
+                 (in_solid(1) == 0) &&
+                 (in_solid(2) != 0)) {
+         if (FF == UF) {
+            xi(0) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
+               - intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
+            fi(0) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 0);
+            xi(2) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
+               + intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
+            fi(2) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 1);
+         } else {
+            scheme = "linear1";
+         }
+      // 0, 1 in solid; 2 in fluid
+      } else if ((in_solid(0) != 0) &&
+                 (in_solid(1) != 0) &&
+                 (in_solid(2) == 0)) {
+         if (FF == UF) {
+            xi(1) = FF->get_DOF_coordinate(i0_ghost[2](interpol_dir), comp, interpol_dir)
+               - intersect_distance[field]->operator()(node_index(2),2*interpol_dir + 0);
+            fi(1) = intersect_fieldValue[field]->operator()(node_index(2),2*interpol_dir + 0);
+            scheme = "linear12";
+         } else {
+            scheme = "linear2";
+         }
+      // 1, 2 in solid; 0 in fluid
+      } else if ((in_solid(0) == 0) &&
+                 (in_solid(1) != 0) &&
+                 (in_solid(2) != 0)) {
+         if (FF == UF) {
+            xi(1) = FF->get_DOF_coordinate(i0_ghost[0](interpol_dir), comp, interpol_dir)
+            + intersect_distance[field]->operator()(node_index(0),2*interpol_dir + 1);
+            fi(1) = intersect_fieldValue[field]->operator()(node_index(0),2*interpol_dir + 1);
+            scheme = "linear01";
+         } else {
+            scheme = "linear0";
+         }
+      }
+   // Point 0 and 1 are in domain, 2 not in domain
+   } else if (in_domain(0) && in_domain(1) && !in_domain(2)) {
+      scheme = "linear01";
+      // 0 in fluid; 1 in solid
+      if ((in_solid(0) == 0) &&
+          (in_solid(1) != 0)) {
+         if (FF == UF) {
+            xi(1) = FF->get_DOF_coordinate(i0_ghost[0](interpol_dir), comp, interpol_dir)
+               + intersect_distance[field]->operator()(node_index(0),2*interpol_dir + 1);
+            fi(1) = intersect_fieldValue[field]->operator()(node_index(0),2*interpol_dir + 1);
+         } else {
+            scheme = "linear0";
+         }
+      // 0 in solid, 1 in fluid
+      } else if ((in_solid(0) != 0) &&
+                 (in_solid(1) == 0)) {
+        if (FF == UF) {
+            xi(0) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
+               - intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
+            fi(0) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 0);
+        } else {
+            scheme = "linear1";
+        }
+      }
+   // Point 1 and 2 are in domain, 0 not in domain
+   } else if (!in_domain(0) && in_domain(1) && in_domain(2)) {
+      scheme = "linear12";
+      // 1 in fluid; 2 in solid
+      if ((in_solid(1) == 0) &&
+          (in_solid(2) != 0)) {
+         if (FF == UF) {
+            xi(2) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
+               + intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
+            fi(2) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 1);
+         } else {
+            scheme = "linear1";
+         }
+      // 1 in solid, 2 in fluid
+      } else if ((in_solid(1) != 0) &&
+                 (in_solid(2) == 0)) {
+         if (FF == UF) {
+            xi(1) = FF->get_DOF_coordinate(i0_ghost[2](interpol_dir), comp, interpol_dir)
+               - intersect_distance[field]->operator()(node_index(2),2*interpol_dir + 0);
+            fi(1) = intersect_fieldValue[field]->operator()(node_index(2),2*interpol_dir + 0);
+         } else {
+            scheme = "linear2";
+         }
+      }
+   }
+
+   double value = 0.;
+   double l0=0.,l1=0.,l2=0.;
+
+   if (scheme == "quadratic") {
+      l0 = (pt->operator()(interpol_dir) - xi(1))
+          *(pt->operator()(interpol_dir) - xi(2))
+          /(xi(0) - xi(1))/(xi(0) - xi(2));
+      l1 = (pt->operator()(interpol_dir) - xi(0))
+          *(pt->operator()(interpol_dir) - xi(2))
+          /(xi(1) - xi(0))/(xi(1) - xi(2));
+      l2 = (pt->operator()(interpol_dir) - xi(0))
+          *(pt->operator()(interpol_dir) - xi(1))
+          /(xi(2) - xi(0))/(xi(2) - xi(1));
+      value = fi(0)*l0 + fi(1)*l1 + fi(2)*l2;
+   } else if (scheme == "linear01") {
+      l0 = (pt->operator()(interpol_dir) - xi(1)) / (xi(0) - xi(1));
+      l1 = (pt->operator()(interpol_dir) - xi(0)) / (xi(1) - xi(0));
+      value = fi(0)*l0 + fi(1)*l1;
+   } else if (scheme == "linear12") {
+      l1 = (pt->operator()(interpol_dir) - xi(2)) / (xi(1) - xi(2));
+      l2 = (pt->operator()(interpol_dir) - xi(1)) / (xi(2) - xi(1));
+      value = fi(1)*l1 + fi(2)*l2;
+   } else if (scheme == "linear0") {
+      value = fi(0);
+   } else if (scheme == "linear1") {
+      value = fi(1);
+   } else if (scheme == "linear2") {
+      value = fi(2);
+   }
+
+   return(value);
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double
+DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
+                                               , size_t const& comp
+                                               , geomVector const* pt
+                                               , size_t_vector const& i0
+                                               , size_t const& ghost_points_dir
+                                               , vector<int> const& sign
+                                               , vector<size_t> const& list)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL("DS_AllRigidBodies:: Triquadratic_interpolation" ) ;
+
+  geomVector point(3);
+  // Directional indexes of ghost points
+  size_t_vector index(i0);
+  // Directional indexes of ghost points
+  vector<size_t_vector> i0_ghost(3,i0);
+  // Coordinates of secondary ghost points
+  vector<geomVector> coord_g(3,0.);
+  // Store particle ID if level_set becomes negative
+  vector<int> in_parID(3,0);
+  // Presence in domain or not
+  boolVector in_domain(3,1);
+  vector<double> net_vel(3,0.);
+  // Decide which scheme to use
+  string scheme = "quadratic";
+
+  size_t sec_ghost_dir = 0;
+  size_t sec_interpol_dir = 0;
+
+  point(0) = pt->operator()(0);
+  point(1) = pt->operator()(1);
+  point(2) = pt->operator()(2);
+
+  // Ghost points generated in y and then quadratic interpolation
+  // in z will generate the same stencil if ghost points are
+  // generated in z and the quadratic interpolation done in y
+  if (ghost_points_dir == 0) {
+     sec_ghost_dir = 1;
+     sec_interpol_dir = 2;
+  } else if (ghost_points_dir == 1) {
+     sec_ghost_dir = 0;
+     sec_interpol_dir = 2;
+  } else if (ghost_points_dir == 2) {
+     sec_ghost_dir = 0;
+     sec_interpol_dir = 1;
+  }
+
+  // Creating ghost points for quadratic interpolation
+  intVector i0_temp(3,0);
+
+  if (sign[sec_ghost_dir] > 0.) {
+     i0_temp(0) = int(i0(sec_ghost_dir));
+     i0_temp(1) = int(i0(sec_ghost_dir)) + 1;
+     i0_temp(2) = int(i0(sec_ghost_dir)) + 2;
+  } else if (sign[sec_ghost_dir] <= 0.) {
+     i0_temp(0) = int(i0(sec_ghost_dir)) - 1;
+     i0_temp(1) = int(i0(sec_ghost_dir));
+     i0_temp(2) = int(i0(sec_ghost_dir)) + 1;
+  }
+
+  // Checking the ghost points in domain or not; loop on the ghost points
+  for (size_t l = 0; l < 3; l++) {
+     if ((i0_temp(l) < 0) ||
+         (i0_temp(l) >= (int)FF->get_local_nb_dof(comp,sec_ghost_dir))) {
+        in_domain(l) = false;
+     } else {
+        in_domain(l) = true;
+     }
+     i0_ghost[l](sec_ghost_dir) = i0_temp(l);
+  }
+
+  // Assume all secondary ghost points in fluid
+  double x0 = in_domain(0) ?
+      FF->get_DOF_coordinate(i0_ghost[0](sec_ghost_dir), comp, sec_ghost_dir)
+                           : 0. ;
+  double x1 = in_domain(1) ?
+      FF->get_DOF_coordinate(i0_ghost[1](sec_ghost_dir), comp, sec_ghost_dir)
+                           : 0. ;
+  double x2 = in_domain(2) ?
+      FF->get_DOF_coordinate(i0_ghost[2](sec_ghost_dir), comp, sec_ghost_dir)
+                           : 0. ;
+
+  if (sec_ghost_dir == 0) {
+     coord_g[0](0) = x0; coord_g[0](1) = point(1); coord_g[0](2) = point(2);
+     coord_g[1](0) = x1; coord_g[1](1) = point(1); coord_g[1](2) = point(2);
+     coord_g[2](0) = x2; coord_g[2](1) = point(1); coord_g[2](2) = point(2);
+  } else if (sec_ghost_dir == 1) {
+     coord_g[0](0) = point(0); coord_g[0](1) = x0; coord_g[0](2) = point(2);
+     coord_g[1](0) = point(0); coord_g[1](1) = x1; coord_g[1](2) = point(2);
+     coord_g[2](0) = point(0); coord_g[2](1) = x2; coord_g[2](2) = point(2);
+  } else if (sec_ghost_dir == 2) {
+     coord_g[0](0) = point(0); coord_g[0](1) = point(1); coord_g[0](2) = x0;
+     coord_g[1](0) = point(0); coord_g[1](1) = point(1); coord_g[1](2) = x1;
+     coord_g[2](0) = point(0); coord_g[2](1) = point(1); coord_g[2](2) = x2;
+  }
+
+  double dh = FF->primary_grid()->get_smallest_grid_size();
+
+
+
+  // Stores rigid body ID if inside solid; -1 otherwise
+  in_parID[0] = isIn_any_RB(coord_g[0]);
+  in_parID[1] = isIn_any_RB(coord_g[1]);
+  in_parID[2] = isIn_any_RB(coord_g[2]);
+
+  double del = 0.;
+
+  // Estimate the field values at the secondary ghost points
+  double f0 = (in_domain(0)) ?
+               Biquadratic_interpolation(FF
+                                       , comp
+                                       , &coord_g[0]
+                                       , i0_ghost[0]
+                                       , sec_interpol_dir
+                                       , sign[sec_interpol_dir],list)
+               : 0.;
+  double f1 = (in_domain(1)) ?
+               Biquadratic_interpolation(FF
+                                       , comp
+                                       , &coord_g[1]
+                                       , i0_ghost[1]
+                                       , sec_interpol_dir
+                                       , sign[sec_interpol_dir],list)
+               : 0.;
+  double f2 = (in_domain(2)) ?
+               Biquadratic_interpolation(FF
+                                       , comp
+                                       , &coord_g[2]
+                                       , i0_ghost[2]
+                                       , sec_interpol_dir
+                                       , sign[sec_interpol_dir],list)
+               : 0.;
+
+  // Ghost points corrections
+  if (in_domain(0) && in_domain(1) && in_domain(2)) {
+     // 0 in solid, rest in fluid
+     if ((in_parID[0] != -1) &&
+         (in_parID[1] == -1) &&
+         (in_parID[2] == -1)) {
+        geomVector rayDir(3);
+        rayDir(sec_ghost_dir) = -1. ;
+        if (FF == UF) {
+           del = m_allDSrigidbodies[in_parID[0]]->
+                                       get_distanceTo(coord_g[1], rayDir, dh);
+           geomVector rayVec(3);
+           rayVec(0) = coord_g[1](0) + del * rayDir(0);
+           rayVec(1) = coord_g[1](1) + del * rayDir(1);
+           rayVec(2) = coord_g[1](2) + del * rayDir(2);
+           geomVector netVel =
+                  rigid_body_velocity(in_parID[0], rayVec);
+                  // rigid_body_velocity(in_parID[0], coord_g[1] + del * rayDir);
+
+           x0 = x1 - del;
+           f0 = netVel(comp);
+	     } else {
+           scheme = "linear12";
+	     }
+     // 2 in solid, rest in fluid
+     } else if ((in_parID[0] == -1) &&
+                (in_parID[1] == -1) &&
+                (in_parID[2] != -1)) {
+         geomVector rayDir(3);
+         rayDir(sec_ghost_dir) = 1. ;
+         if (FF == UF) {
+            del = m_allDSrigidbodies[in_parID[2]]->
+                                        get_distanceTo(coord_g[1], rayDir, dh);
+
+            geomVector rayVec(3);
+            rayVec(0) = coord_g[1](0) + del * rayDir(0);
+            rayVec(1) = coord_g[1](1) + del * rayDir(1);
+            rayVec(2) = coord_g[1](2) + del * rayDir(2);
+            geomVector netVel =
+                   rigid_body_velocity(in_parID[2], rayVec);
+                   // rigid_body_velocity(in_parID[2], coord_g[1] + del * rayDir);
+
+            x2 = x1 + del;
+            f2 = netVel(comp);
+   	   } else {
+            scheme = "linear01";
+	      }
+      // 0, 2 in solid; 1 in fluid
+      } else if ((in_parID[0] != -1) &&
+                 (in_parID[1] == -1) &&
+                 (in_parID[2] != -1)) {
+         geomVector rayDir(3);
+         rayDir(sec_ghost_dir) = -1. ;
+         if (FF == UF) {
+            del = m_allDSrigidbodies[in_parID[0]]->
+                                        get_distanceTo(coord_g[1], rayDir, dh);
+
+            geomVector rayVec(3);
+            rayVec(0) = coord_g[1](0) + del * rayDir(0);
+            rayVec(1) = coord_g[1](1) + del * rayDir(1);
+            rayVec(2) = coord_g[1](2) + del * rayDir(2);
+            geomVector netVel =
+                   rigid_body_velocity(in_parID[0], rayVec);
+                   // rigid_body_velocity(in_parID[0], coord_g[1] + del * rayDir);
+
+            x0 = x1 - del;
+            f0 = netVel(comp);
+
+            rayDir(sec_ghost_dir) = 1. ;
+
+            del = m_allDSrigidbodies[in_parID[2]]->
+                                        get_distanceTo(coord_g[1], rayDir, dh);
+
+            rayVec(0) = coord_g[1](0) + del * rayDir(0);
+            rayVec(1) = coord_g[1](1) + del * rayDir(1);
+            rayVec(2) = coord_g[1](2) + del * rayDir(2);
+            netVel =
+                   rigid_body_velocity(in_parID[2], rayVec);
+                   // rigid_body_velocity(in_parID[2], coord_g[1] + del * rayDir);
+
+            x2 = x1 + del;
+            f2 = netVel(comp);
+	      } else {
+	         scheme = "linear1";
+         }
+      // 0, 1 in solid; 2 in fluid
+      } else if ((in_parID[0] != -1) &&
+                 (in_parID[1] != -1) &&
+                 (in_parID[2] == -1)) {
+         geomVector rayDir(3);
+         rayDir(sec_ghost_dir) = -1. ;
+         if (FF == UF) {
+            del = m_allDSrigidbodies[in_parID[1]]->
+                                        get_distanceTo(coord_g[2], rayDir, dh);
+
+            geomVector rayVec(3);
+            rayVec(0) = coord_g[2](0) + del * rayDir(0);
+            rayVec(1) = coord_g[2](1) + del * rayDir(1);
+            rayVec(2) = coord_g[2](2) + del * rayDir(2);
+            geomVector netVel =
+                   rigid_body_velocity(in_parID[1], rayVec);
+                   // rigid_body_velocity(in_parID[1], coord_g[2] + del * rayDir);
+
+            x1 = x2 - del;
+            f1 = netVel(comp);
+            scheme = "linear12";
+         } else {
+            scheme = "linear2";
+         }
+      // 1, 2 in solid; 0 in fluid
+      } else if ((in_parID[0] == -1) &&
+                 (in_parID[1] != -1) &&
+                 (in_parID[2] != -1)) {
+         geomVector rayDir(3);
+         rayDir(sec_ghost_dir) = 1. ;
+         if (FF == UF) {
+            del = m_allDSrigidbodies[in_parID[1]]->
+                                        get_distanceTo(coord_g[0], rayDir, dh);
+
+            geomVector rayVec(3);
+            rayVec(0) = coord_g[0](0) + del * rayDir(0);
+            rayVec(1) = coord_g[0](1) + del * rayDir(1);
+            rayVec(2) = coord_g[0](2) + del * rayDir(2);
+            geomVector netVel =
+                   rigid_body_velocity(in_parID[1], rayVec);
+                   // rigid_body_velocity(in_parID[1], coord_g[0] + del * rayDir);
+
+            x1 = x0 + del;
+            f1 = netVel(comp);
+            scheme = "linear01";
+         } else {
+            scheme = "linear0";
+         }
+      }
+   // Point 0 and 1 are in domain, 2 not in domain
+   } else if (in_domain(0) && in_domain(1) && !in_domain(2)) {
+      scheme = "linear01";
+      // 0 in fluid; 1 in solid
+      if ((in_parID[0] == -1) &&
+          (in_parID[1] != -1)) {
+          geomVector rayDir(3);
+          rayDir(sec_ghost_dir) = 1. ;
+          if (FF == UF) {
+             del = m_allDSrigidbodies[in_parID[1]]->
+                                        get_distanceTo(coord_g[0], rayDir, dh);
+
+             geomVector rayVec(3);
+             rayVec(0) = coord_g[0](0) + del * rayDir(0);
+             rayVec(1) = coord_g[0](1) + del * rayDir(1);
+             rayVec(2) = coord_g[0](2) + del * rayDir(2);
+             geomVector netVel =
+                   rigid_body_velocity(in_parID[1], rayVec);
+                   // rigid_body_velocity(in_parID[1], coord_g[0] + del * rayDir);
+
+             x1 = x0 + del;
+             f1 = netVel(comp);
+	       } else {
+             scheme = "linear0";
+          }
+       // 0 in solid, 1 in fluid
+       } else if ((in_parID[0] != -1) &&
+                  (in_parID[1] == -1)) {
+          geomVector rayDir(3);
+          rayDir(sec_ghost_dir) = -1. ;
+          if (FF == UF) {
+             del = m_allDSrigidbodies[in_parID[0]]->
+                                        get_distanceTo(coord_g[1], rayDir, dh);
+
+             geomVector rayVec(3);
+             rayVec(0) = coord_g[1](0) + del * rayDir(0);
+             rayVec(1) = coord_g[1](1) + del * rayDir(1);
+             rayVec(2) = coord_g[1](2) + del * rayDir(2);
+             geomVector netVel =
+                   rigid_body_velocity(in_parID[0], rayVec);
+                   // rigid_body_velocity(in_parID[0], coord_g[1] + del * rayDir);
+
+             x0 = x1 - del;
+             f0 = netVel(comp);
+      	 } else {
+      	    scheme = "linear1";
+      	 }
+       }
+   // Point 1 and 2 are in domain, 0 not in domain
+   } else if (!in_domain(0) && in_domain(1) && in_domain(2)) {
+       scheme = "linear12";
+       // 1 in fluid; 2 in solid
+       if ((in_parID[1] == -1) &&
+           (in_parID[2] != -1)) {
+           geomVector rayDir(3);
+           rayDir(sec_ghost_dir) = 1. ;
+           if (FF == UF) {
+              del = m_allDSrigidbodies[in_parID[2]]->
+                                         get_distanceTo(coord_g[1], rayDir, dh);
+
+              geomVector rayVec(3);
+              rayVec(0) = coord_g[1](0) + del * rayDir(0);
+              rayVec(1) = coord_g[1](1) + del * rayDir(1);
+              rayVec(2) = coord_g[1](2) + del * rayDir(2);
+              geomVector netVel =
+                    rigid_body_velocity(in_parID[2], rayVec);
+                    // rigid_body_velocity(in_parID[2], coord_g[1] + del * rayDir);
+
+              x2 = x1 + del;
+              f2 = netVel(comp);
+           } else {
+              scheme = "linear1";
+           }
+       // 1 in solid, 2 in fluid
+       } else if ((in_parID[1] != -1) &&
+                  (in_parID[2] == -1)) {
+           geomVector rayDir(3);
+           rayDir(sec_ghost_dir) = -1. ;
+           if (FF == UF) {
+              del = m_allDSrigidbodies[in_parID[1]]->
+                                        get_distanceTo(coord_g[2], rayDir, dh);
+
+              geomVector rayVec(3);
+              rayVec(0) = coord_g[2](0) + del * rayDir(0);
+              rayVec(1) = coord_g[2](1) + del * rayDir(1);
+              rayVec(2) = coord_g[2](2) + del * rayDir(2);
+              geomVector netVel =
+                   rigid_body_velocity(in_parID[1], rayVec);
+                   // rigid_body_velocity(in_parID[1], coord_g[2] + del * rayDir);
+
+              x1 = x2 - del;
+              f1 = netVel(comp);
+           } else {
+              scheme = "linear2";
+           }
+       }
+   }
+
+  double l0 = 0., l1 = 0., l2 = 0.;
+  double result = 0.;
+
+
+  if (scheme == "quadratic") {
+     l0 = (point(sec_ghost_dir) - x1)
+        * (point(sec_ghost_dir) - x2)
+        / (x0 - x1) / (x0 - x2);
+     l1 = (point(sec_ghost_dir) - x0)
+        * (point(sec_ghost_dir) - x2)
+        / (x1 - x0) / (x1 - x2);
+     l2 = (point(sec_ghost_dir) - x0)
+        * (point(sec_ghost_dir) - x1)
+        / (x2 - x0) / (x2 - x1);
+     result = f0*l0 + f1*l1 + f2*l2;
+  } else if (scheme == "linear01") {
+     l0 = (point(sec_ghost_dir) - x1)/(x0 - x1);
+     l1 = (point(sec_ghost_dir) - x0)/(x1 - x0);
+     result = f0*l0 + f1*l1;
+  } else if (scheme == "linear12") {
+     l1 = (point(sec_ghost_dir) - x2)/(x1 - x2);
+     l2 = (point(sec_ghost_dir) - x1)/(x2 - x1);
+     result = f1*l1 + f2*l2;
+  } else if (scheme == "linear0") {
+     result = f0;
+  } else if (scheme == "linear1") {
+     result = f1;
+  } else if (scheme == "linear2") {
+     result = f2;
+  }
+
+  return(result);
 }
 
 
@@ -1347,6 +2326,9 @@ void DS_AllRigidBodies:: build_solid_variables_on_grid(  )
    pressure_torque.reserve(m_nrb);
 
    geomVector vvv(3);
+
+   avg_pressure_force = vvv;
+   avg_viscous_force = vvv;
 
    for (size_t i = 0; i < m_nrb; ++i) {
       viscous_force.push_back( vvv );

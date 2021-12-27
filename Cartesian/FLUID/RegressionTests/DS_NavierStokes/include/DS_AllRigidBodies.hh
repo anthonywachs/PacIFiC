@@ -220,6 +220,32 @@ class DS_AllRigidBodies
                                     , vector<size_t> const& list);
 
       /** @brief Return the sum of interpolated field for all
+      given list of levels on a point in 2D plane including
+      the corrections near the solid interface
+      @param FF field to interpolate
+      @param comp component of the field to interpolate
+      @param point coordinate where the field is interpolated
+      @param i0 indexes of the point
+      @param interpol_dir direction of the interpolation
+      @param sign of the surface normal vector in each direction
+      @param level vector of field levels to be interpolated   */
+      double Biquadratic_interpolation ( FV_DiscreteField const* FF
+                                       , size_t const& comp
+                                       , geomVector const* pt
+                                       , size_t_vector const& i0
+                                       , size_t const& interpol_dir
+                                       , int const& sign
+                                       , vector<size_t> const& list);
+
+      double Triquadratic_interpolation ( FV_DiscreteField const* FF
+                                        , size_t const& comp
+                                        , geomVector const* pt
+                                        , size_t_vector const& i0
+                                        , size_t const& ghost_points_dir
+                                        , vector<int> const& sign
+                                        , vector<size_t> const& list);
+
+      /** @brief Return the sum of interpolated field for all
       given list of levels on a point in 3D box including
       the corrections near the solid interface
       @param FF field to interpolate
@@ -240,8 +266,15 @@ class DS_AllRigidBodies
       @param parID rigid body ID */
       void first_order_viscous_stress( size_t const& parID );
 
-      /** @brief Calculate the pressure force and torque on all rigib bodies */
+      /** @brief Calculate the second order viscous force and torque on parID
+      @param parID rigid body ID */
+      void second_order_viscous_stress( size_t const& parID );
+
+      /** @brief Calculate the pressure force and torque on all rigid bodies */
       void compute_pressure_force_and_torque_for_allRB ();
+
+      /** @brief Calculate the viscous force and torque on all rigid bodies */
+      void compute_viscous_force_and_torque_for_allRB (string const& StressOrder);
       //@}
 
 
@@ -279,7 +312,7 @@ class DS_AllRigidBodies
       cell on the RB as compared with computational grid cell size */
 
       vector<size_t_vector*> void_fraction; /**< vector of void fraction the
-      field grid nodes */
+      field grid nodes, 0 in fluid and (parID+1) in the rigid bodies*/
       vector<size_t_vector*> rb_ID; /**< vector of rigid body ID on the
       field grid node, if any */
 
@@ -296,6 +329,10 @@ class DS_AllRigidBodies
       pressure stress on rigid bodies */
       vector<geomVector> viscous_force; /**< Value of force due to
       viscous stress on rigid bodies */
+      geomVector avg_pressure_force; /**< Value of average force due to
+      pressure stress on all rigid bodies */
+      geomVector avg_viscous_force; /**< Value of average force due to
+      viscous stress on all rigid bodies */
       vector<geomVector> pressure_torque; /**< Value of torque due to
       pressure stress on rigid bodies */
       vector<geomVector> viscous_torque; /**< Value of torque due to
