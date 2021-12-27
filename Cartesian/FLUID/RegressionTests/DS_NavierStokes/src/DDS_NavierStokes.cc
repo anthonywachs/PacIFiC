@@ -86,10 +86,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , is_par_motion( false )
    , is_stressCal( false )
    , is_surfacestressOUT( false )
-   , IntersectionMethod ( "Bisection" )
    , ViscousStressOrder ( "second" )
-   , PressureStressOrder ( "first" )
-   , tolerance ( 1.e-6 )
    , grid_check_for_solid ( 3.0 )
    , b_particles_as_fixed_obstacles( true )
    , b_projection_translation( dom->primary_grid()->is_translation_active() )
@@ -171,13 +168,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
      exp->test_data( "Viscosity", "Viscosity>0." ) ;
    }
 
-   // Read Intersection tolerance
-   if ( exp->has_entry( "IntersectionTolerance" ) )
-   {
-     tolerance = exp->double_data( "IntersectionTolerance" ) ;
-     exp->test_data( "IntersectionTolerance", "IntersectionTolerance>0." ) ;
-   }
-
    // Read the presence of particles
    if ( exp->has_entry( "Particles" ) )
      is_solids = exp->bool_data( "Particles" ) ;
@@ -185,7 +175,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    if (is_solids) {
       insertion_type = exp->string_data( "InsertionType" ) ;
       MAC_ASSERT( insertion_type == "Grains3D" ) ;
-      loc_thres = exp->double_data( "Local_threshold" ) ;
 
       // Read the solids filename
       if (insertion_type == "Grains3D") {
@@ -220,19 +209,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
                 string error_message="- first\n   - second";
                 MAC_Error::object()->raise_bad_data_value( exp,
                                     "ViscousStressOrder", error_message );
-            }
-         }
-
-         if ( exp->has_entry( "PressureStressOrder" ) ) {
-            PressureStressOrder = exp->string_data( "PressureStressOrder" );
-            if ( PressureStressOrder != "first"
-              && PressureStressOrder != "second"
-              && PressureStressOrder != "second_withNeumannBC") {
-               string error_message="- first\n   "
-                                    "- second\n   "
-                                    "- second_withNeumannBC";
-               MAC_Error::object()->raise_bad_data_value( exp,
-                                    "PressureStressOrder", error_message );
             }
          }
 
@@ -287,17 +263,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
        error_message+="Critical_Distance_Translation is NOT defined.";
        MAC_Error::object()->raise_bad_data_value( exp,
            "Projection_Translation", error_message );
-     }
-   }
-
-   // Method for calculating intersections
-   if ( exp->has_entry( "IntersectionMethod" ) )
-   {
-     IntersectionMethod = exp->string_data( "IntersectionMethod" ) ;
-     if ( IntersectionMethod != "Bisection" && IntersectionMethod != "Newton") {
-        string error_message="   - Bisection\n   - Newton";
-        MAC_Error::object()->raise_bad_data_value( exp,
-           "IntersectionMethod", error_message );
      }
    }
 
@@ -471,9 +436,6 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
       if (my_rank == 0)
          cout << "Finished particle generation... \n" << endl;
 
-      if (my_rank == 0)
-         cout << "Finished intersection calculations... \n" << endl;
-
       vector<size_t> vec{ 0, 1, 3};
       if (dim == 3) vec.push_back(4);
 
@@ -482,12 +444,6 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
       if (my_rank == 0)
          cout << "Finished field initializations... \n" << endl;
 
-      if (is_stressCal) {
-         // Generate discretization of surface in approximate equal area
-         //generate_surface_discretization ();
-      }
-      if (my_rank == 0)
-         cout << "Finished particle surface discretizations... \n" << endl;
    }
 
    // Direction splitting
@@ -524,9 +480,6 @@ DDS_NavierStokes:: do_after_time_stepping( void )
 
    output_L2norm_velocity(0);
    output_L2norm_pressure(0);
-// //   error_with_analytical_solution_poiseuille();
-// //   error_with_analytical_solution_couette(PF,0);
-// //   error_with_analytical_solution_couette(UF,1);
 
    if ( my_rank == is_master )
    {
@@ -596,11 +549,12 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
      	MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
 
    // Compute hydrodynamic forces by surface viscous stress
-   // if (is_stressCal) {
-   //    compute_fluid_velocity_particle_interaction(t_it);
-   // }
-   //
-   // if (level_set_type == "PipeX") error_with_analytical_solution_poiseuille3D();
+   if (is_stressCal) {
+      allrigidbodies->compute_viscous_force_and_torque_for_allRB(ViscousStressOrder);
+   }
+
+   output_L2norm_divergence();
+
 /*
    double vel_divergence = get_velocity_divergence(t_it);
 
@@ -673,221 +627,8 @@ DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
    GLOBAL_EQ->display_debug();
 }
 
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: error_with_analytical_solution_couette (FV_DiscreteField const* FF, size_t const& field)
-// //---------------------------------------------------------------------------
-// {
-//    MAC_LABEL( "DDS_NavierStokes:: error_with_analytical_solution_couette" ) ;
-//
-//    size_t_vector min_unknown_index(dim,0);
-//    size_t_vector max_unknown_index(dim,0);
-//
-//    PartInput solid = GLOBAL_EQ->get_solid(0);
-//    NodeProp node = GLOBAL_EQ->get_node_property(field,0);
-//
-//    for (size_t comp=0;comp<nb_comps[field];++comp) {
-//       // Compute error
-//       double computed_field = 0., analytical_solution = 0., error_L2 = 0.;
-//       // Get local min and max indices
-//       for (size_t l=0;l<dim;++l) {
-//          min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-//          max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-//       }
-//
-//       double xp = solid.coord[0]->item(0);
-//       double yp = solid.coord[1]->item(0);
-//       double r1 = solid.size->item(0);
-//       double o1 = solid.ang_vel[2]->item(0);
-//       double r2 = solid.size->item(1);
-//       double o2 = solid.ang_vel[2]->item(1);
-//       double a = (o2*pow(r2,2.)-o1*pow(r1,2.))/(pow(r2,2.)-pow(r1,2.));
-//       double b = (o1-o2)*(pow(r1,2.)*pow(r2,2.))/(pow(r2,2.)-pow(r1,2.));
-//       //double mean_press = 1./(r2-r1)*(pow(a,2.)*(pow(r2,3.)-pow(r1,3.))/6. + 2.*a*b*((r2*log(r2)-r2)-(r1*log(r1)-r1)) + pow(b,2.)/2./r2 - pow(b,2.)/2./r1);
-//       double mean_press = 1./(pow(r2,2)-pow(r1,2))*(pow(a,2.)/4.*(pow(r2,4.)-pow(r1,4.)) + a*b*(2.*pow(r2,2.)*log(r2)-pow(r2,2.)) - a*b*(2.*pow(r1,2.)*log(r1)-pow(r1,2.)) - pow(b,2.)*log(r2/r1));
-//
-//       for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-//          double x = FF->get_DOF_coordinate( i, comp, 0 ) ;
-//          for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-//             double y = FF->get_DOF_coordinate( j, comp, 1 ) ;
-//             if (dim == 2) {
-//                size_t k=0;
-//                computed_field = FF->DOF_value( i, j, k, comp, 0 ) ;
-//
-//                size_t p = return_node_index(FF,comp,i,j,k);
-//                if (node.void_frac[comp]->item(p) != 1.) {
-//                   double r = pow(pow(x-xp,2.)+pow(y-yp,2.),0.5);
-//                   if (field == 1) {
-//                      double v_theta = a*r + b/r;
-//                      if (comp == 0) {
-//                         analytical_solution = -v_theta*(y-yp)/r;
-// //                        analytical_solution = sin(x)*sin(y);
-//                      } else if (comp == 1) {
-//                         analytical_solution = v_theta*(x-xp)/r;
-// //                        analytical_solution = cos(x)*cos(y);
-//                      }
-//                   } else if (field == 0) {
-// //                     analytical_solution = 0.;
-//                      analytical_solution = rho*(pow(a,2.)*pow(r,2.)/2. + 2.*a*b*log(r) - pow(b,2.)/2./pow(r,2.));
-//                      analytical_solution -= rho*mean_press;
-// //                     analytical_solution = sin(x+y);
-//                   }
-//
-//                   if ( FF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) ) {
-// //                     error_L2 += MAC::sqr( analytical_solution)
-//                      error_L2 += MAC::sqr( computed_field - analytical_solution)
-//                                             * FF->get_cell_measure( i, j, k, comp ) ;
-//                   }
-//                }
-//             }
-//          }
-//       }
-//
-//       error_L2 = macCOMM->sum( error_L2 );
-//       error_L2 = MAC::sqrt(error_L2);
-//
-//       if ( my_rank == 0 )
-//          cout << "L2 Error with analytical solution field " << FF->name() << ", component " << comp << " = " << std::fixed << std::setprecision(16) << error_L2 << endl;
-//    }
-// }
 
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: error_with_analytical_solution_poiseuille3D ( )
-// //---------------------------------------------------------------------------
-// {
-//    MAC_LABEL("DDS_NavierStokes:: error_with_analytical_solution_poiseuille3D" ) ;
-//
-//    // Parameters
-//    size_t cpp=10;
-//    double bodyterm=0.;
-//
-//    // Periodic pressure gradient
-//    if ( UF->primary_grid()->is_periodic_flow() ) {
-//       cpp = UF->primary_grid()->get_periodic_flow_direction() ;
-//       bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
-//                ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
-//                - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
-//    }
-//
-//    for (size_t comp=0;comp<nb_comps[1];++comp) {
-//       // Get nb of local dof
-//       size_t_vector local_dof_number( dim, 0 );
-//       for (size_t l=0;l<dim;++l)
-//          local_dof_number(l) = UF->get_local_nb_dof( comp, l ) ;
-//
-//       double computed_field = 0., analytical_solution = 0.;
-//       double error_L2 = 0.;
-//
-//       if (is_solids) {
-//          PartInput solid = GLOBAL_EQ->get_solid(0);
-//          NodeProp node = GLOBAL_EQ->get_node_property(1,0);
-//          double yp = solid.coord[1]->item(0);
-//          double zp = solid.coord[2]->item(0);
-//          double rp = solid.size->item(0);
-//
-//          // Compute error
-//          for (size_t i=0;i<local_dof_number(0);++i) {
-//             for (size_t j=0;j<local_dof_number(1);++j) {
-//                double y = UF->get_DOF_coordinate( j, comp, 1 ) - yp ;
-//                for (size_t k=0;k<local_dof_number(2);++k) {
-//                   double z = UF->get_DOF_coordinate( k, comp, 2 ) - zp ;
-//                   computed_field = UF->DOF_value( i, j, k, comp, 0 ) ;
-//
-//                   double ri = pow(pow(y,2)+pow(z,2),0.5);
-//
-//                   size_t p = return_node_index(UF,comp,i,j,k);
-//                   if (node.void_frac[comp]->item(p) == 0.) {
-//                      if (comp == cpp) {
-//                         analytical_solution = (bodyterm/(4.*mu))*(ri*ri-rp*rp);
-//                      }
-//                      if ( UF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) )
-//                         error_L2 += MAC::sqr( computed_field - analytical_solution ) * UF->get_cell_measure( i, j, k, comp ) ;
-//                   }
-//                }
-//             }
-//          }
-//       }
-//
-//       error_L2 = macCOMM->sum( error_L2 );
-//       error_L2 = MAC::sqrt(error_L2);
-//
-//       if ( my_rank == 0 )
-//          cout << "L2 Error with analytical solution field " << UF->name() << ", component " << comp << " = " << std::fixed << std::setprecision(16) << error_L2 << endl;
-//    }
-//
-// }
-//
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: error_with_analytical_solution_poiseuille ( )
-// //---------------------------------------------------------------------------
-// {
-//    MAC_LABEL(
-//    "DDS_NavierStokes:: error_with_analytical_solution_poiseuille" ) ;
-//
-//    // Parameters
-//    size_t cpp=10;
-//    double bodyterm=0., height;
-//
-//    // Periodic pressure gradient
-//    if ( UF->primary_grid()->is_periodic_flow() ) {
-//       cpp = UF->primary_grid()->get_periodic_flow_direction() ;
-//       bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
-//                ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
-//                - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
-//    }
-//
-//    height = ( UF->primary_grid()->get_main_domain_max_coordinate(1) - UF->primary_grid()->get_main_domain_min_coordinate(1) ) /2. ;
-//
-//    for (size_t comp=0;comp<nb_comps[1];++comp) {
-//       // Get nb of local dof
-//       size_t_vector local_dof_number( dim, 0 );
-//       for (size_t l=0;l<dim;++l)
-//          local_dof_number(l) = UF->get_local_nb_dof( comp, l ) ;
-//
-//       // Compute error
-//       double computed_field = 0., analytical_solution = 0.;
-//       double error_L2 = 0.;
-//       for (size_t i=0;i<local_dof_number(0);++i) {
-//          for (size_t j=0;j<local_dof_number(1);++j) {
-//             double y = UF->get_DOF_coordinate( j, comp, 1 ) ;
-//
-//             if ( dim == 2 ) {
-//                size_t k = 0 ;
-//                computed_field = UF->DOF_value( i, j, k, comp, 0 ) ;
-//
-//                if (comp == cpp) {
-//                   analytical_solution = (bodyterm/(2.*mu))*((y-height)*(y-height)-height*height);
-//                }
-//
-// //               analytical_solution = MAC::sin(MAC::pi()*x)*MAC::sin(MAC::pi()*y);
-//
-//                if ( UF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) )
-// 	          error_L2 += MAC::sqr( computed_field - analytical_solution ) * UF->get_cell_measure( i, j, k, comp ) ;
-// 	    } else {
-//                for (size_t k=0;k<local_dof_number(2);++k) {
-//                   computed_field = UF->DOF_value( i, j, k, comp, 0 ) ;
-//
-//                   if (comp == cpp) {
-//                      analytical_solution = (bodyterm/(2.*mu))*(y*y-height*height);
-//                   }
-//
-//                   if ( UF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) )
-//                      error_L2 += MAC::sqr( computed_field - analytical_solution ) * UF->get_cell_measure( i, j, k, comp ) ;
-// 	       }
-// 	    }
-//          }
-//       }
-//
-//       error_L2 = macCOMM->sum( error_L2 );
-//       error_L2 = MAC::sqrt(error_L2);
-//
-//       if ( my_rank == 0 )
-//          cout << "L2 Error with analytical solution field " << UF->name() << ", component " << comp << " = " << std::fixed << std::setprecision(16) << error_L2 << endl;
-//    }
-//
-// }
+
 
 //---------------------------------------------------------------------------
 void
@@ -900,67 +641,6 @@ DDS_NavierStokes:: ugradu_initialization ( )
 
 }
 
-
-
-//
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: update_particle_system(FV_TimeIterator const* t_it)
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL( "DDS_NavierStokes:: update_particle_system" ) ;
-//
-//   // Structure of particle input data
-//   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
-//   PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
-//
-//   doubleVector const& gg = gravity_vector->to_double_vector();
-//
-//   if (insertion_type == "file") {
-//
-//      // Structure of particle input data
-//      PartInput solid = GLOBAL_EQ->get_solid(0);
-//
-//      for (size_t i=0;i<Npart;i++) {
-//         double rp = solid.size->item(i);
-//         double mass_p = (dim == 3) ? rho_s*(4./3.)*MAC::pi()*pow(rp,3.) :
-//                                      rho_s*MAC::pi()*pow(rp,2.)*1.;
-//         double moi = 0.;
-// 	if (level_set_type == "Sphere")
-//            moi = (dim == 3) ? (2./5.)*mass_p*rp*rp :
-// 		              (1./2.)*mass_p*rp*rp ;
-//
-//         doubleVector pos(dim,0);
-//         doubleVector vel(dim,0);
-//         doubleVector acc(dim,0);
-//         doubleVector ang_vel(dim,0);
-//         doubleVector ang_acc(dim,0);
-//
-//         for (size_t dir=0;dir<dim;dir++) {
-//            pos(dir) = solid.coord[dir]->item(i);
-//            vel(dir) = solid.vel[dir]->item(i);
-//
-//            if (motion_type == "Sine") {
-//               vel(dir) = gg(dir)*Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
-//               pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
-//            } else if (motion_type == "Hydro") {
-//               acc(dir) = gg(dir)*(1-rho/rho_s) + (hydro_forces.press[dir]->item(i)
-// 	                                       +  hydro_forces.vel[dir]->item(i)) / mass_p ;
-//               vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-//               pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
-//               ang_acc(dir) = (hydro_torque.press[dir]->item(i)
-//                            +  hydro_torque.vel[dir]->item(i)) / moi ;
-//               ang_vel(dir) = ang_vel(dir) + ang_acc(dir)*t_it->time_step();
-//            }
-//
-//            solid.coord[dir]->set_item(i,pos(dir));
-//            solid.vel[dir]->set_item(i,vel(dir));
-//            solid.ang_vel[dir]->set_item(i,ang_vel(dir));
-//         }
-//      }
-//   }
-// }
-//
 
 
 
@@ -1022,129 +702,6 @@ DDS_NavierStokes:: calculate_row_indexes ( FV_DiscreteField const* FF)
       }
    }
 }
-
-
-
-
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: trans_rotation_matrix (size_t const& m
-//                                         , class doubleVector& delta
-//                                         , size_t const& comp
-//                                         , size_t const& field)
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL( "DDS_NavierStokes:: trans_rotation_matrix" ) ;
-//
-//   PartInput solid = GLOBAL_EQ->get_solid(0);
-//
-//   // yaw along z-axis; pitch along y-axis; roll along x-axis
-//   doubleArray2D rot_matrix(3,3,0);
-//
-//   // Rotation matrix assemble
-//   if (insertion_type == "file") {
-//      double roll = (MAC::pi()/180.)*solid.thetap->item(m,0);
-//      double pitch = (MAC::pi()/180.)*solid.thetap->item(m,1);
-//      double yaw = (MAC::pi()/180.)*solid.thetap->item(m,2);
-//      rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-//      rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll)
-//                                     - MAC::sin(yaw)*MAC::cos(roll);
-//      rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll)
-//                                     + MAC::sin(yaw)*MAC::sin(roll);
-//      rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
-//      rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll)
-//                                     + MAC::cos(yaw)*MAC::cos(roll);
-//      rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll)
-//                                     - MAC::cos(yaw)*MAC::sin(roll);
-//      rot_matrix(0,2) = -MAC::sin(pitch);
-//      rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
-//      rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
-//   } else if (insertion_type == "Grains3D") {
-//      rot_matrix(0,0) = solid.thetap->item(m,0);
-//      rot_matrix(1,0) = solid.thetap->item(m,1);
-//      rot_matrix(2,0) = solid.thetap->item(m,2);
-//      rot_matrix(0,1) = solid.thetap->item(m,3);
-//      rot_matrix(1,1) = solid.thetap->item(m,4);
-//      rot_matrix(2,1) = solid.thetap->item(m,5);
-//      rot_matrix(0,2) = solid.thetap->item(m,6);
-//      rot_matrix(1,2) = solid.thetap->item(m,7);
-//      rot_matrix(2,2) = solid.thetap->item(m,8);
-//   }
-//
-//   double delta_x = delta(0)*rot_matrix(0,0)
-//                  + delta(1)*rot_matrix(0,1)
-//                  + delta(2)*rot_matrix(0,2);
-//   double delta_y = delta(0)*rot_matrix(1,0)
-//                  + delta(1)*rot_matrix(1,1)
-//                  + delta(2)*rot_matrix(1,2);
-//   double delta_z = delta(0)*rot_matrix(2,0)
-//                  + delta(1)*rot_matrix(2,1)
-//                  + delta(2)*rot_matrix(2,2);
-//
-//   delta(0) = delta_x;
-//   delta(1) = delta_y;
-//   delta(2) = delta_z;
-// }
-//
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: rotation_matrix (size_t const& m
-//                                   , class doubleVector& delta
-//                                   , size_t const& comp
-//                                   , size_t const& field)
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL( "DDS_NavierStokes:: rotation_matrix" ) ;
-//
-//   PartInput solid = GLOBAL_EQ->get_solid(0);
-//
-//   // yaw along z-axis; pitch along y-axis; roll along x-axis
-//   doubleArray2D rot_matrix(3,3,0);
-//
-//   // Rotation matrix assemble
-//   if (insertion_type == "file") {
-//      double roll = (MAC::pi()/180.)*solid.thetap->item(m,0);
-//      double pitch = (MAC::pi()/180.)*solid.thetap->item(m,1);
-//      double yaw = (MAC::pi()/180.)*solid.thetap->item(m,2);
-//      rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-//      rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll)
-//                                     - MAC::sin(yaw)*MAC::cos(roll);
-//      rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll)
-//                                     + MAC::sin(yaw)*MAC::sin(roll);
-//      rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
-//      rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll)
-//                                     + MAC::cos(yaw)*MAC::cos(roll);
-//      rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll)
-//                                     - MAC::cos(yaw)*MAC::sin(roll);
-//      rot_matrix(2,0) = -MAC::sin(pitch);
-//      rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
-//      rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
-//   } else if (insertion_type == "Grains3D") {
-//      rot_matrix(0,0) = solid.thetap->item(m,0);
-//      rot_matrix(0,1) = solid.thetap->item(m,1);
-//      rot_matrix(0,2) = solid.thetap->item(m,2);
-//      rot_matrix(1,0) = solid.thetap->item(m,3);
-//      rot_matrix(1,1) = solid.thetap->item(m,4);
-//      rot_matrix(1,2) = solid.thetap->item(m,5);
-//      rot_matrix(2,0) = solid.thetap->item(m,6);
-//      rot_matrix(2,1) = solid.thetap->item(m,7);
-//      rot_matrix(2,2) = solid.thetap->item(m,8);
-//   }
-//
-//   double delta_x = delta(0)*rot_matrix(0,0)
-//                  + delta(1)*rot_matrix(0,1)
-//                  + delta(2)*rot_matrix(0,2);
-//   double delta_y = delta(0)*rot_matrix(1,0)
-//                  + delta(1)*rot_matrix(1,1)
-//                  + delta(2)*rot_matrix(1,2);
-//   double delta_z = delta(0)*rot_matrix(2,0)
-//                  + delta(1)*rot_matrix(2,1)
-//                  + delta(2)*rot_matrix(2,2);
-//
-//   delta(0) = delta_x;
-//   delta(1) = delta_y;
-//   delta(2) = delta_z;
-// }
 
 
 
@@ -1411,6 +968,9 @@ DDS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
    return (Aee_diagcoef);
 }
 
+
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
@@ -1595,6 +1155,9 @@ DDS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
    }
 }
 
+
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: assemble_1D_matrices ( FV_DiscreteField const* FF
@@ -1650,6 +1213,9 @@ DDS_NavierStokes:: assemble_1D_matrices ( FV_DiscreteField const* FF
    }
 }
 
+
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
@@ -1686,9 +1252,9 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
   PF->set_neumann_DOF_values();
 
   // Calculate pressure forces on the solid particles
-  // if (is_stressCal) {
-  //    compute_fluid_pressure_particle_interaction(t_it);
-  // }
+  if (is_stressCal) {
+     allrigidbodies->compute_pressure_force_and_torque_for_allRB();
+  }
 
 }
 
@@ -2345,729 +1911,6 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
       }
    }
 }
-
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: compute_fluid_pressure_particle_interaction( FV_TimeIterator const* t_it)
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL("DDS_NavierStokes:: compute_fluid_pressure_particle_interaction" ) ;
-//
-//   // Structure of particle input data
-//   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
-//   PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
-//
-//   size_t Nmax = 0.;
-//   if (level_set_type == "Sphere") {
-//      Nmax = (dim == 2) ? ((size_t) Npoints) : ((size_t) (2*Npoints)) ;
-//   } else if (level_set_type == "Cube") {
-//      Nmax = (dim == 2) ? ((size_t) (4*Npoints)) : ((size_t) (6*pow(Npoints,2))) ;
-//   } else if (level_set_type == "Cylinder") {
-//      double Npm1 = round(pow(MAC::sqrt(Npoints) - MAC::sqrt(MAC::pi()/ar),2.));
-//      double Ncyl = (Npoints - Npm1);
-//      double dh = 1. - MAC::sqrt(Npm1/Npoints);
-//      double Nr = round(2./dh);
-//      Nmax = (dim == 3) ? ((size_t)(2*Npoints + Nr*Ncyl)) : 0 ;
-//   }
-//
-//   for (size_t parID = 0; parID < Npart; parID++) {
-//
-//      // Contribution due to pressure tensor
-//      compute_pressure_force_on_particle(parID, Nmax, t_it);
-//      // Gathering information from all procs
-//      hydro_forces.press[0]->set_item(parID,
-// 		     macCOMM->sum(hydro_forces.press[0]->item(parID))) ;
-//      hydro_forces.press[1]->set_item(parID,
-// 		     macCOMM->sum(hydro_forces.press[1]->item(parID))) ;
-//      hydro_forces.press[2]->set_item(parID,
-// 		     macCOMM->sum(hydro_forces.press[2]->item(parID))) ;
-//      hydro_torque.press[0]->set_item(parID,
-// 		     macCOMM->sum(hydro_torque.press[0]->item(parID))) ;
-//      hydro_torque.press[1]->set_item(parID,
-// 		     macCOMM->sum(hydro_torque.press[1]->item(parID))) ;
-//      hydro_torque.press[2]->set_item(parID,
-// 		     macCOMM->sum(hydro_torque.press[2]->item(parID))) ;
-//
-//   }
-// }
-//
-//
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: compute_fluid_velocity_particle_interaction( FV_TimeIterator const* t_it)
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL("DDS_NavierStokes:: compute_fluid_velocity_particle_interaction" ) ;
-//
-//   string fileName = "./DS_results/particle_forces.csv" ;
-//
-//   ofstream MyFile( fileName.c_str(), ios::app ) ;
-//   if ((t_it->time() == t_it->time_step()) && (my_rank == 0))
-//      MyFile << "Time,parID,Npoints,x,y,z,vx,vy,vz,Fpx,Fpy,Fpz,Fvx,Fvy,Fvz,Tpx,Tpy,Tpz,Tvx,Tvy,Tvz" << endl;
-//
-//   doubleArray2D avg_force(3,2,0);
-//   doubleArray2D avg_torque(3,2,0);
-//
-//   // Structure of hydrodynamic forces
-//   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
-//   PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
-//   // Structure of particle input data
-//   PartInput solid = GLOBAL_EQ->get_solid(0);
-//
-//   size_t Nmax = 0.;
-//   if (level_set_type == "Sphere") {
-//      Nmax = (dim == 2) ? ((size_t) Npoints) : ((size_t) (2*Npoints)) ;
-//   } else if (level_set_type == "Cube") {
-//      Nmax = (dim == 2) ? ((size_t) (4*Npoints)) : ((size_t) (6*pow(Npoints,2))) ;
-//   } else if (level_set_type == "Cylinder") {
-//      double Npm1 = round(pow(MAC::sqrt(Npoints) - MAC::sqrt(MAC::pi()/ar),2.));
-//      double Ncyl = (Npoints - Npm1);
-//      double dh = 1. - MAC::sqrt(Npm1/Npoints);
-//      double Nr = round(2./dh);
-//      Nmax = (dim == 3) ? ((size_t)(2*Npoints + Nr*Ncyl)) : 0 ;
-//   }
-//
-//   for (size_t parID = 0; parID < Npart; parID++) {
-//      // comp won't matter as the particle position is independent of comp
-//      double xp = solid.coord[0]->item(parID);
-//      double yp = solid.coord[1]->item(parID);
-//      double zp = solid.coord[2]->item(parID);
-//      double vx = solid.vel[0]->item(parID);
-//      double vy = solid.vel[1]->item(parID);
-//      double vz = solid.vel[2]->item(parID);
-//
-//      // Contribution of stress tensor
-//      compute_velocity_force_on_particle(parID, Nmax, t_it);
-//      // Gathering information from all procs
-//      hydro_forces.vel[0]->set_item(parID,
-// 		     macCOMM->sum(hydro_forces.vel[0]->item(parID))) ;
-//      hydro_forces.vel[1]->set_item(parID,
-// 		     macCOMM->sum(hydro_forces.vel[1]->item(parID))) ;
-//      hydro_forces.vel[2]->set_item(parID,
-// 		     macCOMM->sum(hydro_forces.vel[2]->item(parID))) ;
-//      hydro_torque.vel[0]->set_item(parID,
-// 		     macCOMM->sum(hydro_torque.vel[0]->item(parID))) ;
-//      hydro_torque.vel[1]->set_item(parID,
-// 		     macCOMM->sum(hydro_torque.vel[1]->item(parID))) ;
-//      hydro_torque.vel[2]->set_item(parID,
-// 		     macCOMM->sum(hydro_torque.vel[2]->item(parID))) ;
-//
-//
-//      if (my_rank == 0) {
-// 	avg_force(0,0) += hydro_forces.press[0]->item(parID);
-// 	avg_force(1,0) += hydro_forces.press[1]->item(parID);
-// 	avg_force(2,0) += hydro_forces.press[2]->item(parID);
-// 	avg_force(0,1) += hydro_forces.vel[0]->item(parID);
-// 	avg_force(1,1) += hydro_forces.vel[1]->item(parID);
-// 	avg_force(2,1) += hydro_forces.vel[2]->item(parID);
-//
-// 	avg_torque(0,0) += hydro_torque.press[0]->item(parID);
-// 	avg_torque(1,0) += hydro_torque.press[1]->item(parID);
-// 	avg_torque(2,0) += hydro_torque.press[2]->item(parID);
-// 	avg_torque(0,1) += hydro_torque.vel[0]->item(parID);
-// 	avg_torque(1,1) += hydro_torque.vel[1]->item(parID);
-// 	avg_torque(2,1) += hydro_torque.vel[2]->item(parID);
-//
-//         MyFile << t_it -> time() << "," << parID << "," << Nmax << "," << xp << "," << yp << "," << zp
-// 	                                                        << "," << vx << "," << vy << "," << vz
-// 					                        << "," << hydro_forces.press[0]->item(parID)
-//                                                                 << "," << hydro_forces.press[1]->item(parID)
-//                                                                 << "," << hydro_forces.press[2]->item(parID)
-//                                                                 << "," << hydro_forces.vel[0]->item(parID)
-//                                                                 << "," << hydro_forces.vel[1]->item(parID)
-//                                                                 << "," << hydro_forces.vel[2]->item(parID)
-// 					                        << "," << hydro_torque.press[0]->item(parID)
-//                                                                 << "," << hydro_torque.press[1]->item(parID)
-//                                                                 << "," << hydro_torque.press[2]->item(parID)
-//                                                                 << "," << hydro_torque.vel[0]->item(parID)
-//                                                                 << "," << hydro_torque.vel[1]->item(parID)
-//                                                                 << "," << hydro_torque.vel[2]->item(parID) << endl;
-//      }
-//   }
-//   if (my_rank == 0) cout << "Average force on particles: " << (avg_force(0,0) + avg_force(0,1))/double(Npart)
-//                                                     << "," << (avg_force(1,0) + avg_force(1,1))/double(Npart)
-//                                                     << "," << (avg_force(2,0) + avg_force(2,1))/double(Npart) <<endl;
-//   if (my_rank == 0) cout << "Average torque on particles: " << (avg_torque(0,0) + avg_torque(0,1))/double(Npart)
-//                                                      << "," << (avg_torque(1,0) + avg_torque(1,1))/double(Npart)
-//                                                      << "," << (avg_torque(2,0) + avg_torque(2,1))/double(Npart) <<endl;
-//   if (my_rank == 0) MyFile.close( ) ;
-// }
-//
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: compute_surface_points_on_cube(size_t const& Np)
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL("DDS_NavierStokes:: compute_surface_points_on_cube" ) ;
-//
-//   // Structure of particle input data
-//   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
-//
-//   double dp = 2./((double)Np);
-//
-//   if (dim == 3) {
-//      // Generating discretization on surface
-//      doubleVector lsp(Np,0.);
-//      for (size_t i=0; i<Np; i++) lsp(i) = -1. + dp*(double(i)+0.5);
-//
-//      size_t cntr = 0;
-//
-//      for (size_t i=0; i<Np; i++) {
-//         for (size_t j=0; j<Np; j++) {
-//            //Front
-//            surface.coordinate[0]->set_item(cntr,lsp(i));
-//            surface.coordinate[1]->set_item(cntr,lsp(j));
-//            surface.coordinate[2]->set_item(cntr,1.);
-//            surface.area->set_item(cntr,dp*dp);
-//            surface.normal[2]->set_item(cntr,1.);
-//            //Behind
-//            surface.coordinate[0]->set_item(Np*Np+cntr,lsp(i));
-//            surface.coordinate[1]->set_item(Np*Np+cntr,lsp(j));
-//            surface.coordinate[2]->set_item(Np*Np+cntr,-1.);
-//            surface.area->set_item(Np*Np+cntr,dp*dp);
-//            surface.normal[2]->set_item(Np*Np+cntr,-1.);
-//            //Top
-//            surface.coordinate[0]->set_item(2*Np*Np+cntr,lsp(i));
-//            surface.coordinate[2]->set_item(2*Np*Np+cntr,lsp(j));
-//            surface.coordinate[1]->set_item(2*Np*Np+cntr,1.);
-//            surface.area->set_item(2*Np*Np+cntr,dp*dp);
-//            surface.normal[1]->set_item(2*Np*Np+cntr,1.);
-//            //Bottom
-//            surface.coordinate[0]->set_item(3*Np*Np+cntr,lsp(i));
-//            surface.coordinate[2]->set_item(3*Np*Np+cntr,lsp(j));
-//            surface.coordinate[1]->set_item(3*Np*Np+cntr,-1.);
-//            surface.area->set_item(3*Np*Np+cntr,dp*dp);
-//            surface.normal[1]->set_item(3*Np*Np+cntr,-1.);
-//            //Right
-//            surface.coordinate[1]->set_item(4*Np*Np+cntr,lsp(i));
-//            surface.coordinate[2]->set_item(4*Np*Np+cntr,lsp(j));
-//            surface.coordinate[0]->set_item(4*Np*Np+cntr,1.);
-//            surface.area->set_item(4*Np*Np+cntr,dp*dp);
-//            surface.normal[0]->set_item(4*Np*Np+cntr,1.);
-//            //Left
-//            surface.coordinate[1]->set_item(5*Np*Np+cntr,lsp(i));
-//            surface.coordinate[2]->set_item(5*Np*Np+cntr,lsp(j));
-//            surface.coordinate[0]->set_item(5*Np*Np+cntr,-1.);
-//            surface.area->set_item(5*Np*Np+cntr,dp*dp);
-//            surface.normal[0]->set_item(5*Np*Np+cntr,-1.);
-//
-//            cntr++;
-//         }
-//      }
-//   } else if (dim == 2) {
-//      // Generating discretization on surface
-//      double lsp=0.;
-//      for (size_t i=0; i<Np; i++) {
-//          lsp = -1. + dp*((double)i+0.5);
-//       	//Bottom
-//       	surface.coordinate[0]->set_item(i,lsp);
-//       	surface.coordinate[1]->set_item(i,-1.);
-//       	surface.area->set_item(i,dp);
-//       	surface.normal[1]->set_item(i,-1.);
-//       	//Top
-//       	surface.coordinate[0]->set_item(Np+i,lsp);
-//       	surface.coordinate[1]->set_item(Np+i,1.);
-//       	surface.area->set_item(Np+i,dp);
-//       	surface.normal[1]->set_item(Np+i,1.);
-//       	//Left
-//       	surface.coordinate[0]->set_item(2*Np+i,-1.);
-//       	surface.coordinate[1]->set_item(2*Np+i,lsp);
-//       	surface.area->set_item(2*Np+i,dp);
-//       	surface.normal[0]->set_item(2*Np+i,-1.);
-//       	//Right
-//       	surface.coordinate[0]->set_item(3*Np+i,1.);
-//       	surface.coordinate[1]->set_item(3*Np+i,lsp);
-//       	surface.area->set_item(3*Np+i,dp);
-//       	surface.normal[0]->set_item(3*Np+i,1.);
-//      }
-//   }
-// }
-//
-//
-//
-//
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: generate_surface_discretization()
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL("DDS_NavierStokes:: generate_surface_discretization" ) ;
-//
-//   size_t kmax = (int) Npoints;
-//   //
-//   // if ( level_set_type == "Sphere" ) {
-
-//   // } else if (level_set_type == "Cube") {
-//   //    compute_surface_points_on_cube(kmax);
-//   //    //  write_surface_discretization((size_t)(6*pow(kmax,2)));
-//   // } else if (level_set_type == "Cylinder") {
-
-//   // }
-// }
-
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: ghost_points_generation( FV_DiscreteField* FF, class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& comp,size_t const& major_dir, class boolArray2D& point_in_domain, class doubleVector& rotated_vector )
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL("DDS_NavierStokes:: ghost_points_generation" ) ;
-//
-//   intVector i0_temp(2,0);
-//   size_t i0_t;
-//
-//   // Ghost points in i for the calculation of i-derivative of field
-//   i0_temp(0) = (sign == 1) ? (int(i0(0,major_dir)) + 1*sign) : (int(i0(0,major_dir)) + 0*sign);
-//   i0_temp(1) = (sign == 1) ? (int(i0(0,major_dir)) + 2*sign) : (int(i0(0,major_dir)) + 1*sign);
-//
-//   if ((i0_temp(0) >= 0) && (i0_temp(0) < (int)FF->get_local_nb_dof(comp,major_dir)))
-//      point(1,major_dir) = FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
-//   if ((i0_temp(1) >= 0) && (i0_temp(1) < (int)FF->get_local_nb_dof(comp,major_dir)))
-//      point(2,major_dir) = FF->get_DOF_coordinate(i0_temp(1), comp, major_dir);
-//
-//   if (MAC::abs(point(0,major_dir)-point(1,major_dir)) < MAC::abs(point(1,major_dir)-point(2,major_dir))) {
-//      i0_temp(0) = (sign == 1) ? (int(i0(0,major_dir)) + 2*sign) : (int(i0(0,major_dir)) + 1*sign);
-//      i0_temp(1) = (sign == 1) ? (int(i0(0,major_dir)) + 3*sign) : (int(i0(0,major_dir)) + 2*sign);
-//
-//      if ((i0_temp(0) >= 0) && (i0_temp(0) < (int)FF->get_local_nb_dof(comp,major_dir)))
-//         point(1,major_dir) = FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
-//      if ((i0_temp(1) >= 0) && (i0_temp(1) < (int)FF->get_local_nb_dof(comp,major_dir)))
-//         point(2,major_dir) = FF->get_DOF_coordinate(i0_temp(1), comp, major_dir);
-//   }
-//
-//   // Velocity field
-//   if (FF == UF) {
-//      if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)FF->get_local_nb_dof(comp,major_dir))) {
-//         point_in_domain(0,major_dir) = 0;
-//      } else {
-//         point_in_domain(0,major_dir) = 1;
-//      }
-//
-//      if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)FF->get_local_nb_dof(comp,major_dir))) {
-//         point_in_domain(1,major_dir) = 0;
-//      } else {
-//         point_in_domain(1,major_dir) = 1;
-//      }
-//
-//      i0(1,major_dir) = i0_temp(0);
-//      i0(2,major_dir) = i0_temp(1);
-//   // Pressure field
-//   } else {
-//      double t1 = (point(1,major_dir) - point(0,major_dir))/rotated_vector(major_dir);
-//      double t2 = (point(2,major_dir) - point(0,major_dir))/rotated_vector(major_dir);
-//
-//      for (size_t dir=0; dir<dim; dir++) {
-//         if (dir != major_dir) {
-//            point(1,dir) = point(0,dir) + rotated_vector(dir)*t1;
-//            point(2,dir) = point(0,dir) + rotated_vector(dir)*t2;
-//         }
-//      }
-//
-//      boolArray2D found(2,dim,true);
-//
-//      for (size_t dir=0; dir<dim; dir++) {
-//         if (dir == major_dir) {
-//            // Checking the points in domain or not
-//            if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)FF->get_local_nb_dof(0,dir))) {
-//               found(0,dir) = 0;
-//            }
-//            if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)FF->get_local_nb_dof(0,dir))) {
-//               found(1,dir) = 0;
-//            }
-//            i0(1,dir) = i0_temp(0);
-//            i0(2,dir) = i0_temp(1);
-//         } else {
-//            found(0,dir) = FV_Mesh::between(FF->get_DOF_coordinates_vector(0,dir), point(1,dir), i0_t);
-//            if (found(0,dir)) i0(1,dir) = i0_t;
-//            found(1,dir) = FV_Mesh::between(FF->get_DOF_coordinates_vector(0,dir), point(2,dir), i0_t);
-//            if (found(1,dir)) i0(2,dir) = i0_t;
-//         }
-//      }
-//
-//      // Checking the ghost points in domain or not
-//      point_in_domain(0,0) = (dim == 2) ? found(0,0) && found(0,1) :
-//                                          found(0,0) && found(0,1) && found(0,2) ;
-//      point_in_domain(0,1) = (dim == 2) ? found(1,0) && found(1,1) :
-//                                          found(1,0) && found(1,1) && found(1,2) ;
-//   }
-// }
-//
-//
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: compute_pressure_force_on_particle(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it )
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL("DDS_NavierStokes:: compute_pressure_force_on_particle" ) ;
-//
-//   if (PressureStressOrder == "first") {
-//      first_order_pressure_stress(parID, Np, t_it );
-//   } else if (PressureStressOrder == "second") {
-//      second_order_pressure_stress(parID, Np, t_it );
-//   } else if (PressureStressOrder == "second_withNeumannBC") {
-//      second_order_pressure_stress_withNeumannBC(parID, Np, t_it );
-//   }
-// }
-//
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: compute_velocity_force_on_particle(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it )
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL("DDS_NavierStokes:: compute_velocity_force_on_particle" ) ;
-//
-//   if (ViscousStressOrder == "first") {
-//      first_order_viscous_stress(parID, Np, t_it );
-//   } else if (ViscousStressOrder == "second") {
-//      second_order_viscous_stress(parID, Np, t_it );
-//   }
-// }
-//
-// //---------------------------------------------------------------------------
-// void
-// DDS_NavierStokes:: second_order_viscous_stress(size_t const& parID, size_t const& Np, FV_TimeIterator const* t_it )
-// //---------------------------------------------------------------------------
-// {
-//   MAC_LABEL("DDS_NavierStokes:: second_order_viscous_stress" ) ;
-//
-//   size_t i0_temp;
-//   double dfdx=0.,dfdy=0., dfdz=0.;
-//
-//   // Structure of particle input data
-//   PartInput solid = GLOBAL_EQ->get_solid(0);
-//   // Structure of particle surface input data
-//   SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
-//
-//   // comp won't matter as the particle position is independent of comp
-//   double xp = solid.coord[0]->item(parID);
-//   double yp = solid.coord[1]->item(parID);
-//   double zp = solid.coord[2]->item(parID);
-//   double ri = solid.size->item(parID);
-//
-//   doubleArray2D point(3,3,0);
-//   doubleArray2D fini(3,3,0);
-//   doubleArray2D stress(Np,6,0);         //xx,yy,zz,xy,yz,zx
-//   doubleArray2D level_set(dim,2,1.);
-//   size_t_array2D in_parID(dim,2,0);         //Store particle ID if level_set becomes negative
-//   boolArray2D found(dim,3,false);
-//   size_t_array2D i0(3,3,0);
-//   vector<double> net_vel(3,0.);
-//   doubleArray2D surface_force(Np,3,0);
-//   doubleArray2D surface_point(Np,3,0);
-//
-//   size_t_vector min_unknown_index(dim,0);
-//   size_t_vector max_unknown_index(dim,0);
-//
-//   doubleVector Dmin(dim,0);
-//   doubleVector Dmax(dim,0);
-//   doubleVector rotated_coord(3,0);
-//   doubleVector rotated_normal(3,0);
-//   intVector sign(dim,0);
-//   boolArray2D point_in_domain(2,dim,1);
-//
-//   // Structure of particle input data
-//   PartForces hydro_forces = GLOBAL_EQ->get_forces(0);
-//   PartForces hydro_torque = GLOBAL_EQ->get_torque(0);
-//
-//   // Force vector
-//   doubleVector force(3,0);
-//   doubleVector torque(3,0);
-//
-//   for (size_t i=0;i<Np;i++) {
-//      for (size_t comp=0;comp<nb_comps[1];comp++) {
-//         // Get local min and max indices
-// 	// Get min and max coordinates in the current processor
-//         for (size_t l=0;l<dim;++l) {
-//            min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp, l );
-//            max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp, l );
-// 	   Dmin(l) = UF->primary_grid()->get_min_coordinate_on_current_processor(l);
-// 	   Dmax(l) = UF->primary_grid()->get_max_coordinate_on_current_processor(l);
-//         }
-//
-// 	// Rotating surface points
-// 	rotated_coord(0) = ri*surface.coordinate[0]->item(i);
-// 	rotated_coord(1) = ri*surface.coordinate[1]->item(i);
-// 	rotated_coord(2) = ri*surface.coordinate[2]->item(i);
-//
-//         rotation_matrix(parID,rotated_coord,comp,1);
-//
-//         point(0,0) = xp + rotated_coord(0);
-//         point(0,1) = yp + rotated_coord(1);
-//         point(0,2) = zp + rotated_coord(2);
-//
-//         // Rotating surface normal
-// 	rotated_normal(0) = surface.normal[0]->item(i);
-// 	rotated_normal(1) = surface.normal[1]->item(i);
-// 	rotated_normal(2) = surface.normal[2]->item(i);
-//
-// 	rotation_matrix(parID,rotated_normal,comp,1);
-//
-//         for (size_t dir=0;dir<dim;dir++) {
-// 	   // PBC on rotated surface points
-// 	   if (is_periodic[1][dir]) {
-//               double isize = UF->primary_grid()->get_main_domain_max_coordinate(dir) - UF->primary_grid()->get_main_domain_min_coordinate(dir);
-//               double imin = UF->primary_grid()->get_main_domain_min_coordinate(dir);
-//               point(0,dir) = point(0,dir) - MAC::floor((point(0,dir)-imin)/isize)*isize;
-//            }
-//            // Finding the grid indexes next to ghost points
-//            found(dir,0) = FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,dir), point(0,dir), i0_temp);
-//            if (found(dir,0) == 1) i0(0,dir) = i0_temp;
-// 	}
-//
-// 	// Accessing the smallest grid size in domain
-//         double dh = UF->primary_grid()->get_smallest_grid_size();
-//
-//         bool status = (dim==2) ? ((point(0,0) > Dmin(0)) && (point(0,0) <= Dmax(0)) && (point(0,1) > Dmin(1)) && (point(0,1) <= Dmax(1))) :
-//                                  ((point(0,0) > Dmin(0)) && (point(0,0) <= Dmax(0)) && (point(0,1) > Dmin(1)) && (point(0,1) <= Dmax(1))
-//                                                                                     && (point(0,2) > Dmin(2)) && (point(0,2) <= Dmax(2)));
-//         double threshold = pow(loc_thres,0.5)*dh;
-//
-//         if (status) {
-//            for (size_t dir=0;dir<dim;dir++) {
-//               sign(dir) = (rotated_normal(dir) > 0.) ? 1 : -1;
-//
-//               // Ghost points in i for the calculation of i-derivative of field
-//               ghost_points_generation( UF, point, i0, sign(dir), comp, dir, point_in_domain, rotated_normal);
-// 	      // Assuming all ghost points are in fluid
-//               level_set(dir,0) = 1.; level_set(dir,1) = 1.;
-// 	   }
-//
-//            // Checking all the ghost points in the solid/fluid, and storing the parID if present in solid
-//            for (size_t m=0;m<Npart;m++) {
-// 	      // In X
-//               if (level_set(0,0) > threshold) {
-//                  level_set(0,0) = level_set_function(UF,m,comp,point(1,0),point(0,1),point(0,2),level_set_type,1);
-//                  level_set(0,0) *= solid.inside->item(m);
-//                  if (level_set(0,0) < threshold) in_parID(0,0) = m;
-//               }
-//               if (level_set(0,1) > threshold) {
-//                  level_set(0,1) = level_set_function(UF,m,comp,point(2,0),point(0,1),point(0,2),level_set_type,1);
-//                  level_set(0,1) *= solid.inside->item(m);
-//                  if (level_set(0,1) < threshold) in_parID(0,1) = m;
-//               }
-// 	      // In Y
-//               if (level_set(1,0) > threshold) {
-//                  level_set(1,0) = level_set_function(UF,m,comp,point(0,0),point(1,1),point(0,2),level_set_type,1);
-//                  level_set(1,0) *= solid.inside->item(m);
-//                  if (level_set(1,0) < threshold) in_parID(1,0) = m;
-//               }
-//               if (level_set(1,1) > threshold) {
-//                  level_set(1,1) = level_set_function(UF,m,comp,point(0,0),point(2,1),point(0,2),level_set_type,1);
-//                  level_set(1,1) *= solid.inside->item(m);
-//                  if (level_set(1,1) < threshold) in_parID(1,1) = m;
-//               }
-// 	      // In Z
-// 	      if (dim == 3) {
-//                  if (level_set(2,0) > threshold) {
-//                     level_set(2,0) = level_set_function(UF,m,comp,point(0,0),point(0,1),point(1,2),level_set_type,1);
-//                     level_set(2,0) *= solid.inside->item(m);
-//                     if (level_set(2,0) < threshold) in_parID(2,0) = m;
-//                  }
-//                  if (level_set(2,1) > threshold) {
-//                     level_set(2,1) = level_set_function(UF,m,comp,point(0,0),point(0,1),point(2,2),level_set_type,1);
-//                     level_set(2,1) *= solid.inside->item(m);
-//                     if (level_set(2,1) < threshold) in_parID(2,1) = m;
-//                  }
-// 	      }
-//            }
-//
-//            // Calculation of field variable on ghost point(0,0)
-//            impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(0,1),point(0,2),parID);
-//            fini(0,0) = net_vel[comp];
-//            fini(0,1) = net_vel[comp];
-//            fini(0,2) = net_vel[comp];
-//
-//            // Calculation of field variable on ghost point(1,0)
-//            if ((level_set(0,0) > threshold) && point_in_domain(0,0)) {
-//               fini(1,0) = third_order_ghost_field_estimate(UF, comp, point(1,0), point(0,1), point(0,2), i0(1,0), i0(0,1), i0(0,2), 0, sign,0);
-//            } else if (level_set(0,0) <= threshold) {
-//               impose_solid_velocity_for_ghost(net_vel,comp,point(1,0),point(0,1),point(0,2),in_parID(0,0));
-//               fini(1,0) = net_vel[comp];
-//            }
-//            // Calculation of field variable on ghost point(2,0)
-//            if ((level_set(0,1) > threshold) && point_in_domain(1,0)) {
-//               fini(2,0) = third_order_ghost_field_estimate(UF, comp, point(2,0), point(0,1), point(0,2), i0(2,0), i0(0,1), i0(0,2), 0, sign,0);
-//            } else if (level_set(0,1) <= threshold) {
-//               impose_solid_velocity_for_ghost(net_vel,comp,point(2,0),point(0,1),point(0,2),in_parID(0,1));
-//               fini(2,0) = net_vel[comp];
-//            }
-//            // Calculation of field variable on ghost point(1,1)
-//            if ((level_set(1,0) > threshold) && point_in_domain(0,1)) {
-// 	      fini(1,1) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(1,1), point(0,2), i0(0,0), i0(1,1), i0(0,2), 1, sign,0);
-//            } else if (level_set(1,0) <= threshold) {
-//               impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(1,1),point(0,2),in_parID(1,0));
-//               fini(1,1) = net_vel[comp];
-// 	   }
-//            // Calculation of field variable on ghost point(2,1)
-//            if ((level_set(1,1) > threshold) && point_in_domain(1,1)) {
-//               fini(2,1) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(2,1), point(0,2), i0(0,0), i0(2,1), i0(0,2), 1, sign,0);
-// 	   } else if (level_set(1,1) <= threshold) {
-//               impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(2,1),point(0,2),in_parID(1,1));
-// 	      fini(2,1) = net_vel[comp];
-//            }
-//
-// 	   if (dim == 3) {
-//               // Calculation of field variable on ghost point(1,2)
-//               if ((level_set(2,0) > threshold) && point_in_domain(0,2)) {
-//                 fini(1,2) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(0,1), point(1,2), i0(0,0), i0(0,1), i0(1,2), 2, sign, 0);
-//               } else if (level_set(2,0) <= threshold) {
-//                  impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(0,1),point(1,2),in_parID(2,0));
-//                  fini(1,2) = net_vel[comp];
-//               }
-//               // Calculation of field variable on ghost point(2,2)
-//               if ((level_set(2,1) > threshold) && point_in_domain(1,2)) {
-//                 fini(2,2) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(0,1), point(2,2), i0(0,0), i0(0,1), i0(2,2), 2, sign, 0);
-// 	      } else if (level_set(2,1) <= threshold) {
-//                  impose_solid_velocity_for_ghost(net_vel,comp,point(0,0),point(0,1),point(2,2),in_parID(2,1));
-// 	         fini(2,2) = net_vel[comp];
-//               }
-//  	   }
-//
-//            // Derivative in x
-//            // Point 1 and 2 in computational domain
-// 	   if (point_in_domain(0,0) && point_in_domain(1,0)) {
-//               if ((level_set(0,0) > threshold) && (level_set(0,1) > threshold)) {
-// 	         double dx1 = (point(1,0)-point(0,0));
-//                  double dx2 = (point(2,0)-point(0,0));
-//                  dfdx = mu*((fini(1,0) - fini(0,0))*dx2/dx1 - (fini(2,0) - fini(0,0))*dx1/dx2)/(dx2-dx1);
-//               // Point 1 in fluid and 2 in the solid
-//               } else if ((level_set(0,0) > threshold) && (level_set(0,1) <= threshold)) {
-//                  double dx1 = (point(1,0)-point(0,0));
-//                  dfdx = mu*(fini(1,0) - fini(0,0))/dx1;
-//               // Point 1 is present in solid
-//               } else if (level_set(0,0) <= threshold) {
-// 	         double dx1 = (point(1,0)-point(0,0));
-//                  dfdx = mu*(fini(1,0) - fini(0,0))/dx1;
-// 	      }
-//            // Point 1 in computational domain
-// 	   } else if (point_in_domain(0,0) && !point_in_domain(1,0)) {
-//               double dx1 = (point(1,0)-point(0,0));
-//               dfdx = mu*(fini(1,0) - fini(0,0))/dx1;
-//            // Particle close to wall
-//            } else if (!point_in_domain(0,0)) {
-//               i0(1,0) = (sign(0) == 1) ? (i0(0,0) + 1*sign(0)) : (i0(0,0) + 0*sign(0));
-//               point(1,0) = UF->get_DOF_coordinate(i0(1,0), comp, 0);
-//               fini(1,0) = third_order_ghost_field_estimate(UF, comp, point(1,0), point(0,1), point(0,2), i0(1,0), i0(0,1), i0(0,2), 0, sign,0);
-//               double dx1 = (point(1,0)-point(0,0));
-//               dfdx = mu*(fini(1,0) - fini(0,0))/dx1;
-// 	   }
-//
-//            // Derivative in y
-//            // Point 1 and 2 in computational domain
-//            if (point_in_domain(0,1) && point_in_domain(1,1)) {
-//               if ((level_set(1,0) > threshold) && (level_set(1,1) > threshold)) {
-//                  double dy1 = (point(1,1)-point(0,1));
-// 	         double dy2 = (point(2,1)-point(0,1));
-//                  dfdy = mu*((fini(1,1) - fini(0,1))*dy2/dy1 - (fini(2,1) - fini(0,1))*dy1/dy2)/(dy2-dy1);
-//               // Point 1 in fluid and 2 in the solid
-//               } else if ((level_set(1,0) > threshold) && (level_set(1,1) <= threshold)) {
-// 	         double dy1 = (point(1,1)-point(0,1));
-//                  dfdy = mu*(fini(1,1) - fini(0,1))/dy1;
-//               // Point 1 is present in solid
-//               } else if (level_set(1,0) <= threshold) {
-//                  double dy1 = (point(1,1)-point(0,1));
-//                  dfdy = mu*(fini(1,1) - fini(0,1))/dy1;
-// 	      }
-//            // Point 1 in computational domain
-// 	   } else if (point_in_domain(0,1) && !point_in_domain(1,1)) {
-//               double dy1 = (point(1,1)-point(0,1));
-//               dfdy = mu*(fini(1,1) - fini(0,1))/dy1;
-//            // Particle close to wall
-//            } else if (!point_in_domain(0,1)) {
-//               i0(1,1) = (sign(1) == 1) ? (i0(0,1) + 1*sign(1)) : (i0(0,1) + 0*sign(1));
-//               point(1,1) = UF->get_DOF_coordinate(i0(1,1), comp, 1);
-// 	      fini(1,1) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(1,1), point(0,2), i0(0,0), i0(1,1), i0(0,2), 1, sign,0);
-//               double dy1 = (point(1,1)-point(0,1));
-//               dfdy = mu*(fini(1,1) - fini(0,1))/dy1;
-//            }
-//
-//            // Derivative in z
-// 	   if (dim == 3) {
-//               // Point 1 and 2 in computational domain
-//               if (point_in_domain(0,2) && point_in_domain(1,2)) {
-//                  if ((level_set(2,0) > threshold) && (level_set(2,1) > threshold)) {
-//                     double dz1 = (point(1,2)-point(0,2));
-//                     double dz2 = (point(2,2)-point(0,2));
-//                     dfdz = mu*((fini(1,2) - fini(0,2))*dz2/dz1 - (fini(2,2) - fini(0,2))*dz1/dz2)/(dz2-dz1);
-//                  // Point 1 in fluid and 2 in solid
-//                  } else if ((level_set(2,0) > threshold) && (level_set(2,1) <= threshold)) {
-// 	            double dz1 = (point(1,2)-point(0,2));
-//                     dfdz = mu*(fini(1,2) - fini(0,2))/dz1;
-//                  // Point 1 is present in solid
-//                  } else if (level_set(2,0) <= threshold) {
-//                     double dz1 = (point(1,2)-point(0,2));
-//                     dfdz = mu*(fini(1,2) - fini(0,2))/dz1;
-//                  }
-//               // Point 1 in computational domain
-// 	      } else if (point_in_domain(0,2) && !point_in_domain(1,2)) {
-//                  double dz1 = (point(1,2)-point(0,2));
-//                  dfdz = mu*(fini(1,2) - fini(0,2))/dz1;
-//               // Particle close to wall
-//               } else if (!point_in_domain(0,2)) {
-//                  i0(1,2) = (sign(2) == 1) ? (i0(0,2) + 1*sign(2)) : (i0(0,2) + 0*sign(2));
-//                  point(1,2) = UF->get_DOF_coordinate(i0(1,2), comp, 2);
-//                 fini(1,2) = third_order_ghost_field_estimate(UF, comp, point(0,0), point(0,1), point(1,2), i0(0,0), i0(0,1), i0(1,2), 2, sign, 0);
-//                  double dz1 = (point(1,2)-point(0,2));
-//                  dfdz = mu*(fini(1,2) - fini(0,2))/dz1;
-// 	      }
-// 	   }
-//
-//            if (comp == 0) {
-//               stress(i,0) = 2.*dfdx;
-//               stress(i,3) = stress(i,3) + dfdy;
-//               stress(i,5) = stress(i,5) + dfdz;
-//            } else if (comp == 1) {
-//               stress(i,1) = 2.*dfdy;
-//               stress(i,3) = stress(i,3) + dfdx;
-//               stress(i,4) = stress(i,4) + dfdz;
-//            } else if (comp == 2) {
-//               stress(i,2) = 2.*dfdz;
-//               stress(i,4) = stress(i,4) + dfdy;
-//               stress(i,5) = stress(i,5) + dfdx;
-//            }
-// 	}
-//      }
-//
-//      double scale = (dim == 2) ? ri : ri*ri;
-//
-//      // Ref: Keating thesis Pg-85
-//      // point_coord*(area) --> Component of area in particular direction
-//      double fx = stress(i,0)*rotated_normal(0)*(surface.area->item(i)*scale)
-//                + stress(i,3)*rotated_normal(1)*(surface.area->item(i)*scale)
-//                + stress(i,5)*rotated_normal(2)*(surface.area->item(i)*scale);
-//      double fy = stress(i,3)*rotated_normal(0)*(surface.area->item(i)*scale)
-//                + stress(i,1)*rotated_normal(1)*(surface.area->item(i)*scale)
-//                + stress(i,4)*rotated_normal(2)*(surface.area->item(i)*scale);
-//      double fz = stress(i,5)*rotated_normal(0)*(surface.area->item(i)*scale)
-//                + stress(i,4)*rotated_normal(1)*(surface.area->item(i)*scale)
-//                + stress(i,2)*rotated_normal(2)*(surface.area->item(i)*scale);
-//
-//      surface_point(i,0) = point(0,0);
-//      surface_point(i,1) = point(0,1);
-//      surface_point(i,2) = point(0,2);
-//
-//      surface_force(i,0) = fx;
-//      surface_force(i,1) = fy;
-//      surface_force(i,2) = fz;
-//
-//      force(0) = force(0) + fx ;
-//      force(1) = force(1) + fy ;
-//      force(2) = force(2) + fz ;
-//
-//      torque(0) = torque(0) + fz*rotated_coord(1) - fy*rotated_coord(2);
-//      torque(1) = torque(1) + fx*rotated_coord(2) - fz*rotated_coord(0);
-//      torque(2) = torque(2) + fy*rotated_coord(0) - fx*rotated_coord(1);
-//   }
-//
-//   write_surface_discretized_forces(UF,Np,parID,surface_point,surface_force,t_it);
-//
-//   hydro_forces.vel[0]->set_item(parID,force(0)) ;
-//   hydro_forces.vel[1]->set_item(parID,force(1)) ;
-//   hydro_forces.vel[2]->set_item(parID,force(2)) ;
-//
-//   hydro_torque.vel[0]->set_item(parID,torque(0)) ;
-//   hydro_torque.vel[1]->set_item(parID,torque(1)) ;
-//   hydro_torque.vel[2]->set_item(parID,torque(2)) ;
-// }
 
 
 
@@ -3831,9 +2674,15 @@ DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
 }
 
 
+
+
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i, size_t const& j, size_t const& k, size_t const& level, FV_TimeIterator const* t_it)
+DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i,
+                                                   size_t const& j,
+                                                   size_t const& k,
+                                                   size_t const& level,
+                                                   FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NavierStokes:: calculate_velocity_divergence" ) ;
@@ -3846,6 +2695,9 @@ DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i, size_t const
 
    return(value);
 }
+
+
+
 
 //---------------------------------------------------------------------------
 double
@@ -3909,6 +2761,9 @@ DDS_NavierStokes:: pressure_local_rhs ( size_t const& j
 
    return fe;
 }
+
+
+
 
 //---------------------------------------------------------------------------
 void
@@ -4070,6 +2925,9 @@ DDS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
   PF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_pressure() ) ;
 }
 
+
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: correct_mean_pressure (size_t const& level )
@@ -4130,6 +2988,9 @@ DDS_NavierStokes:: correct_mean_pressure (size_t const& level )
 
 }
 
+
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
@@ -4168,6 +3029,9 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
      correct_pressure_2nd_layer_solid(1);
   }
 }
+
+
+
 
 //---------------------------------------------------------------------------
 void
@@ -4224,51 +3088,9 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    PF->set_neumann_DOF_values();
 }
 
-//
-// //----------------------------------------------------------------------
-// void
-// DDS_NavierStokes::write_surface_discretized_forces(
-// 		FV_DiscreteField const* FF,
-// 		size_t const& Np,
-// 		size_t const& parID,
-// 		class doubleArray2D& point,
-// 		class doubleArray2D& force,
-// 		FV_TimeIterator const* t_it)
-// //----------------------------------------------------------------------
-// {
-//
-//   if ((is_surfacestressOUT) && (t_it->iteration_number()%100 == 0)) {
-//      // Collect particle data from all the procs, if any.
-//      macCOMM->sum_array(force);
-//
-//      if (my_rank == 0) {
-//         ofstream outputFile ;
-//
-//         std::ostringstream os2;
-//         if (FF == PF) {
-//            os2 << "./DS_results/surface_press_force_parID_" << parID << ".csv";
-//         } else {
-//            os2 << "./DS_results/surface_visco_force_parID_" << parID << ".csv";
-//         }
-//         std::string filename = os2.str();
-//         outputFile.open(filename.c_str());
-//
-//         outputFile << "Sid,x,y,z,Fx,Fy,Fz" << endl;
-//
-//         for (size_t i=0;i<Np;i++) {
-//            outputFile << i << "," << point(i,0) << ","
-//                                   << point(i,1) << ","
-//                                   << point(i,2) << ","
-// 				  << force(i,0) << ","
-//                                   << force(i,1) << ","
-//                                   << force(i,2) << endl;
-//         }
-//         outputFile.close();
-//      }
-//   }
-//
-// }
-//
+
+
+
 // //----------------------------------------------------------------------
 // void
 // DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, FV_TimeIterator const* t_it)
@@ -4341,67 +3163,57 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 //   outputFile.close();
 // }
 //
-// //----------------------------------------------------------------------
-// double
-// DDS_NavierStokes::get_velocity_divergence(FV_TimeIterator const* t_it)
-// //----------------------------------------------------------------------
-// {
-//   size_t_vector min_unknown_index(dim,0);
-//   size_t_vector max_unknown_index(dim,0);
-//   double div_velocity = 0.;
-//   double max_divu=0.;
-//
-//   DivNode* divergence = GLOBAL_EQ->get_node_divergence();
-//
-//   for (size_t l=0;l<dim;++l) {
-//     min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-//     max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-//   }
-//
-//   ofstream outputFile ;
-// /*
-//   std::ostringstream os2;
-//   os2 << "./DS_results/divergence_" << t_it->iteration_number() << ".csv";
-//   std::string filename = os2.str();
-//   outputFile.open(filename.c_str());
-//   outputFile << "i,j,div" << endl;
-// */
-//   for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-//      for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-//         double dx = PF->get_cell_size( i, 0, 0 );
-//         double dy = PF->get_cell_size( j, 0, 1 );
-//         if (dim == 2) {
-//            size_t p = return_node_index(PF,0,i,j,0);
-//            double vel_div = divergence[0].div->item(p);
-//            max_divu = MAC::max( MAC::abs(vel_div), max_divu );
-//            div_velocity += vel_div * ( dx * dy );
-//
-// //           outputFile << PF->get_DOF_coordinate( i, 0, 0 ) << "," << PF->get_DOF_coordinate( j, 0, 1 ) << "," << vel_div << endl;
-//         } else {
-//            for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-//               double dz = PF->get_cell_size( k, 0, 2 );
-//               size_t p = return_node_index(PF,0,i,j,k);
-//               double vel_div = divergence[0].div->item(p);
-//               max_divu = MAC::max( MAC::abs(vel_div), max_divu );
-//               div_velocity += vel_div * ( dx * dy * dz );
-//            }
-//         }
-//      }
-//   }
-//
-//   div_velocity = macCOMM->sum( div_velocity ) ;
-// //  div_velocity = MAC::sqrt( div_velocity );
-//   max_divu = macCOMM->max( max_divu ) ;
-//   if ( my_rank == is_master )
-//     MAC::out() << "Norm L2 div(u) = "<< MAC::doubleToString( ios::scientific, 12, div_velocity ) << " Max div(u) = " << MAC::doubleToString( ios::scientific, 12, max_divu ) << endl;
-//
-// //  outputFile.close( ) ;
-//   return(max_divu);
-// }
-//
-//
-//
-//
+//----------------------------------------------------------------------
+void
+DDS_NavierStokes::output_L2norm_divergence( )
+//----------------------------------------------------------------------
+{
+  size_t_vector min_unknown_index(dim,0);
+  size_t_vector max_unknown_index(dim,0);
+  double div_velocity = 0.;
+  double max_divu = 0.;
+
+  doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
+
+  for (size_t l=0;l<dim;++l) {
+    min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
+    max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
+  }
+
+  for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+     for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+        double dx = PF->get_cell_size( i, 0, 0 );
+        double dy = PF->get_cell_size( j, 0, 1 );
+        if (dim == 2) {
+           size_t p = PF->DOF_local_number(i,j,0,0);
+           double vel_div = divergence->operator()(p);
+           max_divu = MAC::max( MAC::abs(vel_div), max_divu );
+           div_velocity += vel_div * ( dx * dy );
+        } else {
+           for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+              double dz = PF->get_cell_size( k, 0, 2 );
+              size_t p = PF->DOF_local_number(i,j,k,0);
+              double vel_div = divergence->operator()(p);
+              max_divu = MAC::max( MAC::abs(vel_div), max_divu );
+              div_velocity += vel_div * ( dx * dy * dz );
+           }
+        }
+     }
+  }
+
+  div_velocity = macCOMM->sum( div_velocity ) ;
+  max_divu = macCOMM->max( max_divu ) ;
+  if ( my_rank == is_master )
+    MAC::out() << "Norm L2 div(u) = "
+               << MAC::doubleToString( ios::scientific, 12, div_velocity )
+               << " Max div(u) = "
+               << MAC::doubleToString( ios::scientific, 12, max_divu )
+               << endl;
+}
+
+
+
+
 //----------------------------------------------------------------------
 void
 DDS_NavierStokes::output_L2norm_pressure( size_t const& level )
@@ -4507,6 +3319,9 @@ DDS_NavierStokes::output_L2norm_velocity( size_t const& level )
   }
 }
 
+
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: create_DDS_subcommunicators ( void )
@@ -4557,6 +3372,9 @@ DDS_NavierStokes:: create_DDS_subcommunicators ( void )
    }
 }
 
+
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: processor_splitting ( int const& color
@@ -4571,6 +3389,9 @@ DDS_NavierStokes:: processor_splitting ( int const& color
    MPI_Comm_rank( DDS_Comm_i[dir], &rank_in_i[dir] ) ;
 
 }
+
+
+
 
 //---------------------------------------------------------------------------
 void
@@ -4666,6 +3487,9 @@ DDS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
    }
 }
 
+
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: deallocate_mpi_variables ()
@@ -4696,6 +3520,9 @@ DDS_NavierStokes:: deallocate_mpi_variables ()
    }
 }
 
+
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: free_DDS_subcommunicators ( void )
@@ -4703,6 +3530,9 @@ DDS_NavierStokes:: free_DDS_subcommunicators ( void )
 {
    MAC_LABEL( "DDS_NavierStokes:: free_DDS_subcommunicators" ) ;
 }
+
+
+
 
 //---------------------------------------------------------------------------
 void
@@ -4718,6 +3548,8 @@ DDS_NavierStokes:: set_translation_vector()
 }
 
 
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes::build_links_translation()
@@ -4729,6 +3561,7 @@ DDS_NavierStokes::build_links_translation()
    PF->create_transproj_interpolation() ;
 
 }
+
 
 
 
@@ -4765,6 +3598,8 @@ DDS_NavierStokes::fields_projection()
    synchronize_pressure_field( 1 ) ;
 
 }
+
+
 
 
 //---------------------------------------------------------------------------
@@ -4805,6 +3640,8 @@ DDS_NavierStokes:: synchronize_velocity_field ( size_t level )
 }
 
 
+
+
 //---------------------------------------------------------------------------
 void
 DDS_NavierStokes:: synchronize_pressure_field ( size_t level )
@@ -4836,6 +3673,8 @@ DDS_NavierStokes:: synchronize_pressure_field ( size_t level )
   PF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_pressure() ) ;
 
 }
+
+
 
 
 //----------------------------------------------------------------------
@@ -5047,6 +3886,7 @@ DDS_NavierStokes:: assemble_advection_Centered( size_t const& advecting_level,
    }
    return ( coef * flux );
 }
+
 
 
 
