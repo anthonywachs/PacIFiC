@@ -57,7 +57,6 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   compute_surface_variables_for_all_RB();
 
-
   compute_halo_zones_for_all_rigid_body();
 
   compute_void_fraction_on_grid(PF);
@@ -65,8 +64,6 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   compute_grid_intersection_with_rigidbody(PF);
   compute_grid_intersection_with_rigidbody(UF);
-
-  compute_pressure_force_and_torque_for_allRB( );
 
   write_surface_discretization_for_all_RB();
 }
@@ -974,7 +971,7 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                  dfdi(dir) = (f[col1] - f[0])/dx1;
               }
 
-              dfdi(dir) *= mu*sign[dir];
+              dfdi(dir) *= mu;//*sign[dir];
            }
 
            if (comp == 0) {
@@ -2283,12 +2280,13 @@ void DS_AllRigidBodies:: write_surface_discretization_for_all_RB( )
 {
    MAC_LABEL( "DS_AllRigidBodies:: write_surface_discretization_for_all_RB" ) ;
 
-   for (size_t i = 0; i < m_nrb; ++i) {
-      std::ostringstream os2;
-      os2 << "./DS_results/discretized_surface_parID_" << i << ".csv";
-      std::string file = os2.str();
-      m_allDSrigidbodies[i]->write_surface_discretization( file );
-   }
+   if (m_macCOMM->rank() == 0)
+      for (size_t i = 0; i < m_nrb; ++i) {
+         std::ostringstream os2;
+         os2 << "./DS_results/discretized_surface_parID_" << i << ".csv";
+         std::string file = os2.str();
+         m_allDSrigidbodies[i]->write_surface_discretization( file );
+      }
 
 }
 
