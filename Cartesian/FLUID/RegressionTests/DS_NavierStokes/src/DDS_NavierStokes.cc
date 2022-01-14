@@ -479,6 +479,8 @@ DDS_NavierStokes:: do_after_time_stepping( void )
 //   write_output_field(UF,1);
    // SCT_get_elapsed_time( "Writing CSV" );
 
+   allrigidbodies->write_surface_discretization_for_all_RB();
+
    output_L2norm_velocity(0);
    output_L2norm_pressure(0);
 

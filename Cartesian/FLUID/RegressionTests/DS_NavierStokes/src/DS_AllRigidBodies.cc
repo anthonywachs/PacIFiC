@@ -205,6 +205,9 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
   avg_viscous_force(1) = 0.;
   avg_viscous_force(2) = 0.;
 
+  string fileName = "./DS_results/particle_forces.csv" ;
+  std::ofstream MyFile( fileName.c_str(), std::ios::app ) ;
+
   for (size_t i = 0; i < m_nrb; ++i) {
      viscous_force[i](0) = 0.;
      viscous_force[i](1) = 0.;
@@ -219,7 +222,19 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
      avg_viscous_force(0) += viscous_force[i](0);
      avg_viscous_force(1) += viscous_force[i](1);
      avg_viscous_force(2) += viscous_force[i](2);
+
+     if (m_macCOMM->rank() == 0) {
+        MyFile << i << " , " << pressure_force[i](0)
+                    << " , " << pressure_force[i](1)
+                    << " , " << pressure_force[i](2)
+                    << " , " << viscous_force[i](0)
+                    << " , " << viscous_force[i](1)
+                    << " , " << viscous_force[i](2)
+                    << endl;
+     }
   }
+
+  if (m_macCOMM->rank() == 0) MyFile.close( ) ;
 
   if (m_macCOMM->rank() == 0) {
      std::cout << "Average pressure force on RB: "
