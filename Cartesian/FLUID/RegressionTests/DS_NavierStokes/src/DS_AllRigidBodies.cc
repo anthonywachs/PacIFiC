@@ -1237,7 +1237,7 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
                                                                , {0}) ;
                  dfdi(dir) = (f[col1] - f[0])/dh_wall;
               }
-              dfdi(dir) *= mu*sign;
+              dfdi(dir) *= m_mu*sign;
            }
 
            if (comp == 0) {
