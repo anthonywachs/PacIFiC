@@ -67,8 +67,6 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   compute_grid_intersection_with_rigidbody(PF);
   compute_grid_intersection_with_rigidbody(UF);
 
-  compute_viscous_force_and_torque_for_allRB("second");
-
   write_surface_discretization_for_all_RB();
 }
 
