@@ -55,7 +55,8 @@ class DS_AllRigidBodies
                        , FV_DiscreteField const* arb_UF
                        , FV_DiscreteField const* arb_PF
                        , double const& arb_scs
-                       , MAC_Communicator const* arb_macCOMM);
+                       , MAC_Communicator const* arb_macCOMM
+                       , double const& arb_mu );
 
       /** @brief Destructor */
       ~DS_AllRigidBodies();
@@ -289,6 +290,7 @@ class DS_AllRigidBodies
       /**@name Parameters */
       //@{
       size_t m_space_dimension; /**< Space dimension */
+      double m_mu; /**< Fluid viscosity */
       size_t m_npart; /**< number of particles */
       size_t m_nrb; /**< total number of rigid bodies = number of
       	particles + number of obstacles, npart first rigid bodies are always

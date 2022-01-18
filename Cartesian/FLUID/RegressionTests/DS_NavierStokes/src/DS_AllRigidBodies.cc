@@ -28,13 +28,15 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , FV_DiscreteField const* arb_UF
                                   , FV_DiscreteField const* arb_PF
                                   , double const& arb_scs
-                                  , MAC_Communicator const* arb_macCOMM)
+                                  , MAC_Communicator const* arb_macCOMM
+                                  , double const& arb_mu )
 //---------------------------------------------------------------------------
   : m_space_dimension( dimens )
   , UF ( arb_UF )
   , PF ( arb_PF )
   , surface_cell_scale ( arb_scs )
   , m_macCOMM ( arb_macCOMM )
+  , m_mu ( arb_mu )
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
@@ -64,6 +66,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   compute_grid_intersection_with_rigidbody(PF);
   compute_grid_intersection_with_rigidbody(UF);
+
+  compute_viscous_force_and_torque_for_allRB("second");
 
   write_surface_discretization_for_all_RB();
 }
@@ -352,7 +356,7 @@ geomVector DS_AllRigidBodies:: rigid_body_velocity( size_t const& parID,
                                              geomVector const& pt ) const
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_RigidBody:: rigid_body_velocity(pt)" ) ;
+  MAC_LABEL( "DS_AllRigidBodies:: rigid_body_velocity(pt)" ) ;
 
   return (m_allDSrigidbodies[parID]->get_rigid_body_velocity(pt));
 
@@ -768,8 +772,6 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
 {
   MAC_LABEL("DS_AllRigidBodies:: second_order_viscous_stress" ) ;
 
-  double mu = 1.;
-
   size_t nb_comps = UF->nb_components() ;
 
   vector<geomVector*> surface_point = m_allDSrigidbodies[parID]
@@ -843,6 +845,8 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
               size_t col2 = 2*dir + 1 + 1;
               ghost_pt[col1] = *surface_point[i];
               ghost_pt[col2] = *surface_point[i];
+              i0_new[col1] = i0_new[0];
+              i0_new[col2] = i0_new[0];
 
               intVector i0_temp(2,0);
 
@@ -854,6 +858,9 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
 
               if ((i0_temp(0) >= 0) &&
                   (i0_temp(0) < (int)UF->get_local_nb_dof(comp,dir))) {
+
+                 i0_new[col1](dir) = i0_temp(0);
+
                  ghost_pt[col1](dir) = UF->get_DOF_coordinate(i0_temp(0), comp, dir);
                  ghost_pt[col1](dir) += - MAC::floor((ghost_pt[col1](dir)
                                                     -domain_min(dir))
@@ -865,6 +872,9 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
               }
               if ((i0_temp(1) >= 0) &&
                   (i0_temp(1) < (int)UF->get_local_nb_dof(comp,dir))) {
+
+                 i0_new[col2](dir) = i0_temp(1);
+
                  ghost_pt[col2](dir) = UF->get_DOF_coordinate(i0_temp(1), comp, dir);
                  ghost_pt[col2](dir) += - MAC::floor((ghost_pt[col2](dir)
                                                     -domain_min(dir))
@@ -887,19 +897,6 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                            UF->get_min_index_unknown_handled_by_proc( comp, l );
               max_unknown_index(l) =
                            UF->get_max_index_unknown_handled_by_proc( comp, l );
-           }
-
-           // Checking the grid indexes for each ghost point
-           for (size_t col = 1; col < 7; col++) {
-              for (size_t dir = 0; dir < m_space_dimension; dir++) {
-                 size_t i0_temp;
-                 bool found = FV_Mesh::between(
-                                       UF->get_DOF_coordinates_vector(comp,dir)
-                                     , ghost_pt[col](dir)
-                                     , i0_temp);
-                 if (found) i0_new[col](dir) = i0_temp;
-
-              }
            }
 
            // Calculation of field variable on the surface point i
@@ -986,7 +983,7 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                  dfdi(dir) = (f[col1] - f[0])/dx1;
               }
 
-              dfdi(dir) *= mu;//*sign[dir];
+              dfdi(dir) *= m_mu;//*sign[dir];
            }
 
            if (comp == 0) {
@@ -1049,8 +1046,6 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DS_AllRigidBodies:: first_order_viscous_stress" ) ;
-
-  double mu = 1.;
 
   size_t nb_comps = UF->nb_components() ;
   double dh = UF->primary_grid()->get_smallest_grid_size();
@@ -1708,6 +1703,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
          xi(l) = FF->get_DOF_coordinate( i0_ghost[l](interpol_dir)
                                        , comp
                                        , interpol_dir);
+         fi(l) = 0.;
          for (size_t level : list)
             fi(l) += FF->DOF_value( i0_ghost[l](0)
                                   , i0_ghost[l](1)
