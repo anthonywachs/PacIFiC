@@ -1206,7 +1206,7 @@ DDS_NavierStokes:: assemble_1D_matrices ( FV_DiscreteField const* FF
          for (size_t j = min_unknown_index(dir_j);
                     j <= max_unknown_index(dir_j);++j) {
             for (size_t k = local_min_k; k <= local_max_k; ++k) {
-               size_t r_index = row_index->item(j,k);
+               size_t r_index = (size_t) row_index->item(j,k);
                double Aee_diagcoef =
                      assemble_field_matrix (FF,t_it,gamma,comp,dir,j,k,r_index);
 
@@ -1850,7 +1850,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
       for (size_t j = local_min_j; j <= local_max_j; j++) {
          for (size_t k = local_min_k; k <= local_max_k; k++) {
 
-            size_t p = row_index->item(j,k);
+            size_t p = (size_t) row_index->item(j,k);
 
             unpack_compute_ue_pack(comp,dir,p,field);
 
@@ -1893,7 +1893,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
          // Solve the system of equations in each proc
          for (size_t j = local_min_j; j <= local_max_j; j++) {
             for (size_t k = local_min_k; k <= local_max_k; k++) {
-               size_t p = row_index->item(j,k);
+               size_t p = (size_t) row_index->item(j,k);
 
                unpack_ue(comp,second_pass[field][dir].send[comp][rank_in_i[dir]]
                              ,dir,p,field);
@@ -2304,7 +2304,7 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
      if ((nb_ranks_comm_i[dir_i]>1)||(is_periodic[field][dir_i] == 1)) {
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j){
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
-              size_t r_index = row_index->item(j,k);
+              size_t r_index = (size_t) row_index->item(j,k);
               // Assemble fi and return fe for each proc locally
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i,field);
               // Calculate Aei*ui in each proc locally
@@ -2319,7 +2319,7 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
         // Serial mode with non-periodic condition
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j){
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
-              size_t r_index = row_index->item(j,k);
+              size_t r_index = (size_t) row_index->item(j,k);
               assemble_local_rhs(j,k,gamma,t_it,comp,dir_i,field);
               GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir_i)
                                                            ,comp,dir_i,r_index);
@@ -2349,7 +2349,7 @@ DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF
    double *packed_data = first_pass[field][dir].send[comp][rank_in_i[dir]];
 
    // Pack the data
-   size_t vec_pos = row_index->item(j,k);
+   size_t vec_pos = (size_t) row_index->item(j,k);
 
    if (rank_in_i[dir] == 0) {
       // Check if bc is periodic in x

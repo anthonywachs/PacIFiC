@@ -333,6 +333,10 @@ class DS_AllRigidBodies
       pressure stress on rigid bodies */
       vector<geomVector> viscous_torque; /**< Value of torque due to
       viscous stress on rigid bodies */
+      geomVector avg_pressure_torque; /**< Value of average torque due to
+      pressure stress on all rigid bodies */
+      geomVector avg_viscous_torque; /**< Value of average torque due to
+      viscous stress on all rigid bodies */
       MAC_Communicator const* m_macCOMM; /**< Variable for communication
       between processors */
       double m_mu; /**< Fluid viscosity */

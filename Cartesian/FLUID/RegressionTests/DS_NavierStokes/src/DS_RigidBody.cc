@@ -130,6 +130,20 @@ geomVector DS_RigidBody:: get_rigid_body_velocity( geomVector const& pt ) const
 
 
 //---------------------------------------------------------------------------
+geomVector const* DS_RigidBody:: get_ptr_to_gravity_centre( ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: get_ptr_to_gravity_centre( )" ) ;
+
+  return (dynamic_cast<FS_RigidBody*>(m_geometric_rigid_body)
+                              ->get_ptr_to_gravity_centre());
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_RigidBody:: initialize_surface_variables( )
 //---------------------------------------------------------------------------
 {

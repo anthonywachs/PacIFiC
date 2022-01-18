@@ -63,6 +63,9 @@ class DS_RigidBody
       @param pt the point */
       geomVector get_rigid_body_velocity( geomVector const& pt ) const;
 
+      /** @brief Returns pointer to the rigid body gravity center */
+      geomVector const* get_ptr_to_gravity_centre( ) const;
+
       /** @brief Returns the distance of a point with the rigid body
       with a given ray vector and source
       @param pt the point

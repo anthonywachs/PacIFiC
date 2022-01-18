@@ -179,16 +179,28 @@ void DS_AllRigidBodies:: compute_pressure_force_and_torque_for_allRB( )
   avg_pressure_force(1) = 0.;
   avg_pressure_force(2) = 0.;
 
+  avg_pressure_torque(0) = 0.;
+  avg_pressure_torque(1) = 0.;
+  avg_pressure_torque(2) = 0.;
+
   for (size_t i = 0; i < m_nrb; ++i) {
      pressure_force[i](0) = 0.;
      pressure_force[i](1) = 0.;
      pressure_force[i](2) = 0.;
+
+     pressure_torque[i](0) = 0.;
+     pressure_torque[i](1) = 0.;
+     pressure_torque[i](2) = 0.;
 
      first_order_pressure_stress(i);
 
      avg_pressure_force(0) += pressure_force[i](0);
      avg_pressure_force(1) += pressure_force[i](1);
      avg_pressure_force(2) += pressure_force[i](2);
+
+     avg_pressure_torque(0) += pressure_torque[i](0);
+     avg_pressure_torque(1) += pressure_torque[i](1);
+     avg_pressure_torque(2) += pressure_torque[i](2);
   }
 
 }
@@ -207,6 +219,10 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
   avg_viscous_force(1) = 0.;
   avg_viscous_force(2) = 0.;
 
+  avg_viscous_torque(0) = 0.;
+  avg_viscous_torque(1) = 0.;
+  avg_viscous_torque(2) = 0.;
+
   string fileName = "./DS_results/particle_forces.csv" ;
   std::ofstream MyFile( fileName.c_str(), std::ios::app ) ;
 
@@ -214,6 +230,10 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
      viscous_force[i](0) = 0.;
      viscous_force[i](1) = 0.;
      viscous_force[i](2) = 0.;
+
+     viscous_torque[i](0) = 0.;
+     viscous_torque[i](1) = 0.;
+     viscous_torque[i](2) = 0.;
 
      if (StressOrder == "first") {
         first_order_viscous_stress(i);
@@ -225,6 +245,10 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
      avg_viscous_force(1) += viscous_force[i](1);
      avg_viscous_force(2) += viscous_force[i](2);
 
+     avg_viscous_torque(0) += viscous_torque[i](0);
+     avg_viscous_torque(1) += viscous_torque[i](1);
+     avg_viscous_torque(2) += viscous_torque[i](2);
+
      if (m_macCOMM->rank() == 0) {
         MyFile << i << " , " << pressure_force[i](0)
                     << " , " << pressure_force[i](1)
@@ -232,6 +256,12 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
                     << " , " << viscous_force[i](0)
                     << " , " << viscous_force[i](1)
                     << " , " << viscous_force[i](2)
+                    << " , " << pressure_torque[i](0)
+                    << " , " << pressure_torque[i](1)
+                    << " , " << pressure_torque[i](2)
+                    << " , " << viscous_torque[i](0)
+                    << " , " << viscous_torque[i](1)
+                    << " , " << viscous_torque[i](2)
                     << endl;
      }
   }
@@ -248,6 +278,16 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
                << avg_viscous_force(0) / double(m_nrb) << " ,"
                << avg_viscous_force(1) / double(m_nrb) << " ,"
                << avg_viscous_force(2) / double(m_nrb) << endl;
+
+     std::cout << "Average pressure torque on RB: "
+               << avg_pressure_torque(0) / double(m_nrb) << " ,"
+               << avg_pressure_torque(1) / double(m_nrb) << " ,"
+               << avg_pressure_torque(2) / double(m_nrb) << endl;
+
+     std::cout << "Average viscous torque on RB: "
+               << avg_viscous_torque(0) / double(m_nrb) << " ,"
+               << avg_viscous_torque(1) / double(m_nrb) << " ,"
+               << avg_viscous_torque(2) / double(m_nrb) << endl;
   }
 
 }
@@ -681,6 +721,8 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
                                           ->get_rigid_body_surface_normals();
   vector<geomVector*> surface_area = m_allDSrigidbodies[parID]
                                           ->get_rigid_body_surface_areas();
+  geomVector const* pgc = m_allDSrigidbodies[parID]
+                                          ->get_ptr_to_gravity_centre();
 
 
   // Get local min and max indices
@@ -752,12 +794,28 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
 
      pressure_force[parID] += value;
 
-     // pressure_torque[parID] += surface_point[i]->operator^(value);
+     pressure_torque[parID](0) += value(2)*(surface_point[i]->operator()(1)
+                                                       - pgc->operator()(1))
+                                - value(1)*(surface_point[i]->operator()(2)
+                                                       - pgc->operator()(2));
+     pressure_torque[parID](1) += value(0)*(surface_point[i]->operator()(2)
+                                                       - pgc->operator()(2))
+                                - value(2)*(surface_point[i]->operator()(0)
+                                                       - pgc->operator()(0));
+     pressure_torque[parID](2) += value(1)*(surface_point[i]->operator()(0)
+                                                       - pgc->operator()(0))
+                                - value(0)*(surface_point[i]->operator()(1)
+                                                       - pgc->operator()(1));
+
   }
 
   pressure_force[parID](0) = m_macCOMM->sum(pressure_force[parID](0));
   pressure_force[parID](1) = m_macCOMM->sum(pressure_force[parID](1));
   pressure_force[parID](2) = m_macCOMM->sum(pressure_force[parID](2));
+
+  pressure_torque[parID](0) = m_macCOMM->sum(pressure_torque[parID](0));
+  pressure_torque[parID](1) = m_macCOMM->sum(pressure_torque[parID](1));
+  pressure_torque[parID](2) = m_macCOMM->sum(pressure_torque[parID](2));
 
 }
 
@@ -779,6 +837,8 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                                           ->get_rigid_body_surface_normals();
   vector<geomVector*> surface_area = m_allDSrigidbodies[parID]
                                           ->get_rigid_body_surface_areas();
+  geomVector const* pgc = m_allDSrigidbodies[parID]
+                                          ->get_ptr_to_gravity_centre();
 
   // 6 ghost points and 1 surface point
   size_t_vector vvv(3,0);
@@ -1027,13 +1087,28 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
 
      viscous_force[parID] += value;
 
-     // viscous_torque[parID] += surface_point[i]->operator^(value);
+     viscous_torque[parID](0) += value(2)*(surface_point[i]->operator()(1)
+                                                      - pgc->operator()(1))
+                               - value(1)*(surface_point[i]->operator()(2)
+                                                      - pgc->operator()(2));
+     viscous_torque[parID](1) += value(0)*(surface_point[i]->operator()(2)
+                                                      - pgc->operator()(2))
+                               - value(2)*(surface_point[i]->operator()(0)
+                                                      - pgc->operator()(0));
+     viscous_torque[parID](2) += value(1)*(surface_point[i]->operator()(0)
+                                                      - pgc->operator()(0))
+                               - value(0)*(surface_point[i]->operator()(1)
+                                                      - pgc->operator()(1));
 
   }
 
   viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
   viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
   viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
+
+  viscous_torque[parID](0) = m_macCOMM->sum(viscous_torque[parID](0));
+  viscous_torque[parID](1) = m_macCOMM->sum(viscous_torque[parID](1));
+  viscous_torque[parID](2) = m_macCOMM->sum(viscous_torque[parID](2));
 
 }
 
@@ -1055,6 +1130,8 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
                                           ->get_rigid_body_surface_normals();
   vector<geomVector*> surface_area = m_allDSrigidbodies[parID]
                                           ->get_rigid_body_surface_areas();
+  geomVector const* pgc = m_allDSrigidbodies[parID]
+                                          ->get_ptr_to_gravity_centre();
 
   // 6 ghost points and 1 surface point
   vector<geomVector> ghost_pt(7,0);
@@ -1281,13 +1358,28 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
 
      viscous_force[parID] += value;
 
-     // viscous_torque[parID] += surface_point[i]->operator^(value);
+     viscous_torque[parID](0) += value(2)*(surface_point[i]->operator()(1)
+                                                      - pgc->operator()(1))
+                               - value(1)*(surface_point[i]->operator()(2)
+                                                      - pgc->operator()(2));
+     viscous_torque[parID](1) += value(0)*(surface_point[i]->operator()(2)
+                                                      - pgc->operator()(2))
+                               - value(2)*(surface_point[i]->operator()(0)
+                                                      - pgc->operator()(0));
+     viscous_torque[parID](2) += value(1)*(surface_point[i]->operator()(0)
+                                                      - pgc->operator()(0))
+                               - value(0)*(surface_point[i]->operator()(1)
+                                                      - pgc->operator()(1));
 
   }
 
   viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
   viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
   viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
+
+  viscous_torque[parID](0) = m_macCOMM->sum(viscous_torque[parID](0));
+  viscous_torque[parID](1) = m_macCOMM->sum(viscous_torque[parID](1));
+  viscous_torque[parID](2) = m_macCOMM->sum(viscous_torque[parID](2));
 
 }
 
@@ -2348,6 +2440,8 @@ void DS_AllRigidBodies:: build_solid_variables_on_grid(  )
 
    avg_pressure_force = vvv;
    avg_viscous_force = vvv;
+   avg_pressure_torque = vvv;
+   avg_viscous_torque = vvv;
 
    for (size_t i = 0; i < m_nrb; ++i) {
       viscous_force.push_back( vvv );
