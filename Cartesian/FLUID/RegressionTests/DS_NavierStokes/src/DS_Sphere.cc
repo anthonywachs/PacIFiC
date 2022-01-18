@@ -272,7 +272,7 @@ void DS_Sphere:: compute_number_of_surface_variables(
    dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
       ->get_ptr_FS_Sphere_Additional_Param();
 
-  size_t temp = (size_t) (round(1./surface_cell_scale)
+  size_t temp = (size_t) ((1./surface_cell_scale)
                *(4.*MAC::pi()*pagp->radius*pagp->radius)
                /(dx*dx));
 
