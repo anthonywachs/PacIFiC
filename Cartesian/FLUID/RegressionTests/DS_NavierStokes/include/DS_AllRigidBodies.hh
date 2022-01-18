@@ -290,7 +290,6 @@ class DS_AllRigidBodies
       /**@name Parameters */
       //@{
       size_t m_space_dimension; /**< Space dimension */
-      double m_mu; /**< Fluid viscosity */
       size_t m_npart; /**< number of particles */
       size_t m_nrb; /**< total number of rigid bodies = number of
       	particles + number of obstacles, npart first rigid bodies are always
@@ -336,6 +335,7 @@ class DS_AllRigidBodies
       viscous stress on rigid bodies */
       MAC_Communicator const* m_macCOMM; /**< Variable for communication
       between processors */
+      double m_mu; /**< Fluid viscosity */
 
       //@}
 

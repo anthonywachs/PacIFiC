@@ -667,9 +667,6 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
 {
   MAC_LABEL("DS_AllRigidBodies:: first_order_pressure_stress" ) ;
 
-  boolVector const* periodic_comp =
-                        PF->primary_grid()->get_periodic_directions();
-
   size_t comp = 0;
 
   size_t_vector min_unknown_index(m_space_dimension,0);
@@ -746,6 +743,10 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
                       *surface_area[i]->operator()(0);
      value(2) = stress*surface_normal[i]->operator()(2)/norm
                       *surface_area[i]->operator()(0);
+
+     value(0) = m_macCOMM->sum(value(0));
+     value(1) = m_macCOMM->sum(value(1));
+     value(2) = m_macCOMM->sum(value(2));
 
      m_allDSrigidbodies[parID]->update_Pforce_on_surface_point(i,value);
 
@@ -1018,6 +1019,10 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                + stress(2)*surface_normal[i]->operator()(2))
                * surface_area[i]->operator()(0);
 
+     value(0) = m_macCOMM->sum(value(0));
+     value(1) = m_macCOMM->sum(value(1));
+     value(2) = m_macCOMM->sum(value(2));
+
      m_allDSrigidbodies[parID]->update_Vforce_on_surface_point(i,value);
 
      viscous_force[parID] += value;
@@ -1029,10 +1034,6 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
   viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
   viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
   viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
-
-  // std::cout << parID << "," << viscous_force[parID](0)
-  //                    << "," << viscous_force[parID](1)
-  //                    << "," << viscous_force[parID](2) << endl;
 
 }
 
@@ -1108,7 +1109,7 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
               size_t col = 2*dir + ig + 1;
               ghost_pt[col] = *surface_point[i];
               double sign = (surface_normal[i]->operator()(dir) > 0.) ? 1.:-1.;
-              ghost_pt[col](dir) += (ig + 1) * sign * dh;
+              ghost_pt[col](dir) += double(ig + 1) * sign * dh;
               ghost_pt[col](dir) += - MAC::floor((ghost_pt[col](dir)
                                                  -domain_min(dir))
                                                 /domain_length(dir))
@@ -1272,6 +1273,10 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
                + stress(2)*surface_normal[i]->operator()(2))
                * surface_area[i]->operator()(0);
 
+     value(0) = m_macCOMM->sum(value(0));
+     value(1) = m_macCOMM->sum(value(1));
+     value(2) = m_macCOMM->sum(value(2));
+
      m_allDSrigidbodies[parID]->update_Vforce_on_surface_point(i,value);
 
      viscous_force[parID] += value;
@@ -1283,10 +1288,6 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
   viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
   viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
   viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
-
-  // std::cout << parID << "," << viscous_force[parID](0)
-  //                    << "," << viscous_force[parID](1)
-  //                    << "," << viscous_force[parID](2) << endl;
 
 }
 
@@ -1706,7 +1707,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
             fi(l) += FF->DOF_value( i0_ghost[l](0)
                                   , i0_ghost[l](1)
                                   , i0_ghost[l](2), comp, level );
-         fi(l) /= list.size();
+         fi(l) /= (double)list.size();
 
          node_index(l) = FF->DOF_local_number( i0_ghost[l](0)
                                              , i0_ghost[l](1)
