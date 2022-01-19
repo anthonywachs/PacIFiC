@@ -1064,19 +1064,20 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
      geomVector value(3);
+     double norm = surface_normal[i]->calcNorm();
      value(0) = (stress(0)*surface_normal[i]->operator()(0)
                + stress(3)*surface_normal[i]->operator()(1)
-               + stress(5)*surface_normal[i]->operator()(2))
+               + stress(5)*surface_normal[i]->operator()(2))/norm
                * surface_area[i]->operator()(0);
 
      value(1) = (stress(3)*surface_normal[i]->operator()(0)
                + stress(1)*surface_normal[i]->operator()(1)
-               + stress(4)*surface_normal[i]->operator()(2))
+               + stress(4)*surface_normal[i]->operator()(2))/norm
                * surface_area[i]->operator()(0);
 
      value(2) = (stress(5)*surface_normal[i]->operator()(0)
                + stress(4)*surface_normal[i]->operator()(1)
-               + stress(2)*surface_normal[i]->operator()(2))
+               + stress(2)*surface_normal[i]->operator()(2))/norm
                * surface_area[i]->operator()(0);
 
      value(0) = m_macCOMM->sum(value(0));
@@ -1335,19 +1336,21 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
      // Ref: Keating thesis Pg-85
      // point_coord*(area) --> Component of area in particular direction
      geomVector value(3);
+     double norm = surface_normal[i]->calcNorm();
+
      value(0) = (stress(0)*surface_normal[i]->operator()(0)
                + stress(3)*surface_normal[i]->operator()(1)
-               + stress(5)*surface_normal[i]->operator()(2))
+               + stress(5)*surface_normal[i]->operator()(2))/norm
                * surface_area[i]->operator()(0);
 
      value(1) = (stress(3)*surface_normal[i]->operator()(0)
                + stress(1)*surface_normal[i]->operator()(1)
-               + stress(4)*surface_normal[i]->operator()(2))
+               + stress(4)*surface_normal[i]->operator()(2))/norm
                * surface_area[i]->operator()(0);
 
      value(2) = (stress(5)*surface_normal[i]->operator()(0)
                + stress(4)*surface_normal[i]->operator()(1)
-               + stress(2)*surface_normal[i]->operator()(2))
+               + stress(2)*surface_normal[i]->operator()(2))/norm
                * surface_area[i]->operator()(0);
 
      value(0) = m_macCOMM->sum(value(0));
