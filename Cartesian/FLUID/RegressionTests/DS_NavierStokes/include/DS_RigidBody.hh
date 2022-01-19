@@ -7,6 +7,7 @@
 #include <doubleArray2D.hh>
 #include <boolVector.hh>
 #include <MAC_assertions.hh>
+#include <MAC_Communicator.hh>
 #include <vector>
 #include <iostream>
 #include <map>
@@ -137,7 +138,8 @@ class DS_RigidBody
 
       /** @brief Write the surface discretization points of all RB in
       respective CSV files */
-      void write_surface_discretization( const std::string& file );
+      void write_surface_discretization( const std::string& file
+                                  , MAC_Communicator const* m_macCOMM );
 
       /** @brief Initializa the surface variables for a rigid body
       such as points, normals, and area */

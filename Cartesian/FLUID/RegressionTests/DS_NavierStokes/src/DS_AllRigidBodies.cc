@@ -786,9 +786,9 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
      value(2) = stress*surface_normal[i]->operator()(2)/norm
                       *surface_area[i]->operator()(0);
 
-     value(0) = m_macCOMM->sum(value(0));
-     value(1) = m_macCOMM->sum(value(1));
-     value(2) = m_macCOMM->sum(value(2));
+     // value(0) = m_macCOMM->sum(value(0));
+     // value(1) = m_macCOMM->sum(value(1));
+     // value(2) = m_macCOMM->sum(value(2));
 
      m_allDSrigidbodies[parID]->update_Pforce_on_surface_point(i,value);
 
@@ -808,6 +808,14 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
                                                        - pgc->operator()(1));
 
   }
+
+  pressure_force[parID](0) = m_macCOMM->sum(pressure_force[parID](0));
+  pressure_force[parID](1) = m_macCOMM->sum(pressure_force[parID](1));
+  pressure_force[parID](2) = m_macCOMM->sum(pressure_force[parID](2));
+
+  pressure_torque[parID](0) = m_macCOMM->sum(pressure_torque[parID](0));
+  pressure_torque[parID](1) = m_macCOMM->sum(pressure_torque[parID](1));
+  pressure_torque[parID](2) = m_macCOMM->sum(pressure_torque[parID](2));
 
 }
 
@@ -1072,9 +1080,9 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                + stress(2)*surface_normal[i]->operator()(2))/norm
                * surface_area[i]->operator()(0);
 
-     value(0) = m_macCOMM->sum(value(0));
-     value(1) = m_macCOMM->sum(value(1));
-     value(2) = m_macCOMM->sum(value(2));
+     // value(0) = m_macCOMM->sum(value(0));
+     // value(1) = m_macCOMM->sum(value(1));
+     // value(2) = m_macCOMM->sum(value(2));
 
      m_allDSrigidbodies[parID]->update_Vforce_on_surface_point(i,value);
 
@@ -1094,6 +1102,14 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                                                       - pgc->operator()(1));
 
   }
+
+  viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
+  viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
+  viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
+
+  viscous_torque[parID](0) = m_macCOMM->sum(viscous_torque[parID](0));
+  viscous_torque[parID](1) = m_macCOMM->sum(viscous_torque[parID](1));
+  viscous_torque[parID](2) = m_macCOMM->sum(viscous_torque[parID](2));
 
 }
 
@@ -1337,9 +1353,9 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
                + stress(2)*surface_normal[i]->operator()(2))/norm
                * surface_area[i]->operator()(0);
 
-     value(0) = m_macCOMM->sum(value(0));
-     value(1) = m_macCOMM->sum(value(1));
-     value(2) = m_macCOMM->sum(value(2));
+     // value(0) = m_macCOMM->sum(value(0));
+     // value(1) = m_macCOMM->sum(value(1));
+     // value(2) = m_macCOMM->sum(value(2));
 
      m_allDSrigidbodies[parID]->update_Vforce_on_surface_point(i,value);
 
@@ -1359,6 +1375,14 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
                                                       - pgc->operator()(1));
 
   }
+
+  viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
+  viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
+  viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
+
+  viscous_torque[parID](0) = m_macCOMM->sum(viscous_torque[parID](0));
+  viscous_torque[parID](1) = m_macCOMM->sum(viscous_torque[parID](1));
+  viscous_torque[parID](2) = m_macCOMM->sum(viscous_torque[parID](2));
 
 }
 
@@ -2361,13 +2385,12 @@ void DS_AllRigidBodies:: write_surface_discretization_for_all_RB( )
 {
    MAC_LABEL( "DS_AllRigidBodies:: write_surface_discretization_for_all_RB" ) ;
 
-   if (m_macCOMM->rank() == 0)
-      for (size_t i = 0; i < m_nrb; ++i) {
-         std::ostringstream os2;
-         os2 << "./DS_results/discretized_surface_parID_" << i << ".csv";
-         std::string file = os2.str();
-         m_allDSrigidbodies[i]->write_surface_discretization( file );
-      }
+   for (size_t i = 0; i < m_nrb; ++i) {
+      std::ostringstream os2;
+      os2 << "./DS_results/discretized_surface_parID_" << i << ".csv";
+      std::string file = os2.str();
+      m_allDSrigidbodies[i]->write_surface_discretization( file, m_macCOMM );
+   }
 
 }
 

@@ -250,31 +250,45 @@ void DS_RigidBody:: update_Vforce_on_surface_point( size_t const& i
 
 
 //---------------------------------------------------------------------------
-void DS_RigidBody:: write_surface_discretization( const std::string& file )
+void DS_RigidBody:: write_surface_discretization( const std::string& file
+                                      , MAC_Communicator const* m_macCOMM)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_RigidBody:: write_surface_discretization()" ) ;
+  MAC_LABEL( "DS_RigidBody:: write_surface_discretization" ) ;
 
   std::ofstream out;
-  out.open(file.c_str());
-  out << "x ,y ,z ,nx ,ny ,nz ,area ,Fpx ,Fpy ,Fpz ,Fvx ,Fvy , Fvz " << endl;
 
-  for (size_t i = 0; i < m_surface_area.size(); i++) {
-     out << m_surface_points[i]->operator()(0) << " ,"
-         << m_surface_points[i]->operator()(1) << " ,"
-         << m_surface_points[i]->operator()(2) << " ,"
-         << m_surface_normal[i]->operator()(0) << " ,"
-         << m_surface_normal[i]->operator()(1) << " ,"
-         << m_surface_normal[i]->operator()(2) << " ,"
-         << m_surface_area[i]->operator()(0) << " ,"
-         << m_surface_Pforce[i](0) << " ,"
-         << m_surface_Pforce[i](1) << " ,"
-         << m_surface_Pforce[i](2) << " ,"
-         << m_surface_Vforce[i](0) << " ,"
-         << m_surface_Vforce[i](1) << " ,"
-         << m_surface_Vforce[i](2) << endl;
+  if (m_macCOMM->rank() == 0) {
+     out.open(file.c_str());
+     out << "x ,y ,z ,nx ,ny ,nz ,area ,Fpx ,Fpy ,Fpz ,Fvx ,Fvy , Fvz " << endl;
   }
 
-  out.close();
+  for (size_t i = 0; i < m_surface_area.size(); i++) {
+     m_surface_Pforce[i](0) = m_macCOMM->sum(m_surface_Pforce[i](0));
+     m_surface_Pforce[i](1) = m_macCOMM->sum(m_surface_Pforce[i](1));
+     m_surface_Pforce[i](2) = m_macCOMM->sum(m_surface_Pforce[i](2));
+
+     m_surface_Vforce[i](0) = m_macCOMM->sum(m_surface_Vforce[i](0));
+     m_surface_Vforce[i](1) = m_macCOMM->sum(m_surface_Vforce[i](1));
+     m_surface_Vforce[i](2) = m_macCOMM->sum(m_surface_Vforce[i](2));
+
+     if (m_macCOMM->rank() == 0) {
+        out << m_surface_points[i]->operator()(0) << " ,"
+            << m_surface_points[i]->operator()(1) << " ,"
+            << m_surface_points[i]->operator()(2) << " ,"
+            << m_surface_normal[i]->operator()(0) << " ,"
+            << m_surface_normal[i]->operator()(1) << " ,"
+            << m_surface_normal[i]->operator()(2) << " ,"
+            << m_surface_area[i]->operator()(0) << " ,"
+            << m_surface_Pforce[i](0) << " ,"
+            << m_surface_Pforce[i](1) << " ,"
+            << m_surface_Pforce[i](2) << " ,"
+            << m_surface_Vforce[i](0) << " ,"
+            << m_surface_Vforce[i](1) << " ,"
+            << m_surface_Vforce[i](2) << endl;
+     }
+  }
+
+  if (m_macCOMM->rank() == 0) out.close();
 
 }
