@@ -809,14 +809,6 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
 
   }
 
-  pressure_force[parID](0) = m_macCOMM->sum(pressure_force[parID](0));
-  pressure_force[parID](1) = m_macCOMM->sum(pressure_force[parID](1));
-  pressure_force[parID](2) = m_macCOMM->sum(pressure_force[parID](2));
-
-  pressure_torque[parID](0) = m_macCOMM->sum(pressure_torque[parID](0));
-  pressure_torque[parID](1) = m_macCOMM->sum(pressure_torque[parID](1));
-  pressure_torque[parID](2) = m_macCOMM->sum(pressure_torque[parID](2));
-
 }
 
 
@@ -1103,14 +1095,6 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
 
   }
 
-  viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
-  viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
-  viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
-
-  viscous_torque[parID](0) = m_macCOMM->sum(viscous_torque[parID](0));
-  viscous_torque[parID](1) = m_macCOMM->sum(viscous_torque[parID](1));
-  viscous_torque[parID](2) = m_macCOMM->sum(viscous_torque[parID](2));
-
 }
 
 
@@ -1375,14 +1359,6 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
                                                       - pgc->operator()(1));
 
   }
-
-  viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
-  viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
-  viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
-
-  viscous_torque[parID](0) = m_macCOMM->sum(viscous_torque[parID](0));
-  viscous_torque[parID](1) = m_macCOMM->sum(viscous_torque[parID](1));
-  viscous_torque[parID](2) = m_macCOMM->sum(viscous_torque[parID](2));
 
 }
 
