@@ -200,8 +200,8 @@ bool FS_3Dcylinder:: isIn( geomVector const& pt ) const
   double dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
 	                        /  m_agp_3dcyl.cylinder_height ;
 
-  if ( dot < m_agp_3dcyl.cylinder_height && dot > 0. )
-    if ( BottomToPoint.calcNormSquare() - dot * dot <
+  if ( dot <= m_agp_3dcyl.cylinder_height && dot >= 0. )
+    if ( BottomToPoint.calcNormSquare() - dot * dot <=
          m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
       b_isIn = true ;
 
@@ -229,11 +229,11 @@ bool FS_3Dcylinder:: isIn( double const& x, double const& y, double const& z )
 	                                 * m_agp_3dcyl.BottomToTopVec(2)
 	       ) / m_agp_3dcyl.cylinder_height ;
 
-  if ( dot < m_agp_3dcyl.cylinder_height && dot > 0. )
+  if ( dot <= m_agp_3dcyl.cylinder_height && dot >= 0. )
     if ( ( x - m_agp_3dcyl.BottomCenter(0) )*( x - m_agp_3dcyl.BottomCenter(0) )
        + ( y - m_agp_3dcyl.BottomCenter(1) )*( y - m_agp_3dcyl.BottomCenter(1) )
        + ( z - m_agp_3dcyl.BottomCenter(2) )*( z - m_agp_3dcyl.BottomCenter(2) )
-       - dot * dot < m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
+       - dot * dot <= m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
        b_isIn = true ;
 
   return ( b_isIn );
