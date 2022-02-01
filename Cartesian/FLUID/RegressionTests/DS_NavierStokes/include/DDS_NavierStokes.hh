@@ -318,8 +318,7 @@ public SolverComputingTime
       /** Pressure correction */
       void NS_final_step( FV_TimeIterator const* t_it ) ;
 
-      void write_output_field( FV_DiscreteField const* FF
-                             , FV_TimeIterator const* t_it );
+      void write_output_field( FV_DiscreteField const* FF) ;
 
       void output_L2norm_divergence( );
 

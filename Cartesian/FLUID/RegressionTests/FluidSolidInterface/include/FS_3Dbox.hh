@@ -1,5 +1,5 @@
-#ifndef _FS_SPHERE__
-#define _FS_SPHERE__
+#ifndef _FS_3DBOX__
+#define _FS_3DBOX__
 
 #include <FS_RigidBody.hh>
 #include <iostream>
@@ -7,19 +7,23 @@ using std::istream ;
 
 
 /** @brief Additional geometric parameters for the sphere */
-struct FS_Sphere_Additional_Param
+struct FS_3Dbox_Additional_Param
 {
-  double radius; /**< radius of the sphere */
+  vector<geomVector> corners; /**< Corner coordinates of the polyhedron */
+  vector<vector<size_t> > facesVec; /**< polygonal faces numbering */
+  // geomVector* g2; /**< slightly randomly translated gravity center */
+  // geomVector coor_min; /**< minimal coordinates of the bounding box */
+  // geomVector coor_max; /**< maximal coordinates of the bounding box */
 };
 
 
-/** @brief The class FS_Sphere.
+/** @brief The class FS_3Dbox.
 
-A moving or stationary rigid sphere.
+A moving or stationary rigid 3D cylinder of axisymmetric cross-section.
 
 @author A. Wachs - Pacific project 2021 */
 
-class FS_Sphere: public FS_RigidBody
+class FS_3Dbox: public FS_RigidBody
 {
    public: //-----------------------------------------------------------------
 
@@ -28,15 +32,15 @@ class FS_Sphere: public FS_RigidBody
       /**@name Constructors & Destructor */
       //@{
       /** @brief Default constructor */
-      FS_Sphere();
+      FS_3Dbox();
 
       /** @brief Constructor with arguments
       @param in input stream where features of rigid bodies are read
       @param id_ identification number */
-      FS_Sphere( istream& in, size_t& id_ );
+      FS_3Dbox( istream& in, size_t& id_ );
 
       /** @brief Destructor */
-      ~FS_Sphere();
+      ~FS_3Dbox();
       //@}
 
 
@@ -46,8 +50,8 @@ class FS_Sphere: public FS_RigidBody
       //@{
       /** @brief Returns a constant pointer to the structure containing the
       additional geometric parameters for the sphere */
-      struct FS_Sphere_Additional_Param const*
-      	get_ptr_FS_Sphere_Additional_Param() const;
+      struct FS_3Dbox_Additional_Param const*
+      	get_ptr_FS_3Dbox_Additional_Param() const;
 
       //@}
 
@@ -81,11 +85,11 @@ class FS_Sphere: public FS_RigidBody
       @param z x-coordinate of the point */
       bool isIn( double const& x, double const& y, double const& z ) const;
 
-      /** @brief Returns the level set value of a point from a sphere
+      /** @brief Returns the level set value of a point from a cylinder
       @param pt the point */
       double level_set_value( geomVector const& pt ) const;
 
-      /** @brief Returns the level set value of a point from a sphere
+      /** @brief Returns the level set value of a point from a cylinder
       @param x x-coordinate of the point
       @param y x-coordinate of the point
       @param z x-coordinate of the point */
@@ -93,9 +97,25 @@ class FS_Sphere: public FS_RigidBody
                             , double const& y
                             , double const& z ) const;
 
-      /** @brief Returns sphere velocity including rotation speed at pt
+      /** @brief Returns 3Dbox velocity including rotation speed at pt
       @param pt the point */
       geomVector rigid_body_velocity( geomVector const& pt ) const;
+
+      /** @brief Calculate determinant 4 X 4 for checking
+      a point in tetrahedron */
+      double calcPointDeterm4by4( const geomVector &pointOne,
+              const geomVector &pointTwo, const geomVector &pointThree,
+              const geomVector &pointFour ) const;
+
+      /** @brief Check whether a point is inside a tetrahedron */
+      bool checkPointInTetrahedron( const geomVector &pointOne,
+           const geomVector &pointTwo, const geomVector &pointThree,
+           const geomVector &pointFour, const geomVector &pointToCheck ) const;
+
+      double DistOfPointFromTetrahedron( const geomVector &pointOne,
+         const geomVector &pointTwo, const geomVector &pointThree,
+         const geomVector &pointFour, const geomVector &pointToCheck ) const;
+
       //@}
 
 
@@ -105,8 +125,8 @@ class FS_Sphere: public FS_RigidBody
 
       /**@name Parameters */
       //@{
-      struct FS_Sphere_Additional_Param m_agp_sphere; /**< Additional geometric
-      	parameters for the sphere */
+      struct FS_3Dbox_Additional_Param m_agp_3dbox; /**< Additional
+      	geometric parameters for the 3D cylinder */
       //@}
 
 
@@ -117,8 +137,8 @@ class FS_Sphere: public FS_RigidBody
       /**@name Constructors & Destructor */
       //@{
       /** @brief Copy constructor
-      @param copy copied FS_Sphere object */
-      FS_Sphere( FS_Sphere const& copy );
+      @param copy copied FS_3Dbox object */
+      FS_3Dbox( FS_3Dbox const& copy );
       //@}
 
 

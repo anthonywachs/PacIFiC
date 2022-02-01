@@ -4,7 +4,7 @@ using std::endl;
 
 vector<string> FS_RigidBody::GEOMETRICSHAPE_name = { "Sphere", "2D cylinder",
 	"3D cylinder", "General polygon", "General polyhedron", "Square",
-	"Cube", "Equilateral triangle", "Regular tetrahedron" };
+	"3D Box", "Equilateral triangle", "Regular tetrahedron" };
 
 
 //---------------------------------------------------------------------------
@@ -232,6 +232,7 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
   b(1) = rayVec(1);
   b(2) = rayVec(2);
 
+  // Initialize c
   // c = source + delta * rayDir ;
   c(0) = source(0) + delta * rayDir(0);
   c(1) = source(1) + delta * rayDir(1);

@@ -55,9 +55,9 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   build_solid_variables_on_grid();
 
-  initialize_surface_variables_for_all_RB();
-
-  compute_surface_variables_for_all_RB();
+  // initialize_surface_variables_for_all_RB();
+  //
+  // compute_surface_variables_for_all_RB();
 
   compute_halo_zones_for_all_rigid_body();
 
@@ -67,7 +67,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   compute_grid_intersection_with_rigidbody(PF);
   compute_grid_intersection_with_rigidbody(UF);
 
-  write_surface_discretization_for_all_RB();
+  // write_surface_discretization_for_all_RB();
 }
 
 

@@ -476,8 +476,8 @@ DDS_NavierStokes:: do_after_time_stepping( void )
    // Elapsed time by sub-problems
 
    // SCT_set_start( "Writing CSV" );
-//   write_output_field(PF,0);
-//   write_output_field(UF,1);
+   // write_output_field(PF);
+   // write_output_field(UF,1);
    // SCT_get_elapsed_time( "Writing CSV" );
 
    allrigidbodies->write_surface_discretization_for_all_RB();
@@ -569,7 +569,6 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
       MyFile.close( ) ;
    }
 */
-//   write_output_field(UF,t_it);
 
    double cfl = UF->compute_CFL( t_it, 0 );
    if ( my_rank == is_master )
@@ -3095,78 +3094,87 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 
 
 
-// //----------------------------------------------------------------------
-// void
-// DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF, FV_TimeIterator const* t_it)
-// //----------------------------------------------------------------------
-// {
-//   ofstream outputFile ;
-//
-//   std::ostringstream os2;
-//   os2 << "./DS_results/outputNS_" << t_it->iteration_number() << ".csv";
-//   std::string filename = os2.str();
-//   outputFile.open(filename.c_str());
-//
-//   size_t field = (FF == UF) ? 1 : 0 ;
-//
-//   size_t i,j,k;
-//   outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv" << endl;//,behind,bev,front,fv" << endl;
-// //  outputFile << "x,y,z,id,lambdax,lambday,void_frac,fresh,neighx,neighy,count_fresh,counter_neigh,div,vel" << endl;//,behind,bev,front,fv" << endl;
-//
-//   size_t_vector min_index(dim,0);
-//   size_t_vector max_index(dim,0);
-//
-//   NodeProp node = GLOBAL_EQ->get_node_property(field,0);
-// //  FreshNode* fresh = GLOBAL_EQ->get_fresh_node();
-// //  DivNode* divergence = GLOBAL_EQ->get_node_divergence();
-//   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(field,0);
-//
-//   for (size_t comp=0;comp<nb_comps[field];comp++) {
-//      // Get local min and max indices
-//      for (size_t l=0;l<dim;++l) {
-// //        min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l );
-// //        max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l );
-//         min_index(l) = 0;
-//         max_index(l) = FF->get_local_nb_dof( comp, l );
-//      }
-//
-//      size_t local_min_k = 0;
-//      size_t local_max_k = 1;
-//
-//      if (dim == 3) {
-//         local_min_k = min_index(2);
-//         local_max_k = max_index(2);
-//      }
-//
-//      for (i=min_index(0);i<max_index(0);++i) {
-//         double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
-//         for (j=min_index(1);j<max_index(1);++j) {
-//            double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
-//            for (k=local_min_k;k<local_max_k;++k) {
-//               double zC = 0.;
-//               if (dim == 3) zC = FF->get_DOF_coordinate( k, comp, 2 ) ;
-//               size_t p = return_node_index(FF,comp,i,j,k);
-//               double id = node.parID[comp]->item(p);
-//               double voidf = node.void_frac[comp]->item(p);
-//
-// //              double lambdax = divergence[0].lambda[0]->item(p);
-// //              double lambday = divergence[0].lambda[1]->item(p);
-// //	      double div = divergence[0].div->item(p);
-//               outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
-// //              outputFile << xC << "," << yC << "," << zC << "," << p << "," << lambdax << "," << lambday << "," << voidf << "," << fresh[0].flag->item(p) << "," << fresh[0].neigh[0]->item(p) << "," << fresh[0].neigh[1]->item(p) << "," << fresh[0].flag_count->item(p) << "," << fresh[0].neigh_count->item(p) << "," << div << "," << fresh[0].sep_vel->item(p) << endl;
-//               for (size_t dir = 0; dir < dim; dir++) {
-//                   for (size_t off = 0; off < 2; off++) {
-//                       outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off);
-//                   }
-//               }
-//               outputFile << endl;
-//            }
-//         }
-//      }
-//   }
-//   outputFile.close();
-// }
-//
+//----------------------------------------------------------------------
+void
+DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
+//----------------------------------------------------------------------
+{
+  ofstream outputFile ;
+
+  std::ostringstream os2;
+  os2 << "./DS_results/intersection_data.csv";
+  std::string filename = os2.str();
+  outputFile.open(filename.c_str());
+
+  size_t field = (FF == UF) ? 1 : 0 ;
+
+  size_t i,j,k;
+  outputFile << "x,y,z,void_frac,left,lv"
+             << ",right,rv"
+             << ",bottom,bov"
+             << ",top,tv"
+             << ",behind,bev"
+             << ",front,fv" << endl;
+
+  size_t_vector min_index(dim,0);
+  size_t_vector max_index(dim,0);
+
+  size_t_vector* void_frac =
+                    allrigidbodies->get_void_fraction_on_grid(FF);
+  size_t_array2D* intersect_vector =
+                    allrigidbodies->get_intersect_vector_on_grid(FF);
+  doubleArray2D* intersect_distance =
+                    allrigidbodies->get_intersect_distance_on_grid(FF);
+
+  for (size_t comp=0;comp<nb_comps[field];comp++) {
+     // Get local min and max indices
+     for (size_t l=0;l<dim;++l) {
+        min_index(l) = 0;
+        max_index(l) = FF->get_local_nb_dof( comp, l );
+     }
+
+     size_t local_min_k = 0;
+     size_t local_max_k = 1;
+
+     if (dim == 3) {
+        local_min_k = min_index(2);
+        local_max_k = max_index(2);
+     }
+
+     for (i=min_index(0);i<max_index(0);++i) {
+        double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
+        for (j=min_index(1);j<max_index(1);++j) {
+           double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
+           for (k=local_min_k;k<local_max_k;++k) {
+              double zC = 0.;
+              if (dim == 3) zC = FF->get_DOF_coordinate( k, comp, 2 ) ;
+              size_t p = FF->DOF_local_number(i,j,k,comp);
+
+              outputFile << xC << "," << yC << "," << zC
+              << "," << void_frac->operator()(p)
+              << "," << intersect_vector->operator()(p,0)
+              << "," << intersect_distance->operator()(p,0)
+              << "," << intersect_vector->operator()(p,1)
+              << "," << intersect_distance->operator()(p,1)
+              << "," << intersect_vector->operator()(p,2)
+              << "," << intersect_distance->operator()(p,2)
+              << "," << intersect_vector->operator()(p,3)
+              << "," << intersect_distance->operator()(p,3)
+              << "," << intersect_vector->operator()(p,4)
+              << "," << intersect_distance->operator()(p,4)
+              << "," << intersect_vector->operator()(p,5)
+              << "," << intersect_distance->operator()(p,5)
+              << endl;
+           }
+        }
+     }
+  }
+  outputFile.close();
+}
+
+
+
+
 //----------------------------------------------------------------------
 void
 DDS_NavierStokes::output_L2norm_divergence( )

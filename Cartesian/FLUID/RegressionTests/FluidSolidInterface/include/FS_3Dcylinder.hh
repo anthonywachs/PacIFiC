@@ -102,17 +102,6 @@ class FS_3Dcylinder: public FS_RigidBody
       /** @brief Returns 3Dcylinder velocity including rotation speed at pt
       @param pt the point */
       geomVector rigid_body_velocity( geomVector const& pt ) const;
-
-      /** @brief Returns whether a line originating from a point intersects the
-      cylinder, and if it does the distance from the point to the cylinder
-      surface
-      @param pt the point
-      @param direction x, y or z (=0, 1 or 2)
-      @param positive true if search in the positive direction of the coordinate
-      axis and false otherwise */
-      tuple<bool,double,size_t> distanceTo( geomVector const& pt,
-      	size_t const& direction,
-      	bool const& positive ) const;
       //@}
 
 
