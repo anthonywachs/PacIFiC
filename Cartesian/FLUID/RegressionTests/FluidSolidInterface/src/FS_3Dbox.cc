@@ -135,6 +135,16 @@ void FS_3Dbox:: set( istream& in )
     for (i = 0; i < ncorners; i++) in >> m_agp_3dbox.corners[i];
   }
 
+  // Build the reference polyhedron corners
+  if ( m_agp_3dbox.ref_corners.empty() ) {
+    m_agp_3dbox.ref_corners.reserve( ncorners );
+    for (i = 0; i < ncorners; i++) {
+      m_agp_3dbox.ref_corners.push_back(node);
+    }
+  }
+
+  compute_reverseTransformationOfCorners( );
+
   // build the polyhedron faces
   size_t nbFaceCorners, localCornerIdx;
 
@@ -476,5 +486,30 @@ double FS_3Dbox::DistOfPointFromTetrahedron( const geomVector &pointOne,
   }
 
   return out_dist;
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_3Dbox::compute_reverseTransformationOfCorners( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_3Dbox:: compute_reverseTransformationOfCorners()" ) ;
+
+  for (int i = 0; i < (int) m_agp_3dbox.ref_corners.size(); i++) {
+     geomVector pt(m_agp_3dbox.corners[i]);
+
+     m_agp_3dbox.ref_corners[i](0) = pt(0)*m_rotation_matrix[0][0]
+                                   + pt(1)*m_rotation_matrix[1][0]
+                                   + pt(2)*m_rotation_matrix[2][0];
+     m_agp_3dbox.ref_corners[i](1) = pt(0)*m_rotation_matrix[0][1]
+                                   + pt(1)*m_rotation_matrix[1][1]
+                                   + pt(2)*m_rotation_matrix[2][1];
+     m_agp_3dbox.ref_corners[i](2) = pt(0)*m_rotation_matrix[0][2]
+                                   + pt(1)*m_rotation_matrix[1][2]
+                                   + pt(2)*m_rotation_matrix[2][2];
+  }
 
 }

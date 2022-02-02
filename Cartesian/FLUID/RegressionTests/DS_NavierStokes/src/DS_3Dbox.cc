@@ -86,7 +86,7 @@ void DS_3Dbox:: compute_rigid_body_halozone( )
 
   geomVector delta = pagp->corners[0] - *pgc;
 
-  double r_equi = 3.0 * delta.calcNormSquare();
+  double r_equi = 3.0 * delta.calcNorm();
 
   delta(0) = r_equi;
   delta(1) = r_equi;
@@ -109,163 +109,93 @@ void DS_3Dbox:: compute_surface_points(  )
 {
   MAC_LABEL( "DS_3Dbox:: compute_surface_points" ) ;
 
-//   // Pointers to location and additional parameters
-//   struct FS_3Dbox_Additional_Param const* pagp =
-//    dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
-//       ->get_ptr_FS_3Dbox_Additional_Param();
-//
-//   geomVector const* pgc = dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
-//                             ->get_ptr_to_gravity_centre();
-//
-//   // Reference: Becker and Becker, Computational Geometry 45 (2012) 275-283
-//   // Estimating the number of rings on the hemisphere, assuming Pmin=3
-//   // and aspect ratio(ar) as 1
-//   double p = MAC::pi()/ar;
-//   double k_temp = Ndisk;
-//   size_t cntr = 0;
-//
-//   while (k_temp > double(Pmin+2)) {
-//      k_temp = round(pow(MAC::sqrt(k_temp) - MAC::sqrt(p),2.));
-//      cntr++;
-//   }
-//
-//   size_t Nrings = cntr+1;
-//
-//   // Summation of total discretized points with
-//   // increase in number of rings radially
-//   doubleVector k(Nrings,0.);
-//   // Assigning the maximum number of discretized
-//   // points to the last element of the array
-//   k(Nrings-1) = (double) Ndisk;
-//
-//   for (int i=(int)Nrings-2; i>=0; --i) {
-//      k(i) = round(pow(MAC::sqrt(k(i+1)) - MAC::sqrt(p),2.));
-//      if (i==0) k(0) = (double) Pmin;
-//   }
-//
-//   // Radius of the rings in lamber projection plane
-//   doubleVector Rring(Nrings,0.);
-//
-//   Rring(Nrings-1) = 1.;
-//
-//   size_t maxby2 = (size_t) k(Nrings-1);
-//
-//   // Calculation for all rings except at the pole
-//   for (int i=(int)Nrings-1; i>0; --i) {
-//      double Ri = Rring(i);
-//      Rring(i-1) = MAC::sqrt(k(i-1)/k(i))*Rring(i);
-//      Rring(i) = (Rring(i) + Rring(i-1))/2.;
-//      double d_theta = 2.*MAC::pi()/(k(i)-k(i-1));
-//      // Initialize theta initialize as 1% to avoid
-//      // point overlap with mesh gridlines
-//      double theta = 0.01*d_theta;
-//      for (int j=(int)k(i-1); j<k(i); j++) {
-//         theta = theta + d_theta;
-//
-//         geomVector point (pagp->cylinder_radius*Rring(i)*MAC::cos(theta)
-//                         , pagp->cylinder_height*1./2.
-//                         , pagp->cylinder_radius*Rring(i)*MAC::sin(theta) );
-//         geomVector point_mirror (pagp->cylinder_radius*Rring(i)*MAC::cos(theta)
-//                               , pagp->cylinder_height*-1./2.
-//                               , pagp->cylinder_radius*Rring(i)*MAC::sin(theta));
-//         // For top disk
-//         m_surface_points[j]->operator=(point);
-//         m_surface_area[j]->operator()(0) = 0.5*pagp->cylinder_radius
-//                                         *pagp->cylinder_radius
-//                                         *d_theta*(pow(Ri,2)-pow(Rring(i-1),2));
-//
-//      	  // For bottom disk
-//         m_surface_points[maxby2+j]->operator=(point_mirror);
-//         m_surface_area[maxby2+j] = m_surface_area[j];
-//
-//         // Create surface normal vectors
-//         geomVector normal(0., pagp->cylinder_height*1./2., 0.);
-//         m_surface_normal[j]->operator=(normal);
-//         m_surface_normal[maxby2+j]->operator=(-1.*normal);
-//      }
-//   }
-//
-//   // Calculation at the ring on pole (i=0)
-//   double Ri = Rring(0);
-//   Rring(0) = Rring(0)/2.;
-//   double d_theta = 2.*MAC::pi()/(k(0));
-//   // Initialize theta as 1% of the d_theta to avoid
-//   // point overlap with mesh gridlines
-//   double theta = 0.01*d_theta;
-//   if (k(0)>1) {
-//      for (int j=0; j < k(0); j++) {
-//         theta = theta + d_theta;
-//
-//         geomVector point (pagp->cylinder_radius*Rring(0)*MAC::cos(theta)
-//                         , pagp->cylinder_height*1./2.
-//                         , pagp->cylinder_radius*Rring(0)*MAC::sin(theta) );
-//         geomVector point_mirror (pagp->cylinder_radius*Rring(0)*MAC::cos(theta)
-//                               , pagp->cylinder_height*-1./2.
-//                               , pagp->cylinder_radius*Rring(0)*MAC::sin(theta));
-//         // For top disk
-//         m_surface_points[j]->operator=(point);
-//         m_surface_area[j]->operator()(0) = 0.5*pagp->cylinder_radius
-//                                           *pagp->cylinder_radius
-//                                           *d_theta*pow(Ri,2);
-//         // For bottom disk
-//         m_surface_points[maxby2+j]->operator=(point_mirror);
-//         m_surface_area[maxby2+j] = m_surface_area[j];
-//         // Create surface normal vectors
-//         geomVector normal(0., pagp->cylinder_height*1./2., 0.);
-//         m_surface_normal[j]->operator=(normal);
-//         m_surface_normal[maxby2+j]->operator=(-1.*normal);
-//      }
-//   } else {
-//      geomVector normal(0., pagp->cylinder_height*1./2., 0.);
-//      // For top disk
-//      m_surface_points[0]->operator=(normal);
-//      m_surface_area[0]->operator()(0) = 0.5*pagp->cylinder_radius
-//                                        *pagp->cylinder_radius
-//                                        *d_theta*pow(Ri,2.);
-//      // For bottom disk
-//      m_surface_points[maxby2]->operator=(-1.*normal);
-//      m_surface_area[maxby2] = m_surface_area[0];
-//      // Create surface normal vectors
-//      m_surface_normal[0]->operator=(normal);
-//      m_surface_normal[maxby2]->operator=(-1.*normal);
-//   }
-//
-//   // Generating one ring of points on cylindrical surface
-//   // Can be used to calculate stress on whole surface by
-//   // a constant shift of points
-//
-//   int pts_1_ring = (int)(k(Nrings-1) - k(Nrings-2));
-//   int cyl_rings = (int)round((pagp->cylinder_height/pagp->cylinder_radius)
-//                                /(1-MAC::sqrt(k(Nrings-2)/k(Nrings-1))));
-//   double cell_area = 2.*pagp->cylinder_radius*pagp->cylinder_height*MAC::pi()
-//                    / ((double) pts_1_ring*cyl_rings);
-//
-//   d_theta = 2.*MAC::pi()/pts_1_ring;
-//   for (int j=0; j<cyl_rings; j++) {
-//      theta = 0.01*d_theta;
-//      for (int ij=0; ij<pts_1_ring; ij++) {
-//         theta = theta + d_theta;
-//         int n = 2*(int)k(Nrings-1) + j*pts_1_ring + ij;
-//         geomVector point (pagp->cylinder_radius*MAC::cos(theta)
-//                         , pagp->cylinder_height
-//                               *(-1./2. + (j+0.5)/(double(cyl_rings)))
-//                         , pagp->cylinder_radius*MAC::sin(theta) );
-//         geomVector normal (pagp->cylinder_radius*MAC::cos(theta)
-//                          , 0.
-//                          , pagp->cylinder_radius*MAC::sin(theta));
-//         m_surface_points[n]->operator=(point);
-//         m_surface_area[n]->operator()(0) = cell_area;
-//         m_surface_normal[n]->operator=(normal);
-//      }
-//   }
-//
-//   // Translate and rotate
-//   for (size_t i = 0; i < m_surface_area.size(); i++) {
-//      m_geometric_rigid_body->rotate(m_surface_points[i]);
-//      m_geometric_rigid_body->rotate(m_surface_normal[i]);
-//      m_surface_points[i]->translate(*pgc);
-//   }
-//
+  doubleVector di(3,0.);
+
+  di(0) = (box_max[0] - box_min[0])/(double)Npoints[0];
+  di(1) = (box_max[1] - box_min[1])/(double)Npoints[1];
+  di(2) = (box_max[2] - box_min[2])/(double)Npoints[2];
+
+  size_t cntr = 0;
+
+  // x face
+  for (size_t i = 0; i < Npoints[1]; i++) {
+     for (size_t j = 0; j < Npoints[2]; j++) {
+        geomVector point_min (box_min[0]
+                            , box_min[1] + (0.5+(double)i)*di(1)
+                            , box_min[2] + (0.5+(double)j)*di(2) );
+        geomVector point_max (box_max[0]
+                            , box_min[1] + (0.5+(double)i)*di(1)
+                            , box_min[2] + (0.5+(double)j)*di(2) );
+        m_surface_points[cntr]->operator=(point_min);
+        m_surface_points[Npoints[1]*Npoints[2] + cntr]->operator=(point_max);
+
+        m_surface_area[cntr]->operator()(0) = di(1)*di(2);
+        m_surface_area[Npoints[1]*Npoints[2]+cntr]->operator()(0) = di(1)*di(2);
+
+        geomVector normal(-1., 0., 0.);
+        m_surface_normal[cntr]->operator=(normal);
+        m_surface_normal[Npoints[1]*Npoints[2] + cntr]->operator=(-1.*normal);
+
+        cntr++;
+     }
+  }
+
+  cntr = cntr + Npoints[1]*Npoints[2];
+
+  // y face
+  for (size_t i = 0; i < Npoints[0]; i++) {
+     for (size_t j = 0; j < Npoints[2]; j++) {
+        geomVector point_min (box_min[0] + (0.5+(double)i)*di(0)
+                            , box_min[1]
+                            , box_min[2] + (0.5+(double)j)*di(2) );
+        geomVector point_max (box_min[0] + (0.5+(double)i)*di(0)
+                            , box_max[1]
+                            , box_min[2] + (0.5+(double)j)*di(2) );
+        m_surface_points[cntr]->operator=(point_min);
+        m_surface_points[Npoints[0]*Npoints[2] + cntr]->operator=(point_max);
+
+        m_surface_area[cntr]->operator()(0) = di(0)*di(2);
+        m_surface_area[Npoints[0]*Npoints[2]+cntr]->operator()(0) = di(0)*di(2);
+
+        geomVector normal(0., -1., 0.);
+        m_surface_normal[cntr]->operator=(normal);
+        m_surface_normal[Npoints[0]*Npoints[2] + cntr]->operator=(-1.*normal);
+
+        cntr++;
+     }
+  }
+
+  cntr = cntr + Npoints[0]*Npoints[2];
+
+  // z face
+  for (size_t i = 0; i < Npoints[0]; i++) {
+     for (size_t j = 0; j < Npoints[1]; j++) {
+        geomVector point_min (box_min[0] + (0.5+(double)i)*di(0)
+                            , box_min[1] + (0.5+(double)j)*di(1)
+                            , box_min[2] );
+        geomVector point_max (box_min[0] + (0.5+(double)i)*di(0)
+                            , box_min[1] + (0.5+(double)j)*di(1)
+                            , box_max[2] );
+        m_surface_points[cntr]->operator=(point_min);
+        m_surface_points[Npoints[0]*Npoints[1] + cntr]->operator=(point_max);
+
+        m_surface_area[cntr]->operator()(0) = di(0)*di(1);
+        m_surface_area[Npoints[0]*Npoints[1]+cntr]->operator()(0) = di(0)*di(1);
+
+        geomVector normal(0., 0., -1.);
+        m_surface_normal[cntr]->operator=(normal);
+        m_surface_normal[Npoints[0]*Npoints[1] + cntr]->operator=(-1.*normal);
+
+        cntr++;
+     }
+  }
+
+  // Translate and rotate
+  for (size_t i = 0; i < m_surface_area.size(); i++) {
+     m_geometric_rigid_body->rotate(m_surface_points[i]);
+     m_geometric_rigid_body->rotate(m_surface_normal[i]);
+  }
+
 }
 
 
@@ -279,17 +209,40 @@ void DS_3Dbox:: compute_number_of_surface_variables(
 {
   MAC_LABEL( "DS_3Dbox:: compute_number_of_surface_variables" ) ;
 
-//   struct FS_3Dbox_Additional_Param const* pagp =
-//    dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
-//       ->get_ptr_FS_3Dbox_Additional_Param();
-//
-//   Ndisk = round((1./surface_cell_scale)
-//               * ( MAC::pi()*pagp->cylinder_radius*pagp->cylinder_radius )
-//               / ( dx*dx ));
-//
-//   double Npm1 = round(pow(MAC::sqrt(Ndisk) - MAC::sqrt(MAC::pi()/ar),2.));
-//   double dh = 1. - MAC::sqrt(Npm1/Ndisk);
-//   double Nr = round((pagp->cylinder_height/pagp->cylinder_radius)/dh);
-//   Ntot = (size_t) (2*Ndisk + Nr*(Ndisk - Npm1));
-//
+  struct FS_3Dbox_Additional_Param const* pagp =
+                        dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
+                           ->get_ptr_FS_3Dbox_Additional_Param();
+
+  if (box_min.empty()) box_min.assign(3,1.e14);
+  if (box_max.empty()) box_max.assign(3,-1.e14);
+
+  for (int i = 0; i < (int) pagp->ref_corners.size(); i++) {
+     for (int dir = 0; dir < 3; dir++) {
+        if (pagp->ref_corners[i](dir) < box_min[dir])
+           box_min[dir] = pagp->ref_corners[i](dir);
+
+        if (pagp->ref_corners[i](dir) > box_max[dir])
+           box_max[dir] = pagp->ref_corners[i](dir);
+
+     }
+  }
+
+  doubleVector delta(3,0.);
+
+  delta(0) = (box_max[0]-box_min[0]);
+  delta(1) = (box_max[1]-box_min[1]);
+  delta(2) = (box_max[2]-box_min[2]);
+
+  double scale = 1. / sqrt(surface_cell_scale) / dx;
+
+  if (Npoints.empty()) Npoints.reserve(3);
+
+  Npoints[0] = (size_t) round(scale * delta(0) );
+  Npoints[1] = (size_t) round(scale * delta(1) );
+  Npoints[2] = (size_t) round(scale * delta(2) );
+
+  Ntot = 2 * (Npoints[0]*Npoints[1]
+            + Npoints[1]*Npoints[2]
+            + Npoints[2]*Npoints[0]);
+
 }

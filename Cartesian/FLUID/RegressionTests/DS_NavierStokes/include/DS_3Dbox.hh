@@ -75,9 +75,9 @@ class DS_3Dbox: public DS_RigidBody
 
       /**@name Parameters */
       //@{
-      double Ndisk;
-      size_t Pmin = 3;
-      double ar = 1.;
+      vector<double> box_min, box_max;
+      vector<size_t> Npoints;    /** Surface points on each direction
+                                     of 3D box.*/
       //@}
 
 

@@ -11,6 +11,8 @@ struct FS_3Dbox_Additional_Param
 {
   vector<geomVector> corners; /**< Corner coordinates of the polyhedron */
   vector<vector<size_t> > facesVec; /**< polygonal faces numbering */
+  vector<geomVector> ref_corners; /**< Reference Corner coordinates
+                                       of the polyhedron */
   // geomVector* g2; /**< slightly randomly translated gravity center */
   // geomVector coor_min; /**< minimal coordinates of the bounding box */
   // geomVector coor_max; /**< maximal coordinates of the bounding box */
@@ -112,10 +114,16 @@ class FS_3Dbox: public FS_RigidBody
            const geomVector &pointTwo, const geomVector &pointThree,
            const geomVector &pointFour, const geomVector &pointToCheck ) const;
 
+      /** @brief Calculates the relative
+      distance of a point from a tetrahedron */
       double DistOfPointFromTetrahedron( const geomVector &pointOne,
          const geomVector &pointTwo, const geomVector &pointThree,
          const geomVector &pointFour, const geomVector &pointToCheck ) const;
 
+      /** @brief Reverse tranform the corners of the actual 3D box to the
+      reference 3D box
+      @param pt point to transform */
+      void compute_reverseTransformationOfCorners( );
       //@}
 
 
