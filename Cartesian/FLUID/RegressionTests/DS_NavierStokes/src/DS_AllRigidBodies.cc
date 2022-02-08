@@ -2371,8 +2371,10 @@ void DS_AllRigidBodies:: compute_surface_variables_for_all_RB( )
 {
    MAC_LABEL( "DS_AllRigidBodies:: compute_surface_variables_for_all_RB" ) ;
 
-   for (size_t i = 0; i < m_nrb; ++i)
+   for (size_t i = 0; i < m_nrb; ++i) {
       m_allDSrigidbodies[i]->compute_surface_points( );
+      m_allDSrigidbodies[i]->correct_surface_discretization( UF );
+   }
 
 }
 

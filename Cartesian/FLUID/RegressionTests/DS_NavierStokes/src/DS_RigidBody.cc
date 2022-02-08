@@ -2,6 +2,7 @@
 #include <FS_RigidBody.hh>
 #include <FV_DiscreteField.hh>
 #include <FV_Mesh.hh>
+#include <MAC.hh>
 using std::endl;
 
 
@@ -244,6 +245,44 @@ void DS_RigidBody:: update_Vforce_on_surface_point( size_t const& i
 
   m_surface_Vforce[i] = value;
 
+}
+
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_RigidBody:: correct_surface_discretization( FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: correct_surface_discretization( )" ) ;
+
+  vector<geomVector> const* p_pbc =
+                  dynamic_cast<FS_RigidBody*>(m_geometric_rigid_body)
+                              ->get_ptr_to_periodic_directions();
+
+  if (p_pbc) {
+     boolVector const* periodic_comp =
+                           FF->primary_grid()->get_periodic_directions();
+     size_t dim = FF->primary_grid()->nb_space_dimensions() ;
+
+     for (size_t dir=0;dir < dim; dir++) {
+        bool is_periodic = periodic_comp->operator()( dir );
+
+        if (is_periodic) {
+         double isize = FF->primary_grid()->get_main_domain_max_coordinate(dir)
+                     - FF->primary_grid()->get_main_domain_min_coordinate(dir);
+         double imin = FF->primary_grid()->get_main_domain_min_coordinate(dir);
+
+         for (size_t i = 0; i < m_surface_area.size(); i++) {
+           m_surface_points[i]->operator()(dir) =
+                  m_surface_points[i]->operator()(dir)
+                - MAC::floor((m_surface_points[i]->operator()(dir)-imin)/isize)
+                  * isize;
+         }
+        }
+     }
+  }
 }
 
 

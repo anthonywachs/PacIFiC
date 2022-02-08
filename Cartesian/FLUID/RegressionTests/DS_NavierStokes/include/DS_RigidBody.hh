@@ -141,6 +141,9 @@ class DS_RigidBody
       void write_surface_discretization( const std::string& file
                                   , MAC_Communicator const* m_macCOMM );
 
+      /** @brief Correct surface discretization due to PBC */
+      void correct_surface_discretization( FV_DiscreteField const* FF );
+
       /** @brief Initializa the surface variables for a rigid body
       such as points, normals, and area */
       void initialize_surface_variables( );

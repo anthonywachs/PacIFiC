@@ -64,6 +64,9 @@ class FS_RigidBody
 
       /** @brief Returns a constant pointer to the gravity center of RB */
       geomVector const* get_ptr_to_gravity_centre() const;
+
+      /** @brief Returns a constant pointer to the periodic clones of RB */
+      vector<geomVector> const* get_ptr_to_periodic_directions() const;
       //@}
 
 

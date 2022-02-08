@@ -126,7 +126,9 @@ void FS_RigidBody:: display_general( ostream& out,
   {
     out << space << "Periodic directions:" << endl;
     for (size_t i=0;i<m_periodic_directions->size();++i)
-      out << space << three << (*m_periodic_directions)[i] << endl;
+      out << space << three << (*m_periodic_directions)[i](0)
+		 				 << three << (*m_periodic_directions)[i](1)
+						 << three << (*m_periodic_directions)[i](2) << endl;
   }
 
 }
@@ -282,6 +284,19 @@ geomVector const* FS_RigidBody:: get_ptr_to_gravity_centre() const
   MAC_LABEL( "FS_RigidBody:: get_ptr_to_gravity_centre" ) ;
 
   return ( &m_gravity_center );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+vector<geomVector> const* FS_RigidBody:: get_ptr_to_periodic_directions() const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: get_ptr_to_periodic_directions" ) ;
+
+  return ( m_periodic_directions );
 
 }
 
