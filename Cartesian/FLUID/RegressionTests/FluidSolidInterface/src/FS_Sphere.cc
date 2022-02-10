@@ -1,4 +1,5 @@
 #include <FS_Sphere.hh>
+#include <MAC.hh>
 using std::endl;
 
 
@@ -160,7 +161,19 @@ bool FS_Sphere:: isIn( geomVector const& pt ) const
 {
   MAC_LABEL( "FS_Sphere:: isIn(pt)" ) ;
 
-  return ( m_gravity_center.calcDist( pt ) <= m_agp_sphere.radius );
+  bool status = ( m_gravity_center.calcDist( pt ) <= m_agp_sphere.radius );
+
+  if (m_periodic_directions) {
+     for (size_t i = 0; i < m_periodic_directions->size(); ++i) {
+        if (status) break;
+        status = (m_gravity_center + (*m_periodic_directions)[i]).calcDist( pt )
+                  <= m_agp_sphere.radius ;
+     }
+  }
+
+  return (status);
+
+  // return ( m_gravity_center.calcDist( pt ) <= m_agp_sphere.radius );
 
 }
 
@@ -174,7 +187,21 @@ bool FS_Sphere:: isIn( double const& x, double const& y, double const& z )
 {
   MAC_LABEL( "FS_Sphere:: isIn(x,y,z)" ) ;
 
-  return ( m_gravity_center.calcDist( x, y, z ) <= m_agp_sphere.radius );
+  geomVector pt(x, y, z);
+
+  bool status = ( m_gravity_center.calcDist( pt ) <= m_agp_sphere.radius );
+
+  if (m_periodic_directions) {
+     for (size_t i = 0; i < m_periodic_directions->size(); ++i) {
+        if (status) break;
+        status = (m_gravity_center + (*m_periodic_directions)[i]).calcDist( pt )
+                  <= m_agp_sphere.radius ;
+     }
+  }
+
+  return (status);
+
+  // return ( m_gravity_center.calcDist( x, y, z ) <= m_agp_sphere.radius );
 
 }
 
@@ -187,7 +214,20 @@ double FS_Sphere:: level_set_value( geomVector const& pt ) const
 {
   MAC_LABEL( "FS_Sphere:: level_set_value(pt)" ) ;
 
-  return ( m_gravity_center.calcDist( pt ) - m_agp_sphere.radius );
+  double value = ( m_gravity_center.calcDist( pt ) - m_agp_sphere.radius );
+
+  if (m_periodic_directions) {
+     for (size_t i = 0; i < m_periodic_directions->size(); ++i) {
+        double temp = (m_gravity_center +
+                     (*m_periodic_directions)[i]).calcDist( pt )
+                     - m_agp_sphere.radius ;
+        value = MAC::min(temp,value);
+     }
+  }
+
+  return (value);
+
+  // return ( m_gravity_center.calcDist( pt ) - m_agp_sphere.radius );
 
 }
 
@@ -202,7 +242,22 @@ double FS_Sphere:: level_set_value( double const& x
 {
   MAC_LABEL( "FS_Sphere:: level_set_value(x,y,z)" ) ;
 
-  return ( m_gravity_center.calcDist( x, y, z ) - m_agp_sphere.radius );
+  geomVector pt(x, y, z);
+
+  double value = ( m_gravity_center.calcDist( pt ) - m_agp_sphere.radius );
+
+  if (m_periodic_directions) {
+     for (size_t i = 0; i < m_periodic_directions->size(); ++i) {
+        double temp = (m_gravity_center +
+                     (*m_periodic_directions)[i]).calcDist( pt )
+                     - m_agp_sphere.radius ;
+        value = MAC::min(temp,value);
+     }
+  }
+
+  return (value);
+
+  // return ( m_gravity_center.calcDist( x, y, z ) - m_agp_sphere.radius );
 
 }
 
