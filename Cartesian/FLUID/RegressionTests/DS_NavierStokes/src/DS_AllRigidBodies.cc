@@ -504,12 +504,24 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
         for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
            double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
+
+           if (periodic_comp->operator()( 0 ))
+              xC = periodic_transformation(FF,xC,0);
+
            for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
              double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
+
+             if (periodic_comp->operator()( 1 ))
+                yC = periodic_transformation(FF,yC,1);
+
              for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-                 double zC = (m_space_dimension == 2) ? 0.
-                                     : FF->get_DOF_coordinate( k, comp, 2 ) ;
-                 size_t p = FF->DOF_local_number(i,j,k,comp);
+               double zC = (m_space_dimension == 2) ? 0.
+                                  : FF->get_DOF_coordinate( k, comp, 2 ) ;
+
+               if (periodic_comp->operator()( 2 ))
+                  zC = periodic_transformation(FF,zC,2);
+
+               size_t p = FF->DOF_local_number(i,j,k,comp);
 
                  if (isIn(parID,xC,yC,zC))
                     void_fraction[field]->operator()(p) = 1 + parID;
@@ -518,6 +530,27 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
         }
      }
   }
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_AllRigidBodies:: periodic_transformation( FV_DiscreteField const* FF
+                                                , double const& x
+                                                , size_t const& dir)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: periodic_transformation" ) ;
+
+  double isize =
+        FF->primary_grid()->get_main_domain_max_coordinate(dir)
+      - FF->primary_grid()->get_main_domain_min_coordinate(dir);
+  double imin =
+        FF->primary_grid()->get_main_domain_min_coordinate(dir);
+  double value = x - MAC::floor((x-imin)/isize)*isize;
+
+  return (value);
 }
 
 
@@ -611,13 +644,24 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
         for (size_t i = min_nearest_index(0); i < max_nearest_index(0); ++i) {
           ipos(0) = i - min_unknown_index(0);
           double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
+
+          if (periodic_comp->operator()( 0 ))
+             xC = periodic_transformation(FF,xC,0);
+
           for (size_t j = min_nearest_index(1); j < max_nearest_index(1); ++j) {
               ipos(1) = j - min_unknown_index(1);
               double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
+
+              if (periodic_comp->operator()( 1 ))
+                 yC = periodic_transformation(FF,yC,1);
+
               for (size_t k = min_nearest_index(2);k < max_nearest_index(2); ++k) {
                  ipos(2) = k - min_unknown_index(2);
                  double zC = (m_space_dimension == 2) ? 0
                                         : FF->get_DOF_coordinate( k, comp, 2 );
+
+                 if (periodic_comp->operator()( 2 ))
+                    zC = periodic_transformation(FF,zC,2);
 
                  size_t p = FF->DOF_local_number(i,j,k,comp);
                  geomVector source(xC,yC,zC);

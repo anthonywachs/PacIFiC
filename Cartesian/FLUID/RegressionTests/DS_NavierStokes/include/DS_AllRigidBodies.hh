@@ -191,6 +191,14 @@ class DS_AllRigidBodies
       on the Cartesian computational grid */
       void build_solid_variables_on_grid( );
 
+      /** @brief Periodic transformation of a point in a given direction
+      @param FF field
+      @param x point
+      @param dir direction  */
+      double periodic_transformation( FV_DiscreteField const* FF
+                                    , double const& x
+                                    , size_t const& dir);
+
       /** @brief Intialize the surface variables for all rigid bodies */
       void initialize_surface_variables_for_all_RB( );
 
