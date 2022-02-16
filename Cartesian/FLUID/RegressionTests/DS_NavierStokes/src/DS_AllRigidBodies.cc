@@ -183,24 +183,37 @@ void DS_AllRigidBodies:: compute_pressure_force_and_torque_for_allRB( )
   avg_pressure_torque(1) = 0.;
   avg_pressure_torque(2) = 0.;
 
+  pressure_force->set(0.);
+  pressure_torque->set(0.);
+
   for (size_t i = 0; i < m_nrb; ++i) {
-     pressure_force[i](0) = 0.;
-     pressure_force[i](1) = 0.;
-     pressure_force[i](2) = 0.;
 
-     pressure_torque[i](0) = 0.;
-     pressure_torque[i](1) = 0.;
-     pressure_torque[i](2) = 0.;
+     vector<geomVector*> haloZone = m_allDSrigidbodies[i]
+                                                   ->get_rigid_body_haloZone();
 
-     first_order_pressure_stress(i);
+     bool status = PF->primary_grid()
+                 ->is_in_domain_on_current_processor(haloZone[0]->operator()(0)
+                                                    ,haloZone[0]->operator()(1)
+                                                    ,haloZone[0]->operator()(2))
+                || PF->primary_grid()
+                 ->is_in_domain_on_current_processor(haloZone[1]->operator()(0)
+                                                    ,haloZone[1]->operator()(1)
+                                                    ,haloZone[1]->operator()(2));
 
-     avg_pressure_force(0) += pressure_force[i](0);
-     avg_pressure_force(1) += pressure_force[i](1);
-     avg_pressure_force(2) += pressure_force[i](2);
+     if (status) first_order_pressure_stress(i);
+  }
 
-     avg_pressure_torque(0) += pressure_torque[i](0);
-     avg_pressure_torque(1) += pressure_torque[i](1);
-     avg_pressure_torque(2) += pressure_torque[i](2);
+  m_macCOMM->sum_array(*pressure_force);
+  m_macCOMM->sum_array(*pressure_torque);
+
+  for (size_t i = 0; i < m_nrb; ++i) {
+     avg_pressure_force(0) += pressure_force->operator()(i,0);
+     avg_pressure_force(1) += pressure_force->operator()(i,1);
+     avg_pressure_force(2) += pressure_force->operator()(i,2);
+
+     avg_pressure_torque(0) += pressure_torque->operator()(i,0);
+     avg_pressure_torque(1) += pressure_torque->operator()(i,1);
+     avg_pressure_torque(2) += pressure_torque->operator()(i,2);
   }
 
 }
@@ -223,45 +236,60 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
   avg_viscous_torque(1) = 0.;
   avg_viscous_torque(2) = 0.;
 
+  viscous_force->set(0.);
+  viscous_torque->set(0.);
+
+  for (size_t i = 0; i < m_nrb; ++i) {
+
+     vector<geomVector*> haloZone = m_allDSrigidbodies[i]
+                                                   ->get_rigid_body_haloZone();
+
+     bool status = UF->primary_grid()
+                 ->is_in_domain_on_current_processor(haloZone[0]->operator()(0)
+                                                    ,haloZone[0]->operator()(1)
+                                                    ,haloZone[0]->operator()(2))
+                || UF->primary_grid()
+                 ->is_in_domain_on_current_processor(haloZone[1]->operator()(0)
+                                                    ,haloZone[1]->operator()(1)
+                                                    ,haloZone[1]->operator()(2));
+
+     if (status) {
+        if (StressOrder == "first") {
+           first_order_viscous_stress(i);
+        } else if (StressOrder == "second") {
+           second_order_viscous_stress(i);
+        }
+     }
+  }
+
+  m_macCOMM->sum_array(*viscous_force);
+  m_macCOMM->sum_array(*viscous_torque);
+
   string fileName = "./DS_results/particle_forces.csv" ;
   std::ofstream MyFile( fileName.c_str(), std::ios::app ) ;
 
   for (size_t i = 0; i < m_nrb; ++i) {
-     viscous_force[i](0) = 0.;
-     viscous_force[i](1) = 0.;
-     viscous_force[i](2) = 0.;
+     avg_viscous_force(0) += viscous_force->operator()(i,0);
+     avg_viscous_force(1) += viscous_force->operator()(i,1);
+     avg_viscous_force(2) += viscous_force->operator()(i,2);
 
-     viscous_torque[i](0) = 0.;
-     viscous_torque[i](1) = 0.;
-     viscous_torque[i](2) = 0.;
-
-     if (StressOrder == "first") {
-        first_order_viscous_stress(i);
-     } else if (StressOrder == "second") {
-        second_order_viscous_stress(i);
-     }
-
-     avg_viscous_force(0) += viscous_force[i](0);
-     avg_viscous_force(1) += viscous_force[i](1);
-     avg_viscous_force(2) += viscous_force[i](2);
-
-     avg_viscous_torque(0) += viscous_torque[i](0);
-     avg_viscous_torque(1) += viscous_torque[i](1);
-     avg_viscous_torque(2) += viscous_torque[i](2);
+     avg_viscous_torque(0) += viscous_torque->operator()(i,0);
+     avg_viscous_torque(1) += viscous_torque->operator()(i,1);
+     avg_viscous_torque(2) += viscous_torque->operator()(i,2);
 
      if (m_macCOMM->rank() == 0) {
-        MyFile << i << " , " << pressure_force[i](0)
-                    << " , " << pressure_force[i](1)
-                    << " , " << pressure_force[i](2)
-                    << " , " << viscous_force[i](0)
-                    << " , " << viscous_force[i](1)
-                    << " , " << viscous_force[i](2)
-                    << " , " << pressure_torque[i](0)
-                    << " , " << pressure_torque[i](1)
-                    << " , " << pressure_torque[i](2)
-                    << " , " << viscous_torque[i](0)
-                    << " , " << viscous_torque[i](1)
-                    << " , " << viscous_torque[i](2)
+        MyFile << i << " , " << pressure_force->operator()(i,0)
+                    << " , " << pressure_force->operator()(i,1)
+                    << " , " << pressure_force->operator()(i,2)
+                    << " , " << viscous_force->operator()(i,0)
+                    << " , " << viscous_force->operator()(i,1)
+                    << " , " << viscous_force->operator()(i,2)
+                    << " , " << pressure_torque->operator()(i,0)
+                    << " , " << pressure_torque->operator()(i,1)
+                    << " , " << pressure_torque->operator()(i,2)
+                    << " , " << viscous_torque->operator()(i,0)
+                    << " , " << viscous_torque->operator()(i,1)
+                    << " , " << viscous_torque->operator()(i,2)
                     << endl;
      }
   }
@@ -836,30 +864,27 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
 
      m_allDSrigidbodies[parID]->update_Pforce_on_surface_point(i,value);
 
-     pressure_force[parID] += value;
+     pressure_force->operator()(parID,0) += value(0);
+     pressure_force->operator()(parID,1) += value(1);
+     pressure_force->operator()(parID,2) += value(2);
 
-     pressure_torque[parID](0) += value(2)*(surface_point[i]->operator()(1)
+     pressure_torque->operator()(parID,0)
+                               += value(2)*(surface_point[i]->operator()(1)
                                                        - pgc->operator()(1))
                                 - value(1)*(surface_point[i]->operator()(2)
                                                        - pgc->operator()(2));
-     pressure_torque[parID](1) += value(0)*(surface_point[i]->operator()(2)
+     pressure_torque->operator()(parID,1)
+                               += value(0)*(surface_point[i]->operator()(2)
                                                        - pgc->operator()(2))
                                 - value(2)*(surface_point[i]->operator()(0)
                                                        - pgc->operator()(0));
-     pressure_torque[parID](2) += value(1)*(surface_point[i]->operator()(0)
+     pressure_torque->operator()(parID,2)
+                               += value(1)*(surface_point[i]->operator()(0)
                                                        - pgc->operator()(0))
                                 - value(0)*(surface_point[i]->operator()(1)
                                                        - pgc->operator()(1));
 
   }
-
-  pressure_force[parID](0) = m_macCOMM->sum(pressure_force[parID](0));
-  pressure_force[parID](1) = m_macCOMM->sum(pressure_force[parID](1));
-  pressure_force[parID](2) = m_macCOMM->sum(pressure_force[parID](2));
-
-  pressure_torque[parID](0) = m_macCOMM->sum(pressure_torque[parID](0));
-  pressure_torque[parID](1) = m_macCOMM->sum(pressure_torque[parID](1));
-  pressure_torque[parID](2) = m_macCOMM->sum(pressure_torque[parID](2));
 
 }
 
@@ -1130,30 +1155,27 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
 
      m_allDSrigidbodies[parID]->update_Vforce_on_surface_point(i,value);
 
-     viscous_force[parID] += value;
+     viscous_force->operator()(parID,0) += value(0);
+     viscous_force->operator()(parID,1) += value(1);
+     viscous_force->operator()(parID,2) += value(2);
 
-     viscous_torque[parID](0) += value(2)*(surface_point[i]->operator()(1)
+     viscous_torque->operator()(parID,0)
+                              += value(2)*(surface_point[i]->operator()(1)
                                                       - pgc->operator()(1))
                                - value(1)*(surface_point[i]->operator()(2)
                                                       - pgc->operator()(2));
-     viscous_torque[parID](1) += value(0)*(surface_point[i]->operator()(2)
+     viscous_torque->operator()(parID,1)
+                              += value(0)*(surface_point[i]->operator()(2)
                                                       - pgc->operator()(2))
                                - value(2)*(surface_point[i]->operator()(0)
                                                       - pgc->operator()(0));
-     viscous_torque[parID](2) += value(1)*(surface_point[i]->operator()(0)
+     viscous_torque->operator()(parID,2)
+                              += value(1)*(surface_point[i]->operator()(0)
                                                       - pgc->operator()(0))
                                - value(0)*(surface_point[i]->operator()(1)
                                                       - pgc->operator()(1));
 
   }
-
-  viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
-  viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
-  viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
-
-  viscous_torque[parID](0) = m_macCOMM->sum(viscous_torque[parID](0));
-  viscous_torque[parID](1) = m_macCOMM->sum(viscous_torque[parID](1));
-  viscous_torque[parID](2) = m_macCOMM->sum(viscous_torque[parID](2));
 
 }
 
@@ -1403,30 +1425,27 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
 
      m_allDSrigidbodies[parID]->update_Vforce_on_surface_point(i,value);
 
-     viscous_force[parID] += value;
+     viscous_force->operator()(parID,0) += value(0);
+     viscous_force->operator()(parID,1) += value(1);
+     viscous_force->operator()(parID,2) += value(2);
 
-     viscous_torque[parID](0) += value(2)*(surface_point[i]->operator()(1)
+     viscous_torque->operator()(parID,0)
+                              += value(2)*(surface_point[i]->operator()(1)
                                                       - pgc->operator()(1))
                                - value(1)*(surface_point[i]->operator()(2)
                                                       - pgc->operator()(2));
-     viscous_torque[parID](1) += value(0)*(surface_point[i]->operator()(2)
+     viscous_torque->operator()(parID,1)
+                              += value(0)*(surface_point[i]->operator()(2)
                                                       - pgc->operator()(2))
                                - value(2)*(surface_point[i]->operator()(0)
                                                       - pgc->operator()(0));
-     viscous_torque[parID](2) += value(1)*(surface_point[i]->operator()(0)
+     viscous_torque->operator()(parID,2)
+                              += value(1)*(surface_point[i]->operator()(0)
                                                       - pgc->operator()(0))
                                - value(0)*(surface_point[i]->operator()(1)
                                                       - pgc->operator()(1));
 
   }
-
-  viscous_force[parID](0) = m_macCOMM->sum(viscous_force[parID](0));
-  viscous_force[parID](1) = m_macCOMM->sum(viscous_force[parID](1));
-  viscous_force[parID](2) = m_macCOMM->sum(viscous_force[parID](2));
-
-  viscous_torque[parID](0) = m_macCOMM->sum(viscous_torque[parID](0));
-  viscous_torque[parID](1) = m_macCOMM->sum(viscous_torque[parID](1));
-  viscous_torque[parID](2) = m_macCOMM->sum(viscous_torque[parID](2));
 
 }
 
@@ -2478,11 +2497,15 @@ void DS_AllRigidBodies:: build_solid_variables_on_grid(  )
    intersect_fieldValue[0]->re_initialize(PF_LOC_UNK,6);
    intersect_fieldValue[1]->re_initialize(UF_LOC_UNK,6);
 
-   // force variable for all the rigid bodies
-   viscous_force.reserve(m_nrb);
-   pressure_force.reserve(m_nrb);
-   viscous_torque.reserve(m_nrb);
-   pressure_torque.reserve(m_nrb);
+   viscous_force = new doubleArray2D(1,1,0.);
+   pressure_force = new doubleArray2D(1,1,0.);
+   viscous_force->re_initialize(m_nrb,3);
+   pressure_force->re_initialize(m_nrb,3);
+
+   viscous_torque = new doubleArray2D(1,1,0.);
+   pressure_torque = new doubleArray2D(1,1,0.);
+   viscous_torque->re_initialize(m_nrb,3);
+   pressure_torque->re_initialize(m_nrb,3);
 
    geomVector vvv(3);
 
@@ -2490,13 +2513,6 @@ void DS_AllRigidBodies:: build_solid_variables_on_grid(  )
    avg_viscous_force = vvv;
    avg_pressure_torque = vvv;
    avg_viscous_torque = vvv;
-
-   for (size_t i = 0; i < m_nrb; ++i) {
-      viscous_force.push_back( vvv );
-      pressure_force.push_back( vvv );
-      viscous_torque.push_back( vvv );
-      pressure_torque.push_back( vvv );
-   }
 
 }
 

@@ -329,17 +329,17 @@ class DS_AllRigidBodies
       to node point */
       vector<doubleArray2D*> intersect_fieldValue; /**< Value of field variable
       at the intersection */
-      vector<geomVector> pressure_force; /**< Value of force due to
+      doubleArray2D* pressure_force; /**< Value of force due to
       pressure stress on rigid bodies */
-      vector<geomVector> viscous_force; /**< Value of force due to
+      doubleArray2D* viscous_force; /**< Value of force due to
       viscous stress on rigid bodies */
       geomVector avg_pressure_force; /**< Value of average force due to
       pressure stress on all rigid bodies */
       geomVector avg_viscous_force; /**< Value of average force due to
       viscous stress on all rigid bodies */
-      vector<geomVector> pressure_torque; /**< Value of torque due to
+      doubleArray2D* pressure_torque; /**< Value of torque due to
       pressure stress on rigid bodies */
-      vector<geomVector> viscous_torque; /**< Value of torque due to
+      doubleArray2D* viscous_torque; /**< Value of torque due to
       viscous stress on rigid bodies */
       geomVector avg_pressure_torque; /**< Value of average torque due to
       pressure stress on all rigid bodies */
