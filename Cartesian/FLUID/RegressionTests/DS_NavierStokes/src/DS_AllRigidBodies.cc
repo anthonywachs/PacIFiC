@@ -187,20 +187,7 @@ void DS_AllRigidBodies:: compute_pressure_force_and_torque_for_allRB( )
   pressure_torque->set(0.);
 
   for (size_t i = 0; i < m_nrb; ++i) {
-
-     vector<geomVector*> haloZone = m_allDSrigidbodies[i]
-                                                   ->get_rigid_body_haloZone();
-
-     bool status = PF->primary_grid()
-                 ->is_in_domain_on_current_processor(haloZone[0]->operator()(0)
-                                                    ,haloZone[0]->operator()(1)
-                                                    ,haloZone[0]->operator()(2))
-                || PF->primary_grid()
-                 ->is_in_domain_on_current_processor(haloZone[1]->operator()(0)
-                                                    ,haloZone[1]->operator()(1)
-                                                    ,haloZone[1]->operator()(2));
-
-     if (status) first_order_pressure_stress(i);
+     first_order_pressure_stress(i);
   }
 
   m_macCOMM->sum_array(*pressure_force);
@@ -240,25 +227,10 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
   viscous_torque->set(0.);
 
   for (size_t i = 0; i < m_nrb; ++i) {
-
-     vector<geomVector*> haloZone = m_allDSrigidbodies[i]
-                                                   ->get_rigid_body_haloZone();
-
-     bool status = UF->primary_grid()
-                 ->is_in_domain_on_current_processor(haloZone[0]->operator()(0)
-                                                    ,haloZone[0]->operator()(1)
-                                                    ,haloZone[0]->operator()(2))
-                || UF->primary_grid()
-                 ->is_in_domain_on_current_processor(haloZone[1]->operator()(0)
-                                                    ,haloZone[1]->operator()(1)
-                                                    ,haloZone[1]->operator()(2));
-
-     if (status) {
-        if (StressOrder == "first") {
-           first_order_viscous_stress(i);
-        } else if (StressOrder == "second") {
-           second_order_viscous_stress(i);
-        }
+     if (StressOrder == "first") {
+        first_order_viscous_stress(i);
+     } else if (StressOrder == "second") {
+        second_order_viscous_stress(i);
      }
   }
 
