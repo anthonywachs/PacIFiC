@@ -1810,7 +1810,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
    // Local node index of ghost points
    size_t_vector node_index(3,0);
    // Decide which scheme to use
-   string scheme = "quadratic";
+   scheme_list scheme = quadratic;
 
    geomVector xi(3), fi(3);
 
@@ -1872,7 +1872,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                - intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
             fi(0) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 0);
          } else {
-            scheme = "linear12";
+            scheme = linear12;
          }
       // 2 in solid, rest in fluid
       } else if ((in_solid(0) == 0) &&
@@ -1883,7 +1883,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                + intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
             fi(2) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 1);
          } else {
-            scheme = "linear01";
+            scheme = linear01;
          }
       // 0, 2 in solid; 1 in fluid
       } else if ((in_solid(0) != 0) &&
@@ -1897,7 +1897,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                + intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
             fi(2) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 1);
          } else {
-            scheme = "linear1";
+            scheme = linear1;
          }
       // 0, 1 in solid; 2 in fluid
       } else if ((in_solid(0) != 0) &&
@@ -1907,9 +1907,9 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
             xi(1) = FF->get_DOF_coordinate(i0_ghost[2](interpol_dir), comp, interpol_dir)
                - intersect_distance[field]->operator()(node_index(2),2*interpol_dir + 0);
             fi(1) = intersect_fieldValue[field]->operator()(node_index(2),2*interpol_dir + 0);
-            scheme = "linear12";
+            scheme = linear12;
          } else {
-            scheme = "linear2";
+            scheme = linear2;
          }
       // 1, 2 in solid; 0 in fluid
       } else if ((in_solid(0) == 0) &&
@@ -1919,14 +1919,14 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
             xi(1) = FF->get_DOF_coordinate(i0_ghost[0](interpol_dir), comp, interpol_dir)
             + intersect_distance[field]->operator()(node_index(0),2*interpol_dir + 1);
             fi(1) = intersect_fieldValue[field]->operator()(node_index(0),2*interpol_dir + 1);
-            scheme = "linear01";
+            scheme = linear01;
          } else {
-            scheme = "linear0";
+            scheme = linear0;
          }
       }
    // Point 0 and 1 are in domain, 2 not in domain
    } else if (in_domain(0) && in_domain(1) && !in_domain(2)) {
-      scheme = "linear01";
+      scheme = linear01;
       // 0 in fluid; 1 in solid
       if ((in_solid(0) == 0) &&
           (in_solid(1) != 0)) {
@@ -1935,7 +1935,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                + intersect_distance[field]->operator()(node_index(0),2*interpol_dir + 1);
             fi(1) = intersect_fieldValue[field]->operator()(node_index(0),2*interpol_dir + 1);
          } else {
-            scheme = "linear0";
+            scheme = linear0;
          }
       // 0 in solid, 1 in fluid
       } else if ((in_solid(0) != 0) &&
@@ -1945,12 +1945,12 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                - intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
             fi(0) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 0);
         } else {
-            scheme = "linear1";
+            scheme = linear1;
         }
       }
    // Point 1 and 2 are in domain, 0 not in domain
    } else if (!in_domain(0) && in_domain(1) && in_domain(2)) {
-      scheme = "linear12";
+      scheme = linear12;
       // 1 in fluid; 2 in solid
       if ((in_solid(1) == 0) &&
           (in_solid(2) != 0)) {
@@ -1959,7 +1959,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                + intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
             fi(2) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 1);
          } else {
-            scheme = "linear1";
+            scheme = linear1;
          }
       // 1 in solid, 2 in fluid
       } else if ((in_solid(1) != 0) &&
@@ -1969,7 +1969,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                - intersect_distance[field]->operator()(node_index(2),2*interpol_dir + 0);
             fi(1) = intersect_fieldValue[field]->operator()(node_index(2),2*interpol_dir + 0);
          } else {
-            scheme = "linear2";
+            scheme = linear2;
          }
       }
    }
@@ -1977,31 +1977,38 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
    double value = 0.;
    double l0=0.,l1=0.,l2=0.;
 
-   if (scheme == "quadratic") {
-      l0 = (pt->operator()(interpol_dir) - xi(1))
-          *(pt->operator()(interpol_dir) - xi(2))
-          /(xi(0) - xi(1))/(xi(0) - xi(2));
-      l1 = (pt->operator()(interpol_dir) - xi(0))
-          *(pt->operator()(interpol_dir) - xi(2))
-          /(xi(1) - xi(0))/(xi(1) - xi(2));
-      l2 = (pt->operator()(interpol_dir) - xi(0))
-          *(pt->operator()(interpol_dir) - xi(1))
-          /(xi(2) - xi(0))/(xi(2) - xi(1));
-      value = fi(0)*l0 + fi(1)*l1 + fi(2)*l2;
-   } else if (scheme == "linear01") {
-      l0 = (pt->operator()(interpol_dir) - xi(1)) / (xi(0) - xi(1));
-      l1 = (pt->operator()(interpol_dir) - xi(0)) / (xi(1) - xi(0));
-      value = fi(0)*l0 + fi(1)*l1;
-   } else if (scheme == "linear12") {
-      l1 = (pt->operator()(interpol_dir) - xi(2)) / (xi(1) - xi(2));
-      l2 = (pt->operator()(interpol_dir) - xi(1)) / (xi(2) - xi(1));
-      value = fi(1)*l1 + fi(2)*l2;
-   } else if (scheme == "linear0") {
-      value = fi(0);
-   } else if (scheme == "linear1") {
-      value = fi(1);
-   } else if (scheme == "linear2") {
-      value = fi(2);
+   switch(scheme) {
+      case quadratic:
+         l0 = (pt->operator()(interpol_dir) - xi(1))
+             *(pt->operator()(interpol_dir) - xi(2))
+             /(xi(0) - xi(1))/(xi(0) - xi(2));
+         l1 = (pt->operator()(interpol_dir) - xi(0))
+             *(pt->operator()(interpol_dir) - xi(2))
+             /(xi(1) - xi(0))/(xi(1) - xi(2));
+         l2 = (pt->operator()(interpol_dir) - xi(0))
+             *(pt->operator()(interpol_dir) - xi(1))
+             /(xi(2) - xi(0))/(xi(2) - xi(1));
+         value = fi(0)*l0 + fi(1)*l1 + fi(2)*l2;
+         break;
+      case linear01:
+         l0 = (pt->operator()(interpol_dir) - xi(1)) / (xi(0) - xi(1));
+         l1 = (pt->operator()(interpol_dir) - xi(0)) / (xi(1) - xi(0));
+         value = fi(0)*l0 + fi(1)*l1;
+         break;
+      case linear12:
+         l1 = (pt->operator()(interpol_dir) - xi(2)) / (xi(1) - xi(2));
+         l2 = (pt->operator()(interpol_dir) - xi(1)) / (xi(2) - xi(1));
+         value = fi(1)*l1 + fi(2)*l2;
+         break;
+      case linear0:
+         value = fi(0);
+         break;
+      case linear1:
+         value = fi(1);
+         break;
+      case linear2:
+         value = fi(2);
+         break;
    }
 
    return(value);
@@ -2037,7 +2044,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
   boolVector in_domain(3,1);
   vector<double> net_vel(3,0.);
   // Decide which scheme to use
-  string scheme = "quadratic";
+  scheme_list scheme = quadratic;
 
   size_t sec_ghost_dir = 0;
   size_t sec_interpol_dir = 0;
@@ -2168,7 +2175,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
            x0 = x1 - del;
            f0 = netVel(comp);
 	     } else {
-           scheme = "linear12";
+           scheme = linear12;
 	     }
      // 2 in solid, rest in fluid
      } else if ((in_parID[0] == -1) &&
@@ -2191,7 +2198,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
             x2 = x1 + del;
             f2 = netVel(comp);
    	   } else {
-            scheme = "linear01";
+            scheme = linear01;
 	      }
       // 0, 2 in solid; 1 in fluid
       } else if ((in_parID[0] != -1) &&
@@ -2229,7 +2236,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
             x2 = x1 + del;
             f2 = netVel(comp);
 	      } else {
-	         scheme = "linear1";
+	         scheme = linear1;
          }
       // 0, 1 in solid; 2 in fluid
       } else if ((in_parID[0] != -1) &&
@@ -2251,9 +2258,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
             x1 = x2 - del;
             f1 = netVel(comp);
-            scheme = "linear12";
+            scheme = linear12;
          } else {
-            scheme = "linear2";
+            scheme = linear2;
          }
       // 1, 2 in solid; 0 in fluid
       } else if ((in_parID[0] == -1) &&
@@ -2275,14 +2282,14 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
             x1 = x0 + del;
             f1 = netVel(comp);
-            scheme = "linear01";
+            scheme = linear01;
          } else {
-            scheme = "linear0";
+            scheme = linear0;
          }
       }
    // Point 0 and 1 are in domain, 2 not in domain
    } else if (in_domain(0) && in_domain(1) && !in_domain(2)) {
-      scheme = "linear01";
+      scheme = linear01;
       // 0 in fluid; 1 in solid
       if ((in_parID[0] == -1) &&
           (in_parID[1] != -1)) {
@@ -2303,7 +2310,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
              x1 = x0 + del;
              f1 = netVel(comp);
 	       } else {
-             scheme = "linear0";
+             scheme = linear0;
           }
        // 0 in solid, 1 in fluid
        } else if ((in_parID[0] != -1) &&
@@ -2325,12 +2332,12 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
              x0 = x1 - del;
              f0 = netVel(comp);
       	 } else {
-      	    scheme = "linear1";
+      	    scheme = linear1;
       	 }
        }
    // Point 1 and 2 are in domain, 0 not in domain
    } else if (!in_domain(0) && in_domain(1) && in_domain(2)) {
-       scheme = "linear12";
+       scheme = linear12;
        // 1 in fluid; 2 in solid
        if ((in_parID[1] == -1) &&
            (in_parID[2] != -1)) {
@@ -2351,7 +2358,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
               x2 = x1 + del;
               f2 = netVel(comp);
            } else {
-              scheme = "linear1";
+              scheme = linear1;
            }
        // 1 in solid, 2 in fluid
        } else if ((in_parID[1] != -1) &&
@@ -2373,7 +2380,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
               x1 = x2 - del;
               f1 = netVel(comp);
            } else {
-              scheme = "linear2";
+              scheme = linear2;
            }
        }
    }
@@ -2381,32 +2388,38 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
   double l0 = 0., l1 = 0., l2 = 0.;
   double result = 0.;
 
-
-  if (scheme == "quadratic") {
-     l0 = (point(sec_ghost_dir) - x1)
-        * (point(sec_ghost_dir) - x2)
-        / (x0 - x1) / (x0 - x2);
-     l1 = (point(sec_ghost_dir) - x0)
-        * (point(sec_ghost_dir) - x2)
-        / (x1 - x0) / (x1 - x2);
-     l2 = (point(sec_ghost_dir) - x0)
-        * (point(sec_ghost_dir) - x1)
-        / (x2 - x0) / (x2 - x1);
-     result = f0*l0 + f1*l1 + f2*l2;
-  } else if (scheme == "linear01") {
-     l0 = (point(sec_ghost_dir) - x1)/(x0 - x1);
-     l1 = (point(sec_ghost_dir) - x0)/(x1 - x0);
-     result = f0*l0 + f1*l1;
-  } else if (scheme == "linear12") {
-     l1 = (point(sec_ghost_dir) - x2)/(x1 - x2);
-     l2 = (point(sec_ghost_dir) - x1)/(x2 - x1);
-     result = f1*l1 + f2*l2;
-  } else if (scheme == "linear0") {
-     result = f0;
-  } else if (scheme == "linear1") {
-     result = f1;
-  } else if (scheme == "linear2") {
-     result = f2;
+  switch (scheme) {
+     case quadratic:
+        l0 = (point(sec_ghost_dir) - x1)
+           * (point(sec_ghost_dir) - x2)
+           / (x0 - x1) / (x0 - x2);
+        l1 = (point(sec_ghost_dir) - x0)
+           * (point(sec_ghost_dir) - x2)
+           / (x1 - x0) / (x1 - x2);
+        l2 = (point(sec_ghost_dir) - x0)
+           * (point(sec_ghost_dir) - x1)
+           / (x2 - x0) / (x2 - x1);
+        result = f0*l0 + f1*l1 + f2*l2;
+        break;
+     case linear01:
+        l0 = (point(sec_ghost_dir) - x1)/(x0 - x1);
+        l1 = (point(sec_ghost_dir) - x0)/(x1 - x0);
+        result = f0*l0 + f1*l1;
+        break;
+     case linear12:
+        l1 = (point(sec_ghost_dir) - x2)/(x1 - x2);
+        l2 = (point(sec_ghost_dir) - x1)/(x2 - x1);
+        result = f1*l1 + f2*l2;
+        break;
+     case linear0:
+        result = f0;
+        break;
+     case linear1:
+        result = f1;
+        break;
+     case linear2:
+        result = f2;
+        break;
   }
 
   return(result);

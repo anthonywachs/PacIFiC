@@ -21,6 +21,17 @@ class DS_RigidBody;
 class FS_AllRigidBodies;
 class FV_DiscreteField;
 
+/** @brief Interpolation scheme enumeration */
+enum scheme_list
+{
+  quadratic,
+  linear01,
+  linear12,
+  linear0,
+  linear1,
+  linear2
+};
+
 /** @brief The class DS_AllRigidBodies.
 
 The array of all rigid bodies in the Direction Splitting solver.
