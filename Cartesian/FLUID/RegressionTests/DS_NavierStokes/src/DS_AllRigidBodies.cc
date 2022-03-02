@@ -4,6 +4,7 @@
 #include <DS_RigidBody_BuilderFactory.hh>
 #include <FV_DiscreteField.hh>
 #include <FV_Mesh.hh>
+#include <cmath>
 using std::endl;
 
 
@@ -60,6 +61,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   compute_surface_variables_for_all_RB();
 
   compute_halo_zones_for_all_rigid_body();
+
+  create_neighbour_list_for_AllRB();
 
   compute_void_fraction_on_grid(PF);
   compute_void_fraction_on_grid(UF);
@@ -296,13 +299,16 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
 
 
 //---------------------------------------------------------------------------
-int DS_AllRigidBodies:: isIn_any_RB( geomVector const& pt ) const
+int DS_AllRigidBodies:: isIn_any_RB( size_t const& ownID
+                                   , geomVector const& pt ) const
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_AllRigidBodies:: isIn_any_RB(pt)" ) ;
+  MAC_LABEL( "DS_AllRigidBodies:: isIn_any_RB(ownID,pt)" ) ;
 
-  for (size_t i = 0; i < m_nrb; ++i)
-     if (m_allDSrigidbodies[i]->isIn( pt )) return ((int)i);
+  for (size_t i = 0; i < neighbour_list[ownID].size(); ++i) {
+     size_t neighID = neighbour_list[ownID][i];
+     if (m_allDSrigidbodies[neighID]->isIn( pt )) return ((int)neighID);
+  }
 
   return (-1);
 
@@ -312,15 +318,18 @@ int DS_AllRigidBodies:: isIn_any_RB( geomVector const& pt ) const
 
 
 //---------------------------------------------------------------------------
-int DS_AllRigidBodies:: isIn_any_RB( double const& x,
+int DS_AllRigidBodies:: isIn_any_RB( size_t const& ownID,
+                                     double const& x,
                                      double const& y,
                                      double const& z ) const
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_AllRigidBodies:: isIn_any_RB(x,y,z)" ) ;
+  MAC_LABEL( "DS_AllRigidBodies:: isIn_any_RB(ownID,x,y,z)" ) ;
 
-  for (size_t i = 0; i < m_nrb; ++i)
-     if (m_allDSrigidbodies[i]->isIn( x, y, z )) return ((int)i);
+  for (size_t i = 0; i < neighbour_list[ownID].size(); ++i) {
+     size_t neighID = neighbour_list[ownID][i];
+     if (m_allDSrigidbodies[neighID]->isIn( x, y, z )) return ((int)neighID);
+  }
 
   return (-1);
 
@@ -815,7 +824,7 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
         face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
         double press = (m_space_dimension == 2) ?
          Bilinear_interpolation(PF,comp,surface_point[i],i0,face_vector,{0,1}) :
-         Trilinear_interpolation(PF,comp,surface_point[i],i0,{0,1}) ;
+         Trilinear_interpolation(PF,comp,surface_point[i],i0,parID,{0,1}) ;
         stress = - press/2.;
      }
 
@@ -987,8 +996,8 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
 
               // Checking all the ghost points in the solid/fluid,
               // and storing the parID if present in solid
-              in_parID[col1] = isIn_any_RB(ghost_pt[col1]);
-              in_parID[col2] = isIn_any_RB(ghost_pt[col2]);
+              in_parID[col1] = isIn_any_RB(parID,ghost_pt[col1]);
+              in_parID[col2] = isIn_any_RB(parID,ghost_pt[col2]);
            }
 
            // Get local min and max indices
@@ -1022,6 +1031,7 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                                                             , comp
                                                             , &ghost_pt[col]
                                                             , i0_new[col]
+                                                            , parID
                                                             , dir
                                                             , sign
                                                             , {0}) ;
@@ -1076,6 +1086,7 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                                                               , comp
                                                               , &ghost_pt[col1]
                                                               , i0_new[col1]
+                                                              , parID
                                                               , dir
                                                               , sign
                                                               , {0}) ;
@@ -1233,7 +1244,7 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
 
               // Checking all the ghost points in the solid/fluid,
               // and storing the parID if present in solid
-              in_parID[col] = isIn_any_RB(ghost_pt[col]);
+              in_parID[col] = isIn_any_RB(parID,ghost_pt[col]);
            }
         }
 
@@ -1286,6 +1297,7 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
                                                             , comp
                                                             , &ghost_pt[col]
                                                             , i0_new[col]
+                                                            , parID
                                                             , {0}) ;
                  } else if ((in_parID[col] != -1) && in_domain(col)) {
                     geomVector netVelg = rigid_body_velocity(in_parID[col]
@@ -1349,6 +1361,7 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
                                                                , comp
                                                                , &pt
                                                                , i0
+                                                               , parID
                                                                , {0}) ;
                  dfdi(dir) = (f[col1] - f[0])/dh_wall;
               }
@@ -1429,6 +1442,7 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
                                                    , size_t const& comp
                                                    , geomVector const* pt
                                                    , size_t_vector const& i0
+                                                   , size_t const& parID
                                                    , vector<size_t> const& list)
 //---------------------------------------------------------------------------
 {
@@ -1463,7 +1477,7 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
                                                    , face_norm);
       rayDir(face_norm) = -1.;
 
-      in_RB = (FF == UF) ? isIn_any_RB(pt_at_face) : -1 ;
+      in_RB = (FF == UF) ? isIn_any_RB(parID, pt_at_face) : -1 ;
 
       if (in_RB != -1) {
          dl = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
@@ -1489,7 +1503,7 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
                                                    , face_norm);
       rayDir(face_norm) = 1.;
 
-      in_RB = (FF == UF) ? isIn_any_RB(pt_at_face) : -1 ;
+      in_RB = (FF == UF) ? isIn_any_RB(parID, pt_at_face) : -1 ;
 
       if (in_RB != -1) {
          dr = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
@@ -2002,6 +2016,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
                                                , size_t const& comp
                                                , geomVector const* pt
                                                , size_t_vector const& i0
+                                               , size_t const& parID
                                                , size_t const& ghost_points_dir
                                                , vector<int> const& sign
                                                , vector<size_t> const& list)
@@ -2099,9 +2114,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
 
   // Stores rigid body ID if inside solid; -1 otherwise
-  in_parID[0] = isIn_any_RB(coord_g[0]);
-  in_parID[1] = isIn_any_RB(coord_g[1]);
-  in_parID[2] = isIn_any_RB(coord_g[2]);
+  in_parID[0] = isIn_any_RB(parID, coord_g[0]);
+  in_parID[1] = isIn_any_RB(parID, coord_g[1]);
+  in_parID[2] = isIn_any_RB(parID, coord_g[2]);
 
   double del = 0.;
 
@@ -2542,4 +2557,60 @@ doubleArray2D* DS_AllRigidBodies:: get_intersect_fieldValue_on_grid(
 
   return (intersect_fieldValue[field]);
 
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: create_neighbour_list_for_AllRB( )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_AllRigidBodies:: create_neighbour_list_for_AllRB()" ) ;
+
+   boolVector const* periodic_comp =
+                         PF->primary_grid()->get_periodic_directions();
+
+   double dh = PF->primary_grid()->get_smallest_grid_size();
+
+   for (size_t i = 0; i < m_nrb; ++i) {
+      vector<size_t> v1;
+      v1.push_back(i);
+      double r_i = m_allDSrigidbodies[i]->get_circumscribed_radius();
+      geomVector const* pgc_i = m_allDSrigidbodies[i]
+                                              ->get_ptr_to_gravity_centre();
+      for (size_t j = 0; j < m_nrb; ++j) {
+         double r_j = m_allDSrigidbodies[j]->get_circumscribed_radius();
+         geomVector const* pgc_j = m_allDSrigidbodies[j]
+                                                 ->get_ptr_to_gravity_centre();
+
+         size_t dim = PF->primary_grid()->nb_space_dimensions() ;
+
+         geomVector delta(3);
+
+         for (size_t dir = 0; dir < dim; dir++) {
+            delta(dir) = pgc_j->operator()(dir) - pgc_i->operator()(dir);
+
+            bool is_periodic = periodic_comp->operator()( dir );
+
+            if (is_periodic) {
+               double isize = PF->primary_grid()
+                                ->get_main_domain_max_coordinate(dir)
+                            - PF->primary_grid()
+                                ->get_main_domain_min_coordinate(dir);
+               delta(dir) = delta(dir) - round(delta(dir)/isize) * isize;
+            }
+         }
+         double dist = delta.calcNorm();
+
+         // Store if two surfaces are less than 10 grid cells away
+         if (dist <= (r_i + r_j + 10*dh))
+            v1.push_back(j);
+      }
+      if (!v1.empty()) {
+         neighbour_list.push_back(v1);
+      } else {
+         neighbour_list.push_back({0});
+      }
+   }
 }

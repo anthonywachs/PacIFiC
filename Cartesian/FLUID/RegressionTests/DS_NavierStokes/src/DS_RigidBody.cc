@@ -131,6 +131,19 @@ geomVector DS_RigidBody:: get_rigid_body_velocity( geomVector const& pt ) const
 
 
 //---------------------------------------------------------------------------
+double DS_RigidBody:: get_circumscribed_radius( ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: get_circumscribed_radius()" ) ;
+
+  return (m_geometric_rigid_body->get_circumscribed_radius());
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 geomVector const* DS_RigidBody:: get_ptr_to_gravity_centre( ) const
 //---------------------------------------------------------------------------
 {

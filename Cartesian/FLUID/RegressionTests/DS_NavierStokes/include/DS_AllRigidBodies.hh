@@ -131,14 +131,17 @@ class DS_AllRigidBodies
       bool isIn( size_t const& parID, geomVector const& pt ) const;
 
       /** @brief Returns the parID if the point is inside parID
+      @param ownID ID of RB owning the pt
       @param pt the point */
-      int isIn_any_RB( geomVector const& pt ) const;
+      int isIn_any_RB( size_t const& ownID, geomVector const& pt ) const;
 
       /** @brief Returns the parID if the point is inside parID
+      @param ownID ID of RB owning the pt(x,y,z)
       @param x x-coordinate of the point
       @param y x-coordinate of the point
       @param z x-coordinate of the point */
-      int isIn_any_RB( double const& x,
+      int isIn_any_RB(  size_t const& ownID,
+                        double const& x,
                         double const& y,
                         double const& z ) const;
 
@@ -245,6 +248,7 @@ class DS_AllRigidBodies
                                         , size_t const& comp
                                         , geomVector const* pt
                                         , size_t_vector const& i0
+                                        , size_t const& parID
                                         , size_t const& ghost_points_dir
                                         , vector<int> const& sign
                                         , vector<size_t> const& list);
@@ -260,6 +264,7 @@ class DS_AllRigidBodies
                                      , size_t const& comp
                                      , geomVector const* pt
                                      , size_t_vector const& i0
+                                     , size_t const& parID
                                      , vector<size_t> const& list);
 
       /** @brief Calculate the first order pressure force and torque on parID
@@ -279,6 +284,10 @@ class DS_AllRigidBodies
 
       /** @brief Calculate the viscous force and torque on all rigid bodies */
       void compute_viscous_force_and_torque_for_allRB (string const& StressOrder);
+
+      /** @brief Creates the neighbour list for each RB, helps in reducing
+      computing time of isIn_any_RB */
+      void create_neighbour_list_for_AllRB( );
       //@}
 
 
@@ -348,6 +357,7 @@ class DS_AllRigidBodies
       MAC_Communicator const* m_macCOMM; /**< Variable for communication
       between processors */
       double m_mu; /**< Fluid viscosity */
+      vector<vector<size_t>> neighbour_list;
 
       //@}
 

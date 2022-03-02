@@ -291,6 +291,19 @@ geomVector const* FS_RigidBody:: get_ptr_to_gravity_centre() const
 
 
 //---------------------------------------------------------------------------
+double FS_RigidBody:: get_circumscribed_radius() const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: get_circumscribed_radius" ) ;
+
+  return ( m_circumscribed_radius );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 vector<geomVector> const* FS_RigidBody:: get_ptr_to_periodic_directions() const
 //---------------------------------------------------------------------------
 {

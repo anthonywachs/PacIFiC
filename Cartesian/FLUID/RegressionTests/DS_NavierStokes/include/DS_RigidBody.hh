@@ -67,6 +67,9 @@ class DS_RigidBody
       /** @brief Returns pointer to the rigid body gravity center */
       geomVector const* get_ptr_to_gravity_centre( ) const;
 
+      /** @brief Returns circumscribed radius */
+      double get_circumscribed_radius( ) const;
+
       /** @brief Returns the distance of a point with the rigid body
       with a given ray vector and source
       @param pt the point

@@ -324,6 +324,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
      SCT_insert_app("Velocity update");
      SCT_insert_app("Penalty Step");
      SCT_insert_app("Pressure Update");
+     SCT_insert_app("Viscous stress");
+     SCT_insert_app("Pressure stress");
      SCT_get_elapsed_time("Objects_Creation");
    }
 }
@@ -553,9 +555,11 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
      	MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
 
    // Compute hydrodynamic forces by surface viscous stress
+   if ( my_rank == is_master ) SCT_set_start( "Viscous stress" );
    if (is_stressCal) {
       allrigidbodies->compute_viscous_force_and_torque_for_allRB(ViscousStressOrder);
    }
+   if ( my_rank == is_master ) SCT_get_elapsed_time( "Viscous stress" );
 
    output_L2norm_divergence();
 
@@ -1255,9 +1259,11 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
   PF->set_neumann_DOF_values();
 
   // Calculate pressure forces on the solid particles
+  if ( my_rank == is_master ) SCT_set_start( "Pressure stress" );
   if (is_stressCal) {
      allrigidbodies->compute_pressure_force_and_torque_for_allRB();
   }
+  if ( my_rank == is_master ) SCT_get_elapsed_time( "Pressure stress" );
 
 }
 
