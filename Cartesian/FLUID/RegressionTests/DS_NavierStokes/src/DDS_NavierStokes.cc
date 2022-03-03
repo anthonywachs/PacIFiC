@@ -97,6 +97,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , bottom_coordinate( 0. )
    , translated_distance( 0. )
    , gravity_vector( 0 )
+   , stressCalFreq( 1 )
 {
    MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -192,6 +193,8 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       if (is_stressCal) {
          if ( exp->has_entry( "Surface_Stress_Output" ))
             is_surfacestressOUT = exp->bool_data( "Stress_calculation" ) ;
+         if ( exp->has_entry( "Stress_calculation_frequency" ))
+            stressCalFreq = exp->int_data("Stress_calculation_frequency");
       }
 
       // Read weather the particle motion is ON/OFF
@@ -556,7 +559,7 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
 
    // Compute hydrodynamic forces by surface viscous stress
    if ( my_rank == is_master ) SCT_set_start( "Viscous stress" );
-   if (is_stressCal) {
+   if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0)) {
       allrigidbodies->compute_viscous_force_and_torque_for_allRB(ViscousStressOrder);
    }
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Viscous stress" );
@@ -1260,7 +1263,7 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
 
   // Calculate pressure forces on the solid particles
   if ( my_rank == is_master ) SCT_set_start( "Pressure stress" );
-  if (is_stressCal) {
+  if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0)) {
      allrigidbodies->compute_pressure_force_and_torque_for_allRB();
   }
   if ( my_rank == is_master ) SCT_get_elapsed_time( "Pressure stress" );

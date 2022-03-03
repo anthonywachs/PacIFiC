@@ -445,6 +445,7 @@ public SolverComputingTime
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;
       MAC_DoubleVector* gravity_vector ;
+      size_t stressCalFreq;
       bool is_periodic[2][3];
       string insertion_type;
       string level_set_type;
