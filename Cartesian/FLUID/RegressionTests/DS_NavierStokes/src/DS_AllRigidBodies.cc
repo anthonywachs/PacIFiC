@@ -967,28 +967,17 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
 
               if ((i0_temp(0) >= 0) &&
                   (i0_temp(0) < (int)UF->get_local_nb_dof(comp,dir))) {
-
                  i0_new[col1](dir) = i0_temp(0);
-
                  ghost_pt[col1](dir) = UF->get_DOF_coordinate(i0_temp(0), comp, dir);
-                 ghost_pt[col1](dir) += - MAC::floor((ghost_pt[col1](dir)
-                                                    -domain_min(dir))
-                                                   /domain_length(dir))
-                                       *domain_length(dir);
                  in_domain(col1) = 1;
               } else {
                  in_domain(col1) = 0;
               }
+
               if ((i0_temp(1) >= 0) &&
                   (i0_temp(1) < (int)UF->get_local_nb_dof(comp,dir))) {
-
                  i0_new[col2](dir) = i0_temp(1);
-
                  ghost_pt[col2](dir) = UF->get_DOF_coordinate(i0_temp(1), comp, dir);
-                 ghost_pt[col2](dir) += - MAC::floor((ghost_pt[col2](dir)
-                                                    -domain_min(dir))
-                                                   /domain_length(dir))
-                                       *domain_length(dir);
                  in_domain(col2) = 1;
               } else {
                  in_domain(col2) = 0;
