@@ -1,5 +1,5 @@
-#ifndef DDS_NavierStokes_HH
-#define DDS_NavierStokes_HH
+#ifndef DS_NavierStokes_HH
+#define DS_NavierStokes_HH
 
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
@@ -20,19 +20,30 @@ class MAC_Communicator ;
 class FV_DiscreteField ;
 class LA_Vector ;
 class LA_SeqVector ;
-class DDS_NavierStokesSystem ;
+class DS_NavierStokesSystem ;
 class LA_SeqMatrix ;
 class FS_SolidPlugIn ;
 class DS_AllRigidBodies ;
 
-/** @brief The Class DDS_NavierStokes.
+/** For set of variables to pass from NavierStokes to System */
+struct DS2NS
+{
+  double rho_ ;
+  double mu_ ;
+  double kai_ ;
+  string AdvectionScheme_ ;
+  size_t AdvectionTimeAccuracy_ ;
+  bool b_restart_ ;
+  bool is_solids_ ;
+  FV_DomainAndFields const* dom_ ;
+};
 
-Server for the resolution of the unsteady heat equation by a first order
-implicit time integrator and a Finite Volume MAC scheme on rectangular grids.
+/** @brief The Class DS_NavierStokes.
 
-Equation: dT/dt = ( 1 / Pe ) * lap(T) + bodyterm, where Pe is the Peclet number.
+Server for the resolution of the unsteady momentum equation by a second order
+time integrator and a Finite Volume MAC scheme on rectangular grids.
 
-@author A. Wachs - Pacific project 2017 */
+@author A. Goyal - Pacific project 2022 */
 
 /** @brief MPIVar include all vectors required while message passing */
 struct MPIVar {
@@ -41,12 +52,22 @@ struct MPIVar {
    double ***receive;
 };
 
-class DDS_NavierStokes : public FV_OneStepIteration, public ComputingTime,
-public SolverComputingTime
+class DS_NavierStokes : public MAC_Object,
+                        public ComputingTime,
+                        public SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 
    //-- Substeps of the step by step progression
+
+      /** @brief Create and initialize an instance of DS_NavierStokes
+      @param a_owner the MAC-based object
+      @param exp to read the data file
+      @param fromDS structure containing input data from the DS framework */
+      static DS_NavierStokes* create(
+                  MAC_Object* a_owner,
+                  MAC_ModuleExplorer const* exp,
+                  struct DS2NS const& fromDS );
 
       /** @name Substeps of the step by step progression */
       //@{
@@ -89,34 +110,25 @@ public SolverComputingTime
       /** @name Constructors & Destructor */
       //@{
       /** @brief Destructor */
-      ~DDS_NavierStokes( void ) ;
+      virtual ~DS_NavierStokes( void ) ;
 
       /** @brief Copy constructor */
-      DDS_NavierStokes( DDS_NavierStokes const& other ) ;
+      DS_NavierStokes( DS_NavierStokes const& other ) ;
 
       /** @brief Operator ==
       @param other the right hand side */
-      DDS_NavierStokes& operator=( DDS_NavierStokes const& other ) ;
+      DS_NavierStokes& operator=( DS_NavierStokes const& other ) ;
 
       /** @brief Constructor with arguments
       @param a_owner the MAC-based object
       @param exp to read the data file */
-      DDS_NavierStokes( MAC_Object* a_owner,
-      		FV_DomainAndFields const* dom,
-		MAC_ModuleExplorer const* exp ) ;
+      DS_NavierStokes( MAC_Object* a_owner,
+                       MAC_ModuleExplorer const* exp,
+                       struct DS2NS const& fromNS );
 
       /** @brief Constructor without argument */
-      DDS_NavierStokes( void ) ;
+      DS_NavierStokes( void ) ;
 
-      /** @brief Create a clone
-      @param a_owner the MAC-based object
-      @param dom mesh and fields
-      @param prms set of parameters
-      @param exp to read the data file */
-      virtual DDS_NavierStokes* create_replica(
-		MAC_Object* a_owner,
-		FV_DomainAndFields const* dom,
-		MAC_ModuleExplorer* exp ) const ;
       //@}
 
 
@@ -332,7 +344,7 @@ public SolverComputingTime
 
       /** @name Direction splitting communicators */
       /** @brief Create the sub-communicators */
-      void create_DDS_subcommunicators ( void ) ;
+      void create_DS_subcommunicators ( void ) ;
       void processor_splitting ( int const& color
                                , int const& key
                                , size_t const& dir );
@@ -341,7 +353,7 @@ public SolverComputingTime
       void deallocate_mpi_variables ();
 
       /** @brief Free the sub-communicators */
-      void free_DDS_subcommunicators ( void ) ;
+      void free_DS_subcommunicators ( void ) ;
 
 
       //@}
@@ -373,15 +385,12 @@ public SolverComputingTime
 
    //-- Class attributes
 
-      static DDS_NavierStokes const* PROTOTYPE ;
-
    //-- Attributes
 
       FV_DiscreteField* UF;
-
       FV_DiscreteField* PF;
 
-      DDS_NavierStokesSystem* GLOBAL_EQ ;
+      DS_NavierStokesSystem* GLOBAL_EQ ;
 
       size_t nb_procs;
       size_t my_rank;
@@ -391,7 +400,7 @@ public SolverComputingTime
       size_t nb_comps[2];
 
       MAC_Communicator const* macCOMM;
-      MPI_Comm DDS_Comm_i[3];
+      MPI_Comm DS_Comm_i[3];
 
       int rank_in_i[3];
       int nb_ranks_comm_i[3];
@@ -401,14 +410,11 @@ public SolverComputingTime
       // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
       struct MPIVar second_pass[2][3];
 
-
-      double peclet ;
       double mu;
       double kai;
       string AdvectionScheme;
       size_t AdvectionTimeAccuracy;
-      size_t DivRelax;
-      double rho, rho_s;
+      double rho;
       bool b_restart ;
       bool is_solids;
       bool is_par_motion;
@@ -448,7 +454,6 @@ public SolverComputingTime
       size_t stressCalFreq;
       bool is_periodic[2][3];
       string insertion_type;
-      string level_set_type;
 
 } ;
 

@@ -1,8 +1,8 @@
-#include <DDS_NavierStokes.hh>
+#include <DS_NavierStokes.hh>
 #include <FV_DomainAndFields.hh>
 #include <FV_DomainBuilder.hh>
 #include <FV_DiscreteField.hh>
-#include <DDS_NavierStokesSystem.hh>
+#include <DS_NavierStokesSystem.hh>
 #include <FV_SystemNumbering.hh>
 #include <FV_Mesh.hh>
 #include <FV_TimeIterator.hh>
@@ -29,18 +29,23 @@
 #include <DS_AllRigidBodies.hh>
 
 
-
-DDS_NavierStokes const* DDS_NavierStokes::PROTOTYPE
-                                                 = new DDS_NavierStokes() ;
-
-
 //---------------------------------------------------------------------------
-DDS_NavierStokes:: DDS_NavierStokes( void )
-//--------------------------------------------------------------------------
-   : FV_OneStepIteration( "DDS_NavierStokes" )
-   , ComputingTime("Solver")
+DS_NavierStokes*
+DS_NavierStokes:: create( MAC_Object* a_owner,
+		                    MAC_ModuleExplorer const* exp,
+                          struct DS2NS const& transfer )
+//---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
+ MAC_LABEL( "DS_NavierStokes:: create" ) ;
+ MAC_CHECK_PRE( exp != 0 ) ;
+
+ DS_NavierStokes* result =
+                      new DS_NavierStokes( a_owner, exp, transfer ) ;
+
+ MAC_CHECK_POST( result != 0 ) ;
+ MAC_CHECK_POST( result->owner() == a_owner ) ;
+
+ return( result ) ;
 
 }
 
@@ -48,48 +53,29 @@ DDS_NavierStokes:: DDS_NavierStokes( void )
 
 
 //---------------------------------------------------------------------------
-DDS_NavierStokes*
-DDS_NavierStokes:: create_replica( MAC_Object* a_owner,
-		FV_DomainAndFields const* dom,
-		MAC_ModuleExplorer* exp ) const
+DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
+                              	  MAC_ModuleExplorer const* exp,
+                                   struct DS2NS const& fromDS )
 //---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NavierStokes:: create_replica" ) ;
-   MAC_CHECK( create_replica_PRE( a_owner, dom, exp ) ) ;
-
-   DDS_NavierStokes* result =
-                        new DDS_NavierStokes( a_owner, dom, exp ) ;
-
-   MAC_CHECK( create_replica_POST( result, a_owner, dom, exp ) ) ;
-   return( result ) ;
-
-}
-
-//---------------------------------------------------------------------------
-DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
-		FV_DomainAndFields const* dom,
-		MAC_ModuleExplorer const* exp )
-//---------------------------------------------------------------------------
-   : FV_OneStepIteration( a_owner, dom, exp )
-   , ComputingTime("Solver")
-   , UF ( dom->discrete_field( "velocity" ) )
-   , PF ( dom->discrete_field( "pressure" ) )
+   : MAC_Object( a_owner )
+	, ComputingTime("Solver")
+   , UF ( fromDS.dom_->discrete_field( "velocity" ) )
+   , PF ( fromDS.dom_->discrete_field( "pressure" ) )
    , GLOBAL_EQ( 0 )
-   , peclet( 1. )
-   , mu( 1. )
-   , kai( 1. )
-   , AdvectionScheme( "TVD" )
-   , AdvectionTimeAccuracy( 1 )
-   , DivRelax( 10 )
-   , rho( 1. )
-   , is_solids( false )
+   , mu( fromDS.mu_ )
+   , kai( fromDS.kai_ )
+   , AdvectionScheme( fromDS.AdvectionScheme_ )
+   , AdvectionTimeAccuracy( fromDS.AdvectionTimeAccuracy_ )
+   , rho( fromDS.rho_ )
+	, b_restart ( fromDS.b_restart_ )
+   , is_solids( fromDS.is_solids_ )
    , is_par_motion( false )
    , is_stressCal( false )
    , is_surfacestressOUT( false )
    , ViscousStressOrder ( "second" )
    , grid_check_for_solid ( 3.0 )
    , b_particles_as_fixed_obstacles( true )
-   , b_projection_translation( dom->primary_grid()->is_translation_active() )
+   , b_projection_translation( fromDS.dom_->primary_grid()->is_translation_active() )
    , b_grid_has_been_translated_since_last_output( false )
    , b_grid_has_been_translated_at_previous_time( false )
    , critical_distance_translation( 0. )
@@ -99,7 +85,7 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
    , gravity_vector( 0 )
    , stressCalFreq( 1 )
 {
-   MAC_LABEL( "DDS_NavierStokes:: DDS_NavierStokes" ) ;
+   MAC_LABEL( "DS_NavierStokes:: DS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
    MAC_ASSERT( PF->discretization_type() == "centered" ) ;
    if (b_projection_translation) {
@@ -132,46 +118,28 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
      SCT_set_start("Objects_Creation");
    }
 
-   // Is the run a follow up of a previous job
-   b_restart = MAC_Application::is_follow();
-
-
-   // Clear results directory in case of a new run
-   if( !b_restart ) PAC_Misc::clearAllFiles( "Res", "Savings", my_rank ) ;
+	if ( AdvectionScheme == "TVD"
+     && UF->primary_grid()->get_security_bandwidth() < 2 )
+   {
+     string error_message="   >= 2 with TVD scheme";
+     MAC_Error::object()->raise_bad_data_value( exp,
+        "security_bandwidth", error_message );
+   }
 
    // Get space dimension
    dim = UF->primary_grid()->nb_space_dimensions() ;
    nb_comps[0] = PF->nb_components() ;
    nb_comps[1] = UF->nb_components() ;
 
-   if ( dim == 1 )
-   {
+   if ( dim == 1 ) {
      string error_message="Space dimension should either 2 or 3";
      MAC_Error::object()->raise_bad_data_value(exp,
-	"nb_space_dimensions",
-	error_message );
+		  													  "nb_space_dimensions",
+															  error_message );
    }
 
    // Create the Direction Splitting subcommunicators
-   create_DDS_subcommunicators();
-
-   // Read Density
-   if ( exp->has_entry( "Density" ) )
-   {
-     rho = exp->double_data( "Density" ) ;
-     exp->test_data( "Density", "Density>0." ) ;
-   }
-
-   // Read Viscosity
-   if ( exp->has_entry( "Viscosity" ) )
-   {
-     mu = exp->double_data( "Viscosity" ) ;
-     exp->test_data( "Viscosity", "Viscosity>0." ) ;
-   }
-
-   // Read the presence of particles
-   if ( exp->has_entry( "Particles" ) )
-     is_solids = exp->bool_data( "Particles" ) ;
+   create_DS_subcommunicators();
 
    if (is_solids) {
       insertion_type = exp->string_data( "InsertionType" ) ;
@@ -220,32 +188,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       }
    }
 
-   // Read Kai
-   if ( exp->has_entry( "Kai" ) )
-   {
-     kai = exp->double_data( "Kai" ) ;
-     exp->test_data( "Kai", "Kai>=0." ) ;
-   }
-
-   // Advection scheme
-   if ( exp->has_entry( "AdvectionScheme" ) )
-     AdvectionScheme = exp->string_data( "AdvectionScheme" );
-   if ( AdvectionScheme != "Upwind"
-     && AdvectionScheme != "TVD"
-     && AdvectionScheme != "Centered" )
-   {
-     string error_message="   - Upwind\n   - TVD\n   - Centered";
-     MAC_Error::object()->raise_bad_data_value( exp,
-        "AdvectionScheme", error_message );
-   }
-   if ( AdvectionScheme == "TVD"
-   	&& UF->primary_grid()->get_security_bandwidth() < 2 )
-   {
-     string error_message="   >= 2 with TVD scheme";
-     MAC_Error::object()->raise_bad_data_value( exp,
-        "security_bandwidth", error_message );
-   }
-
    if ( is_stressCal == true &&
         UF->primary_grid()->get_security_bandwidth() < 4 )
    {
@@ -269,22 +211,6 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
      }
    }
 
-   // Advection term time accuracy
-   if ( exp->has_entry( "AdvectionTimeAccuracy" ) )
-     AdvectionTimeAccuracy = exp->int_data( "AdvectionTimeAccuracy" );
-   if ( AdvectionTimeAccuracy != 1 && AdvectionTimeAccuracy != 2 )
-   {
-     string error_message ="   - 1\n   - 2\n   ";
-     MAC_Error::object()->raise_bad_data_value( exp,
-	"AdvectionTimeAccuracy", error_message );
-   }
-
-   // Number of iteration to relax the change in divergence stencil
-   if ( exp->has_entry( "DivRelax" ) ) {
-     DivRelax = exp->int_data( "DivRelax" );
-     exp->test_data( "DivRelax", "DivRelax>=0" ) ;
-   }
-
    // Periodic boundary condition check for velocity
    U_periodic_comp = UF->primary_grid()->get_periodic_directions();
    is_periodic[1][0] = U_periodic_comp->operator()( 0 );
@@ -300,13 +226,13 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
       is_periodic[0][2] = P_periodic_comp->operator()( 2 );
 
    // Create structure to input in the solver system
-   struct NavierStokes2System inputData;
+   struct NS2System inputData;
    inputData.is_solids_ = is_solids ;
    inputData.is_stressCal_ = is_stressCal ;
 
    // Build the matrix system
-   MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DDS_NavierStokesSystem" ) ;
-   GLOBAL_EQ = DDS_NavierStokesSystem::create( this, se, UF, PF, inputData ) ;
+   MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DS_NavierStokesSystem" ) ;
+   GLOBAL_EQ = DS_NavierStokesSystem::create( this, se, UF, PF, inputData ) ;
    se->destroy() ;
 
    // Create Grains3D if solidSolverType is Grains3D;
@@ -334,12 +260,12 @@ DDS_NavierStokes:: DDS_NavierStokes( MAC_Object* a_owner,
 }
 
 //---------------------------------------------------------------------------
-DDS_NavierStokes:: ~DDS_NavierStokes( void )
+DS_NavierStokes:: ~DS_NavierStokes( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: ~DDS_NavierStokes" ) ;
+   MAC_LABEL( "DS_NavierStokes:: ~DS_NavierStokes" ) ;
 
-   free_DDS_subcommunicators() ;
+   free_DS_subcommunicators() ;
 
    if ( solidSolver ) delete solidSolver;
    if ( solidFluid_transferStream ) delete solidFluid_transferStream;
@@ -349,14 +275,10 @@ DDS_NavierStokes:: ~DDS_NavierStokes( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_one_inner_iteration( FV_TimeIterator const* t_it )
+DS_NavierStokes:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_one_inner_iteration" ) ;
-   MAC_CHECK_PRE( do_one_inner_iteration_PRE( t_it ) ) ;
-
-   start_total_timer( "DDS_NavierStokes:: do_one_inner_iteration" ) ;
-   start_solving_timer() ;
+   MAC_LABEL( "DS_NavierStokes:: do_one_inner_iteration" ) ;
 
    if ( my_rank == is_master ) SCT_set_start("Pressure predictor");
    NS_first_step(t_it);
@@ -376,24 +298,17 @@ DDS_NavierStokes:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
    UF->copy_DOFs_value( 0, 1 );
 
-   stop_solving_timer() ;
-   stop_total_timer() ;
-
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
+DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
       	std::string const& basename )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_before_time_stepping" ) ;
-
-   start_total_timer( "DDS_NavierStokes:: do_before_time_stepping" ) ;
+   MAC_LABEL( "DS_NavierStokes:: do_before_time_stepping" ) ;
 
    if ( my_rank == is_master ) SCT_set_start("Matrix_Assembly&Initialization");
-
-   FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
 
    allocate_mpi_variables(PF);
    allocate_mpi_variables(UF);
@@ -464,8 +379,6 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    if ( my_rank == is_master )
       SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
 
-   stop_total_timer() ;
-
 }
 
 
@@ -473,10 +386,10 @@ DDS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_after_time_stepping( void )
+DS_NavierStokes:: do_after_time_stepping( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_after_time_stepping" ) ;
+   MAC_LABEL( "DS_NavierStokes:: do_after_time_stepping" ) ;
 
    // Elapsed time by sub-problems
 
@@ -503,15 +416,11 @@ DDS_NavierStokes:: do_after_time_stepping( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_before_inner_iterations_stage(
+DS_NavierStokes:: do_before_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_before_inner_iterations_stage" ) ;
-
-   start_total_timer( "DDS_NavierStokes:: do_before_inner_iterations_stage" ) ;
-
-   FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
+   MAC_LABEL( "DS_NavierStokes:: do_before_inner_iterations_stage" ) ;
 
    //  Projection_Translation
    if ( b_projection_translation )
@@ -535,21 +444,15 @@ DDS_NavierStokes:: do_before_inner_iterations_stage(
    // Perform matrix level operations before each time step
    GLOBAL_EQ->at_each_time_step( );
 
-   stop_total_timer() ;
-
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_after_inner_iterations_stage(
+DS_NavierStokes:: do_after_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_after_inner_iterations_stage" ) ;
-
-   start_total_timer( "DDS_NavierStokes:: do_after_inner_iterations_stage" ) ;
-
-   FV_OneStepIteration::do_after_inner_iterations_stage( t_it ) ;
+   MAC_LABEL( "DS_NavierStokes:: do_after_inner_iterations_stage" ) ;
 
    // Compute velocity change over the time step
    double velocity_time_change = GLOBAL_EQ->compute_DS_velocity_change()
@@ -618,21 +521,15 @@ DDS_NavierStokes:: do_after_inner_iterations_stage(
    //    }
    // }
 
-   stop_total_timer() ;
-
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
+DS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
       	int const& cycleNumber )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: do_additional_savings" ) ;
-
-   start_total_timer( "DDS_NavierStokes:: do_additional_savings" ) ;
-
-   stop_total_timer() ;
+   MAC_LABEL( "DS_NavierStokes:: do_additional_savings" ) ;
 
    GLOBAL_EQ->display_debug();
 }
@@ -642,10 +539,10 @@ DDS_NavierStokes:: do_additional_savings( FV_TimeIterator const* t_it,
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: ugradu_initialization ( )
+DS_NavierStokes:: ugradu_initialization ( )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: ugradu_initialization" ) ;
+  MAC_LABEL( "DS_NavierStokes:: ugradu_initialization" ) ;
 
   for (size_t comp=0;comp<nb_comps[1];comp++) UF->set_DOFs_value( comp, 2, 0.);
 
@@ -656,10 +553,10 @@ DDS_NavierStokes:: ugradu_initialization ( )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: calculate_row_indexes ( FV_DiscreteField const* FF)
+DS_NavierStokes:: calculate_row_indexes ( FV_DiscreteField const* FF)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: calculate_row_indexes" ) ;
+   MAC_LABEL( "DS_NavierStokes:: calculate_row_indexes" ) ;
 
    size_t field = (FF == PF) ? 0 : 1;
 
@@ -718,7 +615,7 @@ DDS_NavierStokes:: calculate_row_indexes ( FV_DiscreteField const* FF)
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
+DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
                                            FV_TimeIterator const* t_it,
                                            double const& gamma,
                                            size_t const& comp,
@@ -728,7 +625,7 @@ DDS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
                                            size_t const& r_index )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: assemble_field_matrix" ) ;
+   MAC_LABEL("DS_NavierStokes:: assemble_field_matrix" ) ;
 
    // Parameters
    double dxr,dxl,dx,xR,xL,xC,right=0.,left=0.,center=0.;
@@ -983,14 +880,14 @@ DDS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
+DS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
                                               , size_t const& dir
                                               , double const& Aee_diagcoef
                                               , size_t const& field
                                               , size_t const& r_index )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: assemble_field_schur_matrix" ) ;
+   MAC_LABEL( "DS_NavierStokes:: assemble_field_schur_matrix" ) ;
    // Compute the product matrix for each proc
 
    TDMatrix* A = GLOBAL_EQ-> get_A(field);
@@ -1029,7 +926,7 @@ DDS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
             // Receive the data
             static MPI_Status status ;
             MPI_Recv( received_data, (int)nb_received_data,
-                     MPI_DOUBLE, (int)i, 0, DDS_Comm_i[dir], &status ) ;
+                     MPI_DOUBLE, (int)i, 0, DS_Comm_i[dir], &status ) ;
 
             // Transfer the received data to the receive matrix
             for (int k=0;k<(int)nbrows;k++) {
@@ -1080,7 +977,7 @@ DDS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
 
          // Send the data
          MPI_Send( packed_data, (int)nb_send_data,
-                                    MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
+                                    MPI_DOUBLE, 0, 0, DS_Comm_i[dir] ) ;
 
          delete [] packed_data;
       }
@@ -1170,11 +1067,11 @@ DDS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_1D_matrices ( FV_DiscreteField const* FF
+DS_NavierStokes:: assemble_1D_matrices ( FV_DiscreteField const* FF
                                         , FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: assemble_1D_matrices" ) ;
+   MAC_LABEL( "DS_NavierStokes:: assemble_1D_matrices" ) ;
 
    double gamma = mu/2.0;
 
@@ -1228,10 +1125,10 @@ DDS_NavierStokes:: assemble_1D_matrices ( FV_DiscreteField const* FF
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
+DS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: NS_first_step" ) ;
+  MAC_LABEL( "DS_NavierStokes:: NS_first_step" ) ;
 
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
@@ -1275,10 +1172,10 @@ DDS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_velocity_diffusion_terms ( )
+DS_NavierStokes:: assemble_velocity_diffusion_terms ( )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: assemble_velocity_diffusion_terms" ) ;
+   MAC_LABEL("DS_NavierStokes:: assemble_velocity_diffusion_terms" ) ;
 
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
@@ -1325,7 +1222,7 @@ DDS_NavierStokes:: assemble_velocity_diffusion_terms ( )
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: compute_un_component ( size_t const& comp,
+DS_NavierStokes:: compute_un_component ( size_t const& comp,
                                           size_t const& i,
                                           size_t const& j,
                                           size_t const& k,
@@ -1333,7 +1230,7 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
                                           size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: compute_un_component" ) ;
+   MAC_LABEL("DS_NavierStokes:: compute_un_component" ) ;
 
    double xhr=1.,xhl=1.,xright=0.,xleft=0.,yhr=1.,yhl=1.,yright=0.,yleft=0.;
    double zhr=1.,zhl=1.,zright=0.,zleft=0., value=0.;
@@ -1485,7 +1382,7 @@ DDS_NavierStokes:: compute_un_component ( size_t const& comp,
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
+DS_NavierStokes:: velocity_local_rhs ( size_t const& j
                                       , size_t const& k
                                       , double const& gamma
                                       , FV_TimeIterator const* t_it
@@ -1494,7 +1391,7 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
 //---------------------------------------------------------------------------
 {
 
-   MAC_LABEL("DDS_NavierStokes:: velocity_local_rhs" ) ;
+   MAC_LABEL("DS_NavierStokes:: velocity_local_rhs" ) ;
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
@@ -1615,13 +1512,13 @@ DDS_NavierStokes:: velocity_local_rhs ( size_t const& j
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp
+DS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp
                                         , size_t const& dir
                                         , size_t const& p
                                         , size_t const& field)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: unpack_compute_ue_pack" ) ;
+   MAC_LABEL("DS_NavierStokes:: unpack_compute_ue_pack" ) ;
 
    LocalVector* VEC = GLOBAL_EQ->get_VEC(field);
 
@@ -1698,14 +1595,14 @@ DDS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs
+DS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs
                                              , size_t const& comp
                                              , size_t const& dir
                                              , size_t const& field
                                              , size_t const& r_index )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokesSystem:: DS_interface_unknown_solver" ) ;
+   MAC_LABEL( "DS_NavierStokesSystem:: DS_interface_unknown_solver" ) ;
 
    TDMatrix* Schur = GLOBAL_EQ->get_Schur(field);
 
@@ -1761,14 +1658,14 @@ DDS_NavierStokes::DS_interface_unknown_solver( LA_SeqVector* interface_rhs
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: unpack_ue(size_t const& comp
+DS_NavierStokes:: unpack_ue(size_t const& comp
                            , double * received_data
                            , size_t const& dir
                            , size_t const& p
                            , size_t const& field)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: unpack_ue" ) ;
+   MAC_LABEL("DS_NavierStokes:: unpack_ue" ) ;
 
    LocalVector* VEC = GLOBAL_EQ->get_VEC(field);
 
@@ -1792,14 +1689,14 @@ DDS_NavierStokes:: unpack_ue(size_t const& comp
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
+DS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
                                             , double const& gamma
                                             , FV_TimeIterator const* t_it
                                             , size_t const& comp
                                             , size_t const& dir)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: solve_interface_unknowns" ) ;
+   MAC_LABEL("DS_NavierStokes:: solve_interface_unknowns" ) ;
 
    size_t field = (FF == PF) ? 0 : 1 ;
 
@@ -1851,7 +1748,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
             static MPI_Status status;
             MPI_Recv( first_pass[field][dir].receive[comp][i],
                 (int) first_pass[field][dir].size[comp],
-                MPI_DOUBLE, (int) i, 0, DDS_Comm_i[dir], &status ) ;
+                MPI_DOUBLE, (int) i, 0, DS_Comm_i[dir], &status ) ;
          }
       }
 
@@ -1880,7 +1777,7 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
       // Send the packed data to master
       MPI_Send( first_pass[field][dir].send[comp][rank_in_i[dir]],
           (int) first_pass[field][dir].size[comp],
-          MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
+          MPI_DOUBLE, 0, 0, DS_Comm_i[dir] ) ;
    }
 
    // Send the data from master iff multi processor are used
@@ -1889,14 +1786,14 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
          for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir]; ++i) {
             MPI_Send( second_pass[field][dir].send[comp][i],
                 (int) second_pass[field][dir].size[comp],
-                MPI_DOUBLE,(int) i, 0, DDS_Comm_i[dir] ) ;
+                MPI_DOUBLE,(int) i, 0, DS_Comm_i[dir] ) ;
          }
       } else {
          // Receive the data
          static MPI_Status status ;
          MPI_Recv( second_pass[field][dir].send[comp][rank_in_i[dir]],
              (int) first_pass[field][dir].size[comp],
-             MPI_DOUBLE, 0, 0, DDS_Comm_i[dir], &status ) ;
+             MPI_DOUBLE, 0, 0, DS_Comm_i[dir], &status ) ;
 
          // Solve the system of equations in each proc
          for (size_t j = local_min_j; j <= local_max_j; j++) {
@@ -1929,13 +1826,13 @@ DDS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: compute_p_component ( size_t const& comp
+DS_NavierStokes:: compute_p_component ( size_t const& comp
                                        , size_t const& i
                                        , size_t const& j
                                        , size_t const& k)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: compute_p_component" ) ;
+   MAC_LABEL("DS_NavierStokes:: compute_p_component" ) ;
    FV_SHIFT_TRIPLET shift ;
    double value=0.;
 
@@ -1983,13 +1880,13 @@ DDS_NavierStokes:: compute_p_component ( size_t const& comp
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: compute_adv_component ( size_t const& comp,
+DS_NavierStokes:: compute_adv_component ( size_t const& comp,
                                            size_t const& i,
                                            size_t const& j,
                                            size_t const& k)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: compute_adv_component" ) ;
+   MAC_LABEL("DS_NavierStokes:: compute_adv_component" ) ;
    double ugradu = 0., value = 0.;
 
    if ( AdvectionScheme == "TVD" ) {
@@ -2015,14 +1912,14 @@ DDS_NavierStokes:: compute_adv_component ( size_t const& comp,
 
 //----------------------------------------------------------------------
 double
-DDS_NavierStokes:: divergence_of_U( size_t const& i
+DS_NavierStokes:: divergence_of_U( size_t const& i
                                   , size_t const& j
                                   , size_t const& k
                                   , size_t const& component
                                   , size_t const& level)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: divergence_of_U" );
+   MAC_LABEL( "DS_NavierStokes:: divergence_of_U" );
 
    // Parameters
    double flux = 0.;
@@ -2183,11 +2080,11 @@ DDS_NavierStokes:: divergence_of_U( size_t const& i
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
+DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
                                            double const& gamma)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: assemble_DS_un_at_rhs" ) ;
+   MAC_LABEL("DS_NavierStokes:: assemble_DS_un_at_rhs" ) ;
 
    // Assemble the diffusive components of velocity once in each iteration
    assemble_velocity_diffusion_terms ( );
@@ -2272,7 +2169,7 @@ DDS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
+DS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
                                  , FV_TimeIterator const* t_it
                                  , size_t const& dir_i
                                  , size_t const& dir_j
@@ -2280,7 +2177,7 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
                                  , double const& gamma)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_NavierStokes:: Solve_i_in_jk" ) ;
+  MAC_LABEL("DS_NavierStokes:: Solve_i_in_jk" ) ;
 
   size_t field = (FF == PF) ? 0 : 1 ;
 
@@ -2339,7 +2236,7 @@ DDS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF
+DS_NavierStokes:: data_packing ( FV_DiscreteField const* FF
                                 , size_t const& j
                                 , size_t const& k
                                 , double const& fe
@@ -2347,7 +2244,7 @@ DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF
                                 , size_t const& dir )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: data_packing" ) ;
+   MAC_LABEL("DS_NavierStokes:: data_packing" ) ;
 
    size_t field = (FF == PF) ? 0 : 1 ;
 
@@ -2392,14 +2289,14 @@ DDS_NavierStokes:: data_packing ( FV_DiscreteField const* FF
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr
+DS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr
                                  , struct LocalVector* VEC
                                  , size_t const& comp
                                  , size_t const& dir
                                  , size_t const& r_index)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: compute_Aei_ui" ) ;
+   MAC_LABEL("DS_NavierStokes:: compute_Aei_ui" ) ;
    // create a replica of local rhs vector in local solution vector
    for (size_t i = 0; i < VEC[dir].local_T[comp]->nb_rows(); i++){
       VEC[dir].local_solution_T[comp]
@@ -2423,7 +2320,7 @@ DDS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_local_rhs ( size_t const& j
+DS_NavierStokes:: assemble_local_rhs ( size_t const& j
                                       , size_t const& k
                                       , double const& gamma
                                       , FV_TimeIterator const* t_it
@@ -2432,7 +2329,7 @@ DDS_NavierStokes:: assemble_local_rhs ( size_t const& j
                                       , size_t const& field )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: assemble_local_rhs" ) ;
+   MAC_LABEL("DS_NavierStokes:: assemble_local_rhs" ) ;
    double fe = 0.;
    if (field == 0) {
       fe = pressure_local_rhs(j,k,t_it,dir);
@@ -2444,10 +2341,10 @@ DDS_NavierStokes:: assemble_local_rhs ( size_t const& j
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
+DS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: NS_velocity_update" ) ;
+   MAC_LABEL( "DS_NavierStokes:: NS_velocity_update" ) ;
 
    double gamma=mu;
 
@@ -2490,10 +2387,10 @@ DDS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list )
+DS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes::initialize_grid_nodes_on_rigidbody" ) ;
+  MAC_LABEL( "DS_NavierStokes::initialize_grid_nodes_on_rigidbody" ) ;
 
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
@@ -2542,14 +2439,14 @@ DDS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
+DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
                                               , size_t const& i
                                               , size_t const& j
                                               , size_t const& k
                                               , size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: assemble_velocity_gradients" ) ;
+   MAC_LABEL("DS_NavierStokes:: assemble_velocity_gradients" ) ;
 
    FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 
@@ -2690,14 +2587,14 @@ DDS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i,
+DS_NavierStokes:: calculate_velocity_divergence ( size_t const& i,
                                                    size_t const& j,
                                                    size_t const& k,
                                                    size_t const& level,
                                                    FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: calculate_velocity_divergence" ) ;
+   MAC_LABEL("DS_NavierStokes:: calculate_velocity_divergence" ) ;
 
    doubleVector grad(3,0);
 
@@ -2713,13 +2610,13 @@ DDS_NavierStokes:: calculate_velocity_divergence ( size_t const& i,
 
 //---------------------------------------------------------------------------
 double
-DDS_NavierStokes:: pressure_local_rhs ( size_t const& j
+DS_NavierStokes:: pressure_local_rhs ( size_t const& j
                                       , size_t const& k
                                       , FV_TimeIterator const* t_it
                                       , size_t const& dir)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: pressure_local_rhs" ) ;
+   MAC_LABEL("DS_NavierStokes:: pressure_local_rhs" ) ;
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
@@ -2779,10 +2676,10 @@ DDS_NavierStokes:: pressure_local_rhs ( size_t const& j
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
+DS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: correct_pressure_1st_layer_solid" ) ;
+  MAC_LABEL( "DS_NavierStokes:: correct_pressure_1st_layer_solid" ) ;
 
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
@@ -2860,10 +2757,10 @@ DDS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
+DS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: correct_pressure_2nd_layer_solid" ) ;
+  MAC_LABEL( "DS_NavierStokes:: correct_pressure_2nd_layer_solid" ) ;
 
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
@@ -2942,10 +2839,10 @@ DDS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: correct_mean_pressure (size_t const& level )
+DS_NavierStokes:: correct_mean_pressure (size_t const& level )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: correct_mean_pressure" ) ;
+  MAC_LABEL( "DS_NavierStokes:: correct_mean_pressure" ) ;
 
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
@@ -3005,10 +2902,10 @@ DDS_NavierStokes:: correct_mean_pressure (size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
+DS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_NavierStokes:: NS_pressure_update" ) ;
+  MAC_LABEL( "DS_NavierStokes:: NS_pressure_update" ) ;
 
   double gamma=mu/2.0;
 
@@ -3047,10 +2944,10 @@ DDS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
+DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: NS_final_step" ) ;
+   MAC_LABEL( "DS_NavierStokes:: NS_final_step" ) ;
 
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
@@ -3105,7 +3002,7 @@ DDS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
+DS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
 //----------------------------------------------------------------------
 {
   ofstream outputFile ;
@@ -3186,7 +3083,7 @@ DDS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::output_L2norm_divergence( )
+DS_NavierStokes::output_L2norm_divergence( )
 //----------------------------------------------------------------------
 {
   size_t_vector min_unknown_index(dim,0);
@@ -3237,7 +3134,7 @@ DDS_NavierStokes::output_L2norm_divergence( )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::output_L2norm_pressure( size_t const& level )
+DS_NavierStokes::output_L2norm_pressure( size_t const& level )
 //----------------------------------------------------------------------
 {
   size_t_vector min_unknown_index(3,0);
@@ -3289,7 +3186,7 @@ DDS_NavierStokes::output_L2norm_pressure( size_t const& level )
 
 //----------------------------------------------------------------------
 void
-DDS_NavierStokes::output_L2norm_velocity( size_t const& level )
+DS_NavierStokes::output_L2norm_velocity( size_t const& level )
 //----------------------------------------------------------------------
 {
   size_t_vector min_unknown_index(3,0);
@@ -3345,10 +3242,10 @@ DDS_NavierStokes::output_L2norm_velocity( size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: create_DDS_subcommunicators ( void )
+DS_NavierStokes:: create_DS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: create_DDS_subcommunicators" ) ;
+   MAC_LABEL( "DS_NavierStokes:: create_DS_subcommunicators" ) ;
 
    int color = 0, key = 0;
    int const* MPI_coordinates_world =
@@ -3398,16 +3295,16 @@ DDS_NavierStokes:: create_DDS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: processor_splitting ( int const& color
+DS_NavierStokes:: processor_splitting ( int const& color
                                        , int const& key
                                        , size_t const& dir )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: processor_splitting" ) ;
+   MAC_LABEL( "DS_NavierStokes:: processor_splitting" ) ;
 
-   MPI_Comm_split(MPI_COMM_WORLD, color, key, &DDS_Comm_i[dir]);
-   MPI_Comm_size( DDS_Comm_i[dir], &nb_ranks_comm_i[dir] ) ;
-   MPI_Comm_rank( DDS_Comm_i[dir], &rank_in_i[dir] ) ;
+   MPI_Comm_split(MPI_COMM_WORLD, color, key, &DS_Comm_i[dir]);
+   MPI_Comm_size( DS_Comm_i[dir], &nb_ranks_comm_i[dir] ) ;
+   MPI_Comm_rank( DS_Comm_i[dir], &rank_in_i[dir] ) ;
 
 }
 
@@ -3416,7 +3313,7 @@ DDS_NavierStokes:: processor_splitting ( int const& color
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
+DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
 //---------------------------------------------------------------------------
 {
 
@@ -3513,7 +3410,7 @@ DDS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: deallocate_mpi_variables ()
+DS_NavierStokes:: deallocate_mpi_variables ()
 //---------------------------------------------------------------------------
 {
    // Array declarations
@@ -3546,10 +3443,10 @@ DDS_NavierStokes:: deallocate_mpi_variables ()
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: free_DDS_subcommunicators ( void )
+DS_NavierStokes:: free_DS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: free_DDS_subcommunicators" ) ;
+   MAC_LABEL( "DS_NavierStokes:: free_DS_subcommunicators" ) ;
 }
 
 
@@ -3557,10 +3454,10 @@ DDS_NavierStokes:: free_DDS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: set_translation_vector()
+DS_NavierStokes:: set_translation_vector()
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: set_translation_vector" ) ;
+   MAC_LABEL( "DS_NavierStokes:: set_translation_vector" ) ;
 
    MVQ_translation_vector.resize( dim );
    translation_direction = UF->primary_grid()->get_translation_direction() ;
@@ -3573,10 +3470,10 @@ DDS_NavierStokes:: set_translation_vector()
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes::build_links_translation()
+DS_NavierStokes::build_links_translation()
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: build_links_translation" ) ;
+   MAC_LABEL( "DS_NavierStokes:: build_links_translation" ) ;
 
    UF->create_transproj_interpolation() ;
    PF->create_transproj_interpolation() ;
@@ -3588,10 +3485,10 @@ DDS_NavierStokes::build_links_translation()
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes::fields_projection()
+DS_NavierStokes::fields_projection()
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: fields_projection" ) ;
+   MAC_LABEL( "DS_NavierStokes:: fields_projection" ) ;
 
    FV_Mesh* pmesh = const_cast<FV_Mesh*>(UF->primary_grid()) ;
 
@@ -3625,10 +3522,10 @@ DDS_NavierStokes::fields_projection()
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: synchronize_velocity_field ( size_t level )
+DS_NavierStokes:: synchronize_velocity_field ( size_t level )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: synchronize_velocity_field" ) ;
+   MAC_LABEL( "DS_NavierStokes:: synchronize_velocity_field" ) ;
 
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
@@ -3665,10 +3562,10 @@ DDS_NavierStokes:: synchronize_velocity_field ( size_t level )
 
 //---------------------------------------------------------------------------
 void
-DDS_NavierStokes:: synchronize_pressure_field ( size_t level )
+DS_NavierStokes:: synchronize_pressure_field ( size_t level )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: synchronize_pressure_field" ) ;
+   MAC_LABEL( "DS_NavierStokes:: synchronize_pressure_field" ) ;
 
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
@@ -3700,7 +3597,7 @@ DDS_NavierStokes:: synchronize_pressure_field ( size_t level )
 
 //----------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_advection_Centered( size_t const& advecting_level,
+DS_NavierStokes:: assemble_advection_Centered( size_t const& advecting_level,
                                                 double const& coef,
                                                 size_t const& advected_level,
                                                 size_t const& i,
@@ -3709,7 +3606,7 @@ DDS_NavierStokes:: assemble_advection_Centered( size_t const& advecting_level,
                                                 size_t const& component )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: assemble_advection_Centered" );
+   MAC_LABEL( "DS_NavierStokes:: assemble_advection_Centered" );
 
    // Parameters
    double dxC = 0., dyC = 0., dzC = 0.;
@@ -3913,12 +3810,12 @@ DDS_NavierStokes:: assemble_advection_Centered( size_t const& advecting_level,
 
 //----------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_advection_Upwind(
+DS_NavierStokes:: assemble_advection_Upwind(
   size_t const& advecting_level, double const& coef, size_t const& advected_level,
   size_t const& i, size_t const& j, size_t const& k, size_t const& component )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: assemble_advection_Upwind" );
+   MAC_LABEL( "DS_NavierStokes:: assemble_advection_Upwind" );
 
    // Parameters
    double dxC = 0., dyC = 0., dzC = 0.;
@@ -4137,12 +4034,12 @@ DDS_NavierStokes:: assemble_advection_Upwind(
 
 //----------------------------------------------------------------------
 double
-DDS_NavierStokes:: assemble_advection_TVD(
+DS_NavierStokes:: assemble_advection_TVD(
   size_t const& advecting_level, double const& coef, size_t const& advected_level,
          size_t const& i, size_t const& j, size_t const& k, size_t const& component ) const
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_NavierStokes:: assemble_advection_TVD" );
+   MAC_LABEL( "DS_NavierStokes:: assemble_advection_TVD" );
 
    // Parameters
    size_t_vector min_unknown_index(dim,0);

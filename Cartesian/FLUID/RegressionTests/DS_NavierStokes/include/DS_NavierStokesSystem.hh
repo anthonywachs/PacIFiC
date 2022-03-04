@@ -26,7 +26,7 @@ class FV_DiscreteField ;
 class FV_TimeIterator ;
 
 /** For set of variables to pass from NavierStokes to System */
-struct NavierStokes2System
+struct NS2System
 {
   bool is_solids_ ;
   bool is_stressCal_ ;
@@ -42,14 +42,16 @@ struct TDMatrix {
    LA_SeqMatrix *** ee;
 };
 
-/** @brief Product matrix is composed of products elements of block matrices (ii,ie,ei,ee) */
+/** @brief Product matrix is composed of products
+elements of block matrices (ii,ie,ei,ee) */
 struct ProdMatrix {
    LA_SeqMatrix ** ei_ii_ie;
    LA_SeqVector ** ii_ie;
    LA_SeqVector ** result;
 };
 
-/** @brief LocalVector to be used in storing the local values and interface values of DOF */
+/** @brief LocalVector to be used in storing the
+local values and interface values of DOF */
 struct LocalVector {
    LA_SeqVector** local_T;
    LA_SeqVector** local_solution_T;
@@ -57,26 +59,31 @@ struct LocalVector {
    LA_SeqVector** interface_T;
 };
 
-/** @brief PartForces to be used to store the hydrodynamic forces and torque on particles */
+/** @brief PartForces to be used to store the
+hydrodynamic forces and torque on particles */
 struct PartForces {
    LA_SeqVector ** press;               // Pressure stress force
    LA_SeqVector ** vel;                // Viscous stress force
 };
 
-/** @brief NodeProp to be used to store the nodes properties due to presence of solid particles in the domian */
+/** @brief NodeProp to be used to store the
+nodes properties due to presence of solid particles in the domian */
 struct NodeProp {
-   LA_SeqVector * void_frac;               // void_fraction of the node due to particle
-   LA_SeqVector * parID;                   // ID of solid particle on the node
-   LA_SeqVector * bound_cell;              // Stores the boundary cell presence in the solids; 1 == 1st boundary cell
+   LA_SeqVector * void_frac;
+   // void_fraction of the node due to particle
+   LA_SeqVector * parID;
+   // ID of solid particle on the node
+   LA_SeqVector * bound_cell;
+   // Stores the boundary cell presence in the solids; 1 == 1st boundary cell
 };
 
-/** @brief The Class DDS_NavierStokesSystem.
+/** @brief The Class DS_NavierStokesSystem.
 
 Matrix systems for the resolution of the heat equation.
 
-@author A. Wachs - Pacific project 2017 */
+@author A. Goyal - Pacific project 2022 */
 
-class DDS_NavierStokesSystem : public MAC_Object
+class DS_NavierStokesSystem : public MAC_Object
 {
    private: //----------------------------------------------------------
 
@@ -85,27 +92,27 @@ class DDS_NavierStokesSystem : public MAC_Object
       /** @name Constructors & Destructor */
       //@{
       /** @brief Constructor without argument */
-      DDS_NavierStokesSystem( void ) ;
+      DS_NavierStokesSystem( void ) ;
 
       /** @brief Destructor */
-      ~DDS_NavierStokesSystem( void ) ;
+      ~DS_NavierStokesSystem( void ) ;
 
       /** @brief Copy constructor */
-      DDS_NavierStokesSystem( DDS_NavierStokesSystem const& other ) ;
+      DS_NavierStokesSystem( DS_NavierStokesSystem const& other ) ;
 
       /** @brief Operator ==
       @param other the right hand side */
-      DDS_NavierStokesSystem& operator=( DDS_NavierStokesSystem const& other ) ;
+      DS_NavierStokesSystem& operator=( DS_NavierStokesSystem const& other ) ;
 
       /** @brief Constructor with arguments
       @param a_owner the MAC-based object
       @param exp to read the data file
       @param mac_UF FV velocity field */
-      DDS_NavierStokesSystem ( MAC_Object* a_owner,
+      DS_NavierStokesSystem ( MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_UF,
             FV_DiscreteField* mac_PF ,
-            struct NavierStokes2System const& fromNS );
+            struct NS2System const& fromNS );
       //@}
 
 
@@ -115,16 +122,16 @@ class DDS_NavierStokesSystem : public MAC_Object
 
       /** @name Instance delivery and initialization */
       //@{
-      /** @brief Create and initialize an instance of DDS_NavierStokesSystem
+      /** @brief Create and initialize an instance of DS_NavierStokesSystem
       @param a_owner the MAC-based object
       @param exp to read the data file
       @param mac_UF FV velocity field */
-      static DDS_NavierStokesSystem* create(
-            MAC_Object* a_owner,
-            MAC_ModuleExplorer const* exp,
-            FV_DiscreteField* mac_UF,
-            FV_DiscreteField* mac_PF,
-            struct NavierStokes2System const& fromNS );
+      static DS_NavierStokesSystem* create(
+                                          MAC_Object* a_owner,
+                                          MAC_ModuleExplorer const* exp,
+                                          FV_DiscreteField* mac_UF,
+                                          FV_DiscreteField* mac_PF,
+                                          struct NS2System const& transfer );
       //@}
 
 
@@ -157,12 +164,20 @@ class DDS_NavierStokesSystem : public MAC_Object
                                   , size_t const& dir
                                   , size_t const& comp);
 
-      void update_global_P_vector(size_t const& i, size_t const& j, size_t const& k, double const& value);
+      void update_global_P_vector(size_t const& i
+                                , size_t const& j
+                                , size_t const& k
+                                , double const& value);
 
-      void update_global_U_vector(size_t const& i, size_t const& j, size_t const& k, size_t const& comp, double const& value);
+      void update_global_U_vector(size_t const& i
+                                , size_t const& j
+                                , size_t const& k
+                                , size_t const& comp
+                                , double const& value);
 
 
-      /** @brief Return the Schur complement of Schur complement in case of periodic domain */
+      /** @brief Return the Schur complement of
+      Schur complement in case of periodic domain */
       TDMatrix* get_DoubleSchur(size_t const& field);
       /** @brief Return the product matrix of Schur complement */
       ProdMatrix* get_SchurP(size_t const& field);
@@ -170,7 +185,8 @@ class DDS_NavierStokesSystem : public MAC_Object
       LocalVector* get_Schur_VEC(size_t const& field);
       /** @brief Return the product matrix of spacial discretization */
       ProdMatrix* get_Ap(size_t const& field);
-      /** @brief Return the product matrix of spacial discretization which will accumulate the information from all processor*/
+      /** @brief Return the product matrix of spacial discretization
+      which will accumulate the information from all processor*/
       ProdMatrix* get_Ap_proc0(size_t const& field);
       /** @brief Return RHS for the matrix system of spacial discretization */
       LocalVector* get_VEC(size_t const& field);
@@ -218,19 +234,39 @@ class DDS_NavierStokesSystem : public MAC_Object
       void display_debug( void );
       //@}
 
-      /** @brief Calls interior function for different conditions to compute the product of Aei*inv(Aii)*Aie */
-      void compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& field, size_t const& r_index );
-      /** @brief Compute the product of Aei*inv(Aii)*Aie in any direction for any field*/
-      void compute_product_matrix_interior(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column, size_t const& dir, size_t const& r_index);
+      /** @brief Calls interior function for different conditions
+      to compute the product of Aei*inv(Aii)*Aie */
+      void compute_product_matrix(struct TDMatrix *arr
+                                , struct ProdMatrix *prr
+                                , size_t const& comp
+                                , size_t const& dir
+                                , size_t const& field
+                                , size_t const& r_index );
+      /** @brief Compute the product of Aei*inv(Aii)*Aie in any
+      direction for any field*/
+      void compute_product_matrix_interior(struct TDMatrix *arr
+                                         , struct ProdMatrix *prr
+                                         , size_t const& comp
+                                         , size_t const& column
+                                         , size_t const& dir
+                                         , size_t const& r_index);
 
    //-- Utilities
 
       /** @name Utilities */
       //@{
-      /** @brief Solve Linear system mat_A*x = rhs with only three vectors of mat_A(x,y,z) using thomas algorithm  */
-      void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& r_index);
+      /** @brief Solve Linear system mat_A*x = rhs with only three
+      vectors of mat_A(x,y,z) using thomas algorithm  */
+      void mod_thomas_algorithm(TDMatrix *arr
+                              , LA_SeqVector* rhs
+                              , size_t const& comp
+                              , size_t const& dir
+                              , size_t const& r_index);
       /** @brief Compute the modified super diagonal for thomas algorithm  */
-      void pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr, size_t const& r_index);
+      void pre_thomas_treatment( size_t const& comp
+                               , size_t const& dir
+                               , struct TDMatrix *arr
+                               , size_t const& r_index);
       //@}
 
    protected: //--------------------------------------------------------
@@ -279,13 +315,18 @@ class DDS_NavierStokesSystem : public MAC_Object
       LA_SeqMatrix * MAT_velocityUnsteadyPlusDiffusion_1D ;
 
       // Spacitial discretization matrices
-      struct TDMatrix A[2][3];          // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
-      struct ProdMatrix Ap[2][3];       // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
-      struct ProdMatrix Ap_proc0[2][3]; // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
-      struct LocalVector VEC[2][3];     // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      struct TDMatrix A[2][3];
+      // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      struct ProdMatrix Ap[2][3];
+      // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      struct ProdMatrix Ap_proc0[2][3];
+      // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      struct LocalVector VEC[2][3];
 
       // Schur complement matrices
-      struct TDMatrix Schur[2][3];      // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      struct TDMatrix Schur[2][3];
       struct ProdMatrix SchurP[2][3];
       struct LocalVector Schur_VEC[2][3];
 
@@ -293,10 +334,14 @@ class DDS_NavierStokesSystem : public MAC_Object
       struct TDMatrix DoubleSchur[2][3];
 
       // Particle structures
-      struct NodeProp node[2][2];			       // 2 rows are for fields; 2 columns are for time level (current and last)
-      vector<doubleVector*> divergence;			       // 0 current timestep, 1 last time step
-      struct PartForces hydro_forces[2];                       // 0 current timestep, 1 last time step
-      struct PartForces hydro_torque[2];                       // 0 current timestep, 1 last time step
+      // 2 rows are for fields; 2 columns are for time level (current and last)
+      struct NodeProp node[2][2];
+      // 0 current timestep, 1 last time step
+      vector<doubleVector*> divergence;
+      // 0 current timestep, 1 last time step
+      struct PartForces hydro_forces[2];
+      // 0 current timestep, 1 last time step
+      struct PartForces hydro_torque[2];
       // Local vector to store diffusive terms
       vector<doubleVector*> vel_diffusion;
 
