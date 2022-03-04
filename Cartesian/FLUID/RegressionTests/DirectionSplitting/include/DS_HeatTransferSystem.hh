@@ -1,5 +1,5 @@
-#ifndef REG_HEAT_EQUATION_SYSTEM_HH
-#define REG_HEAT_EQUATION_SYSTEM_HH
+#ifndef DS_HeatTransferSystem_HH
+#define DS_HeatTransferSystem_HH
 
 #include <MAC_Object.hh>
 #include <utility>
@@ -86,18 +86,18 @@ struct SurfaceDiscretize {
 
 /** @brief BoundaryBisec to be used to store the intersection of solids with grids in each direction */
 struct BoundaryBisec {
-   LA_SeqMatrix ** offset;                  // Direction of intersection relative to node (Column 0 for left and Column 1 for right) 
+   LA_SeqMatrix ** offset;                  // Direction of intersection relative to node (Column 0 for left and Column 1 for right)
    LA_SeqMatrix ** value;                   // Value of offset relative to node point
    LA_SeqMatrix ** field;                   // Value of field variable at the intersection
 };
 
-/** @brief The Class DDS_HeatTransferSystem.
+/** @brief The Class DS_HeatTransferSystem.
 
 Matrix systems for the resolution of the heat equation.
 
 @author A. Wachs - Pacific project 2017 */
 
-class DDS_HeatTransferSystem : public MAC_Object
+class DS_HeatTransferSystem : public MAC_Object
 {
    private: //----------------------------------------------------------
 
@@ -106,23 +106,23 @@ class DDS_HeatTransferSystem : public MAC_Object
       /** @name Constructors & Destructor */
       //@{
       /** @brief Constructor without argument */
-      DDS_HeatTransferSystem( void ) ;
+      DS_HeatTransferSystem( void ) ;
 
       /** @brief Destructor */
-      ~DDS_HeatTransferSystem( void ) ;
+      ~DS_HeatTransferSystem( void ) ;
 
       /** @brief Copy constructor */
-      DDS_HeatTransferSystem( DDS_HeatTransferSystem const& other ) ;
+      DS_HeatTransferSystem( DS_HeatTransferSystem const& other ) ;
 
       /** @brief Operator ==
       @param other the right hand side */
-      DDS_HeatTransferSystem& operator=( DDS_HeatTransferSystem const& other ) ;
+      DS_HeatTransferSystem& operator=( DS_HeatTransferSystem const& other ) ;
 
       /** @brief Constructor with arguments
       @param a_owner the MAC-based object
       @param exp to read the data file
       @param mac_tf FV temperature field */
-      DDS_HeatTransferSystem ( MAC_Object* a_owner,
+      DS_HeatTransferSystem ( MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_tf,
             struct HeatTransfer2System const& fromHE );
@@ -135,11 +135,11 @@ class DDS_HeatTransferSystem : public MAC_Object
 
       /** @name Instance delivery and initialization */
       //@{
-      /** @brief Create and initialize an instance of DDS_HeatTransferSystem
+      /** @brief Create and initialize an instance of DS_HeatTransferSystem
       @param a_owner the MAC-based object
       @param exp to read the data file
       @param mac_tf FV temperature field */
-      static DDS_HeatTransferSystem* create(
+      static DS_HeatTransferSystem* create(
             MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_tf,

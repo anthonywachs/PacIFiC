@@ -1,4 +1,4 @@
-#include <DDS_HeatTransferSystem.hh>
+#include <DS_HeatTransferSystem.hh>
 #include <LA_Matrix.hh>
 #include <LA_Vector.hh>
 #include <LA_Scatter.hh>
@@ -26,19 +26,19 @@
 
 
 //----------------------------------------------------------------------
-DDS_HeatTransferSystem*
-DDS_HeatTransferSystem:: create( MAC_Object* a_owner,
+DS_HeatTransferSystem*
+DS_HeatTransferSystem:: create( MAC_Object* a_owner,
 	MAC_ModuleExplorer const* exp,
 	FV_DiscreteField* mac_tf,
         struct HeatTransfer2System const& transfer )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: create" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: create" ) ;
    MAC_CHECK_PRE( exp != 0 ) ;
    MAC_CHECK_PRE( mac_tf != 0 ) ;
 
-   DDS_HeatTransferSystem* result =
-         new DDS_HeatTransferSystem( a_owner, exp, mac_tf, transfer ) ;
+   DS_HeatTransferSystem* result =
+         new DS_HeatTransferSystem( a_owner, exp, mac_tf, transfer ) ;
 
    MAC_CHECK_POST( result != 0 ) ;
    MAC_CHECK_POST( result->owner() == a_owner ) ;
@@ -51,7 +51,7 @@ DDS_HeatTransferSystem:: create( MAC_Object* a_owner,
 
 
 //----------------------------------------------------------------------
-DDS_HeatTransferSystem:: DDS_HeatTransferSystem(
+DS_HeatTransferSystem:: DS_HeatTransferSystem(
 	MAC_Object* a_owner,
 	MAC_ModuleExplorer const* exp,
 	FV_DiscreteField* mac_tf,
@@ -65,9 +65,9 @@ DDS_HeatTransferSystem:: DDS_HeatTransferSystem(
    , Npart (fromHE.Npart_ )
    , level_set_type (fromHE.level_set_type_ )
    , Nmax (fromHE.Npoints_ )
-   , ar (fromHE.ar_ ) 
+   , ar (fromHE.ar_ )
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: DDS_HeatTransferSystem" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: DS_HeatTransferSystem" ) ;
 
    int const* MPI_coordinates_world = TF->primary_grid()->get_MPI_coordinates() ;
    int const* MPI_max_coordinates_world = TF->primary_grid()->get_domain_decomposition() ;
@@ -103,10 +103,10 @@ DDS_HeatTransferSystem:: DDS_HeatTransferSystem(
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
+DS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: build_system" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: build_system" ) ;
 
    // Temperature Laplacian
    MAT_D_TemperatureUnsteadyPlusDiffusion = LA_Matrix::make( this,
@@ -196,7 +196,7 @@ DDS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
          A[dir].ie[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
          A[dir].ei[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
          A[dir].ee[comp] = (LA_SeqMatrix**) malloc(nb_index * sizeof(LA_SeqMatrix*)) ;
-         
+
          Schur[dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
          Schur[dir].ii_super[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
          Schur[dir].ii_sub[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
@@ -226,7 +226,7 @@ DDS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
             }
          }
       }
-         
+
 
       // Product matrices of spacial discretization
       Ap[dir].ei_ii_ie = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
@@ -235,7 +235,7 @@ DDS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
 
       Ap_proc0[dir].ei_ii_ie = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
 
-      // VEC to store local/interface solution and RHS 
+      // VEC to store local/interface solution and RHS
       VEC[dir].local_T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
       VEC[dir].local_solution_T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
       VEC[dir].T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
@@ -310,10 +310,10 @@ DDS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem:: re_initialize( void )
+DS_HeatTransferSystem:: re_initialize( void )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: re_initialize" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: re_initialize" ) ;
 
    size_t tf_glob = TF->nb_global_unknowns() ;
    size_t tf_loc = TF->nb_local_unknowns() ;
@@ -380,7 +380,7 @@ DDS_HeatTransferSystem:: re_initialize( void )
 	 nb_dof_on_proc( l ) = TF->get_local_nb_dof( comp, l ) ;
       }
 
-    
+
       for (size_t l=0;l<dim;++l) {
          nb_total_unknown *= 1+nb_dof_on_proc(l);
 
@@ -464,8 +464,8 @@ DDS_HeatTransferSystem:: re_initialize( void )
                }
             }
 
-         } else {             
-            // Periodic domain 
+         } else {
+            // Periodic domain
             for (size_t index = 0; index < nb_index; index++) {
                A[l].ii_main[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-1);
                A[l].ii_super[comp][index]->re_initialize(nb_unknowns_handled_by_proc( l )-2);
@@ -538,18 +538,18 @@ DDS_HeatTransferSystem:: re_initialize( void )
 }
 
 //----------------------------------------------------------------------
-DDS_HeatTransferSystem:: ~DDS_HeatTransferSystem( void )
+DS_HeatTransferSystem:: ~DS_HeatTransferSystem( void )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: ~DDS_HeatTransferSystem" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: ~DS_HeatTransferSystem" ) ;
 }
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem::initialize_temperature( void )
+DS_HeatTransferSystem::initialize_temperature( void )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: initialize_temperature" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: initialize_temperature" ) ;
 
    TF->extract_unknown_DOFs_value( 0, TF_DS_LOC ) ;
    TF_NUM->scatter()->set( TF_DS_LOC, VEC_DS_TF ) ;
@@ -558,10 +558,10 @@ DDS_HeatTransferSystem::initialize_temperature( void )
 
 //----------------------------------------------------------------------
 LA_SeqVector const*
-DDS_HeatTransferSystem:: get_solution_DS_temperature( void ) const
+DS_HeatTransferSystem:: get_solution_DS_temperature( void ) const
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_solution_DS_temperature" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_solution_DS_temperature" ) ;
 
    TF_NUM->scatter()->get( VEC_DS_TF, TF_DS_LOC ) ;
 
@@ -573,10 +573,10 @@ DDS_HeatTransferSystem:: get_solution_DS_temperature( void ) const
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem::at_each_time_step( void )
+DS_HeatTransferSystem::at_each_time_step( void )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: at_each_time_step" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: at_each_time_step" ) ;
 
    // Store temperature at previous time
    VEC_DS_TF->synchronize() ;
@@ -586,10 +586,10 @@ DDS_HeatTransferSystem::at_each_time_step( void )
 
 //----------------------------------------------------------------------
 double
-DDS_HeatTransferSystem:: compute_temperature_change( void )
+DS_HeatTransferSystem:: compute_temperature_change( void )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: compute_temperature_change" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: compute_temperature_change" ) ;
 
    VEC_DS_TF->synchronize() ;
    VEC_DS_TF_timechange->set( VEC_DS_TF ) ;
@@ -605,7 +605,7 @@ DDS_HeatTransferSystem:: compute_temperature_change( void )
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem::pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr, size_t const& r_index)
+DS_HeatTransferSystem::pre_thomas_treatment( size_t const& comp, size_t const& dir, struct TDMatrix *arr, size_t const& r_index)
 //----------------------------------------------------------------------
 {
    size_t nrows = arr[dir].ii_main[comp][r_index]->nb_rows() ;
@@ -633,10 +633,10 @@ DDS_HeatTransferSystem::pre_thomas_treatment( size_t const& comp, size_t const& 
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& r_index)
+DS_HeatTransferSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& r_index)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: mod_thomas_algorithm" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: mod_thomas_algorithm" ) ;
 
    size_t nrows = arr[dir].ii_main[comp][r_index] -> nb_rows() ;
    double temp = arr[dir].ii_main[comp][r_index]->item(0);
@@ -671,120 +671,120 @@ DDS_HeatTransferSystem::mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, s
 
 //----------------------------------------------------------------------
 TDMatrix*
-DDS_HeatTransferSystem::get_DoubleSchur()
+DS_HeatTransferSystem::get_DoubleSchur()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_Schur" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_Schur" ) ;
    return (DoubleSchur) ;
 }
 
 //----------------------------------------------------------------------
 TDMatrix*
-DDS_HeatTransferSystem::get_Schur()
+DS_HeatTransferSystem::get_Schur()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_Schur" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_Schur" ) ;
    return (Schur) ;
 }
 
 //----------------------------------------------------------------------
 TDMatrix*
-DDS_HeatTransferSystem::get_A()
+DS_HeatTransferSystem::get_A()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_A" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_A" ) ;
    return (A) ;
 }
 
 //----------------------------------------------------------------------
 ProdMatrix*
-DDS_HeatTransferSystem::get_Ap()
+DS_HeatTransferSystem::get_Ap()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_Ap" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_Ap" ) ;
    return (Ap) ;
 }
 
 //----------------------------------------------------------------------
 ProdMatrix*
-DDS_HeatTransferSystem::get_Ap_proc0()
+DS_HeatTransferSystem::get_Ap_proc0()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_Ap" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_Ap" ) ;
    return (Ap_proc0) ;
 }
 
 
 //----------------------------------------------------------------------
 PartInput
-DDS_HeatTransferSystem::get_solid()
+DS_HeatTransferSystem::get_solid()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_solid" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_solid" ) ;
    return (solid) ;
 }
 
 //----------------------------------------------------------------------
 SurfaceDiscretize
-DDS_HeatTransferSystem::get_surface()
+DS_HeatTransferSystem::get_surface()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_surface" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_surface" ) ;
    return (surface) ;
 }
 
 //----------------------------------------------------------------------
 ProdMatrix*
-DDS_HeatTransferSystem::get_SchurP()
+DS_HeatTransferSystem::get_SchurP()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_SchurP" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_SchurP" ) ;
    return (SchurP) ;
 }
 
 //----------------------------------------------------------------------
 LocalVector*
-DDS_HeatTransferSystem::get_VEC()
+DS_HeatTransferSystem::get_VEC()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_VEC" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_VEC" ) ;
    return (VEC) ;
 }
 
 //----------------------------------------------------------------------
 BoundaryBisec*
-DDS_HeatTransferSystem::get_b_intersect(size_t const& level)
+DS_HeatTransferSystem::get_b_intersect(size_t const& level)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_b_intersect" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_b_intersect" ) ;
    return (b_intersect[level]) ;
 }
 
 //----------------------------------------------------------------------
 NodeProp
-DDS_HeatTransferSystem::get_node_property()
+DS_HeatTransferSystem::get_node_property()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_voidfrac_VEC" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_voidfrac_VEC" ) ;
    return (node) ;
 }
 
 //----------------------------------------------------------------------
 LocalVector*
-DDS_HeatTransferSystem::get_Schur_VEC()
+DS_HeatTransferSystem::get_Schur_VEC()
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: get_VEC" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: get_VEC" ) ;
    return (Schur_VEC) ;
 }
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem::DS_HeatEquation_solver(
+DS_HeatTransferSystem::DS_HeatEquation_solver(
         size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& r_index)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: DS_HeatEquation_solver" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: DS_HeatEquation_solver" ) ;
 
    LocalVector* rhs = get_VEC();
    TDMatrix* arr = get_A();
@@ -795,7 +795,7 @@ DDS_HeatTransferSystem::DS_HeatEquation_solver(
    nb_procs = nb_procs_in_i[dir];
 
    // Solve the DS splitting problem in
-   DDS_HeatTransferSystem::mod_thomas_algorithm(arr, rhs[dir].local_T[comp], comp, dir,r_index);
+   DS_HeatTransferSystem::mod_thomas_algorithm(arr, rhs[dir].local_T[comp], comp, dir,r_index);
 
    // Transfer in the distributed vector
    size_t nb_local_unk = rhs[dir].local_T[comp]->nb_rows();
@@ -844,20 +844,20 @@ DDS_HeatTransferSystem::DS_HeatEquation_solver(
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem::synchronize_DS_solution_vec( void )
+DS_HeatTransferSystem::synchronize_DS_solution_vec( void )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: synchronize_DS_solution_vec" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: synchronize_DS_solution_vec" ) ;
 
    VEC_DS_TF->synchronize();
 }
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem::compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& r_index )
+DS_HeatTransferSystem::compute_product_matrix(struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& r_index )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransferSystem:: compute_product_matrix" ) ;
+   MAC_LABEL( "DS_HeatTransferSystem:: compute_product_matrix" ) ;
 
    size_t proc_pos, nb_procs;
 
@@ -884,7 +884,7 @@ DDS_HeatTransferSystem::compute_product_matrix(struct TDMatrix *arr, struct Prod
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem::compute_product_matrix_interior(struct TDMatrix *arr,struct ProdMatrix *prr, size_t const& comp, size_t const& column,size_t const& dir,size_t const& r_index)
+DS_HeatTransferSystem::compute_product_matrix_interior(struct TDMatrix *arr,struct ProdMatrix *prr, size_t const& comp, size_t const& column,size_t const& dir,size_t const& r_index)
 //----------------------------------------------------------------------
 {
 
@@ -892,7 +892,7 @@ DDS_HeatTransferSystem::compute_product_matrix_interior(struct TDMatrix *arr,str
   arr[dir].ie[comp][r_index] -> extract_col(column, prr[dir].result[comp]);
 
   // Get inv(Aii)*Aie for for appropriate column of Aie
-  DDS_HeatTransferSystem::mod_thomas_algorithm(arr, prr[dir].result[comp], comp, dir,r_index);
+  DS_HeatTransferSystem::mod_thomas_algorithm(arr, prr[dir].result[comp], comp, dir,r_index);
 
   // Get product of Aei*inv(Aii)*Aie for appropriate column
   arr[dir].ei[comp][r_index]->multiply_vec_then_add(prr[dir].result[comp],prr[dir].ii_ie[comp]);
@@ -907,7 +907,7 @@ DDS_HeatTransferSystem::compute_product_matrix_interior(struct TDMatrix *arr,str
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransferSystem::display_debug(void)
+DS_HeatTransferSystem::display_debug(void)
 //----------------------------------------------------------------------
 {
    //Aii_y_main_diagonal[0]->print_items(MAC::out(),0);

@@ -1,8 +1,8 @@
-#include <DDS_HeatTransfer.hh>
+#include <DS_HeatTransfer.hh>
 #include <FV_DomainAndFields.hh>
 #include <FV_DiscreteField.hh>
 #include <FV_DomainBuilder.hh>
-#include <DDS_HeatTransferSystem.hh>
+#include <DS_HeatTransferSystem.hh>
 #include <FV_SystemNumbering.hh>
 #include <FV_Mesh.hh>
 #include <FV_TimeIterator.hh>
@@ -25,17 +25,17 @@
 #include <math.h>
 
 //---------------------------------------------------------------------------
-DDS_HeatTransfer*
-DDS_HeatTransfer:: create( MAC_Object* a_owner,
+DS_HeatTransfer*
+DS_HeatTransfer:: create( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp,
                 struct NavierStokes2Temperature const& transfer )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: create" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: create" ) ;
    MAC_CHECK_PRE( exp != 0 ) ;
 
-   DDS_HeatTransfer* result =
-                        new DDS_HeatTransfer( a_owner, exp, transfer ) ;
+   DS_HeatTransfer* result =
+                        new DS_HeatTransfer( a_owner, exp, transfer ) ;
 
    MAC_CHECK_POST( result != 0 ) ;
    MAC_CHECK_POST( result->owner() == a_owner ) ;
@@ -45,7 +45,7 @@ DDS_HeatTransfer:: create( MAC_Object* a_owner,
 }
 
 //---------------------------------------------------------------------------
-DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
+DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp,
                 struct NavierStokes2Temperature const& fromNS )
 //---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
    , GLOBAL_EQ( 0 )
    , rho( fromNS.rho_ )
    , AdvectionScheme ( fromNS.AdvectionScheme_ )
-   , AdvectionTimeAccuracy ( fromNS.AdvectionTimeAccuracy_ ) 
+   , AdvectionTimeAccuracy ( fromNS.AdvectionTimeAccuracy_ )
    , ViscousStressOrder ( fromNS.ViscousStressOrder_ )
    , heat_capacity( exp->double_data( "Heat_capacity") )
    , thermal_conductivity( exp->double_data( "Thermal_conductivity") )
@@ -67,7 +67,7 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
    , IntersectionMethod ( "Bisection" )
    , tolerance ( fromNS.tolerance_ )
 {
-   MAC_LABEL( "DDS_HeatTransfer:: DDS_HeatTransfer" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: DS_HeatTransfer" ) ;
 
    MAC_ASSERT( TF->discretization_type() == "centered" ) ;
    MAC_ASSERT( TF->storage_depth() == 5 ) ;
@@ -144,12 +144,12 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
                pole_loc = fromNS.pole_loc_ ;
             }
          }
-      }         
+      }
    }
 
    // Create structure to input in the solver system
    struct HeatTransfer2System inputDataHE;
-   inputDataHE.is_solids_ = is_solids ; 
+   inputDataHE.is_solids_ = is_solids ;
    inputDataHE.is_stressCal_ = is_stressCal ;
    inputDataHE.Npart_ = Npart ;
    inputDataHE.level_set_type_ = level_set_type ;
@@ -158,8 +158,8 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
 
    // Build the matrix system
    MAC_ModuleExplorer* se =
-	exp->create_subexplorer( 0,"DDS_HeatTransferSystem" ) ;
-   GLOBAL_EQ = DDS_HeatTransferSystem::create( this, se, TF, inputDataHE ) ;
+	exp->create_subexplorer( 0,"DS_HeatTransferSystem" ) ;
+   GLOBAL_EQ = DS_HeatTransferSystem::create( this, se, TF, inputDataHE ) ;
    se->destroy() ;
 
 
@@ -196,10 +196,10 @@ DDS_HeatTransfer:: DDS_HeatTransfer( MAC_Object* a_owner,
 
 
 //---------------------------------------------------------------------------
-DDS_HeatTransfer:: ~DDS_HeatTransfer( void )
+DS_HeatTransfer:: ~DS_HeatTransfer( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: ~DDS_HeatTransfer" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: ~DS_HeatTransfer" ) ;
 
    free_DDS_subcommunicators() ;
 
@@ -207,11 +207,11 @@ DDS_HeatTransfer:: ~DDS_HeatTransfer( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
+DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
       	std::string const& basename )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: do_before_time_stepping" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: do_before_time_stepping" ) ;
 
    if ( my_rank == is_master ) SCT_set_start("Matrix_Assembly&Initialization");
 
@@ -239,7 +239,7 @@ DDS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
       if (is_stressCal) {
          // Generate discretization of surface in approximate equal area
          generate_surface_discretization ();
-      }     
+      }
       if (my_rank == 0) cout << "HE: Finished particle surface discretizations... \n" << endl;
    }
 
@@ -254,11 +254,11 @@ DDS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: do_before_inner_iterations_stage(
+DS_HeatTransfer:: do_before_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: do_before_inner_iterations_stage" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: do_before_inner_iterations_stage" ) ;
 
 //   FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
 
@@ -280,14 +280,14 @@ DDS_HeatTransfer:: do_before_inner_iterations_stage(
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: do_one_inner_iteration( FV_TimeIterator const* t_it )
+DS_HeatTransfer:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: do_one_inner_iteration" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: do_one_inner_iteration" ) ;
 
    if ( my_rank == is_master ) SCT_set_start("DS_Solution");
 
-   // Solve heat equation using direction splitting 
+   // Solve heat equation using direction splitting
    HeatEquation_DirectionSplittingSolver(t_it);
 
    if ( my_rank == is_master ) SCT_get_elapsed_time( "DS_Solution" );
@@ -296,11 +296,11 @@ DDS_HeatTransfer:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: do_after_inner_iterations_stage(
+DS_HeatTransfer:: do_after_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: do_after_inner_iterations_stage" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: do_after_inner_iterations_stage" ) ;
 
 //   FV_OneStepIteration::do_after_inner_iterations_stage( t_it ) ;
 
@@ -320,10 +320,10 @@ DDS_HeatTransfer:: do_after_inner_iterations_stage(
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: do_after_time_stepping( void )
+DS_HeatTransfer:: do_after_time_stepping( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: do_after_time_stepping" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: do_after_time_stepping" ) ;
 
 //   write_output_field();
 
@@ -344,11 +344,11 @@ DDS_HeatTransfer:: do_after_time_stepping( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: do_additional_savings( FV_TimeIterator const* t_it,
+DS_HeatTransfer:: do_additional_savings( FV_TimeIterator const* t_it,
       	int const& cycleNumber )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: do_additional_savings" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: do_additional_savings" ) ;
 
 }
 
@@ -357,7 +357,7 @@ DDS_HeatTransfer:: do_additional_savings( FV_TimeIterator const* t_it,
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransfer::write_output_field()
+DS_HeatTransfer::write_output_field()
 //----------------------------------------------------------------------
 {
 
@@ -409,12 +409,12 @@ DDS_HeatTransfer::write_output_field()
               outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
               for (size_t dir = 0; dir < dim; dir++) {
                   for (size_t off = 0; off < 2; off++) {
-                      outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off); 
-//                      outputFile << "," << compute_adv_component(comp,i,j,k) << "," << TF->DOF_value(i,j,k,comp,0)*divergence_of_U(comp,i,j,k,0); 
+                      outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off);
+//                      outputFile << "," << compute_adv_component(comp,i,j,k) << "," << TF->DOF_value(i,j,k,comp,0)*divergence_of_U(comp,i,j,k,0);
                   }
               }
               outputFile << endl;
-           } 
+           }
         }
      }
   }
@@ -423,7 +423,7 @@ DDS_HeatTransfer::write_output_field()
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: bodyterm_value ( double const& xC, double const& yC, double const& zC) 
+DS_HeatTransfer:: bodyterm_value ( double const& xC, double const& yC, double const& zC)
 //---------------------------------------------------------------------------
 {
    double bodyterm = 0.;
@@ -433,7 +433,7 @@ DDS_HeatTransfer:: bodyterm_value ( double const& xC, double const& yC, double c
                                                * MAC::sin( MAC::pi() * yC );
       } else if (dim == 3) {
          bodyterm = 3. * MAC::pi() * MAC::pi() * MAC::sin( MAC::pi() * xC )
-                                               * MAC::sin( MAC::pi() * yC ) 
+                                               * MAC::sin( MAC::pi() * yC )
                                                * MAC::sin( MAC::pi() * zC );
       }
    }
@@ -443,7 +443,7 @@ DDS_HeatTransfer:: bodyterm_value ( double const& xC, double const& yC, double c
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: assemble_DS_un_at_rhs (
+DS_HeatTransfer:: assemble_DS_un_at_rhs (
         FV_TimeIterator const* t_it, double const& gamma)
 //---------------------------------------------------------------------------
 {
@@ -486,7 +486,7 @@ DDS_HeatTransfer:: assemble_DS_un_at_rhs (
                  if (node.void_frac[comp]->item(p) == 1) {
                     adv_value = 0.;
                  }
-              } 
+              }
 
               rhs = gamma*(xvalue*dyC + yvalue*dxC) - adv_value + (TF->DOF_value( i, j, k, comp, 1 )*dxC*dyC)/(t_it -> time_step());
               TF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC) + gamma*bodyterm*(t_it -> time_step()));
@@ -511,7 +511,7 @@ DDS_HeatTransfer:: assemble_DS_un_at_rhs (
                     if (node.void_frac[comp]->item(p) == 1) {
                        adv_value = 0.;
                     }
-                 } 
+                 }
 
                  rhs = gamma*(xvalue*dyC*dzC + yvalue*dxC*dzC + zvalue*dxC*dyC) - adv_value
                                + (TF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC)/(t_it -> time_step());
@@ -525,17 +525,17 @@ DDS_HeatTransfer:: assemble_DS_un_at_rhs (
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: divergence_of_U ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& level)
+DS_HeatTransfer:: divergence_of_U ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatTransfer:: divergence_of_U" ) ;
+   MAC_LABEL("DS_HeatTransfer:: divergence_of_U" ) ;
 
    FV_SHIFT_TRIPLET shift = TF->shift_staggeredToCentered() ;
 
    double xvalue = 0.,yvalue=0.,zvalue=0.,value=0.;
 
-   double dxC = TF->get_cell_size( i, comp, 0 ) ;    
-   double dyC = TF->get_cell_size( j, comp, 1 ) ;    
+   double dxC = TF->get_cell_size( i, comp, 0 ) ;
+   double dyC = TF->get_cell_size( j, comp, 1 ) ;
    double dzC = 0.;
 
    // du/dx
@@ -552,7 +552,7 @@ DDS_HeatTransfer:: divergence_of_U ( size_t const& comp, size_t const& i, size_t
 
    if (dim == 3) {
       // dw/dz
-      dzC = TF->get_cell_size( k, comp, 2 ) ;    
+      dzC = TF->get_cell_size( k, comp, 2 ) ;
       double zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
       double zright = UF->DOF_value( i, j, shift.k+k, 2, level ) - UF->DOF_value( i, j, shift.k+k-1, 2, level ) ;
 
@@ -567,10 +567,10 @@ DDS_HeatTransfer:: divergence_of_U ( size_t const& comp, size_t const& i, size_t
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level)
+DS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatTransfer:: compute_un_component" ) ;
+   MAC_LABEL("DS_HeatTransfer:: compute_un_component" ) ;
 
    double xhr,xhl,xright,xleft,yhr,yhl,yright,yleft;
    double zhr,zhl,zright,zleft, value=0.;
@@ -585,12 +585,12 @@ DDS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, s
       xleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i-1, j, k, comp, level ) ;
 
       if (is_solids) {
-         size_t p = return_node_index(TF,comp,i,j,k); 
+         size_t p = return_node_index(TF,comp,i,j,k);
          if (node.void_frac[comp]->item(p) == 0) {
             if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
                xleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
                xhl = b_intersect[dir].value[comp]->item(p,0);
-            } 
+            }
             if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
                xright = b_intersect[dir].field[comp]->item(p,1) - TF->DOF_value( i, j, k, comp, level );
                xhr = b_intersect[dir].value[comp]->item(p,1);
@@ -614,12 +614,12 @@ DDS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, s
       yleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i, j-1, k, comp, level ) ;
 
       if (is_solids) {
-         size_t p = return_node_index(TF,comp,i,j,k);           
+         size_t p = return_node_index(TF,comp,i,j,k);
          if (node.void_frac[comp]->item(p) == 0) {
             if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
                yleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
                yhl = b_intersect[dir].value[comp]->item(p,0);
-            } 
+            }
             if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
                yright = b_intersect[dir].field[comp]->item(p,1) - TF->DOF_value( i, j, k, comp, level );
                yhr = b_intersect[dir].value[comp]->item(p,1);
@@ -657,7 +657,7 @@ DDS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, s
             zleft = 0.; zright = 0.;
          }
       }
-      
+
       //zvalue = zright/zhr - zleft/zhl;
       if (TF->DOF_in_domain((int)i, (int)j, (int)k-1, comp) && TF->DOF_in_domain((int)i, (int)j, (int)k+1, comp))
          value = zright/zhr - zleft/zhl;
@@ -668,15 +668,15 @@ DDS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, s
    }
 
    return(value);
-	   
+
 }
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
+DS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatTransfer:: compute_adv_component" ) ;
+   MAC_LABEL("DS_HeatTransfer:: compute_adv_component" ) ;
    double ugradu = 0., value = 0.;
 
    if ( AdvectionScheme == "TVD" ) {
@@ -685,7 +685,7 @@ DDS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, 
       ugradu = assemble_advection_Upwind(UF,1,1.,i,j,k,1) - TF->DOF_value(i,j,k,comp,1)*divergence_of_U(comp,i,j,k,1);
    } else if ( AdvectionScheme == "Centered" ) {
       ugradu = assemble_advection_Centered(UF,1,1.,i,j,k,1) - TF->DOF_value(i,j,k,comp,1)*divergence_of_U(comp,i,j,k,1);
-   } 
+   }
 
    if ( AdvectionTimeAccuracy == 1 ) {
       value = ugradu;
@@ -698,7 +698,7 @@ DDS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, 
 }
 //---------------------------------------------------------------------------
 size_t
-DDS_HeatTransfer:: return_node_index (
+DS_HeatTransfer:: return_node_index (
   FV_DiscreteField const* FF,
   size_t const& comp,
   size_t const& i,
@@ -706,7 +706,7 @@ DDS_HeatTransfer:: return_node_index (
   size_t const& k )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: return_node_index" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: return_node_index" ) ;
 
    // Get local min and max indices
    size_t_vector min_index(dim,0);
@@ -732,7 +732,7 @@ DDS_HeatTransfer:: return_node_index (
 
 //---------------------------------------------------------------------------
 size_t
-DDS_HeatTransfer:: return_row_index (
+DS_HeatTransfer:: return_row_index (
   FV_DiscreteField const* FF,
   size_t const& comp,
   size_t const& dir,
@@ -740,7 +740,7 @@ DDS_HeatTransfer:: return_row_index (
   size_t const& k )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: return_row_index" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: return_row_index" ) ;
 
    // Get local min and max indices
    size_t_vector min_unknown_index(dim,0);
@@ -768,12 +768,12 @@ DDS_HeatTransfer:: return_row_index (
       }
    }
 
-   return(p); 
+   return(p);
 }
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: assemble_temperature_matrix (
+DS_HeatTransfer:: assemble_temperature_matrix (
   FV_DiscreteField const* FF,
   FV_TimeIterator const* t_it,
   double const& gamma,
@@ -784,7 +784,7 @@ DDS_HeatTransfer:: assemble_temperature_matrix (
   size_t const& r_index )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: assemble_temperature_matrix" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: assemble_temperature_matrix" ) ;
 
    // Parameters
    double dxr,dxl,xR,xL,xC,right,left,center = 0. ;
@@ -865,7 +865,7 @@ DDS_HeatTransfer:: assemble_temperature_matrix (
           k_min = min_unknown_index(2); k_max = max_unknown_index(2);
        }
 
-       // Since, this function is used in all directions; 
+       // Since, this function is used in all directions;
        // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
        int ii=0,jj=0,kk=0;
 
@@ -906,23 +906,23 @@ DDS_HeatTransfer:: assemble_temperature_matrix (
 
        value = value + unsteady_term;
 
-       // Set Aie, Aei and Aee 
+       // Set Aie, Aei and Aee
        if ((!l_bound) && (i == min_unknown_index(dir))) {
           // Periodic boundary condition at minimum unknown index
           // First proc has non zero value in Aie,Aei for first & last index
 	  if (rank_in_i[dir] == 0) {
              A[dir].ie[comp][r_index]->set_item(m,nb_ranks_comm_i[dir]-1,left);
-      	     A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,left);			
+      	     A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,left);
 	  } else {
              A[dir].ie[comp][r_index]->set_item(m,rank_in_i[dir]-1,left);
-	     A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,left);			
+	     A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,left);
 	  }
        }
 
        if ((!r_bound) && (i == max_unknown_index(dir))) {
           // Periodic boundary condition at maximum unknown index
           // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-          A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],left);			
+          A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],left);
           Aee_diagcoef = value;
           A[dir].ei[comp][r_index]->set_item(rank_in_i[dir],m-1,left);
        }
@@ -964,10 +964,10 @@ DDS_HeatTransfer:: assemble_temperature_matrix (
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& r_index)
+DS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& r_index)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: assemble_schur_matrix" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: assemble_schur_matrix" ) ;
 
    TDMatrix* A = GLOBAL_EQ-> get_A();
 
@@ -1064,8 +1064,8 @@ DDS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir,
             if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,-receive_matrix->item(p,p-1));
 	    // In case of periodic and multi-processor, there will be a variant of Tridiagonal matrix instead of normal format
             if (is_iperiodic[dir] == 1) {
-               Schur[dir].ie[comp][r_index]->set_item(p,0,-receive_matrix->item(p,nb_row)); 
-               Schur[dir].ei[comp][r_index]->set_item(0,p,-receive_matrix->item(nb_row,p)); 
+               Schur[dir].ie[comp][r_index]->set_item(p,0,-receive_matrix->item(p,nb_row));
+               Schur[dir].ei[comp][r_index]->set_item(0,p,-receive_matrix->item(nb_row,p));
 	    }
 	 }
 
@@ -1118,10 +1118,10 @@ DDS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir,
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
+DS_HeatTransfer:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: assemble_temperature_and_schur" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: assemble_temperature_and_schur" ) ;
 
    double gamma = (1.0/2.0)*(thermal_conductivity/rho/heat_capacity);
 
@@ -1167,7 +1167,7 @@ DDS_HeatTransfer:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
+DS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    // Get local min and max indices
@@ -1246,7 +1246,7 @@ DDS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double
            if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
               value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
            }
-        }       
+        }
      }
 
      double temp_val=0.;
@@ -1276,7 +1276,7 @@ DDS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double
 
    }
 
-   // Since, this function is used in all directions; 
+   // Since, this function is used in all directions;
    // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
    size_t ii=0,jj=0,kk=0;
 
@@ -1321,7 +1321,7 @@ DDS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index)
+DS_HeatTransfer:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index)
 //---------------------------------------------------------------------------
 {
    // create a replica of local rhs vector in local solution vector
@@ -1343,12 +1343,12 @@ DDS_HeatTransfer:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: data_packing ( double const& fe, size_t const& comp, size_t const& dir, size_t const& vec_pos)
+DS_HeatTransfer:: data_packing ( double const& fe, size_t const& comp, size_t const& dir, size_t const& vec_pos)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
 
-   double *packed_data = first_pass[dir].send[comp][rank_in_i[dir]]; 
+   double *packed_data = first_pass[dir].send[comp][rank_in_i[dir]];
 
    if (rank_in_i[dir] == 0) {
       // Check if bc is periodic in x
@@ -1376,12 +1376,12 @@ DDS_HeatTransfer:: data_packing ( double const& fe, size_t const& comp, size_t c
    }
 
    packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
-   
+
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p)
+DS_HeatTransfer:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
@@ -1436,12 +1436,12 @@ DDS_HeatTransfer:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir,
             second_pass[dir].send[comp][i][2*p+1] = 0;
       }
    }
-   
+
 }
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: unpack_ue(size_t const& comp, double * received_data, size_t const& dir, size_t const& p)
+DS_HeatTransfer:: unpack_ue(size_t const& comp, double * received_data, size_t const& dir, size_t const& p)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
@@ -1461,7 +1461,7 @@ DDS_HeatTransfer:: unpack_ue(size_t const& comp, double * received_data, size_t 
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
+DS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
 //---------------------------------------------------------------------------
 {
    // Get local min and max indices
@@ -1520,7 +1520,7 @@ DDS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeItera
 
      	    size_t p = j-local_min_j;
 
-	    unpack_compute_ue_pack(comp,dir,p); 
+	    unpack_compute_ue_pack(comp,dir,p);
 
             // Need to have the original rhs function assembled for corrosponding j,k pair
             assemble_local_rhs(j,k,gamma,t_it,comp,dir);
@@ -1537,7 +1537,7 @@ DDS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeItera
 
    	       size_t p = (j-local_min_j)+local_length_j*(k-local_min_k);
 
-	       unpack_compute_ue_pack(comp,dir,p); 
+	       unpack_compute_ue_pack(comp,dir,p);
 
                // Need to have the original rhs function assembled for corrosponding j,k pair
                assemble_local_rhs(j,k,gamma,t_it,comp,dir);
@@ -1608,7 +1608,7 @@ DDS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeItera
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k )
+DS_HeatTransfer:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k )
 //---------------------------------------------------------------------------
 {
   size_t_vector min_unknown_index(dim,0);
@@ -1637,7 +1637,7 @@ DDS_HeatTransfer:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& ga
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
 	   for (size_t k=local_min_k; k <= local_max_k; ++k) {
               size_t r_index = return_row_index (TF,comp,dir_i,j,k);
-              // Assemble fi and return fe for each proc locally        
+              // Assemble fi and return fe for each proc locally
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
               // Calculate Aei*ui in each proc locally
               compute_Aei_ui(A,VEC,comp,dir_i,r_index);
@@ -1661,18 +1661,18 @@ DDS_HeatTransfer:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& ga
 
 //----------------------------------------------------------------------
 void
-DDS_HeatTransfer::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index)
+DS_HeatTransfer::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: DS_interface_unknown_solver" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: DS_interface_unknown_solver" ) ;
 
    TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
 
-   // Condition for variant of Tridiagonal Schur complement in Perioidic direction with multi-processor 
+   // Condition for variant of Tridiagonal Schur complement in Perioidic direction with multi-processor
    if ((is_iperiodic[dir] == 1) && (nb_ranks_comm_i[dir] != 1)) {
       LocalVector* Schur_VEC = GLOBAL_EQ->get_Schur_VEC();
       TDMatrix* DoubleSchur = GLOBAL_EQ-> get_DoubleSchur();
-      
+
       // Transfer interface_rhs to Schur VEC (i.e. S_fi and S_fe)
       size_t nrows = Schur_VEC[dir].local_T[comp]->nb_rows();
       for (size_t i = 0; i < nrows; i++) {
@@ -1708,21 +1708,21 @@ DDS_HeatTransfer::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: Solids_generation ()
+DS_HeatTransfer:: Solids_generation ()
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: Solids_generation" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: Solids_generation" ) ;
 
   // Convert string to istringstream
   istringstream global_par_info(*particle_information);
   // Import particle information in Heat Transfer solver
   ReadStringofSolids(global_par_info);
 
-} 
+}
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: ReadStringofSolids( istringstream &is )
+DS_HeatTransfer:: ReadStringofSolids( istringstream &is )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DDS_NSWithHeatTransfer:: ReadStringofSolids" ) ;
@@ -1780,10 +1780,10 @@ DDS_HeatTransfer:: ReadStringofSolids( istringstream &is )
          getline(lineStream, cell, '\t');
          double off = stod(cell);
 /*
-	 cout << "Particle info: " << xp << "," << yp << "," << zp << "," 
-		 		   << vx << "," << vy << "," << vz << "," 
-		 		   << wx << "," << wy << "," << wz << "," 
-		 		   << Rp << "," << Tp << endl; 
+	 cout << "Particle info: " << xp << "," << yp << "," << zp << ","
+		 		   << vx << "," << vy << "," << vz << ","
+		 		   << wx << "," << wy << "," << wz << ","
+		 		   << Rp << "," << Tp << endl;
 */
 	 // Storing the information in particle structure
          for (size_t comp=0;comp<nb_comps;comp++) {
@@ -1821,9 +1821,9 @@ DDS_HeatTransfer:: ReadStringofSolids( istringstream &is )
          getline(lineStream, cell, '\t');
          double tzz = stod(cell);
 /*
-	 cout << "Orientation info: " << txx << "," << txy << "," << txz << "," 
-		 	              << tyx << "," << tyy << "," << tyz << "," 
-		 	              << tzx << "," << tzy << "," << tzz << endl; 
+	 cout << "Orientation info: " << txx << "," << txy << "," << txz << ","
+		 	              << tyx << "," << tyy << "," << tyz << ","
+		 	              << tzx << "," << tzy << "," << tzz << endl;
 */
          // Storing the information in particle structure
          for (size_t comp=0;comp<nb_comps;comp++) {
@@ -1847,10 +1847,10 @@ DDS_HeatTransfer:: ReadStringofSolids( istringstream &is )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: ugradu_initialization (  )
+DS_HeatTransfer:: ugradu_initialization (  )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: ugradu_initialization" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: ugradu_initialization" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -1879,13 +1879,13 @@ DDS_HeatTransfer:: ugradu_initialization (  )
      }
   }
 }
- 
+
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
+DS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: Solids_flux_correction" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: Solids_flux_correction" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -1930,10 +1930,10 @@ DDS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator const* t_it)
+DS_HeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: compute_fluid_particle_interaction" ) ;
+  MAC_LABEL("DS_HeatTransfer:: compute_fluid_particle_interaction" ) ;
 
   string fileName = "./DS_results/particle_Tstress.csv" ;
 
@@ -1973,10 +1973,10 @@ DDS_HeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator const* t_
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np )
+DS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: compute_temperature_gradient_on_particle" ) ;
+  MAC_LABEL("DS_HeatTransfer:: compute_temperature_gradient_on_particle" ) ;
 
   if (ViscousStressOrder == "first") {
      first_order_temperature_gradient(force, parID, Np );
@@ -1987,10 +1987,10 @@ DDS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleVector& 
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np )
+DS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: second_order_temperature_gradient" ) ;
+  MAC_LABEL("DS_HeatTransfer:: second_order_temperature_gradient" ) ;
 
   size_t i0_temp;
   size_t comp = 0;
@@ -2005,7 +2005,7 @@ DDS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, 
   double yp = solid.coord[0]->item(parID,1);
   double zp = solid.coord[0]->item(parID,2);
   double ri = solid.size[0]->item(parID);
-/*  
+/*
   ofstream outputFile ;
   std::ostringstream os2;
   os2 << "./DS_results/temp_grad_" << my_rank << "_" << parID << ".csv";
@@ -2016,7 +2016,7 @@ DDS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, 
 */
   doubleArray2D point(3,3,0);
   doubleVector fini(3,0);
-  doubleVector level_set(2,1.);          
+  doubleVector level_set(2,1.);
   boolVector point_in_domain(2,true);
   size_t_vector in_parID(2,0);         //Store particle ID if level_set becomes negative
   boolArray2D found(dim,3,false);
@@ -2085,7 +2085,7 @@ DDS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, 
         for (size_t dir=0;dir<dim;dir++) {
            sign(dir) = (rotated_normal(dir) > 0.) ? 1 : -1;
 	   if (dim == 2) {
-              if (MAC::abs(rotated_normal(dir)) == MAC::max(MAC::abs(rotated_normal(0)),MAC::abs(rotated_normal(1)))) 
+              if (MAC::abs(rotated_normal(dir)) == MAC::max(MAC::abs(rotated_normal(0)),MAC::abs(rotated_normal(1))))
                  major_dir = dir;
 	   } else if (dim == 3) {
 	      if (MAC::abs(rotated_normal(dir)) == MAC::max(MAC::abs(rotated_normal(0)),
@@ -2142,7 +2142,7 @@ DDS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, 
            } else if ((level_set(0) > threshold) && (level_set(1) <= threshold)) {
               double dx1 = pow(pow(point(1,0)-point(0,0),2) + pow(point(1,1)-point(0,1),2) + pow(point(1,2)-point(0,2),2),0.5);
               dfdi = (fini(1) - fini(0))/dx1;
-           // Point 1 is present in solid 
+           // Point 1 is present in solid
            } else if (level_set(0) <= threshold) {
               double dx1 = pow(pow(point(1,0)-point(0,0),2) + pow(point(1,1)-point(0,1),2) + pow(point(1,2)-point(0,2),2),0.5);
               dfdi = (fini(1) - fini(0))/dx1;
@@ -2154,7 +2154,7 @@ DDS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, 
         // Particle close to wall
         } else if (!point_in_domain(0)) {
            // Creating a new ghost point in domain boundary or wall
-           i0(1,major_dir) = (sign(major_dir) == 1) ? (i0(0,major_dir) + 1*sign(major_dir)) : 
+           i0(1,major_dir) = (sign(major_dir) == 1) ? (i0(0,major_dir) + 1*sign(major_dir)) :
 		                                      (i0(0,major_dir) + 0*sign(major_dir)) ;
            point(1,major_dir) = TF->get_DOF_coordinate(i0(1,major_dir), comp, major_dir);
            double t1 = (point(1,major_dir) - point(0,major_dir))/rotated_normal(major_dir);
@@ -2164,7 +2164,7 @@ DDS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, 
                  point(1,dir) = point(0,dir) + rotated_normal(dir)*t1;
 		 size_t i0_t = 0;
                  bool temp = FV_Mesh::between(TF->get_DOF_coordinates_vector(0,dir), point(1,dir), i0_t);
-                 if (temp) i0(1,dir) = i0_t; 
+                 if (temp) i0(1,dir) = i0_t;
               }
 	   }
 
@@ -2191,10 +2191,10 @@ DDS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, 
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& major_dir, class boolVector& point_in_domain, class doubleVector& rotated_vector )
+DS_HeatTransfer:: ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& major_dir, class boolVector& point_in_domain, class doubleVector& rotated_vector )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: ghost_points_generation" ) ;
+  MAC_LABEL("DS_HeatTransfer:: ghost_points_generation" ) ;
 
   intVector i0_temp(2,0);
   size_t i0_t;
@@ -2212,7 +2212,7 @@ DDS_HeatTransfer:: ghost_points_generation(class doubleArray2D& point, class siz
      i0_temp(0) = (sign == 1) ? (int(i0(0,major_dir)) + 2*sign) : (int(i0(0,major_dir)) + 1*sign);
      i0_temp(1) = (sign == 1) ? (int(i0(0,major_dir)) + 3*sign) : (int(i0(0,major_dir)) + 2*sign);
 
-     if ((i0_temp(0) >= 0) && (i0_temp(0) < (int)TF->get_local_nb_dof(0,major_dir))) 
+     if ((i0_temp(0) >= 0) && (i0_temp(0) < (int)TF->get_local_nb_dof(0,major_dir)))
      point(1,major_dir) = TF->get_DOF_coordinate(i0_temp(0), 0, major_dir);
      if ((i0_temp(1) >= 0) && (i0_temp(1) < (int)TF->get_local_nb_dof(0,major_dir)))
      point(2,major_dir) = TF->get_DOF_coordinate(i0_temp(1), 0, major_dir);
@@ -2233,7 +2233,7 @@ DDS_HeatTransfer:: ghost_points_generation(class doubleArray2D& point, class siz
   for (size_t dir=0; dir<dim; dir++) {
      if (dir == major_dir) {
 
-       // Checking the points in domain or not	     
+       // Checking the points in domain or not
        if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)TF->get_local_nb_dof(0,dir))) {
           found(0,dir) = 0;
        }
@@ -2246,9 +2246,9 @@ DDS_HeatTransfer:: ghost_points_generation(class doubleArray2D& point, class siz
        i0(2,dir) = i0_temp(1);
      } else {
         found(0,dir) = FV_Mesh::between(TF->get_DOF_coordinates_vector(0,dir), point(1,dir), i0_t);
-        if (found(0,dir)) i0(1,dir) = i0_t; 
+        if (found(0,dir)) i0(1,dir) = i0_t;
         found(1,dir) = FV_Mesh::between(TF->get_DOF_coordinates_vector(0,dir), point(2,dir), i0_t);
-        if (found(1,dir)) i0(2,dir) = i0_t; 
+        if (found(1,dir)) i0(2,dir) = i0_t;
      }
   }
 
@@ -2263,10 +2263,10 @@ DDS_HeatTransfer:: ghost_points_generation(class doubleArray2D& point, class siz
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level)
+DS_HeatTransfer:: third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatTransfer:: third_order_ghost_field_estimate" ) ;
+   MAC_LABEL("DS_HeatTransfer:: third_order_ghost_field_estimate" ) ;
 
 // Call respective functions based on 2D or 3D domain
 
@@ -2284,10 +2284,10 @@ DDS_HeatTransfer:: third_order_ghost_field_estimate ( FV_DiscreteField* FF, size
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp)
+DS_HeatTransfer:: gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: gen_dir_index_of_secondary_ghost_points" ) ;
+  MAC_LABEL("DS_HeatTransfer:: gen_dir_index_of_secondary_ghost_points" ) ;
 
   intVector i0_temp(3,0);
 
@@ -2298,11 +2298,11 @@ DDS_HeatTransfer:: gen_dir_index_of_secondary_ghost_points ( class size_t_vector
   }
 
   if (sign(interpol_dir) > 0.) {
-     i0_temp(0) = int(index(interpol_dir));	
+     i0_temp(0) = int(index(interpol_dir));
      i0_temp(1) = int(index(interpol_dir)) + 1;
      i0_temp(2) = int(index(interpol_dir)) + 2;
   } else if (sign(interpol_dir) <= 0.) {
-     i0_temp(0) = int(index(interpol_dir)) - 1;	
+     i0_temp(0) = int(index(interpol_dir)) - 1;
      i0_temp(1) = int(index(interpol_dir));
      i0_temp(2) = int(index(interpol_dir)) + 1;
   }
@@ -2333,15 +2333,15 @@ DDS_HeatTransfer:: gen_dir_index_of_secondary_ghost_points ( class size_t_vector
 }
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& i0, size_t const& j0, size_t const& k0, size_t const& interpol_dir, class intVector& sign, size_t const& level)
+DS_HeatTransfer:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& i0, size_t const& j0, size_t const& k0, size_t const& interpol_dir, class intVector& sign, size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatTransfer:: quadratic_interpolation2D" ) ;
+   MAC_LABEL("DS_HeatTransfer:: quadratic_interpolation2D" ) ;
 
-// Calculates the field value at the ghost points 
-// near the particle boundary using the quadratic interpolation 
+// Calculates the field value at the ghost points
+// near the particle boundary using the quadratic interpolation
 // inspired from Johansen 1998;
-// xp,yp,zp are the ghost point coordinated; interpol_dir is the direction 
+// xp,yp,zp are the ghost point coordinated; interpol_dir is the direction
 // in which the additional points will be used for quadratic interpolation
 /*
    ofstream outputFile ;
@@ -2379,7 +2379,7 @@ DDS_HeatTransfer:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t cons
 
    // Assume all the ghost points in fluid
    // Storing the field values assuming all ghost points in fluid and domain
-   // Check weather the ghost points are in solid or not; TRUE if they are   
+   // Check weather the ghost points are in solid or not; TRUE if they are
    if (point_in_domain(0)) {
       x0 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir);
       f0 = FF->DOF_value( index_g(0,0), index_g(0,1), index_g(0,2), comp, level );
@@ -2455,10 +2455,10 @@ DDS_HeatTransfer:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t cons
       }
    }
 
-/*   
+/*
    if (comp == 0) {
       if (interpol_dir == 0) {
-         double yt = FF->get_DOF_coordinate(index(1), comp, 1); 
+         double yt = FF->get_DOF_coordinate(index(1), comp, 1);
          outputFile << x0 << "," << yt << "," << 0. << "," << f0 << endl;
          outputFile << x1 << "," << yt << "," << 0. << "," << f1 << endl;
          outputFile << x2 << "," << yt << "," << 0. << "," << f2 << endl;
@@ -2492,10 +2492,10 @@ DDS_HeatTransfer:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t cons
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level)
+DS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: quadratic_interpolation3D" ) ;
+  MAC_LABEL("DS_HeatTransfer:: quadratic_interpolation3D" ) ;
 
   // Structure of particle input data
   PartInput solid = GLOBAL_EQ->get_solid();
@@ -2508,9 +2508,9 @@ DDS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
   // Coordinates of secondary ghost points
   doubleArray2D coord_g(3,3,0.);
   // level set value of the secondary ghost points
-  doubleVector level_set(3,1.);          
+  doubleVector level_set(3,1.);
   // Store particle ID if level_set becomes negative
-  size_t_vector in_parID(3,0);         
+  size_t_vector in_parID(3,0);
   // Presence in solid or not
   boolVector point_in_solid(3,0);
   // Presence in domain or not
@@ -2537,7 +2537,7 @@ DDS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
      sec_interpol_dir = 1;
   }
 
-  // Generate indexes of secondary ghost points in sec_ghost_dir direction 
+  // Generate indexes of secondary ghost points in sec_ghost_dir direction
   gen_dir_index_of_secondary_ghost_points(index, sign, sec_ghost_dir, index_g, point_in_domain, comp);
 
   // Assume all secondary ghost points in fluid
@@ -2586,7 +2586,7 @@ DDS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
 
   double f0 = 0., f1 = 0., f2 = 0., del = 0.;
 
-  // Estimate the field values at the secondary ghost points 
+  // Estimate the field values at the secondary ghost points
   f0 = (point_in_domain(0)) ? quadratic_interpolation2D(FF,comp,coord_g(0,0),coord_g(0,1),coord_g(0,2),index_g(0,0),index_g(0,1),index_g(0,2),sec_interpol_dir,sign,level) : 0. ;
   f1 = (point_in_domain(1)) ? quadratic_interpolation2D(FF,comp,coord_g(1,0),coord_g(1,1),coord_g(1,2),index_g(1,0),index_g(1,1),index_g(1,2),sec_interpol_dir,sign,level) : 0. ;
   f2 = (point_in_domain(2)) ? quadratic_interpolation2D(FF,comp,coord_g(2,0),coord_g(2,1),coord_g(2,2),index_g(2,0),index_g(2,1),index_g(2,2),sec_interpol_dir,sign,level) : 0. ;
@@ -2596,51 +2596,51 @@ DDS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
      // 0 in solid, rest in fluid
      if (point_in_solid(0) && !point_in_solid(1) && !point_in_solid(2)) {
         if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
            f0 = impose_solid_temperature_for_ghost(comp,x1-del,yp,zp,in_parID(0));
         } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
            f0 = impose_solid_temperature_for_ghost(comp,xp,x1-del,zp,in_parID(0));
         } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
            f0 = impose_solid_temperature_for_ghost(comp,xp,yp,x1-del,in_parID(0));
         }
         x0 = x1 - del;
      // 2 in solid, rest in fluid
      } else if (!point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
         if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
            f2 = impose_solid_temperature_for_ghost(comp,x1+del,yp,zp,in_parID(2));
         } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
            f2 = impose_solid_temperature_for_ghost(comp,xp,x1+del,zp,in_parID(2));
         } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
            f2 = impose_solid_temperature_for_ghost(comp,xp,yp,x1+del,in_parID(2));
         }
         x2 = x1 + del;
      // 0, 2 in solid; 1 in fluid
      } else if (point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
         if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
            f0 = impose_solid_temperature_for_ghost(comp,x1-del,yp,zp,in_parID(0));
         } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
            f0 = impose_solid_temperature_for_ghost(comp,xp,x1-del,zp,in_parID(0));
         } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
            f0 = impose_solid_temperature_for_ghost(comp,xp,yp,x1-del,in_parID(0));
         }
         x0 = x1 - del;
 
         if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
            f2 = impose_solid_temperature_for_ghost(comp,x1+del,yp,zp,in_parID(2));
         } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
            f2 = impose_solid_temperature_for_ghost(comp,xp,x1+del,zp,in_parID(2));
         } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
            f2 = impose_solid_temperature_for_ghost(comp,xp,yp,x1+del,in_parID(2));
         }
         x2 = x1 + del;
@@ -2648,13 +2648,13 @@ DDS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
      // 0, 1 in solid; 2 in fluid
      } else if (point_in_solid(0) && point_in_solid(1) && !point_in_solid(2)) {
         if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
            f1 = impose_solid_temperature_for_ghost(comp,x2-del,yp,zp,in_parID(1));
         } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
            f1 = impose_solid_temperature_for_ghost(comp,xp,x2-del,zp,in_parID(1));
         } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
            f1 = impose_solid_temperature_for_ghost(comp,xp,yp,x2-del,in_parID(1));
         }
         x1 = x2 - del;
@@ -2662,13 +2662,13 @@ DDS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
      // 1, 2 in solid; 0 in fluid
      } else if (!point_in_solid(0) && point_in_solid(1) && point_in_solid(2)) {
         if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
            f1 = impose_solid_temperature_for_ghost(comp,x0+del,yp,zp,in_parID(1));
         } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
            f1 = impose_solid_temperature_for_ghost(comp,xp,x0+del,zp,in_parID(1));
         } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
            f1 = impose_solid_temperature_for_ghost(comp,xp,yp,x0+del,in_parID(1));
         }
         x1 = x0 + del;
@@ -2680,26 +2680,26 @@ DDS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
      // 0 in fluid; 1 in solid
      if (!point_in_solid(0) && point_in_solid(1)) {
         if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
            f1 = impose_solid_temperature_for_ghost(comp,x0+del,yp,zp,in_parID(1));
         } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
            f1 = impose_solid_temperature_for_ghost(comp,xp,x0+del,zp,in_parID(1));
         } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
            f1 = impose_solid_temperature_for_ghost(comp,xp,yp,x0+del,in_parID(1));
         }
         x1 = x0 + del;
      // 0 in solid, 1 in fluid
      } else if (point_in_solid(0) && !point_in_solid(1)) {
         if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
            f0 = impose_solid_temperature_for_ghost(comp,x1-del,yp,zp,in_parID(0));
         } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
            f0 = impose_solid_temperature_for_ghost(comp,xp,x1-del,zp,in_parID(0));
         } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
            f0 = impose_solid_temperature_for_ghost(comp,xp,yp,x1-del,in_parID(0));
         }
         x0 = x1 - del;
@@ -2710,26 +2710,26 @@ DDS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
      // 1 in fluid; 2 in solid
      if (!point_in_solid(1) && point_in_solid(2)) {
         if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
            f2 = impose_solid_temperature_for_ghost(comp,x1+del,yp,zp,in_parID(2));
         } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
            f2 = impose_solid_temperature_for_ghost(comp,xp,x1+del,zp,in_parID(2));
         } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);    
+           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
            f2 = impose_solid_temperature_for_ghost(comp,xp,yp,x1+del,in_parID(2));
         }
         x2 = x1 + del;
      // 1 in solid, 2 in fluid
      } else if (point_in_solid(1) && !point_in_solid(2)) {
         if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
            f1 = impose_solid_temperature_for_ghost(comp,x2-del,yp,zp,in_parID(1));
         } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
            f1 = impose_solid_temperature_for_ghost(comp,xp,x2-del,zp,in_parID(1));
         } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);    
+           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
            f1 = impose_solid_temperature_for_ghost(comp,xp,yp,x2-del,in_parID(1));
         }
         x1 = x2 - del;
@@ -2761,10 +2761,10 @@ DDS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t cons
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np )
+DS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: first_order_temperature_gradient" ) ;
+  MAC_LABEL("DS_HeatTransfer:: first_order_temperature_gradient" ) ;
 
   size_t i0_temp;
   size_t comp = 0;
@@ -2779,7 +2779,7 @@ DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, s
   double yp = solid.coord[comp]->item(parID,1);
   double zp = solid.coord[comp]->item(parID,2);
   double ri = solid.size[comp]->item(parID);
-/*  
+/*
   ofstream outputFile ;
   std::ostringstream os2;
   os2 << "./DS_results/temp_grad_" << my_rank << "_" << parID << ".csv";
@@ -2788,9 +2788,9 @@ DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, s
   outputFile << "x,y,z,id" << endl;*/
 //  outputFile << "i,Nu" << endl;
 
-  doubleArray2D ipoint(3,3,0.);         
+  doubleArray2D ipoint(3,3,0.);
   doubleVector fini(3,0);
-  doubleVector level_set(2,1.);          
+  doubleVector level_set(2,1.);
   boolVector in_domain(2,true);        //true if ghost point in the computational domain
   size_t_vector in_parID(2,0);         //Store particle ID if level_set becomes negative
   boolArray2D found(3,dim,false);
@@ -2900,10 +2900,10 @@ DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, s
            in_domain(0) = found(1,0) && found(1,1);
            in_domain(1) = found(2,0) && found(2,1);
            // Calculation of field variable on ghost point(1)
-           if ((level_set(0) > threshold) && in_domain(0)) 
+           if ((level_set(0) > threshold) && in_domain(0))
               fini(1) = ghost_field_estimate_on_face (TF,comp,i0(1,0),i0(1,1),0, ipoint(1,0), ipoint(1,1),0, dh,2,0);
            // Calculation of field variable on ghost point(2)
-           if ((level_set(1) > threshold) && in_domain(1)) 
+           if ((level_set(1) > threshold) && in_domain(1))
               fini(2) = ghost_field_estimate_on_face (TF,comp,i0(2,0),i0(2,1),0, ipoint(2,0), ipoint(2,1),0, dh,2,0);
 
         } else if (dim == 3) {
@@ -2911,7 +2911,7 @@ DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, s
            in_domain(1) = found(2,0) && found(2,1) && found(2,2);
 
            // Calculation of field variable on ghost point(1)
-           if ((level_set(0) > threshold) && in_domain(0)) 
+           if ((level_set(0) > threshold) && in_domain(0))
               fini(1) = ghost_field_estimate_in_box (TF,comp,i0(1,0),i0(1,1),i0(1,2),ipoint(1,0),ipoint(1,1),ipoint(1,2),dh,0,parID);
            // Calculation of field variable on ghost point(2)
            if ((level_set(1) > threshold) && in_domain(1))
@@ -2925,17 +2925,17 @@ DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, s
         // Point 1 in fluid and 2 is either in the solid or out of the computational domain
         } else if ((level_set(0) > threshold) && ((level_set(1) <= threshold) || ((in_domain(1) == 0) && (in_domain(0) == 1)))) {
            dfdi = (fini(1) - fini(0))/dh;
-        // Point 1 is present in solid 
+        // Point 1 is present in solid
         } else if (level_set(0) <= threshold) {
            dfdi = (impose_solid_temperature_for_ghost(comp,ipoint(1,0),ipoint(1,1),ipoint(1,2),in_parID(0)) - fini(0))/dh;
-        // Point 1 is out of the computational domain 
-        } else if (!in_domain(0)) { 
+        // Point 1 is out of the computational domain
+        } else if (!in_domain(0)) {
            intVector sign(dim,0);
 	   size_t major_dir = 4;
            for (size_t l=0;l<dim;l++) {
               sign(l) = (rotated_normal(l) > 0.) ? 1 : -1;
               if (dim == 2) {
-                 if (MAC::abs(rotated_normal(l)) == MAC::max(MAC::abs(rotated_normal(0)),MAC::abs(rotated_normal(1)))) 
+                 if (MAC::abs(rotated_normal(l)) == MAC::max(MAC::abs(rotated_normal(0)),MAC::abs(rotated_normal(1))))
                     major_dir = l;
               } else if (dim == 3) {
 	         if (MAC::abs(rotated_normal(l)) == MAC::max(MAC::abs(rotated_normal(0)),
@@ -2944,7 +2944,7 @@ DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, s
 	      }
 	   }
            // Creating a new ghost point in domain boundary or wall
-           i0(1,major_dir) = (sign(major_dir) == 1) ? (i0(0,major_dir) + 1*sign(major_dir)) : 
+           i0(1,major_dir) = (sign(major_dir) == 1) ? (i0(0,major_dir) + 1*sign(major_dir)) :
 		                                      (i0(0,major_dir) + 0*sign(major_dir)) ;
            ipoint(1,major_dir) = TF->get_DOF_coordinate(i0(1,major_dir), comp, major_dir);
            double t1 = (ipoint(1,major_dir) - ipoint(0,major_dir))/rotated_normal(major_dir);
@@ -2954,7 +2954,7 @@ DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, s
                  ipoint(1,dir) = ipoint(0,dir) + rotated_normal(dir)*t1;
 		 size_t i0_t = 0;
                  bool temp = FV_Mesh::between(TF->get_DOF_coordinates_vector(0,dir), ipoint(1,dir), i0_t);
-                 if (temp) i0(1,dir) = i0_t; 
+                 if (temp) i0(1,dir) = i0_t;
               }
 	   }
 
@@ -2976,24 +2976,24 @@ DDS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, s
      // point_coord*(area) --> Component of area in particular direction
      force(parID) = force(parID) + dfdi*(surface.area->item(i)*scale);
   }
-//  outputFile.close();  
+//  outputFile.close();
 }
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level)
+DS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatTransfer:: ghost_field_estimate_on_face" ) ;
+   MAC_LABEL("DS_HeatTransfer:: ghost_field_estimate_on_face" ) ;
 
-// Calculates the field value on a face at the ghost points 
+// Calculates the field value on a face at the ghost points
 // near the particle boundary considering boundary affects;
 // x0,y0,z0 are the ghost point coordinated; i0,j0,k0 is the
-// bottom left index of the face cell; face_vec is the 
-// normal vector of the face (i.e. 0 is x,1 is y, 2 is z) 
+// bottom left index of the face cell; face_vec is the
+// normal vector of the face (i.e. 0 is x,1 is y, 2 is z)
 
-   BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(0);    
-   NodeProp node = GLOBAL_EQ->get_node_property();                
+   BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(0);
+   NodeProp node = GLOBAL_EQ->get_node_property();
    PartInput solid = GLOBAL_EQ->get_solid();
 
    size_t_array2D p(dim,dim,0);
@@ -3044,7 +3044,7 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
          // Face vertex index
          p(i,j) = return_node_index(FF,comp,ix(i,j),iy(i,j),iz(i,j));
          // Vertex field values
-         f(i,j) = FF->DOF_value( ix(i,j), iy(i,j), iz(i,j), comp, level ); 
+         f(i,j) = FF->DOF_value( ix(i,j), iy(i,j), iz(i,j), comp, level );
       }
    }
 
@@ -3072,7 +3072,7 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
       // if bottom vertex is in fluid domain
       } else if ((node.void_frac[comp]->item(p(i,0)) == 0) && (bf_intersect[dir2].offset[comp]->item(p(i,0),1) == 1)) {
          double yint = bf_intersect[dir2].value[comp]->item(p(i,0),1);
-         // Condition where intersection distance is more than ghost point distance, it means that the ghost 
+         // Condition where intersection distance is more than ghost point distance, it means that the ghost
          // point can be projected on the wall
          if (yint >= (xghost(dir2)-extents(dir2,0))) {
             fwall(0,i) = ((extents(dir2,0)+yint-xghost(dir2))*f(i,0)+(xghost(dir2)-extents(dir2,0))*bf_intersect[dir2].field[comp]->item(p(i,0),1))/yint;
@@ -3081,11 +3081,11 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
          } else {
             size_t id = (size_t) node.parID[comp]->item(p(i,1));
             if (face_vec > dir2) {
-               del_wall(0,i) = (i==1) ? 
+               del_wall(0,i) = (i==1) ?
                    find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) :
                    find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) ;
             } else {
-               del_wall(0,i) = (i==1) ? 
+               del_wall(0,i) = (i==1) ?
                    find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) :
                    find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) ;
             }
@@ -3107,7 +3107,7 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
       // if top vertex is in fluid domain
       } else if ((node.void_frac[comp]->item(p(i,1)) == 0) && (bf_intersect[dir2].offset[comp]->item(p(i,1),0) == 1)) {
          double yint = bf_intersect[dir2].value[comp]->item(p(i,1),0);
-         // Condition where intersection distance is more than ghost point distance, it means that the ghost 
+         // Condition where intersection distance is more than ghost point distance, it means that the ghost
          // point can be projected on the wall
          if (yint >= (extents(dir2,1)-xghost(dir2))) {
             fwall(0,i) = ((xghost(dir2)+yint-extents(dir2,1))*f(i,1)+(extents(dir2,1)-xghost(dir2))*bf_intersect[dir2].field[comp]->item(p(i,1),0))/yint;
@@ -3116,11 +3116,11 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
          } else {
             size_t id = (size_t) node.parID[comp]->item(p(i,0));
             if (face_vec > dir2) {
-               del_wall(0,i) = (i==1) ? 
+               del_wall(0,i) = (i==1) ?
                    find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) :
                    find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) ;
             } else {
-               del_wall(0,i) = (i==1) ? 
+               del_wall(0,i) = (i==1) ?
                    find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) :
                    find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) ;
             }
@@ -3144,11 +3144,11 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
          size_t id = (size_t) node.parID[comp]->item(p(i,0));
 
          if (face_vec > dir2) {
-            del_wall(0,i) = (i==1) ? 
+            del_wall(0,i) = (i==1) ?
                 find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) :
                 find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) ;
          } else {
-            del_wall(0,i) = (i==1) ? 
+            del_wall(0,i) = (i==1) ?
                 find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) :
                 find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) ;
          }
@@ -3183,11 +3183,11 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
          } else {
             size_t id = (size_t) node.parID[comp]->item(p(1,j));
             if (face_vec > dir1) {
-               del_wall(1,j) = (j==1) ? 
+               del_wall(1,j) = (j==1) ?
                    find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) :
                    find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) ;
             } else {
-               del_wall(1,j) = (j==1) ? 
+               del_wall(1,j) = (j==1) ?
                    find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) :
                    find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) ;
             }
@@ -3205,7 +3205,7 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
                           (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)-del_wall(1,j),id)) ;
             }
             fwall(1,j) = ghost_temp;
-  
+
          }
       // if right vertex is in fluid domain
       } else if ((node.void_frac[comp]->item(p(1,j)) == 0) && (bf_intersect[dir1].offset[comp]->item(p(1,j),0) == 1)) {
@@ -3216,11 +3216,11 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
          } else {
             size_t id = (size_t) node.parID[comp]->item(p(0,j));
             if (face_vec > dir1) {
-               del_wall(1,j) = (j==1) ? 
+               del_wall(1,j) = (j==1) ?
                    find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) :
                    find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) ;
             } else {
-               del_wall(1,j) = (j==1) ? 
+               del_wall(1,j) = (j==1) ?
                    find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) :
                    find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) ;
             }
@@ -3243,11 +3243,11 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
       } else if ((node.void_frac[comp]->item(p(0,j)) == 1) && (node.void_frac[comp]->item(p(1,j)) == 1)) {
          size_t id = (size_t) node.parID[comp]->item(p(0,j));
          if (face_vec > dir1) {
-            del_wall(1,j) = (j==1) ? 
+            del_wall(1,j) = (j==1) ?
                 find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) :
                 find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) ;
          } else {
-            del_wall(1,j) = (j==1) ? 
+            del_wall(1,j) = (j==1) ?
                 find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) :
                 find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) ;
          }
@@ -3268,7 +3268,7 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
       }
    }
 
-   double field_value = (1./2.)*((del_wall(0,1)*fwall(0,0) + del_wall(0,0)*fwall(0,1))/(del_wall(0,1)+del_wall(0,0)) + 
+   double field_value = (1./2.)*((del_wall(0,1)*fwall(0,0) + del_wall(0,0)*fwall(0,1))/(del_wall(0,1)+del_wall(0,0)) +
                                  (del_wall(1,0)*fwall(1,1) + del_wall(1,1)*fwall(1,0))/(del_wall(1,0)+del_wall(1,1)));
 
    return (field_value);
@@ -3277,7 +3277,7 @@ DDS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t c
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID)
+DS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DDS_NSWithHeatTransfer:: ghost_field_estimate_in_box" ) ;
@@ -3285,13 +3285,13 @@ DDS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t co
 // Calculates the field value at the ghost points in the box
 // near the particle boundary considering boundary affects;
 // x0,y0,z0 are the ghost point coordinated; i0,j0,k0 is the
-// bottom left index of the grid coordinate  
+// bottom left index of the grid coordinate
 
    doubleArray2D vel(dim,2,0);
    doubleArray2D del(dim,2,0);
 
    // Behind face
-   double temp = TF->get_DOF_coordinate(k0,comp , 2); 
+   double temp = TF->get_DOF_coordinate(k0,comp , 2);
    double face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
                        level_set_function (parID,comp,x0,y0,temp,level_set_type);
 
@@ -3299,12 +3299,12 @@ DDS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t co
       vel(2,0) = ghost_field_estimate_on_face (TF,comp,i0,j0,k0,x0,y0,temp,dh,2,0);
       del(2,0) = MAC::abs(temp - z0);
    } else {
-      del(2,0) = find_intersection_for_ghost(temp, z0, x0, y0, parID, comp, 2, dh, 0, 0);    
+      del(2,0) = find_intersection_for_ghost(temp, z0, x0, y0, parID, comp, 2, dh, 0, 0);
       vel(2,0) = impose_solid_temperature_for_ghost(comp,x0,y0,z0-del(2,0),parID);
    }
 
    // Front face
-   temp = TF->get_DOF_coordinate(k0+1,comp , 2); 
+   temp = TF->get_DOF_coordinate(k0+1,comp , 2);
    face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
                 level_set_function (parID,comp,x0,y0,temp,level_set_type);
 
@@ -3312,12 +3312,12 @@ DDS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t co
       vel(2,1) = ghost_field_estimate_on_face (TF,comp,i0,j0,k0+1,x0,y0,temp,dh,2,0);
       del(2,1) = MAC::abs(temp - z0);
    } else {
-      del(2,1) = find_intersection_for_ghost(z0, temp, x0, y0, parID, comp, 2, dh, 0, 1);    
+      del(2,1) = find_intersection_for_ghost(z0, temp, x0, y0, parID, comp, 2, dh, 0, 1);
       vel(2,1) = impose_solid_temperature_for_ghost(comp,x0,y0,z0+del(2,1),parID);
    }
 
    // Left face
-   temp = TF->get_DOF_coordinate(i0,comp, 0); 
+   temp = TF->get_DOF_coordinate(i0,comp, 0);
    face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
                 level_set_function (parID,comp,temp,y0,z0,level_set_type);
 
@@ -3325,12 +3325,12 @@ DDS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t co
       vel(0,0) = ghost_field_estimate_on_face (TF,comp,i0,j0,k0,temp,y0,z0,dh,0,0);
       del(0,0) = MAC::abs(temp - x0);
    } else {
-      del(0,0) = find_intersection_for_ghost(temp, x0, y0, z0, parID, comp, 0, dh, 0, 0);    
+      del(0,0) = find_intersection_for_ghost(temp, x0, y0, z0, parID, comp, 0, dh, 0, 0);
       vel(0,0) = impose_solid_temperature_for_ghost(comp,x0-del(0,0),y0,z0,parID);
    }
 
    // Right face
-   temp = TF->get_DOF_coordinate(i0+1,comp, 0); 
+   temp = TF->get_DOF_coordinate(i0+1,comp, 0);
    face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
                 level_set_function (parID,comp,temp,y0,z0,level_set_type);
 
@@ -3338,12 +3338,12 @@ DDS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t co
       vel(0,1) = ghost_field_estimate_on_face (TF,comp,i0+1,j0,k0,temp,y0,z0,dh,0,0);
       del(0,1) = MAC::abs(temp - x0);
    } else {
-      del(0,1) = find_intersection_for_ghost(x0, temp, y0, z0, parID, comp, 0, dh, 0, 1);    
+      del(0,1) = find_intersection_for_ghost(x0, temp, y0, z0, parID, comp, 0, dh, 0, 1);
       vel(0,1) = impose_solid_temperature_for_ghost(comp,x0+del(0,1),y0,z0,parID);
    }
 
    // Bottom face
-   temp = TF->get_DOF_coordinate(j0,comp, 1); 
+   temp = TF->get_DOF_coordinate(j0,comp, 1);
    face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
                 level_set_function (parID,comp,x0,temp,z0,level_set_type);
 
@@ -3351,12 +3351,12 @@ DDS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t co
       vel(1,0) = ghost_field_estimate_on_face (TF,comp,i0,j0,k0,x0,temp,z0,dh,1,0);
       del(1,0) = MAC::abs(temp - y0);
    } else {
-      del(1,0) = find_intersection_for_ghost(temp, y0, x0, z0, parID, comp, 1, dh, 0, 0);    
+      del(1,0) = find_intersection_for_ghost(temp, y0, x0, z0, parID, comp, 1, dh, 0, 0);
       vel(1,0) = impose_solid_temperature_for_ghost(comp,x0,y0-del(1,0),z0,parID);
    }
 
    // Top face
-   temp = TF->get_DOF_coordinate(j0+1,comp, 1); 
+   temp = TF->get_DOF_coordinate(j0+1,comp, 1);
    face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
                 level_set_function (parID,comp,x0,temp,z0,level_set_type);
 
@@ -3364,11 +3364,11 @@ DDS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t co
       vel(1,1) = ghost_field_estimate_on_face (TF,comp,i0,j0+1,k0,x0,temp,z0,dh,1,0);
       del(1,1) = MAC::abs(temp - y0);
    } else {
-      del(1,1) = find_intersection_for_ghost(y0, temp, x0, z0, parID, comp, 1, dh, 0, 1);    
+      del(1,1) = find_intersection_for_ghost(y0, temp, x0, z0, parID, comp, 1, dh, 0, 1);
       vel(1,1) = impose_solid_temperature_for_ghost(comp,x0,y0+del(1,1),z0,parID);
    }
 
-   double value = (1./3.)*((vel(0,1)*del(0,0)+vel(0,0)*del(0,1))/(del(0,0)+del(0,1)) + 
+   double value = (1./3.)*((vel(0,1)*del(0,0)+vel(0,0)*del(0,1))/(del(0,0)+del(0,1)) +
                            (vel(1,1)*del(1,0)+vel(1,0)*del(1,1))/(del(1,0)+del(1,1)) +
                            (vel(2,1)*del(2,0)+vel(2,0)*del(2,1))/(del(2,0)+del(2,1)));
 
@@ -3377,7 +3377,7 @@ DDS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t co
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: impose_solid_temperature (size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID )
+DS_HeatTransfer:: impose_solid_temperature (size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NSWithHeatTransfer:: impose_solid_velocity" ) ;
@@ -3422,7 +3422,7 @@ DDS_HeatTransfer:: impose_solid_temperature (size_t const& comp, size_t const& d
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: impose_solid_temperature_for_ghost (size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID )
+DS_HeatTransfer:: impose_solid_temperature_for_ghost (size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DDS_NSWithHeatTransfer:: impose_solid_temperature_for_ghost" ) ;
@@ -3457,10 +3457,10 @@ DDS_HeatTransfer:: impose_solid_temperature_for_ghost (size_t const& comp, doubl
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: compute_surface_points_on_cube(size_t const& Np)
+DS_HeatTransfer:: compute_surface_points_on_cube(size_t const& Np)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: compute_surface_points_on_cube" ) ;
+  MAC_LABEL("DS_HeatTransfer:: compute_surface_points_on_cube" ) ;
 /*
   ofstream outputFile ;
   std::ostringstream os2;
@@ -3520,11 +3520,11 @@ DDS_HeatTransfer:: compute_surface_points_on_cube(size_t const& Np)
            surface.area->set_item(5*Np*Np+cntr,dp*dp);
            surface.normal->set_item(5*Np*Np+cntr,0,-1.);
 
-/*	   outputFile << surface.coordinate->item(cntr,0) << "," << surface.coordinate->item(cntr,1) << "," << surface.coordinate->item(cntr,2) << "," << surface.area->item(cntr) << "," << surface.normal->item(cntr,0) << "," << surface.normal->item(cntr,1) << "," << surface.normal->item(cntr,2) << endl; 
-           outputFile << surface.coordinate->item(Np*Np+cntr,0) << "," << surface.coordinate->item(Np*Np+cntr,1) << "," << surface.coordinate->item(Np*Np+cntr,2) << "," << surface.area->item(Np*Np+cntr) << "," << surface.normal->item(Np*Np+cntr,0) << "," << surface.normal->item(Np*Np+cntr,1) << "," << surface.normal->item(Np*Np+cntr,2) << endl; 
-           outputFile << surface.coordinate->item(2*Np*Np+cntr,0) << "," << surface.coordinate->item(2*Np*Np+cntr,1) << "," << surface.coordinate->item(2*Np*Np+cntr,2) << "," << surface.area->item(2*Np*Np+cntr) << "," << surface.normal->item(2*Np*Np+cntr,0) << "," << surface.normal->item(2*Np*Np+cntr,1) << "," << surface.normal->item(2*Np*Np+cntr,2) << endl; 
-           outputFile << surface.coordinate->item(3*Np*Np+cntr,0) << "," << surface.coordinate->item(3*Np*Np+cntr,1) << "," << surface.coordinate->item(3*Np*Np+cntr,2) << "," << surface.area->item(3*Np*Np+cntr) << "," << surface.normal->item(3*Np*Np+cntr,0) << "," << surface.normal->item(3*Np*Np+cntr,1) << "," << surface.normal->item(3*Np*Np+cntr,2) << endl; 
-           outputFile << surface.coordinate->item(4*Np*Np+cntr,0) << "," << surface.coordinate->item(4*Np*Np+cntr,1) << "," << surface.coordinate->item(4*Np*Np+cntr,2) << "," << surface.area->item(4*Np*Np+cntr) << "," << surface.normal->item(4*Np*Np+cntr,0) << "," << surface.normal->item(4*Np*Np+cntr,1) << "," << surface.normal->item(4*Np*Np+cntr,2) << endl; 
+/*	   outputFile << surface.coordinate->item(cntr,0) << "," << surface.coordinate->item(cntr,1) << "," << surface.coordinate->item(cntr,2) << "," << surface.area->item(cntr) << "," << surface.normal->item(cntr,0) << "," << surface.normal->item(cntr,1) << "," << surface.normal->item(cntr,2) << endl;
+           outputFile << surface.coordinate->item(Np*Np+cntr,0) << "," << surface.coordinate->item(Np*Np+cntr,1) << "," << surface.coordinate->item(Np*Np+cntr,2) << "," << surface.area->item(Np*Np+cntr) << "," << surface.normal->item(Np*Np+cntr,0) << "," << surface.normal->item(Np*Np+cntr,1) << "," << surface.normal->item(Np*Np+cntr,2) << endl;
+           outputFile << surface.coordinate->item(2*Np*Np+cntr,0) << "," << surface.coordinate->item(2*Np*Np+cntr,1) << "," << surface.coordinate->item(2*Np*Np+cntr,2) << "," << surface.area->item(2*Np*Np+cntr) << "," << surface.normal->item(2*Np*Np+cntr,0) << "," << surface.normal->item(2*Np*Np+cntr,1) << "," << surface.normal->item(2*Np*Np+cntr,2) << endl;
+           outputFile << surface.coordinate->item(3*Np*Np+cntr,0) << "," << surface.coordinate->item(3*Np*Np+cntr,1) << "," << surface.coordinate->item(3*Np*Np+cntr,2) << "," << surface.area->item(3*Np*Np+cntr) << "," << surface.normal->item(3*Np*Np+cntr,0) << "," << surface.normal->item(3*Np*Np+cntr,1) << "," << surface.normal->item(3*Np*Np+cntr,2) << endl;
+           outputFile << surface.coordinate->item(4*Np*Np+cntr,0) << "," << surface.coordinate->item(4*Np*Np+cntr,1) << "," << surface.coordinate->item(4*Np*Np+cntr,2) << "," << surface.area->item(4*Np*Np+cntr) << "," << surface.normal->item(4*Np*Np+cntr,0) << "," << surface.normal->item(4*Np*Np+cntr,1) << "," << surface.normal->item(4*Np*Np+cntr,2) << endl;
            outputFile << surface.coordinate->item(5*Np*Np+cntr,0) << "," << surface.coordinate->item(5*Np*Np+cntr,1) << "," << surface.coordinate->item(5*Np*Np+cntr,2) << "," << surface.area->item(5*Np*Np+cntr) << "," << surface.normal->item(5*Np*Np+cntr,0) << "," << surface.normal->item(5*Np*Np+cntr,1) << "," << surface.normal->item(5*Np*Np+cntr,2) << endl; */
            cntr++;
 	}
@@ -3554,10 +3554,10 @@ DDS_HeatTransfer:: compute_surface_points_on_cube(size_t const& Np)
 	surface.coordinate->set_item(3*Np+i,1,lsp);
 	surface.area->set_item(3*Np+i,dp);
 	surface.normal->set_item(3*Np+i,0,1.);
-/*  
-  	outputFile << surface.coordinate->item(i,0) << "," << surface.coordinate->item(i,1) << "," << surface.area->item(i) << "," << surface.normal->item(i,0) << "," << surface.normal->item(i,1) << endl; 
-  	outputFile << surface.coordinate->item(1*Np+i,0) << "," << surface.coordinate->item(1*Np+i,1) << "," << surface.area->item(1*Np+i) << "," << surface.normal->item(1*Np+i,0) << "," << surface.normal->item(1*Np+i,1) << endl; 
-  	outputFile << surface.coordinate->item(2*Np+i,0) << "," << surface.coordinate->item(2*Np+i,1) << "," << surface.area->item(2*Np+i) << "," << surface.normal->item(2*Np+i,0) << "," << surface.normal->item(2*Np+i,1) << endl; 
+/*
+  	outputFile << surface.coordinate->item(i,0) << "," << surface.coordinate->item(i,1) << "," << surface.area->item(i) << "," << surface.normal->item(i,0) << "," << surface.normal->item(i,1) << endl;
+  	outputFile << surface.coordinate->item(1*Np+i,0) << "," << surface.coordinate->item(1*Np+i,1) << "," << surface.area->item(1*Np+i) << "," << surface.normal->item(1*Np+i,0) << "," << surface.normal->item(1*Np+i,1) << endl;
+  	outputFile << surface.coordinate->item(2*Np+i,0) << "," << surface.coordinate->item(2*Np+i,1) << "," << surface.area->item(2*Np+i) << "," << surface.normal->item(2*Np+i,0) << "," << surface.normal->item(2*Np+i,1) << endl;
   	outputFile << surface.coordinate->item(3*Np+i,0) << "," << surface.coordinate->item(3*Np+i,1) << "," << surface.area->item(3*Np+i) << "," << surface.normal->item(3*Np+i,0) << "," << surface.normal->item(3*Np+i,1) << endl; */
      }
   }
@@ -3566,10 +3566,10 @@ DDS_HeatTransfer:: compute_surface_points_on_cube(size_t const& Np)
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nring)
+DS_HeatTransfer:: compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nring)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: compute_surface_points_on_cylinder" ) ;
+  MAC_LABEL("DS_HeatTransfer:: compute_surface_points_on_cylinder" ) ;
 /*
   ofstream outputFile ;
   std::ostringstream os2;
@@ -3618,12 +3618,12 @@ DDS_HeatTransfer:: compute_surface_points_on_cylinder(class doubleVector& k, siz
 	   surface.normal->set_item(maxby2+j,1,0.);
 	   surface.normal->set_item(maxby2+j,2,-1.);
 
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," 
-		      << surface.area->item(j) << "," 
+/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << ","
+		      << surface.area->item(j) << ","
 		      << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
            outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
         }
-     } 
+     }
 
      // Calculation at the ring on pole (i=0)
      double Ri = Rring(0);
@@ -3707,10 +3707,10 @@ DDS_HeatTransfer:: compute_surface_points_on_cylinder(class doubleVector& k, siz
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nring)
+DS_HeatTransfer:: compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nring)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: compute_surface_points_on_sphere" ) ;
+  MAC_LABEL("DS_HeatTransfer:: compute_surface_points_on_sphere" ) ;
 /*
   ofstream outputFile ;
   std::ostringstream os2;
@@ -3775,12 +3775,12 @@ DDS_HeatTransfer:: compute_surface_points_on_sphere(class doubleVector& eta, cla
 	   surface.normal->set_item(maxby2+j,1,surface.coordinate->item(maxby2+j,1));
 	   surface.normal->set_item(maxby2+j,2,surface.coordinate->item(maxby2+j,2));
 
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," 
-		      << surface.area->item(j) << "," 
+/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << ","
+		      << surface.area->item(j) << ","
 		      << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
            outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
         }
-     } 
+     }
 
      // Calculation at the ring on pole (i=0)
      double Ri = Rring(0);
@@ -3822,7 +3822,7 @@ DDS_HeatTransfer:: compute_surface_points_on_sphere(class doubleVector& eta, cla
               surface.coordinate->set_item(maxby2+j,2,MAC::sin(theta)*MAC::sin(eta(0)));
               surface.coordinate->set_item(maxby2+j,0,-MAC::cos(eta(0)));
               surface.area->set_item(maxby2+j,0.5*d_theta*pow(Ri,2.));
-           } 
+           }
 	   // Create surface normal vectors
 	   surface.normal->set_item(j,0,surface.coordinate->item(j,0));
 	   surface.normal->set_item(j,1,surface.coordinate->item(j,1));
@@ -3834,7 +3834,7 @@ DDS_HeatTransfer:: compute_surface_points_on_sphere(class doubleVector& eta, cla
            outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
         }
      } else {
-        if (pole_loc == 2) { 
+        if (pole_loc == 2) {
            surface.coordinate->set_item(0,0,0.);
            surface.coordinate->set_item(0,1,0.);
            surface.coordinate->set_item(0,2,1.);
@@ -3864,7 +3864,7 @@ DDS_HeatTransfer:: compute_surface_points_on_sphere(class doubleVector& eta, cla
            surface.coordinate->set_item(maxby2,2,0.);
            surface.coordinate->set_item(maxby2,0,-1.);
            surface.area->set_item(maxby2,0.5*d_theta*pow(Ri,2.));
-        } 
+        }
         // Create surface normal vectors
         surface.normal->set_item(0,0,surface.coordinate->item(0,0));
         surface.normal->set_item(0,1,surface.coordinate->item(0,1));
@@ -3892,22 +3892,22 @@ DDS_HeatTransfer:: compute_surface_points_on_sphere(class doubleVector& eta, cla
 //  outputFile.close();
 }
 //---------------------------------------------------------------------------
-void DDS_HeatTransfer:: generate_surface_discretization()
+void DS_HeatTransfer:: generate_surface_discretization()
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL("DDS_HeatTransfer:: generate_surface_discretization" ) ;
+  MAC_LABEL("DS_HeatTransfer:: generate_surface_discretization" ) ;
 
   size_t kmax = (int) Npoints;
 
   if ( level_set_type == "Sphere" ) {
-     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into 
+     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into
      // equal-area cells, Computational Geometry 45 (2012) 275-283
 
      double eta_temp = MAC::pi()/2.;
      double k_temp = (double) kmax;
      double Ro_temp = MAC::sqrt(2);
      double Rn_temp = MAC::sqrt(2);
-     size_t cntr = 0; 
+     size_t cntr = 0;
 
      // Estimating the number of rings on the hemisphere
      while (k_temp > double(Pmin+2)) {
@@ -3939,7 +3939,7 @@ void DDS_HeatTransfer:: generate_surface_discretization()
         Rring(i) = 2.*MAC::sin(eta(i)/2.);
         k(i) = round(k(i+1)*pow(Rring(i)/Rring(i+1),2.));
         if (i==0) k(0) = (double) Pmin;
-     } 
+     }
 
      // Discretize the particle surface into approximate equal area cells
      if (dim == 3) {
@@ -3950,12 +3950,12 @@ void DDS_HeatTransfer:: generate_surface_discretization()
   } else if (level_set_type == "Cube") {
      compute_surface_points_on_cube(kmax);
   } else if (level_set_type == "Cylinder") {
-     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into 
+     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into
      // equal-area cells, Computational Geometry 45 (2012) 275-283
 
      double p = MAC::pi()/ar;
      double k_temp = (double) kmax;
-     size_t cntr = 0; 
+     size_t cntr = 0;
 
      // Estimating the number of rings on either of the disc
      while (k_temp > double(Pmin+2)) {
@@ -3973,20 +3973,20 @@ void DDS_HeatTransfer:: generate_surface_discretization()
      for (int i=(int)Nrings-2; i>=0; --i) {
 	k(i) = round(pow(MAC::sqrt(k(i+1)) - MAC::sqrt(p),2.));
         if (i==0) k(0) = (double) Pmin;
-     } 
+     }
 
      if (dim == 3) {
         compute_surface_points_on_cylinder(k, Nrings);
-     } 
+     }
   }
 }
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type)
+DS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: level_set_solids" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: level_set_solids" ) ;
 
   PartInput solid = GLOBAL_EQ->get_solid();
 
@@ -4015,17 +4015,17 @@ DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, doub
   if (type == "Sphere") {
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Ellipsoid") {
-     // Solid object rotation, if any     
+     // Solid object rotation, if any
      trans_rotation_matrix(m,delta);
      level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
   } else if (type == "Superquadric") {
-     // Solid object rotation, if any     
+     // Solid object rotation, if any
      trans_rotation_matrix(m,delta);
      level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
   } else if (type == "PipeX") {
      level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
   } else if (type == "Cube") {
-     // Solid object rotation, if any     
+     // Solid object rotation, if any
      trans_rotation_matrix(m,delta);
      delta(0) = MAC::abs(delta(0)) - Rp;
      delta(1) = MAC::abs(delta(1)) - Rp;
@@ -4037,7 +4037,7 @@ DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, doub
         level_set = MAC::max(delta(0),MAC::max(delta(1),delta(2)));
      }
   } else if (type == "Cylinder") {
-     // Solid object rotation, if any     
+     // Solid object rotation, if any
      trans_rotation_matrix(m,delta);
 
      level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
@@ -4053,10 +4053,10 @@ DDS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, doub
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& delta)
+DS_HeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& delta)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: trans_rotation_matrix" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: trans_rotation_matrix" ) ;
 
   PartInput solid = GLOBAL_EQ->get_solid();
 
@@ -4100,10 +4100,10 @@ DDS_HeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& d
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta)
+DS_HeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: rotation_matrix" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: rotation_matrix" ) ;
 
   PartInput solid = GLOBAL_EQ->get_solid();
 
@@ -4135,7 +4135,7 @@ DDS_HeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta)
      rot_matrix(2,1) = solid.thetap[0]->item(m,7);
      rot_matrix(2,2) = solid.thetap[0]->item(m,8);
   }
-     
+
   double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
   double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
   double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
@@ -4147,10 +4147,10 @@ DDS_HeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta)
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: node_property_calculation ( )
+DS_HeatTransfer:: node_property_calculation ( )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: node_property_calculation" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: node_property_calculation" ) ;
 
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
@@ -4193,9 +4193,9 @@ DDS_HeatTransfer:: node_property_calculation ( )
               size_t p = return_node_index(TF,comp,i,j,k);
               for (size_t m=0;m<Npart;m++) {
                  double level_set = level_set_function(m,comp,xC,yC,zC,level_set_type);
-                 level_set *= solid.inside[comp]->item(m);  
+                 level_set *= solid.inside[comp]->item(m);
 
-                 // level_set is xb, if local critical time scale is 0.01 of the global time scale 
+                 // level_set is xb, if local critical time scale is 0.01 of the global time scale
                  // then the node is considered inside the solid object
                  // (xb/dh)^2 = 0.01 --> (xb/xC) = 0.1
                  if (level_set <= pow(loc_thres,0.5)*dh) {
@@ -4221,10 +4221,10 @@ DDS_HeatTransfer:: node_property_calculation ( )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t const& level)
+DS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t const& level)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: assemble_intersection_matrix" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: assemble_intersection_matrix" ) ;
 
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
@@ -4241,7 +4241,7 @@ DDS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t con
       // To include knowns at dirichlet boundary in the intersection calculation as well, important in cases where the particle is close to domain boundary pow(2,64)
 //     min_unknown_index(l) = TF->get_min_index_unknown_on_proc( comp, l );
 //     max_unknown_index(l) = TF->get_max_index_unknown_on_proc( comp, l );
-     min_index(l) = 0 ; 
+     min_index(l) = 0 ;
      max_index(l) = TF->get_local_nb_dof( comp, l ) ;
      local_extents(l,0) = 0;
      local_extents(l,1) = (max_index(l)-min_index(l));
@@ -4259,7 +4259,7 @@ DDS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t con
   for (size_t dir=0;dir<dim;dir++) {
      b_intersect[dir].offset[comp]->nullify();
      b_intersect[dir].value[comp]->nullify();
-     b_intersect[dir].field[comp]->nullify();            
+     b_intersect[dir].field[comp]->nullify();
   }
 
   for (size_t i=min_index(0);i<max_index(0);++i) {
@@ -4297,7 +4297,7 @@ DDS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t con
                     ii = k;jj = i; kk = j;
                  }
                  for (size_t off=0;off<2;off++) {
-		    // Checking if the nodes are on domain boundary or not, 
+		    // Checking if the nodes are on domain boundary or not,
 		    // if so, the check the intersection only on one side
 		    if (ipos(dir) != local_extents(dir,off)) {
                        size_t left, right;
@@ -4323,7 +4323,7 @@ DDS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t con
                           double field_value = impose_solid_temperature(comp,dir,off,i,j,k,xb,par_id);
                           b_intersect[dir].field[comp]->set_item(p,off,field_value);
 		       }
-                    } 
+                    }
                  }
               }
            }
@@ -4334,10 +4334,10 @@ DDS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t con
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& level)
+DS_HeatTransfer:: find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& level)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: find_intersection" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: find_intersection" ) ;
 
   NodeProp node = GLOBAL_EQ->get_node_property();
 
@@ -4413,15 +4413,15 @@ DDS_HeatTransfer:: find_intersection ( size_t const& left, size_t const& right, 
 
   // In case both the points are on the same side of solid interface
   // This will occur when the point just outside the solid interface will be considered inside the solid
-  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid 
-  // by shifting the point by 5% of grid size 
+  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid
+  // by shifting the point by 5% of grid size
   if (funl*funr > 0.) {
      double dx = TF->primary_grid()->get_smallest_grid_size();
 //     double dx = TF->get_cell_size(side(off),comp,dir) ;
      if (off == level) {
         xleft = xleft - 0.05*dx;
      } else {
-        xright = xright + 0.05*dx; 
+        xright = xright + 0.05*dx;
      }
   }
 
@@ -4492,10 +4492,10 @@ DDS_HeatTransfer:: find_intersection ( size_t const& left, size_t const& right, 
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatTransfer:: find_intersection_for_ghost ( double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& level, size_t const& off)
+DS_HeatTransfer:: find_intersection_for_ghost ( double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& level, size_t const& off)
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: find_intersection_for_ghost" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: find_intersection_for_ghost" ) ;
 
   doubleVector side(2,0);
 
@@ -4522,8 +4522,8 @@ DDS_HeatTransfer:: find_intersection_for_ghost ( double const& xl, double const&
 
   // In case both the points are on the same side of solid interface
   // This will occur when the point just outside the solid interface will be considered inside the solid
-  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid 
-  // by shifting the point by 5% of grid size 
+  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid
+  // by shifting the point by 5% of grid size
   if (funl*funr > 0.) {
      if (off == level) {
         xleft = xleft - 0.05*dx;
@@ -4585,7 +4585,7 @@ DDS_HeatTransfer:: find_intersection_for_ghost ( double const& xl, double const&
 
 	   xcenter_old = xcenter;
 	}
-     } 
+     }
   }
 
   if (off == 0) {
@@ -4599,10 +4599,10 @@ DDS_HeatTransfer:: find_intersection_for_ghost ( double const& xl, double const&
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const* t_it )
+DS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver" ) ;
+  MAC_LABEL( "DS_HeatTransfer:: HeatEquation_DirectionSplittingSolver" ) ;
 
   double gamma= thermal_conductivity/rho/heat_capacity;
 
@@ -4661,10 +4661,10 @@ DDS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: output_l2norm ( void )
+DS_HeatTransfer:: output_l2norm ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatTransfer:: output_l2norm" ) ;
+   MAC_LABEL("DS_HeatTransfer:: output_l2norm" ) ;
 
    // Parameters
    size_t k=0;
@@ -4716,10 +4716,10 @@ DDS_HeatTransfer:: output_l2norm ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: DS_error_with_analytical_solution ( FV_DiscreteField const* FF,FV_DiscreteField* FF_ERROR )
+DS_HeatTransfer:: DS_error_with_analytical_solution ( FV_DiscreteField const* FF,FV_DiscreteField* FF_ERROR )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_HeatTransfer:: DS_error_with_analytical_solution" ) ;
+   MAC_LABEL("DS_HeatTransfer:: DS_error_with_analytical_solution" ) ;
 
    // Parameters
    size_t i,j,k;
@@ -4835,10 +4835,10 @@ DDS_HeatTransfer:: DS_error_with_analytical_solution ( FV_DiscreteField const* F
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: create_DDS_subcommunicators ( void )
+DS_HeatTransfer:: create_DDS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: create_DDS_subcommunicators" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: create_DDS_subcommunicators" ) ;
 
    int color = 0, key = 0;
    //int const* number_of_subdomains_per_direction = TF->primary_grid()->get_domain_decomposition() ;
@@ -4881,10 +4881,10 @@ DDS_HeatTransfer:: create_DDS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: processor_splitting ( int const& color, int const& key, size_t const& dir )
+DS_HeatTransfer:: processor_splitting ( int const& color, int const& key, size_t const& dir )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: processor_splitting" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: processor_splitting" ) ;
 
    MPI_Comm_split(MPI_COMM_WORLD, color, key, &DDS_Comm_i[dir]);
    MPI_Comm_size( DDS_Comm_i[dir], &nb_ranks_comm_i[dir] ) ;
@@ -4894,11 +4894,11 @@ DDS_HeatTransfer:: processor_splitting ( int const& color, int const& key, size_
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: allocate_mpi_variables ( void )
+DS_HeatTransfer:: allocate_mpi_variables ( void )
 //---------------------------------------------------------------------------
 {
 
-   for (size_t dir = 0; dir < dim; dir++) {  
+   for (size_t dir = 0; dir < dim; dir++) {
       first_pass[dir].size = new size_t [nb_comps];
       second_pass[dir].size = new size_t [nb_comps];
       for (size_t comp = 0; comp < nb_comps; comp++) {
@@ -4948,7 +4948,7 @@ DDS_HeatTransfer:: allocate_mpi_variables ( void )
    }
 
    // Array declarations
-   for (size_t dir = 0; dir < dim; dir++) {  
+   for (size_t dir = 0; dir < dim; dir++) {
       first_pass[dir].send = new double** [nb_comps];
       first_pass[dir].receive = new double** [nb_comps];
       second_pass[dir].send = new double** [nb_comps];
@@ -4970,7 +4970,7 @@ DDS_HeatTransfer:: allocate_mpi_variables ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: deallocate_mpi_variables ( void )
+DS_HeatTransfer:: deallocate_mpi_variables ( void )
 //---------------------------------------------------------------------------
 {
    // Array declarations
@@ -4998,43 +4998,43 @@ DDS_HeatTransfer:: deallocate_mpi_variables ( void )
 
 //---------------------------------------------------------------------------
 void
-DDS_HeatTransfer:: free_DDS_subcommunicators ( void )
+DS_HeatTransfer:: free_DDS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: free_DDS_subcommunicators" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: free_DDS_subcommunicators" ) ;
 
 
 }
 
 //----------------------------------------------------------------------
-double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* AdvectingField, 
+double DS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* AdvectingField,
 	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: assemble_advection_TVD" );   
+   MAC_LABEL( "DS_HeatTransfer:: assemble_advection_TVD" );
    MAC_CHECK_PRE( advecting_level < AdvectingField->storage_depth() ) ;
-   MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ; 
-   
+   MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ;
+
    // Parameters
-   size_t component = 0 ;  
-   double xC = 0., yC = 0., zC = 0., 
+   size_t component = 0 ;
+   double xC = 0., yC = 0., zC = 0.,
    	xr = 0., xR = 0., xl = 0., xL = 0., yt = 0., yT = 0., yb = 0., yB = 0.,
 	zf = 0., zF = 0., zb = 0., zB = 0.;
-   double dxC = 0., dyC = 0., dzC = 0., 
-   	dxr = 0., dxl = 0., dxCr = 0., dxCl = 0., dxRr = 0., dxR = 0., 
-	dxLl = 0., dyt = 0., dyb = 0., dyCt = 0., dyCb = 0., dyTt = 0., 
-	dyT = 0., dyBb = 0., dzf = 0., dzb = 0., dzCf = 0., dzCb = 0., 
+   double dxC = 0., dyC = 0., dzC = 0.,
+   	dxr = 0., dxl = 0., dxCr = 0., dxCl = 0., dxRr = 0., dxR = 0.,
+	dxLl = 0., dyt = 0., dyb = 0., dyCt = 0., dyCb = 0., dyTt = 0.,
+	dyT = 0., dyBb = 0., dzf = 0., dzb = 0., dzCf = 0., dzCb = 0.,
 	dzFf = 0., dzF = 0., dzBb = 0.;
 
-   double AdvectedvalueC = 0., AdvectedvalueRi = 0., AdvectedvalueRiRi = 0., 
-   	AdvectedvalueLe = 0.,  AdvectedvalueLeLe = 0., AdvectedvalueTo = 0., 
+   double AdvectedvalueC = 0., AdvectedvalueRi = 0., AdvectedvalueRiRi = 0.,
+   	AdvectedvalueLe = 0.,  AdvectedvalueLeLe = 0., AdvectedvalueTo = 0.,
 	AdvectedvalueToTo = 0., AdvectedvalueBo = 0., AdvectedvalueBoBo = 0.,
-   	AdvectedvalueFr = 0., AdvectedvalueFrFr = 0., AdvectedvalueBe = 0., 
+   	AdvectedvalueFr = 0., AdvectedvalueFrFr = 0., AdvectedvalueBe = 0.,
 	AdvectedvalueBeBe = 0.;
    double ur = 0., ul = 0., vt = 0., vb = 0., wf = 0., wb = 0.,
 	fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
    double cRip12 = 0., cLip12 = 0., cRim12 = 0., cLim12 = 0.,
-   	thetaC = 0., thetaRi = 0., thetaLe = 0., thetaTo = 0., thetaBo = 0., 
+   	thetaC = 0., thetaRi = 0., thetaLe = 0., thetaTo = 0., thetaBo = 0.,
 	thetaFr = 0., thetaBe = 0.;
 
    FV_SHIFT_TRIPLET shift = TF->shift_staggeredToCentered() ;
@@ -5042,21 +5042,21 @@ double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advect
    // Perform assembling
 
    xC = TF->get_DOF_coordinate( i, component, 0 );
-   dxC = TF->get_cell_size( i, component, 0 ) ;    
+   dxC = TF->get_cell_size( i, component, 0 ) ;
 
    yC = TF->get_DOF_coordinate( j, component, 1 );
-   dyC = TF->get_cell_size( j, component, 1 ) ;    
+   dyC = TF->get_cell_size( j, component, 1 ) ;
 
    if ( dim == 2 ) {
       AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
-	 
+
       // Right and Left
       // --------------
       AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
       AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
-	 	 
-      thetaC = fabs( AdvectedvalueRi - AdvectedvalueC ) > 1.e-20  ? 
-                   ( AdvectedvalueC - AdvectedvalueLe ) 
+
+      thetaC = fabs( AdvectedvalueRi - AdvectedvalueC ) > 1.e-20  ?
+                   ( AdvectedvalueC - AdvectedvalueLe )
 		 / ( AdvectedvalueRi - AdvectedvalueC ) : 1e20 ;
 
       // Right (X)
@@ -5073,24 +5073,24 @@ double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advect
          dxRr = xR - xr;
          dxR = TF->get_cell_size( i+1, component, 0 );
          AdvectedvalueRiRi = TF->DOF_value( i+2, j, k, component, advected_level );
-	     
-         thetaRi = fabs( AdvectedvalueRiRi - AdvectedvalueRi) > 1.e-20 ? 
- 	               ( AdvectedvalueRi - AdvectedvalueC) 
+
+         thetaRi = fabs( AdvectedvalueRiRi - AdvectedvalueRi) > 1.e-20 ?
+ 	               ( AdvectedvalueRi - AdvectedvalueC)
 		     / ( AdvectedvalueRiRi - AdvectedvalueRi) : 1e20 ;
          cRip12 = AdvectedvalueRi
 		- ( dxRr / dxR ) * FV_DiscreteField::SuperBee_phi(thetaRi)
 		* ( AdvectedvalueRiRi - AdvectedvalueRi );
-         cLip12 = AdvectedvalueC + ( dxCr / dxr ) 
+         cLip12 = AdvectedvalueC + ( dxCr / dxr )
 	   	* FV_DiscreteField::SuperBee_phi( thetaC )
 		* ( AdvectedvalueRi - AdvectedvalueC );
 
          fri = 0.5 * ( ur * ( cRip12 + cLip12 )
 		- fabs(ur) * ( cRip12 - cLip12 ) ) ;
       }
-	 
+
       // Left (X)
       ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
-	   
+
       if ( TF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT ) {
          if ( ul > 0. ) fle = ul * AdvectedvalueLe;
          else fle = ul * AdvectedvalueC;
@@ -5101,39 +5101,39 @@ double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advect
          dxl  = xC - xL;
          dxLl = xl - xL;
          AdvectedvalueLeLe = TF->DOF_value( i-2, j, k, component, advected_level );
-	     
+
          thetaLe = fabs( AdvectedvalueC - AdvectedvalueLe ) > 1.e-20 ?
- 		       ( AdvectedvalueLe - AdvectedvalueLeLe ) 
+ 		       ( AdvectedvalueLe - AdvectedvalueLeLe )
 		     / ( AdvectedvalueC - AdvectedvalueLe ) : 1e20 ;
          cLim12 = AdvectedvalueLe
 		+ ( dxLl / dxl ) * FV_DiscreteField::SuperBee_phi( thetaLe )
 		* ( AdvectedvalueC - AdvectedvalueLe ) ;
-         if ( TF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) 
+         if ( TF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
            cRim12 = AdvectedvalueC;
          else {
            xR = TF->get_DOF_coordinate( i+1, component, 0 );
            dxr  = xR - xC;
-           cRim12 = AdvectedvalueC - ( dxCl / dxr ) 
-	     	* FV_DiscreteField::SuperBee_phi( thetaC ) 
+           cRim12 = AdvectedvalueC - ( dxCl / dxr )
+	     	* FV_DiscreteField::SuperBee_phi( thetaC )
 		* ( AdvectedvalueRi - AdvectedvalueC ) ;
          }
 
 	   fle = 0.5 * ( ul * ( cRim12 + cLim12 )
 			- fabs(ul) * ( cRim12 - cLim12 ) ) ;
       }
-	 
+
       // Top and Bottom
       // --------------
       AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
       AdvectedvalueBo = TF->DOF_value( i, j-1, k, component, advected_level );
 
-      thetaC = fabs( AdvectedvalueTo - AdvectedvalueC ) > 1.e-20 ? 
-    	           ( AdvectedvalueC - AdvectedvalueBo ) 
+      thetaC = fabs( AdvectedvalueTo - AdvectedvalueC ) > 1.e-20 ?
+    	           ( AdvectedvalueC - AdvectedvalueBo )
 		 / ( AdvectedvalueTo - AdvectedvalueC) : 1e20 ;
 
       // Top (Y)
       vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
          if ( vt > 0. ) fto = vt * AdvectedvalueC;
          else fto = vt * AdvectedvalueTo;
@@ -5145,23 +5145,23 @@ double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advect
          dyTt = yT - yt;
 	 dyT = TF->get_cell_size( j+1, component, 1 );
          AdvectedvalueToTo = TF->DOF_value( i, j+2, k, component, advected_level );
-	     
-         thetaTo = fabs( AdvectedvalueToTo - AdvectedvalueTo ) > 1.e-20 ? 
-                       ( AdvectedvalueTo - AdvectedvalueC ) 
+
+         thetaTo = fabs( AdvectedvalueToTo - AdvectedvalueTo ) > 1.e-20 ?
+                       ( AdvectedvalueTo - AdvectedvalueC )
                      / ( AdvectedvalueToTo - AdvectedvalueTo) : 1e20 ;
          cRip12 = AdvectedvalueTo
 		- ( dyTt / dyT ) * FV_DiscreteField::SuperBee_phi( thetaTo )
-		* ( AdvectedvalueToTo - AdvectedvalueTo );   
-         cLip12 = AdvectedvalueC + ( dyCt / dyt ) 
+		* ( AdvectedvalueToTo - AdvectedvalueTo );
+         cLip12 = AdvectedvalueC + ( dyCt / dyt )
 	   	* FV_DiscreteField::SuperBee_phi( thetaC )
 		* ( AdvectedvalueTo - AdvectedvalueC );
-   
+
          fto = 0.5 * ( vt * ( cRip12 + cLip12 ) - fabs(vt) * ( cRip12 - cLip12 ) ) ;
       }
 
       // Bottom (Y)
       vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM ) {
          if ( vb > 0. ) fbo = vb * AdvectedvalueBo;
          else fbo = vb * AdvectedvalueC;
@@ -5172,41 +5172,41 @@ double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advect
          dyb  = yC - yB;
          dyBb = yb - yB;
          AdvectedvalueBoBo = TF->DOF_value( i, j-2, k, component, advected_level );
-	     
+
          thetaBo = fabs( AdvectedvalueC - AdvectedvalueBo ) > 1.e-20 ?
-                       ( AdvectedvalueBo - AdvectedvalueBoBo ) 
+                       ( AdvectedvalueBo - AdvectedvalueBoBo )
 		     / ( AdvectedvalueC - AdvectedvalueBo ) : 1e20 ;
          cLim12 = AdvectedvalueBo
 		+ ( dyBb / dyb ) * FV_DiscreteField::SuperBee_phi( thetaBo )
 		* ( AdvectedvalueC - AdvectedvalueBo );
-         if ( TF->DOF_color( i, j, k, component ) == FV_BC_TOP ) 
+         if ( TF->DOF_color( i, j, k, component ) == FV_BC_TOP )
             cRim12 = AdvectedvalueC;
          else {
             yT = TF->get_DOF_coordinate( j+1, component, 1 );
             dyt  = yT - yC;
-            cRim12 = AdvectedvalueC - ( dyCb / dyt ) 
-	     	* FV_DiscreteField::SuperBee_phi( thetaC ) 
+            cRim12 = AdvectedvalueC - ( dyCb / dyt )
+	     	* FV_DiscreteField::SuperBee_phi( thetaC )
         	* ( AdvectedvalueTo - AdvectedvalueC );
 	 }
-	     
+
 	 fbo = 0.5 * ( vb * ( cRim12 + cLim12 ) - fabs(vb) * ( cRim12 - cLim12 ) ) ;
       }
 
-      flux = ( fto - fbo ) * dxC + ( fri - fle ) * dyC;	 
+      flux = ( fto - fbo ) * dxC + ( fri - fle ) * dyC;
 
    } else {
       zC = TF->get_DOF_coordinate( k, component, 2 );
-      dzC = TF->get_cell_size( k, component, 2 ) ;    
+      dzC = TF->get_cell_size( k, component, 2 ) ;
 
       AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
-	 
+
       // Right and Left
       // --------------
       AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
       AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
-	 	 
-      thetaC = fabs( AdvectedvalueRi - AdvectedvalueC) > 1.e-20 ? 
-                   ( AdvectedvalueC - AdvectedvalueLe ) 
+
+      thetaC = fabs( AdvectedvalueRi - AdvectedvalueC) > 1.e-20 ?
+                   ( AdvectedvalueC - AdvectedvalueLe )
                  / ( AdvectedvalueRi - AdvectedvalueC) : 1e20 ;
 
 
@@ -5226,23 +5226,23 @@ double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advect
           dxR = TF->get_cell_size( i+1, component, 0 );
 
           AdvectedvalueRiRi = TF->DOF_value( i+2, j, k, component, advected_level );
-	     
-          thetaRi = fabs( AdvectedvalueRiRi - AdvectedvalueRi ) > 1.e-20 ? 
+
+          thetaRi = fabs( AdvectedvalueRiRi - AdvectedvalueRi ) > 1.e-20 ?
                         ( AdvectedvalueRi - AdvectedvalueC ) \
                       / ( AdvectedvalueRiRi - AdvectedvalueRi ) : 1e20 ;
           cRip12 = AdvectedvalueRi
 		- ( dxRr / dxR ) * FV_DiscreteField::SuperBee_phi( thetaRi )
 		* ( AdvectedvalueRiRi - AdvectedvalueRi );
-          cLip12 = AdvectedvalueC + ( dxCr / dxr ) 
+          cLip12 = AdvectedvalueC + ( dxCr / dxr )
 	     	* FV_DiscreteField::SuperBee_phi( thetaC )
 		* ( AdvectedvalueRi - AdvectedvalueC );
 
           fri = 0.5 * ( ur * ( cRip12 + cLip12 ) - fabs(ur) * ( cRip12 - cLip12 ) ) ;
       }
-	 
+
       // Left (X)
       ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
-	   
+
       if ( TF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT ) {
          if ( ul > 0. ) fle = ul * AdvectedvalueLe;
          else fle = ul * AdvectedvalueC;
@@ -5253,67 +5253,67 @@ double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advect
          dxl  = xC - xL;
          dxLl = xl - xL;
          AdvectedvalueLeLe = TF->DOF_value( i-2, j, k, component, advected_level );
-	     
+
          thetaLe = fabs( AdvectedvalueC - AdvectedvalueLe) > 1.e-20 ?
-	               ( AdvectedvalueLe - AdvectedvalueLeLe ) 
+	               ( AdvectedvalueLe - AdvectedvalueLeLe )
 		     / ( AdvectedvalueC - AdvectedvalueLe) : 1e20 ;
 	 cLim12 = AdvectedvalueLe
 		+ ( dxLl / dxl ) * FV_DiscreteField::SuperBee_phi( thetaLe )
 		* ( AdvectedvalueC - AdvectedvalueLe ) ;
-         if ( TF->DOF_color( i, j, k, component ) == FV_BC_RIGHT ) 
+         if ( TF->DOF_color( i, j, k, component ) == FV_BC_RIGHT )
             cRim12 = AdvectedvalueC;
          else {
 //            xR = TF->get_DOF_coordinate( i+1, advected_level, 0 );
             xR = TF->get_DOF_coordinate( i+1, component, 0 );
             dxr  = xR - xC;
-            cRim12 = AdvectedvalueC - ( dxCl / dxr ) 
+            cRim12 = AdvectedvalueC - ( dxCl / dxr )
 			* FV_DiscreteField::SuperBee_phi( thetaC )
 			* ( AdvectedvalueRi - AdvectedvalueC );
          }
 
          fle = 0.5 * ( ul * ( cRim12 + cLim12 )	- fabs(ul) * ( cRim12 - cLim12 ) ) ;
       }
-	 
+
       // Top and Bottom
       // --------------
       AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
       AdvectedvalueBo = TF->DOF_value( i, j-1, k, component, advected_level );
 
-      thetaC = fabs( AdvectedvalueTo - AdvectedvalueC ) > 1.e-20 ? 
-	   	   ( AdvectedvalueC - AdvectedvalueBo ) 
+      thetaC = fabs( AdvectedvalueTo - AdvectedvalueC ) > 1.e-20 ?
+	   	   ( AdvectedvalueC - AdvectedvalueBo )
 		 / ( AdvectedvalueTo - AdvectedvalueC ) : 1e20 ;
 
       // Top (Y)
       vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
          if ( vt > 0. ) fto = vt * AdvectedvalueC;
          else fto = vt * AdvectedvalueTo;
-      } else {   
+      } else {
          yt = AdvectingField->get_DOF_coordinate( j+shift.j, 1, 1 );
          yT = TF->get_DOF_coordinate( j+1, component, 1 );
          dyCt = yt - yC;
          dyt  = yT - yC;
          dyTt = yT - yt;
          dyT = TF->get_cell_size( j+1, component, 1 );
-         AdvectedvalueToTo = TF->DOF_value( i, j+2, k, component, advected_level );	     
+         AdvectedvalueToTo = TF->DOF_value( i, j+2, k, component, advected_level );
 
-         thetaTo = fabs( AdvectedvalueToTo - AdvectedvalueTo) > 1.e-20 ? 
-	               ( AdvectedvalueTo - AdvectedvalueC ) 
+         thetaTo = fabs( AdvectedvalueToTo - AdvectedvalueTo) > 1.e-20 ?
+	               ( AdvectedvalueTo - AdvectedvalueC )
 		     / ( AdvectedvalueToTo - AdvectedvalueTo ) : 1e20 ;
          cRip12 = AdvectedvalueTo
 		- ( dyTt / dyT ) * FV_DiscreteField::SuperBee_phi( thetaTo )
-		* ( AdvectedvalueToTo - AdvectedvalueTo ) ;   
-         cLip12 = AdvectedvalueC + ( dyCt / dyt ) 
+		* ( AdvectedvalueToTo - AdvectedvalueTo ) ;
+         cLip12 = AdvectedvalueC + ( dyCt / dyt )
 		* FV_DiscreteField::SuperBee_phi(thetaC)
 		* ( AdvectedvalueTo - AdvectedvalueC ) ;
-   
+
          fto = 0.5 * ( vt * ( cRip12 + cLip12 ) - fabs(vt) * ( cRip12 - cLip12 ) ) ;
       }
 
       // Bottom (Y)
       vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM ) {
          if ( vb > 0. ) fbo = vb * AdvectedvalueBo;
          else fbo = vb * AdvectedvalueC;
@@ -5324,38 +5324,38 @@ double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advect
           dyb  = yC - yB;
           dyBb = yb - yB;
           AdvectedvalueBoBo = TF->DOF_value( i, j-2, k, component, advected_level );
-	     
+
           thetaBo = fabs( AdvectedvalueC - AdvectedvalueBo) > 1.e-20 ?
                         ( AdvectedvalueBo - AdvectedvalueBoBo )
 		      / ( AdvectedvalueC - AdvectedvalueBo ) : 1e20 ;
           cLim12 = AdvectedvalueBo
 		+ ( dyBb / dyb ) * FV_DiscreteField::SuperBee_phi( thetaBo )
 		* ( AdvectedvalueC - AdvectedvalueBo ) ;
-          if ( TF->DOF_color( i, j, k, component ) == FV_BC_TOP ) 
+          if ( TF->DOF_color( i, j, k, component ) == FV_BC_TOP )
              cRim12 = AdvectedvalueC;
           else {
              yT = TF->get_DOF_coordinate( j+1, component, 1 );
              dyt  = yT - yC;
-             cRim12 = AdvectedvalueC - ( dyCb / dyt ) 
+             cRim12 = AdvectedvalueC - ( dyCb / dyt )
 			* FV_DiscreteField::SuperBee_phi( thetaC )
 			* ( AdvectedvalueTo - AdvectedvalueC ) ;
           }
-	     
+
           fbo = 0.5 * ( vb * ( cRim12 + cLim12 ) - fabs(vb) * ( cRim12 - cLim12 ) ) ;
       }
-	 
+
       // Front and Behind
       // ----------------
       AdvectedvalueFr = TF->DOF_value( i, j, k+1, component, advected_level );
       AdvectedvalueBe = TF->DOF_value( i, j, k-1, component, advected_level );
 
-      thetaC = fabs( AdvectedvalueFr - AdvectedvalueC) > 1.e-20 ? 
+      thetaC = fabs( AdvectedvalueFr - AdvectedvalueC) > 1.e-20 ?
     	           ( AdvectedvalueC - AdvectedvalueBe )
 		 / ( AdvectedvalueFr - AdvectedvalueC ) : 1e20 ;
 
       // Front (Z)
       wf = AdvectingField->DOF_value( i, j, k+shift.k, 2, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT ) {
          if ( wf > 0. ) ffr = wf * AdvectedvalueC;
          else ffr = wf * AdvectedvalueFr;
@@ -5367,23 +5367,23 @@ double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advect
          dzFf = zF - zf;
          dzF = TF->get_cell_size( k+1, component, 2 );
          AdvectedvalueFrFr = TF->DOF_value( i, j, k+2, component, advected_level );
-	     
-         thetaFr = fabs( AdvectedvalueFrFr - AdvectedvalueFr) > 1.e-20 ? 
+
+         thetaFr = fabs( AdvectedvalueFrFr - AdvectedvalueFr) > 1.e-20 ?
 		       ( AdvectedvalueFr - AdvectedvalueC )
 		     / ( AdvectedvalueFrFr - AdvectedvalueFr ) : 1e20 ;
 	 cRip12 = AdvectedvalueFr
 		- ( dzFf / dzF ) * FV_DiscreteField::SuperBee_phi( thetaFr )
-		* ( AdvectedvalueFrFr - AdvectedvalueFr ) ;   
-         cLip12 = AdvectedvalueC + ( dzCf / dzf ) 
+		* ( AdvectedvalueFrFr - AdvectedvalueFr ) ;
+         cLip12 = AdvectedvalueC + ( dzCf / dzf )
 		* FV_DiscreteField::SuperBee_phi( thetaC )
 		* ( AdvectedvalueFr - AdvectedvalueC ) ;
-   
+
 	 ffr = 0.5 * ( wf * ( cRip12 + cLip12 ) - fabs(wf) * ( cRip12 - cLip12 ) ) ;
       }
 
       // Behind (Z)
       wb = AdvectingField->DOF_value( i, j, k+shift.k-1, 2, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND ) {
          if ( wb > 0. ) fbe = wb * AdvectedvalueBe;
          else fbe = wb * AdvectedvalueC;
@@ -5394,49 +5394,49 @@ double DDS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advect
           dzb  = zC - zB;
           dzBb = zb - zB;
           AdvectedvalueBeBe = TF->DOF_value( i, j, k-2, component, advected_level );
-	     
+
           thetaBe = fabs( AdvectedvalueC - AdvectedvalueBe) > 1.e-20 ?
 		        ( AdvectedvalueBe - AdvectedvalueBeBe )
 		      / ( AdvectedvalueC - AdvectedvalueBe ) : 1e20 ;
           cLim12 = AdvectedvalueBe
 		+ ( dzBb / dzb ) * FV_DiscreteField::SuperBee_phi( thetaBe )
 		* ( AdvectedvalueC - AdvectedvalueBe ) ;
-          if ( TF->DOF_color( i, j, k, component ) == FV_BC_FRONT ) 
+          if ( TF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
 	     cRim12 = AdvectedvalueC;
 	  else {
              zF = TF->get_DOF_coordinate( k+1, component, 2 );
              dzf  = zF - zC;
-	     cRim12 = AdvectedvalueC - ( dzCb / dzf ) 
+	     cRim12 = AdvectedvalueC - ( dzCb / dzf )
 	       		* FV_DiscreteField::SuperBee_phi( thetaC )
 			* ( AdvectedvalueFr - AdvectedvalueC ) ;
 	  }
-	     
+
 	  fbe = 0.5 * ( wb * ( cRim12 + cLim12 ) - fabs(wb) * ( cRim12 - cLim12 ) ) ;
       }
 
       flux = ( fto - fbo ) * dxC * dzC + ( fri - fle ) * dyC * dzC + ( ffr - fbe ) * dxC * dyC;
-   } 
-   
+   }
+
    return (coef * flux);
-         
+
 }
 
 //----------------------------------------------------------------------
-double DDS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField const* AdvectingField, 
+double DS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField const* AdvectingField,
 	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: assemble_advection_Centered" );   
+   MAC_LABEL( "DS_HeatTransfer:: assemble_advection_Centered" );
    MAC_CHECK_PRE( advecting_level < AdvectingField->storage_depth() ) ;
-   MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ; 
-   
-   // Parameters
-   size_t component = 0 ;  
-   double dxC = 0., dyC = 0., dzC = 0.; 
+   MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ;
 
-   double AdvectedvalueC = 0., AdvectedvalueRi = 0., 
-   	AdvectedvalueLe = 0., AdvectedvalueTo = 0., 
-	AdvectedvalueBo = 0., AdvectedvalueFr = 0., 
+   // Parameters
+   size_t component = 0 ;
+   double dxC = 0., dyC = 0., dzC = 0.;
+
+   double AdvectedvalueC = 0., AdvectedvalueRi = 0.,
+   	AdvectedvalueLe = 0., AdvectedvalueTo = 0.,
+	AdvectedvalueBo = 0., AdvectedvalueFr = 0.,
 	AdvectedvalueBe = 0.;
    double ur = 0., ul = 0., vt = 0., vb = 0., wf = 0., wb = 0.,
 	fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
@@ -5445,18 +5445,18 @@ double DDS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField cons
 
    // Perform assembling
 
-   dxC = TF->get_cell_size( i, component, 0 ) ;    
+   dxC = TF->get_cell_size( i, component, 0 ) ;
 
-   dyC = TF->get_cell_size( j, component, 1 ) ;    
+   dyC = TF->get_cell_size( j, component, 1 ) ;
 
    if ( dim == 2 ) {
       AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
-	 
+
       // Right and Left
       // --------------
       AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
       AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
-	 	 
+
       ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
       ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
       // Right (X)
@@ -5466,15 +5466,15 @@ double DDS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField cons
       } else {
          fri = 0.5*(ur+ul) * 0.5*(AdvectedvalueRi + AdvectedvalueC);
       }
-	 
+
       // Left (X)
-	   
+
       if ( TF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT ) {
          fle = 0.5*(ur+ul) * AdvectedvalueLe;
       } else {
          fle = 0.5*(ur+ul) * 0.5*(AdvectedvalueLe + AdvectedvalueC);
       }
-	 
+
       // Top and Bottom
       // --------------
       AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
@@ -5483,7 +5483,7 @@ double DDS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField cons
       vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
       vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
       // Top (Y)
-	   
+
       if ( TF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
          fto = 0.5*(vt+vb) * AdvectedvalueTo;
       } else {
@@ -5491,25 +5491,25 @@ double DDS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField cons
       }
 
       // Bottom (Y)
-	   
+
       if ( TF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM ) {
          fbo = 0.5*(vt+vb) * AdvectedvalueBo;
       } else {
          fbo = 0.5*(vt+vb) * 0.5*(AdvectedvalueBo + AdvectedvalueC);
       }
 
-      flux = ( fto - fbo ) * dxC + ( fri - fle ) * dyC;	 
+      flux = ( fto - fbo ) * dxC + ( fri - fle ) * dyC;
 
    } else {
-      dzC = TF->get_cell_size( k, component, 2 ) ;    
+      dzC = TF->get_cell_size( k, component, 2 ) ;
 
       AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
-	 
+
       // Right and Left
       // --------------
       AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
       AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
-	 	 
+
       ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
       ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
       // Right (X)
@@ -5519,15 +5519,15 @@ double DDS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField cons
       } else {
          fri = 0.5*(ur+ul) * 0.5*(AdvectedvalueRi + AdvectedvalueC);
       }
-	 
+
       // Left (X)
-	   
+
       if ( TF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT ) {
          fle = 0.5*(ur+ul) * AdvectedvalueLe;
       } else {
          fle = 0.5*(ur+ul) * 0.5*(AdvectedvalueLe + AdvectedvalueC);
       }
-	 
+
       // Top and Bottom
       // --------------
       AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
@@ -5536,21 +5536,21 @@ double DDS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField cons
       vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
       vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
       // Top (Y)
-	   
+
       if ( TF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
          fto = 0.5*(vt+vb) * AdvectedvalueTo;
-      } else {   
+      } else {
          fto = 0.5*(vt+vb) * 0.5*(AdvectedvalueTo + AdvectedvalueC);
       }
 
       // Bottom (Y)
-	   
+
       if ( TF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM ) {
          fbo = 0.5*(vt+vb) * AdvectedvalueBo;
       } else {
          fbo = 0.5*(vt+vb) * 0.5*(AdvectedvalueBo + AdvectedvalueC);
       }
-	 
+
       // Front and Behind
       // ----------------
       AdvectedvalueFr = TF->DOF_value( i, j, k+1, component, advected_level );
@@ -5559,7 +5559,7 @@ double DDS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField cons
       wf = AdvectingField->DOF_value( i, j, k+shift.k, 2, advecting_level );
       wb = AdvectingField->DOF_value( i, j, k+shift.k-1, 2, advecting_level );
       // Front (Z)
-	   
+
       if ( TF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT ) {
          ffr = 0.5*(wf+wb) * AdvectedvalueFr;
       } else {
@@ -5567,7 +5567,7 @@ double DDS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField cons
       }
 
       // Behind (Z)
-	   
+
       if ( TF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND ) {
          fbe = 0.5*(wf+wb) * AdvectedvalueBe;
       } else {
@@ -5575,28 +5575,28 @@ double DDS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField cons
       }
 
       flux = ( fto - fbo ) * dxC * dzC + ( fri - fle ) * dyC * dzC + ( ffr - fbe ) * dxC * dyC;
-   } 
-   
+   }
+
    return (coef * flux);
-         
+
 }
 
 
 //----------------------------------------------------------------------
-double DDS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* AdvectingField, 
+double DS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* AdvectingField,
 	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: assemble_advection_Centered" );   
+   MAC_LABEL( "DS_HeatTransfer:: assemble_advection_Centered" );
    MAC_CHECK_PRE( advecting_level < AdvectingField->storage_depth() ) ;
-   MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ; 
-   
-   // Parameters
-   size_t component = 0 ;  
-   double dxC = 0., dyC = 0., dzC = 0.; 
+   MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ;
 
-   double AdvectedvalueC = 0., AdvectedvalueRi = 0.,  
-   	AdvectedvalueLe = 0., AdvectedvalueTo = 0., 
+   // Parameters
+   size_t component = 0 ;
+   double dxC = 0., dyC = 0., dzC = 0.;
+
+   double AdvectedvalueC = 0., AdvectedvalueRi = 0.,
+   	AdvectedvalueLe = 0., AdvectedvalueTo = 0.,
 	AdvectedvalueBo = 0., AdvectedvalueFr = 0., AdvectedvalueBe = 0.;
    double ur = 0., ul = 0., vt = 0., vb = 0., wf = 0., wb = 0.,
 	fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
@@ -5605,18 +5605,18 @@ double DDS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* A
 
    // Perform assembling
 
-   dxC = TF->get_cell_size( i, component, 0 ) ;    
+   dxC = TF->get_cell_size( i, component, 0 ) ;
 
-   dyC = TF->get_cell_size( j, component, 1 ) ;    
+   dyC = TF->get_cell_size( j, component, 1 ) ;
 
    if ( dim == 2 ) {
       AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
-	 
+
       // Right and Left
       // --------------
       AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
       AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
-	 	 
+
       // Right (X)
       ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
 
@@ -5625,16 +5625,16 @@ double DDS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* A
       } else {
          fri = ur * 0.5*(AdvectedvalueRi + AdvectedvalueC);
       }
-	 
+
       // Left (X)
       ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
-	   
+
       if ( TF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT ) {
          fle = ul * AdvectedvalueLe;
       } else {
          fle = ul * 0.5*(AdvectedvalueLe + AdvectedvalueC);
       }
-	 
+
       // Top and Bottom
       // --------------
       AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
@@ -5642,7 +5642,7 @@ double DDS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* A
 
       // Top (Y)
       vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
          fto = vt * AdvectedvalueTo;
       } else {
@@ -5651,25 +5651,25 @@ double DDS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* A
 
       // Bottom (Y)
       vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM ) {
          fbo = vb * AdvectedvalueBo;
       } else {
          fbo = vb * 0.5*(AdvectedvalueBo + AdvectedvalueC);
       }
 
-      flux = ( fto - fbo ) * dxC + ( fri - fle ) * dyC;	 
+      flux = ( fto - fbo ) * dxC + ( fri - fle ) * dyC;
 
    } else {
-      dzC = TF->get_cell_size( k, component, 2 ) ;    
+      dzC = TF->get_cell_size( k, component, 2 ) ;
 
       AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
-	 
+
       // Right and Left
       // --------------
       AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
       AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
-	 	 
+
       // Right (X)
       ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
 
@@ -5678,16 +5678,16 @@ double DDS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* A
       } else {
          fri = ur * 0.5*(AdvectedvalueRi + AdvectedvalueC);
       }
-	 
+
       // Left (X)
       ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
-	   
+
       if ( TF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT ) {
          fle = ul * AdvectedvalueLe;
       } else {
          fle = ul * 0.5*(AdvectedvalueLe + AdvectedvalueC);
       }
-	 
+
       // Top and Bottom
       // --------------
       AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
@@ -5695,22 +5695,22 @@ double DDS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* A
 
       // Top (Y)
       vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
          fto = vt * AdvectedvalueTo;
-      } else {   
+      } else {
          fto = vt * 0.5*(AdvectedvalueTo + AdvectedvalueC);
       }
 
       // Bottom (Y)
       vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM ) {
          fbo = vb * AdvectedvalueBo;
       } else {
          fbo = vb * 0.5*(AdvectedvalueBo + AdvectedvalueC);
       }
-	 
+
       // Front and Behind
       // ----------------
       AdvectedvalueFr = TF->DOF_value( i, j, k+1, component, advected_level );
@@ -5718,7 +5718,7 @@ double DDS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* A
 
       // Front (Z)
       wf = AdvectingField->DOF_value( i, j, k+shift.k, 2, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT ) {
          ffr = wf * AdvectedvalueFr;
       } else {
@@ -5727,7 +5727,7 @@ double DDS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* A
 
       // Behind (Z)
       wb = AdvectingField->DOF_value( i, j, k+shift.k-1, 2, advecting_level );
-	   
+
       if ( TF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND ) {
          fbe = wb * AdvectedvalueBe;
       } else {
@@ -5735,18 +5735,18 @@ double DDS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* A
       }
 
       flux = ( fto - fbo ) * dxC * dzC + ( fri - fle ) * dyC * dzC + ( ffr - fbe ) * dxC * dyC;
-   } 
-   
+   }
+
    return (coef * flux);
-         
+
 }
 
 //----------------------------------------------------------------------
-double DDS_HeatTransfer:: assemble_advection_Upwind( FV_DiscreteField const* AdvectingField,
+double DS_HeatTransfer:: assemble_advection_Upwind( FV_DiscreteField const* AdvectingField,
 	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DDS_HeatTransfer:: assemble_advection_Upwind" );
+   MAC_LABEL( "DS_HeatTransfer:: assemble_advection_Upwind" );
    MAC_CHECK_PRE( advecting_level < AdvectingField->storage_depth() ) ;
    MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ;
 
@@ -5770,8 +5770,8 @@ double DDS_HeatTransfer:: assemble_advection_Upwind( FV_DiscreteField const* Adv
 
    FV_SHIFT_TRIPLET shift = TF->shift_staggeredToCentered() ;
 
-   dxC = TF->get_cell_size( i, component, 0 ) ;    
-   dyC = TF->get_cell_size( j, component, 1 ) ;    
+   dxC = TF->get_cell_size( i, component, 0 ) ;
+   dyC = TF->get_cell_size( j, component, 1 ) ;
 
    if ( dim == 2 ) {
       AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
