@@ -1,4 +1,4 @@
-#include <DirectionSplitting.hh>
+#include <DS_DirectionSplitting.hh>
 #include <FV_DomainAndFields.hh>
 #include <FV_DomainBuilder.hh>
 #include <FV_DiscreteField.hh>
@@ -20,17 +20,17 @@
 #include <math.h>
 
 
-DirectionSplitting const* DirectionSplitting::PROTOTYPE
-                                                 = new DirectionSplitting() ;
+DS_DirectionSplitting const* DS_DirectionSplitting::PROTOTYPE
+                                                 = new DS_DirectionSplitting() ;
 
 
 //---------------------------------------------------------------------------
-DirectionSplitting:: DirectionSplitting( void )
+DS_DirectionSplitting:: DS_DirectionSplitting( void )
 //--------------------------------------------------------------------------
-   : FV_OneStepIteration( "DirectionSplitting" )
+   : FV_OneStepIteration( "DS_DirectionSplitting" )
    , ComputingTime("Solver")
 {
-   MAC_LABEL( "DirectionSplitting:: DirectionSplitting" ) ;
+   MAC_LABEL( "DS_DirectionSplitting:: DS_DirectionSplitting" ) ;
 
 }
 
@@ -38,17 +38,17 @@ DirectionSplitting:: DirectionSplitting( void )
 
 
 //---------------------------------------------------------------------------
-DirectionSplitting*
-DirectionSplitting:: create_replica( MAC_Object* a_owner,
+DS_DirectionSplitting*
+DS_DirectionSplitting:: create_replica( MAC_Object* a_owner,
 		FV_DomainAndFields const* dom,
 		MAC_ModuleExplorer* exp ) const
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DirectionSplitting:: create_replica" ) ;
+   MAC_LABEL( "DS_DirectionSplitting:: create_replica" ) ;
    MAC_CHECK( create_replica_PRE( a_owner, dom, exp ) ) ;
 
-   DirectionSplitting* result =
-                        new DirectionSplitting( a_owner, dom, exp );
+   DS_DirectionSplitting* result =
+                        new DS_DirectionSplitting( a_owner, dom, exp );
 
    MAC_CHECK( create_replica_POST( result, a_owner, dom, exp ) ) ;
    return( result ) ;
@@ -56,7 +56,7 @@ DirectionSplitting:: create_replica( MAC_Object* a_owner,
 }
 
 //---------------------------------------------------------------------------
-DirectionSplitting:: DirectionSplitting( MAC_Object* a_owner,
+DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 		                                   FV_DomainAndFields const* dom,
                                          MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ DirectionSplitting:: DirectionSplitting( MAC_Object* a_owner,
    , is_solids( false )
    , FlowSolver ( 0 )
 {
-   MAC_LABEL( "DirectionSplitting:: DirectionSplitting" ) ;
+   MAC_LABEL( "DS_DirectionSplitting:: DS_DirectionSplitting" ) ;
 
    // Is the run a follow up of a previous job
    b_restart = MAC_Application::is_follow();
@@ -137,8 +137,8 @@ DirectionSplitting:: DirectionSplitting( MAC_Object* a_owner,
 
 //
 //    // Build the matrix system
-//    MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DirectionSplittingSystem" ) ;
-//    GLOBAL_EQ = DirectionSplittingSystem::create( this, se, UF, PF, inputDataNS ) ;
+//    MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DS_DirectionSplittingSystem" ) ;
+//    GLOBAL_EQ = DS_DirectionSplittingSystem::create( this, se, UF, PF, inputDataNS ) ;
 //    se->destroy() ;
 //
 //    // Create the temperature solver
@@ -187,22 +187,22 @@ DirectionSplitting:: DirectionSplitting( MAC_Object* a_owner,
 }
 
 //---------------------------------------------------------------------------
-DirectionSplitting:: ~DirectionSplitting( void )
+DS_DirectionSplitting:: ~DS_DirectionSplitting( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DirectionSplitting:: ~DirectionSplitting" ) ;
+   MAC_LABEL( "DS_DirectionSplitting:: ~DS_DirectionSplitting" ) ;
 
 }
 
 //---------------------------------------------------------------------------
 void
-DirectionSplitting:: do_one_inner_iteration( FV_TimeIterator const* t_it )
+DS_DirectionSplitting:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DirectionSplitting:: do_one_inner_iteration" ) ;
+   MAC_LABEL( "DS_DirectionSplitting:: do_one_inner_iteration" ) ;
    MAC_CHECK_PRE( do_one_inner_iteration_PRE( t_it ) ) ;
 
-   start_total_timer( "DirectionSplitting:: do_one_inner_iteration" ) ;
+   start_total_timer( "DS_DirectionSplitting:: do_one_inner_iteration" ) ;
    start_solving_timer() ;
 
    // Flow solver
@@ -218,13 +218,13 @@ DirectionSplitting:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
 //---------------------------------------------------------------------------
 void
-DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
+DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
       	std::string const& basename )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DirectionSplitting:: do_before_time_stepping" ) ;
+   MAC_LABEL( "DS_DirectionSplitting:: do_before_time_stepping" ) ;
 
-   start_total_timer( "DirectionSplitting:: do_before_time_stepping" ) ;
+   start_total_timer( "DS_DirectionSplitting:: do_before_time_stepping" ) ;
 
    FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
 
@@ -243,12 +243,12 @@ DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
 //---------------------------------------------------------------------------
 void
-DirectionSplitting:: do_after_time_stepping( void )
+DS_DirectionSplitting:: do_after_time_stepping( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DirectionSplitting:: do_after_time_stepping" ) ;
+   MAC_LABEL( "DS_DirectionSplitting:: do_after_time_stepping" ) ;
 
-   start_total_timer( "DirectionSplitting:: do_after_time_stepping" ) ;
+   start_total_timer( "DS_DirectionSplitting:: do_after_time_stepping" ) ;
 
    // Flow solver
    FlowSolver->do_after_time_stepping() ;
@@ -261,12 +261,12 @@ DirectionSplitting:: do_after_time_stepping( void )
 
 //---------------------------------------------------------------------------
 void
-DirectionSplitting:: do_before_inner_iterations_stage(
+DS_DirectionSplitting:: do_before_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DirectionSplitting:: do_before_inner_iterations_stage" ) ;
-   start_total_timer( "DirectionSplitting:: do_before_inner_iterations_stage" ) ;
+   MAC_LABEL( "DS_DirectionSplitting:: do_before_inner_iterations_stage" ) ;
+   start_total_timer( "DS_DirectionSplitting:: do_before_inner_iterations_stage" ) ;
 
    FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
 
@@ -281,13 +281,13 @@ DirectionSplitting:: do_before_inner_iterations_stage(
 
 //---------------------------------------------------------------------------
 void
-DirectionSplitting:: do_after_inner_iterations_stage(
+DS_DirectionSplitting:: do_after_inner_iterations_stage(
 	FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DirectionSplitting:: do_after_inner_iterations_stage" ) ;
+   MAC_LABEL( "DS_DirectionSplitting:: do_after_inner_iterations_stage" ) ;
 
-   start_total_timer( "DirectionSplitting:: do_after_inner_iterations_stage" ) ;
+   start_total_timer( "DS_DirectionSplitting:: do_after_inner_iterations_stage" ) ;
 
    FV_OneStepIteration::do_after_inner_iterations_stage( t_it ) ;
 
@@ -302,13 +302,13 @@ DirectionSplitting:: do_after_inner_iterations_stage(
 
 //---------------------------------------------------------------------------
 void
-DirectionSplitting:: do_additional_savings( FV_TimeIterator const* t_it,
+DS_DirectionSplitting:: do_additional_savings( FV_TimeIterator const* t_it,
       	int const& cycleNumber )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DirectionSplitting:: do_additional_savings" ) ;
+   MAC_LABEL( "DS_DirectionSplitting:: do_additional_savings" ) ;
 
-   start_total_timer( "DirectionSplitting:: do_additional_savings" ) ;
+   start_total_timer( "DS_DirectionSplitting:: do_additional_savings" ) ;
 
    // Flow solver
    FlowSolver->do_additional_savings( t_it, cycleNumber ) ;

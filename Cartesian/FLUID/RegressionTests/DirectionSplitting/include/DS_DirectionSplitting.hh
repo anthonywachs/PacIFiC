@@ -1,5 +1,5 @@
-#ifndef DirectionSplitting_HH
-#define DirectionSplitting_HH
+#ifndef DS_DirectionSplitting_HH
+#define DS_DirectionSplitting_HH
 
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
@@ -17,13 +17,13 @@ using namespace std;
 class MAC_Communicator ;
 class FV_DiscreteField ;
 
-/** @brief The Class DirectionSplitting.
+/** @brief The Class DS_DirectionSplitting.
 
 Server for the intiating the NavierStokes and/or HeatTransfer classes.
 
 @author A. Goyal - Pacific project 2022 */
 
-class DirectionSplitting : public FV_OneStepIteration,
+class DS_DirectionSplitting : public FV_OneStepIteration,
                            public ComputingTime,
                            public SolverComputingTime
 {
@@ -72,31 +72,31 @@ class DirectionSplitting : public FV_OneStepIteration,
       /** @name Constructors & Destructor */
       //@{
       /** @brief Destructor */
-      ~DirectionSplitting( void ) ;
+      ~DS_DirectionSplitting( void ) ;
 
       /** @brief Copy constructor */
-      DirectionSplitting( DirectionSplitting const& other ) ;
+      DS_DirectionSplitting( DS_DirectionSplitting const& other ) ;
 
       /** @brief Operator ==
       @param other the right hand side */
-      DirectionSplitting& operator=( DirectionSplitting const& other ) ;
+      DS_DirectionSplitting& operator=( DS_DirectionSplitting const& other ) ;
 
       /** @brief Constructor with arguments
       @param a_owner the MAC-based object
       @param exp to read the data file */
-      DirectionSplitting( MAC_Object* a_owner,
+      DS_DirectionSplitting( MAC_Object* a_owner,
       		              FV_DomainAndFields const* dom,
 	                       MAC_ModuleExplorer const* exp ) ;
 
       /** @brief Constructor without argument */
-      DirectionSplitting( void ) ;
+      DS_DirectionSplitting( void ) ;
 
       /** @brief Create a clone
       @param a_owner the MAC-based object
       @param dom mesh and fields
       @param prms set of parameters
       @param exp to read the data file */
-      virtual DirectionSplitting* create_replica(
+      virtual DS_DirectionSplitting* create_replica(
                      		MAC_Object* a_owner,
                      		FV_DomainAndFields const* dom,
                      		MAC_ModuleExplorer* exp ) const ;
@@ -107,7 +107,7 @@ class DirectionSplitting : public FV_OneStepIteration,
 
    //-- Class attributes
 
-      static DirectionSplitting const* PROTOTYPE ;
+      static DS_DirectionSplitting const* PROTOTYPE ;
 
    //-- Attributes
 
