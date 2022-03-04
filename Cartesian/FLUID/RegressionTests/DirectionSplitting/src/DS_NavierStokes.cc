@@ -69,13 +69,18 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , rho( fromDS.rho_ )
 	, b_restart ( fromDS.b_restart_ )
    , is_solids( fromDS.is_solids_ )
-   , is_par_motion( false )
-   , is_stressCal( false )
-   , is_surfacestressOUT( false )
-   , ViscousStressOrder ( "second" )
-   , grid_check_for_solid ( 3.0 )
+	, insertion_type ( fromDS.insertion_type_ )
+	, is_stressCal ( fromDS.is_stressCal_ )
+	, ViscousStressOrder ( fromDS.ViscousStressOrder_ )
+	, surface_cell_scale ( fromDS.surface_cell_scale_ )
+	, is_surfacestressOUT ( fromDS.is_surfacestressOUT_ )
+	, stressCalFreq ( fromDS.stressCalFreq_ )
+	, is_par_motion ( fromDS.is_par_motion_ )
+	, grid_check_for_solid ( fromDS.grid_check_for_solid_ )
+	, allrigidbodies ( 0 )
    , b_particles_as_fixed_obstacles( true )
-   , b_projection_translation( fromDS.dom_->primary_grid()->is_translation_active() )
+   , b_projection_translation( fromDS.dom_->primary_grid()
+														->is_translation_active() )
    , b_grid_has_been_translated_since_last_output( false )
    , b_grid_has_been_translated_at_previous_time( false )
    , critical_distance_translation( 0. )
@@ -83,7 +88,6 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , bottom_coordinate( 0. )
    , translated_distance( 0. )
    , gravity_vector( 0 )
-   , stressCalFreq( 1 )
 {
    MAC_LABEL( "DS_NavierStokes:: DS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -141,52 +145,13 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    // Create the Direction Splitting subcommunicators
    create_DS_subcommunicators();
 
-   if (is_solids) {
-      insertion_type = exp->string_data( "InsertionType" ) ;
-      MAC_ASSERT( insertion_type == "Grains3D" ) ;
-
-      // Read the solids filename
-      if (insertion_type == "Grains3D") {
-         solidSolverType = "Grains3D";
-         b_solidSolver_parallel = false;
-         solidSolver_insertionFile = "Grains/Init/insert.xml";
-         solidSolver_simulationFile = "Grains/Res/simul.xml";
-      }
-
-      // Read weather the sress calculation on particle is ON/OFF
-      if ( exp->has_entry( "Stress_calculation" ) )
-        is_stressCal = exp->bool_data( "Stress_calculation" ) ;
-
-      // Read if the discretized surface force output os ON/OFF
-      if (is_stressCal) {
-         if ( exp->has_entry( "Surface_Stress_Output" ))
-            is_surfacestressOUT = exp->bool_data( "Stress_calculation" ) ;
-         if ( exp->has_entry( "Stress_calculation_frequency" ))
-            stressCalFreq = exp->int_data("Stress_calculation_frequency");
-      }
-
-      // Read weather the particle motion is ON/OFF
-      if ( exp->has_entry( "Particle_motion" ) )
-        is_par_motion = exp->bool_data( "Particle_motion" ) ;
-
-      if ( exp->has_entry( "GridCheckforSolid" ) )
-         grid_check_for_solid = exp->double_data( "GridCheckforSolid" );
-
-      if (is_stressCal) {
-         if ( exp->has_entry( "ViscousStressOrder" ) ) {
-            ViscousStressOrder = exp->string_data( "ViscousStressOrder" );
-            if ( ViscousStressOrder != "first"
-              && ViscousStressOrder != "second") {
-                string error_message="- first\n   - second";
-                MAC_Error::object()->raise_bad_data_value( exp,
-                                    "ViscousStressOrder", error_message );
-            }
-         }
-
-         surface_cell_scale = exp->double_data( "SurfaceCellScale" ) ;
-
-      }
-   }
+	// Read the solids filename
+	if (is_solids && (insertion_type == "Grains3D")) {
+		solidSolverType = "Grains3D";
+		b_solidSolver_parallel = false;
+		solidSolver_insertionFile = "Grains/Init/insert.xml";
+		solidSolver_simulationFile = "Grains/Res/simul.xml";
+	}
 
    if ( is_stressCal == true &&
         UF->primary_grid()->get_security_bandwidth() < 4 )
@@ -267,9 +232,11 @@ DS_NavierStokes:: ~DS_NavierStokes( void )
 
    free_DS_subcommunicators() ;
 
-   if ( solidSolver ) delete solidSolver;
-   if ( solidFluid_transferStream ) delete solidFluid_transferStream;
-   if ( allrigidbodies ) delete allrigidbodies;
+	if ( is_solids ) {
+		if ( solidSolver ) delete solidSolver;
+		if ( solidFluid_transferStream ) delete solidFluid_transferStream;
+		if ( allrigidbodies ) delete allrigidbodies;
+	}
 
 }
 
@@ -398,7 +365,8 @@ DS_NavierStokes:: do_after_time_stepping( void )
    // write_output_field(UF,1);
    // SCT_get_elapsed_time( "Writing CSV" );
 
-   allrigidbodies->write_surface_discretization_for_all_RB();
+	if (is_surfacestressOUT)
+   	allrigidbodies->write_surface_discretization_for_all_RB();
 
    output_L2norm_velocity(0);
    output_L2norm_pressure(0);
@@ -406,7 +374,10 @@ DS_NavierStokes:: do_after_time_stepping( void )
    if ( my_rank == is_master )
    {
      double cputime = CT_get_elapsed_time();
-     cout << endl << "Full problem" << endl;
+     cout << endl
+	  		 << "========================================================" << endl
+			 << "                Navier Stokes Problem                   " << endl
+			 << "========================================================" << endl;
      write_elapsed_time_smhd(cout,cputime,"Computation time");
      SCT_get_summary(cout,cputime);
    }
@@ -1235,12 +1206,15 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
    double xhr=1.,xhl=1.,xright=0.,xleft=0.,yhr=1.,yhl=1.,yright=0.,yleft=0.;
    double zhr=1.,zhl=1.,zright=0.,zleft=0., value=0.;
 
-   size_t_array2D* intersect_vector =
-                           allrigidbodies->get_intersect_vector_on_grid(UF);
-   doubleArray2D* intersect_distance =
-                           allrigidbodies->get_intersect_distance_on_grid(UF);
-   doubleArray2D* intersect_fieldVal =
-                           allrigidbodies->get_intersect_fieldValue_on_grid(UF);
+   size_t_array2D* intersect_vector = (is_solids) ?
+                           allrigidbodies->get_intersect_vector_on_grid(UF)
+									: 0;
+   doubleArray2D* intersect_distance = (is_solids) ?
+                           allrigidbodies->get_intersect_distance_on_grid(UF)
+									: 0;
+   doubleArray2D* intersect_fieldVal = (is_solids) ?
+                           allrigidbodies->get_intersect_fieldValue_on_grid(UF)
+									: 0;
 
    size_t p = UF->DOF_local_number(i,j,k,comp);
 
@@ -1414,12 +1388,15 @@ DS_NavierStokes:: velocity_local_rhs ( size_t const& j
    LocalVector* VEC = GLOBAL_EQ->get_VEC(1);
 
    vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
-   size_t_array2D* intersect_vector =
-                           allrigidbodies->get_intersect_vector_on_grid(UF);
-   doubleArray2D* intersect_distance =
-                           allrigidbodies->get_intersect_distance_on_grid(UF);
-   doubleArray2D* intersect_fieldVal =
-                           allrigidbodies->get_intersect_fieldValue_on_grid(UF);
+   size_t_array2D* intersect_vector = (is_solids) ?
+                           allrigidbodies->get_intersect_vector_on_grid(UF)
+									: 0;
+   doubleArray2D* intersect_distance = (is_solids) ?
+                           allrigidbodies->get_intersect_distance_on_grid(UF)
+									: 0;
+   doubleArray2D* intersect_fieldVal = (is_solids) ?
+                           allrigidbodies->get_intersect_fieldValue_on_grid(UF)
+									: 0;
 
    for (size_t i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
       if (dir == 0) {
@@ -2107,7 +2084,8 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    max_unknown_index(2) = (dim == 3) ? 0 : 1;
 
    vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
-   size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+   size_t_vector* void_frac = (is_solids) ?
+							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
    for (size_t comp=0;comp<nb_comps[1];comp++) {
       // Get local min and max indices
@@ -2452,13 +2430,14 @@ DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
 
    size_t comp = 0;
 
-   size_t_array2D* intersect_vector =
-                           allrigidbodies->get_intersect_vector_on_grid(PF);
-   doubleArray2D* intersect_distance =
-                           allrigidbodies->get_intersect_distance_on_grid(PF);
-   doubleArray2D* intersect_fieldVal =
-                           allrigidbodies->get_intersect_fieldValue_on_grid(PF);
-   size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
+   size_t_array2D* intersect_vector = (is_solids) ?
+                     allrigidbodies->get_intersect_vector_on_grid(PF) : 0;
+   doubleArray2D* intersect_distance = (is_solids) ?
+                     allrigidbodies->get_intersect_distance_on_grid(PF) : 0;
+   doubleArray2D* intersect_fieldVal = (is_solids) ?
+                     allrigidbodies->get_intersect_fieldValue_on_grid(PF) : 0;
+   size_t_vector* void_frac = (is_solids) ?
+							allrigidbodies->get_void_fraction_on_grid(PF) : 0;
 
    size_t p = PF->DOF_local_number(i,j,k,comp);
 
@@ -2852,7 +2831,8 @@ DS_NavierStokes:: correct_mean_pressure (size_t const& level )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
+  size_t_vector* void_frac = (is_solids) ?
+  						allrigidbodies->get_void_fraction_on_grid(PF) : 0;
   size_t comp = 0;
 
   double mean=0.,nb_global_unknown=0.;
@@ -3025,12 +3005,12 @@ DS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
 
-  size_t_vector* void_frac =
-                    allrigidbodies->get_void_fraction_on_grid(FF);
-  size_t_array2D* intersect_vector =
-                    allrigidbodies->get_intersect_vector_on_grid(FF);
-  doubleArray2D* intersect_distance =
-                    allrigidbodies->get_intersect_distance_on_grid(FF);
+  size_t_vector* void_frac = (is_solids) ?
+                    allrigidbodies->get_void_fraction_on_grid(FF) : 0;
+  size_t_array2D* intersect_vector = (is_solids) ?
+                    allrigidbodies->get_intersect_vector_on_grid(FF) : 0;
+  doubleArray2D* intersect_distance = (is_solids) ?
+                    allrigidbodies->get_intersect_distance_on_grid(FF) : 0;
 
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices
@@ -3148,7 +3128,8 @@ DS_NavierStokes::output_L2norm_pressure( size_t const& level )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
+  size_t_vector* void_frac = (is_solids) ?
+  									  allrigidbodies->get_void_fraction_on_grid(PF) : 0;
 
   for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
      for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
@@ -3192,7 +3173,8 @@ DS_NavierStokes::output_L2norm_velocity( size_t const& level )
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
 
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+  size_t_vector* void_frac = (is_solids) ?
+  									allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
   for (size_t comp = 0; comp < nb_comps[1]; comp++) {
      for (size_t l = 0; l < dim; ++l) {

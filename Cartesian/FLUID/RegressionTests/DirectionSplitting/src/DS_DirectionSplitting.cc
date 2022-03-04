@@ -69,6 +69,14 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , AdvectionTimeAccuracy( 1 )
    , b_restart( false )
    , is_solids( false )
+   , insertion_type ( "Grains3D" )
+   , is_stressCal ( false )
+   , ViscousStressOrder ( "second" )
+   , surface_cell_scale ( 1. )
+   , is_surfacestressOUT ( false )
+   , stressCalFreq ( 1 )
+   , is_par_motion ( false )
+   , grid_check_for_solid ( 3.0 )
    , FlowSolver ( 0 )
 {
    MAC_LABEL( "DS_DirectionSplitting:: DS_DirectionSplitting" ) ;
@@ -120,6 +128,43 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 	"AdvectionTimeAccuracy", error_message );
    }
 
+   if (is_solids) {
+      insertion_type = exp->string_data( "InsertionType" ) ;
+      MAC_ASSERT( insertion_type == "Grains3D" ) ;
+
+      // Read weather the sress calculation on particle is ON/OFF
+      if ( exp->has_entry( "Stress_calculation" ) )
+        is_stressCal = exp->bool_data( "Stress_calculation" ) ;
+
+      if (is_stressCal) {
+         if ( exp->has_entry( "ViscousStressOrder" ) ) {
+           ViscousStressOrder = exp->string_data( "ViscousStressOrder" );
+           if ( ViscousStressOrder != "first"
+           && ViscousStressOrder != "second") {
+              string error_message="- first\n   - second";
+              MAC_Error::object()->raise_bad_data_value( exp,
+                 "ViscousStressOrder", error_message );
+           }
+         }
+         surface_cell_scale = exp->double_data( "SurfaceCellScale" ) ;
+      }
+      // Read if the discretized surface force output os ON/OFF
+      if (is_stressCal) {
+         if ( exp->has_entry( "Surface_Stress_Output" ))
+            is_surfacestressOUT = exp->bool_data( "Surface_Stress_Output" ) ;
+         if ( exp->has_entry( "Stress_calculation_frequency" ))
+            stressCalFreq = exp->int_data("Stress_calculation_frequency");
+      }
+
+      // Read weather the particle motion is ON/OFF
+      if ( exp->has_entry( "Particle_motion" ) )
+        is_par_motion = exp->bool_data( "Particle_motion" ) ;
+
+      if ( exp->has_entry( "GridCheckforSolid" ) )
+         grid_check_for_solid = exp->double_data( "GridCheckforSolid" );
+
+   }
+
    // Create structure to input in the solver system
    struct DS2NS inputDataNS;
    inputDataNS.rho_ = rho ;
@@ -129,18 +174,20 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    inputDataNS.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
    inputDataNS.b_restart_ = b_restart ;
    inputDataNS.is_solids_ = is_solids ;
+   inputDataNS.insertion_type_ = insertion_type;
+   inputDataNS.is_stressCal_ = is_stressCal;
+   inputDataNS.ViscousStressOrder_ = ViscousStressOrder;
+   inputDataNS.surface_cell_scale_ = surface_cell_scale;
+   inputDataNS.is_surfacestressOUT_ = is_surfacestressOUT;
+   inputDataNS.stressCalFreq_ = stressCalFreq;
+   inputDataNS.is_par_motion_ = is_par_motion;
+   inputDataNS.grid_check_for_solid_ = grid_check_for_solid;
    inputDataNS.dom_ = dom ;
 
    MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DS_NavierStokes" ) ;
    FlowSolver = DS_NavierStokes::create( this, set, inputDataNS ) ;
    set->destroy() ;
 
-//
-//    // Build the matrix system
-//    MAC_ModuleExplorer* se = exp->create_subexplorer( 0,"DS_DirectionSplittingSystem" ) ;
-//    GLOBAL_EQ = DS_DirectionSplittingSystem::create( this, se, UF, PF, inputDataNS ) ;
-//    se->destroy() ;
-//
 //    // Create the temperature solver
 //    struct NavierStokes2Temperature inputData;
 //    inputData.rho_ = rho ;
@@ -202,17 +249,17 @@ DS_DirectionSplitting:: do_one_inner_iteration( FV_TimeIterator const* t_it )
    MAC_LABEL( "DS_DirectionSplitting:: do_one_inner_iteration" ) ;
    MAC_CHECK_PRE( do_one_inner_iteration_PRE( t_it ) ) ;
 
-   start_total_timer( "DS_DirectionSplitting:: do_one_inner_iteration" ) ;
-   start_solving_timer() ;
 
    // Flow solver
+   start_total_timer( "DS_NavierStokes:: do_one_inner_iteration" ) ;
+   start_solving_timer() ;
    FlowSolver->do_one_inner_iteration( t_it ) ;
+   stop_solving_timer() ;
+   stop_total_timer() ;
 
    // Temperature solver
    // Solver_Temperature->do_one_inner_iteration( t_it ) ;
 
-   stop_solving_timer() ;
-   stop_total_timer() ;
 
 }
 
@@ -224,17 +271,17 @@ DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
 {
    MAC_LABEL( "DS_DirectionSplitting:: do_before_time_stepping" ) ;
 
-   start_total_timer( "DS_DirectionSplitting:: do_before_time_stepping" ) ;
 
    FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
 
    // Flow solver
+   start_total_timer( "DS_NavierStokes:: do_before_time_stepping" ) ;
    FlowSolver->do_before_time_stepping( t_it, basename ) ;
+   stop_total_timer() ;
 
    // Temperature solver
 
 
-   stop_total_timer() ;
 
 }
 
@@ -248,14 +295,14 @@ DS_DirectionSplitting:: do_after_time_stepping( void )
 {
    MAC_LABEL( "DS_DirectionSplitting:: do_after_time_stepping" ) ;
 
-   start_total_timer( "DS_DirectionSplitting:: do_after_time_stepping" ) ;
 
    // Flow solver
+   start_total_timer( "DS_NavierStokes:: do_after_time_stepping" ) ;
    FlowSolver->do_after_time_stepping() ;
+   stop_total_timer() ;
    // Temperature solver
    // Solver_Temperature->do_after_time_stepping() ;
 
-   stop_total_timer() ;
 
 }
 
@@ -266,16 +313,16 @@ DS_DirectionSplitting:: do_before_inner_iterations_stage(
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_DirectionSplitting:: do_before_inner_iterations_stage" ) ;
-   start_total_timer( "DS_DirectionSplitting:: do_before_inner_iterations_stage" ) ;
 
    FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
 
    // Flow solver
+   start_total_timer( "DS_NavierStokes:: do_before_inner_iterations_stage" ) ;
    FlowSolver->do_before_inner_iterations_stage( t_it ) ;
+   stop_total_timer() ;
    // Temperature solver
    // Solver_Temperature->do_before_inner_iterations_stage( t_it ) ;
 
-   stop_total_timer() ;
 
 }
 
@@ -287,16 +334,16 @@ DS_DirectionSplitting:: do_after_inner_iterations_stage(
 {
    MAC_LABEL( "DS_DirectionSplitting:: do_after_inner_iterations_stage" ) ;
 
-   start_total_timer( "DS_DirectionSplitting:: do_after_inner_iterations_stage" ) ;
 
    FV_OneStepIteration::do_after_inner_iterations_stage( t_it ) ;
 
    // Flow solver
+   start_total_timer( "DS_NavierStokes:: do_after_inner_iterations_stage" ) ;
    FlowSolver->do_after_inner_iterations_stage( t_it ) ;
+   stop_total_timer() ;
    // Temperature solver
    // Solver_Temperature->do_after_inner_iterations_stage( t_it ) ;
 
-   stop_total_timer() ;
 
 }
 
@@ -308,13 +355,13 @@ DS_DirectionSplitting:: do_additional_savings( FV_TimeIterator const* t_it,
 {
    MAC_LABEL( "DS_DirectionSplitting:: do_additional_savings" ) ;
 
-   start_total_timer( "DS_DirectionSplitting:: do_additional_savings" ) ;
 
    // Flow solver
+   start_total_timer( "DS_NavierStokes:: do_additional_savings" ) ;
    FlowSolver->do_additional_savings( t_it, cycleNumber ) ;
+   stop_total_timer() ;
    // Temperature solver
    // Solver_Temperature->do_additional_savings( t_it, cycleNumber ) ;
 
-   stop_total_timer() ;
 
 }

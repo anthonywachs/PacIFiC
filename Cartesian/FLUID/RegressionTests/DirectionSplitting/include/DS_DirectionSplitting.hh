@@ -119,6 +119,15 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       bool b_restart;
       bool is_solids;
 
+      string insertion_type;
+      bool is_stressCal;
+      string ViscousStressOrder;
+      double surface_cell_scale;
+      bool is_surfacestressOUT;
+      size_t stressCalFreq;
+      bool is_par_motion;
+      double grid_check_for_solid;
+
       DS_NavierStokes* FlowSolver ;
 
 } ;

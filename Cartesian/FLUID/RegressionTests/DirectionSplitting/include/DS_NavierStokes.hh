@@ -35,6 +35,14 @@ struct DS2NS
   size_t AdvectionTimeAccuracy_ ;
   bool b_restart_ ;
   bool is_solids_ ;
+  string insertion_type_;
+  bool is_stressCal_;
+  string ViscousStressOrder_;
+  double surface_cell_scale_;
+  bool is_surfacestressOUT_;
+  size_t stressCalFreq_;
+  bool is_par_motion_;
+  double grid_check_for_solid_;
   FV_DomainAndFields const* dom_ ;
 };
 
@@ -417,14 +425,15 @@ class DS_NavierStokes : public MAC_Object,
       double rho;
       bool b_restart ;
       bool is_solids;
-      bool is_par_motion;
-      bool is_stressCal;
-      bool is_surfacestressOUT;
-      string IntersectionMethod;
-      string ViscousStressOrder;
-      double grid_check_for_solid;
 
+      string insertion_type;
+      bool is_stressCal;
+      string ViscousStressOrder;
       double surface_cell_scale;
+      bool is_surfacestressOUT;
+      size_t stressCalFreq;
+      bool is_par_motion;
+      double grid_check_for_solid;
 
       // Grains3D variable
       string solidSolverType;
@@ -435,8 +444,6 @@ class DS_NavierStokes : public MAC_Object,
       istringstream* solidFluid_transferStream;
       DS_AllRigidBodies* allrigidbodies;
       bool b_particles_as_fixed_obstacles;
-
-
 
       // Grid motion
       bool b_projection_translation;
@@ -451,9 +458,7 @@ class DS_NavierStokes : public MAC_Object,
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;
       MAC_DoubleVector* gravity_vector ;
-      size_t stressCalFreq;
       bool is_periodic[2][3];
-      string insertion_type;
 
 } ;
 
