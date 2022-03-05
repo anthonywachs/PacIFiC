@@ -836,7 +836,7 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
          Bilinear_interpolation(PF,comp,surface_point[i],i0,face_vector,{0,1}) :
          Trilinear_interpolation(PF,comp,surface_point[i],i0,parID,{0,1}) ;
         stress = - press/2.
-                 + (external_gradP * surface_point[i]->operator()(pfd));
+                 - (external_gradP * surface_point[i]->operator()(pfd));
      }
 
      // Ref: Keating thesis Pg-85
