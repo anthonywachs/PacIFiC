@@ -69,6 +69,9 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , AdvectionTimeAccuracy( 1 )
    , b_restart( false )
    , is_solids( false )
+   , is_HE( false )
+   , is_NS( false )
+   , is_NSwithHE( false )
    , insertion_type ( "Grains3D" )
    , is_stressCal ( false )
    , ViscousStressOrder ( "second" )
@@ -165,72 +168,59 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 
    }
 
-   // Create structure to input in the solver system
-   struct DS2NS inputDataNS;
-   inputDataNS.rho_ = rho ;
-   inputDataNS.mu_ = mu ;
-   inputDataNS.kai_ = kai ;
-   inputDataNS.AdvectionScheme_ = AdvectionScheme ;
-   inputDataNS.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
-   inputDataNS.b_restart_ = b_restart ;
-   inputDataNS.is_solids_ = is_solids ;
-   inputDataNS.insertion_type_ = insertion_type;
-   inputDataNS.is_stressCal_ = is_stressCal;
-   inputDataNS.ViscousStressOrder_ = ViscousStressOrder;
-   inputDataNS.surface_cell_scale_ = surface_cell_scale;
-   inputDataNS.is_surfacestressOUT_ = is_surfacestressOUT;
-   inputDataNS.stressCalFreq_ = stressCalFreq;
-   inputDataNS.is_par_motion_ = is_par_motion;
-   inputDataNS.grid_check_for_solid_ = grid_check_for_solid;
-   inputDataNS.dom_ = dom ;
+   if (dom->discrete_field( "temperature" ) &&
+       dom->discrete_field( "velocity" )) {
+      is_NSwithHE = true;
+   } else if (dom->discrete_field( "temperature" )) {
+      is_HE = true;
+   } else if (dom->discrete_field( "velocity" )) {
+      is_NS = true;
+   }
 
-   MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DS_NavierStokes" ) ;
-   FlowSolver = DS_NavierStokes::create( this, set, inputDataNS ) ;
-   set->destroy() ;
+   // Create structure to input in the NS solver
+   if (is_NS || is_NSwithHE) {
+      struct DS2NS inputDataNS;
+      inputDataNS.rho_ = rho ;
+      inputDataNS.mu_ = mu ;
+      inputDataNS.kai_ = kai ;
+      inputDataNS.AdvectionScheme_ = AdvectionScheme ;
+      inputDataNS.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
+      inputDataNS.b_restart_ = b_restart ;
+      inputDataNS.is_solids_ = is_solids ;
+      inputDataNS.insertion_type_ = insertion_type;
+      inputDataNS.is_stressCal_ = is_stressCal;
+      inputDataNS.ViscousStressOrder_ = ViscousStressOrder;
+      inputDataNS.surface_cell_scale_ = surface_cell_scale;
+      inputDataNS.is_surfacestressOUT_ = is_surfacestressOUT;
+      inputDataNS.stressCalFreq_ = stressCalFreq;
+      inputDataNS.is_par_motion_ = is_par_motion;
+      inputDataNS.grid_check_for_solid_ = grid_check_for_solid;
+      inputDataNS.dom_ = dom ;
 
-//    // Create the temperature solver
-//    struct NavierStokes2Temperature inputData;
-//    inputData.rho_ = rho ;
-//    inputData.b_restart_ = b_restart ;
-//    inputData.dom_ = dom ;
-//    inputData.UF_ = UF ;
-//    inputData.AdvectionScheme_ = AdvectionScheme ;
-//    inputData.ViscousStressOrder_ = ViscousStressOrder;
-//    inputData.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
-//    inputData.is_solids_ = is_solids ;
-//    inputData.is_stressCal_ = is_stressCal ;
-//    inputData.Npart_ = Npart ;
-//    inputData.loc_thres_ = loc_thres ;
-//    inputData.level_set_type_ = level_set_type ;
-//    inputData.Npoints_ = Npoints ;
-//    inputData.Pmin_ = Pmin ;
-//    inputData.ar_ = ar ;
-//    inputData.pole_loc_ = pole_loc ;
-//    inputData.particle_information_ = &particle_information ;
-//    inputData.insertion_type_ = insertion_type ;
-//    inputData.is_par_motion_ = is_par_motion ;
-//    inputData.IntersectionMethod_ = IntersectionMethod ;
-//    inputData.tolerance_ = tolerance ;
-//
-//    MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DDS_HeatTransfer" ) ;
-//    Solver_Temperature = DDS_HeatTransfer::create( this, set, inputData ) ;
-//    set->destroy() ;
-//
-//    // Timing routines
-//    if ( my_rank == is_master )
-//    {
-//      SCT_insert_app("Matrix_Assembly&Initialization");
-//      SCT_insert_app("Pressure predictor");
-// //     SCT_insert_app("Explicit Velocity step");
-// //     SCT_insert_app("Velocity x update");
-// //     SCT_insert_app("Velocity y update");
-// //     SCT_insert_app("Velocity z update");
-//      SCT_insert_app("Velocity update");
-//      SCT_insert_app("Penalty Step");
-//      SCT_insert_app("Pressure Update");
-//      SCT_insert_app("Writing CSV");
-//      SCT_get_elapsed_time("Objects_Creation");
-//    }
+      MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DS_NavierStokes" ) ;
+      FlowSolver = DS_NavierStokes::create( this, set, inputDataNS ) ;
+      set->destroy() ;
+   }
+
+   // Create the temperature solver
+   if (is_HE || is_NSwithHE) {
+      struct DS2HE inputData;
+      inputData.rho_ = rho ;
+      inputData.b_restart_ = b_restart ;
+      inputData.AdvectionScheme_ = AdvectionScheme ;
+      inputData.ViscousStressOrder_ = ViscousStressOrder;
+      inputData.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
+      inputData.is_solids_ = is_solids ;
+      inputData.is_NSwithHE_ = is_NSwithHE ;
+      inputData.is_stressCal_ = is_stressCal ;
+      inputData.is_par_motion_ = is_par_motion ;
+      inputData.dom_ = dom ;
+
+      MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DS_HeatTransfer" ) ;
+      HeatSolver = DS_HeatTransfer::create( this, set, inputData ) ;
+      set->destroy() ;
+   }
+
 }
 
 //---------------------------------------------------------------------------
@@ -249,17 +239,23 @@ DS_DirectionSplitting:: do_one_inner_iteration( FV_TimeIterator const* t_it )
    MAC_LABEL( "DS_DirectionSplitting:: do_one_inner_iteration" ) ;
    MAC_CHECK_PRE( do_one_inner_iteration_PRE( t_it ) ) ;
 
-
    // Flow solver
-   start_total_timer( "DS_NavierStokes:: do_one_inner_iteration" ) ;
-   start_solving_timer() ;
-   FlowSolver->do_one_inner_iteration( t_it ) ;
-   stop_solving_timer() ;
-   stop_total_timer() ;
+   if (is_NS || is_NSwithHE) {
+      start_total_timer( "DS_NavierStokes:: do_one_inner_iteration" ) ;
+      start_solving_timer() ;
+      FlowSolver->do_one_inner_iteration( t_it ) ;
+      stop_solving_timer() ;
+      stop_total_timer() ;
+   }
 
    // Temperature solver
-   // Solver_Temperature->do_one_inner_iteration( t_it ) ;
-
+   if (is_HE || is_NSwithHE) {
+      start_total_timer( "DS_HeatTransfer:: do_one_inner_iteration" ) ;
+      start_solving_timer() ;
+      HeatSolver->do_one_inner_iteration( t_it ) ;
+      stop_solving_timer() ;
+      stop_total_timer() ;
+   }
 
 }
 
@@ -275,12 +271,18 @@ DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
    FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
 
    // Flow solver
-   start_total_timer( "DS_NavierStokes:: do_before_time_stepping" ) ;
-   FlowSolver->do_before_time_stepping( t_it, basename ) ;
-   stop_total_timer() ;
+   if (is_NS || is_NSwithHE) {
+      start_total_timer( "DS_NavierStokes:: do_before_time_stepping" ) ;
+      FlowSolver->do_before_time_stepping( t_it, basename ) ;
+      stop_total_timer() ;
+   }
 
    // Temperature solver
-
+   if (is_HE || is_NSwithHE) {
+      start_total_timer( "DS_HeatTransfer:: do_before_time_stepping" ) ;
+      HeatSolver->do_before_time_stepping( t_it, basename ) ;
+      stop_total_timer() ;
+   }
 
 
 }
@@ -295,14 +297,19 @@ DS_DirectionSplitting:: do_after_time_stepping( void )
 {
    MAC_LABEL( "DS_DirectionSplitting:: do_after_time_stepping" ) ;
 
-
    // Flow solver
-   start_total_timer( "DS_NavierStokes:: do_after_time_stepping" ) ;
-   FlowSolver->do_after_time_stepping() ;
-   stop_total_timer() ;
-   // Temperature solver
-   // Solver_Temperature->do_after_time_stepping() ;
+   if (is_NS || is_NSwithHE) {
+      start_total_timer( "DS_NavierStokes:: do_after_time_stepping" ) ;
+      FlowSolver->do_after_time_stepping() ;
+      stop_total_timer() ;
+   }
 
+   // Temperature solver
+   if (is_HE || is_NSwithHE) {
+      start_total_timer( "DS_HeatTransfer:: do_after_time_stepping" ) ;
+      HeatSolver->do_after_time_stepping() ;
+      stop_total_timer() ;
+   }
 
 }
 
@@ -317,12 +324,17 @@ DS_DirectionSplitting:: do_before_inner_iterations_stage(
    FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
 
    // Flow solver
-   start_total_timer( "DS_NavierStokes:: do_before_inner_iterations_stage" ) ;
-   FlowSolver->do_before_inner_iterations_stage( t_it ) ;
-   stop_total_timer() ;
+   if (is_NS || is_NSwithHE) {
+      start_total_timer( "DS_NavierStokes:: do_before_inner_iterations_stage" ) ;
+      FlowSolver->do_before_inner_iterations_stage( t_it ) ;
+      stop_total_timer() ;
+   }
    // Temperature solver
-   // Solver_Temperature->do_before_inner_iterations_stage( t_it ) ;
-
+   if (is_HE || is_NSwithHE) {
+      start_total_timer( "DS_HeatTransfer:: do_before_inner_iterations_stage" ) ;
+      HeatSolver->do_before_inner_iterations_stage( t_it ) ;
+      stop_total_timer() ;
+   }
 
 }
 
@@ -334,15 +346,20 @@ DS_DirectionSplitting:: do_after_inner_iterations_stage(
 {
    MAC_LABEL( "DS_DirectionSplitting:: do_after_inner_iterations_stage" ) ;
 
-
    FV_OneStepIteration::do_after_inner_iterations_stage( t_it ) ;
 
    // Flow solver
-   start_total_timer( "DS_NavierStokes:: do_after_inner_iterations_stage" ) ;
-   FlowSolver->do_after_inner_iterations_stage( t_it ) ;
-   stop_total_timer() ;
+   if (is_NS || is_NSwithHE) {
+      start_total_timer( "DS_NavierStokes:: do_after_inner_iterations_stage" ) ;
+      FlowSolver->do_after_inner_iterations_stage( t_it ) ;
+      stop_total_timer() ;
+   }
    // Temperature solver
-   // Solver_Temperature->do_after_inner_iterations_stage( t_it ) ;
+   if (is_HE || is_NSwithHE) {
+      start_total_timer( "DS_HeatTransfer:: do_after_inner_iterations_stage" ) ;
+      HeatSolver->do_after_inner_iterations_stage( t_it ) ;
+      stop_total_timer() ;
+   }
 
 
 }
@@ -357,11 +374,17 @@ DS_DirectionSplitting:: do_additional_savings( FV_TimeIterator const* t_it,
 
 
    // Flow solver
-   start_total_timer( "DS_NavierStokes:: do_additional_savings" ) ;
-   FlowSolver->do_additional_savings( t_it, cycleNumber ) ;
-   stop_total_timer() ;
+   if (is_NS || is_NSwithHE) {
+      start_total_timer( "DS_NavierStokes:: do_additional_savings" ) ;
+      FlowSolver->do_additional_savings( t_it, cycleNumber ) ;
+      stop_total_timer() ;
+   }
    // Temperature solver
-   // Solver_Temperature->do_additional_savings( t_it, cycleNumber ) ;
+   if (is_HE || is_NSwithHE) {
+      start_total_timer( "DS_HeatTransfer:: do_additional_savings" ) ;
+      HeatSolver->do_additional_savings( t_it, cycleNumber ) ;
+      stop_total_timer() ;
+   }
 
 
 }

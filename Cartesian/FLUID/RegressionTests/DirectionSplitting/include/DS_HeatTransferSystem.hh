@@ -25,7 +25,7 @@ class FV_DiscreteField ;
 class FV_TimeIterator ;
 
 /** For set of variables to pass from NavierStokes to System */
-struct HeatTransfer2System
+struct HT2System
 {
   bool is_solids_ ;
   size_t Npart_ ;
@@ -125,7 +125,7 @@ class DS_HeatTransferSystem : public MAC_Object
       DS_HeatTransferSystem ( MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_tf,
-            struct HeatTransfer2System const& fromHE );
+            struct HT2System const& fromHE );
       //@}
 
 
@@ -143,7 +143,7 @@ class DS_HeatTransferSystem : public MAC_Object
             MAC_Object* a_owner,
             MAC_ModuleExplorer const* exp,
             FV_DiscreteField* mac_tf,
-            struct HeatTransfer2System const& fromHE );
+            struct HT2System const& fromHE );
       //@}
 
 

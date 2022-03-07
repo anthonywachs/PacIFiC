@@ -6,6 +6,7 @@
 #include <computingtime.hh>
 #include <solvercomputingtime.hh>
 #include <DS_NavierStokes.hh>
+#include <DS_HeatTransfer.hh>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -118,6 +119,7 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       size_t AdvectionTimeAccuracy;
       bool b_restart;
       bool is_solids;
+      bool is_HE, is_NS, is_NSwithHE;
 
       string insertion_type;
       bool is_stressCal;
@@ -129,6 +131,7 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       double grid_check_for_solid;
 
       DS_NavierStokes* FlowSolver ;
+      DS_HeatTransfer* HeatSolver ;
 
 } ;
 

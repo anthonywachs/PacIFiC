@@ -30,7 +30,7 @@ DS_HeatTransferSystem*
 DS_HeatTransferSystem:: create( MAC_Object* a_owner,
 	MAC_ModuleExplorer const* exp,
 	FV_DiscreteField* mac_tf,
-        struct HeatTransfer2System const& transfer )
+        struct HT2System const& transfer )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransferSystem:: create" ) ;
@@ -55,7 +55,7 @@ DS_HeatTransferSystem:: DS_HeatTransferSystem(
 	MAC_Object* a_owner,
 	MAC_ModuleExplorer const* exp,
 	FV_DiscreteField* mac_tf,
-        struct HeatTransfer2System const& fromHE )
+        struct HT2System const& fromHE )
 //----------------------------------------------------------------------
    : MAC_Object( a_owner )
    , TF( mac_tf )

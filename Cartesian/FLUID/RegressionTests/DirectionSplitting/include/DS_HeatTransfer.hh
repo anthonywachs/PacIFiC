@@ -30,35 +30,24 @@ implicit time integrator and a Finite Volume MAC scheme on rectangular grids.
 
 Equation: rho*cp*dT/dt + rho*cp*(u.nabla(T))= k * lap(T) + bodyterm
 
-@author A. Wachs - Pacific project 2017 */
+@author A. Goyal - Pacific project 2022 */
 
-struct NavierStokes2Temperature
+struct DS2HE
 {
   double rho_ ;
   bool b_restart_ ;
-  FV_DomainAndFields const* dom_ ;
-  FV_DiscreteField const* UF_ ;
   string AdvectionScheme_ ;
   string ViscousStressOrder_ ;
   size_t AdvectionTimeAccuracy_ ;
   bool is_solids_ ;
-  size_t Npart_ ;
-  double loc_thres_ ;
-  string level_set_type_ ;
+  bool is_NSwithHE_ ;
   bool is_stressCal_ ;
-  double Npoints_ ;
-  double ar_ ;
-  size_t Pmin_ ;
-  size_t pole_loc_ ;
   bool is_par_motion_ ;
-  string IntersectionMethod_ ;
-  double tolerance_ ;
-  string* particle_information_ ;
-  string insertion_type_ ;
+  FV_DomainAndFields const* dom_ ;
 };
 
 /** @brief MPIVar include all vectors required while message passing */
-struct MPIVar {
+struct MPIVarHT {
    size_t *size;
    double ***send;
    double ***receive;
@@ -77,7 +66,7 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       static DS_HeatTransfer* create(
 		MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp,
-                struct NavierStokes2Temperature const& fromNS );
+                struct DS2HE const& transfer );
 
       /** @name Substeps of the step by step progression */
       //@{
@@ -134,7 +123,7 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       @param exp to read the data file */
       DS_HeatTransfer( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp,
-                struct NavierStokes2Temperature const& fromNS );
+                struct DS2HE const& fromDS );
 
       /** @brief Constructor without argument */
       DS_HeatTransfer( void ) ;
@@ -247,29 +236,18 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
 
       double assemble_advection_Upwind_new( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
 
-      /** @brief Generate the solid particles present in the domain */
-      void Solids_generation( ) ;
-
       /** @brief Solve i in j and k; e.g. solve x in y ank z */
       void Solve_i_in_jk (FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k );
 
       /** @brief Solve interface unknown for all cases */
       void DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index);
 
-      /** @brief Error compared to analytical solution */
-      void DS_error_with_analytical_solution ( FV_DiscreteField const* FF,FV_DiscreteField* FF_ERROR ) ;
-
       void ugradu_initialization (  );
       /** @brief Calculate L2 norm without any analytical solution */
       void output_l2norm ( void ) ;
       //@}
 
-      void ReadStringofSolids( istringstream &is );
-      void generate_surface_discretization();
       void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
-      void compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nrings);
-      void compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nrings);
-      void compute_surface_points_on_cube(size_t const& Np);
       void rotation_matrix (size_t const& m, class doubleVector& delta);
       void trans_rotation_matrix (size_t const& m, class doubleVector& delta);
       void compute_temperature_gradient_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np );
@@ -334,8 +312,8 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       int rank_in_i[3];
       int nb_ranks_comm_i[3];
 
-      struct MPIVar first_pass[3];
-      struct MPIVar second_pass[3];
+      struct MPIVarHT first_pass[3];
+      struct MPIVarHT second_pass[3];
 
       // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
       double loc_thres;
@@ -347,6 +325,7 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       double heat_capacity, thermal_conductivity;
       bool b_bodyterm ;
       bool is_solids;
+      bool is_NSwithHE;
       bool is_stressCal;
       double Npoints;
       size_t Pmin, pole_loc;

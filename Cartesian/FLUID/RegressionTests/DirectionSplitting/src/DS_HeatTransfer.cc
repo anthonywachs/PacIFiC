@@ -28,7 +28,7 @@
 DS_HeatTransfer*
 DS_HeatTransfer:: create( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp,
-                struct NavierStokes2Temperature const& transfer )
+                struct DS2HE const& transfer )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: create" ) ;
@@ -47,25 +47,24 @@ DS_HeatTransfer:: create( MAC_Object* a_owner,
 //---------------------------------------------------------------------------
 DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp,
-                struct NavierStokes2Temperature const& fromNS )
+				    struct DS2HE const& fromDS )
 //---------------------------------------------------------------------------
    : MAC_Object( a_owner )
    , ComputingTime("Solver")
-   , TF ( fromNS.dom_->discrete_field( "temperature" ) )
-   , UF (fromNS.UF_)
+   , TF ( fromDS.dom_->discrete_field( "temperature" ) )
+   // , UF ( 0 )
    , TF_DS_ERROR( 0 )
    , GLOBAL_EQ( 0 )
-   , rho( fromNS.rho_ )
-   , AdvectionScheme ( fromNS.AdvectionScheme_ )
-   , AdvectionTimeAccuracy ( fromNS.AdvectionTimeAccuracy_ )
-   , ViscousStressOrder ( fromNS.ViscousStressOrder_ )
+   , rho( fromDS.rho_ )
+   , AdvectionScheme ( fromDS.AdvectionScheme_ )
+   , AdvectionTimeAccuracy ( fromDS.AdvectionTimeAccuracy_ )
+   , ViscousStressOrder ( fromDS.ViscousStressOrder_ )
    , heat_capacity( exp->double_data( "Heat_capacity") )
    , thermal_conductivity( exp->double_data( "Thermal_conductivity") )
    , b_bodyterm( false )
-   , is_solids ( fromNS.is_solids_ )
-// , IntersectionMethod ( fromNS.IntersectionMethod_ )
+   , is_solids ( fromDS.is_solids_ )
+	, is_NSwithHE (fromDS.is_NSwithHE_ )
    , IntersectionMethod ( "Bisection" )
-   , tolerance ( fromNS.tolerance_ )
 {
    MAC_LABEL( "DS_HeatTransfer:: DS_HeatTransfer" ) ;
 
@@ -92,8 +91,7 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
 
 
    // Is the run a follow up of a previous job
-//   b_restart = MAC_Application::is_follow();
-   b_restart = fromNS.b_restart_ ;
+   b_restart = fromDS.b_restart_ ;
    // Clear results directory in case of a new run
    if( !b_restart ) PAC_Misc::clearAllFiles( "Res", "Savings", my_rank ) ;
 
@@ -101,21 +99,19 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
    dim = TF->primary_grid()->nb_space_dimensions() ;
    nb_comps = TF->nb_components() ;
 
-   if ( dim == 1 )
-   {
+   if ( dim == 1 ) {
      string error_message="Space dimension should either 2 or 3";
      MAC_Error::object()->raise_bad_data_value(exp,
-	"nb_space_dimensions",
-	error_message );
+		  													 "nb_space_dimensions",
+															 error_message );
    }
-
 
    // Create the Direction Splitting subcommunicators
    create_DDS_subcommunicators();
 
    // Read with or without body term
    if ( exp->has_entry( "BodyTerm" ) )
-     b_bodyterm = exp->bool_data( "BodyTerm" ) ;
+      b_bodyterm = exp->bool_data( "BodyTerm" ) ;
 
    // Periodic boundary condition check
    periodic_comp = TF->primary_grid()->get_periodic_directions();
@@ -125,55 +121,23 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
       is_iperiodic[2] = periodic_comp->operator()( 2 );
    }
 
-   is_stressCal = fromNS.is_stressCal_;
-   is_par_motion = fromNS.is_par_motion_;
-   particle_information = fromNS.particle_information_;
-   insertion_type = fromNS.insertion_type_;
-
-   if (is_solids) {
-      Npart = fromNS.Npart_ ;
-      loc_thres = fromNS.loc_thres_ ;
-      level_set_type = fromNS.level_set_type_ ;
-
-      if (is_stressCal) {
-         Npoints = fromNS.Npoints_ ;
-         if (dim == 3) {
-            if ((level_set_type == "Sphere") || (level_set_type == "Cylinder")) {
-               Pmin = fromNS.Pmin_ ;
-               ar = fromNS.ar_ ;
-               pole_loc = fromNS.pole_loc_ ;
-            }
-         }
-      }
-   }
+   is_stressCal = fromDS.is_stressCal_;
+   is_par_motion = fromDS.is_par_motion_;
 
    // Create structure to input in the solver system
-   struct HeatTransfer2System inputDataHE;
-   inputDataHE.is_solids_ = is_solids ;
-   inputDataHE.is_stressCal_ = is_stressCal ;
-   inputDataHE.Npart_ = Npart ;
-   inputDataHE.level_set_type_ = level_set_type ;
-   inputDataHE.Npoints_ = Npoints ;
-   inputDataHE.ar_ = ar ;
+   struct HT2System inputData;
+   inputData.is_solids_ = is_solids ;
+   inputData.is_stressCal_ = is_stressCal ;
+   inputData.Npart_ = Npart ;
+   inputData.level_set_type_ = level_set_type ;
+   inputData.Npoints_ = Npoints ;
+   inputData.ar_ = ar ;
 
    // Build the matrix system
    MAC_ModuleExplorer* se =
 	exp->create_subexplorer( 0,"DS_HeatTransferSystem" ) ;
-   GLOBAL_EQ = DS_HeatTransferSystem::create( this, se, TF, inputDataHE ) ;
+   GLOBAL_EQ = DS_HeatTransferSystem::create( this, se, TF, inputData ) ;
    se->destroy() ;
-
-
-   // Duplicates field for error calculation in case of sinusoidal
-   // solution with body term 3.pi^2.sin(pi.x).sin(pi.y).sin(pi.z)
-   // on a [0:1]x[0:1]x[0:1] domain
-   if ( b_bodyterm )
-   {
-     const_cast<FV_DomainAndFields*>(fromNS.dom_)->duplicate_field(
-   	"temperature", "tf_ds_error" ) ;
-
-     TF_DS_ERROR = fromNS.dom_->discrete_field( "tf_ds_error" ) ;
-     TF_DS_ERROR->set_BC_values_modif_status( true ) ;
-   }
 
    // Timing routines
    if ( my_rank == is_master )
@@ -215,8 +179,6 @@ DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    if ( my_rank == is_master ) SCT_set_start("Matrix_Assembly&Initialization");
 
-//   FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
-
    allocate_mpi_variables();
 
    // Initialize temperature vector at the matrix level
@@ -227,20 +189,12 @@ DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    // Generate solid particles if required
    if (is_solids) {
-      Solids_generation();
-      if (my_rank == 0) cout << "HE: Finished particle generation... \n" << endl;
       node_property_calculation();
       if (my_rank == 0) cout << "HE: Finished intersection calculations... \n" << endl;
       nodes_temperature_initialization(0);
       nodes_temperature_initialization(1);
       nodes_temperature_initialization(3);
       if (dim == 3) nodes_temperature_initialization(4);
-      if (my_rank == 0) cout << "HE: Finished field initializations... \n" << endl;
-      if (is_stressCal) {
-         // Generate discretization of surface in approximate equal area
-         generate_surface_discretization ();
-      }
-      if (my_rank == 0) cout << "HE: Finished particle surface discretizations... \n" << endl;
    }
 
    // Assemble 1D tridiagonal matrices and schur complement calculation
@@ -260,10 +214,7 @@ DS_HeatTransfer:: do_before_inner_iterations_stage(
 {
    MAC_LABEL( "DS_HeatTransfer:: do_before_inner_iterations_stage" ) ;
 
-//   FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
-
    if ((is_par_motion) && (is_solids)) {
-      Solids_generation();
       node_property_calculation();
       nodes_temperature_initialization(0);
       nodes_temperature_initialization(1);
@@ -301,8 +252,6 @@ DS_HeatTransfer:: do_after_inner_iterations_stage(
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: do_after_inner_iterations_stage" ) ;
-
-//   FV_OneStepIteration::do_after_inner_iterations_stage( t_it ) ;
 
    if (is_stressCal) {
       compute_fluid_particle_interaction(t_it);
@@ -469,17 +418,18 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs (
         xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
         for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
            dyC = TF->get_cell_size( j, comp, 1 ) ;
-	   yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
+	   	  yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
            if (dim ==2 ) {
               k = 0;
               // Dxx for un
               xvalue = compute_un_component(comp,i,j,k,0,3);
               // Dyy for un
               yvalue = compute_un_component(comp,i,j,k,1,1);
-	      // Bodyterm for rhs
-	      bodyterm = bodyterm_value(xC,yC,zC);
+		        // Bodyterm for rhs
+		        bodyterm = bodyterm_value(xC,yC,zC);
               // Advection term
-              adv_value = compute_adv_component(comp,i,j,k);
+              adv_value = (is_NSwithHE) ? compute_adv_component(comp,i,j,k)
+				  									 : 0.;
 
               if (is_solids) {
                  size_t p = return_node_index(TF,comp,i,j,k);
@@ -494,17 +444,18 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs (
            } else {
               for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                  dzC = TF->get_cell_size( k, comp, 2 ) ;
-	         zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
+	         	  zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
                  // Dxx for un
                  xvalue = compute_un_component(comp,i,j,k,0,3);
                  // Dyy for un
                  yvalue = compute_un_component(comp,i,j,k,1,4);
                  // Dzz for un
                  zvalue = compute_un_component(comp,i,j,k,2,1);
-	         // Bodyterm for rhs
-	         bodyterm = bodyterm_value(xC,yC,zC);
+		           // Bodyterm for rhs
+		           bodyterm = bodyterm_value(xC,yC,zC);
                  // Advection term
-                 adv_value = compute_adv_component(comp,i,j,k);
+                 adv_value = is_NSwithHE ? compute_adv_component(comp,i,j,k)
+					              				  : 0.;
 
                  if (is_solids) {
                     size_t p = return_node_index(TF,comp,i,j,k);
@@ -1706,143 +1657,7 @@ DS_HeatTransfer::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t
 
 }
 
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: Solids_generation ()
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_HeatTransfer:: Solids_generation" ) ;
 
-  // Convert string to istringstream
-  istringstream global_par_info(*particle_information);
-  // Import particle information in Heat Transfer solver
-  ReadStringofSolids(global_par_info);
-
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: ReadStringofSolids( istringstream &is )
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DDS_NSWithHeatTransfer:: ReadStringofSolids" ) ;
-
-   // Structure of particle input data
-   PartInput solid = GLOBAL_EQ->get_solid();
-
-   string line;
-   istringstream lineStream;
-   string cell;
-   int cntr = -1;
-
-   // Ensure that the getline ALWAYS reads from start of the string
-   is.clear();
-   is.seekg(0);
-
-   // read lines
-   while (getline(is, line)) {
-      lineStream.clear();
-      lineStream.str(line);
-
-      // read first word in a line
-      getline(lineStream, cell, '\t');
-
-      if (cell == "P") {
-         cntr++;
-
-         // Extracting position
-         getline(lineStream, cell, '\t');
-         double xp = stod(cell);
-         getline(lineStream, cell, '\t');
-         double yp = stod(cell);
-         getline(lineStream, cell, '\t');
-         double zp = stod(cell);
-         // Extracting Radius
-         getline(lineStream, cell, '\t');
-         double Rp = stod(cell);
-         // Extracting velocity
-         getline(lineStream, cell, '\t');
-         double vx = stod(cell);
-         getline(lineStream, cell, '\t');
-         double vy = stod(cell);
-         getline(lineStream, cell, '\t');
-         double vz = stod(cell);
-         // Extracting rotational velocity
-         getline(lineStream, cell, '\t');
-         double wx = stod(cell);
-         getline(lineStream, cell, '\t');
-         double wy = stod(cell);
-         getline(lineStream, cell, '\t');
-         double wz = stod(cell);
-	 // Extracting temperature
-         getline(lineStream, cell, '\t');
-         double Tp = stod(cell);
-         getline(lineStream, cell, '\t');
-         double off = stod(cell);
-/*
-	 cout << "Particle info: " << xp << "," << yp << "," << zp << ","
-		 		   << vx << "," << vy << "," << vz << ","
-		 		   << wx << "," << wy << "," << wz << ","
-		 		   << Rp << "," << Tp << endl;
-*/
-	 // Storing the information in particle structure
-         for (size_t comp=0;comp<nb_comps;comp++) {
-            solid.coord[comp]->set_item(cntr,0,xp);
-            solid.coord[comp]->set_item(cntr,1,yp);
-            solid.coord[comp]->set_item(cntr,2,zp);
-            solid.size[comp]->set_item(cntr,Rp);
-            solid.vel[comp]->set_item(cntr,0,vx);
-            solid.vel[comp]->set_item(cntr,1,vy);
-            solid.vel[comp]->set_item(cntr,2,vz);
-            solid.ang_vel[comp]->set_item(cntr,0,wx);
-            solid.ang_vel[comp]->set_item(cntr,1,wy);
-            solid.ang_vel[comp]->set_item(cntr,2,wz);
-            solid.temp[comp]->set_item(cntr,Tp);
-            solid.inside[comp]->set_item(cntr,off);
-         }
-      } else if (cell == "O") {
-         // Extracting Orientation Matrix
-         getline(lineStream, cell, '\t');
-         double txx = stod(cell);
-         getline(lineStream, cell, '\t');
-         double txy = stod(cell);
-         getline(lineStream, cell, '\t');
-         double txz = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tyx = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tyy = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tyz = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tzx = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tzy = stod(cell);
-         getline(lineStream, cell, '\t');
-         double tzz = stod(cell);
-/*
-	 cout << "Orientation info: " << txx << "," << txy << "," << txz << ","
-		 	              << tyx << "," << tyy << "," << tyz << ","
-		 	              << tzx << "," << tzy << "," << tzz << endl;
-*/
-         // Storing the information in particle structure
-         for (size_t comp=0;comp<nb_comps;comp++) {
-            solid.thetap[comp]->set_item(cntr,0,txx);
-            solid.thetap[comp]->set_item(cntr,1,txy);
-            solid.thetap[comp]->set_item(cntr,2,txz);
-            solid.thetap[comp]->set_item(cntr,3,tyx);
-            solid.thetap[comp]->set_item(cntr,4,tyy);
-            solid.thetap[comp]->set_item(cntr,5,tyz);
-            solid.thetap[comp]->set_item(cntr,6,tzx);
-            solid.thetap[comp]->set_item(cntr,7,tzy);
-            solid.thetap[comp]->set_item(cntr,8,tzz);
-         }
-      }
-   }
-
-   // Make sure the number of particle in GRAINS and FLUID are same
-   MAC_ASSERT( (size_t)(cntr+1) == Npart ) ;
-}
 
 
 //---------------------------------------------------------------------------
@@ -3455,531 +3270,8 @@ DS_HeatTransfer:: impose_solid_temperature_for_ghost (size_t const& comp, double
   return(ghost_temp);
 }
 
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: compute_surface_points_on_cube(size_t const& Np)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: compute_surface_points_on_cube" ) ;
-/*
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/point_data_" << my_rank << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-  outputFile << "x,y,z,area,nx,ny,nz" << endl;
-*/
-  // Structure of particle input data
-  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
 
-  double dp = 2./((double)Np);
 
-  if (dim == 3) {
-     // Generating discretization on surface
-     doubleVector lsp(Np,0.);
-     for (size_t i=0; i<Np; i++) lsp(i) = -1. + dp*(double(i)+0.5);
-
-     size_t cntr = 0;
-
-     for (size_t i=0; i<Np; i++) {
-	for (size_t j=0; j<Np; j++) {
-           //Front
-           surface.coordinate->set_item(cntr,0,lsp(i));
-           surface.coordinate->set_item(cntr,1,lsp(j));
-           surface.coordinate->set_item(cntr,2,1.);
-           surface.area->set_item(cntr,dp*dp);
-           surface.normal->set_item(cntr,2,1.);
-           //Behind
-           surface.coordinate->set_item(Np*Np+cntr,0,lsp(i));
-           surface.coordinate->set_item(Np*Np+cntr,1,lsp(j));
-           surface.coordinate->set_item(Np*Np+cntr,2,-1.);
-           surface.area->set_item(Np*Np+cntr,dp*dp);
-           surface.normal->set_item(Np*Np+cntr,2,-1.);
-           //Top
-           surface.coordinate->set_item(2*Np*Np+cntr,0,lsp(i));
-           surface.coordinate->set_item(2*Np*Np+cntr,2,lsp(j));
-           surface.coordinate->set_item(2*Np*Np+cntr,1,1.);
-           surface.area->set_item(2*Np*Np+cntr,dp*dp);
-           surface.normal->set_item(2*Np*Np+cntr,1,1.);
-           //Bottom
-           surface.coordinate->set_item(3*Np*Np+cntr,0,lsp(i));
-           surface.coordinate->set_item(3*Np*Np+cntr,2,lsp(j));
-           surface.coordinate->set_item(3*Np*Np+cntr,1,-1.);
-           surface.area->set_item(3*Np*Np+cntr,dp*dp);
-           surface.normal->set_item(3*Np*Np+cntr,1,-1.);
-           //Right
-           surface.coordinate->set_item(4*Np*Np+cntr,1,lsp(i));
-           surface.coordinate->set_item(4*Np*Np+cntr,2,lsp(j));
-           surface.coordinate->set_item(4*Np*Np+cntr,0,1.);
-           surface.area->set_item(4*Np*Np+cntr,dp*dp);
-           surface.normal->set_item(4*Np*Np+cntr,0,1.);
-           //Left
-           surface.coordinate->set_item(5*Np*Np+cntr,1,lsp(i));
-           surface.coordinate->set_item(5*Np*Np+cntr,2,lsp(j));
-           surface.coordinate->set_item(5*Np*Np+cntr,0,-1.);
-           surface.area->set_item(5*Np*Np+cntr,dp*dp);
-           surface.normal->set_item(5*Np*Np+cntr,0,-1.);
-
-/*	   outputFile << surface.coordinate->item(cntr,0) << "," << surface.coordinate->item(cntr,1) << "," << surface.coordinate->item(cntr,2) << "," << surface.area->item(cntr) << "," << surface.normal->item(cntr,0) << "," << surface.normal->item(cntr,1) << "," << surface.normal->item(cntr,2) << endl;
-           outputFile << surface.coordinate->item(Np*Np+cntr,0) << "," << surface.coordinate->item(Np*Np+cntr,1) << "," << surface.coordinate->item(Np*Np+cntr,2) << "," << surface.area->item(Np*Np+cntr) << "," << surface.normal->item(Np*Np+cntr,0) << "," << surface.normal->item(Np*Np+cntr,1) << "," << surface.normal->item(Np*Np+cntr,2) << endl;
-           outputFile << surface.coordinate->item(2*Np*Np+cntr,0) << "," << surface.coordinate->item(2*Np*Np+cntr,1) << "," << surface.coordinate->item(2*Np*Np+cntr,2) << "," << surface.area->item(2*Np*Np+cntr) << "," << surface.normal->item(2*Np*Np+cntr,0) << "," << surface.normal->item(2*Np*Np+cntr,1) << "," << surface.normal->item(2*Np*Np+cntr,2) << endl;
-           outputFile << surface.coordinate->item(3*Np*Np+cntr,0) << "," << surface.coordinate->item(3*Np*Np+cntr,1) << "," << surface.coordinate->item(3*Np*Np+cntr,2) << "," << surface.area->item(3*Np*Np+cntr) << "," << surface.normal->item(3*Np*Np+cntr,0) << "," << surface.normal->item(3*Np*Np+cntr,1) << "," << surface.normal->item(3*Np*Np+cntr,2) << endl;
-           outputFile << surface.coordinate->item(4*Np*Np+cntr,0) << "," << surface.coordinate->item(4*Np*Np+cntr,1) << "," << surface.coordinate->item(4*Np*Np+cntr,2) << "," << surface.area->item(4*Np*Np+cntr) << "," << surface.normal->item(4*Np*Np+cntr,0) << "," << surface.normal->item(4*Np*Np+cntr,1) << "," << surface.normal->item(4*Np*Np+cntr,2) << endl;
-           outputFile << surface.coordinate->item(5*Np*Np+cntr,0) << "," << surface.coordinate->item(5*Np*Np+cntr,1) << "," << surface.coordinate->item(5*Np*Np+cntr,2) << "," << surface.area->item(5*Np*Np+cntr) << "," << surface.normal->item(5*Np*Np+cntr,0) << "," << surface.normal->item(5*Np*Np+cntr,1) << "," << surface.normal->item(5*Np*Np+cntr,2) << endl; */
-           cntr++;
-	}
-     }
-  } else if (dim == 2) {
-     // Generating discretization on surface
-     double lsp=0.;
-     for (size_t i=0; i<Np; i++) {
-        lsp = -1. + dp*((double)i+0.5);
-	//Bottom
-	surface.coordinate->set_item(i,0,lsp);
-	surface.coordinate->set_item(i,1,-1.);
-	surface.area->set_item(i,dp);
-	surface.normal->set_item(i,1,-1.);
-	//Top
-	surface.coordinate->set_item(Np+i,0,lsp);
-	surface.coordinate->set_item(Np+i,1,1.);
-	surface.area->set_item(Np+i,dp);
-	surface.normal->set_item(Np+i,1,1.);
-	//Left
-	surface.coordinate->set_item(2*Np+i,0,-1.);
-	surface.coordinate->set_item(2*Np+i,1,lsp);
-	surface.area->set_item(2*Np+i,dp);
-	surface.normal->set_item(2*Np+i,0,-1.);
-	//Right
-	surface.coordinate->set_item(3*Np+i,0,1.);
-	surface.coordinate->set_item(3*Np+i,1,lsp);
-	surface.area->set_item(3*Np+i,dp);
-	surface.normal->set_item(3*Np+i,0,1.);
-/*
-  	outputFile << surface.coordinate->item(i,0) << "," << surface.coordinate->item(i,1) << "," << surface.area->item(i) << "," << surface.normal->item(i,0) << "," << surface.normal->item(i,1) << endl;
-  	outputFile << surface.coordinate->item(1*Np+i,0) << "," << surface.coordinate->item(1*Np+i,1) << "," << surface.area->item(1*Np+i) << "," << surface.normal->item(1*Np+i,0) << "," << surface.normal->item(1*Np+i,1) << endl;
-  	outputFile << surface.coordinate->item(2*Np+i,0) << "," << surface.coordinate->item(2*Np+i,1) << "," << surface.area->item(2*Np+i) << "," << surface.normal->item(2*Np+i,0) << "," << surface.normal->item(2*Np+i,1) << endl;
-  	outputFile << surface.coordinate->item(3*Np+i,0) << "," << surface.coordinate->item(3*Np+i,1) << "," << surface.area->item(3*Np+i) << "," << surface.normal->item(3*Np+i,0) << "," << surface.normal->item(3*Np+i,1) << endl; */
-     }
-  }
-//  outputFile.close();
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: compute_surface_points_on_cylinder(class doubleVector& k, size_t const& Nring)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: compute_surface_points_on_cylinder" ) ;
-/*
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/point_data_" << my_rank << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-  outputFile << "x,y,z,area,nx,ny,nz" << endl;
-*/
-
-  // Structure of particle input data
-  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
-
-  // Radius of the rings in lamber projection plane
-  doubleVector Rring(Nring,0.);
-
-  Rring(Nring-1) = 1.;
-
-  size_t maxby2 = (size_t) k(Nring-1);
-
-  if (dim == 3) {
-     // Calculation for all rings except at the pole
-     for (int i=(int)Nring-1; i>0; --i) {
-        double Ri = Rring(i);
-        Rring(i-1) = MAC::sqrt(k(i-1)/k(i))*Rring(i);
-        Rring(i) = (Rring(i) + Rring(i-1))/2.;
-        double d_theta = 2.*MAC::pi()/(k(i)-k(i-1));
-        // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
-        double theta = 0.01*d_theta;
-        for (int j=(int)k(i-1); j<k(i); j++) {
-	   // For top disk
-           theta = theta + d_theta;
-           surface.coordinate->set_item(j,0,Rring(i)*MAC::cos(theta));
-           surface.coordinate->set_item(j,1,Rring(i)*MAC::sin(theta));
-           surface.coordinate->set_item(j,2,1.);
-           surface.area->set_item(j,0.5*d_theta*(pow(Ri,2)-pow(Rring(i-1),2)));
-	   // For bottom disk
-	   surface.coordinate->set_item(maxby2+j,0,Rring(i)*MAC::cos(theta));
-           surface.coordinate->set_item(maxby2+j,1,Rring(i)*MAC::sin(theta));
-           surface.coordinate->set_item(maxby2+j,2,-1.);
-           surface.area->set_item(maxby2+j,0.5*d_theta*(pow(Ri,2)-pow(Rring(i-1),2)));
-	   // Create surface normal vectors
-	   surface.normal->set_item(j,0,0.);
-	   surface.normal->set_item(j,1,0.);
-	   surface.normal->set_item(j,2,1.);
-	   surface.normal->set_item(maxby2+j,0,0.);
-	   surface.normal->set_item(maxby2+j,1,0.);
-	   surface.normal->set_item(maxby2+j,2,-1.);
-
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << ","
-		      << surface.area->item(j) << ","
-		      << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
-           outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
-        }
-     }
-
-     // Calculation at the ring on pole (i=0)
-     double Ri = Rring(0);
-     Rring(0) = Rring(0)/2.;
-     double d_theta = 2.*MAC::pi()/(k(0));
-     // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
-     double theta = 0.01*d_theta;
-     if (k(0)>1) {
-        for (int j=0; j < k(0); j++) {
-	   // For top disk
-           theta = theta + d_theta;
-           surface.coordinate->set_item(j,0,Rring(0)*MAC::cos(theta));
-           surface.coordinate->set_item(j,1,Rring(0)*MAC::sin(theta));
-           surface.coordinate->set_item(j,2,1.);
-           surface.area->set_item(j,0.5*d_theta*pow(Ri,2));
-           // For bottom disk
-           surface.coordinate->set_item(maxby2+j,0,Rring(0)*MAC::cos(theta));
-           surface.coordinate->set_item(maxby2+j,1,Rring(0)*MAC::sin(theta));
-           surface.coordinate->set_item(maxby2+j,2,-1.);
-           surface.area->set_item(maxby2+j,0.5*d_theta*pow(Ri,2.));
-	   // Create surface normal vectors
-	   surface.normal->set_item(j,0,0.);
-	   surface.normal->set_item(j,1,0.);
-	   surface.normal->set_item(j,2,1.);
-	   surface.normal->set_item(maxby2+j,0,0.);
-	   surface.normal->set_item(maxby2+j,1,0.);
-	   surface.normal->set_item(maxby2+j,2,-1.);
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
-           outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
-        }
-     } else {
-	// For top disk
-        surface.coordinate->set_item(0,0,0.);
-        surface.coordinate->set_item(0,1,0.);
-        surface.coordinate->set_item(0,2,1.);
-        surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
-	// For bottom disk
-        surface.coordinate->set_item(maxby2,0,0.);
-        surface.coordinate->set_item(maxby2,1,0.);
-        surface.coordinate->set_item(maxby2,2,-1.);
-        surface.area->set_item(maxby2,0.5*d_theta*pow(Ri,2.));
-        // Create surface normal vectors
-        surface.normal->set_item(0,0,0.);
-        surface.normal->set_item(0,1,0.);
-        surface.normal->set_item(0,2,1.);
-        surface.normal->set_item(maxby2,0,0.);
-        surface.normal->set_item(maxby2,1,0.);
-        surface.normal->set_item(maxby2,2,-1.);
-/*        outputFile << surface.coordinate->item(0,0) << "," << surface.coordinate->item(0,1) << "," << surface.coordinate->item(0,2) << "," << surface.area->item(0) << "," << surface.normal->item(0,0) << "," << surface.normal->item(0,1) << "," << surface.normal->item(0,2) << endl;
-        outputFile << surface.coordinate->item(maxby2,0) << "," << surface.coordinate->item(maxby2,1) << "," << surface.coordinate->item(maxby2,2) << "," << surface.area->item(maxby2) << "," << surface.normal->item(maxby2,0) << "," << surface.normal->item(maxby2,1) << "," << surface.normal->item(maxby2,2) << endl;*/
-     }
-
-     // Generating one ring of points on cylindrical surface
-     // Can be used to calculate stress on whole surface by a constant shift of points
-
-     // Estimating number of points on cylindrical surface
-     int pts_1_ring = (int)(k(Nring-1) - k(Nring-2));
-     int cyl_rings = (int)round(2./(1-MAC::sqrt(k(Nring-2)/k(Nring-1))));
-     double cell_area = 2.*MAC::pi()/(double(pts_1_ring))*(2./(double(cyl_rings)));
-
-     d_theta = 2.*MAC::pi()/pts_1_ring;
-     for (int j=0; j<cyl_rings; j++) {
-        theta = 0.01*d_theta;
-	for (int ij=0; ij<pts_1_ring; ij++) {
-           theta = theta + d_theta;
-	   int n = 2*(int)k(Nring-1) + j*pts_1_ring + ij;
-           surface.coordinate->set_item(n,0,MAC::cos(theta));
-           surface.coordinate->set_item(n,1,MAC::sin(theta));
-           surface.coordinate->set_item(n,2,-1.+ 2.*(j+0.5)/(double(cyl_rings)));
-           surface.area->set_item(n,cell_area);
-           surface.normal->set_item(n,0,MAC::cos(theta));
-           surface.normal->set_item(n,1,MAC::sin(theta));
-           surface.normal->set_item(n,2,0.);
-
-//           outputFile << surface.coordinate->item(2*k(Nring-1)+j*ij,0) << "," << surface.coordinate->item(2*k(Nring-1)+j*ij,1) << "," << surface.coordinate->item(2*k(Nring-1)+j*ij,2) << "," << surface.area->item(2*k(Nring-1)+j*ij) << "," << surface.normal->item(2*k(Nring-1)+j*ij,0) << "," << surface.normal->item(2*k(Nring-1)+j*ij,1) << "," << surface.normal->item(2*k(Nring-1)+j*ij,2) << endl;
-	}
-     }
-  }
-//  outputFile.close();
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: compute_surface_points_on_sphere(class doubleVector& eta, class doubleVector& k, class doubleVector& Rring, size_t const& Nring)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: compute_surface_points_on_sphere" ) ;
-/*
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/point_data_" << my_rank << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-  outputFile << "x,y,z,area,nx,ny,nz" << endl;
-*/
-
-  // Structure of particle input data
-  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
-
-  size_t maxby2 = (size_t) k(Nring-1);
-
-  if (dim == 3) {
-     // Calculation for all rings except at the pole
-     for (int i=(int)Nring-1; i>0; --i) {
-        double Ri = Rring(i);
-        Rring(i) = (Rring(i) + Rring(i-1))/2.;
-        eta(i) = (eta(i) + eta(i-1))/2.;
-        double d_theta = 2.*MAC::pi()/(k(i)-k(i-1));
-        // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
-        double theta = 0.01*d_theta;
-        for (int j=(int)k(i-1); j<k(i); j++) {
-           theta = theta + d_theta;
-           if (pole_loc == 2) {
-              surface.coordinate->set_item(j,0,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,1,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,2,MAC::cos(eta(i)));
-              surface.area->set_item(j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
-              // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,0,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,1,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,2,-MAC::cos(eta(i)));
-              surface.area->set_item(maxby2+j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
-           } else if (pole_loc == 1) {
-              surface.coordinate->set_item(j,2,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,0,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,1,MAC::cos(eta(i)));
-              surface.area->set_item(j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
-              // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,2,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,0,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,1,-MAC::cos(eta(i)));
-              surface.area->set_item(maxby2+j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
-           } else if (pole_loc == 0) {
-              surface.coordinate->set_item(j,1,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,2,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(j,0,MAC::cos(eta(i)));
-              surface.area->set_item(j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
-              // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,1,MAC::cos(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,2,MAC::sin(theta)*MAC::sin(eta(i)));
-              surface.coordinate->set_item(maxby2+j,0,-MAC::cos(eta(i)));
-              surface.area->set_item(maxby2+j,0.5*d_theta*(pow(Ri,2.)-pow(Rring(i-1),2.)));
-           }
-	   // Create surface normal vectors
-	   surface.normal->set_item(j,0,surface.coordinate->item(j,0));
-	   surface.normal->set_item(j,1,surface.coordinate->item(j,1));
-	   surface.normal->set_item(j,2,surface.coordinate->item(j,2));
-	   surface.normal->set_item(maxby2+j,0,surface.coordinate->item(maxby2+j,0));
-	   surface.normal->set_item(maxby2+j,1,surface.coordinate->item(maxby2+j,1));
-	   surface.normal->set_item(maxby2+j,2,surface.coordinate->item(maxby2+j,2));
-
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << ","
-		      << surface.area->item(j) << ","
-		      << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
-           outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
-        }
-     }
-
-     // Calculation at the ring on pole (i=0)
-     double Ri = Rring(0);
-     Rring(0) = Rring(0)/2.;
-     eta(0) = eta(0)/2.;
-     double d_theta = 2.*MAC::pi()/(k(0));
-     // Theta initialize as 1% of the d_theta, so there would be no chance of point overlap with mesh gridlines
-     double theta = 0.01*d_theta;
-     if (k(0)>1) {
-        for (int j=0; j < k(0); j++) {
-           theta = theta + d_theta;
-           if (pole_loc == 2) {
-              surface.coordinate->set_item(j,0,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,1,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,2,MAC::cos(eta(0)));
-              surface.area->set_item(j,0.5*d_theta*pow(Ri,2.));
-              // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,0,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,1,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,2,-MAC::cos(eta(0)));
-              surface.area->set_item(maxby2+j,0.5*d_theta*pow(Ri,2.));
-           } else if (pole_loc == 1) {
-              surface.coordinate->set_item(j,2,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,0,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,1,MAC::cos(eta(0)));
-              surface.area->set_item(j,0.5*d_theta*pow(Ri,2.));
-              // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,2,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,0,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,1,-MAC::cos(eta(0)));
-              surface.area->set_item(maxby2+j,0.5*d_theta*pow(Ri,2.));
-           } else if (pole_loc == 0) {
-              surface.coordinate->set_item(j,1,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,2,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(j,0,MAC::cos(eta(0)));
-              surface.area->set_item(j,0.5*d_theta*pow(Ri,2.));
-              // For second half of sphere
-              surface.coordinate->set_item(maxby2+j,1,MAC::cos(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,2,MAC::sin(theta)*MAC::sin(eta(0)));
-              surface.coordinate->set_item(maxby2+j,0,-MAC::cos(eta(0)));
-              surface.area->set_item(maxby2+j,0.5*d_theta*pow(Ri,2.));
-           }
-	   // Create surface normal vectors
-	   surface.normal->set_item(j,0,surface.coordinate->item(j,0));
-	   surface.normal->set_item(j,1,surface.coordinate->item(j,1));
-	   surface.normal->set_item(j,2,surface.coordinate->item(j,2));
-	   surface.normal->set_item(maxby2+j,0,surface.coordinate->item(maxby2+j,0));
-	   surface.normal->set_item(maxby2+j,1,surface.coordinate->item(maxby2+j,1));
-	   surface.normal->set_item(maxby2+j,2,surface.coordinate->item(maxby2+j,2));
-/*           outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
-           outputFile << surface.coordinate->item(maxby2+j,0) << "," << surface.coordinate->item(maxby2+j,1) << "," << surface.coordinate->item(maxby2+j,2) << "," << surface.area->item(maxby2+j) << "," << surface.normal->item(maxby2+j,0) << "," << surface.normal->item(maxby2+j,1) << "," << surface.normal->item(maxby2+j,2) << endl;*/
-        }
-     } else {
-        if (pole_loc == 2) {
-           surface.coordinate->set_item(0,0,0.);
-           surface.coordinate->set_item(0,1,0.);
-           surface.coordinate->set_item(0,2,1.);
-           surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
-           // For second half of sphere
-           surface.coordinate->set_item(maxby2,0,0.);
-           surface.coordinate->set_item(maxby2,1,0.);
-           surface.coordinate->set_item(maxby2,2,-1.);
-           surface.area->set_item(maxby2,0.5*d_theta*pow(Ri,2.));
-        } else if (pole_loc == 1) {
-           surface.coordinate->set_item(0,2,0.);
-           surface.coordinate->set_item(0,0,0.);
-           surface.coordinate->set_item(0,1,1.);
-           surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
-           // For second half of sphere
-           surface.coordinate->set_item(maxby2,2,0.);
-           surface.coordinate->set_item(maxby2,0,0.);
-           surface.coordinate->set_item(maxby2,1,-1.);
-           surface.area->set_item(maxby2,0.5*d_theta*pow(Ri,2.));
-        } else if (pole_loc == 0) {
-           surface.coordinate->set_item(0,1,0.);
-           surface.coordinate->set_item(0,2,0.);
-           surface.coordinate->set_item(0,0,1.);
-           surface.area->set_item(0,0.5*d_theta*pow(Ri,2.));
-           // For second half of sphere
-           surface.coordinate->set_item(maxby2,1,0.);
-           surface.coordinate->set_item(maxby2,2,0.);
-           surface.coordinate->set_item(maxby2,0,-1.);
-           surface.area->set_item(maxby2,0.5*d_theta*pow(Ri,2.));
-        }
-        // Create surface normal vectors
-        surface.normal->set_item(0,0,surface.coordinate->item(0,0));
-        surface.normal->set_item(0,1,surface.coordinate->item(0,1));
-        surface.normal->set_item(0,2,surface.coordinate->item(0,2));
-        surface.normal->set_item(maxby2,0,surface.coordinate->item(maxby2,0));
-        surface.normal->set_item(maxby2,1,surface.coordinate->item(maxby2,1));
-        surface.normal->set_item(maxby2,2,surface.coordinate->item(maxby2,2));
-/*        outputFile << surface.coordinate->item(0,0) << "," << surface.coordinate->item(0,1) << "," << surface.coordinate->item(0,2) << "," << surface.area->item(0) << "," << surface.normal->item(0,0) << "," << surface.normal->item(0,1) << "," << surface.normal->item(0,2) << endl;
-        outputFile << surface.coordinate->item(maxby2,0) << "," << surface.coordinate->item(maxby2,1) << "," << surface.coordinate->item(maxby2,2) << "," << surface.area->item(maxby2) << "," << surface.normal->item(maxby2,0) << "," << surface.normal->item(maxby2,1) << "," << surface.normal->item(maxby2,2) << endl;*/
-     }
-  } else if (dim == 2) {
-     double d_theta = 2.*MAC::pi()/(double(Nring));
-     double theta = 0.01*d_theta;
-     for (int j=0; j < (int) Nring; j++) {
-        theta = theta + d_theta;
-        surface.coordinate->set_item(j,0,MAC::cos(theta));
-        surface.coordinate->set_item(j,1,MAC::sin(theta));
-        surface.area->set_item(j,d_theta);
-        // Create surface normal vectors
-        surface.normal->set_item(j,0,surface.coordinate->item(j,0));
-        surface.normal->set_item(j,1,surface.coordinate->item(j,1));
-//        outputFile << surface.coordinate->item(j,0) << "," << surface.coordinate->item(j,1) << "," << surface.coordinate->item(j,2) << "," << surface.area->item(j) << "," << surface.normal->item(j,0) << "," << surface.normal->item(j,1) << "," << surface.normal->item(j,2) << endl;
-     }
-  }
-//  outputFile.close();
-}
-//---------------------------------------------------------------------------
-void DS_HeatTransfer:: generate_surface_discretization()
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: generate_surface_discretization" ) ;
-
-  size_t kmax = (int) Npoints;
-
-  if ( level_set_type == "Sphere" ) {
-     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into
-     // equal-area cells, Computational Geometry 45 (2012) 275-283
-
-     double eta_temp = MAC::pi()/2.;
-     double k_temp = (double) kmax;
-     double Ro_temp = MAC::sqrt(2);
-     double Rn_temp = MAC::sqrt(2);
-     size_t cntr = 0;
-
-     // Estimating the number of rings on the hemisphere
-     while (k_temp > double(Pmin+2)) {
-        eta_temp = eta_temp - 2./ar*MAC::sqrt(MAC::pi()/k_temp)*MAC::sin(eta_temp/2.);
-        Rn_temp = 2.*MAC::sin(eta_temp/2.);
-        k_temp = round(k_temp*pow(Rn_temp/Ro_temp,2.));
-        Ro_temp = Rn_temp;
-        cntr++;
-     }
-
-     size_t Nrings = cntr+1;
-
-     // Summation of total discretized points with increase in number of rings radially
-     doubleVector k(Nrings,0.);
-     // Zenithal angle for the sphere
-     doubleVector eta(Nrings,0.);
-     // Radius of the rings in lamber projection plane
-     doubleVector Rring(Nrings,0.);
-
-     // Assigning the maximum number of discretized points to the last element of the array
-     k(Nrings-1) = (double) kmax;
-     // Zenithal angle for the last must be pi/2.
-     eta(Nrings-1) = MAC::pi()/2.;
-     // Radius of last ring in lamber projection plane
-     Rring(Nrings-1) = MAC::sqrt(2.);
-
-     for (int i=int(Nrings)-2; i>=0; --i) {
-        eta(i) = eta(i+1) - 2./ar*MAC::sqrt(MAC::pi()/k(i+1))*MAC::sin(eta(i+1)/2.);
-        Rring(i) = 2.*MAC::sin(eta(i)/2.);
-        k(i) = round(k(i+1)*pow(Rring(i)/Rring(i+1),2.));
-        if (i==0) k(0) = (double) Pmin;
-     }
-
-     // Discretize the particle surface into approximate equal area cells
-     if (dim == 3) {
-        compute_surface_points_on_sphere(eta, k, Rring, Nrings);
-     } else {
-        compute_surface_points_on_sphere(eta, k, Rring, kmax);
-     }
-  } else if (level_set_type == "Cube") {
-     compute_surface_points_on_cube(kmax);
-  } else if (level_set_type == "Cylinder") {
-     // Reference paper: Becker and Becker, A general rule for disk and hemisphere partition into
-     // equal-area cells, Computational Geometry 45 (2012) 275-283
-
-     double p = MAC::pi()/ar;
-     double k_temp = (double) kmax;
-     size_t cntr = 0;
-
-     // Estimating the number of rings on either of the disc
-     while (k_temp > double(Pmin+2)) {
-        k_temp = round(pow(MAC::sqrt(k_temp) - MAC::sqrt(p),2.));
-        cntr++;
-     }
-
-     size_t Nrings = cntr+1;
-
-     // Summation of total discretized points with increase in number of rings radially
-     doubleVector k(Nrings,0.);
-     // Assigning the maximum number of discretized points to the last element of the array
-     k(Nrings-1) = (double) kmax;
-
-     for (int i=(int)Nrings-2; i>=0; --i) {
-	k(i) = round(pow(MAC::sqrt(k(i+1)) - MAC::sqrt(p),2.));
-        if (i==0) k(0) = (double) Pmin;
-     }
-
-     if (dim == 3) {
-        compute_surface_points_on_cylinder(k, Nrings);
-     }
-  }
-}
 
 //---------------------------------------------------------------------------
 double
@@ -4211,11 +3503,7 @@ DS_HeatTransfer:: node_property_calculation ( )
 
      // Level 0 is for the intersection matrix corresponding to fluid side
      assemble_intersection_matrix(comp,0);
-     // Level 1 is for the intersection matrix corresponding to solids side
-//     assemble_intersection_matrix(comp,1);
 
-//     BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-//     b_intersect[0].value[comp]->print_items(MAC::out(),0);
   }
 }
 
@@ -4709,123 +3997,9 @@ DS_HeatTransfer:: output_l2norm ( void )
       computed_DS_L2 = MAC::sqrt(computed_DS_L2);
 
       if (my_rank == is_master) {
-         cout << "L2 Norm for component "<<comp<<" with DS = " << std::fixed << std::setprecision(10) << computed_DS_L2<<endl;
-      }
-   }
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: DS_error_with_analytical_solution ( FV_DiscreteField const* FF,FV_DiscreteField* FF_ERROR )
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DS_HeatTransfer:: DS_error_with_analytical_solution" ) ;
-
-   // Parameters
-   size_t i,j,k;
-
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-
-   for (size_t comp=0;comp<nb_comps;comp++) {
-
-      double x,y,z,analytical_solution=0., computed_DS_field=0.,error_L2 = 0. ,denom = 0., norm_error = 0.;
-      // Get local min and max indices
-      for (size_t l=0;l<dim;++l) {
-	 min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-         max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-      }
-
-      for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-         x = FF->get_DOF_coordinate( i, comp, 0 ) ;
-         for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-            y = FF->get_DOF_coordinate( j, comp, 1 ) ;
-            if (dim == 2) {
-               k=0;
-
-               computed_DS_field = FF->DOF_value( i, j, k, comp, 0 ) ;
-
-               // Presence of solids; analytical solution of hollow cylindrical shell for 2D
-               if (is_solids) {
-                  PartInput solid = GLOBAL_EQ->get_solid();
-                  NodeProp node = GLOBAL_EQ->get_node_property();
-                  size_t p = return_node_index(FF,comp,i,j,0);
-                  if (node.void_frac[comp]->item(p) != 1.) {
-                     double xp = solid.coord[comp]->item(0,0);
-                     double yp = solid.coord[comp]->item(0,1);
-                     double r1 = solid.size[comp]->item(0);
-                     double t1 = solid.temp[comp]->item(0);
-                     double r2 = solid.size[comp]->item(1);
-                     double t2 = solid.temp[comp]->item(1);
-                     double r = pow(pow(x-xp,2.)+pow(y-yp,2.),0.5);
-                     analytical_solution = t2 - (t2-t1)*(log(r/r2)/log(r1/r2));
-                     FF_ERROR->set_DOF_value( i, j, k, comp, 0, MAC::abs( computed_DS_field - analytical_solution) ) ;
-                     if ( FF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) ) {
-                        error_L2 += MAC::sqr( computed_DS_field - analytical_solution)
-                                               * FF->get_cell_measure( i, j, k, comp ) ;
-                     }
-                     denom += MAC::sqr( analytical_solution) * FF->get_cell_measure( i, j, k, comp ) ;
-                  }
-               } else {
-                  analytical_solution = MAC::sin( MAC::pi() * x )* MAC::sin( MAC::pi() * y ) ;
-                  //Get error between computed solutions with Direction splitting
-                  FF_ERROR->set_DOF_value( i, j, k, comp, 0, MAC::abs( computed_DS_field - analytical_solution) ) ;
-                  if ( FF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) ) {
-                     error_L2 += MAC::sqr( computed_DS_field - analytical_solution)
-                                            * FF->get_cell_measure( i, j, k, comp ) ;
-                  }
-                  denom += MAC::sqr( analytical_solution) * FF->get_cell_measure( i, j, k, comp ) ;
-               }
-            } else {
-               for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-                  z = FF->get_DOF_coordinate( k, comp, 2 ) ;
-                  computed_DS_field = FF->DOF_value( i, j, k, comp, 0 ) ;
-                  // Presence of solids; analytical solution for the hollow spherical shell in 3D
-                  if (is_solids) {
-                     PartInput solid = GLOBAL_EQ->get_solid();
-                     NodeProp node = GLOBAL_EQ->get_node_property();
-                     size_t p = return_node_index(FF,comp,i,j,k);
-                     if (node.void_frac[comp]->item(p) != 1.) {
-                        double xp = solid.coord[comp]->item(0,0);
-                        double yp = solid.coord[comp]->item(0,1);
-                        double zp = solid.coord[comp]->item(0,2);
-                        double r1 = solid.size[comp]->item(0);
-                        double t1 = solid.temp[comp]->item(0);
-                        double r2 = solid.size[comp]->item(1);
-                        double t2 = solid.temp[comp]->item(1);
-                        double r = pow(pow(x-xp,2.)+pow(y-yp,2.)+pow(z-zp,2.),0.5);
-                        analytical_solution = t1 - (t1-t2)*(1-r1/r)/(1-r1/r2);
-                        FF_ERROR->set_DOF_value( i, j, k, comp, 0, MAC::abs( computed_DS_field - analytical_solution) ) ;
-                        if ( FF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) ) {
-                           error_L2 += MAC::sqr( computed_DS_field - analytical_solution)
-                                                  * FF->get_cell_measure( i, j, k, comp ) ;
-                        }
-                        denom += MAC::sqr( analytical_solution) * FF->get_cell_measure( i, j, k, comp ) ;
-                     }
-                  } else {
-                     analytical_solution = MAC::sin( MAC::pi() * x )* MAC::sin( MAC::pi() * y ) * MAC::sin( MAC::pi() * z ) ;
-                     //Get error between computed solutions with Direction splitting
-                     FF_ERROR->set_DOF_value( i, j, k, comp, 0, MAC::abs( computed_DS_field- analytical_solution ) ) ;
-                     if ( FF->DOF_is_unknown_handled_by_proc( i, j, k, comp ) ) {
-                        error_L2 += MAC::sqr( computed_DS_field - analytical_solution)
-                                               * FF->get_cell_measure( i, j, k, comp ) ;
-	             }
-                     denom += MAC::sqr( analytical_solution) * FF->get_cell_measure( i, j, k, comp ) ;
-                  }
-               }
-            }
-         }
-      }
-
-      error_L2 = pelCOMM->sum( error_L2 ) ;
-      error_L2 = MAC::sqrt(error_L2);
-      denom = pelCOMM->sum( denom ) ;
-      denom = MAC::sqrt(denom);
-      norm_error = error_L2/denom;
-
-      if (my_rank == is_master) {
-         cout << "L2 Error with analytical solution for "<<comp<<" DS (Normalized) = " << norm_error<<endl;
-         cout << "L2 Error with analytical solution for "<<comp<<" DS = " << error_L2<<endl;
+			MAC::out() << "Norm L2 T = "
+	                 << MAC::doubleToString( ios::scientific, 12, computed_DS_L2 )
+	                 << endl;
       }
    }
 }

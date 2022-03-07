@@ -54,7 +54,7 @@ time integrator and a Finite Volume MAC scheme on rectangular grids.
 @author A. Goyal - Pacific project 2022 */
 
 /** @brief MPIVar include all vectors required while message passing */
-struct MPIVar {
+struct MPIVarNS {
    size_t *size;
    double ***send;
    double ***receive;
@@ -414,9 +414,9 @@ class DS_NavierStokes : public MAC_Object,
       int nb_ranks_comm_i[3];
 
       // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
-      struct MPIVar first_pass[2][3];
+      struct MPIVarNS first_pass[2][3];
       // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
-      struct MPIVar second_pass[2][3];
+      struct MPIVarNS second_pass[2][3];
 
       double mu;
       double kai;
