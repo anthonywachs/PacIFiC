@@ -793,12 +793,19 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
 
   size_t pfd = 0;
   double external_gradP = 0.;
+  double isize = 0.;
 
   if ( PF->primary_grid()->is_periodic_flow() ) {
      pfd = PF->primary_grid()->get_periodic_flow_direction() ;
+
      external_gradP = PF->primary_grid()->get_periodic_pressure_drop() /
               ( PF->primary_grid()->get_main_domain_max_coordinate( pfd )
               - PF->primary_grid()->get_main_domain_min_coordinate( pfd ) ) ;
+
+     isize = PF->primary_grid()
+               ->get_main_domain_max_coordinate(pfd)
+           - PF->primary_grid()
+               ->get_main_domain_min_coordinate(pfd);
   }
 
   for (size_t i = 0; i < surface_area.size(); i++) {
@@ -835,8 +842,15 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
         double press = (m_space_dimension == 2) ?
          Bilinear_interpolation(PF,comp,surface_point[i],i0,face_vector,{0,1}) :
          Trilinear_interpolation(PF,comp,surface_point[i],i0,parID,{0,1}) ;
-        stress = - press/2.
-                 - (external_gradP * surface_point[i]->operator()(pfd));
+        stress = - press/2.;
+
+        if (PF->primary_grid()->is_periodic_flow() &&
+            (external_gradP != 0.)) {
+           double delta = surface_point[i]->operator()(pfd)
+                        - pgc->operator()(pfd);
+           delta = delta - round(delta/isize) * isize;
+           stress += - (external_gradP * (delta + pgc->operator()(pfd)));
+        }
      }
 
      // Ref: Keating thesis Pg-85
