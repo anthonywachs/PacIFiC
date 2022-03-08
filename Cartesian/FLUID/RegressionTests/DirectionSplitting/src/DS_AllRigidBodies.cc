@@ -28,6 +28,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , bool const& b_particles_as_fixed_obstacles
                                   , FV_DiscreteField const* arb_UF
                                   , FV_DiscreteField const* arb_PF
+                                  , FV_Mesh const* arb_mesh
                                   , double const& arb_scs
                                   , MAC_Communicator const* arb_macCOMM
                                   , double const& arb_mu )
@@ -35,6 +36,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   : m_space_dimension( dimens )
   , UF ( arb_UF )
   , PF ( arb_PF )
+  , MESH ( arb_mesh )
   , surface_cell_scale ( arb_scs )
   , m_macCOMM ( arb_macCOMM )
   , m_mu ( arb_mu )
@@ -54,8 +56,6 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
     	m_FSallrigidbodies->get_ptr_rigid_body(i) );
   }
 
-  build_solid_variables_on_grid();
-
   initialize_surface_variables_for_all_RB();
 
   compute_surface_variables_for_all_RB();
@@ -64,13 +64,11 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   create_neighbour_list_for_AllRB();
 
-  compute_void_fraction_on_grid(PF);
-  compute_void_fraction_on_grid(UF);
-
-  compute_grid_intersection_with_rigidbody(PF);
-  compute_grid_intersection_with_rigidbody(UF);
-
-  write_surface_discretization_for_all_RB();
+  // compute_void_fraction_on_grid(PF);
+  // compute_void_fraction_on_grid(UF);
+  //
+  // compute_grid_intersection_with_rigidbody(PF);
+  // compute_grid_intersection_with_rigidbody(UF);
 }
 
 
@@ -459,10 +457,9 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
   MAC_LABEL( "DS_AllRigidBodies:: compute_void_fraction_on_grid" ) ;
 
   size_t nb_comps = FF->nb_components() ;
-  size_t field = (FF == PF) ? 0 : 1 ;
+  size_t field = field_num(FF) ;
 
-  boolVector const* periodic_comp =
-                        FF->primary_grid()->get_periodic_directions();
+  boolVector const* periodic_comp = MESH->get_periodic_directions();
 
   // Get local min and max indices;
   size_t_vector min_unknown_index(3,0);
@@ -483,10 +480,8 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
                    FF->get_max_index_unknown_on_proc( comp, dir );
 
            bool is_periodic = periodic_comp->operator()( dir );
-           double domain_min =
-                   FF->primary_grid()->get_main_domain_min_coordinate( dir );
-           double domain_max =
-                   FF->primary_grid()->get_main_domain_max_coordinate( dir );
+           double domain_min = MESH->get_main_domain_min_coordinate( dir );
+           double domain_max = MESH->get_main_domain_max_coordinate( dir );
 
            bool found =FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
                                        , haloZone[0]->operator()(dir)
@@ -552,11 +547,9 @@ double DS_AllRigidBodies:: periodic_transformation( FV_DiscreteField const* FF
 {
   MAC_LABEL( "DS_AllRigidBodies:: periodic_transformation" ) ;
 
-  double isize =
-        FF->primary_grid()->get_main_domain_max_coordinate(dir)
-      - FF->primary_grid()->get_main_domain_min_coordinate(dir);
-  double imin =
-        FF->primary_grid()->get_main_domain_min_coordinate(dir);
+  double isize = MESH->get_main_domain_max_coordinate(dir)
+               - MESH->get_main_domain_min_coordinate(dir);
+  double imin = MESH->get_main_domain_min_coordinate(dir);
   double value = x - MAC::floor((x-imin)/isize)*isize;
 
   return (value);
@@ -588,10 +581,9 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
   MAC_LABEL( "DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody" ) ;
 
   size_t nb_comps = FF->nb_components() ;
-  size_t field = (FF == PF) ? 0 : 1 ;
+  size_t field = field_num(FF) ;
 
-  boolVector const* periodic_comp =
-                        FF->primary_grid()->get_periodic_directions();
+  boolVector const* periodic_comp = MESH->get_periodic_directions();
 
   for (size_t parID = 0; parID < m_nrb; ++parID) {
      vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
@@ -604,7 +596,7 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
      size_t_array2D local_extents(3,2,0);
      size_t i0_temp = 0;
 
-     double delta = FF->primary_grid()->get_smallest_grid_size();
+     double delta = MESH->get_smallest_grid_size();
 
      for (size_t comp = 0; comp < nb_comps; comp++) {
 
@@ -621,10 +613,8 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
 
           bool is_periodic = periodic_comp->operator()( dir );
 
-          double domain_min =
-                  FF->primary_grid()->get_main_domain_min_coordinate(dir);
-          double domain_max =
-                  FF->primary_grid()->get_main_domain_max_coordinate(dir);
+          double domain_min = MESH->get_main_domain_min_coordinate(dir);
+          double domain_max = MESH->get_main_domain_max_coordinate(dir);
           bool found =
                   FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir)
                                  , haloZone[0]->operator()(dir)
@@ -741,13 +731,49 @@ void DS_AllRigidBodies:: initialize_surface_variables_for_all_RB( )
 {
    MAC_LABEL( "DS_AllRigidBodies:: initialize_surface_variables_for_all_RB" ) ;
 
-   double dx = UF->primary_grid()->get_smallest_grid_size();
+   double dx = MESH->get_smallest_grid_size();
 
    for (size_t i = 0; i < m_nrb; ++i) {
       m_allDSrigidbodies[i]->compute_number_of_surface_variables(
                                           surface_cell_scale, dx);
       m_allDSrigidbodies[i]->initialize_surface_variables( );
    }
+
+   // Reserving three location in memory for PF, UF, TF grid, respectively.
+   void_fraction.reserve(3);
+   void_fraction.push_back(new size_t_vector(1,0));
+   void_fraction.push_back(new size_t_vector(1,0));
+   void_fraction.push_back(new size_t_vector(1,0));
+   intersect_vector.reserve(3);
+   intersect_vector.push_back(new size_t_array2D(1,1,0));
+   intersect_vector.push_back(new size_t_array2D(1,1,0));
+   intersect_vector.push_back(new size_t_array2D(1,1,0));
+   intersect_distance.reserve(3);
+   intersect_distance.push_back(new doubleArray2D(1,1,0.));
+   intersect_distance.push_back(new doubleArray2D(1,1,0.));
+   intersect_distance.push_back(new doubleArray2D(1,1,0.));
+   intersect_fieldValue.reserve(3);
+   intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
+   intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
+   intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
+
+   // Intialization of force and torque variables
+   viscous_force = new doubleArray2D(1,1,0.);
+   pressure_force = new doubleArray2D(1,1,0.);
+   viscous_force->re_initialize(m_nrb,3);
+   pressure_force->re_initialize(m_nrb,3);
+
+   viscous_torque = new doubleArray2D(1,1,0.);
+   pressure_torque = new doubleArray2D(1,1,0.);
+   viscous_torque->re_initialize(m_nrb,3);
+   pressure_torque->re_initialize(m_nrb,3);
+
+   geomVector vvv(3);
+
+   avg_pressure_force = vvv;
+   avg_viscous_force = vvv;
+   avg_pressure_torque = vvv;
+   avg_viscous_torque = vvv;
 
 }
 
@@ -784,28 +810,26 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
   for (size_t l = 0; l < m_space_dimension; l++) {
      min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp, l );
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp, l );
-     Dmin(l) = PF->primary_grid()->get_min_coordinate_on_current_processor( l );
-     Dmax(l) = PF->primary_grid()->get_max_coordinate_on_current_processor( l );
-     domain_length(l) = PF->primary_grid()->get_main_domain_max_coordinate( l )
-                      - PF->primary_grid()->get_main_domain_min_coordinate( l );
-     domain_min(l) = PF->primary_grid()->get_main_domain_min_coordinate( l );
+     Dmin(l) = MESH->get_min_coordinate_on_current_processor( l );
+     Dmax(l) = MESH->get_max_coordinate_on_current_processor( l );
+     domain_length(l) = MESH->get_main_domain_max_coordinate( l )
+                      - MESH->get_main_domain_min_coordinate( l );
+     domain_min(l) = MESH->get_main_domain_min_coordinate( l );
   }
 
   size_t pfd = 0;
   double external_gradP = 0.;
   double isize = 0.;
 
-  if ( PF->primary_grid()->is_periodic_flow() ) {
-     pfd = PF->primary_grid()->get_periodic_flow_direction() ;
+  if ( MESH->is_periodic_flow() ) {
+     pfd = MESH->get_periodic_flow_direction() ;
 
-     external_gradP = PF->primary_grid()->get_periodic_pressure_drop() /
-              ( PF->primary_grid()->get_main_domain_max_coordinate( pfd )
-              - PF->primary_grid()->get_main_domain_min_coordinate( pfd ) ) ;
+     external_gradP = MESH->get_periodic_pressure_drop() /
+              ( MESH->get_main_domain_max_coordinate( pfd )
+              - MESH->get_main_domain_min_coordinate( pfd ) ) ;
 
-     isize = PF->primary_grid()
-               ->get_main_domain_max_coordinate(pfd)
-           - PF->primary_grid()
-               ->get_main_domain_min_coordinate(pfd);
+     isize = MESH->get_main_domain_max_coordinate(pfd)
+           - MESH->get_main_domain_min_coordinate(pfd);
   }
 
   for (size_t i = 0; i < surface_area.size(); i++) {
@@ -844,7 +868,7 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
          Trilinear_interpolation(PF,comp,surface_point[i],i0,parID,{0,1}) ;
         stress = - press/2.;
 
-        if (PF->primary_grid()->is_periodic_flow() &&
+        if (MESH->is_periodic_flow() &&
             (external_gradP != 0.)) {
            double delta = surface_point[i]->operator()(pfd)
                         - pgc->operator()(pfd);
@@ -939,11 +963,11 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
   // One extra grid cell needs to considered, since ghost points can be
   // located in between the min/max index handled by the proc
   for (size_t l = 0; l < m_space_dimension; l++) {
-     Dmin(l) = UF->primary_grid()->get_min_coordinate_on_current_processor( l );
-     Dmax(l) = UF->primary_grid()->get_max_coordinate_on_current_processor( l );
-     domain_length(l) = UF->primary_grid()->get_main_domain_max_coordinate( l )
-                      - UF->primary_grid()->get_main_domain_min_coordinate( l );
-     domain_min(l) = UF->primary_grid()->get_main_domain_min_coordinate( l );
+     Dmin(l) = MESH->get_min_coordinate_on_current_processor( l );
+     Dmax(l) = MESH->get_max_coordinate_on_current_processor( l );
+     domain_length(l) = MESH->get_main_domain_max_coordinate( l )
+                      - MESH->get_main_domain_min_coordinate( l );
+     domain_min(l) = MESH->get_main_domain_min_coordinate( l );
   }
 
   for (size_t i = 0; i < surface_area.size(); i++) {
@@ -1186,7 +1210,7 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
   MAC_LABEL("DS_AllRigidBodies:: first_order_viscous_stress" ) ;
 
   size_t nb_comps = UF->nb_components() ;
-  double dh = UF->primary_grid()->get_smallest_grid_size();
+  double dh = MESH->get_smallest_grid_size();
 
   vector<geomVector*> surface_point = m_allDSrigidbodies[parID]
                                           ->get_rigid_body_surface_points();
@@ -1221,11 +1245,11 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
   // One extra grid cell needs to considered, since ghost points can be
   // located in between the min/max index handled by the proc
   for (size_t l = 0; l < m_space_dimension; l++) {
-     Dmin(l) = UF->primary_grid()->get_min_coordinate_on_current_processor( l );
-     Dmax(l) = UF->primary_grid()->get_max_coordinate_on_current_processor( l );
-     domain_length(l) = UF->primary_grid()->get_main_domain_max_coordinate( l )
-                      - UF->primary_grid()->get_main_domain_min_coordinate( l );
-     domain_min(l) = UF->primary_grid()->get_main_domain_min_coordinate( l );
+     Dmin(l) = MESH->get_min_coordinate_on_current_processor( l );
+     Dmax(l) = MESH->get_max_coordinate_on_current_processor( l );
+     domain_length(l) = MESH->get_main_domain_max_coordinate( l )
+                      - MESH->get_main_domain_min_coordinate( l );
+     domain_min(l) = MESH->get_main_domain_min_coordinate( l );
   }
 
 
@@ -1346,9 +1370,9 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
               } else if (in_domain(col1) == 0) {
                  double dh_wall = (sign > 0.) ?
                      MAC::abs(surface_point[i]->operator()(dir)
-                   - UF->primary_grid()->get_main_domain_max_coordinate(dir)) :
+                   - MESH->get_main_domain_max_coordinate(dir)) :
                      MAC::abs(surface_point[i]->operator()(dir)
-                   - UF->primary_grid()->get_main_domain_min_coordinate(dir)) ;
+                   - MESH->get_main_domain_min_coordinate(dir)) ;
 
                  size_t_vector i0(3,0);
                  // Point on the domain boundary
@@ -1471,7 +1495,7 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
    face_vec[0](0) = 0; face_vec[0](1) = 1; face_vec[0](2) = 1;
    face_vec[1](0) = 1; face_vec[1](1) = 0; face_vec[1](2) = 1;
    face_vec[2](0) = 1; face_vec[2](1) = 1; face_vec[2](2) = 0;
-   double dh = FF->primary_grid()->get_smallest_grid_size();
+   double dh = MESH->get_smallest_grid_size();
    double value = 0.;
    geomVector netVel(3);
    geomVector pt_at_face(3);
@@ -1557,8 +1581,8 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
 {
    MAC_LABEL("DS_AllRigidBodies:: Bilinear_interpolation" ) ;
 
-   size_t field = (FF == PF) ? 0 : 1;
-   double dh = FF->primary_grid()->get_smallest_grid_size();
+   size_t field = field_num(FF);
+   double dh = MESH->get_smallest_grid_size();
 
 
    size_t_array2D p(2,2,0);
@@ -1814,7 +1838,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
 // xp,yp,zp are the ghost point coordinated; interpol_dir is the direction
 // in which the additional points will be used for quadratic interpolation
 
-   size_t field = (FF == UF) ? 1 : 0;
+   size_t field = field_num(FF) ;
 
    // Directional index of point
    boolVector in_solid(3,0);
@@ -2130,7 +2154,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
      coord_g[2](0) = point(0); coord_g[2](1) = point(1); coord_g[2](2) = x2;
   }
 
-  double dh = FF->primary_grid()->get_smallest_grid_size();
+  double dh = MESH->get_smallest_grid_size();
 
 
 
@@ -2477,56 +2501,44 @@ void DS_AllRigidBodies:: write_surface_discretization_for_all_RB( )
 
 
 //---------------------------------------------------------------------------
-void DS_AllRigidBodies:: build_solid_variables_on_grid(  )
+void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
+                                                FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DS_AllRigidBodies:: build_solid_variables_on_grid" ) ;
+   MAC_LABEL( "DS_AllRigidBodies:: build_solid_variables_on_fluid_grid" ) ;
 
-   size_t PF_LOC_UNK = PF->nb_local_unknowns();
-   size_t UF_LOC_UNK = UF->nb_local_unknowns();
+   int field = field_num(FF);
+
+   size_t FF_LOC_UNK = FF->nb_local_unknowns();
 
    // void fraction on the computational grid
-   // For PF and UF
-   void_fraction.reserve(2);
-   void_fraction.push_back(new size_t_vector(1,0));
-   void_fraction.push_back(new size_t_vector(1,0));
-   void_fraction[0]->re_initialize(PF_LOC_UNK);
-   void_fraction[1]->re_initialize(UF_LOC_UNK);
+   void_fraction[field]->re_initialize(FF_LOC_UNK);
 
    // Intersection parameters on the computational grid
    // For PF and UF
-   intersect_vector.reserve(2);
-   intersect_vector.push_back(new size_t_array2D(1,1,0));
-   intersect_vector.push_back(new size_t_array2D(1,1,0));
-   intersect_vector[0]->re_initialize(PF_LOC_UNK,6);
-   intersect_vector[1]->re_initialize(UF_LOC_UNK,6);
-   intersect_distance.reserve(2);
-   intersect_distance.push_back(new doubleArray2D(1,1,0.));
-   intersect_distance.push_back(new doubleArray2D(1,1,0.));
-   intersect_distance[0]->re_initialize(PF_LOC_UNK,6);
-   intersect_distance[1]->re_initialize(UF_LOC_UNK,6);
-   intersect_fieldValue.reserve(2);
-   intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
-   intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
-   intersect_fieldValue[0]->re_initialize(PF_LOC_UNK,6);
-   intersect_fieldValue[1]->re_initialize(UF_LOC_UNK,6);
+   intersect_vector[field]->re_initialize(FF_LOC_UNK,6);
+   intersect_distance[field]->re_initialize(FF_LOC_UNK,6);
+   intersect_fieldValue[field]->re_initialize(FF_LOC_UNK,6);
 
-   viscous_force = new doubleArray2D(1,1,0.);
-   pressure_force = new doubleArray2D(1,1,0.);
-   viscous_force->re_initialize(m_nrb,3);
-   pressure_force->re_initialize(m_nrb,3);
+}
 
-   viscous_torque = new doubleArray2D(1,1,0.);
-   pressure_torque = new doubleArray2D(1,1,0.);
-   viscous_torque->re_initialize(m_nrb,3);
-   pressure_torque->re_initialize(m_nrb,3);
 
-   geomVector vvv(3);
 
-   avg_pressure_force = vvv;
-   avg_viscous_force = vvv;
-   avg_pressure_torque = vvv;
-   avg_viscous_torque = vvv;
+
+//---------------------------------------------------------------------------
+int DS_AllRigidBodies:: field_num( FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+  int number = 0;
+  if (FF == PF) {
+     number = 0;
+  } else if (FF == UF) {
+     number = 1;
+  } else if (FF == TF) {
+     number = 2;
+  }
+
+  return (number);
 
 }
 
@@ -2538,7 +2550,7 @@ size_t_vector* DS_AllRigidBodies:: get_void_fraction_on_grid(
                                                 FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
-  size_t field = (FF == PF) ? 0 : 1;
+  size_t field = field_num(FF);
 
   return (void_fraction[field]);
 
@@ -2552,7 +2564,7 @@ size_t_array2D* DS_AllRigidBodies:: get_intersect_vector_on_grid(
                                                 FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
-  size_t field = (FF == PF) ? 0 : 1;
+  size_t field = field_num(FF);
 
   return (intersect_vector[field]);
 
@@ -2566,7 +2578,7 @@ doubleArray2D* DS_AllRigidBodies:: get_intersect_distance_on_grid(
                                                 FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
-  size_t field = (FF == PF) ? 0 : 1;
+  size_t field = field_num(FF);
 
   return (intersect_distance[field]);
 
@@ -2580,7 +2592,7 @@ doubleArray2D* DS_AllRigidBodies:: get_intersect_fieldValue_on_grid(
                                                 FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
-  size_t field = (FF == PF) ? 0 : 1;
+  size_t field = field_num(FF);
 
   return (intersect_fieldValue[field]);
 
@@ -2595,10 +2607,9 @@ void DS_AllRigidBodies:: create_neighbour_list_for_AllRB( )
 {
    MAC_LABEL( "DS_AllRigidBodies:: create_neighbour_list_for_AllRB()" ) ;
 
-   boolVector const* periodic_comp =
-                         PF->primary_grid()->get_periodic_directions();
+   boolVector const* periodic_comp = MESH->get_periodic_directions();
 
-   double dh = PF->primary_grid()->get_smallest_grid_size();
+   double dh = MESH->get_smallest_grid_size();
 
    for (size_t i = 0; i < m_nrb; ++i) {
       vector<size_t> v1;
@@ -2611,7 +2622,7 @@ void DS_AllRigidBodies:: create_neighbour_list_for_AllRB( )
          geomVector const* pgc_j = m_allDSrigidbodies[j]
                                                  ->get_ptr_to_gravity_centre();
 
-         size_t dim = PF->primary_grid()->nb_space_dimensions() ;
+         size_t dim = MESH->nb_space_dimensions() ;
 
          geomVector delta(3);
 
@@ -2621,10 +2632,8 @@ void DS_AllRigidBodies:: create_neighbour_list_for_AllRB( )
             bool is_periodic = periodic_comp->operator()( dir );
 
             if (is_periodic) {
-               double isize = PF->primary_grid()
-                                ->get_main_domain_max_coordinate(dir)
-                            - PF->primary_grid()
-                                ->get_main_domain_min_coordinate(dir);
+               double isize = MESH->get_main_domain_max_coordinate(dir)
+                            - MESH->get_main_domain_min_coordinate(dir);
                delta(dir) = delta(dir) - round(delta(dir)/isize) * isize;
             }
          }

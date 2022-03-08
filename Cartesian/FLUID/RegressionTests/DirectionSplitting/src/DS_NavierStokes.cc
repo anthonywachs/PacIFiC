@@ -318,6 +318,7 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
                                             , b_particles_as_fixed_obstacles
                                             , UF
                                             , PF
+														  , UF->primary_grid()
                                             , surface_cell_scale
                                             , macCOMM
                                             , mu );
@@ -325,9 +326,22 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
       if (my_rank == 0)
          cout << "Finished particle generation... \n" << endl;
 
+		// Build void frac and intersection variable
+		allrigidbodies->build_solid_variables_on_fluid_grid(PF);
+		allrigidbodies->build_solid_variables_on_fluid_grid(UF);
+		// Compute void fraction for pressure and velocity field
+		allrigidbodies->compute_void_fraction_on_grid(PF);
+		allrigidbodies->compute_void_fraction_on_grid(UF);
+		// Compute intersection with RB for pressure and velocity field
+		allrigidbodies->compute_grid_intersection_with_rigidbody(PF);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(UF);
+
+		if (my_rank == 0)
+         cout << "Finished void fraction and grid intersection... \n" << endl;
+
+		// Field initialization
       vector<size_t> vec{ 0, 1, 3};
       if (dim == 3) vec.push_back(4);
-
       initialize_grid_nodes_on_rigidbody(vec);
 
       if (my_rank == 0)

@@ -20,6 +20,7 @@ using std::string;
 class DS_RigidBody;
 class FS_AllRigidBodies;
 class FV_DiscreteField;
+class FV_Mesh;
 
 /** @brief Interpolation scheme enumeration */
 enum scheme_list
@@ -65,6 +66,7 @@ class DS_AllRigidBodies
                        , bool const& b_particles_as_fixed_obstacles
                        , FV_DiscreteField const* arb_UF
                        , FV_DiscreteField const* arb_PF
+                       , FV_Mesh const* arb_mesh
                        , double const& arb_scs
                        , MAC_Communicator const* arb_macCOMM
                        , double const& arb_mu );
@@ -202,8 +204,9 @@ class DS_AllRigidBodies
                                           geomVector const& pt ) const;
 
       /** @brief Build the variable associated with the rigid bodies
-      on the Cartesian computational grid */
-      void build_solid_variables_on_grid( );
+      on the Cartesian computational grid
+      @param FF target fluid grid */
+      void build_solid_variables_on_fluid_grid( FV_DiscreteField const* FF );
 
       /** @brief Periodic transformation of a point in a given direction
       @param FF field
@@ -299,6 +302,10 @@ class DS_AllRigidBodies
       /** @brief Creates the neighbour list for each RB, helps in reducing
       computing time of isIn_any_RB */
       void create_neighbour_list_for_AllRB( );
+
+      /** @brief Return numeric value with the provided field
+      @param FF input field */
+      int field_num( FV_DiscreteField const* FF );
       //@}
 
 
@@ -328,9 +335,11 @@ class DS_AllRigidBodies
     	FS_AllRigidBodies object that contains the vector of all
     	corresponding geometric rigid bodies */
 
-      // Pointers to the constant velocity and pressure field
+      // Pointers to the constant fields and primary grid
       FV_DiscreteField const* UF ;
       FV_DiscreteField const* PF ;
+      FV_DiscreteField const* TF ;
+      FV_Mesh const* MESH ;
 
       double surface_cell_scale; /**< a variable to store the scale of surface
       cell on the RB as compared with computational grid cell size */
