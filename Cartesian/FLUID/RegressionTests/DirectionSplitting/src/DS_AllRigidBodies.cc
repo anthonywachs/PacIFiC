@@ -69,6 +69,98 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
 
 //---------------------------------------------------------------------------
+DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
+                                  , istream& in
+                                  , bool const& b_particles_as_fixed_obstacles
+                                  , FV_DiscreteField const* arb_UF
+                                  , FV_DiscreteField const* arb_PF
+                                  , FV_DiscreteField const* arb_TF
+                                  , FV_Mesh const* arb_mesh
+                                  , double const& arb_scs
+                                  , MAC_Communicator const* arb_macCOMM
+                                  , double const& arb_mu )
+//---------------------------------------------------------------------------
+  : m_space_dimension( dimens )
+  , UF ( arb_UF )
+  , PF ( arb_PF )
+  , TF ( arb_TF )
+  , MESH ( arb_mesh )
+  , surface_cell_scale ( arb_scs )
+  , m_macCOMM ( arb_macCOMM )
+  , m_mu ( arb_mu )
+{
+  MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
+
+  m_FSallrigidbodies = new FS_AllRigidBodies( m_space_dimension, in,
+  	b_particles_as_fixed_obstacles );
+  m_nrb = m_FSallrigidbodies->get_number_rigid_bodies();
+  m_npart = m_FSallrigidbodies->get_number_particles();
+  DS_RigidBody* dsrb = NULL;
+  m_allDSrigidbodies.reserve( m_nrb );
+  for (size_t i = 0; i < m_nrb; ++i)
+  {
+    m_allDSrigidbodies.push_back( dsrb );
+    m_allDSrigidbodies[i] = DS_RigidBody_BuilderFactory::create(
+    	m_FSallrigidbodies->get_ptr_rigid_body(i) );
+  }
+
+  initialize_surface_variables_for_all_RB();
+
+  compute_surface_variables_for_all_RB();
+
+  compute_halo_zones_for_all_rigid_body();
+
+  create_neighbour_list_for_AllRB();
+}
+
+
+
+
+//---------------------------------------------------------------------------
+DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
+                                  , istream& in
+                                  , bool const& b_particles_as_fixed_obstacles
+                                  , FV_DiscreteField const* arb_TF
+                                  , FV_Mesh const* arb_mesh
+                                  , double const& arb_scs
+                                  , MAC_Communicator const* arb_macCOMM
+                                  , double const& arb_mu )
+//---------------------------------------------------------------------------
+  : m_space_dimension( dimens )
+  , TF ( arb_TF )
+  , MESH ( arb_mesh )
+  , surface_cell_scale ( arb_scs )
+  , m_macCOMM ( arb_macCOMM )
+  , m_mu ( arb_mu )
+{
+  MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
+
+  m_FSallrigidbodies = new FS_AllRigidBodies( m_space_dimension, in,
+  	b_particles_as_fixed_obstacles );
+  m_nrb = m_FSallrigidbodies->get_number_rigid_bodies();
+  m_npart = m_FSallrigidbodies->get_number_particles();
+  DS_RigidBody* dsrb = NULL;
+  m_allDSrigidbodies.reserve( m_nrb );
+  for (size_t i = 0; i < m_nrb; ++i)
+  {
+    m_allDSrigidbodies.push_back( dsrb );
+    m_allDSrigidbodies[i] = DS_RigidBody_BuilderFactory::create(
+    	m_FSallrigidbodies->get_ptr_rigid_body(i) );
+  }
+
+  initialize_surface_variables_for_all_RB();
+
+  compute_surface_variables_for_all_RB();
+
+  compute_halo_zones_for_all_rigid_body();
+
+  create_neighbour_list_for_AllRB();
+}
+
+
+
+
+//---------------------------------------------------------------------------
 DS_AllRigidBodies:: ~DS_AllRigidBodies()
 //---------------------------------------------------------------------------
 {

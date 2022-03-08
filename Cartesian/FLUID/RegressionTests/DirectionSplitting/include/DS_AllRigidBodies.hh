@@ -71,6 +71,48 @@ class DS_AllRigidBodies
                        , MAC_Communicator const* arb_macCOMM
                        , double const& arb_mu );
 
+      /** @brief Constructor with arguments
+      @param dimens number of space dimensions
+      @param in input stream where features of rigid bodies are read
+      @param b_particles_as_fixed_obstacles treat all rigid bodies as fixed
+      obstacles
+      @param arb_UF Pointer to flow field UF
+      @param arb_PF Pointer to flow field PF
+      @param arb_TF Pointer to flow field TF
+      @param arb_scs scale of cell on the rigid body surface as
+      compared with the cell of computational grid
+      @param arb_macCOMM communicator for MPI communications */
+      DS_AllRigidBodies( size_t& dimens
+                       , istream& in
+                       , bool const& b_particles_as_fixed_obstacles
+                       , FV_DiscreteField const* arb_UF
+                       , FV_DiscreteField const* arb_PF
+                       , FV_DiscreteField const* arb_TF
+                       , FV_Mesh const* arb_mesh
+                       , double const& arb_scs
+                       , MAC_Communicator const* arb_macCOMM
+                       , double const& arb_mu );
+
+      /** @brief Constructor with arguments
+      @param dimens number of space dimensions
+      @param in input stream where features of rigid bodies are read
+      @param b_particles_as_fixed_obstacles treat all rigid bodies as fixed
+      obstacles
+      @param arb_TF Pointer to flow field TF
+      @param arb_scs scale of cell on the rigid body surface as
+      compared with the cell of computational grid
+      @param arb_macCOMM communicator for MPI communications */
+      DS_AllRigidBodies( size_t& dimens
+                       , istream& in
+                       , bool const& b_particles_as_fixed_obstacles
+                       , FV_DiscreteField const* arb_TF
+                       , FV_Mesh const* arb_mesh
+                       , double const& arb_scs
+                       , MAC_Communicator const* arb_macCOMM
+                       , double const& arb_mu );
+
+
+
       /** @brief Destructor */
       ~DS_AllRigidBodies();
       //@}
