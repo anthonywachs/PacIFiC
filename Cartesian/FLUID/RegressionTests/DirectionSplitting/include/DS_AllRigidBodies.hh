@@ -38,7 +38,7 @@ enum scheme_list
 The array of all rigid bodies in the Direction Splitting solver.
 
 
-@author A. Wachs - Pacific project 2021 */
+@author A. Goyal - Pacific project 2022 */
 
 class DS_AllRigidBodies
 {
@@ -66,7 +66,6 @@ class DS_AllRigidBodies
                        , bool const& b_particles_as_fixed_obstacles
                        , FV_DiscreteField const* arb_UF
                        , FV_DiscreteField const* arb_PF
-                       , FV_Mesh const* arb_mesh
                        , double const& arb_scs
                        , MAC_Communicator const* arb_macCOMM
                        , double const& arb_mu );
@@ -88,7 +87,6 @@ class DS_AllRigidBodies
                        , FV_DiscreteField const* arb_UF
                        , FV_DiscreteField const* arb_PF
                        , FV_DiscreteField const* arb_TF
-                       , FV_Mesh const* arb_mesh
                        , double const& arb_scs
                        , MAC_Communicator const* arb_macCOMM
                        , double const& arb_mu );
@@ -106,7 +104,6 @@ class DS_AllRigidBodies
                        , istream& in
                        , bool const& b_particles_as_fixed_obstacles
                        , FV_DiscreteField const* arb_TF
-                       , FV_Mesh const* arb_mesh
                        , double const& arb_scs
                        , MAC_Communicator const* arb_macCOMM
                        , double const& arb_mu );

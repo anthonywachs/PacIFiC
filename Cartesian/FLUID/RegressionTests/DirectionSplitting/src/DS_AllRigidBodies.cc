@@ -28,7 +28,6 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , bool const& b_particles_as_fixed_obstacles
                                   , FV_DiscreteField const* arb_UF
                                   , FV_DiscreteField const* arb_PF
-                                  , FV_Mesh const* arb_mesh
                                   , double const& arb_scs
                                   , MAC_Communicator const* arb_macCOMM
                                   , double const& arb_mu )
@@ -36,7 +35,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   : m_space_dimension( dimens )
   , UF ( arb_UF )
   , PF ( arb_PF )
-  , MESH ( arb_mesh )
+  , MESH ( UF->primary_grid() )
   , surface_cell_scale ( arb_scs )
   , m_macCOMM ( arb_macCOMM )
   , m_mu ( arb_mu )
@@ -75,7 +74,6 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , FV_DiscreteField const* arb_UF
                                   , FV_DiscreteField const* arb_PF
                                   , FV_DiscreteField const* arb_TF
-                                  , FV_Mesh const* arb_mesh
                                   , double const& arb_scs
                                   , MAC_Communicator const* arb_macCOMM
                                   , double const& arb_mu )
@@ -84,7 +82,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   , UF ( arb_UF )
   , PF ( arb_PF )
   , TF ( arb_TF )
-  , MESH ( arb_mesh )
+  , MESH ( UF->primary_grid() )
   , surface_cell_scale ( arb_scs )
   , m_macCOMM ( arb_macCOMM )
   , m_mu ( arb_mu )
@@ -121,14 +119,13 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , istream& in
                                   , bool const& b_particles_as_fixed_obstacles
                                   , FV_DiscreteField const* arb_TF
-                                  , FV_Mesh const* arb_mesh
                                   , double const& arb_scs
                                   , MAC_Communicator const* arb_macCOMM
                                   , double const& arb_mu )
 //---------------------------------------------------------------------------
   : m_space_dimension( dimens )
   , TF ( arb_TF )
-  , MESH ( arb_mesh )
+  , MESH ( TF->primary_grid() )
   , surface_cell_scale ( arb_scs )
   , m_macCOMM ( arb_macCOMM )
   , m_mu ( arb_mu )

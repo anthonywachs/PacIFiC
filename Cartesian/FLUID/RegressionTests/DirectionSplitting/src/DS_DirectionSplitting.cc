@@ -210,19 +210,41 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    size_t dim = dom->discrete_field( "velocity" )->primary_grid()
       ->nb_space_dimensions();
 
-   // Create structure to input in the NS solver
-   if (is_NS || is_NSwithHE) {
-      if (is_solids)
+   // Create rigid bodies objects depending on which PDE to solve
+   if (is_solids) {
+      if (is_NS) {
          allrigidbodies = new DS_AllRigidBodies( dim
                           , *solidFluid_transferStream
                           , b_particles_as_fixed_obstacles
                           , dom->discrete_field( "velocity" )
                           , dom->discrete_field( "pressure" )
-                          , dom->discrete_field( "velocity" )->primary_grid()
                           , surface_cell_scale
                           , macCOMM
                           , mu );
+      } else if (is_HE) {
+         allrigidbodies = new DS_AllRigidBodies( dim
+                          , *solidFluid_transferStream
+                          , b_particles_as_fixed_obstacles
+                          , dom->discrete_field( "temperature" )
+                          , surface_cell_scale
+                          , macCOMM
+                          , mu );
+      } else if (is_NSwithHE) {
+         allrigidbodies = new DS_AllRigidBodies( dim
+                          , *solidFluid_transferStream
+                          , b_particles_as_fixed_obstacles
+                          , dom->discrete_field( "velocity" )
+                          , dom->discrete_field( "pressure" )
+                          , dom->discrete_field( "temperature" )
+                          , surface_cell_scale
+                          , macCOMM
+                          , mu );
+      }
+   }
 
+
+   // Create structure to input in the NS solver
+   if (is_NS || is_NSwithHE) {
       struct DS2NS inputDataNS;
       inputDataNS.rho_ = rho ;
       inputDataNS.mu_ = mu ;
