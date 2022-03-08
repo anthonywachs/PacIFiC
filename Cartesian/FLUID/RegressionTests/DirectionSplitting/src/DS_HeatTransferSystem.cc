@@ -141,10 +141,6 @@ DS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
    solid.temp = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
    solid.inside = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
 
-   // Vector to store the presence/absence of particle on the field variable
-   node.void_frac = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
-   node.parID = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
-
    for (size_t dir = 0; dir < dim; dir++) {
       // Spacial discretization matrices
       A[dir].ii_main = (LA_SeqVector***) malloc(nb_comps * sizeof(LA_SeqVector**)) ;
@@ -251,12 +247,6 @@ DS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
       Schur_VEC[dir].local_solution_T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
       Schur_VEC[dir].T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
       Schur_VEC[dir].interface_T = (LA_SeqVector**) malloc(nb_comps * sizeof(LA_SeqVector*)) ;
-
-      for (size_t j=0;j<2;j++) {
-         b_intersect[j][dir].offset = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
-         b_intersect[j][dir].value = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
-         b_intersect[j][dir].field = (LA_SeqMatrix**) malloc(nb_comps * sizeof(LA_SeqMatrix*)) ;
-      }
    }
 
    surface.coordinate = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
@@ -284,14 +274,6 @@ DS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
             solid.vel[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
             solid.ang_vel[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
             solid.inside[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            node.void_frac[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-            node.parID[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-         }
-
-         for (size_t j=0;j<2;j++) {
-            b_intersect[j][dir].offset[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-            b_intersect[j][dir].value[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
-            b_intersect[j][dir].field[comp] = MAT_TemperatureUnsteadyPlusDiffusion_1D->create_copy( this,MAT_TemperatureUnsteadyPlusDiffusion_1D );
          }
 
          if (proc_pos_in_i[dir] == 0) {
@@ -523,17 +505,6 @@ DS_HeatTransferSystem:: re_initialize( void )
             }
          }
       }
-      if (is_solids) {
-         node.void_frac[comp]->re_initialize( nb_total_unknown ) ;
-         node.parID[comp]->re_initialize( nb_total_unknown ) ;
-         for (size_t i=0;i<dim;i++) {
-            for (size_t j=0;j<2;j++) {
-               b_intersect[j][i].offset[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
-               b_intersect[j][i].value[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
-               b_intersect[j][i].field[comp]->re_initialize( nb_total_unknown,2 ) ;      // Column0 for left and Column1 for right
-            }
-         }
-      }
    }
 }
 
@@ -751,23 +722,6 @@ DS_HeatTransferSystem::get_VEC()
    return (VEC) ;
 }
 
-//----------------------------------------------------------------------
-BoundaryBisec*
-DS_HeatTransferSystem::get_b_intersect(size_t const& level)
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_HeatTransferSystem:: get_b_intersect" ) ;
-   return (b_intersect[level]) ;
-}
-
-//----------------------------------------------------------------------
-NodeProp
-DS_HeatTransferSystem::get_node_property()
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_HeatTransferSystem:: get_voidfrac_VEC" ) ;
-   return (node) ;
-}
 
 //----------------------------------------------------------------------
 LocalVector*

@@ -23,9 +23,6 @@
 #include <time.h>
 #include <sys/time.h>
 #include <math.h>
-#include <FS_SolidPlugIn_BuilderFactory.hh>
-#include <FS_SolidPlugIn.hh>
-#include <FS_Grains3DPlugIn.hh>
 #include <DS_AllRigidBodies.hh>
 
 
@@ -113,16 +110,14 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    is_periodic[1][2] = false;
 
    // Timing routines
-   if ( my_rank == is_master )
-   {
+   if ( my_rank == is_master ) {
      CT_set_start();
      SCT_insert_app("Objects_Creation");
      SCT_set_start("Objects_Creation");
    }
 
 	if ( AdvectionScheme == "TVD"
-     && UF->primary_grid()->get_security_bandwidth() < 2 )
-   {
+     && UF->primary_grid()->get_security_bandwidth() < 2 ) {
      string error_message="   >= 2 with TVD scheme";
      MAC_Error::object()->raise_bad_data_value( exp,
         "security_bandwidth", error_message );
@@ -144,25 +139,22 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    create_DS_subcommunicators();
 
    if ( is_stressCal == true &&
-        UF->primary_grid()->get_security_bandwidth() < 4 )
-   {
+        UF->primary_grid()->get_security_bandwidth() < 4 ) {
      string error_message="   >= 4 for correct stress calculations on solids";
      MAC_Error::object()->raise_bad_data_value( exp,
         "security_bandwidth", error_message );
    }
 
    // Critical distance
-   if( b_projection_translation )
-   {
-     if( exp->has_entry( "Critical_Distance_Translation" ) )
-       critical_distance_translation=exp->double_data(
-           "Critical_Distance_Translation" );
-     else
-     {
-       string error_message=" Projection-Translation is active but ";
-       error_message+="Critical_Distance_Translation is NOT defined.";
-       MAC_Error::object()->raise_bad_data_value( exp,
-           "Projection_Translation", error_message );
+   if ( b_projection_translation ) {
+     if ( exp->has_entry( "Critical_Distance_Translation" ) )
+        critical_distance_translation= exp->double_data(
+           										"Critical_Distance_Translation" );
+     else {
+        string error_message=" Projection-Translation is active but ";
+        error_message+="Critical_Distance_Translation is NOT defined.";
+        MAC_Error::object()->raise_bad_data_value( exp,
+           							 "Projection_Translation", error_message );
      }
    }
 
@@ -191,8 +183,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    se->destroy() ;
 
    // Timing routines
-   if ( my_rank == is_master )
-   {
+   if ( my_rank == is_master ) {
      SCT_insert_app("Matrix_Assembly&Initialization");
      SCT_insert_app("Pressure predictor");
      SCT_insert_app("Velocity update");
@@ -2269,12 +2260,12 @@ DS_NavierStokes:: compute_Aei_ui (struct TDMatrix* arr
 //---------------------------------------------------------------------------
 double
 DS_NavierStokes:: assemble_local_rhs ( size_t const& j
-                                      , size_t const& k
-                                      , double const& gamma
-                                      , FV_TimeIterator const* t_it
-                                      , size_t const& comp
-                                      , size_t const& dir
-                                      , size_t const& field )
+                                     , size_t const& k
+                                     , double const& gamma
+                                     , FV_TimeIterator const* t_it
+                                     , size_t const& comp
+                                     , size_t const& dir
+                                     , size_t const& field )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_NavierStokes:: assemble_local_rhs" ) ;

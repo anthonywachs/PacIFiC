@@ -22,6 +22,7 @@ class LA_Vector ;
 class LA_SeqVector ;
 class DS_HeatTransferSystem ;
 class LA_SeqMatrix ;
+class DS_AllRigidBodies ;
 
 /** @brief The Class DS_HeatTransfer.
 
@@ -44,6 +45,7 @@ struct DS2HE
   bool is_stressCal_ ;
   bool is_par_motion_ ;
   FV_DomainAndFields const* dom_ ;
+  DS_AllRigidBodies* allrigidbodies_ ;
 };
 
 /** @brief MPIVar include all vectors required while message passing */
@@ -150,10 +152,6 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
 
       size_t return_row_index ( FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
 
-      /** @brief Returns the node index required in the presence of solids in the system */
-      size_t return_node_index ( FV_DiscreteField const* FF, size_t const& comp, size_t const& i, size_t const& j, size_t const& k );
-
-
       /** @brief Assemble temperature matrix */
       double assemble_temperature_matrix (
         FV_DiscreteField const* FF,
@@ -198,9 +196,6 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       /** @brief Call the appropriate functions to solve any particular direction in the other directions */
       void HeatEquation_DirectionSplittingSolver( FV_TimeIterator const* t_it ) ;
 
-      /** @brief Calculate the required field parrameters such as void_fractions, intersection pointes with the solid objects */
-      void node_property_calculation( ) ;
-
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */
       void nodes_temperature_initialization ( size_t const& level );
 
@@ -213,16 +208,7 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       /** @brief Compute advective term based on either Upwind or TVD spacial scheme */
       double compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k);
 
-      /** @brief Find the intersection using bisection method with the solid interface */
-      double find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& level);
-
-      double find_intersection_for_ghost ( double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& level, size_t const& off);
-
-      double impose_solid_temperature_for_ghost (size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID );
-
       double impose_solid_temperature (size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
-
-      double ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID);
 
       double assemble_advection_Centered( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
       double assemble_advection_Centered_new( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
@@ -246,25 +232,6 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       /** @brief Calculate L2 norm without any analytical solution */
       void output_l2norm ( void ) ;
       //@}
-
-      void compute_fluid_particle_interaction( FV_TimeIterator const* t_it);
-      void rotation_matrix (size_t const& m, class doubleVector& delta);
-      void trans_rotation_matrix (size_t const& m, class doubleVector& delta);
-      void compute_temperature_gradient_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np );
-      void first_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np );
-      void second_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np );
-      void ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& major_dir, class boolVector& point_in_domain, class doubleVector& rotated_vector );
-      double third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level);
-      double quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level);
-      double quadratic_interpolation2D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& i0, size_t const& j0, size_t const& k0, size_t const& interpol_dir, class intVector& sign, size_t const& level);
-      void gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp);
-
-
-
-
-      double ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level);
-
-
 
 
    // Direction splitting communicators
@@ -306,7 +273,7 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       size_t nb_comps;
       size_t Npart;
 
-      MAC_Communicator const* pelCOMM;
+      MAC_Communicator const* macCOMM;
       MPI_Comm DDS_Comm_i[3];
 
       int rank_in_i[3];
@@ -339,6 +306,9 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       string insertion_type;
       string IntersectionMethod;
       double tolerance;
+
+      // Grains3D variable
+      DS_AllRigidBodies* allrigidbodies;
 } ;
 
 #endif

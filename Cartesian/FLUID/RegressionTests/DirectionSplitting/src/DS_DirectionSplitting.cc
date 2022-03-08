@@ -207,8 +207,10 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
    }
 
-   size_t dim = dom->discrete_field( "velocity" )->primary_grid()
-      ->nb_space_dimensions();
+   size_t dim = (is_HE) ? dom->discrete_field( "temperature" )->primary_grid()
+                                                       ->nb_space_dimensions()
+                        : dom->discrete_field( "velocity" )->primary_grid()
+                                                       ->nb_space_dimensions();
 
    // Create rigid bodies objects depending on which PDE to solve
    if (is_solids) {
@@ -281,6 +283,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputData.is_stressCal_ = is_stressCal ;
       inputData.is_par_motion_ = is_par_motion ;
       inputData.dom_ = dom ;
+      inputData.allrigidbodies_ = allrigidbodies ;
 
       MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DS_HeatTransfer" ) ;
       HeatSolver = DS_HeatTransfer::create( this, set, inputData ) ;

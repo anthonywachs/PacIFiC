@@ -23,6 +23,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <math.h>
+#include <DS_AllRigidBodies.hh>
 
 //---------------------------------------------------------------------------
 DS_HeatTransfer*
@@ -46,8 +47,8 @@ DS_HeatTransfer:: create( MAC_Object* a_owner,
 
 //---------------------------------------------------------------------------
 DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
-		MAC_ModuleExplorer const* exp,
-				    struct DS2HE const& fromDS )
+											  MAC_ModuleExplorer const* exp,
+				    			  			  struct DS2HE const& fromDS )
 //---------------------------------------------------------------------------
    : MAC_Object( a_owner )
    , ComputingTime("Solver")
@@ -61,10 +62,13 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
    , ViscousStressOrder ( fromDS.ViscousStressOrder_ )
    , heat_capacity( exp->double_data( "Heat_capacity") )
    , thermal_conductivity( exp->double_data( "Thermal_conductivity") )
-   , b_bodyterm( false )
+   , b_bodyterm ( false )
    , is_solids ( fromDS.is_solids_ )
 	, is_NSwithHE (fromDS.is_NSwithHE_ )
+	, b_restart ( fromDS.b_restart_ )
    , IntersectionMethod ( "Bisection" )
+	, allrigidbodies ( fromDS.allrigidbodies_ )
+	, Npart (1)
 {
    MAC_LABEL( "DS_HeatTransfer:: DS_HeatTransfer" ) ;
 
@@ -73,27 +77,20 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
 
    // Call of MAC_Communicator routine to set the rank of each proces and
    // the number of processes during execution
-   pelCOMM = MAC_Exec::communicator();
-   my_rank = pelCOMM->rank();
-   nb_procs = pelCOMM->nb_ranks();
+   macCOMM = MAC_Exec::communicator();
+   my_rank = macCOMM->rank();
+   nb_procs = macCOMM->nb_ranks();
    is_master = 0;
    is_iperiodic[0] = false;
    is_iperiodic[1] = false;
    is_iperiodic[2] = false;
 
    // Timing routines
-   if ( my_rank == is_master )
-   {
+   if ( my_rank == is_master ) {
      CT_set_start();
      SCT_insert_app("Objects_Creation");
      SCT_set_start("Objects_Creation");
    }
-
-
-   // Is the run a follow up of a previous job
-   b_restart = fromDS.b_restart_ ;
-   // Clear results directory in case of a new run
-   if( !b_restart ) PAC_Misc::clearAllFiles( "Res", "Savings", my_rank ) ;
 
    // Get space dimension
    dim = TF->primary_grid()->nb_space_dimensions() ;
@@ -140,8 +137,7 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
    se->destroy() ;
 
    // Timing routines
-   if ( my_rank == is_master )
-   {
+   if ( my_rank == is_master ) {
      SCT_insert_app("Matrix_Assembly&Initialization");
      SCT_insert_app("Matrix_Solution");
      SCT_insert_app("DS_Solution");
@@ -188,8 +184,19 @@ DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
    if (b_restart == false) ugradu_initialization ( );
 
    // Generate solid particles if required
+
+	if (is_solids) {
+		// Build void frac and intersection variable
+		allrigidbodies->build_solid_variables_on_fluid_grid(TF);
+		// Compute void fraction for temperature field
+		allrigidbodies->compute_void_fraction_on_grid(TF);
+		// Compute intersection with RB for temperature field
+		allrigidbodies->compute_grid_intersection_with_rigidbody(TF);
+		if (my_rank == 0)
+			cout << "Finished void fraction and grid intersection... \n" << endl;
+	}
+
    if (is_solids) {
-      node_property_calculation();
       if (my_rank == 0) cout << "HE: Finished intersection calculations... \n" << endl;
       nodes_temperature_initialization(0);
       nodes_temperature_initialization(1);
@@ -213,17 +220,16 @@ DS_HeatTransfer:: do_before_inner_iterations_stage(
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: do_before_inner_iterations_stage" ) ;
-
-   if ((is_par_motion) && (is_solids)) {
-      node_property_calculation();
-      nodes_temperature_initialization(0);
-      nodes_temperature_initialization(1);
-      nodes_temperature_initialization(3);
-      if (dim == 3) nodes_temperature_initialization(4);
-
-      // Assemble 1D tridiagonal matrices and schur complement calculation
-      assemble_temperature_and_schur(t_it);
-   }
+	//
+   // if ((is_par_motion) && (is_solids)) {
+   //    nodes_temperature_initialization(0);
+   //    nodes_temperature_initialization(1);
+   //    nodes_temperature_initialization(3);
+   //    if (dim == 3) nodes_temperature_initialization(4);
+	//
+   //    // Assemble 1D tridiagonal matrices and schur complement calculation
+   //    assemble_temperature_and_schur(t_it);
+   // }
 
    // Perform matrix level operations before each time step
    GLOBAL_EQ->at_each_time_step( );
@@ -253,9 +259,9 @@ DS_HeatTransfer:: do_after_inner_iterations_stage(
 {
    MAC_LABEL( "DS_HeatTransfer:: do_after_inner_iterations_stage" ) ;
 
-   if (is_stressCal) {
-      compute_fluid_particle_interaction(t_it);
-   }
+   // if (is_stressCal) {
+   //    compute_fluid_particle_interaction(t_it);
+   // }
 
    // Compute temperature change over the time step
    double temperature_time_change = GLOBAL_EQ->compute_temperature_change()
@@ -313,56 +319,67 @@ DS_HeatTransfer::write_output_field()
   ofstream outputFile ;
 
   std::ostringstream os2;
-  os2 << "./DS_results/outputT_" << my_rank << ".csv";
+  os2 << "./DS_results/intersection_data.csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 
-
-//  outputFile.open("./DS_results/output_" << my_rank << ".txt", std::ios_base::out | std::ios_base::trunc) ;
   size_t i,j,k;
-  outputFile << "x,y,z,par_ID,void_frac,left,lv,right,rv,bottom,bov,top,tv,behind,bev,front,fv" << endl;
-//  outputFile << "x,y,z,par_ID,void_frac,ugradu,error" << endl;
+  outputFile << "x,y,z,void_frac,left,lv"
+             << ",right,rv"
+             << ",bottom,bov"
+             << ",top,tv"
+             << ",behind,bev"
+             << ",front,fv" << endl;
 
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
+  size_t_vector min_index(dim,0);
+  size_t_vector max_index(dim,0);
 
-  NodeProp node = GLOBAL_EQ->get_node_property();
-  BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
+  size_t_vector* void_frac = (is_solids) ?
+                    allrigidbodies->get_void_fraction_on_grid(TF) : 0;
+  size_t_array2D* intersect_vector = (is_solids) ?
+                    allrigidbodies->get_intersect_vector_on_grid(TF) : 0;
+  doubleArray2D* intersect_distance = (is_solids) ?
+                    allrigidbodies->get_intersect_distance_on_grid(TF) : 0;
 
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l );// - 1;
-        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l );// + 1;
+		  min_index(l) = 0;
+        max_index(l) = TF->get_local_nb_dof( comp, l );
      }
 
      size_t local_min_k = 0;
-     size_t local_max_k = 0;
+     size_t local_max_k = 1;
 
      if (dim == 3) {
-        local_min_k = min_unknown_index(2);
-        local_max_k = max_unknown_index(2);
+        local_min_k = min_index(2);
+        local_max_k = max_index(2);
      }
 
-     for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+     for (i=min_index(0);i<=max_index(0);++i) {
         double xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
-        for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+        for (j=min_index(1);j<=max_index(1);++j) {
            double yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
            for (k=local_min_k;k<=local_max_k;++k) {
               double zC = 0.;
               if (dim == 3) zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
-              size_t p = return_node_index(TF,comp,i,j,k);
-              size_t id = (size_t) node.parID[comp]->item(p);
-              double voidf = node.void_frac[comp]->item(p);
+				  size_t p = TF->DOF_local_number(i,j,k,comp);
 
-              outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
-              for (size_t dir = 0; dir < dim; dir++) {
-                  for (size_t off = 0; off < 2; off++) {
-                      outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off);
-//                      outputFile << "," << compute_adv_component(comp,i,j,k) << "," << TF->DOF_value(i,j,k,comp,0)*divergence_of_U(comp,i,j,k,0);
-                  }
-              }
-              outputFile << endl;
+              outputFile << xC << "," << yC << "," << zC
+              << "," << void_frac->operator()(p)
+              << "," << intersect_vector->operator()(p,0)
+              << "," << intersect_distance->operator()(p,0)
+              << "," << intersect_vector->operator()(p,1)
+              << "," << intersect_distance->operator()(p,1)
+              << "," << intersect_vector->operator()(p,2)
+              << "," << intersect_distance->operator()(p,2)
+              << "," << intersect_vector->operator()(p,3)
+              << "," << intersect_distance->operator()(p,3)
+              << "," << intersect_vector->operator()(p,4)
+              << "," << intersect_distance->operator()(p,4)
+              << "," << intersect_vector->operator()(p,5)
+              << "," << intersect_distance->operator()(p,5)
+              << endl;
            }
         }
      }
@@ -402,7 +419,8 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs (
   size_t_vector min_unknown_index(dim,0);
   size_t_vector max_unknown_index(dim,0);
 
-  NodeProp node = GLOBAL_EQ->get_node_property();
+  size_t_vector* void_frac = (is_solids) ?
+						  allrigidbodies->get_void_fraction_on_grid(TF) : 0;
 
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices
@@ -432,8 +450,8 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs (
 				  									 : 0.;
 
               if (is_solids) {
-                 size_t p = return_node_index(TF,comp,i,j,k);
-                 if (node.void_frac[comp]->item(p) == 1) {
+					  size_t p = TF->DOF_local_number(i,j,k,comp);
+                 if (void_frac->operator()(p) != 0) {
                     adv_value = 0.;
                  }
               }
@@ -458,8 +476,8 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs (
 					              				  : 0.;
 
                  if (is_solids) {
-                    size_t p = return_node_index(TF,comp,i,j,k);
-                    if (node.void_frac[comp]->item(p) == 1) {
+						  size_t p = TF->DOF_local_number(i,j,k,comp);
+                    if (void_frac->operator()(p) != 0) {
                        adv_value = 0.;
                     }
                  }
@@ -526,25 +544,41 @@ DS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, si
    double xhr,xhl,xright,xleft,yhr,yhl,yright,yleft;
    double zhr,zhl,zright,zleft, value=0.;
 
-   BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-   NodeProp node = GLOBAL_EQ->get_node_property();
+	size_t_array2D* intersect_vector = (is_solids) ?
+									allrigidbodies->get_intersect_vector_on_grid(TF)
+									: 0;
+	doubleArray2D* intersect_distance = (is_solids) ?
+									allrigidbodies->get_intersect_distance_on_grid(TF)
+									: 0;
+	doubleArray2D* intersect_fieldVal = (is_solids) ?
+									allrigidbodies->get_intersect_fieldValue_on_grid(TF)
+									: 0;
+
+	size_t p = TF->DOF_local_number(i,j,k,comp);
 
    if (dir == 0) {
-      xhr= TF->get_DOF_coordinate( i+1,comp, 0 ) - TF->get_DOF_coordinate( i, comp, 0 ) ;
-      xhl= TF->get_DOF_coordinate( i, comp, 0 ) - TF->get_DOF_coordinate( i-1, comp, 0 ) ;
-      xright = TF->DOF_value( i+1, j, k, comp, level ) - TF->DOF_value( i, j, k, comp, level ) ;
-      xleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i-1, j, k, comp, level ) ;
+      xhr = TF->get_DOF_coordinate( i+1,comp, 0 )
+			 - TF->get_DOF_coordinate( i, comp, 0 ) ;
+      xhl = TF->get_DOF_coordinate( i, comp, 0 )
+		    - TF->get_DOF_coordinate( i-1, comp, 0 ) ;
+      xright = TF->DOF_value( i+1, j, k, comp, level )
+				 - TF->DOF_value( i, j, k, comp, level ) ;
+      xleft = TF->DOF_value( i, j, k, comp, level )
+				- TF->DOF_value( i-1, j, k, comp, level ) ;
 
       if (is_solids) {
-         size_t p = return_node_index(TF,comp,i,j,k);
-         if (node.void_frac[comp]->item(p) == 0) {
-            if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-               xleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
-               xhl = b_intersect[dir].value[comp]->item(p,0);
+			size_t_vector* void_frac = allrigidbodies
+												->get_void_fraction_on_grid(TF);
+         if (void_frac->operator()(p) == 0) {
+            if (intersect_vector->operator()(p,2*dir+0) == 1) {
+               xleft = TF->DOF_value( i, j, k, comp, level )
+					      - intersect_fieldVal->operator()(p,2*dir+0);
+               xhl = intersect_distance->operator()(p,2*dir+0);
             }
-            if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-               xright = b_intersect[dir].field[comp]->item(p,1) - TF->DOF_value( i, j, k, comp, level );
-               xhr = b_intersect[dir].value[comp]->item(p,1);
+            if (intersect_vector->operator()(p,2*dir+1) == 1) {
+               xright = intersect_fieldVal->operator()(p,2*dir+1)
+							 - TF->DOF_value( i, j, k, comp, level );
+               xhr = intersect_distance->operator()(p,2*dir+1);
             }
          } else {
             xright = 0.; xleft = 0.;
@@ -552,28 +586,35 @@ DS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, si
       }
 
       //xvalue = xright/xhr - xleft/xhl;
-      if (TF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp) && TF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp))
+      if (TF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)
+		 && TF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp))
          value = xright/xhr - xleft/xhl;
       else if (TF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp))
          value = - xleft/xhl;
       else
          value = xright/xhr;
    } else if (dir == 1) {
-      yhr= TF->get_DOF_coordinate( j+1,comp, 1 ) - TF->get_DOF_coordinate( j, comp, 1 ) ;
-      yhl= TF->get_DOF_coordinate( j, comp, 1 ) - TF->get_DOF_coordinate( j-1, comp, 1 ) ;
-      yright = TF->DOF_value( i, j+1, k, comp, level ) - TF->DOF_value( i, j, k, comp, level ) ;
-      yleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i, j-1, k, comp, level ) ;
+      yhr = TF->get_DOF_coordinate( j+1,comp, 1 )
+		    - TF->get_DOF_coordinate( j, comp, 1 ) ;
+      yhl = TF->get_DOF_coordinate( j, comp, 1 )
+			 - TF->get_DOF_coordinate( j-1, comp, 1 ) ;
+      yright = TF->DOF_value( i, j+1, k, comp, level )
+				 - TF->DOF_value( i, j, k, comp, level ) ;
+      yleft = TF->DOF_value( i, j, k, comp, level )
+				- TF->DOF_value( i, j-1, k, comp, level ) ;
 
       if (is_solids) {
-         size_t p = return_node_index(TF,comp,i,j,k);
-         if (node.void_frac[comp]->item(p) == 0) {
-            if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-               yleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
-               yhl = b_intersect[dir].value[comp]->item(p,0);
+			size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(TF);
+         if (void_frac->operator()(p) == 0) {
+            if (intersect_vector->operator()(p,2*dir+0) == 1) {
+               yleft = TF->DOF_value( i, j, k, comp, level )
+					      - intersect_fieldVal->operator()(p,2*dir+0);
+               yhl = intersect_distance->operator()(p,2*dir+0);
             }
-            if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-               yright = b_intersect[dir].field[comp]->item(p,1) - TF->DOF_value( i, j, k, comp, level );
-               yhr = b_intersect[dir].value[comp]->item(p,1);
+            if (intersect_vector->operator()(p,2*dir+1) == 1) {
+               yright = intersect_fieldVal->operator()(p,2*dir+1)
+					       - TF->DOF_value( i, j, k, comp, level );
+               yhr = intersect_distance->operator()(p,2*dir+1);
             }
          } else {
             yleft = 0.; yright = 0.;
@@ -581,28 +622,35 @@ DS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, si
       }
 
       //yvalue = yright/yhr - yleft/yhl;
-      if (TF->DOF_in_domain((int)i, (int)j-1, (int)k, comp) && TF->DOF_in_domain((int)i, (int)j+1, (int)k, comp))
+      if (TF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)
+		 && TF->DOF_in_domain((int)i, (int)j+1, (int)k, comp))
          value = yright/yhr - yleft/yhl;
       else if(TF->DOF_in_domain((int)i, (int)j-1, (int)k, comp))
          value = - yleft/yhl;
       else
          value = yright/yhr;
    } else if (dir == 2) {
-      zhr= TF->get_DOF_coordinate( k+1,comp, 2 ) - TF->get_DOF_coordinate( k, comp, 2 ) ;
-      zhl= TF->get_DOF_coordinate( k, comp, 2 ) - TF->get_DOF_coordinate( k-1, comp, 2 ) ;
-      zright = TF->DOF_value( i, j, k+1, comp, level ) - TF->DOF_value( i, j, k, comp, level ) ;
-      zleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i, j, k-1, comp, level ) ;
+      zhr = TF->get_DOF_coordinate( k+1,comp, 2 )
+		    - TF->get_DOF_coordinate( k, comp, 2 ) ;
+      zhl = TF->get_DOF_coordinate( k, comp, 2 )
+		    - TF->get_DOF_coordinate( k-1, comp, 2 ) ;
+      zright = TF->DOF_value( i, j, k+1, comp, level )
+				 - TF->DOF_value( i, j, k, comp, level ) ;
+      zleft = TF->DOF_value( i, j, k, comp, level )
+			   - TF->DOF_value( i, j, k-1, comp, level ) ;
 
       if (is_solids) {
-         size_t p = return_node_index(TF,comp,i,j,k);
-         if (node.void_frac[comp]->item(p) == 0) {
-            if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-               zleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
-               zhl = b_intersect[dir].value[comp]->item(p,0);
+         size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(TF);
+         if (void_frac->operator()(p) == 0) {
+            if (intersect_vector->operator()(p,2*dir+0) == 1) {
+               zleft = TF->DOF_value( i, j, k, comp, level )
+					 		- intersect_fieldVal->operator()(p,2*dir+0);
+               zhl = intersect_distance->operator()(p,2*dir+0);
             }
-            if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-               zright = b_intersect[dir].field[comp]->item(p,1) - TF->DOF_value( i, j, k, comp, level );
-               zhr = b_intersect[dir].value[comp]->item(p,1);
+            if (intersect_vector->operator()(p,2*dir+1) == 1) {
+               zright = intersect_fieldVal->operator()(p,2*dir+1)
+							 - TF->DOF_value( i, j, k, comp, level );
+               zhr = intersect_distance->operator()(p,2*dir+1);
             }
          } else {
             zleft = 0.; zright = 0.;
@@ -610,9 +658,10 @@ DS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, si
       }
 
       //zvalue = zright/zhr - zleft/zhl;
-      if (TF->DOF_in_domain((int)i, (int)j, (int)k-1, comp) && TF->DOF_in_domain((int)i, (int)j, (int)k+1, comp))
+      if (TF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)
+		 && TF->DOF_in_domain((int)i, (int)j, (int)k+1, comp))
          value = zright/zhr - zleft/zhl;
-      else if(TF->DOF_in_domain((int)i, (int)j, (int)k-1, comp))
+      else if (TF->DOF_in_domain((int)i, (int)j, (int)k-1, comp))
          value = - zleft/zhl;
       else
          value = zright/zhr;
@@ -647,39 +696,9 @@ DS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, s
 
    return(value);
 }
-//---------------------------------------------------------------------------
-size_t
-DS_HeatTransfer:: return_node_index (
-  FV_DiscreteField const* FF,
-  size_t const& comp,
-  size_t const& i,
-  size_t const& j,
-  size_t const& k )
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_HeatTransfer:: return_node_index" ) ;
 
-   // Get local min and max indices
-   size_t_vector min_index(dim,0);
-   size_t_vector max_index(dim,0);
-   size_t_vector i_length(dim,0);
-   for (size_t l=0;l<dim;++l) {
-      // To include knowns at dirichlet boundary in the indexing as well, wherever required pow(2,64)
-//     min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp, l ) - 1;
-//     max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp, l ) + 1;
-      min_index(l) = 0;
-      max_index(l) = FF->get_local_nb_dof( comp, l );
-      i_length(l) = 1 + max_index(l) - min_index(l);
-   }
 
-   size_t local_min_k = 0;
-   if (dim == 3) local_min_k = min_index(2);
 
-   size_t p = (j-min_index(1)) + i_length(1)*(i-min_index(0)) + i_length(0)*i_length(1)*(k-local_min_k);
-
-   return(p);
-
-}
 
 //---------------------------------------------------------------------------
 size_t
@@ -744,8 +763,10 @@ DS_HeatTransfer:: assemble_temperature_matrix (
    size_t_vector min_unknown_index(dim,0);
    size_t_vector max_unknown_index(dim,0);
    for (size_t l=0;l<dim;++l) {
-	min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-	max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+		min_unknown_index(l) =
+						FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+		max_unknown_index(l) =
+						FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
    }
 
    // Perform assembling
@@ -767,33 +788,39 @@ DS_HeatTransfer:: assemble_temperature_matrix (
 
        if (is_solids) {
           size_t p=0;
-          BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-          NodeProp node = GLOBAL_EQ->get_node_property();
           if (dir == 0) {
-             p = return_node_index(FF,comp,i,j,k);
+             p = FF->DOF_local_number(i,j,k,comp);
           } else if (dir == 1) {
-             p = return_node_index(FF,comp,j,i,k);
+             p = FF->DOF_local_number(j,i,k,comp);
           } else if (dir == 2) {
-             p = return_node_index(FF,comp,j,k,i);
+             p = FF->DOF_local_number(j,k,i,comp);
           }
+
+			 size_t_array2D* intersect_vector =
+                            allrigidbodies->get_intersect_vector_on_grid(FF);
+          doubleArray2D* intersect_distance =
+                            allrigidbodies->get_intersect_distance_on_grid(FF);
+          size_t_vector* void_frac =
+                            allrigidbodies->get_void_fraction_on_grid(FF);
+
           // if left node is inside the solid particle
-          if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-             left = -gamma/(b_intersect[dir].value[comp]->item(p,0));
+          if (intersect_vector->operator()(p,2*dir+0) == 1) {
+             left = -gamma/intersect_distance->operator()(p,2*dir+0);
           }
           // if right node is inside the solid particle
-          if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-             right = -gamma/(b_intersect[dir].value[comp]->item(p,1));
+          if (intersect_vector->operator()(p,2*dir+1) == 1) {
+             right = -gamma/intersect_distance->operator()(p,2*dir+1);
           }
           // if center node is inside the solid particle
-          if (node.void_frac[comp]->item(p) == 1.) {
+          if (void_frac->operator()(p) != 0) {
              left = 0.;
              right = 0.;
           }
 
           center = -(right+left);
 
-          if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) left = 0.;
-          if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) right = 0.;
+          if (intersect_vector->operator()(p,2*dir+0) == 1) left = 0.;
+          if (intersect_vector->operator()(p,2*dir+1) == 1) right = 0.;
        } else {
           center = - (right+left);
        }
@@ -813,7 +840,8 @@ DS_HeatTransfer:: assemble_temperature_matrix (
        if (dim == 2) {
           k_min = 0; k_max = 0;
        } else {
-          k_min = min_unknown_index(2); k_max = max_unknown_index(2);
+          k_min = min_unknown_index(2);
+			 k_max = max_unknown_index(2);
        }
 
        // Since, this function is used in all directions;
@@ -823,13 +851,21 @@ DS_HeatTransfer:: assemble_temperature_matrix (
        // Condition for handling the pressure neumann conditions at wall
        if (i==min_unknown_index(dir) && l_bound) {
           if (dir == 0) {
-             ii = (int)i-1; jj = (int)min_unknown_index(1); kk = (int)k_min;
+             ii = (int)i-1;
+				 jj = (int)min_unknown_index(1);
+				 kk = (int)k_min;
           } else if (dir == 1) {
-             ii = (int)min_unknown_index(0); jj = (int)i-1; kk = (int)k_min;
+             ii = (int)min_unknown_index(0);
+				 jj = (int)i-1;
+				 kk = (int)k_min;
           } else if (dir == 2) {
-             ii = (int)min_unknown_index(0); jj = (int)min_unknown_index(1); kk = (int)i-1;
+             ii = (int)min_unknown_index(0);
+				 jj = (int)min_unknown_index(1);
+				 kk = (int)i-1;
           }
-          if (FF->DOF_in_domain(ii,jj,kk,comp) && FF->DOF_has_imposed_Dirichlet_value((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
+          if (FF->DOF_in_domain(ii,jj,kk,comp)
+			  && FF->DOF_has_imposed_Dirichlet_value
+			  						((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
              // For Dirichlet boundary condition
              value = center;
           } else {
@@ -838,13 +874,21 @@ DS_HeatTransfer:: assemble_temperature_matrix (
           }
        } else if (i==max_unknown_index(dir) && r_bound) {
           if (dir == 0) {
-             ii = (int)i+1; jj = (int)max_unknown_index(1); kk = (int)k_max;
+             ii = (int)i+1;
+				 jj = (int)max_unknown_index(1);
+				 kk = (int)k_max;
           } else if (dir == 1) {
-             ii = (int)max_unknown_index(0); jj = (int)i+1; kk = (int)k_max;
+             ii = (int)max_unknown_index(0);
+				 jj = (int)i+1;
+				 kk = (int)k_max;
           } else if (dir == 2) {
-             ii = (int)max_unknown_index(0); jj = (int)max_unknown_index(1); kk = (int)i+1;
+             ii = (int)max_unknown_index(0);
+				 jj = (int)max_unknown_index(1);
+				 kk = (int)i+1;
           }
-          if (FF->DOF_in_domain(ii,jj,kk,comp) && FF->DOF_has_imposed_Dirichlet_value((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
+          if (FF->DOF_in_domain(ii,jj,kk,comp)
+			  && FF->DOF_has_imposed_Dirichlet_value
+			  						((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
              // For Dirichlet boundary condition
              value = center;
           } else {
@@ -1117,8 +1161,12 @@ DS_HeatTransfer:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
 }
 
 //---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
+double DS_HeatTransfer:: assemble_local_rhs ( size_t const& j
+														  , size_t const& k
+														  , double const& gamma
+														  , FV_TimeIterator const* t_it
+														  , size_t const& comp
+														  , size_t const& dir)
 //---------------------------------------------------------------------------
 {
    // Get local min and max indices
@@ -1138,6 +1186,16 @@ DS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double 
    // Vector for fi
    LocalVector* VEC = GLOBAL_EQ->get_VEC();
 
+	size_t_array2D* intersect_vector = (is_solids) ?
+                           allrigidbodies->get_intersect_vector_on_grid(TF)
+									: 0;
+   doubleArray2D* intersect_distance = (is_solids) ?
+                           allrigidbodies->get_intersect_distance_on_grid(TF)
+									: 0;
+   doubleArray2D* intersect_fieldVal = (is_solids) ?
+                           allrigidbodies->get_intersect_fieldValue_on_grid(TF)
+									: 0;
+
    for (i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
      double value=0.;
      pos = i - min_unknown_index(dir);
@@ -1149,13 +1207,14 @@ DS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double 
      if (dir == 0) {
         value = compute_un_component(comp,i,j,k,dir,3);
         if (is_solids) {
-           BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-           size_t p = return_node_index(TF,comp,i,j,k);
-           if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-              value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
+           size_t p = TF->DOF_local_number(i,j,k,comp);
+           if (intersect_vector->operator()(p,2*dir+0) == 1) {
+              value = value - intersect_fieldVal->operator()(p,2*dir+0)
+				  					 / intersect_distance->operator()(p,2*dir+0);
            }
-           if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-              value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
+           if (intersect_vector->operator()(p,2*dir+1) == 1) {
+              value = value - intersect_fieldVal->operator()(p,2*dir+1)
+				  					 / intersect_distance->operator()(p,2*dir+1);
            }
         }
      // y direction
@@ -1163,50 +1222,56 @@ DS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double 
         if (dim == 2) {
            value = compute_un_component(comp,j,i,k,dir,1);
            if (is_solids) {
-              BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-              size_t p = return_node_index(TF,comp,j,i,k);
-              if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-                 value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
-              }
-              if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-                 value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
-              }
+              size_t p = TF->DOF_local_number(j,i,k,comp);
+				  if (intersect_vector->operator()(p,2*dir+0) == 1) {
+	              value = value - intersect_fieldVal->operator()(p,2*dir+0)
+					  					 / intersect_distance->operator()(p,2*dir+0);
+	           }
+	           if (intersect_vector->operator()(p,2*dir+1) == 1) {
+	              value = value - intersect_fieldVal->operator()(p,2*dir+1)
+					  					 / intersect_distance->operator()(p,2*dir+1);
+	           }
            }
         } else if (dim == 3) {
            value = compute_un_component(comp,j,i,k,dir,4);
            if (is_solids) {
-              BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-              size_t p = return_node_index(TF,comp,j,i,k);
-              if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-                 value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
-              }
-              if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-                 value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
-              }
+              size_t p = TF->DOF_local_number(j,i,k,comp);
+				  if (intersect_vector->operator()(p,2*dir+0) == 1) {
+	              value = value - intersect_fieldVal->operator()(p,2*dir+0)
+					  					 / intersect_distance->operator()(p,2*dir+0);
+	           }
+	           if (intersect_vector->operator()(p,2*dir+1) == 1) {
+	              value = value - intersect_fieldVal->operator()(p,2*dir+1)
+					  					 / intersect_distance->operator()(p,2*dir+1);
+	           }
            }
         }
      // z direction
      } else if (dir == 2) {
         value = compute_un_component(comp,j,k,i,dir,1);
         if (is_solids) {
-           BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(0);
-           size_t p = return_node_index(TF,comp,j,k,i);
-           if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
-              value = value - b_intersect[dir].field[comp]->item(p,0)/b_intersect[dir].value[comp]->item(p,0);
-           }
-           if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
-              value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
-           }
+           size_t p = TF->DOF_local_number(j,k,i,comp);
+			  if (intersect_vector->operator()(p,2*dir+0) == 1) {
+				  value = value - intersect_fieldVal->operator()(p,2*dir+0)
+									 / intersect_distance->operator()(p,2*dir+0);
+			  }
+			  if (intersect_vector->operator()(p,2*dir+1) == 1) {
+				  value = value - intersect_fieldVal->operator()(p,2*dir+1)
+									 / intersect_distance->operator()(p,2*dir+1);
+			  }
         }
      }
 
      double temp_val=0.;
      if (dir == 0) {
-        temp_val = (TF->DOF_value(i,j,k,comp,0)*dC)/(t_it->time_step()) - gamma*value;
+        temp_val = (TF->DOF_value(i,j,k,comp,0)*dC)/(t_it->time_step())
+		  			  - gamma*value;
      } else if (dir == 1) {
-        temp_val = (TF->DOF_value(j,i,k,comp,3)*dC)/(t_it->time_step()) - gamma*value;
+        temp_val = (TF->DOF_value(j,i,k,comp,3)*dC)/(t_it->time_step())
+		  			  - gamma*value;
      } else if (dir == 2) {
-        temp_val = (TF->DOF_value(j,k,i,comp,4)*dC)/(t_it->time_step()) - gamma*value;
+        temp_val = (TF->DOF_value(j,k,i,comp,4)*dC)/(t_it->time_step())
+		  			  - gamma*value;
      }
 
      if (is_iperiodic[dir] == 0) {
@@ -1228,7 +1293,8 @@ DS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double 
    }
 
    // Since, this function is used in all directions;
-   // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
+   // ii, jj, and kk are used to convert the passed arguments
+	// corresponding to correct direction
    size_t ii=0,jj=0,kk=0;
 
 
@@ -1245,9 +1311,11 @@ DS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double 
 
    if ( TF->DOF_in_domain((int)ii,(int)jj,(int)kk,comp))
       if ( TF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
-         double ai = 1/(TF->get_DOF_coordinate(m+1,comp,dir) - TF->get_DOF_coordinate(m,comp,dir));
+         double ai = 1/(TF->get_DOF_coordinate(m+1,comp,dir)
+							 - TF->get_DOF_coordinate(m,comp,dir));
          double dirichlet_value = TF->DOF_value(ii,jj,kk,comp,1) ;
-         VEC[dir].local_T[comp]->add_to_item( 0, + gamma * ai * dirichlet_value );
+         VEC[dir].local_T[comp]->add_to_item( 0
+														, + gamma * ai * dirichlet_value );
       }
 
    m = int(max_unknown_index(dir)) + 1;
@@ -1262,9 +1330,11 @@ DS_HeatTransfer:: assemble_local_rhs ( size_t const& j, size_t const& k, double 
 
    if ( TF->DOF_in_domain((int)ii,(int)jj,(int)kk,comp))
       if ( TF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
-      double ai = 1/(TF->get_DOF_coordinate(m,comp,dir) - TF->get_DOF_coordinate(m-1,comp,dir));
+      double ai = 1/(TF->get_DOF_coordinate(m,comp,dir)
+						 - TF->get_DOF_coordinate(m-1,comp,dir));
       double dirichlet_value = TF->DOF_value(ii,jj,kk,comp,1) ;
-      VEC[dir].local_T[comp]->add_to_item( VEC[dir].local_T[comp]->nb_rows()-1 , + gamma * ai * dirichlet_value );
+      VEC[dir].local_T[comp]->add_to_item( VEC[dir].local_T[comp]->nb_rows()-1
+													, + gamma * ai * dirichlet_value );
    }
 
    return fe;
@@ -1706,17 +1776,21 @@ DS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
   size_t_vector max_unknown_index(dim,0);
 
   // Vector for solid presence
-  NodeProp node = GLOBAL_EQ->get_node_property();
+  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(TF);
 
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
         if (is_iperiodic[l]) {
-           min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-           max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
+           min_unknown_index(l) =
+			  				TF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
+           max_unknown_index(l) =
+			  				TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
         } else {
-           min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l );
-           max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l );
+           min_unknown_index(l) =
+			  				TF->get_min_index_unknown_handled_by_proc( comp, l );
+           max_unknown_index(l) =
+			  				TF->get_max_index_unknown_handled_by_proc( comp, l );
         }
      }
 
@@ -1731,10 +1805,10 @@ DS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
         for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
            for (size_t k=local_min_k;k<=local_max_k;++k) {
-              size_t p = return_node_index(TF,comp,i,j,k);
-              if (node.void_frac[comp]->item(p) == 1.) {
-                 size_t par_id = (size_t) node.parID[comp]->item(p);
-                 double Tpart = impose_solid_temperature (comp,0,10,i,j,k,0.,par_id);
+              size_t p = TF->DOF_local_number(i,j,k,comp);
+              if (void_frac->operator()(p) != 0) {
+                 size_t par_id = void_frac->operator()(p) - 1;
+                 double Tpart = 0;//impose_solid_temperature (comp,0,10,i,j,k,0.,par_id);
                  TF->set_DOF_value( i, j, k, comp, level,Tpart);
               }
            }
@@ -1743,1452 +1817,8 @@ DS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
   }
 }
 
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: compute_fluid_particle_interaction( FV_TimeIterator const* t_it)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: compute_fluid_particle_interaction" ) ;
 
-  string fileName = "./DS_results/particle_Tstress.csv" ;
 
-  doubleVector temp_force(Npart,0);
-  double avg_force = 0.;
-
-  size_t Nmax = 0.;
-  if (level_set_type == "Sphere") {
-     Nmax = (dim == 2) ? ((size_t) Npoints) : ((size_t) (2*Npoints)) ;
-  } else if (level_set_type == "Cube") {
-     Nmax = (dim == 2) ? ((size_t) (4*Npoints)) : ((size_t) (6*pow(Npoints,2))) ;
-  } else if (level_set_type == "Cylinder") {
-     double Npm1 = round(pow(MAC::sqrt(Npoints) - MAC::sqrt(MAC::pi()/ar),2.));
-     double Ncyl = (Npoints - Npm1);
-     double dh = 1. - MAC::sqrt(Npm1/Npoints);
-     double Nr = round(2./dh);
-     Nmax = (dim == 3) ? ((size_t)(2*Npoints + Nr*Ncyl)) : 0 ;
-  }
-
-  for (size_t parID = 0; parID < Npart; parID++) {
-     // Contribution of stress tensor
-     compute_temperature_gradient_on_particle(temp_force, parID, Nmax);
-     // Gathering information from all procs
-     temp_force(parID) = pelCOMM->sum(temp_force(parID)) ;
-
-     if (my_rank == 0) {
-	avg_force += temp_force(parID);
-
-        ofstream MyFile( fileName.c_str(), ios::app ) ;
-        MyFile << t_it -> time() << "," << parID << "," << Nmax << "," << temp_force(parID) << endl;
-        MyFile.close( ) ;
-     }
-  }
-
-  if (my_rank == 0) cout << "Average dimensional Nusselt number for Np " << Nmax << " : " << avg_force/double(Npart) <<endl;
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: compute_temperature_gradient_on_particle(class doubleVector& force, size_t const& parID, size_t const& Np )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: compute_temperature_gradient_on_particle" ) ;
-
-  if (ViscousStressOrder == "first") {
-     first_order_temperature_gradient(force, parID, Np );
-  } else if (ViscousStressOrder == "second") {
-     second_order_temperature_gradient(force, parID, Np );
-  }
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: second_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: second_order_temperature_gradient" ) ;
-
-  size_t i0_temp;
-  size_t comp = 0;
-
-  // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid();
-  // Structure of particle surface input data
-  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
-
-  // comp won't matter as the particle position is independent of comp
-  double xp = solid.coord[0]->item(parID,0);
-  double yp = solid.coord[0]->item(parID,1);
-  double zp = solid.coord[0]->item(parID,2);
-  double ri = solid.size[0]->item(parID);
-/*
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/temp_grad_" << my_rank << "_" << parID << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-//  outputFile << "x,y,z,s_xx,s_yy,s_xy" << endl;
-  outputFile << "x,y,z,id" << endl;
-*/
-  doubleArray2D point(3,3,0);
-  doubleVector fini(3,0);
-  doubleVector level_set(2,1.);
-  boolVector point_in_domain(2,true);
-  size_t_vector in_parID(2,0);         //Store particle ID if level_set becomes negative
-  boolArray2D found(dim,3,false);
-  size_t_array2D i0(3,3,0);
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-
-  doubleVector Dmin(dim,0);
-  doubleVector Dmax(dim,0);
-  doubleVector rotated_coord(dim,0);
-  doubleVector rotated_normal(dim,0);
-  intVector sign(dim,0);
-
-  for (size_t i=0;i<Np;i++) {
-     // Get local min and max indices
-     // Get min and max coordinates in the current processor
-     for (size_t l=0;l<dim;++l) {
-         min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l );
-         max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l );
-         Dmin(l) = TF->primary_grid()->get_min_coordinate_on_current_processor(l);
-         Dmax(l) = TF->primary_grid()->get_max_coordinate_on_current_processor(l);
-     }
-
-     // Rotating surface points
-     rotated_coord(0) = ri*surface.coordinate->item(i,0);
-     rotated_coord(1) = ri*surface.coordinate->item(i,1);
-     rotated_coord(2) = ri*surface.coordinate->item(i,2);
-
-     rotation_matrix(parID,rotated_coord);
-
-     point(0,0) = xp + rotated_coord(0);
-     point(0,1) = yp + rotated_coord(1);
-     point(0,2) = zp + rotated_coord(2);
-
-     // Rotating surface normal
-     rotated_normal(0) = surface.normal->item(i,0);
-     rotated_normal(1) = surface.normal->item(i,1);
-     rotated_normal(2) = surface.normal->item(i,2);
-
-     rotation_matrix(parID,rotated_normal);
-
-     for (size_t dir=0;dir<dim;dir++) {
-        // PBC on rotated surface points
-        if (is_iperiodic[dir]) {
-           double isize = TF->primary_grid()->get_main_domain_max_coordinate(dir) - TF->primary_grid()->get_main_domain_min_coordinate(dir);
-           double imin = TF->primary_grid()->get_main_domain_min_coordinate(dir);
-           point(0,dir) = point(0,dir) - MAC::floor((point(0,dir)-imin)/isize)*isize;
-        }
-        // Finding the grid indexes next to ghost points
-        found(dir,0) = FV_Mesh::between(TF->get_DOF_coordinates_vector(comp,dir), point(0,dir), i0_temp);
-        if (found(dir,0) == 1) i0(0,dir) = i0_temp;
-     }
-
-     // Accessing the smallest grid size in domain
-     double dh = TF->primary_grid()->get_smallest_grid_size();
-
-     bool status = (dim==2) ? ((point(0,0) > Dmin(0)) && (point(0,0) <= Dmax(0)) && (point(0,1) > Dmin(1)) && (point(0,1) <= Dmax(1))) :
-                              ((point(0,0) > Dmin(0)) && (point(0,0) <= Dmax(0)) && (point(0,1) > Dmin(1)) && (point(0,1) <= Dmax(1))
-                                                                                 && (point(0,2) > Dmin(2)) && (point(0,2) <= Dmax(2)));
-     double threshold = pow(loc_thres,0.5)*dh;
-     double dfdi=0.;
-     size_t major_dir=4;
-
-     if (status) {
-        for (size_t dir=0;dir<dim;dir++) {
-           sign(dir) = (rotated_normal(dir) > 0.) ? 1 : -1;
-	   if (dim == 2) {
-              if (MAC::abs(rotated_normal(dir)) == MAC::max(MAC::abs(rotated_normal(0)),MAC::abs(rotated_normal(1))))
-                 major_dir = dir;
-	   } else if (dim == 3) {
-	      if (MAC::abs(rotated_normal(dir)) == MAC::max(MAC::abs(rotated_normal(0)),
-				                   MAC::max(MAC::abs(rotated_normal(1)),MAC::abs(rotated_normal(2)))))
-		 major_dir = dir;
-	   }
-	}
-
-	// Ghost points in i for the calculation of i-derivative of field
-        ghost_points_generation( point, i0, sign(major_dir), major_dir, point_in_domain, rotated_normal);
-
-        // Assuming all ghost points are in fluid
-        level_set(0) = 1.; level_set(1) = 1.;
-
-        // Checking all the ghost points in the solid/fluid, and storing the parID if present in solid
-        for (size_t m=0;m<Npart;m++) {
-           // In Normal direction
-           if (level_set(0) > threshold) {
-              level_set(0) = level_set_function(m,comp,point(1,0),point(1,1),point(1,2),level_set_type);
-              level_set(0) *= solid.inside[comp]->item(m);
-              if (level_set(0) < threshold) in_parID(0) = m;
-           }
-           if (level_set(1) > threshold) {
-              level_set(1) = level_set_function(m,comp,point(2,0),point(2,1),point(2,2),level_set_type);
-              level_set(1) *= solid.inside[comp]->item(m);
-              if (level_set(1) < threshold) in_parID(1) = m;
-           }
-        }
-
-        // Calculation of field variable on ghost point(0)
-        fini(0) = impose_solid_temperature_for_ghost(comp,point(0,0),point(0,1),point(0,2),parID);
-
-        // Calculation of field variable on ghost point(1)
-        if ((level_set(0) > threshold) && (point_in_domain(0))) {
-           fini(1) = third_order_ghost_field_estimate(TF, comp, point(1,0), point(1,1), point(1,2), i0(1,0), i0(1,1), i0(1,2), major_dir, sign,0);
-        } else if (level_set(0) <= threshold) {
-           fini(1) = impose_solid_temperature_for_ghost(comp,point(1,0),point(1,1),point(1,2),in_parID(0));
-        }
-        // Calculation of field variable on ghost point(2)
-        if ((level_set(1) > threshold) && (point_in_domain(1))) {
-           fini(2) = third_order_ghost_field_estimate(TF, comp, point(2,0), point(2,1), point(2,2), i0(2,0), i0(2,1), i0(2,2), major_dir, sign,0);
-        } else if (level_set(1) <= threshold) {
-           fini(2) = impose_solid_temperature_for_ghost(comp,point(2,0),point(2,1),point(2,2),in_parID(1));
-        }
-
-        // Derivative
-        // Point 1 and 2 in computational domain
-        if (point_in_domain(0) && point_in_domain(1)) {
-           if ((level_set(0) > threshold) && (level_set(1) > threshold)) {
-              double dx1 = pow(pow(point(1,0)-point(0,0),2) + pow(point(1,1)-point(0,1),2) + pow(point(1,2)-point(0,2),2),0.5);
-              double dx2 = pow(pow(point(2,0)-point(0,0),2) + pow(point(2,1)-point(0,1),2) + pow(point(2,2)-point(0,2),2),0.5);
-              dfdi = ((fini(1) - fini(0))*dx2/dx1 - (fini(2) - fini(0))*dx1/dx2)/(dx2-dx1);
-           // Point 1 in fluid and 2 in the solid
-           } else if ((level_set(0) > threshold) && (level_set(1) <= threshold)) {
-              double dx1 = pow(pow(point(1,0)-point(0,0),2) + pow(point(1,1)-point(0,1),2) + pow(point(1,2)-point(0,2),2),0.5);
-              dfdi = (fini(1) - fini(0))/dx1;
-           // Point 1 is present in solid
-           } else if (level_set(0) <= threshold) {
-              double dx1 = pow(pow(point(1,0)-point(0,0),2) + pow(point(1,1)-point(0,1),2) + pow(point(1,2)-point(0,2),2),0.5);
-              dfdi = (fini(1) - fini(0))/dx1;
-           }
-        // Point 1 in computational domain
-        } else if (point_in_domain(0) && !point_in_domain(1)) {
-           double dx1 = pow(pow(point(1,0)-point(0,0),2) + pow(point(1,1)-point(0,1),2) + pow(point(1,2)-point(0,2),2),0.5);
-           dfdi = (fini(1) - fini(0))/dx1;
-        // Particle close to wall
-        } else if (!point_in_domain(0)) {
-           // Creating a new ghost point in domain boundary or wall
-           i0(1,major_dir) = (sign(major_dir) == 1) ? (i0(0,major_dir) + 1*sign(major_dir)) :
-		                                      (i0(0,major_dir) + 0*sign(major_dir)) ;
-           point(1,major_dir) = TF->get_DOF_coordinate(i0(1,major_dir), comp, major_dir);
-           double t1 = (point(1,major_dir) - point(0,major_dir))/rotated_normal(major_dir);
-
-           for (size_t dir=0; dir<dim; dir++) {
-              if (dir != major_dir) {
-                 point(1,dir) = point(0,dir) + rotated_normal(dir)*t1;
-		 size_t i0_t = 0;
-                 bool temp = FV_Mesh::between(TF->get_DOF_coordinates_vector(0,dir), point(1,dir), i0_t);
-                 if (temp) i0(1,dir) = i0_t;
-              }
-	   }
-
-	   // Estimating the field value on new ghost point
-           fini(1) = third_order_ghost_field_estimate(TF,comp,point(1,0),point(1,1),point(1,2),i0(1,0),i0(1,1),i0(1,2),major_dir,sign,0);
-           double dx1 = pow(pow(point(1,0)-point(0,0),2) + pow(point(1,1)-point(0,1),2) + pow(point(1,2)-point(0,2),2),0.5);
-           dfdi = (fini(1) - fini(0))/dx1;
-//           outputFile << point(1,0) << "," << point(1,1) << "," << point(1,2) << "," << fini(1) << endl;
-        }
-
-//        outputFile << point(0,0) << "," << point(0,1) << "," << point(0,2) << "," << fini(0) << endl;
-//        if (point_in_domain(0)) outputFile << point(1,0) << "," << point(1,1) << "," << point(1,2) << "," << fini(1) << endl;
-//        if (point_in_domain(1)) outputFile << point(2,0) << "," << point(2,1) << "," << point(2,2) << "," << fini(2) << endl;
-     }
-
-     double scale = (dim == 2) ? (ri/(2.*MAC::pi()*ri)) : (ri*ri/(4.*MAC::pi()*ri*ri));
-
-     // Ref: Keating thesis Pg-85
-     // point_coord*(area) --> Component of area in particular direction
-     force(parID) = force(parID) + dfdi*(surface.area->item(i)*scale);
-  }
-//  outputFile.close();
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: ghost_points_generation(class doubleArray2D& point, class size_t_array2D& i0, int const& sign, size_t const& major_dir, class boolVector& point_in_domain, class doubleVector& rotated_vector )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: ghost_points_generation" ) ;
-
-  intVector i0_temp(2,0);
-  size_t i0_t;
-
-  // Ghost points in i for the calculation of i-derivative of field
-  i0_temp(0) = (sign == 1) ? (int(i0(0,major_dir)) + 1*sign) : (int(i0(0,major_dir)) + 0*sign);
-  i0_temp(1) = (sign == 1) ? (int(i0(0,major_dir)) + 2*sign) : (int(i0(0,major_dir)) + 1*sign);
-
-  if ((i0_temp(0) >= 0) && (i0_temp(0) < (int)TF->get_local_nb_dof(0,major_dir)))
-     point(1,major_dir) = TF->get_DOF_coordinate(i0_temp(0), 0, major_dir);
-  if ((i0_temp(1) >= 0) && (i0_temp(1) < (int)TF->get_local_nb_dof(0,major_dir)))
-     point(2,major_dir) = TF->get_DOF_coordinate(i0_temp(1), 0, major_dir);
-
-  if (MAC::abs(point(0,major_dir)-point(1,major_dir)) < MAC::abs(point(1,major_dir)-point(2,major_dir))) {
-     i0_temp(0) = (sign == 1) ? (int(i0(0,major_dir)) + 2*sign) : (int(i0(0,major_dir)) + 1*sign);
-     i0_temp(1) = (sign == 1) ? (int(i0(0,major_dir)) + 3*sign) : (int(i0(0,major_dir)) + 2*sign);
-
-     if ((i0_temp(0) >= 0) && (i0_temp(0) < (int)TF->get_local_nb_dof(0,major_dir)))
-     point(1,major_dir) = TF->get_DOF_coordinate(i0_temp(0), 0, major_dir);
-     if ((i0_temp(1) >= 0) && (i0_temp(1) < (int)TF->get_local_nb_dof(0,major_dir)))
-     point(2,major_dir) = TF->get_DOF_coordinate(i0_temp(1), 0, major_dir);
-  }
-
-  double t1 = (point(1,major_dir) - point(0,major_dir))/rotated_vector(major_dir);
-  double t2 = (point(2,major_dir) - point(0,major_dir))/rotated_vector(major_dir);
-
-  for (size_t dir=0; dir<dim; dir++) {
-      if (dir != major_dir) {
-         point(1,dir) = point(0,dir) + rotated_vector(dir)*t1;
-         point(2,dir) = point(0,dir) + rotated_vector(dir)*t2;
-      }
-  }
-
-  boolArray2D found(2,dim,true);
-
-  for (size_t dir=0; dir<dim; dir++) {
-     if (dir == major_dir) {
-
-       // Checking the points in domain or not
-       if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)TF->get_local_nb_dof(0,dir))) {
-          found(0,dir) = 0;
-       }
-
-       if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)TF->get_local_nb_dof(0,dir))) {
-          found(1,dir) = 0;
-       }
-
-       i0(1,dir) = i0_temp(0);
-       i0(2,dir) = i0_temp(1);
-     } else {
-        found(0,dir) = FV_Mesh::between(TF->get_DOF_coordinates_vector(0,dir), point(1,dir), i0_t);
-        if (found(0,dir)) i0(1,dir) = i0_t;
-        found(1,dir) = FV_Mesh::between(TF->get_DOF_coordinates_vector(0,dir), point(2,dir), i0_t);
-        if (found(1,dir)) i0(2,dir) = i0_t;
-     }
-  }
-
-  // Checking the ghost points in domain or not
-  point_in_domain(0) = (dim == 2) ? found(0,0) && found(0,1) :
-	                            found(0,0) && found(0,1) && found(0,2) ;
-
-  point_in_domain(1) = (dim == 2) ? found(1,0) && found(1,1) :
-	                            found(1,0) && found(1,1) && found(1,2) ;
-
-}
-
-//---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: third_order_ghost_field_estimate ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DS_HeatTransfer:: third_order_ghost_field_estimate" ) ;
-
-// Call respective functions based on 2D or 3D domain
-
-   double result = 0.;
-
-   if (dim == 2) {
-      result = (ghost_points_dir == 0) ? quadratic_interpolation2D(FF, comp, xp, yp, zp, ii, ji, ki, 1, sign, level) :
-                                         quadratic_interpolation2D(FF, comp, xp, yp, zp, ii, ji, ki, 0, sign, level) ;
-   } else if (dim == 3) {
-      result = quadratic_interpolation3D(FF, comp, xp, yp, zp, ii, ji, ki, ghost_points_dir, sign, level) ;
-   }
-
-   return(result);
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: gen_dir_index_of_secondary_ghost_points ( class size_t_vector& index, class intVector& sign, size_t const& interpol_dir, class size_t_array2D& index_g, class boolVector& point_in_domain, size_t const& comp)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: gen_dir_index_of_secondary_ghost_points" ) ;
-
-  intVector i0_temp(3,0);
-
-  for (size_t dir=0;dir<dim;dir++) {
-     index_g(0,dir) = index(dir);
-     index_g(1,dir) = index(dir);
-     index_g(2,dir) = index(dir);
-  }
-
-  if (sign(interpol_dir) > 0.) {
-     i0_temp(0) = int(index(interpol_dir));
-     i0_temp(1) = int(index(interpol_dir)) + 1;
-     i0_temp(2) = int(index(interpol_dir)) + 2;
-  } else if (sign(interpol_dir) <= 0.) {
-     i0_temp(0) = int(index(interpol_dir)) - 1;
-     i0_temp(1) = int(index(interpol_dir));
-     i0_temp(2) = int(index(interpol_dir)) + 1;
-  }
-
-  // Checking the ghost points in domain or not
-  if ((i0_temp(0) < 0) || (i0_temp(0) >= (int)TF->get_local_nb_dof(comp,interpol_dir))) {
-     point_in_domain(0) = 0;
-  } else {
-     point_in_domain(0) = 1;
-  }
-
-  if ((i0_temp(1) < 0) || (i0_temp(1) >= (int)TF->get_local_nb_dof(comp,interpol_dir))) {
-     point_in_domain(1) = 0;
-  } else {
-     point_in_domain(1) = 1;
-  }
-
-  if ((i0_temp(2) < 0) || (i0_temp(2) >= (int)TF->get_local_nb_dof(comp,interpol_dir))) {
-     point_in_domain(2) = 0;
-  } else {
-     point_in_domain(2) = 1;
-  }
-
-  index_g(0,interpol_dir) = i0_temp(0);
-  index_g(1,interpol_dir) = i0_temp(1);
-  index_g(2,interpol_dir) = i0_temp(2);
-
-}
-//---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: quadratic_interpolation2D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& i0, size_t const& j0, size_t const& k0, size_t const& interpol_dir, class intVector& sign, size_t const& level)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DS_HeatTransfer:: quadratic_interpolation2D" ) ;
-
-// Calculates the field value at the ghost points
-// near the particle boundary using the quadratic interpolation
-// inspired from Johansen 1998;
-// xp,yp,zp are the ghost point coordinated; interpol_dir is the direction
-// in which the additional points will be used for quadratic interpolation
-/*
-   ofstream outputFile ;
-   std::ostringstream os2;
-   os2 << "./DS_results/temp_drag_extras.csv";
-   std::string filename = os2.str();
-   outputFile.open(filename.c_str(), ios::app);
-*/
-   // Node information for field(1)
-   NodeProp node = GLOBAL_EQ->get_node_property();
-   // Intersection information for field(1) in fluid(0)
-   BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(0);
-
-   // Directional index of point
-   size_t_vector index(3,0);
-   boolVector point_in_solid(3,0);
-   boolVector point_in_domain(3,1);
-   doubleVector xi(3,0.);
-   // Directional indexes of ghost points
-   size_t_array2D index_g(3,3,0);
-   // Local node index of ghost points
-   size_t_vector node_index(3,0);
-   // Decide which scheme to use
-   string scheme = "quadratic";
-
-   xi(0) = xp; xi(1) = yp; xi(2) = zp;
-   index(0) = i0; index(1) = j0; index(2) = k0;
-
-   double f0=0.,f1=0.,f2=0.;
-   double x0=0.,x1=0.,x2=0.;
-   double l0=0.,l1=0.,l2=0.;
-
-   // Creating ghost points for quadratic interpolation
-   gen_dir_index_of_secondary_ghost_points(index, sign, interpol_dir, index_g, point_in_domain, comp);
-
-   // Assume all the ghost points in fluid
-   // Storing the field values assuming all ghost points in fluid and domain
-   // Check weather the ghost points are in solid or not; TRUE if they are
-   if (point_in_domain(0)) {
-      x0 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir);
-      f0 = FF->DOF_value( index_g(0,0), index_g(0,1), index_g(0,2), comp, level );
-      node_index(0) = return_node_index(FF,comp,index_g(0,0),index_g(0,1),index_g(0,2));
-      point_in_solid(0) = node.void_frac[comp]->item(node_index(0));
-   }
-
-   if (point_in_domain(1)) {
-      x1 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir);
-      f1 = FF->DOF_value( index_g(1,0), index_g(1,1), index_g(1,2), comp, level );
-      node_index(1) = return_node_index(FF,comp,index_g(1,0),index_g(1,1),index_g(1,2));
-      point_in_solid(1) = node.void_frac[comp]->item(node_index(1));
-   }
-
-   if (point_in_domain(2)) {
-      x2 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir);
-      f2 = FF->DOF_value( index_g(2,0), index_g(2,1), index_g(2,2), comp, level );
-      node_index(2) = return_node_index(FF,comp,index_g(2,0),index_g(2,1),index_g(2,2));
-      point_in_solid(2) = node.void_frac[comp]->item(node_index(2));
-   }
-
-   // Ghost points corrections
-   // All points in domain
-   if (point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
-      // 0 in solid, rest in fluid
-      if (point_in_solid(0) && !point_in_solid(1) && !point_in_solid(2)) {
-         x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
-         f0 = bf_intersect[interpol_dir].field[comp]->item(node_index(1),0);
-      // 2 in solid, rest in fluid
-      } else if (!point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
-         x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
-         f2 = bf_intersect[interpol_dir].field[comp]->item(node_index(1),1);
-      // 0, 2 in solid; 1 in fluid
-      } else if (point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
-         x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
-         f0 = bf_intersect[interpol_dir].field[comp]->item(node_index(1),0);
-         x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
-         f2 = bf_intersect[interpol_dir].field[comp]->item(node_index(1),1);
-      // 0, 1 in solid; 2 in fluid
-      } else if (point_in_solid(0) && point_in_solid(1) && !point_in_solid(2)) {
-         x1 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(2),0);
-         f1 = bf_intersect[interpol_dir].field[comp]->item(node_index(2),0);
-         scheme = "linear12";
-      // 1, 2 in solid; 0 in fluid
-      } else if (!point_in_solid(0) && point_in_solid(1) && point_in_solid(2)) {
-         x1 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(0),1);
-         f1 = bf_intersect[interpol_dir].field[comp]->item(node_index(0),1);
-         scheme = "linear01";
-      }
-   // Point 0 and 1 are in domain, 2 not in domain
-   } else if (point_in_domain(0) && point_in_domain(1) && !point_in_domain(2)) {
-      scheme = "linear01";
-      // 0 in fluid; 1 in solid
-      if (!point_in_solid(0) && point_in_solid(1)) {
-         x1 = FF->get_DOF_coordinate(index_g(0,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(0),1);
-         f1 = bf_intersect[interpol_dir].field[comp]->item(node_index(0),1);
-      // 0 in solid, 1 in fluid
-      } else if (point_in_solid(0) && !point_in_solid(1)) {
-         x0 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(1),0);
-         f0 = bf_intersect[interpol_dir].field[comp]->item(node_index(1),0);
-      }
-   // Point 1 and 2 are in domain, 0 not in domain
-   } else if (!point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
-      scheme = "linear12";
-      // 1 in fluid; 2 in solid
-      if (!point_in_solid(1) && point_in_solid(2)) {
-         x2 = FF->get_DOF_coordinate(index_g(1,interpol_dir), comp, interpol_dir) + bf_intersect[interpol_dir].value[comp]->item(node_index(1),1);
-         f2 = bf_intersect[interpol_dir].field[comp]->item(node_index(1),1);
-      // 1 in solid, 2 in fluid
-      } else if (point_in_solid(1) && !point_in_solid(2)) {
-         x1 = FF->get_DOF_coordinate(index_g(2,interpol_dir), comp, interpol_dir) - bf_intersect[interpol_dir].value[comp]->item(node_index(2),0);
-         f1 = bf_intersect[interpol_dir].field[comp]->item(node_index(2),0);
-      }
-   }
-
-/*
-   if (comp == 0) {
-      if (interpol_dir == 0) {
-         double yt = FF->get_DOF_coordinate(index(1), comp, 1);
-         outputFile << x0 << "," << yt << "," << 0. << "," << f0 << endl;
-         outputFile << x1 << "," << yt << "," << 0. << "," << f1 << endl;
-         outputFile << x2 << "," << yt << "," << 0. << "," << f2 << endl;
-      } else if (interpol_dir == 1) {
-         double xt = FF->get_DOF_coordinate(index(0), comp, 0);
-         outputFile << xt << "," << x0 << "," << 0. << "," << f0 << endl;
-         outputFile << xt << "," << x1 << "," << 0. << "," << f1 << endl;
-         outputFile << xt << "," << x2 << "," << 0. << "," << f2 << endl;
-      }
-   }
-*/
-   double result = 0.;
-
-   if (scheme == "quadratic") {
-      l0 = (xi(interpol_dir) - x1)*(xi(interpol_dir) - x2)/(x0 - x1)/(x0 - x2);
-      l1 = (xi(interpol_dir) - x0)*(xi(interpol_dir) - x2)/(x1 - x0)/(x1 - x2);
-      l2 = (xi(interpol_dir) - x0)*(xi(interpol_dir) - x1)/(x2 - x0)/(x2 - x1);
-      result = f0*l0 + f1*l1 + f2*l2;
-   } else if (scheme == "linear01") {
-      l0 = (xi(interpol_dir) - x1)/(x0 - x1);
-      l1 = (xi(interpol_dir) - x0)/(x1 - x0);
-      result = f0*l0 + f1*l1;
-   } else if (scheme == "linear12") {
-      l1 = (xi(interpol_dir) - x2)/(x1 - x2);
-      l2 = (xi(interpol_dir) - x1)/(x2 - x1);
-      result = f1*l1 + f2*l2;
-   }
-
-   return(result);
-}
-
-//---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: quadratic_interpolation3D ( FV_DiscreteField* FF, size_t const& comp, double const& xp, double const& yp, double const& zp, size_t const& ii, size_t const& ji, size_t const& ki, size_t const& ghost_points_dir, class intVector& sign, size_t const& level)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: quadratic_interpolation3D" ) ;
-
-  // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid();
-
-  doubleArray2D point(3,3,0);
-  // Directional indexes of ghost points
-  size_t_vector index(3,0);
-  // Directional indexes of secondary ghost points
-  size_t_array2D index_g(3,3,0);
-  // Coordinates of secondary ghost points
-  doubleArray2D coord_g(3,3,0.);
-  // level set value of the secondary ghost points
-  doubleVector level_set(3,1.);
-  // Store particle ID if level_set becomes negative
-  size_t_vector in_parID(3,0);
-  // Presence in solid or not
-  boolVector point_in_solid(3,0);
-  // Presence in domain or not
-  boolVector point_in_domain(3,1);
-  // Decide which scheme to use
-  string scheme = "quadratic";
-
-  size_t sec_ghost_dir = 0;
-  size_t sec_interpol_dir = 0;
-
-  point(0,0) = xp; point(0,1) = yp; point(0,2) = zp;
-  index(0) = ii; index(1) = ji; index(2) = ki;
-
-  // Ghost points generated in y and then quadratic interpolation in z will generate the same
-  // stencil if ghost points are generated in z and the quadratic interpolation done in y
-  if (ghost_points_dir == 0) {
-     sec_ghost_dir = 1;
-     sec_interpol_dir = 2;
-  } else if (ghost_points_dir == 1) {
-     sec_ghost_dir = 0;
-     sec_interpol_dir = 2;
-  } else if (ghost_points_dir == 2) {
-     sec_ghost_dir = 0;
-     sec_interpol_dir = 1;
-  }
-
-  // Generate indexes of secondary ghost points in sec_ghost_dir direction
-  gen_dir_index_of_secondary_ghost_points(index, sign, sec_ghost_dir, index_g, point_in_domain, comp);
-
-  // Assume all secondary ghost points in fluid
-  double x0 = (point_in_domain(0)) ? FF->get_DOF_coordinate(index_g(0,sec_ghost_dir), comp, sec_ghost_dir) : 0. ;
-  double x1 = (point_in_domain(1)) ? FF->get_DOF_coordinate(index_g(1,sec_ghost_dir), comp, sec_ghost_dir) : 0. ;
-  double x2 = (point_in_domain(2)) ? FF->get_DOF_coordinate(index_g(2,sec_ghost_dir), comp, sec_ghost_dir) : 0. ;
-
-  if (sec_ghost_dir == 0) {
-     coord_g(0,0) = x0; coord_g(0,1) = point(0,1); coord_g(0,2) = point(0,2);
-     coord_g(1,0) = x1; coord_g(1,1) = point(0,1); coord_g(1,2) = point(0,2);
-     coord_g(2,0) = x2; coord_g(2,1) = point(0,1); coord_g(2,2) = point(0,2);
-  } else if (sec_ghost_dir == 1) {
-     coord_g(0,0) = point(0,0); coord_g(0,1) = x0; coord_g(0,2) = point(0,2);
-     coord_g(1,0) = point(0,0); coord_g(1,1) = x1; coord_g(1,2) = point(0,2);
-     coord_g(2,0) = point(0,0); coord_g(2,1) = x2; coord_g(2,2) = point(0,2);
-  } else if (sec_ghost_dir == 2) {
-     coord_g(0,0) = point(0,0); coord_g(0,1) = point(0,1); coord_g(0,2) = x0;
-     coord_g(1,0) = point(0,0); coord_g(1,1) = point(0,1); coord_g(1,2) = x1;
-     coord_g(2,0) = point(0,0); coord_g(2,1) = point(0,1); coord_g(2,2) = x2;
-  }
-
-  double dh = FF->primary_grid()->get_smallest_grid_size();
-
-  double threshold = pow(loc_thres,0.5)*dh;
-  // Checking the secondary ghost points in the solid/fluid, and storing the parID if present in solid
-  for (size_t m=0;m<Npart;m++) {
-     // x0
-     if (level_set(0) > threshold) {
-        level_set(0) = level_set_function(m,comp,coord_g(0,0),coord_g(0,1),coord_g(0,2),level_set_type);
-        level_set(0) *= solid.inside[comp]->item(m);
-        if (level_set(0) < threshold) { in_parID(0) = m; point_in_solid(0) = 1; }
-     }
-     // x1
-     if (level_set(1) > threshold) {
-        level_set(1) = level_set_function(m,comp,coord_g(1,0),coord_g(1,1),coord_g(1,2),level_set_type);
-        level_set(1) *= solid.inside[comp]->item(m);
-        if (level_set(1) < threshold) { in_parID(1) = m; point_in_solid(1) = 1; }
-     }
-     // x2
-     if (level_set(2) > threshold) {
-        level_set(2) = level_set_function(m,comp,coord_g(2,0),coord_g(2,1),coord_g(2,2),level_set_type);
-        level_set(2) *= solid.inside[comp]->item(m);
-        if (level_set(2) < threshold) { in_parID(2) = m; point_in_solid(2) = 1; }
-     }
-  }
-
-  double f0 = 0., f1 = 0., f2 = 0., del = 0.;
-
-  // Estimate the field values at the secondary ghost points
-  f0 = (point_in_domain(0)) ? quadratic_interpolation2D(FF,comp,coord_g(0,0),coord_g(0,1),coord_g(0,2),index_g(0,0),index_g(0,1),index_g(0,2),sec_interpol_dir,sign,level) : 0. ;
-  f1 = (point_in_domain(1)) ? quadratic_interpolation2D(FF,comp,coord_g(1,0),coord_g(1,1),coord_g(1,2),index_g(1,0),index_g(1,1),index_g(1,2),sec_interpol_dir,sign,level) : 0. ;
-  f2 = (point_in_domain(2)) ? quadratic_interpolation2D(FF,comp,coord_g(2,0),coord_g(2,1),coord_g(2,2),index_g(2,0),index_g(2,1),index_g(2,2),sec_interpol_dir,sign,level) : 0. ;
-
-  // Ghost points corrections
-  if (point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
-     // 0 in solid, rest in fluid
-     if (point_in_solid(0) && !point_in_solid(1) && !point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
-           f0 = impose_solid_temperature_for_ghost(comp,x1-del,yp,zp,in_parID(0));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
-           f0 = impose_solid_temperature_for_ghost(comp,xp,x1-del,zp,in_parID(0));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
-           f0 = impose_solid_temperature_for_ghost(comp,xp,yp,x1-del,in_parID(0));
-        }
-        x0 = x1 - del;
-     // 2 in solid, rest in fluid
-     } else if (!point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
-           f2 = impose_solid_temperature_for_ghost(comp,x1+del,yp,zp,in_parID(2));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
-           f2 = impose_solid_temperature_for_ghost(comp,xp,x1+del,zp,in_parID(2));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
-           f2 = impose_solid_temperature_for_ghost(comp,xp,yp,x1+del,in_parID(2));
-        }
-        x2 = x1 + del;
-     // 0, 2 in solid; 1 in fluid
-     } else if (point_in_solid(0) && !point_in_solid(1) && point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
-           f0 = impose_solid_temperature_for_ghost(comp,x1-del,yp,zp,in_parID(0));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
-           f0 = impose_solid_temperature_for_ghost(comp,xp,x1-del,zp,in_parID(0));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
-           f0 = impose_solid_temperature_for_ghost(comp,xp,yp,x1-del,in_parID(0));
-        }
-        x0 = x1 - del;
-
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
-           f2 = impose_solid_temperature_for_ghost(comp,x1+del,yp,zp,in_parID(2));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
-           f2 = impose_solid_temperature_for_ghost(comp,xp,x1+del,zp,in_parID(2));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
-           f2 = impose_solid_temperature_for_ghost(comp,xp,yp,x1+del,in_parID(2));
-        }
-        x2 = x1 + del;
-
-     // 0, 1 in solid; 2 in fluid
-     } else if (point_in_solid(0) && point_in_solid(1) && !point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
-           f1 = impose_solid_temperature_for_ghost(comp,x2-del,yp,zp,in_parID(1));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
-           f1 = impose_solid_temperature_for_ghost(comp,xp,x2-del,zp,in_parID(1));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
-           f1 = impose_solid_temperature_for_ghost(comp,xp,yp,x2-del,in_parID(1));
-        }
-        x1 = x2 - del;
-        scheme = "linear12";
-     // 1, 2 in solid; 0 in fluid
-     } else if (!point_in_solid(0) && point_in_solid(1) && point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
-           f1 = impose_solid_temperature_for_ghost(comp,x0+del,yp,zp,in_parID(1));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
-           f1 = impose_solid_temperature_for_ghost(comp,xp,x0+del,zp,in_parID(1));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
-           f1 = impose_solid_temperature_for_ghost(comp,xp,yp,x0+del,in_parID(1));
-        }
-        x1 = x0 + del;
-        scheme = "linear01";
-     }
-  // Point 0 and 1 are in domain, 2 not in domain
-  } else if (point_in_domain(0) && point_in_domain(1) && !point_in_domain(2)) {
-     scheme = "linear01";
-     // 0 in fluid; 1 in solid
-     if (!point_in_solid(0) && point_in_solid(1)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
-           f1 = impose_solid_temperature_for_ghost(comp,x0+del,yp,zp,in_parID(1));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
-           f1 = impose_solid_temperature_for_ghost(comp,xp,x0+del,zp,in_parID(1));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 1);
-           f1 = impose_solid_temperature_for_ghost(comp,xp,yp,x0+del,in_parID(1));
-        }
-        x1 = x0 + del;
-     // 0 in solid, 1 in fluid
-     } else if (point_in_solid(0) && !point_in_solid(1)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x0, x1, yp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
-           f0 = impose_solid_temperature_for_ghost(comp,x1-del,yp,zp,in_parID(0));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x0, x1, xp, zp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
-           f0 = impose_solid_temperature_for_ghost(comp,xp,x1-del,zp,in_parID(0));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x0, x1, xp, yp, in_parID(0), comp, sec_ghost_dir, dh, 0, 0);
-           f0 = impose_solid_temperature_for_ghost(comp,xp,yp,x1-del,in_parID(0));
-        }
-        x0 = x1 - del;
-     }
-  // Point 1 and 2 are in domain, 0 not in domain
-  } else if (!point_in_domain(0) && point_in_domain(1) && point_in_domain(2)) {
-     scheme = "linear12";
-     // 1 in fluid; 2 in solid
-     if (!point_in_solid(1) && point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
-           f2 = impose_solid_temperature_for_ghost(comp,x1+del,yp,zp,in_parID(2));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
-           f2 = impose_solid_temperature_for_ghost(comp,xp,x1+del,zp,in_parID(2));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(2), comp, sec_ghost_dir, dh, 0, 1);
-           f2 = impose_solid_temperature_for_ghost(comp,xp,yp,x1+del,in_parID(2));
-        }
-        x2 = x1 + del;
-     // 1 in solid, 2 in fluid
-     } else if (point_in_solid(1) && !point_in_solid(2)) {
-        if (sec_ghost_dir == 0) {
-           del = find_intersection_for_ghost(x1, x2, yp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
-           f1 = impose_solid_temperature_for_ghost(comp,x2-del,yp,zp,in_parID(1));
-        } else if (sec_ghost_dir == 1) {
-           del = find_intersection_for_ghost(x1, x2, xp, zp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
-           f1 = impose_solid_temperature_for_ghost(comp,xp,x2-del,zp,in_parID(1));
-        } else if (sec_ghost_dir == 2) {
-           del = find_intersection_for_ghost(x1, x2, xp, yp, in_parID(1), comp, sec_ghost_dir, dh, 0, 0);
-           f1 = impose_solid_temperature_for_ghost(comp,xp,yp,x2-del,in_parID(1));
-        }
-        x1 = x2 - del;
-     }
-  }
-
-  double l0 = 0., l1 = 0., l2 = 0.;
-  double result = 0.;
-
-  if (scheme == "quadratic") {
-     l0 = (point(0,sec_ghost_dir) - x1)*(point(0,sec_ghost_dir) - x2)/(x0 - x1)/(x0 - x2);
-     l1 = (point(0,sec_ghost_dir) - x0)*(point(0,sec_ghost_dir) - x2)/(x1 - x0)/(x1 - x2);
-     l2 = (point(0,sec_ghost_dir) - x0)*(point(0,sec_ghost_dir) - x1)/(x2 - x0)/(x2 - x1);
-     result = f0*l0 + f1*l1 + f2*l2;
-  } else if (scheme == "linear01") {
-     l0 = (point(0,sec_ghost_dir) - x1)/(x0 - x1);
-     l1 = (point(0,sec_ghost_dir) - x0)/(x1 - x0);
-     result = f0*l0 + f1*l1;
-  } else if (scheme == "linear12") {
-     l1 = (point(0,sec_ghost_dir) - x2)/(x1 - x2);
-     l2 = (point(0,sec_ghost_dir) - x1)/(x2 - x1);
-     result = f1*l1 + f2*l2;
-  }
-
-  return(result);
-}
-
-
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: first_order_temperature_gradient(class doubleVector& force, size_t const& parID, size_t const& Np )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL("DS_HeatTransfer:: first_order_temperature_gradient" ) ;
-
-  size_t i0_temp;
-  size_t comp = 0;
-
-  // Structure of particle input data
-  PartInput solid = GLOBAL_EQ->get_solid();
-  // Structure of particle surface input data
-  SurfaceDiscretize surface = GLOBAL_EQ->get_surface();
-
-  // comp won't matter as the particle position is independent of comp
-  double xp = solid.coord[comp]->item(parID,0);
-  double yp = solid.coord[comp]->item(parID,1);
-  double zp = solid.coord[comp]->item(parID,2);
-  double ri = solid.size[comp]->item(parID);
-/*
-  ofstream outputFile ;
-  std::ostringstream os2;
-  os2 << "./DS_results/temp_grad_" << my_rank << "_" << parID << ".csv";
-  std::string filename = os2.str();
-  outputFile.open(filename.c_str());
-  outputFile << "x,y,z,id" << endl;*/
-//  outputFile << "i,Nu" << endl;
-
-  doubleArray2D ipoint(3,3,0.);
-  doubleVector fini(3,0);
-  doubleVector level_set(2,1.);
-  boolVector in_domain(2,true);        //true if ghost point in the computational domain
-  size_t_vector in_parID(2,0);         //Store particle ID if level_set becomes negative
-  boolArray2D found(3,dim,false);
-  size_t_array2D i0(3,dim,0);
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-
-  doubleVector Dmin(dim,0);
-  doubleVector Dmax(dim,0);
-  doubleVector rotated_coord(dim,0);
-  doubleVector rotated_normal(dim,0);
-
-  for (size_t i=0;i<Np;i++) {
-     // Get local min and max indices
-     for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l );
-        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l );
-        Dmin(l) = TF->primary_grid()->get_min_coordinate_on_current_processor(l);
-        Dmax(l) = TF->primary_grid()->get_max_coordinate_on_current_processor(l);
-     }
-
-     // Rotating surface points
-     rotated_coord(0) = ri*surface.coordinate->item(i,0);
-     rotated_coord(1) = ri*surface.coordinate->item(i,1);
-     rotated_coord(2) = ri*surface.coordinate->item(i,2);
-
-     rotation_matrix(parID,rotated_coord);
-
-     ipoint(0,0) = xp + rotated_coord(0);
-     ipoint(0,1) = yp + rotated_coord(1);
-     ipoint(0,2) = zp + rotated_coord(2);
-
-     // Rotating surface normal
-     rotated_normal(0) = surface.normal->item(i,0);
-     rotated_normal(1) = surface.normal->item(i,1);
-     rotated_normal(2) = surface.normal->item(i,2);
-
-     rotation_matrix(parID,rotated_normal);
-
-     // Correction in case of periodic boundary condition in any direction
-     for (size_t dir=0;dir<dim;dir++) {
-        // PBC on rotated surface points
-        if (is_iperiodic[dir]) {
-           double isize = TF->primary_grid()->get_main_domain_max_coordinate(dir) - TF->primary_grid()->get_main_domain_min_coordinate(dir);
-           double imin = TF->primary_grid()->get_main_domain_min_coordinate(dir);
-           ipoint(0,dir) = ipoint(0,dir) - MAC::floor((ipoint(0,dir)-imin)/isize)*isize;
-        }
-        // Finding the grid indexes next to ghost points
-        found(0,dir) = FV_Mesh::between(TF->get_DOF_coordinates_vector(comp,dir), ipoint(0,dir), i0_temp) ;
-        if (found(0,dir) == 1) i0(0,dir) = i0_temp ;
-     }
-
-     // Accessing the smallest grid size in domain
-     double dh = TF->primary_grid()->get_smallest_grid_size();
-
-     bool status = (dim==2) ? ((ipoint(0,0) > Dmin(0)) && (ipoint(0,0) <= Dmax(0)) && (ipoint(0,1) > Dmin(1)) && (ipoint(0,1) <= Dmax(1))) :
-                              ((ipoint(0,0) > Dmin(0)) && (ipoint(0,0) <= Dmax(0)) && (ipoint(0,1) > Dmin(1)) && (ipoint(0,1) <= Dmax(1))
-                                                                                   && (ipoint(0,2) > Dmin(2)) && (ipoint(0,2) <= Dmax(2)));
-
-     double threshold = pow(loc_thres,0.5)*dh;
-     double dfdi=0.;
-
-     if (status) {
-        for (size_t l=0;l<dim;++l) {
-           // Ghost points in normal direction at the particle surface
-           ipoint(1,l) = ipoint(0,l) + dh*rotated_normal(l);
-           ipoint(2,l) = ipoint(0,l) + 2.*dh*rotated_normal(l);
-
-           // Periocid boundary conditions
-           if (is_iperiodic[l]) {
-              double isize = TF->primary_grid()->get_main_domain_max_coordinate(l) - TF->primary_grid()->get_main_domain_min_coordinate(l);
-              double imin = TF->primary_grid()->get_main_domain_min_coordinate(l);
-              ipoint(1,l) = ipoint(1,l) - MAC::floor((ipoint(1,l)-imin)/isize)*isize;
-              ipoint(2,l) = ipoint(2,l) - MAC::floor((ipoint(2,l)-imin)/isize)*isize;
-           }
-
-           // Finding the grid indexes next to ghost points
-           found(1,l) = FV_Mesh::between(TF->get_DOF_coordinates_vector(comp,l), ipoint(1,l), i0_temp);
-           if (found(1,l) == 1) i0(1,l) = i0_temp;
-           found(2,l) = FV_Mesh::between(TF->get_DOF_coordinates_vector(comp,l), ipoint(2,l), i0_temp);
-           if (found(2,l) == 1) i0(2,l) = i0_temp;
-
-        }
-
-        // Assuming all ghost points are in fluid
-        level_set(0) = 1.; level_set(1) = 1.;
-
-        // Checking all the ghost points in the solid/fluid, and storing the parID if present in solid
-        for (size_t m=0;m<Npart;m++) {
-           if (level_set(0) > threshold) {
-              level_set(0) = level_set_function(m,comp,ipoint(1,0),ipoint(1,1),ipoint(1,2),level_set_type);
-              level_set(0) *= solid.inside[comp]->item(m);
-              if (level_set(0) < threshold) in_parID(0) = m;
-           }
-           if (level_set(1) > threshold) {
-              level_set(1) = level_set_function(m,comp,ipoint(2,0),ipoint(2,1),ipoint(2,2),level_set_type);
-              level_set(1) *= solid.inside[comp]->item(m);
-              if (level_set(1) < threshold) in_parID(1) = m;
-           }
-        }
-
-        // Calculation of field variable on ghost point(0)
-        fini(0) = impose_solid_temperature_for_ghost(comp,ipoint(0,0),ipoint(0,1),ipoint(0,2),parID);
-
-        if (dim == 2) {
-           in_domain(0) = found(1,0) && found(1,1);
-           in_domain(1) = found(2,0) && found(2,1);
-           // Calculation of field variable on ghost point(1)
-           if ((level_set(0) > threshold) && in_domain(0))
-              fini(1) = ghost_field_estimate_on_face (TF,comp,i0(1,0),i0(1,1),0, ipoint(1,0), ipoint(1,1),0, dh,2,0);
-           // Calculation of field variable on ghost point(2)
-           if ((level_set(1) > threshold) && in_domain(1))
-              fini(2) = ghost_field_estimate_on_face (TF,comp,i0(2,0),i0(2,1),0, ipoint(2,0), ipoint(2,1),0, dh,2,0);
-
-        } else if (dim == 3) {
-           in_domain(0) = found(1,0) && found(1,1) && found(1,2);
-           in_domain(1) = found(2,0) && found(2,1) && found(2,2);
-
-           // Calculation of field variable on ghost point(1)
-           if ((level_set(0) > threshold) && in_domain(0))
-              fini(1) = ghost_field_estimate_in_box (TF,comp,i0(1,0),i0(1,1),i0(1,2),ipoint(1,0),ipoint(1,1),ipoint(1,2),dh,0,parID);
-           // Calculation of field variable on ghost point(2)
-           if ((level_set(1) > threshold) && in_domain(1))
-              fini(2) = ghost_field_estimate_in_box (TF,comp,i0(2,0),i0(2,1),i0(2,2),ipoint(2,0),ipoint(2,1),ipoint(2,2),dh,0,parID);
-        }
-
-        // Derivative
-        // Both points 1 and 2 are in fluid, and both in the computational domain
-        if ((level_set(0) > threshold) && (level_set(1) > threshold) && (in_domain(0) && in_domain(1))) {
-           dfdi = (-fini(2) + 4.*fini(1) - 3.*fini(0))/2./dh;
-        // Point 1 in fluid and 2 is either in the solid or out of the computational domain
-        } else if ((level_set(0) > threshold) && ((level_set(1) <= threshold) || ((in_domain(1) == 0) && (in_domain(0) == 1)))) {
-           dfdi = (fini(1) - fini(0))/dh;
-        // Point 1 is present in solid
-        } else if (level_set(0) <= threshold) {
-           dfdi = (impose_solid_temperature_for_ghost(comp,ipoint(1,0),ipoint(1,1),ipoint(1,2),in_parID(0)) - fini(0))/dh;
-        // Point 1 is out of the computational domain
-        } else if (!in_domain(0)) {
-           intVector sign(dim,0);
-	   size_t major_dir = 4;
-           for (size_t l=0;l<dim;l++) {
-              sign(l) = (rotated_normal(l) > 0.) ? 1 : -1;
-              if (dim == 2) {
-                 if (MAC::abs(rotated_normal(l)) == MAC::max(MAC::abs(rotated_normal(0)),MAC::abs(rotated_normal(1))))
-                    major_dir = l;
-              } else if (dim == 3) {
-	         if (MAC::abs(rotated_normal(l)) == MAC::max(MAC::abs(rotated_normal(0)),
-	                                              MAC::max(MAC::abs(rotated_normal(1)),MAC::abs(rotated_normal(2)))))
-                    major_dir = l;
-	      }
-	   }
-           // Creating a new ghost point in domain boundary or wall
-           i0(1,major_dir) = (sign(major_dir) == 1) ? (i0(0,major_dir) + 1*sign(major_dir)) :
-		                                      (i0(0,major_dir) + 0*sign(major_dir)) ;
-           ipoint(1,major_dir) = TF->get_DOF_coordinate(i0(1,major_dir), comp, major_dir);
-           double t1 = (ipoint(1,major_dir) - ipoint(0,major_dir))/rotated_normal(major_dir);
-
-           for (size_t dir=0; dir<dim; dir++) {
-              if (dir != major_dir) {
-                 ipoint(1,dir) = ipoint(0,dir) + rotated_normal(dir)*t1;
-		 size_t i0_t = 0;
-                 bool temp = FV_Mesh::between(TF->get_DOF_coordinates_vector(0,dir), ipoint(1,dir), i0_t);
-                 if (temp) i0(1,dir) = i0_t;
-              }
-	   }
-
-	   // Estimating the field value on new ghost point
-           fini(1) = third_order_ghost_field_estimate(TF,comp,ipoint(1,0),ipoint(1,1),ipoint(1,2),i0(1,0),i0(1,1),i0(1,2),major_dir,sign,0);
-           double dx1 = pow(pow(ipoint(1,0)-ipoint(0,0),2) + pow(ipoint(1,1)-ipoint(0,1),2) + pow(ipoint(1,2)-ipoint(0,2),2),0.5);
-           dfdi = (fini(1) - fini(0))/dx1;
-        }
-/*
-        outputFile << ipoint(0,0) << "," << ipoint(0,1) << "," << ipoint(0,2) << "," << fini(0) << endl;
-        outputFile << ipoint(1,0) << "," << ipoint(1,1) << "," << ipoint(1,2) << "," << fini(1) << endl;
-        outputFile << ipoint(2,0) << "," << ipoint(2,1) << "," << ipoint(2,2) << "," << fini(2) << endl;*/
-     }
-
-//     outputFile << i << "," << dfdi << endl;
-     double scale = (dim == 2) ? (ri/(2.*MAC::pi()*ri)) : (ri*ri/(4.*MAC::pi()*ri*ri));
-
-     // Ref: Keating thesis Pg-85
-     // point_coord*(area) --> Component of area in particular direction
-     force(parID) = force(parID) + dfdi*(surface.area->item(i)*scale);
-  }
-//  outputFile.close();
-}
-
-//---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: ghost_field_estimate_on_face ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& face_vec, size_t const& level)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DS_HeatTransfer:: ghost_field_estimate_on_face" ) ;
-
-// Calculates the field value on a face at the ghost points
-// near the particle boundary considering boundary affects;
-// x0,y0,z0 are the ghost point coordinated; i0,j0,k0 is the
-// bottom left index of the face cell; face_vec is the
-// normal vector of the face (i.e. 0 is x,1 is y, 2 is z)
-
-   BoundaryBisec* bf_intersect = GLOBAL_EQ->get_b_intersect(0);
-   NodeProp node = GLOBAL_EQ->get_node_property();
-   PartInput solid = GLOBAL_EQ->get_solid();
-
-   size_t_array2D p(dim,dim,0);
-   // arrays of vertex indexes of the cube/square
-   size_t_array2D ix(dim,dim,0);
-   size_t_array2D iy(dim,dim,0);
-   size_t_array2D iz(dim,dim,0);
-   // Min and max of the cell containing ghost point
-   doubleArray2D extents(dim,2,0);
-   // Field value at vertex of face
-   doubleArray2D f(2,2,0);
-   // Interpolated values at the walls
-   doubleArray2D fwall(2,2,0);
-   // Distance of grid/particle walls from the ghost point
-   doubleArray2D del_wall(2,2,0);
-   // Ghost point coordinate
-   doubleVector xghost(3,0);
-
-   // Direction in the plane of face
-   size_t dir1=0, dir2=0;
-
-   if (face_vec == 0) {
-      ix(0,0) = i0,     iy(0,0) = j0,    iz(0,0) = k0;
-      ix(1,0) = i0,     iy(1,0) = j0,    iz(1,0) = k0+1;
-      ix(0,1) = i0,     iy(0,1) = j0+1,  iz(0,1) = k0;
-      ix(1,1) = i0,     iy(1,1) = j0+1,  iz(1,1) = k0+1;
-      dir1 = 2, dir2 = 1;
-   } else if (face_vec == 1) {
-      ix(0,0) = i0,     iy(0,0) = j0,    iz(0,0) = k0;
-      ix(1,0) = i0+1,   iy(1,0) = j0,    iz(1,0) = k0;
-      ix(0,1) = i0,     iy(0,1) = j0,    iz(0,1) = k0+1;
-      ix(1,1) = i0+1,   iy(1,1) = j0,    iz(1,1) = k0+1;
-      dir1 = 0, dir2 = 2;
-   } else if (face_vec == 2) {
-      ix(0,0) = i0,     iy(0,0) = j0,    iz(0,0) = k0;
-      ix(1,0) = i0+1,   iy(1,0) = j0,    iz(1,0) = k0;
-      ix(0,1) = i0,     iy(0,1) = j0+1,  iz(0,1) = k0;
-      ix(1,1) = i0+1,   iy(1,1) = j0+1,  iz(1,1) = k0;
-      dir1 = 0, dir2 = 1;
-   }
-
-   xghost(0) = x0;
-   xghost(1) = y0;
-   xghost(2) = z0;
-
-   for (size_t i=0; i < 2; i++) {
-      for (size_t j=0; j < 2; j++) {
-         // Face vertex index
-         p(i,j) = return_node_index(FF,comp,ix(i,j),iy(i,j),iz(i,j));
-         // Vertex field values
-         f(i,j) = FF->DOF_value( ix(i,j), iy(i,j), iz(i,j), comp, level );
-      }
-   }
-
-   // Min x-coordinate in the grid cell
-   extents(0,0) = FF->get_DOF_coordinate( ix(0,0), comp, 0 ) ;
-   // Max x-coordinate in the grid cell
-   extents(0,1) = FF->get_DOF_coordinate( ix(1,1), comp, 0 ) ;
-   // Min y-coordinate in the grid cell
-   extents(1,0) = FF->get_DOF_coordinate( iy(0,0), comp, 1 ) ;
-   // Max y-coordinate in the grid cell
-   extents(1,1) = FF->get_DOF_coordinate( iy(1,1), comp, 1 ) ;
-
-   if (dim == 3) {
-      // Min z-coordinate in the grid cell
-      extents(2,0) = FF->get_DOF_coordinate( iz(0,0), comp, 2 ) ;
-      // Max z-coordinate in the grid cell
-      extents(2,1) = FF->get_DOF_coordinate( iz(1,1), comp, 2 ) ;
-   }
-
-   // Contribution from left and right wall
-   for (size_t i = 0; i < 2; i++) {     // 0 --> left; 1 --> right
-      if ((node.void_frac[comp]->item(p(i,0)) == 0) && (node.void_frac[comp]->item(p(i,1)) == 0)) {
-         fwall(0,i) = ((extents(dir2,1) - xghost(dir2))*f(i,0) + (xghost(dir2) - extents(dir2,0))*f(i,1))/(extents(dir2,1)-extents(dir2,0));
-         del_wall(0,i) = MAC::abs(extents(dir1,i) - xghost(dir1));
-      // if bottom vertex is in fluid domain
-      } else if ((node.void_frac[comp]->item(p(i,0)) == 0) && (bf_intersect[dir2].offset[comp]->item(p(i,0),1) == 1)) {
-         double yint = bf_intersect[dir2].value[comp]->item(p(i,0),1);
-         // Condition where intersection distance is more than ghost point distance, it means that the ghost
-         // point can be projected on the wall
-         if (yint >= (xghost(dir2)-extents(dir2,0))) {
-            fwall(0,i) = ((extents(dir2,0)+yint-xghost(dir2))*f(i,0)+(xghost(dir2)-extents(dir2,0))*bf_intersect[dir2].field[comp]->item(p(i,0),1))/yint;
-            del_wall(0,i) = MAC::abs(extents(dir1,i) - xghost(dir1));
-         // Ghost point cannot be projected on the wall, as the solid surface come first
-         } else {
-            size_t id = (size_t) node.parID[comp]->item(p(i,1));
-            if (face_vec > dir2) {
-               del_wall(0,i) = (i==1) ?
-                   find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) :
-                   find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) ;
-            } else {
-               del_wall(0,i) = (i==1) ?
-                   find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) :
-                   find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) ;
-            }
-
-            double ghost_temp = solid.temp[comp]->item(id);
-
-            if (dir1 == 0) {
-               (i == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)+del_wall(0,i),xghost(1),xghost(2),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)-del_wall(0,i),xghost(1),xghost(2),id)) ;
-            } else if (dir1 == 1) {
-               (i == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)+del_wall(0,i),xghost(2),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)-del_wall(0,i),xghost(2),id)) ;
-            } else if (dir1 == 2) {
-               (i == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)+del_wall(0,i),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)-del_wall(0,i),id)) ;
-            }
-            fwall(0,i) = ghost_temp;
-         }
-      // if top vertex is in fluid domain
-      } else if ((node.void_frac[comp]->item(p(i,1)) == 0) && (bf_intersect[dir2].offset[comp]->item(p(i,1),0) == 1)) {
-         double yint = bf_intersect[dir2].value[comp]->item(p(i,1),0);
-         // Condition where intersection distance is more than ghost point distance, it means that the ghost
-         // point can be projected on the wall
-         if (yint >= (extents(dir2,1)-xghost(dir2))) {
-            fwall(0,i) = ((xghost(dir2)+yint-extents(dir2,1))*f(i,1)+(extents(dir2,1)-xghost(dir2))*bf_intersect[dir2].field[comp]->item(p(i,1),0))/yint;
-            del_wall(0,i) = MAC::abs(extents(dir1,i) - xghost(dir1));
-         // Ghost point cannot be projected on the wall, as the solid surface come first
-         } else {
-            size_t id = (size_t) node.parID[comp]->item(p(i,0));
-            if (face_vec > dir2) {
-               del_wall(0,i) = (i==1) ?
-                   find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) :
-                   find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) ;
-            } else {
-               del_wall(0,i) = (i==1) ?
-                   find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) :
-                   find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) ;
-            }
-
-            double ghost_temp = solid.temp[comp]->item(id);
-
-            if (dir1 == 0) {
-               (i == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)+del_wall(0,i),xghost(1),xghost(2),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)-del_wall(0,i),xghost(1),xghost(2),id)) ;
-            } else if (dir1 == 1) {
-               (i == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)+del_wall(0,i),xghost(2),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)-del_wall(0,i),xghost(2),id)) ;
-            } else if (dir1 == 2) {
-               (i == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)+del_wall(0,i),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)-del_wall(0,i),id)) ;
-            }
-            fwall(0,i) = ghost_temp;
-         }
-      // if both vertex's are in solid domain
-      } else if ((node.void_frac[comp]->item(p(i,0)) == 1) && (node.void_frac[comp]->item(p(i,1)) == 1)) {
-         size_t id = (size_t) node.parID[comp]->item(p(i,0));
-
-         if (face_vec > dir2) {
-            del_wall(0,i) = (i==1) ?
-                find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) :
-                find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(dir2), xghost(face_vec), id, comp, dir1, dh, level, i) ;
-         } else {
-            del_wall(0,i) = (i==1) ?
-                find_intersection_for_ghost(xghost(dir1), extents(dir1,i), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) :
-                find_intersection_for_ghost(extents(dir1,i), xghost(dir1), xghost(face_vec), xghost(dir2), id, comp, dir1, dh, level, i) ;
-         }
-
-         double ghost_temp = solid.temp[comp]->item(id);
-
-         if (dir1 == 0) {
-            (i == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)+del_wall(0,i),xghost(1),xghost(2),id)) :
-                       (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)-del_wall(0,i),xghost(1),xghost(2),id)) ;
-         } else if (dir1 == 1) {
-            (i == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)+del_wall(0,i),xghost(2),id)) :
-                       (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)-del_wall(0,i),xghost(2),id)) ;
-         } else if (dir1 == 2) {
-            (i == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)+del_wall(0,i),id)) :
-                       (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)-del_wall(0,i),id)) ;
-         }
-         fwall(0,i) = ghost_temp;
-      }
-   }
-
-   // Contribution from top and bottom wall
-   for (size_t j = 0; j < 2; j++) {         // 0 --> bottom; 1 --> top
-      if ((node.void_frac[comp]->item(p(0,j)) == 0) && (node.void_frac[comp]->item(p(1,j)) == 0)) {
-         fwall(1,j) = ((extents(dir1,1) - xghost(dir1))*f(0,j) + (xghost(dir1) - extents(dir1,0))*f(1,j))/(extents(dir1,1)-extents(dir1,0));
-         del_wall(1,j) = MAC::abs(extents(dir2,j) - xghost(dir2));
-      // if left vertex is in fluid domain
-      } else if ((node.void_frac[comp]->item(p(0,j)) == 0) && (bf_intersect[dir1].offset[comp]->item(p(0,j),1) == 1)) {
-         double xint = bf_intersect[dir1].value[comp]->item(p(0,j),1);
-         if (xint >= (xghost(dir1)-extents(dir1,0))) {
-            fwall(1,j) = ((extents(dir1,0)+xint-xghost(dir1))*f(0,j)+(xghost(dir1)-extents(dir1,0))*bf_intersect[dir1].field[comp]->item(p(0,j),1))/xint;
-            del_wall(1,j) = MAC::abs(extents(dir2,j) - xghost(dir2));
-         } else {
-            size_t id = (size_t) node.parID[comp]->item(p(1,j));
-            if (face_vec > dir1) {
-               del_wall(1,j) = (j==1) ?
-                   find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) :
-                   find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) ;
-            } else {
-               del_wall(1,j) = (j==1) ?
-                   find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) :
-                   find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) ;
-            }
-
-            double ghost_temp = solid.temp[comp]->item(id);
-
-            if (dir2 == 0) {
-               (j == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)+del_wall(1,j),xghost(1),xghost(2),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)-del_wall(1,j),xghost(1),xghost(2),id)) ;
-            } else if (dir2 == 1) {
-               (j == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)+del_wall(1,j),xghost(2),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)-del_wall(1,j),xghost(2),id)) ;
-            } else if (dir2 == 2) {
-               (j == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)+del_wall(1,j),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)-del_wall(1,j),id)) ;
-            }
-            fwall(1,j) = ghost_temp;
-
-         }
-      // if right vertex is in fluid domain
-      } else if ((node.void_frac[comp]->item(p(1,j)) == 0) && (bf_intersect[dir1].offset[comp]->item(p(1,j),0) == 1)) {
-         double xint = bf_intersect[dir1].value[comp]->item(p(1,j),0);
-         if (xint >= (extents(dir1,1)-xghost(dir1))) {
-            fwall(1,j) = ((xghost(dir1)+xint-extents(dir1,1))*f(1,j)+(extents(dir1,1)-xghost(dir1))*bf_intersect[dir1].field[comp]->item(p(1,j),0))/xint;
-            del_wall(1,j) = MAC::abs(extents(dir2,j) - xghost(dir2));
-         } else {
-            size_t id = (size_t) node.parID[comp]->item(p(0,j));
-            if (face_vec > dir1) {
-               del_wall(1,j) = (j==1) ?
-                   find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) :
-                   find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) ;
-            } else {
-               del_wall(1,j) = (j==1) ?
-                   find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) :
-                   find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) ;
-            }
-
-            double ghost_temp = solid.temp[comp]->item(id);
-
-            if (dir2 == 0) {
-               (j == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)+del_wall(1,j),xghost(1),xghost(2),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)-del_wall(1,j),xghost(1),xghost(2),id)) ;
-            } else if (dir2 == 1) {
-               (j == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)+del_wall(1,j),xghost(2),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)-del_wall(1,j),xghost(2),id)) ;
-            } else if (dir2 == 2) {
-               (j == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)+del_wall(1,j),id)) :
-                          (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)-del_wall(1,j),id)) ;
-            }
-            fwall(1,j) = ghost_temp;
-         }
-      // if both vertex's are in solid domain
-      } else if ((node.void_frac[comp]->item(p(0,j)) == 1) && (node.void_frac[comp]->item(p(1,j)) == 1)) {
-         size_t id = (size_t) node.parID[comp]->item(p(0,j));
-         if (face_vec > dir1) {
-            del_wall(1,j) = (j==1) ?
-                find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) :
-                find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(dir1), xghost(face_vec), id, comp, dir2, dh, level, j) ;
-         } else {
-            del_wall(1,j) = (j==1) ?
-                find_intersection_for_ghost(xghost(dir2), extents(dir2,j), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) :
-                find_intersection_for_ghost(extents(dir2,j), xghost(dir2), xghost(face_vec), xghost(dir1), id, comp, dir2, dh, level, j) ;
-         }
-
-         double ghost_temp = solid.temp[comp]->item(id);
-
-         if (dir2 == 0) {
-            (j == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)+del_wall(1,j),xghost(1),xghost(2),id)) :
-                       (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0)-del_wall(1,j),xghost(1),xghost(2),id)) ;
-         } else if (dir2 == 1) {
-            (j == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)+del_wall(1,j),xghost(2),id)) :
-                       (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1)-del_wall(1,j),xghost(2),id)) ;
-         } else if (dir2 == 2) {
-            (j == 1) ? (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)+del_wall(1,j),id)) :
-                       (ghost_temp = impose_solid_temperature_for_ghost(comp,xghost(0),xghost(1),xghost(2)-del_wall(1,j),id)) ;
-         }
-         fwall(1,j) = ghost_temp;
-      }
-   }
-
-   double field_value = (1./2.)*((del_wall(0,1)*fwall(0,0) + del_wall(0,0)*fwall(0,1))/(del_wall(0,1)+del_wall(0,0)) +
-                                 (del_wall(1,0)*fwall(1,1) + del_wall(1,1)*fwall(1,0))/(del_wall(1,0)+del_wall(1,1)));
-
-   return (field_value);
-
-}
-
-//---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: ghost_field_estimate_in_box ( FV_DiscreteField* FF, size_t const& comp, size_t const& i0, size_t const& j0, size_t const& k0, double const& x0, double const& y0, double const& z0, double const& dh, size_t const& level, size_t const& parID)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DDS_NSWithHeatTransfer:: ghost_field_estimate_in_box" ) ;
-
-// Calculates the field value at the ghost points in the box
-// near the particle boundary considering boundary affects;
-// x0,y0,z0 are the ghost point coordinated; i0,j0,k0 is the
-// bottom left index of the grid coordinate
-
-   doubleArray2D vel(dim,2,0);
-   doubleArray2D del(dim,2,0);
-
-   // Behind face
-   double temp = TF->get_DOF_coordinate(k0,comp , 2);
-   double face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
-                       level_set_function (parID,comp,x0,y0,temp,level_set_type);
-
-   if (face_solid > 0) {
-      vel(2,0) = ghost_field_estimate_on_face (TF,comp,i0,j0,k0,x0,y0,temp,dh,2,0);
-      del(2,0) = MAC::abs(temp - z0);
-   } else {
-      del(2,0) = find_intersection_for_ghost(temp, z0, x0, y0, parID, comp, 2, dh, 0, 0);
-      vel(2,0) = impose_solid_temperature_for_ghost(comp,x0,y0,z0-del(2,0),parID);
-   }
-
-   // Front face
-   temp = TF->get_DOF_coordinate(k0+1,comp , 2);
-   face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
-                level_set_function (parID,comp,x0,y0,temp,level_set_type);
-
-   if (face_solid > 0) {
-      vel(2,1) = ghost_field_estimate_on_face (TF,comp,i0,j0,k0+1,x0,y0,temp,dh,2,0);
-      del(2,1) = MAC::abs(temp - z0);
-   } else {
-      del(2,1) = find_intersection_for_ghost(z0, temp, x0, y0, parID, comp, 2, dh, 0, 1);
-      vel(2,1) = impose_solid_temperature_for_ghost(comp,x0,y0,z0+del(2,1),parID);
-   }
-
-   // Left face
-   temp = TF->get_DOF_coordinate(i0,comp, 0);
-   face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
-                level_set_function (parID,comp,temp,y0,z0,level_set_type);
-
-   if (face_solid > 0) {
-      vel(0,0) = ghost_field_estimate_on_face (TF,comp,i0,j0,k0,temp,y0,z0,dh,0,0);
-      del(0,0) = MAC::abs(temp - x0);
-   } else {
-      del(0,0) = find_intersection_for_ghost(temp, x0, y0, z0, parID, comp, 0, dh, 0, 0);
-      vel(0,0) = impose_solid_temperature_for_ghost(comp,x0-del(0,0),y0,z0,parID);
-   }
-
-   // Right face
-   temp = TF->get_DOF_coordinate(i0+1,comp, 0);
-   face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
-                level_set_function (parID,comp,temp,y0,z0,level_set_type);
-
-   if (face_solid > 0) {
-      vel(0,1) = ghost_field_estimate_on_face (TF,comp,i0+1,j0,k0,temp,y0,z0,dh,0,0);
-      del(0,1) = MAC::abs(temp - x0);
-   } else {
-      del(0,1) = find_intersection_for_ghost(x0, temp, y0, z0, parID, comp, 0, dh, 0, 1);
-      vel(0,1) = impose_solid_temperature_for_ghost(comp,x0+del(0,1),y0,z0,parID);
-   }
-
-   // Bottom face
-   temp = TF->get_DOF_coordinate(j0,comp, 1);
-   face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
-                level_set_function (parID,comp,x0,temp,z0,level_set_type);
-
-   if (face_solid > 0) {
-      vel(1,0) = ghost_field_estimate_on_face (TF,comp,i0,j0,k0,x0,temp,z0,dh,1,0);
-      del(1,0) = MAC::abs(temp - y0);
-   } else {
-      del(1,0) = find_intersection_for_ghost(temp, y0, x0, z0, parID, comp, 1, dh, 0, 0);
-      vel(1,0) = impose_solid_temperature_for_ghost(comp,x0,y0-del(1,0),z0,parID);
-   }
-
-   // Top face
-   temp = TF->get_DOF_coordinate(j0+1,comp, 1);
-   face_solid = level_set_function (parID,comp,x0,y0,z0,level_set_type)*
-                level_set_function (parID,comp,x0,temp,z0,level_set_type);
-
-   if (face_solid > 0) {
-      vel(1,1) = ghost_field_estimate_on_face (TF,comp,i0,j0+1,k0,x0,temp,z0,dh,1,0);
-      del(1,1) = MAC::abs(temp - y0);
-   } else {
-      del(1,1) = find_intersection_for_ghost(y0, temp, x0, z0, parID, comp, 1, dh, 0, 1);
-      vel(1,1) = impose_solid_temperature_for_ghost(comp,x0,y0+del(1,1),z0,parID);
-   }
-
-   double value = (1./3.)*((vel(0,1)*del(0,0)+vel(0,0)*del(0,1))/(del(0,0)+del(0,1)) +
-                           (vel(1,1)*del(1,0)+vel(1,0)*del(1,1))/(del(1,0)+del(1,1)) +
-                           (vel(2,1)*del(2,0)+vel(2,0)*del(2,1))/(del(2,0)+del(2,1)));
-
-   return(value);
-}
 
 //---------------------------------------------------------------------------
 double
@@ -3235,655 +1865,8 @@ DS_HeatTransfer:: impose_solid_temperature (size_t const& comp, size_t const& di
   return(ghost_temp);
 }
 
-//---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: impose_solid_temperature_for_ghost (size_t const& comp, double const& xg, double const& yg, double const& zg, size_t const& parID )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NSWithHeatTransfer:: impose_solid_temperature_for_ghost" ) ;
 
-  doubleVector delta(3,0.);
-  doubleVector grid_coord(3,0.);
-  doubleVector par_coord(3,0.);
 
-  PartInput solid = GLOBAL_EQ->get_solid();
-
-  grid_coord(0) = xg;
-  grid_coord(1) = yg;
-
-  par_coord(0) = solid.coord[comp]->item(parID,0);
-  par_coord(1) = solid.coord[comp]->item(parID,1);
-
-  if (dim == 3) {
-     grid_coord(2) = zg;
-     par_coord(2) = solid.coord[comp]->item(parID,2);
-  }
-
-  for (size_t m = 0; m < 3; m++) {
-     delta(m) = grid_coord(m) - par_coord(m);
-  }
-
-  double ghost_temp = solid.temp[comp]->item(parID);
-//  double ghost_temp = pow((grid_coord(0)-0.5)*(grid_coord(1)-0.5)*(grid_coord(2)-0.5),2.) + pow((grid_coord(0)-0.5),4.)*pow((grid_coord(1)-0.5),4.)*pow((grid_coord(2)-0.5),4.);
-//  double ghost_temp = 3.*MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
-
-  return(ghost_temp);
-}
-
-
-
-
-//---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_HeatTransfer:: level_set_solids" ) ;
-
-  PartInput solid = GLOBAL_EQ->get_solid();
-
-  double xp = solid.coord[comp]->item(m,0);
-  double yp = solid.coord[comp]->item(m,1);
-  double zp = solid.coord[comp]->item(m,2);
-  double Rp = solid.size[comp]->item(m);
-
-  doubleVector delta(3,0);
-
-  delta(0) = xC-xp;
-  delta(1) = yC-yp;
-  delta(2) = 0;
-  if (dim == 3) delta(2) = zC-zp;
-
-  // Displacement correction in case of periodic boundary condition in any or all directions
-  for (size_t dir=0;dir<dim;dir++) {
-     if (is_iperiodic[dir]) {
-        double isize = TF->primary_grid()->get_main_domain_max_coordinate(dir) - TF->primary_grid()->get_main_domain_min_coordinate(dir);
-        delta(dir) = delta(dir) - round(delta(dir)/isize)*isize;
-     }
-  }
-
-  // Try to add continuous level set function; solver performs better in this case for nodes at interface
-  double level_set = 0.;
-  if (type == "Sphere") {
-     level_set = pow(pow(delta(0),2.)+pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
-  } else if (type == "Ellipsoid") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta);
-     level_set = pow(delta(0)/1.,2.)+pow(delta(1)/0.5,2.)+pow(delta(2)/0.5,2.)-Rp;
-  } else if (type == "Superquadric") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta);
-     level_set = pow(pow(delta(0),4.)+pow(delta(1),4.)+pow(delta(2),4.),0.25)-Rp;
-  } else if (type == "PipeX") {
-     level_set = pow(pow(delta(1),2.)+pow(delta(2),2.),0.5)-Rp;
-  } else if (type == "Cube") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta);
-     delta(0) = MAC::abs(delta(0)) - Rp;
-     delta(1) = MAC::abs(delta(1)) - Rp;
-     delta(2) = MAC::abs(delta(2)) - Rp;
-
-     if ((delta(0) < 0.) && (delta(1) < 0.) && (delta(2) < 0.)) {
-        level_set = MAC::min(delta(0),MAC::min(delta(1),delta(2)));
-     } else {
-        level_set = MAC::max(delta(0),MAC::max(delta(1),delta(2)));
-     }
-  } else if (type == "Cylinder") {
-     // Solid object rotation, if any
-     trans_rotation_matrix(m,delta);
-
-     level_set = pow(pow(delta(0),2.)+pow(delta(1),2.),0.5)-Rp;
-     if ((MAC::abs(delta(2)) < Rp) && (level_set < 0.)) {
-        level_set = MAC::abs(MAC::abs(delta(2))-Rp)*level_set;
-     } else {
-        level_set = MAC::max(MAC::abs(MAC::abs(delta(2))-Rp),MAC::abs(level_set));
-     }
-  }
-
-  return(level_set);
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: trans_rotation_matrix (size_t const& m, class doubleVector& delta)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_HeatTransfer:: trans_rotation_matrix" ) ;
-
-  PartInput solid = GLOBAL_EQ->get_solid();
-
-  // yaw along z-axis; pitch along y-axis; roll along x-axis
-  doubleArray2D rot_matrix(3,3,0);
-
-  // Rotation matrix assemble
-  if (insertion_type == "file") {
-     double roll = (MAC::pi()/180.)*solid.thetap[0]->item(m,0);
-     double pitch = (MAC::pi()/180.)*solid.thetap[0]->item(m,1);
-     double yaw = (MAC::pi()/180.)*solid.thetap[0]->item(m,2);
-     rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-     rot_matrix(1,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-     rot_matrix(2,0) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
-     rot_matrix(0,1) = MAC::sin(yaw)*MAC::cos(pitch);
-     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-     rot_matrix(2,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
-     rot_matrix(0,2) = -MAC::sin(pitch);
-     rot_matrix(1,2) = MAC::cos(pitch)*MAC::sin(roll);
-     rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
-  } else if (insertion_type == "GRAINS") {
-     rot_matrix(0,0) = solid.thetap[0]->item(m,0);
-     rot_matrix(1,0) = solid.thetap[0]->item(m,1);
-     rot_matrix(2,0) = solid.thetap[0]->item(m,2);
-     rot_matrix(0,1) = solid.thetap[0]->item(m,3);
-     rot_matrix(1,1) = solid.thetap[0]->item(m,4);
-     rot_matrix(2,1) = solid.thetap[0]->item(m,5);
-     rot_matrix(0,2) = solid.thetap[0]->item(m,6);
-     rot_matrix(1,2) = solid.thetap[0]->item(m,7);
-     rot_matrix(2,2) = solid.thetap[0]->item(m,8);
-  }
-
-  double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
-  double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
-  double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
-
-  delta(0) = delta_x;
-  delta(1) = delta_y;
-  delta(2) = delta_z;
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: rotation_matrix (size_t const& m, class doubleVector& delta)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_HeatTransfer:: rotation_matrix" ) ;
-
-  PartInput solid = GLOBAL_EQ->get_solid();
-
-  // yaw along z-axis; pitch along y-axis; roll along x-axis
-  doubleArray2D rot_matrix(3,3,0);
-
-  // Rotation matrix assemble
-  if (insertion_type == "file") {
-     double roll = (MAC::pi()/180.)*solid.thetap[0]->item(m,0);
-     double pitch = (MAC::pi()/180.)*solid.thetap[0]->item(m,1);
-     double yaw = (MAC::pi()/180.)*solid.thetap[0]->item(m,2);
-     rot_matrix(0,0) = MAC::cos(yaw)*MAC::cos(pitch);
-     rot_matrix(0,1) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-     rot_matrix(0,2) = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
-     rot_matrix(1,0) = MAC::sin(yaw)*MAC::cos(pitch);
-     rot_matrix(1,1) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-     rot_matrix(1,2) = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
-     rot_matrix(2,0) = -MAC::sin(pitch);
-     rot_matrix(2,1) = MAC::cos(pitch)*MAC::sin(roll);
-     rot_matrix(2,2) = MAC::cos(pitch)*MAC::cos(roll);
-  } else if (insertion_type == "GRAINS") {
-     rot_matrix(0,0) = solid.thetap[0]->item(m,0);
-     rot_matrix(0,1) = solid.thetap[0]->item(m,1);
-     rot_matrix(0,2) = solid.thetap[0]->item(m,2);
-     rot_matrix(1,0) = solid.thetap[0]->item(m,3);
-     rot_matrix(1,1) = solid.thetap[0]->item(m,4);
-     rot_matrix(1,2) = solid.thetap[0]->item(m,5);
-     rot_matrix(2,0) = solid.thetap[0]->item(m,6);
-     rot_matrix(2,1) = solid.thetap[0]->item(m,7);
-     rot_matrix(2,2) = solid.thetap[0]->item(m,8);
-  }
-
-  double delta_x = delta(0)*rot_matrix(0,0) + delta(1)*rot_matrix(0,1) + delta(2)*rot_matrix(0,2);
-  double delta_y = delta(0)*rot_matrix(1,0) + delta(1)*rot_matrix(1,1) + delta(2)*rot_matrix(1,2);
-  double delta_z = delta(0)*rot_matrix(2,0) + delta(1)*rot_matrix(2,1) + delta(2)*rot_matrix(2,2);
-
-  delta(0) = delta_x;
-  delta(1) = delta_y;
-  delta(2) = delta_z;
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: node_property_calculation ( )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_HeatTransfer:: node_property_calculation" ) ;
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-
-  PartInput solid = GLOBAL_EQ->get_solid();
-  NodeProp node = GLOBAL_EQ->get_node_property();
-
-  for (size_t comp=0;comp<nb_comps;comp++) {
-     // Get local min and max indices; Calculation on the rows next to the proc as well
-     for (size_t l=0;l<dim;++l) {
-/*        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) - 1 ;
-        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1 ;*/
-        min_unknown_index(l) = TF->get_min_index_unknown_on_proc( comp, l );
-        max_unknown_index(l) = TF->get_max_index_unknown_on_proc( comp, l );
-     }
-
-     size_t local_min_k = 0;
-     size_t local_max_k = 0;
-
-     if (dim == 3) {
-        local_min_k = min_unknown_index(2);
-        local_max_k = max_unknown_index(2);
-     }
-
-     // Clearing the matrices to store new time step value
-     node.void_frac[comp]->nullify();
-     node.parID[comp]->nullify();
-
-     double dh = TF->primary_grid()->get_smallest_grid_size();
-
-     for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-        double xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
-        for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-           double yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
-           for (size_t k=local_min_k;k<=local_max_k;++k) {
-              double zC = 0.;
-              if (dim == 3) {
-                 zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
-              }
-              size_t p = return_node_index(TF,comp,i,j,k);
-              for (size_t m=0;m<Npart;m++) {
-                 double level_set = level_set_function(m,comp,xC,yC,zC,level_set_type);
-                 level_set *= solid.inside[comp]->item(m);
-
-                 // level_set is xb, if local critical time scale is 0.01 of the global time scale
-                 // then the node is considered inside the solid object
-                 // (xb/dh)^2 = 0.01 --> (xb/xC) = 0.1
-                 if (level_set <= pow(loc_thres,0.5)*dh) {
-                 //if (level_set <= 1.E-1*dh) {
-                    node.void_frac[comp]->set_item(p,1.);
-                    node.parID[comp]->set_item(p,(double)m);
-                    break;
-                 }
-              }
-           }
-        }
-     }
-
-     // Level 0 is for the intersection matrix corresponding to fluid side
-     assemble_intersection_matrix(comp,0);
-
-  }
-}
-
-//---------------------------------------------------------------------------
-void
-DS_HeatTransfer:: assemble_intersection_matrix ( size_t const& comp, size_t const& level)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_HeatTransfer:: assemble_intersection_matrix" ) ;
-
-  size_t_vector min_index(dim,0);
-  size_t_vector max_index(dim,0);
-//  size_t_vector min_unknown_index(dim,0);
-//  size_t_vector max_unknown_index(dim,0);
-  size_t_vector ipos(3,0);
-  size_t_array2D local_extents(dim,2,0);
-  size_t_array2D node_neigh(dim,2,0);
-
-  NodeProp node = GLOBAL_EQ->get_node_property();
-  BoundaryBisec* b_intersect = GLOBAL_EQ->get_b_intersect(level);
-
-  for (size_t l=0;l<dim;++l) {
-      // To include knowns at dirichlet boundary in the intersection calculation as well, important in cases where the particle is close to domain boundary pow(2,64)
-//     min_unknown_index(l) = TF->get_min_index_unknown_on_proc( comp, l );
-//     max_unknown_index(l) = TF->get_max_index_unknown_on_proc( comp, l );
-     min_index(l) = 0 ;
-     max_index(l) = TF->get_local_nb_dof( comp, l ) ;
-     local_extents(l,0) = 0;
-     local_extents(l,1) = (max_index(l)-min_index(l));
-  }
-
-  size_t local_min_k = 0;
-  size_t local_max_k = 1;
-
-  if (dim == 3) {
-     local_min_k = min_index(2);
-     local_max_k = max_index(2);
-  }
-
-  // Clearing the matrices to store new time step value
-  for (size_t dir=0;dir<dim;dir++) {
-     b_intersect[dir].offset[comp]->nullify();
-     b_intersect[dir].value[comp]->nullify();
-     b_intersect[dir].field[comp]->nullify();
-  }
-
-  for (size_t i=min_index(0);i<max_index(0);++i) {
-     ipos(0) = i - min_index(0);
-     for (size_t j=min_index(1);j<max_index(1);++j) {
-        ipos(1) = j - min_index(1);
-        for (size_t k=local_min_k;k<local_max_k;++k) {
-           ipos(2) = k - local_min_k;
-           size_t p = return_node_index(TF,comp,i,j,k);
-
-           double center_void_frac = 0.;
-           if (level == 0) {
-              center_void_frac = 1.;
-           } else if (level == 1) {
-              center_void_frac = 0.;
-           }
-
-           if (node.void_frac[comp]->item(p) != center_void_frac) {
-              node_neigh(0,0) = return_node_index(TF,comp,i-1,j,k);
-              node_neigh(0,1) = return_node_index(TF,comp,i+1,j,k);
-              node_neigh(1,0) = return_node_index(TF,comp,i,j-1,k);
-              node_neigh(1,1) = return_node_index(TF,comp,i,j+1,k);
-              if (dim == 3) {
-                 node_neigh(2,0) = return_node_index(TF,comp,i,j,k-1);
-                 node_neigh(2,1) = return_node_index(TF,comp,i,j,k+1);
-              }
-
-              for (size_t dir=0;dir<dim;dir++) {
-                 size_t ii,jj,kk;
-                 if (dir == 0) {
-                    ii = i;jj = j; kk = k;
-                 } else if (dir == 1) {
-                    ii = j;jj = i; kk = k;
-                 } else if (dir == 2) {
-                    ii = k;jj = i; kk = j;
-                 }
-                 for (size_t off=0;off<2;off++) {
-		    // Checking if the nodes are on domain boundary or not,
-		    // if so, the check the intersection only on one side
-		    if (ipos(dir) != local_extents(dir,off)) {
-                       size_t left, right;
-                       if (off == 0) {
-                          left = ii-1; right = ii;
-                       } else if (off == 1) {
-                          left = ii; right = ii+1;
-                       }
-
-                       if (node.void_frac[comp]->item(node_neigh(dir,off)) != node.void_frac[comp]->item(p)) {
-                          double xb = find_intersection(left,right,jj,kk,comp,dir,off,0);
-                          b_intersect[dir].offset[comp]->set_item(p,off,1);
-                          b_intersect[dir].value[comp]->set_item(p,off,xb);
-                          // ID of particle having the intersection with node i
-                          // If level==0, then the neighbour node is present in the particle
-                          // If level==1, then the reference node is present in the particle
-                          size_t par_id;
-                          if (level == 0) {
-                             par_id = (size_t)node.parID[comp]->item(node_neigh(dir,off));
-                          } else if ( level == 1) {
-                             par_id = (size_t)node.parID[comp]->item(p);
-                          }
-                          double field_value = impose_solid_temperature(comp,dir,off,i,j,k,xb,par_id);
-                          b_intersect[dir].field[comp]->set_item(p,off,field_value);
-		       }
-                    }
-                 }
-              }
-           }
-        }
-     }
-  }
-}
-
-//---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off, size_t const& level)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_HeatTransfer:: find_intersection" ) ;
-
-  NodeProp node = GLOBAL_EQ->get_node_property();
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
-  size_t_vector side(2,0);
-
-  side(0) = left;
-  side(1) = right;
-
-  for (size_t l=0;l<dim;++l) {
-     min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) - 1;
-     max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) + 1;
-  }
-
-  double funl=0., func=0., funr=0.;
-
-  double xleft = TF->get_DOF_coordinate( side(0), comp, dir ) ;
-  double xright = TF->get_DOF_coordinate( side(1), comp, dir ) ;
-
-  double yvalue=0.,zvalue=0.;
-  size_t p=0;
-
-  if (dir == 0) {
-     yvalue = TF->get_DOF_coordinate( yconst, comp, 1 ) ;
-     if (dim == 3) zvalue = TF->get_DOF_coordinate( zconst, comp, 2 ) ;
-     // If level==0, then the neighbour node is present in the particle
-     // If level==1, then the reference node is present in the particle
-//     p = return_node_index(TF,comp,side(off),yconst,zconst);
-     if (off != level) {
-        p = return_node_index(TF,comp,side(1),yconst,zconst);
-     } else if (off == level) {
-        p = return_node_index(TF,comp,side(0),yconst,zconst);
-     }
-  } else if (dir == 1) {
-     yvalue = TF->get_DOF_coordinate( yconst, comp, 0 ) ;
-     if (dim == 3) zvalue = TF->get_DOF_coordinate( zconst, comp, 2 ) ;
-     // If level==0, then the neighbour node is present in the particle
-     // If level==1, then the reference node is present in the particle
-//     p = return_node_index(TF,comp,yconst,side(off),zconst);
-     if (off != level) {
-        p = return_node_index(TF,comp,yconst,side(1),zconst);
-     } else if ( off == level) {
-        p = return_node_index(TF,comp,yconst,side(0),zconst);
-     }
-  } else if (dir == 2) {
-     yvalue = TF->get_DOF_coordinate( yconst, comp, 0 ) ;
-     if (dim == 3) zvalue = TF->get_DOF_coordinate( zconst, comp, 1 ) ;
-     // If level==0, then the neighbour node is present in the particle
-     // If level==1, then the reference node is present in the particle
-//     p = return_node_index(TF,comp,yconst,zconst,side(off));
-     if (off != level) {
-        p = return_node_index(TF,comp,yconst,zconst,side(1));
-     } else if ( off == level) {
-        p = return_node_index(TF,comp,yconst,zconst,side(0));
-     }
-  }
-
-  size_t id = (size_t)node.parID[comp]->item(p);
-
-  double xcenter;
-
-  if (dir == 0) {
-     funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
-     funr = level_set_function(id,comp,xright,yvalue,zvalue,level_set_type);
-  } else if (dir == 1) {
-     funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
-     funr = level_set_function(id,comp,yvalue,xright,zvalue,level_set_type);
-  } else if (dir == 2) {
-     funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
-     funr = level_set_function(id,comp,yvalue,zvalue,xright,level_set_type);
-  }
-
-  // In case both the points are on the same side of solid interface
-  // This will occur when the point just outside the solid interface will be considered inside the solid
-  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid
-  // by shifting the point by 5% of grid size
-  if (funl*funr > 0.) {
-     double dx = TF->primary_grid()->get_smallest_grid_size();
-//     double dx = TF->get_cell_size(side(off),comp,dir) ;
-     if (off == level) {
-        xleft = xleft - 0.05*dx;
-     } else {
-        xright = xright + 0.05*dx;
-     }
-  }
-
-  if (dir == 0) {
-     funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
-     funr = level_set_function(id,comp,xright,yvalue,zvalue,level_set_type);
-  } else if (dir == 1) {
-     funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
-     funr = level_set_function(id,comp,yvalue,xright,zvalue,level_set_type);
-  } else if (dir == 2) {
-     funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
-     funr = level_set_function(id,comp,yvalue,zvalue,xright,level_set_type);
-  }
-
-  // If the shifted point is also physically outside the solid then xb = dx
-  if (funl*funr > 0.) {
-     xcenter = TF->get_DOF_coordinate( side(off), comp, dir ) ;
-  } else {
-     if (IntersectionMethod == "Bisection") {
-        // Bisection method algorithm
-	double eps = MAC::abs(xright-xleft);
-	double xcenter_old = eps/2.;
-	size_t max_iter = 500, iter = 0;
-        while ((eps > tolerance) && (iter < max_iter)) {
-           xcenter = (xleft+xright)/2.;
-
-	   if (MAC::abs(xcenter_old) > 1.e-12) {
-	      eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
-	   } else {
-	      eps = MAC::abs(xcenter - xcenter_old);
-	   }
-
-           if (dir == 0) {
-              funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
-              func = level_set_function(id,comp,xcenter,yvalue,zvalue,level_set_type);
-           } else if (dir == 1) {
-              funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
-              func = level_set_function(id,comp,yvalue,xcenter,zvalue,level_set_type);
-           } else if (dir == 2) {
-              funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
-              func = level_set_function(id,comp,yvalue,zvalue,xcenter,level_set_type);
-           }
-
-	   iter = iter + 1;
-           if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
-
-           if (func*funl >= 1.E-16) {
-              xleft = xcenter;
-           } else if (func == 1.E-16) {
-	      break;
-	   } else {
-              xright = xcenter;
-           }
-
-	   xcenter_old = xcenter;
-	}
-     }
-  }
-
-  if (off == 0) {
-     xcenter = MAC::abs(xcenter - TF->get_DOF_coordinate( side(1), comp, dir ));
-  } else if (off == 1) {
-     xcenter = MAC::abs(xcenter - TF->get_DOF_coordinate( side(0), comp, dir ));
-  }
-
-  return (xcenter);
-}
-
-//---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: find_intersection_for_ghost ( double const& xl, double const& xr, double const& yvalue, double const& zvalue, size_t const& id, size_t const& comp, size_t const& dir, double const& dx, size_t const& level, size_t const& off)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_HeatTransfer:: find_intersection_for_ghost" ) ;
-
-  doubleVector side(2,0);
-
-  double xleft = xl;
-  double xright = xr;
-
-  side(0) = xleft;
-  side(1) = xright;
-
-  double funl=0., func=0., funr=0.;
-
-  double xcenter;
-
-  if (dir == 0) {
-     funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
-     funr = level_set_function(id,comp,xright,yvalue,zvalue,level_set_type);
-  } else if (dir == 1) {
-     funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
-     funr = level_set_function(id,comp,yvalue,xright,zvalue,level_set_type);
-  } else if (dir == 2) {
-     funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
-     funr = level_set_function(id,comp,yvalue,zvalue,xright,level_set_type);
-  }
-
-  // In case both the points are on the same side of solid interface
-  // This will occur when the point just outside the solid interface will be considered inside the solid
-  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid
-  // by shifting the point by 5% of grid size
-  if (funl*funr > 0.) {
-     if (off == level) {
-        xleft = xleft - 0.05*dx;
-     } else {
-        xright = xright + 0.05*dx;
-     }
-  }
-
-  if (dir == 0) {
-     funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
-     funr = level_set_function(id,comp,xright,yvalue,zvalue,level_set_type);
-  } else if (dir == 1) {
-     funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
-     funr = level_set_function(id,comp,yvalue,xright,zvalue,level_set_type);
-  } else if (dir == 2) {
-     funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
-     funr = level_set_function(id,comp,yvalue,zvalue,xright,level_set_type);
-  }
-
-  // If the shifted point is also physically outside the solid then xb = dx
-  if (funl*funr > 0.) {
-     xcenter = side(off) ;
-  } else {
-     if (IntersectionMethod == "Bisection") {
-        // Bisection method algorithm
-	double eps = MAC::abs(xright-xleft);
-	double xcenter_old = eps/2.;
-	size_t max_iter = 500, iter = 0;
-        while ((eps > tolerance) && (iter < max_iter)) {
-           xcenter = (xleft+xright)/2.;
-
-	   if (MAC::abs(xcenter_old) > 1.e-12) {
-	      eps = MAC::abs(xcenter - xcenter_old)/MAC::abs(xcenter_old);
-	   } else {
-	      eps = MAC::abs(xcenter - xcenter_old);
-	   }
-
-           if (dir == 0) {
-              funl = level_set_function(id,comp,xleft,yvalue,zvalue,level_set_type);
-              func = level_set_function(id,comp,xcenter,yvalue,zvalue,level_set_type);
-           } else if (dir == 1) {
-              funl = level_set_function(id,comp,yvalue,xleft,zvalue,level_set_type);
-              func = level_set_function(id,comp,yvalue,xcenter,zvalue,level_set_type);
-           } else if (dir == 2) {
-              funl = level_set_function(id,comp,yvalue,zvalue,xleft,level_set_type);
-              func = level_set_function(id,comp,yvalue,zvalue,xcenter,level_set_type);
-           }
-
-	   iter = iter + 1;
-           if (iter == max_iter) cout << "WARNING: Maxmimum iteration reached for intersection calculation. Proceed with Caution !!!" << endl;
-
-           if (func*funl >= 1.E-16) {
-              xleft = xcenter;
-           } else if (func == 1.E-16) {
-	      break;
-	   } else {
-              xright = xcenter;
-           }
-
-	   xcenter_old = xcenter;
-	}
-     }
-  }
-
-  if (off == 0) {
-     xcenter = MAC::abs(xcenter - side(1));
-  } else if (off == 1) {
-     xcenter = MAC::abs(xcenter - side(0));
-  }
-
-  return (xcenter);
-}
 
 //---------------------------------------------------------------------------
 void
@@ -3993,7 +1976,7 @@ DS_HeatTransfer:: output_l2norm ( void )
          }
       }
 
-      computed_DS_L2 = pelCOMM->sum( computed_DS_L2 ) ;
+      computed_DS_L2 = macCOMM->sum( computed_DS_L2 ) ;
       computed_DS_L2 = MAC::sqrt(computed_DS_L2);
 
       if (my_rank == is_master) {

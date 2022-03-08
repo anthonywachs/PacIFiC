@@ -71,24 +71,11 @@ struct PartInput {
    LA_SeqVector ** inside;              // 1 if solid only from inside; -1 if solid only from outside
 };
 
-/** @brief NodeProp to be used to store the nodes properties due to presence of solid particles in the domian */
-struct NodeProp {
-   LA_SeqVector ** void_frac;               // void_fraction of the node due to particle
-   LA_SeqVector ** parID;                   // ID of solid particle on the node
-};
-
 /** @brief SurfaceDiscretize to be used to store the coordinates and area of discretize particle surface */
 struct SurfaceDiscretize {
    LA_SeqMatrix * coordinate;                  // coordinates
    LA_SeqVector * area;                        // area
    LA_SeqMatrix * normal;	               // normal
-};
-
-/** @brief BoundaryBisec to be used to store the intersection of solids with grids in each direction */
-struct BoundaryBisec {
-   LA_SeqMatrix ** offset;                  // Direction of intersection relative to node (Column 0 for left and Column 1 for right)
-   LA_SeqMatrix ** value;                   // Value of offset relative to node point
-   LA_SeqMatrix ** field;                   // Value of field variable at the intersection
 };
 
 /** @brief The Class DS_HeatTransferSystem.
@@ -171,10 +158,6 @@ class DS_HeatTransferSystem : public MAC_Object
       LocalVector* get_VEC();
       /** @brief Return RHS for the Schur complement */
       LocalVector* get_Schur_VEC();
-      /** @brief Return information of intersection with solid boundary */
-      BoundaryBisec* get_b_intersect(size_t const& level);
-      /** @brief Return the (presence/absence) of particle vector */
-      NodeProp get_node_property();
       /** @brief Return the particle input properties */
       PartInput get_solid();
       /** @brief Return the surface discretization from input files */
@@ -270,9 +253,7 @@ class DS_HeatTransferSystem : public MAC_Object
 
       // Particle structures
       struct PartInput solid;
-      struct NodeProp node;
       struct SurfaceDiscretize surface;
-      struct BoundaryBisec b_intersect[2][3];               // 3 are directions; 2 are levels (i.e. 0 is fluid and 1 is solid)
 
       // Schur complement matrices
       struct TDMatrix Schur[3];
