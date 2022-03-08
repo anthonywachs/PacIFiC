@@ -63,12 +63,6 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   compute_halo_zones_for_all_rigid_body();
 
   create_neighbour_list_for_AllRB();
-
-  // compute_void_fraction_on_grid(PF);
-  // compute_void_fraction_on_grid(UF);
-  //
-  // compute_grid_intersection_with_rigidbody(PF);
-  // compute_grid_intersection_with_rigidbody(UF);
 }
 
 
@@ -1093,7 +1087,9 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                  if ((in_parID[col1] == -1) && (in_parID[col2] == -1)) {
                     double dx1 = ghost_pt[col1](dir) - ghost_pt[0](dir);
                     double dx2 = ghost_pt[col2](dir) - ghost_pt[0](dir);
-                    dfdi(dir) = ((f[col1] - f[0])*dx2/dx1 - (f[col2] - f[0])*dx1/dx2)/(dx2-dx1);
+                    dfdi(dir) = ((f[col1] - f[0])*dx2/dx1
+                               - (f[col2] - f[0])*dx1/dx2)
+                               / (dx2-dx1);
                  // Point 1 in fluid and 2 in the solid
                  } else if ((in_parID[col1] == -1) && (in_parID[col2] != -1)) {
                     double dx1 = ghost_pt[col1](dir) - ghost_pt[0](dir);
@@ -1169,10 +1165,6 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                + stress(4)*surface_normal[i]->operator()(1)
                + stress(2)*surface_normal[i]->operator()(2))/norm
                * surface_area[i]->operator()(0);
-
-     // value(0) = m_macCOMM->sum(value(0));
-     // value(1) = m_macCOMM->sum(value(1));
-     // value(2) = m_macCOMM->sum(value(2));
 
      m_allDSrigidbodies[parID]->update_Vforce_on_surface_point(i,value);
 
@@ -2474,7 +2466,7 @@ void DS_AllRigidBodies:: compute_surface_variables_for_all_RB( )
 
    for (size_t i = 0; i < m_nrb; ++i) {
       m_allDSrigidbodies[i]->compute_surface_points( );
-      m_allDSrigidbodies[i]->correct_surface_discretization( UF );
+      m_allDSrigidbodies[i]->correct_surface_discretization( MESH );
    }
 
 }

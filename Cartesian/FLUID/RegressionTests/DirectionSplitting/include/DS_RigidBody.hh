@@ -18,6 +18,7 @@ using std::vector;
 using std::tuple;
 class FS_RigidBody;
 class FV_DiscreteField;
+class FV_Mesh;
 
 /** @brief The class DS_RigidBody.
 
@@ -145,7 +146,7 @@ class DS_RigidBody
                                   , MAC_Communicator const* m_macCOMM );
 
       /** @brief Correct surface discretization due to PBC */
-      void correct_surface_discretization( FV_DiscreteField const* FF );
+      void correct_surface_discretization( FV_Mesh const* MESH );
 
       /** @brief Initializa the surface variables for a rigid body
       such as points, normals, and area */
