@@ -69,7 +69,6 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , rho( fromDS.rho_ )
 	, b_restart ( fromDS.b_restart_ )
    , is_solids( fromDS.is_solids_ )
-	, insertion_type ( fromDS.insertion_type_ )
 	, is_stressCal ( fromDS.is_stressCal_ )
 	, ViscousStressOrder ( fromDS.ViscousStressOrder_ )
 	, surface_cell_scale ( fromDS.surface_cell_scale_ )
@@ -77,8 +76,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
 	, stressCalFreq ( fromDS.stressCalFreq_ )
 	, is_par_motion ( fromDS.is_par_motion_ )
 	, grid_check_for_solid ( fromDS.grid_check_for_solid_ )
-	, allrigidbodies ( 0 )
-   , b_particles_as_fixed_obstacles( true )
+	, allrigidbodies ( fromDS.allrigidbodies_ )
    , b_projection_translation( fromDS.dom_->primary_grid()
 														->is_translation_active() )
    , b_grid_has_been_translated_since_last_output( false )
@@ -145,14 +143,6 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    // Create the Direction Splitting subcommunicators
    create_DS_subcommunicators();
 
-	// Read the solids filename
-	if (is_solids && (insertion_type == "Grains3D")) {
-		solidSolverType = "Grains3D";
-		b_solidSolver_parallel = false;
-		solidSolver_insertionFile = "Grains/Init/insert.xml";
-		solidSolver_simulationFile = "Grains/Res/simul.xml";
-	}
-
    if ( is_stressCal == true &&
         UF->primary_grid()->get_security_bandwidth() < 4 )
    {
@@ -200,16 +190,6 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    GLOBAL_EQ = DS_NavierStokesSystem::create( this, se, UF, PF, inputData ) ;
    se->destroy() ;
 
-   // Create Grains3D if solidSolverType is Grains3D;
-   int error = 0;
-   solidSolver = FS_SolidPlugIn_BuilderFactory:: create( solidSolverType,
-	                                            solidSolver_insertionFile,
-                                               solidSolver_simulationFile,
-                                               1., false,
-                                               b_particles_as_fixed_obstacles,
-                                               1., b_solidSolver_parallel,
-                                               error );
-
    // Timing routines
    if ( my_rank == is_master )
    {
@@ -231,12 +211,6 @@ DS_NavierStokes:: ~DS_NavierStokes( void )
    MAC_LABEL( "DS_NavierStokes:: ~DS_NavierStokes" ) ;
 
    free_DS_subcommunicators() ;
-
-	if ( is_solids ) {
-		if ( solidSolver ) delete solidSolver;
-		if ( solidFluid_transferStream ) delete solidFluid_transferStream;
-		if ( allrigidbodies ) delete allrigidbodies;
-	}
 
 }
 
@@ -307,25 +281,7 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
      build_links_translation() ;
    }
 
-   // Generate solid particles if required
    if (is_solids) {
-
-      solidFluid_transferStream = NULL;
-      solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
-
-      allrigidbodies = new DS_AllRigidBodies( dim
-      	                                   , *solidFluid_transferStream
-                                            , b_particles_as_fixed_obstacles
-                                            , UF
-                                            , PF
-														  , UF->primary_grid()
-                                            , surface_cell_scale
-                                            , macCOMM
-                                            , mu );
-
-      if (my_rank == 0)
-         cout << "Finished particle generation... \n" << endl;
-
 		// Build void frac and intersection variable
 		allrigidbodies->build_solid_variables_on_fluid_grid(PF);
 		allrigidbodies->build_solid_variables_on_fluid_grid(UF);

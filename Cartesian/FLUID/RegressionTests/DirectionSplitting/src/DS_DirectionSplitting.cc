@@ -18,6 +18,10 @@
 #include <time.h>
 #include <sys/time.h>
 #include <math.h>
+#include <FS_SolidPlugIn_BuilderFactory.hh>
+#include <FS_SolidPlugIn.hh>
+#include <FS_Grains3DPlugIn.hh>
+#include <DS_AllRigidBodies.hh>
 
 
 DS_DirectionSplitting const* DS_DirectionSplitting::PROTOTYPE
@@ -81,11 +85,15 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , is_par_motion ( false )
    , grid_check_for_solid ( 3.0 )
    , FlowSolver ( 0 )
+   , HeatSolver ( 0 )
+   , allrigidbodies ( 0 )
+   , b_particles_as_fixed_obstacles( true )
 {
    MAC_LABEL( "DS_DirectionSplitting:: DS_DirectionSplitting" ) ;
 
    // Is the run a follow up of a previous job
    b_restart = MAC_Application::is_follow();
+   macCOMM = MAC_Exec::communicator();
 
    // Read Density
    if ( exp->has_entry( "Density" ) ) {
@@ -124,11 +132,10 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    // Advection term time accuracy
    if ( exp->has_entry( "AdvectionTimeAccuracy" ) )
      AdvectionTimeAccuracy = exp->int_data( "AdvectionTimeAccuracy" );
-   if ( AdvectionTimeAccuracy != 1 && AdvectionTimeAccuracy != 2 )
-   {
+   if ( AdvectionTimeAccuracy != 1 && AdvectionTimeAccuracy != 2 ) {
      string error_message ="   - 1\n   - 2\n   ";
      MAC_Error::object()->raise_bad_data_value( exp,
-	"AdvectionTimeAccuracy", error_message );
+	                          "AdvectionTimeAccuracy", error_message );
    }
 
    if (is_solids) {
@@ -168,6 +175,14 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 
    }
 
+   // Read the solids filename
+   if (is_solids && (insertion_type == "Grains3D")) {
+      solidSolverType = "Grains3D";
+      b_solidSolver_parallel = false;
+      solidSolver_insertionFile = "Grains/Init/insert.xml";
+      solidSolver_simulationFile = "Grains/Res/simul.xml";
+   }
+
    if (dom->discrete_field( "temperature" ) &&
        dom->discrete_field( "velocity" )) {
       is_NSwithHE = true;
@@ -177,8 +192,37 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       is_NS = true;
    }
 
+   // Create Grains3D if solidSolverType is Grains3D;
+   if (is_solids) {
+      int error = 0;
+      solidSolver = FS_SolidPlugIn_BuilderFactory:: create( solidSolverType,
+         solidSolver_insertionFile,
+         solidSolver_simulationFile,
+         1., false,
+         b_particles_as_fixed_obstacles,
+         1., b_solidSolver_parallel,
+         error );
+
+      solidFluid_transferStream = NULL;
+      solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+   }
+
+   size_t dim = dom->discrete_field( "velocity" )->primary_grid()
+      ->nb_space_dimensions();
+
    // Create structure to input in the NS solver
    if (is_NS || is_NSwithHE) {
+      if (is_solids)
+         allrigidbodies = new DS_AllRigidBodies( dim
+                          , *solidFluid_transferStream
+                          , b_particles_as_fixed_obstacles
+                          , dom->discrete_field( "velocity" )
+                          , dom->discrete_field( "pressure" )
+                          , dom->discrete_field( "velocity" )->primary_grid()
+                          , surface_cell_scale
+                          , macCOMM
+                          , mu );
+
       struct DS2NS inputDataNS;
       inputDataNS.rho_ = rho ;
       inputDataNS.mu_ = mu ;
@@ -187,7 +231,6 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataNS.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
       inputDataNS.b_restart_ = b_restart ;
       inputDataNS.is_solids_ = is_solids ;
-      inputDataNS.insertion_type_ = insertion_type;
       inputDataNS.is_stressCal_ = is_stressCal;
       inputDataNS.ViscousStressOrder_ = ViscousStressOrder;
       inputDataNS.surface_cell_scale_ = surface_cell_scale;
@@ -195,7 +238,8 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataNS.stressCalFreq_ = stressCalFreq;
       inputDataNS.is_par_motion_ = is_par_motion;
       inputDataNS.grid_check_for_solid_ = grid_check_for_solid;
-      inputDataNS.dom_ = dom ;
+      inputDataNS.dom_ = dom;
+      inputDataNS.allrigidbodies_ = allrigidbodies;
 
       MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DS_NavierStokes" ) ;
       FlowSolver = DS_NavierStokes::create( this, set, inputDataNS ) ;
@@ -221,6 +265,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       set->destroy() ;
    }
 
+
 }
 
 //---------------------------------------------------------------------------
@@ -228,6 +273,12 @@ DS_DirectionSplitting:: ~DS_DirectionSplitting( void )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_DirectionSplitting:: ~DS_DirectionSplitting" ) ;
+
+   if ( is_solids ) {
+      if ( solidSolver ) delete solidSolver;
+      if ( solidFluid_transferStream ) delete solidFluid_transferStream;
+      if ( allrigidbodies ) delete allrigidbodies;
+   }
 
 }
 

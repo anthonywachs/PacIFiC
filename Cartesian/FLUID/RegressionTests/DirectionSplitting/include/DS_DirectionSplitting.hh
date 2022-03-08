@@ -17,6 +17,8 @@ using namespace std;
 
 class MAC_Communicator ;
 class FV_DiscreteField ;
+class FS_SolidPlugIn ;
+class DS_AllRigidBodies ;
 
 /** @brief The Class DS_DirectionSplitting.
 
@@ -132,6 +134,18 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
 
       DS_NavierStokes* FlowSolver ;
       DS_HeatTransfer* HeatSolver ;
+
+      // Grains3D variable
+      string solidSolverType;
+      FS_SolidPlugIn* solidSolver;
+      bool b_solidSolver_parallel;
+      string solidSolver_insertionFile;
+      string solidSolver_simulationFile;
+      istringstream* solidFluid_transferStream;
+      DS_AllRigidBodies* allrigidbodies;
+      bool b_particles_as_fixed_obstacles;
+
+      MAC_Communicator const* macCOMM;
 
 } ;
 

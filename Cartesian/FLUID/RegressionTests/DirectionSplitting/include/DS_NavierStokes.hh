@@ -22,7 +22,6 @@ class LA_Vector ;
 class LA_SeqVector ;
 class DS_NavierStokesSystem ;
 class LA_SeqMatrix ;
-class FS_SolidPlugIn ;
 class DS_AllRigidBodies ;
 
 /** For set of variables to pass from NavierStokes to System */
@@ -35,7 +34,6 @@ struct DS2NS
   size_t AdvectionTimeAccuracy_ ;
   bool b_restart_ ;
   bool is_solids_ ;
-  string insertion_type_;
   bool is_stressCal_;
   string ViscousStressOrder_;
   double surface_cell_scale_;
@@ -44,6 +42,7 @@ struct DS2NS
   bool is_par_motion_;
   double grid_check_for_solid_;
   FV_DomainAndFields const* dom_ ;
+  DS_AllRigidBodies* allrigidbodies_ ;
 };
 
 /** @brief The Class DS_NavierStokes.
@@ -426,7 +425,6 @@ class DS_NavierStokes : public MAC_Object,
       bool b_restart ;
       bool is_solids;
 
-      string insertion_type;
       bool is_stressCal;
       string ViscousStressOrder;
       double surface_cell_scale;
@@ -436,14 +434,7 @@ class DS_NavierStokes : public MAC_Object,
       double grid_check_for_solid;
 
       // Grains3D variable
-      string solidSolverType;
-      FS_SolidPlugIn* solidSolver;
-      bool b_solidSolver_parallel;
-      string solidSolver_insertionFile;
-      string solidSolver_simulationFile;
-      istringstream* solidFluid_transferStream;
       DS_AllRigidBodies* allrigidbodies;
-      bool b_particles_as_fixed_obstacles;
 
       // Grid motion
       bool b_projection_translation;
