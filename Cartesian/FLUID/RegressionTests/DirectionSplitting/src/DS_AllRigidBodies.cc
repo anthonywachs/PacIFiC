@@ -785,12 +785,15 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                                 rigid_body_velocity(parID, rayVec);
                                 // rigid_body_velocity(parID, source + t * rayDir);
                                // Value of variable at the surface of particle
-                               if ( nb_comps == 1) { // i.e. PF
+                               if ( FF == PF ) { // i.e. PF
                                   intersect_fieldValue[field]->operator()(p,col)
                                                                  = netVel(dir);
-                               } else { // i.e. UF
+                               } else if (FF == UF) { // i.e. UF
                                   intersect_fieldValue[field]->operator()(p,col)
                                                                  = netVel(comp);
+                               } else if (FF == TF) {
+                                  intersect_fieldValue[field]->operator()(p,col)
+                                                                 = 0.;
                                }
                             }
                           }
