@@ -53,7 +53,7 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
    : MAC_Object( a_owner )
    , ComputingTime("Solver")
    , TF ( fromDS.dom_->discrete_field( "temperature" ) )
-   // , UF ( 0 )
+   , UF ( 0 )
    , TF_DS_ERROR( 0 )
    , GLOBAL_EQ( 0 )
    , rho( fromDS.rho_ )
@@ -66,9 +66,7 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
    , is_solids ( fromDS.is_solids_ )
 	, is_NSwithHE (fromDS.is_NSwithHE_ )
 	, b_restart ( fromDS.b_restart_ )
-   , IntersectionMethod ( "Bisection" )
 	, allrigidbodies ( fromDS.allrigidbodies_ )
-	, Npart (1)
 {
    MAC_LABEL( "DS_HeatTransfer:: DS_HeatTransfer" ) ;
 
@@ -121,33 +119,25 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
    is_stressCal = fromDS.is_stressCal_;
    is_par_motion = fromDS.is_par_motion_;
 
+	if (is_NSwithHE) {
+		UF = fromDS.dom_->discrete_field( "velocity" );
+	}
+
    // Create structure to input in the solver system
-   struct HT2System inputData;
-   inputData.is_solids_ = is_solids ;
-   inputData.is_stressCal_ = is_stressCal ;
-   inputData.Npart_ = Npart ;
-   inputData.level_set_type_ = level_set_type ;
-   inputData.Npoints_ = Npoints ;
-   inputData.ar_ = ar ;
 
    // Build the matrix system
    MAC_ModuleExplorer* se =
-	exp->create_subexplorer( 0,"DS_HeatTransferSystem" ) ;
-   GLOBAL_EQ = DS_HeatTransferSystem::create( this, se, TF, inputData ) ;
+								exp->create_subexplorer( 0,"DS_HeatTransferSystem" ) ;
+   GLOBAL_EQ = DS_HeatTransferSystem::create( this, se, TF ) ;
    se->destroy() ;
 
    // Timing routines
    if ( my_rank == is_master ) {
      SCT_insert_app("Matrix_Assembly&Initialization");
-     SCT_insert_app("Matrix_Solution");
-     SCT_insert_app("DS_Solution");
      SCT_insert_app("Solver first step");
      SCT_insert_app("Solver x solution");
-     SCT_insert_app("Transfer x solution");
      SCT_insert_app("Solver y solution");
-     SCT_insert_app("Transfer y solution");
      SCT_insert_app("Solver z solution");
-     SCT_insert_app("Transfer z solution");
      SCT_get_elapsed_time("Objects_Creation");
    }
 }
@@ -177,12 +167,12 @@ DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    allocate_mpi_variables();
 
-   // Initialize temperature vector at the matrix level
-   GLOBAL_EQ->initialize_temperature();
 
    // Necessary especially for cases with non-zero field initiallization
    if (b_restart == false) ugradu_initialization ( );
 
+	// Initialize temperature vector at the matrix level
+	GLOBAL_EQ->initialize_temperature();
    // Generate solid particles if required
 
 	if (is_solids) {
@@ -193,11 +183,10 @@ DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
 		// Compute intersection with RB for temperature field
 		allrigidbodies->compute_grid_intersection_with_rigidbody(TF);
 		if (my_rank == 0)
-			cout << "Finished void fraction and grid intersection... \n" << endl;
+			cout << "HE: Finished void fraction and grid intersection... \n" << endl;
 	}
 
    if (is_solids) {
-      if (my_rank == 0) cout << "HE: Finished intersection calculations... \n" << endl;
       nodes_temperature_initialization(0);
       nodes_temperature_initialization(1);
       nodes_temperature_initialization(3);
@@ -207,7 +196,8 @@ DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
    // Assemble 1D tridiagonal matrices and schur complement calculation
    assemble_temperature_and_schur(t_it);
 
-   if (my_rank == 0) cout << "HE: Finished assembling pre-coefficient matrix... \n" << endl;
+   if (my_rank == 0)
+		cout << "HE: Finished assembling pre-coefficient matrix... \n" << endl;
 
    if ( my_rank == is_master ) SCT_get_elapsed_time( "Matrix_Assembly&Initialization" );
 
@@ -242,12 +232,8 @@ DS_HeatTransfer:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 {
    MAC_LABEL( "DS_HeatTransfer:: do_one_inner_iteration" ) ;
 
-   if ( my_rank == is_master ) SCT_set_start("DS_Solution");
-
    // Solve heat equation using direction splitting
    HeatEquation_DirectionSplittingSolver(t_it);
-
-   if ( my_rank == is_master ) SCT_get_elapsed_time( "DS_Solution" );
 
 }
 
@@ -280,17 +266,19 @@ DS_HeatTransfer:: do_after_time_stepping( void )
 {
    MAC_LABEL( "DS_HeatTransfer:: do_after_time_stepping" ) ;
 
-//   write_output_field();
+  // write_output_field();
 
    // Elapsed time by sub-problems
-   if ( my_rank == is_master )
-   {
+   if ( my_rank == is_master ) {
      double cputime = CT_get_elapsed_time();
-     cout << endl << "Full problem" << endl;
+	  cout << endl
+	  		 << "========================================================" << endl
+			 << "                Heat Transfer Problem                   " << endl
+			 << "========================================================" << endl;
      write_elapsed_time_smhd(cout,cputime,"Computation time");
      SCT_get_summary(cout,cputime);
    }
-//   DS_error_with_analytical_solution(TF,TF_DS_ERROR);
+
    GLOBAL_EQ->display_debug();
    output_l2norm();
 
@@ -482,8 +470,10 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs (
                     }
                  }
 
-                 rhs = gamma*(xvalue*dyC*dzC + yvalue*dxC*dzC + zvalue*dxC*dyC) - adv_value
-                               + (TF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC)/(t_it -> time_step());
+                 rhs = gamma*(xvalue*dyC*dzC + yvalue*dxC*dzC + zvalue*dxC*dyC)
+					  		- adv_value
+                     + (TF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC)
+							/ (t_it -> time_step());
                  TF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC*dzC) + gamma*bodyterm*(t_it -> time_step()));
               }
            }
@@ -493,8 +483,11 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs (
 }
 
 //---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: divergence_of_U ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& level)
+double DS_HeatTransfer:: divergence_of_U ( size_t const& comp
+													  , size_t const& i
+													  , size_t const& j
+													  , size_t const& k
+													  , size_t const& level)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_HeatTransfer:: divergence_of_U" ) ;
@@ -508,22 +501,28 @@ DS_HeatTransfer:: divergence_of_U ( size_t const& comp, size_t const& i, size_t 
    double dzC = 0.;
 
    // du/dx
-   double xhr= UF->get_DOF_coordinate( shift.i+i,0, 0 ) - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
-   double xright = UF->DOF_value( shift.i+i, j, k, 0, level ) - UF->DOF_value( shift.i+i-1, j, k, 0, level ) ;
+   double xhr = UF->get_DOF_coordinate( shift.i+i,0, 0 )
+				  - UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) ;
+   double xright = UF->DOF_value( shift.i+i, j, k, 0, level )
+					  - UF->DOF_value( shift.i+i-1, j, k, 0, level ) ;
 
    xvalue = xright/xhr;
 
    // dv/dy
-   double yhr= UF->get_DOF_coordinate( shift.j+j,1, 1 ) - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
-   double yright = UF->DOF_value( i, shift.j+j, k, 1, level ) - UF->DOF_value( i, shift.j+j-1, k, 1, level ) ;
+   double yhr = UF->get_DOF_coordinate( shift.j+j,1, 1 )
+				  - UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) ;
+   double yright = UF->DOF_value( i, shift.j+j, k, 1, level )
+					  - UF->DOF_value( i, shift.j+j-1, k, 1, level ) ;
 
    yvalue = yright/yhr;
 
    if (dim == 3) {
       // dw/dz
       dzC = TF->get_cell_size( k, comp, 2 ) ;
-      double zhr= UF->get_DOF_coordinate( shift.k+k,2, 2 ) - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
-      double zright = UF->DOF_value( i, j, shift.k+k, 2, level ) - UF->DOF_value( i, j, shift.k+k-1, 2, level ) ;
+      double zhr = UF->get_DOF_coordinate( shift.k+k,2, 2 )
+					  - UF->get_DOF_coordinate( shift.k+k-1, 2, 2 ) ;
+      double zright = UF->DOF_value( i, j, shift.k+k, 2, level )
+						  - UF->DOF_value( i, j, shift.k+k-1, 2, level ) ;
 
       zvalue = zright/zhr;
    }
@@ -680,11 +679,17 @@ DS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, s
    double ugradu = 0., value = 0.;
 
    if ( AdvectionScheme == "TVD" ) {
-      ugradu = assemble_advection_TVD(UF,1,1.,i,j,k,1) - TF->DOF_value(i,j,k,comp,1)*divergence_of_U(comp,i,j,k,1);
+      ugradu = assemble_advection_TVD(UF,1,1.,i,j,k,1)
+				 - TF->DOF_value(i,j,k,comp,1)
+				 * divergence_of_U(comp,i,j,k,1);
    } else if ( AdvectionScheme == "Upwind" ) {
-      ugradu = assemble_advection_Upwind(UF,1,1.,i,j,k,1) - TF->DOF_value(i,j,k,comp,1)*divergence_of_U(comp,i,j,k,1);
+      ugradu = assemble_advection_Upwind(UF,1,1.,i,j,k,1)
+				 - TF->DOF_value(i,j,k,comp,1)
+				 * divergence_of_U(comp,i,j,k,1);
    } else if ( AdvectionScheme == "Centered" ) {
-      ugradu = assemble_advection_Centered(UF,1,1.,i,j,k,1) - TF->DOF_value(i,j,k,comp,1)*divergence_of_U(comp,i,j,k,1);
+      ugradu = assemble_advection_Centered(UF,1,1.,i,j,k,1)
+				 - TF->DOF_value(i,j,k,comp,1)
+				 * divergence_of_U(comp,i,j,k,1);
    }
 
    if ( AdvectionTimeAccuracy == 1 ) {
@@ -1821,54 +1826,6 @@ DS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
 
 
 //---------------------------------------------------------------------------
-double
-DS_HeatTransfer:: impose_solid_temperature (size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DDS_NSWithHeatTransfer:: impose_solid_velocity" ) ;
-
-  doubleVector delta(3,0.);
-  doubleVector grid_coord(3,0.);
-  doubleVector par_coord(3,0.);
-
-  PartInput solid = GLOBAL_EQ->get_solid();
-
-  grid_coord(0) = TF->get_DOF_coordinate( i, comp, 0 ) ;
-  grid_coord(1) = TF->get_DOF_coordinate( j, comp, 1 ) ;
-
-  par_coord(0) = solid.coord[comp]->item(parID,0);
-  par_coord(1) = solid.coord[comp]->item(parID,1);
-
-  if (dim == 3) {
-     grid_coord(2) = TF->get_DOF_coordinate( k, comp, 2 ) ;
-     par_coord(2) = solid.coord[comp]->item(parID,2);
-  }
-
-  double sign = 0.;
-
-  if (off == 0) {
-     sign = -1.;
-  } else if (off == 1) {
-     sign = +1.;
-  }
-
-  grid_coord(dir) = grid_coord(dir) + sign*xb;
-
-  for (size_t m = 0; m < 3; m++) {
-     delta(m) = grid_coord(m) - par_coord(m);
-  }
-
-  double ghost_temp = solid.temp[comp]->item(parID);
-//  double ghost_temp = pow((grid_coord(0)-0.5)*(grid_coord(1)-0.5)*(grid_coord(2)-0.5),2.) + pow((grid_coord(0)-0.5),4.)*pow((grid_coord(1)-0.5),4.)*pow((grid_coord(2)-0.5),4.);
-//  double ghost_temp = 3.*MAC::sin(MAC::pi()*grid_coord(0))*MAC::sin(MAC::pi()*grid_coord(1))*MAC::sin(MAC::pi()*grid_coord(2));
-
-  return(ghost_temp);
-}
-
-
-
-
-//---------------------------------------------------------------------------
 void
 DS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
@@ -1886,23 +1843,21 @@ DS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const*
   // Update gamma based for invidual direction
   gamma = (1.0/2.0)*(thermal_conductivity/rho/heat_capacity);
 
+
   if ( my_rank == is_master ) SCT_set_start("Solver x solution");
   // Solve x-direction(i.e. 0) in y(i.e. 1) and z(i.e. 2)
   Solve_i_in_jk (t_it,gamma,0,1,2);
-  if ( my_rank == is_master ) SCT_get_elapsed_time("Solver x solution");
-  if ( my_rank == is_master ) SCT_set_start("Transfer x solution");
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec();
   // Tranfer back to field
   TF->update_free_DOFs_value( 3, GLOBAL_EQ->get_solution_DS_temperature() ) ;
   if (is_solids) nodes_temperature_initialization(3);
-  if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer x solution");
+  if ( my_rank == is_master ) SCT_get_elapsed_time("Solver x solution");
+
 
   if ( my_rank == is_master ) SCT_set_start("Solver y solution");
   // Solve y-direction(i.e. 1) in x(i.e. 0) and z(i.e. 2)
   Solve_i_in_jk (t_it,gamma,1,0,2);
-  if ( my_rank == is_master ) SCT_get_elapsed_time("Solver y solution");
-  if ( my_rank == is_master ) SCT_set_start("Transfer y solution");
   // Synchronize the distributed DS solution vector
   GLOBAL_EQ->synchronize_DS_solution_vec();
   // Tranfer back to field
@@ -1913,20 +1868,19 @@ DS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const*
      TF->update_free_DOFs_value( 4 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
      if (is_solids) nodes_temperature_initialization(4);
   }
-  if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer y solution");
+  if ( my_rank == is_master ) SCT_get_elapsed_time("Solver y solution");
+
 
   if (dim == 3) {
      if ( my_rank == is_master ) SCT_set_start("Solver z solution");
      // Solve z-direction(i.e. 2) in x(i.e. 0) and y(i.e. 1)
      Solve_i_in_jk (t_it,gamma,2,0,1);
-     if ( my_rank == is_master ) SCT_get_elapsed_time("Solver z solution");
-     if ( my_rank == is_master ) SCT_set_start("Transfer z solution");
      // Synchronize the distributed DS solution vector
      GLOBAL_EQ->synchronize_DS_solution_vec();
      // Tranfer back to field
      TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
      if (is_solids) nodes_temperature_initialization(0);
-     if ( my_rank == is_master ) SCT_get_elapsed_time("Transfer z solution");
+	  if ( my_rank == is_master ) SCT_get_elapsed_time("Solver z solution");
   }
 }
 
@@ -2578,165 +2532,7 @@ double DS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advecti
 
 }
 
-//----------------------------------------------------------------------
-double DS_HeatTransfer:: assemble_advection_Centered_new( FV_DiscreteField const* AdvectingField,
-	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_HeatTransfer:: assemble_advection_Centered" );
-   MAC_CHECK_PRE( advecting_level < AdvectingField->storage_depth() ) ;
-   MAC_ASSERT( AdvectingField->discretization_type() == "staggered" ) ;
 
-   // Parameters
-   size_t component = 0 ;
-   double dxC = 0., dyC = 0., dzC = 0.;
-
-   double AdvectedvalueC = 0., AdvectedvalueRi = 0.,
-   	AdvectedvalueLe = 0., AdvectedvalueTo = 0.,
-	AdvectedvalueBo = 0., AdvectedvalueFr = 0.,
-	AdvectedvalueBe = 0.;
-   double ur = 0., ul = 0., vt = 0., vb = 0., wf = 0., wb = 0.,
-	fri = 0., fle = 0., fto = 0., fbo = 0., ffr = 0., fbe = 0., flux = 0.;
-
-   FV_SHIFT_TRIPLET shift = TF->shift_staggeredToCentered() ;
-
-   // Perform assembling
-
-   dxC = TF->get_cell_size( i, component, 0 ) ;
-
-   dyC = TF->get_cell_size( j, component, 1 ) ;
-
-   if ( dim == 2 ) {
-      AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
-
-      // Right and Left
-      // --------------
-      AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
-      AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
-
-      ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
-      ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
-      // Right (X)
-
-      if ( TF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT ) {
-         fri = 0.5*(ur+ul) * AdvectedvalueRi;
-      } else {
-         fri = 0.5*(ur+ul) * 0.5*(AdvectedvalueRi + AdvectedvalueC);
-      }
-
-      // Left (X)
-
-      if ( TF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT ) {
-         fle = 0.5*(ur+ul) * AdvectedvalueLe;
-      } else {
-         fle = 0.5*(ur+ul) * 0.5*(AdvectedvalueLe + AdvectedvalueC);
-      }
-
-      // Top and Bottom
-      // --------------
-      AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
-      AdvectedvalueBo = TF->DOF_value( i, j-1, k, component, advected_level );
-
-      vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
-      vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
-      // Top (Y)
-
-      if ( TF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
-         fto = 0.5*(vt+vb) * AdvectedvalueTo;
-      } else {
-         fto = 0.5*(vt+vb) * 0.5*(AdvectedvalueTo + AdvectedvalueC);
-      }
-
-      // Bottom (Y)
-
-      if ( TF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM ) {
-         fbo = 0.5*(vt+vb) * AdvectedvalueBo;
-      } else {
-         fbo = 0.5*(vt+vb) * 0.5*(AdvectedvalueBo + AdvectedvalueC);
-      }
-
-      flux = ( fto - fbo ) * dxC + ( fri - fle ) * dyC;
-
-   } else {
-      dzC = TF->get_cell_size( k, component, 2 ) ;
-
-      AdvectedvalueC = TF->DOF_value( i, j, k, component, advected_level );
-
-      // Right and Left
-      // --------------
-      AdvectedvalueRi = TF->DOF_value( i+1, j, k, component, advected_level );
-      AdvectedvalueLe = TF->DOF_value( i-1, j, k, component, advected_level );
-
-      ul = AdvectingField->DOF_value( i+shift.i-1, j, k, 0, advecting_level );
-      ur = AdvectingField->DOF_value( i+shift.i, j, k, 0, advecting_level );
-      // Right (X)
-
-      if ( TF->DOF_color( i+1, j, k, component ) == FV_BC_RIGHT ) {
-         fri = 0.5*(ur+ul) * AdvectedvalueRi;
-      } else {
-         fri = 0.5*(ur+ul) * 0.5*(AdvectedvalueRi + AdvectedvalueC);
-      }
-
-      // Left (X)
-
-      if ( TF->DOF_color( i-1, j, k, component ) == FV_BC_LEFT ) {
-         fle = 0.5*(ur+ul) * AdvectedvalueLe;
-      } else {
-         fle = 0.5*(ur+ul) * 0.5*(AdvectedvalueLe + AdvectedvalueC);
-      }
-
-      // Top and Bottom
-      // --------------
-      AdvectedvalueTo = TF->DOF_value( i, j+1, k, component, advected_level );
-      AdvectedvalueBo = TF->DOF_value( i, j-1, k, component, advected_level );
-
-      vb = AdvectingField->DOF_value( i, j+shift.j-1, k, 1, advecting_level );
-      vt = AdvectingField->DOF_value( i, j+shift.j, k, 1, advecting_level );
-      // Top (Y)
-
-      if ( TF->DOF_color( i, j+1, k, component ) == FV_BC_TOP ) {
-         fto = 0.5*(vt+vb) * AdvectedvalueTo;
-      } else {
-         fto = 0.5*(vt+vb) * 0.5*(AdvectedvalueTo + AdvectedvalueC);
-      }
-
-      // Bottom (Y)
-
-      if ( TF->DOF_color( i, j-1, k, component ) == FV_BC_BOTTOM ) {
-         fbo = 0.5*(vt+vb) * AdvectedvalueBo;
-      } else {
-         fbo = 0.5*(vt+vb) * 0.5*(AdvectedvalueBo + AdvectedvalueC);
-      }
-
-      // Front and Behind
-      // ----------------
-      AdvectedvalueFr = TF->DOF_value( i, j, k+1, component, advected_level );
-      AdvectedvalueBe = TF->DOF_value( i, j, k-1, component, advected_level );
-
-      wf = AdvectingField->DOF_value( i, j, k+shift.k, 2, advecting_level );
-      wb = AdvectingField->DOF_value( i, j, k+shift.k-1, 2, advecting_level );
-      // Front (Z)
-
-      if ( TF->DOF_color( i, j, k+1, component ) == FV_BC_FRONT ) {
-         ffr = 0.5*(wf+wb) * AdvectedvalueFr;
-      } else {
-         ffr = 0.5*(wf+wb) * 0.5*(AdvectedvalueFr + AdvectedvalueC);
-      }
-
-      // Behind (Z)
-
-      if ( TF->DOF_color( i, j, k-1, component ) == FV_BC_BEHIND ) {
-         fbe = 0.5*(wf+wb) * AdvectedvalueBe;
-      } else {
-         fbe = 0.5*(wf+wb) * 0.5*(AdvectedvalueBe + AdvectedvalueC);
-      }
-
-      flux = ( fto - fbo ) * dxC * dzC + ( fri - fle ) * dyC * dzC + ( ffr - fbe ) * dxC * dyC;
-   }
-
-   return (coef * flux);
-
-}
 
 
 //----------------------------------------------------------------------

@@ -208,10 +208,7 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       /** @brief Compute advective term based on either Upwind or TVD spacial scheme */
       double compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k);
 
-      double impose_solid_temperature (size_t const& comp, size_t const& dir, size_t const& off, size_t const& i, size_t const& j, size_t const& k, double const& xb, size_t const& parID );
-
       double assemble_advection_Centered( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
-      double assemble_advection_Centered_new( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
 
       double divergence_of_U ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& level);
 
@@ -271,7 +268,6 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       size_t is_master;
       size_t dim;
       size_t nb_comps;
-      size_t Npart;
 
       MAC_Communicator const* macCOMM;
       MPI_Comm DDS_Comm_i[3];
@@ -294,18 +290,11 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       bool is_solids;
       bool is_NSwithHE;
       bool is_stressCal;
-      double Npoints;
-      size_t Pmin, pole_loc;
-      double ar;
       bool b_restart ;
       bool is_iperiodic[3];
       boolVector const* periodic_comp;
-      string level_set_type;
       bool is_par_motion;
       string* particle_information;
-      string insertion_type;
-      string IntersectionMethod;
-      double tolerance;
 
       // Grains3D variable
       DS_AllRigidBodies* allrigidbodies;

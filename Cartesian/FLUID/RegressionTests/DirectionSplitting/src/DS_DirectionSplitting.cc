@@ -272,21 +272,21 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 
    // Create the temperature solver
    if (is_HE || is_NSwithHE) {
-      struct DS2HE inputData;
-      inputData.rho_ = rho ;
-      inputData.b_restart_ = b_restart ;
-      inputData.AdvectionScheme_ = AdvectionScheme ;
-      inputData.ViscousStressOrder_ = ViscousStressOrder;
-      inputData.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
-      inputData.is_solids_ = is_solids ;
-      inputData.is_NSwithHE_ = is_NSwithHE ;
-      inputData.is_stressCal_ = is_stressCal ;
-      inputData.is_par_motion_ = is_par_motion ;
-      inputData.dom_ = dom ;
-      inputData.allrigidbodies_ = allrigidbodies ;
+      struct DS2HE inputDataHE;
+      inputDataHE.rho_ = rho ;
+      inputDataHE.b_restart_ = b_restart ;
+      inputDataHE.AdvectionScheme_ = AdvectionScheme ;
+      inputDataHE.ViscousStressOrder_ = ViscousStressOrder;
+      inputDataHE.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
+      inputDataHE.is_solids_ = is_solids ;
+      inputDataHE.is_NSwithHE_ = is_NSwithHE ;
+      inputDataHE.is_stressCal_ = is_stressCal ;
+      inputDataHE.is_par_motion_ = is_par_motion ;
+      inputDataHE.dom_ = dom ;
+      inputDataHE.allrigidbodies_ = allrigidbodies ;
 
       MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DS_HeatTransfer" ) ;
-      HeatSolver = DS_HeatTransfer::create( this, set, inputData ) ;
+      HeatSolver = DS_HeatTransfer::create( this, set, inputDataHE ) ;
       set->destroy() ;
    }
 
