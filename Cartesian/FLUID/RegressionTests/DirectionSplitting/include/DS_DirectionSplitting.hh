@@ -7,6 +7,7 @@
 #include <solvercomputingtime.hh>
 #include <DS_NavierStokes.hh>
 #include <DS_HeatTransfer.hh>
+#include <MAC_DoubleVector.hh>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -130,7 +131,7 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       bool is_surfacestressOUT;
       size_t stressCalFreq;
       bool is_par_motion;
-      double grid_check_for_solid;
+      MAC_DoubleVector* gravity_vector ;
 
       DS_NavierStokes* FlowSolver ;
       DS_HeatTransfer* HeatSolver ;
@@ -144,6 +145,8 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       istringstream* solidFluid_transferStream;
       DS_AllRigidBodies* allrigidbodies;
       bool b_particles_as_fixed_obstacles;
+
+      double critical_distance_translation;
 
       MAC_Communicator const* macCOMM;
 

@@ -83,7 +83,6 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , is_surfacestressOUT ( false )
    , stressCalFreq ( 1 )
    , is_par_motion ( false )
-   , grid_check_for_solid ( 3.0 )
    , FlowSolver ( 0 )
    , HeatSolver ( 0 )
    , allrigidbodies ( 0 )
@@ -170,8 +169,18 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       if ( exp->has_entry( "Particle_motion" ) )
         is_par_motion = exp->bool_data( "Particle_motion" ) ;
 
-      if ( exp->has_entry( "GridCheckforSolid" ) )
-         grid_check_for_solid = exp->double_data( "GridCheckforSolid" );
+      // Critical distance
+      if ( dom->primary_grid()->is_translation_active() ) {
+        if ( exp->has_entry( "Critical_Distance_Translation" ) )
+           critical_distance_translation= exp->double_data(
+             										"Critical_Distance_Translation" );
+        else {
+           string error_message=" Projection-Translation is active but ";
+           error_message+="Critical_Distance_Translation is NOT defined.";
+           MAC_Error::object()->raise_bad_data_value( exp,
+              							 "Projection_Translation", error_message );
+        }
+      }
 
    }
 
@@ -212,6 +221,12 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                         : dom->discrete_field( "velocity" )->primary_grid()
                                                        ->nb_space_dimensions();
 
+   // Read the gravity vector or direction of enforced motion
+   doubleVector gg( dim, 0 );
+   if ( exp->has_entry( "Gravity_vector" ) )
+      gg = exp->doubleVector_data( "Gravity_vector" );
+   gravity_vector = MAC_DoubleVector::create( this, gg );
+
    // Create rigid bodies objects depending on which PDE to solve
    if (is_solids) {
       if (is_NS) {
@@ -220,6 +235,8 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                           , b_particles_as_fixed_obstacles
                           , dom->discrete_field( "velocity" )
                           , dom->discrete_field( "pressure" )
+                          , rho
+                          , gravity_vector
                           , surface_cell_scale
                           , macCOMM
                           , mu );
@@ -261,9 +278,9 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataNS.is_surfacestressOUT_ = is_surfacestressOUT;
       inputDataNS.stressCalFreq_ = stressCalFreq;
       inputDataNS.is_par_motion_ = is_par_motion;
-      inputDataNS.grid_check_for_solid_ = grid_check_for_solid;
       inputDataNS.dom_ = dom;
       inputDataNS.allrigidbodies_ = allrigidbodies;
+      inputDataNS.critical_distance_translation_ = critical_distance_translation;
 
       MAC_ModuleExplorer* set = exp->create_subexplorer( 0, "DS_NavierStokes" ) ;
       FlowSolver = DS_NavierStokes::create( this, set, inputDataNS ) ;
@@ -293,6 +310,9 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 
 }
 
+
+
+
 //---------------------------------------------------------------------------
 DS_DirectionSplitting:: ~DS_DirectionSplitting( void )
 //---------------------------------------------------------------------------
@@ -306,6 +326,9 @@ DS_DirectionSplitting:: ~DS_DirectionSplitting( void )
    }
 
 }
+
+
+
 
 //---------------------------------------------------------------------------
 void
@@ -334,6 +357,9 @@ DS_DirectionSplitting:: do_one_inner_iteration( FV_TimeIterator const* t_it )
    }
 
 }
+
+
+
 
 //---------------------------------------------------------------------------
 void
@@ -389,6 +415,9 @@ DS_DirectionSplitting:: do_after_time_stepping( void )
 
 }
 
+
+
+
 //---------------------------------------------------------------------------
 void
 DS_DirectionSplitting:: do_before_inner_iterations_stage(
@@ -413,6 +442,9 @@ DS_DirectionSplitting:: do_before_inner_iterations_stage(
    }
 
 }
+
+
+
 
 //---------------------------------------------------------------------------
 void
@@ -439,6 +471,9 @@ DS_DirectionSplitting:: do_after_inner_iterations_stage(
 
 
 }
+
+
+
 
 //---------------------------------------------------------------------------
 void

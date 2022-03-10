@@ -72,13 +72,12 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
 	, is_surfacestressOUT ( fromDS.is_surfacestressOUT_ )
 	, stressCalFreq ( fromDS.stressCalFreq_ )
 	, is_par_motion ( fromDS.is_par_motion_ )
-	, grid_check_for_solid ( fromDS.grid_check_for_solid_ )
 	, allrigidbodies ( fromDS.allrigidbodies_ )
    , b_projection_translation( fromDS.dom_->primary_grid()
 														->is_translation_active() )
    , b_grid_has_been_translated_since_last_output( false )
    , b_grid_has_been_translated_at_previous_time( false )
-   , critical_distance_translation( 0. )
+   , critical_distance_translation( fromDS.critical_distance_translation_ )
    , translation_direction( 0 )
    , bottom_coordinate( 0. )
    , translated_distance( 0. )
@@ -143,19 +142,6 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
      string error_message="   >= 4 for correct stress calculations on solids";
      MAC_Error::object()->raise_bad_data_value( exp,
         "security_bandwidth", error_message );
-   }
-
-   // Critical distance
-   if ( b_projection_translation ) {
-     if ( exp->has_entry( "Critical_Distance_Translation" ) )
-        critical_distance_translation= exp->double_data(
-           										"Critical_Distance_Translation" );
-     else {
-        string error_message=" Projection-Translation is active but ";
-        error_message+="Critical_Distance_Translation is NOT defined.";
-        MAC_Error::object()->raise_bad_data_value( exp,
-           							 "Projection_Translation", error_message );
-     }
    }
 
    // Periodic boundary condition check for velocity
@@ -358,20 +344,27 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
    if ( b_projection_translation )
      b_grid_has_been_translated_at_previous_time = false;
 
-   // if ((is_par_motion) && (is_solids)) {
-   //    update_particle_system(t_it);
-   //    node_property_calculation(PF);
-   //    node_property_calculation(UF);
-   //    nodes_field_initialization(0);
-   //    nodes_field_initialization(1);
-   //    nodes_field_initialization(3);
-   //    if (dim == 3) nodes_field_initialization(4);
-   //
-   //    // Direction splitting
-   //    // Assemble 1D tridiagonal matrices
-   //    assemble_1D_matrices(PF,t_it);
-   //    assemble_1D_matrices(UF,t_it);
-   // }
+   if ((is_par_motion) && (is_solids)) {
+		// Solve equation of motion for all RB and update pos,vel
+		allrigidbodies->solve_RB_equation_of_motion(t_it);
+		allrigidbodies->compute_halo_zones_for_all_rigid_body();
+		// Compute void fraction for pressure and velocity field
+		allrigidbodies->compute_void_fraction_on_grid(PF);
+		allrigidbodies->compute_void_fraction_on_grid(UF);
+		// Compute intersection with RB for pressure and velocity field
+		allrigidbodies->compute_grid_intersection_with_rigidbody(PF);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(UF);
+
+		// Field initialization
+		vector<size_t> vec{ 0, 1, 3};
+		if (dim == 3) vec.push_back(4);
+		initialize_grid_nodes_on_rigidbody(vec);
+
+	   // Direction splitting
+      // Assemble 1D tridiagonal matrices
+      assemble_1D_matrices(PF,t_it);
+      assemble_1D_matrices(UF,t_it);
+   }
 
    // Perform matrix level operations before each time step
    GLOBAL_EQ->at_each_time_step( );
@@ -417,43 +410,45 @@ DS_NavierStokes:: do_after_inner_iterations_stage(
       MAC::out() << "CFL: "<< cfl <<endl;
 
    // Projection translation
-   // if ( b_projection_translation ) {
-   //
-   //    PartInput solid = GLOBAL_EQ->get_solid(0);
-   //
-   //    double distance_to_bottom =
-   //     MAC::abs(solid.coord[translation_direction]->item(0)-bottom_coordinate);
-   //
-   //    if ( distance_to_bottom < critical_distance_translation ) {
-   //
-   //       if ( my_rank == is_master )
-   //          MAC::out() << "         -> -> -> -> -> -> -> -> -> -> -> ->"
-   //             << endl << "         !!!     Domain Translation      !!!"
-   //             << endl << "         -> -> -> -> -> -> -> -> -> -> -> ->"
-   //             << endl;
-   //
-   //       b_grid_has_been_translated_at_previous_time = true;
-   //
-   //       translated_distance += MVQ_translation_vector( translation_direction );
-   //       if ( my_rank == is_master )
-   //          MAC::out() << "         Translated distance = " <<
-   //              translated_distance << endl;
-   //
-   //       fields_projection();
-   //
-   //       if ( MVQ_translation_vector(translation_direction) < 0. )
-   //          bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-   //                              [translation_direction](0) ;
-   //       else
-   //          bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-   //             [translation_direction]((*UF->primary_grid()->get_global_max_index())
-   //                              (translation_direction)) ;
-   //
-   //       b_grid_has_been_translated_since_last_output = true;
-   //    }
-   // }
+   if ( b_projection_translation ) {
+
+      double min_coord = allrigidbodies->get_min_RB_coord(translation_direction);
+
+      double distance_to_bottom = MAC::abs(min_coord-bottom_coordinate);
+
+      if ( distance_to_bottom < critical_distance_translation ) {
+
+         if ( my_rank == is_master )
+            MAC::out() << "         -> -> -> -> -> -> -> -> -> -> -> ->"
+               << endl << "         !!!     Domain Translation      !!!"
+               << endl << "         -> -> -> -> -> -> -> -> -> -> -> ->"
+               << endl;
+
+         b_grid_has_been_translated_at_previous_time = true;
+
+         translated_distance += MVQ_translation_vector( translation_direction );
+         if ( my_rank == is_master )
+            MAC::out() << "         Translated distance = " <<
+                translated_distance << endl;
+
+         fields_projection();
+
+         if ( MVQ_translation_vector(translation_direction) < 0. )
+            bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
+                                [translation_direction](0) ;
+         else
+            bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
+               [translation_direction]((*UF->primary_grid()->get_global_max_index())
+                                (translation_direction)) ;
+
+         b_grid_has_been_translated_since_last_output = true;
+      }
+   }
 
 }
+
+
+
 
 //---------------------------------------------------------------------------
 void

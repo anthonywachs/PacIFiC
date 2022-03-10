@@ -70,6 +70,9 @@ class FS_RigidBody
 
       /** @brief Returns circumscribed radius of RB */
       double get_circumscribed_radius() const;
+
+      /** @brief Returns a tuple of mass and density of RB */
+      std::tuple<double,double> get_mass_and_density() const;
       //@}
 
 
@@ -94,6 +97,10 @@ class FS_RigidBody
 
       /** @brief Changes rigid body type from particle to obstacle */
       void change_from_particle_to_obstacle();
+
+      /** @brief Update RB position and velocity */
+      void update_RB_position_and_velocity(geomVector const& pos,
+                                           geomVector const& vel);
       //@}
 
 

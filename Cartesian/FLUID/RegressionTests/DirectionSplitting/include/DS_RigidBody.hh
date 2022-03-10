@@ -71,6 +71,9 @@ class DS_RigidBody
       /** @brief Returns circumscribed radius */
       double get_circumscribed_radius( ) const;
 
+      /** @brief Returns a tuple of mass and density of RB */
+      std::tuple<double,double> get_mass_and_density() const;
+
       /** @brief Returns the distance of a point with the rigid body
       with a given ray vector and source
       @param pt the point
@@ -166,6 +169,12 @@ class DS_RigidBody
       @param value the value to assign for viscous force */
       void update_Vforce_on_surface_point( size_t const& i
                                          , geomVector const& value );
+
+      /** @brief Update the RB position and velocity
+      @param pos updated position
+      @param vel updated translation velocity */
+      void update_RB_position_and_velocity(geomVector const& pos,
+                                           geomVector const& vel);
 
       //@}
 

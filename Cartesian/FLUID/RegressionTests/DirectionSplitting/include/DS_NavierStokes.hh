@@ -40,9 +40,9 @@ struct DS2NS
   bool is_surfacestressOUT_;
   size_t stressCalFreq_;
   bool is_par_motion_;
-  double grid_check_for_solid_;
   FV_DomainAndFields const* dom_ ;
   DS_AllRigidBodies* allrigidbodies_ ;
+  double critical_distance_translation_ ;
 };
 
 /** @brief The Class DS_NavierStokes.
@@ -431,7 +431,6 @@ class DS_NavierStokes : public MAC_Object,
       bool is_surfacestressOUT;
       size_t stressCalFreq;
       bool is_par_motion;
-      double grid_check_for_solid;
 
       // Grains3D variable
       DS_AllRigidBodies* allrigidbodies;

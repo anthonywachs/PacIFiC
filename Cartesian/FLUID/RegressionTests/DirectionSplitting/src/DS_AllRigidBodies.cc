@@ -2,6 +2,7 @@
 #include <FS_AllRigidBodies.hh>
 #include <DS_RigidBody.hh>
 #include <DS_RigidBody_BuilderFactory.hh>
+#include <FV_TimeIterator.hh>
 #include <FV_DiscreteField.hh>
 #include <FV_Mesh.hh>
 #include <cmath>
@@ -28,6 +29,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , bool const& b_particles_as_fixed_obstacles
                                   , FV_DiscreteField const* arb_UF
                                   , FV_DiscreteField const* arb_PF
+                                  , double const& arb_rho
+                                  , MAC_DoubleVector const* arb_gv
                                   , double const& arb_scs
                                   , MAC_Communicator const* arb_macCOMM
                                   , double const& arb_mu )
@@ -39,6 +42,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   , surface_cell_scale ( arb_scs )
   , m_macCOMM ( arb_macCOMM )
   , m_mu ( arb_mu )
+  , m_rho ( arb_rho )
+  , gravity_vector ( arb_gv )
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
@@ -380,6 +385,79 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
 
 
 //---------------------------------------------------------------------------
+void DS_AllRigidBodies:: solve_RB_equation_of_motion(
+                                             FV_TimeIterator const* t_it )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: solve_RB_equation_of_motion()" ) ;
+
+  // Get gravity vector from NS solver
+  doubleVector const& gg = gravity_vector->to_double_vector();
+
+
+  for (size_t parID = 0; parID < m_nrb; ++parID) {
+     // Get RB gravity center
+     geomVector const* pgc = m_allDSrigidbodies[parID]
+                                             ->get_ptr_to_gravity_centre();
+     geomVector pv = rigid_body_velocity(parID,*pgc);
+
+     // Get solid mass and density from FS class
+     auto value = m_allDSrigidbodies[parID]->get_mass_and_density();
+     double mass_p = std::get<0>(value);
+     double rho_p = std::get<1>(value);
+
+     geomVector pos(3,0);
+     geomVector vel(3,0);
+     geomVector acc(3,0);
+     geomVector delta(3);
+
+     // Solving equation of motion
+     for (size_t dir=0;dir<m_space_dimension;dir++) {
+        pos(dir) = pgc->operator()(dir);
+        vel(dir) = pv(dir);
+
+        acc(dir) = gg(dir)*(1-m_rho/rho_p) + (viscous_force->operator()(parID,dir)
+                                         +  pressure_force->operator()(parID,dir))
+                                         / mass_p ;
+        vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+        pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
+        delta(dir) = vel(dir)*t_it->time_step();
+     }
+
+     // // Writing istream to update the positions
+     // write_new_parameters_to_stream();
+     //
+     // Updating the RB data
+     m_allDSrigidbodies[parID]->update_RB_position_and_velocity(pos,vel);
+     m_allDSrigidbodies[parID]->translate_surface_points( delta );
+     m_allDSrigidbodies[parID]->correct_surface_discretization( MESH );
+  }
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_AllRigidBodies:: get_min_RB_coord( size_t const& dir )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: get_min_RB_coord()" ) ;
+
+  double value = 1000000.;
+
+  for (size_t parID = 0; parID < m_nrb; ++parID) {
+     geomVector const* pgc = m_allDSrigidbodies[parID]
+                                          ->get_ptr_to_gravity_centre();
+     value = std::min(value,pgc->operator()(dir));
+  }
+
+  return(value);
+
+}
+
+
+
+//---------------------------------------------------------------------------
 int DS_AllRigidBodies:: isIn_any_RB( size_t const& ownID
                                    , geomVector const& pt ) const
 //---------------------------------------------------------------------------
@@ -542,6 +620,8 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
   size_t nb_comps = FF->nb_components() ;
   size_t field = field_num(FF) ;
 
+  void_fraction[field]->set(0);
+
   boolVector const* periodic_comp = MESH->get_periodic_directions();
 
   // Get local min and max indices;
@@ -665,6 +745,10 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
 
   size_t nb_comps = FF->nb_components() ;
   size_t field = field_num(FF) ;
+
+  intersect_vector[field]->set(0);
+  intersect_distance[field]->set(0.);
+  intersect_fieldValue[field]->set(0.);
 
   boolVector const* periodic_comp = MESH->get_periodic_directions();
 

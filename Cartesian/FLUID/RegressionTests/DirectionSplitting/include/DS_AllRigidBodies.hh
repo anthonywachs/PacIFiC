@@ -7,6 +7,7 @@
 #include <doubleArray2D.hh>
 #include <boolArray2D.hh>
 #include <MAC_Communicator.hh>
+#include <MAC_DoubleVector.hh>
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -21,6 +22,7 @@ class DS_RigidBody;
 class FS_AllRigidBodies;
 class FV_DiscreteField;
 class FV_Mesh;
+class FV_TimeIterator;
 
 /** @brief Interpolation scheme enumeration */
 enum scheme_list
@@ -66,6 +68,8 @@ class DS_AllRigidBodies
                        , bool const& b_particles_as_fixed_obstacles
                        , FV_DiscreteField const* arb_UF
                        , FV_DiscreteField const* arb_PF
+                       , double const& arb_rho
+                       , MAC_DoubleVector const* arb_gv
                        , double const& arb_scs
                        , MAC_Communicator const* arb_macCOMM
                        , double const& arb_mu );
@@ -124,6 +128,9 @@ class DS_AllRigidBodies
 
       /** @brief Returns the number of particles */
       size_t get_number_particles() const;
+
+      /** @brief Returns minimum coordinate of RB's dir component */
+      double get_min_RB_coord( size_t const& dir );
 
       /** @brief Returns a constant pointer to the FS_AllRigidBodies object that
       contains the vector of all corresponding geometric rigid bodies */
@@ -345,6 +352,11 @@ class DS_AllRigidBodies
       /** @brief Return numeric value with the provided field
       @param FF input field */
       int field_num( FV_DiscreteField const* FF );
+
+      /** @brief Solve and update the particle position and velocity
+      after solving RB equation of motion explicitly
+      @param t_it Time_iterator */
+      void solve_RB_equation_of_motion( FV_TimeIterator const* t_it );
       //@}
 
 
@@ -416,6 +428,8 @@ class DS_AllRigidBodies
       MAC_Communicator const* m_macCOMM; /**< Variable for communication
       between processors */
       double m_mu; /**< Fluid viscosity */
+      double m_rho; /**< fluid density */
+      MAC_DoubleVector const* gravity_vector ;
       vector<vector<size_t>> neighbour_list;
 
       //@}

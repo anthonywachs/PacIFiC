@@ -304,6 +304,38 @@ double FS_RigidBody:: get_circumscribed_radius() const
 
 
 //---------------------------------------------------------------------------
+std::tuple<double,double> FS_RigidBody:: get_mass_and_density() const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: get_mass_and_density()" ) ;
+
+  return ( std::make_tuple(m_mass,m_density) );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
+												 					 geomVector const& vel)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: update_RB_position_and_velocity()" ) ;
+
+  m_gravity_center(0) = pos(0);
+  m_gravity_center(1) = pos(1);
+  m_gravity_center(2) = pos(2);
+  m_translational_velocity(0) = vel(0);
+  m_translational_velocity(1) = vel(1);
+  m_translational_velocity(2) = vel(2);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 vector<geomVector> const* FS_RigidBody:: get_ptr_to_periodic_directions() const
 //---------------------------------------------------------------------------
 {

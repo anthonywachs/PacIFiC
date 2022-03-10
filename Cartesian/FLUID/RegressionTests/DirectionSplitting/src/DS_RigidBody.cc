@@ -131,6 +131,19 @@ geomVector DS_RigidBody:: get_rigid_body_velocity( geomVector const& pt ) const
 
 
 //---------------------------------------------------------------------------
+std::tuple<double,double> DS_RigidBody:: get_mass_and_density() const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: get_mass_and_density()" ) ;
+
+  return ( m_geometric_rigid_body->get_mass_and_density() );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 double DS_RigidBody:: get_circumscribed_radius( ) const
 //---------------------------------------------------------------------------
 {
@@ -178,6 +191,20 @@ void DS_RigidBody:: initialize_surface_variables( )
       m_surface_Pforce.push_back( vvv );
       m_surface_Vforce.push_back( vvv );
    }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
+                                                    geomVector const& vel)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: update_RB_position_and_velocity" ) ;
+
+  return (m_geometric_rigid_body->update_RB_position_and_velocity(pos,vel));
 
 }
 
