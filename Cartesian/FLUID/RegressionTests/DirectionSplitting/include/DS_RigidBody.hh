@@ -130,9 +130,12 @@ class DS_RigidBody
                             , double const& z ) const;
 
       /** @brief Compute the surface points by discretizing the rigid body
-      surface in approximately equal areas (if possible)
-      @param Np number of points on rigid body surface */
+      surface in approximately equal areas (if possible) */
       virtual void compute_surface_points( ) = 0;
+
+      /** @brief Translate the surface points already discretized at
+      the start of simulation */
+      virtual void translate_surface_points( geomVector const& delta ) = 0;
 
       /** @brief Compute number of points on a rigid body
       @param surface_cell_scale scale of surface cell compared with the grid
