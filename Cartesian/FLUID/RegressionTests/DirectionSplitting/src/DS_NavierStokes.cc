@@ -963,12 +963,25 @@ DS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
    } else if (is_periodic[field][dir] == 1) {
       // Condition for single processor in any
       // direction with periodic boundary conditions
-      ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
-      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir, field,r_index);
+		ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
+      ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0(field);
+
+      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,field,r_index);
 
       LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
-      LA_SeqMatrix* receive_matrix =
-                    product_matrix->create_copy(this,product_matrix);
+
+      size_t nbrow = product_matrix->nb_rows();
+      // Create a copy of product matrix to receive matrix,
+      // this will eliminate the memory leak issue
+      // which caused by "create_copy" command
+      for (size_t k=0;k<nbrow;k++) {
+         for (size_t j=0;j<nbrow;j++) {
+            Ap_proc0[dir].ei_ii_ie[comp]
+                              ->set_item(k,j,product_matrix->item(k,j));
+         }
+      }
+
+		LA_SeqMatrix* receive_matrix = Ap_proc0[dir].ei_ii_ie[comp];
 
       A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
 
