@@ -136,9 +136,6 @@ class DS_RigidBody
       surface in approximately equal areas (if possible) */
       virtual void compute_surface_points( ) = 0;
 
-      /** @brief Translate the surface points already discretized at
-      the start of simulation */
-      virtual void translate_surface_points( geomVector const& delta ) = 0;
 
       /** @brief Compute number of points on a rigid body
       @param surface_cell_scale scale of surface cell compared with the grid
@@ -153,6 +150,10 @@ class DS_RigidBody
 
       /** @brief Correct surface discretization due to PBC */
       void correct_surface_discretization( FV_Mesh const* MESH );
+
+      /** @brief Translate the surface points already discretized at
+      the start of simulation */
+      void translate_surface_points( geomVector const& delta);
 
       /** @brief Initializa the surface variables for a rigid body
       such as points, normals, and area */

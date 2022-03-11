@@ -130,6 +130,23 @@ geomVector DS_RigidBody:: get_rigid_body_velocity( geomVector const& pt ) const
 
 
 
+
+//---------------------------------------------------------------------------
+void DS_RigidBody:: translate_surface_points( geomVector const& delta)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_Sphere:: translate_surface_points()" ) ;
+
+  // Translate
+  for (size_t i = 0; i < m_surface_area.size(); i++) {
+     m_surface_points[i]->translate(delta);
+  }
+
+}
+
+
+
+
 //---------------------------------------------------------------------------
 std::tuple<double,double> DS_RigidBody:: get_mass_and_density() const
 //---------------------------------------------------------------------------

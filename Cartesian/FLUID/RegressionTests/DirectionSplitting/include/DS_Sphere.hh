@@ -59,10 +59,6 @@ class DS_Sphere: public DS_RigidBody
       surface in approximately equal areas (if possible) */
       void compute_surface_points( );
 
-      /** @brief Translate the surface points already discretized on sphere
-      surface */
-      void translate_surface_points( geomVector const& delta);
-
       /** @brief Compute number of points on a sphere
       @param surface_cell_scale scale of surface cell compared with the grid
       @param dx grid size */

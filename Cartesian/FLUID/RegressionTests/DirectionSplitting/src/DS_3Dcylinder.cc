@@ -102,22 +102,6 @@ void DS_3Dcylinder:: compute_rigid_body_halozone( )
 
 
 //---------------------------------------------------------------------------
-void DS_3Dcylinder:: translate_surface_points( geomVector const& delta )
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_3Dcylinder:: translate_surface_points" ) ;
-
-  // Translate
-  for (size_t i = 0; i < m_surface_area.size(); i++) {
-     m_surface_points[i]->translate(delta);
-  }
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
 void DS_3Dcylinder:: compute_surface_points(  )
 //---------------------------------------------------------------------------
 {
