@@ -338,8 +338,17 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
      avg_viscous_torque(1) += viscous_torque->operator()(i,1);
      avg_viscous_torque(2) += viscous_torque->operator()(i,2);
 
+     geomVector const* pgc = m_allDSrigidbodies[i]->get_ptr_to_gravity_centre();
+     geomVector pv = rigid_body_velocity(i,*pgc);
+
      if (m_macCOMM->rank() == 0) {
-        MyFile << i << " , " << pressure_force->operator()(i,0)
+        MyFile << i << " , " << pgc->operator()(0)
+                    << " , " << pgc->operator()(1)
+                    << " , " << pgc->operator()(2)
+                    << " , " << pv(0)
+                    << " , " << pv(1)
+                    << " , " << pv(2)
+                    << " , " << pressure_force->operator()(i,0)
                     << " , " << pressure_force->operator()(i,1)
                     << " , " << pressure_force->operator()(i,2)
                     << " , " << viscous_force->operator()(i,0)
