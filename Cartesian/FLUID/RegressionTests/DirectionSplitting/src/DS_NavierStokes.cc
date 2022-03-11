@@ -171,6 +171,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    // Timing routines
    if ( my_rank == is_master ) {
      SCT_insert_app("Matrix_Assembly&Initialization");
+	  SCT_insert_app("Matrix_RE_Assembly&Initialization");
      SCT_insert_app("Pressure predictor");
      SCT_insert_app("Velocity update");
      SCT_insert_app("Penalty Step");
@@ -340,13 +341,14 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 {
    MAC_LABEL( "DS_NavierStokes:: do_before_inner_iterations_stage" ) ;
 
-   //  Projection_Translation
-   if ( b_projection_translation )
-     b_grid_has_been_translated_at_previous_time = false;
 
    if ((is_par_motion) && (is_solids)) {
+		if ( my_rank == is_master )
+			SCT_set_start( "Matrix_RE_Assembly&Initialization" );
 		// Solve equation of motion for all RB and update pos,vel
-		allrigidbodies->solve_RB_equation_of_motion(t_it);
+		allrigidbodies->solve_RB_equation_of_motion(t_it
+										, b_grid_has_been_translated_at_previous_time
+										, MVQ_translation_vector);
 		allrigidbodies->compute_halo_zones_for_all_rigid_body();
 		// Compute void fraction for pressure and velocity field
 		allrigidbodies->compute_void_fraction_on_grid(PF);
@@ -364,7 +366,13 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
       // Assemble 1D tridiagonal matrices
       assemble_1D_matrices(PF,t_it);
       assemble_1D_matrices(UF,t_it);
+		if ( my_rank == is_master )
+			SCT_get_elapsed_time( "Matrix_RE_Assembly&Initialization" );
    }
+
+	//  Projection_Translation
+	if ( b_projection_translation )
+		b_grid_has_been_translated_at_previous_time = false;
 
    // Perform matrix level operations before each time step
    GLOBAL_EQ->at_each_time_step( );

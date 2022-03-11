@@ -356,7 +356,9 @@ class DS_AllRigidBodies
       /** @brief Solve and update the particle position and velocity
       after solving RB equation of motion explicitly
       @param t_it Time_iterator */
-      void solve_RB_equation_of_motion( FV_TimeIterator const* t_it );
+      void solve_RB_equation_of_motion( FV_TimeIterator const* t_it
+         , bool const& b_grid_has_been_translated_at_previous_time
+         , geomVector const& MVQ_translation_vector);
       //@}
 
 
