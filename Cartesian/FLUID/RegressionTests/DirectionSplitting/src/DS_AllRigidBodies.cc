@@ -395,9 +395,7 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
 
 //---------------------------------------------------------------------------
 void DS_AllRigidBodies:: solve_RB_equation_of_motion(
-                     FV_TimeIterator const* t_it
-                   , bool const& b_grid_has_been_translated_at_previous_time
-                   , geomVector const& MVQ_translation_vector)
+                     FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_AllRigidBodies:: solve_RB_equation_of_motion()" ) ;
@@ -432,9 +430,7 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
                                          / mass_p ;
         vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
         pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
-        delta(dir) = (b_grid_has_been_translated_at_previous_time) ?
-                     vel(dir)*t_it->time_step() - MVQ_translation_vector(dir)
-                   : vel(dir)*t_it->time_step() ;
+        delta(dir) = vel(dir)*t_it->time_step() ;
      }
 
      // // Writing istream to update the positions

@@ -346,9 +346,7 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		if ( my_rank == is_master )
 			SCT_set_start( "Matrix_RE_Assembly&Initialization" );
 		// Solve equation of motion for all RB and update pos,vel
-		allrigidbodies->solve_RB_equation_of_motion(t_it
-										, b_grid_has_been_translated_at_previous_time
-										, MVQ_translation_vector);
+		allrigidbodies->solve_RB_equation_of_motion(t_it);
 		allrigidbodies->compute_halo_zones_for_all_rigid_body();
 		// Compute void fraction for pressure and velocity field
 		allrigidbodies->compute_void_fraction_on_grid(PF);
