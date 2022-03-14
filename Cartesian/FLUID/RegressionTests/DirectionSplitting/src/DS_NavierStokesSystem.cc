@@ -174,7 +174,7 @@ DS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 
       for (size_t dir = 0; dir < dim; dir++) {
 			// Local vector to store the row index
-			row_index[field][dir] = (LA_SeqMatrix**) malloc(nb_comps[field] * sizeof(LA_SeqMatrix*)) ;
+			row_index[field][dir] = (size_t_array2D**) malloc(nb_comps[field] * sizeof(size_t_array2D*)) ;
 
          // Spacial discretization matrices
          A[field][dir].ii_main = (LA_SeqVector***) malloc(nb_comps[field] * sizeof(LA_SeqVector**)) ;
@@ -250,7 +250,7 @@ DS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
                nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
             }
 
-				row_index[field][dir][comp] = MAT_velocityUnsteadyPlusDiffusion_1D->create_copy( this,MAT_velocityUnsteadyPlusDiffusion_1D );
+				row_index[field][dir][comp] = new size_t_array2D(1,1);
 
             A[field][dir].ii_main[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
             A[field][dir].ii_super[comp] = (LA_SeqVector**) malloc(nb_index * sizeof(LA_SeqVector*)) ;
@@ -795,7 +795,7 @@ DS_NavierStokesSystem::get_node_divergence(size_t const& level)
 
 
 //----------------------------------------------------------------------
-LA_SeqMatrix*
+size_t_array2D*
 DS_NavierStokesSystem::get_row_indexes(size_t const& field
 											     , size_t const& dir
 												  , size_t const& comp )

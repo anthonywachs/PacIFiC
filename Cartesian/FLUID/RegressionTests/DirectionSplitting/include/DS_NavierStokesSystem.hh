@@ -4,6 +4,7 @@
 #include <MAC_Object.hh>
 #include <utility>
 #include <boolVector.hh>
+#include <size_t_array2D.hh>
 #include <vector>
 using namespace std;
 
@@ -160,7 +161,7 @@ class DS_NavierStokesSystem : public MAC_Object
       /** @brief Return the velocity diffusive terms */
       vector<doubleVector*> get_velocity_diffusion();
       /** @brief Return the local vector with a vector of row index */
-      LA_SeqMatrix* get_row_indexes(size_t const& field
+      size_t_array2D* get_row_indexes(size_t const& field
                                   , size_t const& dir
                                   , size_t const& comp);
 
@@ -305,7 +306,7 @@ class DS_NavierStokesSystem : public MAC_Object
       // Local vector to store row indexes for each
       // field (i.e. 2)
       // and direction (i.e. 3)
-      LA_SeqMatrix ** row_index[2][3] ;
+      size_t_array2D ** row_index[2][3] ;
 
       // Unknowns numbering
       FV_SystemNumbering* UF_NUM ;
