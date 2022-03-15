@@ -172,8 +172,8 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    if ( my_rank == is_master ) {
      SCT_insert_app("Matrix_Assembly&Initialization");
 	  SCT_insert_app("Matrix_RE_Assembly&Initialization");
-	  SCT_insert_app("Stencil");
-	  SCT_insert_app("Schur");
+	  // SCT_insert_app("Stencil");
+	  // SCT_insert_app("Schur");
      SCT_insert_app("Pressure predictor");
      SCT_insert_app("Velocity update");
      SCT_insert_app("Penalty Step");
@@ -343,6 +343,8 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 {
    MAC_LABEL( "DS_NavierStokes:: do_before_inner_iterations_stage" ) ;
 
+	if ( my_rank == is_master )
+		SCT_set_start( "Matrix_RE_Assembly&Initialization" );
 
    if ((is_par_motion) && (is_solids)) {
 		// Solve equation of motion for all RB and update pos,vel
@@ -361,13 +363,9 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		initialize_grid_nodes_on_rigidbody(vec);
 
 	   // Direction splitting
-		if ( my_rank == is_master )
-		SCT_set_start( "Matrix_RE_Assembly&Initialization" );
       // Assemble 1D tridiagonal matrices
       assemble_1D_matrices(PF,t_it);
       assemble_1D_matrices(UF,t_it);
-		if ( my_rank == is_master )
-			SCT_get_elapsed_time( "Matrix_RE_Assembly&Initialization" );
    }
 
 	//  Projection_Translation
@@ -376,6 +374,9 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 
    // Perform matrix level operations before each time step
    GLOBAL_EQ->at_each_time_step( );
+
+	if ( my_rank == is_master )
+		SCT_get_elapsed_time( "Matrix_RE_Assembly&Initialization" );
 
 }
 
@@ -550,275 +551,243 @@ DS_NavierStokes:: calculate_row_indexes ( FV_DiscreteField const* FF)
 
 //---------------------------------------------------------------------------
 void
-DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
-                                           FV_TimeIterator const* t_it,
-                                           double const& gamma,
-                                           size_t const& comp,
-                                           size_t const& dir,
-                                           size_t const& j,
-                                           size_t const& k,
-                                           size_t const& r_index )
+DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
+                                        , FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_NavierStokes:: assemble_field_matrix" ) ;
 
-	if ( my_rank == is_master )
-		SCT_set_start("Stencil");
+	// if ( my_rank == is_master )
+	// 	SCT_set_start("Stencil");
 
-   // Parameters
-   double dxr,dxl,dx,xR,xL,xC,right=0.,left=0.,center=0.;
+	// Assemble the matrices for pressure field(0) and velocity(1) field
+	size_t field = (FF == PF) ? 0 : 1 ;
+	double gamma = mu/2.0;
+	TDMatrix* A = GLOBAL_EQ-> get_A(field);
 
-   size_t field = (FF == PF) ? 0 : 1 ;
+	size_t_vector min_unknown_index(dim,0);
+	size_t_vector max_unknown_index(dim,0);
 
-   bool r_bound = false;
-   bool l_bound = false;
-   // All the proc will have open right bound,
-   // except last proc for non periodic systems
-   if ((is_periodic[field][dir] != 1)
-    && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1))
-      r_bound = true;
-   // All the proc will have open left bound,
-   // except first proc for non periodic systems
-   if ((is_periodic[field][dir] != 1)
-    && (rank_in_i[dir] == 0))
-      l_bound = true;
+	for (size_t comp=0;comp<nb_comps[field];comp++) {
+		// Get local min and max indices
+		for (size_t l=0;l<dim;++l) {
+			min_unknown_index(l) =
+								FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+			max_unknown_index(l) =
+								FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+		}
 
-   // Get local min and max indices
-   size_t_vector min_unknown_index(3,0);
-   size_t_vector max_unknown_index(3,0);
+		for (size_t dir = 0; dir < dim; dir++) {
 
-   for (size_t l=0;l<dim;++l) {
-      min_unknown_index(l) =
-                     FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      max_unknown_index(l) =
-                     FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-   }
+			bool r_bound = false;
+			bool l_bound = false;
+			// All the proc will have open right bound,
+			// except last proc for non periodic systems
+			if ((is_periodic[field][dir] != 1)
+			&& (rank_in_i[dir] == nb_ranks_comm_i[dir]-1))
+				r_bound = true;
+			// All the proc will have open left bound,
+			// except first proc for non periodic systems
+			if ((is_periodic[field][dir] != 1)
+			&& (rank_in_i[dir] == 0))
+				l_bound = true;
 
-   // Perform assembling
-   size_t m, i;
-   TDMatrix* A = GLOBAL_EQ-> get_A(field);
+			size_t dir_j = (dir == 0) ? 1 : 0;
+			size_t dir_k = (dir == 2) ? 1 : 2;
 
-   double Aee_diagcoef=0.;
+			size_t local_min_k = (dim == 2) ? 0 : min_unknown_index(dir_k);
+			size_t local_max_k = (dim == 2) ? 0 : max_unknown_index(dir_k);
 
-   for (m=0,i=min_unknown_index(dir);i<=max_unknown_index(dir);++i,++m) {
-      int i_temp=0; int j_temp=0; int k_temp=0;
-      if (dir == 0) {
-         i_temp = (int) i;
-         j_temp = (int) min_unknown_index(1);
-         k_temp = (int) min_unknown_index(2);
-      } else if (dir == 1) {
-         i_temp = (int) min_unknown_index(0);
-         j_temp = (int) i;
-         k_temp = (int) min_unknown_index(2);
-      } else if (dir == 2) {
-         i_temp = (int) min_unknown_index(0);
-         j_temp = (int) min_unknown_index(1);
-         k_temp = (int) i;
-      }
+			size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(field,dir,comp);
 
-      xC= FF->get_DOF_coordinate( i, comp, dir) ;
+			for (size_t j = min_unknown_index(dir_j);
+						  j <= max_unknown_index(dir_j);++j) {
+				for (size_t k = local_min_k; k <= local_max_k; ++k) {
+					size_t r_index = row_index->operator()(j,k);
+   				// Perform assembling
+					double Aee_diagcoef = 0.;
+   				for (size_t m = 0, i = min_unknown_index(dir);
+											 i <= max_unknown_index(dir); ++i,++m) {
+						int i_temp = (int)((dir == 0) ? i : min_unknown_index(0));
+						int j_temp = (int)((dir == 1) ? i : min_unknown_index(1));
+						int k_temp = (int)((dir == 2) ? i : min_unknown_index(2));
 
-      // Check if the index is at right domain
-      // boundary with neumann or dirichlet BC
-      if ( (i==max_unknown_index(dir))
-        && r_bound
-        && FF->DOF_on_BC(i_temp,j_temp,k_temp,comp)) {
-         xR = 0.;
-      } else {
-         xR= FF->get_DOF_coordinate( i+1,comp, dir) ;
-      }
+      				double xC = FF->get_DOF_coordinate( i, comp, dir) ;
 
-      // Check if the index is at left domain
-      // boundary with neumann or dirichlet BC
-      if ( (i==min_unknown_index(dir))
-        && l_bound
-        && FF->DOF_on_BC(i_temp,j_temp,k_temp,comp)) {
-         xL = 0.;
-      } else {
-         xL= FF->get_DOF_coordinate( i-1, comp, dir) ;
-      }
+				      // Check if the index is at right domain
+				      // boundary with neumann or dirichlet BC
+						double xR = FF->get_DOF_coordinate( i+1,comp, dir) ;
+				      if ( (i==max_unknown_index(dir))
+				        && r_bound
+				        && FF->DOF_on_BC(i_temp,j_temp,k_temp,comp)) {
+				         xR = 0.;
+				      }
 
-      dx = FF->get_cell_size( i,comp, dir);
+				      // Check if the index is at left domain
+				      // boundary with neumann or dirichlet BC
+						double xL = FF->get_DOF_coordinate( i-1, comp, dir) ;
+				      if ( (i==min_unknown_index(dir))
+				        && l_bound
+				        && FF->DOF_on_BC(i_temp,j_temp,k_temp,comp)) {
+				         xL = 0.;
+				      }
 
-      dxr= xR - xC;
-      dxl= xC - xL;
+      				double dx = FF->get_cell_size( i,comp, dir);
 
-      double value=0., unsteady_term=0.;
+      				double dxr = xR - xC;
+      				double dxl = xC - xL;
 
-      if (field == 0) {
-         right = -1.0/(dxr);
-         left = -1.0/(dxl);
-         // add unsteady term for pressure field
-         unsteady_term = 1.0*dx;
-      } else if (field == 1) {
-         right = -gamma/(dxr);
-         left = -gamma/(dxl);
-         // add unsteady term for velocity field
-         unsteady_term = rho*FF->get_cell_size(i,comp,dir)/t_it->time_step();
-      }
+						double right = (FF == PF) ? -1.0/dxr : -gamma/dxr ;
+						double left = (FF == PF) ? -1.0/dxl : -gamma/dxl ;
+						double unsteady_term = (FF == PF) ? 1.0*dx
+								: rho*FF->get_cell_size(i,comp,dir)/t_it->time_step();
 
-      if ((is_solids) && (field == 1)) {
-         size_t p=0;
-         if (dir == 0) {
-            p = FF->DOF_local_number(i,j,k,comp);
-         } else if (dir == 1) {
-            p = FF->DOF_local_number(j,i,k,comp);
-         } else if (dir == 2) {
-            p = FF->DOF_local_number(j,k,i,comp);
-         }
+						double center = - (right+left);
 
-         size_t_array2D* intersect_vector =
-                           allrigidbodies->get_intersect_vector_on_grid(FF);
-         doubleArray2D* intersect_distance =
-                           allrigidbodies->get_intersect_distance_on_grid(FF);
-         size_t_vector* void_frac =
-                           allrigidbodies->get_void_fraction_on_grid(FF);
+				      if ((is_solids) && (FF == UF)) {
+				         size_t p = 0;
+				         if (dir == 0) {
+				            p = FF->DOF_local_number(i,j,k,comp);
+				         } else if (dir == 1) {
+				            p = FF->DOF_local_number(j,i,k,comp);
+				         } else if (dir == 2) {
+				            p = FF->DOF_local_number(j,k,i,comp);
+				         }
 
-         if (void_frac->operator()(p) == 0) {
-            // if left node is inside the solid particle
-            if (intersect_vector->operator()(p,2*dir+0) == 1) {
-               left = -gamma/intersect_distance->operator()(p,2*dir+0);
-            }
-            // if right node is inside the solid particle
-            if (intersect_vector->operator()(p,2*dir+1) == 1) {
-               right = -gamma/intersect_distance->operator()(p,2*dir+1);
-            }
-         } else if (void_frac->operator()(p) != 0) {
-            // if center node is inside the solid particle
-            left = 0.;
-            right = 0.;
-         }
+				         size_t_array2D* intersect_vector = allrigidbodies
+														->get_intersect_vector_on_grid(FF);
+				         doubleArray2D* intersect_distance = allrigidbodies
+														->get_intersect_distance_on_grid(FF);
+				         size_t_vector* void_frac = allrigidbodies
+														->get_void_fraction_on_grid(FF);
 
-         center = -(right+left);
+				         if (void_frac->operator()(p) == 0) {
+				            // if left node is inside the solid particle
+				            if (intersect_vector->operator()(p,2*dir+0) == 1)
+				               left = -gamma/intersect_distance->operator()(p,2*dir+0);
+				            // if right node is inside the solid particle
+				            if (intersect_vector->operator()(p,2*dir+1) == 1)
+				               right = -gamma/intersect_distance->operator()(p,2*dir+1);
+				         } else if (void_frac->operator()(p) != 0) {
+				            // if center node is inside the solid particle
+				            left = 0.;
+				            right = 0.;
+				         }
 
-         if (intersect_vector->operator()(p,2*dir+0) == 1) left = 0.;
-         if (intersect_vector->operator()(p,2*dir+1) == 1) right = 0.;
-      } else {
-         center = - (right+left);
-      }
+         				center = -(right+left);
 
-      // Since, this function is used in all directions;
-      // ii, jj, and kk are used to convert the passed
-      // arguments corresponding to correct direction
-      int ii=0,jj=0,kk=0;
+         				if (intersect_vector->operator()(p,2*dir+0) == 1)
+								left = 0.;
+         				if (intersect_vector->operator()(p,2*dir+1) == 1)
+								right = 0.;
+      				}
 
-      // Condition for handling the pressure neumann conditions at wall
-      if (i == min_unknown_index(dir) && l_bound) {
-         if (dir == 0) {
-            ii = (int) i-1;
-            jj = (int) min_unknown_index(1);
-            kk = (int) min_unknown_index(2);
-         } else if (dir == 1) {
-            ii = (int) min_unknown_index(0);
-            jj = (int) i-1;
-            kk = (int) min_unknown_index(2);
-         } else if (dir == 2) {
-            ii = (int) min_unknown_index(0);
-            jj = (int) min_unknown_index(1);
-            kk = (int) i-1;
-         }
-         if (FF->DOF_in_domain(ii,jj,kk,comp)
-          && FF->DOF_has_imposed_Dirichlet_value
-                        ((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
-            // For Dirichlet boundary condition
-            value = center;
-         } else {
-            // For Neumann homogeneous boundary condition
-            value = -right;
-         }
-      } else if (i==max_unknown_index(dir) && r_bound) {
-         if (dir == 0) {
-            ii = (int) i+1;
-            jj = (int) max_unknown_index(1);
-            kk = (int) max_unknown_index(2);
-         } else if (dir == 1) {
-            ii = (int) max_unknown_index(0);
-            jj = (int) i+1;
-            kk = (int) max_unknown_index(2);
-         } else if (dir == 2) {
-            ii = (int) max_unknown_index(0);
-            jj = (int) max_unknown_index(1);
-            kk = (int) i+1;
-         }
-         if (FF->DOF_in_domain(ii,jj,kk,comp)
-          && FF->DOF_has_imposed_Dirichlet_value
-                        ((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
-            // For Dirichlet boundary condition
-            value = center;
-         } else {
-            // For Neumann homogeneous boundary condition
-            value = -left;
-         }
-      } else {
-         value = center;
-      }
+						double value = center;
 
-      value = value + unsteady_term;
+				      // Condition for handling the pressure
+						// neumann conditions at wall
+				      if (i == min_unknown_index(dir) && l_bound) {
+							int ii = (int)((dir == 0) ? i-1 : min_unknown_index(0));
+							int jj = (int)((dir == 1) ? i-1 : min_unknown_index(1));
+							int kk = (int)((dir == 2) ? i-1 : min_unknown_index(2));
 
-      // Set Aie, Aei and Ae
-      if ((!l_bound) && (i == min_unknown_index(dir))) {
-         // Periodic boundary condition at minimum unknown index
-         // First proc has non zero value in Aie,Aei for first & last index
-         if (rank_in_i[dir] == 0) {
-            A[dir].ie[comp][r_index]->set_item(m,nb_ranks_comm_i[dir]-1,left);
-            A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,left);
-         } else {
-            A[dir].ie[comp][r_index]->set_item(m,rank_in_i[dir]-1,left);
-            A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,left);
-         }
-      }
+				         if (FF->DOF_in_domain(ii,jj,kk,comp)
+				          && FF->DOF_has_imposed_Dirichlet_value
+				                        ((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
+				            // For Dirichlet boundary condition
+				            value = center;
+				         } else {
+				            // For Neumann homogeneous boundary condition
+				            value = -right;
+				         }
+				      } else if (i==max_unknown_index(dir) && r_bound) {
+							int ii = (int)((dir == 0) ? i+1 : max_unknown_index(0));
+							int jj = (int)((dir == 1) ? i+1 : max_unknown_index(1));
+							int kk = (int)((dir == 2) ? i+1 : max_unknown_index(2));
 
-      if ((!r_bound) && (i == max_unknown_index(dir))) {
-         // Periodic boundary condition at maximum unknown index
-         // For last index, Aee comes from this proc as it
-         // is interface unknown wrt this proc
-         A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],left);
-         Aee_diagcoef = value;
-         A[dir].ei[comp][r_index]->set_item(rank_in_i[dir],m-1,left);
-      }
+				         if (FF->DOF_in_domain(ii,jj,kk,comp)
+				          && FF->DOF_has_imposed_Dirichlet_value
+				                        ((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
+				            // For Dirichlet boundary condition
+				            value = center;
+				         } else {
+				            // For Neumann homogeneous boundary condition
+				            value = -left;
+				         }
+				      }
 
-      // Set Aii_sub_diagonal
-      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1)
-       && (is_periodic[field][dir] != 1)) {
-         if (i > min_unknown_index(dir))
-            A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
-      } else {
-         if (i < max_unknown_index(dir))
-            if (i > min_unknown_index(dir))
-               A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
-      }
+      				value = value + unsteady_term;
 
-      // Set Aii_super_diagonal
-      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1)
-       && (is_periodic[field][dir] != 1)) {
-         if (i < max_unknown_index(dir))
-            A[dir].ii_super[comp][r_index]->set_item(m,right);
-      } else {
-         if (i < max_unknown_index(dir)-1)
-            A[dir].ii_super[comp][r_index]->set_item(m,right);
-      }
+				      // Set Aie, Aei and Ae
+				      if ((!l_bound) && (i == min_unknown_index(dir))) {
+				         // Periodic boundary condition at minimum unknown index
+				         // First proc has non zero value in Aie,Aei for first & last index
+				         if (rank_in_i[dir] == 0) {
+				            A[dir].ie[comp][r_index]->set_item(m,nb_ranks_comm_i[dir]-1,left);
+				            A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,left);
+				         } else {
+				            A[dir].ie[comp][r_index]->set_item(m,rank_in_i[dir]-1,left);
+				            A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,left);
+				         }
+				      }
 
-      // Set Aii_main_diagonal
-      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1)
-       && (is_periodic[field][dir] != 1)) {
-         A[dir].ii_main[comp][r_index]->set_item(m,value);
-      } else {
-         if (i<max_unknown_index(dir))
-            A[dir].ii_main[comp][r_index]->set_item(m,value);
-      }
-   } // End of for loop
+				      if ((!r_bound) && (i == max_unknown_index(dir))) {
+				         // Periodic boundary condition at maximum unknown index
+				         // For last index, Aee comes from this proc as it
+				         // is interface unknown wrt this proc
+				         A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],left);
+				         Aee_diagcoef = value;
+				         A[dir].ei[comp][r_index]->set_item(rank_in_i[dir],m-1,left);
+				      }
 
-   GLOBAL_EQ->pre_thomas_treatment(comp,dir,A,r_index);
+				      // Set Aii_sub_diagonal
+				      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1)
+				       && (is_periodic[field][dir] != 1)) {
+				         if (i > min_unknown_index(dir))
+				            A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
+				      } else {
+				         if (i < max_unknown_index(dir))
+				            if (i > min_unknown_index(dir))
+				               A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
+				      }
 
-	if ( my_rank == is_master )
-		SCT_get_elapsed_time("Stencil");
+				      // Set Aii_super_diagonal
+				      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1)
+				       && (is_periodic[field][dir] != 1)) {
+				         if (i < max_unknown_index(dir))
+				            A[dir].ii_super[comp][r_index]->set_item(m,right);
+				      } else {
+				         if (i < max_unknown_index(dir)-1)
+				            A[dir].ii_super[comp][r_index]->set_item(m,right);
+				      }
 
-	// Storing Aee for MPI communication
-	ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
-	double* local_coeff = data_for_S[field][dir].send[comp][rank_in_i[dir]];
-	size_t nbrow = Ap[dir].ei_ii_ie[comp]->nb_rows();
-	size_t ii = (nbrow*nbrow + 1)*r_index;
-   local_coeff[ii] = Aee_diagcoef;
+				      // Set Aii_main_diagonal
+				      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1)
+				       && (is_periodic[field][dir] != 1)) {
+				         A[dir].ii_main[comp][r_index]->set_item(m,value);
+				      } else {
+				         if (i<max_unknown_index(dir))
+				            A[dir].ii_main[comp][r_index]->set_item(m,value);
+				      }
+				   } // End of for loop
+
+					GLOBAL_EQ->pre_thomas_treatment(comp,dir,A,r_index);
+
+
+					// Storing Aee for MPI communication
+					ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
+					double* local_coeff = data_for_S[field][dir].send[comp][rank_in_i[dir]];
+					size_t nbrow = Ap[dir].ei_ii_ie[comp]->nb_rows();
+					size_t ii = (nbrow*nbrow + 1)*r_index;
+					local_coeff[ii] = Aee_diagcoef;
+				}
+			}
+
+		}
+	}
+
+	// if ( my_rank == is_master )
+	// 	SCT_get_elapsed_time("Stencil");
 
 }
 
@@ -833,8 +802,8 @@ DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
    MAC_LABEL( "DS_NavierStokes:: assemble_field_schur_matrix" ) ;
    // Compute the product matrix for each proc
 
-	if ( my_rank == is_master )
-		SCT_set_start("Schur");
+	// if ( my_rank == is_master )
+	// 	SCT_set_start("Schur");
 
 	size_t field = (FF == PF) ? 0 : 1;
 
@@ -1039,8 +1008,8 @@ DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
       }
    }
 
-	if ( my_rank == is_master )
-		SCT_get_elapsed_time("Schur");
+	// if ( my_rank == is_master )
+	// 	SCT_get_elapsed_time("Schur");
 }
 
 
@@ -1054,49 +1023,9 @@ DS_NavierStokes:: assemble_1D_matrices ( FV_DiscreteField const* FF
 {
    MAC_LABEL( "DS_NavierStokes:: assemble_1D_matrices" ) ;
 
-   double gamma = mu/2.0;
-
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-
-   // Assemble the matrices for pressure field(0) and velocity(1) field
-   size_t field = (FF == PF) ? 0 : 1;
-
-   for (size_t comp=0;comp<nb_comps[field];comp++) {
-      // Get local min and max indices
-      for (size_t l=0;l<dim;++l) {
-         min_unknown_index(l) =
-                        FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-         max_unknown_index(l) =
-                        FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-      }
-
-      for (size_t dir=0;dir<dim;dir++) {
-         size_t dir_j, dir_k;
-
-         if (dir == 0) {
-            dir_j = 1; dir_k = 2;
-         } else if (dir == 1) {
-            dir_j = 0; dir_k = 2;
-         } else if (dir == 2) {
-            dir_j = 0; dir_k = 1;
-         }
-
-         size_t local_min_k = (dim == 2) ? 0 : min_unknown_index(dir_k);
-         size_t local_max_k = (dim == 2) ? 0 : max_unknown_index(dir_k);
-
-         size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(field,dir,comp);
-
-         for (size_t j = min_unknown_index(dir_j);
-                    j <= max_unknown_index(dir_j);++j) {
-            for (size_t k = local_min_k; k <= local_max_k; ++k) {
-               size_t r_index = row_index->operator()(j,k);
-               assemble_field_matrix (FF,t_it,gamma,comp,dir,j,k,r_index);
-            }
-         }
-      }
-   }
-
+   // Assemble field matrix
+   assemble_field_matrix (FF,t_it);
+   // Calculate and assemble Schur complement
 	assemble_field_schur_matrix(FF);
 }
 

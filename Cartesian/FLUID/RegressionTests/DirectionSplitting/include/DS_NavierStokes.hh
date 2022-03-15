@@ -150,14 +150,8 @@ class DS_NavierStokes : public MAC_Object,
 
       /** @brief Assemble 1D matrices for both velocity
       and pressure field in all directions */
-      void assemble_field_matrix ( FV_DiscreteField const* FF,
-                                   FV_TimeIterator const* t_it,
-                                   double const& gamma,
-                                   size_t const& comp,
-                                   size_t const& dir,
-                                   size_t const& j,
-                                   size_t const& k,
-                                   size_t const& r_index );
+      void assemble_field_matrix ( FV_DiscreteField const* FF
+                                 , FV_TimeIterator const* t_it );
 
       /** @brief Assemble 1D schur matrices for both
       velocity and pressure field in all directions */
