@@ -150,22 +150,18 @@ class DS_NavierStokes : public MAC_Object,
 
       /** @brief Assemble 1D matrices for both velocity
       and pressure field in all directions */
-      double assemble_field_matrix ( FV_DiscreteField const* FF,
-                                     FV_TimeIterator const* t_it,
-                                     double const& gamma,
-                                     size_t const& comp,
-                                     size_t const& dir,
-                                     size_t const& j,
-                                     size_t const& k,
-                                     size_t const& r_index );
+      void assemble_field_matrix ( FV_DiscreteField const* FF,
+                                   FV_TimeIterator const* t_it,
+                                   double const& gamma,
+                                   size_t const& comp,
+                                   size_t const& dir,
+                                   size_t const& j,
+                                   size_t const& k,
+                                   size_t const& r_index );
 
       /** @brief Assemble 1D schur matrices for both
       velocity and pressure field in all directions */
-      void assemble_field_schur_matrix (size_t const& comp,
-                                        size_t const& dir,
-                                        double const& Aee_diagcoef,
-                                        size_t const& field,
-                                        size_t const& r_index );
+      void assemble_field_schur_matrix ( FV_DiscreteField const* FF );
 
       /** @brief Assemble advection term for Upwind spacial scheme */
       double assemble_advection_Upwind( size_t const& advecting_level
@@ -416,6 +412,8 @@ class DS_NavierStokes : public MAC_Object,
       struct MPIVarNS first_pass[2][3];
       // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
       struct MPIVarNS second_pass[2][3];
+      // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
+      struct MPIVarNS data_for_S[2][3];
 
       double mu;
       double kai;

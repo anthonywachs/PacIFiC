@@ -186,9 +186,6 @@ class DS_NavierStokesSystem : public MAC_Object
       LocalVector* get_Schur_VEC(size_t const& field);
       /** @brief Return the product matrix of spacial discretization */
       ProdMatrix* get_Ap(size_t const& field);
-      /** @brief Return the product matrix of spacial discretization
-      which will accumulate the information from all processor*/
-      ProdMatrix* get_Ap_proc0(size_t const& field);
       /** @brief Return RHS for the matrix system of spacial discretization */
       LocalVector* get_VEC(size_t const& field);
 
@@ -320,8 +317,6 @@ class DS_NavierStokesSystem : public MAC_Object
       struct TDMatrix A[2][3];
       // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
       struct ProdMatrix Ap[2][3];
-      // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
-      struct ProdMatrix Ap_proc0[2][3];
       // [0,1] are for pressure and velocity;[0,1,2] are for x, y and z directions
       struct LocalVector VEC[2][3];
 

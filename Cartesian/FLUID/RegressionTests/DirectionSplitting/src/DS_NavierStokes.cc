@@ -549,7 +549,7 @@ DS_NavierStokes:: calculate_row_indexes ( FV_DiscreteField const* FF)
 
 
 //---------------------------------------------------------------------------
-double
+void
 DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
                                            FV_TimeIterator const* t_it,
                                            double const& gamma,
@@ -810,9 +810,16 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
 
    GLOBAL_EQ->pre_thomas_treatment(comp,dir,A,r_index);
 
-   return (Aee_diagcoef);
 	if ( my_rank == is_master )
-	SCT_get_elapsed_time("Stencil");
+		SCT_get_elapsed_time("Stencil");
+
+	// Storing Aee for MPI communication
+	ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
+	double* local_coeff = data_for_S[field][dir].send[comp][rank_in_i[dir]];
+	size_t nbrow = Ap[dir].ei_ii_ie[comp]->nb_rows();
+	size_t ii = (nbrow*nbrow + 1)*r_index;
+   local_coeff[ii] = Aee_diagcoef;
+
 }
 
 
@@ -820,202 +827,214 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
 
 //---------------------------------------------------------------------------
 void
-DS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
-                                              , size_t const& dir
-                                              , double const& Aee_diagcoef
-                                              , size_t const& field
-                                              , size_t const& r_index )
+DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_NavierStokes:: assemble_field_schur_matrix" ) ;
    // Compute the product matrix for each proc
 
-   TDMatrix* A = GLOBAL_EQ-> get_A(field);
-
-   if (nb_ranks_comm_i[dir]>1) {
 	if ( my_rank == is_master )
 		SCT_set_start("Schur");
 
-      ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
-      ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0(field);
+	size_t field = (FF == PF) ? 0 : 1;
 
-      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,field,r_index);
+   TDMatrix* A = GLOBAL_EQ-> get_A(field);
+	ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
 
-      LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
+	size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
 
-      size_t nbrow = product_matrix->nb_rows();
-      // Create a copy of product matrix to receive matrix,
-      // this will eliminate the memory leak issue
-      // which caused by "create_copy" command
-      for (size_t k=0;k<nbrow;k++) {
-         for (size_t j=0;j<nbrow;j++) {
-            Ap_proc0[dir].ei_ii_ie[comp]
-                              ->set_item(k,j,product_matrix->item(k,j));
-         }
+   for (size_t comp=0;comp<nb_comps[field];comp++) {
+      // Get local min and max indices
+      for (size_t l=0;l<dim;++l) {
+         min_unknown_index(l) =
+                        FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+         max_unknown_index(l) =
+                        FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
       }
 
-      LA_SeqMatrix* receive_matrix = Ap_proc0[dir].ei_ii_ie[comp];
+      for (size_t dir = 0; dir < dim; dir++) {
+         size_t dir_j = (dir == 0) ? 1 : 0;
+			size_t dir_k = (dir == 2) ? 1 : 2;
 
-      if ( rank_in_i[dir] == 0 ) {
-         A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
-         for (size_t i=1;i<(size_t)nb_ranks_comm_i[dir];++i) {
+			size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(field,dir,comp);
 
-            // Create the container to receive
-            size_t nbrows = product_matrix->nb_rows();
-            size_t nb_received_data = (size_t)pow(nbrows,2)+1;
-            double * received_data = new double [nb_received_data];
+         size_t local_min_k = (dim == 2) ? 0 : min_unknown_index(dir_k);
+         size_t local_max_k = (dim == 2) ? 0 : max_unknown_index(dir_k);
 
-            // Receive the data
-            static MPI_Status status ;
-            MPI_Recv( received_data, (int)nb_received_data,
-                     MPI_DOUBLE, (int)i, 0, DS_Comm_i[dir], &status ) ;
+			if (nb_ranks_comm_i[dir] > 1) {
 
-            // Transfer the received data to the receive matrix
-            for (int k=0;k<(int)nbrows;k++) {
-               for (int j=0;j<(int)nbrows;j++) {
-                  // Assemble the global product matrix by
-                  // adding contributions from all the procs
-                  receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
-               }
-            }
+				size_t nbrow = Ap[dir].ei_ii_ie[comp]->nb_rows();
+				double* local_packet = data_for_S[field][dir].send[comp][rank_in_i[dir]];
 
-  	         if (is_periodic[field][dir] == 0) {
-               if (i<(size_t)nb_ranks_comm_i[dir]-1) {
-                  // Assemble the global Aee matrix
-                  // No periodic condition in x.
-                  // So no fe contribution from last proc
-                  A[dir].ee[comp][r_index]
-                           ->set_item(i,i,received_data[nb_received_data-1]);
-               }
-            } else {
-               // Assemble the global Aee matrix
-               // Periodic condition in x.
-               // So there is fe contribution from last proc
-               A[dir].ee[comp][r_index]
-                           ->set_item(i,i,received_data[nb_received_data-1]);
-            }
-            delete [] received_data;
-         }
-      } else {
-         // Create the packed data container
-         size_t nbrows = product_matrix->nb_rows();
-         size_t nb_send_data = (size_t)pow(nbrows,2)+1;
-         double * packed_data = new double [nb_send_data];
+				// Calculating the product matrix and creating the container for MPI
+	         for (size_t j = min_unknown_index(dir_j);
+	                    j <= max_unknown_index(dir_j);++j) {
+	            for (size_t k = local_min_k; k <= local_max_k; ++k) {
+						size_t r_index = row_index->operator()(j,k);
 
-         // Fill the packed data container with Aie
-         // Iterator only fetches the values present. Zeros are not fetched.
+						GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,field,r_index);
 
-         for (size_t i=0 ; i<nbrows ; i++ ) {
-            for ( size_t j=0 ; j<nbrows ; j++ ) {
-               // Packing rule
-               // Pack the product matrix into a vector
-               packed_data[i*nbrows+j]=product_matrix->item(i,j);
-            }
-         }
+						// Create the data container to send and in the master as well
+						for (size_t kk = 0; kk < nbrow; kk++) {
+							for (size_t jj = 0; jj < nbrow; jj++) {
+								size_t ii = (nbrow*nbrow + 1)*r_index
+											 + nbrow*kk + jj + 1;
+								local_packet[ii] = Ap[dir].ei_ii_ie[comp]->item(kk,jj);
+							}
+						}
+					}
+				}
 
-         // Fill the last element of packed data
-         // with the diagonal coefficient Aee
-         packed_data[nb_send_data-1] = Aee_diagcoef;
+				// Send and recieve the data packet
+				if (rank_in_i[dir] == 0 ) {
+					for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir]; ++i) {
+						// Receive the data
+						static MPI_Status status;
+						MPI_Recv( data_for_S[field][dir].receive[comp][i],
+							 (int) data_for_S[field][dir].size[comp],
+							 MPI_DOUBLE, (int) i, 0, DS_Comm_i[dir], &status ) ;
+					}
+				} else {
+					// Send the packed data to master
+			      MPI_Send( data_for_S[field][dir].send[comp][rank_in_i[dir]],
+			          (int) data_for_S[field][dir].size[comp],
+			          	MPI_DOUBLE, 0, 0, DS_Comm_i[dir] ) ;
+				}
 
-         // Send the data
-         MPI_Send( packed_data, (int)nb_send_data,
-                                    MPI_DOUBLE, 0, 0, DS_Comm_i[dir] ) ;
+				// Assemble the global product matrix by adding contribution from
+				// all procs
+				if (rank_in_i[dir] == 0 ) {
+		         for (size_t j = min_unknown_index(dir_j);
+		                    j <= max_unknown_index(dir_j);++j) {
+		            for (size_t k = local_min_k; k <= local_max_k; ++k) {
+							size_t r_index = row_index->operator()(j,k);
+							size_t p = (nbrow*nbrow + 1)*r_index;
+							double ee_proc0 = local_packet[p];
+							A[dir].ee[comp][r_index]->set_item(0,0,ee_proc0);
 
-         delete [] packed_data;
+							for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir]; ++i) {
+								for (size_t kk = 0;kk < nbrow; kk++) {
+									for (size_t jj = 0;jj < nbrow; jj++) {
+										size_t ii = (nbrow*nbrow + 1)*r_index
+													 + nbrow*kk + jj + 1;
+										double value =
+												data_for_S[field][dir].receive[comp][i][ii];
+										local_packet[ii] += value;
+									}
+								}
+
+								size_t ii = (nbrow*nbrow + 1)*r_index;
+								double value_Aee =
+												data_for_S[field][dir].receive[comp][i][ii];
+
+								// Assemble the global Aee matrix
+								// Only for (nb_proc-1) in case no PBC
+								// Otherwise for (nb_proc)
+								if (!is_periodic[field][dir]) {
+									if (i<(size_t)nb_ranks_comm_i[dir]-1) {
+										A[dir].ee[comp][r_index]->set_item(i,i,value_Aee);
+									}
+								} else {
+               				A[dir].ee[comp][r_index]->set_item(i,i,value_Aee);
+            				}
+							}
+						}
+					}
+				}
+
+				// Assemble the schlur complement in the master proc
+				if (rank_in_i[dir] == 0) {
+					TDMatrix* Schur = GLOBAL_EQ-> get_Schur(field);
+					for (size_t j = min_unknown_index(dir_j);
+		                    j <= max_unknown_index(dir_j);++j) {
+		            for (size_t k = local_min_k; k <= local_max_k; ++k) {
+							size_t r_index = row_index->operator()(j,k);
+							for (int p = 0; p < (int)nbrow; p++) {
+								size_t ii = (nbrow*nbrow + 1)*r_index
+											 + nbrow*p + p + 1;
+								Schur[dir].ii_main[comp][r_index]
+										->set_item(p,A[dir].ee[comp][r_index]->item(p,p)
+											     								-local_packet[ii]);
+								if (p < (int)nbrow-1)
+									Schur[dir].ii_super[comp][r_index]
+										->set_item(p,-local_packet[ii+1]);
+								if (p > 0)
+									Schur[dir].ii_sub[comp][r_index]
+										->set_item(p-1,-local_packet[ii-1]);
+								// In case of periodic and multi-processor,
+								// there will be a variant of Tridiagonal matrix
+								// instead of normal format
+								if (is_periodic[field][dir] == 1) {
+									ii = (nbrow*nbrow + 1)*r_index + nbrow*p + nbrow + 1;
+									Schur[dir].ie[comp][r_index]->set_item(p,0,
+																				-local_packet[ii]);
+									ii = (nbrow*nbrow + 1)*r_index + nbrow*nbrow + p + 1;
+									Schur[dir].ei[comp][r_index]->set_item(0,p,
+																				-local_packet[ii]);
+								}
+							}
+							// Pre-thomas treatment on Schur complement
+							GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
+
+							// In case of periodic and multi-processor, there will be
+							// a variant of Tridiagonal matrix instead of normal format
+							// So, Schur complement of Schur complement is calculated
+							if (is_periodic[field][dir] == 1) {
+								size_t ii = ((size_t)pow(nbrow,2) + 1)*r_index
+											 + nbrow*nbrow
+											 + nbrow + 1;
+								Schur[dir].ee[comp][r_index]->set_item(0,0,
+										A[dir].ee[comp][r_index]->item(nbrow,nbrow)
+									 										- local_packet[ii]);
+
+								ProdMatrix* SchurP = GLOBAL_EQ->get_SchurP(field);
+								GLOBAL_EQ->compute_product_matrix_interior(Schur
+															 ,SchurP,comp,0,dir,r_index);
+
+								TDMatrix* DoubleSchur = GLOBAL_EQ-> get_DoubleSchur(field);
+								DoubleSchur[dir].ii_main[comp][r_index]
+								->set_item(0,Schur[dir].ee[comp][r_index]->item(0,0)
+								-SchurP[dir].ei_ii_ie[comp]->item(0,0));
+							}
+						}
+					}
+				}
+			// Condition for single processor in any
+			// direction with periodic boundary conditions
+			} else if (is_periodic[field][dir] == 1) {
+				for (size_t j = min_unknown_index(dir_j);
+								j <= max_unknown_index(dir_j);++j) {
+					for (size_t k = local_min_k; k <= local_max_k; ++k) {
+						size_t r_index = row_index->operator()(j,k);
+
+						GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,field,r_index);
+
+						LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
+
+						A[dir].ee[comp][r_index]->set_item(0,0
+								,data_for_S[field][dir].send[comp][rank_in_i[dir]][0]);
+
+						TDMatrix* Schur = GLOBAL_EQ-> get_Schur(field);
+						size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
+						for (int p = 0; p < (int)nb_row; p++) {
+							Schur[dir].ii_main[comp][r_index]
+										->set_item(p,A[dir].ee[comp][r_index]->item(p,p)
+														-product_matrix->item(p,p));
+							if (p < (int)nb_row-1)
+								Schur[dir].ii_super[comp][r_index]
+										->set_item(p,-product_matrix->item(p,p+1));
+							if (p > 0)
+							Schur[dir].ii_sub[comp][r_index]
+							->set_item(p-1,-product_matrix->item(p,p-1));
+						}
+						GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
+					}
+				}
+			}
       }
-
-      // Assemble the schlur complement in the master proc
-
-      if (rank_in_i[dir] == 0){
-         TDMatrix* Schur = GLOBAL_EQ-> get_Schur(field);
-         size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
-         for (int p = 0; p < (int)nb_row; p++) {
-            Schur[dir].ii_main[comp][r_index]
-                              ->set_item(p,A[dir].ee[comp][r_index]->item(p,p)
-                                          -receive_matrix->item(p,p));
-            if (p < (int)nb_row-1)
-               Schur[dir].ii_super[comp][r_index]
-                              ->set_item(p,-receive_matrix->item(p,p+1));
-            if (p > 0)
-               Schur[dir].ii_sub[comp][r_index]
-                              ->set_item(p-1,-receive_matrix->item(p,p-1));
-            // In case of periodic and multi-processor,
-            // there will be a variant of Tridiagonal matrix
-            // instead of normal format
-            if (is_periodic[field][dir] == 1) {
-               Schur[dir].ie[comp][r_index]
-                              ->set_item(p,0,-receive_matrix->item(p,nb_row));
-               Schur[dir].ei[comp][r_index]
-                              ->set_item(0,p,-receive_matrix->item(nb_row,p));
-            }
-         }
-         // Pre-thomas treatment on Schur complement
-         GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
-
-         // In case of periodic and multi-processor, there will be a variant
-         // of Tridiagonal matrix instead of normal format
-         // So, Schur complement of Schur complement is calculated
-         if (is_periodic[field][dir] == 1) {
-            Schur[dir].ee[comp][r_index]
-                  ->set_item(0,0,A[dir].ee[comp][r_index]->item(nb_row,nb_row)
-                                 -receive_matrix->item(nb_row,nb_row));
-
-            ProdMatrix* SchurP = GLOBAL_EQ->get_SchurP(field);
-            GLOBAL_EQ->compute_product_matrix_interior(Schur
-                                                      ,SchurP
-                                                      ,comp
-                                                      ,0
-                                                      ,dir
-                                                      ,r_index);
-
-            TDMatrix* DoubleSchur = GLOBAL_EQ-> get_DoubleSchur(field);
-            nb_row = DoubleSchur[dir].ii_main[comp][r_index]->nb_rows();
-            DoubleSchur[dir].ii_main[comp][r_index]
-                  ->set_item(0,Schur[dir].ee[comp][r_index]->item(0,0)
-                              -SchurP[dir].ei_ii_ie[comp]->item(0,0));
-         }
-      }
-   } else if (is_periodic[field][dir] == 1) {
-      // Condition for single processor in any
-      // direction with periodic boundary conditions
-		ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
-      ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0(field);
-
-      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,field,r_index);
-
-      LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
-
-      size_t nbrow = product_matrix->nb_rows();
-      // Create a copy of product matrix to receive matrix,
-      // this will eliminate the memory leak issue
-      // which caused by "create_copy" command
-      for (size_t k=0;k<nbrow;k++) {
-         for (size_t j=0;j<nbrow;j++) {
-            Ap_proc0[dir].ei_ii_ie[comp]
-                              ->set_item(k,j,product_matrix->item(k,j));
-         }
-      }
-
-		LA_SeqMatrix* receive_matrix = Ap_proc0[dir].ei_ii_ie[comp];
-
-      A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
-
-      TDMatrix* Schur = GLOBAL_EQ-> get_Schur(field);
-      size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
-      for (int p = 0; p < (int)nb_row; p++) {
-         Schur[dir].ii_main[comp][r_index]
-                  ->set_item(p,A[dir].ee[comp][r_index]->item(p,p)
-                              -receive_matrix->item(p,p));
-         if (p < (int)nb_row-1)
-            Schur[dir].ii_super[comp][r_index]
-                  ->set_item(p,-receive_matrix->item(p,p+1));
-         if (p > 0)
-            Schur[dir].ii_sub[comp][r_index]
-                  ->set_item(p-1,-receive_matrix->item(p,p-1));
-      }
-      GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
    }
-
+	
 	if ( my_rank == is_master )
 		SCT_get_elapsed_time("Schur");
 }
@@ -1068,14 +1087,13 @@ DS_NavierStokes:: assemble_1D_matrices ( FV_DiscreteField const* FF
                     j <= max_unknown_index(dir_j);++j) {
             for (size_t k = local_min_k; k <= local_max_k; ++k) {
                size_t r_index = row_index->operator()(j,k);
-               double Aee_diagcoef =
-                     assemble_field_matrix (FF,t_it,gamma,comp,dir,j,k,r_index);
-
-               assemble_field_schur_matrix(comp,dir,Aee_diagcoef,field,r_index);
+               assemble_field_matrix (FF,t_it,gamma,comp,dir,j,k,r_index);
             }
          }
       }
    }
+
+	assemble_field_schur_matrix(FF);
 }
 
 
@@ -3291,6 +3309,7 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
    for (size_t dir = 0; dir < dim; dir++) {
       first_pass[field][dir].size = new size_t [nb_comps[field]];
       second_pass[field][dir].size = new size_t [nb_comps[field]];
+		data_for_S[field][dir].size = new size_t [nb_comps[field]];
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
          size_t local_min_j=0, local_max_j=0;
          size_t local_min_k=0, local_max_k=0;
@@ -3332,11 +3351,17 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
          if (dim != 3) {
             first_pass[field][dir].size[comp] = 3*local_length_j;
             second_pass[field][dir].size[comp] = 2*local_length_j;
+				data_for_S[field][dir].size[comp] = is_periodic[field][dir] ?
+						 (size_t)(pow(nb_ranks_comm_i[dir],2) + 1)*local_length_j
+					  : (size_t)(pow(nb_ranks_comm_i[dir]-1,2) + 1)*local_length_j ;
          } else if (dim == 3) {
             first_pass[field][dir].size[comp] =
                                     3*local_length_j*local_length_k;
             second_pass[field][dir].size[comp] =
-                                    2*local_length_j*local_length_k;
+	                                 2*local_length_j*local_length_k;
+				data_for_S[field][dir].size[comp] = is_periodic[field][dir] ?
+			    (size_t)(pow(nb_ranks_comm_i[dir],2) + 1)*local_length_j*local_length_k
+			  : (size_t)(pow(nb_ranks_comm_i[dir]-1,2) + 1)*local_length_j*local_length_k ;
          }
       }
    }
@@ -3351,6 +3376,10 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
                      new double** [nb_comps[field]];
       second_pass[field][dir].receive =
                      new double** [nb_comps[field]];
+		data_for_S[field][dir].send =
+							new double** [nb_comps[field]];
+		data_for_S[field][dir].receive =
+							new double** [nb_comps[field]];
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
          first_pass[field][dir].send[comp] =
                         new double* [nb_ranks_comm_i[dir]];
@@ -3360,6 +3389,10 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
                         new double* [nb_ranks_comm_i[dir]];
          second_pass[field][dir].receive[comp] =
                         new double* [nb_ranks_comm_i[dir]];
+			data_for_S[field][dir].send[comp] =
+	                     new double* [nb_ranks_comm_i[dir]];
+	      data_for_S[field][dir].receive[comp] =
+	                     new double* [nb_ranks_comm_i[dir]];
          for (size_t i = 0; i < (size_t) nb_ranks_comm_i[dir]; i++) {
             first_pass[field][dir].send[comp][i] =
                            new double[first_pass[field][dir].size[comp]];
@@ -3369,6 +3402,10 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
                            new double[second_pass[field][dir].size[comp]];
             second_pass[field][dir].receive[comp][i] =
                            new double[second_pass[field][dir].size[comp]];
+				data_for_S[field][dir].send[comp][i] =
+									new double[data_for_S[field][dir].size[comp]];
+				data_for_S[field][dir].receive[comp][i] =
+									new double[data_for_S[field][dir].size[comp]];
          }
       }
    }
@@ -3391,18 +3428,25 @@ DS_NavierStokes:: deallocate_mpi_variables ()
                delete [] first_pass[field][dir].receive[comp][i];
                delete [] second_pass[field][dir].send[comp][i];
                delete [] second_pass[field][dir].receive[comp][i];
+					delete [] data_for_S[field][dir].send[comp][i];
+               delete [] data_for_S[field][dir].receive[comp][i];
             }
             delete [] first_pass[field][dir].send[comp];
             delete [] first_pass[field][dir].receive[comp];
             delete [] second_pass[field][dir].send[comp];
             delete [] second_pass[field][dir].receive[comp];
+				delete [] data_for_S[field][dir].send[comp];
+            delete [] data_for_S[field][dir].receive[comp];
          }
          delete [] first_pass[field][dir].send;
          delete [] first_pass[field][dir].receive;
          delete [] second_pass[field][dir].send;
          delete [] second_pass[field][dir].receive;
+			delete [] data_for_S[field][dir].send;
+         delete [] data_for_S[field][dir].receive;
          delete [] first_pass[field][dir].size;
          delete [] second_pass[field][dir].size;
+			delete [] data_for_S[field][dir].size;
       }
    }
 }
