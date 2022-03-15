@@ -172,6 +172,8 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    if ( my_rank == is_master ) {
      SCT_insert_app("Matrix_Assembly&Initialization");
 	  SCT_insert_app("Matrix_RE_Assembly&Initialization");
+	  SCT_insert_app("Stencil");
+	  SCT_insert_app("Schur");
      SCT_insert_app("Pressure predictor");
      SCT_insert_app("Velocity update");
      SCT_insert_app("Penalty Step");
@@ -227,7 +229,6 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 {
    MAC_LABEL( "DS_NavierStokes:: do_before_time_stepping" ) ;
 
-   if ( my_rank == is_master ) SCT_set_start("Matrix_Assembly&Initialization");
 
    allocate_mpi_variables(PF);
    allocate_mpi_variables(UF);
@@ -283,6 +284,7 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    }
 
+	if ( my_rank == is_master ) SCT_set_start("Matrix_Assembly&Initialization");
    // Direction splitting
    // Assemble 1D tridiagonal matrices
    assemble_1D_matrices(PF,t_it);
@@ -343,8 +345,6 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 
 
    if ((is_par_motion) && (is_solids)) {
-		if ( my_rank == is_master )
-			SCT_set_start( "Matrix_RE_Assembly&Initialization" );
 		// Solve equation of motion for all RB and update pos,vel
 		allrigidbodies->solve_RB_equation_of_motion(t_it);
 		allrigidbodies->compute_halo_zones_for_all_rigid_body();
@@ -361,6 +361,8 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		initialize_grid_nodes_on_rigidbody(vec);
 
 	   // Direction splitting
+		if ( my_rank == is_master )
+		SCT_set_start( "Matrix_RE_Assembly&Initialization" );
       // Assemble 1D tridiagonal matrices
       assemble_1D_matrices(PF,t_it);
       assemble_1D_matrices(UF,t_it);
@@ -559,6 +561,9 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_NavierStokes:: assemble_field_matrix" ) ;
+
+	if ( my_rank == is_master )
+		SCT_set_start("Stencil");
 
    // Parameters
    double dxr,dxl,dx,xR,xL,xC,right=0.,left=0.,center=0.;
@@ -806,6 +811,8 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF,
    GLOBAL_EQ->pre_thomas_treatment(comp,dir,A,r_index);
 
    return (Aee_diagcoef);
+	if ( my_rank == is_master )
+	SCT_get_elapsed_time("Stencil");
 }
 
 
@@ -826,6 +833,8 @@ DS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
    TDMatrix* A = GLOBAL_EQ-> get_A(field);
 
    if (nb_ranks_comm_i[dir]>1) {
+	if ( my_rank == is_master )
+		SCT_set_start("Schur");
 
       ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
       ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0(field);
@@ -1006,6 +1015,9 @@ DS_NavierStokes:: assemble_field_schur_matrix (size_t const& comp
       }
       GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
    }
+
+	if ( my_rank == is_master )
+		SCT_get_elapsed_time("Schur");
 }
 
 
