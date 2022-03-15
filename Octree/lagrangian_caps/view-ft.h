@@ -21,7 +21,7 @@ static void end_draw_vertices()
 }
 
 struct _draw_lag {
-  coord* lagMesh; // Compulsory
+  lagMesh* mesh; // Compulsory
   bool edges;
   bool vertices;
   float fc[3], lc[3], vc[3], lw, vs;
@@ -40,11 +40,22 @@ void draw_lag(struct _draw_lag p) {
     else {color[0] = 0.; color[1] = 0.; color[2] = 0.;}
     draw_lines(view, color, p.lw) {
       foreach_visible(view) {
-        glBegin(GL_LINE_LOOP);
-          for (int i=0; i<NLP-1; i++)
-            glvertex2d(view, p.lagMesh[i].x, p.lagMesh[i].y);
-        glEnd();
-        view->ni++;
+        #if dimension == 2
+          glBegin(GL_LINE_LOOP);
+            for (int i=0; i<p.mesh->nlp; i++)
+              glvertex2d(view, p.mesh->vertices[i].x, p.mesh->vertices[i].y);
+          glEnd();
+          view->ni++;
+        #else
+          // Untested in 3D
+          for (int i=0; i<p.mesh->nle; i++) {
+            glBegin(GL_LINES);
+                glvertex2d(view, p.mesh->edges[i].vertex[0].x, p.mesh->edges[i].vertex[0].y);
+                glvertex2d(view, p.mesh->edges[i].vertex[1].x, p.mesh->edges[i].vertex[1].y);
+                view->ni++;
+            glEnd();
+          }
+        #endif
       }
     }
   }
@@ -54,8 +65,8 @@ void draw_lag(struct _draw_lag p) {
     else {color[0] = 0.; color[1] = 0.; color[2] = 0.;}
     draw_vertices(view, color, p.vs) {
       glBegin(GL_POINTS);
-        for (int i=0; i<NLP-1; i++)
-          glvertex2d(view, p.lagMesh[i].x, p.lagMesh[i].y);
+        for (int i=0; i<p.mesh->nlp-1; i++)
+          glvertex2d(view, p.mesh->vertices[i].x, p.mesh->vertices[i].y);
       glEnd();
       view->ni++;
     }
