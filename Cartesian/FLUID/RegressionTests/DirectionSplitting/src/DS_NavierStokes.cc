@@ -950,13 +950,15 @@ DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
 		                    j <= max_unknown_index(dir_j);++j) {
 		            for (size_t k = local_min_k; k <= local_max_k; ++k) {
 							size_t r_index = row_index->operator()(j,k);
-							for (int p = 0; p < (int)nbrow; p++) {
+							size_t schur_size = Schur[dir].ii_main[comp][r_index]
+													  ->nb_rows();
+							for (int p = 0; p < (int)schur_size; p++) {
 								size_t ii = (nbrow*nbrow + 1)*r_index
 											 + nbrow*p + p + 1;
 								Schur[dir].ii_main[comp][r_index]
 										->set_item(p,A[dir].ee[comp][r_index]->item(p,p)
 											     								-local_packet[ii]);
-								if (p < (int)nbrow-1)
+								if (p < (int)schur_size-1)
 									Schur[dir].ii_super[comp][r_index]
 										->set_item(p,-local_packet[ii+1]);
 								if (p > 0)
@@ -966,10 +968,12 @@ DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
 								// there will be a variant of Tridiagonal matrix
 								// instead of normal format
 								if (is_periodic[field][dir] == 1) {
-									ii = (nbrow*nbrow + 1)*r_index + nbrow*p + nbrow + 1;
+									ii = (nbrow*nbrow + 1)*r_index
+										+ nbrow*p + schur_size + 1;
 									Schur[dir].ie[comp][r_index]->set_item(p,0,
 																				-local_packet[ii]);
-									ii = (nbrow*nbrow + 1)*r_index + nbrow*nbrow + p + 1;
+									ii = (nbrow*nbrow + 1)*r_index
+										+ nbrow*schur_size + p + 1;
 									Schur[dir].ei[comp][r_index]->set_item(0,p,
 																				-local_packet[ii]);
 								}
@@ -982,10 +986,10 @@ DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
 							// So, Schur complement of Schur complement is calculated
 							if (is_periodic[field][dir] == 1) {
 								size_t ii = ((size_t)pow(nbrow,2) + 1)*r_index
-											 + nbrow*nbrow
-											 + nbrow + 1;
+											 + nbrow*schur_size
+											 + schur_size + 1;
 								Schur[dir].ee[comp][r_index]->set_item(0,0,
-										A[dir].ee[comp][r_index]->item(nbrow,nbrow)
+										A[dir].ee[comp][r_index]->item(schur_size,schur_size)
 									 										- local_packet[ii]);
 
 								ProdMatrix* SchurP = GLOBAL_EQ->get_SchurP(field);
@@ -1034,7 +1038,7 @@ DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
 			}
       }
    }
-	
+
 	if ( my_rank == is_master )
 		SCT_get_elapsed_time("Schur");
 }
