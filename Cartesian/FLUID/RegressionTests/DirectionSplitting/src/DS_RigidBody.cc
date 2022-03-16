@@ -314,11 +314,11 @@ void DS_RigidBody:: correct_surface_discretization( FV_Mesh const* MESH )
 {
   MAC_LABEL( "DS_RigidBody:: correct_surface_discretization( )" ) ;
 
-  vector<geomVector> const* p_pbc =
-                  dynamic_cast<FS_RigidBody*>(m_geometric_rigid_body)
-                              ->get_ptr_to_periodic_directions();
-
-  if (p_pbc) {
+  // vector<geomVector> const* p_pbc =
+  //                 dynamic_cast<FS_RigidBody*>(m_geometric_rigid_body)
+  //                             ->get_ptr_to_periodic_directions();
+  //
+  // if (p_pbc) {
      boolVector const* periodic_comp = MESH->get_periodic_directions();
      size_t dim = MESH->nb_space_dimensions() ;
 
@@ -326,19 +326,19 @@ void DS_RigidBody:: correct_surface_discretization( FV_Mesh const* MESH )
         bool is_periodic = periodic_comp->operator()( dir );
 
         if (is_periodic) {
-         double isize = MESH->get_main_domain_max_coordinate(dir)
-                      - MESH->get_main_domain_min_coordinate(dir);
-         double imin = MESH->get_main_domain_min_coordinate(dir);
+           double isize = MESH->get_main_domain_max_coordinate(dir)
+                        - MESH->get_main_domain_min_coordinate(dir);
+           double imin = MESH->get_main_domain_min_coordinate(dir);
 
-         for (size_t i = 0; i < m_surface_area.size(); i++) {
-           m_surface_points[i]->operator()(dir) =
+           for (size_t i = 0; i < m_surface_area.size(); i++) {
+              m_surface_points[i]->operator()(dir) =
                   m_surface_points[i]->operator()(dir)
                 - MAC::floor((m_surface_points[i]->operator()(dir)-imin)/isize)
                   * isize;
-         }
+           }
         }
      }
-  }
+  // }
 }
 
 
