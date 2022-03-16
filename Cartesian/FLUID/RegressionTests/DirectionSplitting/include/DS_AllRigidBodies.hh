@@ -255,11 +255,9 @@ class DS_AllRigidBodies
       void build_solid_variables_on_fluid_grid( FV_DiscreteField const* FF );
 
       /** @brief Periodic transformation of a point in a given direction
-      @param FF field
       @param x point
       @param dir direction  */
-      double periodic_transformation( FV_DiscreteField const* FF
-                                    , double const& x
+      double periodic_transformation( double const& x
                                     , size_t const& dir);
 
       /** @brief Intialize the surface variables for all rigid bodies */

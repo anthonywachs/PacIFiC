@@ -429,7 +429,8 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
         vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-        pos(dir) = pos(dir) + vel(dir)*t_it->time_step();
+        pos(dir) = periodic_transformation(pos(dir) + vel(dir)*t_it->time_step()
+                                          , dir) ;
         delta(dir) = vel(dir)*t_it->time_step() ;
      }
 
@@ -682,20 +683,20 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
            double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
 
            if (periodic_comp->operator()( 0 ))
-              xC = periodic_transformation(FF,xC,0);
+              xC = periodic_transformation(xC,0);
 
            for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
              double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
 
              if (periodic_comp->operator()( 1 ))
-                yC = periodic_transformation(FF,yC,1);
+                yC = periodic_transformation(yC,1);
 
              for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                double zC = (m_space_dimension == 2) ? 0.
                                   : FF->get_DOF_coordinate( k, comp, 2 ) ;
 
                if (periodic_comp->operator()( 2 ))
-                  zC = periodic_transformation(FF,zC,2);
+                  zC = periodic_transformation(zC,2);
 
                size_t p = FF->DOF_local_number(i,j,k,comp);
 
@@ -712,8 +713,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
 
 //---------------------------------------------------------------------------
-double DS_AllRigidBodies:: periodic_transformation( FV_DiscreteField const* FF
-                                                , double const& x
+double DS_AllRigidBodies:: periodic_transformation( double const& x
                                                 , size_t const& dir)
 //---------------------------------------------------------------------------
 {
@@ -821,14 +821,14 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
           double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
 
           if (periodic_comp->operator()( 0 ))
-             xC = periodic_transformation(FF,xC,0);
+             xC = periodic_transformation(xC,0);
 
           for (size_t j = min_nearest_index(1); j < max_nearest_index(1); ++j) {
               ipos(1) = j - min_unknown_index(1);
               double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
 
               if (periodic_comp->operator()( 1 ))
-                 yC = periodic_transformation(FF,yC,1);
+                 yC = periodic_transformation(yC,1);
 
               for (size_t k = min_nearest_index(2);k < max_nearest_index(2); ++k) {
                  ipos(2) = k - min_unknown_index(2);
@@ -836,7 +836,7 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                                         : FF->get_DOF_coordinate( k, comp, 2 );
 
                  if (periodic_comp->operator()( 2 ))
-                    zC = periodic_transformation(FF,zC,2);
+                    zC = periodic_transformation(zC,2);
 
                  size_t p = FF->DOF_local_number(i,j,k,comp);
                  geomVector source(xC,yC,zC);
