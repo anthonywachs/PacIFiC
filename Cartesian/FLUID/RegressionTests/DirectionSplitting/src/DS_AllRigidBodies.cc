@@ -402,6 +402,7 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
 
   // Get gravity vector from NS solver
   doubleVector const& gg = gravity_vector->to_double_vector();
+  boolVector const* periodic_comp = MESH->get_periodic_directions();
 
 
   for (size_t parID = 0; parID < m_nrb; ++parID) {
@@ -422,6 +423,7 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
 
      // Solving equation of motion
      for (size_t dir=0;dir<m_space_dimension;dir++) {
+        bool is_periodic = periodic_comp->operator()( dir );
         pos(dir) = pgc->operator()(dir);
         vel(dir) = pv(dir);
 
@@ -429,15 +431,16 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
         vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-        pos(dir) = periodic_transformation(pos(dir) + vel(dir)*t_it->time_step()
-                                          , dir) ;
+        pos(dir) = is_periodic ? periodic_transformation(pos(dir)
+                                                + vel(dir)*t_it->time_step()
+                                                         , dir)
+                               : pos(dir) + vel(dir)*t_it->time_step() ;
         delta(dir) = vel(dir)*t_it->time_step() ;
      }
 
      // Temporary added this part to create the clones if RB near boundary
      // Don't trust this for all the cases. Primary purpose for settling
      // sphere case
-     boolVector const* periodic_comp = MESH->get_periodic_directions();
      double radius = m_allDSrigidbodies[parID]->get_circumscribed_radius();
 
      vector<geomVector> m_periodic_directions; /**< periodic clones whose
