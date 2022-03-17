@@ -318,7 +318,8 @@ std::tuple<double,double> FS_RigidBody:: get_mass_and_density() const
 
 //---------------------------------------------------------------------------
 void FS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
-												 					 geomVector const& vel)
+												 					 geomVector const& vel,
+											vector<geomVector> const& periodic_directions)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "FS_RigidBody:: update_RB_position_and_velocity()" ) ;
@@ -329,6 +330,21 @@ void FS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
   m_translational_velocity(0) = vel(0);
   m_translational_velocity(1) = vel(1);
   m_translational_velocity(2) = vel(2);
+
+  if ( m_periodic_directions )
+  {
+    delete m_periodic_directions;
+    m_periodic_directions = NULL;
+  }
+
+  geomVector pv( 3 );
+  m_periodic_directions = new vector<geomVector>( periodic_directions.size()
+  																, pv ) ;
+  for (size_t i = 0; i < periodic_directions.size(); ++i) {
+	  (*m_periodic_directions)[i](0) = periodic_directions[i](0);
+	  (*m_periodic_directions)[i](1) = periodic_directions[i](1);
+	  (*m_periodic_directions)[i](2) = periodic_directions[i](2);
+  }
 
 }
 

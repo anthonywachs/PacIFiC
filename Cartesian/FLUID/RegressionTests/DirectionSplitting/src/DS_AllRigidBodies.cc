@@ -434,13 +434,49 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         delta(dir) = vel(dir)*t_it->time_step() ;
      }
 
+     // Temporary added this part to create the clones if RB near boundary
+     // Don't trust this for all the cases. Primary purpose for settling
+     // sphere case
+     boolVector const* periodic_comp = MESH->get_periodic_directions();
+     double radius = m_allDSrigidbodies[parID]->get_circumscribed_radius();
+
+     vector<geomVector> m_periodic_directions; /**< periodic clones whose
+     position is gravity_center + (*periodic_directions)[i] */
+     m_periodic_directions.reserve(3);
+
+     for (size_t dir = 0; dir < m_space_dimension; dir++) {
+        double Dmin = MESH->get_main_domain_min_coordinate( dir );
+        double Dmax = MESH->get_main_domain_max_coordinate( dir );
+        if (periodic_comp->operator()(dir)) {
+           if (std::abs(pos(dir)-Dmin) <= radius) {
+              geomVector delta_clone(3);
+              delta_clone(dir) = (Dmax - Dmin);
+              m_periodic_directions.push_back(delta_clone);
+           } else if (std::abs(pos(dir)-Dmax) <= radius) {
+              geomVector delta_clone(3);
+              delta_clone(dir) = - (Dmax - Dmin);
+              m_periodic_directions.push_back(delta_clone);
+           }
+        }
+     }
+
+     if (m_periodic_directions.size() == 2) {
+        geomVector delta_clone(3);
+        delta_clone(0) = m_periodic_directions[0](0) + m_periodic_directions[1](0);
+        delta_clone(1) = m_periodic_directions[0](1) + m_periodic_directions[1](1);
+        delta_clone(2) = m_periodic_directions[0](2) + m_periodic_directions[1](2);
+        m_periodic_directions.push_back(delta_clone);
+     }
      // // Writing istream to update the positions
      // write_new_parameters_to_stream();
      //
      // Updating the RB data
-     m_allDSrigidbodies[parID]->update_RB_position_and_velocity(pos,vel);
+     m_allDSrigidbodies[parID]->update_RB_position_and_velocity(pos,vel
+                                                ,m_periodic_directions);
      m_allDSrigidbodies[parID]->translate_surface_points(delta);
      m_allDSrigidbodies[parID]->correct_surface_discretization( MESH );
+
+     if ( !m_periodic_directions.empty() ) m_periodic_directions.clear();
   }
 }
 

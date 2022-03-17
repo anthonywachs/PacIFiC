@@ -216,12 +216,14 @@ void DS_RigidBody:: initialize_surface_variables( )
 
 //---------------------------------------------------------------------------
 void DS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
-                                                    geomVector const& vel)
+                                                    geomVector const& vel,
+                                   vector<geomVector> const& periodic_directions)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_RigidBody:: update_RB_position_and_velocity" ) ;
 
-  return (m_geometric_rigid_body->update_RB_position_and_velocity(pos,vel));
+  return (m_geometric_rigid_body->update_RB_position_and_velocity(pos,vel
+                                                         ,periodic_directions));
 
 }
 

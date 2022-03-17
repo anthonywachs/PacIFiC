@@ -100,7 +100,8 @@ class FS_RigidBody
 
       /** @brief Update RB position and velocity */
       void update_RB_position_and_velocity(geomVector const& pos,
-                                           geomVector const& vel);
+                                           geomVector const& vel,
+                                           vector<geomVector> const& periodic_directions);
       //@}
 
 
