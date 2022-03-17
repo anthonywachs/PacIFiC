@@ -40,22 +40,26 @@ void draw_lag(struct _draw_lag p) {
     else {color[0] = 0.; color[1] = 0.; color[2] = 0.;}
     draw_lines(view, color, p.lw) {
       foreach_visible(view) {
-        #if dimension == 2
-          glBegin(GL_LINE_LOOP);
-            for (int i=0; i<p.mesh->nlp; i++)
-              glvertex2d(view, p.mesh->vertices[i].x, p.mesh->vertices[i].y);
-          glEnd();
-          view->ni++;
-        #else
-          // Untested in 3D
-          for (int i=0; i<p.mesh->nle; i++) {
+        for (int i=0; i<p.mesh->nle; i++) {
+          double length = sqrt(
+              sq(p.mesh->edges[i].vertex[0]->x - p.mesh->edges[i].vertex[1]->x)
+            + sq(p.mesh->edges[i].vertex[0]->y - p.mesh->edges[i].vertex[1]->y)
+          #if dimension > 2
+            + sq(p.mesh->edges[i].vertex[0]->z - p.mesh->edges[i].vertex[1]->z)
+          #endif
+            );
+          /** If the edge crosses a perdiodic boundary (i.e. the edge length is
+          larger than L0/2), we simply don't draw it*/
+          if (length < L0/2) {
             glBegin(GL_LINES);
-                glvertex2d(view, p.mesh->edges[i].vertex[0].x, p.mesh->edges[i].vertex[0].y);
-                glvertex2d(view, p.mesh->edges[i].vertex[1].x, p.mesh->edges[i].vertex[1].y);
+                glvertex2d(view, p.mesh->edges[i].vertex[0]->x,
+                  p.mesh->edges[i].vertex[0]->y);
+                glvertex2d(view, p.mesh->edges[i].vertex[1]->x,
+                  p.mesh->edges[i].vertex[1]->y);
                 view->ni++;
             glEnd();
           }
-        #endif
+        }
       }
     }
   }
