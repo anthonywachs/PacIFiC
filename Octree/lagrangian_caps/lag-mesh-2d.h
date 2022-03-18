@@ -7,20 +7,24 @@
 
 typedef struct edge {
   coord* vertex[2];
-  double l0, l; // Initial edge length, current edge length.
+  double l0, st; // Initial edge length, current stretch
 } edge;
 
-double compute_length(edge e) {
-  /**
-  TODO: deal with periodic boundary conditions
-  */
-  return sqrt(sq(e.vertex[0]->x - e.vertex[1]->x)
-            + sq(e.vertex[0]->y - e.vertex[1]->y)
-  #if dimension > 2
-            + sq(e.vertex[0]->z - e.vertex[1]->z));
-  #else
-        );
-  #endif
+double comp_length(const edge e) {
+  double length = 0.;
+  foreach_dimension() {
+    if (fabs(e.vertex[0]->x - e.vertex[1]->x) > L0/2.) {
+      length += (fabs(e.vertex[0]->x - L0 - e.vertex[1]->x) > L0/2.) ?
+        sq(e.vertex[0]->x - L0 - e.vertex[1]->x) > L0/2. :
+        sq(e.vertex[0]->x + L0 - e.vertex[1]->x) ;
+    }
+    else length += sq(e.vertex[0]->x - e.vertex[1]->x);
+  }
+  return sqrt(length);
+}
+
+void comp_stretch(edge* e) {
+  e->st = comp_length(*e)/e->l0;
 }
 
 typedef struct lagMesh {
@@ -31,6 +35,10 @@ typedef struct lagMesh {
   coord* lagForces;  // Array of Lagrangian forces
   coord* lagVel; // Array of Lagrangian velocities
 } lagMesh;
+
+void comp_mb_stretch(lagMesh* mesh) {
+  for(int i=0; i < mesh->nle; i++) comp_stretch(&(mesh->edges[i]));
+}
 
 bool on_face(double p, int n, double l0) {
   if ((fabs(p/(l0/n)) - ((int)fabs(p/(l0/n)))) < 1.e-10) {
@@ -45,7 +53,8 @@ void correct_lag_pos(lagMesh* mesh) {
   for(int i=0; i < mesh->nlp; i++) {
     foreach_dimension() {
       if (on_face(mesh->vertices[i].x,N,L0)) mesh->vertices[i].x += 1.e-10;
-      if(mesh->vertices[i].x > L0/2) mesh->vertices[i].x -= L0;
+      if(fabs(mesh->vertices[i].x) > L0/2)
+        mesh->vertices[i].x -= L0*sign(mesh->vertices[i].x);
     }
   }
 }
@@ -76,8 +85,8 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
     p.mesh->edges[i].vertex[0] = &(p.mesh->vertices[i]);
     p.mesh->edges[i].vertex[1] = (i+1<nlp) ? &(p.mesh->vertices[i+1]) :
       &(p.mesh->vertices[0]);
-    p.mesh->edges[i].l0 = compute_length(p.mesh->edges[i]);
-    p.mesh->edges[i].l = compute_length(p.mesh->edges[i]);
+    p.mesh->edges[i].l0 = comp_length(p.mesh->edges[i]);
+    p.mesh->edges[i].st = 1.;
     foreach_dimension() {
       p.mesh->lagForces[i].x = 0.;
       p.mesh->lagVel[i].x = 0.;
