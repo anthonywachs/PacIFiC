@@ -1,7 +1,7 @@
 // #define LEVEL 5
 #define MIN_LEVEL 6
 #define MAX_LEVEL 6
-#define NLP 1001
+#define NLP 31
 #define RADIUS .125
 #define L0 1.
 #define MY_DT (1.e-2*.25*L0/(1 << MAX_LEVEL))
@@ -25,10 +25,10 @@
 double dt;
 vector u[];
 FILE* stf = NULL;
+face vector a[];
 
 #include "grid/quadtree.h"
 #include "lagrangian_caps/lag-mesh-2d.h"
-#include "lagrangian_caps/reg-dirac.h"
 #include "lagrangian_caps/view-ft.h"
 
 void output_stretch(lagMesh* mesh, FILE* file) {
@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
     initialize_circular_mb(&mb);
     coord ref_data[NLP];
     for(int i=0; i < NLP; i++){
-      foreach_dimension() ref_data[i].x = mb.vertices[i].x;
+      foreach_dimension() ref_data[i].x = mb.nodes[i].pos.x;
     }
     lagMesh mb2;
     initialize_circular_mb(&mb2);
@@ -90,30 +90,30 @@ int main(int argc, char* argv[]) {
       advect_lagMesh(&mb);
       output_stretch(&mb, stf);
 
-      // if (level == MAX_LEVEL && ((c%100) == 0)) {
-      //   view(fov = 20, bg = {1,1,1});
-      //   clear();
-      //   if (level < 7) cells();
-      //   draw_lag(&mb, lc = {1.,0.,0.}, vc = {1.,0.,0.});
-      //   draw_lag(&mb2);
-      //   save("advect_caps_periodic.mp4");
-      // }
+      if (level == MAX_LEVEL && ((c%100) == 0)) {
+        view(fov = 20, bg = {1,1,1});
+        clear();
+        if (level < 7) cells();
+        draw_lag(&mb, lc = {1.,0.,0.}, vc = {1.,0.,0.});
+        draw_lag(&mb2);
+        save("stretch.mp4");
+      }
 
       t += dt;
       c++;
     }
 
 
-    // if (level == MAX_LEVEL) {
-    //   for(int i=0; i<20; i++) {
-    //     view(fov = 20, bg = {1,1,1});
-    //     clear();
-    //     if (level < 7) cells();
-    //     draw_lag(&mb, lc = {1.,0.,0.}, vc = {1.,0.,0.});
-    //     draw_lag(&mb2);
-    //     save("advect_caps_periodic.mp4");
-    //   }
-    // }
+    if (level == MAX_LEVEL) {
+      for(int i=0; i<20; i++) {
+        view(fov = 20, bg = {1,1,1});
+        clear();
+        if (level < 7) cells();
+        draw_lag(&mb, lc = {1.,0.,0.}, vc = {1.,0.,0.});
+        draw_lag(&mb2);
+        save("stretch.mp4");
+      }
+    }
 
     view(fov = 20, bg = {1,1,1});
     clear();
@@ -133,7 +133,7 @@ int main(int argc, char* argv[]) {
     avg_err = 0.; max_err = -HUGE;
     for(int i=0; i < NLP; i++){
       double err = 0.;
-      foreach_dimension() err += sq(ref_data[i].x - mb.vertices[i].x);
+      foreach_dimension() err += sq(ref_data[i].x - mb.nodes[i].pos.x);
       err = sqrt(err);
       avg_err += err;
       if (err > max_err) max_err = err;

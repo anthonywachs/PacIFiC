@@ -16,17 +16,16 @@ void lag2eul(vector forcing, lagMesh* mesh) {
     coord cpos, pos;
     cpos.x = x; cpos.y = y;
     for(int i=0; i<mesh->nlp; i++) {
-      if ((fabs(cpos.x - mesh->vertices[i].x)<Delta/2.)
-        && (fabs(cpos.y - mesh->vertices[i].y)<Delta/2.)) {
+      if ((fabs(cpos.x - mesh->nodes[i].pos.x)<Delta/2.)
+        && (fabs(cpos.y - mesh->nodes[i].pos.y)<Delta/2.)) {
         foreach_neighbor() {
           pos.x = x; pos.y = y;
-          foreach_dimension() sdist.x = sq(pos.x - mesh->vertices[i].x);
+          foreach_dimension() sdist.x = sq(pos.x - mesh->nodes[i].pos.x);
           if ((sdist.x <= sq(2*Delta)) && (sdist.y <= sq(2*Delta))) {
             foreach_dimension() forcing.x[] +=
-                (1 + cos(.5*pi*(pos.x - mesh->vertices[i].x)/Delta))
-                *(1 + cos(.5*pi*(pos.y - mesh->vertices[i].y)/Delta))
-                *mesh->lagForces[i].x/(16.*sq(Delta));
-                // *mesh->lagForces[i].x/16.;
+                (1 + cos(.5*pi*(pos.x - mesh->nodes[i].pos.x)/Delta))
+                *(1 + cos(.5*pi*(pos.y - mesh->nodes[i].pos.y)/Delta))
+                *mesh->nodes[i].lagForce.x/(16.*sq(Delta));
           }
         }
       }
@@ -35,27 +34,28 @@ void lag2eul(vector forcing, lagMesh* mesh) {
 }
 
 /**
-The function below interpolates the eulerian velocities onto the vertices of
+The function below interpolates the eulerian velocities onto the nodes of
 the Lagrangian mesh.
 */
 void eul2lag(lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++){
-    foreach_dimension() mesh->lagVel[i].x = 0.;
+    foreach_dimension() mesh->nodes[i].lagVel.x = 0.;
   }
   foreach() {
     coord sdist;
     coord cpos, pos;
     cpos.x = x; cpos.y = y;
     for(int i=0; i<mesh->nlp; i++) {
-      if ((fabs(cpos.x - mesh->vertices[i].x)<Delta/2.)
-        && (fabs(cpos.y - mesh->vertices[i].y)<Delta/2.)) {
+      if ((fabs(cpos.x - mesh->nodes[i].pos.x)<Delta/2.)
+        && (fabs(cpos.y - mesh->nodes[i].pos.y)<Delta/2.)) {
         foreach_neighbor() {
           pos.x = x; pos.y = y;
-          foreach_dimension() sdist.x = sq(pos.x - mesh->vertices[i].x);
+          foreach_dimension() sdist.x = sq(pos.x - mesh->nodes[i].pos.x);
           if ((sdist.x <= sq(2*Delta)) && (sdist.y <= sq(2*Delta))) {
             foreach_dimension() {
-              mesh->lagVel[i].x += (1 + cos(.5*pi*(pos.x - mesh->vertices[i].x)
-                /Delta))*(1 + cos(.5*pi*(pos.y - mesh->vertices[i].y)/Delta))
+              mesh->nodes[i].lagVel.x += (1 + cos(.5*pi*(pos.x -
+                mesh->nodes[i].pos.x)/Delta))
+                *(1 + cos(.5*pi*(pos.y - mesh->nodes[i].pos.y)/Delta))
                 *u.x[]/16.;
             }
           }
