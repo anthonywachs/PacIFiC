@@ -15,8 +15,8 @@ double comp_length(const edge e) {
   foreach_dimension() {
     if (fabs(e.vertex[0]->x - e.vertex[1]->x) > L0/2.) {
       length += (fabs(e.vertex[0]->x - L0 - e.vertex[1]->x) > L0/2.) ?
-        sq(e.vertex[0]->x - L0 - e.vertex[1]->x) > L0/2. :
-        sq(e.vertex[0]->x + L0 - e.vertex[1]->x) ;
+        sq(e.vertex[0]->x + L0 - e.vertex[1]->x) :
+        sq(e.vertex[0]->x - L0 - e.vertex[1]->x) ;
     }
     else length += sq(e.vertex[0]->x - e.vertex[1]->x);
   }
