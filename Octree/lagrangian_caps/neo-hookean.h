@@ -6,15 +6,29 @@ the membrane(s).*/
 #endif
 
 void neo_hookean(lagMesh* mesh) {
-  for(int node=0; node<mesh->nlp; node++) {
+  for(int i=0; i<mesh->nlp; i++) {
     coord t[2];
-    for(int edge=0; edge<2; edge++){
-      // check if t[0] and t[1] need to be swapped
-      // fill t[0], t[1]
-      double stretch = mesh->vertices[node]->edges[edge]
-      double tension = E_S*(
+    for(int j=0; j<2; j++) {
+      int edge_id, edge_node1, edge_node2;
+      edge_id = mesh->nodes[i].edge_ids[j];
+      double stretch_cube = cube(mesh->edges[edge_id].st);
+      double tension_norm = E_S*(stretch_cube - 1.)/sqrt(stretch_cube);
+      /** We compute the direction vector $e$ for the tension */
+      edge_node1 = mesh->edges[edge_id].vertex_ids[0];
+      edge_node2 = mesh->edges[edge_id].vertex_ids[1];
+      coord e;
+      double ne = 0.;
+      foreach_dimension() {
+        e.x = mesh->nodes[edge_node1].pos.x - mesh->nodes[edge_node2].pos.x;
+        ne += sq(e.x);
+      }
+      ne = sqrt(ne);
+      /** $\bm{T_i} = \frac{E_s}{\lamba_i^{\frac{3}{2}}} (\lambda^3 - 1)
+      \bm{e_i}$ */
+      foreach_dimension()
+        t[j].x = tension_norm*e.x/ne;
     }
-    foreach_dimension() mesh->lagForces[node].x = t[0].x - t[1].x;
+    foreach_dimension() mesh->lagForces[i].x = t[0].x - t[1].x;
   }
 }
 

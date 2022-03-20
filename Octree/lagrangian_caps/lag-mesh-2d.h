@@ -8,6 +8,8 @@
   #define NCAPS 1
 #endif
 
+/** In the Lagrangian mesh, each node is assigned coordinates, the IDs of its
+two connecting edges (in 2D), an elastic force, and a velocity. */
 typedef struct lagNode {
   coord pos;
   int edge_ids[2];
@@ -15,11 +17,16 @@ typedef struct lagNode {
   coord lagVel;
 } lagNode;
 
+/** Similarly, the edges of the mesh are assigned the IDs of the two nodes they
+connect, an undeformed length $l_0$ and a stretch ratio $\lamba =
+\frac{l}{l_0}$, where $l$ is the current length of the edge. */
 typedef struct Edge {
   int vertex_ids[2];
   double l0, st; // Initial edge length, current stretch
 } Edge;
 
+/** The lagMesh struct stores an array of nodes, edges as well as their
+respective sizes. */
 typedef struct lagMesh {
   int nlp;  // Number of Lagrangian points
   int nle;  // Number of Lagrangian Edges
@@ -27,12 +34,15 @@ typedef struct lagMesh {
   Edge* edges;  // Array of edges
 } lagMesh;
 
+/** The function below computes the length of an edge. It takes as arguments
+a pointer to the mesh as well as the ID of the edge of interest. */
 double comp_length(lagMesh* mesh, int i) {
   double length = 0.;
   int v1, v2;
   v1 = mesh->edges[i].vertex_ids[0];
   v2 = mesh->edges[i].vertex_ids[1];
   foreach_dimension() {
+    /** This if-statement deals with the case of periodic boundaries. */
     if (fabs(mesh->nodes[v1].pos.x - mesh->nodes[v2].pos.x) > L0/2.) {
       length += (fabs(mesh->nodes[v1].pos.x - L0
         - mesh->nodes[v2].pos.x) > L0/2.) ?
@@ -49,6 +59,10 @@ void comp_mb_stretch(lagMesh* mesh) {
     mesh->edges[i].st = comp_length(mesh, i)/mesh->edges[i].l0;
 }
 
+/** If a Lagrangian node falls exactly on an edge or a vertex of the Eulerian
+mesh, some issues arise when checking for periodic boundary conditions. As a
+quick fix, if this is the case we shift the point position by $10^{-10}$, as
+is done in the two functions below. */
 bool on_face(double p, int n, double l0) {
   if ((fabs(p/(l0/n)) - ((int)fabs(p/(l0/n)))) < 1.e-10) return true;
   else return false;
@@ -121,6 +135,9 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
 
 #include "reg-dirac.h"
 
+/** The function below advects each Lagrangian node of a capsule mesh by
+interpolating the velocities around the node of interest. A simple forward Euler
+scheme is used as a scheme. */
 void advect_lagMesh(lagMesh* mesh) {
   eul2lag(mesh);
   for(int i=0; i < mesh->nlp; i++) {
@@ -149,14 +166,21 @@ event defaults (i = 0) {
   }
 }
 
+/** Below, we advect each Lagrangian node using the interpolated Eulerian
+velocities. We also take this loop onto the nodes as an opportunity to
+re-initialize the Lagrangian forces to zero. */
 event tracer_advection(i++) {
-  for(int i=0; i<mbs.nbmb; i++) advect_lagMesh(&mbs.mb[i]);
-}
-
-event acceleration (i++) {
-  face vector ae = a;
-  for(int i=0; i<mbs.nbmb; i++)
+  for(int i=0; i<mbs.nbmb; i++) {
+    advect_lagMesh(&mbs.mb[i]);
     for(int j=0; j<mbs.mb->nlp; j++)
       foreach_dimension() mbs.mb[i].nodes[j].lagForce.x = 0.;
+  }
+}
+
+/** In the acceleration event, we transfer the Lagrangian forces to the fluid
+using a regularized Dirac function. The acceleration is stored on the cell
+faces, and will fed as a source term to the Navier-Stokes solver. */
+event acceleration (i++) {
+  face vector ae = a;
   for(int i=0; i<mbs.nbmb; i++) lag2eul(ae,&mbs.mb[i]);
 }
