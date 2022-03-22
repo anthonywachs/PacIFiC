@@ -162,14 +162,6 @@ DS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 	// Direction splitting matrices
 	MAT_velocityUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this, exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
 
-   for (size_t level = 0; level < 2; level++) {
-      // Structure for the particle force discretization
-      hydro_forces[level].press = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-      hydro_forces[level].vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-      hydro_torque[level].press = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-      hydro_torque[level].vel = (LA_SeqVector**) malloc(sizeof(LA_SeqVector*)) ;
-   }
-
    for (size_t field = 0; field < 2; field++) {
 
       for (size_t dir = 0; dir < dim; dir++) {
@@ -289,15 +281,6 @@ DS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
       }
    }
 
-   for (size_t level=0; level<2;level++) {
-      for (size_t dir=0; dir<3; dir++) {
-         hydro_forces[level].press[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-         hydro_forces[level].vel[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-         hydro_torque[level].press[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-         hydro_torque[level].vel[dir] = MAT_velocityUnsteadyPlusDiffusion_1D->create_vector( this ) ;
-      }
-   }
-
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
          for (size_t comp=0;comp<nb_comps[field];++comp) {
@@ -383,40 +366,6 @@ DS_NavierStokesSystem:: re_initialize( void )
 	}
    // Initialize Direction splitting matrices & vectors for pressure
    size_t nb_procs, proc_pos;
-
-   // if (is_solids) {
-   //    for (size_t level=0;level<2;level++){
-	//  		for (size_t dir=0;dir<3;dir++) {
-   //          hydro_forces[level].press[dir]->re_initialize(Npart);
-   //          hydro_forces[level].vel[dir]->re_initialize(Npart);
-   //          hydro_torque[level].press[dir]->re_initialize(Npart);
-   //          hydro_torque[level].vel[dir]->re_initialize(Npart);
-	//  		}
-   //    }
-   // }
-
-   // if (is_solids && is_stressCal) {
-   //    if (dim == 3) {
-	//  		if (level_set_type == "Sphere") {
-	//     		Nmax = 2*Nmax;
-	//  		} else if (level_set_type == "Cube") {
-   //          Nmax = 6*pow(Nmax,2);
- 	//  		} else if (level_set_type == "Cylinder") {
-   //          double Npm1 = round(pow(MAC::sqrt(Nmax) - MAC::sqrt(MAC::pi()/ar),2.));
-   //          double dh = 1. - MAC::sqrt(Npm1/Nmax);
-   //          double Nr = round(2./dh);
-	//     		Nmax = (2*Nmax + Nr*(Nmax - Npm1));
-	//  		}
-   //    } else {
-	//  		if (level_set_type == "Sphere") {
-	//     		Nmax = Nmax;
- 	// 		} else if (level_set_type == "Cube") {
-   //          Nmax = 4*Nmax;
-	//  		}
-   //    }
-	//
-	//
-   // }
 
    for (size_t field = 0; field < 2; field++) {
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
@@ -744,24 +693,6 @@ DS_NavierStokesSystem::get_A(size_t const& field)
 {
    MAC_LABEL( "DS_NavierStokesSystem:: get_A" ) ;
    return (A[field]) ;
-}
-
-//----------------------------------------------------------------------
-PartForces
-DS_NavierStokesSystem::get_torque(size_t const& level)
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: get_forces" ) ;
-   return (hydro_torque[level]) ;
-}
-
-//----------------------------------------------------------------------
-PartForces
-DS_NavierStokesSystem::get_forces(size_t const& level)
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: get_forces" ) ;
-   return (hydro_forces[level]) ;
 }
 
 

@@ -288,8 +288,7 @@ class DS_NavierStokes : public MAC_Object,
 
       /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */
       void data_packing ( FV_DiscreteField const* FF
-                        , size_t const& j
-                        , size_t const& k
+                        , size_t const& p
                         , double const& fe
                         , size_t const& comp
                         , size_t const& dir );

@@ -60,13 +60,6 @@ struct LocalVector {
    LA_SeqVector** interface_T;
 };
 
-/** @brief PartForces to be used to store the
-hydrodynamic forces and torque on particles */
-struct PartForces {
-   LA_SeqVector ** press;               // Pressure stress force
-   LA_SeqVector ** vel;                // Viscous stress force
-};
-
 /** @brief NodeProp to be used to store the
 nodes properties due to presence of solid particles in the domian */
 struct NodeProp {
@@ -150,10 +143,6 @@ class DS_NavierStokesSystem : public MAC_Object
       TDMatrix* get_A(size_t const& field);
       /** @brief Return the Schur complement of spacial discretization */
       TDMatrix* get_Schur(size_t const& field);
-      /** @brief Return the hydrodynamic forces */
-      PartForces get_forces(size_t const& level);
-      /** @brief Return the hydrodynamic torque */
-      PartForces get_torque(size_t const& level);
       /** @brief Return the (presence/absence) of particle vector */
       NodeProp get_node_property(size_t const& field, size_t const& time_level);
       /** @brief Return the divergence on pressure node */
@@ -334,10 +323,6 @@ class DS_NavierStokesSystem : public MAC_Object
       struct NodeProp node[2][2];
       // 0 current timestep, 1 last time step
       vector<doubleVector*> divergence;
-      // 0 current timestep, 1 last time step
-      struct PartForces hydro_forces[2];
-      // 0 current timestep, 1 last time step
-      struct PartForces hydro_torque[2];
       // Local vector to store diffusive terms
       vector<doubleVector*> vel_diffusion;
 

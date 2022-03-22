@@ -1436,19 +1436,17 @@ DS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp
 
    size_t nb_interface_unknowns = VEC[dir].T[comp]->nb_rows();
 
-   for (size_t i=0;i<nb_interface_unknowns;i++) {
-      VEC[dir].T[comp]->set_item(i,0);
-      VEC[dir].interface_T[comp]->set_item(i,0);
-   }
+   VEC[dir].T[comp]->set(0.);
+   VEC[dir].interface_T[comp]->set(0.);
 
    if (is_periodic[field][dir])
       VEC[dir].T[comp]->set_item(nb_ranks_comm_i[dir]-1,
-                     first_pass[field][dir].send[comp][rank_in_i[dir]][3*p]);
+                     first_pass[field][dir].send[comp][0][3*p]);
 
    VEC[dir].T[comp]->set_item(0,
-                     first_pass[field][dir].send[comp][rank_in_i[dir]][3*p+1]);
+                     first_pass[field][dir].send[comp][0][3*p+1]);
    VEC[dir].interface_T[comp]->set_item(0,
-                     first_pass[field][dir].send[comp][rank_in_i[dir]][3*p+2]);
+                     first_pass[field][dir].send[comp][0][3*p+2]);
 
 
    // Vec_temp might contain previous values
@@ -1487,7 +1485,7 @@ DS_NavierStokes:: unpack_compute_ue_pack(size_t const& comp
    // Solve for ue (interface unknowns) in the master proc
    DS_interface_unknown_solver(VEC[dir].interface_T[comp],comp,dir,field,p);
 
-   for (size_t i=1;i<(size_t)nb_ranks_comm_i[dir];++i) {
+   for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir]; ++i) {
       if (i != (size_t)nb_ranks_comm_i[dir]-1) {
          second_pass[field][dir].send[comp][i][2*p+0] =
                                           VEC[dir].interface_T[comp]->item(i-1);
@@ -1626,29 +1624,12 @@ DS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
    LocalVector* VEC = GLOBAL_EQ->get_VEC(field);
 
    // Array declaration for sending data from master to all slaves
-   size_t local_min_j=0, local_max_j=0;
-   size_t local_min_k=0, local_max_k=0;
-
-   if (dir == 0) {
-      local_min_j = min_unknown_index(1);
-      local_max_j = max_unknown_index(1);
-      if (dim == 3) {
-         local_min_k = min_unknown_index(2);
-         local_max_k = max_unknown_index(2);
-      }
-   } else if (dir == 1) {
-      local_min_j = min_unknown_index(0);
-      local_max_j = max_unknown_index(0);
-      if (dim == 3) {
-         local_min_k = min_unknown_index(2);
-         local_max_k = max_unknown_index(2);
-      }
-   } else if (dir == 2) {
-      local_min_j = min_unknown_index(0);
-      local_max_j = max_unknown_index(0);
-      local_min_k = min_unknown_index(1);
-      local_max_k = max_unknown_index(1);
-   }
+   size_t local_min_j = (dir == 0) ? min_unknown_index(1) : min_unknown_index(0);
+	size_t local_max_j = (dir == 0) ? max_unknown_index(1) : max_unknown_index(0);
+   size_t local_min_k = (dim == 2) ? 0 :
+							  ((dir == 2) ? min_unknown_index(1) : min_unknown_index(2));
+   size_t local_max_k = (dim == 2) ? 0 :
+							  ((dir == 2) ? max_unknown_index(1) : max_unknown_index(2));
 
    size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(field,dir,comp);
 
@@ -1687,7 +1668,7 @@ DS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
 
    } else {
       // Send the packed data to master
-      MPI_Send( first_pass[field][dir].send[comp][rank_in_i[dir]],
+      MPI_Send( first_pass[field][dir].send[comp][0],
           (int) first_pass[field][dir].size[comp],
           MPI_DOUBLE, 0, 0, DS_Comm_i[dir] ) ;
    }
@@ -1703,8 +1684,8 @@ DS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
       } else {
          // Receive the data
          static MPI_Status status ;
-         MPI_Recv( second_pass[field][dir].send[comp][rank_in_i[dir]],
-             (int) first_pass[field][dir].size[comp],
+         MPI_Recv( second_pass[field][dir].receive[comp][0],
+             (int) second_pass[field][dir].size[comp],
              MPI_DOUBLE, 0, 0, DS_Comm_i[dir], &status ) ;
 
          // Solve the system of equations in each proc
@@ -1712,7 +1693,7 @@ DS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
             for (size_t k = local_min_k; k <= local_max_k; k++) {
                size_t p = row_index->operator()(j,k);
 
-               unpack_ue(comp,second_pass[field][dir].send[comp][rank_in_i[dir]]
+               unpack_ue(comp,second_pass[field][dir].receive[comp][0]
                              ,dir,p,field);
 
                // Need to have the original rhs function
@@ -2128,7 +2109,7 @@ DS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
               // Calculate Aei*ui in each proc locally
               compute_Aei_ui(A,VEC,comp,dir_i,r_index);
               // Pack Aei_ui and fe for sending it to master
-              data_packing (FF,j,k,fe,comp,dir_i);
+              data_packing (FF,r_index,fe,comp,dir_i);
            }
         }
         solve_interface_unknowns ( FF, gamma, t_it, comp, dir_i);
@@ -2150,8 +2131,7 @@ DS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
 //---------------------------------------------------------------------------
 void
 DS_NavierStokes:: data_packing ( FV_DiscreteField const* FF
-                                , size_t const& j
-                                , size_t const& k
+                                , size_t const& p
                                 , double const& fe
                                 , size_t const& comp
                                 , size_t const& dir )
@@ -2162,41 +2142,36 @@ DS_NavierStokes:: data_packing ( FV_DiscreteField const* FF
    size_t field = (FF == PF) ? 0 : 1 ;
 
    LocalVector* VEC = GLOBAL_EQ->get_VEC(field) ;
-   size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(field,dir,comp);
-
-   double *packed_data = first_pass[field][dir].send[comp][rank_in_i[dir]];
-
-   // Pack the data
-   size_t vec_pos = row_index->operator()(j,k);
+   double *packed_data = first_pass[field][dir].send[comp][0];
 
    if (rank_in_i[dir] == 0) {
       // Check if bc is periodic in x
       // If it is, we need to pack two elements apart from fe
       if(is_periodic[field][dir])
-          packed_data[3*vec_pos+0] =
+          packed_data[3*p+0] =
                         VEC[dir].T[comp]->item(nb_ranks_comm_i[dir]-1);
       else
-          packed_data[3*vec_pos+0] = 0;
+          packed_data[3*p+0] = 0;
 
-      packed_data[3*vec_pos+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
+      packed_data[3*p+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
 
    } else if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
       // Check if bc is periodic in x
       // If it is, we need to pack two elements apart from fe
       if(is_periodic[field][dir])
-          packed_data[3*vec_pos+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
+          packed_data[3*p+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
       else
-          packed_data[3*vec_pos+1]=0;
+          packed_data[3*p+1]=0;
 
-      packed_data[3*vec_pos+0] = VEC[dir].T[comp]->item(rank_in_i[dir]-1);
+      packed_data[3*p+0] = VEC[dir].T[comp]->item(rank_in_i[dir]-1);
 
    } else {
-      packed_data[3*vec_pos+0] = VEC[dir].T[comp]->item(rank_in_i[dir]-1);
-      packed_data[3*vec_pos+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
+      packed_data[3*p+0] = VEC[dir].T[comp]->item(rank_in_i[dir]-1);
+      packed_data[3*p+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
    }
 
    // Send the fe values and 0 for last proc
-   packed_data[3*vec_pos+2] = fe;
+   packed_data[3*p+2] = fe;
 
 }
 
@@ -3241,9 +3216,6 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
       second_pass[field][dir].size = new size_t [nb_comps[field]];
 		data_for_S[field][dir].size = new size_t [nb_comps[field]];
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
-         size_t local_min_j=0, local_max_j=0;
-         size_t local_min_k=0, local_max_k=0;
-
          // Get local min and max indices
          size_t_vector min_unknown_index(dim,0);
          size_t_vector max_unknown_index(dim,0);
@@ -3254,26 +3226,16 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
                         FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
          }
 
-         if (dir == 0) {
-            local_min_j = min_unknown_index(1);
-            local_max_j = max_unknown_index(1);
-            if (dim == 3) {
-               local_min_k = min_unknown_index(2);
-               local_max_k = max_unknown_index(2);
-            }
-         } else if (dir == 1) {
-            local_min_j = min_unknown_index(0);
-            local_max_j = max_unknown_index(0);
-            if (dim == 3) {
-               local_min_k = min_unknown_index(2);
-               local_max_k = max_unknown_index(2);
-            }
-         } else if (dir == 2) {
-            local_min_j = min_unknown_index(0);
-            local_max_j = max_unknown_index(0);
-            local_min_k = min_unknown_index(1);
-            local_max_k = max_unknown_index(1);
-         }
+			size_t local_min_j = (dir == 0) ? min_unknown_index(1)
+													  : min_unknown_index(0);
+			size_t local_max_j = (dir == 0) ? max_unknown_index(1)
+													  : max_unknown_index(0);
+			size_t local_min_k = (dim == 2) ? 0 :
+									  ((dir == 2) ? min_unknown_index(1)
+									  				  : min_unknown_index(2));
+			size_t local_max_k = (dim == 2) ? 0 :
+									  ((dir == 2) ? max_unknown_index(1)
+									  				  : max_unknown_index(2));
 
          size_t local_length_j = (local_max_j-local_min_j+1);
          size_t local_length_k = (local_max_k-local_min_k+1);
@@ -3312,13 +3274,13 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
 							new double** [nb_comps[field]];
       for (size_t comp = 0; comp < nb_comps[field]; comp++) {
          first_pass[field][dir].send[comp] =
-                        new double* [nb_ranks_comm_i[dir]];
+                        new double* [1];
          first_pass[field][dir].receive[comp] =
                         new double* [nb_ranks_comm_i[dir]];
          second_pass[field][dir].send[comp] =
                         new double* [nb_ranks_comm_i[dir]];
          second_pass[field][dir].receive[comp] =
-                        new double* [nb_ranks_comm_i[dir]];
+                        new double* [1];
 			data_for_S[field][dir].send[comp] =
 	                     new double* [1];
 	      data_for_S[field][dir].receive[comp] =
@@ -3327,14 +3289,14 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
 								new double[data_for_S[field][dir].size[comp]];
 			data_for_S[field][dir].receive[comp][0] =
 								new double[data_for_S[field][dir].size[comp]];
+			first_pass[field][dir].send[comp][0] =
+								new double[first_pass[field][dir].size[comp]];
+			second_pass[field][dir].receive[comp][0] =
+								new double[second_pass[field][dir].size[comp]];
          for (size_t i = 0; i < (size_t) nb_ranks_comm_i[dir]; i++) {
-            first_pass[field][dir].send[comp][i] =
-                           new double[first_pass[field][dir].size[comp]];
             first_pass[field][dir].receive[comp][i] =
                            new double[first_pass[field][dir].size[comp]];
             second_pass[field][dir].send[comp][i] =
-                           new double[second_pass[field][dir].size[comp]];
-            second_pass[field][dir].receive[comp][i] =
                            new double[second_pass[field][dir].size[comp]];
          }
       }
@@ -3355,11 +3317,11 @@ DS_NavierStokes:: deallocate_mpi_variables ()
          for (size_t comp = 0; comp < nb_comps[field]; comp++) {
 				delete [] data_for_S[field][dir].send[comp][0];
 				delete [] data_for_S[field][dir].receive[comp][0];
+				delete [] first_pass[field][dir].send[comp][0];
+				delete [] second_pass[field][dir].receive[comp][0];
             for (size_t i = 0; i < (size_t) nb_ranks_comm_i[dir]; i++) {
-               delete [] first_pass[field][dir].send[comp][i];
                delete [] first_pass[field][dir].receive[comp][i];
                delete [] second_pass[field][dir].send[comp][i];
-               delete [] second_pass[field][dir].receive[comp][i];
             }
             delete [] first_pass[field][dir].send[comp];
             delete [] first_pass[field][dir].receive[comp];
