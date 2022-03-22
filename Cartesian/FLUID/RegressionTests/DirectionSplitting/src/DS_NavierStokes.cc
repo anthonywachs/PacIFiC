@@ -229,6 +229,7 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 {
    MAC_LABEL( "DS_NavierStokes:: do_before_time_stepping" ) ;
 
+	if ( my_rank == is_master ) SCT_set_start("Matrix_Assembly&Initialization");
 
    allocate_mpi_variables(PF);
    allocate_mpi_variables(UF);
@@ -284,7 +285,6 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    }
 
-	if ( my_rank == is_master ) SCT_set_start("Matrix_Assembly&Initialization");
    // Direction splitting
    // Assemble 1D tridiagonal matrices
    assemble_1D_matrices(PF,t_it);

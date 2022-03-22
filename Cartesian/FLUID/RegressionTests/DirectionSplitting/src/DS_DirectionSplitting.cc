@@ -166,8 +166,10 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       }
 
       // Read weather the particle motion is ON/OFF
-      if ( exp->has_entry( "Particle_motion" ) )
+      if ( exp->has_entry( "Particle_motion" ) ) {
         is_par_motion = exp->bool_data( "Particle_motion" ) ;
+        b_particles_as_fixed_obstacles = !is_par_motion;
+      }
 
       // Critical distance
       if ( dom->primary_grid()->is_translation_active() ) {
