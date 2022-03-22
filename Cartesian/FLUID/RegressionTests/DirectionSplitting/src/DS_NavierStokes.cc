@@ -776,7 +776,7 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 
 					// Storing Aee for MPI communication
 					ProdMatrix* Ap = GLOBAL_EQ->get_Ap(field);
-					double* local_coeff = data_for_S[field][dir].send[comp][rank_in_i[dir]];
+					double* local_coeff = data_for_S[field][dir].send[comp][0];
 					size_t nbrow = Ap[dir].ei_ii_ie[comp]->nb_rows();
 					size_t ii = (nbrow*nbrow + 1)*r_index;
 					local_coeff[ii] = Aee_diagcoef;
@@ -834,7 +834,7 @@ DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
 			if (nb_ranks_comm_i[dir] > 1) {
 
 				size_t nbrow = Ap[dir].ei_ii_ie[comp]->nb_rows();
-				double* local_packet = data_for_S[field][dir].send[comp][rank_in_i[dir]];
+				double* local_packet = data_for_S[field][dir].send[comp][0];
 
 				// Calculating the product matrix and creating the container for MPI
 	         for (size_t j = min_unknown_index(dir_j);
@@ -855,18 +855,9 @@ DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
 					}
 				}
 
-				// Send and recieve the data packet
-				if (rank_in_i[dir] == 0 ) {
-					for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir]; ++i) {
-						// Receive the data
-						static MPI_Status status;
-						MPI_Recv( data_for_S[field][dir].receive[comp][i],
-							 (int) data_for_S[field][dir].size[comp],
-							 MPI_DOUBLE, (int) i, 0, DS_Comm_i[dir], &status ) ;
-					}
-				} else {
+				if (rank_in_i[dir] != 0 ) {
 					// Send the packed data to master
-			      MPI_Send( data_for_S[field][dir].send[comp][rank_in_i[dir]],
+			      MPI_Send( data_for_S[field][dir].send[comp][0],
 			          (int) data_for_S[field][dir].size[comp],
 			          	MPI_DOUBLE, 0, 0, DS_Comm_i[dir] ) ;
 				}
@@ -874,28 +865,34 @@ DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
 				// Assemble the global product matrix by adding contribution from
 				// all procs
 				if (rank_in_i[dir] == 0 ) {
-		         for (size_t j = min_unknown_index(dir_j);
-		                    j <= max_unknown_index(dir_j);++j) {
-		            for (size_t k = local_min_k; k <= local_max_k; ++k) {
-							size_t r_index = row_index->operator()(j,k);
-							size_t p = (nbrow*nbrow + 1)*r_index;
-							double ee_proc0 = local_packet[p];
-							A[dir].ee[comp][r_index]->set_item(0,0,ee_proc0);
+					for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir]; ++i) {
+						// Recieve the data packet sent by master
+						static MPI_Status status;
+						MPI_Recv( data_for_S[field][dir].receive[comp][0],
+							(int) data_for_S[field][dir].size[comp],
+							MPI_DOUBLE, (int) i, 0, DS_Comm_i[dir], &status ) ;
 
-							for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir]; ++i) {
+		         	for (size_t j = min_unknown_index(dir_j);
+		                    		j <= max_unknown_index(dir_j);++j) {
+		            	for (size_t k = local_min_k; k <= local_max_k; ++k) {
+								size_t r_index = row_index->operator()(j,k);
+								size_t p = (nbrow*nbrow + 1)*r_index;
+								double ee_proc0 = local_packet[p];
+								A[dir].ee[comp][r_index]->set_item(0,0,ee_proc0);
+
 								for (size_t kk = 0;kk < nbrow; kk++) {
 									for (size_t jj = 0;jj < nbrow; jj++) {
 										size_t ii = (nbrow*nbrow + 1)*r_index
 													 + nbrow*kk + jj + 1;
 										double value =
-												data_for_S[field][dir].receive[comp][i][ii];
+												data_for_S[field][dir].receive[comp][0][ii];
 										local_packet[ii] += value;
 									}
 								}
 
 								size_t ii = (nbrow*nbrow + 1)*r_index;
 								double value_Aee =
-												data_for_S[field][dir].receive[comp][i][ii];
+												data_for_S[field][dir].receive[comp][0][ii];
 
 								// Assemble the global Aee matrix
 								// Only for (nb_proc-1) in case no PBC
@@ -986,7 +983,7 @@ DS_NavierStokes:: assemble_field_schur_matrix ( FV_DiscreteField const* FF )
 						LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
 
 						A[dir].ee[comp][r_index]->set_item(0,0
-								,data_for_S[field][dir].send[comp][rank_in_i[dir]][0]);
+								,data_for_S[field][dir].send[comp][0][0]);
 
 						TDMatrix* Schur = GLOBAL_EQ-> get_Schur(field);
 						size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
@@ -3323,9 +3320,13 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
          second_pass[field][dir].receive[comp] =
                         new double* [nb_ranks_comm_i[dir]];
 			data_for_S[field][dir].send[comp] =
-	                     new double* [nb_ranks_comm_i[dir]];
+	                     new double* [1];
 	      data_for_S[field][dir].receive[comp] =
-	                     new double* [nb_ranks_comm_i[dir]];
+	                     new double* [1];
+			data_for_S[field][dir].send[comp][0] =
+								new double[data_for_S[field][dir].size[comp]];
+			data_for_S[field][dir].receive[comp][0] =
+								new double[data_for_S[field][dir].size[comp]];
          for (size_t i = 0; i < (size_t) nb_ranks_comm_i[dir]; i++) {
             first_pass[field][dir].send[comp][i] =
                            new double[first_pass[field][dir].size[comp]];
@@ -3335,10 +3336,6 @@ DS_NavierStokes:: allocate_mpi_variables (FV_DiscreteField const* FF)
                            new double[second_pass[field][dir].size[comp]];
             second_pass[field][dir].receive[comp][i] =
                            new double[second_pass[field][dir].size[comp]];
-				data_for_S[field][dir].send[comp][i] =
-									new double[data_for_S[field][dir].size[comp]];
-				data_for_S[field][dir].receive[comp][i] =
-									new double[data_for_S[field][dir].size[comp]];
          }
       }
    }
@@ -3356,13 +3353,13 @@ DS_NavierStokes:: deallocate_mpi_variables ()
    for (size_t field = 0; field < 2; field++) {
       for (size_t dir = 0; dir < dim; dir++) {
          for (size_t comp = 0; comp < nb_comps[field]; comp++) {
+				delete [] data_for_S[field][dir].send[comp][0];
+				delete [] data_for_S[field][dir].receive[comp][0];
             for (size_t i = 0; i < (size_t) nb_ranks_comm_i[dir]; i++) {
                delete [] first_pass[field][dir].send[comp][i];
                delete [] first_pass[field][dir].receive[comp][i];
                delete [] second_pass[field][dir].send[comp][i];
                delete [] second_pass[field][dir].receive[comp][i];
-					delete [] data_for_S[field][dir].send[comp][i];
-               delete [] data_for_S[field][dir].receive[comp][i];
             }
             delete [] first_pass[field][dir].send[comp];
             delete [] first_pass[field][dir].receive[comp];
