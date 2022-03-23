@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE Grains3D SYSTEM "../../dtd/Grains3D.dtd">
+
+<Grains3D>
+  <Construction>
+    <Recipient LX="40.e-3" LY="10.e-3" LZ="40.e-3"/>
+
+    <Obstacles>
+      <Composite name="Recipient">
+	<Obstacle name="Avant">
+	  <Convex RayonInteraction=".1e-4">
+	    <Box LX="0.040" LY="0.001" LZ="0.036"/>
+	  </Convex>
+	  <Centre X="0.020" Y="0.000" Z="0.018"/>
+	  <Orientation Type="Unite"></Orientation>
+	  <Materiau>matO</Materiau>
+	  <Couleur R="0." V="1." B="0."/>
+	</Obstacle>
+
+	<Obstacle name="Arriere">
+	  <Convex RayonInteraction=".1e-4">
+	    <Box LX="0.040" LY="0.001" LZ="0.036"/>
+	  </Convex>
+	  <Centre X="0.020" Y="0.005" Z="0.018"/>
+	  <Orientation Type="Unite"></Orientation>
+	  <Materiau>matO</Materiau>
+	  <Couleur R="0." V="1." B="0."/>
+	</Obstacle>
+
+	<Obstacle name="AGauche">
+	  <Convex RayonInteraction=".1e-4">
+	    <Box LX="0.001" LY="0.005" LZ="0.020"/>
+	  </Convex>
+	  <Centre X="0.000" Y="0.0025" Z="0.010"/>
+	  <Orientation Type="Unite"></Orientation>
+	  <Materiau>matO</Materiau>
+	  <Couleur R="0." V="1;" B="0."/>
+	</Obstacle>
+
+	<Obstacle name="ADroite">
+	  <Convex RayonInteraction=".1e-4">
+	    <Box LX="0.001" LY="0.005" LZ="0.020"/>
+	  </Convex>
+	  <Centre X="0.040" Y="0.0025" Z="0.010"/>
+	  <Orientation Type="Unite"></Orientation>
+	  <Materiau>matO</Materiau>
+	  <Couleur R="0." V="1;" B="0."/>
+	</Obstacle>
+
+	<Obstacle name="Gauche">
+	  <Convex RayonInteraction=".1e-4">
+	    <Box LX="0.001" LY="0.006" LZ="0.020"/>
+	  </Convex>
+	  <Centre X="0.007" Y="0.0025" Z="0.025"/>
+	  <Orientation Type="Matrice">.699 0. -.714
+                       0.   1.  0.
+                       .714 0.  .699</Orientation>
+	  <Materiau>matO</Materiau>
+	  <Couleur R="0." V="1;" B="1."/>
+	</Obstacle>
+
+	<Obstacle name="Droite">
+	  <Convex RayonInteraction=".1e-4">
+	    <Box LX="0.001" LY="0.006" LZ="0.020"/>
+	  </Convex>
+	  <Centre X="0.033" Y="0.0025" Z="0.025"/>
+	  <Orientation Type="Matrice">.699 0. .714
+                       0.   1. 0.
+                      -.714 0. .699</Orientation>
+	  <Materiau>matO</Materiau>
+	  <Couleur R="0." V="1." B="1."/>
+	</Obstacle>
+
+	<Obstacle name="Socle">
+	  <Convex RayonInteraction=".1e-4">
+	    <Box LX="0.040" LY="0.005" LZ="0.001"/>
+	  </Convex>
+	  <Centre X="0.020" Y="0.003" Z="0.000"/>
+	  <Orientation Type="Unite"></Orientation>
+	  <Materiau>matO</Materiau>
+	  <Couleur R="0." V="1;" B="1."/>
+	</Obstacle>
+
+	<Obstacle name="Trappe">
+	  <Convex RayonInteraction=".1e-4">
+	    <Box LX="0.020" LY="0.005" LZ="0.001"/>
+	  </Convex>
+	  <Centre X="0.020" Y="0.003" Z="0.018"/>
+	  <Orientation Type="Unite"></Orientation>
+	  <Materiau>matO</Materiau>
+	  <Couleur R="0." V="1;" B="1."/>
+	</Obstacle>
+
+	<Obstacle name="Poincon">
+	  <Convex RayonInteraction=".1e-4">
+	    <Box LX="0.005" LY="0.005" LZ="0.001"/>
+	  </Convex>
+	  <Centre X="0.020" Y="0.003" Z="0.038"/>
+	  <Orientation Type="Unite"></Orientation>
+	  <Materiau>matO</Materiau>
+	  <Couleur R="0." V="1." B="1."/>
+	</Obstacle>
+      </Composite>
+    </Obstacles>
+  </Construction>
+
+  <Forces>
+  </Forces>
+
+  <Simulation>
+    <Temps Debut="0." Fin="0.00001"/>
+    <IncreTemps dt="1.e-5"/>
+    <TempsSave Debut="0." Fin="1." Dt="0.001"/>
+    <Fichier>silo</Fichier>
+  </Simulation>
+</Grains3D>

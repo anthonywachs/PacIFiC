@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE Grains2D SYSTEM "../../dtd/Grains2D.dtd">
+
+<Grains2D>
+  <Construction>
+    <Recipient LX="0.10" LY="0.12" LZ="0.0"/>
+    <Reload Fichier="periode3a" Vitesse="Reset"/>
+  </Construction>
+
+  <Forces>
+    <Gravite GX="0." GY="9.81" GZ="0."/>
+  </Forces>
+
+  <Simulation>
+    <Temps Debut="0." Fin="0.9"/>
+    <IncreTemps dt="1.e-5"/>
+    <TempsSave Debut="0." Fin="2." Dt="0.001"/>
+    <Fichier>periode3b</Fichier>
+  </Simulation>
+</Grains2D>
