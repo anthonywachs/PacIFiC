@@ -15,6 +15,8 @@ typedef struct lagNode {
   int edge_ids[2];
   coord lagForce;
   coord lagVel;
+  coord normal;
+  double curv;
 } lagNode;
 
 /** Similarly, the edges of the mesh are assigned the IDs of the two nodes they
@@ -33,6 +35,11 @@ typedef struct lagMesh {
   lagNode* nodes;  // Array of nodes
   Edge* edges;  // Array of edges
 } lagMesh;
+
+void free_mesh(lagMesh* mesh) {
+  free(mesh->nodes);
+  free(mesh->edges);
+}
 
 /** The function below computes the length of an edge. It takes as arguments
 a pointer to the mesh as well as the ID of the edge of interest. */
@@ -57,6 +64,42 @@ double comp_length(lagMesh* mesh, int i) {
 void comp_mb_stretch(lagMesh* mesh) {
   for(int i=0; i < mesh->nle; i++)
     mesh->edges[i].st = comp_length(mesh, i)/mesh->edges[i].l0;
+    // FIXME: the right stretch is probably the commented one above;
+    // mesh->edges[i].st = mesh->edges[i].l0/comp_length(mesh, i);
+}
+
+void comp_normals(lagMesh* mesh) {
+  for(int i=0; i<mesh->nlp; i++) {
+    coord n[2];
+    double l[2];
+    double normn;
+    for(int j=0; j<2; j++) {
+      int edge_id, edge_node1, edge_node2;
+      edge_id = mesh->nodes[i].edge_ids[j];
+      l[j] = mesh->edges[edge_id].st*mesh->edges[edge_id].l0;
+      // compute the vector normal to the edge:
+      edge_node1 = mesh->edges[edge_id].vertex_ids[0];
+      edge_node2 = mesh->edges[edge_id].vertex_ids[1];
+      normn = 0.;
+      n[j].x = mesh->nodes[edge_node1].pos.x - mesh->nodes[edge_node2].pos.x;
+      normn += sq(n[j].x);
+      n[j].y = mesh->nodes[edge_node2].pos.y - mesh->nodes[edge_node1].pos.y;
+      normn += sq(n[j].y);
+      normn = sqrt(normn);
+      foreach_dimension() n[j].x /= normn;
+    }
+    /** the normal vector at a node is the weighted average of the normal
+    vectors of its edges. The average is weighted by the distance of the node
+    to each of the edges' centers. */
+    double epsilon = l[1]/(l[0] + l[1]);
+    normn = 0.;
+    foreach_dimension() {
+      mesh->nodes[i].normal.x = epsilon*n[0].x + (1. - epsilon)*n[1].x;
+      normn += sq(mesh->nodes[i].normal.x);
+    }
+    normn = sqrt(normn);
+    foreach_dimension() mesh->nodes[i].normal.x /= normn;
+  }
 }
 
 /** If a Lagrangian node falls exactly on an edge or a vertex of the Eulerian
@@ -96,12 +139,12 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   double radius = (p.radius) ? p.radius : RADIUS;
   int nlp = (p.nlp) ? p.nlp : NLP;
   p.mesh->nlp = nlp;
-  p.mesh->nle = nlp - 1;
+  p.mesh->nle = nlp;
   p.mesh->nodes = malloc(nlp*sizeof(lagNode));
-  p.mesh->edges = malloc((nlp-1)*sizeof(Edge));
+  p.mesh->edges = malloc(nlp*sizeof(Edge));
 
 
-  double alpha = 2*pi/(nlp-1);
+  double alpha = 2*pi/(nlp);
   /** Fill the array of nodes */
   for(int i=0; i<nlp; i++) {
     p.mesh->nodes[i].pos.x = radius*cos(alpha*i);
@@ -115,7 +158,7 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   }
   /** Fill the array of edges.
   For the last edge, the next vertex id is 0 */
-  for(int i=0; i<nlp-1; i++) {
+  for(int i=0; i<p.mesh->nle; i++) {
     p.mesh->edges[i].vertex_ids[0] = i;
     if (p.mesh->nodes[i].edge_ids[0] < 0)
       p.mesh->nodes[i].edge_ids[0] = i;
@@ -130,6 +173,10 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
     p.mesh->edges[i].l0 = comp_length(p.mesh, i);
     p.mesh->edges[i].st = 1.;
   }
+  /** The above procedure switches the two egde ids for the first node, which
+  we correct below */
+  p.mesh->nodes[0].edge_ids[0] = p.mesh->nle-1;
+  p.mesh->nodes[0].edge_ids[1] = 0;
   correct_lag_pos(p.mesh);
 }
 
@@ -153,6 +200,9 @@ typedef struct Capsules {
   int nbmb;
 } Capsules;
 
+void free_caps(Capsules* caps) {
+  for(int i=0; i<caps->nbmb; i++) free_mesh(&(caps->mb[i]));
+}
 
 Capsules mbs;
 event defaults (i = 0) {
@@ -180,7 +230,14 @@ event tracer_advection(i++) {
 /** In the acceleration event, we transfer the Lagrangian forces to the fluid
 using a regularized Dirac function. The acceleration is stored on the cell
 faces, and will fed as a source term to the Navier-Stokes solver. */
+vector forcing[];
 event acceleration (i++) {
   face vector ae = a;
-  for(int i=0; i<mbs.nbmb; i++) lag2eul(ae,&mbs.mb[i]);
+  foreach() foreach_dimension() forcing.x[] = 0.;
+  for(int i=0; i<mbs.nbmb; i++) lag2eul(forcing, &mbs.mb[i]);
+  foreach_face() ae.x[] = .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
+}
+
+event cleanup (t = end) {
+  free_caps(&mbs);
 }

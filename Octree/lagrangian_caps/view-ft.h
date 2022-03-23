@@ -30,8 +30,8 @@ struct _draw_lag {
 void draw_lag(struct _draw_lag p) {
   bool edges = true;
   bool vertices = false;
-  if (p.edges) edges = true;
-  if (p.vertices) vertices = true;
+  if (p.edges == true) edges = true;
+  if (p.vertices == true) vertices = true;
   float color[3];
   bview * view = draw();
   if (edges) {

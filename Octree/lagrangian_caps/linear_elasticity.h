@@ -5,16 +5,14 @@ the membrane(s).*/
   #define E_S 1.
 #endif
 
-void neo_hookean(lagMesh* mesh) {
+void linear_elasticity(lagMesh* mesh) {
   comp_mb_stretch(mesh);
   for(int i=0; i<mesh->nlp; i++) {
     coord T[2];
     for(int j=0; j<2; j++) {
       int edge_id, edge_node1, edge_node2;
       edge_id = mesh->nodes[i].edge_ids[j];
-      double stretch_cube = cube(mesh->edges[edge_id].st);
-      double tension_norm = (fabs(stretch_cube) > 1.e-10) ?
-        E_S*(stretch_cube - 1.)/sqrt(stretch_cube) : 0.;
+      double tension_norm = E_S*(mesh->edges[edge_id].st - 1.);
       /** We compute the direction vector $e$ for the tension */
       edge_node1 = mesh->edges[edge_id].vertex_ids[0];
       edge_node2 = mesh->edges[edge_id].vertex_ids[1];
@@ -38,5 +36,5 @@ void neo_hookean(lagMesh* mesh) {
 }
 
 event acceleration (i++) {
-  for(int i=0; i<mbs.nbmb; i++) neo_hookean(&mbs.mb[i]);
+  for(int i=0; i<mbs.nbmb; i++) linear_elasticity(&mbs.mb[i]);
 }
