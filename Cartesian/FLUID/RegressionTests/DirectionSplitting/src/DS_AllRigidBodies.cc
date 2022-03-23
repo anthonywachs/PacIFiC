@@ -451,11 +451,11 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         double Dmin = MESH->get_main_domain_min_coordinate( dir );
         double Dmax = MESH->get_main_domain_max_coordinate( dir );
         if (periodic_comp->operator()(dir)) {
-           if (std::abs(pos(dir)-Dmin) <= radius) {
+           if (MAC::abs(pos(dir)-Dmin) <= radius) {
               geomVector delta_clone(3);
               delta_clone(dir) = (Dmax - Dmin);
               m_periodic_directions.push_back(delta_clone);
-           } else if (std::abs(pos(dir)-Dmax) <= radius) {
+           } else if (MAC::abs(pos(dir)-Dmax) <= radius) {
               geomVector delta_clone(3);
               delta_clone(dir) = - (Dmax - Dmin);
               m_periodic_directions.push_back(delta_clone);

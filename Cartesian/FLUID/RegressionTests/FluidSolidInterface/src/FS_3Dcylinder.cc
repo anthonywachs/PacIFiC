@@ -1,4 +1,5 @@
 #include <FS_3Dcylinder.hh>
+#include <MAC.hh>
 using std::endl;
 
 
@@ -221,20 +222,16 @@ bool FS_3Dcylinder:: isIn( double const& x, double const& y, double const& z )
 
   bool b_isIn = false;
 
-  double dot = ( ( x - m_agp_3dcyl.BottomCenter(0) )
-		                         * m_agp_3dcyl.BottomToTopVec(0)
-               + ( y - m_agp_3dcyl.BottomCenter(1) )
-	                                 * m_agp_3dcyl.BottomToTopVec(1)
-               + ( z - m_agp_3dcyl.BottomCenter(2) )
-	                                 * m_agp_3dcyl.BottomToTopVec(2)
-	       ) / m_agp_3dcyl.cylinder_height ;
+  geomVector pt(x,y,z);
+
+  geomVector BottomToPoint( pt - m_agp_3dcyl.BottomCenter );
+  double dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
+                           /  m_agp_3dcyl.cylinder_height ;
 
   if ( dot <= m_agp_3dcyl.cylinder_height && dot >= 0. )
-    if ( ( x - m_agp_3dcyl.BottomCenter(0) )*( x - m_agp_3dcyl.BottomCenter(0) )
-       + ( y - m_agp_3dcyl.BottomCenter(1) )*( y - m_agp_3dcyl.BottomCenter(1) )
-       + ( z - m_agp_3dcyl.BottomCenter(2) )*( z - m_agp_3dcyl.BottomCenter(2) )
-       - dot * dot <= m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
-       b_isIn = true ;
+    if ( BottomToPoint.calcNormSquare() - dot * dot <=
+         m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
+      b_isIn = true ;
 
   return ( b_isIn );
 
@@ -253,8 +250,17 @@ double FS_3Dcylinder:: level_set_value( geomVector const& pt ) const
   double dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
 	                        /  m_agp_3dcyl.cylinder_height ;
 
-  double value = BottomToPoint.calcNormSquare() - dot * dot -
+  double rad_sq_dist = BottomToPoint.calcNormSquare() - dot * dot -
          m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius;
+
+  double value = 0.;
+
+  if ( dot < m_agp_3dcyl.cylinder_height && dot > 0. && rad_sq_dist < 0.) {
+     value = MAC::abs(dot - m_agp_3dcyl.cylinder_height)*(rad_sq_dist);
+  } else {
+     value = MAC::max(MAC::abs(MAC::abs(dot)-m_agp_3dcyl.cylinder_height)
+                    , MAC::abs(rad_sq_dist));
+  }
 
   return ( value );
 
@@ -271,19 +277,23 @@ double FS_3Dcylinder:: level_set_value( double const& x
 {
   MAC_LABEL( "FS_3Dcylinder:: level_set_value(x,y,z)" ) ;
 
-  double dot = ( ( x - m_agp_3dcyl.BottomCenter(0) )
-		                         * m_agp_3dcyl.BottomToTopVec(0)
-               + ( y - m_agp_3dcyl.BottomCenter(1) )
-	                                 * m_agp_3dcyl.BottomToTopVec(1)
-               + ( z - m_agp_3dcyl.BottomCenter(2) )
-	                                 * m_agp_3dcyl.BottomToTopVec(2)
-	       ) / m_agp_3dcyl.cylinder_height ;
+  geomVector pt(x,y,z);
 
-  double value =
-      ( x - m_agp_3dcyl.BottomCenter(0) ) * ( x - m_agp_3dcyl.BottomCenter(0) )
-    + ( y - m_agp_3dcyl.BottomCenter(1) ) * ( y - m_agp_3dcyl.BottomCenter(1) )
-    + ( z - m_agp_3dcyl.BottomCenter(2) ) * ( z - m_agp_3dcyl.BottomCenter(2) )
-    - dot * dot - m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius;
+  geomVector BottomToPoint( pt - m_agp_3dcyl.BottomCenter );
+  double dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
+	                        /  m_agp_3dcyl.cylinder_height ;
+
+  double rad_sq_dist = BottomToPoint.calcNormSquare() - dot * dot -
+         m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius;
+
+  double value = 0.;
+
+  if ( dot < m_agp_3dcyl.cylinder_height && dot > 0. && rad_sq_dist < 0.) {
+     value = MAC::abs(dot - m_agp_3dcyl.cylinder_height)*(rad_sq_dist);
+  } else {
+     value = MAC::max(MAC::abs(MAC::abs(dot)-m_agp_3dcyl.cylinder_height)
+                    , MAC::abs(rad_sq_dist));
+  }
 
   return ( value );
 
