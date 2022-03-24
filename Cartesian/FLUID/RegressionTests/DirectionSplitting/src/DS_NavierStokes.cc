@@ -349,6 +349,7 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
    if ((is_par_motion) && (is_solids)) {
 		// Solve equation of motion for all RB and update pos,vel
 		allrigidbodies->solve_RB_equation_of_motion(t_it);
+		allrigidbodies->generate_list_of_local_RB();
 		allrigidbodies->compute_halo_zones_for_all_rigid_body();
 		// Compute void fraction for pressure and velocity field
 		allrigidbodies->compute_void_fraction_on_grid(PF);

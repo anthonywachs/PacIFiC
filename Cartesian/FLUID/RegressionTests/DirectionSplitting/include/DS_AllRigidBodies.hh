@@ -355,6 +355,9 @@ class DS_AllRigidBodies
       after solving RB equation of motion explicitly
       @param t_it Time_iterator */
       void solve_RB_equation_of_motion( FV_TimeIterator const* t_it);
+
+      /** @brief Create a list of local rigid bodies */
+      void generate_list_of_local_RB( );
       //@}
 
 
@@ -429,6 +432,8 @@ class DS_AllRigidBodies
       double m_rho; /**< fluid density */
       MAC_DoubleVector const* gravity_vector ;
       vector<vector<size_t>> neighbour_list;
+
+      vector<size_t> local_RB_list; /**< Stores a list of local RB */
 
       //@}
 

@@ -60,6 +60,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
     	m_FSallrigidbodies->get_ptr_rigid_body(i) );
   }
 
+  generate_list_of_local_RB();
+
   initialize_surface_variables_for_all_RB();
 
   compute_surface_variables_for_all_RB();
@@ -107,6 +109,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
     	m_FSallrigidbodies->get_ptr_rigid_body(i) );
   }
 
+  generate_list_of_local_RB();
+
   initialize_surface_variables_for_all_RB();
 
   compute_surface_variables_for_all_RB();
@@ -150,6 +154,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
     	m_FSallrigidbodies->get_ptr_rigid_body(i) );
   }
 
+  generate_list_of_local_RB();
+  
   initialize_surface_variables_for_all_RB();
 
   compute_surface_variables_for_all_RB();
@@ -275,7 +281,10 @@ void DS_AllRigidBodies:: compute_pressure_force_and_torque_for_allRB( )
   pressure_force->set(0.);
   pressure_torque->set(0.);
 
-  for (size_t i = 0; i < m_nrb; ++i) {
+  // for (size_t i = 0; i < m_nrb; ++i) {
+  for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                              it != local_RB_list.end() ; ++it) {
+     size_t i = *it;
      first_order_pressure_stress(i);
   }
 
@@ -315,7 +324,10 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
   viscous_force->set(0.);
   viscous_torque->set(0.);
 
-  for (size_t i = 0; i < m_nrb; ++i) {
+  // for (size_t i = 0; i < m_nrb; ++i) {
+  for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                               it != local_RB_list.end() ; ++it) {
+     size_t i = *it;
      if (StressOrder == "first") {
         first_order_viscous_stress(i);
      } else if (StressOrder == "second") {
@@ -679,7 +691,10 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
   size_t i0_temp = 0;
 
-  for (size_t parID = 0; parID < m_nrb; ++parID) {
+  for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                               it != local_RB_list.end() ; ++it) {
+     size_t parID = *it;
+  // for (size_t parID = 0; parID < m_nrb; ++parID) {
      vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
                                                    ->get_rigid_body_haloZone();
      // Calculation on the indexes near the rigid body
@@ -770,6 +785,64 @@ double DS_AllRigidBodies:: periodic_transformation( double const& x
 
 
 //---------------------------------------------------------------------------
+void DS_AllRigidBodies:: generate_list_of_local_RB( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: generate_list_of_local_RB" ) ;
+
+  doubleVector Dmin(m_space_dimension,0);
+  doubleVector Dmax(m_space_dimension,0);
+
+  if (!local_RB_list.empty()) local_RB_list.clear();
+
+  for (size_t l = 0; l < m_space_dimension; ++l) {
+     Dmin(l) = MESH->get_min_coordinate_on_current_processor(l);
+     Dmax(l) = MESH->get_max_coordinate_on_current_processor(l);
+  }
+
+  for (size_t m = 0; m < m_nrb; m++) {
+     geomVector const* pgc = m_allDSrigidbodies[m]->get_ptr_to_gravity_centre();
+     double Rp = 2.*m_allDSrigidbodies[m]->get_circumscribed_radius();
+
+     double x0 = pgc->operator()(0);
+     double y0 = pgc->operator()(1);
+     double z0 = pgc->operator()(2);
+
+     doubleVector xr(2,x0);
+     xr(0) = periodic_transformation(xr(0) - Rp,0);
+     xr(1) = periodic_transformation(xr(1) + Rp,0);
+     doubleVector yr(2,y0);
+     yr(0) = periodic_transformation(yr(0) - Rp,1);
+     yr(1) = periodic_transformation(yr(1) + Rp,1);
+     doubleVector zr(2,z0);
+     zr(0) = periodic_transformation(zr(0) - Rp,2);
+     zr(1) = periodic_transformation(zr(1) + Rp,2);
+
+     bool status = false;
+
+     for (size_t i = 0; i < 2; i++) {
+        for (size_t j = 0; j < 2; j++) {
+           for (size_t k = 0; k < 2; k++) {
+              status = (m_space_dimension==2) ?
+                                    (xr(i) > Dmin(0)) && (xr(i) <= Dmax(0))
+                                 && (yr(j) > Dmin(1)) && (yr(j) <= Dmax(1)) :
+                                    (xr(i) > Dmin(0)) && (xr(i) <= Dmax(0))
+                                 && (yr(j) > Dmin(1)) && (yr(j) <= Dmax(1))
+                                 && (zr(k) > Dmin(2)) && (zr(k) <= Dmax(2)) ;
+              if (status) goto skip_loop;
+          }
+        }
+     }
+
+     skip_loop:
+        if (status) local_RB_list.push_back(m);
+  }
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_AllRigidBodies:: compute_halo_zones_for_all_rigid_body( )
 //---------------------------------------------------------------------------
 {
@@ -800,7 +873,10 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
 
   boolVector const* periodic_comp = MESH->get_periodic_directions();
 
-  for (size_t parID = 0; parID < m_nrb; ++parID) {
+  for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                               it != local_RB_list.end() ; ++it) {
+     size_t parID = *it;
+  // for (size_t parID = 0; parID < m_nrb; ++parID) {
      vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
                                                    ->get_rigid_body_haloZone();
      size_t_vector min_unknown_index(3,0);
@@ -951,7 +1027,10 @@ void DS_AllRigidBodies:: initialize_surface_variables_for_all_RB( )
 
    double dx = MESH->get_smallest_grid_size();
 
-   for (size_t i = 0; i < m_nrb; ++i) {
+   // for (size_t i = 0; i < m_nrb; ++i) {
+   for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                              it != local_RB_list.end() ; ++it) {
+     size_t i = *it;
       m_allDSrigidbodies[i]->compute_number_of_surface_variables(
                                           surface_cell_scale, dx);
       m_allDSrigidbodies[i]->initialize_surface_variables( );
@@ -2688,7 +2767,10 @@ void DS_AllRigidBodies:: compute_surface_variables_for_all_RB( )
 {
    MAC_LABEL( "DS_AllRigidBodies:: compute_surface_variables_for_all_RB" ) ;
 
-   for (size_t i = 0; i < m_nrb; ++i) {
+   // for (size_t i = 0; i < m_nrb; ++i) {
+   for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                              it != local_RB_list.end() ; ++it) {
+     size_t i = *it;
       m_allDSrigidbodies[i]->compute_surface_points( );
       m_allDSrigidbodies[i]->correct_surface_discretization( MESH );
    }
