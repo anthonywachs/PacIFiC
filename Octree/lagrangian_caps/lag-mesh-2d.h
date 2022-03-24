@@ -25,6 +25,7 @@ connect, an undeformed length $l_0$ and a stretch ratio $\lamba =
 typedef struct Edge {
   int vertex_ids[2];
   double l0, st; // Initial edge length, current stretch
+  coord normal;
 } Edge;
 
 /** The lagMesh struct stores an array of nodes, edges as well as their
@@ -81,9 +82,9 @@ void comp_normals(lagMesh* mesh) {
       edge_node1 = mesh->edges[edge_id].vertex_ids[0];
       edge_node2 = mesh->edges[edge_id].vertex_ids[1];
       normn = 0.;
-      n[j].x = mesh->nodes[edge_node1].pos.x - mesh->nodes[edge_node2].pos.x;
+      n[j].y = mesh->nodes[edge_node1].pos.x - mesh->nodes[edge_node2].pos.x;
       normn += sq(n[j].x);
-      n[j].y = mesh->nodes[edge_node2].pos.y - mesh->nodes[edge_node1].pos.y;
+      n[j].x = mesh->nodes[edge_node2].pos.y - mesh->nodes[edge_node1].pos.y;
       normn += sq(n[j].y);
       normn = sqrt(normn);
       foreach_dimension() n[j].x /= normn;
@@ -99,6 +100,20 @@ void comp_normals(lagMesh* mesh) {
     }
     normn = sqrt(normn);
     foreach_dimension() mesh->nodes[i].normal.x /= normn;
+  }
+}
+
+void comp_edge_normals(lagMesh* mesh) {
+  for(int i=0; i<mesh->nle; i++) {
+    int node_id[2];
+    for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].vertex_ids[j];
+    mesh->edges[i].normal.y = mesh->nodes[node_id[0]].pos.x
+      - mesh->nodes[node_id[1]].pos.x;
+    mesh->edges[i].normal.x = mesh->nodes[node_id[1]].pos.y
+      - mesh->nodes[node_id[0]].pos.y;
+    double normn = sqrt(sq(mesh->edges[i].normal.x)
+      + sq(mesh->edges[i].normal.y));
+    foreach_dimension() mesh->edges[i].normal.x /= normn;
   }
 }
 
@@ -179,6 +194,53 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   p.mesh->nodes[0].edge_ids[1] = 0;
   correct_lag_pos(p.mesh);
 }
+
+void initialize_biconcave_mb(struct _initialize_circular_mb p) {
+  double radius = (p.radius) ? p.radius : RADIUS;
+  int nlp = (p.nlp) ? p.nlp : NLP;
+  double c = 1.3858189;
+  p.mesh->nlp = nlp;
+  p.mesh->nle = nlp;
+  p.mesh->nodes = malloc(nlp*sizeof(lagNode));
+  p.mesh->edges = malloc(nlp*sizeof(Edge));
+
+
+  double alpha = 2*pi/(nlp);
+  /** Fill the array of nodes */
+  for(int i=0; i<nlp; i++) {
+    p.mesh->nodes[i].pos.y = radius*c*cos(alpha*i);
+    p.mesh->nodes[i].pos.x = .5*radius*c*sin(alpha*i)*(0.207 + 2.003*sq(cos(alpha*i)) - 1.123*sq(sq(cos(alpha*i))));
+    p.mesh->nodes[i].edge_ids[0] = -1;
+    p.mesh->nodes[i].edge_ids[1] = -1;
+    foreach_dimension() {
+      p.mesh->nodes[i].lagForce.x = 0.;
+      p.mesh->nodes[i].lagVel.x = 0.;
+    }
+  }
+  /** Fill the array of edges.
+  For the last edge, the next vertex id is 0 */
+  for(int i=0; i<p.mesh->nle; i++) {
+    p.mesh->edges[i].vertex_ids[0] = i;
+    if (p.mesh->nodes[i].edge_ids[0] < 0)
+      p.mesh->nodes[i].edge_ids[0] = i;
+    else
+      p.mesh->nodes[i].edge_ids[1] = i;
+    int next_vertex_id = (i+1<nlp) ? i+1 : 0;
+    p.mesh->edges[i].vertex_ids[1] = next_vertex_id;
+    if (p.mesh->nodes[next_vertex_id].edge_ids[0] < 0)
+      p.mesh->nodes[next_vertex_id].edge_ids[0] = i;
+    else
+      p.mesh->nodes[next_vertex_id].edge_ids[1] = i;
+    p.mesh->edges[i].l0 = comp_length(p.mesh, i);
+    p.mesh->edges[i].st = 1.;
+  }
+  /** The above procedure switches the two egde ids for the first node, which
+  we correct below */
+  p.mesh->nodes[0].edge_ids[0] = p.mesh->nle-1;
+  p.mesh->nodes[0].edge_ids[1] = 0;
+  correct_lag_pos(p.mesh);
+}
+
 
 #include "reg-dirac.h"
 

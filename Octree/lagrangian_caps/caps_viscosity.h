@@ -5,24 +5,35 @@
   #define MUC 1.;
 #endif
 
+vector G[];
 void construct_divG(scalar divG, lagMesh* mesh) {
-  vector G[];
-  comp_normals(mesh);
+  comp_edge_normals(mesh);
   foreach() {
+    foreach_dimension() G.x[] = 0.;
     coord sdist;
     coord cpos, pos;
     cpos.x = x; cpos.y = y;
-    for(int i=0; i<mesh->nlp; i++) {
-      if ((fabs(cpos.x - mesh->nodes[i].pos.x)<Delta/2.)
-        && (fabs(cpos.y - mesh->nodes[i].pos.y)<Delta/2.)) {
+    for(int i=0; i<mesh->nle; i++) {
+      coord midpoint;
+      int node_id[2];
+      for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].vertex_ids[j];
+      midpoint.x = .5*(mesh->nodes[node_id[0]].pos.x
+        + mesh->nodes[node_id[1]].pos.x);
+      midpoint.y = .5*(mesh->nodes[node_id[0]].pos.y
+        + mesh->nodes[node_id[1]].pos.y);
+      if ((fabs(cpos.x - midpoint.x)<Delta/2.)
+        && (fabs(cpos.y - midpoint.y)<Delta/2.)) {
+        double length = mesh->edges[i].st*mesh->edges[i].l0;
         foreach_neighbor() {
           pos.x = x; pos.y = y;
-          foreach_dimension() sdist.x = sq(pos.x - mesh->nodes[i].pos.x);
+          foreach_dimension() sdist.x = sq(pos.x - midpoint.x);
           if ((sdist.x <= sq(2*Delta)) && (sdist.y <= sq(2*Delta))) {
-            foreach_dimension() G.x[] +=
-                (1 + cos(.5*pi*(pos.x - mesh->nodes[i].pos.x)/Delta))
-                *(1 + cos(.5*pi*(pos.y - mesh->nodes[i].pos.y)/Delta))
-                *mesh->nodes[i].normal.x/(16.*sq(Delta));
+            /** We need the inward normal instead of the outward normal, hence
+            the minus sign */
+            foreach_dimension() G.x[] -=
+              (1 + cos(.5*pi*(pos.x - midpoint.x)/Delta))
+              *(1 + cos(.5*pi*(pos.y - midpoint.y)/Delta))
+              *mesh->edges[i].normal.x*length/(16.*sq(Delta));
           }
         }
       }
@@ -36,34 +47,38 @@ void construct_divG(scalar divG, lagMesh* mesh) {
 
 double muc, mup;
 scalar I[];
+scalar divG[];
 event defaults (i = 0) {
   mu = new face vector;
   mup = MUP;
   muc = MUC;
 }
-I[left] = dirichlet(0.);
 I[top] = dirichlet(0.);
+I[bottom] = dirichlet(0.);
+divG[top] = dirichlet(0.);
+divG[bottom] = dirichlet(0.);
 
 event properties (i++) {
-  scalar divG[];
-
   construct_divG(divG, &(mbs.mb[0]));
-  mgstats s = poisson (I, divG, tolerance = 1.e-6);
+  mgstats s = poisson (I, divG, tolerance = 1.e-10);
+
+  /** Apparently we need to re-scale the indicator function */
+  double maxI = normf(I).max;
+  double inside_mean = 0.;
+  int nb_inside_cells = 0.;
+  foreach() {
+    if (I[]/maxI > .5) {
+      inside_mean += I[];
+      nb_inside_cells++;
+    }
+  }
+  inside_mean /= (nb_inside_cells > 0) ? nb_inside_cells : 1.;
+  foreach() {
+    I[] = clamp((nb_inside_cells > 0) ? I[]/inside_mean : I[], 0., 1.);
+  }
 
   foreach_face() {
     face vector muv = mu;
-    muv.x[] = mup + (muc - mup)*.5*(I[] + I[-1]);
+    muv.x[] = mup + (muc - mup)*.5*(I[]/maxI + I[-1]/maxI);
   }
-  view(fov = 20, bg = {1,1,1});
-  clear();
-  cells();
-  squares("I", linear=false);
-  draw_lag(&(mbs.mb[0]), lc = {1.,0.,0.}, vc = {1., 0., 0.}, vs = 3.);
-  save("indicator.png");
-  view(fov = 20, bg = {1,1,1});
-  clear();
-  cells();
-  squares("mu.x", linear=false);
-  draw_lag(&(mbs.mb[0]), lc = {1.,0.,0.}, vc = {1., 0., 0.}, vs = 3.);
-  save("viscosity.png");
 }
