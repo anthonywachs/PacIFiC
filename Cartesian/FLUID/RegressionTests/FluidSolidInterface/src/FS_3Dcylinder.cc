@@ -256,9 +256,9 @@ double FS_3Dcylinder:: level_set_value( geomVector const& pt ) const
   double value = 0.;
 
   if ( dot < m_agp_3dcyl.cylinder_height && dot > 0. && rad_sq_dist < 0.) {
-     value = MAC::abs(dot - m_agp_3dcyl.cylinder_height)*(rad_sq_dist);
+     value = MAC::abs(MAC::abs(dot) - m_agp_3dcyl.cylinder_height)*rad_sq_dist;
   } else {
-     value = MAC::max(MAC::abs(MAC::abs(dot)-m_agp_3dcyl.cylinder_height)
+     value = MAC::min(MAC::abs(MAC::abs(dot)-m_agp_3dcyl.cylinder_height)
                     , MAC::abs(rad_sq_dist));
   }
 
@@ -289,9 +289,9 @@ double FS_3Dcylinder:: level_set_value( double const& x
   double value = 0.;
 
   if ( dot < m_agp_3dcyl.cylinder_height && dot > 0. && rad_sq_dist < 0.) {
-     value = MAC::abs(dot - m_agp_3dcyl.cylinder_height)*(rad_sq_dist);
+     value = MAC::abs(MAC::abs(dot) - m_agp_3dcyl.cylinder_height)*rad_sq_dist;
   } else {
-     value = MAC::max(MAC::abs(MAC::abs(dot)-m_agp_3dcyl.cylinder_height)
+     value = MAC::min(MAC::abs(MAC::abs(dot)-m_agp_3dcyl.cylinder_height)
                     , MAC::abs(rad_sq_dist));
   }
 

@@ -199,7 +199,8 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
   MAC_LABEL( "FS_RigidBody:: distanceTo" ) ;
 
   double t = 0.;
-  double threshold = delta;
+  // Consider threshold of intersection as 0.1% of the smallest grid cell
+  double threshold = 0.001*delta;
 
   geomVector rayVec(3);
 
@@ -244,7 +245,7 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
   max_iter = 500; iter = 0;
 
   // Bisection method
-  while (((a.calcDist(b)/delta) >= threshold) && (iter <= max_iter)) {
+  while ((a.calcDist(b) >= threshold) && (iter <= max_iter)) {
 	  // Find middle point
 	 c = 0.5 * ( a + b );
 
