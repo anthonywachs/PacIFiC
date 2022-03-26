@@ -145,8 +145,7 @@ class DS_RigidBody
 
       /** @brief Write the surface discretization points of all RB in
       respective CSV files */
-      void write_surface_discretization( const std::string& file
-                                  , MAC_Communicator const* m_macCOMM );
+      void write_surface_discretization( const std::string& file );
 
       /** @brief Correct surface discretization due to PBC */
       void correct_surface_discretization( FV_Mesh const* MESH );

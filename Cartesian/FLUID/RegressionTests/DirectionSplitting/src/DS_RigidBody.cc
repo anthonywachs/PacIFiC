@@ -347,29 +347,18 @@ void DS_RigidBody:: correct_surface_discretization( FV_Mesh const* MESH )
 
 
 //---------------------------------------------------------------------------
-void DS_RigidBody:: write_surface_discretization( const std::string& file
-                                      , MAC_Communicator const* m_macCOMM)
+void DS_RigidBody:: write_surface_discretization( const std::string& file)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_RigidBody:: write_surface_discretization" ) ;
 
   std::ofstream out;
 
-  if (m_macCOMM->rank() == 0) {
-     out.open(file.c_str());
-     out << "x ,y ,z ,nx ,ny ,nz ,area ,Fpx ,Fpy ,Fpz ,Fvx ,Fvy , Fvz " << endl;
-  }
+  out.open(file.c_str());
+  out << "x ,y ,z ,nx ,ny ,nz ,area ,Fpx ,Fpy ,Fpz ,Fvx ,Fvy ,Fvz " << endl;
 
   for (size_t i = 0; i < m_surface_area.size(); i++) {
-     m_surface_Pforce[i](0) = m_macCOMM->sum(m_surface_Pforce[i](0));
-     m_surface_Pforce[i](1) = m_macCOMM->sum(m_surface_Pforce[i](1));
-     m_surface_Pforce[i](2) = m_macCOMM->sum(m_surface_Pforce[i](2));
-
-     m_surface_Vforce[i](0) = m_macCOMM->sum(m_surface_Vforce[i](0));
-     m_surface_Vforce[i](1) = m_macCOMM->sum(m_surface_Vforce[i](1));
-     m_surface_Vforce[i](2) = m_macCOMM->sum(m_surface_Vforce[i](2));
-
-     if (m_macCOMM->rank() == 0) {
+     if (m_surface_Pforce[i](0) != 0)
         out << m_surface_points[i]->operator()(0) << " ,"
             << m_surface_points[i]->operator()(1) << " ,"
             << m_surface_points[i]->operator()(2) << " ,"

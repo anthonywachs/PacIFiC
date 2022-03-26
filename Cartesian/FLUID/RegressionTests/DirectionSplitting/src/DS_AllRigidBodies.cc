@@ -2786,11 +2786,15 @@ void DS_AllRigidBodies:: write_surface_discretization_for_all_RB( )
 {
    MAC_LABEL( "DS_AllRigidBodies:: write_surface_discretization_for_all_RB" ) ;
 
-   for (size_t i = 0; i < m_nrb; ++i) {
+   // for (size_t i = 0; i < m_nrb; ++i) {
+   for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                              it != local_RB_list.end() ; ++it) {
+     size_t i = *it;
       std::ostringstream os2;
-      os2 << "./DS_results/discretized_surface_parID_" << i << ".csv";
+      os2 << "./DS_results/discretized_surface_parID_" << i
+                              << "_" << m_macCOMM->rank() << ".csv";
       std::string file = os2.str();
-      m_allDSrigidbodies[i]->write_surface_discretization( file, m_macCOMM );
+      m_allDSrigidbodies[i]->write_surface_discretization( file );
    }
 
 }
