@@ -372,9 +372,8 @@ void DS_RigidBody:: write_surface_discretization( const std::string& file)
             << m_surface_Vforce[i](0) << " ,"
             << m_surface_Vforce[i](1) << " ,"
             << m_surface_Vforce[i](2) << endl;
-     }
   }
 
-  if (m_macCOMM->rank() == 0) out.close();
+  out.close();
 
 }
