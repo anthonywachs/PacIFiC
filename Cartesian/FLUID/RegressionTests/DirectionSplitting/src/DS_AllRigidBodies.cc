@@ -830,8 +830,16 @@ void DS_AllRigidBodies:: generate_list_of_local_RB( )
                                  && (yr(j) > Dmin(1)) && (yr(j) <= Dmax(1))
                                  && (zr(k) > Dmin(2)) && (zr(k) <= Dmax(2)) ;
               if (status) goto skip_loop;
-          }
+           }
         }
+     }
+
+     // If the RB's domain extent are bigger that local extents
+     if (((xr(0) < Dmin(0)) && (xr(1) > Dmax(0)))
+      || ((yr(0) < Dmin(1)) && (yr(1) > Dmax(1)))
+      || ((zr(0) < Dmin(2)) && (zr(1) > Dmax(2)))) {
+        status = true;
+        goto skip_loop;
      }
 
      skip_loop:
