@@ -199,8 +199,8 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
   MAC_LABEL( "FS_RigidBody:: distanceTo" ) ;
 
   double t = 0.;
-  // Consider threshold of intersection as 0.1% of the smallest grid cell
-  double threshold = 0.001*delta;
+  // Consider threshold of intersection as 0.0001% change in the relative solution
+  double threshold = 1.e-10;
 
   geomVector rayVec(3);
 
@@ -223,7 +223,7 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
 	  t += delta/max_iter;
   }
 
-  geomVector a(3), b(3), c(3);
+  geomVector a(3), b(3), c(3), c_old(3);
 
   // a = source;
   a(0) = source(0);
@@ -241,13 +241,25 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
   c(1) = source(1) + delta * rayDir(1);
   c(2) = source(2) + delta * rayDir(2);
 
+  c_old(0) = MAC::abs(a(0) - b(0))/2.;
+  c_old(1) = MAC::abs(a(1) - b(1))/2.;
+  c_old(2) = MAC::abs(a(2) - b(2))/2.;
+
+  double eps = (b.calcNorm() > 1.e-12) ? a.calcDist(b)/b.calcNorm()
+  													: a.calcDist(b);
 
   max_iter = 500; iter = 0;
 
   // Bisection method
-  while ((a.calcDist(b) >= threshold) && (iter <= max_iter)) {
+  while ((eps >= threshold) && (iter <= max_iter)) {
 	  // Find middle point
 	 c = 0.5 * ( a + b );
+
+	 if (c_old.calcNorm() > 1.e-12) {
+		 eps = c.calcDist(c_old)/c_old.calcNorm();
+	 } else {
+		 eps = c.calcDist(c_old);
+	 }
 
 	 // Check if middle point is root
 	 if (level_set_value (c) == 0.)
@@ -259,6 +271,8 @@ double FS_RigidBody:: distanceTo( geomVector const& source,
 		  a = c;
 
   	 iter += 1;
+
+	 c_old = c;
 
 	 if (iter == max_iter)
 		 std::cout << "WARNING: Maxmimum iteration reached for intersection"
