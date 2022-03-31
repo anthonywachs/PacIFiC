@@ -7,7 +7,7 @@
 
 // ----------------------------------------------------------------------------
 // Default constructor
-Quaternion::Quaternion() 
+Quaternion::Quaternion()
   : m_w( 1. )
   , m_vqt( 0. )
 {}
@@ -16,9 +16,9 @@ Quaternion::Quaternion()
 
 
 // ----------------------------------------------------------------------------
-// Constructor with 2 scalar as input parameters q and d. Quaternion 
-// is initialized as [ d, (q,q,q) ] 
-Quaternion::Quaternion( double q, double d ) 
+// Constructor with 2 scalar as input parameters q and d. Quaternion
+// is initialized as [ d, (q,q,q) ]
+Quaternion::Quaternion( double q, double d )
   : m_w( d )
   , m_vqt( q )
 {}
@@ -27,9 +27,9 @@ Quaternion::Quaternion( double q, double d )
 
 
 // ----------------------------------------------------------------------------
-// Constructor with a Vector3 vector vec and a scalar d. Quaternion 
+// Constructor with a Vector3 vector vec and a scalar d. Quaternion
 // is initialized as [ d, vec ]
-Quaternion::Quaternion( Vector3 const &vec, double d ) 
+Quaternion::Quaternion( Vector3 const &vec, double d )
   : m_w( d )
   , m_vqt( vec )
 {}
@@ -38,9 +38,9 @@ Quaternion::Quaternion( Vector3 const &vec, double d )
 
 
 // ----------------------------------------------------------------------------
-// Constructor with a vector given by its 3 components (x,y,z) and a 
+// Constructor with a vector given by its 3 components (x,y,z) and a
 // scalar d. Quaternion is initialized as [ d, (x,y,z) ]
-Quaternion::Quaternion( double x, double y, double z, double d ) 
+Quaternion::Quaternion( double x, double y, double z, double d )
   : m_w( d )
   , m_vqt( Vector3( x, y, z ) )
 {}
@@ -50,7 +50,7 @@ Quaternion::Quaternion( double x, double y, double z, double d )
 
 // ----------------------------------------------------------------------------
 // Copy constructor
-Quaternion::Quaternion( Quaternion const& q ) 
+Quaternion::Quaternion( Quaternion const& q )
   : m_w( q.m_w )
   , m_vqt( q.m_vqt )
 {}
@@ -100,11 +100,11 @@ Quaternion Quaternion::multLeftVec( Vector3 const& lhs ) const
 
 
 // ----------------------------------------------------------------------------
-// Multiplies the quaternion on the right by another quaternion rhs, 
+// Multiplies the quaternion on the right by another quaternion rhs,
 // i.e., perform this x rhs, and return the vectorial part of this x rhs
 Vector3 Quaternion::multToVector3( const Quaternion& rhs ) const
 {
-  Vector3 vtmp = ( m_vqt ^ rhs.m_vqt ) + ( m_w * rhs.m_vqt ) 
+  Vector3 vtmp = ( m_vqt ^ rhs.m_vqt ) + ( m_w * rhs.m_vqt )
   	+ ( rhs.m_w * m_vqt );
   return ( vtmp );
 }
@@ -113,12 +113,12 @@ Vector3 Quaternion::multToVector3( const Quaternion& rhs ) const
 
 
 // ----------------------------------------------------------------------------
-// Multiplies the quaternion on the right by the conjugate of another 
-// quaternion rhs, i.e., perform this x rhs^t, and return the vectorial part of 
+// Multiplies the quaternion on the right by the conjugate of another
+// quaternion rhs, i.e., perform this x rhs^t, and return the vectorial part of
 // this x rhs^t
 Vector3 Quaternion::multConjugateToVector3( Quaternion const& rhs ) const
 {
-  Vector3 vtmp = - ( m_vqt ^ rhs.m_vqt ) - ( m_w * rhs.m_vqt ) 
+  Vector3 vtmp = - ( m_vqt ^ rhs.m_vqt ) - ( m_w * rhs.m_vqt )
   	+ ( rhs.m_w * m_vqt );
   return ( vtmp );
 }
@@ -128,7 +128,7 @@ Vector3 Quaternion::multConjugateToVector3( Quaternion const& rhs ) const
 
 // ----------------------------------------------------------------------------
 // Returns the value of the scalar part of the quaternion
-double Quaternion::getdouble() const 
+double Quaternion::getdouble() const
 {
   return ( m_w );
 }
@@ -147,7 +147,7 @@ Vector3 const* Quaternion::getVector3() const
 
 
 // ----------------------------------------------------------------------------
-// Sets the quaternion with a Vector3 vector vec and a scalar d. 
+// Sets the quaternion with a Vector3 vector vec and a scalar d.
 // Quaternion is set to [ d, vec ]
 void Quaternion::setQuaternion( Vector3 const& vec, double d )
 {
@@ -202,19 +202,19 @@ void Quaternion::setQuaternion( Matrix const& rot )
   else
   {
     double den = 0.;
-    
+
     // Case rotYY > - rotZZ, rotXX > - rotYY and rotXX > - rotZZ
-    if ( rot[Y][Y] > - rot[Z][Z] && rot[X][X] > - rot[Y][Y] 
+    if ( rot[Y][Y] > - rot[Z][Z] && rot[X][X] > - rot[Y][Y]
     	&& rot[X][X] > - rot[Z][Z] )
     {
       den = pow( 1. + rot[X][X] + rot[Y][Y] + rot[Z][Z], 0.5 );
       m_w = 0.5 * den;
       m_vqt[X] = 0.5 * ( rot[Z][Y] - rot[Y][Z] ) / den;
-      m_vqt[Y] = 0.5 * ( rot[X][Z] - rot[Z][X] ) / den;      
-      m_vqt[Z] = 0.5 * ( rot[Y][X] - rot[X][Y] ) / den;      
+      m_vqt[Y] = 0.5 * ( rot[X][Z] - rot[Z][X] ) / den;
+      m_vqt[Z] = 0.5 * ( rot[Y][X] - rot[X][Y] ) / den;
     }
     // Case rotYY < - rotZZ, rotXX > rotYY and rotXX > rotZZ
-    else if ( rot[Y][Y] < - rot[Z][Z] && rot[X][X] > rot[Y][Y] 
+    else if ( rot[Y][Y] < - rot[Z][Z] && rot[X][X] > rot[Y][Y]
     	&& rot[X][X] > rot[Z][Z] )
     {
       den = pow( 1. + rot[X][X] - rot[Y][Y] - rot[Z][Z], 0.5 );
@@ -224,32 +224,69 @@ void Quaternion::setQuaternion( Matrix const& rot )
       m_vqt[Z] = 0.5 * ( rot[Z][X] + rot[X][Z] ) / den;
     }
     // Case rotYY > rotZZ, rotXX < rotYY and rotXX < - rotZZ
-    else if ( rot[Y][Y] > rot[Z][Z] && rot[X][X] < rot[Y][Y] 
-    	&& rot[X][X] < - rot[Z][Z] ) 
+    else if ( rot[Y][Y] > rot[Z][Z] && rot[X][X] < rot[Y][Y]
+    	&& rot[X][X] < - rot[Z][Z] )
     {
       den = pow( 1. - rot[X][X] + rot[Y][Y] - rot[Z][Z], 0.5 );
       m_w = 0.5 * ( rot[X][Z] - rot[Z][X] ) / den;
       m_vqt[X] = 0.5 * ( rot[X][Y] + rot[Y][X] ) / den;
       m_vqt[Y] = 0.5 * den;
-      m_vqt[Z] = 0.5 * ( rot[Y][Z] + rot[Z][Y] ) / den;   
+      m_vqt[Z] = 0.5 * ( rot[Y][Z] + rot[Z][Y] ) / den;
     }
     // Case rotYY < rotZZ, rotXX < - rotYY and rotXX < rotZZ
-    else if ( rot[Y][Y] < rot[Z][Z] && rot[X][X] < - rot[Y][Y] 
-    	&& rot[X][X] < rot[Z][Z] ) 
+    else if ( rot[Y][Y] < rot[Z][Z] && rot[X][X] < - rot[Y][Y]
+    	&& rot[X][X] < rot[Z][Z] )
     {
       den = pow( 1. - rot[X][X] - rot[Y][Y] + rot[Z][Z], 0.5 );
-      m_w = 0.5 * ( rot[Y][X] - rot[X][Y] ) / den;  
+      m_w = 0.5 * ( rot[Y][X] - rot[X][Y] ) / den;
       m_vqt[X] = 0.5 * ( rot[Z][X] + rot[X][Z] ) / den;
-      m_vqt[Y] = 0.5 * ( rot[Y][Z] + rot[Z][Y] ) / den;  
-      m_vqt[Z] = 0.5 * den;    
+      m_vqt[Y] = 0.5 * ( rot[Y][Z] + rot[Z][Y] ) / den;
+      m_vqt[Z] = 0.5 * den;
     }
     else
       cout << "Warning: case not covered in Quaternion::setQuaternion"
-    	"( Matrix const& rot )" << endl;          	   
+    	"( Matrix const& rot )" << endl;
   }
 }
 
 
+/* Build a unit quaternion representing the rotation
+ * from u to v. The input vectors need not be normalised. */
+// TODO: if the input vectors aren't normalized, normalize then and warn the
+// user.
+void Quaternion::setRotFromTwoVectors( const Vector3& u, const Vector3& v)
+{
+    double norm_u_norm_v = sqrt( (u*u) * (v*v) );
+    double real_part = norm_u_norm_v + u*v;
+    Vector3 vect;
+
+    if (real_part < 1.e-6 * norm_u_norm_v)
+    {
+        /* If u and v are exactly opposite, rotate 180 degrees
+         * around an arbitrary orthogonal axis. Axis normalisation
+         * can happen later, when we normalise the quaternion. */
+        real_part = 0.;
+        vect = fabs(u[0]) > fabs(u[2]) ? Vector3(-u[1], u[0], 0.)
+                                : Vector3(0., -u[2], u[1]);
+    }
+    else
+    {
+        /* Otherwise, build quaternion the standard way. */
+        vect = u^v;
+    }
+
+    *this = Quaternion(vect[0],vect[1],vect[2],real_part) * (1/
+            Norm( Quaternion(vect[0],vect[1],vect[2],real_part)) );
+}
+
+
+Vector3 Quaternion::rotateVector(const Vector3 v)
+{
+  Vector3 v_rotated;
+  v_rotated = (m_w*m_w - Norm(m_vqt)*Norm(m_vqt))*v + 2*(v*m_vqt)*m_vqt
+              + 2*m_w*(m_vqt^v);
+  return v_rotated ;
+}
 
 
 // ----------------------------------------------------------------------------
@@ -257,7 +294,7 @@ void Quaternion::setQuaternion( Matrix const& rot )
 Quaternion& Quaternion::operator = ( Quaternion const& rhs )
 {
   if ( &rhs != this )
-  {   
+  {
     m_w   = rhs.m_w;
     m_vqt = rhs.m_vqt;
   }
@@ -268,7 +305,7 @@ Quaternion& Quaternion::operator = ( Quaternion const& rhs )
 
 
 // ----------------------------------------------------------------------------
-// Equal operator to a scalar d, the result is [ d, (d,d,d) ] 
+// Equal operator to a scalar d, the result is [ d, (d,d,d) ]
 Quaternion Quaternion::operator = ( const double d )
 {
   m_w = d;
@@ -293,7 +330,7 @@ double& Quaternion::operator [] ( int i )
 // ----------------------------------------------------------------------------
 // ith-component accessor: (0,1,2) for the vector components and 3 for
 // the scalar
-double Quaternion::operator [] ( int i ) const 
+double Quaternion::operator [] ( int i ) const
 {
   return ( i == 3 ? m_w :  m_vqt[i] );
 }
@@ -324,7 +361,7 @@ Quaternion& Quaternion::operator += ( Quaternion const& rhs )
 
 
 // ----------------------------------------------------------------------------
-// Sum of 2 quaternions 
+// Sum of 2 quaternions
 Quaternion Quaternion::operator + ( Quaternion const& rhs ) const
 {
   return ( Quaternion( m_vqt + rhs.m_vqt, m_w + rhs.m_w ) );
@@ -346,7 +383,7 @@ Quaternion& Quaternion::operator -= ( Quaternion const& rhs )
 
 
 // ----------------------------------------------------------------------------
-// Subtraction of 2 quaternions, i.e., compute this - rhs 
+// Subtraction of 2 quaternions, i.e., compute this - rhs
 Quaternion Quaternion::operator - ( Quaternion const& rhs )
 {
   return ( Quaternion( m_vqt - rhs.m_vqt, m_w - rhs.m_w ) );
@@ -390,11 +427,11 @@ Quaternion operator * ( double d, Quaternion const& rhs )
 
 
 // ----------------------------------------------------------------------------
-// double product this x rhs of 2 quaternions 
+// double product this x rhs of 2 quaternions
 Quaternion Quaternion::operator * ( Quaternion const& rhs ) const
 {
   double tmp = ( m_w * rhs.m_w ) - ( m_vqt * rhs.m_vqt );
-  Vector3 vtmp = ( m_vqt ^ rhs.m_vqt ) + ( m_w * rhs.m_vqt ) 
+  Vector3 vtmp = ( m_vqt ^ rhs.m_vqt ) + ( m_w * rhs.m_vqt )
   	+ ( rhs.m_w * m_vqt );
   return ( Quaternion( vtmp, tmp ) );
 }
@@ -429,9 +466,9 @@ Quaternion operator , ( Vector3 const& lhs, Quaternion const& q )
 // Comparison operator
 bool Quaternion::operator == ( Quaternion const& rhs )
 {
-  return ( m_w == rhs.m_w 
-  	&& m_vqt[0] == rhs.m_vqt[0] 
-	&& m_vqt[1] == rhs.m_vqt[1] 
+  return ( m_w == rhs.m_w
+  	&& m_vqt[0] == rhs.m_vqt[0]
+	&& m_vqt[1] == rhs.m_vqt[1]
 	&& m_vqt[2] == rhs.m_vqt[2] );
 }
 
@@ -477,7 +514,7 @@ void Quaternion::writeQuaternion( ostream &fileOut ) const
 {
   fileOut << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
   	m_w ) << " ";
-  m_vqt.writeGroup3( fileOut );   
+  m_vqt.writeGroup3( fileOut );
 }
 
 
@@ -488,7 +525,7 @@ void Quaternion::writeQuaternion( ostream &fileOut ) const
 void Quaternion::writeQuaternion_binary( ostream &fileOut )
 {
   fileOut.write( reinterpret_cast<char*>( &m_w ), sizeof( double ) );
-  m_vqt.writeGroup3_binary( fileOut );   
+  m_vqt.writeGroup3_binary( fileOut );
 }
 
 
@@ -499,7 +536,7 @@ void Quaternion::writeQuaternion_binary( ostream &fileOut )
 void Quaternion::readQuaternion_binary( istream &StreamIN )
 {
   StreamIN.read( reinterpret_cast<char*>( &m_w ), sizeof( double ) );
-  m_vqt.readGroup3_binary( StreamIN );   
+  m_vqt.readGroup3_binary( StreamIN );
 }
 
 
@@ -509,7 +546,7 @@ void Quaternion::readQuaternion_binary( istream &StreamIN )
 // Returns the norm of the quaternion
 double Norm( Quaternion const& q )
 {
-  return ( sqrt( q.m_vqt[X] * q.m_vqt[X] + q.m_vqt[Y] * q.m_vqt[Y] 
+  return ( sqrt( q.m_vqt[X] * q.m_vqt[X] + q.m_vqt[Y] * q.m_vqt[Y]
   	+ q.m_vqt[Z] * q.m_vqt[Z] + q.m_w * q.m_w ) );
 }
 
@@ -520,6 +557,6 @@ double Norm( Quaternion const& q )
 // Returns the norm square of the quaternion
 double Norm2( Quaternion const& q )
 {
-  return ( q.m_vqt[X] * q.m_vqt[X] + q.m_vqt[Y] * q.m_vqt[Y] 
+  return ( q.m_vqt[X] * q.m_vqt[X] + q.m_vqt[Y] * q.m_vqt[Y]
   	+ q.m_vqt[Z] * q.m_vqt[Z] + q.m_w * q.m_w );
 }
