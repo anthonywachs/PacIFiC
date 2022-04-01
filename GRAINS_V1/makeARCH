@@ -3,7 +3,7 @@
 # $1 : create = mkdir and delete = "rm -rf"
 # $2 : force a specific architecture other than the one from the shell variables
 
-tabdir=(Main Tools/PrePost/Position Tools/PrePost/ParticuleData Tools/PrePost/Orientation Tools/PrePost/Contact)
+tabdir=(Main Tools/PrePost/Position Tools/PrePost/ShapeFile Tools/PrePost/RotationMatrix)
 
 
 # Check $1 parameter as the right value

@@ -186,7 +186,7 @@ $(OBJDIR)/%.o : %.cpp
 UTLDIR  := $(GRAINS_HOME)/Tools/Perl
 DEPEND  := $(INCDIR:%=-I%) $(GRAINS_SYSINC:%=-I%)
 
-depend :
+depend : CPINC
 	@echo 'Generating dependencies'
 	touch ./Maketmp
 	makedepend -f ./Maketmp $(DEPEND) $(SRCFILES_WP_BASE) \
