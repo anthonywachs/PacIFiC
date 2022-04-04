@@ -21,6 +21,11 @@ void construct_divG(scalar divG, lagMesh* mesh) {
         + mesh->nodes[node_id[1]].pos.x);
       midpoint.y = .5*(mesh->nodes[node_id[0]].pos.y
         + mesh->nodes[node_id[1]].pos.y);
+      // coord normal;
+      // double theta = fabs(midpoint.x) > 0. ? atan2(midpoint.y, midpoint.x) :
+      //   atan2(midpoint.y, midpoint.x + 1.e-6);
+      // normal.x = cos(theta);
+      // normal.y = sin(theta);
       if ((fabs(cpos.x - midpoint.x)<Delta/2.)
         && (fabs(cpos.y - midpoint.y)<Delta/2.)) {
         double length = mesh->edges[i].st*mesh->edges[i].l0;
@@ -30,10 +35,11 @@ void construct_divG(scalar divG, lagMesh* mesh) {
           if ((sdist.x <= sq(2*Delta)) && (sdist.y <= sq(2*Delta))) {
             /** We need the inward normal instead of the outward normal, hence
             the minus sign */
-            foreach_dimension() G.x[] -=
+            foreach_dimension() G.x[] -= //why do I have to multiply by 2??
               (1 + cos(.5*pi*(pos.x - midpoint.x)/Delta))
               *(1 + cos(.5*pi*(pos.y - midpoint.y)/Delta))
               *mesh->edges[i].normal.x*length/(16.*sq(Delta));
+              // *normal.x*(0.7853981633974483/mesh->nle)/(16.*sq(Delta));
           }
         }
       }
@@ -47,6 +53,7 @@ void construct_divG(scalar divG, lagMesh* mesh) {
 
 double muc, mup;
 scalar I[];
+scalar prevI[];
 scalar divG[];
 event defaults (i = 0) {
   mu = new face vector;
@@ -55,30 +62,30 @@ event defaults (i = 0) {
 }
 I[top] = dirichlet(0.);
 I[bottom] = dirichlet(0.);
+prevI[top] = dirichlet(0.);
+prevI[bottom] = dirichlet(0.);
 divG[top] = dirichlet(0.);
 divG[bottom] = dirichlet(0.);
 
 event properties (i++) {
   construct_divG(divG, &(mbs.mb[0]));
-  mgstats s = poisson (I, divG, tolerance = 1.e-10);
+  poisson (I, divG, tolerance = 1.e-10);
 
-  /** Apparently we need to re-scale the indicator function */
-  double maxI = normf(I).max;
-  double inside_mean = 0.;
-  int nb_inside_cells = 0.;
+  // Simple clamping of I:
   foreach() {
-    if (I[]/maxI > .5) {
-      inside_mean += I[];
-      nb_inside_cells++;
+    if (fabs(divG[]) > 1.e-10) {
+      I[] = clamp(I[], 0, 1);
+      prevI[] = I[];
     }
-  }
-  inside_mean /= (nb_inside_cells > 0) ? nb_inside_cells : 1.;
-  foreach() {
-    I[] = clamp((nb_inside_cells > 0) ? I[]/inside_mean : I[], 0., 1.);
+    else {
+      prevI[] = round(prevI[]);
+      I[] = prevI[];
+    }
   }
 
   foreach_face() {
     face vector muv = mu;
-    muv.x[] = mup + (muc - mup)*.5*(I[]/maxI + I[-1]/maxI);
+    muv.x[] = mup + (muc - mup)*.5*(I[] + I[-1]);
+    // muv.x[] = mup + (muc - mup)*.5*(I[]/maxI + I[-1]/maxI);
   }
 }
