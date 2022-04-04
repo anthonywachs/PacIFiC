@@ -11,8 +11,8 @@ install: xerces createarch createdepend depend update dtd
 	@echo 'Full Grains platform built!'
 
 depend:
-	cd Main/src ; make depend ; cd ../..
 	cd Grains ; make depend ; cd ..
+	cd Main/src ; make depend ; cd ../..
 	cd Tools/PrePost ; make depend ; cd ../..
 	
 clean:
