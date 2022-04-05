@@ -33,7 +33,7 @@ void neo_hookean(lagMesh* mesh) {
       foreach_dimension()
         T[j].x = (fabs(ne) > 1.e-10) ? tension_norm*e.x/ne : 0.;
     }
-    foreach_dimension() mesh->nodes[i].lagForce.x = T[0].x - T[1].x;
+    foreach_dimension() mesh->nodes[i].lagForce.x += T[0].x - T[1].x;
   }
 }
 
