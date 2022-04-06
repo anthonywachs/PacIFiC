@@ -37,6 +37,7 @@
 
 #Others
 #*.dtd
+*Makedepend
 *.so.*
 PacIFiC-*.env.sh
 GRAINS/Env/grains-*.env.sh
