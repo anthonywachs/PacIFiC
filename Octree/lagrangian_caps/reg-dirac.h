@@ -16,8 +16,8 @@ void lag2eul(vector forcing, lagMesh* mesh) {
     coord cpos, pos;
     cpos.x = x; cpos.y = y;
     for(int i=0; i<mesh->nlp; i++) {
-      if ((fabs(cpos.x - mesh->nodes[i].pos.x)<Delta/2.)
-        && (fabs(cpos.y - mesh->nodes[i].pos.y)<Delta/2.)) {
+      if ((fabs(cpos.x - mesh->nodes[i].pos.x)<=Delta/2.)
+        && (fabs(cpos.y - mesh->nodes[i].pos.y)<=Delta/2.)) {
         foreach_neighbor() {
           pos.x = x; pos.y = y;
           foreach_dimension() sdist.x = sq(pos.x - mesh->nodes[i].pos.x);
@@ -46,8 +46,8 @@ void eul2lag(lagMesh* mesh) {
     coord cpos, pos;
     cpos.x = x; cpos.y = y;
     for(int i=0; i<mesh->nlp; i++) {
-      if ((fabs(cpos.x - mesh->nodes[i].pos.x)<Delta/2.)
-        && (fabs(cpos.y - mesh->nodes[i].pos.y)<Delta/2.)) {
+      if ((fabs(cpos.x - mesh->nodes[i].pos.x)<=Delta/2.)
+        && (fabs(cpos.y - mesh->nodes[i].pos.y)<=Delta/2.)) {
         foreach_neighbor() {
           pos.x = x; pos.y = y;
           foreach_dimension() sdist.x = sq(pos.x - mesh->nodes[i].pos.x);

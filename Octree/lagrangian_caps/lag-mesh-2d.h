@@ -123,6 +123,7 @@ void comp_normals(lagMesh* mesh) {
 }
 
 void comp_curvature(lagMesh* mesh) {
+  // FIXME: not compatible with periodic boundaries
   if (!mesh->updated_curvatures) {
     comp_normals(mesh);
     bool up; // decide if we switch the x and y axes
