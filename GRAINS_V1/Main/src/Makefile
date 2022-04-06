@@ -60,7 +60,7 @@ grains : MESS START $(EXEDIR)/grains
 
 $(EXEDIR)/grains : app
 	@echo 'Building software grains'
-	$(LINK) $(LINKFLAGS) $(XERCESFLAGS) $(GRAINSFLAGS) $(MPIFLAGS) $(MAINOBJ) -o $@
+	$(LINK) $(MAINOBJ) -o $@ $(LINKFLAGS) $(GRAINSFLAGS) $(MPIFLAGS) $(XERCESFLAGS)
 
 MESS   :
 	@echo '***********************************************************'

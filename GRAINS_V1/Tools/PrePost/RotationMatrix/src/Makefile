@@ -40,7 +40,7 @@ all : MESS $(EXEDIR)/rotationmatrix
 
 $(EXEDIR)/rotationmatrix : $(MAINOBJ)
 	@echo 'Building PrePost tool rotationmatrix'
-	$(LINK) $(LINKFLAGS) $(XERCESFLAGS) $(GRAINSFLAGS) $(MAINOBJ) -o $@
+	$(LINK) $(MAINOBJ) -o $@ $(LINKFLAGS) $(GRAINSFLAGS) $(XERCESFLAGS)
 
 MESS   :
 	@echo '***********************************************'
