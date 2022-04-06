@@ -56,7 +56,6 @@ PostProcessing:: ~PostProcessing()
 //---------------------------------------------------------------------------
 double
 PostProcessing:: compute_mean( FV_DiscreteField const* FF
-                             , size_t const& level
                              , size_t const& comp )
 //---------------------------------------------------------------------------
 {
@@ -81,7 +80,7 @@ PostProcessing:: compute_mean( FV_DiscreteField const* FF
          double dy = FF->get_cell_size( j, comp, 1 );
          for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
             double dz = (m_dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1;
-            value += FF->DOF_value(i, j, k, comp, level)*dx*dy*dz;
+            value += FF->DOF_value(i, j, k, comp, 0)*dx*dy*dz;
             volume += dx*dy*dz;
          }
       }
@@ -89,7 +88,8 @@ PostProcessing:: compute_mean( FV_DiscreteField const* FF
 
    value = m_macCOMM->sum( value ) ;
    volume = m_macCOMM->sum( volume ) ;
-   std::cout << "Mean value: " << value/volume << endl;
+   if (m_macCOMM->rank())
+      std::cout << "Mean value in whole domain: " << value/volume << endl;
 
    return (value/volume);
 
@@ -100,7 +100,8 @@ PostProcessing:: compute_mean( FV_DiscreteField const* FF
 
 //---------------------------------------------------------------------------
 void
-PostProcessing::prepare_fieldVolumeAverageInBox( MAC_ModuleExplorer const* exp
+PostProcessing::prepare_fieldVolumeAverageInBox( MAC_Object* a_owner
+                                               , MAC_ModuleExplorer const* exp
                                                , FV_DomainAndFields const* dom)
 //---------------------------------------------------------------------------
 {
@@ -109,6 +110,8 @@ PostProcessing::prepare_fieldVolumeAverageInBox( MAC_ModuleExplorer const* exp
   // Read the module for box averaging
   MAC_ModuleExplorer* se =
                   exp->create_subexplorer( 0,"fieldVolumeAverageInBox" ) ;
+
+  MESH = dom->primary_grid();
 
   for (se->start_module_iterator(); se->is_valid_module();
                                     se->go_next_module() ) {
@@ -140,56 +143,31 @@ PostProcessing::prepare_fieldVolumeAverageInBox( MAC_ModuleExplorer const* exp
         MAC_Error::object()->raise_missing_keyword( sse, "box_name" ) ;
      }
 
-     // Read box parameters
-     geomVector ctemp(3), ltemp(3);
-     if ( sse->has_entry( "GravityCenterX" ) ) {
-        ctemp(0) = sse->double_data( "GravityCenterX" ) ;
+     // Read the gravity center of box
+     doubleVector gc( m_dim, 0 );
+     if ( sse->has_entry( "GravityCenter" ) ) {
+        gc = sse->doubleVector_data( "GravityCenter" );
+        fva.center = MAC_DoubleVector::create(a_owner,gc);
      } else {
-        MAC_Error::object()->raise_missing_keyword( sse,
-                                          "GravityCenterX" ) ;
-     }
-     if ( sse->has_entry( "GravityCenterY" ) ) {
-        ctemp(1) = sse->double_data( "GravityCenterY" ) ;
-     } else {
-        MAC_Error::object()->raise_missing_keyword( sse,
-                                          "GravityCenterY" ) ;
-     }
-     if ( sse->has_entry( "GravityCenterZ" ) ) {
-        ctemp(2) = sse->double_data( "GravityCenterZ" ) ;
-     } else {
-        MAC_Error::object()->raise_missing_keyword( sse,
-                                          "GravityCenterZ" ) ;
+        MAC_Error::object()->raise_missing_keyword( sse, "GravityCenter" ) ;
      }
 
-     if ( sse->has_entry( "LX" ) ) {
-        ltemp(0) = sse->double_data( "LX" ) ;
+     // Read the box length
+     doubleVector bl( m_dim, 0 );
+     if ( sse->has_entry( "BoxLength" ) ) {
+        bl = sse->doubleVector_data( "BoxLength" ) ;
+        fva.length = MAC_DoubleVector::create(a_owner,bl);
      } else {
-        MAC_Error::object()->raise_missing_keyword( sse,
-                                                      "LX" ) ;
-     }
-     if ( sse->has_entry( "LY" ) ) {
-        ltemp(1) = sse->double_data( "LY" ) ;
-     } else {
-        MAC_Error::object()->raise_missing_keyword( sse,
-                                                      "LY" ) ;
-     }
-     if ( sse->has_entry( "LZ" ) ) {
-        ltemp(2) = sse->double_data( "LZ" ) ;
-     } else {
-        MAC_Error::object()->raise_missing_keyword( sse,
-                                                      "LZ" ) ;
+        MAC_Error::object()->raise_missing_keyword( sse, "BoxLength" ) ;
      }
 
-     fva.center = ctemp;
-     fva.length = ltemp;
+     doubleVector const& box_length = fva.length->to_double_vector();
 
      for (size_t i = 0; i < m_dim; i++) {
-        double global_min = dom->primary_grid()
-                               ->get_main_domain_min_coordinate(i);
-        double global_max = dom->primary_grid()
-                               ->get_main_domain_max_coordinate(i);
+        double global_min = MESH->get_main_domain_min_coordinate(i);
+        double global_max = MESH->get_main_domain_max_coordinate(i);
 
-        if (fva.length(i) > (global_max - global_min)) {
+        if (box_length(i) > (global_max - global_min)) {
            std::ostringstream msg;
            msg << "In MAC_Utils:: prepare_fieldVolumeAverageInBox()" <<endl;
            msg << "--> Control Volume larger than domain in " << i
@@ -215,8 +193,164 @@ PostProcessing::compute_fieldVolumeAverageInBox( )
 {
   MAC_LABEL( "PostProcessing::compute_fieldVolumeAverageInBox" ) ;
 
+  list<struct fieldVolumeAverageInBox>::const_iterator it;
 
+  for ( it = m_fieldVolumeAverageInBox_list.begin()
+      ; it != m_fieldVolumeAverageInBox_list.end()
+      ; it++ ) {
 
+      doubleVector const& box_length = it->length->to_double_vector();
+      doubleVector const& box_center = it->center->to_double_vector();
+      boolVector const* is_periodic = MESH->get_periodic_directions();
+
+      for (size_t comp = 0; comp < it->FF->nb_components(); comp++) {
+         size_t_vector min_local_index(m_dim,0);
+         size_t_vector max_local_index(m_dim,0);
+
+         for (size_t dir = 0; dir < m_dim; dir++) {
+            double global_min = MESH->get_main_domain_min_coordinate(dir);
+            double global_max = MESH->get_main_domain_max_coordinate(dir);
+            double local_min = MESH->get_min_coordinate_on_current_processor(dir);
+            double local_max = MESH->get_max_coordinate_on_current_processor(dir);
+            // Control volume min and max with periodic treatment, if any
+            doubleVector box_extents(2,0.);
+            box_extents(0) = box_center(dir) - box_length(dir)/2.;
+            box_extents(1) = box_center(dir) + box_length(dir)/2.;
+            if ((*is_periodic)(dir)) {
+               box_extents(0) = periodic_transformation(box_extents(0),dir);
+               box_extents(1) = periodic_transformation(box_extents(1),dir);
+            }
+
+            // Warnings
+            if (m_macCOMM->rank() == 0) {
+               if (!(*is_periodic)(dir)) {
+                  if ((box_extents(0) < global_min)
+                   || (box_extents(1) > global_max))
+                     std::cout << endl <<
+                        " WARNING : Box Averaging Control Volume overlaps a " <<
+                        " non-periodic BC" << endl <<
+                        " Control volume will be reduced" << endl << endl;
+               }
+            }
+
+            // Getting the minimum grid index in control volume (CV)
+            if (box_extents(0) < box_extents(1)) {// Non-periodic CV
+               if (box_extents(0) > local_min) {
+                  if (box_extents(0) < local_max) {
+                     size_t i0_temp = 0;
+                     bool found = FV_Mesh::between(
+                                    it->FF->get_DOF_coordinates_vector(comp,dir)
+                                  , box_extents(0)
+                                  , i0_temp) ;
+                     min_local_index(dir) = (found) ? i0_temp : 0;
+                  } else {
+                     min_local_index(dir) = 0;
+                  }
+               } else {
+                  if (box_extents(1) > local_min) {
+                     min_local_index(dir) =
+                        it->FF->get_min_index_unknown_handled_by_proc(comp,dir);
+                  } else {
+                     min_local_index(dir) = 0;
+                  }
+               }
+            } else {// periodic control volume
+               if (box_extents(0) > local_min) {
+                  if (box_extents(0) < local_max) {
+                     size_t i0_temp = 0;
+                     bool found = FV_Mesh::between(
+                                    it->FF->get_DOF_coordinates_vector(comp,dir)
+                                  , box_extents(0)
+                                  , i0_temp) ;
+                     min_local_index(dir) = (found) ? i0_temp : 0;
+                  } else if (box_extents(1) > local_min) {
+                     min_local_index(dir) =
+                        it->FF->get_min_index_unknown_handled_by_proc(comp,dir);
+                  } else {
+                     min_local_index(dir) = 0;
+                  }
+               } else {
+                  min_local_index(dir) =
+                        it->FF->get_min_index_unknown_handled_by_proc(comp,dir);
+               }
+            }
+
+            // Getting the maximum grid index in control volume (CV)
+            if (box_extents(0) < box_extents(1)) {// Non-periodic CV
+               if (box_extents(1) < local_max) {
+                  if (box_extents(1) > local_min) {
+                     size_t i0_temp = 0;
+                     bool found = FV_Mesh::between(
+                                    it->FF->get_DOF_coordinates_vector(comp,dir)
+                                  , box_extents(1)
+                                  , i0_temp) ;
+                     max_local_index(dir) = (found) ? i0_temp : 0;
+                  } else {
+                     max_local_index(dir) = 0;
+                  }
+               } else {
+                  if (box_extents(0) < local_max) {
+                     max_local_index(dir) =
+                        it->FF->get_max_index_unknown_handled_by_proc(comp,dir);
+                  } else {
+                     max_local_index(dir) = 0;
+                  }
+               }
+            } else {// periodic control volume
+               if (box_extents(1) < local_max) {
+                  if (box_extents(1) > local_min) {
+                     size_t i0_temp = 0;
+                     bool found = FV_Mesh::between(
+                                    it->FF->get_DOF_coordinates_vector(comp,dir)
+                                  , box_extents(1)
+                                  , i0_temp) ;
+                     max_local_index(dir) = (found) ? i0_temp : 0;
+                  } else if (box_extents(0) < local_max) {
+                     max_local_index(dir) =
+                        it->FF->get_max_index_unknown_handled_by_proc(comp,dir);
+                  } else {
+                     max_local_index(dir) = 0;
+                  }
+               } else {
+                  max_local_index(dir) =
+                        it->FF->get_max_index_unknown_handled_by_proc(comp,dir);
+               }
+            }
+         }  // dir
+
+         double value = 0.;
+         double volume = 0.;
+
+         if (min_local_index(0) != 0) {
+            for (size_t i = min_local_index(0);
+                       i <= max_local_index(0); i++) {
+               double dx = it->FF->get_cell_size( i, comp, 0 );
+               if (min_local_index(1) != 0) {
+                  for (size_t j = min_local_index(1);
+                             j <= max_local_index(1); j++) {
+                     double dy = it->FF->get_cell_size( j, comp, 1 );
+                     if (min_local_index(2) != 0) {
+                        for (size_t k = min_local_index(2);
+                                   k <= max_local_index(2); k++) {
+                           double dz = (m_dim == 3) ?
+                                       it->FF->get_cell_size( k, comp, 2 ) : 1;
+                           value += it->FF->DOF_value(i, j, k, comp, 0)
+                                    * dx * dy * dz;
+                           volume += dx * dy * dz;
+                        }
+                     }
+                  }
+               }
+            }
+         }
+
+         value = m_macCOMM->sum( value ) ;
+         volume = m_macCOMM->sum( volume ) ;
+         if (m_macCOMM->rank() == 0)
+            std::cout << "Mean value in CV: " << value/volume << endl;
+
+     }  // comp
+  }  // box
 }
 
 
@@ -288,4 +422,22 @@ PostProcessing::kernel( double distance, double radius, double boxWidth,
   }
 
   return (result);
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double PostProcessing:: periodic_transformation( double const& x
+                                                , size_t const& dir)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "PostProcessing:: periodic_transformation" ) ;
+
+  double isize = MESH->get_main_domain_max_coordinate(dir)
+               - MESH->get_main_domain_min_coordinate(dir);
+  double imin = MESH->get_main_domain_min_coordinate(dir);
+  double value = x - MAC::floor((x-imin)/isize)*isize;
+
+  return (value);
 }

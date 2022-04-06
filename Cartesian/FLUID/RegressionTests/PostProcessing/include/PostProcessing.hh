@@ -5,6 +5,7 @@
 #include <DS_AllRigidBodies.hh>
 #include <MAC_Communicator.hh>
 #include <FV_DomainAndFields.hh>
+#include <MAC_DoubleVector.hh>
 
 /** @brief The class PostProcessing
 
@@ -20,8 +21,8 @@ struct fieldVolumeAverageInBox
   FV_DiscreteField const* FF;
   string field_name;
   string box_name;
-  geomVector center;
-  geomVector length;
+  MAC_DoubleVector* center;
+  MAC_DoubleVector* length;
 };
 
 
@@ -48,7 +49,8 @@ class PostProcessing
       ~PostProcessing( );
 
       /** @brief Read parameters from prob def for box averaging */
-      void prepare_fieldVolumeAverageInBox( MAC_ModuleExplorer const* exp
+      void prepare_fieldVolumeAverageInBox( MAC_Object* a_owner
+                                          , MAC_ModuleExplorer const* exp
                                           , FV_DomainAndFields const* dom);
 
       /** @brief Compute average field in the list of boxes */
@@ -56,9 +58,8 @@ class PostProcessing
 
       /** @brief Compute the L2 norm of a given field
       @param FF field
-      @param level field level */
+      @param comp field component */
       double compute_mean( FV_DiscreteField const* FF
-                         , size_t const& level
                          , size_t const& comp);
 
    protected: //--------------------------------------------------------------
@@ -92,6 +93,12 @@ class PostProcessing
                            , double radius
                            , double boxWidth
                            , size_t kernel_type );
+
+      /**@brief Transform a point using PBC
+         @param x point
+         @param dir transformation direction
+       */
+       double periodic_transformation( double const& x, size_t const& dir);
 
    private: //----------------------------------------------------------------
 
