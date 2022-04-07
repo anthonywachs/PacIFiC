@@ -12,7 +12,11 @@ the implementation below.*/
 face vector G[];
 void construct_divG(scalar divG, lagMesh* mesh) {
   comp_normals(mesh);
-  foreach() foreach_dimension() G.x[] = 0.;
+  comp_mb_stretch(mesh);
+  foreach() {
+    foreach_dimension() G.x[] = 0.;
+    divG[] = 0.;
+  }
   foreach() {
     coord cpos = {x, y};
     for(int i=0; i<mesh->nle; i++) {
@@ -55,7 +59,6 @@ void construct_divG(scalar divG, lagMesh* mesh) {
   }
   boundary((scalar*){G});
   foreach() {
-    divG[] = 0.;
     foreach_dimension() divG[] += (G.x[1] - G.x[0])/(Delta);
   }
   boundary({divG});
@@ -69,13 +72,13 @@ event defaults (i = 0) {
   mu = new face vector;
   mup = MUP;
   muc = MUC;
+  I[top] = dirichlet(0.);
+  I[bottom] = dirichlet(0.);
+  prevI[top] = dirichlet(0.);
+  prevI[bottom] = dirichlet(0.);
+  divG[top] = dirichlet(0.);
+  divG[bottom] = dirichlet(0.);
 }
-I[top] = dirichlet(0.);
-I[bottom] = dirichlet(0.);
-prevI[top] = dirichlet(0.);
-prevI[bottom] = dirichlet(0.);
-divG[top] = dirichlet(0.);
-divG[bottom] = dirichlet(0.);
 
 event properties (i++) {
   construct_divG(divG, &(mbs.mb[0]));
@@ -91,6 +94,7 @@ event properties (i++) {
       prevI[] = round(prevI[]);
       I[] = prevI[];
     }
+    I[] = clamp(I[], 0, 1);
   }
   boundary({I, prevI});
 

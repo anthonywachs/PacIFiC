@@ -18,7 +18,6 @@ typedef struct lagNode {
   coord normal;
   double curv;
   double ref_curv;
-  bool up; // for debug only
 } lagNode;
 
 /** Similarly, the edges of the mesh are assigned the IDs of the two nodes they
@@ -157,8 +156,6 @@ void comp_curvature(lagMesh* mesh) {
       }
       int s = (a.x*b.x + a.y*b.y > 0) ? 1 : -1;
       cn->curv = s*fabs(ddy)/cube(sqrt(1 + sq(dy)));
-      if (up) cn->up = true;
-      else cn->up = false;
     }
     mesh->updated_curvatures = true;
   }
