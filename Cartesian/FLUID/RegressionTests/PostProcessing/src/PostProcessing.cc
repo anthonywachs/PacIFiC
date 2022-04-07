@@ -54,45 +54,70 @@ PostProcessing:: ~PostProcessing()
 
 
 //---------------------------------------------------------------------------
-double
-PostProcessing:: compute_mean( FV_DiscreteField const* FF
-                             , size_t const& comp )
+void
+PostProcessing::prepare_fieldVolumeAverageAroundRB( MAC_Object* a_owner
+                                               , MAC_ModuleExplorer const* exp
+                                               , FV_DomainAndFields const* dom)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "PostProcessing:: compute_mean" ) ;
+  MAC_LABEL( "PostProcessing::prepare_fieldVolumeAverageAroundRB" ) ;
 
-   size_t_vector min_unknown_index(3,0);
-   size_t_vector max_unknown_index(3,0);
+  // Read the module for box averaging
+  MAC_ModuleExplorer* se =
+            exp->create_subexplorer( 0,"fieldVolumeAverageAroundRB" ) ;
 
-   for (size_t l = 0; l < 3; ++l) {
-      min_unknown_index(l) =
-                   FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-      max_unknown_index(l) =
-                   FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-   }
+  MESH = dom->primary_grid();
 
-   double value = 0.;
-   double volume = 0.;
+  if (!m_is_solids) {
+     std::ostringstream msg;
+     msg << "Average around RB not possible in single phase flow " << endl;
+     MAC_Error::object()->raise_plain( msg.str() ) ;
+  }
 
-   for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
-      double dx = FF->get_cell_size( i, comp, 0 );
-      for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
-         double dy = FF->get_cell_size( j, comp, 1 );
-         for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
-            double dz = (m_dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1;
-            value += FF->DOF_value(i, j, k, comp, 0)*dx*dy*dz;
-            volume += dx*dy*dz;
-         }
-      }
-   }
+  for (se->start_module_iterator(); se->is_valid_module();
+                                    se->go_next_module() ) {
+     struct fieldVolumeAverageAroundRB fva ;
+     MAC_ModuleExplorer* sse =
+                     se->create_subexplorer( 0 ) ;
+     string field_name = "none";
 
-   value = m_macCOMM->sum( value ) ;
-   volume = m_macCOMM->sum( volume ) ;
-   if (m_macCOMM->rank())
-      std::cout << "Mean value in whole domain: " << value/volume << endl;
+     // Read the field name
+     if ( sse->has_entry( "field_name" ) ) {
+        field_name = sse->string_data( "field_name" );
+        fva.field_name = field_name;
+     } else {
+        MAC_Error::object()->raise_missing_keyword( sse, "field_name" ) ;
+     }
 
-   return (value/volume);
+     if ( !dom->has_discrete_field( field_name ) ) {
+        MAC_Error::object()->raise_bad_data_value( sse,
+                            "field_name", field_name+" does not exist" );
+     } else {
+        fva.FF = dom->discrete_field( field_name );
+     }
 
+     // Read if mean is with or without porosity
+     if ( sse->has_entry( "withPorosity" ) ) {
+        fva.withPorosity = sse->bool_data( "withPorosity" );
+     } else {
+        MAC_Error::object()->raise_missing_keyword( sse, "withPorosity" ) ;
+     }
+
+     // Read kernel
+     if ( sse->has_entry( "kernel_type" ) )
+        fva.kernelType = sse->int_data( "kernel_type" ) ;
+     else fva.kernelType = 0 ;
+
+     // Read volume width
+     if ( sse->has_entry( "volume_width" ) )
+      fva.volumeWidth = sse->double_data( "volume_width" ) ;
+     else MAC_Error::object()->raise_missing_keyword( sse,"volume_width (in Dp)" ) ;
+
+     m_fieldVolumeAverageAroundRB_list.push_back(fva);
+
+     sse->destroy(); sse = 0;
+  }
+  se->destroy(); se = 0;
 }
 
 
@@ -143,6 +168,14 @@ PostProcessing::prepare_fieldVolumeAverageInBox( MAC_Object* a_owner
         MAC_Error::object()->raise_missing_keyword( sse, "box_name" ) ;
      }
 
+     // Read if mean is with or without porosity
+     if ( sse->has_entry( "withPorosity" ) ) {
+        fva.withPorosity = sse->bool_data( "withPorosity" );
+     } else {
+        MAC_Error::object()->raise_missing_keyword( sse, "withPorosity" ) ;
+     }
+     if (!m_is_solids) fva.withPorosity = false;
+
      // Read the gravity center of box
      doubleVector gc( m_dim, 0 );
      if ( sse->has_entry( "GravityCenter" ) ) {
@@ -188,10 +221,16 @@ PostProcessing::prepare_fieldVolumeAverageInBox( MAC_Object* a_owner
 
 //---------------------------------------------------------------------------
 void
-PostProcessing::compute_fieldVolumeAverageInBox( )
+PostProcessing::compute_fieldVolumeAverageInBox(
+                                    DS_AllRigidBodies* allrigidbodies )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "PostProcessing::compute_fieldVolumeAverageInBox" ) ;
+
+  string fileName = "./Res/fieldVolumeAverageInBox.res";
+  std::ofstream MyFile (fileName.c_str(), std::ios::out);
+  MyFile.setf(std::ios::scientific,std::ios::floatfield);
+  MyFile.precision(6);
 
   list<struct fieldVolumeAverageInBox>::const_iterator it;
 
@@ -201,122 +240,32 @@ PostProcessing::compute_fieldVolumeAverageInBox( )
 
       doubleVector const& box_length = it->length->to_double_vector();
       doubleVector const& box_center = it->center->to_double_vector();
-      boolVector const* is_periodic = MESH->get_periodic_directions();
+
+      if (m_macCOMM->rank() == 0) {
+         MyFile << "# Average "
+                << it->field_name
+                << " in "
+                << it->box_name
+                << " with porosity "
+                << it->withPorosity << endl;
+      }
 
       for (size_t comp = 0; comp < it->FF->nb_components(); comp++) {
          size_t_vector min_local_index(m_dim,0);
          size_t_vector max_local_index(m_dim,0);
 
          for (size_t dir = 0; dir < m_dim; dir++) {
-            double global_min = MESH->get_main_domain_min_coordinate(dir);
-            double global_max = MESH->get_main_domain_max_coordinate(dir);
-            double local_min = MESH->get_min_coordinate_on_current_processor(dir);
-            double local_max = MESH->get_max_coordinate_on_current_processor(dir);
-            // Control volume min and max with periodic treatment, if any
+            // Control volume min and max, if any
             doubleVector box_extents(2,0.);
             box_extents(0) = box_center(dir) - box_length(dir)/2.;
             box_extents(1) = box_center(dir) + box_length(dir)/2.;
-            if ((*is_periodic)(dir)) {
-               box_extents(0) = periodic_transformation(box_extents(0),dir);
-               box_extents(1) = periodic_transformation(box_extents(1),dir);
-            }
 
-            // Warnings
-            if (m_macCOMM->rank() == 0) {
-               if (!(*is_periodic)(dir)) {
-                  if ((box_extents(0) < global_min)
-                   || (box_extents(1) > global_max))
-                     std::cout << endl <<
-                        " WARNING : Box Averaging Control Volume overlaps a " <<
-                        " non-periodic BC" << endl <<
-                        " Control volume will be reduced" << endl << endl;
-               }
-            }
+            size_t_vector temp =
+                  get_local_index_of_extents(box_extents, it->FF, dir, comp);
 
-            // Getting the minimum grid index in control volume (CV)
-            if (box_extents(0) < box_extents(1)) {// Non-periodic CV
-               if (box_extents(0) > local_min) {
-                  if (box_extents(0) < local_max) {
-                     size_t i0_temp = 0;
-                     bool found = FV_Mesh::between(
-                                    it->FF->get_DOF_coordinates_vector(comp,dir)
-                                  , box_extents(0)
-                                  , i0_temp) ;
-                     min_local_index(dir) = (found) ? i0_temp : 0;
-                  } else {
-                     min_local_index(dir) = 0;
-                  }
-               } else {
-                  if (box_extents(1) > local_min) {
-                     min_local_index(dir) =
-                        it->FF->get_min_index_unknown_handled_by_proc(comp,dir);
-                  } else {
-                     min_local_index(dir) = 0;
-                  }
-               }
-            } else {// periodic control volume
-               if (box_extents(0) > local_min) {
-                  if (box_extents(0) < local_max) {
-                     size_t i0_temp = 0;
-                     bool found = FV_Mesh::between(
-                                    it->FF->get_DOF_coordinates_vector(comp,dir)
-                                  , box_extents(0)
-                                  , i0_temp) ;
-                     min_local_index(dir) = (found) ? i0_temp : 0;
-                  } else if (box_extents(1) > local_min) {
-                     min_local_index(dir) =
-                        it->FF->get_min_index_unknown_handled_by_proc(comp,dir);
-                  } else {
-                     min_local_index(dir) = 0;
-                  }
-               } else {
-                  min_local_index(dir) =
-                        it->FF->get_min_index_unknown_handled_by_proc(comp,dir);
-               }
-            }
-
-            // Getting the maximum grid index in control volume (CV)
-            if (box_extents(0) < box_extents(1)) {// Non-periodic CV
-               if (box_extents(1) < local_max) {
-                  if (box_extents(1) > local_min) {
-                     size_t i0_temp = 0;
-                     bool found = FV_Mesh::between(
-                                    it->FF->get_DOF_coordinates_vector(comp,dir)
-                                  , box_extents(1)
-                                  , i0_temp) ;
-                     max_local_index(dir) = (found) ? i0_temp : 0;
-                  } else {
-                     max_local_index(dir) = 0;
-                  }
-               } else {
-                  if (box_extents(0) < local_max) {
-                     max_local_index(dir) =
-                        it->FF->get_max_index_unknown_handled_by_proc(comp,dir);
-                  } else {
-                     max_local_index(dir) = 0;
-                  }
-               }
-            } else {// periodic control volume
-               if (box_extents(1) < local_max) {
-                  if (box_extents(1) > local_min) {
-                     size_t i0_temp = 0;
-                     bool found = FV_Mesh::between(
-                                    it->FF->get_DOF_coordinates_vector(comp,dir)
-                                  , box_extents(1)
-                                  , i0_temp) ;
-                     max_local_index(dir) = (found) ? i0_temp : 0;
-                  } else if (box_extents(0) < local_max) {
-                     max_local_index(dir) =
-                        it->FF->get_max_index_unknown_handled_by_proc(comp,dir);
-                  } else {
-                     max_local_index(dir) = 0;
-                  }
-               } else {
-                  max_local_index(dir) =
-                        it->FF->get_max_index_unknown_handled_by_proc(comp,dir);
-               }
-            }
-         }  // dir
+            min_local_index(dir) = temp(0);
+            max_local_index(dir) = temp(1);
+         }
 
          double value = 0.;
          double volume = 0.;
@@ -334,9 +283,16 @@ PostProcessing::compute_fieldVolumeAverageInBox( )
                                    k <= max_local_index(2); k++) {
                            double dz = (m_dim == 3) ?
                                        it->FF->get_cell_size( k, comp, 2 ) : 1;
+                           double epsilon = 1;
+                           if (it->withPorosity) {
+                              size_t_vector* void_frac = allrigidbodies
+														->get_void_fraction_on_grid(it->FF);
+                              size_t p = it->FF->DOF_local_number(i,j,k,comp);
+                              epsilon = (void_frac->operator()(p) != 0)? 0 : 1 ;
+                           }
                            value += it->FF->DOF_value(i, j, k, comp, 0)
-                                    * dx * dy * dz;
-                           volume += dx * dy * dz;
+                                    * epsilon * dx * dy * dz;
+                           volume += dx * dy * dz * epsilon;
                         }
                      }
                   }
@@ -346,11 +302,252 @@ PostProcessing::compute_fieldVolumeAverageInBox( )
 
          value = m_macCOMM->sum( value ) ;
          volume = m_macCOMM->sum( volume ) ;
-         if (m_macCOMM->rank() == 0)
-            std::cout << "Mean value in CV: " << value/volume << endl;
+         if (m_macCOMM->rank() == 0) {
+            if (volume != 0.) {
+               MyFile << value/volume << '\t';
+            } else {
+               MyFile << 0. << '\t';
+            }
+         }
 
      }  // comp
+     if (m_macCOMM->rank() == 0) MyFile << endl;
   }  // box
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void
+PostProcessing::compute_fieldVolumeAverageAroundRB(
+                                    DS_AllRigidBodies* allrigidbodies )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "PostProcessing::compute_fieldVolumeAverageAroundRB" ) ;
+
+  string fileName = "./Res/fieldVolumeAverageAroundRB.res";
+  std::ofstream MyFile (fileName.c_str(), std::ios::out);
+  MyFile.setf(std::ios::scientific,std::ios::floatfield);
+  MyFile.precision(6);
+
+  size_t m_nrb = allrigidbodies->get_number_rigid_bodies();
+  list<struct fieldVolumeAverageAroundRB>::const_iterator it;
+
+  for (size_t parID = 0; parID < m_nrb; parID++) {
+     for ( it = m_fieldVolumeAverageAroundRB_list.begin()
+         ; it != m_fieldVolumeAverageAroundRB_list.end()
+         ; it++ ) {
+
+         if (m_macCOMM->rank() == 0) {
+            MyFile << "# Average "
+                   << it->field_name
+                   << " around rigid body "
+                   << parID
+                   << " with kernel "
+                   << it->kernelType
+                   << ", the box size "
+                   << it->volumeWidth
+                   << ", and porosity "
+                   << it->withPorosity
+                   << endl;
+         }
+
+         DS_RigidBody const* rigidBody = allrigidbodies
+                                             ->get_ptr_rigid_body(parID);
+
+         geomVector const* ptgc = rigidBody->get_ptr_to_gravity_centre();
+         double cr = rigidBody->get_circumscribed_radius();
+
+         for (size_t comp = 0; comp < it->FF->nb_components(); comp++) {
+            size_t_vector min_local_index(m_dim,0);
+            size_t_vector max_local_index(m_dim,0);
+
+            for (size_t dir = 0; dir < m_dim; dir++) {
+               // Control volume min and max, if any
+               doubleVector box_extents(2,0.);
+               box_extents(0) = ptgc->operator()(dir) -
+                                             (cr + it->volumeWidth*(2.*cr));
+               box_extents(1) = ptgc->operator()(dir) +
+                                             (cr + it->volumeWidth*(2.*cr));
+
+               size_t_vector temp =
+                     get_local_index_of_extents(box_extents, it->FF, dir, comp);
+
+               min_local_index(dir) = temp(0);
+               max_local_index(dir) = temp(1);
+            }
+
+            double value = 0.;
+            double volume = 0.;
+
+            if (min_local_index(0) != 0) {
+               for (size_t i = min_local_index(0);
+                          i <= max_local_index(0); i++) {
+                  double dx = it->FF->get_cell_size( i, comp, 0 );
+                  if (min_local_index(1) != 0) {
+                     for (size_t j = min_local_index(1);
+                                j <= max_local_index(1); j++) {
+                        double dy = it->FF->get_cell_size( j, comp, 1 );
+                        if (min_local_index(2) != 0) {
+                           for (size_t k = min_local_index(2);
+                                      k <= max_local_index(2); k++) {
+                              double dz = (m_dim == 3) ?
+                                       it->FF->get_cell_size( k, comp, 2 ) : 1;
+                              double epsilon = 1;
+                              if (it->withPorosity) {
+                                 size_t_vector* void_frac = allrigidbodies
+   														->get_void_fraction_on_grid(it->FF);
+                                 size_t p = it->FF->DOF_local_number(i,j,k,comp);
+                                 epsilon=(void_frac->operator()(p) != 0)? 0 : 1 ;
+                              }
+                              value += it->FF->DOF_value(i, j, k, comp, 0)
+                                       * epsilon * dx * dy * dz;
+                              volume += dx * dy * dz * epsilon;
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+
+            value = m_macCOMM->sum( value ) ;
+            volume = m_macCOMM->sum( volume ) ;
+            if (m_macCOMM->rank() == 0) {
+               if (volume != 0.) {
+                  MyFile << value/volume << '\t';
+               } else {
+                  MyFile << 0. << '\t';
+               }
+            }
+
+         }
+         if (m_macCOMM->rank() == 0) MyFile << endl;
+      }
+   }
+}
+
+
+
+
+//---------------------------------------------------------------------------
+size_t_vector
+PostProcessing::get_local_index_of_extents( class doubleVector& bounds
+                                          , FV_DiscreteField const* FF
+                                          , size_t const& dir
+                                          , size_t const& comp)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "PostProcessing::get_grid_index_of_extents" ) ;
+
+  size_t_vector value(2,0);
+
+  boolVector const* is_periodic = MESH->get_periodic_directions();
+
+  // Control volume periodic treatment, if any
+  if ((*is_periodic)(dir)) {
+     bounds(0) = periodic_transformation(bounds(0),dir);
+     bounds(1) = periodic_transformation(bounds(1),dir);
+  }
+
+  double global_min = MESH->get_main_domain_min_coordinate(dir);
+  double global_max = MESH->get_main_domain_max_coordinate(dir);
+  double local_min = MESH->get_min_coordinate_on_current_processor(dir);
+  double local_max = MESH->get_max_coordinate_on_current_processor(dir);
+
+  // Warnings
+  if (m_macCOMM->rank() == 0) {
+     if (!(*is_periodic)(dir)) {
+        if ((bounds(0) < global_min)
+        || (bounds(1) > global_max))
+           std::cout << endl <<
+             " WARNING : Box Averaging Control Volume overlaps a " <<
+             " non-periodic BC" << endl <<
+             " Control volume will be reduced" << endl << endl;
+     }
+  }
+
+  // Getting the minimum grid index in control volume (CV)
+  if (bounds(0) < bounds(1)) {// Non-periodic CV
+     if (bounds(0) > local_min) {
+        if (bounds(0) < local_max) {
+           size_t i0_temp = 0;
+           bool found = FV_Mesh::between(
+                          FF->get_DOF_coordinates_vector(comp,dir)
+                        , bounds(0)
+                        , i0_temp) ;
+           value(0) = (found) ? i0_temp : 0;
+        } else {
+           value(0) = 0;
+        }
+     } else {
+        if (bounds(1) > local_min) {
+           value(0) = FF->get_min_index_unknown_handled_by_proc(comp,dir);
+        } else {
+           value(0) = 0;
+        }
+     }
+  } else {// periodic control volume
+     if (bounds(0) > local_min) {
+        if (bounds(0) < local_max) {
+           size_t i0_temp = 0;
+           bool found = FV_Mesh::between(
+                          FF->get_DOF_coordinates_vector(comp,dir)
+                        , bounds(0)
+                        , i0_temp) ;
+           value(0) = (found) ? i0_temp : 0;
+        } else if (bounds(1) > local_min) {
+           value(0) =
+             FF->get_min_index_unknown_handled_by_proc(comp,dir);
+        } else {
+           value(0) = 0;
+        }
+     } else {
+        value(0) = FF->get_min_index_unknown_handled_by_proc(comp,dir);
+     }
+  }
+
+  // Getting the maximum grid index in control volume (CV)
+  if (bounds(0) < bounds(1)) {// Non-periodic CV
+     if (bounds(1) < local_max) {
+        if (bounds(1) > local_min) {
+           size_t i0_temp = 0;
+           bool found = FV_Mesh::between(
+                          FF->get_DOF_coordinates_vector(comp,dir)
+                        , bounds(1)
+                        , i0_temp) ;
+           value(1) = (found) ? i0_temp : 0;
+        } else {
+           value(1) = 0;
+        }
+     } else {
+        if (bounds(0) < local_max) {
+           value(1) = FF->get_max_index_unknown_handled_by_proc(comp,dir);
+        } else {
+           value(1) = 0;
+        }
+     }
+  } else {// periodic control volume
+     if (bounds(1) < local_max) {
+        if (bounds(1) > local_min) {
+           size_t i0_temp = 0;
+           bool found = FV_Mesh::between(
+                          FF->get_DOF_coordinates_vector(comp,dir)
+                        , bounds(1)
+                        , i0_temp) ;
+           value(1) = (found) ? i0_temp : 0;
+        } else if (bounds(0) < local_max) {
+           value(1) = FF->get_max_index_unknown_handled_by_proc(comp,dir);
+        } else {
+           value(1) = 0;
+        }
+     } else {
+        value(1) = FF->get_max_index_unknown_handled_by_proc(comp,dir);
+     }
+  }
+
+  return (value);
+
 }
 
 

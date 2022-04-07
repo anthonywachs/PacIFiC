@@ -3,6 +3,7 @@
 
 #include <FV_DiscreteField.hh>
 #include <DS_AllRigidBodies.hh>
+#include <DS_RigidBody.hh>
 #include <MAC_Communicator.hh>
 #include <FV_DomainAndFields.hh>
 #include <MAC_DoubleVector.hh>
@@ -23,6 +24,18 @@ struct fieldVolumeAverageInBox
   string box_name;
   MAC_DoubleVector* center;
   MAC_DoubleVector* length;
+  bool withPorosity;
+};
+
+/** @brief The Structure fieldVolumeAverageAroundRB.
+Information to compute the mean value of a field into a defined box */
+struct fieldVolumeAverageAroundRB
+{
+  FV_DiscreteField const* FF;
+  string field_name;
+  double volumeWidth;
+  bool withPorosity;
+  size_t kernelType;
 };
 
 
@@ -53,14 +66,20 @@ class PostProcessing
                                           , MAC_ModuleExplorer const* exp
                                           , FV_DomainAndFields const* dom);
 
-      /** @brief Compute average field in the list of boxes */
-      void compute_fieldVolumeAverageInBox( );
+      /** @brief Read parameters from prob def for averaging around RB*/
+      void prepare_fieldVolumeAverageAroundRB( MAC_Object* a_owner
+                                          , MAC_ModuleExplorer const* exp
+                                          , FV_DomainAndFields const* dom);
 
-      /** @brief Compute the L2 norm of a given field
-      @param FF field
-      @param comp field component */
-      double compute_mean( FV_DiscreteField const* FF
-                         , size_t const& comp);
+      /** @brief Compute average field in the list of boxes
+      @param allrigidbodies pointer to all rigid bodies */
+      void compute_fieldVolumeAverageInBox(
+                                    DS_AllRigidBodies* allrigidbodies);
+
+      /** @brief Compute average field around a RB for all list of boxes
+      @param allrigidbodies pointer to all rigid bodies */
+      void compute_fieldVolumeAverageAroundRB(
+                                    DS_AllRigidBodies* allrigidbodies);
 
    protected: //--------------------------------------------------------------
 
@@ -94,6 +113,17 @@ class PostProcessing
                            , double boxWidth
                            , size_t kernel_type );
 
+      /**@brief Return the grid index in a direction of box box_extents
+         @param bounds bounds of the box in particular direction
+         @param FF field
+         @param dir direction
+         @param comp field component
+       */
+       size_t_vector get_local_index_of_extents( class doubleVector& bounds
+                                              , FV_DiscreteField const* FF
+                                              , size_t const& dir
+                                              , size_t const& comp);
+
       /**@brief Transform a point using PBC
          @param x point
          @param dir transformation direction
@@ -115,6 +145,8 @@ class PostProcessing
       between processors */
 
       list<struct fieldVolumeAverageInBox> m_fieldVolumeAverageInBox_list;
+
+      list<struct fieldVolumeAverageAroundRB> m_fieldVolumeAverageAroundRB_list;
 
 
       //@}
