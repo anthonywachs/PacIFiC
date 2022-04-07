@@ -130,6 +130,12 @@ class PostProcessing
        */
        double periodic_transformation( double const& x, size_t const& dir);
 
+      /**@brief Transform distance using PBC
+         @param delta distance
+         @param dir transformation direction
+       */
+       double delta_periodic_transformation( double const& delta, size_t const& dir);
+
    private: //----------------------------------------------------------------
 
       // Pointers to the constant fields and primary grid

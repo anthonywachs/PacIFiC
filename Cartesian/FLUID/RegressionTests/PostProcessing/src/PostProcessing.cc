@@ -385,15 +385,31 @@ PostProcessing::compute_fieldVolumeAverageAroundRB(
                for (size_t i = min_local_index(0);
                           i <= max_local_index(0); i++) {
                   double dx = it->FF->get_cell_size( i, comp, 0 );
+                  double xC = it->FF->get_DOF_coordinate( i, comp, 0) ;
+                  xC = delta_periodic_transformation(
+                                 fabs(xC - ptgc->operator()(0)), 0);
                   if (min_local_index(1) != 0) {
                      for (size_t j = min_local_index(1);
                                 j <= max_local_index(1); j++) {
                         double dy = it->FF->get_cell_size( j, comp, 1 );
+                        double yC = it->FF->get_DOF_coordinate( j, comp, 1) ;
+                        yC = delta_periodic_transformation(
+                                       fabs(yC - ptgc->operator()(1)), 1);
                         if (min_local_index(2) != 0) {
                            for (size_t k = min_local_index(2);
                                       k <= max_local_index(2); k++) {
                               double dz = (m_dim == 3) ?
                                        it->FF->get_cell_size( k, comp, 2 ) : 1;
+                              double zC = (m_dim == 3) ?
+                                  it->FF->get_DOF_coordinate( k, comp, 2) : 0.;
+                              zC = delta_periodic_transformation(
+                                           fabs(zC - ptgc->operator()(2)), 2);
+
+                              double distance = MAC::sqrt(xC*xC + yC*yC + zC*zC);
+                              double weight = kernel(distance
+                                                   , cr
+                                                   , 2.*cr*(1.+2.*it->volumeWidth)
+                                                   , it->kernelType);
                               double epsilon = 1;
                               if (it->withPorosity) {
                                  size_t_vector* void_frac = allrigidbodies
@@ -401,9 +417,10 @@ PostProcessing::compute_fieldVolumeAverageAroundRB(
                                  size_t p = it->FF->DOF_local_number(i,j,k,comp);
                                  epsilon=(void_frac->operator()(p) != 0)? 0 : 1 ;
                               }
+
                               value += it->FF->DOF_value(i, j, k, comp, 0)
-                                       * epsilon * dx * dy * dz;
-                              volume += dx * dy * dz * epsilon;
+                                       * epsilon * weight * dx * dy * dz;
+                              volume += epsilon * weight * dx * dy * dz;
                            }
                         }
                      }
@@ -442,18 +459,15 @@ PostProcessing::get_local_index_of_extents( class doubleVector& bounds
 
   size_t_vector value(2,0);
 
-  boolVector const* is_periodic = MESH->get_periodic_directions();
-
-  // Control volume periodic treatment, if any
-  if ((*is_periodic)(dir)) {
-     bounds(0) = periodic_transformation(bounds(0),dir);
-     bounds(1) = periodic_transformation(bounds(1),dir);
-  }
+  bounds(0) = periodic_transformation(bounds(0),dir);
+  bounds(1) = periodic_transformation(bounds(1),dir);
 
   double global_min = MESH->get_main_domain_min_coordinate(dir);
   double global_max = MESH->get_main_domain_max_coordinate(dir);
   double local_min = MESH->get_min_coordinate_on_current_processor(dir);
   double local_max = MESH->get_max_coordinate_on_current_processor(dir);
+
+  boolVector const* is_periodic = MESH->get_periodic_directions();
 
   // Warnings
   if (m_macCOMM->rank() == 0) {
@@ -631,10 +645,39 @@ double PostProcessing:: periodic_transformation( double const& x
 {
   MAC_LABEL( "PostProcessing:: periodic_transformation" ) ;
 
-  double isize = MESH->get_main_domain_max_coordinate(dir)
-               - MESH->get_main_domain_min_coordinate(dir);
-  double imin = MESH->get_main_domain_min_coordinate(dir);
-  double value = x - MAC::floor((x-imin)/isize)*isize;
+  double value = x;
+
+  boolVector const* is_periodic = MESH->get_periodic_directions();
+  // Control volume periodic treatment, if any
+  if ((*is_periodic)(dir)) {
+     double isize = MESH->get_main_domain_max_coordinate(dir)
+                  - MESH->get_main_domain_min_coordinate(dir);
+     double imin = MESH->get_main_domain_min_coordinate(dir);
+     value = x - MAC::floor((x-imin)/isize)*isize;
+  }
+
+  return (value);
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double PostProcessing:: delta_periodic_transformation( double const& delta
+                                                     , size_t const& dir)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "PostProcessing:: delta_periodic_transformation" ) ;
+
+  double value = delta;
+
+  boolVector const* is_periodic = MESH->get_periodic_directions();
+  // Control volume periodic treatment, if any
+  if ((*is_periodic)(dir)) {
+     double isize = MESH->get_main_domain_max_coordinate(dir)
+                  - MESH->get_main_domain_min_coordinate(dir);
+     value = delta - round(delta/isize) * isize;
+  }
 
   return (value);
 }
