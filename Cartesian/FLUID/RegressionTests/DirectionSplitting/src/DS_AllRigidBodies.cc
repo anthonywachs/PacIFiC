@@ -6,6 +6,7 @@
 #include <FV_DiscreteField.hh>
 #include <FV_Mesh.hh>
 #include <cmath>
+#define EPSILON 1.e-7
 using std::endl;
 
 
@@ -1287,8 +1288,7 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
      if (in_domain(0)) {
 
         for (size_t l = 0; l < m_space_dimension; l++)
-           sign[l] = (surface_normal[i]->operator()(l) > 0.) ? 1 : -1 ;
-
+           sign[l] = (surface_normal[i]->operator()(l) > -EPSILON) ? 1 : -1 ;
 
         for (size_t comp = 0; comp < nb_comps; comp++) {
            // Finding the grid indexes next to ghost points
