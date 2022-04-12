@@ -133,9 +133,7 @@ class FV_DiscreteField : public MAC_Object
 	
       void build_field_numbering( void ) ;
       
-      void initialize_DOFs( MAC_ModuleExplorer const* exp ) ;
-      
-      void allocate_DLMFDconstrainedDOFs( void ) ;	
+      void initialize_DOFs( MAC_ModuleExplorer const* exp ) ;	
 
       
    //-- Identification
@@ -216,14 +214,6 @@ class FV_DiscreteField : public MAC_Object
       size_t DOF_global_number( size_t i, size_t j, size_t k,
       	size_t component ) const ;
 	
-      // Here DLMFDconstrainedDOFs are define as a Boolean
-      // bool DOF_is_constrained( size_t i, size_t j, size_t k,
-      // 	size_t component ) const ;
-      
-      // Here DLMFDconstrainedDOFs are define as a integer
-      int DOF_is_constrained( size_t i, size_t j, size_t k,
-      	size_t component ) const ;
-	
       size_t global_index_from_local( size_t i, size_t component, 
       	size_t direction ) const ;
 
@@ -247,16 +237,14 @@ class FV_DiscreteField : public MAC_Object
 	const double &Y_coordinate, const double &Z_coordinate,
 	size_t component, size_t level ) const ;
 	
-      /**
-        @brief Reconstruct field values in 3D
-        @param X_coordinate x coordinate
-        @param Y_coordinate y coordinate
-        @param Z_coordinate z coordinate
-        @param component field component
-        @param level component storage level
-        @param kernelWidth length scale of Gaussian function
-        @param dp Particle diameter
-      */
+      /** @brief Reconstruct field values in 3D
+      @param X_coordinate x coordinate
+      @param Y_coordinate y coordinate
+      @param Z_coordinate z coordinate
+      @param component field component
+      @param level component storage level
+      @param kernelWidth length scale of Gaussian function
+      @param dp Particle diameter */
       double GaussianReconstructionFieldValues(
         const double &X_coordinate,
         const double &Y_coordinate,
@@ -266,16 +254,14 @@ class FV_DiscreteField : public MAC_Object
         const double kernelWidth,
         const double dp ) const ;    
 	
-      /**
-        @brief Reconstruct field values in 3D using a corrective Kernel
-        @param X_coordinate x coordinate
-        @param Y_coordinate y coordinate
-        @param Z_coordinate z coordinate
-        @param component field component
-        @param level component storage level
-        @param kernelWidth length scale of the corrective kernel
-        @param dp Particle diameter
-      */
+      /** @brief Reconstruct field values in 3D using a corrective Kernel
+      @param X_coordinate x coordinate
+      @param Y_coordinate y coordinate
+      @param Z_coordinate z coordinate
+      @param component field component
+      @param level component storage level
+      @param kernelWidth length scale of the corrective kernel
+      @param dp Particle diameter */
       double CorrectiveKernelAverageFieldValues(
         const double &X_coordinate,
         const double &Y_coordinate,
@@ -289,7 +275,7 @@ class FV_DiscreteField : public MAC_Object
       @param X_coordinate x coordinate
       @param Y_coordinate y coordinate
       @param component field component
-      @param level component storage level*/
+      @param level component storage level */
       double interpolateFieldValues( const double &X_coordinate,
           const double &Y_coordinate, size_t component, size_t level ) const ;
 
@@ -299,7 +285,7 @@ class FV_DiscreteField : public MAC_Object
       @param Y_coordinate y coordinate
       @param Z_coordinate z coordinate
       @param component field component
-      @param level component storage level*/
+      @param level component storage level */
       geomVector interpolateGradient( const double &X_coordinate,
 	const double &Y_coordinate, const double &Z_coordinate, 
 	size_t component, size_t level ) const ;	
@@ -310,22 +296,20 @@ class FV_DiscreteField : public MAC_Object
       @param Y_coordinate y coordinate
       @param Z_coordinate z coordinate
       @param component field component
-      @param level component storage level*/
+      @param level component storage level */
       double interpolateLap( const double &X_coordinate,
 	const double &Y_coordinate, const double &Z_coordinate, 
 	size_t component, size_t level ) const ;
 	
-      /**
-        @brief Compute gradient in 3D, using a corrective Kernel
-        adapted to the Cappecelatro method
-        @param X_coordinate x coordinate
-        @param Y_coordinate y coordinate
-        @param Z_coordinate z coordinate
-        @param component field component
-        @param level component storage level
-        @param kernelWidth length scale of Gaussian function
-        @param dp Particle diameter
-      */
+      /** @brief Compute gradient in 3D, using a corrective Kernel
+      adapted to the Cappecelatro method
+      @param X_coordinate x coordinate
+      @param Y_coordinate y coordinate
+      @param Z_coordinate z coordinate
+      @param component field component
+      @param level component storage level
+      @param kernelWidth length scale of Gaussian function
+      @param dp Particle diameter */
       geomVector CorrectiveKernelGradientFieldValues(
         const double &X_coordinate,
         const double &Y_coordinate,
@@ -335,17 +319,15 @@ class FV_DiscreteField : public MAC_Object
         const double kernelWidth,
         const double dp ) const ;
 
-      /**
-        @brief Compute gradient in 3D, using two-cubes in both
-	sides (not used for the moment)
-        @param X_coordinate x coordinate
-        @param Y_coordinate y coordinate
-        @param Z_coordinate z coordinate
-        @param component field component
-        @param level component storage level
-        @param kernelWidth length scale of Gaussian function
-        @param dp Particle diameter
-      */
+      /** @brief Compute gradient in 3D, using two-cubes in both
+      sides (not used for the moment)
+      @param X_coordinate x coordinate
+      @param Y_coordinate y coordinate
+      @param Z_coordinate z coordinate
+      @param component field component
+      @param level component storage level
+      @param kernelWidth length scale of Gaussian function
+      @param dp Particle diameter */
       geomVector interpolateGradientWithKernel(
         const double &X_coordinate,
         const double &Y_coordinate,
@@ -354,19 +336,16 @@ class FV_DiscreteField : public MAC_Object
         size_t level,
         const double kernelWidth,
         const double dp ) const ;
-		
-	
-      /**
-        @brief Compute Laplacian in 3D, equivalent of "interpolateGradient
-	WithKernel" method, used to compute explicit viscouse drag
-        @param X_coordinate x coordinate
-        @param Y_coordinate y coordinate
-        @param Z_coordinate z coordinate
-        @param component field component
-        @param level component storage level
-        @param kernelWidth length scale of Gaussian function
-        @param dp Particle diameter
-      */
+			
+      /** @brief Compute Laplacian in 3D, equivalent of "interpolateGradient
+      WithKernel" method, used to compute explicit viscouse drag
+      @param X_coordinate x coordinate
+      @param Y_coordinate y coordinate
+      @param Z_coordinate z coordinate
+      @param component field component
+      @param level component storage level
+      @param kernelWidth length scale of Gaussian function
+      @param dp Particle diameter */
       double interpolateLaplacianWithKernel(
         const double &X_coordinate,
         const double &Y_coordinate,
@@ -428,19 +407,8 @@ class FV_DiscreteField : public MAC_Object
       virtual void copy_DOFs_value( size_t source_level, size_t target_level ) ;
       
       virtual void add_to_DOFs_value( size_t component, size_t level,
-      		double const& val ) ;      
-      
-      void initialize_DLMFDconstrainedDOFs( void ) ;
-
-      // Here DLMFDconstrainedDOFs are define as a Boolean
-      //void set_DOF_constrained( size_t i, size_t j, size_t k,
-      //	size_t component ) ;      
-  
-      // Here DLMFDconstrainedDOFs are define as a Boolean
-      void set_DOF_constrained( size_t i, size_t j, size_t k,
-            size_t component, bool b_has_extended_constrained = 0 ) ;      
+      		double const& val ) ;         
     
-
             
    //-- Post processing
    
@@ -567,16 +535,11 @@ class FV_DiscreteField : public MAC_Object
 		size_t component, size_t direction,
 		double dxC, double dyC, double dzC ) ; 
 		
-      void synchronize_field( size_t level ) ;
-
-      virtual void synchronize_extended_DOF_constrained( 
-		size_t level, 
-		list<FV_TRIPLET> &ijk, 
-		list<size_t> &comps );  
+      void synchronize( size_t level ) ;
       
-      void set_HaloZone_Features( size_t level ) ;      
+      void set_synchronization_features( void ) ;      
 
-      void set_HaloZone_Features_Periodic( void ) ;
+      void set_periodic_synchronization_features( void ) ;
       
       FV_BoundaryCondition const* get_BC( size_t color ) const;      
 
@@ -715,9 +678,7 @@ class FV_DiscreteField : public MAC_Object
 	periodic, 5 = bufferzone standard + periodic */
       
       vector< intArray3D >* DOFcolors;
-      vector< intArray3D >* DOFstatus; 
-      //vector< boolArray3D >* DLMFDconstrainedDOFs;
-      vector< intArray3D >* DLMFDconstrainedDOFs;     
+      vector< intArray3D >* DOFstatus;   
       
       boolVector* PERIODIC;      
       vector< FV_SHIFT_TRIPLET >* PERIODIC_SHIFT;
@@ -731,9 +692,14 @@ class FV_DiscreteField : public MAC_Object
       
       vector< size_t_vector >* transproj_interpolation ;      
 
-      list< vector< double* > > halozone_values_list ;
-      list< vector< double* > > bufferzone_values ; 
-      size_t synchronized_level ;     
+      list< vector< vector< FV_TRIPLET > > > halozone_received ;
+      list< vector< vector< FV_TRIPLET > > > bufferzone_sent ;
+      list< size_t > synchronization_MPI_rank_neighbors;
+      list< double* > halozone_received_data;
+      list< size_t > halozone_received_data_size;
+      list< double* > bufferzone_sent_data;
+      list< size_t > bufferzone_sent_data_size; 
+      bool synchronization_ready ;     
       
    private: //----------------------------------------------------------
 
