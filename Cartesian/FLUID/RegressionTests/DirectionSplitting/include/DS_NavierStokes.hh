@@ -8,6 +8,7 @@
 #include <boolVector.hh>
 #include <solvercomputingtime.hh>
 #include <MAC_DoubleVector.hh>
+// #include <PostProcessing.hh>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -441,6 +442,8 @@ class DS_NavierStokes : public MAC_Object,
       MAC_DoubleVector* gravity_vector ;
       bool is_periodic[2][3];
 
+      // // Post Processing variable
+      // PostProcessing* postProcessing;
 } ;
 
 #endif
