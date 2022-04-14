@@ -64,7 +64,7 @@ void draw_lag(struct _draw_lag p) {
       }
     }
   }
-  if (vertices || p.vc || p.vs) {
+  if (p.vs > 0.) {
     p.vs = (p.vs) ? p.vs : 8.;
     if (p.vc) {color[0] = p.vc[0]; color[1] = p.vc[1]; color[2] = p.vc[2];}
     else {color[0] = 0.; color[1] = 0.; color[2] = 0.;}

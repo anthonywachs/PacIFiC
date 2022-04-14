@@ -18,6 +18,7 @@ typedef struct lagNode {
   coord normal;
   double curv;
   double ref_curv;
+  double shear_tension;
 } lagNode;
 
 /** Similarly, the edges of the mesh are assigned the IDs of the two nodes they
@@ -45,6 +46,10 @@ void free_mesh(lagMesh* mesh) {
   free(mesh->nodes);
   free(mesh->edges);
 }
+
+#define ACROSS_PERIODIC(a,b) (fabs(a,b) > L0/2.)
+#define PERIODIC_1DIST(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 - b : a - L0 + b)
+#define GENERAL_1DIST(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DIST(a,b) : a - b)
 
 /** The function below computes the length of an edge. It takes as arguments
 a pointer to the mesh as well as the ID of the edge of interest. */
@@ -94,6 +99,7 @@ void comp_edge_normals(lagMesh* mesh) {
 on the midpoints of all the edges. */
 void comp_normals(lagMesh* mesh) {
   if (!mesh->updated_normals) {
+    comp_mb_stretch(mesh);
     for(int i=0; i<mesh->nlp; i++) {
       coord n[2];
       double l[2];
@@ -256,5 +262,5 @@ event cleanup (t = end) {
   free_caps(&mbs);
 }
 
-/** Finally, we include some functions to create common initial shapes: */
-#include "common-shapes.h"
+// /** Finally, we include some functions to create common initial shapes: */
+// #include "common-shapes.h"

@@ -35,11 +35,12 @@ void bending(lagMesh* mesh) {
       l[j] = mesh->edges[edge_id].st*mesh->edges[edge_id].l0;
       m[j] = .5*E_B*(mesh->nodes[edge_nodes[0]].curv +
         mesh->nodes[edge_nodes[1]].curv - mesh->nodes[edge_nodes[0]].ref_curv -
-          mesh->nodes[edge_nodes[1]].ref_curv);
+        mesh->nodes[edge_nodes[1]].ref_curv);
     }
-    /** We then differentiate the bending moment to obtain q=dm/dl at the
-    considered node. */
+    /** We then differentiate the bending moment to obtain the transverse shear
+    tension q=dm/dl at the considered node. */
     double q = (m[1] - m[0])/(.5*(l[0] + l[1]));
+    mesh->nodes[i].shear_tension = q;
     foreach_dimension() mesh->nodes[i].lagForce.x += q*mesh->nodes[i].normal.x;
   }
 }
