@@ -47,7 +47,7 @@ void free_mesh(lagMesh* mesh) {
   free(mesh->edges);
 }
 
-#define ACROSS_PERIODIC(a,b) (fabs(a,b) > L0/2.)
+#define ACROSS_PERIODIC(a,b) (fabs(a - b) > L0/2.)
 #define PERIODIC_1DIST(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 - b : a - L0 + b)
 #define GENERAL_1DIST(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DIST(a,b) : a - b)
 
@@ -59,14 +59,7 @@ double comp_length(lagMesh* mesh, int i) {
   v1 = mesh->edges[i].vertex_ids[0];
   v2 = mesh->edges[i].vertex_ids[1];
   foreach_dimension() {
-    /** This if-statement deals with the case of periodic boundaries. */
-    if (fabs(mesh->nodes[v1].pos.x - mesh->nodes[v2].pos.x) > L0/2.) {
-      length += (fabs(mesh->nodes[v1].pos.x - L0
-        - mesh->nodes[v2].pos.x) > L0/2.) ?
-        sq(mesh->nodes[v1].pos.x + L0 - mesh->nodes[v2].pos.x) :
-        sq(mesh->nodes[v1].pos.x - L0 - mesh->nodes[v2].pos.x) ;
-      }
-    else length += sq(mesh->nodes[v1].pos.x - mesh->nodes[v2].pos.x);
+    length += sq(GENERAL_1DIST(mesh->nodes[v1].pos.x, mesh->nodes[v2].pos.x));
   }
   return sqrt(length);
 }
@@ -82,10 +75,10 @@ void comp_mb_stretch(lagMesh* mesh) {
 void comp_edge_normal(lagMesh* mesh, int i) {
     int node_id[2];
     for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].vertex_ids[j];
-    mesh->edges[i].normal.y = mesh->nodes[node_id[0]].pos.x
-      - mesh->nodes[node_id[1]].pos.x;
-    mesh->edges[i].normal.x = mesh->nodes[node_id[1]].pos.y
-      - mesh->nodes[node_id[0]].pos.y;
+    mesh->edges[i].normal.y = GENERAL_1DIST(mesh->nodes[node_id[0]].pos.x,
+      mesh->nodes[node_id[1]].pos.x);
+    mesh->edges[i].normal.x = GENERAL_1DIST(mesh->nodes[node_id[1]].pos.y,
+      mesh->nodes[node_id[0]].pos.y);
     double normn = sqrt(sq(mesh->edges[i].normal.x)
       + sq(mesh->edges[i].normal.y));
     foreach_dimension() mesh->edges[i].normal.x /= normn;
@@ -143,6 +136,16 @@ void comp_curvature(lagMesh* mesh) {
         foreach_dimension() p[j].x = up ? mesh->nodes[index].pos.x :
           mesh->nodes[index].pos.y;
       }
+      /* If one of the neighboring nodes is across a periodic boundary, we
+correct its position */
+      for(int j=0; j<3; j+=2) {
+        foreach_dimension() {
+          if (ACROSS_PERIODIC(p[j].x,p[1].x)) {
+            p[j].x += (ACROSS_PERIODIC(p[j].x + L0, p[1].x)) ? -L0 : L0;
+          }
+        }
+      }
+
       double dy, ddy; dy = 0.; ddy = 0.;
       for(int j=0; j<3; j++) {
         dy += p[j].y*(2*p[1].x - p[(j+1)%3].x - p[(j+2)%3].x)/

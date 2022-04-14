@@ -11,6 +11,10 @@ struct _initialize_circular_mb {
 void initialize_circular_mb(struct _initialize_circular_mb p) {
   double radius = (p.radius) ? p.radius : RADIUS;
   int nlp = (p.nlp) ? p.nlp : NLP;
+  coord shift;
+  if (p.shift.x || p.shift.y || p.shift.z)
+    {shift.x = p.shift.x; shift.y = p.shift.y; shift.z = p.shift.z;}
+  else {shift.x = 0.; shift.y = 0.; shift.z = 0.;}
   p.mesh->nlp = nlp;
   p.mesh->nle = nlp;
   p.mesh->nodes = malloc(nlp*sizeof(lagNode));
@@ -19,8 +23,8 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   double alpha = 2*pi/(nlp);
   /** Fill the array of nodes */
   for(int i=0; i<nlp; i++) {
-    p.mesh->nodes[i].pos.x = radius*cos(alpha*i);
-    p.mesh->nodes[i].pos.y = radius*sin(alpha*i);
+    p.mesh->nodes[i].pos.x = radius*cos(alpha*i) + shift.x;
+    p.mesh->nodes[i].pos.y = radius*sin(alpha*i) + shift.y;
     p.mesh->nodes[i].edge_ids[0] = -1;
     p.mesh->nodes[i].edge_ids[1] = -1;
     foreach_dimension() {
