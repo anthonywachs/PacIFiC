@@ -574,8 +574,8 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 	double gamma = mu/2.0;
 	TDMatrix* A = GLOBAL_EQ-> get_A(field);
 
-	size_t_vector min_unknown_index(dim,0);
-	size_t_vector max_unknown_index(dim,0);
+	size_t_vector min_unknown_index(3,0);
+	size_t_vector max_unknown_index(3,0);
 
 	for (size_t comp=0;comp<nb_comps[field];comp++) {
 		// Get local min and max indices
@@ -2005,8 +2005,8 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
 
-   min_unknown_index(2) = (dim == 3) ? 0 : 0;
-   max_unknown_index(2) = (dim == 3) ? 0 : 1;
+   // min_unknown_index(2) = (dim == 3) ? 0 : 0;
+   // max_unknown_index(2) = (dim == 3) ? 0 : 1;
 
    vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
    size_t_vector* void_frac = (is_solids) ?
