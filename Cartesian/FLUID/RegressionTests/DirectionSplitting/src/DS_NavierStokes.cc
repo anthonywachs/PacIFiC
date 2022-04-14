@@ -239,10 +239,6 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    allocate_mpi_variables(PF);
    allocate_mpi_variables(UF);
 
-   // Initialize velocity vector at the matrix level
-   GLOBAL_EQ->initialize_DS_velocity();
-   GLOBAL_EQ->initialize_DS_pressure();
-
    // Setting ugradu as zero at start of simulation
    if (b_restart == false) ugradu_initialization ( );
 
@@ -381,9 +377,6 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 	if ( b_projection_translation )
 		b_grid_has_been_translated_at_previous_time = false;
 
-   // Perform matrix level operations before each time step
-   GLOBAL_EQ->at_each_time_step( );
-
 	if ( my_rank == is_master )
 		SCT_get_elapsed_time( "Matrix_RE_Assembly&Initialization" );
 
@@ -396,12 +389,6 @@ DS_NavierStokes:: do_after_inner_iterations_stage(
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_NavierStokes:: do_after_inner_iterations_stage" ) ;
-
-   // Compute velocity change over the time step
-   double velocity_time_change = GLOBAL_EQ->compute_DS_velocity_change()
-   	/ t_it->time_step() ;
-   if ( my_rank == is_master ) cout << "velocity change = " <<
-     	MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
 
    // Compute hydrodynamic forces by surface viscous stress
    if ( my_rank == is_master ) SCT_set_start( "Viscous stress" );
@@ -1061,15 +1048,13 @@ DS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
             // Set P*_n as sum of P_(n-1/2)+phi_(n-1/2)
             double value = PF->DOF_value( i, j, k, 0, 0 )
                          + PF->DOF_value( i, j, k, 0, 1 );
-            GLOBAL_EQ->update_global_P_vector(i,j,k,value);
+				PF->set_DOF_value( i, j, k, 0, 1, value);
          }
      }
   }
 
-  // Synchronize the distributed DS solution vector
-  GLOBAL_EQ->synchronize_DS_solution_vec_P();
-  // Tranfer back to field
-  PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+  // Synchronize pressure field
+  PF->synchronize(1);
 
   PF->set_neumann_DOF_values();
 
@@ -1612,7 +1597,8 @@ DS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
                                             , double const& gamma
                                             , FV_TimeIterator const* t_it
                                             , size_t const& comp
-                                            , size_t const& dir)
+                                            , size_t const& dir
+													  	  , size_t const& level)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_NavierStokes:: solve_interface_unknowns" ) ;
@@ -1671,7 +1657,7 @@ DS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
 
             // Solve ui and transfer solution into distributed vector
             GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir)
-                                                            ,comp,dir,p);
+                                                            ,comp,dir,p,level);
          }
       }
 
@@ -1716,7 +1702,7 @@ DS_NavierStokes:: solve_interface_unknowns ( FV_DiscreteField* FF
 
                // Solve ui and transfer solution into distributed vector
                GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir)
-                                                            ,comp,dir,p);
+                                                            ,comp,dir,p,level);
             }
          }
       }
@@ -2077,7 +2063,8 @@ DS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
                                  , size_t const& dir_i
                                  , size_t const& dir_j
                                  , size_t const& dir_k
-                                 , double const& gamma)
+                                 , double const& gamma
+											, size_t const& level)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL("DS_NavierStokes:: Solve_i_in_jk" ) ;
@@ -2121,7 +2108,7 @@ DS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
               data_packing (FF,r_index,fe,comp,dir_i);
            }
         }
-        solve_interface_unknowns ( FF, gamma, t_it, comp, dir_i);
+        solve_interface_unknowns ( FF, gamma, t_it, comp, dir_i,level);
 
      } else if (is_periodic[field][dir_i] == 0) {
         // Serial mode with non-periodic condition
@@ -2130,7 +2117,7 @@ DS_NavierStokes:: Solve_i_in_jk ( FV_DiscreteField* FF
               size_t r_index = row_index->operator()(j,k);
               assemble_local_rhs(j,k,gamma,t_it,comp,dir_i,field);
               GLOBAL_EQ->DS_NavierStokes_solver(FF,j,k,min_unknown_index(dir_i)
-                                                           ,comp,dir_i,r_index);
+                                                  ,comp,dir_i,r_index,level);
            }
         }
      }
@@ -2249,33 +2236,28 @@ DS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    // Update gamma based for invidual direction
    gamma = mu/2.0;
 
-   Solve_i_in_jk(UF,t_it,0,1,2,gamma);
-   // Synchronize the distributed DS solution vector
-   GLOBAL_EQ->synchronize_DS_solution_vec();
-   // Tranfer back to field
-   UF->update_free_DOFs_value( 3, GLOBAL_EQ->get_solution_DS_velocity() ) ;
+   Solve_i_in_jk(UF,t_it,0,1,2,gamma,3);
+   // Synchronize the velocity field
+	UF->synchronize( 3 );
    if (is_solids) initialize_grid_nodes_on_rigidbody({3});
 
-   Solve_i_in_jk(UF,t_it,1,0,2,gamma);
-   // Synchronize the distributed DS solution vector
-   GLOBAL_EQ->synchronize_DS_solution_vec();
-   // Tranfer back to field
-   if (dim == 2) {
-      UF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_velocity() ) ;
-      if (is_solids) initialize_grid_nodes_on_rigidbody({0});
-   } else if (dim == 3) {
-      UF->update_free_DOFs_value( 4 , GLOBAL_EQ->get_solution_DS_velocity() ) ;
-      if (is_solids) initialize_grid_nodes_on_rigidbody({4});
-   }
+	size_t level = (dim == 2) ? 0 : 4 ;
+   Solve_i_in_jk(UF,t_it,1,0,2,gamma,level);
+	// Synchronize the velocity field
+	UF->synchronize( level );
+   if (is_solids) initialize_grid_nodes_on_rigidbody({level});
 
    if (dim == 3) {
-      Solve_i_in_jk(UF,t_it,2,0,1,gamma);
-      // Synchronize the distributed DS solution vector
-      GLOBAL_EQ->synchronize_DS_solution_vec();
-      // Tranfer back to field
-      UF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_velocity() ) ;
+      Solve_i_in_jk(UF,t_it,2,0,1,gamma,0);
+		// Synchronize the velocity field
+		UF->synchronize( 0 );
       if (is_solids) initialize_grid_nodes_on_rigidbody({0});
    }
+
+	// Compute velocity change over the time step
+	double velocity_time_change = compute_DS_velocity_change()/t_it->time_step();
+	if ( my_rank == is_master ) cout << "velocity change = " <<
+		MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
 
 }
 
@@ -2641,16 +2623,14 @@ DS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
               }
 
               if (count != 0.) value = value/count;
-              GLOBAL_EQ->update_global_P_vector(i,j,k,value);
+				  PF->set_DOF_value( i, j, k, comp, level, value);
            }
         }
      }
   }
 
-  // Synchronize the distributed DS solution vector
-  GLOBAL_EQ->synchronize_DS_solution_vec_P();
-  // Tranfer back to field
-  PF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+  // Synchronize the pressure field
+  PF->synchronize( level );
 }
 
 //---------------------------------------------------------------------------
@@ -2721,15 +2701,14 @@ DS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
               }
 
               if (count != 0.) value = value/count;
-              GLOBAL_EQ->update_global_P_vector(i,j,k,value);
+				  PF->set_DOF_value( i, j, k, comp, level, value);
            }
         }
      }
   }
-  // Synchronize the distributed DS solution vector
-  GLOBAL_EQ->synchronize_DS_solution_vec_P();
-  // Tranfer back to field
-  PF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+
+  // Synchronize the pressure field
+  PF->synchronize( level );
 }
 
 
@@ -2782,17 +2761,15 @@ DS_NavierStokes:: correct_mean_pressure (size_t const& level )
               size_t p = PF->DOF_local_number(i,j,k,comp);
               if (void_frac->operator()(p) == 0) {
                  double value = PF->DOF_value( i, j, k, comp, level );
-                 GLOBAL_EQ->update_global_P_vector(i,j,k,value-mean);
+					  PF->set_DOF_value( i, j, k, comp, level, value-mean);
               }
            }
         }
      }
   }
 
-  // Synchronize the distributed DS solution vector
-  GLOBAL_EQ->synchronize_DS_solution_vec_P();
-  // Tranfer back to field
-  PF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+  // Synchronize the pressure field
+  PF->synchronize( level );
 
 }
 
@@ -2808,24 +2785,18 @@ DS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
 
   double gamma=mu/2.0;
 
-  Solve_i_in_jk (PF,t_it,0,1,2,gamma);
-  // Synchronize the distributed DS solution vector
-  GLOBAL_EQ->synchronize_DS_solution_vec_P();
-  // Tranfer back to field
-  PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+  Solve_i_in_jk (PF,t_it,0,1,2,gamma,1);
+  // Synchronize the pressure field
+  PF->synchronize( 1 );
 
-  Solve_i_in_jk (PF,t_it,1,0,2,gamma);
-  // Synchronize the distributed DS solution vector
-  GLOBAL_EQ->synchronize_DS_solution_vec_P();
-  // Tranfer back to field
-  PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+  Solve_i_in_jk (PF,t_it,1,0,2,gamma,1);
+  // Synchronize the pressure field
+  PF->synchronize( 1 );
 
   if (dim == 3) {
-     Solve_i_in_jk (PF,t_it,2,0,1,gamma);
-     // Synchronize the distributed DS solution vector
-     GLOBAL_EQ->synchronize_DS_solution_vec_P();
-     // Tranfer back to field
-     PF->update_free_DOFs_value( 1, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+     Solve_i_in_jk (PF,t_it,2,0,1,gamma,1);
+	  // Synchronize the pressure field
+	  PF->synchronize( 1 );
   }
 
   if (PF->all_BCs_nonDirichlet(0)) {
@@ -2870,15 +2841,13 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
             double value = PF->DOF_value( i, j, k, 0, 0 )
                          + PF->DOF_value( i, j, k, 0, 1 )
                          - 0.5*kai*mu*(vel_div0+vel_div1);
-            GLOBAL_EQ->update_global_P_vector(i,j,k,value);
+				PF->set_DOF_value( i, j, k, 0, 0, value);
          }
       }
    }
 
-   // Synchronize the distributed DS solution vector
-   GLOBAL_EQ->synchronize_DS_solution_vec_P();
-   // Tranfer back to field
-   PF->update_free_DOFs_value( 0, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+   // Synchronize the pressure field
+	PF->synchronize( 0 );
 
    if (PF->all_BCs_nonDirichlet(0)) {
       correct_mean_pressure(0);
@@ -3079,6 +3048,48 @@ DS_NavierStokes::output_L2norm_pressure( size_t const& level )
                 << " Max P = "
                 << MAC::doubleToString( ios::scientific, 12, max_P ) << endl;
 
+}
+
+
+
+
+//----------------------------------------------------------------------
+double
+DS_NavierStokes:: compute_DS_velocity_change( void )
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_NavierStokes:: compute_DS_velocity_change" ) ;
+
+	size_t_vector min_unknown_index(3,0);
+	size_t_vector max_unknown_index(3,0);
+
+	double sum_sq_U=0.,sum_sq_dU=0.;
+
+	for (size_t comp = 0; comp < nb_comps[1]; comp++) {
+		for (size_t l = 0; l < dim; ++l) {
+			min_unknown_index(l) =
+							 UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+			max_unknown_index(l) =
+							 UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+		}
+
+
+		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+				for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+					sum_sq_U += pow(UF->DOF_value( i, j, k, comp, 0 ),2.);
+				   sum_sq_dU += pow(UF->DOF_value( i, j, k, comp, 0 )
+									   - UF->DOF_value( i, j, k, comp, 1 ),2.);
+
+				}
+			}
+		}
+	}
+
+	sum_sq_U = macCOMM->sum(sum_sq_U);
+	sum_sq_dU = macCOMM->sum(sum_sq_dU);
+
+   return ( MAC::sqrt(sum_sq_dU/sum_sq_U) ) ;
 }
 
 
@@ -3409,100 +3420,25 @@ DS_NavierStokes::fields_projection()
    pmesh->translation() ;
 
    UF->translation_projection( 0, 5, 0 ) ;
-   synchronize_velocity_field ( 0 ) ;
+   UF->synchronize( 0 ) ;
 
    UF->translation_projection( 1, 5, 0 ) ;
-   synchronize_velocity_field ( 1 ) ;
+   UF->synchronize( 1 ) ;
 
    UF->translation_projection( 2, 5, 0 ) ;
-   synchronize_velocity_field ( 2 ) ;
+   UF->synchronize( 2 ) ;
 
    UF->translation_projection( 3, 5, 0 ) ;
-   synchronize_velocity_field ( 3 ) ;
+	UF->synchronize( 3 ) ;
 
    UF->translation_projection( 4, 5 ) ;
-   synchronize_velocity_field ( 4 ) ;
+	UF->synchronize( 4 ) ;
 
    PF->translation_projection( 0, 2, 0 ) ;
-   synchronize_pressure_field( 0 ) ;
+	PF->synchronize( 0 );
 
    PF->translation_projection( 1, 2 ) ;
-   synchronize_pressure_field( 1 ) ;
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DS_NavierStokes:: synchronize_velocity_field ( size_t level )
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokes:: synchronize_velocity_field" ) ;
-
-   size_t_vector min_unknown_index(3,0);
-   size_t_vector max_unknown_index(3,0);
-
-   for (size_t comp=0;comp<nb_comps[1];++comp) {
-
-      // Get local min and max indices
-      for (size_t l=0;l<dim;++l) {
-         min_unknown_index(l) =
-                     UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-         max_unknown_index(l) =
-                     UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-      }
-
-      for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
-       for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
-        for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
-          GLOBAL_EQ->update_global_U_vector(i,j,k,comp,
-                                    UF->DOF_value(i, j, k, comp, level));
-        }
-       }
-      }
-   }
-
-   // Synchronize the distributed DS solution vector
-   GLOBAL_EQ->synchronize_DS_solution_vec();
-   // Tranfer back to field
-   UF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_velocity() ) ;
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
-DS_NavierStokes:: synchronize_pressure_field ( size_t level )
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokes:: synchronize_pressure_field" ) ;
-
-  size_t_vector min_unknown_index(3,0);
-  size_t_vector max_unknown_index(3,0);
-
-  // Get local min and max indices
-  for (size_t l=0;l<dim;++l) {
-     min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
-     max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
-  }
-
-  for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
-   for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
-    for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
-       GLOBAL_EQ->update_global_P_vector(i,j,k,
-                                 PF->DOF_value(i, j, k, 0, level));
-    }
-   }
-  }
-
-  // Synchronize the distributed DS solution vector
-  GLOBAL_EQ->synchronize_DS_solution_vec_P();
-  // Tranfer back to field
-  PF->update_free_DOFs_value( level, GLOBAL_EQ->get_solution_DS_pressure() ) ;
+	PF->synchronize( 1 );
 
 }
 

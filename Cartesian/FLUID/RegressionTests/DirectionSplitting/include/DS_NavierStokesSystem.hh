@@ -133,12 +133,6 @@ class DS_NavierStokesSystem : public MAC_Object
 
       /** @name Access */
       //@{
-      /** @brief Return the DS velocity solution vector DS_UF */
-      LA_SeqVector const* get_solution_DS_velocity( void ) const ;
-
-      /** @brief Return the DS pressure solution vector DS_PF */
-      LA_SeqVector const* get_solution_DS_pressure( void ) const ;
-
       /** @brief Return the matrix system of spacial discretization */
       TDMatrix* get_A(size_t const& field);
       /** @brief Return the Schur complement of spacial discretization */
@@ -154,18 +148,6 @@ class DS_NavierStokesSystem : public MAC_Object
                                   , size_t const& dir
                                   , size_t const& comp);
 
-      void update_global_P_vector(size_t const& i
-                                , size_t const& j
-                                , size_t const& k
-                                , double const& value);
-
-      void update_global_U_vector(size_t const& i
-                                , size_t const& j
-                                , size_t const& k
-                                , size_t const& comp
-                                , double const& value);
-
-
       /** @brief Return the Schur complement of
       Schur complement in case of periodic domain */
       TDMatrix* get_DoubleSchur(size_t const& field);
@@ -177,20 +159,6 @@ class DS_NavierStokesSystem : public MAC_Object
       ProdMatrix* get_Ap(size_t const& field);
       /** @brief Return RHS for the matrix system of spacial discretization */
       LocalVector* get_VEC(size_t const& field);
-
-   //-- Basic operations on matrices & vectors
-
-      /** @name Basic operations on matrices & vectors */
-      //@{
-      /** @brief Initialize the velocity unknown vector with field values */
-      void initialize_DS_velocity( void );
-      /** @brief Initialize the pressure unknown vector with field values */
-      void initialize_DS_pressure( void );
-      /** @brief Store velocity vector at previous time step */
-      void at_each_time_step( void ) ;
-      /** @brief Compute velocity change from one time step to the
-      next one with the direction splitting solution method */
-      double compute_DS_velocity_change( void );
 
    //-- Solver
 
@@ -204,14 +172,10 @@ class DS_NavierStokesSystem : public MAC_Object
                                  , size_t const& min_i
                                  , size_t const& comp
                                  , size_t const& dir
-                                 , size_t const& r_index) ;
+                                 , size_t const& r_index
+                                 , size_t const& level ) ;
 
       //@}
-
-      /** @brief Synchronize the DS solution vector for velocity*/
-      void synchronize_DS_solution_vec( void );
-      /** @brief Synchronize the DS solution vector for pressure*/
-      void synchronize_DS_solution_vec_P( void );
 
    //-- Output methods
 
@@ -274,20 +238,6 @@ class DS_NavierStokesSystem : public MAC_Object
       //-- Attributes
       FV_DiscreteField* UF ;
       FV_DiscreteField* PF ;
-
-      // Local vectors
-      LA_SeqVector * UF_DS_LOC ;
-      LA_SeqVector * PF_DS_LOC ;
-
-      // Global velocity solution vectors
-      LA_Vector * VEC_DS_UF ;
-      LA_Vector * VEC_DS_UF_previoustime ;
-      LA_Vector * VEC_DS_UF_timechange ;
-      // Global pressure solution vectors
-      LA_Vector * VEC_DS_PF ;
-      // Matrices & rhs
-      LA_Matrix * MAT_D_velocityUnsteadyPlusDiffusion ;
-      LA_Vector * VEC_rhs_D_velocityDiffusionPlusBodyTerm ;
 
       // Local vector to store row indexes for each
       // field (i.e. 2)

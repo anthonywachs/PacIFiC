@@ -120,25 +120,6 @@ DS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 {
    MAC_LABEL( "DS_NavierStokesSystem:: build_system" ) ;
 
-   // velocity Laplacian
-   MAT_D_velocityUnsteadyPlusDiffusion = LA_Matrix::make( this,exp->create_subexplorer( this,"MAT_D_velocityDiffusion"  ) ) ;
-   VEC_rhs_D_velocityDiffusionPlusBodyTerm = MAT_D_velocityUnsteadyPlusDiffusion->create_vector(this) ;
-
-   // Unknowns vectors
-   VEC_DS_UF = MAT_D_velocityUnsteadyPlusDiffusion->create_vector( this ) ;
-   VEC_DS_UF_previoustime = MAT_D_velocityUnsteadyPlusDiffusion->create_vector( this ) ;
-   VEC_DS_UF_timechange = MAT_D_velocityUnsteadyPlusDiffusion->create_vector( this ) ;
-
-   VEC_DS_PF = MAT_D_velocityUnsteadyPlusDiffusion->create_vector( this ) ;
-
-   // Local vector
-   UF_DS_LOC = LA_SeqVector::create( this, 0 ) ;
-   PF_DS_LOC = LA_SeqVector::create( this, 0 ) ;
-
-   // velocity numbering
-   UF_NUM = FV_SystemNumbering::create( this, UF ) ;
-   PF_NUM = FV_SystemNumbering::create( this, PF ) ;
-
 	// Local vectors to store diffusive terms
 	vel_diffusion.reserve(3);
 	vel_diffusion.push_back(new doubleVector(1,0.));
@@ -315,31 +296,8 @@ DS_NavierStokesSystem:: re_initialize( void )
 {
    MAC_LABEL( "DS_NavierStokesSystem:: re_initialize" ) ;
 
-   size_t UF_glob = UF->nb_global_unknowns() ;
    size_t UF_loc = UF->nb_local_unknowns() ;
-
-   size_t pf_glob = PF->nb_global_unknowns() ;
    size_t pf_loc = PF->nb_local_unknowns() ;
-
-   // velocity Laplacian
-   MAT_D_velocityUnsteadyPlusDiffusion->re_initialize( UF_glob, UF_glob ) ;
-   VEC_rhs_D_velocityDiffusionPlusBodyTerm->re_initialize( UF_glob ) ;
-
-   // Unknowns vectors
-   VEC_DS_UF->re_initialize( UF_glob ) ;
-   VEC_DS_UF_previoustime->re_initialize( UF_glob ) ;
-   VEC_DS_UF_timechange->re_initialize( UF_glob ) ;
-
-   VEC_DS_PF->re_initialize( pf_glob ) ;
-
-   // Local vector
-   UF_DS_LOC->re_initialize( UF_loc ) ;
-
-   PF_DS_LOC->re_initialize( pf_loc ) ;
-
-   // velocity numbering
-   UF_NUM->define_scatter( VEC_DS_UF ) ;
-   PF_NUM->define_scatter( VEC_DS_PF ) ;
 
 	vel_diffusion[0]->re_initialize( UF_loc );
 	vel_diffusion[1]->re_initialize( UF_loc );
@@ -532,91 +490,8 @@ DS_NavierStokesSystem:: ~DS_NavierStokesSystem( void )
    MAC_LABEL( "DS_NavierStokesSystem:: ~DS_NavierStokesSystem" ) ;
 }
 
-//----------------------------------------------------------------------
-void
-DS_NavierStokesSystem::initialize_DS_velocity( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: initialize_DS_velocity" ) ;
 
-   UF->extract_unknown_DOFs_value( 0, UF_DS_LOC ) ;
-   UF_NUM->scatter()->set( UF_DS_LOC, VEC_DS_UF ) ;
 
-}
-
-//----------------------------------------------------------------------
-void
-DS_NavierStokesSystem::initialize_DS_pressure( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: initialize_DS_pressure" ) ;
-
-   PF->extract_unknown_DOFs_value( 0, PF_DS_LOC ) ;
-   PF_NUM->scatter()->set( PF_DS_LOC, VEC_DS_PF ) ;
-
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector const*
-DS_NavierStokesSystem:: get_solution_DS_velocity( void ) const
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: get_solution_DS_velocity" ) ;
-
-   UF_NUM->scatter()->get( VEC_DS_UF, UF_DS_LOC ) ;
-
-   LA_SeqVector const* DS_result = UF_DS_LOC ;
-
-   return( DS_result ) ;
-
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector const*
-DS_NavierStokesSystem:: get_solution_DS_pressure( void ) const
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: get_solution_DS_pressure" ) ;
-
-   PF_NUM->scatter()->get( VEC_DS_PF, PF_DS_LOC ) ;
-
-   LA_SeqVector const* DS_result = PF_DS_LOC ;
-
-   return( DS_result ) ;
-
-}
-
-//----------------------------------------------------------------------
-void
-DS_NavierStokesSystem::at_each_time_step( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: at_each_time_step" ) ;
-
-   // Store velocity at previous time
-   VEC_DS_UF->synchronize() ;
-   VEC_DS_UF_previoustime->set( VEC_DS_UF ) ;
-   VEC_DS_PF->synchronize() ;
-
-}
-
-//----------------------------------------------------------------------
-double
-DS_NavierStokesSystem:: compute_DS_velocity_change( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: compute_DS_velocity_change" ) ;
-
-   VEC_DS_UF->synchronize() ;
-   VEC_DS_UF_timechange->set( VEC_DS_UF ) ;
-   VEC_DS_UF_timechange->sum( VEC_DS_UF_previoustime, -1.0 ) ;
-
-   double norm_UF = VEC_DS_UF->two_norm() ;
-   double time_change = VEC_DS_UF_timechange->two_norm() ;
-   if ( norm_UF > 1e-4 ) time_change /= norm_UF;
-
-   return ( time_change ) ;
-}
 
 //----------------------------------------------------------------------
 void
@@ -800,32 +675,8 @@ DS_NavierStokesSystem::get_VEC(size_t const& field)
 }
 
 
-//----------------------------------------------------------------------
-void
-DS_NavierStokesSystem::update_global_U_vector(size_t const& i, size_t const& j, size_t const& k, size_t const& comp, double const& value)
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: update_global_U_vector" ) ;
-
-   size_t global_number_in_distributed_vector = UF->DOF_global_number(i,j,k,comp);
-
-   VEC_DS_UF->set_item( global_number_in_distributed_vector, value);
-
-}
 
 
-//----------------------------------------------------------------------
-void
-DS_NavierStokesSystem::update_global_P_vector(size_t const& i, size_t const& j, size_t const& k, double const& value)
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: update_global_P_vector" ) ;
-
-   size_t global_number_in_distributed_vector = PF->DOF_global_number(i,j,k,0);
-
-   VEC_DS_PF->set_item( global_number_in_distributed_vector, value);
-
-}
 //----------------------------------------------------------------------
 void
 DS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
@@ -834,7 +685,8 @@ DS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
 															, size_t const& min_i
 															, size_t const& comp
 															, size_t const& dir
-															, size_t const& r_index )
+															, size_t const& r_index
+														 	, size_t const& level )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DS_NavierStokesSystem:: DS_NavierStokes_solver" ) ;
@@ -850,15 +702,20 @@ DS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
    nb_procs = nb_procs_in_i[dir];
 
    // Solve the DS splitting problem in
-   DS_NavierStokesSystem::mod_thomas_algorithm( arr, rhs[dir].local_T[comp], comp, dir, r_index);
+   DS_NavierStokesSystem::mod_thomas_algorithm( arr
+															 , rhs[dir].local_T[comp]
+															 , comp
+															 , dir
+															 , r_index);
 
    // Transfer in the distributed vector
    size_t nb_local_unk = rhs[dir].local_T[comp]->nb_rows();
    // Since, this function is used in all directions;
-   // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
+   // ii, jj, and kk are used to convert the passed
+	// arguments corresponding to correct direction
    size_t ii=0,jj=0,kk=0;
 
-   size_t m, i, global_number_in_distributed_vector;
+   size_t m, i;
 
    for (m=0;m<nb_local_unk;++m) {
       i = min_i + m ;
@@ -871,12 +728,8 @@ DS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
          ii = j; jj = k; kk = i;
       }
 
-      global_number_in_distributed_vector = FF->DOF_global_number( ii, jj, kk, comp );
-      if (field == 0) {
-         VEC_DS_PF->set_item( global_number_in_distributed_vector, rhs[dir].local_T[comp]->item( m ) );
-      } else if (field == 1) {
-         VEC_DS_UF->set_item( global_number_in_distributed_vector, rhs[dir].local_T[comp]->item( m ) );
-      }
+		FF->set_DOF_value( ii, jj, kk, comp
+											, level, rhs[dir].local_T[comp]->item( m ));
    }
 
    // Put the interface unknowns in distributed vector
@@ -890,41 +743,16 @@ DS_NavierStokesSystem::DS_NavierStokes_solver(FV_DiscreteField* FF
    }
 
    if ((is_periodic[field][dir] == 1)) {
-      global_number_in_distributed_vector = FF->DOF_global_number( ii, jj, kk, comp );
-      if (field == 0) {
-         VEC_DS_PF->set_item( global_number_in_distributed_vector,rhs[dir].interface_T[comp]->item( proc_pos ) );
-      } else if (field == 1) {
-         VEC_DS_UF->set_item( global_number_in_distributed_vector, rhs[dir].interface_T[comp]->item( proc_pos ) );
-      }
+		FF->set_DOF_value( ii, jj, kk, comp
+								, level, rhs[dir].interface_T[comp]->item( proc_pos ));
    } else if ((is_periodic[field][dir] == 0) && (proc_pos != nb_procs-1)) {
-      global_number_in_distributed_vector = FF->DOF_global_number( ii, jj, kk, comp );
-      if (field == 0) {
-         VEC_DS_PF->set_item( global_number_in_distributed_vector,rhs[dir].interface_T[comp]->item( proc_pos ) );
-      } else if (field == 1) {
-         VEC_DS_UF->set_item( global_number_in_distributed_vector, rhs[dir].interface_T[comp]->item( proc_pos ) );
-      }
+		FF->set_DOF_value( ii, jj, kk, comp
+								, level, rhs[dir].interface_T[comp]->item( proc_pos ));
    }
 }
 
-//----------------------------------------------------------------------
-void
-DS_NavierStokesSystem::synchronize_DS_solution_vec( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: synchronize_DS_solution_vec" ) ;
 
-   VEC_DS_UF->synchronize();
-}
 
-//----------------------------------------------------------------------
-void
-DS_NavierStokesSystem::synchronize_DS_solution_vec_P( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: synchronize_DS_solution_vec" ) ;
-
-   VEC_DS_PF->synchronize();
-}
 
 //----------------------------------------------------------------------
 void

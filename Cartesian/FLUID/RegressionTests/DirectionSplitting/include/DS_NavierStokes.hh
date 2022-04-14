@@ -272,7 +272,8 @@ class DS_NavierStokes : public MAC_Object,
                                    , double const& gamma
                                    , FV_TimeIterator const* t_it
                                    , size_t const& comp
-                                   , size_t const& dir);
+                                   , size_t const& dir
+                                   , size_t const& level);
       /** @brief Unpack the interface variable sent
       by master processor to slave processor */
       void unpack_ue(size_t const& comp
@@ -313,7 +314,8 @@ class DS_NavierStokes : public MAC_Object,
                          , size_t const& dir_i
                          , size_t const& dir_j
                          , size_t const& dir_k
-                         , double const& gamma );
+                         , double const& gamma
+                         , size_t const& level);
 
       /** Pressure predictor */
       void NS_first_step( FV_TimeIterator const* t_it ) ;
@@ -334,6 +336,10 @@ class DS_NavierStokes : public MAC_Object,
       void output_L2norm_pressure( size_t const& level );
 
       void output_L2norm_velocity( size_t const& level );
+
+      /** @brief Compute velocity change from one time step to the
+      next one with the direction splitting solution method */
+      double compute_DS_velocity_change( void );
       //@}
 
 
@@ -368,14 +374,6 @@ class DS_NavierStokes : public MAC_Object,
       /** @brief Projection of the field on the translated position of the grid
       */
       void fields_projection();
-
-      /** @brief Synchronize the global pressure variable at "level"
-      */
-      void synchronize_pressure_field ( size_t level );
-
-      /** @brief Synchronize the global velocity variable at "level"
-      */
-      void synchronize_velocity_field ( size_t level );
 
 
    private: //----------------------------------------------------------------
