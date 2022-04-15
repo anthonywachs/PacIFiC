@@ -50,6 +50,8 @@ void free_mesh(lagMesh* mesh) {
 #define ACROSS_PERIODIC(a,b) (fabs(a - b) > L0/2.)
 #define PERIODIC_1DIST(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 - b : a - L0 - b)
 #define GENERAL_1DIST(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DIST(a,b) : a - b)
+#define PERIODIC_1DAVG(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 + b : a - L0 + b)
+#define GENERAL_1DAVG(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DAVG(a,b) : a + b)
 
 /** The function below computes the length of an edge. It takes as arguments
 a pointer to the mesh as well as the ID of the edge of interest. */

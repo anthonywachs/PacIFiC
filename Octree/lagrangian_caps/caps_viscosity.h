@@ -23,10 +23,10 @@ void construct_divG(scalar divG, lagMesh* mesh) {
       coord midpoint;
       int node_id[2];
       for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].vertex_ids[j];
-      midpoint.x = .5*(mesh->nodes[node_id[0]].pos.x
-        + mesh->nodes[node_id[1]].pos.x);
-      midpoint.y = .5*(mesh->nodes[node_id[0]].pos.y
-        + mesh->nodes[node_id[1]].pos.y);
+      midpoint.x = .5*GENERAL_1DAVG(mesh->nodes[node_id[0]].pos.x,
+        mesh->nodes[node_id[1]].pos.x);
+      midpoint.y = .5*GENERAL_1DAVG(mesh->nodes[node_id[0]].pos.y,
+        mesh->nodes[node_id[1]].pos.y);
       if ((fabs(cpos.x - midpoint.x)<=Delta/2.)
         && (fabs(cpos.y - midpoint.y)<=Delta/2.)) {
         double length = mesh->edges[i].st*mesh->edges[i].l0;
