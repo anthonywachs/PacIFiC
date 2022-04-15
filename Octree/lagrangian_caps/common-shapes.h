@@ -58,7 +58,7 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   }
 
   #ifdef MUP
-    fraction(prevI, sq(radius) - sq(x) - sq(y));
+    fraction(prevI, sq(radius) - sq(x - shift.x) - sq(y - shift.y));
   #endif
 }
 

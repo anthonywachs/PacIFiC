@@ -48,7 +48,7 @@ void free_mesh(lagMesh* mesh) {
 }
 
 #define ACROSS_PERIODIC(a,b) (fabs(a - b) > L0/2.)
-#define PERIODIC_1DIST(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 - b : a - L0 + b)
+#define PERIODIC_1DIST(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 - b : a - L0 - b)
 #define GENERAL_1DIST(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DIST(a,b) : a - b)
 
 /** The function below computes the length of an edge. It takes as arguments
@@ -121,7 +121,6 @@ void comp_normals(lagMesh* mesh) {
 }
 
 void comp_curvature(lagMesh* mesh) {
-  // FIXME: not compatible with periodic boundaries
   if (!mesh->updated_curvatures) {
     comp_normals(mesh);
     bool up; // decide if we switch the x and y axes
@@ -228,6 +227,9 @@ void free_caps(Capsules* caps) {
 }
 
 Capsules mbs;
+#define MB(i) (mbs.mb[i])
+
+
 event defaults (i = 0) {
   mbs.nbmb = NCAPS;
   for(int i=0; i<mbs.nbmb; i++) initialize_empty_mb(&mbs.mb[i]);
@@ -258,12 +260,9 @@ event acceleration (i++) {
   face vector ae = a;
   foreach() foreach_dimension() forcing.x[] = 0.;
   for(int i=0; i<mbs.nbmb; i++) lag2eul(forcing, &mbs.mb[i]);
-  foreach_face() ae.x[] = .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
+  foreach_face() ae.x[] += .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
 }
 
 event cleanup (t = end) {
   free_caps(&mbs);
 }
-
-// /** Finally, we include some functions to create common initial shapes: */
-// #include "common-shapes.h"
