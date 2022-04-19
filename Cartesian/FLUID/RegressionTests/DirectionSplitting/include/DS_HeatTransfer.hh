@@ -150,8 +150,6 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       /** @brief Call the functions to assemble temperature and schur complement */
       void assemble_temperature_and_schur( FV_TimeIterator const* t_it) ;
 
-      size_t return_row_index ( FV_DiscreteField const* FF, size_t const& comp, size_t const& dir, size_t const& j, size_t const& k );
-
       /** @brief Assemble temperature matrix */
       double assemble_temperature_matrix (
         FV_DiscreteField const* FF,
@@ -233,6 +231,8 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
 
       /** @brief Calculate the temperature change in each iteration */
       double compute_DS_temperature_change( );
+
+      void calculate_row_indexes ( );
 
       /** @brief Solve interface unknown for all cases */
       void DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index);

@@ -103,7 +103,11 @@ DS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
    MAT_TemperatureUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this,
 								exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
 
+
    for (size_t dir = 0; dir < dim; dir++) {
+
+		row_index[0][dir] = (size_t_array2D**)
+										malloc(nb_comps * sizeof(size_t_array2D*)) ;
       // Spacial discretization matrices
       A[dir].ii_main = (LA_SeqVector***)
 										malloc(nb_comps * sizeof(LA_SeqVector**)) ;
@@ -163,6 +167,8 @@ DS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
             nb_index = nb_unknowns_handled_by_proc(0)
 							*nb_unknowns_handled_by_proc(1);
          }
+
+			row_index[0][dir][comp] = new size_t_array2D(1,1);
 
          A[dir].ii_main[comp] = (LA_SeqVector**)
 											malloc(nb_index * sizeof(LA_SeqVector*)) ;
@@ -305,7 +311,7 @@ DS_HeatTransferSystem:: re_initialize( void )
          nb_unknowns_handled_by_proc( l ) =
                             1 + TF->get_max_index_unknown_handled_by_proc( comp, l )
                               - TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-	 nb_dof_on_proc( l ) = TF->get_local_nb_dof( comp, l ) ;
+			nb_dof_on_proc( l ) = TF->get_local_nb_dof( comp, l ) ;
       }
 
 
@@ -316,17 +322,25 @@ DS_HeatTransferSystem:: re_initialize( void )
          if (l == 0) {
             if (dim == 2) {
                nb_index = nb_unknowns_handled_by_proc(1);
+					row_index[0][l][comp]->re_initialize(nb_dof_on_proc(1),1);
             } else if (dim == 3) {
                nb_index = nb_unknowns_handled_by_proc(1)*nb_unknowns_handled_by_proc(2);
+					row_index[0][l][comp]->re_initialize(nb_dof_on_proc(1)
+																		 ,nb_dof_on_proc(2));
             }
          } else if (l == 1) {
             if (dim == 2) {
                nb_index = nb_unknowns_handled_by_proc(0);
+					row_index[0][l][comp]->re_initialize(nb_dof_on_proc(0),1);
             } else if (dim == 3) {
                nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(2);
+					row_index[0][l][comp]->re_initialize(nb_dof_on_proc(0)
+																		 ,nb_dof_on_proc(2));
             }
          } else if (l == 2) {
             nb_index = nb_unknowns_handled_by_proc(0)*nb_unknowns_handled_by_proc(1);
+				row_index[0][l][comp]->re_initialize(nb_dof_on_proc(0)
+																	 ,nb_dof_on_proc(1));
          }
 
          nb_procs = nb_procs_in_i[l];
@@ -574,6 +588,23 @@ DS_HeatTransferSystem::get_SchurP()
    return (SchurP) ;
 }
 
+
+
+
+//----------------------------------------------------------------------
+size_t_array2D*
+DS_HeatTransferSystem::get_row_indexes(size_t const& field
+											     , size_t const& dir
+												  , size_t const& comp )
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_HeatTransferSystem:: get_row_indexes" ) ;
+   return (row_index[field][dir][comp]) ;
+}
+
+
+
+
 //----------------------------------------------------------------------
 LocalVector*
 DS_HeatTransferSystem::get_VEC()
@@ -622,7 +653,7 @@ DS_HeatTransferSystem::DS_HeatEquation_solver( size_t const& j
    // Since, this function is used in all directions;
    // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
    size_t ii=0,jj=0,kk=0;
-   size_t m, i, global_number_in_distributed_vector;
+   size_t m, i;
 
    for (m=0;m<nb_local_unk;++m) {
       i = min_i + m ;

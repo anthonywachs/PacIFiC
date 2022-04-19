@@ -4,6 +4,7 @@
 #include <MAC_Object.hh>
 #include <utility>
 #include <boolVector.hh>
+#include <size_t_array2D.hh>
 using namespace std;
 
 
@@ -109,6 +110,11 @@ class DS_HeatTransferSystem : public MAC_Object
       /** @name Access */
       //@{
 
+      /** @brief Return the local vector with a vector of row index */
+      size_t_array2D* get_row_indexes(size_t const& field
+                                  , size_t const& dir
+                                  , size_t const& comp);
+
       /** @brief Return the matrix system of spacial discretization */
       TDMatrix* get_A();
       /** @brief Return the product matrix of spacial discretization */
@@ -190,6 +196,11 @@ class DS_HeatTransferSystem : public MAC_Object
 
       //-- Attributes
       FV_DiscreteField* TF ;
+
+      // Local vector to store row indexes for each
+      // field (i.e. 1)
+      // and direction (i.e. 3)
+      size_t_array2D ** row_index[1][3] ;
 
       // Direction splitting matrices
       LA_SeqMatrix * MAT_TemperatureUnsteadyPlusDiffusion_1D ;

@@ -170,6 +170,9 @@ DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
    // Necessary especially for cases with non-zero field initiallization
    if (b_restart == false) ugradu_initialization ( );
 
+	// Calculate row index for each field in each direction`
+	calculate_row_indexes ( );
+
    // Generate solid particles if required
 	if (is_solids) {
 		// Build void frac and intersection variable
@@ -700,45 +703,62 @@ DS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, s
 
 
 //---------------------------------------------------------------------------
-size_t
-DS_HeatTransfer:: return_row_index (
-  FV_DiscreteField const* FF,
-  size_t const& comp,
-  size_t const& dir,
-  size_t const& j,
-  size_t const& k )
+void
+DS_HeatTransfer:: calculate_row_indexes ( )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DS_HeatTransfer:: return_row_index" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: calculate_row_indexes" ) ;
 
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l) {
-	min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-	max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-   }
+   for (size_t comp = 0; comp < nb_comps; comp++) {
+      // Get local min and max indices
+      size_t_vector min_unknown_index(3,0);
+      size_t_vector max_unknown_index(3,0);
 
-   size_t p=0;
-
-   if (dim == 2) {
-      if (dir == 0) {
-         p = j - min_unknown_index(1);
-      } else if (dir == 1) {
-         p = j - min_unknown_index(0);
+      for (size_t l = 0; l < dim; ++l) {
+         min_unknown_index(l) =
+                           TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+         max_unknown_index(l) =
+                           TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
       }
-   } else if (dim == 3) {
-      if (dir == 0) {
-         p = (j-min_unknown_index(1))+(1+max_unknown_index(1)-min_unknown_index(1))*(k-min_unknown_index(2));
-      } else if (dir == 1) {
-         p = (j-min_unknown_index(0))+(1+max_unknown_index(0)-min_unknown_index(0))*(k-min_unknown_index(2));
-      } else if (dir == 2) {
-         p = (j-min_unknown_index(0))+(1+max_unknown_index(0)-min_unknown_index(0))*(k-min_unknown_index(1));
+
+      for (size_t dir = 0; dir < dim; dir++) {
+         size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(0,dir,comp);
+         switch (dir) {
+            case 0:
+             for (size_t j=min_unknown_index(1); j<=max_unknown_index(1); j++) {
+              for (size_t k=min_unknown_index(2); k<=max_unknown_index(2); k++) {
+                  size_t p = (j - min_unknown_index(1))
+                           + (1 + max_unknown_index(1) - min_unknown_index(1))
+                           * (k - min_unknown_index(2));
+                  row_index->operator()(j,k) = p;
+              }
+             }
+             break;
+            case 1:
+             for (size_t i=min_unknown_index(0); i<=max_unknown_index(0); i++) {
+              for (size_t k=min_unknown_index(2); k<=max_unknown_index(2); k++) {
+                  size_t p = (i - min_unknown_index(0))
+                           + (1 + max_unknown_index(0) - min_unknown_index(0))
+                           * (k - min_unknown_index(2));
+						row_index->operator()(i,k) = p;
+              }
+             }
+             break;
+            case 2:
+             for (size_t i=min_unknown_index(0); i<=max_unknown_index(0); i++) {
+              for (size_t j=min_unknown_index(1); j<=max_unknown_index(1); j++) {
+                  size_t p = (i - min_unknown_index(0))
+                           + (1 + max_unknown_index(0) - min_unknown_index(0))
+                           * (j - min_unknown_index(1));
+						row_index->operator()(i,j) = p;
+              }
+             }
+             break;
+         }
       }
    }
-
-   return(p);
 }
+
 
 
 
@@ -1006,7 +1026,7 @@ DS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, 
 
    TDMatrix* A = GLOBAL_EQ-> get_A();
 
-   if (nb_ranks_comm_i[dir]>1) {
+   if (nb_ranks_comm_i[dir] > 1) {
 
       ProdMatrix* Ap = GLOBAL_EQ->get_Ap();
       ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0();
@@ -1046,7 +1066,7 @@ DS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, 
                 }
              }
 
-   	     if (is_iperiodic[dir] == 0) {
+   	     	 if (is_iperiodic[dir] == 0) {
                 if (i<(size_t)nb_ranks_comm_i[dir]-1) {
                    // Assemble the global Aee matrix
                    // No periodic condition in x. So no fe contribution from last proc
@@ -1057,7 +1077,7 @@ DS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, 
                 // Periodic condition in x. So there is fe contribution from last proc
                 A[dir].ee[comp][r_index]->set_item(i,i,received_data[nb_received_data-1]);
              }
-	     delete [] received_data;
+     			 delete [] received_data;
 
          }
       } else {
@@ -1091,7 +1111,7 @@ DS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, 
       // Assemble the schlur complement in the master proc
 
       if (rank_in_i[dir] == 0) {
-	 TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
+	 		TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
          size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
          for (int p = 0; p < (int)nb_row; p++) {
             Schur[dir].ii_main[comp][r_index]->set_item(p,A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
@@ -1121,7 +1141,8 @@ DS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, 
 
       }
    } else if (is_iperiodic[dir] == 1) {
-      // Condition for single processor in any direction with periodic boundary conditions
+      // Condition for single processor in any
+		// direction with periodic boundary conditions
       ProdMatrix* Ap = GLOBAL_EQ->get_Ap();
       ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0();
       GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,r_index);
@@ -1129,7 +1150,9 @@ DS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, 
       LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
 
       size_t nbrow = product_matrix->nb_rows();
-      // Create a copy of product matrix to receive matrix, this will eliminate the memory leak issue which caused by "create_copy" command
+      // Create a copy of product matrix to receive matrix,
+		// this will eliminate the memory leak issue
+		// which caused by "create_copy" command
       for (size_t k=0;k<nbrow;k++) {
          for (size_t j=0;j<nbrow;j++) {
             Ap_proc0[dir].ei_ii_ie[comp]->set_item(k,j,product_matrix->item(k,j));
@@ -1143,9 +1166,12 @@ DS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, 
       TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
       size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
       for (int p = 0; p < (int)nb_row; p++) {
-         Schur[dir].ii_main[comp][r_index]->set_item(p,A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
-         if (p < (int)nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,-receive_matrix->item(p,p+1));
-         if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,-receive_matrix->item(p,p-1));
+         Schur[dir].ii_main[comp][r_index]->set_item(p,
+					A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
+         if (p < (int)nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,
+																-receive_matrix->item(p,p+1));
+         if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,
+																-receive_matrix->item(p,p-1));
       }
       GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
    }
@@ -1189,9 +1215,11 @@ DS_HeatTransfer:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
             local_max_k = max_unknown_index(dir_k);
          }
 
+			size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(0,dir,comp);
+
          for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
             for (size_t k=local_min_k; k <= local_max_k; ++k) {
-               size_t r_index = return_row_index (TF,comp,dir,j,k);
+               size_t r_index = row_index->operator()(j,k);
                double Aee_diagcoef = assemble_temperature_matrix (TF,t_it,gamma,comp,dir,j,k,r_index);
                assemble_schur_matrix(comp,dir,Aee_diagcoef,r_index);
             }
@@ -1701,26 +1729,27 @@ DS_HeatTransfer:: Solve_i_in_jk ( FV_TimeIterator const* t_it
 
      LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
      TDMatrix* A = GLOBAL_EQ->get_A();
+	  size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(0,dir_i,comp);
 
      // Solve in i
      if ((nb_ranks_comm_i[dir_i]>1)||(is_iperiodic[dir_i] == 1)) {
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
-	   for (size_t k=local_min_k; k <= local_max_k; ++k) {
-              size_t r_index = return_row_index (TF,comp,dir_i,j,k);
+	   	  for (size_t k=local_min_k; k <= local_max_k; ++k) {
+				  size_t r_index = row_index->operator()(j,k);
               // Assemble fi and return fe for each proc locally
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
               // Calculate Aei*ui in each proc locally
               compute_Aei_ui(A,VEC,comp,dir_i,r_index);
               // Pack Aei_ui and fe for sending it to master
               data_packing (fe,comp,dir_i,r_index);
-	   }
+	   	  }
         }
         solve_interface_unknowns (gamma,t_it,comp,dir_i,level);
 
      } else if (is_iperiodic[dir_i] == 0) {  // Serial mode with non-periodic condition
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
-              size_t r_index = return_row_index (TF,comp,dir_i,j,k);
+				  size_t r_index = row_index->operator()(j,k);
               assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir_i)
 				  													,comp,dir_i,r_index,level);
