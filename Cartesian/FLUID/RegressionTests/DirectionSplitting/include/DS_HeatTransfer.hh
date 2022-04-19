@@ -232,6 +232,8 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       /** @brief Calculate the temperature change in each iteration */
       double compute_DS_temperature_change( );
 
+      void assemble_temperature_diffusion_terms ( );
+
       void calculate_row_indexes ( );
 
       /** @brief Solve interface unknown for all cases */

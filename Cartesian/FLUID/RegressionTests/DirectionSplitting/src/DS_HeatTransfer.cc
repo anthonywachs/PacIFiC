@@ -394,10 +394,13 @@ DS_HeatTransfer:: bodyterm_value ( double const& xC, double const& yC, double co
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: assemble_DS_un_at_rhs (
-        FV_TimeIterator const* t_it, double const& gamma)
+DS_HeatTransfer:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it
+													 , double const& gamma)
 //---------------------------------------------------------------------------
 {
+  // Assemble the diffusive components of velocity once in each iteration
+  assemble_temperature_diffusion_terms();
+
   double dxC, dyC, dzC, xC, yC, zC=0.;
   double xvalue=0.,yvalue=0.,zvalue=0.,rhs=0., bodyterm=0., adv_value=0.;
 
@@ -406,6 +409,8 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs (
 
   size_t_vector* void_frac = (is_solids) ?
 						  allrigidbodies->get_void_fraction_on_grid(TF) : 0;
+
+  vector<doubleVector*> T_diffusion = GLOBAL_EQ->get_temperature_diffusion();
 
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices
@@ -424,10 +429,11 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs (
 	   	  yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
            if (dim ==2 ) {
               k = 0;
+				  size_t p = TF->DOF_local_number(i,j,k,comp);
               // Dxx for un
-              xvalue = compute_un_component(comp,i,j,k,0,3);
+              xvalue = T_diffusion[0]->operator()(p);
               // Dyy for un
-              yvalue = compute_un_component(comp,i,j,k,1,1);
+              yvalue = T_diffusion[1]->operator()(p);
 		        // Bodyterm for rhs
 		        bodyterm = bodyterm_value(xC,yC,zC);
               // Advection term
@@ -448,12 +454,13 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs (
               for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                  dzC = TF->get_cell_size( k, comp, 2 ) ;
 	         	  zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
+					  size_t p = TF->DOF_local_number(i,j,k,comp);
                  // Dxx for un
-                 xvalue = compute_un_component(comp,i,j,k,0,3);
+                 xvalue = T_diffusion[0]->operator()(p);
                  // Dyy for un
-                 yvalue = compute_un_component(comp,i,j,k,1,4);
+                 yvalue = T_diffusion[1]->operator()(p);
                  // Dzz for un
-                 zvalue = compute_un_component(comp,i,j,k,2,1);
+                 zvalue = T_diffusion[2]->operator()(p);
 		           // Bodyterm for rhs
 		           bodyterm = bodyterm_value(xC,yC,zC);
                  // Advection term
@@ -530,9 +537,66 @@ double DS_HeatTransfer:: divergence_of_U ( size_t const& comp
    return value;
 }
 
+
+
+
+//---------------------------------------------------------------------------
+void DS_HeatTransfer:: assemble_temperature_diffusion_terms ( )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_HeatTransfer:: assemble_temperature_diffusion_terms" ) ;
+
+   size_t_vector min_unknown_index(3,0);
+   size_t_vector max_unknown_index(3,0);
+
+   vector<doubleVector*> T_diffusion = GLOBAL_EQ->get_temperature_diffusion();
+
+   for (size_t comp = 0; comp < nb_comps; comp++) {
+      // Get local min and max indices
+      for (size_t l=0;l<dim;++l) {
+         min_unknown_index(l) =
+                        TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+         max_unknown_index(l) =
+                        TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+      }
+
+      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+         for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+            for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+               size_t p = TF->DOF_local_number(i,j,k,comp);
+               // dxx of level3
+               T_diffusion[0]->operator()(p) =
+                                    compute_un_component(comp,i,j,k,0,3);
+               // dyy of level1(2D) or level4(3D)
+               if (dim == 2) {
+                  T_diffusion[1]->operator()(p) =
+                                    compute_un_component(comp,i,j,k,1,1);
+               } else {
+                  T_diffusion[1]->operator()(p) =
+                                    compute_un_component(comp,i,j,k,1,4);
+               }
+               // dzz of level3
+               if (dim == 3)
+                  T_diffusion[2]->operator()(p) =
+                                    compute_un_component(comp,i,j,k,2,1);
+
+            }
+         }
+      }
+   }
+}
+
+
+
+
 //---------------------------------------------------------------------------
 double
-DS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level)
+DS_HeatTransfer:: compute_un_component ( size_t const& comp
+													, size_t const& i
+													, size_t const& j
+													, size_t const& k
+													, size_t const& dir
+													, size_t const& level)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_HeatTransfer:: compute_un_component" ) ;
@@ -669,7 +733,10 @@ DS_HeatTransfer:: compute_un_component ( size_t const& comp, size_t const& i, si
 
 //---------------------------------------------------------------------------
 double
-DS_HeatTransfer:: compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k)
+DS_HeatTransfer:: compute_adv_component ( size_t const& comp
+													 , size_t const& i
+													 , size_t const& j
+													 , size_t const& k)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_HeatTransfer:: compute_adv_component" ) ;
@@ -803,15 +870,14 @@ double DS_HeatTransfer:: compute_DS_temperature_change( void )
 
 //---------------------------------------------------------------------------
 double
-DS_HeatTransfer:: assemble_temperature_matrix (
-  FV_DiscreteField const* FF,
-  FV_TimeIterator const* t_it,
-  double const& gamma,
-  size_t const& comp,
-  size_t const& dir,
-  size_t const& j,
-  size_t const& k,
-  size_t const& r_index )
+DS_HeatTransfer:: assemble_temperature_matrix (FV_DiscreteField const* FF
+															, FV_TimeIterator const* t_it
+															, double const& gamma
+										  					, size_t const& comp
+										  					, size_t const& dir
+										  					, size_t const& j
+										  					, size_t const& k
+										  					, size_t const& r_index )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: assemble_temperature_matrix" ) ;
@@ -887,9 +953,12 @@ DS_HeatTransfer:: assemble_temperature_matrix (
 
        bool r_bound = false;
        bool l_bound = false;
-       // All the proc will have open right bound, except last proc for non periodic systems
-       if ((is_iperiodic[dir] != 1) && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
-       // All the proc will have open left bound, except first proc for non periodic systems
+       // All the proc will have open right bound,
+		 // except last proc for non periodic systems
+       if ((is_iperiodic[dir] != 1)
+		  && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
+       // All the proc will have open left bound,
+		 // except first proc for non periodic systems
        if ((is_iperiodic[dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
 
        // add unsteady term
@@ -897,12 +966,8 @@ DS_HeatTransfer:: assemble_temperature_matrix (
        size_t k_min, k_max;
        double unsteady_term = (FF->get_cell_size(i,comp,dir))/(t_it->time_step());
 
-       if (dim == 2) {
-          k_min = 0; k_max = 0;
-       } else {
-          k_min = min_unknown_index(2);
-			 k_max = max_unknown_index(2);
-       }
+       k_min = (dim == 2) ? 0 : min_unknown_index(2);
+		 k_max = (dim == 2) ? 0 : max_unknown_index(2);
 
        // Since, this function is used in all directions;
        // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
@@ -1245,15 +1310,19 @@ double DS_HeatTransfer:: assemble_local_rhs ( size_t const& j
      max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc(comp,l) ;
    }
 
-   size_t i,pos;
-   int m;
-
    // Compute VEC_rhs_x = rhs in x
-   double dC=0, fe=0.;
+   double fe = 0.;
+
+	// Since, this function is used in all directions;
+   // ii, jj, and kk are used to convert the passed
+   // arguments corresponding to correct direction
+   size_t ii=0,jj=0,kk=0;
+	size_t level = 0;
 
    // Vector for fi
    LocalVector* VEC = GLOBAL_EQ->get_VEC();
 
+	vector<doubleVector*> T_diffusion = GLOBAL_EQ->get_temperature_diffusion();
 	size_t_array2D* intersect_vector = (is_solids) ?
                            allrigidbodies->get_intersect_vector_on_grid(TF)
 									: 0;
@@ -1264,110 +1333,55 @@ double DS_HeatTransfer:: assemble_local_rhs ( size_t const& j
                            allrigidbodies->get_intersect_fieldValue_on_grid(TF)
 									: 0;
 
-   for (i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
-     double value=0.;
-     pos = i - min_unknown_index(dir);
+   for (size_t i = min_unknown_index(dir);i <= max_unknown_index(dir); ++i) {
+		if (dir == 0) {
+         ii = i; jj = j; kk = k; level = 0;
+      } else if (dir == 1) {
+         ii = j; jj = i; kk = k; level = 3;
+      } else if (dir == 2) {
+         ii = j; jj = k; kk = i; level = 4;
+      }
+      size_t pos = i - min_unknown_index(dir);
+		size_t p = TF->DOF_local_number(ii,jj,kk,comp);
 
-     // Get contribution of un
-     dC = TF->get_cell_size(i,comp,dir) ;
+		double value = T_diffusion[dir]->operator()(p);
 
-     // x direction
-     if (dir == 0) {
-        value = compute_un_component(comp,i,j,k,dir,3);
-        if (is_solids) {
-           size_t p = TF->DOF_local_number(i,j,k,comp);
-           if (intersect_vector->operator()(p,2*dir+0) == 1) {
-              value = value - intersect_fieldVal->operator()(p,2*dir+0)
-				  					 / intersect_distance->operator()(p,2*dir+0);
-           }
-           if (intersect_vector->operator()(p,2*dir+1) == 1) {
-              value = value - intersect_fieldVal->operator()(p,2*dir+1)
-				  					 / intersect_distance->operator()(p,2*dir+1);
-           }
-        }
-     // y direction
-     } else if (dir == 1) {
-        if (dim == 2) {
-           value = compute_un_component(comp,j,i,k,dir,1);
-           if (is_solids) {
-              size_t p = TF->DOF_local_number(j,i,k,comp);
-				  if (intersect_vector->operator()(p,2*dir+0) == 1) {
-	              value = value - intersect_fieldVal->operator()(p,2*dir+0)
-					  					 / intersect_distance->operator()(p,2*dir+0);
-	           }
-	           if (intersect_vector->operator()(p,2*dir+1) == 1) {
-	              value = value - intersect_fieldVal->operator()(p,2*dir+1)
-					  					 / intersect_distance->operator()(p,2*dir+1);
-	           }
-           }
-        } else if (dim == 3) {
-           value = compute_un_component(comp,j,i,k,dir,4);
-           if (is_solids) {
-              size_t p = TF->DOF_local_number(j,i,k,comp);
-				  if (intersect_vector->operator()(p,2*dir+0) == 1) {
-	              value = value - intersect_fieldVal->operator()(p,2*dir+0)
-					  					 / intersect_distance->operator()(p,2*dir+0);
-	           }
-	           if (intersect_vector->operator()(p,2*dir+1) == 1) {
-	              value = value - intersect_fieldVal->operator()(p,2*dir+1)
-					  					 / intersect_distance->operator()(p,2*dir+1);
-	           }
-           }
-        }
-     // z direction
-     } else if (dir == 2) {
-        value = compute_un_component(comp,j,k,i,dir,1);
-        if (is_solids) {
-           size_t p = TF->DOF_local_number(j,k,i,comp);
-			  if (intersect_vector->operator()(p,2*dir+0) == 1) {
-				  value = value - intersect_fieldVal->operator()(p,2*dir+0)
-									 / intersect_distance->operator()(p,2*dir+0);
-			  }
-			  if (intersect_vector->operator()(p,2*dir+1) == 1) {
-				  value = value - intersect_fieldVal->operator()(p,2*dir+1)
-									 / intersect_distance->operator()(p,2*dir+1);
-			  }
-        }
-     }
+		if (is_solids) {
+			if (intersect_vector->operator()(p,2*dir+0) == 1) {
+				value = value - intersect_fieldVal->operator()(p,2*dir+0)
+								  / intersect_distance->operator()(p,2*dir+0);
+			}
+			if (intersect_vector->operator()(p,2*dir+1) == 1) {
+				value = value - intersect_fieldVal->operator()(p,2*dir+1)
+								  / intersect_distance->operator()(p,2*dir+1);
+			}
+		}
 
-     double temp_val=0.;
-     if (dir == 0) {
-        temp_val = (TF->DOF_value(i,j,k,comp,0)*dC)/(t_it->time_step())
-		  			  - gamma*value;
-     } else if (dir == 1) {
-        temp_val = (TF->DOF_value(j,i,k,comp,3)*dC)/(t_it->time_step())
-		  			  - gamma*value;
-     } else if (dir == 2) {
-        temp_val = (TF->DOF_value(j,k,i,comp,4)*dC)/(t_it->time_step())
-		  			  - gamma*value;
-     }
+      double dC = TF->get_cell_size(i,comp,dir) ;
 
-     if (is_iperiodic[dir] == 0) {
-        if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
-           VEC[dir].local_T[comp]->set_item( pos,temp_val);
-        } else {
-           if (i == max_unknown_index(dir))
-              fe = temp_val;
-           else
-              VEC[dir].local_T[comp]->set_item( pos,temp_val);
-        }
-     } else {
-           if (i == max_unknown_index(dir))
-              fe = temp_val;
-           else
-              VEC[dir].local_T[comp]->set_item( pos,temp_val);
-     }
+      double temp_val = (TF->DOF_value(ii,jj,kk,comp,level)*dC)
+							 / (t_it->time_step()) - gamma*value;
+
+      if (is_iperiodic[dir] == 0) {
+         if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
+            VEC[dir].local_T[comp]->set_item( pos,temp_val);
+         } else {
+            if (i == max_unknown_index(dir))
+               fe = temp_val;
+            else
+               VEC[dir].local_T[comp]->set_item( pos,temp_val);
+         }
+      } else {
+         if (i == max_unknown_index(dir))
+            fe = temp_val;
+         else
+            VEC[dir].local_T[comp]->set_item( pos,temp_val);
+      }
 
    }
 
-   // Since, this function is used in all directions;
-   // ii, jj, and kk are used to convert the passed arguments
-	// corresponding to correct direction
-   size_t ii=0,jj=0,kk=0;
-
-
    // Effect of boundary conditions in case of non-periodic direction
-   m = int(min_unknown_index(dir)) - 1;
+   int m = int(min_unknown_index(dir)) - 1;
 
    if (dir == 0) {
       ii = m; jj = j; kk = k;

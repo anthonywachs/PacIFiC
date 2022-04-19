@@ -5,6 +5,7 @@
 #include <utility>
 #include <boolVector.hh>
 #include <size_t_array2D.hh>
+#include <vector>
 using namespace std;
 
 
@@ -115,6 +116,9 @@ class DS_HeatTransferSystem : public MAC_Object
                                   , size_t const& dir
                                   , size_t const& comp);
 
+      /** @brief Return the temperature diffusive terms */
+      vector<doubleVector*> get_temperature_diffusion();
+
       /** @brief Return the matrix system of spacial discretization */
       TDMatrix* get_A();
       /** @brief Return the product matrix of spacial discretization */
@@ -223,6 +227,9 @@ class DS_HeatTransferSystem : public MAC_Object
       LA_Vector * VEC_DS_TF ;
       LA_Vector * VEC_DS_TF_previoustime ;
       LA_Vector * VEC_DS_TF_timechange ;
+
+      // Local vector to store diffusive terms
+      vector<doubleVector*> T_diffusion;
 
       size_t dim;
       size_t nb_comps;

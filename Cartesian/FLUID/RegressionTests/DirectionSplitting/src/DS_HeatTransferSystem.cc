@@ -99,6 +99,12 @@ DS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
 {
    MAC_LABEL( "DS_HeatTransferSystem:: build_system" ) ;
 
+	// Local vectors to store diffusive terms
+	T_diffusion.reserve(3);
+	T_diffusion.push_back(new doubleVector(1,0.));
+	T_diffusion.push_back(new doubleVector(1,0.));
+	T_diffusion.push_back(new doubleVector(1,0.));
+
    // Direction splitting matrices
    MAT_TemperatureUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this,
 								exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
@@ -297,6 +303,12 @@ DS_HeatTransferSystem:: re_initialize( void )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransferSystem:: re_initialize" ) ;
+
+   size_t TF_loc = TF->nb_local_unknowns() ;
+
+	T_diffusion[0]->re_initialize( TF_loc );
+	T_diffusion[1]->re_initialize( TF_loc );
+	T_diffusion[2]->re_initialize( TF_loc );
 
    // Direction splitting matrices & vectors
    size_t nb_procs, proc_pos;
@@ -623,6 +635,21 @@ DS_HeatTransferSystem::get_Schur_VEC()
    MAC_LABEL( "DS_HeatTransferSystem:: get_VEC" ) ;
    return (Schur_VEC) ;
 }
+
+
+
+
+//----------------------------------------------------------------------
+vector<doubleVector*>
+DS_HeatTransferSystem::get_temperature_diffusion()
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_HeatTransferSystem:: get_temperature_diffusion" ) ;
+   return (T_diffusion) ;
+}
+
+
+
 
 //----------------------------------------------------------------------
 void
