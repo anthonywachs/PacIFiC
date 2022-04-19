@@ -191,7 +191,11 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, size_t const& p);
 
       /** @brief Call the appropriate functions to solve local variable and interface unknown */
-      void solve_interface_unknowns(double const& gamma,FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir);
+      void solve_interface_unknowns(double const& gamma
+                                  , FV_TimeIterator const* t_it
+                                  , size_t const& comp
+                                  , size_t const& dir
+                                  , size_t const& level );
 
       /** @brief Call the appropriate functions to solve any particular direction in the other directions */
       void HeatEquation_DirectionSplittingSolver( FV_TimeIterator const* t_it ) ;
@@ -220,7 +224,15 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       double assemble_advection_Upwind_new( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
 
       /** @brief Solve i in j and k; e.g. solve x in y ank z */
-      void Solve_i_in_jk (FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k );
+      void Solve_i_in_jk (FV_TimeIterator const* t_it
+                        , double const& gamma
+                        , size_t const& dir_i
+                        , size_t const& dir_j
+                        , size_t const& dir_k
+                        , size_t const& level);
+
+      /** @brief Calculate the temperature change in each iteration */
+      double compute_DS_temperature_change( );
 
       /** @brief Solve interface unknown for all cases */
       void DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index);

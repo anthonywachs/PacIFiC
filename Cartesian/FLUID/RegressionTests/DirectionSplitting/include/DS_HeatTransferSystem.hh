@@ -109,9 +109,6 @@ class DS_HeatTransferSystem : public MAC_Object
       /** @name Access */
       //@{
 
-      /** @brief Return the DS temperature solution vector DS_TF */
-      LA_SeqVector const* get_solution_DS_temperature( void ) const ;
-
       /** @brief Return the matrix system of spacial discretization */
       TDMatrix* get_A();
       /** @brief Return the product matrix of spacial discretization */
@@ -131,17 +128,6 @@ class DS_HeatTransferSystem : public MAC_Object
 
    //-- Basic operations on matrices & vectors
 
-      /** @name Basic operations on matrices & vectors */
-      //@{
-      /** @brief Initialize the temperature unknown vector with field values */
-      void initialize_temperature( void );
-
-      /** @brief Store temperature vector at previous time step */
-      void at_each_time_step( void ) ;
-
-      /** @brief Compute temperature change from one time step to the
-      next one */
-      double compute_temperature_change( void );
 
    //-- Solver
 
@@ -150,7 +136,13 @@ class DS_HeatTransferSystem : public MAC_Object
 
       /** @brief Solve the DS splitting problem in x by performing the
       matrix-vector product A_x^-1.Vx and transfer in the distributed vector */
-      void DS_HeatEquation_solver( size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir,size_t const& r_index) ;
+      void DS_HeatEquation_solver( size_t const& j
+                                 , size_t const& k
+                                 , size_t const& min_i
+                                 , size_t const& comp
+                                 , size_t const& dir
+                                 , size_t const& r_index
+                                 , size_t const& level) ;
 
       //@}
 
@@ -198,15 +190,6 @@ class DS_HeatTransferSystem : public MAC_Object
 
       //-- Attributes
       FV_DiscreteField* TF ;
-
-      // Local vectors
-      LA_SeqVector * TF_DS_LOC ;
-
-      // Matrices & rhs
-      LA_Matrix * MAT_D_TemperatureUnsteadyPlusDiffusion ;
-
-      // Unknowns numbering
-      FV_SystemNumbering* TF_NUM ;
 
       // Direction splitting matrices
       LA_SeqMatrix * MAT_TemperatureUnsteadyPlusDiffusion_1D ;

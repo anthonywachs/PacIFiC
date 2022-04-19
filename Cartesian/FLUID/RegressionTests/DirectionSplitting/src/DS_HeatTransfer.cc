@@ -167,14 +167,10 @@ DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    allocate_mpi_variables();
 
-
    // Necessary especially for cases with non-zero field initiallization
    if (b_restart == false) ugradu_initialization ( );
 
-	// Initialize temperature vector at the matrix level
-	GLOBAL_EQ->initialize_temperature();
    // Generate solid particles if required
-
 	if (is_solids) {
 		// Build void frac and intersection variable
 		allrigidbodies->build_solid_variables_on_fluid_grid(TF);
@@ -221,8 +217,6 @@ DS_HeatTransfer:: do_before_inner_iterations_stage(
    //    assemble_temperature_and_schur(t_it);
    // }
 
-   // Perform matrix level operations before each time step
-   GLOBAL_EQ->at_each_time_step( );
 }
 
 //---------------------------------------------------------------------------
@@ -250,7 +244,7 @@ DS_HeatTransfer:: do_after_inner_iterations_stage(
    // }
 
    // Compute temperature change over the time step
-   double temperature_time_change = GLOBAL_EQ->compute_temperature_change()
+   double temperature_time_change = compute_DS_temperature_change()
    	/ t_it->time_step() ;
    if ( my_rank == is_master )
      cout << "Temperature change = " <<
@@ -745,6 +739,47 @@ DS_HeatTransfer:: return_row_index (
 
    return(p);
 }
+
+
+
+//----------------------------------------------------------------------
+double DS_HeatTransfer:: compute_DS_temperature_change( void )
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_HeatTransfer:: compute_DS_temperature_change" ) ;
+
+	size_t_vector min_unknown_index(3,0);
+	size_t_vector max_unknown_index(3,0);
+
+	size_t comp = 0;
+	double sum_sq_U=0.,sum_sq_dU=0.;
+
+	for (size_t l = 0; l < dim; ++l) {
+		min_unknown_index(l) =
+						 TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+		max_unknown_index(l) =
+						 TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+	}
+
+	for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+		for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+			for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+				sum_sq_U += pow(TF->DOF_value( i, j, k, comp, 0 ),2.);
+			   sum_sq_dU += pow(TF->DOF_value( i, j, k, comp, 0 )
+								   - TF->DOF_value( i, j, k, comp, 1 ),2.);
+
+			}
+		}
+	}
+
+	sum_sq_U = macCOMM->sum(sum_sq_U);
+	sum_sq_dU = macCOMM->sum(sum_sq_dU);
+
+   return ( MAC::sqrt(sum_sq_dU/sum_sq_U) ) ;
+}
+
+
+
 
 //---------------------------------------------------------------------------
 double
@@ -1487,7 +1522,11 @@ DS_HeatTransfer:: unpack_ue(size_t const& comp, double * received_data, size_t c
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir)
+DS_HeatTransfer:: solve_interface_unknowns ( double const& gamma
+														 , FV_TimeIterator const* t_it
+														 , size_t const& comp
+														 , size_t const& dir
+													 	 , size_t const& level )
 //---------------------------------------------------------------------------
 {
    // Get local min and max indices
@@ -1555,7 +1594,7 @@ DS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterat
             A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
             // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p);
+            GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p,level);
          }
       } else {
          for (size_t k=local_min_k;k<=local_max_k;k++) {
@@ -1572,7 +1611,7 @@ DS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterat
                A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
                // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p);
+               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p,level);
             }
          }
       }
@@ -1608,7 +1647,7 @@ DS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterat
                A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
                // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p);
+               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p,level);
             }
          } else {
             for (size_t k = local_min_k;k<=local_max_k;k++) {
@@ -1624,7 +1663,7 @@ DS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterat
                   A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
 
                   // Solve ui and transfer solution into distributed vector
-                  GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p);
+                  GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p,level);
                }
             }
          }
@@ -1634,7 +1673,12 @@ DS_HeatTransfer:: solve_interface_unknowns ( double const& gamma,  FV_TimeIterat
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k )
+DS_HeatTransfer:: Solve_i_in_jk ( FV_TimeIterator const* t_it
+										  , double const& gamma
+										  , size_t const& dir_i
+										  , size_t const& dir_j
+										  , size_t const& dir_k
+									     , size_t const& level)
 //---------------------------------------------------------------------------
 {
   size_t_vector min_unknown_index(dim,0);
@@ -1671,14 +1715,15 @@ DS_HeatTransfer:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& gam
               data_packing (fe,comp,dir_i,r_index);
 	   }
         }
-        solve_interface_unknowns (gamma,t_it,comp,dir_i);
+        solve_interface_unknowns (gamma,t_it,comp,dir_i,level);
 
      } else if (is_iperiodic[dir_i] == 0) {  // Serial mode with non-periodic condition
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
            for (size_t k=local_min_k; k <= local_max_k; ++k) {
               size_t r_index = return_row_index (TF,comp,dir_i,j,k);
               assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
-              GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir_i),comp,dir_i,r_index);
+              GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir_i)
+				  													,comp,dir_i,r_index,level);
            }
         }
      }
@@ -1846,39 +1891,29 @@ DS_HeatTransfer:: HeatEquation_DirectionSplittingSolver ( FV_TimeIterator const*
 
   if ( my_rank == is_master ) SCT_set_start("Solver x solution");
   // Solve x-direction(i.e. 0) in y(i.e. 1) and z(i.e. 2)
-  Solve_i_in_jk (t_it,gamma,0,1,2);
-  // Synchronize the distributed DS solution vector
-  GLOBAL_EQ->synchronize_DS_solution_vec();
-  // Tranfer back to field
-  TF->update_free_DOFs_value( 3, GLOBAL_EQ->get_solution_DS_temperature() ) ;
+  Solve_i_in_jk (t_it,gamma,0,1,2,3);
+  // Synchronize the temperature field
+  TF->synchronize( 3 );
   if (is_solids) nodes_temperature_initialization(3);
   if ( my_rank == is_master ) SCT_get_elapsed_time("Solver x solution");
 
+  size_t level = (dim == 2) ? 0 : 4 ;
 
   if ( my_rank == is_master ) SCT_set_start("Solver y solution");
   // Solve y-direction(i.e. 1) in x(i.e. 0) and z(i.e. 2)
-  Solve_i_in_jk (t_it,gamma,1,0,2);
-  // Synchronize the distributed DS solution vector
-  GLOBAL_EQ->synchronize_DS_solution_vec();
-  // Tranfer back to field
-  if (dim == 2) {
-     TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
-     if (is_solids) nodes_temperature_initialization(0);
-  } else if (dim == 3) {
-     TF->update_free_DOFs_value( 4 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
-     if (is_solids) nodes_temperature_initialization(4);
-  }
+  Solve_i_in_jk (t_it,gamma,1,0,2,level);
+  // Synchronize the temperature field
+  TF->synchronize( level );
+  if (is_solids) nodes_temperature_initialization(level);
   if ( my_rank == is_master ) SCT_get_elapsed_time("Solver y solution");
 
 
   if (dim == 3) {
      if ( my_rank == is_master ) SCT_set_start("Solver z solution");
      // Solve z-direction(i.e. 2) in x(i.e. 0) and y(i.e. 1)
-     Solve_i_in_jk (t_it,gamma,2,0,1);
-     // Synchronize the distributed DS solution vector
-     GLOBAL_EQ->synchronize_DS_solution_vec();
-     // Tranfer back to field
-     TF->update_free_DOFs_value( 0 , GLOBAL_EQ->get_solution_DS_temperature() ) ;
+     Solve_i_in_jk (t_it,gamma,2,0,1,0);
+     // Synchronize the temperature field
+	  TF->synchronize( 0 );
      if (is_solids) nodes_temperature_initialization(0);
 	  if ( my_rank == is_master ) SCT_get_elapsed_time("Solver z solution");
   }

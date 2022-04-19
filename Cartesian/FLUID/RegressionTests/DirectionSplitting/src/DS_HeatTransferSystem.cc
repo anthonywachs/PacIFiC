@@ -99,23 +99,6 @@ DS_HeatTransferSystem:: build_system( MAC_ModuleExplorer const* exp )
 {
    MAC_LABEL( "DS_HeatTransferSystem:: build_system" ) ;
 
-   // Temperature Laplacian
-   MAT_D_TemperatureUnsteadyPlusDiffusion = LA_Matrix::make( this,
-         exp->create_subexplorer( this,
-	 										"MAT_D_TemperatureDiffusion"  ) ) ;
-
-   VEC_DS_TF = MAT_D_TemperatureUnsteadyPlusDiffusion->create_vector( this ) ;
-   VEC_DS_TF_previoustime = MAT_D_TemperatureUnsteadyPlusDiffusion
-																	  ->create_vector( this ) ;
-   VEC_DS_TF_timechange = MAT_D_TemperatureUnsteadyPlusDiffusion
-																	  ->create_vector( this ) ;
-
-   // Local vector
-   TF_DS_LOC = LA_SeqVector::create( this, 0 ) ;
-
-   // Temperature numbering
-   TF_NUM = FV_SystemNumbering::create( this, TF ) ;
-
    // Direction splitting matrices
    MAT_TemperatureUnsteadyPlusDiffusion_1D = LA_SeqMatrix::make( this,
 								exp->create_subexplorer( this,"MAT_1DLAP_generic" ) );
@@ -309,23 +292,6 @@ DS_HeatTransferSystem:: re_initialize( void )
 {
    MAC_LABEL( "DS_HeatTransferSystem:: re_initialize" ) ;
 
-   size_t tf_glob = TF->nb_global_unknowns() ;
-   size_t tf_loc = TF->nb_local_unknowns() ;
-
-   // Temperature Laplacian
-   MAT_D_TemperatureUnsteadyPlusDiffusion->re_initialize( tf_glob, tf_glob ) ;
-
-   // Unknowns vectors
-   VEC_DS_TF->re_initialize( tf_glob ) ;
-   VEC_DS_TF_previoustime->re_initialize( tf_glob ) ;
-   VEC_DS_TF_timechange->re_initialize( tf_glob ) ;
-
-   // Local vector
-   TF_DS_LOC->re_initialize( tf_loc ) ;
-
-   // Temperature numbering
-   TF_NUM->define_scatter( VEC_DS_TF ) ;
-
    // Direction splitting matrices & vectors
    size_t nb_procs, proc_pos;
 
@@ -425,25 +391,25 @@ DS_HeatTransferSystem:: re_initialize( void )
                A[l].ei[comp][index]->re_initialize(nb_procs,nb_unknowns_handled_by_proc( l )-1 );
             }
 
-	    Ap[l].result[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1 );
+	    		Ap[l].result[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1 );
             Ap[l].ii_ie[comp]->re_initialize(nb_procs);
             Ap[l].ei_ii_ie[comp]->re_initialize(nb_procs,nb_procs );
 
             Ap_proc0[l].ei_ii_ie[comp]->re_initialize(nb_procs,nb_procs );
 
-	    VEC[l].local_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
+	    		VEC[l].local_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
             VEC[l].local_solution_T[comp]->re_initialize( nb_unknowns_handled_by_proc( l )-1) ;
             VEC[l].interface_T[comp]->re_initialize( nb_procs ) ;
             VEC[l].T[comp]->re_initialize( nb_procs ) ;
 
             if (proc_pos == 0) {
-	       // Master processor
+	       		// Master processor
                for (size_t index = 0; index < nb_index; index++) {
                   A[l].ee[comp][index]->re_initialize(nb_procs,nb_procs );
                }
-	       if (nb_procs != 1) {
-		  // Mutli processor with periodic domain
-		  // Condition where schur complement won't be a standard tridiagonal matrix but a variation
+	       		if (nb_procs != 1) {
+					  // Mutli processor with periodic domain
+					  // Condition where schur complement won't be a standard tridiagonal matrix but a variation
                   for (size_t index = 0; index < nb_index; index++) {
                      Schur[l].ii_main[comp][index]->re_initialize(nb_procs-1);
                      Schur[l].ii_super[comp][index]->re_initialize(nb_procs-2);
@@ -451,26 +417,26 @@ DS_HeatTransferSystem:: re_initialize( void )
                      Schur[l].ie[comp][index]->re_initialize(nb_procs-1,1);
                      Schur[l].ei[comp][index]->re_initialize(1,nb_procs-1);
                      Schur[l].ee[comp][index]->re_initialize(1,1);
-		     DoubleSchur[l].ii_main[comp][index]->re_initialize(1);
+		     				DoubleSchur[l].ii_main[comp][index]->re_initialize(1);
                   }
 
-		  SchurP[l].result[comp]->re_initialize(nb_procs-1);
+		  				SchurP[l].result[comp]->re_initialize(nb_procs-1);
                   SchurP[l].ii_ie[comp]->re_initialize(1);
                   SchurP[l].ei_ii_ie[comp]->re_initialize(1,1);
 
-      		  Schur_VEC[l].local_T[comp]->re_initialize(nb_procs-1) ;
+      		  		Schur_VEC[l].local_T[comp]->re_initialize(nb_procs-1) ;
                   Schur_VEC[l].local_solution_T[comp]->re_initialize(nb_procs-1) ;
                   Schur_VEC[l].interface_T[comp]->re_initialize(1) ;
                   Schur_VEC[l].T[comp]->re_initialize(1) ;
 
-	       } else {
+	       		} else {
                   for (size_t index = 0; index < nb_index; index++) {
                      // Serial mode with periodic domain
                      Schur[l].ii_main[comp][index]->re_initialize(nb_procs);
                      Schur[l].ii_super[comp][index]->re_initialize(nb_procs-1);
                      Schur[l].ii_sub[comp][index]->re_initialize(nb_procs-1);
                   }
-	       }
+	       		}
             }
          }
       }
@@ -484,64 +450,8 @@ DS_HeatTransferSystem:: ~DS_HeatTransferSystem( void )
    MAC_LABEL( "DS_HeatTransferSystem:: ~DS_HeatTransferSystem" ) ;
 }
 
-//----------------------------------------------------------------------
-void
-DS_HeatTransferSystem::initialize_temperature( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_HeatTransferSystem:: initialize_temperature" ) ;
 
-   TF->extract_unknown_DOFs_value( 0, TF_DS_LOC ) ;
-   TF_NUM->scatter()->set( TF_DS_LOC, VEC_DS_TF ) ;
 
-}
-
-//----------------------------------------------------------------------
-LA_SeqVector const*
-DS_HeatTransferSystem:: get_solution_DS_temperature( void ) const
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_HeatTransferSystem:: get_solution_DS_temperature" ) ;
-
-   TF_NUM->scatter()->get( VEC_DS_TF, TF_DS_LOC ) ;
-
-   LA_SeqVector const* DS_result = TF_DS_LOC ;
-
-   return( DS_result ) ;
-
-}
-
-//----------------------------------------------------------------------
-void
-DS_HeatTransferSystem::at_each_time_step( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_HeatTransferSystem:: at_each_time_step" ) ;
-
-   // Store temperature at previous time
-   VEC_DS_TF->synchronize() ;
-   VEC_DS_TF_previoustime->set( VEC_DS_TF ) ;
-
-}
-
-//----------------------------------------------------------------------
-double
-DS_HeatTransferSystem:: compute_temperature_change( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_HeatTransferSystem:: compute_temperature_change" ) ;
-
-   VEC_DS_TF->synchronize() ;
-   VEC_DS_TF_timechange->set( VEC_DS_TF ) ;
-   VEC_DS_TF_timechange->sum( VEC_DS_TF_previoustime, -1.0 ) ;
-
-   double norm_TF = VEC_DS_TF->two_norm() ;
-   double time_change = VEC_DS_TF_timechange->two_norm() ;
-   if ( norm_TF > 1e-4 ) time_change /= norm_TF;
-
-   return ( time_change ) ;
-
-}
 
 //----------------------------------------------------------------------
 void
@@ -685,8 +595,13 @@ DS_HeatTransferSystem::get_Schur_VEC()
 
 //----------------------------------------------------------------------
 void
-DS_HeatTransferSystem::DS_HeatEquation_solver(
-        size_t const& j, size_t const& k, size_t const& min_i, size_t const& comp, size_t const& dir, size_t const& r_index)
+DS_HeatTransferSystem::DS_HeatEquation_solver( size_t const& j
+															, size_t const& k
+															, size_t const& min_i
+															, size_t const& comp
+															, size_t const& dir
+															, size_t const& r_index
+															, size_t const& level )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransferSystem:: DS_HeatEquation_solver" ) ;
@@ -720,8 +635,7 @@ DS_HeatTransferSystem::DS_HeatEquation_solver(
          ii = j; jj = k; kk = i;
       }
 
-      global_number_in_distributed_vector = TF->DOF_global_number( ii, jj, kk, comp );
-      VEC_DS_TF->set_item( global_number_in_distributed_vector,rhs[dir].local_T[comp]->item( m ) );
+		TF->set_DOF_value( ii, jj, kk, comp, level, rhs[dir].local_T[comp]->item( m ));
    }
 
    // Put the interface unknowns in distributed vector
@@ -735,27 +649,16 @@ DS_HeatTransferSystem::DS_HeatEquation_solver(
    }
 
    if ((is_iperiodic[dir] == 1)) {
-      global_number_in_distributed_vector =
-      TF->DOF_global_number( ii, jj, kk, comp );
-      VEC_DS_TF->set_item( global_number_in_distributed_vector,
-          rhs[dir].interface_T[comp]->item( proc_pos ) );
+		TF->set_DOF_value( ii, jj, kk, comp, level,
+											rhs[dir].interface_T[comp]->item( proc_pos ));
    } else if ((is_iperiodic[dir] == 0) && (proc_pos != nb_procs-1)) {
-      global_number_in_distributed_vector =
-      TF->DOF_global_number( ii, jj, kk, comp );
-      VEC_DS_TF->set_item( global_number_in_distributed_vector,
-          rhs[dir].interface_T[comp]->item( proc_pos ) );
+		TF->set_DOF_value( ii, jj, kk, comp, level,
+											rhs[dir].interface_T[comp]->item( proc_pos ));
    }
 }
 
-//----------------------------------------------------------------------
-void
-DS_HeatTransferSystem::synchronize_DS_solution_vec( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_HeatTransferSystem:: synchronize_DS_solution_vec" ) ;
 
-   VEC_DS_TF->synchronize();
-}
+
 
 //----------------------------------------------------------------------
 void
