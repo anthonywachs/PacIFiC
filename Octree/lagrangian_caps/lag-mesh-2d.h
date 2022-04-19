@@ -7,6 +7,10 @@
 #ifndef NCAPS
   #define NCAPS 1
 #endif
+#ifndef ADVECT_LAG_RK2
+  #define ADVECT_LAG_RK2 1
+#endif
+#define MB(i) (mbs.mb[i])
 
 /** In the Lagrangian mesh, each node is assigned coordinates, the IDs of its
 two connecting edges (in 2D), an elastic force, and a velocity. */
@@ -211,11 +215,33 @@ interpolating the velocities around the node of interest. A simple forward Euler
 scheme is used as a scheme. */
 void advect_lagMesh(lagMesh* mesh) {
   eul2lag(mesh);
-  for(int i=0; i < mesh->nlp; i++) {
-    foreach_dimension() {
-      mesh->nodes[i].pos.x += dt*mesh->nodes[i].lagVel.x;
+  /** By default the Lagrangian mesh is advected with a second order Runge-Kutta
+  scheme. Otherwise, we use a first order forward Euler advection scheme. */
+  #if !(ADVECT_LAG_RK2)
+    for(int i=0; i < mesh->nlp; i++) {
+      foreach_dimension() {
+        mesh->nodes[i].pos.x += dt*mesh->nodes[i].lagVel.x;
+      }
     }
-  }
+  #else
+    lagMesh buffer_mesh;
+    buffer_mesh.nlp = mesh->nlp;
+    buffer_mesh.nodes = malloc(mesh->nlp*sizeof(lagNode));
+    for(int i=0; i<mesh->nlp; i++) {
+      // Step 1 of RK2
+      foreach_dimension()
+        buffer_mesh.nodes[i].pos.x = mesh->nodes[i].pos.x +
+          .5*dt*mesh->nodes[i].lagVel.x;
+    }
+    correct_lag_pos(&buffer_mesh);
+    eul2lag(&buffer_mesh);
+    for(int i=0; i<mesh->nlp; i++) {
+      // Step 2 or RK2
+      foreach_dimension()
+        mesh->nodes[i].pos.x += dt*buffer_mesh.nodes[i].lagVel.x;
+    }
+    free(buffer_mesh.nodes);
+  #endif
   correct_lag_pos(mesh);
 }
 
@@ -229,8 +255,6 @@ void free_caps(Capsules* caps) {
 }
 
 Capsules mbs;
-#define MB(i) (mbs.mb[i])
-
 
 event defaults (i = 0) {
   mbs.nbmb = NCAPS;
