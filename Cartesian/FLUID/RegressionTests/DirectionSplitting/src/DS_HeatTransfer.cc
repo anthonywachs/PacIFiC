@@ -401,11 +401,8 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it
   // Assemble the diffusive components of velocity once in each iteration
   assemble_temperature_diffusion_terms();
 
-  double dxC, dyC, dzC, xC, yC, zC=0.;
-  double xvalue=0.,yvalue=0.,zvalue=0.,rhs=0., bodyterm=0., adv_value=0.;
-
-  size_t_vector min_unknown_index(dim,0);
-  size_t_vector max_unknown_index(dim,0);
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
 
   size_t_vector* void_frac = (is_solids) ?
 						  allrigidbodies->get_void_fraction_on_grid(TF) : 0;
@@ -415,30 +412,34 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+        min_unknown_index(l) =
+		  						TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_unknown_index(l) =
+		  						TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
      }
 
-     size_t i, j, k;
-     for (i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-        // Compute VEC_rhs_x = rhs in x
-        dxC = TF->get_cell_size( i, comp, 0 ) ;
-        xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
-        for (j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-           dyC = TF->get_cell_size( j, comp, 1 ) ;
-	   	  yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
-           if (dim ==2 ) {
-              k = 0;
+     for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+        double dxC = TF->get_cell_size( i, comp, 0 ) ;
+        double xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
+        for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+           double dyC = TF->get_cell_size( j, comp, 1 ) ;
+	   	  double yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
+			  for (size_t k = min_unknown_index(2);k <= max_unknown_index(2);++k) {
+				  double dzC = (dim == 2) ? 1. : TF->get_cell_size( k, comp, 2 ) ;
+				  double zC = (dim == 2) ? 0. : TF->get_DOF_coordinate( k, comp, 2 ) ;
+
 				  size_t p = TF->DOF_local_number(i,j,k,comp);
               // Dxx for un
-              xvalue = T_diffusion[0]->operator()(p);
+              double xvalue = T_diffusion[0]->operator()(p);
               // Dyy for un
-              yvalue = T_diffusion[1]->operator()(p);
+              double yvalue = T_diffusion[1]->operator()(p);
+				  // Dzz for un
+				  double zvalue = (dim == 2) ? 0. : T_diffusion[2]->operator()(p);
 		        // Bodyterm for rhs
-		        bodyterm = bodyterm_value(xC,yC,zC);
+		        double bodyterm = bodyterm_value(xC,yC,zC);
               // Advection term
-              adv_value = (is_NSwithHE) ? compute_adv_component(comp,i,j,k)
-				  									 : 0.;
+              double adv_value = (is_NSwithHE) ? compute_adv_component(comp,i,j,k)
+				  									 		  : 0.;
 
               if (is_solids) {
                  if (void_frac->operator()(p) != 0) {
@@ -446,38 +447,16 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it
                  }
               }
 
-              rhs = gamma*(xvalue*dyC + yvalue*dxC) - adv_value + (TF->DOF_value( i, j, k, comp, 1 )*dxC*dyC)/(t_it -> time_step());
-              TF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC) + gamma*bodyterm*(t_it -> time_step()));
+				  double rhs = gamma*(xvalue*dyC*dzC
+					  					  + yvalue*dxC*dzC
+										  + zvalue*dxC*dyC)
+			  				  	 - adv_value
+				  		 		 + (TF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC)
+				  		 		  / t_it -> time_step();
 
-           } else {
-              for (k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-                 dzC = TF->get_cell_size( k, comp, 2 ) ;
-	         	  zC = TF->get_DOF_coordinate( k, comp, 2 ) ;
-					  size_t p = TF->DOF_local_number(i,j,k,comp);
-                 // Dxx for un
-                 xvalue = T_diffusion[0]->operator()(p);
-                 // Dyy for un
-                 yvalue = T_diffusion[1]->operator()(p);
-                 // Dzz for un
-                 zvalue = T_diffusion[2]->operator()(p);
-		           // Bodyterm for rhs
-		           bodyterm = bodyterm_value(xC,yC,zC);
-                 // Advection term
-                 adv_value = is_NSwithHE ? compute_adv_component(comp,i,j,k)
-					              				  : 0.;
-
-                 if (is_solids) {
-                    if (void_frac->operator()(p) != 0) {
-                       adv_value = 0.;
-                    }
-                 }
-
-                 rhs = gamma*(xvalue*dyC*dzC + yvalue*dxC*dzC + zvalue*dxC*dyC)
-					  		- adv_value
-                     + (TF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC)
-							/ (t_it -> time_step());
-                 TF->set_DOF_value( i, j, k, comp, 0, rhs*(t_it -> time_step())/(dxC*dyC*dzC) + gamma*bodyterm*(t_it -> time_step()));
-              }
+              TF->set_DOF_value( i, j, k, comp, 0,
+				  					rhs*(t_it -> time_step())/(dxC*dyC*dzC)
+								 + gamma*bodyterm*(t_it -> time_step()));
            }
         }
      }
