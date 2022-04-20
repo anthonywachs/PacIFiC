@@ -102,7 +102,7 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
    }
 
    // Create the Direction Splitting subcommunicators
-   create_DDS_subcommunicators();
+   create_DS_subcommunicators();
 
    // Read with or without body term
    if ( exp->has_entry( "BodyTerm" ) )
@@ -151,7 +151,7 @@ DS_HeatTransfer:: ~DS_HeatTransfer( void )
 {
    MAC_LABEL( "DS_HeatTransfer:: ~DS_HeatTransfer" ) ;
 
-   free_DDS_subcommunicators() ;
+   free_DS_subcommunicators() ;
 
 }
 
@@ -441,7 +441,6 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it
 				  									 : 0.;
 
               if (is_solids) {
-					  size_t p = TF->DOF_local_number(i,j,k,comp);
                  if (void_frac->operator()(p) != 0) {
                     adv_value = 0.;
                  }
@@ -468,7 +467,6 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it
 					              				  : 0.;
 
                  if (is_solids) {
-						  size_t p = TF->DOF_local_number(i,j,k,comp);
                     if (void_frac->operator()(p) != 0) {
                        adv_value = 0.;
                     }
@@ -869,376 +867,420 @@ double DS_HeatTransfer:: compute_DS_temperature_change( void )
 
 
 //---------------------------------------------------------------------------
-double
+void
 DS_HeatTransfer:: assemble_temperature_matrix (FV_DiscreteField const* FF
-															, FV_TimeIterator const* t_it
-															, double const& gamma
-										  					, size_t const& comp
-										  					, size_t const& dir
-										  					, size_t const& j
-										  					, size_t const& k
-										  					, size_t const& r_index )
+															, FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: assemble_temperature_matrix" ) ;
 
-   // Parameters
-   double dxr,dxl,xR,xL,xC,right,left,center = 0. ;
+	double gamma = (1.0/2.0)*(thermal_conductivity/rho/heat_capacity);
+	TDMatrix* A = GLOBAL_EQ-> get_A();
 
-   // Get local min and max indices
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-   for (size_t l=0;l<dim;++l) {
-		min_unknown_index(l) =
-						FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-		max_unknown_index(l) =
-						FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-   }
+   size_t_vector min_unknown_index(3,0);
+   size_t_vector max_unknown_index(3,0);
 
-   // Perform assembling
-   size_t m, i;
-   TDMatrix* A = GLOBAL_EQ-> get_A();
+	for (size_t comp = 0; comp < nb_comps; comp++) {
+		// Get local min and max indices
+		for (size_t l=0;l<dim;++l) {
+			min_unknown_index(l) =
+							FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+			max_unknown_index(l) =
+							FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+	   }
 
-   double Aee_diagcoef=0.;
+		for (size_t dir = 0; dir < dim; dir++) {
 
-   for (m=0,i=min_unknown_index(dir);i<=max_unknown_index(dir);++i,++m) {
-       xC = FF->get_DOF_coordinate( i, comp, dir ) ;
-       xR = FF->get_DOF_coordinate( i+1, comp, dir ) ;
-       xL = FF->get_DOF_coordinate( i-1, comp, dir ) ;
+			bool r_bound = false;
+         bool l_bound = false;
+         // All the proc will have open right bound,
+  		 	// except last proc for non periodic systems
+         if ((is_iperiodic[dir] != 1)
+  		    && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1))
+			   r_bound = true;
+         // All the proc will have open left bound,
+  		   // except first proc for non periodic systems
+         if ((is_iperiodic[dir] != 1)
+			 && (rank_in_i[dir] == 0))
+			 	l_bound = true;
 
-       dxr = xR - xC;
-       dxl = xC - xL;
+			size_t dir_j = (dir == 0) ? 1 : 0;
+			size_t dir_k = (dir == 2) ? 1 : 2;
 
-       right = -gamma/(dxr);
-       left = -gamma/(dxl);
+			size_t local_min_k = (dim == 2) ? 0 : min_unknown_index(dir_k);
+			size_t local_max_k = (dim == 2) ? 0 : max_unknown_index(dir_k);
 
-       if (is_solids) {
-          size_t p=0;
-          if (dir == 0) {
-             p = FF->DOF_local_number(i,j,k,comp);
-          } else if (dir == 1) {
-             p = FF->DOF_local_number(j,i,k,comp);
-          } else if (dir == 2) {
-             p = FF->DOF_local_number(j,k,i,comp);
-          }
+			size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(0,dir,comp);
 
-			 size_t_array2D* intersect_vector =
-                            allrigidbodies->get_intersect_vector_on_grid(FF);
-          doubleArray2D* intersect_distance =
-                            allrigidbodies->get_intersect_distance_on_grid(FF);
-          size_t_vector* void_frac =
-                            allrigidbodies->get_void_fraction_on_grid(FF);
+			for (size_t j = min_unknown_index(dir_j);
+						  j <= max_unknown_index(dir_j);++j) {
+				for (size_t k = local_min_k; k <= local_max_k; ++k) {
+					size_t r_index = row_index->operator()(j,k);
+					// Perform assembling
+   				double Aee_diagcoef=0.;
+   				for (size_t m = 0, i = min_unknown_index(dir);
+											 i <= max_unknown_index(dir); ++i, ++m) {
+    					double xC = FF->get_DOF_coordinate( i, comp, dir ) ;
+       				double xR = FF->get_DOF_coordinate( i+1, comp, dir ) ;
+       				double xL = FF->get_DOF_coordinate( i-1, comp, dir ) ;
 
-          // if left node is inside the solid particle
-          if (intersect_vector->operator()(p,2*dir+0) == 1) {
-             left = -gamma/intersect_distance->operator()(p,2*dir+0);
-          }
-          // if right node is inside the solid particle
-          if (intersect_vector->operator()(p,2*dir+1) == 1) {
-             right = -gamma/intersect_distance->operator()(p,2*dir+1);
-          }
-          // if center node is inside the solid particle
-          if (void_frac->operator()(p) != 0) {
-             left = 0.;
-             right = 0.;
-          }
+       				double dxr = xR - xC;
+       				double dxl = xC - xL;
 
-          center = -(right+left);
+       				double right = -gamma/(dxr);
+       				double left = -gamma/(dxl);
 
-          if (intersect_vector->operator()(p,2*dir+0) == 1) left = 0.;
-          if (intersect_vector->operator()(p,2*dir+1) == 1) right = 0.;
-       } else {
-          center = - (right+left);
-       }
+						double center = -(right+left);
 
-       bool r_bound = false;
-       bool l_bound = false;
-       // All the proc will have open right bound,
-		 // except last proc for non periodic systems
-       if ((is_iperiodic[dir] != 1)
-		  && (rank_in_i[dir] == nb_ranks_comm_i[dir]-1)) r_bound = true;
-       // All the proc will have open left bound,
-		 // except first proc for non periodic systems
-       if ((is_iperiodic[dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
+				      if (is_solids) {
+				         size_t p=0;
+				         if (dir == 0) {
+				            p = FF->DOF_local_number(i,j,k,comp);
+				         } else if (dir == 1) {
+				            p = FF->DOF_local_number(j,i,k,comp);
+				         } else if (dir == 2) {
+				            p = FF->DOF_local_number(j,k,i,comp);
+				         }
 
-       // add unsteady term
-       double value;
-       size_t k_min, k_max;
-       double unsteady_term = (FF->get_cell_size(i,comp,dir))/(t_it->time_step());
+							size_t_array2D* intersect_vector =
+				                   allrigidbodies->get_intersect_vector_on_grid(FF);
+				         doubleArray2D* intersect_distance =
+				                 allrigidbodies->get_intersect_distance_on_grid(FF);
+				         size_t_vector* void_frac =
+				                      allrigidbodies->get_void_fraction_on_grid(FF);
 
-       k_min = (dim == 2) ? 0 : min_unknown_index(2);
-		 k_max = (dim == 2) ? 0 : max_unknown_index(2);
+				         // if left node is inside the solid particle
+				         if (intersect_vector->operator()(p,2*dir+0) == 1) {
+				            left = -gamma/intersect_distance->operator()(p,2*dir+0);
+				         }
+				         // if right node is inside the solid particle
+				         if (intersect_vector->operator()(p,2*dir+1) == 1) {
+				            right = -gamma/intersect_distance->operator()(p,2*dir+1);
+				         }
+				         // if center node is inside the solid particle
+				         if (void_frac->operator()(p) != 0) {
+				            left = 0.;
+				            right = 0.;
+				         }
 
-       // Since, this function is used in all directions;
-       // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
-       int ii=0,jj=0,kk=0;
+          				center = -(right+left);
 
-       // Condition for handling the pressure neumann conditions at wall
-       if (i==min_unknown_index(dir) && l_bound) {
-          if (dir == 0) {
-             ii = (int)i-1;
-				 jj = (int)min_unknown_index(1);
-				 kk = (int)k_min;
-          } else if (dir == 1) {
-             ii = (int)min_unknown_index(0);
-				 jj = (int)i-1;
-				 kk = (int)k_min;
-          } else if (dir == 2) {
-             ii = (int)min_unknown_index(0);
-				 jj = (int)min_unknown_index(1);
-				 kk = (int)i-1;
-          }
-          if (FF->DOF_in_domain(ii,jj,kk,comp)
-			  && FF->DOF_has_imposed_Dirichlet_value
-			  						((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
-             // For Dirichlet boundary condition
-             value = center;
-          } else {
-             // For Neumann homogeneous boundary condition
-             value = -right;
-          }
-       } else if (i==max_unknown_index(dir) && r_bound) {
-          if (dir == 0) {
-             ii = (int)i+1;
-				 jj = (int)max_unknown_index(1);
-				 kk = (int)k_max;
-          } else if (dir == 1) {
-             ii = (int)max_unknown_index(0);
-				 jj = (int)i+1;
-				 kk = (int)k_max;
-          } else if (dir == 2) {
-             ii = (int)max_unknown_index(0);
-				 jj = (int)max_unknown_index(1);
-				 kk = (int)i+1;
-          }
-          if (FF->DOF_in_domain(ii,jj,kk,comp)
-			  && FF->DOF_has_imposed_Dirichlet_value
-			  						((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
-             // For Dirichlet boundary condition
-             value = center;
-          } else {
-             // For Neumann homogeneous boundary condition
-             value = -left;
-          }
-       } else {
-          value = center;
-       }
+				         if (intersect_vector->operator()(p,2*dir+0) == 1)
+								left = 0.;
+				         if (intersect_vector->operator()(p,2*dir+1) == 1)
+								right = 0.;
+				      }
 
-       value = value + unsteady_term;
+			         // add unsteady term
+			         double value = center;
+       				double unsteady_term =
+									(FF->get_cell_size(i,comp,dir))/(t_it->time_step());
 
-       // Set Aie, Aei and Aee
-       if ((!l_bound) && (i == min_unknown_index(dir))) {
-          // Periodic boundary condition at minimum unknown index
-          // First proc has non zero value in Aie,Aei for first & last index
-	  if (rank_in_i[dir] == 0) {
-             A[dir].ie[comp][r_index]->set_item(m,nb_ranks_comm_i[dir]-1,left);
-      	     A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,left);
-	  } else {
-             A[dir].ie[comp][r_index]->set_item(m,rank_in_i[dir]-1,left);
-	     A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,left);
-	  }
-       }
+				      // Condition for handling the pressure neumann conditions at wall
+				      if (i==min_unknown_index(dir) && l_bound) {
+							int ii = (int)((dir == 0) ? i-1 : min_unknown_index(0));
+							int jj = (int)((dir == 1) ? i-1 : min_unknown_index(1));
+							int kk = (int)((dir == 2) ? i-1 : min_unknown_index(2));
 
-       if ((!r_bound) && (i == max_unknown_index(dir))) {
-          // Periodic boundary condition at maximum unknown index
-          // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-          A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],left);
-          Aee_diagcoef = value;
-          A[dir].ei[comp][r_index]->set_item(rank_in_i[dir],m-1,left);
-       }
+			 				if (FF->DOF_in_domain(ii,jj,kk,comp)
+			  				 && FF->DOF_has_imposed_Dirichlet_value
+			  									((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
+             				// For Dirichlet boundary condition
+             				value = center;
+          				} else {
+          					// For Neumann homogeneous boundary condition
+             				value = -right;
+          				}
+       				} else if (i==max_unknown_index(dir) && r_bound) {
+							int ii = (int)((dir == 0) ? i+1 : max_unknown_index(0));
+							int jj = (int)((dir == 1) ? i+1 : max_unknown_index(1));
+							int kk = (int)((dir == 2) ? i+1 : max_unknown_index(2));
 
-       // Set Aii_sub_diagonal
-       if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_iperiodic[dir] != 1)) {
-          if (i > min_unknown_index(dir)) A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
-       } else {
-          if (i<max_unknown_index(dir)) {
-             if (i>min_unknown_index(dir)) {
-                A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
-	     }
-	  }
-       }
+          				if (FF->DOF_in_domain(ii,jj,kk,comp)
+			  				 && FF->DOF_has_imposed_Dirichlet_value
+		  										((size_t)ii,(size_t)jj,(size_t)kk,comp)) {
+          					// For Dirichlet boundary condition
+             				value = center;
+          				} else {
+             				// For Neumann homogeneous boundary condition
+             				value = -left;
+          				}
+       				}
 
-       // Set Aii_super_diagonal
-       if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_iperiodic[dir] != 1)) {
-          if (i < max_unknown_index(dir)) A[dir].ii_super[comp][r_index]->set_item(m,right);
-       } else {
-          if (i < max_unknown_index(dir)-1) {
-             A[dir].ii_super[comp][r_index]->set_item(m,right);
-          }
-       }
+       				value = value + unsteady_term;
 
-       // Set Aii_main_diagonal
-       if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1) && (is_iperiodic[dir] != 1)) {
-          A[dir].ii_main[comp][r_index]->set_item(m,value);
-       } else {
-          if (i<max_unknown_index(dir)) {
-             A[dir].ii_main[comp][r_index]->set_item(m,value);
-          }
-       }
-   }  // End of for loop
+				      // Set Aie, Aei and Aee
+				      if ((!l_bound) && (i == min_unknown_index(dir))) {
+			            // Periodic boundary condition at minimum unknown index
+			            // First proc has non zero value in Aie,Aei for first & last index
+	  			  		   if (rank_in_i[dir] == 0) {
+             				A[dir].ie[comp][r_index]->set_item(m,nb_ranks_comm_i[dir]-1,left);
+      	     				A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,left);
+	  						} else {
+             				A[dir].ie[comp][r_index]->set_item(m,rank_in_i[dir]-1,left);
+	     						A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,left);
+	  						}
+       				}
 
-   GLOBAL_EQ->pre_thomas_treatment(comp,dir,A,r_index);
+       				if ((!r_bound) && (i == max_unknown_index(dir))) {
+          				// Periodic boundary condition at maximum unknown index
+          				// For last index, Aee comes from this proc as it
+							// is interface unknown wrt this proc
+          				A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],left);
+          				Aee_diagcoef = value;
+          				A[dir].ei[comp][r_index]->set_item(rank_in_i[dir],m-1,left);
+       				}
 
-   return(Aee_diagcoef);
+				      // Set Aii_sub_diagonal
+				      if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1)
+						 && (is_iperiodic[dir] != 1)) {
+				         if (i > min_unknown_index(dir))
+								A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
+				       } else {
+				          if (i<max_unknown_index(dir))
+				             if (i>min_unknown_index(dir))
+				                A[dir].ii_sub[comp][r_index]->set_item(m-1,left);
+				       }
+
+       				 // Set Aii_super_diagonal
+       				 if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1)
+						  && (is_iperiodic[dir] != 1)) {
+          				 if (i < max_unknown_index(dir))
+							 	 A[dir].ii_super[comp][r_index]->set_item(m,right);
+       				 } else {
+          				 if (i < max_unknown_index(dir)-1)
+             				 A[dir].ii_super[comp][r_index]->set_item(m,right);
+       				 }
+
+			        	 // Set Aii_main_diagonal
+			       	 if ((rank_in_i[dir] == nb_ranks_comm_i[dir]-1)
+						  && (is_iperiodic[dir] != 1)) {
+          				 A[dir].ii_main[comp][r_index]->set_item(m,value);
+       				 } else {
+       					 if (i<max_unknown_index(dir))
+          					 A[dir].ii_main[comp][r_index]->set_item(m,value);
+       				 }
+   		 		 }  // End of for loop
+
+   		 		 GLOBAL_EQ->pre_thomas_treatment(comp,dir,A,r_index);
+
+					 // Storing Aee for MPI communication
+ 					 ProdMatrix* Ap = GLOBAL_EQ->get_Ap();
+ 					 double* local_coeff = data_for_S[dir].send[comp][0];
+ 					 size_t nbrow = Ap[dir].ei_ii_ie[comp]->nb_rows();
+ 					 size_t ii = (nbrow*nbrow + 1)*r_index;
+ 					 local_coeff[ii] = Aee_diagcoef;
+				 }
+			 }
+		 }
+	 }
 }
+
+
+
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: assemble_schur_matrix (size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& r_index)
+DS_HeatTransfer:: assemble_schur_matrix ( FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: assemble_schur_matrix" ) ;
 
    TDMatrix* A = GLOBAL_EQ-> get_A();
+	ProdMatrix* Ap = GLOBAL_EQ->get_Ap();
 
-   if (nb_ranks_comm_i[dir] > 1) {
+	size_t_vector min_unknown_index(dim,0);
+	size_t_vector max_unknown_index(dim,0);
 
-      ProdMatrix* Ap = GLOBAL_EQ->get_Ap();
-      ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0();
+	for (size_t comp = 0; comp < nb_comps; comp++) {
+		// Get local min and max indices
+		for (size_t l=0;l<dim;++l) {
+			min_unknown_index(l) =
+								FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+			max_unknown_index(l) =
+								FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+		}
 
-      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,r_index);
+		for (size_t dir = 0; dir < dim; dir++) {
+			size_t dir_j = (dir == 0) ? 1 : 0;
+			size_t dir_k = (dir == 2) ? 1 : 2;
 
-      LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
+			size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(0,dir,comp);
 
-      size_t nbrow = product_matrix->nb_rows();
-      // Create a copy of product matrix to receive matrix, this will eliminate the memory leak issue which caused by "create_copy" command
-      for (size_t k=0;k<nbrow;k++) {
-         for (size_t j=0;j<nbrow;j++) {
-            Ap_proc0[dir].ei_ii_ie[comp]->set_item(k,j,product_matrix->item(k,j));
-         }
+			size_t local_min_k = (dim == 2) ? 0 : min_unknown_index(dir_k);
+			size_t local_max_k = (dim == 2) ? 0 : max_unknown_index(dir_k);
+
+   		if (nb_ranks_comm_i[dir] > 1) {
+				size_t nbrow = Ap[dir].ei_ii_ie[comp]->nb_rows();
+				double* local_packet = data_for_S[dir].send[comp][0];
+
+				// Calculating the product matrix and creating the container for MPI
+	         for (size_t j = min_unknown_index(dir_j);
+	                    j <= max_unknown_index(dir_j);++j) {
+	            for (size_t k = local_min_k; k <= local_max_k; ++k) {
+						size_t r_index = row_index->operator()(j,k);
+
+      				GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,r_index);
+
+						// Create the data container to send and in the master as well
+						for (size_t kk = 0; kk < nbrow; kk++) {
+							for (size_t jj = 0; jj < nbrow; jj++) {
+								size_t ii = (nbrow*nbrow + 1)*r_index
+											 + nbrow*kk + jj + 1;
+							   local_packet[ii] = Ap[dir].ei_ii_ie[comp]->item(kk,jj);
+							}
+						}
+					}
+				}
+
+				if (rank_in_i[dir] != 0 ) {
+					// Send the packed data to master
+					MPI_Send( data_for_S[dir].send[comp][0],
+						 (int) data_for_S[dir].size[comp],
+							MPI_DOUBLE, 0, 0, DS_Comm_i[dir] ) ;
+				}
+
+				// Assemble the global product matrix by adding contribution from
+				// all procs
+      		if ( rank_in_i[dir] == 0 ) {
+					for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir]; ++i) {
+						// Recieve the data packet sent by master
+						static MPI_Status status;
+						MPI_Recv( data_for_S[dir].receive[comp][0],
+							(int) data_for_S[dir].size[comp],
+							MPI_DOUBLE, (int) i, 0, DS_Comm_i[dir], &status ) ;
+
+		         	for (size_t j = min_unknown_index(dir_j);
+		                    		j <= max_unknown_index(dir_j);++j) {
+		            	for (size_t k = local_min_k; k <= local_max_k; ++k) {
+								size_t r_index = row_index->operator()(j,k);
+								size_t p = (nbrow*nbrow + 1)*r_index;
+								double ee_proc0 = local_packet[p];
+         					A[dir].ee[comp][r_index]->set_item(0,0,ee_proc0);
+
+								for (size_t kk = 0;kk < nbrow; kk++) {
+									for (size_t jj = 0;jj < nbrow; jj++) {
+										size_t ii = (nbrow*nbrow + 1)*r_index
+													 + nbrow*kk + jj + 1;
+										double value =
+												data_for_S[dir].receive[comp][0][ii];
+										local_packet[ii] += value;
+									}
+								}
+
+								size_t ii = (nbrow*nbrow + 1)*r_index;
+								double value_Aee =
+												data_for_S[dir].receive[comp][0][ii];
+
+								// Assemble the global Aee matrix
+								// Only for (nb_proc-1) in case no PBC
+								// Otherwise for (nb_proc)
+								if (!is_iperiodic[dir]) {
+									if (i<(size_t)nb_ranks_comm_i[dir]-1) {
+										A[dir].ee[comp][r_index]->set_item(i,i,value_Aee);
+									}
+								} else {
+									A[dir].ee[comp][r_index]->set_item(i,i,value_Aee);
+								}
+							}
+						}
+					}
+				}
+
+      		// Assemble the schlur complement in the master proc
+				if (rank_in_i[dir] == 0) {
+					TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
+					for (size_t j = min_unknown_index(dir_j);
+		                    j <= max_unknown_index(dir_j);++j) {
+		            for (size_t k = local_min_k; k <= local_max_k; ++k) {
+							size_t r_index = row_index->operator()(j,k);
+							size_t schur_size = Schur[dir].ii_main[comp][r_index]
+													  ->nb_rows();
+							for (int p = 0; p < (int)schur_size; p++) {
+								size_t ii = (nbrow*nbrow + 1)*r_index
+											 + nbrow*p + p + 1;
+								Schur[dir].ii_main[comp][r_index]
+										->set_item(p,A[dir].ee[comp][r_index]->item(p,p)
+											     								-local_packet[ii]);
+								if (p < (int)schur_size-1)
+									Schur[dir].ii_super[comp][r_index]
+										->set_item(p,-local_packet[ii+1]);
+								if (p > 0)
+									Schur[dir].ii_sub[comp][r_index]
+										->set_item(p-1,-local_packet[ii-1]);
+								// In case of periodic and multi-processor,
+								// there will be a variant of Tridiagonal matrix
+								// instead of normal format
+								if (is_iperiodic[dir] == 1) {
+									ii = (nbrow*nbrow + 1)*r_index
+										+ nbrow*p + schur_size + 1;
+									Schur[dir].ie[comp][r_index]->set_item(p,0,
+																				-local_packet[ii]);
+									ii = (nbrow*nbrow + 1)*r_index
+										+ nbrow*schur_size + p + 1;
+									Schur[dir].ei[comp][r_index]->set_item(0,p,
+																				-local_packet[ii]);
+								}
+							}
+							// Pre-thomas treatment on Schur complement
+							GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
+
+							// In case of periodic and multi-processor, there will be
+							// a variant of Tridiagonal matrix instead of normal format
+							// So, Schur complement of Schur complement is calculated
+							if (is_iperiodic[dir] == 1) {
+								size_t ii = ((size_t)pow(nbrow,2) + 1)*r_index
+											 + nbrow*schur_size
+											 + schur_size + 1;
+								Schur[dir].ee[comp][r_index]->set_item(0,0,
+										A[dir].ee[comp][r_index]->item(schur_size,schur_size)
+									 										- local_packet[ii]);
+
+								ProdMatrix* SchurP = GLOBAL_EQ->get_SchurP();
+								GLOBAL_EQ->compute_product_matrix_interior(Schur
+															 ,SchurP,comp,0,dir,r_index);
+
+								TDMatrix* DoubleSchur = GLOBAL_EQ->get_DoubleSchur();
+								DoubleSchur[dir].ii_main[comp][r_index]
+								->set_item(0,Schur[dir].ee[comp][r_index]->item(0,0)
+								-SchurP[dir].ei_ii_ie[comp]->item(0,0));
+							}
+						}
+					}
+				}
+			// Condition for single processor in any
+			// direction with periodic boundary conditions
+			} else if (is_iperiodic[dir] == 1) {
+				for (size_t j = min_unknown_index(dir_j);
+								j <= max_unknown_index(dir_j);++j) {
+					for (size_t k = local_min_k; k <= local_max_k; ++k) {
+						size_t r_index = row_index->operator()(j,k);
+
+						GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,r_index);
+
+						LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
+
+						A[dir].ee[comp][r_index]->set_item(0,0
+								,data_for_S[dir].send[comp][0][0]);
+
+						TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
+						size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
+						for (int p = 0; p < (int)nb_row; p++) {
+							Schur[dir].ii_main[comp][r_index]
+										->set_item(p,A[dir].ee[comp][r_index]->item(p,p)
+														-product_matrix->item(p,p));
+							if (p < (int)nb_row-1)
+								Schur[dir].ii_super[comp][r_index]
+										->set_item(p,-product_matrix->item(p,p+1));
+							if (p > 0)
+							Schur[dir].ii_sub[comp][r_index]
+							->set_item(p-1,-product_matrix->item(p,p-1));
+						}
+						GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
+					}
+				}
+			}
       }
-
-      LA_SeqMatrix* receive_matrix = Ap_proc0[dir].ei_ii_ie[comp];
-
-      if ( rank_in_i[dir] == 0 ) {
-         A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
-         for (size_t i=1;i<(size_t)nb_ranks_comm_i[dir];++i) {
-
-             // Create the container to receive
-             size_t nbrows = product_matrix->nb_rows();
-             size_t nb_received_data = nbrows*nbrows+1;
-             double * received_data = new double [nb_received_data];
-
-             // Receive the data
-             static MPI_Status status ;
-             MPI_Recv( received_data, (int)nb_received_data, MPI_DOUBLE, (int) i, 0, DDS_Comm_i[dir], &status ) ;
-
-             // Transfer the received data to the receive matrix
-             for (size_t k=0;k<(size_t)nbrows;k++) {
-                for (size_t j=0;j<(size_t)nbrows;j++) {
-                   // Assemble the global product matrix by adding contributions from all the procs
-                   receive_matrix->add_to_item(k,j,received_data[k*(nbrows)+j]);
-                }
-             }
-
-   	     	 if (is_iperiodic[dir] == 0) {
-                if (i<(size_t)nb_ranks_comm_i[dir]-1) {
-                   // Assemble the global Aee matrix
-                   // No periodic condition in x. So no fe contribution from last proc
-                   A[dir].ee[comp][r_index]->set_item(i,i,received_data[nb_received_data-1]);
-                }
-             } else{
-                // Assemble the global Aee matrix
-                // Periodic condition in x. So there is fe contribution from last proc
-                A[dir].ee[comp][r_index]->set_item(i,i,received_data[nb_received_data-1]);
-             }
-     			 delete [] received_data;
-
-         }
-      } else {
-         // Create the packed data container
-
-         size_t nbrows = product_matrix->nb_rows();
-         size_t nb_send_data = nbrows*nbrows+1;
-         double * packed_data = new double [nb_send_data];
-
-         // Fill the packed data container with Aie
-         // Iterator only fetches the values present. Zeros are not fetched.
-
-         for (size_t i=0 ; i<nbrows ; i++ ) {
-            for ( size_t j=0 ; j<nbrows ; j++ ) {
-               // Packing rule
-               // Pack the product matrix into a vector
-               packed_data[i*nbrows+j]=product_matrix->item(i,j);
-            }
-         }
-
-         // Fill the last element of packed data with the diagonal coefficient Aee
-         packed_data[nb_send_data-1] = Aee_diagcoef;
-
-         // Send the data
-         MPI_Send( packed_data, (int)nb_send_data, MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
-
-         delete [] packed_data;
-
-      }
-
-      // Assemble the schlur complement in the master proc
-
-      if (rank_in_i[dir] == 0) {
-	 		TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
-         size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
-         for (int p = 0; p < (int)nb_row; p++) {
-            Schur[dir].ii_main[comp][r_index]->set_item(p,A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
-            if (p < (int)nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,-receive_matrix->item(p,p+1));
-            if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,-receive_matrix->item(p,p-1));
-	    // In case of periodic and multi-processor, there will be a variant of Tridiagonal matrix instead of normal format
-            if (is_iperiodic[dir] == 1) {
-               Schur[dir].ie[comp][r_index]->set_item(p,0,-receive_matrix->item(p,nb_row));
-               Schur[dir].ei[comp][r_index]->set_item(0,p,-receive_matrix->item(nb_row,p));
-	    }
-	 }
-
-	 // Pre-thomas treatment on Schur complement
-	 GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
-
-	 // In case of periodic and multi-processor, there will be a variant of Tridiagonal matrix instead of normal format
-	 // So, Schur complement of Schur complement is calculated
-	 if (is_iperiodic[dir] == 1) {
-            Schur[dir].ee[comp][r_index]->set_item(0,0,A[dir].ee[comp][r_index]->item(nb_row,nb_row)-receive_matrix->item(nb_row,nb_row));
-
-	    ProdMatrix* SchurP = GLOBAL_EQ->get_SchurP();
-            GLOBAL_EQ->compute_product_matrix_interior(Schur,SchurP,comp,0,dir,r_index);
-
-            TDMatrix* DoubleSchur = GLOBAL_EQ-> get_DoubleSchur();
-            DoubleSchur[dir].ii_main[comp][r_index]->set_item(0,Schur[dir].ee[comp][r_index]->item(0,0)-SchurP[dir].ei_ii_ie[comp]->item(0,0));
-	 }
-
-      }
-   } else if (is_iperiodic[dir] == 1) {
-      // Condition for single processor in any
-		// direction with periodic boundary conditions
-      ProdMatrix* Ap = GLOBAL_EQ->get_Ap();
-      ProdMatrix* Ap_proc0 = GLOBAL_EQ->get_Ap_proc0();
-      GLOBAL_EQ->compute_product_matrix(A,Ap,comp,dir,r_index);
-
-      LA_SeqMatrix* product_matrix = Ap[dir].ei_ii_ie[comp];
-
-      size_t nbrow = product_matrix->nb_rows();
-      // Create a copy of product matrix to receive matrix,
-		// this will eliminate the memory leak issue
-		// which caused by "create_copy" command
-      for (size_t k=0;k<nbrow;k++) {
-         for (size_t j=0;j<nbrow;j++) {
-            Ap_proc0[dir].ei_ii_ie[comp]->set_item(k,j,product_matrix->item(k,j));
-         }
-      }
-
-      LA_SeqMatrix* receive_matrix = Ap_proc0[dir].ei_ii_ie[comp];
-
-      A[dir].ee[comp][r_index]->set_item(0,0,Aee_diagcoef);
-
-      TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
-      size_t nb_row = Schur[dir].ii_main[comp][r_index]->nb_rows();
-      for (int p = 0; p < (int)nb_row; p++) {
-         Schur[dir].ii_main[comp][r_index]->set_item(p,
-					A[dir].ee[comp][r_index]->item(p,p)-receive_matrix->item(p,p));
-         if (p < (int)nb_row-1) Schur[dir].ii_super[comp][r_index]->set_item(p,
-																-receive_matrix->item(p,p+1));
-         if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,
-																-receive_matrix->item(p,p-1));
-      }
-      GLOBAL_EQ->pre_thomas_treatment(comp,dir,Schur,r_index);
    }
 }
 
@@ -1248,49 +1290,10 @@ DS_HeatTransfer:: assemble_temperature_and_schur ( FV_TimeIterator const* t_it)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: assemble_temperature_and_schur" ) ;
-
-   double gamma = (1.0/2.0)*(thermal_conductivity/rho/heat_capacity);
-
-   size_t_vector min_unknown_index(dim,0);
-   size_t_vector max_unknown_index(dim,0);
-
-   // Assemble temperature matrix and schur complement for each component
-   for (size_t comp = 0; comp < nb_comps; comp++) {
-      // Get local min and max indices
-      for (size_t l=0;l<dim;++l) {
-         min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-         max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-      }
-
-      for (size_t dir = 0; dir < dim; dir++) {
-         size_t dir_j, dir_k;
-         size_t local_min_k = 0;
-         size_t local_max_k = 0;
-
-         if (dir == 0) {
-            dir_j = 1; dir_k = 2;
-         } else if (dir == 1) {
-            dir_j = 0; dir_k = 2;
-         } else if (dir == 2) {
-            dir_j = 0; dir_k = 1;
-         }
-
-         if (dim == 3) {
-            local_min_k = min_unknown_index(dir_k);
-            local_max_k = max_unknown_index(dir_k);
-         }
-
-			size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(0,dir,comp);
-
-         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
-            for (size_t k=local_min_k; k <= local_max_k; ++k) {
-               size_t r_index = row_index->operator()(j,k);
-               double Aee_diagcoef = assemble_temperature_matrix (TF,t_it,gamma,comp,dir,j,k,r_index);
-               assemble_schur_matrix(comp,dir,Aee_diagcoef,r_index);
-            }
-         }
-      }
-   }
+	// Assemble temperature matrix
+	assemble_temperature_matrix (TF,t_it);
+	// Calculate and assemble Schur complement
+	assemble_schur_matrix (TF);
 }
 
 //---------------------------------------------------------------------------
@@ -1446,63 +1449,70 @@ DS_HeatTransfer:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC,
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: data_packing ( double const& fe, size_t const& comp, size_t const& dir, size_t const& vec_pos)
+DS_HeatTransfer:: data_packing ( double const& fe
+										 , size_t const& comp
+										 , size_t const& dir
+										 , size_t const& p)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
 
-   double *packed_data = first_pass[dir].send[comp][rank_in_i[dir]];
+   double *packed_data = first_pass[dir].send[comp][0];
 
    if (rank_in_i[dir] == 0) {
       // Check if bc is periodic in x
       // If it is, we need to pack two elements apart from fe
       if(is_iperiodic[dir])
-          packed_data[3*vec_pos+0] = VEC[dir].T[comp]->item(nb_ranks_comm_i[dir]-1);
+          packed_data[3*p+0] = VEC[dir].T[comp]->item(nb_ranks_comm_i[dir]-1);
       else
-          packed_data[3*vec_pos+0] = 0;
+          packed_data[3*p+0] = 0;
 
-      packed_data[3*vec_pos+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
+      packed_data[3*p+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
 
    } else if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
       // Check if bc is periodic in x
       // If it is, we need to pack two elements apart from fe
       if(is_iperiodic[dir])
-          packed_data[3*vec_pos+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
+          packed_data[3*p+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
       else
-          packed_data[3*vec_pos+1]=0;
+          packed_data[3*p+1]=0;
 
-      packed_data[3*vec_pos+0] = VEC[dir].T[comp]->item(rank_in_i[dir]-1);
+      packed_data[3*p+0] = VEC[dir].T[comp]->item(rank_in_i[dir]-1);
 
    } else {
-      packed_data[3*vec_pos+0] = VEC[dir].T[comp]->item(rank_in_i[dir]-1);
-      packed_data[3*vec_pos+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
+      packed_data[3*p+0] = VEC[dir].T[comp]->item(rank_in_i[dir]-1);
+      packed_data[3*p+1] = VEC[dir].T[comp]->item(rank_in_i[dir]);
    }
 
-   packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
+   packed_data[3*p+2] = fe; // Send the fe values and 0 for last proc
 
 }
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p)
+DS_HeatTransfer:: unpack_compute_ue_pack(size_t const& comp
+													, size_t const& dir
+													, size_t const& p)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
 
    size_t nb_interface_unknowns = VEC[dir].T[comp]->nb_rows();
-   for (size_t i=0;i<nb_interface_unknowns;i++) {
-       VEC[dir].T[comp]->set_item(i,0);
-       VEC[dir].interface_T[comp]->set_item(i,0);
-   }
+
+	VEC[dir].T[comp]->set(0.);
+   VEC[dir].interface_T[comp]->set(0.);
 
    // If periodic in x, first proc contributes to last interface unknown
    if (is_iperiodic[dir])
-      VEC[dir].T[comp]->set_item(nb_ranks_comm_i[dir]-1,first_pass[dir].send[comp][rank_in_i[dir]][3*p]);
-   VEC[dir].T[comp]->set_item(0,first_pass[dir].send[comp][rank_in_i[dir]][3*p+1]);
-   VEC[dir].interface_T[comp]->set_item(0,first_pass[dir].send[comp][rank_in_i[dir]][3*p+2]);
+      VEC[dir].T[comp]->set_item(nb_ranks_comm_i[dir]-1,
+							first_pass[dir].send[comp][0][3*p]);
+   VEC[dir].T[comp]->set_item(0,
+							first_pass[dir].send[comp][0][3*p+1]);
+   VEC[dir].interface_T[comp]->set_item(0,
+							first_pass[dir].send[comp][0][3*p+2]);
 
    // Vec_temp might contain previous values
-   for (size_t i=1;i<(size_t)nb_ranks_comm_i[dir];i++) {
+   for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir];i++) {
       if (i!=(size_t)nb_ranks_comm_i[dir]-1) {
          VEC[dir].T[comp]->add_to_item(i-1,first_pass[dir].receive[comp][i][3*p]);
          VEC[dir].T[comp]->add_to_item(i,first_pass[dir].receive[comp][i][3*p+1]);
@@ -1527,7 +1537,7 @@ DS_HeatTransfer:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir, 
    DS_interface_unknown_solver(VEC[dir].interface_T[comp], comp, dir,p);
 
    // Pack the interface_rhs_x into the appropriate send_data
-   for (size_t i=1;i<(size_t)nb_ranks_comm_i[dir];++i) {
+   for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir]; ++i) {
       if (i!=(size_t)nb_ranks_comm_i[dir]-1) {
          second_pass[dir].send[comp][i][2*p+0] = VEC[dir].interface_T[comp]->item(i-1);
          second_pass[dir].send[comp][i][2*p+1] = VEC[dir].interface_T[comp]->item(i);
@@ -1582,133 +1592,91 @@ DS_HeatTransfer:: solve_interface_unknowns ( double const& gamma
    TDMatrix* A = GLOBAL_EQ->get_A();
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
 
-   // Array declaration for sending data from master to all slaves
-   size_t local_length_j=0;
-   size_t local_min_j=0, local_max_j=0;
-   size_t local_min_k=0, local_max_k=0;
+	// Array declaration for sending data from master to all slaves
+	size_t local_min_j = (dir == 0) ? min_unknown_index(1) : min_unknown_index(0);
+	size_t local_max_j = (dir == 0) ? max_unknown_index(1) : max_unknown_index(0);
+	size_t local_min_k = (dim == 2) ? 0 :
+							  ((dir == 2) ? min_unknown_index(1) : min_unknown_index(2));
+	size_t local_max_k = (dim == 2) ? 0 :
+							  ((dir == 2) ? max_unknown_index(1) : max_unknown_index(2));
 
-   if (dir == 0) {
-      local_min_j = min_unknown_index(1);
-      local_max_j = max_unknown_index(1);
-      if (dim == 3) {
-         local_min_k = min_unknown_index(2);
-         local_max_k = max_unknown_index(2);
-      }
-   } else if (dir == 1) {
-      local_min_j = min_unknown_index(0);
-      local_max_j = max_unknown_index(0);
-      if (dim == 3) {
-         local_min_k = min_unknown_index(2);
-         local_max_k = max_unknown_index(2);
-      }
-   } else if (dir == 2) {
-      local_min_j = min_unknown_index(0);
-      local_max_j = max_unknown_index(0);
-      local_min_k = min_unknown_index(1);
-      local_max_k = max_unknown_index(1);
-   }
-
-   local_length_j = (local_max_j-local_min_j+1);
+   size_t_array2D* row_index = GLOBAL_EQ->get_row_indexes(0,dir,comp);
 
    // Send and receive the data first pass
    if ( rank_in_i[dir] == 0 ) {
       // Receiving data from all the slave procs iff multi processors are used
       if (nb_ranks_comm_i[dir] != 1) {
-         for (size_t i=1;i<(size_t)nb_ranks_comm_i[dir];++i) {
+         for (size_t i = 1; i < (size_t)nb_ranks_comm_i[dir]; ++i) {
             static MPI_Status status;
-            MPI_Recv( first_pass[dir].receive[comp][i], (int) first_pass[dir].size[comp], MPI_DOUBLE, (int) i, 0, DDS_Comm_i[dir], &status ) ;
+            MPI_Recv( first_pass[dir].receive[comp][i],
+				    (int) first_pass[dir].size[comp],
+				  MPI_DOUBLE, (int) i, 0, DS_Comm_i[dir], &status ) ;
          }
       }
 
-      // Solve system of interface unknowns for each y
-      if (dim == 2) {
-         size_t k = 0;
-         for (size_t j=local_min_j;j<=local_max_j;j++) {
+		for (size_t j = local_min_j; j <= local_max_j; j++) {
+         for (size_t k = local_min_k; k <= local_max_k; k++) {
 
-     	    size_t p = j-local_min_j;
+            size_t p = row_index->operator()(j,k);
 
-	    unpack_compute_ue_pack(comp,dir,p);
+            unpack_compute_ue_pack(comp,dir,p);
 
-            // Need to have the original rhs function assembled for corrosponding j,k pair
+  	         // Need to have the original rhs function
+            // assembled for corrosponding j,k pair
             assemble_local_rhs(j,k,gamma,t_it,comp,dir);
 
-            // Setup RHS = fi - Aie*ue for solving ui
-            A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
+            // Setup RHS = fi - Aie*xe for solving ui
+            A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp]
+                                             ,VEC[dir].local_T[comp],-1.0,1.0);
 
             // Solve ui and transfer solution into distributed vector
-            GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p,level);
-         }
-      } else {
-         for (size_t k=local_min_k;k<=local_max_k;k++) {
-            for (size_t j=local_min_j;j<=local_max_j;j++) {
-
-   	       size_t p = (j-local_min_j)+local_length_j*(k-local_min_k);
-
-	       unpack_compute_ue_pack(comp,dir,p);
-
-               // Need to have the original rhs function assembled for corrosponding j,k pair
-               assemble_local_rhs(j,k,gamma,t_it,comp,dir);
-
-               // Setup RHS = fi - Aie*ue for solving ui
-               A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
-
-               // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p,level);
-            }
+            GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir)
+                                                            ,comp,dir,p,level);
          }
       }
    } else {
       // Send the packed data to master
-      MPI_Send( first_pass[dir].send[comp][rank_in_i[dir]], (int) first_pass[dir].size[comp], MPI_DOUBLE, 0, 0, DDS_Comm_i[dir] ) ;
+      MPI_Send( first_pass[dir].send[comp][0],
+			 (int) first_pass[dir].size[comp],
+			 MPI_DOUBLE, 0, 0, DS_Comm_i[dir] ) ;
    }
 
    // Send the data from master iff multi processor are used
    if (nb_ranks_comm_i[dir] != 1) {
       if ( rank_in_i[dir] == 0 ) {
-         for (size_t i=1;i<(size_t)nb_ranks_comm_i[dir];++i) {
-            MPI_Send( second_pass[dir].send[comp][i], (int) second_pass[dir].size[comp], MPI_DOUBLE,(int) i, 0, DDS_Comm_i[dir] ) ;
+         for (size_t i = 1;i < (size_t)nb_ranks_comm_i[dir]; ++i) {
+            MPI_Send( second_pass[dir].send[comp][i],
+					 (int) second_pass[dir].size[comp],
+					 MPI_DOUBLE,(int) i, 0, DS_Comm_i[dir] ) ;
          }
       } else {
          // Create the container to receive the ue
          static MPI_Status status ;
-         MPI_Recv( second_pass[dir].receive[comp][rank_in_i[dir]], (int) second_pass[dir].size[comp], MPI_DOUBLE, 0, 0, DDS_Comm_i[dir], &status ) ;
+         MPI_Recv( second_pass[dir].receive[comp][0],
+				 (int) second_pass[dir].size[comp],
+				 MPI_DOUBLE, 0, 0, DS_Comm_i[dir], &status ) ;
 
-         // Solve the system of equations in each proc
+			// Solve the system of equations in each proc
+			for (size_t j = local_min_j; j <= local_max_j; j++) {
+				for (size_t k = local_min_k; k <= local_max_k; k++) {
+					size_t p = row_index->operator()(j,k);
 
-         if (dim == 2) {
-            size_t k = 0;
-            for (size_t j = local_min_j;j<=local_max_j;j++) {
-               size_t p = j-local_min_j;
+					unpack_ue(comp,second_pass[dir].receive[comp][0],dir,p);
 
-               unpack_ue(comp,second_pass[dir].receive[comp][rank_in_i[dir]],dir,p);
+					// Need to have the original rhs function
+					// assembled for corrosponding j,k pair
+					assemble_local_rhs(j,k,gamma,t_it,comp,dir);
 
-               // Need to have the original rhs function assembled for corrosponding j,k pair
-               assemble_local_rhs(j,k,gamma,t_it,comp,dir);
+					// Setup RHS = fi - Aie*xe for solving ui
+					A[dir].ie[comp][p]
+							  ->multiply_vec_then_add(VEC[dir].interface_T[comp]
+															 ,VEC[dir].local_T[comp],-1.0,1.0);
 
-               // Setup RHS = fi - Aie*xe for solving ui
-               A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
-
-               // Solve ui and transfer solution into distributed vector
-               GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p,level);
-            }
-         } else {
-            for (size_t k = local_min_k;k<=local_max_k;k++) {
-               for (size_t j = local_min_j;j<=local_max_j;j++) {
-                  size_t p = (j-local_min_j)+local_length_j*(k-local_min_k);
-
-	          unpack_ue(comp,second_pass[dir].receive[comp][rank_in_i[dir]],dir,p);
-
-                  // Need to have the original rhs function assembled for corrosponding j,k pair
-                  assemble_local_rhs(j,k,gamma,t_it,comp,dir);
-
-                  // Setup RHS = fi - Aie*xe for solving ui
-                  A[dir].ie[comp][p]->multiply_vec_then_add(VEC[dir].interface_T[comp],VEC[dir].local_T[comp],-1.0,1.0);
-
-                  // Solve ui and transfer solution into distributed vector
-                  GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir),comp,dir,p,level);
-               }
-            }
-         }
+					// Solve ui and transfer solution into distributed vector
+					GLOBAL_EQ->DS_HeatEquation_solver(j,k,min_unknown_index(dir)
+																				,comp,dir,p,level);
+				}
+			}
       }
    }
 }
@@ -2024,10 +1992,10 @@ DS_HeatTransfer:: output_l2norm ( void )
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: create_DDS_subcommunicators ( void )
+DS_HeatTransfer:: create_DS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DS_HeatTransfer:: create_DDS_subcommunicators" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: create_DS_subcommunicators" ) ;
 
    int color = 0, key = 0;
    //int const* number_of_subdomains_per_direction = TF->primary_grid()->get_domain_decomposition() ;
@@ -2075,9 +2043,9 @@ DS_HeatTransfer:: processor_splitting ( int const& color, int const& key, size_t
 {
    MAC_LABEL( "DS_HeatTransfer:: processor_splitting" ) ;
 
-   MPI_Comm_split(MPI_COMM_WORLD, color, key, &DDS_Comm_i[dir]);
-   MPI_Comm_size( DDS_Comm_i[dir], &nb_ranks_comm_i[dir] ) ;
-   MPI_Comm_rank( DDS_Comm_i[dir], &rank_in_i[dir] ) ;
+   MPI_Comm_split(MPI_COMM_WORLD, color, key, &DS_Comm_i[dir]);
+   MPI_Comm_size( DS_Comm_i[dir], &nb_ranks_comm_i[dir] ) ;
+   MPI_Comm_rank( DS_Comm_i[dir], &rank_in_i[dir] ) ;
 
 }
 
@@ -2090,48 +2058,44 @@ DS_HeatTransfer:: allocate_mpi_variables ( void )
    for (size_t dir = 0; dir < dim; dir++) {
       first_pass[dir].size = new size_t [nb_comps];
       second_pass[dir].size = new size_t [nb_comps];
+		data_for_S[dir].size = new size_t [nb_comps];
       for (size_t comp = 0; comp < nb_comps; comp++) {
-         size_t local_min_j=0, local_max_j=0;
-         size_t local_min_k=0, local_max_k=0;
-
          // Get local min and max indices
          size_t_vector min_unknown_index(dim,0);
          size_t_vector max_unknown_index(dim,0);
          for (size_t l=0;l<dim;++l) {
-            min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-            max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+            min_unknown_index(l) =
+								TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+            max_unknown_index(l) =
+								TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
          }
 
-         if (dir == 0) {
-            local_min_j = min_unknown_index(1);
-            local_max_j = max_unknown_index(1);
-            if (dim == 3) {
-               local_min_k = min_unknown_index(2);
-               local_max_k = max_unknown_index(2);
-            }
-         } else if (dir == 1) {
-            local_min_j = min_unknown_index(0);
-            local_max_j = max_unknown_index(0);
-            if (dim == 3) {
-               local_min_k = min_unknown_index(2);
-               local_max_k = max_unknown_index(2);
-            }
-         } else if (dir == 2) {
-            local_min_j = min_unknown_index(0);
-            local_max_j = max_unknown_index(0);
-            local_min_k = min_unknown_index(1);
-            local_max_k = max_unknown_index(1);
-         }
+			size_t local_min_j = (dir == 0) ? min_unknown_index(1)
+													  : min_unknown_index(0);
+			size_t local_max_j = (dir == 0) ? max_unknown_index(1)
+													  : max_unknown_index(0);
+			size_t local_min_k = (dim == 2) ? 0 :
+									  ((dir == 2) ? min_unknown_index(1)
+													  : min_unknown_index(2));
+			size_t local_max_k = (dim == 2) ? 0 :
+									  ((dir == 2) ? max_unknown_index(1)
+													  : max_unknown_index(2));
 
-         size_t local_length_j = (local_max_j-local_min_j+1);
-         size_t local_length_k = (local_max_k-local_min_k+1);
+			size_t local_length_j = (local_max_j-local_min_j+1);
+			size_t local_length_k = (local_max_k-local_min_k+1);
 
          if (dim != 3) {
             first_pass[dir].size[comp] = 3*local_length_j;
             second_pass[dir].size[comp] = 2*local_length_j;
+				data_for_S[dir].size[comp] = is_iperiodic[dir] ?
+						 (size_t)(pow(nb_ranks_comm_i[dir],2) + 1)*local_length_j
+					  : (size_t)(pow(nb_ranks_comm_i[dir]-1,2) + 1)*local_length_j ;
          } else if (dim == 3) {
             first_pass[dir].size[comp] = 3*local_length_j*local_length_k;
             second_pass[dir].size[comp] = 2*local_length_j*local_length_k;
+				data_for_S[dir].size[comp] = is_iperiodic[dir] ?
+			    (size_t)(pow(nb_ranks_comm_i[dir],2) + 1)*local_length_j*local_length_k
+			  : (size_t)(pow(nb_ranks_comm_i[dir]-1,2) + 1)*local_length_j*local_length_k ;
          }
       }
    }
@@ -2142,16 +2106,28 @@ DS_HeatTransfer:: allocate_mpi_variables ( void )
       first_pass[dir].receive = new double** [nb_comps];
       second_pass[dir].send = new double** [nb_comps];
       second_pass[dir].receive = new double** [nb_comps];
+		data_for_S[dir].send = new double** [nb_comps];
+		data_for_S[dir].receive = new double** [nb_comps];
       for (size_t comp = 0; comp < nb_comps; comp++) {
-         first_pass[dir].send[comp] = new double* [nb_ranks_comm_i[dir]];
+         first_pass[dir].send[comp] = new double* [1];
          first_pass[dir].receive[comp] = new double* [nb_ranks_comm_i[dir]];
          second_pass[dir].send[comp] = new double* [nb_ranks_comm_i[dir]];
-         second_pass[dir].receive[comp] = new double* [nb_ranks_comm_i[dir]];
+         second_pass[dir].receive[comp] = new double* [1];
+			data_for_S[dir].send[comp] = new double* [1];
+	      data_for_S[dir].receive[comp] = new double* [1];
+			data_for_S[dir].send[comp][0] =
+								new double[data_for_S[dir].size[comp]];
+			data_for_S[dir].receive[comp][0] =
+								new double[data_for_S[dir].size[comp]];
+			first_pass[dir].send[comp][0] =
+								new double[first_pass[dir].size[comp]];
+			second_pass[dir].receive[comp][0] =
+								new double[second_pass[dir].size[comp]];
          for (size_t i = 0; i < (size_t)nb_ranks_comm_i[dir]; i++) {
-            first_pass[dir].send[comp][i] = new double[first_pass[dir].size[comp]];
-            first_pass[dir].receive[comp][i] = new double[first_pass[dir].size[comp]];
-            second_pass[dir].send[comp][i] = new double[second_pass[dir].size[comp]];
-            second_pass[dir].receive[comp][i] = new double[second_pass[dir].size[comp]];
+            first_pass[dir].receive[comp][i] =
+								new double[first_pass[dir].size[comp]];
+            second_pass[dir].send[comp][i] =
+								new double[second_pass[dir].size[comp]];
          }
       }
    }
@@ -2165,32 +2141,39 @@ DS_HeatTransfer:: deallocate_mpi_variables ( void )
    // Array declarations
    for (size_t dir = 0; dir < dim; dir++) {
       for (size_t comp = 0; comp < nb_comps; comp++) {
-         for (size_t i = 0; i < (size_t) nb_ranks_comm_i[dir]; i++) {
-            delete [] first_pass[dir].send[comp][i];
+			delete [] data_for_S[dir].send[comp][0];
+			delete [] data_for_S[dir].receive[comp][0];
+			delete [] first_pass[dir].send[comp][0];
+			delete [] second_pass[dir].receive[comp][0];
+			for (size_t i = 0; i < (size_t) nb_ranks_comm_i[dir]; i++) {
             delete [] first_pass[dir].receive[comp][i];
             delete [] second_pass[dir].send[comp][i];
-            delete [] second_pass[dir].receive[comp][i];
          }
          delete [] first_pass[dir].send[comp];
          delete [] first_pass[dir].receive[comp];
          delete [] second_pass[dir].send[comp];
          delete [] second_pass[dir].receive[comp];
+			delete [] data_for_S[dir].send[comp];
+			delete [] data_for_S[dir].receive[comp];
       }
       delete [] first_pass[dir].send;
       delete [] first_pass[dir].receive;
       delete [] second_pass[dir].send;
       delete [] second_pass[dir].receive;
+		delete [] data_for_S[dir].send;
+		delete [] data_for_S[dir].receive;
       delete [] first_pass[dir].size;
       delete [] second_pass[dir].size;
+		delete [] data_for_S[dir].size;
    }
 }
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: free_DDS_subcommunicators ( void )
+DS_HeatTransfer:: free_DS_subcommunicators ( void )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DS_HeatTransfer:: free_DDS_subcommunicators" ) ;
+   MAC_LABEL( "DS_HeatTransfer:: free_DS_subcommunicators" ) ;
 
 
 }

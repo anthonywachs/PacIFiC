@@ -151,18 +151,11 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       void assemble_temperature_and_schur( FV_TimeIterator const* t_it) ;
 
       /** @brief Assemble temperature matrix */
-      double assemble_temperature_matrix (
-        FV_DiscreteField const* FF,
-        FV_TimeIterator const* t_it,
-        double const& gamma,
-        size_t const& comp,
-        size_t const& dir,
-        size_t const& j,
-        size_t const& k,
-        size_t const& r_index  );
+      void assemble_temperature_matrix ( FV_DiscreteField const* FF
+                                       , FV_TimeIterator const* t_it);
 
       /** @brief Assemble schur matrix */
-      void assemble_schur_matrix (size_t const& comp, size_t const& dir, double const& Aee_diagcoef, size_t const& r_index);
+      void assemble_schur_matrix ( FV_DiscreteField const* FF);
 
 
       void write_output_field();
@@ -180,7 +173,10 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index);
 
       /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */
-      void data_packing ( double const& fe, size_t const& comp, size_t const& dir, size_t const& vec_pos);
+      void data_packing ( double const& fe
+                        , size_t const& comp
+                        , size_t const& dir
+                        , size_t const& p);
 
       /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */
       void unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p);
@@ -249,7 +245,7 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
 
       /** @name Direction splitting communicators */
       /** @brief Create the sub-communicators */
-      void create_DDS_subcommunicators ( void ) ;
+      void create_DS_subcommunicators ( void ) ;
       void processor_splitting ( int const& color, int const& key, size_t const& dir );
 
       void allocate_mpi_variables (void);
@@ -257,7 +253,7 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
 
 
       /** @brief Free the sub-communicators */
-      void free_DDS_subcommunicators ( void ) ;
+      void free_DS_subcommunicators ( void ) ;
       //@}
 
    private: //----------------------------------------------------------------
@@ -284,13 +280,14 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       size_t nb_comps;
 
       MAC_Communicator const* macCOMM;
-      MPI_Comm DDS_Comm_i[3];
+      MPI_Comm DS_Comm_i[3];
 
       int rank_in_i[3];
       int nb_ranks_comm_i[3];
 
       struct MPIVarHT first_pass[3];
       struct MPIVarHT second_pass[3];
+      struct MPIVarHT data_for_S[3];
 
       // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
       double loc_thres;

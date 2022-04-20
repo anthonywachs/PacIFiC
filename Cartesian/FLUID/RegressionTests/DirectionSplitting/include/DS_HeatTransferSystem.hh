@@ -123,8 +123,6 @@ class DS_HeatTransferSystem : public MAC_Object
       TDMatrix* get_A();
       /** @brief Return the product matrix of spacial discretization */
       ProdMatrix* get_Ap();
-      /** @brief Return the product matrix of spacial discretization which will accumulate the information from all processor*/
-      ProdMatrix* get_Ap_proc0();
       /** @brief Return the Schur complement of spacial discretization */
       TDMatrix* get_Schur();
       /** @brief Return the product matrix of Schur complement */
@@ -212,7 +210,6 @@ class DS_HeatTransferSystem : public MAC_Object
       // Spacitial discretization matrices
       struct TDMatrix A[3];
       struct ProdMatrix Ap[3];
-      struct ProdMatrix Ap_proc0[3];
       struct LocalVector VEC[3];
 
       // Schur complement matrices
