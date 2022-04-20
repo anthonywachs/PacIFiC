@@ -154,8 +154,6 @@ class DS_HeatTransferSystem : public MAC_Object
 
       //@}
 
-      /** @brief Synchronize the DS solution vector*/
-      void synchronize_DS_solution_vec( void );
    //-- Output methods
 
       /** @name Output methods */
@@ -165,18 +163,34 @@ class DS_HeatTransferSystem : public MAC_Object
       //@}
 
       /** @brief Call the interior function for different conditions of procs and periodicity*/
-      void compute_product_matrix( struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& dir, size_t const& r_index );
+      void compute_product_matrix( struct TDMatrix *arr
+                                 , struct ProdMatrix *prr
+                                 , size_t const& comp
+                                 , size_t const& dir
+                                 , size_t const& r_index );
       /** @brief Compute the product of Aei*inv(Aii)*Aie in x*/
-      void compute_product_matrix_interior( struct TDMatrix *arr, struct ProdMatrix *prr, size_t const& comp, size_t const& column, size_t const& dir, size_t const& r_index);
+      void compute_product_matrix_interior( struct TDMatrix *arr
+                                          , struct ProdMatrix *prr
+                                          , size_t const& comp
+                                          , size_t const& column
+                                          , size_t const& dir
+                                          , size_t const& r_index);
 
    //-- Utilities
 
       /** @name Utilities */
       //@{
       /** @brief Compute the pre-thomas step on the provided matrix arr */
-      void pre_thomas_treatment(size_t const& comp, size_t const& dir, struct TDMatrix *arr, size_t const& r_index);
+      void pre_thomas_treatment(size_t const& comp
+                              , size_t const& dir
+                              , struct TDMatrix *arr
+                              , size_t const& r_index);
       /** @brief Compute the inverse of 1 tridiagonal matrix  */
-      static void mod_thomas_algorithm(TDMatrix *arr, LA_SeqVector* rhs, size_t const& comp, size_t const& dir, size_t const& r_index) ;
+      static void mod_thomas_algorithm(TDMatrix *arr
+                                     , LA_SeqVector* rhs
+                                     , size_t const& comp
+                                     , size_t const& dir
+                                     , size_t const& r_index) ;
 
       //@}
 
@@ -219,11 +233,6 @@ class DS_HeatTransferSystem : public MAC_Object
 
       // Schur complement of Schur complement
       struct TDMatrix DoubleSchur[3];
-
-      // Global Temperature solution vectors
-      LA_Vector * VEC_DS_TF ;
-      LA_Vector * VEC_DS_TF_previoustime ;
-      LA_Vector * VEC_DS_TF_timechange ;
 
       // Local vector to store diffusive terms
       vector<doubleVector*> T_diffusion;
