@@ -374,7 +374,9 @@ DS_HeatTransfer::write_output_field()
 
 //---------------------------------------------------------------------------
 double
-DS_HeatTransfer:: bodyterm_value ( double const& xC, double const& yC, double const& zC)
+DS_HeatTransfer:: bodyterm_value ( double const& xC
+											, double const& yC
+											, double const& zC)
 //---------------------------------------------------------------------------
 {
    double bodyterm = 0.;
@@ -1406,23 +1408,31 @@ double DS_HeatTransfer:: assemble_local_rhs ( size_t const& j
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index)
+DS_HeatTransfer:: compute_Aei_ui (struct TDMatrix* arr
+										  , struct LocalVector* VEC
+										  , size_t const& comp
+										  , size_t const& dir
+										  , size_t const& r_index)
 //---------------------------------------------------------------------------
 {
    // create a replica of local rhs vector in local solution vector
    for (size_t i=0;i<VEC[dir].local_T[comp]->nb_rows();i++){
-      VEC[dir].local_solution_T[comp]->set_item(i,VEC[dir].local_T[comp]->item(i));
+      VEC[dir].local_solution_T[comp]->set_item(i
+															,VEC[dir].local_T[comp]->item(i));
    }
 
    // Solve for ui locally and put it in local solution vector
-   GLOBAL_EQ->mod_thomas_algorithm(arr, VEC[dir].local_solution_T[comp], comp, dir,r_index);
+   GLOBAL_EQ->mod_thomas_algorithm(arr, VEC[dir].local_solution_T[comp]
+												  , comp, dir,r_index);
 
    for (size_t i=0;i<VEC[dir].T[comp]->nb_rows();i++){
           VEC[dir].T[comp]->set_item(i,0);
    }
 
    // Calculate Aei*ui in each proc locally and put it in T vector
-   arr[dir].ei[comp][r_index]->multiply_vec_then_add(VEC[dir].local_solution_T[comp],VEC[dir].T[comp]);
+   arr[dir].ei[comp][r_index]->multiply_vec_then_add(
+																VEC[dir].local_solution_T[comp]
+															  ,VEC[dir].T[comp]);
 
 }
 
@@ -1533,7 +1543,10 @@ DS_HeatTransfer:: unpack_compute_ue_pack(size_t const& comp
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: unpack_ue(size_t const& comp, double * received_data, size_t const& dir, size_t const& p)
+DS_HeatTransfer:: unpack_ue(size_t const& comp
+								  , double * received_data
+								  , size_t const& dir
+								  , size_t const& p)
 //---------------------------------------------------------------------------
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
@@ -1722,14 +1735,18 @@ DS_HeatTransfer:: Solve_i_in_jk ( FV_TimeIterator const* t_it
 
 //----------------------------------------------------------------------
 void
-DS_HeatTransfer::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index)
+DS_HeatTransfer::DS_interface_unknown_solver(LA_SeqVector* interface_rhs
+														 , size_t const& comp
+														 , size_t const& dir
+														 , size_t const& r_index)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: DS_interface_unknown_solver" ) ;
 
    TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
 
-   // Condition for variant of Tridiagonal Schur complement in Perioidic direction with multi-processor
+   // Condition for variant of Tridiagonal Schur complement
+	// in Perioidic direction with multi-processor
    if ((is_iperiodic[dir] == 1) && (nb_ranks_comm_i[dir] != 1)) {
       LocalVector* Schur_VEC = GLOBAL_EQ->get_Schur_VEC();
       TDMatrix* DoubleSchur = GLOBAL_EQ-> get_DoubleSchur();
@@ -1745,16 +1762,28 @@ DS_HeatTransfer::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t
       compute_Aei_ui(Schur,Schur_VEC,comp,dir,r_index);
 
       // Calculate S_fe - Sei*(Sii)-1*S_fi
-      Schur_VEC[dir].interface_T[comp]->set_item(0,Schur_VEC[dir].interface_T[comp]->item(0)-Schur_VEC[dir].T[comp]->item(0));
+      Schur_VEC[dir].interface_T[comp]->set_item(0,
+												Schur_VEC[dir].interface_T[comp]->item(0)
+											 - Schur_VEC[dir].T[comp]->item(0));
 
       // Calculate S_ue, using Schur complement of Schur complement
-      GLOBAL_EQ->mod_thomas_algorithm(DoubleSchur, Schur_VEC[dir].interface_T[comp], comp, dir,r_index);
+      GLOBAL_EQ->mod_thomas_algorithm(DoubleSchur
+												, Schur_VEC[dir].interface_T[comp]
+												, comp
+												, dir
+												, r_index);
 
       // Calculate S_fi-Sie*S_ue
-      Schur[dir].ie[comp][r_index]->multiply_vec_then_add(Schur_VEC[dir].interface_T[comp],Schur_VEC[dir].local_T[comp],-1.0,1.0);
+      Schur[dir].ie[comp][r_index]->multiply_vec_then_add(
+													Schur_VEC[dir].interface_T[comp]
+												 , Schur_VEC[dir].local_T[comp],-1.0,1.0);
 
       // Calculate S_ui
-      GLOBAL_EQ->mod_thomas_algorithm(Schur, Schur_VEC[dir].local_T[comp], comp, dir, r_index);
+      GLOBAL_EQ->mod_thomas_algorithm(Schur
+												, Schur_VEC[dir].local_T[comp]
+												, comp
+												, dir
+												, r_index);
 
       // Transfer back the solution to interface_rhs
       for (size_t i = 0; i < nrows; i++) {
@@ -1783,8 +1812,10 @@ DS_HeatTransfer:: ugradu_initialization (  )
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_unknown_index(l) = TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-        max_unknown_index(l) = TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+        min_unknown_index(l) =
+		  					TF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_unknown_index(l) =
+		  					TF->get_max_index_unknown_handled_by_proc( comp, l ) ;
      }
 
      size_t local_min_k = 0;
@@ -1978,8 +2009,10 @@ DS_HeatTransfer:: create_DS_subcommunicators ( void )
 
    int color = 0, key = 0;
    //int const* number_of_subdomains_per_direction = TF->primary_grid()->get_domain_decomposition() ;
-   int const* MPI_coordinates_world = TF->primary_grid()->get_MPI_coordinates() ;
-   int const* MPI_number_of_coordinates = TF->primary_grid()->get_domain_decomposition() ;
+   int const* MPI_coordinates_world =
+									TF->primary_grid()->get_MPI_coordinates() ;
+   int const* MPI_number_of_coordinates =
+									TF->primary_grid()->get_domain_decomposition() ;
 
    if (dim == 2) {
       // Assign color and key for splitting in x
@@ -1995,19 +2028,22 @@ DS_HeatTransfer:: create_DS_subcommunicators ( void )
       processor_splitting (color,key,1);
    } else {
       // Assign color and key for splitting in x
-      color = MPI_coordinates_world[1] + MPI_coordinates_world[2]*MPI_number_of_coordinates[1] ;
+      color = MPI_coordinates_world[1]
+				+ MPI_coordinates_world[2]*MPI_number_of_coordinates[1] ;
       key = MPI_coordinates_world[0];
       // Split by direction in x
       processor_splitting (color,key,0);
 
       // Assign color and key for splitting in y
-      color = MPI_coordinates_world[2] + MPI_coordinates_world[0]*MPI_number_of_coordinates[2];
+      color = MPI_coordinates_world[2]
+				+ MPI_coordinates_world[0]*MPI_number_of_coordinates[2];
       key = MPI_coordinates_world[1];
       // Split by direction in y
       processor_splitting (color,key,1);
 
       // Assign color and key for splitting in y
-      color = MPI_coordinates_world[0] + MPI_coordinates_world[1]*MPI_number_of_coordinates[0];;
+      color = MPI_coordinates_world[0]
+				+ MPI_coordinates_world[1]*MPI_number_of_coordinates[0];;
       key = MPI_coordinates_world[2];
 
       // Split by direction in y
@@ -2017,7 +2053,9 @@ DS_HeatTransfer:: create_DS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DS_HeatTransfer:: processor_splitting ( int const& color, int const& key, size_t const& dir )
+DS_HeatTransfer:: processor_splitting ( int const& color
+												  , int const& key
+												  , size_t const& dir )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: processor_splitting" ) ;
@@ -2158,8 +2196,14 @@ DS_HeatTransfer:: free_DS_subcommunicators ( void )
 }
 
 //----------------------------------------------------------------------
-double DS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* AdvectingField,
-	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
+double DS_HeatTransfer:: assemble_advection_TVD(
+										FV_DiscreteField const* AdvectingField
+									 ,	size_t advecting_level
+									 , double const& coef
+									 , size_t const& i
+									 , size_t const& j
+									 , size_t const& k
+									 , size_t advected_level) const
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: assemble_advection_TVD" );
@@ -2576,8 +2620,14 @@ double DS_HeatTransfer:: assemble_advection_TVD( FV_DiscreteField const* Advecti
 
 
 //----------------------------------------------------------------------
-double DS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* AdvectingField,
-	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
+double DS_HeatTransfer:: assemble_advection_Centered(
+											FV_DiscreteField const* AdvectingField
+										 , size_t advecting_level
+										 , double const& coef
+										 , size_t const& i
+										 , size_t const& j
+										 , size_t const& k
+										 , size_t advected_level) const
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: assemble_advection_Centered" );
@@ -2735,8 +2785,14 @@ double DS_HeatTransfer:: assemble_advection_Centered( FV_DiscreteField const* Ad
 }
 
 //----------------------------------------------------------------------
-double DS_HeatTransfer:: assemble_advection_Upwind( FV_DiscreteField const* AdvectingField,
-	size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const
+double DS_HeatTransfer:: assemble_advection_Upwind(
+											FV_DiscreteField const* AdvectingField
+										 , size_t advecting_level
+										 , double const& coef
+										 , size_t const& i
+										 , size_t const& j
+										 , size_t const& k
+										 , size_t advected_level) const
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DS_HeatTransfer:: assemble_advection_Upwind" );

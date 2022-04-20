@@ -55,7 +55,9 @@ struct MPIVarHT {
    double ***receive;
 };
 
-class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverComputingTime
+class DS_HeatTransfer : public MAC_Object
+                      , public ComputingTime
+                      , public SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 
@@ -138,12 +140,20 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       /** @name Basic discrete system building */
       //@{
       /** @brief Compute diffusive term of temperature from perivious timestep */
-      double compute_un_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& dir, size_t const& level);
+      double compute_un_component ( size_t const& comp
+                                  , size_t const& i
+                                  , size_t const& j
+                                  , size_t const& k
+                                  , size_t const& dir
+                                  , size_t const& level);
       /** @brief Assemble temperature body term */
-      double bodyterm_value ( double const& xC, double const& yC, double const& zC);
+      double bodyterm_value ( double const& xC
+                            , double const& yC
+                            , double const& zC);
 
       /** @brief Assemble RHS of temperature for first step of Crank_Nicolson time discretization */
-      void assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it, double const& gamma);
+      void assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it
+                                 , double const& gamma);
 
 
 
@@ -167,10 +177,19 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       //@{
 
       /** @brief Assemble local RHS for 1D equation solver */
-      double assemble_local_rhs( size_t const& j, size_t const& k, double const& gamma, FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir );
+      double assemble_local_rhs( size_t const& j
+                               , size_t const& k
+                               , double const& gamma
+                               , FV_TimeIterator const* t_it
+                               , size_t const& comp
+                               , size_t const& dir );
 
       /** @brief Compute Aei*(Aii)-1*fi required to compute interface unknown */
-      void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index);
+      void compute_Aei_ui (struct TDMatrix* arr
+                         , struct LocalVector* VEC
+                         , size_t const& comp
+                         , size_t const& dir
+                         , size_t const& r_index);
 
       /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */
       void data_packing ( double const& fe
@@ -179,10 +198,15 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
                         , size_t const& p);
 
       /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */
-      void unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p);
+      void unpack_compute_ue_pack(size_t const& comp
+                                , size_t const& dir
+                                , size_t const& p);
 
       /** @brief Unpack the interface variable sent by master processor to slave processor */
-      void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, size_t const& p);
+      void unpack_ue(size_t const& comp
+                   , double * received_data
+                   , size_t const& dir
+                   , size_t const& p);
 
       /** @brief Call the appropriate functions to solve local variable and interface unknown */
       void solve_interface_unknowns(double const& gamma
@@ -197,25 +221,41 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */
       void nodes_temperature_initialization ( size_t const& level );
 
-      /** @brief Returns negative value of the point lies inside the solid, otherwise returns a positive number*/
-      double level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type);
-
-      /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */
-      void assemble_intersection_matrix ( size_t const& comp, size_t const& level);                 // Here level:0 -> fluid; 1-> solid
-
       /** @brief Compute advective term based on either Upwind or TVD spacial scheme */
-      double compute_adv_component ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k);
+      double compute_adv_component ( size_t const& comp
+                                   , size_t const& i
+                                   , size_t const& j
+                                   , size_t const& k);
 
-      double assemble_advection_Centered( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
+      double assemble_advection_Centered( FV_DiscreteField const* AdvectingField
+                                        , size_t advecting_level
+                                        , double const& coef
+                                        , size_t const& i
+                                        , size_t const& j
+                                        , size_t const& k
+                                        , size_t advected_level) const;
 
-      double divergence_of_U ( size_t const& comp, size_t const& i, size_t const& j, size_t const& k, size_t const& level);
+      double divergence_of_U ( size_t const& comp
+                             , size_t const& i
+                             , size_t const& j
+                             , size_t const& k
+                             , size_t const& level);
 
+      double assemble_advection_TVD( FV_DiscreteField const* AdvectingField
+                                   , size_t advecting_level
+                                   , double const& coef
+                                   , size_t const& i
+                                   , size_t const& j
+                                   , size_t const& k
+                                   , size_t advected_level) const;
 
-      double assemble_advection_TVD( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
-
-      double assemble_advection_Upwind( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
-
-      double assemble_advection_Upwind_new( FV_DiscreteField const* AdvectingField, size_t advecting_level, double const& coef, size_t const& i, size_t const& j, size_t const& k, size_t advected_level) const;
+      double assemble_advection_Upwind( FV_DiscreteField const* AdvectingField
+                                      , size_t advecting_level
+                                      , double const& coef
+                                      , size_t const& i
+                                      , size_t const& j
+                                      , size_t const& k
+                                      , size_t advected_level) const;
 
       /** @brief Solve i in j and k; e.g. solve x in y ank z */
       void Solve_i_in_jk (FV_TimeIterator const* t_it
@@ -233,7 +273,10 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       void calculate_row_indexes ( );
 
       /** @brief Solve interface unknown for all cases */
-      void DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index);
+      void DS_interface_unknown_solver(LA_SeqVector* interface_rhs
+                                     , size_t const& comp
+                                     , size_t const& dir
+                                     , size_t const& r_index);
 
       void ugradu_initialization (  );
       /** @brief Calculate L2 norm without any analytical solution */
@@ -246,7 +289,10 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       /** @name Direction splitting communicators */
       /** @brief Create the sub-communicators */
       void create_DS_subcommunicators ( void ) ;
-      void processor_splitting ( int const& color, int const& key, size_t const& dir );
+
+      void processor_splitting ( int const& color
+                               , int const& key
+                               , size_t const& dir );
 
       void allocate_mpi_variables (void);
       void deallocate_mpi_variables ( void );
@@ -289,9 +335,6 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       struct MPIVarHT second_pass[3];
       struct MPIVarHT data_for_S[3];
 
-      // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
-      double loc_thres;
-
       double rho;
       string AdvectionScheme;
       size_t AdvectionTimeAccuracy;
@@ -305,7 +348,6 @@ class DS_HeatTransfer : public MAC_Object, public ComputingTime, public SolverCo
       bool is_iperiodic[3];
       boolVector const* periodic_comp;
       bool is_par_motion;
-      string* particle_information;
 
       // Grains3D variable
       DS_AllRigidBodies* allrigidbodies;
