@@ -444,10 +444,9 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
         vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-        pos(dir) = is_periodic ? periodic_transformation(pos(dir)
-                                                + vel(dir)*t_it->time_step()
-                                                         , dir)
-                               : pos(dir) + vel(dir)*t_it->time_step() ;
+        pos(dir) = periodic_transformation(pos(dir)
+                                         + vel(dir)*t_it->time_step()
+                                                         , dir) ;
         delta(dir) = vel(dir)*t_it->time_step() ;
      }
 
@@ -736,22 +735,16 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
         for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
            double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
-
-           if (periodic_comp->operator()( 0 ))
-              xC = periodic_transformation(xC,0);
+           xC = periodic_transformation(xC,0);
 
            for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
              double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
-
-             if (periodic_comp->operator()( 1 ))
-                yC = periodic_transformation(yC,1);
+             yC = periodic_transformation(yC,1);
 
              for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                double zC = (m_space_dimension == 2) ? 0.
                                   : FF->get_DOF_coordinate( k, comp, 2 ) ;
-
-               if (periodic_comp->operator()( 2 ))
-                  zC = periodic_transformation(zC,2);
+               zC = periodic_transformation(zC,2);
 
                size_t p = FF->DOF_local_number(i,j,k,comp);
 
@@ -774,10 +767,16 @@ double DS_AllRigidBodies:: periodic_transformation( double const& x
 {
   MAC_LABEL( "DS_AllRigidBodies:: periodic_transformation" ) ;
 
-  double isize = MESH->get_main_domain_max_coordinate(dir)
-               - MESH->get_main_domain_min_coordinate(dir);
-  double imin = MESH->get_main_domain_min_coordinate(dir);
-  double value = x - MAC::floor((x-imin)/isize)*isize;
+  double value = x;
+
+  boolVector const* periodic_comp = MESH->get_periodic_directions();
+
+  if (periodic_comp->operator()( dir )) {
+     double isize = MESH->get_main_domain_max_coordinate(dir)
+                  - MESH->get_main_domain_min_coordinate(dir);
+     double imin = MESH->get_main_domain_min_coordinate(dir);
+     value = x - MAC::floor((x-imin)/isize)*isize;
+  }
 
   return (value);
 }
@@ -825,11 +824,11 @@ void DS_AllRigidBodies:: generate_list_of_local_RB( )
         for (size_t j = 0; j < 2; j++) {
            for (size_t k = 0; k < 2; k++) {
               status = (m_space_dimension==2) ?
-                                    (xr(i) > Dmin(0)) && (xr(i) <= Dmax(0))
-                                 && (yr(j) > Dmin(1)) && (yr(j) <= Dmax(1)) :
-                                    (xr(i) > Dmin(0)) && (xr(i) <= Dmax(0))
-                                 && (yr(j) > Dmin(1)) && (yr(j) <= Dmax(1))
-                                 && (zr(k) > Dmin(2)) && (zr(k) <= Dmax(2)) ;
+                                    (xr(i) >= Dmin(0)) && (xr(i) <= Dmax(0))
+                                 && (yr(j) >= Dmin(1)) && (yr(j) <= Dmax(1)) :
+                                    (xr(i) >= Dmin(0)) && (xr(i) <= Dmax(0))
+                                 && (yr(j) >= Dmin(1)) && (yr(j) <= Dmax(1))
+                                 && (zr(k) >= Dmin(2)) && (zr(k) <= Dmax(2)) ;
               if (status) goto skip_loop;
            }
         }
@@ -943,24 +942,18 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
         for (size_t i = min_nearest_index(0); i < max_nearest_index(0); ++i) {
           ipos(0) = i - min_unknown_index(0);
           double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
-
-          if (periodic_comp->operator()( 0 ))
-             xC = periodic_transformation(xC,0);
+          xC = periodic_transformation(xC,0);
 
           for (size_t j = min_nearest_index(1); j < max_nearest_index(1); ++j) {
               ipos(1) = j - min_unknown_index(1);
               double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
-
-              if (periodic_comp->operator()( 1 ))
-                 yC = periodic_transformation(yC,1);
+              yC = periodic_transformation(yC,1);
 
               for (size_t k = min_nearest_index(2);k < max_nearest_index(2); ++k) {
                  ipos(2) = k - min_unknown_index(2);
                  double zC = (m_space_dimension == 2) ? 0
                                         : FF->get_DOF_coordinate( k, comp, 2 );
-
-                 if (periodic_comp->operator()( 2 ))
-                    zC = periodic_transformation(zC,2);
+                 zC = periodic_transformation(zC,2);
 
                  size_t p = FF->DOF_local_number(i,j,k,comp);
                  geomVector source(xC,yC,zC);
