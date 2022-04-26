@@ -375,9 +375,6 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
   m_macCOMM->sum_array(*viscous_force);
   m_macCOMM->sum_array(*viscous_torque);
 
-  string fileName = "./DS_results/particle_forces.csv" ;
-  std::ofstream MyFile( fileName.c_str(), std::ios::app ) ;
-
   for (size_t i = 0; i < m_nrb; ++i) {
      avg_viscous_force(0) += viscous_force->operator()(i,0);
      avg_viscous_force(1) += viscous_force->operator()(i,1);
@@ -386,30 +383,54 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
      avg_viscous_torque(0) += viscous_torque->operator()(i,0);
      avg_viscous_torque(1) += viscous_torque->operator()(i,1);
      avg_viscous_torque(2) += viscous_torque->operator()(i,2);
+  }
 
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: write_force_and_flux_summary(
+                                              FV_TimeIterator const* t_it
+                                            , bool const& b_restart)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: write_force_and_flux_summary()" ) ;
+
+  string fileName = "./DS_results/particle_forces.csv" ;
+  std::ofstream MyFile;
+
+  if (m_macCOMM->rank() == 0)
+     MyFile.open( fileName.c_str(), std::ios::app ) ;
+
+  for (size_t i = 0; i < m_nrb; ++i) {
      geomVector const* pgc = m_allDSrigidbodies[i]->get_ptr_to_gravity_centre();
      geomVector pv = rigid_body_velocity(i,*pgc);
 
      if (m_macCOMM->rank() == 0) {
-        MyFile << i << " , " << pgc->operator()(0)
-                    << " , " << pgc->operator()(1)
-                    << " , " << pgc->operator()(2)
-                    << " , " << pv(0)
-                    << " , " << pv(1)
-                    << " , " << pv(2)
-                    << " , " << pressure_force->operator()(i,0)
-                    << " , " << pressure_force->operator()(i,1)
-                    << " , " << pressure_force->operator()(i,2)
-                    << " , " << viscous_force->operator()(i,0)
-                    << " , " << viscous_force->operator()(i,1)
-                    << " , " << viscous_force->operator()(i,2)
-                    << " , " << pressure_torque->operator()(i,0)
-                    << " , " << pressure_torque->operator()(i,1)
-                    << " , " << pressure_torque->operator()(i,2)
-                    << " , " << viscous_torque->operator()(i,0)
-                    << " , " << viscous_torque->operator()(i,1)
-                    << " , " << viscous_torque->operator()(i,2)
-                    << endl;
+        MyFile << t_it->time()
+               << " , " << i
+               << " , " << pgc->operator()(0)
+               << " , " << pgc->operator()(1)
+               << " , " << pgc->operator()(2)
+               << " , " << pv(0)
+               << " , " << pv(1)
+               << " , " << pv(2)
+               << " , " << pressure_force->operator()(i,0)
+               << " , " << pressure_force->operator()(i,1)
+               << " , " << pressure_force->operator()(i,2)
+               << " , " << viscous_force->operator()(i,0)
+               << " , " << viscous_force->operator()(i,1)
+               << " , " << viscous_force->operator()(i,2)
+               << " , " << pressure_torque->operator()(i,0)
+               << " , " << pressure_torque->operator()(i,1)
+               << " , " << pressure_torque->operator()(i,2)
+               << " , " << viscous_torque->operator()(i,0)
+               << " , " << viscous_torque->operator()(i,1)
+               << " , " << viscous_torque->operator()(i,2)
+               << " , " << temperature_gradient->operator()(i)
+               << endl;
      }
   }
 
@@ -435,6 +456,9 @@ void DS_AllRigidBodies:: compute_viscous_force_and_torque_for_allRB(
                << avg_viscous_torque(0) / double(m_nrb) << " ,"
                << avg_viscous_torque(1) / double(m_nrb) << " ,"
                << avg_viscous_torque(2) / double(m_nrb) << endl;
+
+     std::cout << "Average temperature flux on RB: "
+               << avg_temperature_gradient / double(m_nrb) << endl;
   }
 
 }
@@ -472,7 +496,6 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
 
      // Solving equation of motion
      for (size_t dir=0;dir<m_space_dimension;dir++) {
-        bool is_periodic = periodic_comp->operator()( dir );
         pos(dir) = pgc->operator()(dir);
         vel(dir) = pv(dir);
 
@@ -1274,8 +1297,6 @@ DS_AllRigidBodies:: second_order_temperature_flux(size_t const& parID)
                                           ->get_rigid_body_surface_normals();
   vector<geomVector*> surface_area = m_allDSrigidbodies[parID]
                                           ->get_rigid_body_surface_areas();
-  geomVector const* pgc = m_allDSrigidbodies[parID]
-                                          ->get_ptr_to_gravity_centre();
 
   size_t_vector vvv(3,0);
   vector<int> sign(3,0);

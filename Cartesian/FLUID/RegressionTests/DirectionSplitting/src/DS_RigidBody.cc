@@ -374,7 +374,8 @@ void DS_RigidBody:: write_surface_discretization( const std::string& file)
 
   for (size_t i = 0; i < m_surface_area.size(); i++) {
      if ((m_surface_Pforce[i].calcNorm() != 0) ||
-         (m_surface_Vforce[i].calcNorm() != 0))
+         (m_surface_Vforce[i].calcNorm() != 0) ||
+         (m_surface_Tgrad[i] != 0))
         out << m_surface_points[i]->operator()(0) << " ,"
             << m_surface_points[i]->operator()(1) << " ,"
             << m_surface_points[i]->operator()(2) << " ,"

@@ -365,6 +365,12 @@ class DS_AllRigidBodies
 
       /** @brief Create a list of local rigid bodies */
       void generate_list_of_local_RB( );
+
+      /** @brief Output force and flux summary in a csv file
+      @param t_it Time_iterator
+      @param b_restart if simulation is restart or not */
+      void write_force_and_flux_summary( FV_TimeIterator const* t_it
+                                       , bool const& b_restart);
       //@}
 
 

@@ -387,6 +387,21 @@ DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
       stop_total_timer() ;
    }
 
+   string fileName = "./DS_results/particle_forces.csv" ;
+   std::ofstream MyFile;
+   if (!b_restart && macCOMM->rank() == 0) {
+      MyFile.open( fileName.c_str(), std::ios::trunc ) ;
+      MyFile << "t , parID , x , y , z "
+             << ", vx , vy , vz "
+             << ", Fpx , Fpy , Fpz "
+             << ", Fvx , Fvy , Fvz "
+             << ", Tpx , Tpy , Tpz "
+             << ", Tvx , Tvy , Tvz "
+             << ", Tgrad"
+             << endl;
+      MyFile.close();
+   }
+
 
 }
 
@@ -472,6 +487,9 @@ DS_DirectionSplitting:: do_after_inner_iterations_stage(
       HeatSolver->do_after_inner_iterations_stage( t_it ) ;
       stop_total_timer() ;
    }
+
+   if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0))
+      allrigidbodies->write_force_and_flux_summary(t_it, b_restart);
 
 
 }
