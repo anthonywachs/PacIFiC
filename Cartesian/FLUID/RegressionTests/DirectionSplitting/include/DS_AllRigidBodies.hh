@@ -337,11 +337,18 @@ class DS_AllRigidBodies
       @param parID rigid body ID */
       void second_order_viscous_stress( size_t const& parID );
 
+      /** @brief Calculate the second order temperature flux on parID
+      @param parID rigid body ID */
+      void second_order_temperature_flux( size_t const& parID );
+
       /** @brief Calculate the pressure force and torque on all rigid bodies */
       void compute_pressure_force_and_torque_for_allRB ();
 
       /** @brief Calculate the viscous force and torque on all rigid bodies */
       void compute_viscous_force_and_torque_for_allRB (string const& StressOrder);
+
+      /** @brief Calculate the temperature gradient all rigid bodies */
+      void compute_temperature_gradient_for_allRB (string const& StressOrder);
 
       /** @brief Creates the neighbour list for each RB, helps in reducing
       computing time of isIn_any_RB */
@@ -414,6 +421,10 @@ class DS_AllRigidBodies
       pressure stress on rigid bodies */
       doubleArray2D* viscous_force; /**< Value of force due to
       viscous stress on rigid bodies */
+      doubleVector* temperature_gradient; /**< Value of temperature flux
+      on rigid bodies */
+      double avg_temperature_gradient; /**< Value of average temperature flux
+      on all rigid bodies */
       geomVector avg_pressure_force; /**< Value of average force due to
       pressure stress on all rigid bodies */
       geomVector avg_viscous_force; /**< Value of average force due to

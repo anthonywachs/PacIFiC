@@ -298,6 +298,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataHE.is_solids_ = is_solids ;
       inputDataHE.is_NSwithHE_ = is_NSwithHE ;
       inputDataHE.is_stressCal_ = is_stressCal ;
+      inputDataHE.stressCalFreq_ = stressCalFreq;
       inputDataHE.is_par_motion_ = is_par_motion ;
       inputDataHE.dom_ = dom ;
       inputDataHE.allrigidbodies_ = allrigidbodies ;

@@ -170,6 +170,12 @@ class DS_RigidBody
       void update_Vforce_on_surface_point( size_t const& i
                                          , geomVector const& value );
 
+      /** @brief Update the temperature gradient on a surface point
+      @param i index of the surface point
+      @param value the value to assign for temperature gradient */
+      void update_Tgrad_on_surface_point( size_t const& i
+                                        , double const& value );
+
       /** @brief Update the RB position and velocity
       @param pos updated position
       @param vel updated translation velocity */
@@ -197,6 +203,8 @@ class DS_RigidBody
       vector<geomVector> m_surface_Pforce; /**< vector of the pressure force
          on the points distributed on the surface of the particle */
       vector<geomVector> m_surface_Vforce; /**< vector of the viscous force
+         on the points distributed on the surface of the particle */
+      vector<double> m_surface_Tgrad; /**< vector of the temperature gradient
          on the points distributed on the surface of the particle */
       vector<geomVector*> m_halo_zone; /**< vector of min and max extents
          of rigid body halozone, required for void fraction detection */

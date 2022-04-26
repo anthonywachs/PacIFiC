@@ -59,13 +59,16 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
    , rho( fromDS.rho_ )
    , AdvectionScheme ( fromDS.AdvectionScheme_ )
    , AdvectionTimeAccuracy ( fromDS.AdvectionTimeAccuracy_ )
-   , ViscousStressOrder ( fromDS.ViscousStressOrder_ )
+	, ViscousStressOrder ( fromDS.ViscousStressOrder_ )
    , heat_capacity( exp->double_data( "Heat_capacity") )
    , thermal_conductivity( exp->double_data( "Thermal_conductivity") )
    , b_bodyterm ( false )
    , is_solids ( fromDS.is_solids_ )
 	, is_NSwithHE (fromDS.is_NSwithHE_ )
+	, is_stressCal (fromDS.is_stressCal_ )
+	, stressCalFreq ( fromDS.stressCalFreq_ )
 	, b_restart ( fromDS.b_restart_ )
+	, is_par_motion ( fromDS.is_par_motion_ )
 	, allrigidbodies ( fromDS.allrigidbodies_ )
 {
    MAC_LABEL( "DS_HeatTransfer:: DS_HeatTransfer" ) ;
@@ -116,7 +119,6 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
       is_iperiodic[2] = periodic_comp->operator()( 2 );
    }
 
-   is_stressCal = fromDS.is_stressCal_;
    is_par_motion = fromDS.is_par_motion_;
 
 	if (is_NSwithHE) {
@@ -242,9 +244,10 @@ DS_HeatTransfer:: do_after_inner_iterations_stage(
 {
    MAC_LABEL( "DS_HeatTransfer:: do_after_inner_iterations_stage" ) ;
 
-   // if (is_stressCal) {
-   //    compute_fluid_particle_interaction(t_it);
-   // }
+	// Compute fluid particle interaction
+	if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0)) {
+		allrigidbodies->compute_temperature_gradient_for_allRB("second");
+	}
 
    // Compute temperature change over the time step
    double temperature_time_change = compute_DS_temperature_change()
@@ -263,9 +266,10 @@ DS_HeatTransfer:: do_after_time_stepping( void )
 {
    MAC_LABEL( "DS_HeatTransfer:: do_after_time_stepping" ) ;
 
-  // write_output_field();
+	GLOBAL_EQ->display_debug();
+	output_l2norm();
 
-   // Elapsed time by sub-problems
+	// Elapsed time by sub-problems
    if ( my_rank == is_master ) {
      double cputime = CT_get_elapsed_time();
 	  cout << endl
@@ -276,10 +280,7 @@ DS_HeatTransfer:: do_after_time_stepping( void )
      SCT_get_summary(cout,cputime);
    }
 
-   GLOBAL_EQ->display_debug();
-   output_l2norm();
-
-   deallocate_mpi_variables();
+	deallocate_mpi_variables();
 }
 
 //---------------------------------------------------------------------------

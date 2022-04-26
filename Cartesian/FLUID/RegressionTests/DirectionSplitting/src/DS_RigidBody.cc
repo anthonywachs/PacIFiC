@@ -198,6 +198,7 @@ void DS_RigidBody:: initialize_surface_variables( )
   m_surface_normal.reserve( Ntot );
   m_surface_Pforce.reserve( Ntot );
   m_surface_Vforce.reserve( Ntot );
+  m_surface_Tgrad.reserve( Ntot );
 
   geomVector vvv(3);
 
@@ -207,6 +208,7 @@ void DS_RigidBody:: initialize_surface_variables( )
       m_surface_normal.push_back( new geomVector(3) );
       m_surface_Pforce.push_back( vvv );
       m_surface_Vforce.push_back( vvv );
+      m_surface_Tgrad.push_back( 0. );
    }
 
 }
@@ -309,6 +311,19 @@ void DS_RigidBody:: update_Vforce_on_surface_point( size_t const& i
 
 
 
+//---------------------------------------------------------------------------
+void DS_RigidBody:: update_Tgrad_on_surface_point( size_t const& i
+                                                 , double const& value )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: update_Tgrad_on_surface_point" ) ;
+
+  m_surface_Tgrad[i] = value;
+
+}
+
+
+
 
 //---------------------------------------------------------------------------
 void DS_RigidBody:: correct_surface_discretization( FV_Mesh const* MESH )
@@ -355,7 +370,7 @@ void DS_RigidBody:: write_surface_discretization( const std::string& file)
   std::ofstream out;
 
   out.open(file.c_str());
-  out << "x ,y ,z ,nx ,ny ,nz ,area ,Fpx ,Fpy ,Fpz ,Fvx ,Fvy ,Fvz " << endl;
+  out << "x ,y ,z ,nx ,ny ,nz ,area ,Fpx ,Fpy ,Fpz ,Fvx ,Fvy ,Fvz, Tgrad" << endl;
 
   for (size_t i = 0; i < m_surface_area.size(); i++) {
      if ((m_surface_Pforce[i].calcNorm() != 0) ||
@@ -372,7 +387,8 @@ void DS_RigidBody:: write_surface_discretization( const std::string& file)
             << m_surface_Pforce[i](2) << " ,"
             << m_surface_Vforce[i](0) << " ,"
             << m_surface_Vforce[i](1) << " ,"
-            << m_surface_Vforce[i](2) << endl;
+            << m_surface_Vforce[i](2) << " ,"
+            << m_surface_Tgrad[i] << endl;
   }
 
   out.close();

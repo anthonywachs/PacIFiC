@@ -43,6 +43,7 @@ struct DS2HE
   bool is_solids_ ;
   bool is_NSwithHE_ ;
   bool is_stressCal_ ;
+  size_t stressCalFreq_;
   bool is_par_motion_ ;
   FV_DomainAndFields const* dom_ ;
   DS_AllRigidBodies* allrigidbodies_ ;
@@ -344,6 +345,7 @@ class DS_HeatTransfer : public MAC_Object
       bool is_solids;
       bool is_NSwithHE;
       bool is_stressCal;
+      size_t stressCalFreq;
       bool b_restart ;
       bool is_iperiodic[3];
       boolVector const* periodic_comp;
