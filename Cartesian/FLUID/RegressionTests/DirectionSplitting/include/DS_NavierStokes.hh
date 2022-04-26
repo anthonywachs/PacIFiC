@@ -37,8 +37,6 @@ struct DS2NS
   bool is_solids_ ;
   bool is_stressCal_;
   string ViscousStressOrder_;
-  double surface_cell_scale_;
-  bool is_surfacestressOUT_;
   size_t stressCalFreq_;
   bool is_par_motion_;
   FV_DomainAndFields const* dom_ ;
@@ -418,7 +416,6 @@ class DS_NavierStokes : public MAC_Object,
       bool is_stressCal;
       string ViscousStressOrder;
       double surface_cell_scale;
-      bool is_surfacestressOUT;
       size_t stressCalFreq;
       bool is_par_motion;
 

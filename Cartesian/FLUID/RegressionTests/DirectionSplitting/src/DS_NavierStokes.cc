@@ -68,8 +68,6 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , is_solids( fromDS.is_solids_ )
 	, is_stressCal ( fromDS.is_stressCal_ )
 	, ViscousStressOrder ( fromDS.ViscousStressOrder_ )
-	, surface_cell_scale ( fromDS.surface_cell_scale_ )
-	, is_surfacestressOUT ( fromDS.is_surfacestressOUT_ )
 	, stressCalFreq ( fromDS.stressCalFreq_ )
 	, is_par_motion ( fromDS.is_par_motion_ )
 	, allrigidbodies ( fromDS.allrigidbodies_ )
@@ -315,9 +313,6 @@ DS_NavierStokes:: do_after_time_stepping( void )
    // write_output_field(PF);
    // write_output_field(UF,1);
    // SCT_get_elapsed_time( "Writing CSV" );
-
-	if (is_surfacestressOUT)
-   	allrigidbodies->write_surface_discretization_for_all_RB();
 
    output_L2norm_velocity(0);
    output_L2norm_pressure(0);

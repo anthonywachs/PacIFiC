@@ -276,8 +276,6 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataNS.is_solids_ = is_solids ;
       inputDataNS.is_stressCal_ = is_stressCal;
       inputDataNS.ViscousStressOrder_ = ViscousStressOrder;
-      inputDataNS.surface_cell_scale_ = surface_cell_scale;
-      inputDataNS.is_surfacestressOUT_ = is_surfacestressOUT;
       inputDataNS.stressCalFreq_ = stressCalFreq;
       inputDataNS.is_par_motion_ = is_par_motion;
       inputDataNS.dom_ = dom;
@@ -414,6 +412,9 @@ DS_DirectionSplitting:: do_after_time_stepping( void )
       HeatSolver->do_after_time_stepping() ;
       stop_total_timer() ;
    }
+
+   if (is_surfacestressOUT)
+      allrigidbodies->write_surface_discretization_for_all_RB();
 
 }
 
