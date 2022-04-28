@@ -246,7 +246,7 @@ DS_HeatTransfer:: do_after_inner_iterations_stage(
 
 	// Compute fluid particle interaction
 	if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0)) {
-		allrigidbodies->compute_temperature_gradient_for_allRB("second");
+		allrigidbodies->compute_temperature_gradient_for_allRB(ViscousStressOrder);
 	}
 
    // Compute temperature change over the time step

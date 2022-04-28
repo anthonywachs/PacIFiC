@@ -345,6 +345,10 @@ class DS_AllRigidBodies
       @param parID rigid body ID */
       void second_order_viscous_stress( size_t const& parID );
 
+      /** @brief Calculate the first order temperature flux on parID
+      @param parID rigid body ID */
+      void first_order_temperature_flux( size_t const& parID );
+
       /** @brief Calculate the second order temperature flux on parID
       @param parID rigid body ID */
       void second_order_temperature_flux( size_t const& parID );
