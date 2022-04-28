@@ -1334,13 +1334,6 @@ DS_AllRigidBodies:: second_order_temperature_flux(size_t const& parID)
   // Extents on the currect processor
   geomVector Dmin(3), Dmax(3);
 
-  // std::ofstream outputFile ;
-  // std::ostringstream os2;
-  // os2 << "./DS_results/point_data.csv";
-  // std::string filename = os2.str();
-  // outputFile.open(filename.c_str());
-  // outputFile << "x,y,z,status,f" << endl;
-
   // Get local min and max indices
   // One extra grid cell needs to considered, since ghost points can be
   // located in between the min/max index handled by the proc
@@ -1494,22 +1487,6 @@ DS_AllRigidBodies:: second_order_temperature_flux(size_t const& parID)
            }
         }
 
-        // outputFile << ghost_pt[0](0) << ","
-        //            << ghost_pt[0](1) << ","
-        //            << ghost_pt[0](2) << ","
-        //            << in_domain(0) << ","
-        //            << f[0] << endl;
-        // outputFile << ghost_pt[1](0) << ","
-        //            << ghost_pt[1](1) << ","
-        //            << ghost_pt[1](2) << ","
-        //            << in_domain(1) << ","
-        //            << f[1] << endl;
-        // outputFile << ghost_pt[2](0) << ","
-        //            << ghost_pt[2](1) << ","
-        //            << ghost_pt[2](2) << ","
-        //            << in_domain(2) << ","
-        //            << f[2] << endl;
-
         double dfdi = 0.;
 
         // Calculation of derivative
@@ -1645,11 +1622,6 @@ void DS_AllRigidBodies:: first_order_temperature_flux( size_t const& parID )
      domain_min(l) = MESH->get_main_domain_min_coordinate( l );
   }
 
-  string fileName = "./DS_results/point_data.csv" ;
-  std::ofstream MyFile;
-  MyFile.open( fileName.c_str() ) ;
-  MyFile << "id,x,y,z,f" << endl;
-
   for (size_t i = 0; i < surface_area.size(); i++) {
      // Check it the point is in the current domain
      ghost_pt[0] = *surface_point[i];
@@ -1732,19 +1704,6 @@ void DS_AllRigidBodies:: first_order_temperature_flux( size_t const& parID )
            }
         }
 
-        MyFile << i << "," << ghost_pt[0](0) << ","
-              << ghost_pt[0](1) << ","
-              << ghost_pt[0](2) << ","
-              << f[0] << endl;
-        MyFile << i << "," << ghost_pt[1](0) << ","
-              << ghost_pt[1](1) << ","
-              << ghost_pt[1](2) << ","
-              << f[1] << endl;
-        MyFile << i << "," << ghost_pt[2](0) << ","
-              << ghost_pt[2](1) << ","
-              << ghost_pt[2](2) << ","
-              << f[2] << endl;
-
         double dfdi = 0.;
 
         // Calculation of derivative
@@ -1763,40 +1722,42 @@ void DS_AllRigidBodies:: first_order_temperature_flux( size_t const& parID )
            dfdi = (netTempg(0) - f[0])/dh;
         // Point 1 is out of the computational domain
         } else if (in_domain(1) == 0) {
-           // double dh_wall = (sign > 0.) ?
-           //        MAC::abs(surface_point[i]->operator()(dir)
-           //      - MESH->get_main_domain_max_coordinate(dir)) :
-           //        MAC::abs(surface_point[i]->operator()(dir)
-           //      - MESH->get_main_domain_min_coordinate(dir)) ;
-           //
-           // size_t_vector i0(3,0);
-           // // Point on the domain boundary
-           // geomVector pt(3);
-           //    pt = ghost_pt[0];
-           //    pt(dir) += sign*dh_wall;
-           //
-           //    for (size_t l = 0; l < m_space_dimension; l++) {
-           //       size_t i0_temp;
-           //       bool found_temp =
-           //        FV_Mesh::between(UF->get_DOF_coordinates_vector(comp,l)
-           //                       , pt(l)
-           //                       , i0_temp);
-           //       if (found_temp == 1) i0(l) = i0_temp;
-           //    }
-           //    f[col1] = (m_space_dimension == 2) ?
-           //                             Bilinear_interpolation(UF
-           //                                                  , comp
-           //                                                  , &pt
-           //                                                  , i0
-           //                                                  , face_vector
-           //                                                  , {0})
-           //                           : Trilinear_interpolation(UF
-           //                                                  , comp
-           //                                                  , &pt
-           //                                                  , i0
-           //                                                  , parID
-           //                                                  , {0}) ;
-           //    dfdi(dir) = (f[col1] - f[0])/dh_wall;
+           vector<int> sign(3,0);
+           size_t major_dir = 4;
+
+           double max_comp = MAC::max(MAC::abs(surface_normal[i]->operator()(0))
+                           , MAC::max(MAC::abs(surface_normal[i]->operator()(1))
+                                    , MAC::abs(surface_normal[i]->operator()(2))));
+
+           for (size_t l = 0; l < m_space_dimension; l++) {
+              sign[l] = (surface_normal[i]->operator()(l) > -EPSILON) ? 1 : -1 ;
+              if (MAC::abs(surface_normal[i]->operator()(l)) == max_comp)
+                 major_dir = l;
+           }
+
+           i0_new[1](major_dir) = (sign[major_dir] == 1)
+                              ? (int(i0_new[0](major_dir)) + 1*sign[major_dir])
+                              : (int(i0_new[0](major_dir)) + 0*sign[major_dir]);
+
+           double t1 = (ghost_pt[1](major_dir) - ghost_pt[0](major_dir))
+                     / surface_normal[i]->operator()(major_dir);
+
+           for (size_t l = 0; l < m_space_dimension; l++) {
+              if (l != major_dir) {
+                 ghost_pt[1](l) = ghost_pt[1](l)
+                                 + t1 * surface_normal[i]->operator()(l);
+
+                 size_t i_temp;
+                 found(1,l) = FV_Mesh::between(
+                              TF->get_DOF_coordinates_vector(0,l),
+                              ghost_pt[1](l),
+                              i_temp);
+                 if (found(1,l)) i0_new[1](l) = i_temp;
+              }
+           }
+
+           f[1] = TF->DOF_value(i0_new[1](0), i0_new[1](1), i0_new[1](2), 0, 0);
+           dfdi = (f[1] - f[0])/t1;
         }
         value = dfdi * surface_area[i]->operator()(0);
      }
