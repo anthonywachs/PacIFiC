@@ -84,7 +84,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , FV_DiscreteField const* arb_TF
                                   , double const& arb_scs
                                   , MAC_Communicator const* arb_macCOMM
-                                  , double const& arb_mu )
+                                  , double const& arb_mu
+                                  , double const& arb_RBTemp)
 //---------------------------------------------------------------------------
   : m_space_dimension( dimens )
   , UF ( arb_UF )
@@ -94,6 +95,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   , surface_cell_scale ( arb_scs )
   , m_macCOMM ( arb_macCOMM )
   , m_mu ( arb_mu )
+  , m_RBTemp ( arb_RBTemp )
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
@@ -131,7 +133,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , FV_DiscreteField const* arb_TF
                                   , double const& arb_scs
                                   , MAC_Communicator const* arb_macCOMM
-                                  , double const& arb_mu )
+                                  , double const& arb_mu
+                                  , double const& arb_RBTemp)
 //---------------------------------------------------------------------------
   : m_space_dimension( dimens )
   , TF ( arb_TF )
@@ -139,6 +142,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   , surface_cell_scale ( arb_scs )
   , m_macCOMM ( arb_macCOMM )
   , m_mu ( arb_mu )
+  , m_RBTemp ( arb_RBTemp )
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
@@ -332,11 +336,6 @@ void DS_AllRigidBodies:: compute_temperature_gradient_for_allRB(
 
   for (size_t i = 0; i < m_nrb; ++i)
      avg_temperature_gradient += temperature_gradient->operator()(i);
-
-  if (m_macCOMM->rank() == 0) {
-     std::cout << "Average temperature flux on RB: "
-               << avg_temperature_gradient / double(m_nrb) << endl;
-  }
 
 }
 
@@ -685,6 +684,20 @@ geomVector DS_AllRigidBodies:: rigid_body_velocity( size_t const& parID,
   MAC_LABEL( "DS_AllRigidBodies:: rigid_body_velocity(pt)" ) ;
 
   return (m_allDSrigidbodies[parID]->get_rigid_body_velocity(pt));
+
+}
+
+
+
+//---------------------------------------------------------------------------
+geomVector DS_AllRigidBodies:: rigid_body_temperature( size_t const& parID,
+                                             geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: rigid_body_temperature(pt)" ) ;
+
+  geomVector value( m_RBTemp, m_RBTemp, m_RBTemp);
+  return (value);
 
 }
 
@@ -1050,8 +1063,9 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                                rayVec(0) = source(0) + t * rayDir(0);
                                rayVec(1) = source(1) + t * rayDir(1);
                                rayVec(2) = source(2) + t * rayDir(2);
-                               geomVector netVel =
-                                rigid_body_velocity(parID, rayVec);
+                               geomVector netVel = (FF == TF) ?
+                                rigid_body_temperature(parID, rayVec) :
+                                rigid_body_velocity(parID, rayVec) ;
                                 // rigid_body_velocity(parID, source + t * rayDir);
                                // Value of variable at the surface of particle
                                if ( FF == PF ) { // i.e. PF
@@ -1062,7 +1076,7 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                                                                  = netVel(comp);
                                } else if (FF == TF) {
                                   intersect_fieldValue[field]->operator()(p,col)
-                                                                 = 0.;
+                                                                 = netVel(comp);
                                }
                             }
                           }
@@ -1449,8 +1463,8 @@ DS_AllRigidBodies:: second_order_temperature_flux(size_t const& parID)
         }
 
         // Calculation of field variable on the surface point i
-        double netTemp = 0.;//rigid_body_temperature(parID, ghost_pt[0]);
-        f[0] = netTemp;
+        geomVector netTemp = rigid_body_temperature(parID, ghost_pt[0]);
+        f[0] = netTemp(comp);
 
         // Calculation of field variable on the ghost points
         for (size_t ig = 1; ig < 3; ig++) {
@@ -1474,9 +1488,9 @@ DS_AllRigidBodies:: second_order_temperature_flux(size_t const& parID)
                                                  , sign
                                                  , {0}) ;
            } else if ((in_parID[ig] != -1) && in_domain(ig)) {
-              double netTempg = 0.;//rigid_body_temperature(in_parID[col]
-        //                                                 , ghost_pt[col]);
-              f[ig] = netTempg;
+              geomVector netTempg = rigid_body_temperature(in_parID[ig]
+                                                        , ghost_pt[ig]);
+              f[ig] = netTempg(comp);
            }
         }
 
@@ -2177,7 +2191,7 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
                                                    , face_norm);
       rayDir(face_norm) = -1.;
 
-      in_RB = (FF == UF) ? isIn_any_RB(parID, pt_at_face) : -1 ;
+      in_RB = (FF == PF) ? -1 : isIn_any_RB(parID, pt_at_face) ;
 
       if (in_RB != -1) {
          dl = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
@@ -2185,8 +2199,8 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
          rayVec(0) = pt->operator()(0) + dl * rayDir(0);
          rayVec(1) = pt->operator()(1) + dl * rayDir(1);
          rayVec(2) = pt->operator()(2) + dl * rayDir(2);
-         netVel = rigid_body_velocity(in_RB, rayVec);
-         // rigid_body_velocity(in_RB, *pt + dl * rayDir);
+         netVel = (FF == UF) ? rigid_body_velocity(in_RB, rayVec) :
+                               rigid_body_temperature(in_RB, rayVec) ;
          fl = netVel(comp);
       } else {
          fl = Bilinear_interpolation(FF, comp, &pt_at_face, i0_left
@@ -2203,7 +2217,7 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
                                                    , face_norm);
       rayDir(face_norm) = 1.;
 
-      in_RB = (FF == UF) ? isIn_any_RB(parID, pt_at_face) : -1 ;
+      in_RB = (FF == PF) ? -1 : isIn_any_RB(parID, pt_at_face) ;
 
       if (in_RB != -1) {
          dr = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
@@ -2211,8 +2225,8 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
          rayVec(0) = pt->operator()(0) + dr * rayDir(0);
          rayVec(1) = pt->operator()(1) + dr * rayDir(1);
          rayVec(2) = pt->operator()(2) + dr * rayDir(2);
-         netVel = rigid_body_velocity(in_RB, rayVec);
-         // rigid_body_velocity(in_RB, *pt + dr * rayDir);
+         netVel = (FF == UF) ? rigid_body_velocity(in_RB, rayVec) :
+                               rigid_body_temperature(in_RB, rayVec) ;
          fr = netVel(comp);
       } else {
          fr = Bilinear_interpolation(FF, comp, &pt_at_face, i0_right
@@ -2335,7 +2349,9 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             surface_point(0) = pt->operator()(0) + del_wall(0,i)*rayDir(0);
             surface_point(1) = pt->operator()(1) + del_wall(0,i)*rayDir(1);
             surface_point(2) = pt->operator()(2) + del_wall(0,i)*rayDir(2);
-            geomVector net_vel = rigid_body_velocity(id,surface_point);
+            geomVector net_vel = (FF == UF) ?
+                                    rigid_body_velocity(id,surface_point) :
+                                    rigid_body_temperature(id,surface_point) ;
             fwall(0,i) = net_vel(comp);
          }
       // if top vertex is in fluid domain
@@ -2363,7 +2379,9 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             surface_point(0) = pt->operator()(0) + del_wall(0,i)*rayDir(0);
             surface_point(1) = pt->operator()(1) + del_wall(0,i)*rayDir(1);
             surface_point(2) = pt->operator()(2) + del_wall(0,i)*rayDir(2);
-            geomVector net_vel = rigid_body_velocity(id,surface_point);
+            geomVector net_vel = (FF == UF) ?
+                                    rigid_body_velocity(id,surface_point) :
+                                    rigid_body_temperature(id,surface_point) ;
             fwall(0,i) = net_vel(comp);
          }
       // if both vertex's are in solid domain
@@ -2379,7 +2397,9 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
          surface_point(0) = pt->operator()(0) + del_wall(0,i)*rayDir(0);
          surface_point(1) = pt->operator()(1) + del_wall(0,i)*rayDir(1);
          surface_point(2) = pt->operator()(2) + del_wall(0,i)*rayDir(2);
-         geomVector net_vel = rigid_body_velocity(id,surface_point);
+         geomVector net_vel = (FF == UF) ?
+                                 rigid_body_velocity(id,surface_point) :
+                                 rigid_body_temperature(id,surface_point) ;
          fwall(0,i) = net_vel(comp);
       }
    }
@@ -2419,7 +2439,9 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             surface_point(0) = pt->operator()(0) + del_wall(1,j)*rayDir(0);
             surface_point(1) = pt->operator()(1) + del_wall(1,j)*rayDir(1);
             surface_point(2) = pt->operator()(2) + del_wall(1,j)*rayDir(2);
-            geomVector net_vel = rigid_body_velocity(id,surface_point);
+            geomVector net_vel = (FF == UF) ?
+                                    rigid_body_velocity(id,surface_point) :
+                                    rigid_body_temperature(id,surface_point) ;
             fwall(1,j) = net_vel(comp);
          }
       // if right vertex is in fluid domain
@@ -2448,7 +2470,9 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             surface_point(0) = pt->operator()(0) + del_wall(1,j)*rayDir(0);
             surface_point(1) = pt->operator()(1) + del_wall(1,j)*rayDir(1);
             surface_point(2) = pt->operator()(2) + del_wall(1,j)*rayDir(2);
-            geomVector net_vel = rigid_body_velocity(id,surface_point);
+            geomVector net_vel = (FF == UF) ?
+                                    rigid_body_velocity(id,surface_point) :
+                                    rigid_body_temperature(id,surface_point) ;
             fwall(1,j) = net_vel(comp);
          }
       // if both vertex's are in solid domain
@@ -2463,7 +2487,9 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
          surface_point(0) = pt->operator()(0) + del_wall(1,j)*rayDir(0);
          surface_point(1) = pt->operator()(1) + del_wall(1,j)*rayDir(1);
          surface_point(2) = pt->operator()(2) + del_wall(1,j)*rayDir(2);
-         geomVector net_vel = rigid_body_velocity(id,surface_point);
+         geomVector net_vel = (FF == UF) ?
+                                 rigid_body_velocity(id,surface_point) :
+                                 rigid_body_temperature(id,surface_point) ;
          fwall(1,j) = net_vel(comp);
       }
    }
@@ -2861,16 +2887,16 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
          (in_parID[2] == -1)) {
         geomVector rayDir(3);
         rayDir(sec_ghost_dir) = -1. ;
-        if (FF == UF) {
+        if (FF != PF) {
            del = m_allDSrigidbodies[in_parID[0]]->
                                        get_distanceTo(coord_g[1], rayDir, dh);
            geomVector rayVec(3);
            rayVec(0) = coord_g[1](0) + del * rayDir(0);
            rayVec(1) = coord_g[1](1) + del * rayDir(1);
            rayVec(2) = coord_g[1](2) + del * rayDir(2);
-           geomVector netVel =
-                  rigid_body_velocity(in_parID[0], rayVec);
-                  // rigid_body_velocity(in_parID[0], coord_g[1] + del * rayDir);
+           geomVector netVel = (FF == UF) ?
+                     rigid_body_velocity(in_parID[0], rayVec) :
+                     rigid_body_temperature(in_parID[0], rayVec) ;
 
            x0 = x1 - del;
            f0 = netVel(comp);
@@ -2883,7 +2909,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
                 (in_parID[2] != -1)) {
          geomVector rayDir(3);
          rayDir(sec_ghost_dir) = 1. ;
-         if (FF == UF) {
+         if (FF != PF) {
             del = m_allDSrigidbodies[in_parID[2]]->
                                         get_distanceTo(coord_g[1], rayDir, dh);
 
@@ -2891,9 +2917,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
             rayVec(0) = coord_g[1](0) + del * rayDir(0);
             rayVec(1) = coord_g[1](1) + del * rayDir(1);
             rayVec(2) = coord_g[1](2) + del * rayDir(2);
-            geomVector netVel =
-                   rigid_body_velocity(in_parID[2], rayVec);
-                   // rigid_body_velocity(in_parID[2], coord_g[1] + del * rayDir);
+            geomVector netVel = (FF == UF) ?
+                   rigid_body_velocity(in_parID[2], rayVec) :
+                   rigid_body_temperature(in_parID[2], rayVec) ;
 
             x2 = x1 + del;
             f2 = netVel(comp);
@@ -2906,7 +2932,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
                  (in_parID[2] != -1)) {
          geomVector rayDir(3);
          rayDir(sec_ghost_dir) = -1. ;
-         if (FF == UF) {
+         if (FF != PF) {
             del = m_allDSrigidbodies[in_parID[0]]->
                                         get_distanceTo(coord_g[1], rayDir, dh);
 
@@ -2914,9 +2940,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
             rayVec(0) = coord_g[1](0) + del * rayDir(0);
             rayVec(1) = coord_g[1](1) + del * rayDir(1);
             rayVec(2) = coord_g[1](2) + del * rayDir(2);
-            geomVector netVel =
-                   rigid_body_velocity(in_parID[0], rayVec);
-                   // rigid_body_velocity(in_parID[0], coord_g[1] + del * rayDir);
+            geomVector netVel = (FF == UF) ?
+                        rigid_body_velocity(in_parID[0], rayVec) :
+                        rigid_body_temperature(in_parID[0], rayVec) ;
 
             x0 = x1 - del;
             f0 = netVel(comp);
@@ -2929,9 +2955,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
             rayVec(0) = coord_g[1](0) + del * rayDir(0);
             rayVec(1) = coord_g[1](1) + del * rayDir(1);
             rayVec(2) = coord_g[1](2) + del * rayDir(2);
-            netVel =
-                   rigid_body_velocity(in_parID[2], rayVec);
-                   // rigid_body_velocity(in_parID[2], coord_g[1] + del * rayDir);
+            netVel = (FF == UF) ?
+                     rigid_body_velocity(in_parID[2], rayVec) :
+                     rigid_body_temperature(in_parID[2], rayVec) ;
 
             x2 = x1 + del;
             f2 = netVel(comp);
@@ -2944,7 +2970,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
                  (in_parID[2] == -1)) {
          geomVector rayDir(3);
          rayDir(sec_ghost_dir) = -1. ;
-         if (FF == UF) {
+         if (FF != PF) {
             del = m_allDSrigidbodies[in_parID[1]]->
                                         get_distanceTo(coord_g[2], rayDir, dh);
 
@@ -2952,9 +2978,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
             rayVec(0) = coord_g[2](0) + del * rayDir(0);
             rayVec(1) = coord_g[2](1) + del * rayDir(1);
             rayVec(2) = coord_g[2](2) + del * rayDir(2);
-            geomVector netVel =
-                   rigid_body_velocity(in_parID[1], rayVec);
-                   // rigid_body_velocity(in_parID[1], coord_g[2] + del * rayDir);
+            geomVector netVel = (FF == UF) ?
+                     rigid_body_velocity(in_parID[1], rayVec) :
+                     rigid_body_temperature(in_parID[1], rayVec) ;
 
             x1 = x2 - del;
             f1 = netVel(comp);
@@ -2968,7 +2994,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
                  (in_parID[2] != -1)) {
          geomVector rayDir(3);
          rayDir(sec_ghost_dir) = 1. ;
-         if (FF == UF) {
+         if (FF != PF) {
             del = m_allDSrigidbodies[in_parID[1]]->
                                         get_distanceTo(coord_g[0], rayDir, dh);
 
@@ -2976,9 +3002,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
             rayVec(0) = coord_g[0](0) + del * rayDir(0);
             rayVec(1) = coord_g[0](1) + del * rayDir(1);
             rayVec(2) = coord_g[0](2) + del * rayDir(2);
-            geomVector netVel =
-                   rigid_body_velocity(in_parID[1], rayVec);
-                   // rigid_body_velocity(in_parID[1], coord_g[0] + del * rayDir);
+            geomVector netVel = (FF == UF) ?
+                     rigid_body_velocity(in_parID[1], rayVec) :
+                     rigid_body_temperature(in_parID[1], rayVec) ;
 
             x1 = x0 + del;
             f1 = netVel(comp);
@@ -2995,7 +3021,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
           (in_parID[1] != -1)) {
           geomVector rayDir(3);
           rayDir(sec_ghost_dir) = 1. ;
-          if (FF == UF) {
+          if (FF != PF) {
              del = m_allDSrigidbodies[in_parID[1]]->
                                         get_distanceTo(coord_g[0], rayDir, dh);
 
@@ -3003,9 +3029,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
              rayVec(0) = coord_g[0](0) + del * rayDir(0);
              rayVec(1) = coord_g[0](1) + del * rayDir(1);
              rayVec(2) = coord_g[0](2) + del * rayDir(2);
-             geomVector netVel =
-                   rigid_body_velocity(in_parID[1], rayVec);
-                   // rigid_body_velocity(in_parID[1], coord_g[0] + del * rayDir);
+             geomVector netVel = (FF == UF) ?
+                        rigid_body_velocity(in_parID[1], rayVec) :
+                        rigid_body_temperature(in_parID[1], rayVec) ;
 
              x1 = x0 + del;
              f1 = netVel(comp);
@@ -3017,7 +3043,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
                   (in_parID[1] == -1)) {
           geomVector rayDir(3);
           rayDir(sec_ghost_dir) = -1. ;
-          if (FF == UF) {
+          if (FF != PF) {
              del = m_allDSrigidbodies[in_parID[0]]->
                                         get_distanceTo(coord_g[1], rayDir, dh);
 
@@ -3025,9 +3051,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
              rayVec(0) = coord_g[1](0) + del * rayDir(0);
              rayVec(1) = coord_g[1](1) + del * rayDir(1);
              rayVec(2) = coord_g[1](2) + del * rayDir(2);
-             geomVector netVel =
-                   rigid_body_velocity(in_parID[0], rayVec);
-                   // rigid_body_velocity(in_parID[0], coord_g[1] + del * rayDir);
+             geomVector netVel = (FF == UF) ?
+                        rigid_body_velocity(in_parID[0], rayVec) :
+                        rigid_body_temperature(in_parID[0], rayVec) ;
 
              x0 = x1 - del;
              f0 = netVel(comp);
@@ -3043,7 +3069,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
            (in_parID[2] != -1)) {
            geomVector rayDir(3);
            rayDir(sec_ghost_dir) = 1. ;
-           if (FF == UF) {
+           if (FF != PF) {
               del = m_allDSrigidbodies[in_parID[2]]->
                                          get_distanceTo(coord_g[1], rayDir, dh);
 
@@ -3051,9 +3077,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
               rayVec(0) = coord_g[1](0) + del * rayDir(0);
               rayVec(1) = coord_g[1](1) + del * rayDir(1);
               rayVec(2) = coord_g[1](2) + del * rayDir(2);
-              geomVector netVel =
-                    rigid_body_velocity(in_parID[2], rayVec);
-                    // rigid_body_velocity(in_parID[2], coord_g[1] + del * rayDir);
+              geomVector netVel = (FF == UF) ?
+                        rigid_body_velocity(in_parID[2], rayVec) :
+                        rigid_body_temperature(in_parID[2], rayVec) ;
 
               x2 = x1 + del;
               f2 = netVel(comp);
@@ -3065,7 +3091,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
                   (in_parID[2] == -1)) {
            geomVector rayDir(3);
            rayDir(sec_ghost_dir) = -1. ;
-           if (FF == UF) {
+           if (FF != PF) {
               del = m_allDSrigidbodies[in_parID[1]]->
                                         get_distanceTo(coord_g[2], rayDir, dh);
 
@@ -3073,9 +3099,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
               rayVec(0) = coord_g[2](0) + del * rayDir(0);
               rayVec(1) = coord_g[2](1) + del * rayDir(1);
               rayVec(2) = coord_g[2](2) + del * rayDir(2);
-              geomVector netVel =
-                   rigid_body_velocity(in_parID[1], rayVec);
-                   // rigid_body_velocity(in_parID[1], coord_g[2] + del * rayDir);
+              geomVector netVel = (FF == UF) ?
+                        rigid_body_velocity(in_parID[1], rayVec) :
+                        rigid_body_temperature(in_parID[1], rayVec) ;
 
               x1 = x2 - del;
               f1 = netVel(comp);

@@ -203,6 +203,12 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       is_NS = true;
    }
 
+   if (is_NSwithHE || is_HE) {
+      RBTemp = exp->double_data( "RigidBodyTemperature" ) ;
+   } else {
+      RBTemp = 0.;
+   }
+
    // Create Grains3D if solidSolverType is Grains3D;
    if (is_solids) {
       int error = 0;
@@ -249,7 +255,8 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                           , dom->discrete_field( "temperature" )
                           , surface_cell_scale
                           , macCOMM
-                          , mu );
+                          , mu
+                          , RBTemp);
       } else if (is_NSwithHE) {
          allrigidbodies = new DS_AllRigidBodies( dim
                           , *solidFluid_transferStream
@@ -259,7 +266,8 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                           , dom->discrete_field( "temperature" )
                           , surface_cell_scale
                           , macCOMM
-                          , mu );
+                          , mu
+                          , RBTemp);
       }
    }
 

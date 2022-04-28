@@ -123,6 +123,7 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       bool b_restart;
       bool is_solids;
       bool is_HE, is_NS, is_NSwithHE;
+      double RBTemp;
 
       string insertion_type;
       bool is_stressCal;

@@ -1875,13 +1875,17 @@ DS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
      }
 
      for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+		  double xC = TF->get_DOF_coordinate( i, comp, 0 ) ;
         for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+			  double yC = TF->get_DOF_coordinate( j, comp, 1 ) ;
            for (size_t k=local_min_k;k<=local_max_k;++k) {
+				  double zC = (dim == 2) ? 0 : TF->get_DOF_coordinate( k, comp, 2 );
+				  geomVector pt(xC,yC,zC);
               size_t p = TF->DOF_local_number(i,j,k,comp);
               if (void_frac->operator()(p) != 0) {
                  size_t par_id = void_frac->operator()(p) - 1;
-                 double Tpart = 0;//impose_solid_temperature (comp,0,10,i,j,k,0.,par_id);
-                 TF->set_DOF_value( i, j, k, comp, level,Tpart);
+					  geomVector Tpart = allrigidbodies->rigid_body_temperature(par_id,pt);
+                 TF->set_DOF_value( i, j, k, comp, level,Tpart(comp));
               }
            }
         }

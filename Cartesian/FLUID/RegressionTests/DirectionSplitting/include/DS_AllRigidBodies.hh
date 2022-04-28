@@ -93,7 +93,8 @@ class DS_AllRigidBodies
                        , FV_DiscreteField const* arb_TF
                        , double const& arb_scs
                        , MAC_Communicator const* arb_macCOMM
-                       , double const& arb_mu );
+                       , double const& arb_mu
+                       , double const& arb_RBTemp);
 
       /** @brief Constructor with arguments
       @param dimens number of space dimensions
@@ -110,7 +111,8 @@ class DS_AllRigidBodies
                        , FV_DiscreteField const* arb_TF
                        , double const& arb_scs
                        , MAC_Communicator const* arb_macCOMM
-                       , double const& arb_mu );
+                       , double const& arb_mu
+                       , double const& arb_RBTemp);
 
 
 
@@ -247,6 +249,12 @@ class DS_AllRigidBodies
       at a given geometric vector pt
       @param pt a point in space*/
       geomVector rigid_body_velocity( size_t const& parID,
+                                          geomVector const& pt ) const;
+
+      /** @brief Return the rigid body temperature, currently a user input
+      but can be read from the Grains in future
+      @param pt a point in space*/
+      geomVector rigid_body_temperature( size_t const& parID,
                                           geomVector const& pt ) const;
 
       /** @brief Build the variable associated with the rigid bodies
@@ -447,6 +455,7 @@ class DS_AllRigidBodies
       between processors */
       double m_mu; /**< Fluid viscosity */
       double m_rho; /**< fluid density */
+      double m_RBTemp; /**< Rigid body temperature */
       MAC_DoubleVector const* gravity_vector ;
       vector<vector<size_t>> neighbour_list;
 
