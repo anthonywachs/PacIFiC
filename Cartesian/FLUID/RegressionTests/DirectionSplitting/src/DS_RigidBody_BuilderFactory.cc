@@ -4,6 +4,7 @@
 #include <FS_RigidBody.hh>
 #include <DS_Sphere.hh>
 #include <DS_3Dcylinder.hh>
+#include <DS_2Dcylinder.hh>
 #include <DS_3Dbox.hh>
 using std::endl;
 
@@ -21,6 +22,10 @@ DS_RigidBody* DS_RigidBody_BuilderFactory:: create( FS_RigidBody* pgrb )
   {
     case GEOM_SPHERE:
       dsrb = new DS_Sphere( pgrb );
+      break;
+
+    case GEOM_2DCYLINDER:
+      dsrb = new DS_2Dcylinder( pgrb );
       break;
 
     case GEOM_3DCYLINDER:

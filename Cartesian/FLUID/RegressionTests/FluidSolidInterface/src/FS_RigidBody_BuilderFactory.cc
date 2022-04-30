@@ -3,6 +3,7 @@
 #include <FS_RigidBody.hh>
 #include <FS_Sphere.hh>
 #include <FS_3Dcylinder.hh>
+#include <FS_2Dcylinder.hh>
 #include <FS_3Dbox.hh>
 using std::endl;
 
@@ -19,7 +20,15 @@ FS_RigidBody* FS_RigidBody_BuilderFactory:: create( size_t& dimens,
   // Build the rigid body
   if ( dimens == 2 )
   {
+  	  switch ( ncorners_ )
+  	  {
+	 	  case 1:
+			 prb = new FS_2Dcylinder( in, id_ );
+	  		 break;
 
+	 	  default:
+			 MAC::out() << "Unknown rigid body shape" << endl;
+  	  }
   }
   else
   {

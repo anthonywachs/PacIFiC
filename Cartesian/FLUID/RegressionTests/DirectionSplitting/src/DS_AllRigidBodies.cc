@@ -48,9 +48,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
-  size_t FS_space_dimension = 3;
-
-  m_FSallrigidbodies = new FS_AllRigidBodies( FS_space_dimension, in,
+  m_FSallrigidbodies = new FS_AllRigidBodies( m_space_dimension, in,
   	b_particles_as_fixed_obstacles );
   m_nrb = m_FSallrigidbodies->get_number_rigid_bodies();
   m_npart = m_FSallrigidbodies->get_number_particles();
@@ -101,9 +99,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
-  size_t FS_space_dimension = 3;
-
-  m_FSallrigidbodies = new FS_AllRigidBodies( FS_space_dimension, in,
+  m_FSallrigidbodies = new FS_AllRigidBodies( m_space_dimension, in,
   	b_particles_as_fixed_obstacles );
   m_nrb = m_FSallrigidbodies->get_number_rigid_bodies();
   m_npart = m_FSallrigidbodies->get_number_particles();
@@ -150,9 +146,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
-  size_t FS_space_dimension = 3;
-
-  m_FSallrigidbodies = new FS_AllRigidBodies( FS_space_dimension, in,
+  m_FSallrigidbodies = new FS_AllRigidBodies( m_space_dimension, in,
   	b_particles_as_fixed_obstacles );
   m_nrb = m_FSallrigidbodies->get_number_rigid_bodies();
   m_npart = m_FSallrigidbodies->get_number_particles();
@@ -1221,7 +1215,12 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
      double stress = 0.;
 
      // Check it the point is in the current domain
-     bool status = (surface_point[i]->operator()(0) > Dmin(0))
+     bool status = (m_space_dimension == 2) ?
+                   (surface_point[i]->operator()(0) > Dmin(0))
+                && (surface_point[i]->operator()(0) <= Dmax(0))
+                && (surface_point[i]->operator()(1) > Dmin(1))
+                && (surface_point[i]->operator()(1) <= Dmax(1)) :
+                   (surface_point[i]->operator()(0) > Dmin(0))
                 && (surface_point[i]->operator()(0) <= Dmax(0))
                 && (surface_point[i]->operator()(1) > Dmin(1))
                 && (surface_point[i]->operator()(1) <= Dmax(1))
@@ -1358,7 +1357,10 @@ DS_AllRigidBodies:: second_order_temperature_flux(size_t const& parID)
   for (size_t i = 0; i < surface_area.size(); i++) {
      ghost_pt[0] = *surface_point[i];
      // Check it the point is in the current domain
-     in_domain(0) = (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
+     in_domain(0) = (m_space_dimension == 2) ?
+                    (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
+                 && (ghost_pt[0](1) > Dmin(1)) && (ghost_pt[0](1) <= Dmax(1)) :
+                    (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
                  && (ghost_pt[0](1) > Dmin(1)) && (ghost_pt[0](1) <= Dmax(1))
                  && (ghost_pt[0](2) > Dmin(2)) && (ghost_pt[0](2) <= Dmax(2));
 
@@ -1635,12 +1637,12 @@ void DS_AllRigidBodies:: first_order_temperature_flux( size_t const& parID )
   for (size_t i = 0; i < surface_area.size(); i++) {
      // Check it the point is in the current domain
      ghost_pt[0] = *surface_point[i];
-     bool status = (ghost_pt[0](0) > Dmin(0))
-                && (ghost_pt[0](0) <= Dmax(0))
-                && (ghost_pt[0](1) > Dmin(1))
-                && (ghost_pt[0](1) <= Dmax(1))
-                && (ghost_pt[0](2) > Dmin(2))
-                && (ghost_pt[0](2) <= Dmax(2));
+     bool status = (m_space_dimension == 2) ?
+                   (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
+                && (ghost_pt[0](1) > Dmin(1)) && (ghost_pt[0](1) <= Dmax(1)) :
+                   (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
+                && (ghost_pt[0](1) > Dmin(1)) && (ghost_pt[0](1) <= Dmax(1))
+                && (ghost_pt[0](2) > Dmin(2)) && (ghost_pt[0](2) <= Dmax(2));
 
      double value = 0.;
 
@@ -1832,7 +1834,11 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
   for (size_t i = 0; i < surface_area.size(); i++) {
      ghost_pt[0] = *surface_point[i];
      // Check it the point is in the current domain
-     in_domain(0) = (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
+
+     in_domain(0) = (m_space_dimension == 2) ?
+                    (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
+                 && (ghost_pt[0](1) > Dmin(1)) && (ghost_pt[0](1) <= Dmax(1)) :
+                    (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
                  && (ghost_pt[0](1) > Dmin(1)) && (ghost_pt[0](1) <= Dmax(1))
                  && (ghost_pt[0](2) > Dmin(2)) && (ghost_pt[0](2) <= Dmax(2));
 
