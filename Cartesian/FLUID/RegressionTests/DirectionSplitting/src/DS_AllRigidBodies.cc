@@ -48,7 +48,9 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
-  m_FSallrigidbodies = new FS_AllRigidBodies( m_space_dimension, in,
+  size_t FS_space_dimension = 3;
+
+  m_FSallrigidbodies = new FS_AllRigidBodies( FS_space_dimension, in,
   	b_particles_as_fixed_obstacles );
   m_nrb = m_FSallrigidbodies->get_number_rigid_bodies();
   m_npart = m_FSallrigidbodies->get_number_particles();
@@ -99,7 +101,9 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
-  m_FSallrigidbodies = new FS_AllRigidBodies( m_space_dimension, in,
+  size_t FS_space_dimension = 3;
+
+  m_FSallrigidbodies = new FS_AllRigidBodies( FS_space_dimension, in,
   	b_particles_as_fixed_obstacles );
   m_nrb = m_FSallrigidbodies->get_number_rigid_bodies();
   m_npart = m_FSallrigidbodies->get_number_particles();
@@ -146,7 +150,9 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
-  m_FSallrigidbodies = new FS_AllRigidBodies( m_space_dimension, in,
+  size_t FS_space_dimension = 3;
+
+  m_FSallrigidbodies = new FS_AllRigidBodies( FS_space_dimension, in,
   	b_particles_as_fixed_obstacles );
   m_nrb = m_FSallrigidbodies->get_number_rigid_bodies();
   m_npart = m_FSallrigidbodies->get_number_particles();
@@ -816,7 +822,8 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
              for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                double zC = (m_space_dimension == 2) ? 0.
                                   : FF->get_DOF_coordinate( k, comp, 2 ) ;
-               zC = periodic_transformation(zC,2);
+               if (m_space_dimension == 3)
+                  zC = periodic_transformation(zC,2);
 
                size_t p = FF->DOF_local_number(i,j,k,comp);
 
@@ -887,8 +894,10 @@ void DS_AllRigidBodies:: generate_list_of_local_RB( )
      yr(0) = periodic_transformation(yr(0) - Rp,1);
      yr(1) = periodic_transformation(yr(1) + Rp,1);
      doubleVector zr(2,z0);
-     zr(0) = periodic_transformation(zr(0) - Rp,2);
-     zr(1) = periodic_transformation(zr(1) + Rp,2);
+     if (m_space_dimension == 3) {
+        zr(0) = periodic_transformation(zr(0) - Rp,2);
+        zr(1) = periodic_transformation(zr(1) + Rp,2);
+     }
 
      bool status = false;
 
@@ -1025,7 +1034,8 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                  ipos(2) = k - min_unknown_index(2);
                  double zC = (m_space_dimension == 2) ? 0
                                         : FF->get_DOF_coordinate( k, comp, 2 );
-                 zC = periodic_transformation(zC,2);
+                 if (m_space_dimension == 3)
+                    zC = periodic_transformation(zC,2);
 
                  size_t p = FF->DOF_local_number(i,j,k,comp);
                  geomVector source(xC,yC,zC);
