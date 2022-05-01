@@ -193,6 +193,13 @@ void DS_RigidBody:: initialize_surface_variables( )
 {
   MAC_LABEL( "DS_RigidBody:: initialize_surface_variables" ) ;
 
+  if (!m_surface_points.empty()) m_surface_points.clear();
+  if (!m_surface_area.empty()) m_surface_area.clear();
+  if (!m_surface_normal.empty()) m_surface_normal.clear();
+  if (!m_surface_Pforce.empty()) m_surface_Pforce.clear();
+  if (!m_surface_Vforce.empty()) m_surface_Vforce.clear();
+  if (!m_surface_Tgrad.empty()) m_surface_Tgrad.clear();
+
   m_surface_points.reserve( Ntot );
   m_surface_area.reserve( Ntot );
   m_surface_normal.reserve( Ntot );

@@ -349,7 +349,10 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		// Solve equation of motion for all RB and update pos,vel
 		allrigidbodies->solve_RB_equation_of_motion(t_it);
 		allrigidbodies->generate_list_of_local_RB();
+		allrigidbodies->initialize_surface_variables_for_all_RB();
+		allrigidbodies->compute_surface_variables_for_all_RB();
 		allrigidbodies->compute_halo_zones_for_all_rigid_body();
+		allrigidbodies->create_neighbour_list_for_AllRB();
 		// Compute void fraction for pressure and velocity field
 		allrigidbodies->compute_void_fraction_on_grid(PF);
 		allrigidbodies->compute_void_fraction_on_grid(UF);

@@ -65,6 +65,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   initialize_surface_variables_for_all_RB();
 
+  initialize_surface_variables_on_grid();
+
   compute_surface_variables_for_all_RB();
 
   compute_halo_zones_for_all_rigid_body();
@@ -116,6 +118,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   initialize_surface_variables_for_all_RB();
 
+  initialize_surface_variables_on_grid();
+
   compute_surface_variables_for_all_RB();
 
   compute_halo_zones_for_all_rigid_body();
@@ -162,6 +166,8 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   generate_list_of_local_RB();
 
   initialize_surface_variables_for_all_RB();
+
+  initialize_surface_variables_on_grid();
 
   compute_surface_variables_for_all_RB();
 
@@ -1099,21 +1105,10 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
 
 
 //---------------------------------------------------------------------------
-void DS_AllRigidBodies:: initialize_surface_variables_for_all_RB( )
+void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL( "DS_AllRigidBodies:: initialize_surface_variables_for_all_RB" ) ;
-
-   double dx = MESH->get_smallest_grid_size();
-
-   // for (size_t i = 0; i < m_nrb; ++i) {
-   for (vector<size_t>::iterator it = local_RB_list.begin() ;
-                              it != local_RB_list.end() ; ++it) {
-     size_t i = *it;
-      m_allDSrigidbodies[i]->compute_number_of_surface_variables(
-                                          surface_cell_scale, dx);
-      m_allDSrigidbodies[i]->initialize_surface_variables( );
-   }
+   MAC_LABEL( "DS_AllRigidBodies:: initialize_surface_variables_on_grid" ) ;
 
    // Reserving three location in memory for PF, UF, TF grid, respectively.
    void_fraction.reserve(3);
@@ -1153,6 +1148,26 @@ void DS_AllRigidBodies:: initialize_surface_variables_for_all_RB( )
    avg_pressure_torque = vvv;
    avg_viscous_torque = vvv;
    avg_temperature_gradient = 0.;
+
+}
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: initialize_surface_variables_for_all_RB( )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_AllRigidBodies:: initialize_surface_variables_for_all_RB" ) ;
+
+   double dx = MESH->get_smallest_grid_size();
+
+   // for (size_t i = 0; i < m_nrb; ++i) {
+   for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                              it != local_RB_list.end() ; ++it) {
+     size_t i = *it;
+      m_allDSrigidbodies[i]->compute_number_of_surface_variables(
+                                          surface_cell_scale, dx);
+      m_allDSrigidbodies[i]->initialize_surface_variables( );
+   }
+
 
 }
 

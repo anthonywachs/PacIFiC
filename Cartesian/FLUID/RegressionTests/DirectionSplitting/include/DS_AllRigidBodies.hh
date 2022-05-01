@@ -271,6 +271,9 @@ class DS_AllRigidBodies
       /** @brief Intialize the surface variables for all rigid bodies */
       void initialize_surface_variables_for_all_RB( );
 
+      /** @brief Intialize the surface variables on the Cartesian grid */
+      void initialize_surface_variables_on_grid();
+
       /** @brief Compute the surface variables for all rigid bodies */
       void compute_surface_variables_for_all_RB( );
 
