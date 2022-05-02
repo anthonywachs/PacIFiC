@@ -123,6 +123,11 @@ void FS_2Dcylinder:: set( istream& in )
   in >> m_gravity_center;
   in >> nfaces;
 
+  // Force the mass equivalent to a disk
+  m_mass = MAC::pi() * m_circumscribed_radius
+                     * m_circumscribed_radius
+                     * m_density;
+
   // Set volume
   m_volume = m_mass / m_density ;
 
