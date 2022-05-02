@@ -30,12 +30,11 @@ typedef struct lagNode {
 } lagNode;
 
 /** Similarly, the edges of the mesh are assigned the IDs of the two nodes they
-connect, an undeformed length $l_0$, a stretch ratio $\lambda =
-\frac{l}{l_0}$, where $l$ is the current length of the edge; and a normal
+connect, an undeformed and a deformed lengths $l_0$ and $l$, and a normal
 vector.  */
 typedef struct Edge {
   int vertex_ids[2];
-  double l0, st; // Initial edge length, current stretch
+  double l0, length; // Initial edge length, current stretch
   coord normal;
 } Edge;
 
@@ -137,7 +136,7 @@ with $l$ the current length of an edge and $l_0$ its reference length
 void comp_mb_stretch(lagMesh* mesh) {
   if (!mesh->updated_stretches) {
     for(int i=0; i < mesh->nle; i++)
-      mesh->edges[i].st = comp_length(mesh, i)/mesh->edges[i].l0;
+      mesh->edges[i].length = comp_length(mesh, i);
     mesh->updated_stretches = true;
   }
 }
@@ -174,7 +173,7 @@ void comp_normals(lagMesh* mesh) {
       for(int j=0; j<2; j++) {
         int edge_id;
         edge_id = mesh->nodes[i].edge_ids[j];
-        l[j] = mesh->edges[edge_id].st*mesh->edges[edge_id].l0;
+        l[j] = mesh->edges[edge_id].length;
         comp_edge_normal(mesh, edge_id);
         foreach_dimension() n[j].x = mesh->edges[edge_id].normal.x;
       }

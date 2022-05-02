@@ -14,7 +14,8 @@ void linear_elasticity(lagMesh* mesh) {
     for(int j=0; j<2; j++) {
       int edge_id, edge_node1, edge_node2;
       edge_id = mesh->nodes[i].edge_ids[j];
-      double tension_norm = E_S*(mesh->edges[edge_id].st - 1.);
+      double tension_norm = E_S*
+        (mesh->edges[edge_id].length/mesh->edges[edge_id].l0 - 1.);
       /** We compute the direction vector $e$ for the tension */
       edge_node1 = mesh->edges[edge_id].vertex_ids[0];
       edge_node2 = mesh->edges[edge_id].vertex_ids[1];

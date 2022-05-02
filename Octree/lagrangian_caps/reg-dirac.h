@@ -80,7 +80,7 @@ void eul2lag(lagMesh* mesh) {
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
         coord dist;
-        dist.x =GENERAL_1DIST(x, mesh->nodes[i].pos.x);
+        dist.x = GENERAL_1DIST(x, mesh->nodes[i].pos.x);
         dist.y = GENERAL_1DIST(y, mesh->nodes[i].pos.y);
         if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta)) {
           double weight = (1 + cos(.5*pi*dist.x/Delta))*

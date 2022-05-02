@@ -61,7 +61,7 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   correct_lag_pos(p.mesh);
   for(int i=0.; i<p.mesh->nle; i++) {
     p.mesh->edges[i].l0 = comp_length(p.mesh, i);
-    p.mesh->edges[i].st = 1.;
+    p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
 
   #ifdef MUP
@@ -122,7 +122,7 @@ void initialize_biconcave_mb(struct _initialize_circular_mb p) {
   correct_lag_pos(p.mesh);
   for(int i=0.; i<p.mesh->nle; i++) {
     p.mesh->edges[i].l0 = comp_length(p.mesh, i);
-    p.mesh->edges[i].st = 1.;
+    p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
 
   #ifdef MUP
@@ -193,7 +193,7 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
   correct_lag_pos(p.mesh);
   for(int i=0.; i<p.mesh->nle; i++) {
     p.mesh->edges[i].l0 = comp_length(p.mesh, i);
-    p.mesh->edges[i].st = 1.;
+    p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
 
   #ifdef MUP

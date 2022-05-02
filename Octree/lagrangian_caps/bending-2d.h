@@ -33,7 +33,7 @@ void bending(lagMesh* mesh) {
       int edge_nodes[2];
       edge_nodes[0] = mesh->edges[edge_id].vertex_ids[0];
       edge_nodes[1] = mesh->edges[edge_id].vertex_ids[1];
-      l[j] = mesh->edges[edge_id].st*mesh->edges[edge_id].l0;
+      l[j] = mesh->edges[edge_id].length;
       m[0] = E_B*(mesh->nodes[edge_nodes[0]].curv -
         mesh->nodes[edge_nodes[0]].ref_curv);
       m[1] = E_B*(mesh->nodes[edge_nodes[1]].curv -

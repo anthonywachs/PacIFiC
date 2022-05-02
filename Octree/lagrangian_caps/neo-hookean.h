@@ -12,7 +12,8 @@ void neo_hookean(lagMesh* mesh) {
     for(int j=0; j<2; j++) {
       int edge_id, edge_node1, edge_node2;
       edge_id = mesh->nodes[i].edge_ids[j];
-      double stretch_cube = cube(mesh->edges[edge_id].st);
+      double stretch_cube =
+        cube(mesh->edges[edge_id].length/mesh->edges[edge_id].l0);
       double tension_norm = (fabs(stretch_cube) > 1.e-10) ?
         E_S*(stretch_cube - 1.)/sqrt(stretch_cube) : 0.;
       /** We compute the direction vector $e$ for the tension */
