@@ -1,5 +1,12 @@
 /** Some common initial shapes for vesicles */
 
+#ifndef NLP
+  #define NLP 100
+#endif
+#ifndef RADIUS
+  #define RADIUS 1.
+#endif
+
 struct _initialize_circular_mb {
   lagMesh* mesh;
   double radius;
@@ -146,7 +153,7 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
   double a = (p.a) ? p.a : RADIUS;
   double b = (p.b) ? p.b : RADIUS;
   int nlp = (p.nlp) ? p.nlp : NLP;
-  double inclination = (p.inclination) ? p.inclination : 0.;
+  // double inclination = (p.inclination) ? p.inclination : 0.;
   p.mesh->nlp = nlp;
   p.mesh->nle = nlp;
   p.mesh->nodes = malloc(nlp*sizeof(lagNode));

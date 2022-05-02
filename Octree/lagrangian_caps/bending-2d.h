@@ -25,7 +25,8 @@ void bending(lagMesh* mesh) {
     /** For each node, we compute the bending moment at the midpoint of each
     connecting edge. The current and reference curvature at the midpoint of the
     edges are simply the average of those at their nodes. */
-    double m[2]; // the bending moment
+    double m[3]; // the bending moment
+    double q[2]; // the transverse shear tension
     double l[2]; // the length of the edges
     for(int j=0; j<2; j++) {
       int edge_id = mesh->nodes[i].edge_ids[j];
@@ -33,15 +34,20 @@ void bending(lagMesh* mesh) {
       edge_nodes[0] = mesh->edges[edge_id].vertex_ids[0];
       edge_nodes[1] = mesh->edges[edge_id].vertex_ids[1];
       l[j] = mesh->edges[edge_id].st*mesh->edges[edge_id].l0;
-      m[j] = .5*E_B*(mesh->nodes[edge_nodes[0]].curv +
-        mesh->nodes[edge_nodes[1]].curv - mesh->nodes[edge_nodes[0]].ref_curv -
+      m[0] = E_B*(mesh->nodes[edge_nodes[0]].curv -
+        mesh->nodes[edge_nodes[0]].ref_curv);
+      m[1] = E_B*(mesh->nodes[edge_nodes[1]].curv -
         mesh->nodes[edge_nodes[1]].ref_curv);
+      q[j] = (m[1] - m[0])/l[j];
     }
-    /** We then differentiate the bending moment to obtain the transverse shear
+    /** We then differentiate the transverse shear
     tension q=dm/dl at the considered node. */
-    double q = (m[1] - m[0])/(.5*(l[0] + l[1]));
-    mesh->nodes[i].shear_tension = q;
-    foreach_dimension() mesh->nodes[i].lagForce.x += q*mesh->nodes[i].normal.x;
+    coord fb;
+    foreach_dimension()
+      fb.x = (q[1]*mesh->edges[mesh->nodes[i].edge_ids[1]].normal.x -
+         q[0]*mesh->edges[mesh->nodes[i].edge_ids[0]].normal.x)/
+         (.5*(l[0] + l[1]));
+    foreach_dimension() mesh->nodes[i].lagForce.x += fb.x;
   }
 }
 

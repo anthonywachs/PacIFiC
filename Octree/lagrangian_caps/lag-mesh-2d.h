@@ -1,19 +1,20 @@
-#ifndef NLP
-  #define NLP 31
-#endif
-#ifndef RADIUS
-  #define RADIUS .25
-#endif
-#ifndef NCAPS
-  #define NCAPS 1
-#endif
-#ifndef ADVECT_LAG_RK2
-  #define ADVECT_LAG_RK2 1
-#endif
-#define MB(i) (mbs.mb[i])
+/**
+# Lagrangian mesh
 
-/** In the Lagrangian mesh, each node is assigned coordinates, the IDs of its
-two connecting edges (in 2D), an elastic force, and a velocity. */
+In this file, we implement a Lagrangian mesh meant to track the position and
+compute the stresses of an elasitc membrane.
+
+
+## Structure of the mesh
+
+In the Lagrangian mesh, each node is assigned coordinates, the IDs of its
+two connecting edges (in 2D), an elastic force, a velocity, a normal vector,
+a current and a reference curvature (i.e. the curvature of the unstressed
+resting shape) and a stencil used for averaging the neighboring velocities and
+spreading the Lagrangian force as a body force on the neighboring Eulerian
+nodes. In the case of MPI, we also store the rank of the processor which owns
+the Eulerian cell containing the Node.
+*/
 typedef struct lagNode {
   coord pos;
   int edge_ids[2];
@@ -22,12 +23,16 @@ typedef struct lagNode {
   coord normal;
   double curv;
   double ref_curv;
-  double shear_tension;
+  Cache stencil;
+  #if _MPI
+    int pid;
+  #endif
 } lagNode;
 
 /** Similarly, the edges of the mesh are assigned the IDs of the two nodes they
-connect, an undeformed length $l_0$ and a stretch ratio $\lamba =
-\frac{l}{l_0}$, where $l$ is the current length of the edge. */
+connect, an undeformed length $l_0$, a stretch ratio $\lambda =
+\frac{l}{l_0}$, where $l$ is the current length of the edge; and a normal
+vector.  */
 typedef struct Edge {
   int vertex_ids[2];
   double l0, st; // Initial edge length, current stretch
@@ -35,7 +40,9 @@ typedef struct Edge {
 } Edge;
 
 /** The lagMesh struct stores an array of nodes, edges as well as their
-respective sizes. */
+respective sizes. The three booleans are used to check if the stretches, normal
+vectors and curvatures have been re-computed since the position of the mesh was
+advected. */
 typedef struct lagMesh {
   int nlp;  // Number of Lagrangian points
   int nle;  // Number of Lagrangian Edges
@@ -46,19 +53,71 @@ typedef struct lagMesh {
   bool updated_curvatures;
 } lagMesh;
 
+/** We denote by $NCAPS$ the number of Lagrangian meshes, or capsules, in the
+simulation. It is one by default. */
+#ifndef NCAPS
+  #define NCAPS 1
+#endif
+
+/** The Lagrangian mesh is accessible in the code thanks to the structure
+below, which is simply an array of Lagrangian meshes (useful when several of
+them are considered). The macro $MB(k)$ can be used as a shortcut to access the
+$k^{th}$ membrane. */
+typedef struct Capsules {
+  lagMesh mb[NCAPS];
+  int nbmb;
+} Capsules;
+Capsules mbs;
+#define MB(i) (mbs.mb[i])
+
+
+/**
+## Initialization, memory management and useful macros.
+*/
+void initialize_empty_mb(lagMesh* mesh) {
+  mesh->nlp = 0;
+  mesh->nle = 0;
+  mesh->nodes = NULL;
+  mesh->edges = NULL;
+  mesh->updated_stretches = false;
+  mesh->updated_normals = false;
+  mesh->updated_curvatures = false;
+}
+
 void free_mesh(lagMesh* mesh) {
+  for(int i=0; i<mesh->nlp; i++) free(mesh->nodes[i].stencil.p);
   free(mesh->nodes);
   free(mesh->edges);
 }
 
+void free_caps(Capsules* caps) {
+  for(int i=0; i<caps->nbmb; i++) free_mesh(&(caps->mb[i]));
+}
+
+/** By default, the mesh is advected using a second-order two-step Runge Kutta
+scheme. If the following macro is set to $0$, a first-order forward Euler schme
+is used instead. */
+#ifndef ADVECT_LAG_RK2
+  #define ADVECT_LAG_RK2 1
+#endif
+
+/** The next few macros are useful to compute signed distances and averages
+across periodic boundaries. We assume for this purpose that the length of
+the edges are less that half the domain size, which in practice should always
+be the case. */
 #define ACROSS_PERIODIC(a,b) (fabs(a - b) > L0/2.)
 #define PERIODIC_1DIST(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 - b : a - L0 - b)
 #define GENERAL_1DIST(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DIST(a,b) : a - b)
 #define PERIODIC_1DAVG(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 + b : a - L0 + b)
 #define GENERAL_1DAVG(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DAVG(a,b) : a + b)
 
-/** The function below computes the length of an edge. It takes as arguments
-a pointer to the mesh as well as the ID of the edge of interest. */
+
+/**
+## Geometric computations
+
+The function below computes the length of an edge. It takes as arguments
+a pointer to the mesh as well as the ID of the edge of interest.
+*/
 double comp_length(lagMesh* mesh, int i) {
   double length = 0.;
   int v1, v2;
@@ -70,6 +129,11 @@ double comp_length(lagMesh* mesh, int i) {
   return sqrt(length);
 }
 
+/**
+The function below computes the membrane stretch $\lambda = \frac{l}{l_0}$,
+with $l$ the current length of an edge and $l_0$ its reference length
+(in the untressed resting shape).
+*/
 void comp_mb_stretch(lagMesh* mesh) {
   if (!mesh->updated_stretches) {
     for(int i=0; i < mesh->nle; i++)
@@ -78,6 +142,10 @@ void comp_mb_stretch(lagMesh* mesh) {
   }
 }
 
+/**
+The two functions below compute the outward normal vector to all the edges of
+a Lagrangian mesh.
+*/
 void comp_edge_normal(lagMesh* mesh, int i) {
     int node_id[2];
     for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].vertex_ids[j];
@@ -126,6 +194,11 @@ void comp_normals(lagMesh* mesh) {
   }
 }
 
+
+/**
+The function below computes the signed curvature of the Lagrangian mesh at each
+node. It scales in a second-order fashion with the number of Lagrangian points.
+*/
 void comp_curvature(lagMesh* mesh) {
   if (!mesh->updated_curvatures) {
     comp_normals(mesh);
@@ -141,7 +214,7 @@ void comp_curvature(lagMesh* mesh) {
         foreach_dimension() p[j].x = up ? mesh->nodes[index].pos.x :
           mesh->nodes[index].pos.y;
       }
-      /* If one of the neighboring nodes is across a periodic boundary, we
+      /** If one of the neighboring nodes is across a periodic boundary, we
 correct its position */
       for(int j=0; j<3; j+=2) {
         foreach_dimension() {
@@ -158,7 +231,7 @@ correct its position */
         ddy += 2*p[j].y/((p[j].x - p[(j+1)%3].x)*(p[j].x - p[(j+2)%3].x));
       }
       /** The formula for the signed curvature of a function y(x) is
-  $$ \kappa = \frac{y''}{(1 + y'^2)^{\frac{3}{2}}} $$.
+  $$ \kappa = \frac{y''}{(1 + y'^2)^{\frac{3}{2}}}. $$
   The sign is dertemined from a parametrization of the curve: walking
   anticlockwise along the curve, if we turn left the curvature is positive. This
   statement can be easily written as a dot product between edge i's normal
@@ -175,10 +248,12 @@ correct its position */
   }
 }
 
-/** If a Lagrangian node falls exactly on an edge or a vertex of the Eulerian
+/**
+If a Lagrangian node falls exactly on an edge or a vertex of the Eulerian
 mesh, some issues arise when checking for periodic boundary conditions. As a
 quick fix, if this is the case we shift the point position by $10^{-10}$, as
-is done in the two functions below. */
+is done in the two functions below.
+*/
 bool on_face(double p, int n, double l0) {
   if ((fabs(p/(l0/n)) - ((int)fabs(p/(l0/n)))) < 1.e-10) return true;
   else return false;
@@ -198,25 +273,29 @@ void correct_lag_pos(lagMesh* mesh) {
   mesh->updated_curvatures = false;
 }
 
-void initialize_empty_mb(lagMesh* mesh) {
-  mesh->nlp = 0;
-  mesh->nle = 0;
-  mesh->nodes = NULL;
-  mesh->edges = NULL;
-  mesh->updated_stretches = false;
-  mesh->updated_normals = false;
-  mesh->updated_curvatures = false;
-}
 
+/**
+## Advection of the mesh
+
+The advection have to be compatible with MPI, so we start by including the MPI
+communication functions. We also include [reg-dirac.h](reg-dirac.h), which
+implements the interpolation of the Eulerian velocities onto the Lagrangian
+nodes.
+*/
+
+#if _MPI
+  #include "lag-mesh-mpi.h"
+#endif
 #include "reg-dirac.h"
 
-/** The function below advects each Lagrangian node of a capsule mesh by
-interpolating the velocities around the node of interest. A simple forward Euler
-scheme is used as a scheme. */
+/**
+The function below advects each Lagrangian node by
+interpolating the velocities around the node of interest. By default, a
+second-order Runge Kutta scheme is used. By setting the macro $ADVECT\_LAG\_RK2$
+to zero, a simple forward Euler scheme is used as a scheme.
+*/
 void advect_lagMesh(lagMesh* mesh) {
   eul2lag(mesh);
-  /** By default the Lagrangian mesh is advected with a second order Runge-Kutta
-  scheme. Otherwise, we use a first order forward Euler advection scheme. */
   #if !(ADVECT_LAG_RK2)
     for(int i=0; i < mesh->nlp; i++) {
       foreach_dimension() {
@@ -234,31 +313,40 @@ void advect_lagMesh(lagMesh* mesh) {
           .5*dt*mesh->nodes[i].lagVel.x;
     }
     correct_lag_pos(&buffer_mesh);
+    for(int j=0; j<buffer_mesh.nlp; j++) {
+      buffer_mesh.nodes[j].stencil.n = 25;
+      buffer_mesh.nodes[j].stencil.nm = 25*128;
+      buffer_mesh.nodes[j].stencil.p = (Index*) malloc(25*sizeof(Index));
+    }
+    generate_lag_stencils(&buffer_mesh);
     eul2lag(&buffer_mesh);
     for(int i=0; i<mesh->nlp; i++) {
-      // Step 2 or RK2
+      // Step 2 of RK2
       foreach_dimension()
         mesh->nodes[i].pos.x += dt*buffer_mesh.nodes[i].lagVel.x;
     }
+    for(int i=0; i<buffer_mesh.nlp; i++) free(buffer_mesh.nodes[i].stencil.p);
     free(buffer_mesh.nodes);
   #endif
   correct_lag_pos(mesh);
+  generate_lag_stencils(mesh);
 }
 
-typedef struct Capsules {
-  lagMesh mb[NCAPS];
-  int nbmb;
-} Capsules;
 
-void free_caps(Capsules* caps) {
-  for(int i=0; i<caps->nbmb; i++) free_mesh(&(caps->mb[i]));
-}
+/**
+## Putting the pieces together
 
-Capsules mbs;
+Below with call the above functions at the appropriate time using the Basilisk
+event syntax.
 
+We start by creating empty Lagrangian meshes, and allocating an acceleration
+field in case it isn't done yet by another Basilisk module.
+*/
 event defaults (i = 0) {
   mbs.nbmb = NCAPS;
-  for(int i=0; i<mbs.nbmb; i++) initialize_empty_mb(&mbs.mb[i]);
+  for(int i=0; i<mbs.nbmb; i++) {
+    initialize_empty_mb(&mbs.mb[i]);
+  }
   if (is_constant(a.x)) {
     a = new face vector;
     foreach_face()
@@ -267,20 +355,34 @@ event defaults (i = 0) {
   }
 }
 
+/** Before the iterations start, we allocate memory for the stencils and
+generate them. Note that this implementation assumes the membrane was
+initialized in the init event. */
+event init (i = 0) {
+  for(int i=0; i<mbs.nbmb; i++) {
+    for(int j=0; j<MB(i).nlp; j++) {
+      MB(i).nodes[j].stencil.n = 25;
+      MB(i).nodes[j].stencil.nm = 25*128;
+      MB(i).nodes[j].stencil.p = (Index*) malloc(25*sizeof(Index));
+    }
+    generate_lag_stencils(&MB(i));
+  }
+}
+
 /** Below, we advect each Lagrangian node using the interpolated Eulerian
-velocities. We also take this loop onto the nodes as an opportunity to
+velocities. We also use this loop as an opportunity to
 re-initialize the Lagrangian forces to zero. */
 event tracer_advection(i++) {
   for(int i=0; i<mbs.nbmb; i++) {
     advect_lagMesh(&mbs.mb[i]);
-    for(int j=0; j<mbs.mb->nlp; j++)
+    for(int j=0; j<mbs.mb[i].nlp; j++)
       foreach_dimension() mbs.mb[i].nodes[j].lagForce.x = 0.;
   }
 }
 
 /** In the acceleration event, we transfer the Lagrangian forces to the fluid
 using a regularized Dirac function. The acceleration is stored on the cell
-faces, and will fed as a source term to the Navier-Stokes solver. */
+faces, and will be fed as a source term to the Navier-Stokes solver. */
 vector forcing[];
 event acceleration (i++) {
   face vector ae = a;
@@ -289,6 +391,17 @@ event acceleration (i++) {
   foreach_face() ae.x[] += .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
 }
 
+/** At the end of the simulation, we need to free the allocated memory.*/
 event cleanup (t = end) {
   free_caps(&mbs);
 }
+
+
+/**
+## Tests
+[advect_caps.c](../../tests/lagrangian_caps/advect_caps.c): Tests the
+convergence of the advection scheme.
+[curvature.c](../../tests/lagrangian_caps/curvature.c): Tests the computation of
+the curvature at the Lagrangian nodes. Since the curvature depends on the
+normals, this case also validates the computation of the normal vectors.
+*/

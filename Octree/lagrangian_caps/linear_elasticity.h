@@ -1,5 +1,7 @@
-/** In this file we compute a linear elastic force on each Lagrangian node of
-the membrane(s). We choose this force from Breyiannis & Pozrikidis, 2000.*/
+/**
+In this file we compute a linear elastic force on each Lagrangian node of
+the membrane(s). We choose this force from Breyiannis & Pozrikidis, 2000.
+*/
 
 #ifndef E_S
   #define E_S 1.
