@@ -1,17 +1,8 @@
 /**
-Definition of the IBM regularized Dirac
+# Definition of the IBM regularized Dirac
 */
 
 #define BGHOSTS 2
-
-void copy_point(const Point* pref, Point* p) {
-  p->i = pref->i;
-  p->j = pref->j;
-  #if dimension >=3
-    p->k = pref->k;
-  #endif
-  p->level = pref->level;
-}
 
 static void change_cache_entry(Cache* s, int i, Point pt, int flag) {
   if (i > s->n) fprintf(stderr, "Error: Cache index out of range.\n");
@@ -33,6 +24,8 @@ void generate_lag_stencils(lagMesh* mesh) {
         Point point;
         point = locate(mesh->nodes[i].pos.x + ni*delta,
           mesh->nodes[i].pos.y + nj*delta);
+        if (point.level >= 0 && point.level != grid->maxdepth)
+          fprintf(stderr, "Warning: Lagrangian stencil not fully resolved.\n");
         change_cache_entry(&(mesh->nodes[i].stencil), c, point, 0);
         #if _MPI
           if (ni == 0 && nj == 0) {
@@ -94,6 +87,23 @@ void eul2lag(lagMesh* mesh) {
   }
 
   #if _MPI
-    reduce_lagVel(mesh);
+    if (mpi_npe > 1) reduce_lagVel(mesh);
   #endif
+}
+
+scalar stencils[];
+void tag_ibm_stencils(lagMesh* mesh) {
+  foreach() stencils[] = 0.;
+  for(int i=0; i<mesh->nlp; i++) {
+    foreach_cache(mesh->nodes[i].stencil) {
+      if (point.level >= 0) {
+        coord dist;
+        dist.x = GENERAL_1DIST(x, mesh->nodes[i].pos.x);
+        dist.y = GENERAL_1DIST(y, mesh->nodes[i].pos.y);
+        if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta))
+          stencils[] = sq(dist.x + dist.y)/sq(2.*Delta)*(2.+noise());
+      }
+    }
+  }
+  boundary({stencils});
 }

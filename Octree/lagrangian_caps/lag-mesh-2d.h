@@ -400,6 +400,7 @@ event cleanup (t = end) {
 ## Tests
 [advect_caps.c](../../tests/lagrangian_caps/advect_caps.c): Tests the
 convergence of the advection scheme.
+
 [curvature.c](../../tests/lagrangian_caps/curvature.c): Tests the computation of
 the curvature at the Lagrangian nodes. Since the curvature depends on the
 normals, this case also validates the computation of the normal vectors.

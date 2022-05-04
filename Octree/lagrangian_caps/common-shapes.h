@@ -1,4 +1,6 @@
-/** Some common initial shapes for vesicles */
+/**
+Some common initial shapes for vesicles
+*/
 
 #ifndef NLP
   #define NLP 100
@@ -64,7 +66,7 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
     p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
 
-  #ifdef MUP
+  #ifdef CAPS_VISCOSITY
     fraction(prevI, sq(radius) - sq(x - shift.x) - sq(y - shift.y));
   #endif
 }
@@ -125,7 +127,7 @@ void initialize_biconcave_mb(struct _initialize_circular_mb p) {
     p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
 
-  #ifdef MUP
+  #ifdef CAPS_VISCOSITY
     // We define below the local coordinates of the RBC and the parametric angle
     #define MY_X ((x - shift.x)*cos(inclination) + \
       (y - shift.y)*sin(inclination))
@@ -196,7 +198,7 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
     p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
 
-  #ifdef MUP
+  #ifdef CAPS_VISCOSITY
     fraction(prevI, 1 - sq(x/a) - sq(y/b));
   #endif
 }
