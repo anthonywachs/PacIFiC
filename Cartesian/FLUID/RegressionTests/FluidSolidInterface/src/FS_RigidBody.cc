@@ -334,6 +334,7 @@ std::tuple<double,double> FS_RigidBody:: get_mass_and_density() const
 //---------------------------------------------------------------------------
 void FS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
 												 					 geomVector const& vel,
+																	 geomVector const& ang_vel,
 											vector<geomVector> const& periodic_directions)
 //---------------------------------------------------------------------------
 {
@@ -345,6 +346,9 @@ void FS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
   m_translational_velocity(0) = vel(0);
   m_translational_velocity(1) = vel(1);
   m_translational_velocity(2) = vel(2);
+  m_angular_velocity(0) = ang_vel(0);
+  m_angular_velocity(1) = ang_vel(1);
+  m_angular_velocity(2) = ang_vel(2);
 
   if ( m_periodic_directions )
   {

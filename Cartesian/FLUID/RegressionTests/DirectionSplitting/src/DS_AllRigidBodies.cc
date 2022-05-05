@@ -550,7 +550,7 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
      // write_new_parameters_to_stream();
      //
      // Updating the RB data
-     m_allDSrigidbodies[parID]->update_RB_position_and_velocity(pos,vel
+     m_allDSrigidbodies[parID]->update_RB_position_and_velocity(pos,vel,ang_vel
                                                 ,m_periodic_directions);
      m_allDSrigidbodies[parID]->translate_surface_points(delta);
      m_allDSrigidbodies[parID]->correct_surface_discretization( MESH );
