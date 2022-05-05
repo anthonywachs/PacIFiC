@@ -249,7 +249,7 @@ class DS_AllRigidBodies
       at a given geometric vector pt
       @param pt a point in space*/
       geomVector rigid_body_velocity( size_t const& parID,
-                                          geomVector const& pt ) const;
+                                          geomVector const& pt );
 
       /** @brief Returns the rigid body angular velocity */
       geomVector rigid_body_angular_velocity( size_t const& parID) const;

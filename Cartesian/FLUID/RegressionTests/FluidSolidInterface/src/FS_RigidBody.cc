@@ -389,8 +389,7 @@ geomVector FS_RigidBody:: rigid_body_velocity( geomVector const& pt ) const
 {
   MAC_LABEL( "FS_RigidBody:: rigid_body_velocity(pt)" ) ;
 
-  return (m_translational_velocity
-        + (m_angular_velocity^(pt-m_gravity_center)));
+  return (m_translational_velocity + (m_angular_velocity^pt));
 
 }
 

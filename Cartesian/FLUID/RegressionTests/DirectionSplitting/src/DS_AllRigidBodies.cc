@@ -500,12 +500,12 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
      double rho_p = std::get<1>(value);
      double radius = m_allDSrigidbodies[parID]->get_circumscribed_radius();
 
-     geomVector pos(3,0.);
-     geomVector vel(3,0.);
-     geomVector acc(3,0.);
+     geomVector pos(3);
+     geomVector vel(3);
+     geomVector acc(3);
      geomVector delta(3);
-     geomVector ang_vel(3,0.);
-     geomVector ang_acc(3,0.);
+     geomVector ang_vel(3);
+     geomVector ang_acc(3);
 
      double moi = (m_space_dimension == 2) ? (1./2.)*mass_p*radius*radius :
                                              (2./5.)*mass_p*radius*radius ;
@@ -708,12 +708,20 @@ double DS_AllRigidBodies:: level_set_value( size_t const& parID,
 
 //---------------------------------------------------------------------------
 geomVector DS_AllRigidBodies:: rigid_body_velocity( size_t const& parID,
-                                             geomVector const& pt ) const
+                                             geomVector const& pt )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_AllRigidBodies:: rigid_body_velocity(pt)" ) ;
 
-  return (m_allDSrigidbodies[parID]->get_rigid_body_velocity(pt));
+  geomVector const* pgc = m_allDSrigidbodies[parID]
+                                    ->get_ptr_to_gravity_centre();
+  geomVector delta(3);
+
+  delta(0) = delta_periodic_transformation(pt(0) - pgc->operator()(0), 0);
+  delta(1) = delta_periodic_transformation(pt(1) - pgc->operator()(1), 1);
+  delta(2) = delta_periodic_transformation(pt(2) - pgc->operator()(2), 2);
+
+  return (m_allDSrigidbodies[parID]->get_rigid_body_velocity(delta));
 
 }
 
