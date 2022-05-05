@@ -412,6 +412,7 @@ void DS_AllRigidBodies:: write_force_and_flux_summary(
   for (size_t i = 0; i < m_nrb; ++i) {
      geomVector const* pgc = m_allDSrigidbodies[i]->get_ptr_to_gravity_centre();
      geomVector pv = rigid_body_velocity(i,*pgc);
+     geomVector pav = rigid_body_angular_velocity(i);
 
      if (m_macCOMM->rank() == 0) {
         MyFile << t_it->time()
@@ -422,6 +423,9 @@ void DS_AllRigidBodies:: write_force_and_flux_summary(
                << " , " << pv(0)
                << " , " << pv(1)
                << " , " << pv(2)
+               << " , " << pav(0)
+               << " , " << pav(1)
+               << " , " << pav(2)
                << " , " << pressure_force->operator()(i,0)
                << " , " << pressure_force->operator()(i,1)
                << " , " << pressure_force->operator()(i,2)
@@ -488,19 +492,26 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
      geomVector const* pgc = m_allDSrigidbodies[parID]
                                              ->get_ptr_to_gravity_centre();
      geomVector pv = rigid_body_velocity(parID,*pgc);
+     geomVector pav = rigid_body_angular_velocity(parID);
 
      // Get solid mass and density from FS class
      auto value = m_allDSrigidbodies[parID]->get_mass_and_density();
      double mass_p = std::get<0>(value);
      double rho_p = std::get<1>(value);
+     double radius = m_allDSrigidbodies[parID]->get_circumscribed_radius();
 
      geomVector pos(3,0);
      geomVector vel(3,0);
      geomVector acc(3,0);
      geomVector delta(3);
+     geomVector ang_vel(3);
+     geomVector ang_acc(3);
+
+     double moi = (m_space_dimension == 2) ? (1./2.)*mass_p*radius*radius :
+                                             (2./5.)*mass_p*radius*radius ;
 
      // Solving equation of motion
-     for (size_t dir=0;dir<m_space_dimension;dir++) {
+     for (size_t dir = 0; dir < m_space_dimension;dir++) {
         pos(dir) = pgc->operator()(dir);
         vel(dir) = pv(dir);
 
@@ -514,11 +525,24 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         delta(dir) = vel(dir)*t_it->time_step() ;
      }
 
+     if (m_space_dimension == 2) {
+        ang_vel(2) = pav(2);
+        ang_acc(2) = (viscous_torque->operator()(parID,2)
+                      + pressure_torque->operator()(parID,2)) / moi ;
+        ang_vel(2) = ang_vel(2) + ang_acc(2)*t_it->time_step();
+     } else {
+        for (size_t dir = 0; dir < m_space_dimension;dir++) {
+           ang_vel(dir) = pav(dir);
+           ang_acc(dir) = (viscous_torque->operator()(parID,dir)
+                         + pressure_torque->operator()(parID,dir)) / moi ;
+           ang_vel(dir) = ang_vel(dir) + ang_acc(dir)*t_it->time_step();
+        }
+     }
+
+
      // Temporary added this part to create the clones if RB near boundary
      // Don't trust this for all the cases. Primary purpose for settling
      // sphere case
-     double radius = m_allDSrigidbodies[parID]->get_circumscribed_radius();
-
      vector<geomVector> m_periodic_directions; /**< periodic clones whose
      position is gravity_center + (*periodic_directions)[i] */
      m_periodic_directions.reserve(3);

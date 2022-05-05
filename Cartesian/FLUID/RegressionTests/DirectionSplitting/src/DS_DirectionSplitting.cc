@@ -401,6 +401,7 @@ DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
       MyFile.open( fileName.c_str(), std::ios::trunc ) ;
       MyFile << "t , parID , x , y , z "
              << ", vx , vy , vz "
+             << ", wx , wy , wz "
              << ", Fpx , Fpy , Fpz "
              << ", Fvx , Fvy , Fvz "
              << ", Tpx , Tpy , Tpz "
