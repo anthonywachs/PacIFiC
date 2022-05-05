@@ -384,6 +384,33 @@ vector<geomVector> const* FS_RigidBody:: get_ptr_to_periodic_directions() const
 
 
 //---------------------------------------------------------------------------
+geomVector FS_RigidBody:: rigid_body_velocity( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: rigid_body_velocity(pt)" ) ;
+
+  return (m_translational_velocity
+        + (m_angular_velocity^(pt-m_gravity_center)));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+geomVector FS_RigidBody:: rigid_body_angular_velocity( ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: rigid_body_angular_velocity" ) ;
+
+  return (m_angular_velocity);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void FS_RigidBody:: rotate(geomVector* pt)
 //---------------------------------------------------------------------------
 {

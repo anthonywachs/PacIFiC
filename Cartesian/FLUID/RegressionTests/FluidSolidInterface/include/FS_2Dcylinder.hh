@@ -93,12 +93,6 @@ class FS_2Dcylinder: public FS_RigidBody
                             , double const& y
                             , double const& z ) const;
 
-      /** @brief Returns 2Dcylinder velocity including rotation speed at pt
-      @param pt the point */
-      geomVector rigid_body_velocity( geomVector const& pt ) const;
-
-      /** @brief Returns 2Dcylinder angular velocity */
-      geomVector rigid_body_angular_velocity( ) const;
       //@}
 
 

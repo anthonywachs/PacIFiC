@@ -99,13 +99,6 @@ class FS_3Dbox: public FS_RigidBody
                             , double const& y
                             , double const& z ) const;
 
-      /** @brief Returns 3Dbox velocity including rotation speed at pt
-      @param pt the point */
-      geomVector rigid_body_velocity( geomVector const& pt ) const;
-
-      /** @brief Returns 3DBox angular velocity */
-      geomVector rigid_body_angular_velocity( ) const;
-
       /** @brief Calculate determinant 4 X 4 for checking
       a point in tetrahedron */
       double calcPointDeterm4by4( const geomVector &pointOne,

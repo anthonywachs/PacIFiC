@@ -309,33 +309,6 @@ double FS_3Dcylinder:: level_set_value( double const& x
 
 
 //---------------------------------------------------------------------------
-geomVector FS_3Dcylinder:: rigid_body_velocity( geomVector const& pt ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "FS_3Dcylinder:: rigid_body_velocity(pt)" ) ;
-
-  return (m_translational_velocity
-        + (m_angular_velocity^(pt-m_gravity_center)));
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-geomVector FS_3Dcylinder:: rigid_body_angular_velocity( ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "FS_3Dcylinder:: rigid_body_angular_velocity()" ) ;
-
-  return (m_angular_velocity);
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
 struct FS_3Dcylinder_Additional_Param const* FS_3Dcylinder::
 	get_ptr_FS_3Dcylinder_Additional_Param() const
 //---------------------------------------------------------------------------
