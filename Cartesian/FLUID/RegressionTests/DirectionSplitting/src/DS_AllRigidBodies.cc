@@ -695,6 +695,21 @@ geomVector DS_AllRigidBodies:: rigid_body_velocity( size_t const& parID,
 
 
 
+
+//---------------------------------------------------------------------------
+geomVector DS_AllRigidBodies:: rigid_body_angular_velocity( size_t const& parID
+                                                          ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: rigid_body_angular_velocity(pt)" ) ;
+
+  return (m_allDSrigidbodies[parID]->get_rigid_body_angular_velocity());
+
+}
+
+
+
+
 //---------------------------------------------------------------------------
 geomVector DS_AllRigidBodies:: rigid_body_temperature( size_t const& parID,
                                              geomVector const& pt ) const

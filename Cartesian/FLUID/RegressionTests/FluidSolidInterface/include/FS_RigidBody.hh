@@ -142,6 +142,9 @@ class FS_RigidBody
       @param pt the point */
       virtual geomVector rigid_body_velocity( geomVector const& pt ) const = 0;
 
+      /** @brief Returns rigid body angular velocity */
+      virtual geomVector rigid_body_angular_velocity( ) const = 0;
+
       /** @brief Returns whether a line originating from a point intersects the
       rigid body, and if it does the distance from the point to the rigid body
       surface

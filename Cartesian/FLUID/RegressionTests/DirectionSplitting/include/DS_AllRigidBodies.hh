@@ -251,6 +251,9 @@ class DS_AllRigidBodies
       geomVector rigid_body_velocity( size_t const& parID,
                                           geomVector const& pt ) const;
 
+      /** @brief Returns the rigid body angular velocity */
+      geomVector rigid_body_angular_velocity( size_t const& parID) const;
+
       /** @brief Return the rigid body temperature, currently a user input
       but can be read from the Grains in future
       @param pt a point in space*/

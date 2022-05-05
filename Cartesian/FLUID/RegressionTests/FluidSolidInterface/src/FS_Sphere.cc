@@ -277,6 +277,20 @@ geomVector FS_Sphere:: rigid_body_velocity( geomVector const& pt ) const
 
 
 
+
+//---------------------------------------------------------------------------
+geomVector FS_Sphere:: rigid_body_angular_velocity( ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Sphere:: rigid_body_angular_velocity()" ) ;
+
+  return (m_angular_velocity);
+
+}
+
+
+
+
 //---------------------------------------------------------------------------
 struct FS_Sphere_Additional_Param const* FS_Sphere::
 	get_ptr_FS_Sphere_Additional_Param() const

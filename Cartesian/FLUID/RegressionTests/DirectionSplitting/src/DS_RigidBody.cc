@@ -130,6 +130,18 @@ geomVector DS_RigidBody:: get_rigid_body_velocity( geomVector const& pt ) const
 
 
 
+//---------------------------------------------------------------------------
+geomVector DS_RigidBody:: get_rigid_body_angular_velocity( ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody:: rigid_body_angular_velocity()" ) ;
+
+  return (m_geometric_rigid_body->rigid_body_angular_velocity());
+
+}
+
+
+
 
 //---------------------------------------------------------------------------
 void DS_RigidBody:: translate_surface_points( geomVector const& delta)

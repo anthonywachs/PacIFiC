@@ -102,6 +102,10 @@ class FS_3Dcylinder: public FS_RigidBody
       /** @brief Returns 3Dcylinder velocity including rotation speed at pt
       @param pt the point */
       geomVector rigid_body_velocity( geomVector const& pt ) const;
+
+      /** @brief Returns 3Dcylinder angular velocity */
+      geomVector rigid_body_angular_velocity( ) const;
+
       //@}
 
 

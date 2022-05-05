@@ -350,6 +350,19 @@ geomVector FS_3Dbox:: rigid_body_velocity( geomVector const& pt ) const
 
 
 //---------------------------------------------------------------------------
+geomVector FS_3Dbox:: rigid_body_angular_velocity( ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_3Dbox:: rigid_body_angular_velocity()" ) ;
+
+  return (m_angular_velocity);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 struct FS_3Dbox_Additional_Param const* FS_3Dbox::
 	get_ptr_FS_3Dbox_Additional_Param() const
 //---------------------------------------------------------------------------

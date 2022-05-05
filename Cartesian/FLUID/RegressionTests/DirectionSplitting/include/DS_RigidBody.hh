@@ -65,6 +65,9 @@ class DS_RigidBody
       @param pt the point */
       geomVector get_rigid_body_velocity( geomVector const& pt ) const;
 
+      /** @brief Returns rigid body angular velocity */
+      geomVector get_rigid_body_angular_velocity( ) const;
+
       /** @brief Returns pointer to the rigid body gravity center */
       geomVector const* get_ptr_to_gravity_centre( ) const;
 
