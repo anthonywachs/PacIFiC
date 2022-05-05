@@ -500,12 +500,12 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
      double rho_p = std::get<1>(value);
      double radius = m_allDSrigidbodies[parID]->get_circumscribed_radius();
 
-     geomVector pos(3,0);
-     geomVector vel(3,0);
-     geomVector acc(3,0);
+     geomVector pos(3,0.);
+     geomVector vel(3,0.);
+     geomVector acc(3,0.);
      geomVector delta(3);
-     geomVector ang_vel(3);
-     geomVector ang_acc(3);
+     geomVector ang_vel(3,0.);
+     geomVector ang_acc(3,0.);
 
      double moi = (m_space_dimension == 2) ? (1./2.)*mass_p*radius*radius :
                                              (2./5.)*mass_p*radius*radius ;
@@ -873,6 +873,29 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
         }
      }
   }
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_AllRigidBodies:: delta_periodic_transformation( double const& delta
+                                                     , size_t const& dir)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: delta_periodic_transformation" ) ;
+
+  double value = delta;
+
+  boolVector const* periodic_comp = MESH->get_periodic_directions();
+  // Control volume periodic treatment, if any
+  if (periodic_comp->operator()( dir )) {
+     double isize = MESH->get_main_domain_max_coordinate(dir)
+                  - MESH->get_main_domain_min_coordinate(dir);
+     value = delta - round(delta/isize) * isize;
+  }
+
+  return (value);
 }
 
 
@@ -1336,21 +1359,20 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
      pressure_force->operator()(parID,1) += value(1);
      pressure_force->operator()(parID,2) += value(2);
 
-     pressure_torque->operator()(parID,0)
-                               += value(2)*(surface_point[i]->operator()(1)
-                                                       - pgc->operator()(1))
-                                - value(1)*(surface_point[i]->operator()(2)
-                                                       - pgc->operator()(2));
-     pressure_torque->operator()(parID,1)
-                               += value(0)*(surface_point[i]->operator()(2)
-                                                       - pgc->operator()(2))
-                                - value(2)*(surface_point[i]->operator()(0)
-                                                       - pgc->operator()(0));
-     pressure_torque->operator()(parID,2)
-                               += value(1)*(surface_point[i]->operator()(0)
-                                                       - pgc->operator()(0))
-                                - value(0)*(surface_point[i]->operator()(1)
-                                                       - pgc->operator()(1));
+     geomVector delta(3);
+     delta(0) = delta_periodic_transformation(
+                surface_point[i]->operator()(0) - pgc->operator()(0), 0);
+     delta(1) = delta_periodic_transformation(
+                surface_point[i]->operator()(1) - pgc->operator()(1), 1);
+     delta(2) = delta_periodic_transformation(
+                surface_point[i]->operator()(2) - pgc->operator()(2), 2);
+
+     pressure_torque->operator()(parID,0) += value(2)*delta(1)
+                                           - value(1)*delta(2);
+     pressure_torque->operator()(parID,1) += value(0)*delta(2)
+                                           - value(2)*delta(0);
+     pressure_torque->operator()(parID,2) += value(1)*delta(0)
+                                           - value(0)*delta(1);
 
   }
 
@@ -2096,21 +2118,20 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
      viscous_force->operator()(parID,1) += value(1);
      viscous_force->operator()(parID,2) += value(2);
 
-     viscous_torque->operator()(parID,0)
-                              += value(2)*(surface_point[i]->operator()(1)
-                                                      - pgc->operator()(1))
-                               - value(1)*(surface_point[i]->operator()(2)
-                                                      - pgc->operator()(2));
-     viscous_torque->operator()(parID,1)
-                              += value(0)*(surface_point[i]->operator()(2)
-                                                      - pgc->operator()(2))
-                               - value(2)*(surface_point[i]->operator()(0)
-                                                      - pgc->operator()(0));
-     viscous_torque->operator()(parID,2)
-                              += value(1)*(surface_point[i]->operator()(0)
-                                                      - pgc->operator()(0))
-                               - value(0)*(surface_point[i]->operator()(1)
-                                                      - pgc->operator()(1));
+     geomVector delta(3);
+     delta(0) = delta_periodic_transformation(
+                surface_point[i]->operator()(0) - pgc->operator()(0), 0);
+     delta(1) = delta_periodic_transformation(
+                surface_point[i]->operator()(1) - pgc->operator()(1), 1);
+     delta(2) = delta_periodic_transformation(
+                surface_point[i]->operator()(2) - pgc->operator()(2), 2);
+
+     viscous_torque->operator()(parID,0) += value(2)*delta(1)
+                                          - value(1)*delta(2);
+     viscous_torque->operator()(parID,1) += value(0)*delta(2)
+                                          - value(2)*delta(0);
+     viscous_torque->operator()(parID,2) += value(1)*delta(0)
+                                          - value(0)*delta(1);
 
   }
 
@@ -2368,21 +2389,20 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
      viscous_force->operator()(parID,1) += value(1);
      viscous_force->operator()(parID,2) += value(2);
 
-     viscous_torque->operator()(parID,0)
-                              += value(2)*(surface_point[i]->operator()(1)
-                                                      - pgc->operator()(1))
-                               - value(1)*(surface_point[i]->operator()(2)
-                                                      - pgc->operator()(2));
-     viscous_torque->operator()(parID,1)
-                              += value(0)*(surface_point[i]->operator()(2)
-                                                      - pgc->operator()(2))
-                               - value(2)*(surface_point[i]->operator()(0)
-                                                      - pgc->operator()(0));
-     viscous_torque->operator()(parID,2)
-                              += value(1)*(surface_point[i]->operator()(0)
-                                                      - pgc->operator()(0))
-                               - value(0)*(surface_point[i]->operator()(1)
-                                                      - pgc->operator()(1));
+     geomVector delta(3);
+     delta(0) = delta_periodic_transformation(
+                surface_point[i]->operator()(0) - pgc->operator()(0), 0);
+     delta(1) = delta_periodic_transformation(
+                surface_point[i]->operator()(1) - pgc->operator()(1), 1);
+     delta(2) = delta_periodic_transformation(
+                surface_point[i]->operator()(2) - pgc->operator()(2), 2);
+
+     viscous_torque->operator()(parID,0) += value(2)*delta(1)
+                                          - value(1)*delta(2);
+     viscous_torque->operator()(parID,1) += value(0)*delta(2)
+                                          - value(2)*delta(0);
+     viscous_torque->operator()(parID,2) += value(1)*delta(0)
+                                          - value(0)*delta(1);
 
   }
 

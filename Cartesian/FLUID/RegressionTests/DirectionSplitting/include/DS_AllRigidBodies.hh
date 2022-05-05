@@ -265,6 +265,12 @@ class DS_AllRigidBodies
       @param FF target fluid grid */
       void build_solid_variables_on_fluid_grid( FV_DiscreteField const* FF );
 
+      /** @brief Periodic transformation of a distance in a given direction
+      @param delta distance
+      @param dir direction  */
+      double delta_periodic_transformation( double const& delta
+                                          , size_t const& dir);
+
       /** @brief Periodic transformation of a point in a given direction
       @param x point
       @param dir direction  */
