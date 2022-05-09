@@ -1026,6 +1026,15 @@ void DS_AllRigidBodies:: generate_list_of_local_RB( )
 
      bool status = false;
 
+     // Check the gravity center first
+     status = (m_space_dimension==2) ?
+                           (x0 >= Dmin(0)) && (x0 <= Dmax(0))
+                        && (y0 >= Dmin(1)) && (y0 <= Dmax(1)) :
+                           (x0 >= Dmin(0)) && (x0 <= Dmax(0))
+                        && (y0 >= Dmin(1)) && (y0 <= Dmax(1))
+                        && (z0 >= Dmin(2)) && (z0 <= Dmax(2)) ;
+     if (status) goto skip_loop;
+
      for (size_t i = 0; i < 2; i++) {
         for (size_t j = 0; j < 2; j++) {
            for (size_t k = 0; k < 2; k++) {
