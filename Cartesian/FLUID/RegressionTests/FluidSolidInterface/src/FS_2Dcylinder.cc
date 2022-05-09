@@ -1,7 +1,6 @@
 #include <FS_2Dcylinder.hh>
 #include <MAC.hh>
 #include <math.h>
-#define EPSILON 1.e-4         // 0.01% of particle size
 using std::endl;
 
 
@@ -168,14 +167,13 @@ bool FS_2Dcylinder:: isIn( geomVector const& pt ) const
 {
   MAC_LABEL( "FS_2Dcylinder:: isIn(pt)" ) ;
 
-  bool status = ( m_gravity_center.calcDist( pt ) <= m_agp_2Dcylinder.radius
-                                                   * (1. + EPSILON));
+  bool status = ( m_gravity_center.calcDist( pt ) <= m_agp_2Dcylinder.radius);
 
   if (m_periodic_directions) {
      for (size_t i = 0; i < m_periodic_directions->size(); ++i) {
         if (status) break;
         status = (m_gravity_center + (*m_periodic_directions)[i]).calcDist( pt )
-                  <= m_agp_2Dcylinder.radius * ( 1. + EPSILON);
+                  <= m_agp_2Dcylinder.radius;
      }
   }
 
@@ -197,14 +195,13 @@ bool FS_2Dcylinder:: isIn( double const& x, double const& y, double const& z )
 
   geomVector pt(x, y, z);
 
-  bool status = ( m_gravity_center.calcDist( pt ) <= m_agp_2Dcylinder.radius
-                                                   * (1. + EPSILON));
+  bool status = ( m_gravity_center.calcDist( pt ) <= m_agp_2Dcylinder.radius);
 
   if (m_periodic_directions) {
      for (size_t i = 0; i < m_periodic_directions->size(); ++i) {
         if (status) break;
         status = (m_gravity_center + (*m_periodic_directions)[i]).calcDist( pt )
-                  <= m_agp_2Dcylinder.radius * ( 1. + EPSILON);
+                  <= m_agp_2Dcylinder.radius;
      }
   }
 
@@ -223,14 +220,13 @@ double FS_2Dcylinder:: level_set_value( geomVector const& pt ) const
 {
   MAC_LABEL( "FS_2Dcylinder:: level_set_value(pt)" ) ;
 
-  double value = ( m_gravity_center.calcDist( pt ) - m_agp_2Dcylinder.radius
-                                                   * (1. + EPSILON));
+  double value = ( m_gravity_center.calcDist( pt ) - m_agp_2Dcylinder.radius);
 
   if (m_periodic_directions) {
      for (size_t i = 0; i < m_periodic_directions->size(); ++i) {
         double temp = (m_gravity_center +
                      (*m_periodic_directions)[i]).calcDist( pt )
-                     - m_agp_2Dcylinder.radius * ( 1. + EPSILON);
+                     - m_agp_2Dcylinder.radius;
         value = MAC::min(temp,value);
      }
   }
@@ -254,14 +250,13 @@ double FS_2Dcylinder:: level_set_value( double const& x
 
   geomVector pt(x, y, z);
 
-  double value = ( m_gravity_center.calcDist( pt ) - m_agp_2Dcylinder.radius
-                                                   * (1. + EPSILON));
+  double value = ( m_gravity_center.calcDist( pt ) - m_agp_2Dcylinder.radius);
 
   if (m_periodic_directions) {
      for (size_t i = 0; i < m_periodic_directions->size(); ++i) {
         double temp = (m_gravity_center +
                      (*m_periodic_directions)[i]).calcDist( pt )
-                     - m_agp_2Dcylinder.radius * ( 1. + EPSILON);
+                     - m_agp_2Dcylinder.radius;
         value = MAC::min(temp,value);
      }
   }

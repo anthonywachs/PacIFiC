@@ -7,6 +7,7 @@
 #include <FV_Mesh.hh>
 #include <cmath>
 #define EPSILON 1.e-7
+#define THRES 1.e-4
 using std::endl;
 
 
@@ -647,6 +648,56 @@ int DS_AllRigidBodies:: isIn_any_RB( size_t const& ownID,
 
 
 //---------------------------------------------------------------------------
+int DS_AllRigidBodies:: levelset_any_RB( size_t const& ownID
+                                       , geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: levelset_any_RB(ownID,pt)" ) ;
+
+  // To avoid any jumps while RB motion
+  double dh = MESH->get_smallest_grid_size();
+  double threshold = pow(THRES,0.5)*dh;
+
+  for (size_t i = 0; i < neighbour_list[ownID].size(); ++i) {
+     size_t neighID = neighbour_list[ownID][i];
+     if (m_allDSrigidbodies[neighID]->level_set_value( pt ) < threshold )
+        return ((int)neighID);
+  }
+
+  return (-1);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+int DS_AllRigidBodies:: levelset_any_RB( size_t const& ownID,
+                                        double const& x,
+                                        double const& y,
+                                        double const& z ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: levelset_any_RB(ownID,x,y,z)" ) ;
+
+  // To avoid any jumps while RB motion
+  double dh = MESH->get_smallest_grid_size();
+  double threshold = pow(THRES,0.5)*dh;
+
+  for (size_t i = 0; i < neighbour_list[ownID].size(); ++i) {
+     size_t neighID = neighbour_list[ownID][i];
+     if (m_allDSrigidbodies[neighID]->level_set_value( x, y, z ) < threshold)
+        return ((int)neighID);
+  }
+
+  return (-1);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 bool DS_AllRigidBodies:: isIn( size_t const& parID,
 		                         geomVector const& pt ) const
 //---------------------------------------------------------------------------
@@ -810,6 +861,9 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
   boolVector const* periodic_comp = MESH->get_periodic_directions();
 
+  double dh = MESH->get_smallest_grid_size();
+  double threshold = pow(THRES,0.5)*dh;
+
   // Get local min and max indices;
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
@@ -874,7 +928,8 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
                size_t p = FF->DOF_local_number(i,j,k,comp);
 
-                 if (isIn(parID,xC,yC,zC))
+               if (level_set_value(parID,xC,yC,zC) < threshold)
+               // if (isIn(parID,xC,yC,zC))
                     void_fraction[field]->operator()(p) = 1 + parID;
              }
            }
@@ -1540,8 +1595,8 @@ DS_AllRigidBodies:: second_order_temperature_flux(size_t const& parID)
 
         // Checking all the ghost points in the solid/fluid,
         // and storing the parID if present in solid
-        in_parID[1] = isIn_any_RB(parID,ghost_pt[1]);
-        in_parID[2] = isIn_any_RB(parID,ghost_pt[2]);
+        in_parID[1] = levelset_any_RB(parID,ghost_pt[1]);
+        in_parID[2] = levelset_any_RB(parID,ghost_pt[2]);
 
         // Get local min and max indices
         for (size_t l = 0; l < m_space_dimension; l++) {
@@ -1744,7 +1799,7 @@ void DS_AllRigidBodies:: first_order_temperature_flux( size_t const& parID )
                            + dh*surface_normal[i]->operator()(2)/nor_mag;
            // Checking all the ghost points in the solid/fluid,
            // and storing the parID if present in solid
-           in_parID[ig] = isIn_any_RB(parID,ghost_pt[ig]);
+           in_parID[ig] = levelset_any_RB(parID,ghost_pt[ig]);
         }
 
         // Get local min and max indices
@@ -1982,8 +2037,8 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
 
               // Checking all the ghost points in the solid/fluid,
               // and storing the parID if present in solid
-              in_parID[col1] = isIn_any_RB(parID,ghost_pt[col1]);
-              in_parID[col2] = isIn_any_RB(parID,ghost_pt[col2]);
+              in_parID[col1] = levelset_any_RB(parID,ghost_pt[col1]);
+              in_parID[col2] = levelset_any_RB(parID,ghost_pt[col2]);
            }
 
            // Get local min and max indices
@@ -2227,7 +2282,7 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
 
               // Checking all the ghost points in the solid/fluid,
               // and storing the parID if present in solid
-              in_parID[col] = isIn_any_RB(parID,ghost_pt[col]);
+              in_parID[col] = levelset_any_RB(parID,ghost_pt[col]);
            }
         }
 
@@ -2463,7 +2518,7 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
                                                    , face_norm);
       rayDir(face_norm) = -1.;
 
-      in_RB = (FF == PF) ? -1 : isIn_any_RB(parID, pt_at_face) ;
+      in_RB = (FF == PF) ? -1 : levelset_any_RB(parID, pt_at_face) ;
 
       if (in_RB != -1) {
          dl = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
@@ -2494,7 +2549,7 @@ double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
                                                    , face_norm);
       rayDir(face_norm) = 1.;
 
-      in_RB = (FF == PF) ? -1 : isIn_any_RB(parID, pt_at_face) ;
+      in_RB = (FF == PF) ? -1 : levelset_any_RB(parID, pt_at_face) ;
 
       if (in_RB != -1) {
          dr = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
@@ -3124,9 +3179,9 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
 
   // Stores rigid body ID if inside solid; -1 otherwise
-  in_parID[0] = isIn_any_RB(parID, coord_g[0]);
-  in_parID[1] = isIn_any_RB(parID, coord_g[1]);
-  in_parID[2] = isIn_any_RB(parID, coord_g[2]);
+  in_parID[0] = levelset_any_RB(parID, coord_g[0]);
+  in_parID[1] = levelset_any_RB(parID, coord_g[1]);
+  in_parID[2] = levelset_any_RB(parID, coord_g[2]);
 
   double del = 0.;
 

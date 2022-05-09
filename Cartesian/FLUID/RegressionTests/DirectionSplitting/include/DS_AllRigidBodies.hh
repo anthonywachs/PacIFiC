@@ -191,17 +191,33 @@ class DS_AllRigidBodies
       @param pt the point */
       bool isIn( size_t const& parID, geomVector const& pt ) const;
 
-      /** @brief Returns the parID if the point is inside parID
+      /** @brief Returns the parID if the point is inside parID, based on isIn
       @param ownID ID of RB owning the pt
       @param pt the point */
       int isIn_any_RB( size_t const& ownID, geomVector const& pt ) const;
 
-      /** @brief Returns the parID if the point is inside parID
+      /** @brief Returns the parID if the point is inside parID, based on isIn
       @param ownID ID of RB owning the pt(x,y,z)
       @param x x-coordinate of the point
       @param y x-coordinate of the point
       @param z x-coordinate of the point */
       int isIn_any_RB(  size_t const& ownID,
+                        double const& x,
+                        double const& y,
+                        double const& z ) const;
+
+
+      /** @brief Returns the parID if the point is inside parID, based on levelset
+      @param ownID ID of RB owning the pt
+      @param pt the point */
+      int levelset_any_RB( size_t const& ownID, geomVector const& pt ) const;
+
+      /** @brief Returns the parID if the point is inside parID, based on levelset
+      @param ownID ID of RB owning the pt(x,y,z)
+      @param x x-coordinate of the point
+      @param y x-coordinate of the point
+      @param z x-coordinate of the point */
+      int levelset_any_RB(  size_t const& ownID,
                         double const& x,
                         double const& y,
                         double const& z ) const;
