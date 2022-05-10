@@ -17,8 +17,10 @@ void construct_divG(scalar divG, lagMesh* mesh) {
   comp_normals(mesh);
   comp_mb_stretch(mesh);
   // foreach_face() foreach_dimension() G.x[] = 0.;
-  foreach() foreach_dimension() G.x[] = 0.;
-  foreach() divG[] = 0.;
+  foreach() {
+    foreach_dimension() G.x[] = 0.;
+    divG[] = 0.;
+  }
   boundary((scalar*){divG, G});
 
   for(int i=0; i<mesh->nle; i++) {

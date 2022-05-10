@@ -17,7 +17,6 @@ the Eulerian cell containing the Node.
 */
 typedef struct lagNode {
   coord pos;
-  int edge_ids[2];
   coord lagForce;
   coord lagVel;
   coord normal;
@@ -27,6 +26,14 @@ typedef struct lagNode {
   #if _MPI
     int pid;
   #endif
+  #if dimension < 3
+    int edge_ids[2];
+  #else
+    int nb_edges;
+    int edge_ids[6]
+    int nb_triangles;
+    int triangle_ids[6];
+  #endif
 } lagNode;
 
 /** Similarly, the edges of the mesh are assigned the IDs of the two nodes they
@@ -34,9 +41,22 @@ connect, an undeformed and a deformed lengths $l_0$ and $l$, and a normal
 vector.  */
 typedef struct Edge {
   int vertex_ids[2];
+  #if dimension > 2
+    int triangle_ids[2];
+  #endif
   double l0, length; // Initial edge length, current stretch
   coord normal;
 } Edge;
+
+/** In 3 dimensions, we define triangle faces */
+#if dimension > 2
+  typedef struct Triangle {
+    int node_ids[3];
+    int edge_ids[3];
+    double area, ref_area;
+    coord normal;
+  } Triangle;
+#endif
 
 /** The lagMesh struct stores an array of nodes, edges as well as their
 respective sizes. The three booleans are used to check if the stretches, normal
@@ -47,6 +67,10 @@ typedef struct lagMesh {
   int nle;  // Number of Lagrangian Edges
   lagNode* nodes;  // Array of nodes
   Edge* edges;  // Array of edges
+  #if dimension > 2
+    int nlt; // Number of Lagrangian triangles
+    Trangle* triangles;
+  #endif
   bool updated_stretches;
   bool updated_normals;
   bool updated_curvatures;
@@ -78,6 +102,10 @@ void initialize_empty_mb(lagMesh* mesh) {
   mesh->nle = 0;
   mesh->nodes = NULL;
   mesh->edges = NULL;
+  #if dimension > 2
+    mesh->nlt = 0;
+    mesh->triangles = NULL;
+  #endif
   mesh->updated_stretches = false;
   mesh->updated_normals = false;
   mesh->updated_curvatures = false;
@@ -87,6 +115,9 @@ void free_mesh(lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) free(mesh->nodes[i].stencil.p);
   free(mesh->nodes);
   free(mesh->edges);
+  #if dimension > 2
+    free(mesh->triangles);
+  #endif
 }
 
 void free_caps(Capsules* caps) {
@@ -206,29 +237,71 @@ void comp_curvature(lagMesh* mesh) {
     for(int i=0; i<mesh->nlp; i++) {
       cn = &(mesh->nodes[i]);
       up = (fabs(cn->normal.y) > fabs(cn->normal.x)) ? true : false;
-      coord p[3]; // store the coordinates of the current node and of its
+      coord p[5]; // store the coordinates of the current node and of its
                   // neighbors'
-      for(int j=0; j<3; j++) {
-        int index = (i==0 && j==0) ? mesh->nlp-1 : (i-1+j)%mesh->nlp;
+      for(int j=0; j<5; j++) {
+        int index = (mesh->nlp + i - 2 + j)%mesh->nlp;
         foreach_dimension() p[j].x = up ? mesh->nodes[index].pos.x :
           mesh->nodes[index].pos.y;
       }
       /** If one of the neighboring nodes is across a periodic boundary, we
 correct its position */
-      for(int j=0; j<3; j+=2) {
-        foreach_dimension() {
-          if (ACROSS_PERIODIC(p[j].x,p[1].x)) {
-            p[j].x += (ACROSS_PERIODIC(p[j].x + L0, p[1].x)) ? -L0 : L0;
+      for(int j=0; j<5; j++) {
+        if (j!=2) {
+          foreach_dimension() {
+            if (ACROSS_PERIODIC(p[j].x,p[2].x)) {
+              p[j].x += (ACROSS_PERIODIC(p[j].x + L0, p[2].x)) ? -L0 : L0;
+            }
           }
         }
       }
 
-      double dy, ddy; dy = 0.; ddy = 0.;
-      for(int j=0; j<3; j++) {
-        dy += p[j].y*(2*p[1].x - p[(j+1)%3].x - p[(j+2)%3].x)/
-          ((p[j].x - p[(j+1)%3].x)*(p[j].x - p[(j+2)%3].x));
-        ddy += 2*p[j].y/((p[j].x - p[(j+1)%3].x)*(p[j].x - p[(j+2)%3].x));
+/** Since the bending force will involve taking the laplacian of the curvature,
+we seek a cuvrature to fourth order accuracy, so we need to interpolate the
+membrane with a fourth-degree polynomial, which we need to differentiate twice
+to get the curvature:
+$$P_4(x) = \sum_{j=i-2}^{i+2} y_j \prod_{k \neq j} \frac{x - x_j}{x_k - x_j} $$
+
+$$P'_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
+\right) \sum_{l \neq j}\prod_{m \neq j, m \neq l} x - x_m $$
+
+$$P''_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
+\right) \sum_{l \neq j}\sum_{m \neq j, m \neq l}\sum_{n \neq j, n \neq l, n
+\neq m}x - x_n $$
+*/
+      double dy = 0.;
+      double ddy = 0.;
+      for(int j=0; j<5; j++) {
+        double b1 = 0.; double b2 = 0.;
+        for(int l=0; l<5; l++) {
+          if (l!=j) {
+            double c1 = 1.; double c2 = 0.;
+            for(int m=0; m<5; m++) {
+              if (m!=j && m!=l) {
+                double d2 = 1.;
+                for(int n=0; n<5; n++) {
+                  if (n!=j && n!=l && n!= m) {
+                    d2 *= p[2].x - p[n].x;
+                  }
+                }
+                c1 *= p[2].x - p[m].x;
+                c2 += d2;
+              }
+            }
+            b1 += c1;
+            b2 += c2;
+          }
+        }
+        for(int k=0; k<5; k++) {
+          if (k!=j) {
+            b1 /= (p[k].x - p[j].x);
+            b2 /= (p[k].x - p[j].x);
+          }
+        }
+        dy += b1*p[j].y;
+        ddy += b2*p[j].y;
       }
+
       /** The formula for the signed curvature of a function y(x) is
   $$ \kappa = \frac{y''}{(1 + y'^2)^{\frac{3}{2}}}. $$
   The sign is dertemined from a parametrization of the curve: walking
