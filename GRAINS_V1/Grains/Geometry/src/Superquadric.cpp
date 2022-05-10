@@ -309,6 +309,28 @@ void Superquadric::write_polygonsPts_PARAVIEW( ostream &f,
   const double dphi = 2.0 * PI / visuNodeNbOnPer;
   Point3 pp, pptrans;
 
+  pp[X] = pp[Y] = 0.;
+  // Center
+  pp[Z] = 0.;
+  pptrans = transform( pp );
+  if ( translation )
+    pptrans += *translation;
+  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
+
+  // Top point
+  pp[Z] = m_c;
+  pptrans = transform( pp );
+  if ( translation )
+    pptrans += *translation;
+  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
+
+  // Bottom point
+  pp[Z] = -m_c;
+  pptrans = transform( pp ) ;
+  if ( translation )
+    pptrans += *translation;
+  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
+
   // Regular points on the surface
   double cost, sint, costeps1, sinteps1, cosp, sinp;
 
@@ -324,8 +346,8 @@ void Superquadric::write_polygonsPts_PARAVIEW( ostream &f,
     else
       costeps1 = pow( cost, eps1 );
 
-    // Theta est toujours strictement compris entre 0 et pi donc sint est
-    // strictement positif
+    // Theta is always strictly between 0 and pi so sint is
+    // strictly positive
     sinteps1 = pow( sint, eps1 );
 
     for ( int j = 0; j < visuNodeNbOnPer; j++ )
@@ -355,28 +377,6 @@ void Superquadric::write_polygonsPts_PARAVIEW( ostream &f,
       f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
     }
   }
-
-  pp[X] = pp[Y] = 0.;
-  // Bottom point
-  pp[Z] = -m_c;
-  pptrans = transform( pp ) ;
-  if ( translation )
-  pptrans += *translation;
-  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
-
-  // Top point
-  pp[Z] = m_c;
-  pptrans = transform( pp );
-  if ( translation )
-    pptrans += *translation;
-  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
-
-  // Centre
-  pp[Z] = 0.;
-  pptrans = transform( pp );
-  if ( translation )
-    pptrans += *translation;
-  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
 }
 
 
@@ -394,6 +394,28 @@ list<Point3> Superquadric::get_polygonsPts_PARAVIEW( Transform const& transform,
     const double dphi = 2.0 * PI / visuNodeNbOnPer;
     Point3 pp, pptrans;
 
+    pp[X] = pp[Y] = 0.;
+    // Gravity center
+    pp[Z] = 0.;
+    pptrans = transform( pp );
+    if ( translation )
+      pptrans += *translation;
+    ParaviewPoints.push_back( pptrans );
+
+    // Top point
+    pp[Z] = m_c;
+    pptrans = transform( pp );
+    if ( translation )
+      pptrans += *translation;
+    ParaviewPoints.push_back( pptrans );
+
+    // Bottom point
+    pp[Z] = -m_c;
+    pptrans = transform( pp ) ;
+    if ( translation )
+      pptrans += *translation;
+    ParaviewPoints.push_back( pptrans );
+
     // Regular points on the surface
     double cost, sint, costeps1, sinteps1, cosp, sinp;
 
@@ -409,8 +431,8 @@ list<Point3> Superquadric::get_polygonsPts_PARAVIEW( Transform const& transform,
       else
         costeps1 = pow( cost, eps1 );
 
-      // Theta est toujours strictement compris entre 0 et pi donc sint est
-      // strictement positif
+      // Theta is always strictly between 0 and pi so sint is
+      // strictly positive
       sinteps1 = pow( sint, eps1 );
 
       for ( int j = 0; j < visuNodeNbOnPer; j++ )
@@ -440,30 +462,8 @@ list<Point3> Superquadric::get_polygonsPts_PARAVIEW( Transform const& transform,
       }
     }
 
-    pp[X] = pp[Y] = 0.;
-    // Bottom point
-    pp[Z] = -m_c;
-    pptrans = transform( pp ) ;
-    if ( translation )
-      pptrans += *translation;
-    ParaviewPoints.push_back( pptrans );
-
-    // Top point
-    pp[Z] = m_c;
-    pptrans = transform( pp );
-    if ( translation )
-      pptrans += *translation;
-    ParaviewPoints.push_back( pptrans );
-
-    // Gravity center
-    pp[Z] = 0.;
-    pptrans = transform( pp );
-    if ( translation )
-      pptrans += *translation;
-    ParaviewPoints.push_back( pptrans );
-
     return ( ParaviewPoints );
-  }
+}
 
 
 
@@ -485,37 +485,67 @@ void Superquadric::write_polygonsStr_PARAVIEW( list<int>& connectivity,
       list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
   int& last_offset ) const
 {
+  // Top cells: tetrahedron
+  for ( int j = 0; j < visuNodeNbOnPer - 1; j++ )
+  {
+    // Center
+    connectivity.push_back( firstpoint_globalnumber );
+    // Top point
+    connectivity.push_back( firstpoint_globalnumber + 1 );
+    connectivity.push_back( firstpoint_globalnumber + 3 + j );
+    connectivity.push_back( firstpoint_globalnumber + 3 + j + 1);
+    last_offset += 4;
+    offsets.push_back( last_offset );
+    cellstype.push_back( 10 );
+  }
+  // Center
+  connectivity.push_back( firstpoint_globalnumber );
+  // Top point
+  connectivity.push_back( firstpoint_globalnumber + 1 );
+  // Last point of the first latitude (i=1)
+  connectivity.push_back( firstpoint_globalnumber + 3 + visuNodeNbOnPer - 1 );
+  // First point of the first latitude (i=1)
+  connectivity.push_back( firstpoint_globalnumber + 3 );
+  last_offset += 4;
+  offsets.push_back( last_offset );
+  cellstype.push_back( 10 );
+
   // Regular cells: Pyramid
   int pointact = 3; // Current point (we will browse the grid)
 
-  for ( int i = 1 ; i < visuNodeNbOnPer - 1 ; ++i )
+  for ( int i = 1 ; i < visuNodeNbOnPer - 1; ++i )
   {
-    for ( int j = 0; j < visuNodeNbOnPer -1 ; j++ )
+    for ( int j = 0; j < visuNodeNbOnPer - 1; j++ )
     {
-      connectivity.push_back(firstpoint_globalnumber); // Center
-      connectivity.push_back(firstpoint_globalnumber+pointact); // Current point
+      // Center
+      connectivity.push_back( firstpoint_globalnumber );
+      // Current point
+      connectivity.push_back( firstpoint_globalnumber + pointact );
       // same latitude, +1 longitude
-      connectivity.push_back(firstpoint_globalnumber+pointact+1);
+      connectivity.push_back( firstpoint_globalnumber + pointact + 1) ;
+      // +1 latitude, +1 longitude
+      connectivity.push_back( firstpoint_globalnumber + pointact
+        + visuNodeNbOnPer + 1 );
       // +1 latitude, same longitude
-      connectivity.push_back(firstpoint_globalnumber+pointact+visuNodeNbOnPer);
-       // +1 latitude, +1 longitude
-      connectivity.push_back(firstpoint_globalnumber+pointact+visuNodeNbOnPer+1);
+      connectivity.push_back( firstpoint_globalnumber + pointact
+        + visuNodeNbOnPer );
       last_offset += 5;
-      offsets.push_back(last_offset);
+      offsets.push_back( last_offset );
       cellstype.push_back( 14 );
       pointact++;
     }
-    connectivity.push_back( firstpoint_globalnumber ); // Center
+    // Center
+    connectivity.push_back( firstpoint_globalnumber );
     // Current point (last of its latitude)
     connectivity.push_back( firstpoint_globalnumber + pointact );
     // First point (j=0) on the same latitude as pointact
     connectivity.push_back( firstpoint_globalnumber + pointact
       - ( visuNodeNbOnPer - 1 ) );
+    // First point (j=0) on the latitude under that of pointact
+    connectivity.push_back( firstpoint_globalnumber + pointact + 1 );
     // +1 latitude, same longitude
     connectivity.push_back( firstpoint_globalnumber + pointact
       + visuNodeNbOnPer );
-    // First point (j=0) on the latitude under that of pointact
-    connectivity.push_back( firstpoint_globalnumber + pointact + 1 );
     last_offset += 5;
     offsets.push_back( last_offset );
     cellstype.push_back( 14 );
@@ -525,7 +555,7 @@ void Superquadric::write_polygonsStr_PARAVIEW( list<int>& connectivity,
   // Bottom cells: tetrahedron
   const int Firstptlastlat = 3 + visuNodeNbOnPer * (visuNodeNbOnPer - 2);
 
-  for ( int j = 0; j < visuNodeNbOnPer-1; j++ )
+  for ( int j = 0; j < visuNodeNbOnPer - 1; j++ )
   {
     connectivity.push_back( firstpoint_globalnumber ); // Center
     connectivity.push_back( firstpoint_globalnumber + 2 ); // Bottom point
@@ -542,27 +572,6 @@ void Superquadric::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     + visuNodeNbOnPer - 1 );
   // First point last latitude
   connectivity.push_back( firstpoint_globalnumber + Firstptlastlat );
-  last_offset += 4;
-  offsets.push_back( last_offset );
-  cellstype.push_back( 10 );
-
-  // Top cells: tetrahedron
-  for ( int j = 0; j < visuNodeNbOnPer-1; j++ )
-  {
-    connectivity.push_back( firstpoint_globalnumber ); // Center
-    connectivity.push_back( firstpoint_globalnumber + 1 ); // Top point
-    connectivity.push_back( firstpoint_globalnumber + 3 + j );
-    connectivity.push_back( firstpoint_globalnumber + 3 + j + 1);
-    last_offset += 4;
-    offsets.push_back( last_offset );
-    cellstype.push_back( 10 );
-  }
-  connectivity.push_back( firstpoint_globalnumber ); // Center
-  connectivity.push_back( firstpoint_globalnumber + 1 );  // Top point
-  // Last point of the first latitude (i=1)
-  connectivity.push_back( firstpoint_globalnumber + 3 + visuNodeNbOnPer - 1 );
-  // First point of the first latitude (i=1)
-  connectivity.push_back( firstpoint_globalnumber + 3 );
   last_offset += 4;
   offsets.push_back( last_offset );
   cellstype.push_back( 10 );
