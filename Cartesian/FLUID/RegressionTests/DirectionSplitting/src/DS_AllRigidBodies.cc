@@ -1013,53 +1013,78 @@ void DS_AllRigidBodies:: generate_list_of_local_RB( )
      double z0 = pgc->operator()(2);
 
      doubleVector xr(2,x0);
-     xr(0) = periodic_transformation(xr(0) - Rp,0);
-     xr(1) = periodic_transformation(xr(1) + Rp,0);
+     xr(0) = xr(0) - Rp;
+     xr(1) = xr(1) + Rp;
+     bool found_x = is_bounding_box_in_local_domain(xr,0);
      doubleVector yr(2,y0);
-     yr(0) = periodic_transformation(yr(0) - Rp,1);
-     yr(1) = periodic_transformation(yr(1) + Rp,1);
+     yr(0) = yr(0) - Rp;
+     yr(1) = yr(1) + Rp;
+     bool found_y = is_bounding_box_in_local_domain(yr,1);
      doubleVector zr(2,z0);
+     bool found_z = false;
      if (m_space_dimension == 3) {
-        zr(0) = periodic_transformation(zr(0) - Rp,2);
-        zr(1) = periodic_transformation(zr(1) + Rp,2);
+        zr(0) = zr(0) - Rp;
+        zr(1) = zr(1) + Rp;
+        found_z = is_bounding_box_in_local_domain(zr,2);
      }
 
-     bool status = false;
+     bool status = (m_space_dimension == 2) ? found_x && found_y
+                                            : found_x && found_y && found_z;
 
-     // Check the gravity center first
-     status = (m_space_dimension==2) ?
-                           (x0 >= Dmin(0)) && (x0 <= Dmax(0))
-                        && (y0 >= Dmin(1)) && (y0 <= Dmax(1)) :
-                           (x0 >= Dmin(0)) && (x0 <= Dmax(0))
-                        && (y0 >= Dmin(1)) && (y0 <= Dmax(1))
-                        && (z0 >= Dmin(2)) && (z0 <= Dmax(2)) ;
-     if (status) goto skip_loop;
+     if (status) local_RB_list.push_back(m);
+  }
+}
 
-     for (size_t i = 0; i < 2; i++) {
-        for (size_t j = 0; j < 2; j++) {
-           for (size_t k = 0; k < 2; k++) {
-              status = (m_space_dimension==2) ?
-                                    (xr(i) >= Dmin(0)) && (xr(i) <= Dmax(0))
-                                 && (yr(j) >= Dmin(1)) && (yr(j) <= Dmax(1)) :
-                                    (xr(i) >= Dmin(0)) && (xr(i) <= Dmax(0))
-                                 && (yr(j) >= Dmin(1)) && (yr(j) <= Dmax(1))
-                                 && (zr(k) >= Dmin(2)) && (zr(k) <= Dmax(2)) ;
-              if (status) goto skip_loop;
-           }
+
+
+
+//---------------------------------------------------------------------------
+bool
+DS_AllRigidBodies::is_bounding_box_in_local_domain( class doubleVector& bounds
+                                                  , size_t const& dir)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies::is_bounding_box_in_local_domain" ) ;
+
+  bool value = false;
+
+  bounds(0) = periodic_transformation(bounds(0),dir);
+  bounds(1) = periodic_transformation(bounds(1),dir);
+
+  double local_min = MESH->get_min_coordinate_on_current_processor(dir);
+  double local_max = MESH->get_max_coordinate_on_current_processor(dir);
+
+  // Getting the minimum grid index in control volume (CV)
+  if (bounds(0) < bounds(1)) {// Non-periodic CV
+     if (bounds(0) > local_min) {
+        if (bounds(0) < local_max) {
+           value = true;
+        } else {
+           value = false;
+        }
+     } else {
+        if (bounds(1) > local_min) {
+           value = true;
+        } else {
+           value = false;
         }
      }
-
-     // If the RB's domain extent are bigger that local extents
-     if (((xr(0) < Dmin(0)) && (xr(1) > Dmax(0)))
-      || ((yr(0) < Dmin(1)) && (yr(1) > Dmax(1)))
-      || ((zr(0) < Dmin(2)) && (zr(1) > Dmax(2)))) {
-        status = true;
-        goto skip_loop;
+  } else {// periodic control volume
+     if (bounds(0) > local_min) {
+        if (bounds(0) < local_max) {
+           value = true;
+        } else if (bounds(1) > local_min) {
+           value = true;
+        } else {
+           value = false;
+        }
+     } else {
+        value = true;
      }
-
-     skip_loop:
-        if (status) local_RB_list.push_back(m);
   }
+
+  return (value);
+
 }
 
 

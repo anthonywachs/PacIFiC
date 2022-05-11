@@ -411,6 +411,13 @@ class DS_AllRigidBodies
       @param b_restart if simulation is restart or not */
       void write_force_and_flux_summary( FV_TimeIterator const* t_it
                                        , bool const& b_restart);
+
+      /** @brief Returns true if a box is within the local domain
+      extents
+      @param bounds vector with min and max in dir
+      @param dir direction to check */
+      bool is_bounding_box_in_local_domain( class doubleVector& bounds
+                                           , size_t const& dir);
       //@}
 
 
