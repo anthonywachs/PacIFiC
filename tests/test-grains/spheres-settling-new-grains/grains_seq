@@ -1,0 +1,18 @@
+#/bin/bash
+
+# Input file
+if [ $1 ] 
+  then
+    ROOT_FILE=$1
+  else 
+    ROOT_FILE=Grains/Init/insert.xml
+fi
+INPUT_FILE=$ROOT_FILE
+
+#Execute Grains
+if [ -f $INPUT_FILE ]
+  then
+    time ${GRAINS_HOME}/Main/bin${GRAINS_FULL_EXT}/grains $INPUT_FILE 
+  else
+    echo 'Input file' $INPUT_FILE 'does not exist'
+fi 
