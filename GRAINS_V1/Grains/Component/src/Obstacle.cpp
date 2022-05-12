@@ -412,66 +412,66 @@ void Obstacle::writePositionInFluid( ostream &fileOut )
 
 
 
-// // ----------------------------------------------------------------------------
-// // Initializes all contact map entries to false
-// void Obstacle::setContactMapToFalse()
-// {
-//   cout << "Warning when calling Obstacle::setContactMapToFalse() "
-//        << "\nShould not go into this class !\n"
-//        << "Need for an assistance ! Stop running !\n";
-//   exit(10);
-// }
-//
-//
-//
-//
-// // ----------------------------------------------------------------------------
-// // Updates contact map
-// void Obstacle::updateContactMap()
-// {
-//   cout << "Warning when calling Obstacle::updateContactMap() "
-//        << "\nShould not go into this class !\n"
-//        << "Need for an assistance ! Stop running !\n";
-//   exit(10);
-// }
-//
-//
-//
-//
-// // ----------------------------------------------------------------------------
-// // Does the contact exist in the map, if yes return the pointer to the
-// // cumulative tangential displacement
-// bool Obstacle::ContactInMapIsActive( double*& tangentialDepl, int const& id )
-// {
-//   cout << "Warning when calling Obstacle::ContactInMapIsActive() "
-//        << "\nShould not go into this class !\n"
-//        << "Need for an assistance ! Stop running !\n";
-//   exit(10);
-// }
-//
-//
-//
-//
-// // ----------------------------------------------------------------------------
-// // Adds new contact in the map
-// void Obstacle::addNewContactInMap( double const& tangentialDepl, int const& id )
-// {
-//   cout << "Warning when calling Obstacle::addNewContactInMap() "
-//        << "\nShould not go into this class !\n"
-//        << "Need for an assistance ! Stop running !\n";
-//   exit(10);
-// }
-//
-//
-//
-//
-// // ----------------------------------------------------------------------------
-// // Increases cumulative tangential displacement with component id
-// void Obstacle::addDeplContactInMap( double const& tangentialDepl,
-// 	int const& id )
-// {
-//   cout << "Warning when calling Obstacle::addDeplContactInMap() "
-//        << "\nShould not go into this class !\n"
-//        << "Need for an assistance ! Stop running !\n";
-//   exit(10);
-// }
+// ----------------------------------------------------------------------------
+// Initializes all contact map entries to false
+void Obstacle::setContactMapToFalse()
+{
+  cout << "Warning when calling Obstacle::setContactMapToFalse() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Updates contact map
+void Obstacle::updateContactMap()
+{
+  cout << "Warning when calling Obstacle::updateContactMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Does the contact exist in the map, if yes return the pointer to the
+// cumulative tangential displacement
+bool Obstacle::ContactInMapIsActive( double*& tangentialDepl, int const& id )
+{
+  cout << "Warning when calling Obstacle::ContactInMapIsActive() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Adds new contact in the map
+void Obstacle::addNewContactInMap( double const& tangentialDepl, int const& id )
+{
+  cout << "Warning when calling Obstacle::addNewContactInMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Increases cumulative tangential displacement with component id
+void Obstacle::addDeplContactInMap( double const& tangentialDepl,
+	int const& id )
+{
+  cout << "Warning when calling Obstacle::addDeplContactInMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
