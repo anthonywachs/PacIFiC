@@ -46,27 +46,32 @@ void draw_lag(struct _draw_lag p) {
       if (p.lc) {color[0] = p.lc[0]; color[1] = p.lc[1]; color[2] = p.lc[2];}
       else {color[0] = 0.; color[1] = 0.; color[2] = 0.;}
       draw_lines(view, color, p.lw) {
-        foreach_visible(view) {
-          for (int i=0; i<p.mesh->nle; i++) {
-            bool across_periodic_bc = false;
-            int v1, v2;
-            v1 = p.mesh->edges[i].vertex_ids[0];
-            v2 = p.mesh->edges[i].vertex_ids[1];
-            foreach_dimension() {
-              if (fabs(p.mesh->nodes[v1].pos.x
-                - p.mesh->nodes[v2].pos.x) > L0/2.) across_periodic_bc = true;
-            }
-            /** If the edge crosses a perdiodic boundary (i.e. the edge length
-            is larger than L0/2), we simply don't draw it */
-            if (!across_periodic_bc) {
-              glBegin(GL_LINES);
+        for (int i=0; i<p.mesh->nle; i++) {
+          bool across_periodic_bc = false;
+          int v1, v2;
+          v1 = p.mesh->edges[i].vertex_ids[0];
+          v2 = p.mesh->edges[i].vertex_ids[1];
+          foreach_dimension() {
+            if (fabs(p.mesh->nodes[v1].pos.x
+              - p.mesh->nodes[v2].pos.x) > L0/2.) across_periodic_bc = true;
+          }
+          /** If the edge crosses a perdiodic boundary (i.e. the edge length
+          is larger than L0/2), we simply don't draw it */
+          if (!across_periodic_bc) {
+            glBegin(GL_LINES);
+              #if dimension < 3
                 glvertex2d(view, p.mesh->nodes[v1].pos.x,
                   p.mesh->nodes[v1].pos.y);
                 glvertex2d(view, p.mesh->nodes[v2].pos.x,
                   p.mesh->nodes[v2].pos.y);
-                view->ni++;
-              glEnd();
-            }
+              #else
+                glvertex3d(view, p.mesh->nodes[v1].pos.x,
+                  p.mesh->nodes[v1].pos.y, p.mesh->nodes[v1].pos.z);
+                glvertex3d(view, p.mesh->nodes[v2].pos.x,
+                  p.mesh->nodes[v2].pos.y, p.mesh->nodes[v2].pos.z);
+              #endif
+              view->ni++;
+            glEnd();
           }
         }
       }
@@ -78,11 +83,37 @@ void draw_lag(struct _draw_lag p) {
       draw_vertices(view, color, p.vs) {
         glBegin(GL_POINTS);
           for (int i=0; i<p.mesh->nlp; i++)
-            glvertex2d(view, p.mesh->nodes[i].pos.x,
-              p.mesh->nodes[i].pos.y);
+            #if dimension < 3
+              glvertex2d(view, p.mesh->nodes[i].pos.x,
+                p.mesh->nodes[i].pos.y);
+            #else
+            glvertex3d(view, p.mesh->nodes[i].pos.x,
+              p.mesh->nodes[i].pos.y, p.mesh->nodes[i].pos.z);
+            #endif
         glEnd();
         view->ni++;
       }
     }
+    // #if dimension > 2
+    //   bool faces = true;
+    //   if (faces) {
+    //     float fc[3] = {1., 1., 1.};
+    //     colormap map = jet;
+    //     double cmap[NCMAP][3];
+    //     map (cmap);
+    //     colorized(fc, true, cmap, false) {
+    //       for (int i=0; i<p.mesh->nlt; i++) {
+    //         glBegin(GL_TRIANGLE_FAN);
+    //           for(int j=0; j<3; j++) {
+    //             glvertex3d(view,
+    //               p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.x,
+    //               p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.y,
+    //               p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.z);
+    //             }
+    //         glEnd();
+    //       }
+    //     }
+    //   }
+    // #endif
   }
 }

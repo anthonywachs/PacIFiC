@@ -29,8 +29,10 @@ typedef struct lagNode {
   #if dimension < 3
     int edge_ids[2];
   #else
+    int nb_neighbors;
+    int neighbor_ids[6];
     int nb_edges;
-    int edge_ids[6]
+    int edge_ids[6];
     int nb_triangles;
     int triangle_ids[6];
   #endif
@@ -69,7 +71,7 @@ typedef struct lagMesh {
   Edge* edges;  // Array of edges
   #if dimension > 2
     int nlt; // Number of Lagrangian triangles
-    Trangle* triangles;
+    Triangle* triangles;
   #endif
   bool updated_stretches;
   bool updated_normals;
@@ -432,6 +434,7 @@ generate them. Note that this implementation assumes the membrane was
 initialized in the init event. */
 event init (i = 0) {
   for(int i=0; i<mbs.nbmb; i++) {
+    fprintf(stderr, "nlp=%d\n", MB(i).nlp);
     for(int j=0; j<MB(i).nlp; j++) {
       MB(i).nodes[j].stencil.n = 25;
       MB(i).nodes[j].stencil.nm = 25*128;
