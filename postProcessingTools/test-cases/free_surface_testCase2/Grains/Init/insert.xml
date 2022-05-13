@@ -1,0 +1,183 @@
+<Grains3D Type="Standard">
+  <Construction>
+    <Recipient LX="0.64" LY="0.2" LZ="0.3"/>
+    <Origine OX="0." OY="0." OZ="0."/>
+    <DomainDecomposition NX="1" NY="1" NZ="1"/>
+    <MPI Strategie="SRLocalCommOpt" VerbosityLevel="2"/>
+
+    <Contacts>
+      <Contact>
+        <Material materiauA="matP" materiauB="matP"/>
+        <ERHContact>
+          <stiff>1.e+6</stiff>
+          <muc>0.46</muc>
+          <en>0.85</en>
+          <mut>1.e+3</mut>
+          <ks>2.e+4</ks>
+          <kms>0.</kms>
+          <eps>1.e-10</eps>
+          <color>0</color>
+        </ERHContact>
+      </Contact>
+
+      <Contact>
+        <Material materiauA="matP" materiauB="matW"/>
+        <ERHContact>
+          <stiff>1.e+6</stiff>
+          <muc>0.62</muc>
+          <en>0.85</en>
+          <mut>1.e+3</mut>
+          <ks>9.e+4</ks>
+          <kms>0.</kms>
+          <eps>1.e-10</eps>
+          <color>0</color>
+        </ERHContact>
+      </Contact>
+
+      <Contact>
+        <Material materiauA="matP" materiauB="matG"/>
+        <ERHContact>
+          <stiff>1.e+6</stiff>
+          <muc>0.</muc>
+          <en>0.85</en>
+          <mut>0.</mut>
+          <ks>0.</ks>
+          <kms>0.</kms>
+          <eps>1.e-10</eps>
+          <color>0</color>
+        </ERHContact>
+     </Contact>
+  </Contacts>
+
+  <CompParticules>
+     <CompParticule Nombre="1000" MasseVolumique="700."
+                    Name="2DCross" nx="300" ny="300" nz="100">
+        <Materiau>matP</Materiau>
+	<Orientation Type="Unite"></Orientation>	
+        <Inertie>
+           <Volume VOLUME="3.122698903898148e-07"/>
+           <GravityCenter xCG="0."
+                          yCG="0."
+                          zCG="0."/>
+           <Tenseur Ixx="9.831541150800389e-12"
+                    Iyy="9.831541150802116e-12"
+                    Izz="1.920540602638696e-11"
+                    Iyz="0."
+                    Ixz="0."
+                    Ixy="0."/>
+        </Inertie>
+        <ElementParticules>
+           <ElementParticule>
+              <Convex RayonInteraction="1.e-4">
+         	 <Box LX="0.027" LY="0.002" LZ="0.003"/>
+              </Convex>
+              <RelativePosition X="0." Y="0." Z="0."/>
+              <Orientation Type="Unite"></Orientation>
+              <Couleur R="1.0" V="0.1" B="0.1"/>
+           </ElementParticule>
+           <ElementParticule>
+              <Convex RayonInteraction="1.e-4">
+         	 <Box LX="0.027" LY="0.002" LZ="0.003"/>
+              </Convex>
+              <RelativePosition X="0." Y="0." Z="0."/>
+              <Orientation Type="Matrice">
+              0.   -1   0
+              1   0.   0
+              0   0   1
+              </Orientation>              
+              <Couleur R="1.0" V="0.1" B="0.1"/>
+           </ElementParticule>   	   	   
+        </ElementParticules>
+     </CompParticule>
+  </CompParticules>
+
+  <Obstacles>
+      <Composite name="box">
+        <Obstacle name="box_Front">
+          <Convex RayonInteraction="0.0005">
+            <Box LX="0.65" LY="0.21" LZ="0.005"/>
+          </Convex>
+          <Centre X="0.32" Y="0.105" Z="0.3025"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matW</Materiau>
+        </Obstacle>
+        <Obstacle name="box_Behind">
+          <Convex RayonInteraction="0.0005">
+            <Box LX="0.65" LY="0.21" LZ="0.005"/>
+          </Convex>
+          <Centre X="0.32" Y="0.105" Z="-0.0025"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matW</Materiau>
+        </Obstacle>
+        <Obstacle name="box_Left">
+          <Convex RayonInteraction="0.0005">
+            <Box LX="0.005" LY="0.21" LZ="0.31"/>
+          </Convex>
+          <Centre X="-0.0025" Y="0.105" Z="0.15"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matW</Materiau>
+        </Obstacle>
+        <Obstacle name="box_Right">
+          <Convex RayonInteraction="0.0005">
+            <Box LX="0.005" LY="0.21" LZ="0.31"/>
+          </Convex>
+          <Centre X="0.6425" Y="0.105" Z="0.15"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matW</Materiau>
+        </Obstacle>
+        <Obstacle name="box_Bottom">
+          <Convex RayonInteraction="0.0005">
+            <Box LX="0.65" LY="0.005" LZ="0.31"/>
+          </Convex>
+          <Centre X="0.32" Y="-0.0025" Z="0.15"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matW</Materiau>
+        </Obstacle>
+        <Obstacle name="box_Top">
+          <Convex RayonInteraction="0.0005">
+            <Box LX="0.65" LY="0.005" LZ="0.31"/>
+          </Convex>
+          <Centre X="0.32" Y="0.2025" Z="0.15"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matW</Materiau>
+        </Obstacle>
+      </Composite>
+      
+      <Obstacle name="Gate">
+          <Convex RayonInteraction="0.0005">
+            <Box LX="0.005" LY="0.21" LZ="0.31"/>
+          </Convex>
+          <Centre X="0.0425" Y="0.105" Z="0.15"/>
+          <Orientation Type="Unite"></Orientation>
+          <Materiau>matG</Materiau>
+      </Obstacle>
+  </Obstacles>
+
+  <Forces>
+    <Gravite GX="0.0" GY="0." GZ="-9.81"/>
+  </Forces>
+
+
+  <Simulation>
+    <Temps Debut="0." Fin="1.5"/>
+    <IncreTemps dt="2.5e-6"/>
+    <TempsSave Debut="0." Fin="60." Dt="0.01"/>
+    <Fichier>Grains/Init/insert</Fichier>
+    <VitesseRelative value="2.2"/>
+    <ModeEcriture>Hybride</ModeEcriture>
+
+    <Insertion Mode="Aleatoire" Configuration="Aleatoire" Aleatoire="Total">
+      <Fenetres>
+        <Fenetre>
+          <Point X="0." Y="0." Z="0.3"/>
+          <Point X="0.04" Y="0.2" Z="0.2"/>
+        </Fenetre>
+      </Fenetres>
+    </Insertion>
+
+    <PostProcessingWriters>
+        <Paraview Name="insert" Root="Grains/Init" InitialCycleNumber="1" Mode="binary" Network="False"/>
+        <PositionVitesse Name="Grains/Init/insert"/>
+    </PostProcessingWriters>
+  </Simulation>
+</Grains3D>

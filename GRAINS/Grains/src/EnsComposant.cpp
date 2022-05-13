@@ -1269,6 +1269,14 @@ void EnsComposant::updateClonesPeriodiques( LinkedCell* LC )
 }
 
 
+void EnsComposant::updateContactMapId( int prev_id, int new_id)
+{
+  list<Particule*>::iterator part;
+  for(part=m_particulesActives.begin(); part!=m_particulesActives.end(); ++part)
+  {
+    (*part)->updateContactMapId( prev_id, new_id);
+  }
+}
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1277,7 +1285,7 @@ void EnsComposant::updateClonesPeriodiques( LinkedCell* LC )
 // A. WACHS - Aout 2014 - Modification
 // D. RAKOTONIRINA - Sept 2014 - Modification
 void EnsComposant::read( istream &fileSave, string const& filename,
-	bool const& new_reload_format )
+	bool const& new_reload_format, bool const& contact_history_storage )
 {
   string buffer, particuleCle, adresse, particuleRefID, materiauCle,
       matType, particuleType, readingMode ;
@@ -1337,7 +1345,8 @@ void EnsComposant::read( istream &fileSave, string const& filename,
     if ( new_reload_format )
     {
       if ( Grains_Exec::m_writingModeHybrid )
-        particule->read2014_binary( FILEbin, &m_ParticuleClassesReference );
+          particule->read2014_binary( FILEbin, &m_ParticuleClassesReference,
+                                    contact_history_storage );
       else
         particule->read2014( fileSave, &m_ParticuleClassesReference );
     }
@@ -1581,7 +1590,6 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
     else
       postProcessingPeriodiques = new list<Particule*>;
   }
-
   // Initialise force at the contact point for the post-processing
   // of the stress tensor
   if ( Grains_Exec::m_stressTensor || Grains_Exec::m_particleStressTensor )
@@ -1637,7 +1645,6 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
       delete postProcessingPeriodiques;
     }
   }
-
   // Dans le cas d'une simulation periodique ou la periodicite est geree
   // par le pattern MPI, on vide la liste
   if ( Grains_Exec::m_MPIperiodique ) m_particulesClonesPeriodiques.clear();
@@ -1732,7 +1739,7 @@ void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
 	postProcessingPeriodiques,
 	&m_ParticuleClassesReference,
 	m_obstacle,
-	LC );   	
+	LC );
     }
     else
     {
@@ -1742,7 +1749,7 @@ void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
 	&m_particulesClonesPeriodiques,
 	&m_ParticuleClassesReference,
 	m_obstacle,
-	LC ); 	
+	LC );
     }
 
   if ( nprocs > 1 && m_hasSerialPostProcessors )
@@ -2049,13 +2056,15 @@ void EnsComposant::checkMatlabPostProcessing(
 // A.WACHS - Mars.2010 - Creation
 int EnsComposant::numeroMaxParticules() const
 {
-  int numeroMax = 0;
+  int numeroMax = -1;
   list<Particule*>::const_iterator particule;
 
   for (particule=m_particulesActives.begin();
   	particule!=m_particulesActives.end(); particule++)
-    numeroMax = numeroMax < (*particule)->getID() ?
+    {
+      numeroMax = numeroMax < (*particule)->getID() ?
     	(*particule)->getID() : numeroMax;
+    }
 
   for (particule=m_pwait.begin(); particule!=m_pwait.end(); particule++)
     numeroMax = numeroMax < (*particule)->getID() ?
@@ -2635,7 +2644,7 @@ double EnsComposant::
   	omynm1, omznm1;
   int i = 0 ;
   list<Particule*>::iterator particule;
-  
+
   for (particule=m_particulesActives.begin(),i=0;
   	particule!=m_particulesActives.end(); particule++)
   {
@@ -2644,7 +2653,7 @@ double EnsComposant::
     {
       ifstream pdata( ( dirRes + "/particle-data-" + Grains_Exec::intToString(i)
       	+ "" ).c_str(), ios::in );
-	
+
       while ( !pdata.eof() )
       {
         getline( pdata, sbuffer, '\n' );
@@ -2653,30 +2662,30 @@ double EnsComposant::
           linetnm1 = linet ;
           linet = sbuffer ;
         }
-      } 
-          	
+      }
+
       iss.str( linetnm1 );
       iss >> time_nm1 >> sbuffer >> sbuffer >> sbuffer >> vxnm1 >> vynm1 >>
 	vznm1 >> omxnm1 >> omynm1 >> omznm1;
       iss.clear();
-      
+
       iss.str( linet );
       iss >> time_n;
-      iss.clear(); 
-      
+      iss.clear();
+
       previousdtfluid = time_n - time_nm1;
-      
+
 //      cout << previousdtfluid << " " << vznm1 << endl;
-      
+
       (*particule)->setVelocityPreviousTimeRestart( vxnm1,
   	vynm1, vznm1, omxnm1, omynm1, omznm1 ) ;
-      (*particule)->setVelocityAndVelocityDifferencePreviousTime() ;           
-      
-      pdata.close();	      
+      (*particule)->setVelocityAndVelocityDifferencePreviousTime() ;
+
+      pdata.close();
     }
   }
-  
-  return ( previousdtfluid );  
+
+  return ( previousdtfluid );
 }
 
 
@@ -2765,7 +2774,7 @@ void EnsComposant::compute_ParticleClassesConcentration( void )
   vector<Particule*>::iterator iv;
   int i=0;
   MPIWrapperGrains const* wrapper = Grains_Exec::getComm() ;
-
+  // cout << "hi 3.0" << endl;
   for (iv=m_ParticuleClassesReference.begin();
   	iv!=m_ParticuleClassesReference.end(); iv++, i++)
   {
@@ -2837,6 +2846,22 @@ void EnsComposant::setAllContactMapToFalse()
 	particule!=m_particulesActives.end();particule++)
     (*particule)->setContactMapToFalse();
 
+  for (list<Particule*>::iterator particuleH=m_particulesHalozone.begin();
+	particuleH!=m_particulesHalozone.end();particuleH++){
+        (*particuleH)->setContactMapToFalse();
+    }
+
+  for (list<Particule*>::iterator particuleClone=m_particulesClones.begin();
+	particuleClone!=m_particulesClones.end();particuleClone++){
+        (*particuleClone)->setContactMapToFalse();
+    }
+
+  for (list<Particule*>::iterator particuleCloneP=
+    m_particulesClonesPeriodiques.begin();
+	particuleCloneP!=m_particulesClonesPeriodiques.end();particuleCloneP++){
+        (*particuleCloneP)->setContactMapToFalse();
+    }
+
   list<MonObstacle*> obstacles = m_obstacle->getObstacles();
   list<MonObstacle*>::iterator myObs;
   for( myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++ )
@@ -2856,6 +2881,21 @@ void EnsComposant::updateAllContactMaps()
         (*particule)->updateContactMap();
     }
 
+  for (list<Particule*>::iterator particuleH=m_particulesHalozone.begin();
+	particuleH!=m_particulesHalozone.end();particuleH++){
+        (*particuleH)->updateContactMap();
+    }
+
+  for (list<Particule*>::iterator particuleClone=m_particulesClones.begin();
+	particuleClone!=m_particulesClones.end();particuleClone++){
+        (*particuleClone)->updateContactMap();
+    }
+
+  for (list<Particule*>::iterator particuleCloneP=
+    m_particulesClonesPeriodiques.begin();
+	particuleCloneP!=m_particulesClonesPeriodiques.end();particuleCloneP++){
+        (*particuleCloneP)->updateContactMap();
+    }
 
   list<MonObstacle*> obstacles = m_obstacle->getObstacles();
   list<MonObstacle*>::iterator myObs;

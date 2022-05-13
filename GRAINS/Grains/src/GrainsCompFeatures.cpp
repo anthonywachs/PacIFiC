@@ -69,10 +69,10 @@ void GrainsCompFeatures::Construction( DOMElement* rootElement )
   string output_root = ReaderXML::getNodeAttr_String( para, "Root");
 
 
-  // Particules 
+  // Particules
   DOMNode* particules = ReaderXML::getNode( root, "Particules" );
-  if ( particules ) 
-  {  
+  if ( particules )
+  {
     cout << "!!! ERROR !!!\n"
 	 << "GrainsCompFeatures is only for non-convex particles\n"
 	 << "Check input particles\n";
@@ -81,39 +81,39 @@ void GrainsCompFeatures::Construction( DOMElement* rootElement )
 
   // Particules Composites
   DOMNode* compParticules = ReaderXML::getNode( root, "CompParticules" );
-  if ( compParticules ) 
+  if ( compParticules )
   {
     int nbPC = int(m_composants.getParticuleClassesReference()->size());
-    DOMNodeList* allCompParticules = ReaderXML::getNodes( rootElement, 
+    DOMNodeList* allCompParticules = ReaderXML::getNodes( rootElement,
     	"CompParticule" );
 
-    // nombre de particules elemtaires 
+    // nombre de particules elemtaires
     size_t nbreCompPart = allCompParticules->getLength();
 
-    for (XMLSize_t i=0; i<nbreCompPart; i++) 
+    for (XMLSize_t i=0; i<nbreCompPart; i++)
     {
       DOMNode* nCompParticule = allCompParticules->item( i );
       int nbre = ReaderXML::getNodeAttr_Int( nCompParticule, "Nombre" );
 
-      // Remarque: les particules de référence ont un numéro générique -1
-      // d'où "false" dans le constructeur pour auto_numbering = false
-      Particule* particuleRef = new CompParticule( nCompParticule, false, 
+      // Remarque: les particules de rï¿½fï¿½rence ont un numï¿½ro gï¿½nï¿½rique -1
+      // d'oï¿½ "false" dans le constructeur pour auto_numbering = false
+      Particule* particuleRef = new CompParticule( nCompParticule, false,
       	nbPC+int(i) );
       m_composants.AjouterClasseParticules( particuleRef );
       pair<Particule*,int> ppp( particuleRef, nbre );
-      m_newParticules.push_back( ppp );     
-      
+      m_newParticules.push_back( ppp );
+
       /*------------------------------------------------*/
       /* Nombre des points de discretisation du domaine */
       /* de la particule composite                      */
       /*------------------------------------------------*/
       int nx, ny, nz;
-      nx = ReaderXML::getNodeAttr_Int( nCompParticule, "nx"); 
-      ny = ReaderXML::getNodeAttr_Int( nCompParticule, "ny"); 
-      nz = ReaderXML::getNodeAttr_Int( nCompParticule, "nz"); 
+      nx = ReaderXML::getNodeAttr_Int( nCompParticule, "nx");
+      ny = ReaderXML::getNodeAttr_Int( nCompParticule, "ny");
+      nz = ReaderXML::getNodeAttr_Int( nCompParticule, "nz");
 
       cout << "nx=" << nx << " |ny=" << ny << " |nz=" << nz << endl;
-     
+
       /* recuperation du domaine pour l'evaluation du volume */
       vector<Scalar> box = particuleRef->getCompFeaturesBox();
       vector<Vecteur> InitialPos = particuleRef->getInitialRelativePositions();
@@ -130,7 +130,7 @@ void GrainsCompFeatures::Construction( DOMElement* rootElement )
       dy = ly/(ny-1);
       dz = lz/(nz-1);
       dV = dx*dy*dz;
-      
+
       Scalar volume_appr = 0.;
       double x = 0., y = 0., z = 0.;
       double xCG = 0., yCG = 0., zCG = 0.;
@@ -141,10 +141,10 @@ void GrainsCompFeatures::Construction( DOMElement* rootElement )
 
       Scalar Iox, Ioy, Ioz, Ioyz, Ioxz, Ioxy;
       Iox = Ioy = Ioz = Ioyz = Ioxz = Ioxy = 0.;
-      
+
       /* Output python visualisation */
 //      ofstream f( ( output_root + "/CompParticule.dat" ).c_str(), ios::out );
-      for(int ii = 0; ii < nx-1; ++ii) 
+      for(int ii = 0; ii < nx-1; ++ii)
         for(int jj = 0; jj < ny-1; ++jj)
           for(int kk = 0; kk < nz-1; ++kk)
 	  {
@@ -167,13 +167,13 @@ void GrainsCompFeatures::Construction( DOMElement* rootElement )
 	      Ioxz +=  x * z * dV;
 	      Ioxy +=  x * y * dV;
             }
-  	  
+
 	  }
       /* Centre de gravite dans le repere local */
       xCG = (xCG / volume_appr);
       yCG = (yCG / volume_appr);
       zCG = (zCG / volume_appr);
-      
+
 //      f.close();
 
       /*-----------------------------------------------------------*/
@@ -186,17 +186,17 @@ void GrainsCompFeatures::Construction( DOMElement* rootElement )
 
       ofstream fOut( ( output_root + "/inertia.xml" ).c_str(), ios::out );
       fOut << "        <Inertie>" << endl;
-      fOut << "           <Volume VOLUME=\"" << scientific << 
-      setprecision(15)<< volume_appr << "\"/>" << endl; 
+      fOut << "           <Volume VOLUME=\"" << scientific <<
+      setprecision(15)<< volume_appr << "\"/>" << endl;
       fOut << "           <GravityCenter xCG=\"" << xCG << "\"" << endl;
       fOut << "                          yCG=\"" << yCG << "\"" << endl;
-      fOut << "                          zCG=\"" << zCG << "\"/>"<< endl; 
+      fOut << "                          zCG=\"" << zCG << "\"/>"<< endl;
       fOut << "           <Tenseur Ixx=\"" << Iox << "\"" << endl;
       fOut << "                    Iyy=\"" << Ioy << "\"" << endl;
       fOut << "                    Izz=\"" << Ioz << "\"" << endl;
       fOut << "                    Iyz=\"" << Ioyz << "\"" << endl;
       fOut << "                    Ixz=\"" << Ioxz << "\"" << endl;
-      fOut << "                    Ixy=\"" << Ioxy << "\"/>" << endl; 
+      fOut << "                    Ixy=\"" << Ioxy << "\"/>" << endl;
       fOut << "        </Inertie>" << endl;
       fOut.close();
 
@@ -222,19 +222,19 @@ void GrainsCompFeatures::Chargement( DOMElement* rootElement )
   DOMNode* root = ReaderXML::getNode( rootElement, "Simulation" );
 
   // Post-processing writers
-  DOMNode* nPostProcessors = ReaderXML::getNode( root, 
+  DOMNode* nPostProcessors = ReaderXML::getNode( root,
   	"PostProcessingWriters" );
   if ( nPostProcessors )
   {
     DOMNodeList* allPPW = ReaderXML::getNodes( nPostProcessors );
     for (XMLSize_t i=0; i<allPPW->getLength(); i++)
-    {      
+    {
       DOMNode* nPPW = allPPW->item( i );
       PostProcessingWriter* ppw = PostProcessingWriter_BuilderFactory::create(
     		nPPW, m_rank, m_nprocs );
       if ( ppw ) m_composants.addPostProcessingWriter( ppw );
     }
-  }	
+  }
 }
 
 
@@ -254,13 +254,13 @@ void GrainsCompFeatures::Simulation( bool predict, bool isPredictorCorrector,
 	bool explicit_added_mass )
 {
   // IMPORTANT: quel que soit le systeme etudie, si celui ci contient
-  // N particules et M obstacles, les particules sont numerotees de 0 à N-1
-  // et les obstacles de N à N+M-1
+  // N particules et M obstacles, les particules sont numerotees de 0 ï¿½ N-1
+  // et les obstacles de N ï¿½ N+M-1
   // Dans le cas de reload avec insertion supplementaire, cela necessite de
   // renumeroter les obstacles
-  
+
   int numPartMax = numeroMaxParticules();
-  if (numPartMax) ++numPartMax;  
+  if (numPartMax) ++numPartMax;
   list< pair<Particule*,int> >::iterator ipart;
 
   // Construction des nouvelles particules
@@ -268,13 +268,13 @@ void GrainsCompFeatures::Simulation( bool predict, bool isPredictorCorrector,
   for (ipart=m_newParticules.begin();ipart!=m_newParticules.end();ipart++)
   {
     int nbre = ipart->second;
-    for (int ii=0; ii<nbre; ii++) 
+    for (int ii=0; ii<nbre; ii++)
     {
       Particule* particule = ipart->first->createCloneCopy();
       m_composants.Ajouter( particule );
     }
   }
-  
+
 //  Grains::InsertCreateNewParticules();
   m_composants.PostProcessing_start( m_temps, m_dt, m_sec, m_fenetres );
   m_composants.PostProcessing_end();

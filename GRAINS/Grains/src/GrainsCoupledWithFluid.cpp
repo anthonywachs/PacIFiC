@@ -135,14 +135,23 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
       string   cle;
       ifstream simulLoad( restart.c_str() );
       simulLoad >> cle >> m_temps;
-      m_new_reload_format = false ;
+			m_new_reload_format = false ;
       if ( cle == "NEW_RELOAD_FORMAT" )
       {
         m_new_reload_format = true ;
-	simulLoad >> cle >> m_temps;
+        simulLoad >> cle >> m_temps;
+      }
+      else if (cle == "NEW_RELOAD_FORMAT_AND_CONTACT_HISTORY")
+      {
+        // Contact history is the new standard - just as reload 2014 - but these
+        // conditions ensure previous cases are still compatible.
+        m_new_reload_format = true ;
+        m_history_storage = true ;
+        simulLoad >> cle >> m_temps;
       }
       Contact_BuilderFactory::reload( simulLoad );
-      m_composants.read( simulLoad, restart, m_new_reload_format );
+      m_composants.read( simulLoad, restart, m_new_reload_format,
+			 										m_history_storage);
       Contact_BuilderFactory::set_materialsForObstaclesOnly_reload(
       		m_composants.getParticuleClassesReference() );
       simulLoad >> cle;
@@ -198,7 +207,7 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
     DOMNode* cellsize = ReaderXML::getNode( root, "CellSize" );
     if ( cellsize )
       LC_coef = ReaderXML::getNodeAttr_Double( cellsize, "Factor" );
-    if ( LC_coef < 1. ) LC_coef = 1.;    
+    if ( LC_coef < 1. ) LC_coef = 1.;
     defineLinkedCell( LC_coef * m_rayon );
 
     m_sec->Link( m_composants.getObstacles() );
@@ -426,7 +435,7 @@ void GrainsCoupledWithFluid::set_timeStep( double const dtfluid )
 
     m_dt = dtfluid/m_N;
     m_simulTime = dtfluid;
-    
+
     // cout << "Can: granular time-step: dtg " << m_dt << endl;
     // cout << "Can: number of granular time-steps " << m_N << endl;
     // cout << "Can: fluid time-step: dtf within grains " << dtfluid << endl;
@@ -437,8 +446,8 @@ void GrainsCoupledWithFluid::set_timeStep( double const dtfluid )
 void GrainsCoupledWithFluid::set_ExplicitAddedMasstimeStep( double dtfluid )
 {
 
-  if ( m_processorIsActiv )     
-    if ( m_explicitAddedMass ) 
+  if ( m_processorIsActiv )
+    if ( m_explicitAddedMass )
       dynamic_cast<AddedMass*>(m_explicitAddedMass)->setsimulTime( dtfluid );
 }
 
@@ -690,10 +699,10 @@ void GrainsCoupledWithFluid::Simulation( bool predict,
         break;
       }
     }
-    
-    cout << "Grains Time = " << 
+
+    cout << "Grains Time = " <<
     	Grains_Exec::doubleToString( ios::scientific, 8, m_temps ) << endl;
-    cout << "Grains dtfluid = " << 
+    cout << "Grains dtfluid = " <<
     	Grains_Exec::doubleToString( ios::scientific, 8, time ) << endl;
   }
 }
@@ -845,25 +854,25 @@ void GrainsCoupledWithFluid::AddExplicitAddedMass(
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void GrainsCoupledWithFluid::InitializeExplicitAddedMassRestart(
-	bool const& restart, string const& dirRes, 
+	bool const& restart, string const& dirRes,
 	string const& fluidsolver )
 {
   if ( m_processorIsActiv )
   {
     if ( restart )
     {
-      if ( fluidsolver == "PeliGRIFF" ) 
+      if ( fluidsolver == "PeliGRIFF" )
         m_composants.setVelocityAndVelocityDifferencePreviousTimeRestart(
       		dirRes );
-		
+
       else
-      { 
+      {
         double previousdtfluid = m_composants.
 		setVelocityAndVelocityDifferencePreviousTimeRestart_Basilisk(
       		dirRes );
-	dynamic_cast<AddedMass*>(m_explicitAddedMass)->setsimulTime( 
+	dynamic_cast<AddedMass*>(m_explicitAddedMass)->setsimulTime(
 		previousdtfluid );
-      }	
+      }
     }
   }
 }

@@ -62,6 +62,14 @@ public:
 		     LinkedCell *LC,
 		     Scalar dt, int nbContact = 1 ) ;
 
+  /** @brief Computation of vector tangent to contact according to Costa (2015)
+  @param tij The vector where the result is stored
+  @param n_t Eta_t, the tangential damping coefficient
+  @param u_t The tangential velocity
+  @param kdelta The cumulative displacement */
+  void computeTangentialVector(Vecteur& tij, double n_t, const Vecteur ut,
+        const Vecteur kdelta);
+
   /*
     @brief Initialisation des proprietes cohesives
     @param p0_ Premier composant (Particule)
@@ -135,13 +143,15 @@ protected:
   	const double& en_, const double &tc_, const double &v0_ ) const;
 
   /**
-    @brief Calcul effectif des forces & moments de contact
-    @param p0_ Premier Composant (Particule)
-    @param p1_ Deuxieme Composant (Particule ou Obstacle)
-    @param recouvrement Points & Recouvrement entre les deux Composants
-    @param delFN force normale
-    @param delFT force tangentielle
-    @param delM moment
+    @brief Computation of contact forces & torques with memory term
+    @param p0_ First Composant (Particule)
+    @param p1_ Second Composant (Particule or Obstacle)
+    @param recouvrement Points & Recouvrement between the two Composants
+    @param delFN normal force
+    @param delFT tangential force
+    @param delM torque
+    @param elementary_id0 Id of elementary particle in case of Composite
+    @param elementary id1 Id of elementary particle in case of Composite
   */
   void performForcesCalculus(
         Composant* p0_,
@@ -150,7 +160,10 @@ protected:
 	PointContact &recouvrement,
 	Vecteur &delFN,
 	Vecteur &delFT,
-	Vecteur &delM );
+	Vecteur &delM,
+  int elementary_id0,
+  int elementary_id1,
+  bool forget_contact=false);
 
   /** @brief Compute the contact force for postprocessing
        it also computes the energy dissipation rate

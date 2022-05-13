@@ -132,32 +132,57 @@ public:
   /** @brief Update contact map */
   virtual void updateContactMap();
 
-  /** @brief Does the contact exist in the map, if yes return the pointer to the
-  cumulative tangential displacement
-  @param tangentialDepl pointer to the cumulative tangential displacement
-  @param id id number of the other component */
-  virtual bool ContactInMapIsActive( int const& id, int* &nbCumulTangent,
-    Vecteur* &tangent, double* &tangentialDepl, Vecteur* &cumulSpringTorque );
+  /** @brief Does the contact exist in the map? If so, return true and make
+  kdelta, prev_normal and cumulSpringTorque point to the memorized info. Otherwise, return false and set those pointers to NULL.
+  @param id key in the map
+  @param kdelta pointer to the memory of the vector kt * delta_t
+  @param prev_normal pointer to the previous vector normal to the contact plane
+  @param cumulSpringTorque pointer to the memory of the spring-like component of the friction torque */
+  virtual bool getContactMemory( std::tuple<int,int,int> const& id,
+    Vecteur* &kdelta, Vecteur* &prev_normal, Vecteur* &cumulSpringTorque );
 
   /** @brief Add new contact in the map
-  @param tangentialDepl initial tangential displacement
-  @param id id number of the other component */
-  virtual void addNewContactInMap( int const& id, int const& nbCumulTangent,
-    Vecteur const& tangent, double const& tangentialDepl,
+  @param id key in the map
+  @param kdelta pointer to the memory of the vector kt * delta_t
+  @param prev_normal pointer to the previous vector normal to the contact plane
+  @param cumulSpringTorque pointer to the memory of the spring-like component of the friction torque */
+  virtual void addNewContactInMap( std::tuple<int,int,int> const& id,
+    Vecteur const& kdelta, Vecteur const& prev_normal,
     Vecteur const& cumulSpringTorque );
 
-  /** @brief Increase cumulative tangential displacement with component id
-  @param tangentialDepl additional tangential displacement
-  @param id id number of the other component */
-  virtual void addDeplContactInMap( int const& id, int const& nbCumulTangent,
-    Vecteur const& tangent, double const& tangentialDepl,
+  /** @brief Store memory of the contact with component id: increase cumulative tangential displacement and cumulative spring torque, remember contact normal.
+  @param id key in the map
+  @param kdelta pointer to the memory of the vector kt * delta_t
+  @param prev_normal pointer to the previous vector normal to the contact plane
+  @param cumulSpringTorque pointer to the memory of the spring-like component of the friction torque */
+  virtual void addDeplContactInMap( std::tuple<int,int,int> const& id,
+    Vecteur const& kdelta, Vecteur const& prev_normal,
     Vecteur const& cumulSpringTorque );
 
-  //@}
+  /** @brief copyHistoryContacts write the contact map information in an array of doubles
+  @param destination the array of double where the contact map should be stored
+  @param start index the index of destination where the copy should start */
+  virtual void copyHistoryContacts( double* &destination, int start_index );
 
-  // ---------------------------------------------------------------------------
-  // Print active neighbors of the particle
+  /** @brief copyContactInMap add a single contact info to the contact map
+  @param id key in the map
+  @param isActive boolean: true if the contact is active, false otherwise
+  @param kdelta pointer to the memory of the vector kt * delta_t
+  @param prev_normal pointer to the previous vector normal to the contact plane
+  @param cumulSpringTorque pointer to the memory of the spring-like component of the friction torque */
+  virtual void copyContactInMap( std::tuple<int,int,int> const& id,
+    bool const& isActive, Vecteur const& kdelta, Vecteur const& prev_normal,
+    Vecteur const& cumulSpringTorque );
+
+  /** @brief getContactMapSize Return the number of contacts in the contact map
+  */
+  virtual int getContactMapSize();
+
+  /** @brief printActiveNeighbors displays the active neighbours in the format "my_elementary_id/neighbour_id/neightbout_elementary_id ; ...". Useful for debugging only.
+  @param id id of this component
+  */
   virtual void printActiveNeighbors(int const& id );
+  //@}
 
 
   /** @name Methods Set */
@@ -535,6 +560,12 @@ public:
   ( Voir CompParticule ) */
   virtual bool isElementParticule() const { return ( false ); }
 
+  /** @brief Update the ids of the contact map: in the case of a reload with insersion, the obstacle's ids are reset. This function keeps track of that change.
+  @param prev_id previous id that should be updated
+  @param new_id updated id
+  */
+  void updateContactMapId( int prev_id, int new_id);
+
   //@}
 
 
@@ -657,6 +688,22 @@ protected:
   @param composant solid object */
   virtual void writeStatique( ostream &statique,
 	Composant const* composant = NULL ) const;
+
+  /** @brief Write the contact map to file in plain 2014 format
+  @param fileSave output file stream */
+  void writeContactMemory_2014(ostream &fileSave ) const;
+
+  /** @brief Write the contact map to file in binary format
+  @param fileSave output file stream */
+  void writeContactMemory_binary( ostream &fileOut );
+
+  /** @brief Read the contact map to file in plain 2014 format
+  @param fileSave input file stream */
+  void readContactMap_2014( istream &fileSave);
+
+  /** @brief Read the contact map to file in binary format
+  @param fileSave input file stream */
+  void readContactMap_binary( istream &fileSave );
   //@}
 
 
@@ -684,21 +731,12 @@ protected:
   	each particle for postprocessing purposes */
   Vecteur m_ForceLubriPP; /** Sum of lubrication force acting on each particle
         for postprocessing purposes */
-    //     map< int, pair< pair<double,Vecteur> ,bool> > m_contactMap; /** List of active contacts with
-  	// other components */
-  // map < int, std::tuple<double,bool,Vecteur,int> > m_contactMap; /** List of active
-  // contacts with other components. It reads as follows:
-  // map<neighbor id, tuple<tangentialDepl,isContactActive,cumulative tangential
-  // vector, number of time steps since the speed is less than a criterion >*/
-  map < int, std::tuple<bool, int, int, Vecteur, double, Vecteur> > m_contactMap;
+  map < std::tuple<int,int,int>, std::tuple<bool, Vecteur, Vecteur, Vecteur> > m_contactMap;
   /** List of active contacts with other components. It reads as follows:
-  map<neighbor id, tuple<isContactActive, number of time steps since the
-  translational speed is less than a criterion, cumulative tangential vector,
-  cumulative tangential displacement, umber of time steps since the
-  rotational velocity is less than a criterion, cumulative rotational vector,
-  cumulative friction torque> > */
+  map<tuple<own elementary particle id, neighbour id, neighbour elementary
+  particle id>, tuple<isContactActive, kt * cumulative tangential dispacement,
+  previous normal vector, kr * cumulative rotational displacement> > */
   //@}
-
 
   /** @name Parameters Static */
   //@{

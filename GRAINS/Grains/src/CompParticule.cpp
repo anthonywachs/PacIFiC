@@ -92,7 +92,7 @@ CompParticule::CompParticule( DOMNode* root,
     // Convention : les particules elementaires sont de la meme classe
     // que le composite
     m_elementaryParticules[i] = new ElementParticule( nElemParticule,
-    	pc, this );
+    	pc, this, (int) i );
 
     // Lecture de la position relative par rapport � 0
     DOMNode* nRelPos  = ReaderXML::getNode( nElemParticule,
@@ -860,6 +860,7 @@ void CompParticule::InterAction( Composant* voisin,
   throw ( ErreurContact )
 {
   list<ContactInfos*>  listContactInfos;
+	// int c=0;
   for ( size_t i=0; i<m_elementaryParticules.size(); ++i )
   {
     if ( voisin->isCompParticule() )
@@ -867,6 +868,8 @@ void CompParticule::InterAction( Composant* voisin,
 	  temps, LC, listContactInfos );
     else m_elementaryParticules[i]->SearchContact( voisin, dt,
 	  temps, LC, listContactInfos )  ;
+		// cout << "sub-particle #"<<c<<" and length ContactInfo="<<int(listContactInfos.size()) << endl;
+		// c++;
   }
 
   int nbContact = int(listContactInfos.size());
@@ -1166,6 +1169,9 @@ void CompParticule::read2014( istream &fileSave, vector<Particule*> const*
   	m_geoFormeVdw->getConvex() );
   fileSave >> *m_cinematique;
 
+	// Read the contact memories of the particle (if any)
+  readContactMap_2014( fileSave );
+
   // Calcul de la masse volumique et du poids
   m_compVolume = (*ParticuleClassesReference)[m_ParticuleClasse]->getVolume();
   m_masseVolumique = m_masse / m_compVolume;
@@ -1200,11 +1206,12 @@ void CompParticule::read2014( istream &fileSave, vector<Particule*> const*
 // dans la simulation (actives ou en attentes) pour le format de reload 2014
 // format de reload
 void CompParticule::read2014_binary( istream &fileSave,
-	vector<Particule*> const* ParticuleClassesReference )
+	vector<Particule*> const* ParticuleClassesReference,
+	bool const& contact_history_storage )
 {
   // Lecture du n� et de la classe de reference
-  fileSave.read( reinterpret_cast<char*>( &m_id ), sizeof(int) );
-  fileSave.read( reinterpret_cast<char*>( &m_ParticuleClasse ), sizeof(int) );
+	fileSave.read( reinterpret_cast<char*>( &m_id ), sizeof(int) );
+	fileSave.read( reinterpret_cast<char*>( &m_ParticuleClasse ), sizeof(int) );
 
   // Creation de la forme (convex + transform) en utilisant le constructeur
   // de recopie
@@ -1243,6 +1250,12 @@ void CompParticule::read2014_binary( istream &fileSave,
   m_cinematique = Cinematique_BuilderFactory::create(
   	m_geoFormeVdw->getConvex() );
   m_cinematique->readCineParticule2014_binary( fileSave );
+
+	if (contact_history_storage)
+  {
+    // Read the contact memories of the particle (if any)
+    readContactMap_binary( fileSave );
+  }
 
   // Calcul de la masse volumique et du poids
   m_compVolume = (*ParticuleClassesReference)[m_ParticuleClasse]->getVolume();
@@ -1351,7 +1364,7 @@ void CompParticule::read( istream &fileSave, vector<Particule*> const*
 
   bool actif;
   fileSave >> buffer >> actif;
-  cout << buffer << " " << actif << endl;
+  // cout << buffer << " " << actif << endl;
   m_activity = ( actif == true ) ? COMPUTE : WAIT;
 
   if ( m_cinematique ) delete m_cinematique;
@@ -1395,6 +1408,7 @@ void CompParticule::ReadElementParticules( istream &fileSave, size_t nbre,
   }
 
   string Cle;
+	string prev_Cle;
   size_t j = 0;
   while ( Cle != "</ElementParticules>" )
   {
@@ -1404,8 +1418,9 @@ void CompParticule::ReadElementParticules( istream &fileSave, size_t nbre,
       j++;
       // Creation des particules elementaires
       m_elementaryParticules[j-1] = new ElementParticule( fileSave,
-	    Cle, this );
+	    Cle, this, std::stoi(prev_Cle) );
     }
+		prev_Cle = Cle;
     fileSave >> Cle;
   }
   assert( Cle == "</ElementParticules>" );

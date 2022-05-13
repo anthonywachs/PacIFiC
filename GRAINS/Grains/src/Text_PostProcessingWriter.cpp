@@ -879,7 +879,7 @@ void Text_PostProcessingWriter::one_output_Standard(Scalar const& temps,
     centre = (*particule)->getPosition();
     gc_coordinates_x << " " << (*centre)[X];
     gc_coordinates_y << " " << (*centre)[Y];
-    gc_coordinates_z << " " << scientific << (*centre)[Z];
+    gc_coordinates_z << " " << (*centre)[Z];
 
     // Vitesse translationnelle du centre de gravit�
     vitesseT = (*particule)->getVitesseTranslation();

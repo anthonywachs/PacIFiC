@@ -341,7 +341,6 @@ void MonObstacle::reload( Obstacle &obstacle, istream &file )
 {
   string buffer, adresse;
   Scalar buf = 0.;
-
   file >> adresse >> m_id;
   SaveTable::create( adresse, this );
   file >> buffer >> m_nomMateriau;
@@ -687,11 +686,11 @@ void MonObstacle::updateContactMap()
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Does the contact exist in the map, if yes return the pointer to the
 // cumulative tangential displacement
-bool MonObstacle::ContactInMapIsActive( int const& id, int* &nbCumulTangent,
-  Vecteur* &tangent, double* &tangentialDepl, Vecteur* &cumulSpringTorque )
+bool MonObstacle::getContactMemory( std::tuple<int,int,int> const& id,
+  Vecteur* &tangent, Vecteur* &prev_normal, Vecteur* &cumulSpringTorque )
 {
-  return ( Composant::ContactInMapIsActive( id, nbCumulTangent, tangent,
-    tangentialDepl, cumulSpringTorque) );
+  return ( Composant::getContactMemory( id, tangent, prev_normal,
+    cumulSpringTorque) );
 }
 
 
@@ -699,12 +698,11 @@ bool MonObstacle::ContactInMapIsActive( int const& id, int* &nbCumulTangent,
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Add new contact in the map
-void MonObstacle::addNewContactInMap( int const& id, int const& nbCumulTangent,
-  Vecteur const& tangent, double const& tangentialDepl,
+void MonObstacle::addNewContactInMap( std::tuple<int,int,int> const& id,
+  Vecteur const& tangent, Vecteur const& prev_normal,
   Vecteur const& cumulSpringTorque )
 {
-  Composant::addNewContactInMap( id, nbCumulTangent, tangent,
-    tangentialDepl, cumulSpringTorque );
+  Composant::addNewContactInMap( id, tangent, prev_normal, cumulSpringTorque );
 }
 
 
@@ -712,10 +710,35 @@ void MonObstacle::addNewContactInMap( int const& id, int const& nbCumulTangent,
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Increase cumulative tangential displacement with component id
-void MonObstacle::addDeplContactInMap( int const& id, int const& nbCumulTangent,
-  Vecteur const& tangent, double const& tangentialDepl,
+void MonObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
+  Vecteur const& tangent, Vecteur const& prev_normal,
   Vecteur const& cumulSpringTorque )
 {
-  Composant::addDeplContactInMap( id, nbCumulTangent, tangent,
-    tangentialDepl, cumulSpringTorque );
+  Composant::addDeplContactInMap( id, tangent, prev_normal, cumulSpringTorque );
+}
+
+
+void MonObstacle::copyHistoryContacts( double* &destination, int start_index )
+{
+  Composant::copyHistoryContacts( destination, start_index ) ;
+}
+
+// ----------------------------------------------------------------------------
+// Copy existing contact in the map
+void MonObstacle::copyContactInMap( std::tuple<int,int,int> const& id,
+  bool const& isActive, Vecteur const& tangent, Vecteur const& prev_normal,
+  Vecteur const& cumulSpringTorque )
+{
+  Composant::copyContactInMap( id, isActive, tangent, prev_normal,
+    cumulSpringTorque ) ;
+}
+
+int MonObstacle::getContactMapSize()
+{
+  return ( Composant::getContactMapSize() );
+}
+
+void MonObstacle::updateContactMapId( int prev_id, int new_id)
+{
+  Composant::updateContactMapId( prev_id, new_id);
 }
