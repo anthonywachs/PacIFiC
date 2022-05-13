@@ -2253,7 +2253,7 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
           for ( size_t i=0;i<m_periodic_vector_indices[geoloc].size();++i)
           {
 	    // Create periodic clone
-	    periodic_clone = (*particle)->createCloneCopy( (*particle)->getID(), 
+	    periodic_clone = (*particle)->createCloneCopy( (*particle)->getID(),
 		(*ReferenceParticles)[(*particle)->getGeometricType()], 
 		*((*particle)->getTranslationalVelocity()),
 		*((*particle)->getQuaternionRotation()),	 

@@ -194,9 +194,10 @@ class RigidBody
     @param fileOut output stream */
     void writePosition( ostream& fileOut ) const;
 
-    /** @brief Writes the rigid body's transformation in an output stream in a
-    format suitable to the coupling with a fluid solver. Note: this method works
-    for discs, polygons, polyhedrons, spheres and 3D cylinders
+    /** @brief Writes the geometric features of the rigid body in its current
+    position in an output stream in a format suitable to the coupling with a 
+    fluid solver. Note: this method works for discs, polygons, polyhedrons, 
+    spheres and 3D cylinders
     @param fluid output stream */
     void writePositionInFluid( ostream& fluid );
 

@@ -5,7 +5,7 @@ int Disc::m_visuNodeNb = 20;
 
 // ----------------------------------------------------------------------------
 // Constructor with radius as input parameter
-Disc::Disc(double r) 
+Disc::Disc( double r ) 
   : m_radius(r)
 {}
 

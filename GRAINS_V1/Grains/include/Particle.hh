@@ -605,32 +605,32 @@ class Particle : public Component
     double m_density; /**< Density */
     static double m_fluidDensity; /**< Surrounding fluid density */
     static double m_fluidViscosity; /**< Surrounding fluid viscosity */
-    static bool m_explicitAddedMass; /** Whether part of the particle
+    static bool m_explicitAddedMass; /**< Whether part of the particle
     	acceleration is treated explicitly */
-    double m_inertia[6]; /** Inertia tensor I={I(1,1), I(1,2), I(1,3), 
+    double m_inertia[6]; /**< Inertia tensor I={I(1,1), I(1,2), I(1,3), 
   	I(2,2), I(2,3), I(3,3)} */  
-    double m_inertia_1[6]; /** Inverse inertia tensor */  
-    ParticleActivity m_activity; /** Particle activity */  
-    struct AddedMassInfos* m_addedMassInfos; /** data to compute the 
+    double m_inertia_1[6]; /**< Inverse inertia tensor */  
+    ParticleActivity m_activity; /**< Particle activity */  
+    struct AddedMassInfos* m_addedMassInfos; /**< data to compute the 
     	contribution of the particle acceleration treated explicitly (used for 
 	neutrally buoyant or lighter particles than the fluid) */ 
-    int m_tag; /** tag of the cell the particle belongs to at the 
+    int m_tag; /**< tag of the cell the particle belongs to at the 
     	current time: 0=interior, 1=buffer zone, 2=halo zone */
-    GeoPosition m_GeoLoc; /** geographic position of the particle in the 
+    GeoPosition m_GeoLoc; /**< geographic position of the particle in the 
     	Linked cell, i.e. geographic position of the cell the particle belongs 
 	to at the current time */
-    Cell* m_cellule; /** Cell that the particle belongs to at the 
+    Cell* m_cellule; /**< Cell that the particle belongs to at the 
     	current time */
-    int m_tag_nm1; /** tag of the cell the particle belonged to at the 
+    int m_tag_nm1; /**< tag of the cell the particle belonged to at the 
     	previous time: 0=interior, 1=buffer zone, 2=halo zone */
-    GeoPosition m_GeoLoc_nm1; /** geographic position of the particle in the 
+    GeoPosition m_GeoLoc_nm1; /**< geographic position of the particle in the 
     	Linked cell, i.e. geographic position of the cell the particle belonged 
 	to at the previous time */		    
-    Cell* m_cellule_nm1; /** Cell that the particle belonged to at the 
+    Cell* m_cellule_nm1; /**< Cell that the particle belonged to at the 
     	previous time */
-    int m_GeomType; /** particle geometric type */ 
-    int m_coordination_number; /** coordination number */
-    Vector3 m_weight; /** particle weight */
+    int m_GeomType; /**< particle geometric type */ 
+    int m_coordination_number; /**< coordination number */
+    Vector3 m_weight; /**< particle weight */
     //@}
     
     

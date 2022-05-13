@@ -38,6 +38,11 @@ INCDIRXML := XML/include
 INCDIR += $(INCDIRXML)
 ALLINC += $(wildcard $(INCDIRXML)/*.hh)
 
+SRCDIRBAS := InterfaceCBasilisk/src
+INCDIRBAS := InterfaceCBasilisk/include
+INCDIR += $(INCDIRBAS)
+ALLINC += $(wildcard $(INCDIRBAS)/*.h)
+
 
 # Target directories
 OBJDIR := obj$(GRAINS_FULL_EXT)
@@ -98,6 +103,8 @@ DEBUG  := -g
 # XML 
 MACRO       := -D_XML
 XERCESINC   := $(XERCESC_ROOT)/include
+XERCESLIB   := $(XERCESC_ROOT)/lib$(GRAINS_BITS_EXT)-$(GRAINS_SERCOMPIL_ENV)-$(GRAINS_SERCOMPIL_VERSION)
+XERCESFLAGS := -L$(XERCESLIB) -lxerces-c -lxerces-depdom
 
 
 # MPI
@@ -123,16 +130,16 @@ COMPFLAGS := $(DEBUG) $(INCFLAGS)
 # Production rules
 .SILENT:
 
-all : grains
-	@echo '--------------------------------'
+all : grains Basilisk
 
 grains : MESS CPINC START XML GEOM COMPO BASE TIME PP FLUID
 	$(LINK) -shared -Wl,-soname,libgrains.so $(MPIFLAGS) $(ZFLAGS) -o $(LIBDIR)/libgrains.so $(OBJS_XML) $(OBJS_GEOM) $(OBJS_COMPO) $(OBJS_BASE) $(OBJS_TIME) $(OBJS_PP) $(OBJS_FLUID) 
 	@echo 'Compilation is complete'
 	@echo '--------------------------------'
 	@echo 'Library libgrains.so generated !'
+	@echo '--------------------------------'	
 
-BASE   :  $(OBJS_BASE)
+BASE   : $(OBJS_BASE)
 	@echo '*** Package Base compiled'
 	@echo
 
@@ -177,6 +184,15 @@ CPINC  :
 	@echo 'Copy include files from subdirectories to' $(INCDIROUT)
 	rm -f $(INCDIROUT)/*
 	cp $(ALLINC) $(INCDIROUT)/	 	
+
+Basilisk :
+	@echo 'Compiling $(SRCDIRBAS)/InterfaceGrains3DBasilisk.cpp'
+	$(COMP) $(COMPFLAGS) -shared $(SRCDIRBAS)/InterfaceGrains3DBasilisk.cpp -L$(LIBDIR) -lgrains $(XERCESFLAGS) -o $(LIBDIR)/libInterfaceGrains3DBasilisk.so
+#	rm -f $(BASILISK_DLMFD)/InterfaceGrains3DBasilisk.h
+#	ln -s $(GRAINS_ROOT)/inc/InterfaceGrains3DBasilisk.h $(BASILISK_DLMFD)/InterfaceGrains3DBasilisk.h
+	@echo '---------------------------------------------------'
+	@echo 'Library libInterfaceGrains3DBasilisk.so generated !'
+	@echo '---------------------------------------------------'	
 
 $(OBJDIR)/%.o : %.cpp
 	@echo 'Compiling '$<
