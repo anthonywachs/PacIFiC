@@ -27,13 +27,23 @@
 # define inf2deltaz (relnl.z < 2.1*delta) && (relnl.z > 1.9*delta)
 # define inf1deltaz (relnl.z < 1.1*delta) && (relnl.z > 0.9*delta)
 
-void compute_relative_vector (coord vec1, coord vec2, coord * rel) {
+
+//----------------------------------------------------------------------------
+void compute_relative_vector (coord vec1, coord vec2, coord * rel) 
+//----------------------------------------------------------------------------
+{
   foreach_dimension() {
     rel->x = vec2.x - vec1.x;
   }
 }
 
-void assign_dial (coord rel, int * CX) {
+
+
+
+//----------------------------------------------------------------------------
+void assign_dial (coord rel, int * CX) 
+//----------------------------------------------------------------------------
+{
 #if dimension == 2
   if (rel.x > 0 ) {
     if (rel.y > 0 ) {
@@ -59,7 +69,8 @@ void assign_dial (coord rel, int * CX) {
 
 #elif dimension == 3 
   if (rel.z > 0){
-    /* one has to pick the forward cells + the middle ones according to their 2D counterpart */
+    /* one has to pick the forward cells + the middle ones according 
+    to their 2D counterpart */
     if (rel.x > 0 ){
       if (rel.y > 0 ){
 	/* We are on the lower left cell */
@@ -83,7 +94,8 @@ void assign_dial (coord rel, int * CX) {
   }
   
   if (rel.z < 0){
-    /* one has to pick the backward cells + the middle ones according to their 2D counterpart */
+    /* one has to pick the backward cells + the middle ones according 
+    to their 2D counterpart */
 
     if (rel.x > 0 ){
       if (rel.y > 0 ){
@@ -109,8 +121,14 @@ void assign_dial (coord rel, int * CX) {
 #endif 
 }
 
-void NCX1_CX1 (const coord relnl, const double delta, const int weight_numbers[9], int * weight_id, size_t * goflag) {
 
+
+
+//----------------------------------------------------------------------------
+void NCX1_CX1 (const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   // weight_numbers[2] -> right column top
   // weight_numbers[5] -> right column middle
   // weight_numbers[1] -> right column bottom
@@ -176,10 +194,15 @@ void NCX1_CX1 (const coord relnl, const double delta, const int weight_numbers[9
 
   
 }
-//recoded on 28-02-2019
 
-void NCX1_CX2 (const coord relnl, const double delta, const int weight_numbers[9], int * weight_id, size_t * goflag) {
 
+
+
+//----------------------------------------------------------------------------
+void NCX1_CX2 (const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   // weight_numbers[2] -> right column top
   // weight_numbers[5] -> right column middle
   // weight_numbers[1] -> right column bottom
@@ -240,9 +263,15 @@ void NCX1_CX2 (const coord relnl, const double delta, const int weight_numbers[9
     }
   }
 }
-//recoded on 28-02-2019
 
-void NCX_centred (const coord relnl, const double delta, const int weight_numbers[9], int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX_centred (const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   /* Stencil config, O is the cell containning the Lagrange multiplier */
   /* |_|_|_|_|_| -->  |_|_|_|_|_| */
   /* |_|x|x|x|_| -->  |_|3|6|2|_| */
@@ -292,9 +321,15 @@ void NCX_centred (const coord relnl, const double delta, const int weight_number
   }
 
 }
-//recoded on 28-02-2019
 
-void NCX1_CX4 (const coord relnl, const double delta, const int weight_numbers[9], int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX1_CX4 (const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   // weight_numbers[2] -> right column top
   // weight_numbers[5] -> right column middle
   // weight_numbers[1] -> right column bottom
@@ -357,9 +392,15 @@ void NCX1_CX4 (const coord relnl, const double delta, const int weight_numbers[9
     }
   }
 }
-//recoded on 28-02-2019
 
-void NCX2_CX2 (const coord relnl, const double delta, const int weight_numbers[9], int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX2_CX2 (const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   // weight_numbers[2] -> right column top
   // weight_numbers[5] -> right column middle
   // weight_numbers[1] -> right column bottom
@@ -423,9 +464,15 @@ void NCX2_CX2 (const coord relnl, const double delta, const int weight_numbers[9
     }
   }
 }
-//recoded on 28-02-2019
 
-void NCX2_CX3 (const coord relnl, const double delta, const int weight_numbers[9], int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX2_CX3 (const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   // weight_numbers[2] -> right column top
   // weight_numbers[5] -> right column middle
   // weight_numbers[1] -> right column bottom
@@ -487,9 +534,15 @@ void NCX2_CX3 (const coord relnl, const double delta, const int weight_numbers[9
     }	
   }
 }
-//recoded on 28-02-2019
 
-void NCX3_CX3 (const coord relnl, const double delta, const int weight_numbers[9], int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX3_CX3 (const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   // weight_numbers[2] -> right column top
   // weight_numbers[5] -> right column middle
   // weight_numbers[1] -> right column bottom
@@ -552,9 +605,15 @@ void NCX3_CX3 (const coord relnl, const double delta, const int weight_numbers[9
   }
 
 }
-//recoded on 28-02-2019
 
-void NCX3_CX4 (const coord relnl, const double delta, const int weight_numbers[9], int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX3_CX4 (const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   // weight_numbers[2] -> right column top
   // weight_numbers[5] -> right column middle
   // weight_numbers[1] -> right column bottom
@@ -617,9 +676,15 @@ void NCX3_CX4 (const coord relnl, const double delta, const int weight_numbers[9
     }
   }
 }
-//recoded on 28-02-2019
 
-void NCX4_CX4 (const coord relnl, const double delta, const int weight_numbers[9], int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX4_CX4 (const coord relnl, const double delta, 
+	const int weight_numbers[9], int * weight_id, size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   /* Stencil config, O is the cell containning the Lagrange multiplier */
   /* |_|_|_|_|_| -->  |_|_|_|_|_| */
   /* |_|_|_|_|_| -->  |_|_|_|_|_| */
@@ -670,10 +735,14 @@ void NCX4_CX4 (const coord relnl, const double delta, const int weight_numbers[9
   }
 
 }
-//recoded on 28-02-2019
 
-void fill_weight_numbers (const int wisz, int * weight_numbers) {
 
+
+
+//----------------------------------------------------------------------------
+void fill_weight_numbers (const int wisz, int * weight_numbers) 
+//----------------------------------------------------------------------------
+{
   // In the plane:
   // weight_numbers[2] -> right column top
   // weight_numbers[5] -> right column middle
@@ -713,11 +782,17 @@ void fill_weight_numbers (const int wisz, int * weight_numbers) {
     weight_numbers[0] = 18; weight_numbers[4] = 19; weight_numbers[1] = 20;
   }
 }
-//recoded on 28-02-2019
+
+
+
 
 #if dimension == 3 
-//NCX10_CX Bloc, 8 functions
-void NCX10_CX10 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+// NCX10_CX Bloc, 8 functions
+//----------------------------------------------------------------------------
+void NCX10_CX10 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -761,9 +836,15 @@ void NCX10_CX10 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX1_CX1 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX10_CX20 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX10_CX20 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] =  {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
  /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -804,9 +885,15 @@ void NCX10_CX20 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX1_CX2 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX10_CX30 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX10_CX30 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -847,9 +934,15 @@ void NCX10_CX30 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX_centred (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX10_CX40 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX10_CX40 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -889,9 +982,15 @@ void NCX10_CX40 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX1_CX4 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX10_CX11 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX10_CX11 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -932,9 +1031,15 @@ void NCX10_CX11 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX1_CX1 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX10_CX21 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX10_CX21 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -973,9 +1078,15 @@ void NCX10_CX21 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX1_CX2 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX10_CX31 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX10_CX31 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1015,9 +1126,15 @@ void NCX10_CX31 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX_centred (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX10_CX41 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX10_CX41 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1057,7 +1174,9 @@ void NCX10_CX41 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX1_CX4 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
+
+
+
 
 // NCX11_CX Bloc, 4 functions
 
@@ -1067,7 +1186,11 @@ void NCX10_CX41 (const coord relnl, const double delta, int * weight_id, size_t 
 
 /* NCX11_CX40 = NCX10_CX41 */
 
-void NCX11_CX11 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+//----------------------------------------------------------------------------
+void NCX11_CX11 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1108,9 +1231,15 @@ void NCX11_CX11 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX1_CX1 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX11_CX21 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX11_CX21 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   /* Stencil config, O is the cell containning the Lagrange multiplier */
   
@@ -1150,9 +1279,15 @@ void NCX11_CX21 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX1_CX2 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX11_CX31 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX11_CX31 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   /* Stencil config, O is the cell containning the Lagrange multiplier */
 
@@ -1192,9 +1327,15 @@ void NCX11_CX31 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX_centred (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX11_CX41 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX11_CX41 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   /* Stencil config, O is the cell containning the Lagrange multiplier */
 
@@ -1234,10 +1375,17 @@ void NCX11_CX41 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX1_CX4 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-//NCX20_CX Bloc, 6 functions
-void NCX20_CX20 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+// NCX20_CX Bloc, 6 functions
+
+//----------------------------------------------------------------------------
+void NCX20_CX20 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1279,9 +1427,15 @@ void NCX20_CX20 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX2_CX2 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX20_CX30 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX20_CX30 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1323,9 +1477,15 @@ void NCX20_CX30 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX2_CX3 (relnl, delta, weight_numbers, weight_id, goflag);
   }  
 }
-//recoded on 28-02-2019
 
-void NCX20_CX40 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX20_CX40 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1367,9 +1527,15 @@ void NCX20_CX40 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX_centred (relnl, delta, weight_numbers, weight_id, goflag);
   }  
 }
-//recoded on 28-02-2019
 
-void NCX20_CX21 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX20_CX21 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1410,9 +1576,15 @@ void NCX20_CX21 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX2_CX2 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX20_CX31 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX20_CX31 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1453,9 +1625,15 @@ void NCX20_CX31 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX2_CX3 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX20_CX41 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX20_CX41 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1496,7 +1674,9 @@ void NCX20_CX41 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX_centred (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
+
+
+
 
 // NCX21_CX Bloc 3 functions
 
@@ -1504,7 +1684,11 @@ void NCX20_CX41 (const coord relnl, const double delta, int * weight_id, size_t 
 
 /* NCX21_CX40 = NCX20_CX41 */
 
-void NCX21_CX21 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+//----------------------------------------------------------------------------
+void NCX21_CX21 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1546,7 +1730,14 @@ void NCX21_CX21 (const coord relnl, const double delta, int * weight_id, size_t 
   }
 }
 
-void NCX21_CX31 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX21_CX31 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1587,9 +1778,15 @@ void NCX21_CX31 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX2_CX3 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX21_CX41 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX21_CX41 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1630,10 +1827,17 @@ void NCX21_CX41 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX_centred (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-//NCX30_CX Bloc, 4 functions
-void NCX30_CX30 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+// NCX30_CX Bloc, 4 functions
+
+//----------------------------------------------------------------------------
+void NCX30_CX30 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1675,9 +1879,15 @@ void NCX30_CX30 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX3_CX3 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX30_CX40 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX30_CX40 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1719,9 +1929,15 @@ void NCX30_CX40 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX3_CX4 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX30_CX31 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX30_CX31 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1762,9 +1978,15 @@ void NCX30_CX31 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX3_CX3 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX30_CX41 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX30_CX41 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1805,13 +2027,19 @@ void NCX30_CX41 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX3_CX4 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-//NCX31_CX Bloc 3 functions
+
+
+
+// NCX31_CX Bloc 3 functions
 
 /* NCX31_CX40 = NCX30_CX41 */
 
-void NCX31_CX31 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+//----------------------------------------------------------------------------
+void NCX31_CX31 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1852,9 +2080,15 @@ void NCX31_CX31 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX3_CX3 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX31_CX41 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX31_CX41 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1895,10 +2129,17 @@ void NCX31_CX41 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX3_CX4 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-//NCX40_CX Bloc 2 functions
-void NCX40_CX40 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+// NCX40_CX Bloc 2 functions
+
+//----------------------------------------------------------------------------
+void NCX40_CX40 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1940,9 +2181,15 @@ void NCX40_CX40 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX4_CX4 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-void NCX40_CX41 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void NCX40_CX41 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
 
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -1983,10 +2230,17 @@ void NCX40_CX41 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX4_CX4 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 
-//NCX41_CX Bloc 1 function
-void NCX41_CX41 (const coord relnl, const double delta, int * weight_id, size_t * goflag) {
+
+
+
+// NCX41_CX Bloc 1 function
+
+//----------------------------------------------------------------------------
+void NCX41_CX41 (const coord relnl, const double delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   int weight_numbers[9] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
   
   /* Stencil config, O is the cell containning the Lagrange multiplier */
@@ -2027,10 +2281,17 @@ void NCX41_CX41 (const coord relnl, const double delta, int * weight_id, size_t 
     NCX4_CX4 (relnl, delta, weight_numbers, weight_id, goflag);
   }
 }
-//recoded on 28-02-2019
 #endif
 
-void assign_weight_id_quad_outward (const int NCX, const int CX, const coord relnl, const double Delta, int * weight_id, size_t * goflag) {
+
+
+
+//----------------------------------------------------------------------------
+void assign_weight_id_quad_outward (const int NCX, const int CX, 
+	const coord relnl, const double Delta, int * weight_id, 
+	size_t * goflag) 
+//----------------------------------------------------------------------------
+{
   double delta = Delta;
   
 #if dimension == 2
@@ -2498,7 +2759,13 @@ void assign_weight_id_quad_outward (const int NCX, const int CX, const coord rel
 #endif
 }
 
-double Q2weighting (size_t  i, double  x, double y, double z ) { 
+
+
+
+//----------------------------------------------------------------------------
+double Q2weighting (size_t  i, double  x, double y, double z ) 
+//----------------------------------------------------------------------------
+{ 
   double result = 0. ;
 
 #if dimension == 2
@@ -2626,61 +2893,131 @@ double Q2weighting (size_t  i, double  x, double y, double z ) {
   return(result);  
 }
 
-void weight_NCX1_CX1 (const coord poslocal, const double Delta, double * x1, double * y1) {
+
+
+
+//----------------------------------------------------------------------------
+void weight_NCX1_CX1 (const coord poslocal, const double Delta, double * x1, 
+	double * y1) 
+//----------------------------------------------------------------------------
+{
   // local cell is the bottom left cell of the stencil
   *x1 = poslocal.x;
   *y1 = poslocal.y;
 }
 
-void weight_NCX1_CX2 (const coord poslocal, const double Delta, double * x1, double * y1) {
+
+
+
+//----------------------------------------------------------------------------
+void weight_NCX1_CX2 (const coord poslocal, const double Delta, double * x1, 
+	double * y1) 
+//----------------------------------------------------------------------------
+{
   // local cell is the bottom center cell of the stencil
   *x1 = poslocal.x - Delta;
   *y1 = poslocal.y;
 }
 
-void weight_centred (const coord poslocal, const double Delta, double * x1, double * y1) {
+
+
+
+//----------------------------------------------------------------------------
+void weight_centred (const coord poslocal, const double Delta, double * x1, 
+	double * y1) 
+//----------------------------------------------------------------------------
+{
   // local cell is the center cell of the stencil
   *x1 = poslocal.x - Delta;
   *y1 = poslocal.y - Delta;
 }
 
-void weight_NCX1_CX4 (const coord poslocal, const double Delta, double * x1, double * y1) {
+
+
+
+//----------------------------------------------------------------------------
+void weight_NCX1_CX4 (const coord poslocal, const double Delta, double * x1, 
+	double * y1) 
+//----------------------------------------------------------------------------
+{
   // local cell is the center left cell of the stencil
   *x1 = poslocal.x;
   *y1 = poslocal.y - Delta;
 }
 
-void weight_NCX2_CX2 (const coord poslocal, const double Delta, double * x1, double * y1) {
+
+
+
+//----------------------------------------------------------------------------
+void weight_NCX2_CX2 (const coord poslocal, const double Delta, double * x1, 
+	double * y1) 
+//----------------------------------------------------------------------------
+{
   // local cell is the bottom right cell of the stencil
   *x1 = poslocal.x - 2.*Delta;
   *y1 = poslocal.y;
 }
 
-void weight_NCX2_CX3 (const coord poslocal, const double Delta, double * x1, double * y1) {
+
+
+
+//----------------------------------------------------------------------------
+void weight_NCX2_CX3 (const coord poslocal, const double Delta, double * x1, 
+	double * y1) 
+//----------------------------------------------------------------------------
+{
   // local cell is the center right cell of the stencil
   *x1 = poslocal.x - 2.*Delta;
   *y1 = poslocal.y - Delta;
 }
 
-void weight_NCX3_CX3 (const coord poslocal, const double Delta, double * x1, double * y1) {
+
+
+
+//----------------------------------------------------------------------------
+void weight_NCX3_CX3 (const coord poslocal, const double Delta, double * x1, 
+	double * y1) 
+//----------------------------------------------------------------------------
+{
   // local cell is the top right cell of the stencil
   *x1 = poslocal.x - 2.*Delta; 
   *y1 = poslocal.y - 2.*Delta; 
 }
 
-void weight_NCX3_CX4 (const coord poslocal, const double Delta, double * x1, double * y1) {
+
+
+
+//----------------------------------------------------------------------------
+void weight_NCX3_CX4 (const coord poslocal, const double Delta, double * x1, 
+	double * y1) 
+//----------------------------------------------------------------------------
+{
   // local cell is the top center cell of the stencil
   *x1 = poslocal.x - Delta; 
   *y1 = poslocal.y - 2.*Delta; 
 }
 
-void weight_NCX4_CX4 (const coord poslocal, const double Delta, double * x1, double * y1) {
+
+
+
+//----------------------------------------------------------------------------
+void weight_NCX4_CX4 (const coord poslocal, const double Delta, double * x1, 
+	double * y1) 
+//----------------------------------------------------------------------------
+{
   // local cell is at the top left cell of the stencil 
   *x1 = poslocal.x; 
   *y1 = poslocal.y - 2.*Delta;
 }
 
-double compute_weight_Quad (const int weight_id, const coord posb ,const coord poslocal, const int NCX, const int CX, const double Delta) {
+
+
+
+//----------------------------------------------------------------------------
+double compute_weight_Quad (const int weight_id, const coord posb ,
+	const coord poslocal, const int NCX, const int CX, const double Delta) 
+//----------------------------------------------------------------------------
+{
   double x1 = 0., y1 = 0., weight = 0.;
   coord posref;
   
@@ -3122,20 +3459,14 @@ double compute_weight_Quad (const int weight_id, const coord posb ,const coord p
 #endif
 }
 
-size_t is_it_in_sphere (const double x, const double y, const double z, const GeomParameter gp) {
-  size_t isin = 0;
 
-#if dimension == 2
-  if (sqrt (sq (x - gp.center.x) + sq (y - gp.center.y)) < gp.radius)
-    isin = 1;
-#elif dimension == 3
-  if (sqrt (sq (x - gp.center.x) + sq (y - gp.center.y) + sq (z - gp.center.z)) < gp.radius)
-    isin = 1;
-#endif
- return isin;
-}
 
-size_t is_it_in_cube (const double x, const double y, const double z, const GeomParameter gp) {
+
+//----------------------------------------------------------------------------
+size_t is_in_cubic_boundingbox( const double x, const double y, 
+	const double z, const GeomParameter gp ) 
+//----------------------------------------------------------------------------
+{
   size_t isin = 0;
 
   double xmax = gp.center.x + 0.5*gp.radius;
@@ -3159,108 +3490,129 @@ size_t is_it_in_cube (const double x, const double y, const double z, const Geom
   return isin;
 }
 
-void assign_dial_fd_boundary (particle * p, const coord posb, const GeomParameter gp, const double Delta,  int * NCX) {
-// find the normal to the fictitious domain and assign the dial accordingly
-  
-  size_t  isin_xp = 0, isin_yp = 0;
+
+
+
+/** Finds the normal to the fictitious domain and 
+assign the dial accordingly */
+//----------------------------------------------------------------------------
+void assign_dial_fd_boundary( particle* p, const coord posb, 
+	const GeomParameter gp, const double Delta, int* NCX ) 
+//----------------------------------------------------------------------------
+{
+  bool isin_xp = false, isin_yp = false, isin_zp = false;  
   double RDelta = Delta / 100.;
-  
-  if (!(p->iscube) && !(p->iswall)) {
-    isin_xp = is_it_in_sphere (posb.x + RDelta, posb.y, posb.z, gp);
-    isin_yp = is_it_in_sphere (posb.x, posb.y + RDelta, posb.z, gp);
-  }
+  coord checkpt;
 
-  if (p->iscube) {
-    coord checkpt = {posb.x + RDelta, posb.y, posb.z};
-    isin_xp = is_it_in_cube_v2 (&(p->g.u1), &(p->g.v1), &(p->g.w1), &(p->g.mins), &(p->g.maxs), &checkpt);
+  switch ( p->shape )
+  {
+    case SPHERE:
+      isin_xp = is_in_Sphere( posb.x + RDelta, posb.y, posb.z, gp );
+      isin_yp = is_in_Sphere( posb.x, posb.y + RDelta, posb.z, gp );
+      isin_zp = is_in_Sphere( posb.x, posb.y, posb.z + RDelta, gp );
+      break;
+	  
+    case CIRCULARCYLINDER2D:
+      isin_xp = is_in_CircularCylinder2D( posb.x + RDelta, posb.y, gp );
+      isin_yp = is_in_CircularCylinder2D( posb.x, posb.y + RDelta, gp );
+      break;
+	  
+    case CUBE:
+      checkpt.x = posb.x + RDelta;
+      checkpt.y = posb.y;
+      checkpt.z = posb.z;      
+      isin_xp = is_in_Cube( &(p->g.pgp->u1), &(p->g.pgp->v1), 
+    	&(p->g.pgp->w1), &(p->g.pgp->mins), &(p->g.pgp->maxs), &checkpt );
+      checkpt.x = posb.x;
+      checkpt.y = posb.y + RDelta;
+      checkpt.z = posb.z;
+      isin_yp = is_in_Cube( &(p->g.pgp->u1), &(p->g.pgp->v1), 
+    	&(p->g.pgp->w1), &(p->g.pgp->mins), &(p->g.pgp->maxs), &checkpt );	
+      checkpt.x = posb.x;
+      checkpt.y = posb.y;
+      checkpt.z  = posb.z + RDelta;
+      isin_zp = is_in_Cube( &(p->g.pgp->u1), &(p->g.pgp->v1), 
+    	&(p->g.pgp->w1), &(p->g.pgp->mins), &(p->g.pgp->maxs), &checkpt );
+      break;
 
-    checkpt.x = posb.x;
-    checkpt.y = posb.y + RDelta;
-    checkpt.z = posb.z;
-    isin_yp = is_it_in_cube_v2 (&(p->g.u1), &(p->g.v1), &(p->g.w1), &(p->g.mins), &(p->g.maxs), &checkpt);
+    case TETRAHEDRON:
+      isin_xp = is_in_Tetrahedron( posb.x + RDelta, posb.y, posb.z, gp );
+      isin_yp = is_in_Tetrahedron( posb.x, posb.y + RDelta, posb.z, gp );
+      isin_zp = is_in_Tetrahedron( posb.x, posb.y, posb.z + RDelta, gp );
+      break;
+	  
+    default:
+      fprintf( stderr,"Unknown Rigid Body shape !!\n" );
   }
   
-#if dimension == 2
-  if (isin_xp) {
-    if(isin_yp){
-      // fictitious-boundary's normal is oriented x- and y-. 
-      *NCX = 3;
-    }
-    else{
+# if dimension == 2
+    if ( isin_xp ) 
+    {
+      if ( isin_yp )
+        // fictitious-boundary's normal is oriented x- and y-. 
+        *NCX = 3;    
+      else
 	// fictitious-boundary's normal is oriented x- and y+.
 	*NCX = 2;
-      }
-  }
-  else {
-    if (isin_yp) {
-      // fictitious-boundary's normal is oriented x+ and y-. 
-      *NCX = 4;}
-    else {
-      // fictitious-boundary's normal is oriented x+ and y+.
-      *NCX = 1;
     }
-  }
-      
-#elif dimension == 3
-  size_t isin_zp = 0;
+    else
+    {
+      if ( isin_yp )
+        // fictitious-boundary's normal is oriented x+ and y-. 
+        *NCX = 4;
+      else
+        // fictitious-boundary's normal is oriented x+ and y+.
+        *NCX = 1; 
+    }
+# else
+    if ( isin_zp ) 
+    {
+      // fictitious-boundary's normal is oriented z-.  
+      if ( isin_xp  ) 
+      {
+        if ( isin_yp )
+	  // fictitious-boundary's normal is oriented x-, y-, z- . 
+	  *NCX = 31;
+        else
+	  // fictitious-boundary's normal is oriented x-, y+, z-.
+	  *NCX = 21;
+      }
+      else
+      {
+        if ( isin_yp )
+	  // fictitious-boundary's normal is oriented x+, y-, z-. 
+	  *NCX = 41;
+        else
+	  // fictitious-boundary's normal is oriented x+, y+, z-.
+	  *NCX = 11;
+      }
+    }
+    else 
+    {
+      // fictitious-boundary's normal is oriented z+.  
+      if ( isin_xp ) 
+      {
+        if ( isin_yp )
+	  // fictitious-boundary's normal is oriented x-, y-, z+ . 
+	  *NCX = 30;
+        else
+	  // fictitious-boundary's normal is oriented x-, y+, z+.
+	  *NCX = 20;
+      }
+      else 
+      {
+        if ( isin_yp )
+	  // fictitious-boundary's normal is oriented x+, y-, z+. 
+	  *NCX = 40;
+        else
+	  // fictitious-boundary's normal is oriented x+, y+, z+.
+	  *NCX = 10;
+      }
+    }
+  
+  if ( *NCX == 0 )
+    fprintf( stderr, "NCX = 0, isin_xp = %u, isin_yp = %u, isin_zp = %u \n",
+	isin_xp, isin_yp, isin_zp );
 
-  if (!(p->iscube) && !(p->iswall)) {
-    isin_zp = is_it_in_sphere (posb.x, posb.y, posb.z + RDelta, gp);
-  }
-  coord checkpt;
-  checkpt.x = posb.x;
-  checkpt.y = posb.y;
-  checkpt.z  = posb.z + RDelta;
-  
-  if (p->iscube)
-    isin_zp = is_it_in_cube_v2 (&(p->g.u1), &(p->g.v1), &(p->g.w1), &(p->g.mins), &(p->g.maxs), &checkpt);
-  
-  if (isin_zp) {
-    // fictitious-boundary's normal is oriented z-.  
-    if (isin_xp) {
-      if (isin_yp) {
-	// fictitious-boundary's normal is oriented x-, y-, z- . 
-	*NCX = 31;
-      }
-      else{
-	// fictitious-boundary's normal is oriented x-, y+, z-.
-	*NCX = 21;
-      }
-    }
-    else{
-      if(isin_yp){
-	// fictitious-boundary's normal is oriented x+, y-, z-. 
-	*NCX = 41;}
-      else{
-	// fictitious-boundary's normal is oriented x+, y+, z-.
-	*NCX = 11;
-      }
-    }
-  }
-  else {
-    // fictitious-boundary's normal is oriented z+.  
-    if (isin_xp) {
-      if (isin_yp) {
-	// fictitious-boundary's normal is oriented x-, y-, z+ . 
-	*NCX = 30;
-      }
-      else {
-	// fictitious-boundary's normal is oriented x-, y+, z+.
-	*NCX = 20;
-      }
-    }
-    else {
-      if (isin_yp){ 
-	// fictitious-boundary's normal is oriented x+, y-, z+. 
-	*NCX = 40;}
-      else {
-	// fictitious-boundary's normal is oriented x+, y+, z+.
-	*NCX = 10;
-      }
-    }
-  }
-  if (*NCX == 0) {
-    fprintf(stderr, "NCX = 0, isin_xp = %zu, isin_yp = %zu, isin_zp = %zu \n",  isin_xp, isin_yp, isin_zp);
-  }
 #endif
 }
