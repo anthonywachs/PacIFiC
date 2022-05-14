@@ -15,7 +15,7 @@ vector G[];
 // face vector G[];
 void construct_divG(scalar divG, lagMesh* mesh) {
   comp_normals(mesh);
-  comp_mb_stretch(mesh);
+  compute_lengths(mesh);
   // foreach_face() foreach_dimension() G.x[] = 0.;
   foreach() {
     foreach_dimension() G.x[] = 0.;
@@ -27,8 +27,8 @@ void construct_divG(scalar divG, lagMesh* mesh) {
     // compute the grid gradient on the midpoint of the edge
     coord gg; // grid gradient
     int en[2];
-    en[0] = mesh->edges[i].vertex_ids[0];
-    en[1] = mesh->edges[i].vertex_ids[1];
+    en[0] = mesh->edges[i].node_ids[0];
+    en[1] = mesh->edges[i].node_ids[1];
     foreach_dimension() gg.x = mesh->edges[i].normal.x*mesh->edges[i].length;
     for(int j=0; j<2; j++) {
       foreach_cache(mesh->nodes[en[j]].stencil) {

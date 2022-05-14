@@ -39,7 +39,7 @@ void bending(lagMesh* mesh) {
       int neighbor_index = (i-1+j) > 0 ? (i-1+j)%mesh->nlp : mesh->nlp - 1;
       curv[j] = mesh->nodes[neighbor_index].curv - mesh->nodes[neighbor_index].ref_curv;
     }
-    double ddcurv = -(curv[0]/(l[0]*lavg) - 2.*curv[1]/(l[0]*l[1])
+    double ddcurv = (curv[0]/(l[0]*lavg) - 2.*curv[1]/(l[0]*l[1])
       + curv[2]/(l[1]*lavg));
     foreach_dimension() raw_bending[i].x = -E_B*(ddcurv
       + .5*cube(curv[1]))*mesh->nodes[i].normal.x*lavg;
@@ -59,7 +59,7 @@ void bending(lagMesh* mesh) {
 }
 
 // void bending(lagMesh* mesh) {
-//   comp_mb_stretch(mesh);
+//   compute_lengths(mesh);
 //   comp_curvature(mesh);
 //   for(int i=0; i<mesh->nlp; i++) {
 //     /** For each node, we compute the bending moment at the midpoint of each
@@ -70,8 +70,8 @@ void bending(lagMesh* mesh) {
 //     for(int j=0; j<2; j++) {
 //       int edge_id = mesh->nodes[i].edge_ids[j];
 //       int edge_nodes[2];
-//       edge_nodes[0] = mesh->edges[edge_id].vertex_ids[0];
-//       edge_nodes[1] = mesh->edges[edge_id].vertex_ids[1];
+//       edge_nodes[0] = mesh->edges[edge_id].node_ids[0];
+//       edge_nodes[1] = mesh->edges[edge_id].node_ids[1];
 //       l[j] = mesh->edges[edge_id].length;
 //       m[j] = .5*E_B*(mesh->nodes[edge_nodes[0]].curv +
 //         mesh->nodes[edge_nodes[1]].curv - mesh->nodes[edge_nodes[0]].ref_curv -

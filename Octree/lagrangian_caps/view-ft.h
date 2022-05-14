@@ -35,8 +35,7 @@ struct _draw_lag {
 
 void draw_lag(struct _draw_lag p) {
   if (pid() == 0) {
-    bool edges = true;
-    if (p.edges == true) edges = true;
+    bool edges = (p.edges) ? p.edges : true;
     // bool vertices = false;
     // if (p.vertices == true) vertices = true;
     float color[3];
@@ -49,8 +48,8 @@ void draw_lag(struct _draw_lag p) {
         for (int i=0; i<p.mesh->nle; i++) {
           bool across_periodic_bc = false;
           int v1, v2;
-          v1 = p.mesh->edges[i].vertex_ids[0];
-          v2 = p.mesh->edges[i].vertex_ids[1];
+          v1 = p.mesh->edges[i].node_ids[0];
+          v2 = p.mesh->edges[i].node_ids[1];
           foreach_dimension() {
             if (fabs(p.mesh->nodes[v1].pos.x
               - p.mesh->nodes[v2].pos.x) > L0/2.) across_periodic_bc = true;
@@ -94,26 +93,26 @@ void draw_lag(struct _draw_lag p) {
         view->ni++;
       }
     }
-    // #if dimension > 2
-    //   bool faces = true;
-    //   if (faces) {
-    //     float fc[3] = {1., 1., 1.};
-    //     colormap map = jet;
-    //     double cmap[NCMAP][3];
-    //     map (cmap);
-    //     colorized(fc, true, cmap, false) {
-    //       for (int i=0; i<p.mesh->nlt; i++) {
-    //         glBegin(GL_TRIANGLE_FAN);
-    //           for(int j=0; j<3; j++) {
-    //             glvertex3d(view,
-    //               p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.x,
-    //               p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.y,
-    //               p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.z);
-    //             }
-    //         glEnd();
-    //       }
-    //     }
-    //   }
-    // #endif
+    #if dimension > 2
+      bool faces = true;
+      if (faces) {
+        float fc[3] = {1., 1., 1.};
+        colormap map = jet;
+        double cmap[NCMAP][3];
+        map (cmap);
+        colorized(fc, true, cmap, false) {
+          for (int i=0; i<p.mesh->nlt; i++) {
+            glBegin(GL_TRIANGLE_FAN);
+              for(int j=0; j<3; j++) {
+                glvertex3d(view,
+                  p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.x,
+                  p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.y,
+                  p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.z);
+                }
+            glEnd();
+          }
+        }
+      }
+    #endif
   }
 }

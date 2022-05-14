@@ -42,7 +42,7 @@ typedef struct lagNode {
 connect, an undeformed and a deformed lengths $l_0$ and $l$, and a normal
 vector.  */
 typedef struct Edge {
-  int vertex_ids[2];
+  int node_ids[2];
   #if dimension > 2
     int triangle_ids[2];
   #endif
@@ -150,11 +150,11 @@ be the case. */
 The function below computes the length of an edge. It takes as arguments
 a pointer to the mesh as well as the ID of the edge of interest.
 */
-double comp_length(lagMesh* mesh, int i) {
+double edge_length(lagMesh* mesh, int i) {
   double length = 0.;
   int v1, v2;
-  v1 = mesh->edges[i].vertex_ids[0];
-  v2 = mesh->edges[i].vertex_ids[1];
+  v1 = mesh->edges[i].node_ids[0];
+  v2 = mesh->edges[i].node_ids[1];
   foreach_dimension() {
     length += sq(GENERAL_1DIST(mesh->nodes[v1].pos.x, mesh->nodes[v2].pos.x));
   }
@@ -166,10 +166,17 @@ The function below computes the membrane stretch $\lambda = \frac{l}{l_0}$,
 with $l$ the current length of an edge and $l_0$ its reference length
 (in the untressed resting shape).
 */
-void comp_mb_stretch(lagMesh* mesh) {
-  if (!mesh->updated_stretches) {
+struct _compute_lengths{
+  lagMesh* mesh;
+  bool force;
+};
+
+void compute_lengths(struct _compute_lengths p) {
+  lagMesh* mesh = p.mesh;
+  bool force = (p.force) ? p.force : false;
+  if (force || !mesh->updated_stretches) {
     for(int i=0; i < mesh->nle; i++)
-      mesh->edges[i].length = comp_length(mesh, i);
+      mesh->edges[i].length = edge_length(mesh, i);
     mesh->updated_stretches = true;
   }
 }
@@ -180,7 +187,7 @@ a Lagrangian mesh.
 */
 void comp_edge_normal(lagMesh* mesh, int i) {
     int node_id[2];
-    for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].vertex_ids[j];
+    for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].node_ids[j];
     mesh->edges[i].normal.y = GENERAL_1DIST(mesh->nodes[node_id[0]].pos.x,
       mesh->nodes[node_id[1]].pos.x);
     mesh->edges[i].normal.x = GENERAL_1DIST(mesh->nodes[node_id[1]].pos.y,
@@ -198,7 +205,7 @@ void comp_edge_normals(lagMesh* mesh) {
 on the midpoints of all the edges. */
 void comp_normals(lagMesh* mesh) {
   if (!mesh->updated_normals) {
-    comp_mb_stretch(mesh);
+    compute_lengths(mesh);
     for(int i=0; i<mesh->nlp; i++) {
       coord n[2];
       double l[2];

@@ -44,13 +44,13 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   /** Fill the array of edges.
   For the last edge, the next vertex id is 0 */
   for(int i=0; i<p.mesh->nle; i++) {
-    p.mesh->edges[i].vertex_ids[0] = i;
+    p.mesh->edges[i].node_ids[0] = i;
     if (p.mesh->nodes[i].edge_ids[0] < 0)
       p.mesh->nodes[i].edge_ids[0] = i;
     else
       p.mesh->nodes[i].edge_ids[1] = i;
     int next_vertex_id = (i+1<nlp) ? i+1 : 0;
-    p.mesh->edges[i].vertex_ids[1] = next_vertex_id;
+    p.mesh->edges[i].node_ids[1] = next_vertex_id;
     if (p.mesh->nodes[next_vertex_id].edge_ids[0] < 0)
       p.mesh->nodes[next_vertex_id].edge_ids[0] = i;
     else
@@ -62,7 +62,7 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   p.mesh->nodes[0].edge_ids[1] = 0;
   correct_lag_pos(p.mesh);
   for(int i=0.; i<p.mesh->nle; i++) {
-    p.mesh->edges[i].l0 = comp_length(p.mesh, i);
+    p.mesh->edges[i].l0 = edge_length(p.mesh, i);
     p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
 
@@ -105,13 +105,13 @@ void initialize_biconcave_mb(struct _initialize_circular_mb p) {
   /** Fill the array of edges.
   For the last edge, the next vertex id is 0 */
   for(int i=0; i<p.mesh->nle; i++) {
-    p.mesh->edges[i].vertex_ids[0] = i;
+    p.mesh->edges[i].node_ids[0] = i;
     if (p.mesh->nodes[i].edge_ids[0] < 0)
       p.mesh->nodes[i].edge_ids[0] = i;
     else
       p.mesh->nodes[i].edge_ids[1] = i;
     int next_vertex_id = (i+1<nlp) ? i+1 : 0;
-    p.mesh->edges[i].vertex_ids[1] = next_vertex_id;
+    p.mesh->edges[i].node_ids[1] = next_vertex_id;
     if (p.mesh->nodes[next_vertex_id].edge_ids[0] < 0)
       p.mesh->nodes[next_vertex_id].edge_ids[0] = i;
     else
@@ -123,7 +123,7 @@ void initialize_biconcave_mb(struct _initialize_circular_mb p) {
   p.mesh->nodes[0].edge_ids[1] = 0;
   correct_lag_pos(p.mesh);
   for(int i=0.; i<p.mesh->nle; i++) {
-    p.mesh->edges[i].l0 = comp_length(p.mesh, i);
+    p.mesh->edges[i].l0 = edge_length(p.mesh, i);
     p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
 
@@ -176,13 +176,13 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
   /** Fill the array of edges.
   For the last edge, the next vertex id is 0 */
   for(int i=0; i<p.mesh->nle; i++) {
-    p.mesh->edges[i].vertex_ids[0] = i;
+    p.mesh->edges[i].node_ids[0] = i;
     if (p.mesh->nodes[i].edge_ids[0] < 0)
       p.mesh->nodes[i].edge_ids[0] = i;
     else
       p.mesh->nodes[i].edge_ids[1] = i;
     int next_vertex_id = (i+1<nlp) ? i+1 : 0;
-    p.mesh->edges[i].vertex_ids[1] = next_vertex_id;
+    p.mesh->edges[i].node_ids[1] = next_vertex_id;
     if (p.mesh->nodes[next_vertex_id].edge_ids[0] < 0)
       p.mesh->nodes[next_vertex_id].edge_ids[0] = i;
     else
@@ -194,7 +194,7 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
   p.mesh->nodes[0].edge_ids[1] = 0;
   correct_lag_pos(p.mesh);
   for(int i=0.; i<p.mesh->nle; i++) {
-    p.mesh->edges[i].l0 = comp_length(p.mesh, i);
+    p.mesh->edges[i].l0 = edge_length(p.mesh, i);
     p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
 
@@ -205,97 +205,7 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
 
 #if dimension > 2
 
-#define GET_LD(NODE) ((fabs(fabs(NODE.pos.x) - ll) < 1.e-8) ? 0 : \
-  ((fabs(fabs(NODE.pos.y) - ll) < 1.e-8 ? 1 : 2)))
-#define GET_LD_SIGN(NODE) ((GET_LD(NODE) == 0) ? sign(NODE.pos.x) : \
-  ((GET_LD(NODE) == 1) ? sign(NODE.pos.y) : sign(NODE.pos.z)))
-#define GET_SD(NODE) ((fabs(fabs(NODE.pos.x) - sl) < 1.e-8) ? 0 : \
-  ((fabs(fabs(NODE.pos.y) - sl) < 1.e-8 ? 1 : 2)))
-#define GET_SD_SIGN(NODE) ((GET_SD(NODE) == 0) ? sign(NODE.pos.x) : \
-  ((GET_SD(NODE) == 1) ? sign(NODE.pos.y) : sign(NODE.pos.z)))
-#define GET_ZD(NODE) ((fabs(NODE.pos.x) < 1.e-8) ? 0 : \
-  ((fabs(NODE.pos.y) < 1.e-8 ? 1 : 2)))
-
-bool edge_exists(lagMesh* mesh, int j, int k) {
-  for(int i=0; i<mesh->nle; i++) {
-    if ((mesh->edges[i].vertex_ids[0] == j && mesh->edges[i].vertex_ids[1] == k)
-      || (mesh->edges[i].vertex_ids[0] == k
-      && mesh->edges[i].vertex_ids[1] == j)) return true;
-  }
-  return false;
-}
-
-bool write_edge(lagMesh* mesh, int i, int j, int k) {
-  if (edge_exists(mesh, j, k)) return false;
-  else {
-    mesh->edges[i].vertex_ids[0] = j;
-    mesh->edges[i].vertex_ids[1] = k;
-    for(int ii=0; ii<2; ii++) mesh->edges[i].triangle_ids[ii] = -1;
-    mesh->nodes[j].edge_ids[mesh->nodes[j].nb_edges] = i;
-    mesh->nodes[j].nb_edges++;
-    mesh->nodes[j].neighbor_ids[mesh->nodes[j].nb_neighbors] = k;
-    mesh->nodes[j].nb_neighbors++;
-    mesh->nodes[k].edge_ids[mesh->nodes[k].nb_edges] = i;
-    mesh->nodes[k].nb_edges++;
-    mesh->nodes[k].neighbor_ids[mesh->nodes[k].nb_neighbors] = j;
-    mesh->nodes[k].nb_neighbors++;
-    return true;
-  }
-}
-
-bool triangle_exists(lagMesh* mesh, int i, int j, int k) {
-  for(int t=0; t<mesh->nlt; t++) {
-    for(int a=0; a<3; a++) {
-      if (mesh->triangles[t].node_ids[a] == i) {
-        for(int b=0; b<3; b++) {
-          if (b != a && mesh->triangles[t].node_ids[b] == j) {
-            for(int c=0; c<3; c++) {
-              if (c != a && c != b && mesh->triangles[t].node_ids[c] == k) {
-                return true;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  return false;
-}
-
-bool write_triangle(lagMesh* mesh, int tid, int i, int j, int k) {
-  if (triangle_exists(mesh, i, j, k)) return false;
-  else {
-    mesh->triangles[tid].node_ids[0] = i;
-    mesh->triangles[tid].node_ids[1] = j;
-    mesh->triangles[tid].node_ids[2] = k;
-    mesh->nodes[j].triangle_ids[mesh->nodes[i].nb_triangles] = tid;
-    mesh->nodes[j].nb_triangles++;
-    mesh->nodes[k].triangle_ids[mesh->nodes[k].nb_triangles] = tid;
-    mesh->nodes[k].nb_triangles++;
-    int c = 0;
-    for(int a=0; a<3; a++) {
-      int va = mesh->triangles[tid].node_ids[a];
-      for(int b=0; b<3; b++) {
-        if (b != a) {
-          int vb = mesh->triangles[tid].node_ids[b];
-          for(int m=0; m<mesh->nodes[va].nb_edges; m++) {
-            for(int n=0; n<mesh->nodes[vb].nb_edges; n++) {
-              if (mesh->nodes[va].edge_ids[m] == mesh->nodes[vb].edge_ids[n]) {
-                mesh->triangles[tid].edge_ids[c] = mesh->nodes[va].edge_ids[m];
-                c++;
-                int p =
-                (mesh->edges[mesh->nodes[va].edge_ids[m]].triangle_ids[0] == -1)
-                ? 0 : 1;
-                mesh->edges[mesh->nodes[va].edge_ids[m]].triangle_ids[p] = tid;
-              }
-            }
-          }
-        }
-      }
-    }
-    return true;
-  }
-}
+#include "mesh-toolbox.h"
 
 void initialize_icosahedron(struct _initialize_circular_mb p) {
   double radius = (p.radius) ? p.radius : RADIUS;
@@ -335,12 +245,14 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
     for(int j=0; j<p.mesh->nlp; j++) {
       if (p.mesh->nodes[j].nb_triangles == my_gr && j != i) {
         if (my_ld_sign == GET_LD_SIGN(p.mesh->nodes[j])) {
-          if (write_edge(p.mesh, p.mesh->nle, i, j)) p.mesh->nle++;
+          if (write_edge(p.mesh, p.mesh->nle, i, j, new_mesh = true))
+            p.mesh->nle++;
         }
       }
       else if (GET_LD(p.mesh->nodes[j]) == GET_ZD(p.mesh->nodes[i])) {
         if (GET_SD_SIGN(p.mesh->nodes[j]) == GET_LD_SIGN(p.mesh->nodes[i])) {
-          if (write_edge(p.mesh, p.mesh->nle, i, j)) p.mesh->nle++;
+          if (write_edge(p.mesh, p.mesh->nle, i, j, new_mesh = true))
+            p.mesh->nle++;
         }
       }
     }
@@ -352,46 +264,116 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
   }
   for(int i=0; i<p.mesh->nle; i++) {
     int nid[2];
-    for(int j=0; j<2; j++) nid[j] = p.mesh->edges[i].vertex_ids[j];
+    for(int j=0; j<2; j++) nid[j] = p.mesh->edges[i].node_ids[j];
     for(int j=0; j<p.mesh->nodes[nid[0]].nb_neighbors; j++) {
       for(int k=0; k<p.mesh->nodes[nid[1]].nb_neighbors; k++) {
         if (p.mesh->nodes[nid[0]].neighbor_ids[j] ==
-          p.mesh->nodes[nid[1]].neighbor_ids[k])
+          p.mesh->nodes[nid[1]].neighbor_ids[k] && p.mesh->nodes[nid[0]].neighbor_ids[j] != -1)
           if (write_triangle(p.mesh, p.mesh->nlt, nid[0], nid[1],
-            p.mesh->nodes[nid[0]].neighbor_ids[j])) {
-            fprintf(stderr, "writing triangle %d %d %d\n", nid[0], nid[1],
-              p.mesh->nodes[nid[0]].neighbor_ids[j]);
-            p.mesh->nlt++;
-          }
+            p.mesh->nodes[nid[0]].neighbor_ids[j], new_mesh = true))
+              p.mesh->nlt++;
       }
     }
   }
-  fprintf(stderr, "nlt = %d\n", p.mesh->nlt);
 }
 
 void initialize_spherical_mb(struct _initialize_circular_mb p) {
   initialize_icosahedron(p);
-
   double radius = (p.radius) ? p.radius : RADIUS;
   int nlp = (p.nlp) ? p.nlp : NLP;
-  int nle, nlt;
   coord shift;
   if (p.shift.x || p.shift.y || p.shift.z)
     {shift.x = p.shift.x; shift.y = p.shift.y; shift.z = p.shift.z;}
   else {shift.x = 0.; shift.y = 0.; shift.z = 0.;}
-  int i=1;
-  int cn = 12;
-  while(cn < nlp) {
-    nle = 30*pow(3,i);
-    cn = nle/3; //this is an upper bound
-    i++;
+  int ns = 0; /** number of subdivision to perform to reach desired number of
+  nodes */
+  int nn, ne, nt; // the numbers of nodes, edges and triangles.
+  nn = 12;
+  while(nn < nlp) {
+    ne = 30*pow(4,ns+1);
+    nn = ne/2; /** this is a (too) comfortable upper bound */
+    ns++;
   }
-  nlp = cn;
-  nlt = 20*pow(4,i);
-  fprintf(stderr, "Number of Lagrangian nodes = %d\n", nlp);
-  fprintf(stderr, "Number of Lagrangian edges = %d\n", nle);
-  fprintf(stderr, "Number of Lagrangian triangles = %d\n", nlt);
-  // p.mesh->nodes = malloc(nlp*sizeof(lagNode));
+  ne = 30*pow(4,ns);
+  nt = 20*pow(4,ns);
+  fprintf(stderr, "Expected number of Lagrangian nodes = %d\n", nn);
+  fprintf(stderr, "Expected number of Lagrangian edges = %d\n", ne);
+  fprintf(stderr, "Expected number of Lagrangian triangles = %d\n", nt);
+  fprintf(stderr, "Expected number of refinements = %d\n", ns);
+  p.mesh->nodes = realloc(p.mesh->nodes, nn*sizeof(lagNode));
+  p.mesh->edges = realloc(p.mesh->edges, ne*sizeof(Edge));
+  p.mesh->triangles = realloc(p.mesh->triangles, nt*sizeof(Triangle));
+
+  /** Perform the loop subdivision algorithm: until we reach the desired number
+  of nodes, we split each triangles into four smaller ones */
+  double cel = p.mesh->edges[0].length; // current edge length
+  int cnt = p.mesh->nlt; // current number of triangles
+
+
+  for(int s=0; s<ns; s++) {
+    for(int i=0; i<cnt; i++) {
+      int mid_ids[3];
+      /** If not done yet, we split each edge into two */
+      for(int j=0; j<3; j++) {
+        if (p.mesh->edges[p.mesh->triangles[i].edge_ids[j]].triangle_ids[0] >
+          -1) {
+          split_edge(p.mesh, p.mesh->triangles[i].edge_ids[j]);
+          p.mesh->edges[p.mesh->nle-1].triangle_ids[0] = i;
+          mid_ids[j] = p.mesh->nlp-1;
+        }
+        else {
+          mid_ids[j] = is_triangle_vertex(p.mesh, i,
+            p.mesh->edges[p.mesh->triangles[i].edge_ids[j]].node_ids[0]) ?
+            p.mesh->edges[p.mesh->triangles[i].edge_ids[j]].node_ids[1] :
+            p.mesh->edges[p.mesh->triangles[i].edge_ids[j]].node_ids[0];
+        }
+      }
+      /** Connect the three midpoints with edges, and create corner triangles */
+      for(int j=0; j<3; j++) {
+        /** create edges between midpoints */
+        write_edge(p.mesh, p.mesh->nle, mid_ids[j], mid_ids[(j+1)%3]);
+        p.mesh->nle++;
+        int nnl = 2; // next neighbor in the list
+        while (p.mesh->nodes[mid_ids[j]].neighbor_ids[nnl] > -1) nnl++;
+        p.mesh->nodes[mid_ids[j]].neighbor_ids[nnl] = mid_ids[(j+1)%3];
+        p.mesh->nodes[mid_ids[j]].neighbor_ids[nnl + 1] = mid_ids[(j+2)%3];
+
+        /** create the corner triangle with the new edge */
+        int corner_id = -1;
+        for(int k1=0; k1<p.mesh->nodes[mid_ids[j]].nb_neighbors; k1++) {
+          if (corner_id > -1) break;
+          fprintf(stderr, "neighbor %d of %d: %d\n", k1, mid_ids[j], p.mesh->nodes[mid_ids[j]].neighbor_ids[k1]);
+          for(int k2=0; k2<p.mesh->nodes[mid_ids[(j+1)%3]].nb_neighbors; k2++) {
+            if (corner_id > -1) break;
+            fprintf(stderr, "neighbor %d of %d: %d\n", k2, mid_ids[(j+1)%3], p.mesh->nodes[mid_ids[(j+1)%3]].neighbor_ids[k2]);
+            if (p.mesh->nodes[mid_ids[j]].neighbor_ids[k1] ==
+              p.mesh->nodes[mid_ids[(j+1)%3]].neighbor_ids[k2])
+              corner_id = p.mesh->nodes[mid_ids[j]].neighbor_ids[k1];
+          }
+        }
+        assert(corner_id > -1);
+        write_triangle(p.mesh, p.mesh->nlt, mid_ids[j], mid_ids[(j+1)%3],
+          corner_id);
+        p.mesh->nlt++;
+      }
+      /** Shrink the original, big, triangle into the center smaller one */
+      // TODO: resize ith triangle
+    }
+    double cel = p.mesh->edges[0].length; // current edge length
+    cnt = p.mesh->nlt;
+  }
+
+  /** Project each node onto a sphere of desired radius */
+  for(int i=0; i<p.mesh->nlp; i++) {
+    double cr = 0.;
+    foreach_dimension() cr += sq(p.mesh->nodes[i].pos.x);
+    cr = sqrt(cr);
+    foreach_dimension() p.mesh->nodes[i].pos.x *= radius/cr;
+  }
+
+  fprintf(stderr, "Number of Lagrangian nodes = %d\n", p.mesh->nlp);
+  fprintf(stderr, "Number of Lagrangian edges = %d\n", p.mesh->nle);
+  fprintf(stderr, "Number of Lagrangian triangles = %d\n", p.mesh->nlt);
 }
 
 #endif

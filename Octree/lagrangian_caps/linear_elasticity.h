@@ -8,7 +8,7 @@ the membrane(s). We choose this force from Breyiannis & Pozrikidis, 2000.
 #endif
 
 void linear_elasticity(lagMesh* mesh) {
-  comp_mb_stretch(mesh);
+  compute_lengths(mesh);
   for(int i=0; i<mesh->nlp; i++) {
     coord T[2];
     for(int j=0; j<2; j++) {
@@ -17,8 +17,8 @@ void linear_elasticity(lagMesh* mesh) {
       double tension_norm = E_S*
         (mesh->edges[edge_id].length/mesh->edges[edge_id].l0 - 1.);
       /** We compute the direction vector $e$ for the tension */
-      edge_node1 = mesh->edges[edge_id].vertex_ids[0];
-      edge_node2 = mesh->edges[edge_id].vertex_ids[1];
+      edge_node1 = mesh->edges[edge_id].node_ids[0];
+      edge_node2 = mesh->edges[edge_id].node_ids[1];
       coord e;
       double ne = 0.;
       foreach_dimension() {

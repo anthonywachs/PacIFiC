@@ -6,7 +6,7 @@ the membrane(s).*/
 #endif
 
 void neo_hookean(lagMesh* mesh) {
-  comp_mb_stretch(mesh);
+  compute_lengths(mesh);
   for(int i=0; i<mesh->nlp; i++) {
     coord T[2];
     for(int j=0; j<2; j++) {
@@ -17,8 +17,8 @@ void neo_hookean(lagMesh* mesh) {
       double tension_norm = (fabs(stretch_cube) > 1.e-10) ?
         E_S*(stretch_cube - 1.)/sqrt(stretch_cube) : 0.;
       /** We compute the direction vector $e$ for the tension */
-      edge_node1 = mesh->edges[edge_id].vertex_ids[0];
-      edge_node2 = mesh->edges[edge_id].vertex_ids[1];
+      edge_node1 = mesh->edges[edge_id].node_ids[0];
+      edge_node2 = mesh->edges[edge_id].node_ids[1];
       coord e;
       double ne = 0.;
       foreach_dimension() {
