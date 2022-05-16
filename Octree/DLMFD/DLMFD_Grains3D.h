@@ -29,11 +29,6 @@ event GranularSolver_init (t < -1.)
 //----------------------------------------------------------------------------
 {
   // Initialize Grains with its parameters 
-  bool b_intitializeClonePer = false;
-  double grid_size = 0.;
-  bool is_solidsolver_parallel = false;
-  int my_rank = pid();
-  int nb_procs = npe();
   char* pstr = NULL;
   int pstrsize = 0;  
 
@@ -44,9 +39,7 @@ event GranularSolver_init (t < -1.)
     printf( "Grains3D\n" );
     
     // Initialize Grains
-    Init_Grains( grains_inputfile, rhoval, restarted_simu, 
-    	b_intitializeClonePer, grid_size,
-	is_solidsolver_parallel, my_rank, nb_procs );
+    Init_Grains( grains_inputfile, rhoval, restarted_simu );
 
     // Set initial time
     SetInitialTime( trestart );
@@ -104,12 +97,9 @@ event GranularSolver_predictor (t < -1.)
   {
     // Output the call to Grains3D
     printf ("run Grains3D\n");
-
-    // Set the fluid time step magnitude in Grains3D
-    Setdt_Grains( dt );
     
     // Run the granular simulation
-    Simu_Grains( true, false, b_explicit_added_mass );
+    Simu_Grains( dt, b_explicit_added_mass );
 
     // Transfer the data from Grains to an array of characters
     pstr = GrainsToBasilisk( &pstrsize );     

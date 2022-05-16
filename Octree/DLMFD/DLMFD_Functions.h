@@ -103,7 +103,7 @@ typedef struct {
   enum RigidBodyShape shape;  
   SolidBodyBoundary s;
   GeomParameter g;
-  double M, Ip[6], rho_s, Vp, DLMFD_couplingfactor;  
+  double M, Ip[6], rho_s, Vp, DLMFD_couplingfactor, RotMat[3][3];  
 # if DLM_Moving_particle
     ToyGSParameter *toygsp;
     coord gravity;

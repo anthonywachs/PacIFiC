@@ -167,3 +167,4 @@
 ../obj64-OpenMPI-4.0.1-GNU-4.8.5/main.o : /home/wachs/Multiphase/PacNewGrains-Git/pacific/GRAINS_V1/Grains/include/LinkedCell.hh
 ../obj64-OpenMPI-4.0.1-GNU-4.8.5/main.o : /home/wachs/Multiphase/PacNewGrains-Git/pacific/GRAINS_V1/Grains/include/AppCollision.hh
 ../obj64-OpenMPI-4.0.1-GNU-4.8.5/main.o : /home/wachs/Multiphase/PacNewGrains-Git/pacific/GRAINS_V1/Grains/include/GrainsBuilderFactory.hh
+../obj64-OpenMPI-4.0.1-GNU-4.8.5/main.o : /home/wachs/Multiphase/PacNewGrains-Git/pacific/GRAINS_V1/Grains/include/GrainsCoupledWithFluid.hh

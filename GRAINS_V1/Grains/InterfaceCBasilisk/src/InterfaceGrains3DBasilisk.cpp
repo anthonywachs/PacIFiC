@@ -12,7 +12,7 @@
 extern "C" {
 #endif
   
-  static GrainsCoupledWithFluid * grains = NULL;
+  static GrainsCoupledWithFluid* grains = NULL;
 
   
   void Init_Grains ( char const* inputfile, 
@@ -32,7 +32,10 @@ extern "C" {
     if ( b_restart ) grains->setReloadSame();
     grains->do_before_time_stepping( rootNode );
     ReaderXML::terminate();
-     
+    
+    string cmd = "/bin/rm " + simulation_file_exe;
+    system( cmd.c_str() ); 
+         
     cout << "Construction of Grains completed" << endl;
   }
 

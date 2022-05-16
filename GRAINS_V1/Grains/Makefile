@@ -188,8 +188,8 @@ CPINC  :
 Basilisk :
 	@echo 'Compiling $(SRCDIRBAS)/InterfaceGrains3DBasilisk.cpp'
 	$(COMP) $(COMPFLAGS) -shared $(SRCDIRBAS)/InterfaceGrains3DBasilisk.cpp -L$(LIBDIR) -lgrains $(XERCESFLAGS) -o $(LIBDIR)/libInterfaceGrains3DBasilisk.so
-#	rm -f $(BASILISK_DLMFD)/InterfaceGrains3DBasilisk.h
-#	ln -s $(GRAINS_ROOT)/inc/InterfaceGrains3DBasilisk.h $(BASILISK_DLMFD)/InterfaceGrains3DBasilisk.h
+	rm -f $(BASILISK_DLMFD)/InterfaceGrains3DBasilisk.h
+	ln -s $(GRAINS_ROOT)/InterfaceCBasilisk/include/InterfaceGrains3DBasilisk.h $(BASILISK_DLMFD)/InterfaceGrains3DBasilisk.h
 	@echo '---------------------------------------------------'
 	@echo 'Library libInterfaceGrains3DBasilisk.so generated !'
 	@echo '---------------------------------------------------'	

@@ -59,6 +59,9 @@ void GrainsCoupledWithFluid::do_before_time_stepping( DOMElement* rootElement )
   // Set time to initial time 
   m_time = m_tstart;
 
+  // Link all components with the grid
+  m_allcomponents.Link( *m_collision );
+
   // Number of particles: inserted and in the system
   m_allcomponents.setNumberParticlesOnAllProc( 
   	m_allcomponents.getNumberParticles() );
@@ -115,7 +118,8 @@ void GrainsCoupledWithFluid::Simulation( double time_interval, bool predict,
   	m_min_dt );
   m_ndt = size_t( m_fluidflow_dt / dteff );
   m_dt = m_fluidflow_dt / double(m_ndt);  
-
+//   cout << m_fluidflow_dt << " " << m_dt << " " << m_ndt << endl;
+//   cout << m_time << endl;
 
   // Simulation: time marching algorithm
   for (size_t m=0;m<m_ndt;++m)
@@ -471,7 +475,7 @@ void GrainsCoupledWithFluid::AdditionalFeatures( DOMElement* rootElement )
     else
     {
       if ( m_rank == 0 ) cout << GrainsExec::m_shift6 << 
-		"Time step fetaures are mandatory !!" << endl;
+		"Time step features are mandatory !!" << endl;
       grainsAbort();
     }    
     

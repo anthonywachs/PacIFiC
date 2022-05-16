@@ -83,7 +83,7 @@
     <!ATTLIST Gravity GZ CDATA #REQUIRED>
 
 
-  <!ELEMENT Simulation (TimeInterval, TimeStep, TimeIntegration, RestartFile, TimeSave, CollisionalRelativeVelocity?, MovingObstacles?, ParticleInsertion?, Chargements?, PostProcessingWriters?)>
+  <!ELEMENT Simulation (TimeInterval, TimeStep, TimeIntegration, RestartFile, TimeSave, CollisionalRelativeVelocity?, MovingObstacles?, ParticleInsertion?, ObstacleLoadings?, PostProcessingWriters?)>
     <!ELEMENT TimeInterval EMPTY>
     <!ATTLIST TimeInterval Start CDATA #REQUIRED>
     <!ATTLIST TimeInterval End   CDATA #REQUIRED>
