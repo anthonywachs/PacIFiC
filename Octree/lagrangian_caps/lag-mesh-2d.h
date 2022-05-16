@@ -441,7 +441,6 @@ generate them. Note that this implementation assumes the membrane was
 initialized in the init event. */
 event init (i = 0) {
   for(int i=0; i<mbs.nbmb; i++) {
-    fprintf(stderr, "nlp=%d\n", MB(i).nlp);
     for(int j=0; j<MB(i).nlp; j++) {
       MB(i).nodes[j].stencil.n = 25;
       MB(i).nodes[j].stencil.nm = 25*128;

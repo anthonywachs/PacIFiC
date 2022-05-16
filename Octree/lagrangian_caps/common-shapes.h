@@ -277,93 +277,45 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
   }
 }
 
+/** The function below triangulates a sphere: it starts from an icosahedron,
+subdivides each of its triangles into four smaller ones until the desired number
+of Lagrangian nodes is reached or exceeded, and projects the resulting mesh
+onto a sphere. */
 void initialize_spherical_mb(struct _initialize_circular_mb p) {
   initialize_icosahedron(p);
+
   double radius = (p.radius) ? p.radius : RADIUS;
   int nlp = (p.nlp) ? p.nlp : NLP;
   coord shift;
   if (p.shift.x || p.shift.y || p.shift.z)
     {shift.x = p.shift.x; shift.y = p.shift.y; shift.z = p.shift.z;}
   else {shift.x = 0.; shift.y = 0.; shift.z = 0.;}
-  int ns = 0; /** number of subdivision to perform to reach desired number of
-  nodes */
+
+  /** 1. Determine the number of triangles subdivisions required */
+  int ns = 0; // ns for "number of subdivisions"
   int nn, ne, nt; // the numbers of nodes, edges and triangles.
-  nn = 12;
+  nn = 12; // at first, an icosahedron has 12 nodes
+  /** For each subdivision:
+  * the number of additional nodes equals the number of edges
+  * the number of edges is multiplied by 4: each edge is split in two, and
+  each new nodes results in two new edges (one per neighboring triangles)
+  * the number of triangles is multiplied by 4
+  */
   while(nn < nlp) {
-    ne = 30*pow(4,ns+1);
-    nn = ne/2; /** this is a (too) comfortable upper bound */
+    ne = 30*pow(4,ns);
+    nn += ne;
     ns++;
   }
   ne = 30*pow(4,ns);
   nt = 20*pow(4,ns);
-  fprintf(stderr, "Expected number of Lagrangian nodes = %d\n", nn);
-  fprintf(stderr, "Expected number of Lagrangian edges = %d\n", ne);
-  fprintf(stderr, "Expected number of Lagrangian triangles = %d\n", nt);
-  fprintf(stderr, "Expected number of refinements = %d\n", ns);
   p.mesh->nodes = realloc(p.mesh->nodes, nn*sizeof(lagNode));
   p.mesh->edges = realloc(p.mesh->edges, ne*sizeof(Edge));
   p.mesh->triangles = realloc(p.mesh->triangles, nt*sizeof(Triangle));
 
-  /** Perform the loop subdivision algorithm: until we reach the desired number
-  of nodes, we split each triangles into four smaller ones */
-  double cel = p.mesh->edges[0].length; // current edge length
-  int cnt = p.mesh->nlt; // current number of triangles
+  /** It's time to perform our $ns$ triangle subdivisions */
+  for(int i=0; i<ns; i++) refine_mesh(p.mesh);
 
-
-  for(int s=0; s<ns; s++) {
-    for(int i=0; i<cnt; i++) {
-      int mid_ids[3];
-      /** If not done yet, we split each edge into two */
-      for(int j=0; j<3; j++) {
-        if (p.mesh->edges[p.mesh->triangles[i].edge_ids[j]].triangle_ids[0] >
-          -1) {
-          split_edge(p.mesh, p.mesh->triangles[i].edge_ids[j]);
-          p.mesh->edges[p.mesh->nle-1].triangle_ids[0] = i;
-          mid_ids[j] = p.mesh->nlp-1;
-        }
-        else {
-          mid_ids[j] = is_triangle_vertex(p.mesh, i,
-            p.mesh->edges[p.mesh->triangles[i].edge_ids[j]].node_ids[0]) ?
-            p.mesh->edges[p.mesh->triangles[i].edge_ids[j]].node_ids[1] :
-            p.mesh->edges[p.mesh->triangles[i].edge_ids[j]].node_ids[0];
-        }
-      }
-      /** Connect the three midpoints with edges, and create corner triangles */
-      for(int j=0; j<3; j++) {
-        /** create edges between midpoints */
-        write_edge(p.mesh, p.mesh->nle, mid_ids[j], mid_ids[(j+1)%3]);
-        p.mesh->nle++;
-        int nnl = 2; // next neighbor in the list
-        while (p.mesh->nodes[mid_ids[j]].neighbor_ids[nnl] > -1) nnl++;
-        p.mesh->nodes[mid_ids[j]].neighbor_ids[nnl] = mid_ids[(j+1)%3];
-        p.mesh->nodes[mid_ids[j]].neighbor_ids[nnl + 1] = mid_ids[(j+2)%3];
-
-        /** create the corner triangle with the new edge */
-        int corner_id = -1;
-        for(int k1=0; k1<p.mesh->nodes[mid_ids[j]].nb_neighbors; k1++) {
-          if (corner_id > -1) break;
-          fprintf(stderr, "neighbor %d of %d: %d\n", k1, mid_ids[j], p.mesh->nodes[mid_ids[j]].neighbor_ids[k1]);
-          for(int k2=0; k2<p.mesh->nodes[mid_ids[(j+1)%3]].nb_neighbors; k2++) {
-            if (corner_id > -1) break;
-            fprintf(stderr, "neighbor %d of %d: %d\n", k2, mid_ids[(j+1)%3], p.mesh->nodes[mid_ids[(j+1)%3]].neighbor_ids[k2]);
-            if (p.mesh->nodes[mid_ids[j]].neighbor_ids[k1] ==
-              p.mesh->nodes[mid_ids[(j+1)%3]].neighbor_ids[k2])
-              corner_id = p.mesh->nodes[mid_ids[j]].neighbor_ids[k1];
-          }
-        }
-        assert(corner_id > -1);
-        write_triangle(p.mesh, p.mesh->nlt, mid_ids[j], mid_ids[(j+1)%3],
-          corner_id);
-        p.mesh->nlt++;
-      }
-      /** Shrink the original, big, triangle into the center smaller one */
-      // TODO: resize ith triangle
-    }
-    double cel = p.mesh->edges[0].length; // current edge length
-    cnt = p.mesh->nlt;
-  }
-
-  /** Project each node onto a sphere of desired radius */
+  /** At last, we project each node onto a sphere of desired radius */
   for(int i=0; i<p.mesh->nlp; i++) {
     double cr = 0.;
     foreach_dimension() cr += sq(p.mesh->nodes[i].pos.x);
@@ -371,9 +323,10 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
     foreach_dimension() p.mesh->nodes[i].pos.x *= radius/cr;
   }
 
-  fprintf(stderr, "Number of Lagrangian nodes = %d\n", p.mesh->nlp);
-  fprintf(stderr, "Number of Lagrangian edges = %d\n", p.mesh->nle);
-  fprintf(stderr, "Number of Lagrangian triangles = %d\n", p.mesh->nlt);
+  fprintf(stderr, "Number of triangle refinements: %d\n", ns);
+  fprintf(stderr, "Number of Lagrangian nodes: %d\n", p.mesh->nlp);
+  fprintf(stderr, "Number of Lagrangian edges: %d\n", p.mesh->nle);
+  fprintf(stderr, "Number of Lagrangian triangles: %d\n", p.mesh->nlt);
 }
 
 #endif
