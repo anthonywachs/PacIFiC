@@ -57,6 +57,7 @@ typedef struct Edge {
     int edge_ids[3];
     double area, ref_area;
     coord normal;
+    coord centroid;
   } Triangle;
 #endif
 
@@ -201,10 +202,75 @@ void comp_edge_normals(lagMesh* mesh) {
   for(int i=0; i<mesh->nle; i++) comp_edge_normal(mesh, i);
 }
 
+#if dimension > 2
+/** The function below assumes that the Lagrangian mesh contains the origin,
+and swaps the order of the nodes in order to compute an outward normal vector.
+This only need to be performed at the creation of the mesh since the outward
+property of the normal vectors won't change through the simulation. */
+void comp_initial_area_normals(lagMesh* mesh) {
+  for(int i=0; i<mesh->nlt; i++) {
+    int nid[3]; // node ids
+    coord centroid;
+    foreach_dimension() centroid.x = 0.;
+    for(int j=0; j<3; j++) {
+      nid[j] = mesh->triangles[i].node_ids[j];
+      foreach_dimension() centroid.x += mesh->nodes[nid[j]].pos.x/3;
+    }
+    coord normal, e[2];
+    for(int j=0; j<2; j++)
+      foreach_dimension()
+        e[j].x = mesh->nodes[nid[0]].pos.x - mesh->nodes[nid[j+1]].pos.x;
+    foreach_dimension() normal.x = e[0].y*e[1].z - e[0].z*e[1].y;
+    double norm = sqrt(sq(normal.x) + sq(normal.y) + sq(normal.z));
+    double dp = 0.; // dp for "dot product"
+    foreach_dimension() dp += normal.x*centroid.x;
+    /** If the dot product is negative, the computed normal is inward and we
+    need to swap two nodes of the triangle.*/
+    if (dp < 0) {
+      mesh->triangles[i].node_ids[1] = nid[2];
+      mesh->triangles[i].node_ids[2] = nid[1];
+      foreach_dimension() normal.x *= -1;
+    }
+    foreach_dimension() {
+      mesh->triangles[i].centroid.x = centroid.x;
+      mesh->triangles[i].normal.x = normal.x/norm;
+    }
+    mesh->triangles[i].area = norm/2;
+  }
+}
+
+/** The two function below compute the outward normal vector to all the
+triangles of the mesh. */
+void comp_triangle_area_normal(lagMesh* mesh, int i) {
+  int nid[3]; // node ids
+  for(int j=0; j<3; j++) nid[j] = mesh->triangles[i].node_ids[j];
+  foreach_dimension() mesh->triangles[i].centroid.x = 0.;
+  for(int j=0; j<3; j++) {
+    nid[j] = mesh->triangles[i].node_ids[j];
+    foreach_dimension()
+      mesh->triangles[i].centroid.x += mesh->nodes[nid[j]].pos.x/3;
+  }
+  coord normal, e[2];
+  for(int j=0; j<2; j++)
+    foreach_dimension()
+      e[j].x = mesh->nodes[nid[0]].pos.x - mesh->nodes[nid[j+1]].pos.x;
+  foreach_dimension() normal.x = e[0].y*e[1].z - e[0].z*e[1].y;
+  double norm = sqrt(sq(normal.x) + sq(normal.y) + sq(normal.z));
+  foreach_dimension() mesh->triangles[i].normal.x = normal.x/norm;
+  mesh->triangles[i].area = norm/2.;
+}
+
+void comp_triangle_area_normals(lagMesh* mesh) {
+  for(int i=0; i<mesh->nlt; i++) comp_triangle_area_normal(mesh, i);
+}
+#endif
+
 /** The function below updates the normal vectors on all the nodes as well as
-on the midpoints of all the edges. */
+the lengths and midpoints of all the edges (in 2D) or the area and centroids of
+all the triangles (in 3D). */
 void comp_normals(lagMesh* mesh) {
   if (!mesh->updated_normals) {
+    #if dimension < 3
     compute_lengths(mesh);
     for(int i=0; i<mesh->nlp; i++) {
       coord n[2];
@@ -229,6 +295,25 @@ void comp_normals(lagMesh* mesh) {
       normn = sqrt(normn);
       foreach_dimension() mesh->nodes[i].normal.x /= normn;
     }
+    #else // dimension = 3
+    comp_triangle_area_normals(mesh);
+    for(int i=0; i<mesh->nlp; i++) {
+      foreach_dimension() mesh->nodes[i].normal.x = 0.;
+      double sw = 0.; // sum of the weights
+      for(int j=0; j<mesh->nodes[i].nb_triangles; j++) {
+        int tid = mesh->nodes[i].triangle_ids[j];
+        double dist = 0.;
+        foreach_dimension()
+          dist += sq(mesh->nodes[i].pos.x - mesh->triangles[tid].centroid.x);
+        dist = sqrt(dist);
+        sw += dist;
+        foreach_dimension()
+          mesh->nodes[i].normal.x += mesh->triangles[tid].normal.x*dist;
+      }
+      foreach_dimension()
+        mesh->nodes[i].normal.x /= sw;
+    }
+    #endif
     mesh->updated_normals = true;
   }
 }

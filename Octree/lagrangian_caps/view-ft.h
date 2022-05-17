@@ -28,23 +28,25 @@ static void end_draw_vertices()
 
 struct _draw_lag {
   lagMesh* mesh; // Compulsory
+  bool nodes;
   bool edges;
-  bool vertices;
-  float fc[3], lc[3], vc[3], lw, vs;
+  bool triangles;
+  float fc[3], lc[3], vc[3], lw, ns;
 };
 
 void draw_lag(struct _draw_lag p) {
   if (pid() == 0) {
-    bool edges = (p.edges) ? p.edges : true;
-    // bool vertices = false;
-    // if (p.vertices == true) vertices = true;
-    float color[3];
+    bool edges = p.edges;
+    if (p.lw > 0 || (p.lc[0] > 0 || p.lc[1] > 0 || p.lc[2] > 0)) edges = true;
+    bool nodes = p.nodes;
+    if (p.ns > 0) nodes = true;
+    float my_color[3];
     bview * view = draw();
     if (edges) {
       p.lw = (p.lw) ? p.lw : 2.;
-      if (p.lc) {color[0] = p.lc[0]; color[1] = p.lc[1]; color[2] = p.lc[2];}
-      else {color[0] = 0.; color[1] = 0.; color[2] = 0.;}
-      draw_lines(view, color, p.lw) {
+      if (p.lc) {my_color[0] = p.lc[0]; my_color[1] = p.lc[1]; my_color[2] = p.lc[2];}
+      else {my_color[0] = 0.; my_color[1] = 0.; my_color[2] = 0.;}
+      draw_lines(view, my_color, p.lw) {
         for (int i=0; i<p.mesh->nle; i++) {
           bool across_periodic_bc = false;
           int v1, v2;
@@ -69,17 +71,17 @@ void draw_lag(struct _draw_lag p) {
                 glvertex3d(view, p.mesh->nodes[v2].pos.x,
                   p.mesh->nodes[v2].pos.y, p.mesh->nodes[v2].pos.z);
               #endif
-              view->ni++;
             glEnd();
+            view->ni++;
           }
         }
       }
     }
-    if (p.vs > 0.) {
-      p.vs = (p.vs) ? p.vs : 8.;
-      if (p.vc) {color[0] = p.vc[0]; color[1] = p.vc[1]; color[2] = p.vc[2];}
-      else {color[0] = 0.; color[1] = 0.; color[2] = 0.;}
-      draw_vertices(view, color, p.vs) {
+    if (nodes) {
+      p.ns = (p.ns) ? p.ns : 8.;
+      if (p.vc) {my_color[0] = p.vc[0]; my_color[1] = p.vc[1]; my_color[2] = p.vc[2];}
+      else {my_color[0] = 0.; my_color[1] = 0.; my_color[2] = 0.;}
+      draw_vertices(view, my_color, p.ns) {
         glBegin(GL_POINTS);
           for (int i=0; i<p.mesh->nlp; i++)
             #if dimension < 3
@@ -96,22 +98,39 @@ void draw_lag(struct _draw_lag p) {
     #if dimension > 2
       bool faces = true;
       if (faces) {
-        float fc[3] = {1., 1., 1.};
-        colormap map = jet;
-        double cmap[NCMAP][3];
-        map (cmap);
-        colorized(fc, true, cmap, false) {
+        // float fc[3] = {1., 1., 1.};
+        // colormap map = jet;
+        // double cmap[NCMAP][3];
+        // map (cmap);
+        // colorized (fc, true, cmap, true) {
           for (int i=0; i<p.mesh->nlt; i++) {
-            glBegin(GL_TRIANGLE_FAN);
+            glBegin (GL_POLYGON);
+            // glColor3f (0., 0., 0.);
               for(int j=0; j<3; j++) {
-                glvertex3d(view,
+                glColor3f (255., 255., 255.);
+                // color b = colormap_color (cmap, 255., 0., 255.);
+                // glColor3f (b.r/255., b.g/255., b.b/255.);
+                // glvertex3d(view,
+                glVertex3d(
                   p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.x,
                   p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.y,
                   p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.z);
                 }
-            glEnd();
+            glEnd ();
+            view->ni++;
+            // coord p1, p2;
+            // foreach_dimension() {
+            //   p1.x = p.mesh->triangles[i].centroid.x;
+            //   p2.x = p1.x + RADIUS/10*p.mesh->triangles[i].normal.x;
+            // }
+            // glColor3f (0., 0., 0.);
+            // glBegin(GL_LINES);
+            //   glvertex3d(view, p1.x, p1.y, p1.z);
+            //   glvertex3d(view, p2.x, p2.y, p2.z);
+            // glEnd();
+            // view->ni++;
           }
-        }
+        // }
       }
     #endif
   }
