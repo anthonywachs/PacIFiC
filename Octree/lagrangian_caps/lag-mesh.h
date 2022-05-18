@@ -55,9 +55,10 @@ typedef struct Edge {
   typedef struct Triangle {
     int node_ids[3];
     int edge_ids[3];
-    double area, ref_area;
+    double area, refArea;
     coord normal;
     coord centroid;
+    coord refShape[2];
   } Triangle;
 #endif
 
@@ -203,10 +204,11 @@ void comp_edge_normals(lagMesh* mesh) {
 }
 
 #if dimension > 2
-/** The function below assumes that the Lagrangian mesh contains the origin,
-and swaps the order of the nodes in order to compute an outward normal vector.
-This only need to be performed at the creation of the mesh since the outward
-property of the normal vectors won't change through the simulation. */
+/** The function below assumes that the Lagrangian mesh contains the origin and
+is convex, and swaps the order of the nodes in order to compute an outward
+normal vector. This only need to be performed at the creation of the mesh since
+the outward property of the normal vectors won't change through the simulation.
+*/
 void comp_initial_area_normals(lagMesh* mesh) {
   for(int i=0; i<mesh->nlt; i++) {
     int nid[3]; // node ids
@@ -557,7 +559,7 @@ event acceleration (i++) {
   foreach_face() ae.x[] += .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
 }
 
-/** At the end of the simulation, we need to free the allocated memory.*/
+/** At the end of the simulation, we free the allocated memory.*/
 event cleanup (t = end) {
   free_caps(&mbs);
 }

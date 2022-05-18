@@ -30,7 +30,7 @@ struct _draw_lag {
   lagMesh* mesh; // Compulsory
   bool nodes;
   bool edges;
-  bool triangles;
+  bool facets;
   float fc[3], lc[3], vc[3], lw, ns;
 };
 
@@ -96,41 +96,20 @@ void draw_lag(struct _draw_lag p) {
       }
     }
     #if dimension > 2
-      bool faces = true;
-      if (faces) {
-        // float fc[3] = {1., 1., 1.};
-        // colormap map = jet;
-        // double cmap[NCMAP][3];
-        // map (cmap);
-        // colorized (fc, true, cmap, true) {
-          for (int i=0; i<p.mesh->nlt; i++) {
-            glBegin (GL_POLYGON);
-            // glColor3f (0., 0., 0.);
-              for(int j=0; j<3; j++) {
-                glColor3f (255., 255., 255.);
-                // color b = colormap_color (cmap, 255., 0., 255.);
-                // glColor3f (b.r/255., b.g/255., b.b/255.);
-                // glvertex3d(view,
-                glVertex3d(
-                  p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.x,
-                  p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.y,
-                  p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.z);
-                }
-            glEnd ();
-            view->ni++;
-            // coord p1, p2;
-            // foreach_dimension() {
-            //   p1.x = p.mesh->triangles[i].centroid.x;
-            //   p2.x = p1.x + RADIUS/10*p.mesh->triangles[i].normal.x;
-            // }
-            // glColor3f (0., 0., 0.);
-            // glBegin(GL_LINES);
-            //   glvertex3d(view, p1.x, p1.y, p1.z);
-            //   glvertex3d(view, p2.x, p2.y, p2.z);
-            // glEnd();
-            // view->ni++;
-          }
-        // }
+      bool facets = p.facets;
+      if (facets) {
+        for (int i=0; i<p.mesh->nlt; i++) {
+          glBegin (GL_POLYGON);
+            for(int j=0; j<3; j++) {
+              glColor3f (255., 255., 255.);
+              glVertex3d(
+                p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.x,
+                p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.y,
+                p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.z);
+              }
+          glEnd ();
+          view->ni++;
+        }
       }
     #endif
   }
