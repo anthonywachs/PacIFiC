@@ -5,8 +5,8 @@ the membrane(s).*/
   #define E_S 1.
 #endif
 
-#define DWDL1(L1, L2) (E_S*L1*(1. - 1./(sq(L1*L2)))/3.)
-#define DWDL2(L1, L2) (E_S*L2*(1. - 1./(sq(L1*L2)))/3.)
+#define DWDL1(L1, L2) (E_S*(L1 - 1./(cube(L1)*sq(L2)))/3.)
+#define DWDL2(L1, L2) (E_S*(L2 - 1./(sq(L1)*cube(L2)))/3.)
 
 #include "elasticity-ft.h"
 

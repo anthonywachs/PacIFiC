@@ -328,7 +328,7 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   fprintf(stderr, "Number of Lagrangian edges: %d\n", p.mesh->nle);
   fprintf(stderr, "Number of Lagrangian triangles: %d\n", p.mesh->nlt);
 
-  comp_initial_area_normals(p.mesh);
+  comp_normals(p.mesh);
 }
 
 #endif
