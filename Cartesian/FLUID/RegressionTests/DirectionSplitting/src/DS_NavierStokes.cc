@@ -166,11 +166,6 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    GLOBAL_EQ = DS_NavierStokesSystem::create( this, se, UF, PF, inputData ) ;
    se->destroy() ;
 
-	// // if postprocessing is required
-	// postProcessing = new PostProcessing(is_solids, allrigidbodies, dim, macCOMM);
-	// postProcessing->prepare_fieldVolumeAverageInBox(this, exp, fromDS.dom_);
-	// postProcessing->prepare_fieldVolumeAverageAroundRB(this, exp, fromDS.dom_);
-
    // Timing routines
    if ( my_rank == is_master ) {
      SCT_insert_app("Matrix_Assembly&Initialization");
@@ -316,9 +311,6 @@ DS_NavierStokes:: do_after_time_stepping( void )
 
    output_L2norm_velocity(0);
    output_L2norm_pressure(0);
-
-	// postProcessing->compute_fieldVolumeAverageInBox(allrigidbodies);
-	// postProcessing->compute_fieldVolumeAverageAroundRB(allrigidbodies);
 
    if ( my_rank == is_master )
    {

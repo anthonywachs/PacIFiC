@@ -65,6 +65,12 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       @param cycleNumber cycle number */
       virtual void do_additional_savings( FV_TimeIterator const* t_it,
       	int const& cycleNumber  );
+
+      /** @brief Inbuilt function for post processing data
+      @param dom domain and fields
+      @param exp module explorer */
+      virtual void do_more_post_processing( FV_DomainAndFields * dom,
+                                           MAC_ModuleExplorer const* exp ) ;
       //@}
 
    protected: //--------------------------------------------------------------
@@ -120,6 +126,7 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       double kai;
       string AdvectionScheme;
       size_t AdvectionTimeAccuracy;
+      size_t space_dimensions;
       bool b_restart;
       bool is_solids;
       bool is_HE, is_NS, is_NSwithHE;

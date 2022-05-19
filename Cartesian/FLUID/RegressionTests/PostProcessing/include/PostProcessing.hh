@@ -54,7 +54,7 @@ class PostProcessing
       @param is_solids RB present or not
       @param allrigidbodies pointer to all RB */
       PostProcessing( bool is_solids_
-                    , DS_AllRigidBodies const* allrigidbodies_
+                    , DS_AllRigidBodies * allrigidbodies_
                     , size_t const& dim_
                     , MAC_Communicator const* macCOMM_);
 
@@ -71,15 +71,11 @@ class PostProcessing
                                           , MAC_ModuleExplorer const* exp
                                           , FV_DomainAndFields const* dom);
 
-      /** @brief Compute average field in the list of boxes
-      @param allrigidbodies pointer to all rigid bodies */
-      void compute_fieldVolumeAverageInBox(
-                                    DS_AllRigidBodies* allrigidbodies);
+      /** @brief Compute average field in the list of boxes */
+      void compute_fieldVolumeAverageInBox();
 
-      /** @brief Compute average field around a RB for all list of boxes
-      @param allrigidbodies pointer to all rigid bodies */
-      void compute_fieldVolumeAverageAroundRB(
-                                    DS_AllRigidBodies* allrigidbodies);
+      /** @brief Compute average field around a RB for all list of boxes */
+      void compute_fieldVolumeAverageAroundRB();
 
    protected: //--------------------------------------------------------------
 
@@ -145,7 +141,7 @@ class PostProcessing
       FV_Mesh const* MESH ;
 
       bool m_is_solids;
-      DS_AllRigidBodies const* m_allrigidbodies;
+      DS_AllRigidBodies * m_allrigidbodies;
       size_t m_dim;
       MAC_Communicator const* m_macCOMM; /**< Variable for communication
       between processors */

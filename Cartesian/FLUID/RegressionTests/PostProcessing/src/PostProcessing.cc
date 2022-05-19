@@ -14,7 +14,7 @@ PostProcessing:: PostProcessing()
   : m_is_solids( false )
   , m_allrigidbodies( NULL )
 {
-  MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies" ) ;
+  MAC_LABEL( "PostProcessing:: PostProcessing" ) ;
 
 }
 
@@ -23,7 +23,7 @@ PostProcessing:: PostProcessing()
 
 //---------------------------------------------------------------------------
 PostProcessing:: PostProcessing( bool is_solids_
-                               , DS_AllRigidBodies const* allrigidbodies_
+                               , DS_AllRigidBodies * allrigidbodies_
                                , size_t const& dim_
                                , MAC_Communicator const* macCOMM_)
 //---------------------------------------------------------------------------
@@ -221,8 +221,7 @@ PostProcessing::prepare_fieldVolumeAverageInBox( MAC_Object* a_owner
 
 //---------------------------------------------------------------------------
 void
-PostProcessing::compute_fieldVolumeAverageInBox(
-                                    DS_AllRigidBodies* allrigidbodies )
+PostProcessing::compute_fieldVolumeAverageInBox()
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "PostProcessing::compute_fieldVolumeAverageInBox" ) ;
@@ -278,14 +277,14 @@ PostProcessing::compute_fieldVolumeAverageInBox(
                   for (size_t j = min_local_index(1);
                              j <= max_local_index(1); j++) {
                      double dy = it->FF->get_cell_size( j, comp, 1 );
-                     if (min_local_index(2) != 0) {
+                     if (m_dim == 2 || min_local_index(2) != 0) {
                         for (size_t k = min_local_index(2);
                                    k <= max_local_index(2); k++) {
                            double dz = (m_dim == 3) ?
                                        it->FF->get_cell_size( k, comp, 2 ) : 1;
                            double epsilon = 1;
                            if (it->withPorosity) {
-                              size_t_vector* void_frac = allrigidbodies
+                              size_t_vector* void_frac = m_allrigidbodies
 														->get_void_fraction_on_grid(it->FF);
                               size_t p = it->FF->DOF_local_number(i,j,k,comp);
                               epsilon = (void_frac->operator()(p) != 0)? 0 : 1 ;
@@ -320,8 +319,7 @@ PostProcessing::compute_fieldVolumeAverageInBox(
 
 //---------------------------------------------------------------------------
 void
-PostProcessing::compute_fieldVolumeAverageAroundRB(
-                                    DS_AllRigidBodies* allrigidbodies )
+PostProcessing::compute_fieldVolumeAverageAroundRB()
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "PostProcessing::compute_fieldVolumeAverageAroundRB" ) ;
@@ -331,7 +329,7 @@ PostProcessing::compute_fieldVolumeAverageAroundRB(
   MyFile.setf(std::ios::scientific,std::ios::floatfield);
   MyFile.precision(6);
 
-  size_t m_nrb = allrigidbodies->get_number_rigid_bodies();
+  size_t m_nrb = m_allrigidbodies->get_number_rigid_bodies();
   list<struct fieldVolumeAverageAroundRB>::const_iterator it;
 
   for (size_t parID = 0; parID < m_nrb; parID++) {
@@ -353,7 +351,7 @@ PostProcessing::compute_fieldVolumeAverageAroundRB(
                    << endl;
          }
 
-         DS_RigidBody const* rigidBody = allrigidbodies
+         DS_RigidBody const* rigidBody = m_allrigidbodies
                                              ->get_ptr_rigid_body(parID);
 
          geomVector const* ptgc = rigidBody->get_ptr_to_gravity_centre();
@@ -367,9 +365,9 @@ PostProcessing::compute_fieldVolumeAverageAroundRB(
                // Control volume min and max, if any
                doubleVector box_extents(2,0.);
                box_extents(0) = ptgc->operator()(dir) -
-                                             (cr + it->volumeWidth*(2.*cr));
+                                             (0.5*it->volumeWidth*(2.*cr));
                box_extents(1) = ptgc->operator()(dir) +
-                                             (cr + it->volumeWidth*(2.*cr));
+                                             (0.5*it->volumeWidth*(2.*cr));
 
                size_t_vector temp =
                      get_local_index_of_extents(box_extents, it->FF, dir, comp);
@@ -395,7 +393,7 @@ PostProcessing::compute_fieldVolumeAverageAroundRB(
                         double yC = it->FF->get_DOF_coordinate( j, comp, 1) ;
                         yC = delta_periodic_transformation(
                                        fabs(yC - ptgc->operator()(1)), 1);
-                        if (min_local_index(2) != 0) {
+                        if (m_dim == 2 || min_local_index(2) != 0) {
                            for (size_t k = min_local_index(2);
                                       k <= max_local_index(2); k++) {
                               double dz = (m_dim == 3) ?
@@ -408,11 +406,11 @@ PostProcessing::compute_fieldVolumeAverageAroundRB(
                               double distance = MAC::sqrt(xC*xC + yC*yC + zC*zC);
                               double weight = kernel(distance
                                                    , cr
-                                                   , 2.*cr*(1.+2.*it->volumeWidth)
+                                                   , it->volumeWidth
                                                    , it->kernelType);
                               double epsilon = 1;
                               if (it->withPorosity) {
-                                 size_t_vector* void_frac = allrigidbodies
+                                 size_t_vector* void_frac = m_allrigidbodies
    														->get_void_fraction_on_grid(it->FF);
                                  size_t p = it->FF->DOF_local_number(i,j,k,comp);
                                  epsilon=(void_frac->operator()(p) != 0)? 0 : 1 ;

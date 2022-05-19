@@ -3,6 +3,7 @@
 #include <FV_DomainBuilder.hh>
 #include <FV_DiscreteField.hh>
 #include <FV_SystemNumbering.hh>
+#include <PostProcessing.hh>
 #include <FV_Mesh.hh>
 #include <FV_TimeIterator.hh>
 #include <MAC.hh>
@@ -224,13 +225,13 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
    }
 
-   size_t dim = (is_HE) ? dom->discrete_field( "temperature" )->primary_grid()
+   space_dimensions = (is_HE) ? dom->discrete_field( "temperature" )->primary_grid()
                                                        ->nb_space_dimensions()
                         : dom->discrete_field( "velocity" )->primary_grid()
                                                        ->nb_space_dimensions();
 
    // Read the gravity vector or direction of enforced motion
-   doubleVector gg( dim, 0 );
+   doubleVector gg( space_dimensions, 0 );
    if ( exp->has_entry( "Gravity_vector" ) )
       gg = exp->doubleVector_data( "Gravity_vector" );
    gravity_vector = MAC_DoubleVector::create( this, gg );
@@ -238,7 +239,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    // Create rigid bodies objects depending on which PDE to solve
    if (is_solids) {
       if (is_NS) {
-         allrigidbodies = new DS_AllRigidBodies( dim
+         allrigidbodies = new DS_AllRigidBodies( space_dimensions
                           , *solidFluid_transferStream
                           , b_particles_as_fixed_obstacles
                           , dom->discrete_field( "velocity" )
@@ -249,7 +250,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                           , macCOMM
                           , mu );
       } else if (is_HE) {
-         allrigidbodies = new DS_AllRigidBodies( dim
+         allrigidbodies = new DS_AllRigidBodies( space_dimensions
                           , *solidFluid_transferStream
                           , b_particles_as_fixed_obstacles
                           , dom->discrete_field( "temperature" )
@@ -258,7 +259,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                           , mu
                           , RBTemp);
       } else if (is_NSwithHE) {
-         allrigidbodies = new DS_AllRigidBodies( dim
+         allrigidbodies = new DS_AllRigidBodies( space_dimensions
                           , *solidFluid_transferStream
                           , b_particles_as_fixed_obstacles
                           , dom->discrete_field( "velocity" )
@@ -526,6 +527,39 @@ DS_DirectionSplitting:: do_additional_savings( FV_TimeIterator const* t_it,
       start_total_timer( "DS_HeatTransfer:: do_additional_savings" ) ;
       HeatSolver->do_additional_savings( t_it, cycleNumber ) ;
       stop_total_timer() ;
+   }
+
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void
+DS_DirectionSplitting:: do_more_post_processing( FV_DomainAndFields * dom,
+                                                 MAC_ModuleExplorer const* exp )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_DirectionSplitting:: do_more_post_processing" ) ;
+
+   // Post Processing variable
+   PostProcessing* postProcessing;
+
+   // if postprocessing is required
+	postProcessing = new PostProcessing(is_solids
+                                     , allrigidbodies
+                                     , space_dimensions
+                                     , macCOMM);
+
+   if ( exp->has_module( "fieldVolumeAverageInBox" ) ) {
+	   postProcessing->prepare_fieldVolumeAverageInBox(this, exp, dom);
+      postProcessing->compute_fieldVolumeAverageInBox();
+   }
+
+   if ( exp->has_module( "fieldVolumeAverageAroundRB" ) ) {
+      postProcessing->prepare_fieldVolumeAverageAroundRB(this, exp, dom);
+      postProcessing->compute_fieldVolumeAverageAroundRB();
    }
 
 
