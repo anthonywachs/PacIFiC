@@ -205,54 +205,6 @@ void DS_RigidBody:: initialize_surface_variables( )
 {
   MAC_LABEL( "DS_RigidBody:: initialize_surface_variables" ) ;
 
-  if (!m_surface_points.empty()) {
-     for (vector<geomVector*>::iterator pObj = m_surface_points.begin();
-          pObj < m_surface_points.end(); pObj++) {
-        delete *pObj;
-     }
-     m_surface_points.clear();
-  }
-
-  if (!m_surface_area.empty()) {
-     for (vector<geomVector*>::iterator pObj = m_surface_area.begin();
-          pObj < m_surface_area.end(); pObj++) {
-        delete *pObj;
-     }
-     m_surface_area.clear();
-  }
-
-  if (!m_surface_normal.empty()) {
-     for (vector<geomVector*>::iterator pObj = m_surface_normal.begin();
-          pObj < m_surface_normal.end(); pObj++) {
-        delete *pObj;
-     }
-     m_surface_normal.clear();
-  }
-
-  if (!m_surface_Pforce.empty()) {
-     for (vector<geomVector*>::iterator pObj = m_surface_Pforce.begin();
-          pObj < m_surface_Pforce.end(); pObj++) {
-        delete *pObj;
-     }
-     m_surface_Pforce.clear();
-  }
-
-  if (!m_surface_Vforce.empty()) {
-     for (vector<geomVector*>::iterator pObj = m_surface_Vforce.begin();
-          pObj < m_surface_Vforce.end(); pObj++) {
-        delete *pObj;
-     }
-     m_surface_Vforce.clear();
-  }
-
-  if (!m_surface_Tgrad.empty()) {
-     for (vector<geomVector*>::iterator pObj = m_surface_Tgrad.begin();
-          pObj < m_surface_Tgrad.end(); pObj++) {
-        delete *pObj;
-     }
-     m_surface_Tgrad.clear();
-  }
-
   if (m_surface_points.empty()) {
      m_surface_points.reserve( Ntot );
      m_surface_area.reserve( Ntot );
