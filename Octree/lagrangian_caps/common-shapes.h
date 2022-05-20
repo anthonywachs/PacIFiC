@@ -204,9 +204,6 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
 }
 
 #if dimension > 2
-
-#include "mesh-toolbox.h"
-
 void initialize_icosahedron(struct _initialize_circular_mb p) {
   double radius = (p.radius) ? p.radius : RADIUS;
   coord shift;
@@ -328,6 +325,7 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   fprintf(stderr, "Number of Lagrangian edges: %d\n", p.mesh->nle);
   fprintf(stderr, "Number of Lagrangian triangles: %d\n", p.mesh->nlt);
 
+  comp_initial_area_normals(p.mesh);
   comp_normals(p.mesh);
 }
 

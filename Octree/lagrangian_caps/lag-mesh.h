@@ -59,6 +59,7 @@ typedef struct Edge {
     coord normal;
     coord centroid;
     coord refShape[2];
+    double sfc[3][2]; // sfc for "shape function coefficients"
   } Triangle;
 #endif
 
@@ -526,12 +527,17 @@ event defaults (i = 0) {
 /** Before the iterations start, we allocate memory for the stencils and
 generate them. Note that this implementation assumes the membrane was
 initialized in the init event. */
+// #if dimension < 3
+  #define STENCIL_SIZE 25
+// #else
+//   #define STENCIL_SIZE 125
+// #endif
 event init (i = 0) {
   for(int i=0; i<mbs.nbmb; i++) {
     for(int j=0; j<MB(i).nlp; j++) {
-      MB(i).nodes[j].stencil.n = 25;
-      MB(i).nodes[j].stencil.nm = 25*128;
-      MB(i).nodes[j].stencil.p = (Index*) malloc(25*sizeof(Index));
+      MB(i).nodes[j].stencil.n = STENCIL_SIZE;
+      MB(i).nodes[j].stencil.nm = STENCIL_SIZE*128;
+      MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
     }
     generate_lag_stencils(&MB(i));
   }
@@ -564,6 +570,9 @@ event cleanup (t = end) {
   free_caps(&mbs);
 }
 
+#if dimension > 2
+  #include "mesh-toolbox.h"
+#endif
 
 /**
 ## Tests

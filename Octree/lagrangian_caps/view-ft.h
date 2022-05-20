@@ -31,7 +31,7 @@ struct _draw_lag {
   bool nodes;
   bool edges;
   bool facets;
-  float fc[3], lc[3], vc[3], lw, ns;
+  float fc[3], lc[3], nc[3], lw, ns;
 };
 
 void draw_lag(struct _draw_lag p) {
@@ -79,7 +79,7 @@ void draw_lag(struct _draw_lag p) {
     }
     if (nodes) {
       p.ns = (p.ns) ? p.ns : 8.;
-      if (p.vc) {my_color[0] = p.vc[0]; my_color[1] = p.vc[1]; my_color[2] = p.vc[2];}
+      if (p.nc) {my_color[0] = p.nc[0]; my_color[1] = p.nc[1]; my_color[2] = p.nc[2];}
       else {my_color[0] = 0.; my_color[1] = 0.; my_color[2] = 0.;}
       draw_vertices(view, my_color, p.ns) {
         glBegin(GL_POINTS);
@@ -99,16 +99,20 @@ void draw_lag(struct _draw_lag p) {
       bool facets = p.facets;
       if (facets) {
         for (int i=0; i<p.mesh->nlt; i++) {
-          glBegin (GL_POLYGON);
-            for(int j=0; j<3; j++) {
-              glColor3f (255., 255., 255.);
-              glVertex3d(
-                p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.x,
-                p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.y,
-                p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos.z);
-              }
-          glEnd ();
-          view->ni++;
+          int nodes[3];
+          for(int j=0; j<3; j++) nodes[j] = p.mesh->triangles[i].node_ids[j];
+          if (!(is_triangle_across_periodic(p.mesh, i))) {
+            glBegin (GL_POLYGON);
+              for(int j=0; j<3; j++) {
+                glColor3f (255., 255., 255.);
+                glVertex3d(
+                  p.mesh->nodes[nodes[j]].pos.x,
+                  p.mesh->nodes[nodes[j]].pos.y,
+                  p.mesh->nodes[nodes[j]].pos.z);
+                }
+            glEnd ();
+            view->ni++;
+          }
         }
       }
     #endif

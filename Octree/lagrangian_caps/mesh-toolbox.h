@@ -29,6 +29,19 @@ bool edge_exists(lagMesh* mesh, int j, int k) {
   return false;
 }
 
+/** The function below returns true if the edge $i$ is across a priodic
+boundary. */
+bool is_edge_across_periodic(lagMesh* mesh, int i) {
+  int n[2];
+  for(int k=0; k<2; k++) n[k] = mesh->edges[i].node_ids[k];
+  if (ACROSS_PERIODIC(mesh->nodes[n[0]].pos.x, mesh->nodes[n[1]].pos.x)
+    || ACROSS_PERIODIC(mesh->nodes[n[0]].pos.y, mesh->nodes[n[1]].pos.y)
+    || ACROSS_PERIODIC(mesh->nodes[n[0]].pos.z, mesh->nodes[n[1]].pos.z))
+      return true;
+  return false;
+}
+
+
 struct _write_edge {
   lagMesh* mesh;
   int i;
@@ -85,6 +98,18 @@ bool triangle_exists(lagMesh* mesh, int i, int j, int k) {
       }
     }
   }
+  return false;
+}
+
+/** The function below returns true if the triangle_ids $i$ is across a priodic
+boundary. */
+bool is_triangle_across_periodic(lagMesh* mesh, int i) {
+  int e[3];
+  for(int k=0; k<3; k++) e[k] = mesh->triangles[i].edge_ids[k];
+  if (is_edge_across_periodic(mesh, e[0])
+    || is_edge_across_periodic(mesh, e[1])
+    || is_edge_across_periodic(mesh, e[2]))
+      return true;
   return false;
 }
 

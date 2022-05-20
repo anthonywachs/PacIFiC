@@ -8,7 +8,7 @@ static void change_cache_entry(Cache* s, int i, Point pt, int flag) {
   if (i > s->n) fprintf(stderr, "Error: Cache index out of range.\n");
   s->p[i].i = pt.i;
   s->p[i].j = pt.j;
-  #if dimension >= 3
+  #if dimension > 2
     s->p[i].k = pt.k;
   #endif
   s->p[i].level = pt.level;
@@ -50,12 +50,24 @@ void lag2eul(vector forcing, lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) {
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
-        coord sdist;
-        sdist.x = sq(x - mesh->nodes[i].pos.x);
-        sdist.y = sq(y - mesh->nodes[i].pos.y);
-        if (sdist.x <= sq(2*Delta) && sdist.y <= sq(2*Delta)) {
-          double weight = (1 + cos(.5*pi*(x - mesh->nodes[i].pos.x)/Delta))*
-            (1 + cos(.5*pi*(y - mesh->nodes[i].pos.y)/Delta))/(16.*sq(Delta));
+        coord dist;
+        dist.x = GENERAL_1DIST(x, mesh->nodes[i].pos.x);
+        dist.y = GENERAL_1DIST(y, mesh->nodes[i].pos.y);
+        // #if dimension > 2
+        // dist.z = GENERAL_1DIST(z, mesh->nodes[i].pos.z);
+        // #endif
+        // #if dimension < 2
+        if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta)) {
+          double weight =
+            (1 + cos(.5*pi*dist.x/Delta))*(1 + cos(.5*pi*dist.y/Delta))
+            /(16.*sq(Delta));
+        // #else
+        // if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta) &&
+        //   sq(dist.z) <= sq(2*Delta)) {
+        //   double weight =
+        //     (1 + cos(.5*pi*dist.x/Delta))*(1 + cos(.5*pi*dist.y/Delta))
+        //     *(1 + cos(.5*pi*dist.z/Delta))/(cube(4*Delta));
+        // #endif
           foreach_dimension() forcing.x[] += weight*mesh->nodes[i].lagForce.x;
         }
       }
@@ -75,12 +87,20 @@ void eul2lag(lagMesh* mesh) {
         coord dist;
         dist.x = GENERAL_1DIST(x, mesh->nodes[i].pos.x);
         dist.y = GENERAL_1DIST(y, mesh->nodes[i].pos.y);
+        // #if dimension > 2
+        // dist.z = GENERAL_1DIST(z, mesh->nodes[i].pos.z);
+        // #endif
+        // #if dimension < 3
         if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta)) {
           double weight = (1 + cos(.5*pi*dist.x/Delta))*
             (1 + cos(.5*pi*dist.y/Delta))/16.;
-          foreach_dimension() {
-            mesh->nodes[i].lagVel.x += weight*u.x[];
-          }
+        // #else
+        // if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta)
+        //   && sq(dist.z) <= sq(2*Delta)) {
+        //   double weight = (1 + cos(.5*pi*dist.x/Delta))*
+        //     (1 + cos(.5*pi*dist.y/Delta))*(1 + cos(.5*pi*dist.y/Delta))/64.;
+        // #endif
+        foreach_dimension() mesh->nodes[i].lagVel.x += weight*u.x[];
         }
       }
     }
@@ -100,8 +120,18 @@ void tag_ibm_stencils(lagMesh* mesh) {
         coord dist;
         dist.x = GENERAL_1DIST(x, mesh->nodes[i].pos.x);
         dist.y = GENERAL_1DIST(y, mesh->nodes[i].pos.y);
-        if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta))
+        // #if dimension > 2
+        // dist.z = GENERAL_1DIST(z, mesh->nodes[i].pos.z);
+        // #endif
+        // #if dimension < 3
+        if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta)) {
           stencils[] = sq(dist.x + dist.y)/sq(2.*Delta)*(2.+noise());
+        // #else
+        // if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta)
+        //   && sq(dist.z) <= sq(2*Delta)) {
+        //   stencils[] = sq(dist.x + dist.y + dist.z)/cube(2.*Delta)*(2.+noise());
+        //   #endif
+        }
       }
     }
   }
