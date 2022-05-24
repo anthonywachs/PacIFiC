@@ -136,6 +136,13 @@ is used instead. */
   #define ADVECT_LAG_RK2 1
 #endif
 
+/** We specify the size of the 5x5(x5) stencil in 2D or 3D. */
+#if dimension < 3
+  #define STENCIL_SIZE 25
+#else
+  #define STENCIL_SIZE 125
+#endif
+
 /** The next few macros are useful to compute signed distances and averages
 across periodic boundaries. We assume for this purpose that the length of
 the edges are less that half the domain size, which in practice should always
@@ -184,6 +191,7 @@ void compute_lengths(struct _compute_lengths p) {
   }
 }
 
+#if dimension < 3
 /**
 The two functions below compute the outward normal vector to all the edges of
 a Lagrangian mesh.
@@ -203,8 +211,7 @@ void comp_edge_normal(lagMesh* mesh, int i) {
 void comp_edge_normals(lagMesh* mesh) {
   for(int i=0; i<mesh->nle; i++) comp_edge_normal(mesh, i);
 }
-
-#if dimension > 2
+#else // dimension > 2
 /** The function below assumes that the Lagrangian mesh contains the origin and
 is convex, and swaps the order of the nodes in order to compute an outward
 normal vector. This only need to be performed at the creation of the mesh since
@@ -483,9 +490,9 @@ void advect_lagMesh(lagMesh* mesh) {
     }
     correct_lag_pos(&buffer_mesh);
     for(int j=0; j<buffer_mesh.nlp; j++) {
-      buffer_mesh.nodes[j].stencil.n = 25;
-      buffer_mesh.nodes[j].stencil.nm = 25*128;
-      buffer_mesh.nodes[j].stencil.p = (Index*) malloc(25*sizeof(Index));
+      buffer_mesh.nodes[j].stencil.n = STENCIL_SIZE;
+      buffer_mesh.nodes[j].stencil.nm = STENCIL_SIZE*128;
+      buffer_mesh.nodes[j].stencil.p = malloc(STENCIL_SIZE*sizeof(Index));
     }
     generate_lag_stencils(&buffer_mesh);
     eul2lag(&buffer_mesh);
@@ -527,11 +534,6 @@ event defaults (i = 0) {
 /** Before the iterations start, we allocate memory for the stencils and
 generate them. Note that this implementation assumes the membrane was
 initialized in the init event. */
-// #if dimension < 3
-  #define STENCIL_SIZE 25
-// #else
-//   #define STENCIL_SIZE 125
-// #endif
 event init (i = 0) {
   for(int i=0; i<mbs.nbmb; i++) {
     for(int j=0; j<MB(i).nlp; j++) {

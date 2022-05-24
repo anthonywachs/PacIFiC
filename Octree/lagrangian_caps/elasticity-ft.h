@@ -1,4 +1,6 @@
 /**
+# Elasticity front-tracking
+
 In this file, we use the Lagrangian mesh to compute the stretches, and the
 stresses associated to a specific elastic law. Default is the Neo-Hookean model.
 */
@@ -142,7 +144,7 @@ void comp_elastic_stress(lagMesh* mesh) {
     }
     foreach_dimension() mesh->nodes[i].lagForce.x += T[0].x - T[1].x;
   }
-  #else // dimension = 3
+  #else // dimension == 3
   /** Loop through each triangle */
   for(int i=0; i<mesh->nlt; i++) {
     /** 1. Rotate triangle to common plane using the rotation matrix $\bm{R}$ */
@@ -151,8 +153,8 @@ void comp_elastic_stress(lagMesh* mesh) {
     rotate_to_reference_plane(mesh, i, cn, R);
 
     /** 2. Compute the displacement $v_k$ of each node
-    From now on we abandon the use of foreach_dimension() since we will
-    manipulate 2D vectors and matrices. */
+    From now on we abandon the convenient use of foreach_dimension() since we
+    have to manipulate 2D vectors and matrices. */
     double v[2][2];
     for(int k=0; k<2; k++) {
       v[k][0] = cn[k].x - mesh->triangles[i].refShape[k].x;
