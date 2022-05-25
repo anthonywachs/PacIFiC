@@ -74,6 +74,9 @@ void reduce_lagVel(lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) {
     send_data[li*i] = mesh->nodes[i].lagVel.x;
     send_data[li*i+1] = mesh->nodes[i].lagVel.y;
+    #if dimension > 2
+    send_data[li*i+2] = mesh->nodes[i].lagVel.z;
+    #endif
   }
   MPI_Allgather(send_data, mesh->nlp*li, MPI_DOUBLE, recv_data,
     mesh->nlp*li, MPI_DOUBLE, MPI_COMM_WORLD);
@@ -81,12 +84,18 @@ void reduce_lagVel(lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) {
     mesh->nodes[i].lagVel.x = 0.;
     mesh->nodes[i].lagVel.y = 0.;
+    #if dimension > 2
+    mesh->nodes[i].lagVel.z = 0.;
+    #endif
   }
 
   for(int k=0; k<mpi_npe; k++) {
     for(int i=0; i<mesh->nlp; i++) {
       mesh->nodes[i].lagVel.x += recv_data[k*li*mesh->nlp+li*i];
       mesh->nodes[i].lagVel.y += recv_data[k*li*mesh->nlp+li*i+1];
+      #if dimension > 2
+      mesh->nodes[i].lagVel.z += recv_data[k*li*mesh->nlp+li*i+2];
+      #endif
     }
   }
   free(send_data);
