@@ -1,119 +1,186 @@
 /** 
-# Set of functions for a cube 
+# Set of functions for a octahedron 
 */
 
 
-/** Computes the 3 principal vectors of the cube */
 //----------------------------------------------------------------------------
-void compute_principal_vectors_Cube( particle* p ) 
-//----------------------------------------------------------------------------
+int determ_posi_plane_Octahedron( coord* pointOne, coord* pointTwo, 
+	coord* pointThree, coord* pointCheck )
+//----------------------------------------------------------------------------	 
 {
-  GeomParameter * gcp = &(p->g);
-  int nfaces = gcp->pgp->allFaces;
-  int npoints;
+  // Equation of the plane: ax + by + cz + k = 0
+  double x1 = pointOne->x;
+  double y1 = pointOne->y;
+  double z1 = pointOne->z;	
+  double x2 = pointTwo->x;
+  double y2 = pointTwo->y;
+  double z2 = pointTwo->z;
+  double x3 = pointThree->x;
+  double y3 = pointThree->y;
+  double z3 = pointThree->z;
+	
+  double xc = pointCheck->x;
+  double yc = pointCheck->y;
+  double zc = pointCheck->z;
 
-  /* get the 3 directions u1, u2, u3 of the cube with such that */
-  /* u1 = corner0 - corner3; */
-  /* u2 = corner0 - corner1; */
-  /* u3 = corner0 - corner4; */
-  coord corner0 = {0, 0, 0}, corner1 = {0, 0, 0}, 
-  	corner3 = {0, 0, 0}, corner4 = {0, 0, 0};
-  coord u1, v1, w1;
-  coord mins, maxs;
-  
-  /* find the coordinates of these 4 corners */
-  for (int i = 0; i < nfaces; i++) 
-  {
-    npoints = gcp->pgp->numPointsOnFaces[i];
-    
-    for (int j = 0; j < npoints; j++) 
-    {
-      if (gcp->pgp->cornersIndex[i][j] == 0) 
-      {
-	long int ii = gcp->pgp->cornersIndex[i][j];
-	corner0.x = gcp->pgp->cornersCoord[ii][0];
-	corner0.y = gcp->pgp->cornersCoord[ii][1];
-	corner0.z = gcp->pgp->cornersCoord[ii][2];
-      }
-      
-      if (gcp->pgp->cornersIndex[i][j] == 1) 
-      {
-	long int ii = gcp->pgp->cornersIndex[i][j];
-	corner1.x = gcp->pgp->cornersCoord[ii][0];
-	corner1.y = gcp->pgp->cornersCoord[ii][1];
-	corner1.z = gcp->pgp->cornersCoord[ii][2];
-      }
-      
-      if (gcp->pgp->cornersIndex[i][j] == 3) 
-      {
-	long int ii = gcp->pgp->cornersIndex[i][j];
-	corner3.x = gcp->pgp->cornersCoord[ii][0];
-	corner3.y = gcp->pgp->cornersCoord[ii][1];
-	corner3.z = gcp->pgp->cornersCoord[ii][2];
-      }
-      
-      if (gcp->pgp->cornersIndex[i][j] == 4) 
-      {
-	long int ii = gcp->pgp->cornersIndex[i][j];
-	corner4.x = gcp->pgp->cornersCoord[ii][0];
-	corner4.y = gcp->pgp->cornersCoord[ii][1];
-	corner4.z = gcp->pgp->cornersCoord[ii][2];
-      }
-    }  
-  }
+  double cross_a = (y2 - y1) * (z3 - z2) - (z2 - z1) * (y3 - y2);
+  double cross_b = (z2 - z1) * (x3 - x2) - (x2 - x1) * (z3 - z2);
+  double cross_c = (x2 - x1) * (y3 - y2) - (y2 - y1) * (x3 - x2);
 
-  foreach_dimension() 
-  {
-    u1.x = corner0.x - corner3.x;
-    v1.x = corner0.x - corner1.x;
-    w1.x = corner0.x - corner4.x;
-    mins.x = 0.;
-    maxs.x = 0.;
-  }
-  
-  gcp->pgp->u1 = u1;
-  gcp->pgp->v1 = v1;
-  gcp->pgp->w1 = w1;
-  
-  double minval = 0., maxval = 0.;
+  double k =  - (cross_a*x1 + cross_b*y1 + cross_c*z1);
 
-  foreach_dimension() {
-    minval += u1.x*corner0.x;
-    maxval += u1.x*corner3.x;
-  }
+  double check_value  = cross_a*xc + cross_b*yc + cross_c*zc + k;
 
-  mins.x = (minval); maxs.x = (maxval);
+  int retVal;
+  if ( fabs(check_value) > 1.e-13 )
+    retVal = (k*check_value > 0) - (k*check_value < 0); 
+  else 
+    retVal = 0;
 
-  minval = 0; maxval = 0;
-  foreach_dimension() 
-  {
-    minval += v1.x*corner0.x;
-    maxval += v1.x*corner1.x;
-  }
-  
-  mins.y = (minval); maxs.y = (maxval);
-
-  minval = 0; maxval = 0;
-  foreach_dimension() 
-  {
-    minval += w1.x*corner0.x;
-    maxval += w1.x*corner4.x;
-  }
-  
-  mins.z = (minval); maxs.z = (maxval);
-
-
-  gcp->pgp->mins = mins;
-  gcp->pgp->maxs = maxs;  
+  return retVal;  
 }
 
 
 
 
-/** Distributes points on an edge of the cube */
+/** Tests whether a point lies inside the octahedron */
 //----------------------------------------------------------------------------
-void distribute_points_edge_Cube( coord const corner1, coord const corner2, 
-	SolidBodyBoundary* dlm_bd, int const lN, int const istart ) 
+bool is_in_Octahedron( const double x, const double y, const double z, 
+	const GeomParameter gp )
+//----------------------------------------------------------------------------
+{
+  GeomParameter const* gcp = &gp;
+         
+  coord checkpt;
+  checkpt.x = x - gcp->center.x;
+  checkpt.y = y - gcp->center.y;
+  checkpt.z = z - gcp->center.z;
+
+  int nfaces = gcp->pgp->allFaces;
+  int iref, i1, i2, ichoice;
+
+  ichoice = 0;
+  int npoints;
+
+  int* position = (int *) calloc( nfaces, sizeof(int) );
+  
+  for (int i = 0; i < nfaces; i++) 
+  {
+    npoints = gcp->pgp->numPointsOnFaces[i];
+  
+    iref = gcp->pgp->cornersIndex[i][ichoice];
+    i1 = gcp->pgp->cornersIndex[i][ichoice + 1];
+    i2 = gcp->pgp->cornersIndex[i][npoints - 1];
+
+    coord refcorner = {gcp->pgp->cornersCoord[iref][0] - gcp->center.x, 
+    	gcp->pgp->cornersCoord[iref][1] - gcp->center.y,
+    	gcp->pgp->cornersCoord[iref][2] - gcp->center.z}; 
+
+    coord cornerTwo = {gcp->pgp->cornersCoord[i1][0] - gcp->center.x, 
+    	gcp->pgp->cornersCoord[i1][1] - gcp->center.y,
+    	gcp->pgp->cornersCoord[i1][2] - gcp->center.z};
+
+    coord cornerThree = {gcp->pgp->cornersCoord[i2][0] - gcp->center.x, 
+    	gcp->pgp->cornersCoord[i2][1] - gcp->center.y,
+    	gcp->pgp->cornersCoord[i2][2] - gcp->center.z};
+
+    // Judge if the point lies at the same side with origin 
+    // compared to the plane generated by refcorner, cornerTwo
+    // and cornerThree
+    position[i]  = determ_posi_plane_Octahedron( &refcorner, &cornerTwo, 
+	        &cornerThree, &checkpt );
+  }
+
+  bool isin=false;
+  int all_position = 0;
+  for(int i = 0; i < nfaces; i++) all_position += position[i] ;  
+  
+  if ( all_position == nfaces ) isin = true;
+
+  free( position );
+
+  return isin;
+}
+
+
+/** Computes the number of boundary points on the surface of the octahedron */
+//----------------------------------------------------------------------------
+void compute_nboundary_Octahedron( GeomParameter* gcp, int* nb, int* lN ) 
+//----------------------------------------------------------------------------
+{
+  Cache poscache = {0};
+  Point lpoint;
+  *nb = 0;
+  coord pos = {0., 0., 0.};
+  int ip = 0;
+
+  while ( *nb == 0 ) 
+  {
+    pos.x = gcp->pgp->cornersCoord[ip][0];
+    pos.y = gcp->pgp->cornersCoord[ip][1];
+    pos.z = gcp->pgp->cornersCoord[ip][2];
+    lpoint = locate( pos.x, pos.y, pos.z );
+   
+    /** Only one thread has the point in its domain (works in serial
+	too). */
+    if ( lpoint.level > -1 ) 
+    {    
+      /** Only this thread creates the Cache ... */
+      cache_append(&poscache, lpoint, 0); 
+
+      /** and only this thread computes the number of boundary points
+	  ... */
+    
+      /* Grains sends the octahedron circumscribed radius, so to get the 
+      octahedron edge length we multiply by sqrt(2.) */ 
+      double lengthedge = gcp->radius * sqrt (2.) ;
+    
+      /* We compute the number of intervals on the octahedron edge */             
+      foreach_cache (poscache) 
+      {
+	*lN = floor( lengthedge / ( INTERBPCOEF * Delta ) );
+	
+        /* The numberof points on a octahedron edge is the number of 
+	intervals + 1 */
+        *lN += 1;      
+      }
+      
+      /* number of points required for the 12 edges of the octahedron */
+      *nb += (*lN-2) * 12;
+      /* number of points required for the 8 faces of the octahedron */
+      *nb += 8 *(*lN-2)*(*lN-3)/2.;
+      /* number of points required for the 6 corners of the octahedron */
+      *nb += 6;
+      
+      /** and finally, this thread destroys the cache. */
+      free( poscache.p );
+    }
+  
+#   if _MPI
+      MPI_Barrier( MPI_COMM_WORLD );
+      mpi_all_reduce( *nb, MPI_INT, MPI_MAX );
+      mpi_all_reduce( *lN, MPI_INT, MPI_MAX );
+#   endif
+    
+    if ( ip < gcp->ncorners )
+      ip++;
+    else
+      break;
+  }
+  
+  if ( *nb == 0 )
+    fprintf( stderr,"nboundary = 0: No boundary points for the"
+    	" Octahedron !!!\n" );
+}
+
+
+
+
+/** Distributes points on an edge of the octahedron */
+//----------------------------------------------------------------------------
+void distribute_points_edge_Octahedron( coord const corner1, 
+	coord const corner2, SolidBodyBoundary* dlm_bd, 
+	int const lN, int const istart ) 
 //----------------------------------------------------------------------------
 {
   if ( lN > 0 ) 
@@ -135,122 +202,9 @@ void distribute_points_edge_Cube( coord const corner1, coord const corner2,
 
 
 
-/** Tests whether a point lies inside the cube */
+/** Creates boundary points on the surface of the octahedron */
 //----------------------------------------------------------------------------
-bool is_in_Cube( coord* u, coord* v, coord* w, coord* mins, 
-	coord* maxs, coord* checkpt ) 
-//----------------------------------------------------------------------------
-{
-  
-  /* a point x with coord (x,y,z) lies in the rectangle if the 3
-     following conditions are satisfied */
-  /* 1- u.p0 <= u.x <= u.p3 */
-  /* 2- v.p0 <= v.x <= v.p1 */
-  /* 3- w.p0 <= w.w <= w.p4 */
-  double x = checkpt->x;
-  double y = checkpt->y;
-  double z = checkpt->z;
-  double checkval = 0.;
-  coord u1 = *u;
-  coord v1 = *v;
-  coord w1 = *w;
-  coord cpt = {0., 0., 0.};
-  bool isin = false;
-  
-  checkval = u1.x*x + u1.y*y + u1.z*z;
-  cpt.x = checkval;
-
-  checkval = v1.x*x + v1.y*y + v1.z*z;
-  cpt.y = checkval; 
-
-  checkval = w1.x*x + w1.y*y + w1.z*z;
-  cpt.z = checkval;
-
-  if ((cpt.x >= maxs->x) && (cpt.x <= mins->x) && (cpt.y >= maxs->y) 
-  	&& (cpt.y <= mins->y) && (cpt.z >= maxs->z) && (cpt.z <= mins->z) )
-    isin = true;
-
-  return isin;
-}
-
-
-
-
-/** Computes the number of boundary points on the surface of the cube */
-//----------------------------------------------------------------------------
-void compute_nboundary_Cube( GeomParameter* gcp, int* nb, int* lN ) 
-//----------------------------------------------------------------------------
-{
-  Cache poscache = {0};
-  Point lpoint;
-  *nb = 0;
-  coord pos = {0., 0., 0.};
-  int ip = 0;
-
-  while ( *nb == 0 ) 
-  {
-    pos.x = gcp->pgp->cornersCoord[ip][0];
-    pos.y = gcp->pgp->cornersCoord[ip][1];
-    pos.z = gcp->pgp->cornersCoord[ip][2];
-    lpoint = locate( pos.x, pos.y, pos.z );
-   
-    /** Only one thread has the point in its domain (works in serial
-	too). */
-    if ( lpoint.level > -1 ) 
-    {    
-      /** Only this thread creates the Cache ... */
-      cache_append( &poscache, lpoint, 0 );
-
-      /** and only this thread computes the number of boundary points
-	  ... */
-    
-      /* Grains sends the cube circumscribed radius, so to get the cube edge
-      length we multiply by 2/sqrt(3) */
-      double lengthedge = 2. * gcp->radius / sqrt(3.);
-    
-      /* We compute the number of intervals on the cube edge */ 
-      foreach_cache (poscache) 
-      {
-	*lN = floor( lengthedge / ( INTERBPCOEF * Delta ) );
-	
-        /* The numberof points on a cube edge is the number of intervals + 1 */
-        *lN += 1;      
-      }
-      
-      /* number of points required for the 12 edges of the cube */
-      *nb += (*lN-2)*12;
-      /* number of points required for the 6 faces of the cube */
-      *nb += 6*(*lN-2)*(*lN-2);
-      /* number of points required for the 8 corners */
-      *nb += 8;
-      
-      /** and finally, this thread destroys the cache. */
-      free( poscache.p );
-    }
-  
-#   if _MPI
-      MPI_Barrier( MPI_COMM_WORLD );
-      mpi_all_reduce( *nb, MPI_INT, MPI_MAX );
-      mpi_all_reduce( *lN, MPI_INT, MPI_MAX );
-#   endif
-    
-    if ( ip < gcp->ncorners )
-      ip++;
-    else
-      break;
-  }
-  
-  if ( *nb == 0 )
-    fprintf( stderr,"nboundary = 0: No boundary points for the"
-    	" cube/square !!!\n" );
-}
-
-
-
-
-/** Creates boundary points on the surface of the cube */
-//----------------------------------------------------------------------------
-void create_FD_Boundary_Cube( GeomParameter* gcp, 
+void create_FD_Boundary_Octahedron( GeomParameter* gcp, 
 	SolidBodyBoundary* dlm_bd, const int m, const int lN, vector pshift ) 
 //----------------------------------------------------------------------------
 {
@@ -261,7 +215,7 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
   int isb = 0;
   int npoints;
 
-  /* Add first interior points on surfaces */
+  /* Add first interrior points on surfaces */
   for (int i = 0; i < nfaces; i++) 
   {
     npoints = gcp->pgp->numPointsOnFaces[i];
@@ -292,7 +246,7 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
        
     for (int ii = 1; ii <= lN-2; ii++) 
     {
-      for (int jj = 1; jj <= lN-2; jj++) 
+      for (int jj = 1; jj <= lN-2 - ii; jj++) 
       { 
 	dlm_bd->x[isb] = refcorner.x + (double) ii * dir1.x 
 		+ (double) jj * dir2.x;
@@ -307,9 +261,9 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
     }
   }
 
-  int allindextable[8][8] = {{0}};
-  int j1,jm1;
-
+  // We have 6 corner points for the octahedron
+  int allindextable[6][6] = {{0}};
+  int j1, jm1;
   
   /* Add points on the edges without the corners*/
   for (int i = 0; i < nfaces; i++) 
@@ -322,9 +276,9 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
       jm1 = gcp->pgp->cornersIndex[i][j-1];
       j1 = gcp->pgp->cornersIndex[i][j];
       
-      if (jm1 > j1) 
+      if ( jm1 > j1 ) 
       {
-	if (allindextable[jm1][j1] == 0) 
+	if ( allindextable[jm1][j1] == 0 ) 
 	{
 	  coord c1 = {gcp->pgp->cornersCoord[jm1][0], 
 	  	gcp->pgp->cornersCoord[jm1][1], 
@@ -332,14 +286,14 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
 	  coord c2 = {gcp->pgp->cornersCoord[j1][0], 
 	  	gcp->pgp->cornersCoord[j1][1], 
 	  	gcp->pgp->cornersCoord[j1][2]};
-	  distribute_points_edge_Cube( c1, c2, dlm_bd, lN, isb );
+	  distribute_points_edge_Octahedron( c1, c2, dlm_bd, lN, isb );
 	  allindextable[jm1][j1] = 1;
 	  isb +=lN-2;
 	}
       }      
       else 
       {
-	if (allindextable[j1][jm1] == 0) 
+	if ( allindextable[j1][jm1] == 0 ) 
 	{
 	  coord c1 = {gcp->pgp->cornersCoord[j1][0], 
 	  	gcp->pgp->cornersCoord[j1][1], 
@@ -347,7 +301,7 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
 	  coord c2 = {gcp->pgp->cornersCoord[jm1][0], 
 	  	gcp->pgp->cornersCoord[jm1][1], 
 	  	gcp->pgp->cornersCoord[jm1][2]};
-	  distribute_points_edge_Cube( c1, c2, dlm_bd, lN, isb );
+	  distribute_points_edge_Octahedron( c1, c2, dlm_bd, lN, isb );
 	  allindextable[j1][jm1] = 1;
 	  isb +=lN-2;
 	}
@@ -355,7 +309,7 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
     }   
   }
   
-  /* Add the final 8 corners points */
+  /* Add the final 6 corners points */
   for (int i = 0; i  < gcp->ncorners; i++) 
   {
     dlm_bd->x[isb] = gcp->pgp->cornersCoord[i][0];
@@ -363,36 +317,29 @@ void create_FD_Boundary_Cube( GeomParameter* gcp,
     dlm_bd->z[isb] = gcp->pgp->cornersCoord[i][2];
     isb++;
   }
+
+
 }
 
 
 
 
-/** Finds cells lying inside the cube */
+/** Finds cells lying inside the octahedron */
 //----------------------------------------------------------------------------
-void create_FD_Interior_Cube( particle* p, vector Index_lambda, 
-	vector pshift ) 
+void create_FD_Interior_Octahedron( particle * p, vector Index_lambda, 
+	vector shift ) 
 //----------------------------------------------------------------------------
 {
-  Cache * c;
+  Cache* c;
   
-  /** Create the cache of the interior points for a cube*/
+  /** Create the cache of the interior points for a octahedron*/
   c = &(p->Interior);
 
-  /* compute the 3 principal vector of the cube */
-  compute_principal_vectors_Cube( p );
+  /** Extract geometric information from particle pointer p */
+  GeomParameter gp = p->g;
 
-  /* a point x with coord (x,y,z) lies in the cube if the 3
-     following conditions are satisfied */
-  /* 1- u.p0 <= u.x <= u.p3 */
-  /* 2- v.p0 <= v.x <= v.p1 */
-  /* 3- w.p0 <= w.w <= w.p4  */
+  /** Declare the checkpoint parameter */
   coord checkpt;
-  coord u1 = p->g.pgp->u1;
-  coord v1 = p->g.pgp->v1;
-  coord w1 = p->g.pgp->w1;
-  coord mins = p->g.pgp->mins;
-  coord maxs = p->g.pgp->maxs;
 
   /* Min/Max coordinates for the AABB (Axed-Aligned-Bounding-Box) */
   coord mincoord = {HUGE, HUGE, HUGE};
@@ -427,105 +374,106 @@ void create_FD_Interior_Cube( particle* p, vector Index_lambda,
     checkpt.z = z;
 
     /* Check only if the point is in the AABB (Axed-Aligned-Bounding-Box) */
-    if ((x > mincoord.x) && (x < maxcoord.x)) 
-      if ((y > mincoord.y) && (y < maxcoord.y))
-	if ((z > mincoord.z) && (z < maxcoord.z))
+    if ( ( x > mincoord.x ) && ( x < maxcoord.x ) ) 
+      if ( ( y > mincoord.y ) && ( y < maxcoord.y ) )
+	if ( ( z > mincoord.z ) && ( z < maxcoord.z ) )
 
-	  /* If yes: check if it is inside the cube now */
-    	  if ( is_in_Cube( &u1, &v1, &w1, &mins, &maxs, &checkpt ) ) 
+	  /* If yes: check if it is inside the octahedron now */
+    	  if ( is_in_Octahedron( checkpt.x, checkpt.y, checkpt.z, gp ) ) 
 	  {
-	    cache_append (c, point, 0);
+	    cache_append( c, point, 0 );
 	    /* tag cell with the number of the particle */
 	    if ( (int)Index_lambda.y[] == -1 )
 	      Index_lambda.y[] = p->pnum;
 	  }
   }
- 
-  cache_shrink( c );    
+  
+  cache_shrink( c );
 }
 
 
 
 
-/** Reads geometric parameters of the cube */
+/** Reads geometric parameters of the octahedron */
 //----------------------------------------------------------------------------
-void update_Cube( GeomParameter* gcp ) 
+void update_Octahedron( GeomParameter* gcp ) 
 //----------------------------------------------------------------------------
 {  
   char* token = NULL;
-  
-  // Read number of corners, check that it is 8
+
+  // Read number of corners, check that it is 6
   size_t nc = 0;
   token = strtok(NULL, " " );
-  sscanf( token, "%lu", &nc ); 
-  if ( nc != 8 )
-    printf ("Error in number of corners in update_Cube\n");
+  sscanf( token, "%lu", &nc );
+  if ( nc != 6 )
+    printf ("Error in number of corners in update_Octahedron \n");
 
   // Allocate the PolyGeomParameter structure
   gcp->pgp = (PolyGeomParameter*) malloc( sizeof(PolyGeomParameter) );
   gcp->pgp->allPoints = nc;
-    
+
   // Allocate the array of corner coordinates
   gcp->pgp->cornersCoord = (double**) malloc( nc * sizeof(double*) );
-  for (size_t i=0;i<nc;i++) 
+  for (size_t i=0;i<nc;i++)
     gcp->pgp->cornersCoord[i] = (double*) malloc( 3 * sizeof(double) );
-    
+
   // Read the point/corner coordinates
-  for (size_t i=0;i<nc;++i) 
-    for (size_t j=0;j<3;++j)     
+  for (size_t i=0;i<nc;++i)
+    for (size_t j=0;j<3;++j)
     {
       token = strtok(NULL, " " );
-      sscanf( token, "%lf", &(gcp->pgp->cornersCoord[i][j]) );       
+      sscanf( token, "%lf", &(gcp->pgp->cornersCoord[i][j]) );
     }
 
-  // Read number of faces, check that it is 6
+  // Read number of faces, check that it is 8
   size_t nf = 0;
   token = strtok(NULL, " " );
-  sscanf( token, "%lu", &nf ); 
-  if ( nf != 6 )
-    printf ("Error in number of faces in update_Cube\n");
-  gcp->pgp->allFaces = nf;     
+  sscanf( token, "%lu", &nf );
+  if ( nf != 8 )
+    printf ("Error in number of faces in update_Octahedron\n");
+  gcp->pgp->allFaces = nf;
 
   // Allocate the array of number of points/corners on each face
   gcp->pgp->numPointsOnFaces = (long int*) malloc( nf * sizeof(long int) );
-  
+
   // Allocate the array of point/corner indices on each face
-  gcp->pgp->cornersIndex = (long int**) malloc( nf * sizeof(long int*) ); 
-  
+  gcp->pgp->cornersIndex = (long int**) malloc( nf * sizeof(long int*) );
+
   // Read the face indices
   long int nppf = 0;
   for (size_t i=0;i<nf;++i)
   {
-    // Read the number of points/corners on the face, check that it is 4
+    // Read the number of points/corners on the face, check that it is 3
     token = strtok(NULL, " " );
     sscanf( token, "%ld", &nppf );
-    if ( nppf != 4 )
-      printf ("Error in number of corners per face in update_Cube\n");
+    if ( nppf != 3 )
+      printf ("Error in number of corners per face in update_Octahedron\n");
     gcp->pgp->numPointsOnFaces[i] = nppf;
-      
+
     // Allocate the point/corner index vector on the face
     gcp->pgp->cornersIndex[i] = (long int*) malloc( nppf * sizeof(long int) );
-    
+
     // Read the point/corner indices
-    for (size_t j=0;j<4;++j)
+    for (size_t j=0;j<3;++j)
     {
       token = strtok(NULL, " " );
       sscanf( token, "%ld", &(gcp->pgp->cornersIndex[i][j]));
-    }    
-  }    
+    }
+  }
+	
 }
 
 
 
 
-/** Frees the geometric parameters of the cube */
+/** Frees the geometric parameters of the octahedron */
 //----------------------------------------------------------------------------
-void free_Cube( GeomParameter* gcp ) 
+void free_Octahedron( GeomParameter* gcp ) 
 //----------------------------------------------------------------------------
 {  
   // Free the point/corner coordinate array
   double* cc = NULL;
-  for (size_t i=0;i<gcp->pgp->allPoints;++i) 
+  for (int i=0; i < gcp->pgp->allPoints; ++i) 
   {
     cc = &(gcp->pgp->cornersCoord[i][0]);
     free( cc );
@@ -537,7 +485,7 @@ void free_Cube( GeomParameter* gcp )
 
   // Free the point/corner arrays
   long int* in = NULL;
-  for (size_t i=0;i<gcp->pgp->allFaces;++i) 
+  for (int i=0;i < gcp->pgp->allFaces; ++i) 
   {
     in = &(gcp->pgp->cornersIndex[i][0]);   
     free( in );

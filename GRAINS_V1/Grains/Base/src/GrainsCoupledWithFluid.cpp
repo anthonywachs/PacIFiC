@@ -107,8 +107,7 @@ void GrainsCoupledWithFluid::do_after_time_stepping()
 
 // ----------------------------------------------------------------------------
 // Runs the simulation over the prescribed time interval
-void GrainsCoupledWithFluid::Simulation( double time_interval, bool predict, 
-	bool isPredictorCorrector, bool explicit_added_mass )
+void GrainsCoupledWithFluid::Simulation( double time_interval )
 {
   list<App*>::iterator app;
   
@@ -847,7 +846,8 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
     Vector3 const* vtrans = NULL;
     Vector3 const* vrot = NULL;
     Point3 const* centre = NULL;
-    const double* inertia = NULL;
+    vector<double> inertia( 6, 0. );
+    //double const* inertia = NULL;
     string particleType = "P";
     double density = 0., mass = 0., radius = 0.;
     Matrix mr;
@@ -873,7 +873,8 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
           centre = (*particle)->getPosition();
           density = (*particle)->getDensity();
           mass = (*particle)->getMass();
-          inertia = (*particle)->getInertiaTensor();
+          (*particle)->computeInertiaTensorSpaceFixed( inertia );
+	  //inertia = (*particle)->getInertiaTensorBodyFixed();
           radius = (*particle)->getCircumscribedRadius();
           ncorners = (*particle)->getNbCorners();
           nclonesper = 0; // TO DO

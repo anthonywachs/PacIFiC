@@ -41,6 +41,9 @@
 #   define RoundDoubleCoef (1.e-4)
 # endif
 
+# ifndef figs_dir
+#   define figs_dir "Figs"
+# endif
 
 double deltau;
 int restarted_simu = 0;
@@ -133,7 +136,7 @@ event init (i = 0)
   // If new simulation: set fluid initial condition from user defined case file
   if ( ! restore ( file = fluid_dump_filename ) ) 
   {
-    // Set the restarted simulation boolean to 1
+    // Set the restarted simulation boolean to 0
     restarted_simu = 0;
   }
   else // Restart of a simulation 

@@ -214,8 +214,7 @@ void Grains::do_after_time_stepping()
 
 // ----------------------------------------------------------------------------
 // Runs the simulation over the prescribed time interval
-void Grains::Simulation( double time_interval, bool predict, 
-	bool isPredictorCorrector, bool explicit_added_mass )
+void Grains::Simulation( double time_interval )
 {
   list<App*>::iterator app;
   double vmax = 0., vmean = 0. ;

@@ -80,12 +80,12 @@ void compute_nboundary_Sphere( const GeomParameter gcp, int* nb )
     free( poscache.p );
   }
 
-#if _MPI
-  MPI_Barrier( MPI_COMM_WORLD );
-  mpi_all_reduce( *nb, MPI_INT, MPI_MAX );
-#endif
+# if _MPI
+    MPI_Barrier( MPI_COMM_WORLD );
+    mpi_all_reduce( *nb, MPI_INT, MPI_MAX );
+# endif
       
-  if( *nb == 0 )
+  if ( *nb == 0 )
     printf( "nboundary = 0: No boundary points !!!\n" );
 }
 
@@ -210,7 +210,7 @@ void create_FD_Interior_Sphere( particle * p, vector Index_lambda,
 //----------------------------------------------------------------------------
 {
   GeomParameter gci = p->g;
-  Cache * fd = &(p->Interior);
+  Cache* fd = &(p->Interior);
   
   /** Create the cache for the interior points */
   foreach() 

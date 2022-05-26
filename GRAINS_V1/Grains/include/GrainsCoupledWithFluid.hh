@@ -40,16 +40,9 @@ class GrainsCoupledWithFluid : virtual public Grains
     virtual void do_after_time_stepping();
 
     /** @brief Runs the simulation over the prescribed time interval
-    @param predict time algorithm mode 
-    @param isPredictorCorrector true if the time algorithm is
-    	predictor-corrector
-    @param explicit_added_mass true if added mass is treated explicitly 
     @param time_interval runs the simulation on a time interval different than 
-    	m_tend - m_tstart */
-    virtual void Simulation( double time_interval = 0., 
-    	bool predict = true,
-  	bool isPredictorCorrector = false,
-	bool explicit_added_mass = false ) ; 	
+    	m_tend - m_tstart  */
+    virtual void Simulation( double time_interval = 0. ) ; 	
     //@}
 
 

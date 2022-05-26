@@ -75,9 +75,20 @@ bool RigidBody::BuildInertia( double *inertia, double *inertia_1 ) const
 	inertia_1[1], inertia_1[3], inertia_1[4],
 	inertia_1[2], inertia_1[4], inertia_1[5] );
 
-  Matrix base = m_transform.getBasis();
-  m   = base * m   * base.transpose();
-  m_1 = base * m_1 * base.transpose();
+  // Using mr = m_transform.getBasis() is wrong, as the angular position 
+  // of the particle is tracked from its reference non-rotated position and 
+  // the rotation matrix m_transform.getBasis() accounts for the complete
+  // rotation from the reference position
+  //   Matrix mr = m_transform.getBasis();
+  // We must use mr = identity and compute the inertia tensor in the 
+  // reference non-rotated position. Indeed this function is only called at 
+  // the initial time, so the moment of inertia tensor must be in the reference 
+  // non-rotated position of the rigid body
+  // Consequently most of the operations done in this method are unnecessary
+  // but I (Anthony) leave them here for now just in case I made a mistake
+  Matrix mr;
+  m   = mr * m   * mr.transpose();
+  m_1 = mr * m_1 * mr.transpose();
 
   inertia[0] = m[0][0];
   inertia[1] = m[1][0];

@@ -3540,6 +3540,30 @@ void assign_dial_fd_boundary( particle* p, const coord posb,
       isin_yp = is_in_Tetrahedron( posb.x, posb.y + RDelta, posb.z, gp );
       isin_zp = is_in_Tetrahedron( posb.x, posb.y, posb.z + RDelta, gp );
       break;
+      
+    case OCTAHEDRON:
+      isin_xp = is_in_Octahedron( posb.x + RDelta, posb.y, posb.z, gp );
+      isin_yp = is_in_Octahedron( posb.x, posb.y + RDelta, posb.z, gp );
+      isin_zp = is_in_Octahedron( posb.x, posb.y, posb.z + RDelta, gp );
+      break;
+
+    case DODECAHEDRON:
+      isin_xp = is_in_Dodecahedron( posb.x + RDelta, posb.y, posb.z, gp );
+      isin_yp = is_in_Dodecahedron( posb.x, posb.y + RDelta, posb.z, gp );
+      isin_zp = is_in_Dodecahedron( posb.x, posb.y, posb.z + RDelta, gp );
+      break;  
+            
+    case ICOSAHEDRON:
+      isin_xp = is_in_Icosahedron( posb.x + RDelta, posb.y, posb.z, gp );
+      isin_yp = is_in_Icosahedron( posb.x, posb.y + RDelta, posb.z, gp );
+      isin_zp = is_in_Icosahedron( posb.x, posb.y, posb.z + RDelta, gp );
+      break;     
+
+    case TRANCOCTAHEDRON:
+      isin_xp = is_in_Trancoctahedron( posb.x + RDelta, posb.y, posb.z, gp );
+      isin_yp = is_in_Trancoctahedron( posb.x, posb.y + RDelta, posb.z, gp );
+      isin_zp = is_in_Trancoctahedron( posb.x, posb.y, posb.z + RDelta, gp );
+      break;      
 	  
     default:
       fprintf( stderr,"Unknown Rigid Body shape !!\n" );

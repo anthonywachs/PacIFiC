@@ -42,9 +42,9 @@ extern "C" {
 
 
 
-  void Simu_Grains( const double dt_fluid, const bool explicit_added_mass ) 
+  void Simu_Grains( const double dt_fluid ) 
   {
-    grains->Simulation( dt_fluid, true, false, explicit_added_mass );	
+    grains->Simulation( dt_fluid );	
   }
 
  
@@ -71,15 +71,7 @@ extern "C" {
     
     // Return the pointer to the char
     return pstr;
-  }
-
-
-
-  
-  void Setdt_AddedMassGrains( double dtfluid ) 
-  {
-    // TO DO
-  }  
+  } 
 
 
 
@@ -97,7 +89,7 @@ extern "C" {
 
 
 
-  void checkParaviewPostProcessing_Grains( char * solid_resDir )
+  void checkParaviewPostProcessing_Grains( char* solid_resDir )
   {    
     grains->checkParaviewPostProcessing( "grains", solid_resDir, true );
   }
@@ -106,7 +98,7 @@ extern "C" {
 
   
   void UpdateVelocityGrains( double arrayv[][6], const int m, 
-  	bool explicit_added_mass ) 
+  	bool bsplit_explicit_acceleration ) 
   {
     // Transfer into a vector< vector<double> >
     vector<double> buf( 6, 0.);
@@ -116,24 +108,8 @@ extern "C" {
         vecv[i][j] = arrayv[i][j];
 
     // We use the interface function of PeliGRIFF
-    grains->updateParticlesVelocity( vecv, explicit_added_mass );
+    grains->updateParticlesVelocity( vecv, bsplit_explicit_acceleration );
   }  
-
-
-
-  
-  void ActivateExplicitAddedMass( bool restart ) 
-  {
-    // TO DO
-  }
-
-
-
-  
-  void InitializeExplicitAddedMass( bool restart, char * rootfilename ) 
-  {
-    // TO DO
-  }
 
 
 

@@ -238,3 +238,173 @@ void output_vtu_dlmfd_bpts( particle const* allpart, const int np,
     }
 # endif     
 }
+
+
+
+
+ //----------------------------------------------------------------------------
+void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
+	char const* fname )
+//----------------------------------------------------------------------------
+{
+# if debugBD == 0
+    int my_rank = 0, my_size = 1;
+
+#   if _MPI
+      MPI_Comm_rank( MPI_COMM_WORLD, &my_rank );
+      MPI_Comm_size( MPI_COMM_WORLD, &my_size );
+#   endif
+     
+    int number_interior_points = 0;
+    int total_interior_points = 0;
+    
+    for (int k = 0; k < np; k++) 
+      foreach()
+        if ( flagfield[] < 1 && (int)index_lambda.y[] == k )
+       	  number_interior_points += 1;
+     
+    double* interior_coordx = NULL;
+    double* interior_coordy = NULL;
+    double* interior_coordz = NULL;
+    int* interior_count = NULL;
+    int* interior_displace = NULL;
+     	
+    interior_coordx = (double*) calloc( number_interior_points, 
+    	sizeof(double) ); 
+    interior_coordy = (double*) calloc( number_interior_points, 
+    	sizeof(double) );
+    interior_coordz = (double*) calloc( number_interior_points, 
+    	sizeof(double) );
+    interior_count = (int*) calloc( my_size, sizeof(int) );
+    interior_displace = (int*) calloc( my_size, sizeof(int) );
+
+    int counter = 0;
+    for (int k = 0; k < np; k++) 
+      foreach()
+     	if ( flagfield[] < 1 && (int)index_lambda.y[] == k ) 
+       	{
+          interior_coordx[counter] = x;
+          interior_coordy[counter] = y;
+          interior_coordz[counter] = z;
+          counter++;
+        }
+      
+    printf( "number_interior_points %d, counter is: %d, my rank is: %d\n", 
+    	number_interior_points, counter, my_rank );
+#   if _MPI
+      MPI_Allreduce( &number_interior_points, &total_interior_points, 1, 
+      	MPI_INT, MPI_SUM, MPI_COMM_WORLD );
+      MPI_Allgather( &number_interior_points, 1, MPI_INT, interior_count, 1, 
+    	MPI_INT, MPI_COMM_WORLD );
+#   else
+      total_interior_points = number_interior_points;
+      interior_count[0] = number_interior_points;
+#   endif
+    
+    int temp = 0;
+    for(int i = 0; i < my_size; i++)
+    {
+       interior_displace[i] = temp;
+       temp += interior_count[i];
+    }
+    
+    double* All_interior_coordx = NULL;
+    double* All_interior_coordy = NULL;
+    double* All_interior_coordz = NULL;
+    
+#   if _MPI
+      All_interior_coordx = (double*) calloc( total_interior_points, 
+    	sizeof(double)); 
+      All_interior_coordy = (double*) calloc( total_interior_points,
+    	sizeof(double));
+      All_interior_coordz = (double*) calloc( total_interior_points, 
+    	sizeof(double));
+     
+      MPI_Gatherv( interior_coordx, number_interior_points, MPI_DOUBLE, 
+    	All_interior_coordx, interior_count, interior_displace, MPI_DOUBLE, 
+	0,  MPI_COMM_WORLD );
+      MPI_Gatherv( interior_coordy, number_interior_points, MPI_DOUBLE, 
+    	All_interior_coordy, interior_count, interior_displace, MPI_DOUBLE, 
+	0,  MPI_COMM_WORLD );
+      MPI_Gatherv( interior_coordz, number_interior_points, MPI_DOUBLE, 
+    	All_interior_coordz, interior_count, interior_displace, MPI_DOUBLE, 
+	0,  MPI_COMM_WORLD );
+#   else
+      All_interior_coordx = interior_coordx;
+      All_interior_coordy = interior_coordy;
+      All_interior_coordz = interior_coordz;            
+#   endif  
+                     
+    if ( pid() == 0 ) 
+    {
+      for(int i= 0; i < my_size; i++)
+      {
+   	printf( "Counts for each processor %d: %d\n", i, interior_count[i] );
+   	printf( "Displacements for each processor %d: %d\n", i, 
+		interior_displace[i] );
+      }
+    
+      char filename[80] = ""; 
+      sprintf( filename, "%s", result_dir );
+      strcat( filename, "/" );  
+      strcat( filename, fname );
+      strcat( filename, ".vtu" );
+                
+      FILE* fdlm = fopen(filename, "w" ); 
+
+      fputs( "<?xml version=\"1.0\"?>\n"
+  	"<VTKFile type=\"UnstructuredGrid\" version=\"1.0\" "
+	"byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fdlm );
+      fputs( "<UnstructuredGrid>\n", fdlm );
+      fprintf( fdlm, "<Piece NumberOfPoints=\"%d\" NumberOfCells=\"%d\">\n", 
+      	total_interior_points, total_interior_points); 
+      fputs( "<Points>\n", fdlm );  
+      fputs( "<DataArray type=\"Float64\" NumberOfComponents=\"3\" "
+      	"format=\"ascii\">\n", fdlm );
+      	
+      for (int k = 0; k < np; k++) 
+      {
+        printf( "Interior points are %d, and our counts are: %d", 
+		allpart[k].Interior.n, total_interior_points );
+	for(int i = 0; i < total_interior_points; i++)
+     	{
+          fprintf( fdlm, "%g %g", All_interior_coordx[i], 
+	  	All_interior_coordy[i] );
+#         if dimension == 3  
+            fprintf( fdlm, " %g\n", All_interior_coordz[i] );
+#         else
+            fprintf( fdlm, " 0.\n" );
+#         endif	
+     	} 	  	
+      }
+      fputs( "</DataArray>\n", fdlm );  
+      fputs( "</Points>\n", fdlm );
+      fputs( "<Cells>\n", fdlm );
+      fputs( "<DataArray type=\"Int64\" Name=\"connectivity\" "
+      	"format=\"ascii\">\n", fdlm );
+      for (int j = 0; j < total_interior_points; j++)
+        fprintf( fdlm, "%d ", j );
+      fprintf( fdlm, "\n" );
+      fputs( "</DataArray>\n", fdlm ); 
+      fputs( "<DataArray type=\"Int64\" Name=\"offsets\" "
+      	"format=\"ascii\">\n", fdlm );
+      for (int j = 0; j < total_interior_points; j++)
+        fprintf( fdlm, "%d ", j+1 );
+      fprintf( fdlm, "\n" );		
+      fputs( "</DataArray>\n", fdlm );
+      fputs( "<DataArray type=\"Int64\" Name=\"types\" "
+      	"format=\"ascii\">\n", fdlm );
+      for (int j = 0; j < total_interior_points; j++)
+        fprintf( fdlm, "1 " );
+      fprintf( fdlm, "\n" ); 	
+      fputs( "</DataArray>\n", fdlm ); 
+      fputs( "</Cells>\n", fdlm );
+      fputs( "</Piece>\n", fdlm );
+      fputs( "</UnstructuredGrid>\n", fdlm );            
+      fputs( "</VTKFile>\n", fdlm );
+                 	              	       
+      fclose( fdlm );
+    }
+# endif     
+}
+    

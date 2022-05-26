@@ -157,8 +157,8 @@ CompositeParticle::CompositeParticle( DOMNode* root,
   // Compute and set the the circumscribed radius
   setCircumscribedRadius();
 
-  // Explicit added mass
-  if ( Particle::m_explicitAddedMass ) createAddedMassInfos();
+  // In case part of the particle acceleration computed explicity
+  if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
   
   // Reset the total number of created components by subtracting the number 
   // of elementary particles as the construction of each elementary particle

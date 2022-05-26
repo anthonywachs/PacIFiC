@@ -42,7 +42,7 @@ void UpdateDLMFDtoGS_vel( double arrayv[][6], particle* p,
 from the granular solver */
 //----------------------------------------------------------------------------
 char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
-	particle* allpart, const int npart_, bool explicit_added_mass_, 
+	particle* allpart, const int npart_, bool fluidCorrectedAcceleration_, 
 	double rhoval_ )
 //----------------------------------------------------------------------------
 {
@@ -318,10 +318,11 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     gg->radius = radiusp;             
     
     // DLMFD coupling factor
-    // If explicit add mass, DLMFD_couplingFactor = 1
-    // otherwise DLMFD_couplingFactor = ( 1 - rhoval / rho_s )
+    // If fluidCorrectedAcceleration_ == true, DLMFD_couplingFactor = 
+    //   ( 1 - rhoval / rho_s )
+    // otherwise DLMFD_couplingFactor = 1
     allpart[k].DLMFD_couplingfactor = 1. ;
-    if ( !explicit_added_mass_ ) 
+    if ( fluidCorrectedAcceleration_ ) 
       allpart[k].DLMFD_couplingfactor -= rhoval_ / allpart[k].rho_s ;
 
 #   if DLM_Moving_particle      
@@ -352,7 +353,25 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
           allpart[k].shape = CUBE;
 	  update_Cube( gg );
 	  compute_principal_vectors_Cube( &(allpart[k]) ); 
-          break;	  
+          break;
+	  
+       // For now, we assume that all 12-corner polyhedrons are icosahedrons
+       case 12: 
+         allpart[k].shape = ICOSAHEDRON;
+	 update_Icosahedron( gg );
+         break;  
+          
+       // For now, we assume that all 20-corner polyhedrons are dodecahedrons
+       case 20: 
+         allpart[k].shape = DODECAHEDRON;
+	 update_Dodecahedron( gg );
+         break;      
+          
+       // For now, we assume that all 24-corner polyhedrons are trancoctahedrons
+       case 24: 
+         allpart[k].shape = TRANCOCTAHEDRON;
+	 update_Trancoctahedron( gg );
+         break;	  	  
 #     else
         case 1: 
           allpart[k].shape = CIRCULARCYLINDER2D;
