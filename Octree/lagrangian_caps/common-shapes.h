@@ -267,7 +267,7 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
         if (p.mesh->nodes[nid[0]].neighbor_ids[j] ==
           p.mesh->nodes[nid[1]].neighbor_ids[k] && p.mesh->nodes[nid[0]].neighbor_ids[j] != -1)
           if (write_triangle(p.mesh, p.mesh->nlt, nid[0], nid[1],
-            p.mesh->nodes[nid[0]].neighbor_ids[j], new_mesh = true))
+            p.mesh->nodes[nid[0]].neighbor_ids[j]))
               p.mesh->nlt++;
       }
     }
@@ -298,7 +298,7 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   each new nodes results in two new edges (one per neighboring triangles)
   * the number of triangles is multiplied by 4
   */
-  while(nn < nlp) {
+  while (nn < nlp) {
     ne = 30*pow(4,ns);
     nn += ne;
     ns++;

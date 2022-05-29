@@ -101,7 +101,7 @@ bool triangle_exists(lagMesh* mesh, int i, int j, int k) {
   return false;
 }
 
-/** The function below returns true if the triangle_ids $i$ is across a priodic
+/** The function below returns true if the triangle_ids $i$ is across a periodic
 boundary. */
 bool is_triangle_across_periodic(lagMesh* mesh, int i) {
   int e[3];
@@ -119,22 +119,18 @@ struct _write_triangle {
   int i;
   int j;
   int k;
-  bool new_mesh;
   bool overwrite;
-  int tid_to_replace;
 };
 
 /** The function below writes a triangle at index location tid, connecting nodes
-i, j and k. */
+i, j and k. It updates the connectivity information of its nodes and edges.*/
 bool write_triangle(struct _write_triangle p) {
   lagMesh* mesh = p.mesh;
   int tid = p.tid;
   int i = p.i;
   int j = p.j;
   int k = p.k;
-  bool new_mesh = (p.new_mesh) ? p.new_mesh : false;
   bool overwrite = (p.overwrite) ? p.overwrite : false;
-  int tid_to_replace = (p.tid_to_replace) ? p.tid_to_replace : -1;
   if (!overwrite && triangle_exists(mesh, i, j, k)) return false;
   else {
     mesh->triangles[tid].node_ids[0] = i;
@@ -157,38 +153,12 @@ bool write_triangle(struct _write_triangle p) {
         }
       }
     }
-    if (new_mesh) {
-      mesh->nodes[i].triangle_ids[mesh->nodes[i].nb_triangles] = tid;
-      mesh->nodes[j].triangle_ids[mesh->nodes[j].nb_triangles] = tid;
-      mesh->nodes[k].triangle_ids[mesh->nodes[k].nb_triangles] = tid;
-      mesh->nodes[i].nb_triangles++;
-      mesh->nodes[j].nb_triangles++;
-      mesh->nodes[k].nb_triangles++;
-    }
-    else {
-      for(int m=0; m<3; m++) {
-        bool updated_tid = false;
-        for(int n=0; n<p.mesh->nodes[
-          p.mesh->triangles[tid].node_ids[m]].nb_triangles; n++) {
-          if (p.mesh->nodes[p.mesh->triangles[tid].node_ids[m]].triangle_ids[n]
-            == tid_to_replace) {
-              p.mesh->nodes[p.mesh->triangles[tid].node_ids[m]].triangle_ids[n] = tid;
-              updated_tid = true;
-            }
-        }
-        if (!updated_tid) {
-          for(int n=0; n<p.mesh->nodes[
-            p.mesh->triangles[tid].node_ids[m]].nb_triangles; n++) {
-            if (p.mesh->nodes[
-              p.mesh->triangles[tid].node_ids[m]].triangle_ids[n] == -1) {
-                p.mesh->nodes[
-                  p.mesh->triangles[tid].node_ids[m]].triangle_ids[n] = tid;
-                updated_tid = true;
-              }
-          }
-        }
-      }
-    }
+    mesh->nodes[i].triangle_ids[mesh->nodes[i].nb_triangles] = tid;
+    mesh->nodes[j].triangle_ids[mesh->nodes[j].nb_triangles] = tid;
+    mesh->nodes[k].triangle_ids[mesh->nodes[k].nb_triangles] = tid;
+    mesh->nodes[i].nb_triangles++;
+    mesh->nodes[j].nb_triangles++;
+    mesh->nodes[k].nb_triangles++;
     return true;
   }
 }
@@ -201,6 +171,9 @@ struct _new_triangle {
   int prev_tid;
 };
 
+/** The function below also writes a new triangle connecting nodes i, j and k,
+but in the specific context of the refinement process. The variable $prev\_tid$
+is used to update the connectivity information of the nodes and edges. */
 void new_triangle(lagMesh* mesh, int i, int j, int k, int prev_tid) {
   assert((i < mesh->nlp) && (j < mesh->nlp) && (k < mesh->nlp));
   int nodes[3];
@@ -228,7 +201,7 @@ void new_triangle(lagMesh* mesh, int i, int j, int k, int prev_tid) {
     /** Find the edges and: (i) add them to the list of edges of the new
     triangle; (ii) specify the id of the new triangle for the edges */
     /** First, we find the edge that connects node i to node i+1 */
-    int ce; // ce for "current edge
+    int ce = -1; // ce for "current edge
     for(int l=0; l<mesh->nodes[nodes[k]].nb_edges; l++) {
       ce = mesh->nodes[nodes[k]].edge_ids[l];
       int cn = (mesh->edges[ce].node_ids[0] == nodes[k]) ?
@@ -275,7 +248,7 @@ void overwrite_triangle(lagMesh* mesh, int tid, int i, int j, int k) {
 
     /** 2. Take care of the egdes of the triangle */
     /** 2.1. Identify the edge id connecting nodes $i$, $i+1$ */
-    int eid;
+    int eid = -1; // eid for "edge id"
     for(int j=0; j<mesh->nodes[nodes[i]].nb_edges; j++) {
       eid = mesh->nodes[nodes[i]].edge_ids[j];
       int cn = (mesh->edges[eid].node_ids[0] == nodes[i]) ?

@@ -1,5 +1,5 @@
 /**
-# Elasticity front-tracking
+# Elasticity in the front-tracking framework
 
 In this file, we use the Lagrangian mesh to compute the stretches, and the
 stresses associated to a specific elastic law. Default is the Neo-Hookean model.
@@ -9,8 +9,8 @@ stresses associated to a specific elastic law. Default is the Neo-Hookean model.
   #ifndef E_S
     #define E_S 1.
   #endif
-  #define DWDL1(L1, L2) (E_S*(L1 - 1./(sq(L1*L2)))/(3.*L1))
-  #define DWDL2(L1, L2) (E_S*(L2 - 1./(sq(L1*L2)))/(3.*L2))
+  #define DWDL1(L1, L2) (E_S/(3.*L1)*(sq(L1) - 1./(sq(L1*L2))))
+  #define DWDL2(L1, L2) (E_S/(3.*L2)*(sq(L2) - 1./(sq(L1*L2))))
 #endif
 
 #ifndef SURFACE_FORCE
@@ -47,8 +47,7 @@ void rotate_to_reference_plane(lagMesh* mesh, int tid, coord rn[2],
   foreach_dimension() {
     ec[0].x = GENERAL_1DIST(mesh->nodes[nodes[2]].pos.x,
       mesh->nodes[nodes[0]].pos.x);
-    ec[2].x = -mesh->triangles[tid].normal.x; /** Probably only a convention,
-    but check the significance of this minus sign. */
+    ec[2].x = -mesh->triangles[tid].normal.x;
   }
   double enorm = cnorm(ec[0]);
   foreach_dimension() ec[0].x /= enorm;
@@ -155,16 +154,12 @@ void comp_elastic_stress(lagMesh* mesh) {
     coord cn[2];
     double R[3][3]; // the rotation matrix from the reference to the current plane
     rotate_to_reference_plane(mesh, i, cn, R);
-    // fprintf(stdout, "triangle %d, R = [[%g %g %g][%g %g %g][%g %g %g]]\n",
-    //   i, R[0][0],R[0][1],R[0][2],R[1][0],R[1][1],R[1][2],
-    //   R[2][0],R[2][1],R[2][2]);
 
     /** 2. Compute the displacement $v_k$ of each node
     From now on we abandon the convenient use of foreach_dimension() since we
     have to manipulate 2D vectors and matrices. */
     double v[2][2];
     for(int k=0; k<2; k++) {
-      // fprintf(stdout, "triangle %d, node %d, [x,y]=[%g, %g]\n", i, k+1, cn[k].x, cn[k].y);
       v[k][0] = cn[k].x - mesh->triangles[i].refShape[k].x;
       v[k][1] = cn[k].y - mesh->triangles[i].refShape[k].y;
     }
@@ -201,12 +196,6 @@ void comp_elastic_stress(lagMesh* mesh) {
       4*sq(C[0][1]))));
     lambda[1] = sqrt(.5*(C[0][0] + C[1][1] + sqrt(sq(C[0][0] - C[1][1]) +
       4*sq(C[0][1]))));
-
-    // fprintf(stdout, "Triangle %d: Lambda_1 = %g, Lambda_2 = %g\n", i, lambda[0], lambda[1]);
-    // fprintf(stdout, "Triangle %d, F = [[%g %g][%g %g]]\n",
-    //   i, F[0][0], F[0][1],F[1][0], F[1][1]);
-    //   fprintf(stdout, "Triangle %d, C = [[%g %g][%g %g]]\n",
-    //     i, C[0][0], C[0][1], C[1][0], C[1][1]);
 
     /** 5. For each node of the triangle, compute the force in the common plane,
     then rotate it and add it to the Lagrangian force of the node */
@@ -255,9 +244,12 @@ void comp_elastic_stress(lagMesh* mesh) {
       mesh->nodes[nodes[j]].lagForce.x -= area*(R[0][0]*fj.x + R[0][1]*fj.y);
       mesh->nodes[nodes[j]].lagForce.y -= area*(R[1][0]*fj.x + R[1][1]*fj.y);
       mesh->nodes[nodes[j]].lagForce.z -= area*(R[2][0]*fj.x + R[2][1]*fj.y);
-      // fprintf(stdout, "Triangle %d, node %d, adding [fx, fy]=[%g, %g]\n",
-      //   i, j, R[0][0]*fj.x + R[0][1]*fj.y, R[1][0]*fj.x + R[1][1]*fj.y);
     }
   }
 #endif
+}
+
+
+event acceleration (i++) {
+  for(int i=0; i<mbs.nbmb; i++) comp_elastic_stress(&mbs.mb[i]);
 }

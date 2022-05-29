@@ -229,7 +229,8 @@ void comp_initial_area_normals(lagMesh* mesh) {
     coord normal, e[2];
     for(int j=0; j<2; j++)
       foreach_dimension()
-        e[j].x = mesh->nodes[nid[0]].pos.x - mesh->nodes[nid[j+1]].pos.x;
+        e[j].x = GENERAL_1DIST(mesh->nodes[nid[0]].pos.x,
+          mesh->nodes[nid[j+1]].pos.x);
     foreach_dimension() normal.x = e[0].y*e[1].z - e[0].z*e[1].y;
     double norm = sqrt(sq(normal.x) + sq(normal.y) + sq(normal.z));
     double dp = 0.; // dp for "dot product"
@@ -332,10 +333,12 @@ void comp_normals(lagMesh* mesh) {
 /**
 The function below computes the signed curvature of the Lagrangian mesh at each
 node. It scales in a second-order fashion with the number of Lagrangian points.
+It only works in two dimensions.
 */
 void comp_curvature(lagMesh* mesh) {
   if (!mesh->updated_curvatures) {
     comp_normals(mesh);
+    #if dimension < 3
     bool up; // decide if we switch the x and y axes
     lagNode* cn; // current node
     for(int i=0; i<mesh->nlp; i++) {
@@ -420,6 +423,7 @@ $$P''_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
       int s = (a.x*b.x + a.y*b.y > 0) ? 1 : -1;
       cn->curv = s*fabs(ddy)/cube(sqrt(1 + sq(dy)));
     }
+    #endif
     mesh->updated_curvatures = true;
   }
 }
@@ -580,6 +584,7 @@ event cleanup (t = end) {
 ## Tests
 [advect_caps.c](../../tests/lagrangian_caps/advect_caps.c): Tests the
 convergence of the advection scheme.
+
 
 [curvature.c](../../tests/lagrangian_caps/curvature.c): Tests the computation of
 the curvature at the Lagrangian nodes. Since the curvature depends on the

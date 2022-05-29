@@ -1,15 +1,15 @@
-/** In this file we compute the neo-Hookean force on each Lagrangian node of
-the membrane(s).*/
+/**
+# Neo-Hookean law for elastic membranes
+
+In this file we define the neo-Hookean strain energy function, used to compute
+the elastic force on each Lagrangian node of the membrane.
+*/
 
 #ifndef E_S
   #define E_S 1.
 #endif
 
-#define DWDL1(L1, L2) (E_S*(L1 - 1./(cube(L1)*sq(L2)))/3.)
-#define DWDL2(L1, L2) (E_S*(L2 - 1./(sq(L1)*cube(L2)))/3.)
+#define DWDL1(L1, L2) (E_S/(3.*L1)*(sq(L1) - 1./(sq(L1*L2))))
+#define DWDL2(L1, L2) (E_S/(3.*L2)*(sq(L2) - 1./(sq(L1*L2))))
 
 #include "elasticity-ft.h"
-
-event acceleration (i++) {
-  for(int i=0; i<mbs.nbmb; i++) comp_elastic_stress(&mbs.mb[i]);
-}
