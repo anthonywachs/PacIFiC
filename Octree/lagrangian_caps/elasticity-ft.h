@@ -236,11 +236,7 @@ void comp_elastic_stress(lagMesh* mesh) {
 
       /** 5.3 Rotate the force in the common plane to the current plane:
       $f_j = \bm{R^T} f_j^P$ */
-      #if SURFACE_FORCE
-        double area = mesh->triangles[i].area;
-      #else
-        double area = 1.;
-      #endif
+      double area = mesh->triangles[i].area;
       mesh->nodes[nodes[j]].lagForce.x -= area*(R[0][0]*fj.x + R[0][1]*fj.y);
       mesh->nodes[nodes[j]].lagForce.y -= area*(R[1][0]*fj.x + R[1][1]*fj.y);
       mesh->nodes[nodes[j]].lagForce.z -= area*(R[2][0]*fj.x + R[2][1]*fj.y);
