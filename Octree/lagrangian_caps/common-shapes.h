@@ -128,7 +128,9 @@ void initialize_biconcave_mb(struct _initialize_circular_mb p) {
   }
 
   #ifdef CAPS_VISCOSITY
-    // We define below the local coordinates of the RBC and the parametric angle
+    /**
+    We define below the local coordinates of the RBC and the parametric angle
+    */
     #define MY_X ((x - shift.x)*cos(inclination) + \
       (y - shift.y)*sin(inclination))
     #define MY_Y (-(x - shift.x)*sin(inclination) + \
@@ -206,10 +208,6 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
 #if dimension > 2
 void initialize_icosahedron(struct _initialize_circular_mb p) {
   double radius = (p.radius) ? p.radius : RADIUS;
-  coord shift;
-  if (p.shift.x || p.shift.y || p.shift.z)
-    {shift.x = p.shift.x; shift.y = p.shift.y; shift.z = p.shift.z;}
-  else {shift.x = 0.; shift.y = 0.; shift.z = 0.;}
   p.mesh->nlp = 12;
   p.mesh->nodes = malloc(p.mesh->nlp*sizeof(lagNode));
   p.mesh->nle = 0;
@@ -217,13 +215,17 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
   p.mesh->nlt = 0;
   p.mesh->triangles = malloc(20*sizeof(Triangle));
 
-  /** Create the Lagrangian nodes */
+  /**
+  * Create the Lagrangian nodes
+  The nodes of a regular icosahedron are located at the vertices of [three
+  mutually orthogonal golden rectangles](https://en.wikipedia.org/wiki/Regular_icosahedron#/media/File:Icosahedron-golden-rectangles.svg).
+   */
   double sl, ll, r;
   r = sqrt(1. + sq(.5*(1. + sqrt(5))));
-  sl = radius*1./r;
-  ll = radius*.5*(1 + sqrt(5))/r;
+  sl = radius*1./r; // sl for "small length"
+  ll = radius*.5*(1 + sqrt(5))/r; // ll for "large length"
   coord c[3] = {{0, sl, ll}, {sl, ll, 0}, {ll, 0, sl}};
-  int s[9] = {0, 1, 1, -1, -1, -1, 1, -1, 1};
+  int s[9] = {0, 1, 1, -1, -1, -1, 1, -1, 1}; // s for "signs"
   for(int i=0; i<3; i++) {
     for(int j=0; j<4; j++) {
       p.mesh->nodes[i*4+j].nb_neighbors = 0;
@@ -231,14 +233,17 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
       p.mesh->nodes[i*4+j].nb_triangles = i;
       foreach_dimension()
         p.mesh->nodes[i*4+j].pos.x = c[i].x*
-          s[(1+j+4*((fabs(c[i].x - sl) < 1.e-8) ? 0 : 1))*((fabs(c[i].x) < 1.e-8) ? 0 : 1)];
+          s[(1+j+4*((fabs(c[i].x - sl) < 1.e-8) ? 0 : 1))*
+            ((fabs(c[i].x) < 1.e-8) ? 0 : 1)];
     }
   }
 
-  /** Create the edges */
+  /**
+  * Create the edges
+  */
   for(int i=0; i<p.mesh->nlp; i++) {
-    int my_gr = p.mesh->nodes[i].nb_triangles;
-    int my_ld_sign = GET_LD_SIGN(p.mesh->nodes[i]);
+    int my_gr = p.mesh->nodes[i].nb_triangles; // gr for "golden ratio"
+    int my_ld_sign = GET_LD_SIGN(p.mesh->nodes[i]); // ld for "large distance"
     for(int j=0; j<p.mesh->nlp; j++) {
       if (p.mesh->nodes[j].nb_triangles == my_gr && j != i) {
         if (my_ld_sign == GET_LD_SIGN(p.mesh->nodes[j])) {
@@ -255,7 +260,9 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
     }
   }
 
-  /** Create the triangular faces */
+  /**
+  * Create the triangular faces
+  */
   for(int i=0; i<p.mesh->nlp; i++) {
     p.mesh->nodes[i].nb_triangles = 0;
   }
@@ -326,6 +333,12 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   fprintf(stderr, "Number of Lagrangian triangles: %d\n", p.mesh->nlt);
 
   comp_initial_area_normals(p.mesh);
+  if (shift.x > 1.e-10 || shift.y > 1.e-10 || shift.z > 1.e-10) {
+    for(int i=0; i<p.mesh->nlp; i++)
+      foreach_dimension()
+        p.mesh->nodes[i].pos.x += shift.x;
+  }
+  correct_lag_pos(p.mesh);
   comp_normals(p.mesh);
 }
 

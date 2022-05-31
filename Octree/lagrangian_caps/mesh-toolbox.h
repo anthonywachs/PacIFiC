@@ -394,7 +394,7 @@ void refine_mesh(lagMesh* mesh) {
       }
       new_triangle(mesh, mid_ids[j], mid_ids[(j+1)%3], corner_id, i);
     }
-    /** Shrink the original, big, triangle into the center smaller one */
+    /** Shrink the original (big) triangle into the center smaller one */
     overwrite_triangle(mesh, i, mid_ids[0], mid_ids[1], mid_ids[2]);
   }
 }

@@ -1,8 +1,12 @@
 /**
 # Elasticity in the front-tracking framework
 
-In this file, we use the Lagrangian mesh to compute the stretches, and the
-stresses associated to a specific elastic law. Default is the Neo-Hookean model.
+In this file, we use the Lagrangian mesh to compute the stretches and the
+stresses associated to a specific elastic law. The default elastic law is the
+Neo-Hookean law.
+
+In three dimensions, this task is performed using an explicit finite element
+method introduced by Charrier et al.
 */
 
 #ifndef DWDL1
@@ -11,10 +15,6 @@ stresses associated to a specific elastic law. Default is the Neo-Hookean model.
   #endif
   #define DWDL1(L1, L2) (E_S/(3.*L1)*(sq(L1) - 1./(sq(L1*L2))))
   #define DWDL2(L1, L2) (E_S/(3.*L2)*(sq(L2) - 1./(sq(L1*L2))))
-#endif
-
-#ifndef SURFACE_FORCE
-  #define SURFACE_FORCE 1
 #endif
 
 #if dimension < 3
