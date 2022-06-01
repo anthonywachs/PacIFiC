@@ -142,8 +142,8 @@ FV_MorePostProcessing:: create_modified_data_deck_module( void )
    result->remove_entry( "concrete_name" ) ;
    result->remove_module( "MAC_ObjectWriter" ) ;
    result->remove_module( "FV_TimeIterator" ) ;
-   result->remove_entry( "graphics_output_times" ) ;
-   result->remove_entry( "state_saving_times" ) ;
+   result->remove_entry( "number_graphics_output_times" ) ;
+   result->remove_entry( "number_state_saving_times" ) ;
    if ( result->has_entry( "INITIAL_CYCLE_NUMBER" ) )
      result->remove_entry( "INITIAL_CYCLE_NUMBER" ) ; 
    result->remove_module( "FV_DomainAndFields/FV_ResultSaver" ) ;     
