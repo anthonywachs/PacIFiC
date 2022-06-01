@@ -41,7 +41,11 @@ enum RigidBodyShape {
   SPHERE,
   CIRCULARCYLINDER2D,
   CUBE,
-  TETRAHEDRON
+  TETRAHEDRON,
+  OCTAHEDRON,
+  DODECAHEDRON,
+  ICOSAHEDRON,
+  TRANCOCTAHEDRON
 };
 
 
@@ -103,7 +107,7 @@ typedef struct {
   enum RigidBodyShape shape;  
   SolidBodyBoundary s;
   GeomParameter g;
-  double M, Ip[6], rho_s, Vp, DLMFD_couplingfactor;  
+  double M, Ip[6], rho_s, Vp, DLMFD_couplingfactor, RotMat[3][3];  
 # if DLM_Moving_particle
     ToyGSParameter *toygsp;
     coord gravity;
@@ -130,6 +134,10 @@ typedef struct {
 # include "Sphere.h"
 # include "Cube.h"
 # include "Tetrahedron.h"
+# include "Octahedron.h"
+# include "Dodecahedron.h"
+# include "Icosahedron.h"
+# include "Trancoctahedron.h"
 
 
 /** Allocates memory for m points in the SolidBodyBoundary structure. */
@@ -242,6 +250,22 @@ void free_particles( particle* pp, const int n )
       case TETRAHEDRON:
         free_Tetrahedron( &(pp[k].g) );
 	break;
+	
+      case OCTAHEDRON:
+	free_Octahedron( &(pp[k].g) );
+	break;
+	
+      case ICOSAHEDRON:
+	free_Icosahedron( &(pp[k].g) );
+	break;
+
+      case DODECAHEDRON:
+	free_Dodecahedron( &(pp[k].g) );
+	break;	
+
+      case TRANCOCTAHEDRON: //gg
+	free_Trancoctahedron( &(pp[k].g) );
+	break;	
 	  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -277,7 +301,23 @@ void print_particle( particle const* pp, char const* poshift )
 	
       case TETRAHEDRON:
         printf( "TETRAHEDRON" );
-	break;	
+	break;
+	
+      case OCTAHEDRON:
+        printf( "OCTAHEDRON" );
+	break;
+	
+      case ICOSAHEDRON:
+        printf( "ICOSAHEDRON" );
+	break;
+
+      case DODECAHEDRON:
+        printf( "DODECAHEDRON" );
+	break;
+	
+      case TRANCOCTAHEDRON:
+	printf( "TRANCOCTAHEDRON" );
+	break;		
 	  
       default:
         fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -294,6 +334,18 @@ void print_particle( particle const* pp, char const* poshift )
     printf( "%sVolume = %e\n", poshift, pp->Vp );     
     printf( "%sDensity = %e\n", poshift, pp->rho_s ); 
 #   if DLM_Moving_particle
+#     if dimension == 3
+        printf( "%sInertia tensor\n", poshift );
+        printf( "%s   Ixx = %e\n", poshift, pp->Ip[0] );
+        printf( "%s   Iyy = %e\n", poshift, pp->Ip[1] );	  
+        printf( "%s   Izz = %e\n", poshift, pp->Ip[2] );	  
+        printf( "%s   Ixy = %e\n", poshift, pp->Ip[3] );	  
+        printf( "%s   Ixz = %e\n", poshift, pp->Ip[4] );	  
+        printf( "%s   Iyz = %e\n", poshift, pp->Ip[5] );
+#     else
+        printf( "%s   Inertia tensor component Izz = %e\n", poshift, 
+		pp->Ip[2] );
+#     endif             
 #     if TRANSLATION
         printf( "%sTranslational velocity = %e %e", poshift, pp->U.x, pp->U.y );
 #       if dimension == 3
@@ -325,8 +377,8 @@ void print_particle( particle const* pp, char const* poshift )
   int intpts = pp->Interior.n;
   int bdpts = pp->reduced_domain.n;  
 # if _MPI
-    mpi_all_reduce( intpts, MPI_INTEGER, MPI_SUM );
-    mpi_all_reduce( bdpts, MPI_INTEGER, MPI_SUM );
+    mpi_all_reduce( intpts, MPI_INT, MPI_SUM );
+    mpi_all_reduce( bdpts, MPI_INT, MPI_SUM );
 # endif
   if ( pid() == 0 )
   {   
@@ -848,7 +900,31 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
 	compute_nboundary_Tetrahedron( &gci, &m, &lN );
         allocate_SolidBodyBoundary( &(p[k].s), m );
         create_FD_Boundary_Tetrahedron( &gci, &(p[k].s), m, lN, pshift );
+	break;
+	
+      case OCTAHEDRON:
+	compute_nboundary_Octahedron( &gci, &m, &lN );
+        allocate_SolidBodyBoundary( &(p[k].s), m );
+        create_FD_Boundary_Octahedron( &gci, &(p[k].s), m, lN, pshift );
+	break;
+
+      case ICOSAHEDRON:
+	compute_nboundary_Icosahedron( &gci, &m, &lN );
+        allocate_SolidBodyBoundary( &(p[k].s), m );
+        create_FD_Boundary_Icosahedron( &gci, &(p[k].s), m, lN, pshift );
 	break;	
+
+      case DODECAHEDRON:     
+	compute_nboundary_Dodecahedron( &gci, &m, &lN );	
+        allocate_SolidBodyBoundary( &(p[k].s), m );
+        create_FD_Boundary_Dodecahedron( &gci, &(p[k].s), m, lN, pshift );
+  	break;	
+ 
+      case TRANCOCTAHEDRON:
+	compute_nboundary_Trancoctahedron( &gci, &m, &lN );  
+        allocate_SolidBodyBoundary( &(p[k].s), m );
+        create_FD_Boundary_Trancoctahedron( &gci, &(p[k].s), m, lN, pshift );
+	break;		
 	  
       default:
         fprintf( stderr, "Unknown Rigid Body shape !!\n" );
@@ -1580,7 +1656,7 @@ int totalcells()
   foreach() t++;
   
 # if _MPI
-    mpi_all_reduce( t, MPI_INTEGER, MPI_SUM );
+    mpi_all_reduce( t, MPI_INT, MPI_SUM );
 # endif
   
   return t;
@@ -1608,7 +1684,7 @@ int total_dlmfd_cells( particle* allpart, const int np )
   }
   
 # if _MPI
-    mpi_all_reduce( apts, MPI_INTEGER, MPI_SUM );
+    mpi_all_reduce( apts, MPI_INT, MPI_SUM );
 # endif
 
   return apts;
@@ -1630,7 +1706,7 @@ int total_dlmfd_multipliers( particle* allpart, const int np )
       apts += allpart[k].Interior.n;
   
 #   if _MPI
-      mpi_all_reduce (apts, MPI_INTEGER, MPI_SUM);
+      mpi_all_reduce (apts, MPI_INT, MPI_SUM);
 #   endif
 # endif
   

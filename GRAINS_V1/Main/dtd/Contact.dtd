@@ -1,0 +1,16 @@
+<!-- Contact Definition DTD -->
+
+<!ELEMENT ContactForceModel (Material, HODC?)>
+
+<!ELEMENT Material EMPTY>
+<!ATTLIST Material materialA CDATA #REQUIRED>
+<!ATTLIST Material materialB CDATA #REQUIRED>
+
+<!ELEMENT HODC   (stiff, muc, en, mut, kms )>
+
+  <!ELEMENT kms    (#PCDATA)>
+  <!ELEMENT muc    (#PCDATA)>
+  <!ELEMENT mun    (#PCDATA)>
+  <!ELEMENT mut    (#PCDATA)>
+  <!ELEMENT stiff  (#PCDATA)>
+  <!ELEMENT en     (#PCDATA)>  

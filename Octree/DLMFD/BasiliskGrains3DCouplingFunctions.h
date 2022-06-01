@@ -42,7 +42,7 @@ void UpdateDLMFDtoGS_vel( double arrayv[][6], particle* p,
 from the granular solver */
 //----------------------------------------------------------------------------
 char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
-	particle* allpart, const int npart_, bool explicit_added_mass_, 
+	particle* allpart, const int npart_, bool fluidCorrectedAcceleration_, 
 	double rhoval_ )
 //----------------------------------------------------------------------------
 {
@@ -73,7 +73,9 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
   // Read the parsed array of character for each particle
   double Ux = 0., Uy = 0., Uz = 0., omx = 0., omy = 0., omz = 0., rhop = 0., 
   	massp  = 0., Ixx = 0., Ixy = 0., Ixz = 0., Iyy = 0., Iyz = 0., Izz = 0.,
-	gx = 0., gy = 0., gz = 0., radiusp = 0.;
+	gx = 0., gy = 0., gz = 0., radiusp = 0.,
+	MRxx = 0., MRxy = 0., MRxz = 0., MRyx = 0., MRyy = 0., MRyz = 0.,
+	MRzx = 0., MRzy = 0., MRzz = 0.;
   int ncornersp = 0;
   for (size_t k = 0; k < npart_; k++) 
   { 
@@ -153,6 +155,44 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     // Read Izz
     token = strtok( NULL, " " );
     sscanf( token, "%lf", &Izz );                 
+
+#   if dimension == 3
+      // Read MRxx
+      token = strtok( NULL, " " );
+      sscanf( token, "%lf", &MRxx ); 
+
+      // Read MRxy
+      token = strtok( NULL, " " );
+      sscanf( token, "%lf", &MRxy );
+      
+      // Read MRxz
+      token = strtok( NULL, " " );
+      sscanf( token, "%lf", &MRxz );       
+
+      // Read MRyx
+      token = strtok( NULL, " " );
+      sscanf( token, "%lf", &MRyx );
+      
+      // Read MRyy
+      token = strtok( NULL, " " );
+      sscanf( token, "%lf", &MRyy );      
+      
+      // Read MRyz
+      token = strtok( NULL, " " );
+      sscanf( token, "%lf", &MRyz );      
+      
+      // Read MRz
+      token = strtok( NULL, " " );
+      sscanf( token, "%lf", &MRzx );
+      
+      // Read MRzy
+      token = strtok( NULL, " " );
+      sscanf( token, "%lf", &MRzy );       
+#   endif
+
+    // Read MRzz
+    token = strtok( NULL, " " );
+    sscanf( token, "%lf", &MRzz );  
 
     // Read gx
     token = strtok( NULL, " " );
@@ -247,6 +287,26 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
       allpart[k].Ip[5] = 0.;
 #   endif
     allpart[k].Ip[2] = Izz;
+#   if dimension == 3
+      allpart[k].RotMat[0][0] = MRxx;
+      allpart[k].RotMat[0][1] = MRxy;
+      allpart[k].RotMat[0][2] = MRxz;
+      allpart[k].RotMat[1][0] = MRyx;
+      allpart[k].RotMat[1][1] = MRyy;
+      allpart[k].RotMat[1][2] = MRyz;
+      allpart[k].RotMat[2][0] = MRzx;
+      allpart[k].RotMat[2][1] = MRzy;                        
+#   else
+      allpart[k].RotMat[0][0] = 0.;
+      allpart[k].RotMat[0][1] = 0.;
+      allpart[k].RotMat[0][2] = 0.;
+      allpart[k].RotMat[1][0] = 0.;
+      allpart[k].RotMat[1][1] = 0.;
+      allpart[k].RotMat[1][2] = 0.;
+      allpart[k].RotMat[2][0] = 0.;
+      allpart[k].RotMat[2][1] = 0.;
+#   endif
+    allpart[k].RotMat[2][2] = MRzz;        
     gg->center.x = gx;
     gg->center.y = gy;
 #   if dimension == 3
@@ -258,10 +318,11 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
     gg->radius = radiusp;             
     
     // DLMFD coupling factor
-    // If explicit add mass, DLMFD_couplingFactor = 1
-    // otherwise DLMFD_couplingFactor = ( 1 - rhoval / rho_s )
+    // If fluidCorrectedAcceleration_ == true, DLMFD_couplingFactor = 
+    //   ( 1 - rhoval / rho_s )
+    // otherwise DLMFD_couplingFactor = 1
     allpart[k].DLMFD_couplingfactor = 1. ;
-    if ( !explicit_added_mass_ ) 
+    if ( fluidCorrectedAcceleration_ ) 
       allpart[k].DLMFD_couplingfactor -= rhoval_ / allpart[k].rho_s ;
 
 #   if DLM_Moving_particle      
@@ -292,7 +353,25 @@ char* UpdateParticlesBasilisk( char* pstr, const int pstrsize,
           allpart[k].shape = CUBE;
 	  update_Cube( gg );
 	  compute_principal_vectors_Cube( &(allpart[k]) ); 
-          break;	  
+          break;
+	  
+       // For now, we assume that all 12-corner polyhedrons are icosahedrons
+       case 12: 
+         allpart[k].shape = ICOSAHEDRON;
+	 update_Icosahedron( gg );
+         break;  
+          
+       // For now, we assume that all 20-corner polyhedrons are dodecahedrons
+       case 20: 
+         allpart[k].shape = DODECAHEDRON;
+	 update_Dodecahedron( gg );
+         break;      
+          
+       // For now, we assume that all 24-corner polyhedrons are trancoctahedrons
+       case 24: 
+         allpart[k].shape = TRANCOCTAHEDRON;
+	 update_Trancoctahedron( gg );
+         break;	  	  
 #     else
         case 1: 
           allpart[k].shape = CIRCULARCYLINDER2D;

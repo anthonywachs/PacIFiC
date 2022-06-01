@@ -36,7 +36,8 @@
 *.pyo
 
 #Others
-*.dtd
+#*.dtd
+*Makedepend
 *.so.*
 PacIFiC-*.env.sh
 GRAINS/Env/grains-*.env.sh
@@ -64,3 +65,16 @@ GRAINS/README
 GRAINS/Utils*
 GRAINS/XERCES*
 Octree/basilisk/*
+GRAINS_V1/Archives*
+GRAINS_V1/diffGrains*
+GRAINS_V1/DoxyGRAINS/Files
+GRAINS_V1/DoxyGRAINS/html
+GRAINS_V1/DoxyGRAINS/Images
+GRAINS_V1/DoxyGRAINS/Pages
+GRAINS_V1/DoxyGRAINS/Pages_style
+GRAINS_V1/Main/bin64*/*
+GRAINS_V1/Grains/lib64-*/*
+GRAINS_V1/Grains/lib64-*
+GRAINS_V1/NotIncluded
+GRAINS_V1/XERCES*
+

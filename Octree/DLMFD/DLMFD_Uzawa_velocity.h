@@ -373,7 +373,27 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
         case TETRAHEDRON:
 	  create_FD_Interior_Tetrahedron( &p[k], index_lambda, 
 	  	DLM_periodic_shift );
-	  break;		  
+	  break;
+	  
+        case OCTAHEDRON:
+	  create_FD_Interior_Octahedron( &p[k], index_lambda, 
+	  	DLM_periodic_shift );
+	  break;
+	  		  
+        case ICOSAHEDRON:
+	  create_FD_Interior_Icosahedron( &p[k], index_lambda, 
+	  	DLM_periodic_shift );
+	  break;
+
+        case DODECAHEDRON:
+	  create_FD_Interior_Dodecahedron( &p[k], index_lambda, 
+	  	DLM_periodic_shift );
+	  break;
+	
+	case TRANCOCTAHEDRON:
+	  create_FD_Interior_Trancoctahedron( &p[k], index_lambda, 
+	  	DLM_periodic_shift );
+	  break;	  		  
 	  
 	default:
           fprintf( stderr,"Unknown Rigid Body shape !!\n" );
@@ -483,7 +503,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
 # endif  
   
 # if _MPI
-    mpi_all_reduce( tcells, MPI_INTEGER, MPI_SUM );
+    mpi_all_reduce( tcells, MPI_INT, MPI_SUM );
 # endif
 
 

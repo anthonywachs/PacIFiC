@@ -199,7 +199,7 @@ void compute_nboundary_Cube( GeomParameter* gcp, int* nb, int* lN )
     if ( lpoint.level > -1 ) 
     {    
       /** Only this thread creates the Cache ... */
-      cache_append(&poscache, lpoint, 0);
+      cache_append( &poscache, lpoint, 0 );
 
       /** and only this thread computes the number of boundary points
 	  ... */
@@ -225,14 +225,15 @@ void compute_nboundary_Cube( GeomParameter* gcp, int* nb, int* lN )
       *nb += 8;
       
       /** and finally, this thread destroys the cache. */
-      free(poscache.p);
+      free( poscache.p );
     }
   
-#if _MPI
-    MPI_Barrier(MPI_COMM_WORLD);
-    mpi_all_reduce(*nb, MPI_INT, MPI_MAX);
-    mpi_all_reduce(*lN, MPI_INT, MPI_MAX);
-#endif
+#   if _MPI
+      MPI_Barrier( MPI_COMM_WORLD );
+      mpi_all_reduce( *nb, MPI_INT, MPI_MAX );
+      mpi_all_reduce( *lN, MPI_INT, MPI_MAX );
+#   endif
+    
     if ( ip < gcp->ncorners )
       ip++;
     else
@@ -434,19 +435,19 @@ void create_FD_Interior_Cube( particle* p, vector Index_lambda,
     	  if ( is_in_Cube( &u1, &v1, &w1, &mins, &maxs, &checkpt ) ) 
 	  {
 	    cache_append (c, point, 0);
-	    /* tagg cell with the number of the particle */
-	    if ((int)Index_lambda.y[] == -1)
+	    /* tag cell with the number of the particle */
+	    if ( (int)Index_lambda.y[] == -1 )
 	      Index_lambda.y[] = p->pnum;
 	  }
   }
  
-  cache_shrink (c);    
+  cache_shrink( c );    
 }
 
 
 
 
-// Reads geometric parameters of the cube
+/** Reads geometric parameters of the cube */
 //----------------------------------------------------------------------------
 void update_Cube( GeomParameter* gcp ) 
 //----------------------------------------------------------------------------
@@ -517,7 +518,7 @@ void update_Cube( GeomParameter* gcp )
 
 
 
-// Frees the geometric parameters of the cube
+/** Frees the geometric parameters of the cube */
 //----------------------------------------------------------------------------
 void free_Cube( GeomParameter* gcp ) 
 //----------------------------------------------------------------------------

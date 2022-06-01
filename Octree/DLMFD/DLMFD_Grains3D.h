@@ -12,6 +12,12 @@
 #   define grains_inputfile "Grains/Simu/simul.xml"
 # endif
 
+/** Split explicit acceleration treatment in case of particles are lighter 
+than the fluid */
+# ifndef b_split_explicit_acceleration
+#   define b_split_explicit_acceleration false
+# endif
+
 /** Coupling Interface for Grains3D */
 # include "InterfaceGrains3DBasilisk.h"
 
@@ -29,11 +35,6 @@ event GranularSolver_init (t < -1.)
 //----------------------------------------------------------------------------
 {
   // Initialize Grains with its parameters 
-  bool b_intitializeClonePer = false;
-  double grid_size = 0.;
-  bool is_solidsolver_parallel = false;
-  int my_rank = pid();
-  int nb_procs = npe();
   char* pstr = NULL;
   int pstrsize = 0;  
 
@@ -44,22 +45,16 @@ event GranularSolver_init (t < -1.)
     printf( "Grains3D\n" );
     
     // Initialize Grains
-    Init_Grains( grains_inputfile, rhoval, restarted_simu, 
-    	b_intitializeClonePer, grid_size,
-	is_solidsolver_parallel, my_rank, nb_procs );
+    Init_Grains( grains_inputfile, rhoval, restarted_simu );
 
     // Set initial time
     SetInitialTime( trestart );
 
-    // Activate explicit added mass if solid density < fluid density
-    if ( b_explicit_added_mass )
+    // In case part of the particle acceleration is computed explicitly
+    // when particles are lighter than the fluid
+    if ( b_split_explicit_acceleration )
     {
-      ActivateExplicitAddedMass( restarted_simu ); 
-      char rootfilename[80] = "";
-      strcpy( rootfilename, result_dir );
-      strcat( rootfilename, "/" );
-      strcat( rootfilename, result_particle_vp_rootfilename );      
-      InitializeExplicitAddedMass( restarted_simu, rootfilename );
+      // TO DO
     }
     
     // Transfer the data from Grains to an array of characters
@@ -83,7 +78,7 @@ event GranularSolver_init (t < -1.)
 
   // Update all particle data 
   pstr = UpdateParticlesBasilisk( pstr, pstrsize, particles, NPARTICLES,
-  	b_explicit_added_mass, rhoval );  
+  	!b_split_explicit_acceleration, rhoval );  
   free( pstr );      
 } 
 
@@ -104,23 +99,24 @@ event GranularSolver_predictor (t < -1.)
   {
     // Output the call to Grains3D
     printf ("run Grains3D\n");
-
-    // Set the fluid time step magnitude in Grains3D
-    Setdt_Grains( dt );
     
     // Run the granular simulation
-    Simu_Grains( true, false, b_explicit_added_mass );
+    Simu_Grains( dt );
 
     // Transfer the data from Grains to an array of characters
     pstr = GrainsToBasilisk( &pstrsize );     
     
-    // Set dt for explicit mass calculation in Grains3D at next time step
-    if ( b_explicit_added_mass ) Setdt_AddedMassGrains( dt ) ;
+    // Set dt for split explicit acceleration computation in Grains3D at 
+    // next time step
+    if ( b_split_explicit_acceleration ) 
+    {
+      // TO DO
+    }    
   }
     
   // Update all particle data 
   pstr = UpdateParticlesBasilisk( pstr, pstrsize, particles, NPARTICLES,
-    	b_explicit_added_mass, rhoval );  
+    	!b_split_explicit_acceleration, rhoval );  
   free( pstr ); 
 }
 
@@ -141,6 +137,7 @@ event GranularSolver_updateVelocity (t < -1.)
     UpdateDLMFDtoGS_vel( DLMFDtoGS_vel, particles, NPARTICLES );  
 
     // Update particle velocity in Grains using the 2D array
-    UpdateVelocityGrains( DLMFDtoGS_vel, NPARTICLES, b_explicit_added_mass );
+    UpdateVelocityGrains( DLMFDtoGS_vel, NPARTICLES, 
+    	b_split_explicit_acceleration );
   }
 }
