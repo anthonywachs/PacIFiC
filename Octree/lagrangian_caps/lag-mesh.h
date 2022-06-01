@@ -531,7 +531,9 @@ event defaults (i = 0) {
     a = new face vector;
     foreach_face()
       a.x[] = 0.;
+    #if OLD_QCC
     boundary ((scalar *){a});
+    #endif
   }
 }
 

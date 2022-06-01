@@ -21,7 +21,9 @@ void construct_divG(scalar divG, lagMesh* mesh) {
     foreach_dimension() G.x[] = 0.;
     divG[] = 0.;
   }
+  #if OLD_QCC
   boundary((scalar*){divG, G});
+  #endif
 
   for(int i=0; i<mesh->nle; i++) {
     // compute the grid gradient on the midpoint of the edge
@@ -66,10 +68,14 @@ void construct_divG(scalar divG, lagMesh* mesh) {
       }
     }
   }
+  #if OLD_QCC
   boundary((scalar*){G});
+  #endif
   foreach() foreach_dimension() divG[] += (G.x[1] - G.x[-1])/(2.*Delta);
   // foreach() foreach_dimension() divG[] += (G.x[1] - G.x[])/(Delta);
+  #if OLD_QCC
   boundary({divG});
+  #endif
 }
 
 double muc, mup;
@@ -104,7 +110,9 @@ event properties (i++) {
     }
     I[] = clamp(I[], 0, 1);
   }
+  #if OLD_QCC
   boundary({I, prevI});
+  #endif
 
   foreach_face() {
     face vector muv = mu;

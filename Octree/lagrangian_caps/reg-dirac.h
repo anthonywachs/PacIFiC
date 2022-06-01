@@ -147,5 +147,7 @@ void tag_ibm_stencils(lagMesh* mesh) {
       }
     }
   }
+  #if OLD_QCC
   boundary({stencils});
+  #endif
 }
