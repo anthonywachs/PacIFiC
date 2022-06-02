@@ -16,7 +16,6 @@ vector G[];
 void construct_divG(scalar divG, lagMesh* mesh) {
   comp_normals(mesh);
   compute_lengths(mesh);
-  // foreach_face() foreach_dimension() G.x[] = 0.;
   foreach() {
     foreach_dimension() G.x[] = 0.;
     divG[] = 0.;
@@ -25,6 +24,7 @@ void construct_divG(scalar divG, lagMesh* mesh) {
   boundary((scalar*){divG, G});
   #endif
 
+  #if dimension < 3
   for(int i=0; i<mesh->nle; i++) {
     // compute the grid gradient on the midpoint of the edge
     coord gg; // grid gradient
@@ -36,25 +36,6 @@ void construct_divG(scalar divG, lagMesh* mesh) {
       foreach_cache(mesh->nodes[en[j]].stencil) {
         //spread half the grid gradient of the edge from each of its nodes
         if (point.level >= 0) {
-          // coord xpos = {x - .5*Delta, y};
-          // coord ypos = {x, y - .5*Delta};
-          // coord xdist, ydist;
-          // foreach_dimension() {
-          //   xdist.x = GENERAL_1DIST(xpos.x, mesh->nodes[en[j]].pos.x);
-          //   ydist.x = GENERAL_1DIST(ypos.x, mesh->nodes[en[j]].pos.x);
-          // }
-          // if (sq(xdist.x) <= sq(2*Delta) && sq(xdist.y) <= sq(2*Delta)) {
-          //   double weight =
-          //     (1 + cos(.5*pi*xdist.x/Delta))*(1 + cos(.5*pi*xdist.y/Delta))/
-          //     (16.*sq(Delta));
-          //   G.x[] -= weight*.5*gg.x;
-          // }
-          // if (sq(ydist.x) <= sq(2*Delta) && sq(ydist.y) <= sq(2*Delta)) {
-          //   double weight =
-          //     (1 + cos(.5*pi*ydist.x/Delta))*(1 + cos(.5*pi*ydist.y/Delta))/
-          //     (16.*sq(Delta));
-          //   G.y[] -= weight*.5*gg.y;
-          // }
         coord dist;
           dist.x = GENERAL_1DIST(x, mesh->nodes[en[j]].pos.x);
           dist.y = GENERAL_1DIST(y, mesh->nodes[en[j]].pos.y);
@@ -62,17 +43,46 @@ void construct_divG(scalar divG, lagMesh* mesh) {
             double weight =
               (1 + cos(.5*pi*dist.x/Delta))*(1 + cos(.5*pi*dist.y/Delta))/
               (16.*sq(Delta));
-            foreach_dimension() G.x[] -= weight*.5*gg.x;
+            foreach_dimension() G.x[] -= weight*.5*gg.x; // Why is there a .5??
           }
         }
       }
     }
   }
+  #else
+  for(int i=0; i<mesh->nlt; i++) {
+    // compute the grid gradient on the midpoint of the edge
+    coord gg; // gg for "grid gradient"
+    int tn[3]; // tn for "triangle's nodes"
+    tn[0] = mesh->triangles[i].node_ids[0];
+    tn[1] = mesh->triangles[i].node_ids[1];
+    tn[2] = mesh->triangles[i].node_ids[2];
+    foreach_dimension()
+      gg.x = mesh->triangles[i].normal.x*mesh->triangles[i].area;
+    for(int j=0; j<3; j++) {
+      foreach_cache(mesh->nodes[en[j]].stencil) {
+        //spread half the grid gradient of the edge from each of its nodes
+        if (point.level >= 0) {
+        coord dist;
+          dist.x = GENERAL_1DIST(x, mesh->nodes[tn[j]].pos.x);
+          dist.y = GENERAL_1DIST(y, mesh->nodes[tn[j]].pos.y);
+          dist.z = GENERAL_1DIST(z, mesh->nodes[tn[j]].pos.z);
+          if (sq(dist.x) <= sq(2*Delta) && sq(dist.y) <= sq(2*Delta)
+            && sq(dist.z) <= sq(2*Delta)) {
+            double weight = (1 + cos(.5*pi*dist.x/Delta))
+              *(1 + cos(.5*pi*dist.y/Delta))*(1 + cos(.5*pi*dist.z/Delta))
+              /(cube(4*Delta));
+            foreach_dimension() G.x[] -= weight*gg.x;
+          }
+        }
+      }
+    }
+  }
+  #endif
   #if OLD_QCC
   boundary((scalar*){G});
   #endif
   foreach() foreach_dimension() divG[] += (G.x[1] - G.x[-1])/(2.*Delta);
-  // foreach() foreach_dimension() divG[] += (G.x[1] - G.x[])/(Delta);
   #if OLD_QCC
   boundary({divG});
   #endif
