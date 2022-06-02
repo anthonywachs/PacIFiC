@@ -75,7 +75,7 @@ endif
 ifeq ($(WITH_X11),1)
 
 X11PATH = /usr
-CPPFLAGS += -I$(MACWORLD_X11_INCDIR)
+CPPFLAGS += $(foreach path,$(MACWORLD_X11_INCDIR), -I$(path))
 LIBPATH  += $(MACWORLD_X11_LIBDIR)
 LDLIBS   += -lnsl -lXt -lX11 -lXmu
 
