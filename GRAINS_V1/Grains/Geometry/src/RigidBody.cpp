@@ -285,7 +285,7 @@ void RigidBody::setOrigin( Point3 const& pos )
 
 
 // ----------------------------------------------------------------------------
-// Sets the rigid body's transformation with an 1D array of 16 
+// Sets the rigid body's transformation with an 1D array of 12 
 // values (see class Transform for details)
 void RigidBody::setTransform( double const* pos ) 
 {

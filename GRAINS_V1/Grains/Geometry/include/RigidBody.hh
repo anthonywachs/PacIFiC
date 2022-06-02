@@ -131,7 +131,7 @@ class RigidBody
     @param pos origin coordinates as a Point3 */
     void setOrigin( Point3 const& pos );
   
-    /** @brief Sets the rigid body's transformation with an 1D array of 16 
+    /** @brief Sets the rigid body's transformation with an 1D array of 12 
     values (see class Transform for details)
     @param pos 1D array of values containing the tranformation coefficients */
     void setTransform( double const* pos );  

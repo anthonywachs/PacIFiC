@@ -160,7 +160,7 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
 	double const& qrotationx, double const& qrotationy, 
 	double const& qrotationz, double const& qrotations,	 
 	double const& rx, double const& ry, double const& rz,	 
-	const double m[16],
+	const double m[12],
 	ParticleActivity const& activ, 
 	int const& tag_,
 	int const& coordination_number_ ) 

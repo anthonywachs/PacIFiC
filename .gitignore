@@ -35,7 +35,7 @@
 *.pyc
 *.pyo
 
-#Others
+# Others
 #*.dtd
 *Makedepend
 *.so.*
@@ -43,6 +43,7 @@
 GRAINS/Env/grains-*.env.sh
 Cartesian/FLUID/Env/fluid-*.env.sh
 Cartesian/MacWorld/Env/macworld-*.env.sh
+Cartesian/MacWorld/MAC/include/*
 *.mak
 .tags*
 

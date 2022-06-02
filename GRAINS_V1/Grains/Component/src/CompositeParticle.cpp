@@ -173,25 +173,23 @@ CompositeParticle::CompositeParticle( DOMNode* root,
 
 
 
-// // ----------------------------------------------------------------------------
-// // Constructeur (MPI)
-// CompositeParticle::CompositeParticle( const int &id_, Particule const* ParticuleRef, 
-// 	const double &vx, const double &vy, const double &vz,
-// 	const double &qrotationx, const double &qrotationy, 
-// 	const double &qrotationz, const double &qrotations,	 
-// 	const double &rx, const double &ry, const double &rz,	 
-// 	const Scalar m[16],
-// 	const ParticuleActivity &activ, 
-// 	const int &tag_,
-// 	const int &coordination_number_,
-// 	const bool &updatePosition ) :
-//   Particule( id_, ParticuleRef, 
-//             vx, vy, vz, 
-//             qrotationx, qrotationy,
-// 	    qrotationz, qrotations,
-// 	    rx, ry, rz, m, activ,
-// 	    tag_, coordination_number_ )
-// {
+// ----------------------------------------------------------------------------
+// Constructor with input parameters
+CompositeParticle::CompositeParticle( int const& id_, 
+	Particle const* ParticleRef, 
+	double const& vx, double const& vy, double const& vz,
+	double const& qrotationx, double const& qrotationy, 
+	double const& qrotationz, double const& qrotations,	 
+	double const& rx, double const& ry, double const& rz,	 
+	const double m[12],
+	ParticleActivity const& activ, 
+	int const& tag_,
+	int const& coordination_number_ ,
+ 	bool const& updatePosition )
+  : Particle( id_, ParticleRef, vx, vy, vz, 
+	qrotationx, qrotationy, qrotationz, qrotations,
+	rx, ry, rz, m, activ, tag_, coordination_number_ )
+{
 //   /* Particules elementaires */
 //   m_elementaryParticles.reserve( ParticuleRef->getNbreElemPart() );
 //   ElementParticule* ppp = NULL;
@@ -225,7 +223,7 @@ CompositeParticle::CompositeParticle( DOMNode* root,
 // 
 //   if ( updatePosition )
 //     setElementPosition();
-// }
+}
 
 
 

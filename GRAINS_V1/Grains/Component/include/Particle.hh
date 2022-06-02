@@ -95,7 +95,7 @@ class Particle : public Component
 	double const& qrotationx, double const& qrotationy, 
 	double const& qrotationz, double const& qrotations,	 
 	double const& rx, double const& ry, double const& rz,	 
-	const double m[16],
+	const double m[12],
 	ParticleActivity const& activ, 
 	int const& tag_,
 	int const& coordination_number_ = 0 ); 
@@ -515,7 +515,9 @@ class Particle : public Component
     /**@name I/O methods */
     //@{
     /** @brief Reads a (in practice reference) particle data from a stream  
-    @param fileIn input stream */
+    @param fileIn input stream 
+    @param elemPart true if the particle is an elementary particle of a
+    composite particle, false otherwise */
     void read( istream& fileIn, bool elemPart = false );
 
     /** @brief Reads particle data from a stream. Usage: for standard particles

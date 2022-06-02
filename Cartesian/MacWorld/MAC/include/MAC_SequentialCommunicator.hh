@@ -36,6 +36,10 @@ class MAC_SequentialCommunicator : public MAC_Communicator
       virtual void send( size_t dest, int const* value, int nb ) const ;
       virtual void receive( size_t src, int* value, int nb ) const ;
 
+      virtual void send( size_t dest, long long int const* value, int nb ) 
+      	const ;
+      virtual void receive( size_t src, long long int* value, int nb ) const ;
+      
       virtual void send( size_t dest, double const* value, int nb ) const ;
       virtual void receive( size_t src, double* value, int nb ) const ;
       
