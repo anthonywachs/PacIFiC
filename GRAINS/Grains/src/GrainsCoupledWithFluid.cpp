@@ -261,11 +261,14 @@ void GrainsCoupledWithFluid::Chargement( DOMElement* rootElement )
     if (app_FluidTemperature)
       app_FluidTemperature->set_simultime( m_simulTime );
 
-		// Basilisk
+    // Basilisk
     DOMNode* basilisk = ReaderXML::getNode( root, "Basilisk" );
-    m_dtgmin = ReaderXML::getNodeAttr_Double( basilisk, "dtgmin" );
-    m_dtgmax = ReaderXML::getNodeAttr_Double( basilisk, "dtgmax" );
-    m_N = ReaderXML::getNodeAttr_Int( basilisk, "N" );
+    if ( basilisk )
+    {
+      m_dtgmin = ReaderXML::getNodeAttr_Double( basilisk, "dtgmin" );
+      m_dtgmax = ReaderXML::getNodeAttr_Double( basilisk, "dtgmax" );
+      m_N = ReaderXML::getNodeAttr_Int( basilisk, "N" );
+    }
 
     // Fichier
     DOMNode* file = ReaderXML::getNode( root, "Fichier" );

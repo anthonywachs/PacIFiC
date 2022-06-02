@@ -3,7 +3,7 @@
 # $1 : create = mkdir and delete = "rm -rf"
 # $2 : force a specific architecture other than the one from the shell variables
 
-tabdir=(Main Utils/Position Utils/ParticuleData Utils/Orientation Utils/Contact Utils/PairCorrelation_mpi Utils/TwoPointVelocity_and_Pair_correlation_mpi2 Utils/FlucVel_mpi2)
+tabdir=(Main Utils/Position Utils/ParticleData Utils/Orientation)
 
 
 # Check $1 parameter as the right value
