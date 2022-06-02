@@ -58,6 +58,7 @@ Cartesian/MacWorld/petsc-3.2.0-p7/*
 GRAINS/Main/bin64*/*
 GRAINS/Grains/lib64-*/*
 GRAINS/Grains/lib64-*
+GRAINS/Utils/*/bin64*/*
 GRAINS/diffGrains*
 GRAINS/Archives*
 GRAINS/DoxyGRAINS*
