@@ -225,10 +225,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
    }
 
-   space_dimensions = (is_HE) ? dom->discrete_field( "temperature" )->primary_grid()
-                                                       ->nb_space_dimensions()
-                        : dom->discrete_field( "velocity" )->primary_grid()
-                                                       ->nb_space_dimensions();
+   space_dimensions = dom->primary_grid()->nb_space_dimensions();
 
    // Read the gravity vector or direction of enforced motion
    doubleVector gg( space_dimensions, 0 );
@@ -543,14 +540,42 @@ DS_DirectionSplitting:: do_more_post_processing( FV_DomainAndFields * dom,
 {
    MAC_LABEL( "DS_DirectionSplitting:: do_more_post_processing" ) ;
 
+   FV_DiscreteField * PP_EPSILON = NULL;
+
+   // Check and warn if a porosity field already exists
+   if ( dom->has_discrete_field( "porosity" ) && macCOMM->rank() == 0 ) {
+      std::cout << endl
+         <<"WARNING : A porosity field already exist"<<endl
+         <<"          (defined in Savings/XXX.mac, actually comming from "
+         <<"prob_def.mac)."<<endl<<endl;
+   }
+
+   PP_EPSILON = FV_DiscreteField::create( this
+                                        , dom->primary_grid()
+                                        , "PP_epsilon"
+                                        , "centered", 1, 1 );
+   PP_EPSILON->build_field_numbering() ;
+   PP_EPSILON->set_DOFs_value( 0, 0, 1. );
+   if (is_solids) {
+      allrigidbodies->compute_void_fraction_on_epsilon_grid(PP_EPSILON);
+   }
+   // Appending the field to the original domain
+   dom->append_field(PP_EPSILON);
+
    // Post Processing variable
    PostProcessing* postProcessing;
 
    // if postprocessing is required
-	postProcessing = new PostProcessing(is_solids
-                                     , allrigidbodies
-                                     , space_dimensions
-                                     , macCOMM);
+   if (is_solids) {
+	   postProcessing = new PostProcessing(is_solids
+                                  , allrigidbodies->get_ptr_FS_AllRigidBodies()
+                                  , dom
+                                  , macCOMM);
+   } else {
+      postProcessing = new PostProcessing(is_solids
+                                  , dom
+                                  , macCOMM);
+   }
 
    if ( exp->has_module( "fieldVolumeAverageInBox" ) ) {
 	   postProcessing->prepare_fieldVolumeAverageInBox(this, exp, dom);

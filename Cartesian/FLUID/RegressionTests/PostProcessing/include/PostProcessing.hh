@@ -2,11 +2,15 @@
 #define POST_PROCESSING_HH
 
 #include <FV_DiscreteField.hh>
-#include <DS_AllRigidBodies.hh>
-#include <DS_RigidBody.hh>
+#include <FS_AllRigidBodies.hh>
+#include <FS_RigidBody.hh>
 #include <MAC_Communicator.hh>
 #include <FV_DomainAndFields.hh>
 #include <MAC_DoubleVector.hh>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 /** @brief The class PostProcessing
 
@@ -51,11 +55,18 @@ class PostProcessing
       PostProcessing();
 
       /** @brief Constructor with arguments
+      @param is_solids RB present or not */
+      PostProcessing( bool is_solids_
+                    , FV_DomainAndFields * dom
+                    , MAC_Communicator const* macCOMM_);
+
+
+      /** @brief Constructor with arguments
       @param is_solids RB present or not
       @param allrigidbodies pointer to all RB */
       PostProcessing( bool is_solids_
-                    , DS_AllRigidBodies * allrigidbodies_
-                    , size_t const& dim_
+                    , FS_AllRigidBodies const* allrigidbodies_
+                    , FV_DomainAndFields * dom
                     , MAC_Communicator const* macCOMM_);
 
       /** @brief Destructor */
@@ -115,10 +126,10 @@ class PostProcessing
          @param dir direction
          @param comp field component
        */
-       size_t_vector get_local_index_of_extents( class doubleVector& bounds
-                                              , FV_DiscreteField const* FF
-                                              , size_t const& dir
-                                              , size_t const& comp);
+       intVector get_local_index_of_extents( class doubleVector& bounds
+                                           , FV_DiscreteField const* FF
+                                           , size_t const& dir
+                                           , size_t const& comp);
 
       /**@brief Transform a point using PBC
          @param x point
@@ -132,16 +143,29 @@ class PostProcessing
        */
        double delta_periodic_transformation( double const& delta, size_t const& dir);
 
+       /**@brief Return the field value on the EPSILON grid
+          @param FF field
+          @param i,j,k index of EPSILON field
+          @param comp component
+          @param level level to return
+        */
+       double field_value(FV_DiscreteField const* FF, size_t const& i
+                                                    , size_t const& j
+                                                    , size_t const& k
+                                                    , size_t const& comp
+                                                    , size_t const& level);
+
    private: //----------------------------------------------------------------
 
       // Pointers to the constant fields and primary grid
       FV_DiscreteField const* UF ;
       FV_DiscreteField const* PF ;
       FV_DiscreteField const* TF ;
+      FV_DiscreteField const* EPSILON ;
       FV_Mesh const* MESH ;
 
       bool m_is_solids;
-      DS_AllRigidBodies * m_allrigidbodies;
+      FS_AllRigidBodies const* m_allrigidbodies;
       size_t m_dim;
       MAC_Communicator const* m_macCOMM; /**< Variable for communication
       between processors */

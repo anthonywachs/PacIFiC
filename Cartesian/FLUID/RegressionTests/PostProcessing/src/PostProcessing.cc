@@ -23,8 +23,32 @@ PostProcessing:: PostProcessing()
 
 //---------------------------------------------------------------------------
 PostProcessing:: PostProcessing( bool is_solids_
-                               , DS_AllRigidBodies * allrigidbodies_
-                               , size_t const& dim_
+                               , FV_DomainAndFields * dom
+                               , MAC_Communicator const* macCOMM_)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "PostProcessing:: PostProcessing" ) ;
+
+   m_is_solids = is_solids_ ;
+   m_allrigidbodies = NULL ;
+   m_dim = dom->primary_grid()->nb_space_dimensions();
+   m_macCOMM = macCOMM_ ;
+   if ( !dom->has_discrete_field( "PP_epsilon" ) ) {
+      MAC_Error::object()->raise_plain( "field_name PP_epsilon does not exist");
+   } else {
+      EPSILON = dom->discrete_field( "PP_epsilon" );
+   }
+   // EPSILON = porosity_ ;
+   MAC_ASSERT( EPSILON->discretization_type() == "centered" ) ;
+}
+
+
+
+
+//---------------------------------------------------------------------------
+PostProcessing:: PostProcessing( bool is_solids_
+                               , FS_AllRigidBodies const* allrigidbodies_
+                               , FV_DomainAndFields * dom
                                , MAC_Communicator const* macCOMM_)
 //---------------------------------------------------------------------------
 {
@@ -32,9 +56,15 @@ PostProcessing:: PostProcessing( bool is_solids_
 
    m_is_solids = is_solids_ ;
    m_allrigidbodies = allrigidbodies_ ;
-   m_dim = dim_ ;
+   m_dim = dom->primary_grid()->nb_space_dimensions();
    m_macCOMM = macCOMM_ ;
-
+   if ( !dom->has_discrete_field( "PP_epsilon" ) ) {
+      MAC_Error::object()->raise_plain( "field_name PP_epsilon does not exist");
+   } else {
+      EPSILON = dom->discrete_field( "PP_epsilon" );
+   }
+   // EPSILON = porosity_ ;
+   MAC_ASSERT( EPSILON->discretization_type() == "centered" ) ;
 }
 
 
@@ -227,9 +257,12 @@ PostProcessing::compute_fieldVolumeAverageInBox()
   MAC_LABEL( "PostProcessing::compute_fieldVolumeAverageInBox" ) ;
 
   string fileName = "./Res/fieldVolumeAverageInBox.res";
-  std::ofstream MyFile (fileName.c_str(), std::ios::out);
-  MyFile.setf(std::ios::scientific,std::ios::floatfield);
-  MyFile.precision(6);
+  std::ofstream MyFile;
+  if (m_macCOMM->rank() == 0) {
+     MyFile.open(fileName.c_str(), std::ios::out);
+     MyFile.setf(std::ios::scientific,std::ios::floatfield);
+     MyFile.precision(6);
+  }
 
   list<struct fieldVolumeAverageInBox>::const_iterator it;
 
@@ -239,6 +272,7 @@ PostProcessing::compute_fieldVolumeAverageInBox()
 
       doubleVector const& box_length = it->length->to_double_vector();
       doubleVector const& box_center = it->center->to_double_vector();
+      size_t ncomps = it->FF->nb_components();
 
       if (m_macCOMM->rank() == 0) {
          MyFile << "# Average "
@@ -249,48 +283,45 @@ PostProcessing::compute_fieldVolumeAverageInBox()
                 << it->withPorosity << endl;
       }
 
-      for (size_t comp = 0; comp < it->FF->nb_components(); comp++) {
-         size_t_vector min_local_index(m_dim,0);
-         size_t_vector max_local_index(m_dim,0);
+      intVector min_local_index(m_dim,0);
+      intVector max_local_index(m_dim,0);
 
-         for (size_t dir = 0; dir < m_dim; dir++) {
-            // Control volume min and max, if any
-            doubleVector box_extents(2,0.);
-            box_extents(0) = box_center(dir) - box_length(dir)/2.;
-            box_extents(1) = box_center(dir) + box_length(dir)/2.;
+      for (size_t dir = 0; dir < m_dim; dir++) {
+         // Control volume min and max, if any
+         doubleVector box_extents(2,0.);
+         box_extents(0) = box_center(dir) - box_length(dir)/2.;
+         box_extents(1) = box_center(dir) + box_length(dir)/2.;
 
-            size_t_vector temp =
-                  get_local_index_of_extents(box_extents, it->FF, dir, comp);
+         intVector temp =
+         get_local_index_of_extents(box_extents, EPSILON, dir, 0);
 
-            min_local_index(dir) = temp(0);
-            max_local_index(dir) = temp(1);
-         }
+         min_local_index(dir) = temp(0);
+         max_local_index(dir) = temp(1);
+      }
 
+      for (size_t comp = 0; comp < ncomps; comp++) {
          double value = 0.;
          double volume = 0.;
 
-         if (min_local_index(0) != 0) {
-            for (size_t i = min_local_index(0);
-                       i <= max_local_index(0); i++) {
+         if (min_local_index(0) != -1) {
+            for (int i = min_local_index(0);
+                     i <= max_local_index(0); i++) {
                double dx = it->FF->get_cell_size( i, comp, 0 );
-               if (min_local_index(1) != 0) {
-                  for (size_t j = min_local_index(1);
-                             j <= max_local_index(1); j++) {
+               if (min_local_index(1) != -1) {
+                  for (int j = min_local_index(1);
+                           j <= max_local_index(1); j++) {
                      double dy = it->FF->get_cell_size( j, comp, 1 );
-                     if (m_dim == 2 || min_local_index(2) != 0) {
-                        for (size_t k = min_local_index(2);
-                                   k <= max_local_index(2); k++) {
+                     if (m_dim == 2 || min_local_index(2) != -1) {
+                        for (int k = min_local_index(2);
+                                 k <= max_local_index(2); k++) {
                            double dz = (m_dim == 3) ?
                                        it->FF->get_cell_size( k, comp, 2 ) : 1;
                            double epsilon = 1;
                            if (it->withPorosity) {
-                              size_t_vector* void_frac = m_allrigidbodies
-														->get_void_fraction_on_grid(it->FF);
-                              size_t p = it->FF->DOF_local_number(i,j,k,comp);
-                              epsilon = (void_frac->operator()(p) != 0)? 0 : 1 ;
+                              epsilon = EPSILON->DOF_value(i, j, k, 0, 0);
                            }
-                           value += it->FF->DOF_value(i, j, k, comp, 0)
-                                    * epsilon * dx * dy * dz;
+                           value += field_value(it->FF, i , j, k, comp, 0)
+                                  * epsilon * dx * dy * dz;
                            volume += dx * dy * dz * epsilon;
                         }
                      }
@@ -318,6 +349,45 @@ PostProcessing::compute_fieldVolumeAverageInBox()
 
 
 //---------------------------------------------------------------------------
+double
+PostProcessing::field_value(FV_DiscreteField const* FF, size_t const& i
+                                                      , size_t const& j
+                                                      , size_t const& k
+                                                      , size_t const& comp
+                                                      , size_t const& level)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "PostProcessing::field_value" ) ;
+
+  FV_SHIFT_TRIPLET shift = EPSILON->shift_staggeredToCentered() ;
+
+  double field = 0.;
+
+  size_t ncomps = FF->nb_components();
+
+  if (ncomps == 1) {   //centered
+     field = FF->DOF_value(i, j, k, comp, level);
+  } else { //staggered
+    if (comp == 0) {
+       field = (FF->DOF_value(i+shift.i-1, j, k, comp, level)
+              + FF->DOF_value(i+shift.i, j, k, comp, level)) * 0.5;
+    } else if (comp == 1) {
+       field = (FF->DOF_value(i, j+shift.j-1, k, comp, level)
+              + FF->DOF_value(i, j+shift.j, k, comp, level)) * 0.5;
+    } else if (comp == 2) {
+       field = (FF->DOF_value(i, j, k+shift.k-1, comp, level)
+              + FF->DOF_value(i, j, k+shift.k, comp, level)) * 0.5;
+    }
+  }
+
+  return(field);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void
 PostProcessing::compute_fieldVolumeAverageAroundRB()
 //---------------------------------------------------------------------------
@@ -325,10 +395,12 @@ PostProcessing::compute_fieldVolumeAverageAroundRB()
   MAC_LABEL( "PostProcessing::compute_fieldVolumeAverageAroundRB" ) ;
 
   string fileName = "./Res/fieldVolumeAverageAroundRB.res";
-  std::ofstream MyFile (fileName.c_str(), std::ios::out);
-  MyFile.setf(std::ios::scientific,std::ios::floatfield);
-  MyFile.precision(6);
-
+  std::ofstream MyFile;
+  if (m_macCOMM->rank() == 0) {
+     MyFile.open(fileName.c_str(), std::ios::out);
+     MyFile.setf(std::ios::scientific,std::ios::floatfield);
+     MyFile.precision(6);
+  }
   size_t m_nrb = m_allrigidbodies->get_number_rigid_bodies();
   list<struct fieldVolumeAverageAroundRB>::const_iterator it;
 
@@ -351,51 +423,52 @@ PostProcessing::compute_fieldVolumeAverageAroundRB()
                    << endl;
          }
 
-         DS_RigidBody const* rigidBody = m_allrigidbodies
+         FS_RigidBody const* rigidBody = m_allrigidbodies
                                              ->get_ptr_rigid_body(parID);
 
          geomVector const* ptgc = rigidBody->get_ptr_to_gravity_centre();
          double cr = rigidBody->get_circumscribed_radius();
+         size_t ncomps = it->FF->nb_components();
 
-         for (size_t comp = 0; comp < it->FF->nb_components(); comp++) {
-            size_t_vector min_local_index(m_dim,0);
-            size_t_vector max_local_index(m_dim,0);
+         intVector min_local_index(m_dim,0);
+         intVector max_local_index(m_dim,0);
 
-            for (size_t dir = 0; dir < m_dim; dir++) {
-               // Control volume min and max, if any
-               doubleVector box_extents(2,0.);
-               box_extents(0) = ptgc->operator()(dir) -
-                                             (0.5*it->volumeWidth*(2.*cr));
-               box_extents(1) = ptgc->operator()(dir) +
-                                             (0.5*it->volumeWidth*(2.*cr));
+         for (size_t dir = 0; dir < m_dim; dir++) {
+            // Control volume min and max, if any
+            doubleVector box_extents(2,0.);
+            box_extents(0) = ptgc->operator()(dir)
+                           - (0.5*it->volumeWidth*(2.*cr));
+            box_extents(1) = ptgc->operator()(dir)
+                           + (0.5*it->volumeWidth*(2.*cr));
 
-               size_t_vector temp =
-                     get_local_index_of_extents(box_extents, it->FF, dir, comp);
+            intVector temp =
+            get_local_index_of_extents(box_extents, EPSILON, dir, 0);
 
-               min_local_index(dir) = temp(0);
-               max_local_index(dir) = temp(1);
-            }
+            min_local_index(dir) = temp(0);
+            max_local_index(dir) = temp(1);
+         }
 
+         for (size_t comp = 0; comp < ncomps; comp++) {
             double value = 0.;
             double volume = 0.;
 
-            if (min_local_index(0) != 0) {
-               for (size_t i = min_local_index(0);
-                          i <= max_local_index(0); i++) {
+            if (min_local_index(0) != -1) {
+               for (int i = min_local_index(0);
+                        i <= max_local_index(0); i++) {
                   double dx = it->FF->get_cell_size( i, comp, 0 );
                   double xC = it->FF->get_DOF_coordinate( i, comp, 0) ;
                   xC = delta_periodic_transformation(
                                  fabs(xC - ptgc->operator()(0)), 0);
-                  if (min_local_index(1) != 0) {
-                     for (size_t j = min_local_index(1);
-                                j <= max_local_index(1); j++) {
+                  if (min_local_index(1) != -1) {
+                     for (int j = min_local_index(1);
+                              j <= max_local_index(1); j++) {
                         double dy = it->FF->get_cell_size( j, comp, 1 );
                         double yC = it->FF->get_DOF_coordinate( j, comp, 1) ;
                         yC = delta_periodic_transformation(
                                        fabs(yC - ptgc->operator()(1)), 1);
-                        if (m_dim == 2 || min_local_index(2) != 0) {
-                           for (size_t k = min_local_index(2);
-                                      k <= max_local_index(2); k++) {
+                        if (m_dim == 2 || min_local_index(2) != -1) {
+                           for (int k = min_local_index(2);
+                                    k <= max_local_index(2); k++) {
                               double dz = (m_dim == 3) ?
                                        it->FF->get_cell_size( k, comp, 2 ) : 1;
                               double zC = (m_dim == 3) ?
@@ -410,13 +483,9 @@ PostProcessing::compute_fieldVolumeAverageAroundRB()
                                                    , it->kernelType);
                               double epsilon = 1;
                               if (it->withPorosity) {
-                                 size_t_vector* void_frac = m_allrigidbodies
-   														->get_void_fraction_on_grid(it->FF);
-                                 size_t p = it->FF->DOF_local_number(i,j,k,comp);
-                                 epsilon=(void_frac->operator()(p) != 0)? 0 : 1 ;
+                                 epsilon = EPSILON->DOF_value(i, j, k, 0, 0);
                               }
-
-                              value += it->FF->DOF_value(i, j, k, comp, 0)
+                              value += field_value(it->FF, i , j, k, comp, 0)
                                        * epsilon * weight * dx * dy * dz;
                               volume += epsilon * weight * dx * dy * dz;
                            }
@@ -446,7 +515,7 @@ PostProcessing::compute_fieldVolumeAverageAroundRB()
 
 
 //---------------------------------------------------------------------------
-size_t_vector
+intVector
 PostProcessing::get_local_index_of_extents( class doubleVector& bounds
                                           , FV_DiscreteField const* FF
                                           , size_t const& dir
@@ -455,7 +524,7 @@ PostProcessing::get_local_index_of_extents( class doubleVector& bounds
 {
   MAC_LABEL( "PostProcessing::get_grid_index_of_extents" ) ;
 
-  size_t_vector value(2,0);
+  intVector value(2,0);
 
   bounds(0) = periodic_transformation(bounds(0),dir);
   bounds(1) = periodic_transformation(bounds(1),dir);
@@ -488,15 +557,15 @@ PostProcessing::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(0)
                         , i0_temp) ;
-           value(0) = (found) ? i0_temp : 0;
+           value(0) = (found) ? (int)i0_temp : 0;
         } else {
-           value(0) = 0;
+           value(0) = -1;
         }
      } else {
         if (bounds(1) > local_min) {
-           value(0) = FF->get_min_index_unknown_handled_by_proc(comp,dir);
+           value(0) = (int)FF->get_min_index_unknown_handled_by_proc(comp,dir);
         } else {
-           value(0) = 0;
+           value(0) = -1;
         }
      }
   } else {// periodic control volume
@@ -507,15 +576,14 @@ PostProcessing::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(0)
                         , i0_temp) ;
-           value(0) = (found) ? i0_temp : 0;
+           value(0) = (found) ? (int)i0_temp : 0;
         } else if (bounds(1) > local_min) {
-           value(0) =
-             FF->get_min_index_unknown_handled_by_proc(comp,dir);
+           value(0) = (int)FF->get_min_index_unknown_handled_by_proc(comp,dir);
         } else {
-           value(0) = 0;
+           value(0) = -1;
         }
      } else {
-        value(0) = FF->get_min_index_unknown_handled_by_proc(comp,dir);
+        value(0) = (int)FF->get_min_index_unknown_handled_by_proc(comp,dir);
      }
   }
 
@@ -528,15 +596,15 @@ PostProcessing::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(1)
                         , i0_temp) ;
-           value(1) = (found) ? i0_temp : 0;
+           value(1) = (found) ? (int)i0_temp : 0;
         } else {
-           value(1) = 0;
+           value(1) = -1;
         }
      } else {
         if (bounds(0) < local_max) {
-           value(1) = FF->get_max_index_unknown_handled_by_proc(comp,dir);
+           value(1) = (int)FF->get_max_index_unknown_handled_by_proc(comp,dir);
         } else {
-           value(1) = 0;
+           value(1) = -1;
         }
      }
   } else {// periodic control volume
@@ -547,14 +615,14 @@ PostProcessing::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(1)
                         , i0_temp) ;
-           value(1) = (found) ? i0_temp : 0;
+           value(1) = (found) ? (int)i0_temp : 0;
         } else if (bounds(0) < local_max) {
-           value(1) = FF->get_max_index_unknown_handled_by_proc(comp,dir);
+           value(1) = (int)FF->get_max_index_unknown_handled_by_proc(comp,dir);
         } else {
-           value(1) = 0;
+           value(1) = -1;
         }
      } else {
-        value(1) = FF->get_max_index_unknown_handled_by_proc(comp,dir);
+        value(1) = (int)FF->get_max_index_unknown_handled_by_proc(comp,dir);
      }
   }
 
