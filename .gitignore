@@ -39,7 +39,7 @@
 #*.dtd
 *Makedepend
 *.so.*
-PacIFiC-*.env.sh
+#PacIFiC-*.env.sh
 GRAINS/Env/grains-*.env.sh
 Cartesian/FLUID/Env/fluid-*.env.sh
 Cartesian/MacWorld/Env/macworld-*.env.sh
@@ -62,7 +62,7 @@ GRAINS/diffGrains*
 GRAINS/Archives*
 GRAINS/DoxyGRAINS*
 GRAINS/README
-GRAINS/Utils*
+#GRAINS/Utils*
 GRAINS/XERCES*
 Octree/basilisk/*
 GRAINS_V1/Archives*
