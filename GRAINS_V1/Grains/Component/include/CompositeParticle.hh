@@ -30,34 +30,34 @@ class CompositeParticle : public Particle
     CompositeParticle( DOMNode* root, bool const& autonumbering = true, 
   	int const& pc = 0 );
 
-//   /** @brief Constructeur avec arguments
-//   @param id_ numero
-//   @param ParticleRef Particle de reference
-//   @param vx composante x de la vitesse de translation
-//   @param vy composante y de la vitesse de translation  
-//   @param vz composante z de la vitesse de translation
-//   @param rx composante x de la vitesse de rotation
-//   @param ry composante y de la vitesse de rotation  
-//   @param rz composante z de la vitesse de rotation 
-//   @param qrotationx composante x du quaternion de rotation
-//   @param qrotationy composante y du quaternion de rotation  
-//   @param qrotationz composante z du quaternion de rotation
-//   @param qrotations scalaire du quaternion de rotation
-//   @param m position & configuration de la Particle    
-//   @param activ activite 
-//   @param tag_ tag 
-//   @param coordination_number_ nombre de contacts de la Particle
-//   @param updatePosition do we update position or not ? */
-//   CompositeParticle( const int &id_, Particle const* ParticleRef, 
-// 	const double &vx, const double &vy, const double &vz,
-// 	const double &qrotationx, const double &qrotationy, 
-// 	const double &qrotationz, const double &qrotations,	 
-// 	const double &rx, const double &ry, const double &rz,	 
-// 	const Scalar m[16],
-// 	const ParticleActivity &activ, 
-// 	const int &tag_,
-// 	const int &coordination_number_ = 0,
-// 	const bool &updatePosition = false ); 
+    /** @brief Constructor with input parameters
+    @param id_ ID number
+    @param ParticleRef reference particle
+    @param vx x translational velocity component
+    @param vy y translational velocity component  
+    @param vz z translational velocity component
+    @param rx x angular velocity component
+    @param ry y angular velocity component
+    @param rz z angular velocity component
+    @param qrotationx x rotation quaternion component
+    @param qrotationy y rotation quaternion component 
+    @param qrotationz z rotation quaternion component
+    @param qrotations scalar rotation quaternion component
+    @param m particle position & configuration as a 1D array  
+    @param activ particle activity 
+    @param tag_ tag of the cell the particle belongs to
+    @param coordination_number_ particle coordination number 
+    @param updatePosition whether we update position or not */
+    CompositeParticle( int const& id_, Particle const* ParticleRef, 
+	double const& vx, double const& vy, double const& vz,
+	double const& qrotationx, double const& qrotationy, 
+	double const& qrotationz, double const& qrotations,	 
+	double const& rx, double const& ry, double const& rz,	 
+	const double m[12],
+	ParticleActivity const& activ, 
+	int const& tag_,
+	int const& coordination_number_ = 0,
+ 	bool const& updatePosition = false ); 
 	
     /** @brief Constructor with input parameters. This constructor is expected 
     to be used for periodic clone particle

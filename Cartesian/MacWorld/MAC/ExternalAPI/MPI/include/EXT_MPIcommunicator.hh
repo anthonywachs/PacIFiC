@@ -22,7 +22,7 @@ class EXT_MPIcommunicator : public MAC_Communicator
       EXT_MPIcommunicator( EXT_MPIcommunicator const& other ) ;
       EXT_MPIcommunicator& operator=( EXT_MPIcommunicator const& other ) ;
       
-      enum { TAG_INT, TAG_DOUBLE, TAG_CHAR } ;
+      enum { TAG_INT, TAG_DOUBLE, TAG_CHAR, TAG_LONG_LONG } ;
 
    //-- Characteristics
          
@@ -34,6 +34,10 @@ class EXT_MPIcommunicator : public MAC_Communicator
 
       virtual void send( size_t dest, int const* value, int nb ) const ;
       virtual void receive( size_t src, int* value, int nb ) const ;
+
+      virtual void send( size_t dest, long long int const* value, int nb ) 
+      	const ;
+      virtual void receive( size_t src, long long int* value, int nb ) const ;
       
       virtual void send( size_t dest, double const* value, int nb ) const ;
       virtual void receive( size_t src, double* value, int nb ) const ;

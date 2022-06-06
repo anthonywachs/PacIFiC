@@ -53,10 +53,21 @@ ParticleKinematics* ParticleKinematics3D::clone() const
 
 // ----------------------------------------------------------------------------
 // Computes the momentum change over dt 
-void ParticleKinematics3D::computeMomentumChangeOverDt( const Torsor &torseur,
+void ParticleKinematics3D::computeMomentumChangeOverDt( Torsor const& torseur,
 	double dt, Particle const* particle )
 {
+  // Values of the coupling factor:
+  // 1) purely granular
+  //    FluidCorrectedAcceleration is true and fluid density is 0
+  //    so coupling factor = 1
+  // 2) coupled to fluid, fluid density is not 0
+  //    a. FluidCorrectedAcceleration is true so coupling factor = 1 - 
+  //    fluid density / particle density
+  //    b. FluidCorrectedAcceleration is false so coupling factor = 1  
   double couplingFactor = 1.;
+  if ( Particle::getFluidCorrectedAcceleration() )
+    couplingFactor -=
+    	Particle::getFluidDensity() / particle->getDensity();  
 
   // Translational momentum
   m_dUdt = *(torseur.getForce()) / ( particle->getMass() * couplingFactor );
@@ -69,7 +80,7 @@ void ParticleKinematics3D::computeMomentumChangeOverDt( const Torsor &torseur,
   Quaternion pConjugue = m_QuaternionRotation.Conjugate(); 
 	
   // Inverse inertia tensor
-  double const* inertieInverse = particle->getInverseInertiaTensor(); 
+  double const* inverseInertia = particle->getInverseInertiaTensorBodyFixed(); 
   
   if ( Grains::isModePredictor() )
   {      
@@ -78,10 +89,10 @@ void ParticleKinematics3D::computeMomentumChangeOverDt( const Torsor &torseur,
     	( m_angularVelocity , m_QuaternionRotation ) );
 	
     // Compute I.w in body-fixed coordinates system
-    const double *inertie = particle->getInertiaTensor(); 
-    vTmp[0] = inertie[0]*omb[0] + inertie[1]*omb[1] + inertie[2]*omb[2];
-    vTmp[1] = inertie[1]*omb[0] + inertie[3]*omb[1] + inertie[4]*omb[2];
-    vTmp[2] = inertie[2]*omb[0] + inertie[4]*omb[1] + inertie[5]*omb[2];
+    const double *inertia = particle->getInertiaTensorBodyFixed(); 
+    vTmp[0] = inertia[0]*omb[0] + inertia[1]*omb[1] + inertia[2]*omb[2];
+    vTmp[1] = inertia[1]*omb[0] + inertia[3]*omb[1] + inertia[4]*omb[2];
+    vTmp[2] = inertia[2]*omb[0] + inertia[4]*omb[1] + inertia[5]*omb[2];
     
     // Compute I.w ^ w in body-fixed coordinates system 
     work = vTmp ^ omb;
@@ -99,12 +110,12 @@ void ParticleKinematics3D::computeMomentumChangeOverDt( const Torsor &torseur,
     	( *(torseur.getTorque()) , m_QuaternionRotation ) );
 	 
   // Compute I^-1.(T + I.w ^ w) in body-fixed coordinates system 
-  vTmp[0] = inertieInverse[0]*work[0] + inertieInverse[1]*work[1] 
-    + inertieInverse[2]*work[2];
-  vTmp[1] = inertieInverse[1]*work[0] + inertieInverse[3]*work[1] 
-    + inertieInverse[4]*work[2];
-  vTmp[2] = inertieInverse[2]*work[0] + inertieInverse[4]*work[1] 
-    + inertieInverse[5]*work[2];
+  vTmp[0] = inverseInertia[0]*work[0] + inverseInertia[1]*work[1] 
+    + inverseInertia[2]*work[2];
+  vTmp[1] = inverseInertia[1]*work[0] + inverseInertia[3]*work[1] 
+    + inverseInertia[4]*work[2];
+  vTmp[2] = inverseInertia[2]*work[0] + inverseInertia[4]*work[1] 
+    + inverseInertia[5]*work[2];
   
   // Write I^-1.(T + I.w ^ w) in space-fixed coordinates system
   work = m_QuaternionRotation.multToVector3( ( vTmp , pConjugue ) );

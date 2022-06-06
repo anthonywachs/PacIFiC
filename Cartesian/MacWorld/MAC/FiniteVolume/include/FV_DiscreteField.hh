@@ -8,6 +8,7 @@
 #include <size_t_array2D.hh>
 #include <doubleArray3D.hh>
 #include <intArray3D.hh>
+#include <longLongIntArray3D.hh>
 #include <boolArray3D.hh>
 #include <doubleVector.hh>
 #include <vector>
@@ -133,9 +134,7 @@ class FV_DiscreteField : public MAC_Object
 	
       void build_field_numbering( void ) ;
       
-      void initialize_DOFs( MAC_ModuleExplorer const* exp ) ;
-      
-      void allocate_DLMFDconstrainedDOFs( void ) ;	
+      void initialize_DOFs( MAC_ModuleExplorer const* exp ) ;	
 
       
    //-- Identification
@@ -216,14 +215,6 @@ class FV_DiscreteField : public MAC_Object
       size_t DOF_global_number( size_t i, size_t j, size_t k,
       	size_t component ) const ;
 	
-      // Here DLMFDconstrainedDOFs are define as a Boolean
-      // bool DOF_is_constrained( size_t i, size_t j, size_t k,
-      // 	size_t component ) const ;
-      
-      // Here DLMFDconstrainedDOFs are define as a integer
-      int DOF_is_constrained( size_t i, size_t j, size_t k,
-      	size_t component ) const ;
-	
       size_t global_index_from_local( size_t i, size_t component, 
       	size_t direction ) const ;
 
@@ -247,16 +238,14 @@ class FV_DiscreteField : public MAC_Object
 	const double &Y_coordinate, const double &Z_coordinate,
 	size_t component, size_t level ) const ;
 	
-      /**
-        @brief Reconstruct field values in 3D
-        @param X_coordinate x coordinate
-        @param Y_coordinate y coordinate
-        @param Z_coordinate z coordinate
-        @param component field component
-        @param level component storage level
-        @param kernelWidth length scale of Gaussian function
-        @param dp Particle diameter
-      */
+      /** @brief Reconstruct field values in 3D
+      @param X_coordinate x coordinate
+      @param Y_coordinate y coordinate
+      @param Z_coordinate z coordinate
+      @param component field component
+      @param level component storage level
+      @param kernelWidth length scale of Gaussian function
+      @param dp Particle diameter */
       double GaussianReconstructionFieldValues(
         const double &X_coordinate,
         const double &Y_coordinate,
@@ -266,16 +255,14 @@ class FV_DiscreteField : public MAC_Object
         const double kernelWidth,
         const double dp ) const ;    
 	
-      /**
-        @brief Reconstruct field values in 3D using a corrective Kernel
-        @param X_coordinate x coordinate
-        @param Y_coordinate y coordinate
-        @param Z_coordinate z coordinate
-        @param component field component
-        @param level component storage level
-        @param kernelWidth length scale of the corrective kernel
-        @param dp Particle diameter
-      */
+      /** @brief Reconstruct field values in 3D using a corrective Kernel
+      @param X_coordinate x coordinate
+      @param Y_coordinate y coordinate
+      @param Z_coordinate z coordinate
+      @param component field component
+      @param level component storage level
+      @param kernelWidth length scale of the corrective kernel
+      @param dp Particle diameter */
       double CorrectiveKernelAverageFieldValues(
         const double &X_coordinate,
         const double &Y_coordinate,
@@ -289,7 +276,7 @@ class FV_DiscreteField : public MAC_Object
       @param X_coordinate x coordinate
       @param Y_coordinate y coordinate
       @param component field component
-      @param level component storage level*/
+      @param level component storage level */
       double interpolateFieldValues( const double &X_coordinate,
           const double &Y_coordinate, size_t component, size_t level ) const ;
 
@@ -299,7 +286,7 @@ class FV_DiscreteField : public MAC_Object
       @param Y_coordinate y coordinate
       @param Z_coordinate z coordinate
       @param component field component
-      @param level component storage level*/
+      @param level component storage level */
       geomVector interpolateGradient( const double &X_coordinate,
 	const double &Y_coordinate, const double &Z_coordinate, 
 	size_t component, size_t level ) const ;	
@@ -310,22 +297,20 @@ class FV_DiscreteField : public MAC_Object
       @param Y_coordinate y coordinate
       @param Z_coordinate z coordinate
       @param component field component
-      @param level component storage level*/
+      @param level component storage level */
       double interpolateLap( const double &X_coordinate,
 	const double &Y_coordinate, const double &Z_coordinate, 
 	size_t component, size_t level ) const ;
 	
-      /**
-        @brief Compute gradient in 3D, using a corrective Kernel
-        adapted to the Cappecelatro method
-        @param X_coordinate x coordinate
-        @param Y_coordinate y coordinate
-        @param Z_coordinate z coordinate
-        @param component field component
-        @param level component storage level
-        @param kernelWidth length scale of Gaussian function
-        @param dp Particle diameter
-      */
+      /** @brief Compute gradient in 3D, using a corrective Kernel
+      adapted to the Cappecelatro method
+      @param X_coordinate x coordinate
+      @param Y_coordinate y coordinate
+      @param Z_coordinate z coordinate
+      @param component field component
+      @param level component storage level
+      @param kernelWidth length scale of Gaussian function
+      @param dp Particle diameter */
       geomVector CorrectiveKernelGradientFieldValues(
         const double &X_coordinate,
         const double &Y_coordinate,
@@ -335,17 +320,15 @@ class FV_DiscreteField : public MAC_Object
         const double kernelWidth,
         const double dp ) const ;
 
-      /**
-        @brief Compute gradient in 3D, using two-cubes in both
-	sides (not used for the moment)
-        @param X_coordinate x coordinate
-        @param Y_coordinate y coordinate
-        @param Z_coordinate z coordinate
-        @param component field component
-        @param level component storage level
-        @param kernelWidth length scale of Gaussian function
-        @param dp Particle diameter
-      */
+      /** @brief Compute gradient in 3D, using two-cubes in both
+      sides (not used for the moment)
+      @param X_coordinate x coordinate
+      @param Y_coordinate y coordinate
+      @param Z_coordinate z coordinate
+      @param component field component
+      @param level component storage level
+      @param kernelWidth length scale of Gaussian function
+      @param dp Particle diameter */
       geomVector interpolateGradientWithKernel(
         const double &X_coordinate,
         const double &Y_coordinate,
@@ -354,19 +337,16 @@ class FV_DiscreteField : public MAC_Object
         size_t level,
         const double kernelWidth,
         const double dp ) const ;
-		
-	
-      /**
-        @brief Compute Laplacian in 3D, equivalent of "interpolateGradient
-	WithKernel" method, used to compute explicit viscouse drag
-        @param X_coordinate x coordinate
-        @param Y_coordinate y coordinate
-        @param Z_coordinate z coordinate
-        @param component field component
-        @param level component storage level
-        @param kernelWidth length scale of Gaussian function
-        @param dp Particle diameter
-      */
+			
+      /** @brief Compute Laplacian in 3D, equivalent of "interpolateGradient
+      WithKernel" method, used to compute explicit viscouse drag
+      @param X_coordinate x coordinate
+      @param Y_coordinate y coordinate
+      @param Z_coordinate z coordinate
+      @param component field component
+      @param level component storage level
+      @param kernelWidth length scale of Gaussian function
+      @param dp Particle diameter */
       double interpolateLaplacianWithKernel(
         const double &X_coordinate,
         const double &Y_coordinate,
@@ -422,25 +402,14 @@ class FV_DiscreteField : public MAC_Object
       void set_BC_values_modif_status( bool const& allowed ) ;
       
       virtual void set_postprocessing_options( 
-      		std::string const& a_location,
-		std::string const& a_paraview_fname ) = 0;
+	std::string const& a_location,
+	std::string const& a_paraview_fname ) = 0;
 
       virtual void copy_DOFs_value( size_t source_level, size_t target_level ) ;
       
       virtual void add_to_DOFs_value( size_t component, size_t level,
-      		double const& val ) ;      
-      
-      void initialize_DLMFDconstrainedDOFs( void ) ;
-
-      // Here DLMFDconstrainedDOFs are define as a Boolean
-      //void set_DOF_constrained( size_t i, size_t j, size_t k,
-      //	size_t component ) ;      
-  
-      // Here DLMFDconstrainedDOFs are define as a Boolean
-      void set_DOF_constrained( size_t i, size_t j, size_t k,
-            size_t component, bool b_has_extended_constrained = 0 ) ;      
+	double const& val ) ;         
     
-
             
    //-- Post processing
    
@@ -448,11 +417,11 @@ class FV_DiscreteField : public MAC_Object
 	MAC_Module* cell_data ) const = 0;
 			       
       virtual double interpolate_values_at_nodes( 
-      		size_t i, size_t shift_i,
-		size_t j, size_t shift_j,
-		size_t k, size_t shift_k,
-		size_t component,
-		size_t level ) const = 0;
+	size_t i, size_t shift_i,
+	size_t j, size_t shift_j,
+	size_t k, size_t shift_k,
+	size_t component,
+	size_t level ) const = 0;
 			       
 
    //-- Persistence   
@@ -489,46 +458,44 @@ class FV_DiscreteField : public MAC_Object
 	
       virtual size_t get_local_nb_dof( size_t component, 
       	size_t direction ) const = 0 ;		
-
-      void check_field_numbering( void ) const ;
       
       	
    //-- Interpolation tools
 
       /* @brief Interpolate staggered field on centered Control Volume */
-      virtual FV_SHIFT_TRIPLET	shift_staggeredToCentered( void ) const ;
+      virtual FV_SHIFT_TRIPLET shift_staggeredToCentered( void ) const ;
       
       /* @brief Interpolate vertex field on staggered Control Volume */
-      virtual FV_SHIFT_TRIPLET	shift_vertexToStaggered( void ) const ;      
+      virtual FV_SHIFT_TRIPLET shift_vertexToStaggered( void ) const ;      
 			       
       /* @brief Interpolate one component of a staggered field
       	on another component of a staggered Control Volume */
-      virtual FV_SHIFT_TRIPLET	shift_staggeredToStaggered( 
-      			size_t component ) const ; 
+      virtual FV_SHIFT_TRIPLET shift_staggeredToStaggered( 
+	size_t component ) const ; 
 			
       /* @brief Interpolate vorticity field on staggered Control Volume */
-      virtual FV_SHIFT_TRIPLET	shift_vorticityToStaggered( 
-      			size_t component ) const ; 
+      virtual FV_SHIFT_TRIPLET shift_vorticityToStaggered( 
+	size_t component ) const ; 
 			
       /* @brief Interpolate staggered field on tensor Control Volume */
       virtual FV_SHIFT_TRIPLET	shift_staggeredToTensor( 
-      			size_t component ) const ; 
+	size_t component ) const ; 
 			
       /* @brief Interpolate tensor field on tensor Control Volume */
       virtual FV_SHIFT_TRIPLET	shift_tensorToTensor( 
-      			size_t component ) const ; 
+	size_t component ) const ; 
 			
       /* @brief Interpolate comp1 on comp2 in 2D */
       virtual double interpolateOneCompOnAnotherComp(
-		size_t i, size_t j,
-		size_t comp1, size_t comp2, size_t level,
-		FV_SHIFT_TRIPLET shift ) const ;
+	size_t i, size_t j,
+	size_t comp1, size_t comp2, size_t level,
+	FV_SHIFT_TRIPLET shift ) const ;
 
       /* @brief Interpolate comp1 on comp2 in 3D */
       virtual double interpolateOneCompOnAnotherComp(
-		size_t i, size_t j, size_t k,
-		size_t comp1, size_t comp2, size_t level,
-		FV_SHIFT_TRIPLET shift ) const ;
+	size_t i, size_t j, size_t k,
+	size_t comp1, size_t comp2, size_t level,
+	FV_SHIFT_TRIPLET shift ) const ;
 
 
    //-- Translation-projection
@@ -556,27 +523,22 @@ class FV_DiscreteField : public MAC_Object
 	const ;
       
       virtual double compute_grad_at_cell_center(
-      		size_t i, size_t j,
-		FV_SHIFT_TRIPLET shift,
-		size_t component, size_t direction,
-		double dxC, double dyC ) ;      
+	size_t i, size_t j,
+	FV_SHIFT_TRIPLET shift,
+	size_t component, size_t direction,
+	double dxC, double dyC ) ;      
       
       virtual double compute_grad_at_cell_center(
-      		size_t i, size_t j, size_t k,
-		FV_SHIFT_TRIPLET shift,
-		size_t component, size_t direction,
-		double dxC, double dyC, double dzC ) ; 
+	size_t i, size_t j, size_t k,
+	FV_SHIFT_TRIPLET shift,
+	size_t component, size_t direction,
+	double dxC, double dyC, double dzC ) ; 
 		
-      void synchronize_field( size_t level ) ;
-
-      virtual void synchronize_extended_DOF_constrained( 
-		size_t level, 
-		list<FV_TRIPLET> &ijk, 
-		list<size_t> &comps );  
+      void synchronize( size_t level ) ;
       
-      void set_HaloZone_Features( size_t level ) ;      
+      void set_synchronization_features( void ) ;      
 
-      void set_HaloZone_Features_Periodic( void ) ;
+      void set_periodic_synchronization_features( void ) ;
       
       FV_BoundaryCondition const* get_BC( size_t color ) const;      
 
@@ -584,14 +546,14 @@ class FV_DiscreteField : public MAC_Object
    //-- Spatial discretization and matrix assembly
    
       void assemble_constantcoef_laplacian_matrix( double const& coef_lap,
-      		LA_Matrix *MAT, LA_Vector *VEC_rhs,
-		bool const& rescale = false ) const;
+	LA_Matrix *MAT, LA_Vector *VEC_rhs,
+	bool const& rescale = false ) const;
 		
       void assemble_mass_matrix( double const& coef, 
-      		LA_Matrix *MAT, double const& power_index = 1 ) const;	
+	LA_Matrix *MAT, double const& power_index = 1 ) const;	
 
       void assemble_mass_vector( double const& coef, 
-      		LA_Vector *VEC, double const& power_index = 1 ) const;		
+	LA_Vector *VEC, double const& power_index = 1 ) const;		
 
       virtual void assemble_pDivv_matrix( FV_DiscreteField const* UU,
 	double const& coef, LA_Matrix *MAT, LA_Vector *VEC_rhs ) const;	
@@ -623,31 +585,31 @@ class FV_DiscreteField : public MAC_Object
       virtual ~FV_DiscreteField( void ) ;
       
       FV_DiscreteField( MAC_Object* a_owner,
-		FV_Mesh const* a_primary_mesh,
-		std::string const& a_name,
-		std::string const& a_type ) ;
+	FV_Mesh const* a_primary_mesh,
+	std::string const& a_name,
+	std::string const& a_type ) ;
       
       FV_DiscreteField( std::string const& a_type ) ;
       
       FV_DiscreteField( MAC_Object* a_owner,
-      		FV_Mesh const* a_primary_mesh,
-		std::string const& a_name,
-		std::string const& a_type,
-		size_t a_nb_components,
-		size_t a_depth ) ;      
+	FV_Mesh const* a_primary_mesh,
+	std::string const& a_name,
+	std::string const& a_type,
+	size_t a_nb_components,
+	size_t a_depth ) ;      
       
       virtual FV_DiscreteField* create_clone_replica( 
-      		MAC_Object* a_owner,
-		FV_Mesh const* a_primary_mesh,
-		std::string const& a_name,
-		std::string const& a_type ) const = 0 ; 
+	MAC_Object* a_owner,
+	FV_Mesh const* a_primary_mesh,
+	std::string const& a_name,
+	std::string const& a_type ) const = 0 ; 
 		
       virtual FV_DiscreteField* create_replica( MAC_Object* a_owner,
-		FV_Mesh const* a_primary_mesh,
-		std::string const& a_name,
-		std::string const& a_type,
-		size_t a_nb_components,
-		size_t a_depth ) const = 0 ; 		
+	FV_Mesh const* a_primary_mesh,
+	std::string const& a_name,
+	std::string const& a_type,
+	size_t a_nb_components,
+	size_t a_depth ) const = 0 ; 		
 		
       bool is_a_prototype( void ) const ;
       
@@ -684,7 +646,7 @@ class FV_DiscreteField : public MAC_Object
       vector< FV_BoundaryCondition* >* V_BCS ;      
       
       vector< intArray3D >* UNK_LOCAL_NUMBERING ;
-      vector< intArray3D >* UNK_GLOBAL_NUMBERING ;
+      vector< longLongIntArray3D >* UNK_GLOBAL_NUMBERING ;
       size_t NB_LOCAL_UNKNOWNS ;
       size_t NB_LOCAL_UNKNOWNS_HANDLED_BY_PROC ;
       size_t NB_LOCAL_UNKNOWNS_HANDLED_BY_PROC_IN_BUFFERZONE ; 
@@ -715,9 +677,7 @@ class FV_DiscreteField : public MAC_Object
 	periodic, 5 = bufferzone standard + periodic */
       
       vector< intArray3D >* DOFcolors;
-      vector< intArray3D >* DOFstatus; 
-      //vector< boolArray3D >* DLMFDconstrainedDOFs;
-      vector< intArray3D >* DLMFDconstrainedDOFs;     
+      vector< intArray3D >* DOFstatus;   
       
       boolVector* PERIODIC;      
       vector< FV_SHIFT_TRIPLET >* PERIODIC_SHIFT;
@@ -731,9 +691,14 @@ class FV_DiscreteField : public MAC_Object
       
       vector< size_t_vector >* transproj_interpolation ;      
 
-      list< vector< double* > > halozone_values_list ;
-      list< vector< double* > > bufferzone_values ; 
-      size_t synchronized_level ;     
+      list< vector< vector< FV_TRIPLET > > > halozone_received ;
+      list< vector< vector< FV_TRIPLET > > > bufferzone_sent ;
+      list< size_t > synchronization_MPI_rank_neighbors;
+      list< double* > halozone_received_data;
+      list< size_t > halozone_received_data_size;
+      list< double* > bufferzone_sent_data;
+      list< size_t > bufferzone_sent_data_size; 
+      bool synchronization_ready ;     
       
    private: //----------------------------------------------------------
 
@@ -746,10 +711,10 @@ class FV_DiscreteField : public MAC_Object
       virtual void set_nb_dof_post_processing( void ) = 0 ;
 
       void set_min_max_indices_unknown_handled_by_proc( 
-      		size_t i, size_t j, size_t k, size_t component ) ;
+	size_t i, size_t j, size_t k, size_t component ) ;
 		
       void set_min_max_indices_unknown_on_proc( 
-      		size_t i, size_t j, size_t k, size_t component ) ;		
+	size_t i, size_t j, size_t k, size_t component ) ;		
 
       virtual void translate_field_mesh( const size_t& trans_dir, 
       	const double &trans_dist ) = 0 ;
@@ -757,10 +722,10 @@ class FV_DiscreteField : public MAC_Object
       void build_periodic_numbering( void ) ;
       
       double one_DOF_laplacian( LA_Matrix *MAT, LA_Vector *VEC_rhs, 
-      		bool const& rescale,
-          	int i, int j, int k,
-          	size_t component, bool center_unknown_on_BC,
-          	size_t center_pos_in_matrix, double ai ) const;	
+	bool const& rescale,
+	int i, int j, int k,
+	size_t component, bool center_unknown_on_BC,
+	size_t center_pos_in_matrix, double ai ) const;	
 
    //-- Class attributes
 

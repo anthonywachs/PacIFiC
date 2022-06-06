@@ -252,8 +252,7 @@ void GrainsCRBFeatures::AdditionalFeatures( DOMElement* rootElement )
 
 // ----------------------------------------------------------------------------
 // Runs the simulation over the prescribed time interval
-void GrainsCRBFeatures::Simulation( bool predict, bool isPredictorCorrector,
-	bool explicit_added_mass )
+void GrainsCRBFeatures::Simulation( double time_interval )
 {
   if ( m_processorIsActive )
   {

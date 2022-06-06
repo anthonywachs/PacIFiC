@@ -33,9 +33,9 @@ Transform::Transform( double gx, double gy, double gz )
 
 
 // --------------------------------------------------------------------------
-// Constructor with a 1D array of 16 values as inputs containing the
-// origin and the matrix coefficients, plus 4 additional useless values
-Transform::Transform( double const m[16] ) 
+// Constructor with a 1D array of 12 values as inputs containing the
+// rotation matrix coefficients following by the origin coordinates
+Transform::Transform( double const m[12] ) 
 { 
   setValue( m );    
 }
@@ -240,7 +240,7 @@ void Transform::setBasis( const Matrix &basis_ )
 
 
 // --------------------------------------------------------------------------
-// Sets the transformation with an 1D array of 16 values as inputs 
+// Sets the transformation with an 1D array of 12 values as inputs 
 void Transform::setValue( const double m[12] ) 
 {
   m_basis.setValue( m );

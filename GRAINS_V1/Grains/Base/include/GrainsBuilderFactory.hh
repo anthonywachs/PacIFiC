@@ -2,6 +2,7 @@
 #define _GRAINSBUILDERFACTORY_HH_
 
 #include "Grains.hh"
+#include "GrainsCoupledWithFluid.hh"
 #include "ReaderXML.hh"
 
 
@@ -29,6 +30,12 @@ class GrainsBuilderFactory
     /** @brief Creates and returns a standard Grains application
     @param root XML root ("<Grains3D>" or "<Graind2D>") */
     static Grains* create( DOMElement* root );
+    
+    /** @brief Creates and returns a GrainsCoupledWithFluid application
+    @param root XML root ("<Grains3D>" or "<Graind2D>")
+    @param fluid_density_ fluid density */
+    static GrainsCoupledWithFluid* createCoupledWithFluid( DOMElement* root,
+    	double fluid_density_ );      
 
     /** @brief Returns the space dimension of the simulation */
     static EAPPLI getContext();

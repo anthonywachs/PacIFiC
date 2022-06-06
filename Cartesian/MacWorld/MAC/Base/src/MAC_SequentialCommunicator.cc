@@ -58,6 +58,16 @@ MAC_SequentialCommunicator:: send( size_t dest, int const* value,
 
 //----------------------------------------------------------------------
 void
+MAC_SequentialCommunicator:: send( size_t dest, long long int const* value, 
+                                   int nb  ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "MAC_SequentialCommunicator:: send( long long int const* )" ) ;
+   MAC_CHECK( send_PRE( dest, value, nb ) ) ;
+}
+
+//----------------------------------------------------------------------
+void
 MAC_SequentialCommunicator:: send( size_t dest, double const* value, 
                                    int nb  ) const
 //----------------------------------------------------------------------
@@ -105,6 +115,16 @@ MAC_SequentialCommunicator:: receive( size_t src, int* value,
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "MAC_SequentialCommunicator:: receive( int* )" ) ;
+   MAC_CHECK( receive_PRE( src, value, nb ) ) ;
+}
+
+//----------------------------------------------------------------------
+void
+MAC_SequentialCommunicator:: receive( size_t src, long long int* value,
+                                      int nb  ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "MAC_SequentialCommunicator:: receive( long long int* )" ) ;
    MAC_CHECK( receive_PRE( src, value, nb ) ) ;
 }
 

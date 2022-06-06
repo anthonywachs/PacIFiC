@@ -75,9 +75,20 @@ bool RigidBody::BuildInertia( double *inertia, double *inertia_1 ) const
 	inertia_1[1], inertia_1[3], inertia_1[4],
 	inertia_1[2], inertia_1[4], inertia_1[5] );
 
-  Matrix base = m_transform.getBasis();
-  m   = base * m   * base.transpose();
-  m_1 = base * m_1 * base.transpose();
+  // Using mr = m_transform.getBasis() is wrong, as the angular position 
+  // of the particle is tracked from its reference non-rotated position and 
+  // the rotation matrix m_transform.getBasis() accounts for the complete
+  // rotation from the reference position
+  //   Matrix mr = m_transform.getBasis();
+  // We must use mr = identity and compute the inertia tensor in the 
+  // reference non-rotated position. Indeed this function is only called at 
+  // the initial time, so the moment of inertia tensor must be in the reference 
+  // non-rotated position of the rigid body
+  // Consequently most of the operations done in this method are unnecessary
+  // but I (Anthony) leave them here for now just in case I made a mistake
+  Matrix mr;
+  m   = mr * m   * mr.transpose();
+  m_1 = mr * m_1 * mr.transpose();
 
   inertia[0] = m[0][0];
   inertia[1] = m[1][0];
@@ -274,7 +285,7 @@ void RigidBody::setOrigin( Point3 const& pos )
 
 
 // ----------------------------------------------------------------------------
-// Sets the rigid body's transformation with an 1D array of 16 
+// Sets the rigid body's transformation with an 1D array of 12 
 // values (see class Transform for details)
 void RigidBody::setTransform( double const* pos ) 
 {
@@ -406,64 +417,66 @@ void RigidBody::writeStatic( ostream& fileOut ) const
 
 
 // ----------------------------------------------------------------------------
-// Writes the rigid body's transformation in an output stream in a
-// format suitable to the coupling with a fluid solver. Note: this method works
-// for discs, polygons, polyhedrons, spheres and 3D cylinders
+// Writes the geometric features of the rigid body in its current
+// position in an output stream in a format suitable to the coupling with a 
+// fluid solver. Note: this method works for discs, polygons, polyhedrons, 
+// spheres and 3D cylinders
 void RigidBody::writePositionInFluid( ostream& fluid )
 {
-  Point3     pointEnvelop;
+  Point3 pointEnvelop;
   vector<Point3> allPoints = m_convex->getEnvelope();
   vector<Point3>::iterator point;
   
-  // m_circumscribedRadius is not given to stream from here any more
-  // it's given from InterfaceFluide2D.cpp//InterfaceFluide3D.cpp line 287
-  // fluid << m_circumscribedRadius << " " << allPoints.size() << "\n";
-   fluid << " " << allPoints.size() << "\n";
+  fluid << " " << allPoints.size() << endl;
 
-   // Cas 2D
+  // 2D case
   if ( GrainsBuilderFactory::getContext() == DIM_2 )
   {
-    // Points du polygone
+    // Points describing the shape
     for (point=allPoints.begin(); point!=allPoints.end(); point++) 
     {
       pointEnvelop = m_transform(*point);
-      fluid << pointEnvelop[X] << " " << pointEnvelop[Y] << "\n";
+      fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelop[X] ) << " " << 
+	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelop[Y] ) << endl;     
     }
   }
-  // Cas 3D  
+  
+  // 3D case 
   else if ( GrainsBuilderFactory::getContext() == DIM_3 )
   {
-    // Points du polyedre
+    // Points describing the shape
     for (point=allPoints.begin(); point!=allPoints.end(); point++) 
     {
       pointEnvelop = m_transform(*point);
-      fluid << pointEnvelop[X] << " " << pointEnvelop[Y] << " "
-	<< pointEnvelop[Z] << "\n";
-//       fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-//       		pointEnvelop[X] ) << " " 
-//       	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		pointEnvelop[Y] ) << " "
-// 	<< GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		pointEnvelop[Z] ) << "\n";
+      fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelop[X] ) << " " <<  
+	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelop[Y] ) << " " <<  
+	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelop[Z] ) << endl; 
     }
 
-    // Faces du polyedre
+    // Faces describing the shape
     vector< vector<int> > const* allFaces  = m_convex->getFaces();
     vector< vector<int> >::const_iterator face;
     if ( allFaces )
     {
-      fluid << allFaces->size() << '\n';
+      fluid << allFaces->size() << endl;
       for (face=allFaces->begin(); face!=allFaces->end(); face++) 
       {
         vector<int>::const_iterator index;
         fluid << (*face).size() << " ";
         for (index=(*face).begin(); index!=(*face).end(); index++)
           fluid << (*index) << " ";
-        fluid << '\n';
+        fluid << endl;
       }
     }
-    else fluid << "0" << '\n';  
+    else fluid << "0" << endl;  
   }
+  
+  // Problem with dimension
   else
   {
     cout << "!!! Warning: Physical dimension undefined (DIM_2 or DIM_3)" 

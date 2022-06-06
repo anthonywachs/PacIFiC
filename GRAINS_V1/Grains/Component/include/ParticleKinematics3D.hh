@@ -50,7 +50,7 @@ class ParticleKinematics3D : public ParticleKinematics
     /** @brief Computes explicitly Idw/dt
     @param dw explicit change of angular velocity
     @param inertie particle inertia tensor */
-    Vector3 computeExplicitDJomDt( Vector3 const & dw,
+    Vector3 computeExplicitDJomDt( Vector3 const& dw,
 	double const* inertie ) const ;
     //@}
 

@@ -35,13 +35,14 @@
 *.pyc
 *.pyo
 
-#Others
+# Others
 #*.dtd
 *.so.*
-PacIFiC-*.env.sh
+#PacIFiC-*.env.sh
 GRAINS/Env/grains-*.env.sh
 Cartesian/FLUID/Env/fluid-*.env.sh
 Cartesian/MacWorld/Env/macworld-*.env.sh
+Cartesian/MacWorld/MAC/include/*
 *.mak
 .tags*
 Makedepend
@@ -52,6 +53,7 @@ GRAINS_V1/Env/grains-*.env.sh
 *.tst
 
 # Folders
+GRAINS_V1/*
 Cartesian/MacWorld/hypre-2.10.1/*
 Cartesian/MacWorld/hypre/*
 Cartesian/MacWorld/hypre
@@ -59,11 +61,12 @@ Cartesian/MacWorld/petsc-3.2.0-p7/*
 GRAINS/Main/bin64*/*
 GRAINS/Grains/lib64-*/*
 GRAINS/Grains/lib64-*
+GRAINS/Utils/*/bin64*/*
 GRAINS/diffGrains*
 GRAINS/Archives*
 GRAINS/DoxyGRAINS*
 GRAINS/README
-GRAINS/Utils*
+#GRAINS/Utils*
 GRAINS/XERCES*
 Octree/basilisk/*
 GRAINS_V1/Archives*

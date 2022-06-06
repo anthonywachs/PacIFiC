@@ -2,6 +2,7 @@
 #include "GrainsParameters.hh"
 #include "GrainsCRBFeatures.hh"
 #include "GrainsTestDev.hh"
+#include "GrainsCoupledWithFluid.hh"
 #include <string>
 using namespace std;
 
@@ -32,6 +33,35 @@ Grains* GrainsBuilderFactory::create( DOMElement* root )
   assert( grains != NULL );
 
   return ( grains );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Creates and returns a GrainsCoupledWithFluid application
+GrainsCoupledWithFluid* GrainsBuilderFactory::createCoupledWithFluid( 
+	DOMElement* root, double fluid_density_ )
+{
+  // Preconditions
+  assert( root != NULL );
+
+  GrainsCoupledWithFluid* grains = NULL;
+
+  // Construction de l'application
+  string type   = ReaderXML::getNodeName( root );
+  string option = ReaderXML::getNodeAttr_String( root, "Type" );
+
+  m_context = DIM_2;
+  if ( type == "Grains3D" ) m_context = DIM_3;
+
+  if ( option == "CoupledFluid" ) 
+    grains = new GrainsCoupledWithFluid( fluid_density_ );
+
+  // Postconditions
+  assert( grains != NULL );
+
+  return grains;
 }
 
 

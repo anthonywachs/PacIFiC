@@ -19,8 +19,9 @@ using namespace std;
 
 // Initialisation des attributs static
 double Particle::m_fluidDensity = 0.;
-bool Particle::m_explicitAddedMass = false ;
 double Particle::m_fluidViscosity = 0.;
+bool Particle::m_fluidCorrectedAcceleration = true ;
+bool Particle::m_splitExplicitAcceleration = false;
 
 
 // ----------------------------------------------------------------------------
@@ -31,7 +32,7 @@ Particle::Particle( bool const& autonumbering )
   , m_kinematics( NULL )
   , m_density( 0.0 )   
   , m_activity( WAIT )
-  , m_addedMassInfos( NULL )
+  , m_VelocityInfosNm1( NULL )
   , m_tag( 0 )
   , m_GeoLoc( GEOPOS_NONE )
   , m_cellule( NULL )
@@ -59,7 +60,7 @@ Particle::Particle( Particle const& other )
   , m_masterParticle( this )
   , m_density( other.m_density )
   , m_activity( WAIT )
-  , m_addedMassInfos( NULL )
+  , m_VelocityInfosNm1( NULL )
   , m_tag( other.m_tag )
   , m_GeoLoc( other.m_GeoLoc )
   , m_cellule( other.m_cellule ) 
@@ -74,17 +75,17 @@ Particle::Particle( Particle const& other )
   copy( &other.m_inertia[0], &other.m_inertia[6], &m_inertia[0] );
   copy( &other.m_inertia_1[0], &other.m_inertia_1[6], &m_inertia_1[0] );
   
-  if ( other.m_addedMassInfos )
+  if ( other.m_VelocityInfosNm1 )
   {
-    m_addedMassInfos = new struct AddedMassInfos;
-    m_addedMassInfos->TranslationalVelocity_nm1 = other.m_addedMassInfos->
+    m_VelocityInfosNm1 = new struct VelocityInfosNm1;
+    m_VelocityInfosNm1->TranslationalVelocity_nm1 = other.m_VelocityInfosNm1->
     	TranslationalVelocity_nm1;
-    m_addedMassInfos->TranslationalVelocity_difference = 
-    	other.m_addedMassInfos->TranslationalVelocity_difference;
-    m_addedMassInfos->RotationalVelocity_nm1 = other.m_addedMassInfos->
+    m_VelocityInfosNm1->TranslationalVelocity_difference = 
+    	other.m_VelocityInfosNm1->TranslationalVelocity_difference;
+    m_VelocityInfosNm1->RotationalVelocity_nm1 = other.m_VelocityInfosNm1->
     	RotationalVelocity_nm1;
-    m_addedMassInfos->RotationalVelocity_difference = other.m_addedMassInfos->
-    	RotationalVelocity_difference;
+    m_VelocityInfosNm1->RotationalVelocity_difference = 
+    	other.m_VelocityInfosNm1->RotationalVelocity_difference;
   }		
 }
 
@@ -101,7 +102,7 @@ Particle::Particle( DOMNode* root, bool const& autonumbering,
   , m_kinematics( NULL )
   , m_density( 2500. )  
   , m_activity( WAIT )  
-  , m_addedMassInfos( NULL )
+  , m_VelocityInfosNm1( NULL )
   , m_tag( 0 )
   , m_GeoLoc( GEOPOS_NONE )
   , m_cellule( NULL )
@@ -145,8 +146,8 @@ Particle::Particle( DOMNode* root, bool const& autonumbering,
   // Weight
   computeWeight();
   
-  // Explicit added mass
-  if ( Particle::m_explicitAddedMass ) createAddedMassInfos();
+  // In case part of the particle acceleration is computed explicity
+  if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
 }
 
 
@@ -159,7 +160,7 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
 	double const& qrotationx, double const& qrotationy, 
 	double const& qrotationz, double const& qrotations,	 
 	double const& rx, double const& ry, double const& rz,	 
-	const double m[16],
+	const double m[12],
 	ParticleActivity const& activ, 
 	int const& tag_,
 	int const& coordination_number_ ) 
@@ -167,7 +168,7 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_activity( activ )
-  , m_addedMassInfos( NULL )
+  , m_VelocityInfosNm1( NULL )
   , m_tag( tag_ )
   , m_GeoLoc( GEOPOS_NONE )  
   , m_cellule_nm1( NULL )
@@ -214,8 +215,8 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
   // Weight
   computeWeight();
   
-  // Explicit added mass
-  if ( Particle::m_explicitAddedMass ) createAddedMassInfos();    
+  // In case part of the particle acceleration is computed explicity
+  if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();   
 }
 
 
@@ -233,7 +234,7 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_activity( activ )
-  , m_addedMassInfos( NULL )
+  , m_VelocityInfosNm1( NULL )
   , m_tag( 0 )
   , m_GeoLoc( GEOPOS_NONE )
   , m_cellule( NULL )
@@ -275,8 +276,8 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
   // Weight
   computeWeight();
   
-  // Explicit added mass
-  if ( Particle::m_explicitAddedMass ) createAddedMassInfos();    
+  // In case part of the particle acceleration is computed explicity
+  if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();   
 }
 
 
@@ -336,7 +337,7 @@ void Particle::computeWeight()
 Particle::~Particle()
 {
   delete m_kinematics;  
-  if ( m_addedMassInfos ) delete m_addedMassInfos; 
+  if ( m_VelocityInfosNm1 ) delete m_VelocityInfosNm1; 
 }
 
 
@@ -495,7 +496,7 @@ double Particle::getFluidViscosity()
 
 // ----------------------------------------------------------------------------
 // Returns particle inertia tensor
-double const* Particle::getInertiaTensor() const
+double const* Particle::getInertiaTensorBodyFixed() const
 {
   return ( m_inertia );
 }
@@ -505,7 +506,7 @@ double const* Particle::getInertiaTensor() const
 
 // ----------------------------------------------------------------------------
 // Inertie inverse de la particle. 
-double const* Particle::getInverseInertiaTensor() const
+double const* Particle::getInverseInertiaTensorBodyFixed() const
 {
   return ( m_inertia_1 );
 }
@@ -824,8 +825,8 @@ void Particle::read( istream& fileIn, bool elemPart )
     // Read additional features
     readAdditionalFeatures( fileIn );
 
-    // Explicit added mass
-    if ( Particle::m_explicitAddedMass ) createAddedMassInfos();
+    // In case part of the particle acceleration is computed explicity
+    if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
 
     // Compute particle weight  
     computeWeight();
@@ -891,8 +892,8 @@ void Particle::read2014( istream& fileIn, vector<Particle*> const*
   	m_geoRBWC->getConvex() );
   fileIn >> *m_kinematics;
 
-  // Explicit added mass
-  if ( Particle::m_explicitAddedMass ) createAddedMassInfos();
+  // In case part of the particle acceleration is computed explicity
+  if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
   
   // Compute particle weight  
   computeWeight();   	      	 
@@ -950,8 +951,8 @@ void Particle::read2014_binary( istream& fileIn, vector<Particle*> const*
   	m_geoRBWC->getConvex() );
   m_kinematics->readParticleKinematics2014_binary( fileIn );
 
-  // Explicit added mass
-  if ( Particle::m_explicitAddedMass ) createAddedMassInfos();
+  // In case part of the particle acceleration is computed explicity
+  if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
   
   // Compute particle weight  
   computeWeight();         	                 	 
@@ -1078,7 +1079,7 @@ void Particle::writeIdentity( ostream& file ) const
 // Returns translational velocity difference at the previous discrete time
 Vector3 Particle::getTranslationalVelocityDifferencePreviousTime() const
 {
-  return ( m_addedMassInfos->TranslationalVelocity_difference );
+  return ( m_VelocityInfosNm1->TranslationalVelocity_difference );
 }
 
 
@@ -1088,7 +1089,7 @@ Vector3 Particle::getTranslationalVelocityDifferencePreviousTime() const
 // Returns angular velocity difference at the previous discrete time
 Vector3 Particle::getRotationalVelocityDifferencePreviousTime() const
 {
-  return ( m_addedMassInfos->RotationalVelocity_difference );
+  return ( m_VelocityInfosNm1->RotationalVelocity_difference );
 }
 
 
@@ -1098,15 +1099,15 @@ Vector3 Particle::getRotationalVelocityDifferencePreviousTime() const
 // Updates velocity difference and velocity at previous discrete time
 void Particle::setVelocityAndVelocityDifferencePreviousTime()
 {
-  m_addedMassInfos->TranslationalVelocity_difference = 
+  m_VelocityInfosNm1->TranslationalVelocity_difference = 
   	*m_kinematics->getTranslationalVelocity()
-  	- m_addedMassInfos->TranslationalVelocity_nm1;
-  m_addedMassInfos->TranslationalVelocity_nm1 =
+  	- m_VelocityInfosNm1->TranslationalVelocity_nm1;
+  m_VelocityInfosNm1->TranslationalVelocity_nm1 =
   	*m_kinematics->getTranslationalVelocity();
-  m_addedMassInfos->RotationalVelocity_difference = 
+  m_VelocityInfosNm1->RotationalVelocity_difference = 
   	*m_kinematics->getAngularVelocity()
-  	- m_addedMassInfos->RotationalVelocity_nm1;
-  m_addedMassInfos->RotationalVelocity_nm1 = 
+  	- m_VelocityInfosNm1->RotationalVelocity_nm1;
+  m_VelocityInfosNm1->RotationalVelocity_nm1 = 
   	*m_kinematics->getAngularVelocity();
 }
 
@@ -1120,32 +1121,36 @@ void Particle::setVelocityPreviousTimeRestart(
   	double const& vx, double const& vy, double const& vz, 
   	double const& omx, double const& omy, double const& omz )
 {
-  m_addedMassInfos->TranslationalVelocity_nm1[X] = vx ;
-  m_addedMassInfos->TranslationalVelocity_nm1[Y] = vy ;  
-  m_addedMassInfos->TranslationalVelocity_nm1[Z] = vz ;  
-  m_addedMassInfos->RotationalVelocity_nm1[X] = omx ;  
-  m_addedMassInfos->RotationalVelocity_nm1[Y] = omy ;
-  m_addedMassInfos->RotationalVelocity_nm1[Z] = omz ;    
+  m_VelocityInfosNm1->TranslationalVelocity_nm1[X] = vx ;
+  m_VelocityInfosNm1->TranslationalVelocity_nm1[Y] = vy ;  
+  m_VelocityInfosNm1->TranslationalVelocity_nm1[Z] = vz ;  
+  m_VelocityInfosNm1->RotationalVelocity_nm1[X] = omx ;  
+  m_VelocityInfosNm1->RotationalVelocity_nm1[Y] = omy ;
+  m_VelocityInfosNm1->RotationalVelocity_nm1[Z] = omz ;    
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Defines whether explicit added mass is used
-void Particle::setExplicitMassCorrection( bool is_explicit )
+// Defines whether the particle acceleration (i.e. change of
+// momentum) is corrected by the fluid density in case of immersed rigid 
+// bodies
+void Particle::setFluidCorrectedAcceleration( bool correct )
 {
-  Particle::m_explicitAddedMass = is_explicit;
+  Particle::m_fluidCorrectedAcceleration = correct;
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns whether explicit added mass is used
-bool Particle::getExplicitMassCorrection()
+// Returns whether the particle acceleration (i.e. change of
+// momentum) is corrected by the fluid density in case of immersed rigid 
+// bodies
+bool Particle::getFluidCorrectedAcceleration()
 {
-  return ( Particle::m_explicitAddedMass );
+  return ( Particle::m_fluidCorrectedAcceleration );
 }
 
 
@@ -1222,11 +1227,11 @@ GeoPosition Particle::getGeoPositionNm1() const
 
 
 // ----------------------------------------------------------------------------
-// Creates the AddedMassInfos structure
-void Particle::createAddedMassInfos()
+// Creates the VelocityInfosNm1 structure
+void Particle::createVelocityInfosNm1()
 {
-  if ( !m_addedMassInfos )
-    m_addedMassInfos = new struct AddedMassInfos;
+  if ( !m_VelocityInfosNm1 )
+    m_VelocityInfosNm1 = new struct VelocityInfosNm1;
 } 
 
 
@@ -1649,3 +1654,34 @@ void Particle::setKinematics( ParticleKinematics* pkine )
 {
   m_kinematics = pkine;
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes particle inertia tensor in the space fixed coordinate frame 
+void Particle::computeInertiaTensorSpaceFixed( vector<double>& inertia ) const
+{
+  // Get rotation matrix from ref position to current position
+  Matrix mr = m_geoRBWC->getTransform()->getBasis();
+  
+  // Compute the rotation matrix transposed
+  Matrix mrt = mr.transpose();
+  
+  // Transfer inertia vector into a matrix
+  Matrix inertiaBodyFixed( m_inertia[0], m_inertia[1], m_inertia[2],
+  	m_inertia[1], m_inertia[3], m_inertia[4],
+	m_inertia[2], m_inertia[4], m_inertia[5] );
+	
+  // Compute the inertia matrix in the space fixed frame
+  // I_space = Mr * I_body * Mr^t	
+  Matrix inertiaSpaceFixed = mr * ( inertiaBodyFixed * mrt );
+  
+  // Transfer the inertia matrix into the inertia vector
+  inertia[0] = inertiaSpaceFixed[X][X];
+  inertia[1] = inertiaSpaceFixed[X][Y];  
+  inertia[2] = inertiaSpaceFixed[X][Z];  
+  inertia[3] = inertiaSpaceFixed[Y][Y];  	
+  inertia[4] = inertiaSpaceFixed[Y][Z];  
+  inertia[5] = inertiaSpaceFixed[Z][Z];  
+}

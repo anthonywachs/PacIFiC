@@ -33,9 +33,9 @@ enum ParticleActivity
   };
 
 
-/** @brief Data to compute the added mass force and torque in case of coupling
-with the fluid. Note: generally used for particles lighther than the fluid */
-struct AddedMassInfos
+/** @brief Data to compute part of the particle acceleration explicitly.
+Note: generally used for particles lighther than the fluid */
+struct VelocityInfosNm1
 {
   Vector3 TranslationalVelocity_nm1; /**< Translation velocity at the previous
   	fluid discrete time */
@@ -95,7 +95,7 @@ class Particle : public Component
 	double const& qrotationx, double const& qrotationy, 
 	double const& qrotationz, double const& qrotations,	 
 	double const& rx, double const& ry, double const& rz,	 
-	const double m[16],
+	const double m[12],
 	ParticleActivity const& activ, 
 	int const& tag_,
 	int const& coordination_number_ = 0 ); 
@@ -134,12 +134,16 @@ class Particle : public Component
     @param rho fluid density */
     static void setFluidDensity( double rho ); 
   
-    /** @brief Defines whether explicit added mass is used
-    @param is_explicit vrai si explicite, faux sinon */
-    static void setExplicitMassCorrection( bool is_explicit ); 
+    /** @brief Defines whether the particle acceleration (i.e. change of
+    momentum) is corrected by the fluid density in case of immersed rigid 
+    bodies
+    @param correct true if fluid corrected */
+    static void setFluidCorrectedAcceleration( bool correct ); 
   
-    /** @brief Returns whether explicit added mass is used */
-    static bool getExplicitMassCorrection(); 
+    /** @brief Returns whether the particle acceleration (i.e. change of
+    momentum) is corrected by the fluid density in case of immersed rigid 
+    bodies */
+    static bool getFluidCorrectedAcceleration(); 
   
     /** @brief Returns the viscosity of the surrounding fluid */
     static double getFluidViscosity();
@@ -335,8 +339,8 @@ class Particle : public Component
     this method uses the cell from the previous time m_cellule_nm1 */
     void updateGeoPosition();	
   
-    /** @brief Creates the AddedMassInfos structure */
-    void createAddedMassInfos();  
+    /** @brief Creates the VelocityInfosNm1 structure */
+    void createVelocityInfosNm1();  
   
     /** @brief Returns an orientation vector to describe the angular position of
     the particle */
@@ -400,7 +404,12 @@ class Particle : public Component
     /** @brief Compose the component transformation on the right by another
     transformation: this = this o t (t first followed by this)
     @param t the other affine transformation */  
-    virtual void composePositionRightByTransform( Transform const& t );    
+    virtual void composePositionRightByTransform( Transform const& t ); 
+    
+    /** @brief Computes particle inertia tensor in the space fixed coordinate 
+    frame 
+    @param inertia inertia tensor in the space fixed coordinate frame */ 
+    void computeInertiaTensorSpaceFixed( vector<double>& inertia ) const;
     //@}
 
 
@@ -426,11 +435,13 @@ class Particle : public Component
     discrete time */
     Vector3 getRotationalVelocityDifferencePreviousTime() const;
   
-    /** @brief Returns particle inertia tensor */ 
-    virtual double const* getInertiaTensor() const;
+    /** @brief Returns particle inertia tensor in the body fixed coordinate 
+    frame */ 
+    double const* getInertiaTensorBodyFixed() const;    
 
-    /** @brief Returns inverse of particle inertia tensor */
-    double const* getInverseInertiaTensor() const;
+    /** @brief Returns inverse of particle inertia tensor in the body fixed 
+    coordinate frame */
+    double const* getInverseInertiaTensorBodyFixed() const;
 
     /** @brief Returns particle density */
     double getDensity() const;
@@ -504,7 +515,9 @@ class Particle : public Component
     /**@name I/O methods */
     //@{
     /** @brief Reads a (in practice reference) particle data from a stream  
-    @param fileIn input stream */
+    @param fileIn input stream 
+    @param elemPart true if the particle is an elementary particle of a
+    composite particle, false otherwise */
     void read( istream& fileIn, bool elemPart = false );
 
     /** @brief Reads particle data from a stream. Usage: for standard particles
@@ -605,32 +618,34 @@ class Particle : public Component
     double m_density; /**< Density */
     static double m_fluidDensity; /**< Surrounding fluid density */
     static double m_fluidViscosity; /**< Surrounding fluid viscosity */
-    static bool m_explicitAddedMass; /** Whether part of the particle
-    	acceleration is treated explicitly */
-    double m_inertia[6]; /** Inertia tensor I={I(1,1), I(1,2), I(1,3), 
+    static bool m_fluidCorrectedAcceleration; /**< Whether the particle
+    	acceleration is corrected by the fluid density */
+    static bool m_splitExplicitAcceleration; /**< Whether part of the particle
+    	acceleration is computed explicitly */	
+    double m_inertia[6]; /**< Inertia tensor I={I(1,1), I(1,2), I(1,3), 
   	I(2,2), I(2,3), I(3,3)} */  
-    double m_inertia_1[6]; /** Inverse inertia tensor */  
-    ParticleActivity m_activity; /** Particle activity */  
-    struct AddedMassInfos* m_addedMassInfos; /** data to compute the 
+    double m_inertia_1[6]; /**< Inverse inertia tensor */  
+    ParticleActivity m_activity; /**< Particle activity */  
+    struct VelocityInfosNm1* m_VelocityInfosNm1; /**< data to compute the 
     	contribution of the particle acceleration treated explicitly (used for 
 	neutrally buoyant or lighter particles than the fluid) */ 
-    int m_tag; /** tag of the cell the particle belongs to at the 
+    int m_tag; /**< tag of the cell the particle belongs to at the 
     	current time: 0=interior, 1=buffer zone, 2=halo zone */
-    GeoPosition m_GeoLoc; /** geographic position of the particle in the 
+    GeoPosition m_GeoLoc; /**< geographic position of the particle in the 
     	Linked cell, i.e. geographic position of the cell the particle belongs 
 	to at the current time */
-    Cell* m_cellule; /** Cell that the particle belongs to at the 
+    Cell* m_cellule; /**< Cell that the particle belongs to at the 
     	current time */
-    int m_tag_nm1; /** tag of the cell the particle belonged to at the 
+    int m_tag_nm1; /**< tag of the cell the particle belonged to at the 
     	previous time: 0=interior, 1=buffer zone, 2=halo zone */
-    GeoPosition m_GeoLoc_nm1; /** geographic position of the particle in the 
+    GeoPosition m_GeoLoc_nm1; /**< geographic position of the particle in the 
     	Linked cell, i.e. geographic position of the cell the particle belonged 
 	to at the previous time */		    
-    Cell* m_cellule_nm1; /** Cell that the particle belonged to at the 
+    Cell* m_cellule_nm1; /**< Cell that the particle belonged to at the 
     	previous time */
-    int m_GeomType; /** particle geometric type */ 
-    int m_coordination_number; /** coordination number */
-    Vector3 m_weight; /** particle weight */
+    int m_GeomType; /**< particle geometric type */ 
+    int m_coordination_number; /**< coordination number */
+    Vector3 m_weight; /**< particle weight */
     //@}
     
     

@@ -152,11 +152,6 @@ class FV_DiscreteField_Staggered : public FV_DiscreteField
 		FV_SHIFT_TRIPLET shift,
 		size_t component, size_t direction,
 		double dxC, double dyC, double dzC ) ;   
-
-      virtual void synchronize_extended_DOF_constrained( 
-		size_t level, 
-		list<FV_TRIPLET> &ijk, 
-		list<size_t> &comps );
 		
 		
    //-- Spatial discretization and matrix assembly

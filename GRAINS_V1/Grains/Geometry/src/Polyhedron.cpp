@@ -22,7 +22,7 @@ Polyhedron::Polyhedron( istream &fileIn, int nb_point, VertexBase& ref,
   , m_InertiaPoly( NULL )
   , m_VolumePoly( 0. )
 {
-  readFaces(fileIn);
+  readFaces( fileIn );
 }
 
 
@@ -73,8 +73,7 @@ ConvexType Polyhedron::getConvexType() const
 // Creates a polyhedron from an input stream
 Polyhedron* Polyhedron::create( istream& fileIn ) 
 { 
-  // Lecture du nom puis ouverture du fichier contenant la description 
-  // du polyedre
+  // Read polyhedron file name and open the corresponding file
   string fichpoly;
   fileIn >> fichpoly;
   fichpoly = GrainsExec::m_ReloadDirectory + "/" 
@@ -83,32 +82,30 @@ Polyhedron* Polyhedron::create( istream& fileIn )
   if ( PolyIN->is_open() ) 
     GrainsExec::m_additionalDataFiles.insert( fichpoly );
   
-  // Lecture du nb de points definissant le polyedre
+  // Number of vertices
   int nb_point;
-  *PolyIN >> nb_point;
-  *PolyIN >> nb_point;
+  *PolyIN >> nb_point >> nb_point;
   
   // Creation du tableau de points du polyedre  
   Point3* point = new Point3[nb_point];
   VertexBase* vertexbase = new VertexBase( (void *)point );
   
-  // Creation du tableau d'indices des sommets dans le tableau de points
+  // Creation of the array of vertex indices in the array of vertices
   unsigned int *v = new unsigned int[nb_point];
   for(int i=0; i<nb_point; i++) v[i] = i;
   IndexArray* ia = new IndexArray( nb_point, v ); 
   delete [] v; 
     
-  // Creation du polyedre   
+  // Creation of the polyhedron
   Polyhedron *polyhedron = new Polyhedron( *PolyIN, nb_point, *vertexbase,
   	*ia );
   polyhedron->m_fichPoly = fichpoly;
   PolyIN->close();
 
-  // Les objets m_base, m_cobound, m_index et m_allFaces ne sont crees qu'une 
-  // seule fois par type de particle, les particles suivantes ne possedent 
-  // qu'un pointeur sur ces derniers.
-  // Un mecanisme de garbage collector a ete mis en place dans la classe
-  // GrainsExec qui conserve les pointeurs et se charge de les detruire
+  // Objects m_base, m_cobound, m_index and m_allFaces are created once per
+  // particle type, other particles of same type have a pointer only to these
+  // objects. They are all freed by the garbage collector mechanism implemented
+  // in GrainsExec
   GrainsExec::addOnePolytopeRefPointBase( point, vertexbase );
   GrainsExec::addOnePolytopeNodeNeighbors( polyhedron->m_cobound ); 
   GrainsExec::addOnePolytopeNodeIndex( ia );
@@ -126,37 +123,35 @@ Polyhedron* Polyhedron::create( istream& fileIn )
 // Creates a polyhedron from an XML node
 Polyhedron* Polyhedron::create( DOMNode* root )
 {
-  // Lecture du nom puis ouverture du fichier contenant la description 
-  // du polyedre
+  // Read polyhedron file name and open the corresponding file
   string fichpoly = ReaderXML::getNodeAttr_String( root, "Name" ); 
   ifstream PolyIN( fichpoly.c_str() );
   if ( PolyIN.is_open() ) 
     GrainsExec::m_additionalDataFiles.insert( fichpoly );
   
-  // Lecture du nb de points definissant le polyedre
+  // Number of vertices
   int nb_point;
   PolyIN >> nb_point >> nb_point;
 
-  // Creation du tableau de points du polyedre
+  // Creation of the array of vertices
   Point3* point = new Point3[nb_point];
   VertexBase* vertexbase = new VertexBase( (void *)point );
 
-  // Creation du tableau d'indices des sommets dans le tableau de points
+  // Creation of the array of vertex indices in the array of vertices
   unsigned int *v = new unsigned int[nb_point];
   for(int i=0; i<nb_point; i++) v[i] = i;
   IndexArray* ia = new IndexArray( nb_point, v ); 
   delete [] v; 
       
-  // Creation du polyedre
+  // Creation of the polyhedron
   Polyhedron *polyhedron = new Polyhedron( PolyIN, nb_point, *vertexbase, 
   	*ia );
   polyhedron->m_fichPoly = fichpoly;
 
-  // Les objets m_base, m_cobound, m_index et m_allFaces ne sont crees qu'une 
-  // seule fois par type de particle, les particles suivantes ne possedent 
-  // qu'un pointeur sur ces derniers.
-  // Un mecanisme de garbage collector a ete mis en place dans la classe
-  // GrainsExec qui conserve les pointeurs et se charge de les detruire
+  // Objects m_base, m_cobound, m_index and m_allFaces are created once per
+  // particle type, other particles of same type have a pointer only to these
+  // objects. They are all freed by the garbage collector mechanism implemented
+  // in GrainsExec
   GrainsExec::addOnePolytopeRefPointBase( point, vertexbase );
   GrainsExec::addOnePolytopeNodeNeighbors( polyhedron->m_cobound ); 
   GrainsExec::addOnePolytopeNodeIndex( ia );
@@ -169,8 +164,7 @@ Polyhedron* Polyhedron::create( DOMNode* root )
 
 
 // ----------------------------------------------------------------------
-// D.PETIT - Juin. 2000 - Creation
-// Determine l'inertie et l'inertie inverse d'un Polyhedron
+// Computes the inertia tensor and the inverse of the inertia tensor
 bool Polyhedron::BuildInertia( double* inertia, double* inertia_1 ) const
 {
   std::copy(&m_InertiaPoly[0], &m_InertiaPoly[6], &inertia[0]);
@@ -194,7 +188,7 @@ bool Polyhedron::BuildInertia( double* inertia, double* inertia_1 ) const
   inertia_1[5] = ( inertia[0] * inertia[3] - inertia[1] * inertia[1] )
   	/ determinant;
  
-  return true;
+  return ( true );
 }
 
 
@@ -325,7 +319,7 @@ Convex* Polyhedron::clone() const
 // ----------------------------------------------------------------------
 // Polyhedron support function, returns the support point P, i.e. 
 // the point on the surface of the sphere that satisfies max(P.v)
-// Note: condition "d <= h" has been replaced by "d-h < eps" inrelation to
+// Note: condition "d <= h" has been replaced by "d-h < eps" in relation to
 // round error issues. For now, eps = 1.e-16 but this should be re-examined   
 Point3 Polyhedron::support( Vector3 const& v ) const 
 {
@@ -392,9 +386,10 @@ void Polyhedron::BuildPolyhedron( int nbface, IndexArray const* face )
  
   IndexBuf* indexBuf = new IndexBuf[numVerts()];
   
-  //On initialise le volume et l'inertie a zero.
+  // Initialize volume and moment of inertia tensor to 0
   Initialisation();
 
+  // Compute volume and moment of inertia tenso
   Point3 G_ ;
   int i, j, k;
   for(i=0; i<nbface; i++)
@@ -440,33 +435,37 @@ void Polyhedron::readFaces( istream &fileIn )
   
   int nbface;
   fileIn >> nbface;
-  fileIn.getline(buffer,sizeof(buffer)); // pour aller a la ligne suivante
+  fileIn.getline( buffer, sizeof(buffer) ); 
 
   IndexArray *face = new IndexArray[nbface];
   IndexBuf facetind;
   
-  // lecture des faces
-  for(int i = 0;i < nbface;i++) {
-    fileIn.getline(buffer,sizeof(buffer));
-    istringstream lign(buffer);
-    if (!fileIn.eof()) {
+  // Read the face index - vertex index connectivity
+  for(int i = 0;i < nbface;i++) 
+  {
+    fileIn.getline( buffer, sizeof(buffer) );
+    istringstream lign( buffer );
+    if ( !fileIn.eof() ) 
+    {
       int integer;
-      for(;;){
-	if (!lign.eof()) {
+      for(;;)
+      {
+	if (!lign.eof()) 
+	{
 	  lign >> integer;
-	  facetind.push_back(integer);
+	  facetind.push_back( integer );
 	}
 	else break;
       }
-      new(&face[i]) IndexArray(int(facetind.size()),&facetind[0]);
-      facetind.erase(facetind.begin(), facetind.end());
+      new(&face[i]) IndexArray( int(facetind.size()), &facetind[0] );
+      facetind.erase( facetind.begin(), facetind.end() );
     }
     else break;
   }
 
   BuildPolyhedron( nbface, face );
   
-  // Stockage de la connectivite des faces
+  // Store the face index - vertex index connectivity
   m_allFaces = new vector< vector<int> >;
   m_allFaces->reserve( nbface );
   for(int i=0;i<nbface;i++) 
@@ -507,16 +506,23 @@ int Polyhedron::numberOfCells_PARAVIEW() const
 {
   int ncorners = numVerts(), ncells = 0;
 
-  // Tetraedre ou parallelepipede
+  // Tetrahedron or box
   if ( ncorners == 4 || ncorners == 8 ) ncells = 1;
-  // Icosaedre
+  // Icosahedron
   else if ( ncorners == 12 && m_allFaces->size() == 20 ) ncells = 20;
-  // Prisme
-  else if ( ncorners == 6 && m_allFaces->size() == 5 ) ncells = 1;  
+  // Prism
+  else if ( ncorners == 6 && m_allFaces->size() == 5 ) ncells = 1; 
+  // Octahedron 
+  else if ( ncorners == 6 && m_allFaces->size() == 8 ) ncells = 8; 
+   // Dodecahedron 
+  else if ( ncorners == 20 && m_allFaces->size() == 12 ) ncells = 36; 
+  // Trancoctahedron 
+  else if ( ncorners == 24 && m_allFaces->size() == 14 ) ncells = 44; 
+  // General: not implemented yet !!
   else
   {
-    // General: not implemented yet !!  
-  }
+  
+  }   
     
   return ( ncells );  
 }
@@ -532,7 +538,7 @@ void Polyhedron::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 {
   int ncorners = numVerts();
   
-  // Tetraedre ou parallelepipede ou prisme
+  // Tetrahedron or box or prism
   if ( ncorners == 4 || ncorners == 8 || 
   	( ncorners == 6 && m_allFaces->size() == 5 ) )
   {
@@ -547,13 +553,16 @@ void Polyhedron::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     if ( ncorners == 4 ) cellstype.push_back(10);
     else if ( ncorners == 8 ) cellstype.push_back(12);
     else cellstype.push_back(13);
-  
+ 	
     firstpoint_globalnumber += ncorners + 1;
   }
-  // Icosaedre
-  // L'icosaedre est decoupe en 20 tetraedres composes du centre de gravite
-  // et des 3 vertex de chaque face
-  else if ( ncorners == 12 && m_allFaces->size() == 20 )
+  // Icosahedron or octahedron
+  // The icosahedron is split into 20 tetrahedrons using the center of mass and
+  // 3 vertices on each triangular face
+  // The octahedron is split into 8 tetrahedrons using the center of mass and
+  // 3 vertices on each triangular face  
+  else if ( ( ncorners == 12 && m_allFaces->size() == 20 ) ||
+	  ( ncorners == 6 && m_allFaces->size() == 8 ) )
   {
     size_t nbface = m_allFaces->size();
     for (size_t i=0;i<nbface;++i)
@@ -567,13 +576,193 @@ void Polyhedron::write_polygonsStr_PARAVIEW( list<int>& connectivity,
       offsets.push_back(last_offset);
       cellstype.push_back(10);
     }
-     
+
     firstpoint_globalnumber += ncorners + 1;       
   }
+  // Dodecahedron
+  // Each pentagonal face is split into 3 triangles
+  // The dodecahedron is split into 12*3=36 tetrahedrons using the center of 
+  // mass and each triangular sub-face of each pentagonal face
+  else if ( ncorners == 20 && m_allFaces->size() == 12 )
+  {
+    size_t nbface = m_allFaces->size();
+    for (size_t i=0;i<nbface;++i)
+    {
+      // First tetrahedron
+      connectivity.push_back( firstpoint_globalnumber );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][0] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][1] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][2] + 1 );
+      last_offset += 4;
+      offsets.push_back(last_offset);
+      cellstype.push_back(10);
+ 
+      // Second tetrahedron
+      connectivity.push_back( firstpoint_globalnumber );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][2] + 1 );
+       connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][3] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][0] + 1 );
+      last_offset += 4;
+      offsets.push_back(last_offset);
+      cellstype.push_back(10);
+	
+      // Third tetrahedron
+      connectivity.push_back( firstpoint_globalnumber );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][3] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][4] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][0] + 1 );
+      last_offset += 4;
+      offsets.push_back(last_offset);
+      cellstype.push_back(10);
+    }
+    
+    firstpoint_globalnumber += ncorners + 1;  
+  }
+  // Trancoctahedron
+  // Each pentagonal face is split into 3 triangles
+  // The trancoctahedron is split into 8*4 + 6*2 = 44 tetrahedrons using the 
+  // center of mass and each triangular sub-face of each pentagonal face  
+  else if ( ncorners == 24 && m_allFaces->size() == 14 )
+  {
+    size_t nbface = m_allFaces->size();
+    for (size_t i=0;i<8;++i)
+    {
+      // First tetrahedron
+      connectivity.push_back( firstpoint_globalnumber );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][0] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][1] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][2] + 1 );
+      last_offset += 4;
+      offsets.push_back(last_offset);
+      cellstype.push_back(10);
+ 
+      // Second tetrahedron
+      connectivity.push_back( firstpoint_globalnumber );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][2] + 1 );
+       connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][3] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][0] + 1 );
+      last_offset += 4;
+      offsets.push_back(last_offset);
+      cellstype.push_back(10);
+	
+      // Third tetrahedron
+      connectivity.push_back( firstpoint_globalnumber );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][3] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][4] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][0] + 1 );
+      last_offset += 4;
+      offsets.push_back(last_offset);
+      cellstype.push_back(10);
+
+      // Fourth tetrahedron
+      connectivity.push_back( firstpoint_globalnumber );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][4] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][5] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][0] + 1 );
+      last_offset += 4;
+      offsets.push_back(last_offset);
+      cellstype.push_back(10);
+    }
+    
+    for (size_t i=8;i<nbface;++i)
+    {
+      // First tetrahedron
+      connectivity.push_back( firstpoint_globalnumber );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][0] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][1] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][2] + 1 );
+      last_offset += 4;
+      offsets.push_back(last_offset);
+      cellstype.push_back(10);
+ 
+      // Second tetrahedron
+      connectivity.push_back( firstpoint_globalnumber );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][2] + 1 );
+       connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][3] + 1 );
+      connectivity.push_back( firstpoint_globalnumber
+                + (*m_allFaces)[i][0] + 1 );
+      last_offset += 4;
+      offsets.push_back(last_offset);
+      cellstype.push_back(10);
+    }
+    
+    firstpoint_globalnumber += ncorners + 1;  
+  }
+  // General: not implemented yet !!
   else
   {
-    // General: not implemented yet !!  
+  
   }
+//   int ncorners = numVerts();
+//   
+//   // Tetrahedron or box or prism
+//   if ( ncorners == 4 || ncorners == 8 || 
+//   	( ncorners == 6 && m_allFaces->size() == 5 ) )
+//   {
+//     int count = firstpoint_globalnumber + 1;
+//     for (int i=0;i<ncorners;++i)
+//     {
+//       connectivity.push_back(count);
+//       ++count;
+//     }  
+//     last_offset += ncorners;
+//     offsets.push_back(last_offset);
+//     if ( ncorners == 4 ) cellstype.push_back(10);
+//     else if ( ncorners == 8 ) cellstype.push_back(12);
+//     else cellstype.push_back(13);
+//   
+//     firstpoint_globalnumber += ncorners + 1;
+//   }
+//   // Icosahedron
+//   // The icosahedron is split into 20 tetrahedrons using the center of mass and
+//   // 3 vertices on each face
+//   else if ( ncorners == 12 && m_allFaces->size() == 20 )
+//   {
+//     size_t nbface = m_allFaces->size();
+//     for (size_t i=0;i<nbface;++i)
+//     {
+//       connectivity.push_back( firstpoint_globalnumber );
+//       size_t nbv = (*m_allFaces)[i].size();
+//       for (size_t j=0;j<nbv;++j) 
+//         connectivity.push_back( firstpoint_globalnumber 
+// 		+ (*m_allFaces)[i][j] + 1 );
+//       last_offset += 4;
+//       offsets.push_back(last_offset);
+//       cellstype.push_back(10);
+//     }
+//      
+//     firstpoint_globalnumber += ncorners + 1;       
+//   }
+//   else
+//   {
+//     // General: not implemented yet !!  
+//   }
 }
 
 
@@ -586,7 +775,7 @@ void Polyhedron::write_convex_STL( ostream& f, Transform const& transform )
 {
   int ncorners = numVerts();
 
-  // Parallelepipede
+  // Box
   if ( ncorners == 8 && m_allFaces->size() == 6 )    
   {
     Point3 pp;

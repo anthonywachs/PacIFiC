@@ -276,8 +276,7 @@ void GrainsParameters::AdditionalFeatures( DOMElement* rootElement )
 
 // ----------------------------------------------------------------------------
 // Runs the simulation over the prescribed time interval
-void GrainsParameters::Simulation( bool predict, bool isPredictorCorrector,
-	bool explicit_added_mass )
+void GrainsParameters::Simulation( double time_interval )
 {
   if ( m_processorIsActive )
   {

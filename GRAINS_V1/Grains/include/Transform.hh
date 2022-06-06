@@ -41,10 +41,10 @@ class Transform
     @param gz origin z-coordinate */
     Transform( double gx, double gy, double gz );
 
-    /** @brief Constructor with a 1D array of 16 values as inputs containing the
-    origin and the matrix coefficients, plus 4 additional useless values
-    @param m 1D array contanining 16 values */
-    Transform( double const m[16] );
+    /** @brief Constructor with a 1D array of 12 values as inputs containing the
+    rotation matrix coefficients following by the origin coordinates
+    @param m 1D array contanining 12 values */
+    Transform( double const m[12] );
 
     /** @brief Copy constructor
     @param other the transformation to be copied */

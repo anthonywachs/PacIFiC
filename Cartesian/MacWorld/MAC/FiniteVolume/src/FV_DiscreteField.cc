@@ -122,7 +122,6 @@ FV_DiscreteField:: FV_DiscreteField( MAC_Object* a_owner,
    , local_cell_size( 0 )   
    , DOFcolors( 0 )
    , DOFstatus( 0 )   
-   , DLMFDconstrainedDOFs( 0 )
    , PERIODIC( 0 )
    , PERIODIC_SHIFT( 0 )
    , PARAVIEW_FNAME( "" )
@@ -131,7 +130,7 @@ FV_DiscreteField:: FV_DiscreteField( MAC_Object* a_owner,
    , ALL_COMPS_SAME_LOCATION( true ) 
    , SET_BC_VALUES_ALLOWED( false )      	   
    , transproj_interpolation( 0 )
-   , synchronized_level( 0 )
+   , synchronization_ready( false )
    , IS_PROTO( false )           
 {
    MAC_LABEL( "FV_DiscreteField:: FV_DiscreteField" ) ;
@@ -205,7 +204,6 @@ FV_DiscreteField:: FV_DiscreteField(
    , local_cell_size( 0 )    
    , DOFcolors( 0 )
    , DOFstatus( 0 ) 
-   , DLMFDconstrainedDOFs( 0 )
    , PERIODIC( 0 )
    , PERIODIC_SHIFT( 0 )         
    , PARAVIEW_FNAME( "" )
@@ -214,7 +212,7 @@ FV_DiscreteField:: FV_DiscreteField(
    , ALL_COMPS_SAME_LOCATION( true )
    , SET_BC_VALUES_ALLOWED( false )
    , transproj_interpolation( 0 ) 
-   , synchronized_level( 0 )                      	   
+   , synchronization_ready( false )                      	   
    , IS_PROTO( true )    
 {
    MAC_LABEL( "FV_DiscreteField:: FV_DiscreteField" ) ;
@@ -268,7 +266,6 @@ FV_DiscreteField:: FV_DiscreteField( MAC_Object* a_owner,
    , local_cell_size( 0 )    
    , DOFcolors( 0 )
    , DOFstatus( 0 ) 
-   , DLMFDconstrainedDOFs( 0 )
    , PERIODIC( 0 )
    , PERIODIC_SHIFT( 0 )      
    , PARAVIEW_FNAME( "" )
@@ -277,7 +274,7 @@ FV_DiscreteField:: FV_DiscreteField( MAC_Object* a_owner,
    , ALL_COMPS_SAME_LOCATION( true ) 
    , SET_BC_VALUES_ALLOWED( false ) 
    , transproj_interpolation( 0 )
-   , synchronized_level( 0 )                  	   
+   , synchronization_ready( false )                  	   
    , IS_PROTO( false )    
 {
    MAC_LABEL( "FV_DiscreteField:: FV_DiscreteField" ) ;
@@ -395,23 +392,40 @@ FV_DiscreteField:: ~FV_DiscreteField( void )
      delete transproj_interpolation ; 
    } 
    
-   if ( DLMFDconstrainedDOFs )
+   if ( synchronization_ready )
    {
-     DLMFDconstrainedDOFs->clear();
-     delete DLMFDconstrainedDOFs;
-   } 
-   
-   if ( !halozone_values_list.empty() )
-   {
-     list< vector< double* > >::iterator ilv;
-     for ( ilv=halozone_values_list.begin();ilv!=halozone_values_list.end();
-     		ilv++ )
+     list< vector< vector< FV_TRIPLET > > >::iterator ilv;
+     vector< vector< FV_TRIPLET > >::iterator iv;
+     for (ilv=halozone_received.begin();ilv!=halozone_received.end();ilv++)
+     {
+       for (iv=ilv->begin();iv!=ilv->end();iv++)       
+         iv->clear();
        ilv->clear();
-     halozone_values_list.clear();
-      
-     for (ilv=bufferzone_values.begin();ilv!=bufferzone_values.end();ilv++)
+     }
+     halozone_received.clear();
+     
+     for (ilv=bufferzone_sent.begin();ilv!=bufferzone_sent.end();ilv++)
+     {
+       for (iv=ilv->begin();iv!=ilv->end();iv++)       
+         iv->clear();
        ilv->clear();
-     bufferzone_values.clear();       
+     }
+     bufferzone_sent.clear();
+     
+     synchronization_MPI_rank_neighbors.clear(); 
+     
+     list< double* >::iterator ild;
+     for (ild=halozone_received_data.begin();ild!=halozone_received_data.end();
+     	ild++)
+       delete [] (*ild);
+     halozone_received_data.clear();
+     for (ild=bufferzone_sent_data.begin();ild!=bufferzone_sent_data.end();
+     	ild++)
+       delete [] (*ild);  
+     bufferzone_sent_data.clear();
+     
+     halozone_received_data_size.clear();  
+     bufferzone_sent_data_size.clear();         
    }    
 }
 
@@ -466,8 +480,9 @@ FV_DiscreteField:: create_clone( MAC_Object* a_owner,
    for (size_t comp=0;comp<NB_COMPS;++comp)
      (*result->UNK_LOCAL_NUMBERING)[comp] = (*UNK_LOCAL_NUMBERING)[comp] ;
   
-   result->UNK_GLOBAL_NUMBERING = new vector< intArray3D >(
-   	UNK_GLOBAL_NUMBERING->size(), work_int ) ;
+   longLongIntArray3D work_llint( 1, 1, 1, 0 ) ;
+   result->UNK_GLOBAL_NUMBERING = new vector< longLongIntArray3D >(
+   	UNK_GLOBAL_NUMBERING->size(), work_llint ) ;
    for (size_t comp=0;comp<NB_COMPS;++comp)
      (*result->UNK_GLOBAL_NUMBERING)[comp] = (*UNK_GLOBAL_NUMBERING)[comp] ;
 
@@ -609,30 +624,60 @@ FV_DiscreteField:: create_clone( MAC_Object* a_owner,
      for (size_t comp=0;comp<NB_COMPS;++comp) 
        (*result->transproj_interpolation)[comp] = 
        		(*transproj_interpolation)[comp] ;
-   }
+   }   
    
-   // Here DLMFDconstrainedDOFs is a boolean
-   // if ( DLMFDconstrainedDOFs )
-   // {
-   //   boolArray3D work_bool( 1, 1, 1, false ) ; 
-   //   result->DLMFDconstrainedDOFs = new vector< boolArray3D >(
-   // 	DLMFDconstrainedDOFs->size(), work_bool ) ;
-   //   for (size_t i=0;i<DLMFDconstrainedDOFs->size();++i)
-   //     (*result->DLMFDconstrainedDOFs)[i] = (*DLMFDconstrainedDOFs)[i] ;
-   // } 
-   
-   // Here DLMFDconstrainedDOFs is an integer
-   if ( DLMFDconstrainedDOFs )
+   // Copy synchronization features
+   if ( synchronization_ready )
    {
-     intArray3D work_int( 1, 1, 1, 0 ) ; 
-     result->DLMFDconstrainedDOFs = new vector< intArray3D >(
-   	DLMFDconstrainedDOFs->size(), work_int ) ;
-     for (size_t i=0;i<DLMFDconstrainedDOFs->size();++i)
-       (*result->DLMFDconstrainedDOFs)[i] = (*DLMFDconstrainedDOFs)[i] ;
-   } 
-   
-   if ( !halozone_values_list.empty() )
-     result->set_HaloZone_Features( synchronized_level );   
+     list< vector< vector< FV_TRIPLET > > >::const_iterator ihr, ibs;
+     for (ihr=halozone_received.begin();ihr!=halozone_received.end();ihr++)
+       result->halozone_received.push_back( *ihr );
+       
+     for (ibs=bufferzone_sent.begin();ibs!=bufferzone_sent.end();ibs++)
+       result->halozone_received.push_back( *ibs ); 
+       
+     list< size_t >::const_iterator il;
+     for (il=synchronization_MPI_rank_neighbors.begin();
+     	il!=synchronization_MPI_rank_neighbors.end();il++)
+       result->synchronization_MPI_rank_neighbors.push_back( *il );
+     for (il=halozone_received_data_size.begin();
+     	il!=halozone_received_data_size.end();il++)
+       result->halozone_received_data_size.push_back( *il );
+     for (il=bufferzone_sent_data_size.begin();
+     	il!=bufferzone_sent_data_size.end();il++)
+       result->bufferzone_sent_data_size.push_back( *il ); 
+       
+     double* pnull = NULL;
+     list< double* >::const_iterator ild;
+     list< double* >::iterator ildr;
+     size_t nhal = halozone_received_data.size();
+     for (size_t i=0;i<nhal;++i) 
+       result->halozone_received_data.push_back( pnull );
+     for (ild=halozone_received_data.begin(),
+     	ildr=result->halozone_received_data.begin(),
+	il=halozone_received_data_size.begin();	
+	ild!=halozone_received_data.end();
+     	ild++,il++,ildr++)
+     {
+       size_t vecsize = *il;
+       (*ildr) = new double[vecsize];
+       for (size_t i=0;i<vecsize;++i) (*ildr)[i] = (*ild)[i];  
+     }
+     
+     size_t nbuf = bufferzone_sent.size();
+     for (size_t i=0;i<nbuf;++i) 
+       result->bufferzone_sent_data.push_back( pnull );
+     for (ild=bufferzone_sent_data.begin(),
+     	ildr=result->bufferzone_sent_data.begin(),
+	il=bufferzone_sent_data_size.begin();	
+	ild!=bufferzone_sent_data.end();
+     	ild++,il++,ildr++)
+     {
+       size_t vecsize = *il;
+       (*ildr) = new double[vecsize];
+       for (size_t i=0;i<vecsize;++i) (*ildr)[i] = (*ild)[i];  
+     }     
+   }   
 			
    MAC_CHECK_POST( result != 0 ) ;
    MAC_CHECK_POST( result->owner() == a_owner ) ;
@@ -865,7 +910,9 @@ FV_DiscreteField:: set_freeDOFonBC_update_features( void )
    {
      size_t bc_color = (*il)->get_color_ID() ;
      for (size_t comp=0;comp<NB_COMPS;++comp)
+     {
        if ( (*il)->is_neumann( comp ) && !(*il)->has_unknown( comp ) )
+       {
          if ( FV_DomainBuilder::is_main_color( bc_color ) )
 	 {
 	   FV_SHIFT_TRIPLET const* mst = 
@@ -934,6 +981,8 @@ FV_DiscreteField:: set_freeDOFonBC_update_features( void )
 	       (*il)->set_shift_MacTriplet( comp, &summst, 1. ) ;
 	   }  
 	 }
+       }
+     }
    }         
 }
 
@@ -1856,12 +1905,14 @@ FV_DiscreteField:: set_DOF_status( size_t component )
        for (size_t j=0;j<(*local_dof_number)[component](1);++j) 
          if ( (*on_current_processor)[component][0](i) == 3 
 	 	|| (*on_current_processor)[component][1](j) == 3 )
-	   if ( (*DOFstatus)[component](i,j,0) != FV_DOF_HALOZONE ) 
+	   if ( (*DOFstatus)[component](i,j,0) != FV_DOF_HALOZONE )
+	   { 
 	     if ( (*DOFstatus)[component](i,j,0) == FV_DOF_ONPROC ) 
 	       (*DOFstatus)[component](i,j,0) = FV_DOF_PERIODIC_BUFFERZONE ;
 	     else if ( (*DOFstatus)[component](i,j,0) == FV_DOF_BUFFERZONE )
 	       (*DOFstatus)[component](i,j,0) = 
 	       		FV_DOF_BUFFERZONE_PERIODIC_BUFFERZONE ; 
+	   }
    }
    else
    {
@@ -1871,12 +1922,14 @@ FV_DiscreteField:: set_DOF_status( size_t component )
            if ( (*on_current_processor)[component][0](i) == 3 
 	 	|| (*on_current_processor)[component][1](j) == 3
 	 	|| (*on_current_processor)[component][2](k) == 3 )
-	   if ( (*DOFstatus)[component](i,j,k) != FV_DOF_HALOZONE ) 
-	     if ( (*DOFstatus)[component](i,j,k) == FV_DOF_ONPROC ) 
-	       (*DOFstatus)[component](i,j,k) = FV_DOF_PERIODIC_BUFFERZONE ;
-	     else if ( (*DOFstatus)[component](i,j,k) == FV_DOF_BUFFERZONE )
-	       (*DOFstatus)[component](i,j,k) = 
+	     if ( (*DOFstatus)[component](i,j,k) != FV_DOF_HALOZONE ) 
+	     {
+	       if ( (*DOFstatus)[component](i,j,k) == FV_DOF_ONPROC ) 
+	         (*DOFstatus)[component](i,j,k) = FV_DOF_PERIODIC_BUFFERZONE ;
+	       else if ( (*DOFstatus)[component](i,j,k) == FV_DOF_BUFFERZONE )
+	         (*DOFstatus)[component](i,j,k) = 
 	       		FV_DOF_BUFFERZONE_PERIODIC_BUFFERZONE ;
+	     }
    } 
    
    // Buffer - Buffer periodic dof
@@ -1923,7 +1976,8 @@ FV_DiscreteField:: build_field_numbering( void )
    // Allocate numbering arrays
    intArray3D work(1,1,1);
    UNK_LOCAL_NUMBERING = new vector< intArray3D >( NB_COMPS, work ) ;
-   UNK_GLOBAL_NUMBERING = new vector< intArray3D >( NB_COMPS, work ) ;   
+   longLongIntArray3D llwork(1,1,1);   
+   UNK_GLOBAL_NUMBERING = new vector< longLongIntArray3D >( NB_COMPS, llwork ) ;   
    for (size_t comp=0;comp<NB_COMPS;comp++)
    {
      locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
@@ -2039,7 +2093,7 @@ FV_DiscreteField:: build_field_numbering( void )
    // Global numbering for unknowns in halozone
    size_t width = 5 ;
    bool send_numbering = false ;
-   intVector global_num_comm( 
+   longLongIntVector global_num_comm( 
    	NB_LOCAL_UNKNOWNS_HANDLED_BY_PROC_IN_BUFFERZONE*width, 0 );
    size_t positionIndex = 0 ;
 
@@ -2093,7 +2147,7 @@ FV_DiscreteField:: build_field_numbering( void )
      }
      else
      {
-       intVector global_num_from_r(1) ;
+       longLongIntVector global_num_from_r(1) ;
        macCOMM->receive( *r, global_num_from_r ) ;
        size_t vecsize = global_num_from_r.size(), ig, jg, kg = 0, comp, gnum; 
        
@@ -2515,7 +2569,7 @@ FV_DiscreteField:: build_periodic_numbering( void )
 
    // Transfer the lists into a single vector
    size_t width = 5 ;
-   intVector global_num_comm( ijk.size()*width, 0 );
+   longLongIntVector global_num_comm( ijk.size()*width, 0 );
    size_t positionIndex = 0 ;
    list<FV_TRIPLET>::iterator imac = ijk.begin();
    list<size_t>::iterator icomp = comps.begin(),iglobnum;
@@ -2553,7 +2607,7 @@ FV_DiscreteField:: build_periodic_numbering( void )
      }
      else
      {
-       intVector global_num_from_r(1) ;
+       longLongIntVector global_num_from_r(1) ;
        macCOMM->receive( *r, global_num_from_r ) ;
        size_t vecsize = global_num_from_r.size() ; 
        
@@ -2604,114 +2658,24 @@ FV_DiscreteField:: build_periodic_numbering( void )
 
 //----------------------------------------------------------------------
 void
-FV_DiscreteField:: check_field_numbering( void ) const
+FV_DiscreteField:: set_synchronization_features( void )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "FV_DiscreteField:: check_field_numbering" ) ;
-   MAC_CHECK_PRE( DOFcolors != 0 );
-   MAC_CHECK_PRE( DOFstatus != 0 );   
+   MAC_LABEL( "FV_DiscreteField:: set_synchronization_features" ) ;
 
-   size_t locNum = 0 ;
-   size_t width = 5 ;
-   MAC_Communicator const* macCOMM = MAC_Exec::communicator();
-   size_t nb_ranks = macCOMM->nb_ranks();
-   size_t rank = macCOMM->rank();
-   intVector global_num_comm( 
-   	NB_LOCAL_UNKNOWNS_HANDLED_BY_PROC_IN_BUFFERZONE*width, 0 );
-   size_t positionIndex = 0 ;
-
-   for (size_t comp=0;comp<NB_COMPS;comp++)
-   {
-     locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
-     size_t kmax = DIM == 2 ? 1 : (*local_dof_number)[locNum](2);
-     for (size_t i=0;i<(*local_dof_number)[locNum](0);++i)
-       for (size_t j=0;j<(*local_dof_number)[locNum](1);++j) 
-         for (size_t k=0;k<kmax;++k)
-	 { 		   
-	   if ( (*UNK_GLOBAL_NUMBERING)[comp](i,j,k) != -1 )
-	     if ( (*DOFstatus)[locNum](i,j,k) == FV_DOF_BUFFERZONE
-	     	|| (*DOFstatus)[locNum](i,j,k) 
-			== FV_DOF_BUFFERZONE_PERIODIC_BUFFERZONE )
-	     {
-               global_num_comm(positionIndex) = i + 
-	     	(*local_min_index_in_global)[locNum](0) ;
-               global_num_comm(positionIndex+1) = j + 
-	     	(*local_min_index_in_global)[locNum](1) ;
-               global_num_comm(positionIndex+2) = DIM == 2 ? 0 : 
-	     	k + (*local_min_index_in_global)[locNum](2) ;
-	       global_num_comm(positionIndex+3) = comp ;	     
-               global_num_comm(positionIndex+4) = 
-	     	(*UNK_GLOBAL_NUMBERING)[comp](i,j,k) ;	     
-	       positionIndex += width ;
-	     }
-	 }
-   }         
-
-   // Send global numbering in bufferzone to other processors
-   // for update if they own the unknown in their own halozone 
-   for (size_t r=0;r<nb_ranks;++r)
-   {
-     if ( r == rank )
-     {
-       for (size_t k=0;k<nb_ranks;++k)
-         if ( k != r )
-	   macCOMM->send( k, global_num_comm ) ; 
-     }
-     else
-     {
-       intVector global_num_from_r(1) ;
-       macCOMM->receive( r, global_num_from_r ) ;
-       size_t vecsize = global_num_from_r.size(), ig, jg, kg = 0, comp ;
-       int gnum ; 
-       
-       for (positionIndex=0;positionIndex<vecsize; )
-       {
-         ig = global_num_from_r(positionIndex);
-         jg = global_num_from_r(positionIndex+1);
-         kg = global_num_from_r(positionIndex+2);
-	 comp = global_num_from_r(positionIndex+3);
-	 gnum = global_num_from_r(positionIndex+4);
-	 
-         locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
-	 if ( is_global_triplet_local_DOF( ig, jg, kg, locNum ) ) 
-	   if ( (*UNK_GLOBAL_NUMBERING)[comp](
-	   	ig-(*local_min_index_in_global)[locNum](0),
-	   	jg-(*local_min_index_in_global)[locNum](1),
-		DIM == 2 ? 0 : kg - (*local_min_index_in_global)[locNum](2) )
-		!= gnum )
-	     FV_DiscreteField_ERROR::n4( FNAME ) ; 
-	 	 	 
-         positionIndex += width ;
-       }
-     }
-   }  
-} 
-
-
-
-
-//----------------------------------------------------------------------
-void
-FV_DiscreteField:: set_HaloZone_Features( size_t level )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "FV_DiscreteField:: set_HaloZone_Features" ) ;
-
-   synchronized_level = level ;
+   synchronization_ready = true;
    
    size_t locNum = 0 ;
    MAC_Communicator const* macCOMM = MAC_Exec::communicator();
    size_t rank = macCOMM->rank();
 
-   // ----------------------------------------------------------------
-   // 1) Fill buffer_features with all my BufferZone features
-   size_t width = 4, positionIndex = 0, i ;
+   // Fill buffer_features with the (i,j,k,comp) of dof handled by this proc
+   // i.e. dof in the buffer zone
+   size_t width = 4, positionIndex = 0, i, comp, ig, jg, kg, nijk, m ;
    bool send_features = false ;
    intVector buffer_features( 
-   	(NB_LOCAL_UNKNOWNS_HANDLED_BY_PROC_IN_BUFFERZONE+
-	NB_LOCAL_UNKNOWNS_HANDLED_BY_PROC_IN_PERIODIC_BUFFERZONE)*
-	width, 0 );
-   for (size_t comp=0;comp<NB_COMPS;comp++)
+   	NB_LOCAL_UNKNOWNS_HANDLED_BY_PROC_IN_BUFFERZONE*width, 0 );
+   for (comp=0;comp<NB_COMPS;comp++)
    {
      locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
      size_t kmax = DIM == 2 ? 1 : (*local_dof_number)[locNum](2);
@@ -2729,9 +2693,7 @@ FV_DiscreteField:: set_HaloZone_Features( size_t level )
 	   if ( send_features )
 	     if ( (*DOFstatus)[locNum](i,j,k) == FV_DOF_BUFFERZONE
 	     	|| (*DOFstatus)[locNum](i,j,k) 
-			== FV_DOF_BUFFERZONE_PERIODIC_BUFFERZONE
-	     	|| (*DOFstatus)[locNum](i,j,k) 
-			== FV_DOF_PERIODIC_BUFFERZONE )
+			== FV_DOF_BUFFERZONE_PERIODIC_BUFFERZONE )
 	     {
                buffer_features(positionIndex) = i + 
 	     	(*local_min_index_in_global)[locNum](0) ;
@@ -2739,151 +2701,275 @@ FV_DiscreteField:: set_HaloZone_Features( size_t level )
 	     	(*local_min_index_in_global)[locNum](1) ;
                buffer_features(positionIndex+2) = DIM == 2 ? 0 : k + 
 	     	(*local_min_index_in_global)[locNum](2) ;
-	       buffer_features(positionIndex+3) = comp ;	     
-
+	       buffer_features(positionIndex+3) = comp ;
 	       positionIndex += width ;
 	     }
 	 }
    }
 
-   // ---------------------------------------------------------------------
-   // 2) Send my full buffer features and receive my neighbors' ones
+   // Send the bufferzone (i,j,k,comp) features to the neighboring procs
+   // and process the received features. We store the (i,j,k,comp) that belong
+   // to this proc in halozone_received
    list<size_t> MPI_neighbors_world =
    	*PRIMARY_GRID->get_MPI_neighbors_ranks() ;
-   list< list<size_t> > features_list_list ;
-   list< list<size_t> >::iterator ill;    
    MPI_neighbors_world.push_back( rank ) ;
    MPI_neighbors_world.sort();   
-   list<size_t>::iterator r, k, il;
-
+   list<size_t>::iterator r, k, ils;
+   FV_TRIPLET mt;
+   mt.i = 0 ;
+   mt.j = 0 ;
+   mt.k = 0 ;
+   list<FV_TRIPLET> ijk ;
+   vector< list<FV_TRIPLET> > kept_ijk_per_comp( NB_COMPS, ijk );
+   list<FV_TRIPLET>::iterator imt;
+   
    for (r=MPI_neighbors_world.begin();r!=MPI_neighbors_world.end();r++)
    {
      if ( *r == rank )
      {
-       // 2-a) SEND all my BufferZone features to neighbors
        for (k=MPI_neighbors_world.begin();k!=MPI_neighbors_world.end();k++)
          if ( *k != rank )
            macCOMM->send( *k, buffer_features ) ;
      }
      else
      {
-       // 2-b) RECEIVE all my neighbors' BufferZone features
-       intVector full_buffer_features_from_r(1) ;
-       macCOMM->receive( *r, full_buffer_features_from_r ) ;
-       list<size_t> hz_features_list ;
-       size_t vecsize = full_buffer_features_from_r.size(), comp, ig, jg, kg ; 
-       // Look through the whole BufferFeatures message
+       intVector received_buffer_features_from_r(1) ;
+       macCOMM->receive( *r, received_buffer_features_from_r ) ;
+       size_t vecsize = received_buffer_features_from_r.size() ; 
+
        for ( positionIndex=0;positionIndex<vecsize; )
        {
-         ig = full_buffer_features_from_r(positionIndex);
-         jg = full_buffer_features_from_r(positionIndex+1);
-         kg = full_buffer_features_from_r(positionIndex+2);
-	 comp = full_buffer_features_from_r(positionIndex+3);
+         ig = received_buffer_features_from_r(positionIndex);
+         jg = received_buffer_features_from_r(positionIndex+1);
+         kg = received_buffer_features_from_r(positionIndex+2);
+	 comp = received_buffer_features_from_r(positionIndex+3);
 	 
          locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
 
-         // 2-c) KEEP only the ones I own in my HaloZone
 	 if ( is_global_triplet_local_DOF( ig, jg, kg, locNum ) )
 	 {
-	   hz_features_list.push_back( ig ) ;
-	   hz_features_list.push_back( jg ) ;
-	   hz_features_list.push_back( kg ) ;
-	   hz_features_list.push_back( comp ) ;
+	   mt.i = ig - (*local_min_index_in_global)[locNum](0);
+	   mt.j = jg - (*local_min_index_in_global)[locNum](1);
+	   mt.k = DIM == 2 ? 0 : kg - 
+	     	(*local_min_index_in_global)[locNum](2) ;
+	   kept_ijk_per_comp[comp].push_back( mt );
 	 }
 	   
          positionIndex += width ;
        }
        
-       // Keep it for all neighbors procs
-       features_list_list.push_back( hz_features_list ) ;
-       
-       // Keep pointers on HaloZone values which will be update
-       vector< double* > work( hz_features_list.size() / width, NULL );
-       for( il=hz_features_list.begin(),i=0; il!=hz_features_list.end();
-       		++i,il++ )
+       // Transfer the vector of list into a vector of vector
+       vector< FV_TRIPLET > vvv;
+       vector< vector< FV_TRIPLET > > vec_kept_ijk_per_comp( NB_COMPS, vvv );
+       for (comp=0;comp<NB_COMPS;comp++)
        {
-         ig = *il;
-	 il++;
-         jg = *il;
-	 il++;
-         kg = *il;
-	 il++;
-	 comp = *il; 
-
-	 locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
-
-	 // Keep HaloZone values adresses (with LOCAL features !!)
-         work[i] =  &((*VALUES)[level][locNum](
-	 	ig - (*local_min_index_in_global)[locNum](0), 
-		jg - (*local_min_index_in_global)[locNum](1), 
-		DIM == 2 ? 0 : kg - 
-	     	(*local_min_index_in_global)[locNum](2) ) );      
-       }
-       // Keep vector work for all neighbors       
-       halozone_values_list.push_back( work );
+         size_t vsize = kept_ijk_per_comp[comp].size();
+	 vec_kept_ijk_per_comp[comp].reserve( vsize );
+	 for (i=0;i<vsize;++i) vec_kept_ijk_per_comp[comp].push_back( mt ); 
+       }    
+       for (comp=0;comp<NB_COMPS;comp++)
+       {
+         size_t m = 0;
+         for (imt=kept_ijk_per_comp[comp].begin();
+	 	imt!=kept_ijk_per_comp[comp].end();imt++,++m)
+	   vec_kept_ijk_per_comp[comp][m] = *imt;
+       }	
+	            
+       // Store the vector of vector into halozone_received
+       halozone_received.push_back( vec_kept_ijk_per_comp );
+       
+       // Store the MPI rank of the neighbor
+       synchronization_MPI_rank_neighbors.push_back( *r );
+       
+       // Clear the content of the lists per comp
+       for (comp=0;comp<NB_COMPS;comp++)
+         kept_ijk_per_comp[comp].clear();
      }
    }  
 
-   // ---------------------------------------------------------------------
-   // 3) Send back HaloZone-features to neighbors, thus they create a 
-   // resticted array of pointers-on-values of the bufferzone they
-   // share with each neighbor
-   intVector restricted_hz_features( 0, 0 );
+   // Send back the halozone_received (i,j,k,comp) features to neighbors
+   // such that they can create the corresponding bufferzone_sent (i,j,k,comp)
+   // features
+   intVector hz_features( 0, 0 );
+   list< vector< vector< FV_TRIPLET > > >::iterator ihr, ibs;
    for (r=MPI_neighbors_world.begin();r!=MPI_neighbors_world.end();r++)
    {
      if ( *r == rank )
      {
-       // 3-a) SEND restricted list of HaloZone features to neighbors
-       for ( k=MPI_neighbors_world.begin(),ill=features_list_list.begin();
-       	k!=MPI_neighbors_world.end(); k++ )
+       for ( k=MPI_neighbors_world.begin(),ihr=halozone_received.begin();
+       		k!=MPI_neighbors_world.end(); k++ )
          if ( *k != rank )
 	 {
-	   restricted_hz_features.resize( ill->size() ) ;
-           // this vector is the similar to the 
-           // hz_feature_list vector of previous stage 2-c)
-	   for( il=ill->begin(),i=0; il!=ill->end(); il++,++i )
-             restricted_hz_features(i) = *il ;
-	   macCOMM->send( *k, restricted_hz_features ) ;
-	   ill++;
+           // Number of ijk to be sent
+	   nijk = 0;
+	   for (comp=0;comp<NB_COMPS;comp++)
+	     nijk += (*ihr)[comp].size();
+	   hz_features.resize( nijk * width ) ;
+
+           // Fill the buffer
+	   positionIndex = 0;
+	   for (comp=0;comp<NB_COMPS;comp++)
+	   {
+	     nijk = (*ihr)[comp].size();
+	     
+	     locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
+	     
+	     for (size_t m=0;m<nijk;++m)
+	     {
+	       hz_features(positionIndex) = (*ihr)[comp][m].i + 
+	     	(*local_min_index_in_global)[locNum](0) ;			
+               hz_features(positionIndex+1) = (*ihr)[comp][m].j + 
+	     	(*local_min_index_in_global)[locNum](1) ;
+               hz_features(positionIndex+2) = DIM == 2 ? 0 :
+	       	(*ihr)[comp][m].k + (*local_min_index_in_global)[locNum](2) ;
+	       hz_features(positionIndex+3) = comp ;
+	       positionIndex += width ;	       
+	     }
+	   }
+
+	   // Send message
+	   macCOMM->send( *k, hz_features ) ;
+	   ihr++;
 	 }
      }
      else
      {
-       // 3-b) RECEIVE restricted list of BufferZone-features 
-       // that neighbors share with me
-       intVector restricted_buffer_features(1) ;
-       macCOMM->receive( *r, restricted_buffer_features ) ;
-       size_t vecsize = restricted_buffer_features.size(), comp, ig, jg, kg ;
-       vector< double* > work( vecsize / width, NULL ); 
+       intVector received_bufferzone_features_from_r(1) ;
+       macCOMM->receive( *r, received_bufferzone_features_from_r ) ;
+       size_t vecsize = received_bufferzone_features_from_r.size();
+       vector<size_t> nijk_per_comp( NB_COMPS, 0 );
        
-       for ( positionIndex=0,i=0; positionIndex<vecsize; ++i)
+       // Get the number of ijk per comp
+       for ( positionIndex=0; positionIndex<vecsize; )
        {
-         ig = restricted_buffer_features(positionIndex);
-         jg = restricted_buffer_features(positionIndex+1);
-         kg = restricted_buffer_features(positionIndex+2);
-	 comp = restricted_buffer_features(positionIndex+3);
+         comp = received_bufferzone_features_from_r(positionIndex+3);
+	 nijk_per_comp[comp]++;
+	 positionIndex += width;
+       } 
+       
+       // Allocate bufferzone_sent for this neighboring proc
+       vector< FV_TRIPLET > vvv;
+       vector< vector< FV_TRIPLET > > vec_ijk_per_comp( NB_COMPS, vvv );
+       for (comp=0;comp<NB_COMPS;comp++)
+       {
+	 vec_ijk_per_comp[comp].reserve( nijk_per_comp[comp] );
+	 for (i=0;i<nijk_per_comp[comp];++i) 
+	   vec_ijk_per_comp[comp].push_back( mt ); 
+       }        
+       
+       positionIndex = 0;
+       for (comp=0;comp<NB_COMPS;comp++)
+       {
+         for (m=0;m<nijk_per_comp[comp];++m)
+	 {
+           ig = received_bufferzone_features_from_r(positionIndex);
+           jg = received_bufferzone_features_from_r(positionIndex+1);
+           kg = received_bufferzone_features_from_r(positionIndex+2);
 	 
-         locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
+           locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
 
-         work[i] =  &((*VALUES)[level][locNum](
-	 	ig - (*local_min_index_in_global)[locNum](0), 
-		jg - (*local_min_index_in_global)[locNum](1), 
-		DIM == 2 ? 0 : kg - 
-	     	(*local_min_index_in_global)[locNum](2) ));  
-	 
-         positionIndex += width ;
-       }             
-       // Keep BufferZone values pointers to send to neighbors for updating
-       bufferzone_values.push_back( work );
+           vec_ijk_per_comp[comp][m].i = ig 
+	 	- (*local_min_index_in_global)[locNum](0);
+           vec_ijk_per_comp[comp][m].j = jg 
+	 	- (*local_min_index_in_global)[locNum](1);		
+           vec_ijk_per_comp[comp][m].k = DIM == 2 ? 0 : kg - 
+	     	(*local_min_index_in_global)[locNum](2); 
+	   
+	   positionIndex += width ;	 
+	 }
+       }
+                    
+       // Store the vector of vector into bufferzone_sent
+       bufferzone_sent.push_back( vec_ijk_per_comp );
      }
    }
-   // Can be improve by sending only concerned pointers to
-   // neighbor, instead of concerned pointers to neighborSSSS
 
-
-   // set_HaloZone_Features in periodic cases
-//   if ( PERIODIC_SHIFT ) set_HaloZone_Features_PERIODIC() ;   
-
+   // If periodic, set the periodic synchronization features
+   if ( PERIODIC_SHIFT ) set_periodic_synchronization_features() ; 
+   
+   // Allocate 1D arrays to send and receive data 
+   size_t nneighbors = halozone_received.size();
+   double* pdouble = NULL;
+   for ( i=0;i<nneighbors;++i) 
+   {
+     halozone_received_data.push_back( pdouble );
+     bufferzone_sent_data.push_back( pdouble );
+   }
+   
+   list< double* >::iterator ild = halozone_received_data.begin();
+   for ( ihr=halozone_received.begin();ihr!=halozone_received.end();
+   	ihr++,ild++ )
+   {
+     nijk = 0;
+     for (comp=0;comp<NB_COMPS;comp++) nijk += (*ihr)[comp].size();
+     (*ild) = new double[nijk];
+     halozone_received_data_size.push_back(nijk); 
+   } 
+   ild = bufferzone_sent_data.begin();
+   for ( ibs=bufferzone_sent.begin();ibs!=bufferzone_sent.end();
+   	ibs++,ild++ )
+   {
+     nijk = 0;
+     for (comp=0;comp<NB_COMPS;comp++) nijk += (*ibs)[comp].size();
+     (*ild) = new double[nijk];
+     bufferzone_sent_data_size.push_back(nijk); 
+   }
+   
+   
+//    // Debug
+//    size_t nb_ranks = macCOMM->nb_ranks() ;
+//    size_t RANK = macCOMM->rank() ;
+//    for (size_t i=0;i<nb_ranks;++i)
+//    {
+//      if ( i == RANK )
+//      {       
+//        cout << "Rank " << RANK << endl ;
+//        cout << "   Buffer data" << endl;
+//        for ( r=synchronization_MPI_rank_neighbors.begin(),
+//   	ibs=bufferzone_sent.begin(),
+// 	ils=bufferzone_sent_data_size.begin();
+//   	r!=synchronization_MPI_rank_neighbors.end();
+// 	r++,ibs++,ils++ )
+//        {
+//          cout << "   To rank " << *r << endl;
+// 	 cout << "   Buffer data size = " << *ils << endl;
+// 	 cout << "   Number of triplets per comp = " << *ils << endl;
+// 	 for (comp=0;comp<NB_COMPS;comp++)
+// 	 {
+// 	   cout << "      Comp = " << comp << " n = " << (*ibs)[comp].size() 
+// 	   	<< endl;
+// 	   nijk = (*ibs)[comp].size();
+// 	   for (m=0;m<nijk;++m)
+// 	     cout << "      " << (*ibs)[comp][m].i << " " << (*ibs)[comp][m].j 
+// 	     	<< " " << (*ibs)[comp][m].k << endl;
+// 	 }	 
+//        }
+//        cout << endl; 
+//        cout << "   Halozone data" << endl;
+//        for ( r=synchronization_MPI_rank_neighbors.begin(),
+//   	ihr=halozone_received.begin(),
+// 	ils=halozone_received_data_size.begin();
+//   	r!=synchronization_MPI_rank_neighbors.end();
+// 	r++,ihr++,ils++ )
+//        {
+//          cout << "   From rank " << *r << endl;
+// 	 cout << "   Received data size = " << *ils << endl;
+// 	 cout << "   Number of triplets per comp = " << *ils << endl;
+// 	 for (comp=0;comp<NB_COMPS;comp++)
+// 	 {
+// 	   cout << "      Comp = " << comp << " n = " << (*ihr)[comp].size() 
+// 	   	<< endl;
+// 	   nijk = (*ihr)[comp].size();
+// 	   for (m=0;m<nijk;++m)
+// 	     cout << "      " << (*ihr)[comp][m].i << " " << (*ihr)[comp][m].j 
+// 	     	<< " " << (*ihr)[comp][m].k << endl;
+// 	 }
+//        }
+//        cout << endl;                     
+//      }
+//      macCOMM->barrier();
+//    }
+//    if ( RANK == 0 ) cout << endl;       
 } 
 
 
@@ -2891,25 +2977,28 @@ FV_DiscreteField:: set_HaloZone_Features( size_t level )
 
 //----------------------------------------------------------------------
 void
-FV_DiscreteField:: set_HaloZone_Features_Periodic( void )
+FV_DiscreteField:: set_periodic_synchronization_features( void )
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "FV_DiscreteField:: set_HaloZone_Features_Periodic" ) ;
+   MAC_LABEL( "FV_DiscreteField:: set_periodic_synchronization_features" ) ;
    
-   list<FV_TRIPLET> ijk ;
+   size_t locNum = 0, comp, i, j, m ;
+   MAC_Communicator const* macCOMM = MAC_Exec::communicator();
+   size_t rank = macCOMM->rank();
+   list<FV_TRIPLET> ijk, signed_periodic_shift ;
    FV_TRIPLET mt ;
    mt.i = 0 ;
-   mt.j = 0 ;
-   mt.k = 0 ;
-   list<size_t> comps, globalnums ;
-   size_t locNum ; 
-
-   // Store periodic buffer zone unknown numbering in lists
-   for (size_t comp=0;comp<NB_COMPS;comp++)
+   mt.j = 0 ;   
+   mt.k = 0 ; 
+   list<size_t> comps ;
+   
+   // Fill buffer_features with the (i,j,k,comp) of dof handled by this proc
+   // i.e. dof in the buffer zone
+   for (comp=0;comp<NB_COMPS;comp++)
    {
      locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
      size_t kmax = DIM == 2 ? 1 : (*local_dof_number)[locNum](2);
-     for (size_t i=0;i<(*local_dof_number)[locNum](0);++i)
+     for (i=0;i<(*local_dof_number)[locNum](0);++i)
        for (size_t j=0;j<(*local_dof_number)[locNum](1);++j) 
          for (size_t k=0;k<kmax;++k)
 	 {            
@@ -2930,7 +3019,10 @@ FV_DiscreteField:: set_HaloZone_Features_Periodic( void )
 	       {
 	         ijk.push_back( mt ) ;
 		 comps.push_back( comp ) ; 
-		 globalnums.push_back( (*UNK_GLOBAL_NUMBERING)[comp](i,j,k) ) ;
+		 mt.i = (*PERIODIC_SHIFT)[locNum].i;
+		 mt.j = 0 ;
+		 mt.k = 0 ;
+		 signed_periodic_shift.push_back( mt ) ;
 	       }
 	       
                mt.i = i + (*local_min_index_in_global)[locNum](0) 
@@ -2941,14 +3033,703 @@ FV_DiscreteField:: set_HaloZone_Features_Periodic( void )
 	       if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
 	       {
 	         ijk.push_back( mt ) ;
-		 comps.push_back( comp ) ; 
-		 globalnums.push_back( (*UNK_GLOBAL_NUMBERING)[comp](i,j,k) ) ;
+		 comps.push_back( comp ) ;
+		 mt.i = - (*PERIODIC_SHIFT)[locNum].i;
+		 mt.j = 0 ;
+		 mt.k = 0 ;
+		 signed_periodic_shift.push_back( mt ) ;		  
 	       }	        	       
 	     }
+	     
+             // Y periodicity
+	     if ( (*PERIODIC)(1) )
+	     {
+               mt.i = i + (*local_min_index_in_global)[locNum](0) ;
+               mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		+ (*PERIODIC_SHIFT)[locNum].j ;   
+               mt.k = DIM == 2 ? 0 : 
+	       		k + (*local_min_index_in_global)[locNum](2) ;	       
+	       if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	       {
+	         ijk.push_back( mt ) ;
+		 comps.push_back( comp ) ;
+		 mt.i = 0;
+		 mt.j = (*PERIODIC_SHIFT)[locNum].j ;
+		 mt.k = 0 ;
+		 signed_periodic_shift.push_back( mt ) ; 
+	       }
+	       
+               mt.i = i + (*local_min_index_in_global)[locNum](0) ;
+               mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		- (*PERIODIC_SHIFT)[locNum].j ;   
+               mt.k = DIM == 2 ? 0 : 
+	       		k + (*local_min_index_in_global)[locNum](2) ;	       
+	       if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	       {
+	         ijk.push_back( mt ) ;
+		 comps.push_back( comp ) ;
+		 mt.i = 0;
+		 mt.j = - (*PERIODIC_SHIFT)[locNum].j ;
+		 mt.k = 0 ;
+		 signed_periodic_shift.push_back( mt ) ; 
+	       }	        	       
+	     }
+	     
+             // X-Y biperiodicity
+	     if ( (*PERIODIC)(0) && (*PERIODIC)(1) )
+	     {
+               mt.i = i + (*local_min_index_in_global)[locNum](0) 
+			+ (*PERIODIC_SHIFT)[locNum].i ;
+               mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		+ (*PERIODIC_SHIFT)[locNum].j ;   
+               mt.k = DIM == 2 ? 0 : 
+	       		k + (*local_min_index_in_global)[locNum](2) ;	       
+	       if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	       {
+	         ijk.push_back( mt ) ;
+		 comps.push_back( comp ) ;
+		 mt.i = (*PERIODIC_SHIFT)[locNum].i;
+		 mt.j = (*PERIODIC_SHIFT)[locNum].j ;
+		 mt.k = 0 ;
+		 signed_periodic_shift.push_back( mt ) ; 
+	       }
+	       
+               mt.i = i + (*local_min_index_in_global)[locNum](0) 
+			+ (*PERIODIC_SHIFT)[locNum].i ;
+               mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		- (*PERIODIC_SHIFT)[locNum].j ;   
+               mt.k = DIM == 2 ? 0 : 
+	       		k + (*local_min_index_in_global)[locNum](2) ;	       
+	       if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	       {
+	         ijk.push_back( mt ) ;
+		 comps.push_back( comp ) ;
+		 mt.i = (*PERIODIC_SHIFT)[locNum].i;
+		 mt.j = - (*PERIODIC_SHIFT)[locNum].j ;
+		 mt.k = 0 ;
+		 signed_periodic_shift.push_back( mt ) ; 
+	       }
+	       
+               mt.i = i + (*local_min_index_in_global)[locNum](0) 
+			- (*PERIODIC_SHIFT)[locNum].i ;
+               mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		+ (*PERIODIC_SHIFT)[locNum].j ;   
+               mt.k = DIM == 2 ? 0 : 
+	       		k + (*local_min_index_in_global)[locNum](2) ;	       
+	       if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	       {
+	         ijk.push_back( mt ) ;
+		 comps.push_back( comp ) ;
+		 mt.i = - (*PERIODIC_SHIFT)[locNum].i;
+		 mt.j = (*PERIODIC_SHIFT)[locNum].j ;
+		 mt.k = 0 ;
+		 signed_periodic_shift.push_back( mt ) ; 
+	       }
+	       
+               mt.i = i + (*local_min_index_in_global)[locNum](0) 
+			- (*PERIODIC_SHIFT)[locNum].i ;
+               mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		- (*PERIODIC_SHIFT)[locNum].j ;   
+               mt.k = DIM == 2 ? 0 : 
+	       		k + (*local_min_index_in_global)[locNum](2) ;	       
+	       if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	       {
+	         ijk.push_back( mt ) ;
+		 comps.push_back( comp ) ;
+		 mt.i = - (*PERIODIC_SHIFT)[locNum].i;
+		 mt.j = - (*PERIODIC_SHIFT)[locNum].j ;
+		 mt.k = 0 ;
+		 signed_periodic_shift.push_back( mt ) ; 
+	       }	       
+	     }
+	     
+	     // 3D cases
+	     if ( DIM == 3 )
+	     {
+               // Z periodicity
+	       if ( (*PERIODIC)(2) )
+	       {
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		+ (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ;
+                   mt.i = 0 ;
+		   mt.j = 0 ;
+		   mt.k = (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ;		    
+	         }
+	       
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		- (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ; 
+		   mt.i = 0 ;
+		   mt.j = 0 ;
+		   mt.k = - (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ;
+	         }	        	       
+	       }
+	       
+               // X-Z biperiodicity
+	       if ( (*PERIODIC)(0) && (*PERIODIC)(2) )
+	       {
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		+ (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		+ (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ;
+		   mt.i = (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = 0 ;
+		   mt.k = (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ; 
+	         }
+	       
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		+ (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		- (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ;
+		   mt.i = (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = 0 ;
+		   mt.k = - (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ;  
+	         }
+		 
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		- (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		+ (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ; 
+		   mt.i = - (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = 0 ;
+		   mt.k = (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ;
+	         }
+	       
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		- (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		- (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ;
+		   mt.i = - (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = 0 ;
+		   mt.k = - (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ; 
+	         }		 	        	       
+	       }
+	       
+               // Y-Z biperiodicity
+	       if ( (*PERIODIC)(1) && (*PERIODIC)(2) )
+	       {
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		+ (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		+ (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ;
+		   mt.i = 0 ;
+		   mt.j = (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ; 
+	         }
+	       
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		+ (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		- (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ; 
+		   mt.i = 0 ;
+		   mt.j = (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = - (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ; 
+	         }
+		 
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		- (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		+ (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ;
+		   mt.i = 0 ;
+		   mt.j = - (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ;  
+	         }
+	       
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		- (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		- (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ; 
+		   mt.i = 0 ;
+		   mt.j = - (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = - (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ; 
+	         }		 	        	       
+	       }
+	       
+               // X-Y-Z triperiodicity
+	       if ( (*PERIODIC)(0) && (*PERIODIC)(1) && (*PERIODIC)(2) )
+	       {
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		+ (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		+ (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		+ (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ; 
+		   mt.i = (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ; 
+	         }
+	       
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		+ (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		+ (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		- (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ;
+		   mt.i = (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = - (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ; 
+	         }
+		 
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		+ (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		- (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		+ (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ;
+		   mt.i = (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = - (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ; 
+	         }
+	       
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		+ (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		- (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		- (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ; 
+		   mt.i = (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = - (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = - (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ;
+	         }
+		 
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		- (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		+ (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		+ (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ; 
+		   mt.i = - (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ;
+	         }
+	       
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		- (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		+ (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		- (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ;
+		   mt.i = - (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = - (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ; 
+	         }
+		 
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		- (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		- (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		+ (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ; 
+		   mt.i = - (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = - (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ;
+	         }
+	       
+                 mt.i = i + (*local_min_index_in_global)[locNum](0) 
+	       		- (*PERIODIC_SHIFT)[locNum].i ;
+                 mt.j = j + (*local_min_index_in_global)[locNum](1) 
+	       		- (*PERIODIC_SHIFT)[locNum].j ;   
+                 mt.k = k + (*local_min_index_in_global)[locNum](2) 
+	       		- (*PERIODIC_SHIFT)[locNum].k ;	       
+	         if ( is_global_triplet( mt.i, mt.j, mt.k, comp ) )	       
+	         {
+	           ijk.push_back( mt ) ;
+		   comps.push_back( comp ) ; 
+		   mt.i = - (*PERIODIC_SHIFT)[locNum].i ;
+		   mt.j = - (*PERIODIC_SHIFT)[locNum].j ;
+		   mt.k = - (*PERIODIC_SHIFT)[locNum].k ;
+		   signed_periodic_shift.push_back( mt ) ;
+	         }		 		 	        	       
+	       }	       	       	       	     
+	     }	     	     
 	   }
 	 }
-   }
+   }   
 
+   // Transfer the lists into a single vector
+   size_t width = 7 ;
+   intVector buffer_features( ijk.size()*width, 0 );
+   size_t positionIndex = 0 ;
+   list<FV_TRIPLET>::iterator imac, ishift;
+   list<size_t>::iterator icomp;
+   
+   for (imac=ijk.begin(),icomp=comps.begin(),
+   	ishift=signed_periodic_shift.begin();
+   	imac!=ijk.end();icomp++,imac++,ishift++)
+   {
+      buffer_features(positionIndex) = imac->i ;
+      buffer_features(positionIndex+1) = imac->j ;
+      buffer_features(positionIndex+2) = imac->k ;
+      buffer_features(positionIndex+3) = *icomp ;
+      buffer_features(positionIndex+4) = ishift->i ;
+      buffer_features(positionIndex+5) = ishift->j ;
+      buffer_features(positionIndex+6) = ishift->k ;      	          
+      positionIndex += width ;     
+   }      
+
+   // Send the bufferzone (i,j,k,comp) features to the neighboring procs
+   // and process the received features. We store the (i,j,k,comp) that belong
+   // to this proc in halozone_received
+   size_t ig = 0, jg = 0, kg = 0 ;   
+   list<size_t> MPI_periodic_neighbors_world =
+   	*PRIMARY_GRID->get_MPI_periodic_neighbors_ranks() ;
+   MPI_periodic_neighbors_world.push_back( rank ) ;
+   MPI_periodic_neighbors_world.sort();
+   list<size_t>::iterator r, k, ils;
+   list<FV_TRIPLET> trip ;
+   vector< list<FV_TRIPLET> > kept_ijk_per_comp( NB_COMPS, trip );
+   list<FV_TRIPLET>::iterator imt;
+   list<size_t> stl;
+   vector< list<size_t> > position_bufferzone_list(
+   	MPI_periodic_neighbors_world.size(), stl );
+
+   for (r=MPI_periodic_neighbors_world.begin(),i=0;
+   	r!=MPI_periodic_neighbors_world.end();r++,++i)
+   {
+     if ( *r == rank )
+     {
+       // Send messages to the neighboring procs
+       for (k=MPI_periodic_neighbors_world.begin();
+       	k!=MPI_periodic_neighbors_world.end();k++)
+         if ( *k != rank )
+	   macCOMM->send( *k, buffer_features ) ;
+	   
+       // Check on the proc itself (in case of a single proc in the periodic
+       // direction)
+       size_t vecsize = buffer_features.size() ; 
+       for (positionIndex=0,m=0;positionIndex<vecsize;++m )
+       {
+         ig = buffer_features(positionIndex);
+         jg = buffer_features(positionIndex+1);
+         kg = buffer_features(positionIndex+2);
+	 comp = buffer_features(positionIndex+3);
+	 
+         locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
+
+	 if ( is_global_triplet_local_DOF( ig, jg, kg, locNum ) ) 
+	 {
+	   mt.i = ig - (*local_min_index_in_global)[locNum](0);
+	   mt.j = jg - (*local_min_index_in_global)[locNum](1);
+	   mt.k = DIM == 2 ? 0 : kg - 
+	     	(*local_min_index_in_global)[locNum](2) ;
+	   kept_ijk_per_comp[comp].push_back( mt );
+	   position_bufferzone_list[i].push_back( m );
+	 }
+	 	 	 
+         positionIndex += width ;
+       }        
+     }
+     else
+     {
+       intVector received_buffer_features_from_r(1) ;
+       macCOMM->receive( *r, received_buffer_features_from_r ) ;
+       size_t vecsize = received_buffer_features_from_r.size() ; 
+
+       for (positionIndex=0,m=0;positionIndex<vecsize;++m )
+       {
+         ig = received_buffer_features_from_r(positionIndex);
+         jg = received_buffer_features_from_r(positionIndex+1);
+         kg = received_buffer_features_from_r(positionIndex+2);
+	 comp = received_buffer_features_from_r(positionIndex+3);
+	 
+         locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
+
+	 if ( is_global_triplet_local_DOF( ig, jg, kg, locNum ) ) 
+	 {
+	   mt.i = ig - (*local_min_index_in_global)[locNum](0);
+	   mt.j = jg - (*local_min_index_in_global)[locNum](1);
+	   mt.k = DIM == 2 ? 0 : kg - 
+	     	(*local_min_index_in_global)[locNum](2) ;
+	   kept_ijk_per_comp[comp].push_back( mt );
+	   position_bufferzone_list[i].push_back( m );
+	 }
+	 	 	 
+         positionIndex += width ;
+       }
+     }
+     
+     if ( !position_bufferzone_list[i].empty() )
+     {
+       // Transfer the vector of list into a vector of vector
+       vector< FV_TRIPLET > vvv;
+       vector< vector< FV_TRIPLET > > vec_kept_ijk_per_comp( NB_COMPS, vvv );
+       for (comp=0;comp<NB_COMPS;comp++)
+       {
+         size_t vsize = kept_ijk_per_comp[comp].size();
+	 vec_kept_ijk_per_comp[comp].reserve( vsize );
+	 for (m=0;m<vsize;++m) vec_kept_ijk_per_comp[comp].push_back( mt ); 
+       }    
+       for (comp=0;comp<NB_COMPS;comp++)
+       {
+         m = 0;
+         for (imt=kept_ijk_per_comp[comp].begin();
+	 	imt!=kept_ijk_per_comp[comp].end();imt++,++m)
+	   vec_kept_ijk_per_comp[comp][m] = *imt;
+       }	
+	            
+       // Important remark: 
+       // In the case of 2 procs only in the periodic direction,
+       // these 2 procs already exchange data through their interior boundary
+       // Now they also exchange data through their periodic boundary
+       // Consequently, a MPI rank of a neighboring proc can appear multiple
+       // times (once for interior boundary and once for periodic boundary)
+       // We therefore send-receive a few more messages as 2 neighboring procs
+       // may exchange 2 (or more ) messages instead of 1, but this simplifies 
+       // the programming
+       
+       // Store the vector of vector into halozone_received
+       halozone_received.push_back( vec_kept_ijk_per_comp );
+       
+       // Store the MPI rank of the neighbor
+       synchronization_MPI_rank_neighbors.push_back( *r );
+       
+       // Clear the content of the lists per comp
+       for (comp=0;comp<NB_COMPS;comp++)
+         kept_ijk_per_comp[comp].clear();       
+     }
+   }    
+
+   // Send back the halozone_received (i,j,k,comp) features to neighbors
+   // as a list of positions in the initial buffer sent by the neighbor
+   // such that they can create the corresponding bufferzone_sent (i,j,k,comp)
+   // features 
+   size_t_vector position_bufferzone( 0, 0 );
+   size_t is, js, ks;
+   for (r=MPI_periodic_neighbors_world.begin(),i=0;
+   	r!=MPI_periodic_neighbors_world.end();r++,++i)
+   {
+     if ( *r == rank )
+     {
+       for (k=MPI_periodic_neighbors_world.begin(),j=0;
+       	k!=MPI_periodic_neighbors_world.end();k++,++j)
+         if ( *k != rank )
+	 {
+           // Number of positions in the bufferzone list
+	   size_t npos = position_bufferzone_list[j].size();
+	   
+	   // Transfer list into vector
+	   position_bufferzone.resize( npos ) ;
+	   for (ils=position_bufferzone_list[j].begin(),m=0;
+	   	ils!=position_bufferzone_list[j].end();ils++,++m)
+	     position_bufferzone(m) = *ils;
+	    
+	   // Send message
+	   macCOMM->send( *k, position_bufferzone ) ; 	   
+	 }
+	 
+       // Check on the proc itself (in case of a single proc in the periodic
+       // direction) 
+       if ( !position_bufferzone_list[i].empty() )
+       { 
+         vector<size_t> nijk_per_comp( NB_COMPS, 0 );
+
+	 // Get the number of ijk per comp
+         for (ils=position_bufferzone_list[i].begin();
+	 	ils!=position_bufferzone_list[i].end();ils++)
+         {
+           comp = buffer_features((*ils)*width+3);
+	   nijk_per_comp[comp]++;
+         } 
+ 
+         // Allocate bufferzone_sent for this neighboring proc
+         vector< FV_TRIPLET > vvv;
+         vector< vector< FV_TRIPLET > > vec_ijk_per_comp( NB_COMPS, vvv );
+         for (comp=0;comp<NB_COMPS;comp++)
+         {
+	   vec_ijk_per_comp[comp].reserve( nijk_per_comp[comp] );
+	   for (m=0;m<nijk_per_comp[comp];++m) 
+	     vec_ijk_per_comp[comp].push_back( mt ); 
+         }
+
+         m = 0;
+         size_t previous_comp = 0;
+         for (ils=position_bufferzone_list[i].begin();
+	 	ils!=position_bufferzone_list[i].end();ils++)
+         {
+	   ig = buffer_features((*ils)*width);
+           jg = buffer_features((*ils)*width+1);
+           kg = buffer_features((*ils)*width+2);
+           comp = buffer_features((*ils)*width+3);
+	   is = buffer_features((*ils)*width+4);
+           js = buffer_features((*ils)*width+5);
+           ks = buffer_features((*ils)*width+6);		
+			 
+           locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
+	 
+	   if ( comp != previous_comp ) m = 0; // data are ordered per comp
+
+           vec_ijk_per_comp[comp][m].i = ig - is  
+		- (*local_min_index_in_global)[locNum](0);
+           vec_ijk_per_comp[comp][m].j = jg - js 
+		- (*local_min_index_in_global)[locNum](1);		
+           vec_ijk_per_comp[comp][m].k = DIM == 2 ? 0 : kg - ks 
+	     	- (*local_min_index_in_global)[locNum](2); 
+	   ++m;
+	   previous_comp = comp;	 
+         }
+
+         // Store the vector of vector into bufferzone_sent
+         bufferzone_sent.push_back( vec_ijk_per_comp );  	 	       
+       }       
+     }
+     else
+     {
+       size_t_vector received_buffer_features_from_r(1) ;
+       macCOMM->receive( *r, received_buffer_features_from_r ) ;
+       size_t vecsize = received_buffer_features_from_r.size() ; 
+       vector<size_t> nijk_per_comp( NB_COMPS, 0 );
+
+       // Get the number of ijk per comp
+       for (positionIndex=0;positionIndex<vecsize;++positionIndex)
+       {
+         comp = buffer_features(received_buffer_features_from_r(positionIndex)
+	 	*width+3);
+	 nijk_per_comp[comp]++;
+       }       
+
+       // Allocate bufferzone_sent for this neighboring proc
+       vector< FV_TRIPLET > vvv;
+       vector< vector< FV_TRIPLET > > vec_ijk_per_comp( NB_COMPS, vvv );
+       for (comp=0;comp<NB_COMPS;comp++)
+       {
+	 vec_ijk_per_comp[comp].reserve( nijk_per_comp[comp] );
+	 for (m=0;m<nijk_per_comp[comp];++m) 
+	   vec_ijk_per_comp[comp].push_back( mt ); 
+       }
+              
+       m = 0;
+       size_t previous_comp = 0;
+       for (positionIndex=0;positionIndex<vecsize;++positionIndex)
+       {
+	 ig = buffer_features(received_buffer_features_from_r(positionIndex)
+	 	*width);
+         jg = buffer_features(received_buffer_features_from_r(positionIndex)
+	 	*width+1);
+         kg = buffer_features(received_buffer_features_from_r(positionIndex)
+	 	*width+2);
+         comp = buffer_features(received_buffer_features_from_r(positionIndex)
+	 	*width+3);
+	 is = buffer_features(received_buffer_features_from_r(positionIndex)
+	 	*width+4);
+         js = buffer_features(received_buffer_features_from_r(positionIndex)
+	 	*width+5);
+         ks = buffer_features(received_buffer_features_from_r(positionIndex)
+	 	*width+6);		
+			 
+         locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
+	 
+	 if ( comp != previous_comp ) m = 0; // data are ordered per comp
+
+         vec_ijk_per_comp[comp][m].i = ig - is  
+		- (*local_min_index_in_global)[locNum](0);
+         vec_ijk_per_comp[comp][m].j = jg - js 
+		- (*local_min_index_in_global)[locNum](1);		
+         vec_ijk_per_comp[comp][m].k = DIM == 2 ? 0 : kg - ks 
+	     	- (*local_min_index_in_global)[locNum](2); 
+	 ++m;
+	 previous_comp = comp;	 
+       }
+       
+       // Store the vector of vector into bufferzone_sent
+       bufferzone_sent.push_back( vec_ijk_per_comp );       
+     }
+   }     
 }
 
 
@@ -2956,77 +3737,150 @@ FV_DiscreteField:: set_HaloZone_Features_Periodic( void )
 
 //----------------------------------------------------------------------
 void
-FV_DiscreteField:: synchronize_field( size_t level )
+FV_DiscreteField:: synchronize( size_t level )
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "FV_DiscreteField:: synchronize_field" ) ;
-   MAC_ASSERT( synchronized_level == level );
+   MAC_ASSERT( level < STO_DEPTH );
 
-   MAC_Communicator const* macCOMM = MAC_Exec::communicator();
+  if ( !synchronization_ready ) set_synchronization_features();
+
+  MAC_Communicator const* macCOMM = MAC_Exec::communicator();
+  list<size_t>::iterator r, k;
+  list< double* >::iterator ild;
+  list< size_t >::iterator ils;
+  list< vector< vector< FV_TRIPLET > > >::iterator ihr, ibs;
+  size_t comp, ntriplets, m, positionIndex;
+  void* sreq = NULL; 
+  vector<void*> idreq( synchronization_MPI_rank_neighbors.size(), sreq );
+  size_t ireq; 
+
+  // Important remark:
+  // When a proc sends 2 separate messages to another proc with the same tag and
+  // matching receives, the MPI standard guarantees that messages are received 
+  // in the order that they were sent (Messages are non-overtaking) provided 
+  // (i) multi-threading is no performed 
+  // (ii) MPI_ANY_SOURCE is 
+  // Here, the send-receive method implemented in MAC_Communicator uses a tag 
+  // per data type, hence below double vectors are all sent with the same tag.
+  // We use neither multi-threading nor MPI_ANY_SOURCE anywhere, therefore the 
+  // programming model below is robust while same tag + (i) + (ii) is fulfilled.
    
-   list<size_t> MPI_neighbors_world =
-   	*PRIMARY_GRID->get_MPI_neighbors_ranks() ;
-   MPI_neighbors_world.sort();	
-   list<size_t>::iterator r, k, il;
-   list< vector< double* > >::iterator ilv;
-   void* sreq = NULL; 
-   vector<void*> idreq( MPI_neighbors_world.size(), sreq );
-   size_t ireq;
-   
-   // 1) SEND restricted BufferZone to concerned neighbors
-   // bufferzone_values-array contains Nb_neighbors*restricted_BZ-array
-   for ( r=MPI_neighbors_world.begin(),ireq=0,ilv=bufferzone_values.begin();
-   	r!=MPI_neighbors_world.end(); r++,ireq++,ilv++ )
-   {
-     size_t sendbuf_size = ilv->size();
-     double* sendbuf = new double[ sendbuf_size ];
-     for ( size_t i=0; i<sendbuf_size; ++i )
-       sendbuf[i] = *((*ilv)[i]) ;
-
-     idreq[ireq] = macCOMM->Isend( *r, sendbuf, sendbuf_size );
-     delete [] sendbuf;
-   }
-   
-   // 2) RECEIVE neighbor's restricted BufferZone and update HaloZone
-   for (r=MPI_neighbors_world.begin(),ilv=halozone_values_list.begin();
-   	r!=MPI_neighbors_world.end(); r++,ilv++)
-   {
-     // 2-a) Receive from neighbor r
-     size_t recbuf_size = ilv->size();
-     double* recbuf = new double[ recbuf_size ];     
-     macCOMM->receive( *r, recbuf, recbuf_size );
-     
-     // 2-b) Update HZ shared with proc r
-     for ( size_t i=0; i<recbuf_size; ++i)
-       *((*ilv)[i]) = recbuf[i];
-
-     delete [] recbuf;
-   }
-
-   // 3) CHECK that all non-blocking exchanges are ended
-   for (ireq=0;ireq<idreq.size();++ireq)
-     macCOMM->wait( idreq[ireq] );
+  // Send bufferzone data to neighboring procs
+  for ( r=synchronization_MPI_rank_neighbors.begin(),
+  	ibs=bufferzone_sent.begin(),ild=bufferzone_sent_data.begin(),
+	ils=bufferzone_sent_data_size.begin(),ireq=0;
+  	r!=synchronization_MPI_rank_neighbors.end();
+	r++,ibs++,ild++,ils++,ireq++ )
+  {
+    // Fill the bufferzone_sent_data array 
+    positionIndex = 0;
+    for (comp=0;comp<NB_COMPS;comp++)
+    {
+      ntriplets = (*ibs)[comp].size();
+      for (m=0;m<ntriplets;++m)
+      {
+        (*ild)[positionIndex] = (*VALUES)[level][comp]( 
+		(*ibs)[comp][m].i, (*ibs)[comp][m].j, (*ibs)[comp][m].k );
+	++positionIndex;   
+      }  
+    }
     
-}
+    // Send message
+    idreq[ireq] = macCOMM->Isend( *r, *ild, *ils );      	
+  }
 
-
-
-//----------------------------------------------------------------------
-void
-FV_DiscreteField:: synchronize_extended_DOF_constrained( size_t level,
-      list<FV_TRIPLET> &ijk, list<size_t> &comps )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "FV_DiscreteField:: synchronize_extended_DOF_constrained" ) ;
+  // Receive data in halozone from neighboring procs 
+  for ( r=synchronization_MPI_rank_neighbors.begin(),
+  	ihr=halozone_received.begin(),ild=halozone_received_data.begin(),
+	ils=halozone_received_data_size.begin(),ireq=0;
+  	r!=synchronization_MPI_rank_neighbors.end();
+	r++,ihr++,ild++,ils++ )
+  {
+    // Receive the halozone_received_data array
+    macCOMM->receive( *r, *ild, *ils );
+    
+    // Update the halozone values    
+    positionIndex = 0;
+    for (comp=0;comp<NB_COMPS;comp++)
+    {
+      ntriplets = (*ihr)[comp].size();
+      for (m=0;m<ntriplets;++m)
+      {
+        (*VALUES)[level][comp]( (*ihr)[comp][m].i, (*ihr)[comp][m].j, 
+		(*ihr)[comp][m].k ) = (*ild)[positionIndex];
+	++positionIndex;   
+      }  
+    }     	
+  }  
   
-   ostringstream mesg ;
-   mesg << "Field " << FNAME << " is not of the "
-   	<< "FV_DiscreteField_Staggered type; "
-	<< "method \"synchronize_extended_DOF_constrained\" is "
-	<< "implemented for a field of type "
-	<< "FV_DiscreteField_Staggered only !!" << endl;
-   MAC_Error::object()->raise_plain( mesg.str() ) ;   
-           
+  // Check that all non-blocking messages are complete
+  for (ireq=0;ireq<idreq.size();++ireq)
+    macCOMM->wait( idreq[ireq] ); 
+    
+    
+//    // Debug
+//    size_t nb_ranks = macCOMM->nb_ranks() ;
+//    size_t RANK = macCOMM->rank() ;
+//    size_t nijk = 0;
+//    for (size_t i=0;i<nb_ranks;++i)
+//    {
+//      if ( i == RANK )
+//      {       
+//        cout << "Rank " << RANK << endl ;
+//        cout << "   Buffer data" << endl;
+//        for ( r=synchronization_MPI_rank_neighbors.begin(),
+//   	ibs=bufferzone_sent.begin(),
+// 	ils=bufferzone_sent_data_size.begin();
+//   	r!=synchronization_MPI_rank_neighbors.end();
+// 	r++,ibs++,ils++ )
+//        {
+//          cout << "   To rank " << *r << endl;
+// 	 cout << "   Buffer data size = " << *ils << endl;
+// 	 cout << "   Number of triplets per comp = " << *ils << endl;
+// 	 for (comp=0;comp<NB_COMPS;comp++)
+// 	 {
+// 	   cout << "      Comp = " << comp << " n = " << (*ibs)[comp].size() 
+// 	   	<< endl;
+// 	   nijk = (*ibs)[comp].size();
+// 	   for (m=0;m<nijk;++m)
+// 	     cout << "      " << (*ibs)[comp][m].i << " " << (*ibs)[comp][m].j 
+// 	     	<< " " << (*ibs)[comp][m].k << " " << 
+// 		MAC::doubleToString( std::ios::scientific, 8, 
+// 		(*VALUES)[level][comp]( 
+// 		(*ibs)[comp][m].i, (*ibs)[comp][m].j, (*ibs)[comp][m].k ) )
+// 		<< endl;
+// 	 }	 
+//        }
+//        cout << endl; 
+//        cout << "   Halozone data" << endl;
+//        for ( r=synchronization_MPI_rank_neighbors.begin(),
+//   	ihr=halozone_received.begin(),
+// 	ils=halozone_received_data_size.begin();
+//   	r!=synchronization_MPI_rank_neighbors.end();
+// 	r++,ihr++,ils++ )
+//        {
+//          cout << "   From rank " << *r << endl;
+// 	 cout << "   Received data size = " << *ils << endl;
+// 	 cout << "   Number of triplets per comp = " << *ils << endl;
+// 	 for (comp=0;comp<NB_COMPS;comp++)
+// 	 {
+// 	   cout << "      Comp = " << comp << " n = " << (*ihr)[comp].size() 
+// 	   	<< endl;
+// 	   nijk = (*ihr)[comp].size();
+// 	   for (m=0;m<nijk;++m)
+// 	     cout << "      " << (*ihr)[comp][m].i << " " << (*ihr)[comp][m].j 
+// 	     	<< " " << (*ihr)[comp][m].k << " " << 
+// 		MAC::doubleToString( std::ios::scientific, 8, 
+// 		(*VALUES)[level][comp]( (*ihr)[comp][m].i, (*ihr)[comp][m].j, 
+// 		(*ihr)[comp][m].k ) ) << endl;
+// 	 }
+//        }
+//        cout << endl;                     
+//      }
+//      macCOMM->barrier();
+//    }
+//    if ( RANK == 0 ) cout << endl;        
 }
 
 
@@ -4088,198 +4942,6 @@ FV_DiscreteField:: check_field_primary_meshes_coincide(
 
 
 
-// // -------- Here DLMFDconstrainedDOFs are define as boolean -----------  
-// //----------------------------------------------------------------------
-// void
-// FV_DiscreteField:: allocate_DLMFDconstrainedDOFs( void )
-// //----------------------------------------------------------------------
-// {
-//    MAC_LABEL( "FV_DiscreteField:: allocate_DLMFDconstrainedDOFs" ) ;
-
-//    if ( !DLMFDconstrainedDOFs )
-//    {
-//      if ( ALL_COMPS_SAME_LOCATION )
-//      {     
-//        boolArray3D work_bool( (*DOFcolors)[0].index_bound(0), 
-//      	(*DOFcolors)[0].index_bound(1), 
-// 	(*DOFcolors)[0].index_bound(2), false ) ;      
-//        DLMFDconstrainedDOFs = new vector< boolArray3D >( NB_COMPS, work_bool ); 
-//      }
-//      else
-//      {
-//        boolArray3D work_bool( 1, 1, 1, false ) ; 
-//        DLMFDconstrainedDOFs = new vector< boolArray3D >( NB_COMPS, work_bool ) ;
-//        for (size_t i=0;i<NB_COMPS;++i)
-//          (*DLMFDconstrainedDOFs)[i].re_initialize( 
-//        		(*DOFcolors)[i].index_bound(0), 
-//      		(*DOFcolors)[i].index_bound(1), 
-// 		(*DOFcolors)[i].index_bound(2), false ) ;  
-//      }
-//    }
-// }
-
-
-
-
-// //----------------------------------------------------------------------
-// bool
-// FV_DiscreteField:: DOF_is_constrained( size_t i, size_t j, size_t k,
-//       	size_t component ) const
-// //----------------------------------------------------------------------
-// {
-//    MAC_LABEL( "FV_DiscreteField:: DOF_is_constrained" ) ;
-//    MAC_CHECK_PRE( component < NB_COMPS );     
-//    MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-//    	i < (*DLMFDconstrainedDOFs)[component].index_bound(0) ) );
-//    MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-//    	j < (*DLMFDconstrainedDOFs)[component].index_bound(1) ) );   
-//    MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-//    	k < (*DLMFDconstrainedDOFs)[component].index_bound(2) ) );
-
-//    return ( DLMFDconstrainedDOFs ? 
-//    	(*DLMFDconstrainedDOFs)[component]( i, j, k ) : false );
-// }
-
-
-
-
-
-// //----------------------------------------------------------------------
-// void
-// FV_DiscreteField:: set_DOF_constrained( size_t i, size_t j, size_t k,
-//       	size_t component ) 
-// //----------------------------------------------------------------------
-// {
-//    MAC_LABEL( "FV_DiscreteField:: set_DOF_constrained" ) ;
-//    MAC_CHECK_PRE( component < NB_COMPS ); 
-//    MAC_CHECK_PRE( DLMFDconstrainedDOFs );    
-//    MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-//    	i < (*DLMFDconstrainedDOFs)[component].index_bound(0) ) );
-//    MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-//    	j < (*DLMFDconstrainedDOFs)[component].index_bound(1) ) );   
-//    MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-//    	k < (*DLMFDconstrainedDOFs)[component].index_bound(2) ) );
-
-//    (*DLMFDconstrainedDOFs)[component]( i, j, k ) = true ;
-// }
-
-
-
-
-// //----------------------------------------------------------------------
-// void
-// FV_DiscreteField:: initialize_DLMFDconstrainedDOFs( void )
-// //----------------------------------------------------------------------
-// {
-//    MAC_LABEL( "FV_DiscreteField:: initialize_DLMFDconstrainedDOFs" ) ;
-//    MAC_CHECK_PRE( DLMFDconstrainedDOFs );
-   
-//    for (size_t i=0;i<NB_COMPS;++i)
-//      (*DLMFDconstrainedDOFs)[i].set( false );
-// }
-
-
-
-
-// -------- Here DLMFDconstrainedDOFs are define as a integer -----------  
-//----------------------------------------------------------------------
-void
-FV_DiscreteField:: allocate_DLMFDconstrainedDOFs( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "FV_DiscreteField:: allocate_DLMFDconstrainedDOFs" ) ;
-
-   if ( !DLMFDconstrainedDOFs )
-   {
-     if ( ALL_COMPS_SAME_LOCATION )
-     {     
-       intArray3D work_int( (*DOFcolors)[0].index_bound(0), 
-     	(*DOFcolors)[0].index_bound(1), 
-	(*DOFcolors)[0].index_bound(2), 0 ) ;      
-       DLMFDconstrainedDOFs = new vector< intArray3D >( NB_COMPS, work_int ); 
-     }
-     else
-     {
-       intArray3D work_int( 1, 1, 1, 0 ) ; 
-       DLMFDconstrainedDOFs = new vector< intArray3D >( NB_COMPS, work_int ) ;
-       for (size_t i=0;i<NB_COMPS;++i)
-         (*DLMFDconstrainedDOFs)[i].re_initialize( 
-       		(*DOFcolors)[i].index_bound(0), 
-     		(*DOFcolors)[i].index_bound(1), 
-		(*DOFcolors)[i].index_bound(2), 0 ) ;  
-     }
-   }
-}
-
-
-
-
-
-//----------------------------------------------------------------------
-int
-FV_DiscreteField:: DOF_is_constrained( size_t i, size_t j, size_t k,
-      	size_t component ) const
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "FV_DiscreteField:: DOF_is_constrained" ) ;
-   MAC_CHECK_PRE( component < NB_COMPS );     
-   MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-   	i < (*DLMFDconstrainedDOFs)[component].index_bound(0) ) );
-   MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-   	j < (*DLMFDconstrainedDOFs)[component].index_bound(1) ) );   
-   MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-   	k < (*DLMFDconstrainedDOFs)[component].index_bound(2) ) );
-
-   // return ( DLMFDconstrainedDOFs != 0 ? 
-   // 	(*DLMFDconstrainedDOFs)[component]( i, j, k ) : 0 );
-
-   return (*DLMFDconstrainedDOFs)[component]( i, j, k );
-
-}
-
-
-
-
-
-//----------------------------------------------------------------------
-void
-FV_DiscreteField:: set_DOF_constrained( size_t i, size_t j, size_t k,
-       size_t component, bool b_has_extended_constrained ) 
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "FV_DiscreteField:: set_DOF_constrained" ) ;
-   MAC_CHECK_PRE( component < NB_COMPS ); 
-   MAC_CHECK_PRE( DLMFDconstrainedDOFs );    
-   MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-   	i < (*DLMFDconstrainedDOFs)[component].index_bound(0) ) );
-   MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-   	j < (*DLMFDconstrainedDOFs)[component].index_bound(1) ) );   
-   MAC_CHECK_PRE( IMPLIES( DLMFDconstrainedDOFs, 
-   	k < (*DLMFDconstrainedDOFs)[component].index_bound(2) ) );
-
-   if( !b_has_extended_constrained )
-     (*DLMFDconstrainedDOFs)[component]( i, j, k ) = 1 ;//Next step Tag_particle
-   else
-     (*DLMFDconstrainedDOFs)[component]( i, j, k ) = -1 ;
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-FV_DiscreteField:: initialize_DLMFDconstrainedDOFs( void )
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "FV_DiscreteField:: initialize_DLMFDconstrainedDOFs" ) ;
-   MAC_CHECK_PRE( DLMFDconstrainedDOFs );
-   
-   for (size_t i=0;i<NB_COMPS;++i)
-     (*DLMFDconstrainedDOFs)[i].set( 0 );
-}
-
-
-
 
 //----------------------------------------------------------------------
 size_t
@@ -5115,25 +5777,7 @@ geomVector FV_DiscreteField:: CorrectiveKernelGradientFieldValues(
 	    PosRTF(2) += (*local_main_coordinates)[locNum][2](k);
 	    ResRTF(2) += (*VALUES)[level][locNum](i,j,k);
 	  }
-	}
-	
-//DEBUG  if (counter != pow((2*stencil + 1),3) )
-//DEBUG  {
-//DEBUG    cout << "TOTO Something wrong in \
-//DEBUG    FV_DiscreteField:: interpolateGradientWithKernel; counter= "
-//DEBUG    <<counter<<" indices(0) = "<<indices(0)<< " indices(1) ="<<
-//DEBUG    indices(1)<<" indices(2) ="<<indices(2) << 
-//DEBUG    " point(2) = "<<point(2)<<" component = " <<component<<endl;
-//DEBUG    FV_Mesh:: between( &(*local_main_coordinates)[locNum][2], point(2),
-//DEBUG      	 indices(2) );
-//DEBUG    cout<<" indice2 before = "<<indices(2)<<endl ;
-//DEBUG    cout << "TITI indices(ii)  stencil\
-//DEBUG    (*local_min_index_in_global)[locNum](2) = "<<indices(2)<<" "<<stencil<<
-//DEBUG    " "<<(*local_min_index_in_global)[locNum](2)<<endl;
-//DEBUG    cout <<"added value = "<<(*local_min_index_in_global)[locNum](2)-
-//DEBUG      		 (indices(2) - stencil) + 1<< endl;
-//DEBUG  }  
-	      
+	}		      
 
   PosLBB(0) = PosLBB(0)/cellNbLBB(0);
   PosLBB(1) = PosLBB(1)/cellNbLBB(1);

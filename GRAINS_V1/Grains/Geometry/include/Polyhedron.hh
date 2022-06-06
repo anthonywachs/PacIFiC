@@ -118,7 +118,7 @@ class Polyhedron : public Polytope
     	vertex */
     mutable unsigned int m_curr_vertex; /**< index of the last vertex returned
     	by the support function */
-    double* m_InertiaPoly; /**< polygon inertia tensor */
+    double* m_InertiaPoly; /**< polyhedron inertia tensor */
     double m_VolumePoly; /**< polyhedron volume */
     vector< vector<int> >* m_allFaces; /**< vertex indices in each face */ 
     //@}

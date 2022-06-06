@@ -55,7 +55,7 @@ class IndexArray
     /**@name Constructors */
     //@{
     /** @brief Copy constructor (forbidden)
-    @param Ia objet a copier */
+    @param Ia object to be copied */
     IndexArray( IndexArray const& Ia );
     //@}
 
@@ -63,7 +63,7 @@ class IndexArray
     /**@name Operators */
     //@{
     /** @brief Equal operator (forbidden) 
-    @param Ia objet a copier */
+    @param Ia object to compare to */
     IndexArray& operator = ( IndexArray const& Ia );
     //@}
 

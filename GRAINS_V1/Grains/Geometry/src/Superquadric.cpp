@@ -185,7 +185,7 @@ Point3 Superquadric::support( Vector3 const& v ) const
 
       else
       {
-        const double alpha = pow( m_c*abvz / (m_b*abvy), 1.0 / ( m_n1 - 1.0) );
+        const double alpha = pow( m_c*abvz / (m_b*abvy), 1.0 / (m_n1 - 1.0) );
         const double yt = 1.0 / pow( 1.0 + pow( alpha, m_n1 ), 1.0 / m_n1 );
 
         return ( Point3( 0., signy * m_b * yt, signz * alpha * m_c * yt ) );
@@ -194,7 +194,7 @@ Point3 Superquadric::support( Vector3 const& v ) const
 
     else
     {
-      const double alpha = pow( m_b*abvy / (m_a*abvx), 1.0 / ( m_n2 - 1.0) );
+      const double alpha = pow( m_b*abvy / (m_a*abvx), 1.0 / m_n2 - 1.0 );
       const double gamma = pow( 1.0 + pow( alpha, m_n2 ), m_n1 / m_n2 - 1.0 );
       const double beta = pow( gamma*m_c*abvz / (m_a*abvx), 1.0 / (m_n1-1.0) );
       const double xt = 1.0 / pow( pow( 1.0+pow(alpha,m_n2) , m_n1 / m_n2 )
