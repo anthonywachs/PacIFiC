@@ -15,6 +15,7 @@ static void change_cache_entry(Cache* s, int i, Point pt, int flag) {
   s->p[i].flags = flag;
 }
 
+trace
 void generate_lag_stencils(lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) {
     int c = 0;
@@ -58,6 +59,7 @@ of magnitude $force$ located at $x0$. This assumes that $forcing$ is "clean",
 i.e. that it is zero everywhere (or that if there is already some non-zero terms
 the intention is to include them in the forcing).
 */
+trace
 void lag2eul(vector forcing, lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) {
     foreach_cache(mesh->nodes[i].stencil) {
@@ -91,6 +93,7 @@ void lag2eul(vector forcing, lagMesh* mesh) {
 The function below interpolates the eulerian velocities onto the nodes of
 the Lagrangian mesh.
 */
+trace
 void eul2lag(lagMesh* mesh) {
   for(int ii=0; ii<mesh->nlp; ii++) {
     foreach_dimension() mesh->nodes[ii].lagVel.x = 0.;
@@ -124,6 +127,7 @@ void eul2lag(lagMesh* mesh) {
 }
 
 scalar stencils[];
+trace
 void tag_ibm_stencils(lagMesh* mesh) {
   foreach() stencils[] = 0.;
   for(int i=0; i<mesh->nlp; i++) {

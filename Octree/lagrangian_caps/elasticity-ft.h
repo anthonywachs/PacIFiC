@@ -115,6 +115,7 @@ event init (i = 0) {
 }
 #endif
 
+trace
 void comp_elastic_stress(lagMesh* mesh) {
   #if dimension < 3
   compute_lengths(mesh);

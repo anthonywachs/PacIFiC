@@ -474,6 +474,7 @@ interpolating the velocities around the node of interest. By default, a
 second-order Runge Kutta scheme is used. By setting the macro $ADVECT\_LAG\_RK2$
 to zero, a simple forward Euler scheme is used as a scheme.
 */
+trace
 void advect_lagMesh(lagMesh* mesh) {
   eul2lag(mesh);
   #if !(ADVECT_LAG_RK2)
