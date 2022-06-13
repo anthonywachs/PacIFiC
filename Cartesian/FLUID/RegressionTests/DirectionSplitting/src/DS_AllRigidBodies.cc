@@ -2184,13 +2184,14 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                  size_t col = 2*dir + ig + 1;
 
                  if ((in_parID[col] == -1) && in_domain(col)) {
+                    size_t interpol_dir = (dir == 0) ? 1 : 0 ;
                     f[col] = (m_space_dimension == 2) ?
                                        Biquadratic_interpolation(UF
                                                            , comp
                                                            , &ghost_pt[col]
                                                            , i0_new[col]
-                                                           , (dir == 0) ? 1 : 0
-                                                           , sign[dir]
+                                                           , interpol_dir
+                                                           , sign[interpol_dir]
                                                            , {0})
                                      : Triquadratic_interpolation(UF
                                                             , comp
