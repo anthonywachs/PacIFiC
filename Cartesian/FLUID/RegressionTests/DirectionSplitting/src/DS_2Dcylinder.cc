@@ -115,7 +115,7 @@ void DS_2Dcylinder:: compute_surface_points( )
 
   size_t Npoints = m_surface_area.size();
   double d_theta = 2.*MAC::pi()/((double)Npoints);
-  double theta = 0.01*d_theta;
+  double theta = 0.5*d_theta;
 
   for (size_t i = 0; i < Npoints; i++) {
      theta = theta + d_theta;
