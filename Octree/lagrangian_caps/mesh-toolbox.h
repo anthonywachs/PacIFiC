@@ -398,3 +398,115 @@ void refine_mesh(lagMesh* mesh) {
     overwrite_triangle(mesh, i, mid_ids[0], mid_ids[1], mid_ids[2]);
   }
 }
+
+/**
+## Output
+The functions below write/read the lagrangian mesh to/from a file in order
+to restart simulations.
+*/
+
+void dump_lagmesh(FILE* fp, lagMesh* mesh) {
+  fwrite(&(mesh->nlp), sizeof(int), 1, fp);
+  for(int i=0; i<mesh->nlp; i++) {
+    foreach_dimension() fwrite(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
+    fwrite(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
+    fwrite(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
+    for(int j=0; j<6; j++)
+      fwrite(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
+    fwrite(&(mesh->nodes[i].nb_edges), sizeof(int), 1, fp);
+    for(int j=0; j<6; j++)
+      fwrite(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
+    fwrite(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
+    for(int j=0; j<6; j++)
+      fwrite(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
+  }
+  fwrite(&(mesh->nle), sizeof(int), 1, fp);
+  for(int i=0; i<mesh->nle; i++) {
+    fwrite(&(mesh->edges[i].l0), sizeof(double), 1, fp);
+    for(int j=0; j<2; j++) {
+      fwrite(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
+      fwrite(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
+    }
+  }
+  fwrite(&(mesh->nlt), sizeof(int), 1, fp);
+  for(int i=0; i<mesh->nlt; i++) {
+    fwrite(&(mesh->triangles[i].refArea), sizeof(double), 1, fp);
+    for(j=0; j<2; j++) {
+      foreach_dimension()
+        fwrite(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
+    }
+    for(j=0; j<3; j++) {
+      for(int k=0; k<2; k++) {
+        fwrite(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
+      }
+    }
+    for(int j=0; j<3; j++)
+      fwrite(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
+    for(int j=0; j<3; j++)
+      fwrite(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
+  }
+}
+
+void restore_lagmesh(file* fp, lagMesh* mesh) {
+  fread(&(mesh->nlp), sizeof(int), 1, fp);
+  mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
+  for(int i=0; i<mesh->nlp; i++) {
+    foreach_dimension() fread(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
+    fread(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
+    fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
+    for(int j=0; j<6; j++)
+      fread(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
+    fread(&(mesh->nodes[i].nb_edges), sizeof(int), 1, fp);
+    for(int j=0; j<6; j++)
+      fread(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
+    fread(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
+    for(int j=0; j<6; j++)
+      fread(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
+  }
+  fread(&(mesh->nle), sizeof(int), 1, fp);
+  mesh->edges = malloc(mesh->nle*sizeof(Edges));
+  for(int i=0; i<mesh->nle; i++) {
+    fread(&(mesh->edges[i].l0), sizeof(double), 1, fp);
+    for(int j=0; j<2; j++) {
+      fread(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
+      fread(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
+    }
+  }
+  fread(&(mesh->nlt), sizeof(int), 1, fp);
+  mesh->triangles = malloc(mesh->nlt*sizeof(Triangles));
+  for(int i=0; i<mesh->nlt; i++) {
+    fread(&(mesh->triangles[i].refArea), sizeof(double), 1, fp);
+    for(j=0; j<2; j++) {
+      foreach_dimension()
+        fread(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
+    }
+    for(j=0; j<3; j++) {
+      for(int k=0; k<2; k++) {
+        fread(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
+      }
+    }
+    for(int j=0; j<3; j++)
+      fread(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
+    for(int j=0; j<3; j++)
+      fread(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
+  }
+  generate_lag_stencils(mesh);
+  updated_stretches = false;
+  updated_normals = false;
+  updated_curvatures = false;
+  comp_triangle_area_normals(mesh);
+}
+
+void dump_membranes() {
+  FILE* file = fopen(filename, "w");
+  assert(file);
+  for(int i=0; i<mbs.nbmb; i++) {
+    dump_lagmesh(fp, &MB(i));
+  }
+}
+
+void restore_membranes() {
+  for(int i=0; i<mbs.nbmb; i++) {
+    restore_lagmesh(fp, &MB(i));
+  }
+}
