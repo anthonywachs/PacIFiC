@@ -1,5 +1,5 @@
 /**
-Some common initial shapes for vesicles
+# Common initial shapes for immersed membranes
 */
 
 #ifndef NLP
@@ -9,6 +9,9 @@ Some common initial shapes for vesicles
   #define RADIUS 1.
 #endif
 
+/**
+## 2D circular membrane
+*/
 struct _initialize_circular_mb {
   lagMesh* mesh;
   double radius;
@@ -71,6 +74,9 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   #endif
 }
 
+/**
+## 2D biconcave membrane
+*/
 void initialize_biconcave_mb(struct _initialize_circular_mb p) {
   double radius = (p.radius) ? p.radius : RADIUS;
   int nlp = (p.nlp) ? p.nlp : NLP;
@@ -145,6 +151,9 @@ void initialize_biconcave_mb(struct _initialize_circular_mb p) {
 }
 
 
+/**
+## 2D elliptic membrane
+*/
 struct _initialize_elliptic_mb {
   lagMesh* mesh;
   double a;
@@ -206,6 +215,9 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
 }
 
 #if dimension > 2
+/**
+## 3D icosahedron
+*/
 void initialize_icosahedron(struct _initialize_circular_mb p) {
   double radius = (p.radius) ? p.radius : RADIUS;
   p.mesh->nlp = 12;
@@ -281,6 +293,9 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
   }
 }
 
+/**
+## 3D spherical membrane
+*/
 /** The function below triangulates a sphere: it starts from an icosahedron,
 subdivides each of its triangles into four smaller ones until the desired number
 of Lagrangian nodes is reached or exceeded, and projects the resulting mesh

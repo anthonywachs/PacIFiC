@@ -1,3 +1,17 @@
+/**
+# Toolbox to perform operations on a Lagrangian mesh
+
+From defining useful macros, subdividing triangles, or dumping the mesh in
+restart files: below is a collection of helpful functions to deal with
+triangular meshes.
+*/
+
+
+/**
+## Useful macros
+
+The macros below are useful to define an icosahedron
+*/
 #define GET_LD(NODE) ((fabs(fabs(NODE.pos.x) - ll) < 1.e-8) ? 0 : \
   ((fabs(fabs(NODE.pos.y) - ll) < 1.e-8 ? 1 : 2)))
 #define GET_LD_SIGN(NODE) ((GET_LD(NODE) == 0) ? sign(NODE.pos.x) : \
@@ -9,7 +23,10 @@
 #define GET_ZD(NODE) ((fabs(NODE.pos.x) < 1.e-8) ? 0 : \
   ((fabs(NODE.pos.y) < 1.e-8 ? 1 : 2)))
 
-/** The function below returns true if the two nodes $i$ and $j$ are neighbors
+/**
+## Operations on edges
+
+The function below returns true if the two nodes $i$ and $j$ are neighbors
 */
 bool is_neighbor(lagMesh* mesh, int i, int j) {
   for(int k=0; k<mesh->nodes[i].nb_neighbors; k++) {
@@ -80,7 +97,90 @@ bool write_edge(struct _write_edge p) {
   }
 }
 
-/** The function below returns true if the triangle connecting nodes i,j and k
+/** The function below creates a new edge between nodes i and j, and updates the
+connectivity information of its nodes (but not its triangles, since they
+don't exist yet). */
+void new_edge(lagMesh* mesh, int i, int j) {
+  int eid = mesh->nle; // id of the new edge
+  int nodes[2];
+  nodes[0] = i; nodes[1] = j;
+  for(int k=0; k<2; k++) {
+    mesh->edges[eid].node_ids[k] = nodes[k];
+
+    /** Add the edge id to the newly connected nodes */
+    for(int l=0; l<mesh->nodes[nodes[k]].nb_edges; l++) {
+      if (mesh->nodes[nodes[k]].edge_ids[l] == -1) {
+        mesh->nodes[nodes[k]].edge_ids[l] = eid;
+        break;
+      }
+    }
+
+    /** Update the neighbors' list of the newly connected nodes */
+    for(int l=0; l<mesh->nodes[nodes[k]].nb_neighbors; l++) {
+      if (mesh->nodes[nodes[k]].neighbor_ids[l] == -1) {
+        mesh->nodes[nodes[k]].neighbor_ids[l] = nodes[(k+1)%2];
+        break;
+      }
+    }
+
+    /** The newly created edge is not yet surrounded by any triangle */
+    mesh->edges[eid].triangle_ids[k] = -1;
+  }
+  mesh->nle++;
+}
+
+/** The function below splits an edge in two smaller edges, creating a node
+at its midpoint. */
+void split_edge(lagMesh* mesh, int i) {
+  int nid[2];
+  for(int j=0; j<2; j++) nid[j] = mesh->edges[i].node_ids[j];
+
+  /** Create new node */
+  foreach_dimension()
+    mesh->nodes[mesh->nlp].pos.x =
+      .5*(mesh->nodes[nid[0]].pos.x + mesh->nodes[nid[1]].pos.x);
+  mesh->nodes[mesh->nlp].nb_neighbors = 6;
+  mesh->nodes[mesh->nlp].nb_edges = 6;
+  mesh->nodes[mesh->nlp].nb_triangles = 6;
+  mesh->nodes[mesh->nlp].neighbor_ids[0] = nid[0];
+  mesh->nodes[mesh->nlp].neighbor_ids[1] = nid[1];
+  mesh->nodes[mesh->nlp].edge_ids[0] = i;
+  mesh->nodes[mesh->nlp].edge_ids[1] = mesh->nle;
+  for(int j=0; j<6; j++) {
+    mesh->nodes[mesh->nlp].triangle_ids[j] = -1;
+    if (j>1) {
+      mesh->nodes[mesh->nlp].neighbor_ids[j] = -1;
+      mesh->nodes[mesh->nlp].edge_ids[j] = -1;
+    }
+  }
+
+  /** Create new edge and update current one */
+  write_edge(mesh, i, nid[0], mesh->nlp, overwrite = true);
+  write_edge(mesh, mesh->nle, nid[1], mesh->nlp);
+  for (int j=0; j<2; j++) {
+    mesh->edges[i].triangle_ids[j] = -1;
+    mesh->edges[mesh->nle].triangle_ids[j] = -1;
+  }
+
+  /** Update node information: neighboring nodes, connecting edges */
+  for(int j=0; j<mesh->nodes[nid[0]].nb_neighbors; j++)
+    if (mesh->nodes[nid[0]].neighbor_ids[j] == nid[1])
+      mesh->nodes[nid[0]].neighbor_ids[j] = mesh->nlp;
+  for(int j=0; j<mesh->nodes[nid[1]].nb_neighbors; j++)
+    if (mesh->nodes[nid[1]].neighbor_ids[j] == nid[0])
+      mesh->nodes[nid[1]].neighbor_ids[j] = mesh->nlp;
+  for(int j=0; j<mesh->nodes[nid[1]].nb_edges; j++)
+    if (mesh->nodes[nid[1]].edge_ids[j] == i)
+      mesh->nodes[nid[1]].edge_ids[j] = mesh->nle;
+
+  mesh->nlp++;
+  mesh->nle++;
+}
+
+/**
+## Operations on triangles
+
+The function below returns true if the triangle connecting nodes i,j and k
 already exists in the mesh. */
 bool triangle_exists(lagMesh* mesh, int i, int j, int k) {
   for(int t=0; t<mesh->nlt; t++) {
@@ -264,87 +364,6 @@ void overwrite_triangle(lagMesh* mesh, int tid, int i, int j, int k) {
   }
 }
 
-/** The function below creates a new edge between nodes i and j, and updates the
-connectivity information of its nodes (but not its triangles, since they
-don't exist yet). */
-void new_edge(lagMesh* mesh, int i, int j) {
-  int eid = mesh->nle; // id of the new edge
-  int nodes[2];
-  nodes[0] = i; nodes[1] = j;
-  for(int k=0; k<2; k++) {
-    mesh->edges[eid].node_ids[k] = nodes[k];
-
-    /** Add the edge id to the newly connected nodes */
-    for(int l=0; l<mesh->nodes[nodes[k]].nb_edges; l++) {
-      if (mesh->nodes[nodes[k]].edge_ids[l] == -1) {
-        mesh->nodes[nodes[k]].edge_ids[l] = eid;
-        break;
-      }
-    }
-
-    /** Update the neighbors' list of the newly connected nodes */
-    for(int l=0; l<mesh->nodes[nodes[k]].nb_neighbors; l++) {
-      if (mesh->nodes[nodes[k]].neighbor_ids[l] == -1) {
-        mesh->nodes[nodes[k]].neighbor_ids[l] = nodes[(k+1)%2];
-        break;
-      }
-    }
-
-    /** The newly created edge is not yet surrounded by any triangle */
-    mesh->edges[eid].triangle_ids[k] = -1;
-  }
-  mesh->nle++;
-}
-
-/** The function below splits an edge in two smaller edges, creating a node
-at its midpoint. */
-void split_edge(lagMesh* mesh, int i) {
-  int nid[2];
-  for(int j=0; j<2; j++) nid[j] = mesh->edges[i].node_ids[j];
-
-  /** Create new node */
-  foreach_dimension()
-    mesh->nodes[mesh->nlp].pos.x =
-      .5*(mesh->nodes[nid[0]].pos.x + mesh->nodes[nid[1]].pos.x);
-  mesh->nodes[mesh->nlp].nb_neighbors = 6;
-  mesh->nodes[mesh->nlp].nb_edges = 6;
-  mesh->nodes[mesh->nlp].nb_triangles = 6;
-  mesh->nodes[mesh->nlp].neighbor_ids[0] = nid[0];
-  mesh->nodes[mesh->nlp].neighbor_ids[1] = nid[1];
-  mesh->nodes[mesh->nlp].edge_ids[0] = i;
-  mesh->nodes[mesh->nlp].edge_ids[1] = mesh->nle;
-  for(int j=0; j<6; j++) {
-    mesh->nodes[mesh->nlp].triangle_ids[j] = -1;
-    if (j>1) {
-      mesh->nodes[mesh->nlp].neighbor_ids[j] = -1;
-      mesh->nodes[mesh->nlp].edge_ids[j] = -1;
-    }
-  }
-
-  /** Create new edge and update current one */
-  write_edge(mesh, i, nid[0], mesh->nlp, overwrite = true);
-  write_edge(mesh, mesh->nle, nid[1], mesh->nlp);
-  for (int j=0; j<2; j++) {
-    mesh->edges[i].triangle_ids[j] = -1;
-    mesh->edges[mesh->nle].triangle_ids[j] = -1;
-  }
-
-  /** Update node information: neighboring nodes, connecting edges */
-  for(int j=0; j<mesh->nodes[nid[0]].nb_neighbors; j++)
-    if (mesh->nodes[nid[0]].neighbor_ids[j] == nid[1])
-      mesh->nodes[nid[0]].neighbor_ids[j] = mesh->nlp;
-  for(int j=0; j<mesh->nodes[nid[1]].nb_neighbors; j++)
-    if (mesh->nodes[nid[1]].neighbor_ids[j] == nid[0])
-      mesh->nodes[nid[1]].neighbor_ids[j] = mesh->nlp;
-  for(int j=0; j<mesh->nodes[nid[1]].nb_edges; j++)
-    if (mesh->nodes[nid[1]].edge_ids[j] == i)
-      mesh->nodes[nid[1]].edge_ids[j] = mesh->nle;
-
-  mesh->nlp++;
-  mesh->nle++;
-}
-
-
 /** The function below returns true if node j is a vertex of triangle i */
 bool is_triangle_vertex(lagMesh* mesh, int i, int j) {
   for(int k=0; k<3; k++) {
@@ -353,7 +372,10 @@ bool is_triangle_vertex(lagMesh* mesh, int i, int j) {
   return false;
 }
 
-/** The function below loops through all triangles in the mesh and divide them
+/**
+## Uniform refinement of a mesh by subdividing its triangles
+
+The function below loops through all triangles in the mesh and divide them
 in four smaller ones. Keeping the correct structure of the mesh, i.e. updating
 the relationship between nodes, edges, triangles and their neighbors results
 in the somewhat complicated implementation below. */
@@ -405,108 +427,108 @@ The functions below write/read the lagrangian mesh to/from a file in order
 to restart simulations.
 */
 
-void dump_lagmesh(FILE* fp, lagMesh* mesh) {
-  fwrite(&(mesh->nlp), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nlp; i++) {
-    foreach_dimension() fwrite(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
-    fwrite(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
-    fwrite(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fwrite(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
-    fwrite(&(mesh->nodes[i].nb_edges), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fwrite(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
-    fwrite(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fwrite(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
-  }
-  fwrite(&(mesh->nle), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nle; i++) {
-    fwrite(&(mesh->edges[i].l0), sizeof(double), 1, fp);
-    for(int j=0; j<2; j++) {
-      fwrite(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
-      fwrite(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
-    }
-  }
-  fwrite(&(mesh->nlt), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nlt; i++) {
-    fwrite(&(mesh->triangles[i].refArea), sizeof(double), 1, fp);
-    for(j=0; j<2; j++) {
-      foreach_dimension()
-        fwrite(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
-    }
-    for(j=0; j<3; j++) {
-      for(int k=0; k<2; k++) {
-        fwrite(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
-      }
-    }
-    for(int j=0; j<3; j++)
-      fwrite(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
-    for(int j=0; j<3; j++)
-      fwrite(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
-  }
-}
-
-void restore_lagmesh(file* fp, lagMesh* mesh) {
-  fread(&(mesh->nlp), sizeof(int), 1, fp);
-  mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
-  for(int i=0; i<mesh->nlp; i++) {
-    foreach_dimension() fread(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
-    fread(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
-    fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fread(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
-    fread(&(mesh->nodes[i].nb_edges), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fread(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
-    fread(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fread(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
-  }
-  fread(&(mesh->nle), sizeof(int), 1, fp);
-  mesh->edges = malloc(mesh->nle*sizeof(Edges));
-  for(int i=0; i<mesh->nle; i++) {
-    fread(&(mesh->edges[i].l0), sizeof(double), 1, fp);
-    for(int j=0; j<2; j++) {
-      fread(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
-      fread(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
-    }
-  }
-  fread(&(mesh->nlt), sizeof(int), 1, fp);
-  mesh->triangles = malloc(mesh->nlt*sizeof(Triangles));
-  for(int i=0; i<mesh->nlt; i++) {
-    fread(&(mesh->triangles[i].refArea), sizeof(double), 1, fp);
-    for(j=0; j<2; j++) {
-      foreach_dimension()
-        fread(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
-    }
-    for(j=0; j<3; j++) {
-      for(int k=0; k<2; k++) {
-        fread(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
-      }
-    }
-    for(int j=0; j<3; j++)
-      fread(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
-    for(int j=0; j<3; j++)
-      fread(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
-  }
-  generate_lag_stencils(mesh);
-  updated_stretches = false;
-  updated_normals = false;
-  updated_curvatures = false;
-  comp_triangle_area_normals(mesh);
-}
-
-void dump_membranes() {
-  FILE* file = fopen(filename, "w");
-  assert(file);
-  for(int i=0; i<mbs.nbmb; i++) {
-    dump_lagmesh(fp, &MB(i));
-  }
-}
-
-void restore_membranes() {
-  for(int i=0; i<mbs.nbmb; i++) {
-    restore_lagmesh(fp, &MB(i));
-  }
-}
+// void dump_lagmesh(FILE* fp, lagMesh* mesh) {
+//   fwrite(&(mesh->nlp), sizeof(int), 1, fp);
+//   for(int i=0; i<mesh->nlp; i++) {
+//     foreach_dimension() fwrite(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
+//     fwrite(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
+//     fwrite(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
+//     for(int j=0; j<6; j++)
+//       fwrite(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
+//     fwrite(&(mesh->nodes[i].nb_edges), sizeof(int), 1, fp);
+//     for(int j=0; j<6; j++)
+//       fwrite(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
+//     fwrite(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
+//     for(int j=0; j<6; j++)
+//       fwrite(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
+//   }
+//   fwrite(&(mesh->nle), sizeof(int), 1, fp);
+//   for(int i=0; i<mesh->nle; i++) {
+//     fwrite(&(mesh->edges[i].l0), sizeof(double), 1, fp);
+//     for(int j=0; j<2; j++) {
+//       fwrite(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
+//       fwrite(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
+//     }
+//   }
+//   fwrite(&(mesh->nlt), sizeof(int), 1, fp);
+//   for(int i=0; i<mesh->nlt; i++) {
+//     fwrite(&(mesh->triangles[i].refArea), sizeof(double), 1, fp);
+//     for(j=0; j<2; j++) {
+//       foreach_dimension()
+//         fwrite(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
+//     }
+//     for(j=0; j<3; j++) {
+//       for(int k=0; k<2; k++) {
+//         fwrite(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
+//       }
+//     }
+//     for(int j=0; j<3; j++)
+//       fwrite(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
+//     for(int j=0; j<3; j++)
+//       fwrite(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
+//   }
+// }
+//
+// void restore_lagmesh(file* fp, lagMesh* mesh) {
+//   fread(&(mesh->nlp), sizeof(int), 1, fp);
+//   mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
+//   for(int i=0; i<mesh->nlp; i++) {
+//     foreach_dimension() fread(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
+//     fread(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
+//     fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
+//     for(int j=0; j<6; j++)
+//       fread(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
+//     fread(&(mesh->nodes[i].nb_edges), sizeof(int), 1, fp);
+//     for(int j=0; j<6; j++)
+//       fread(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
+//     fread(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
+//     for(int j=0; j<6; j++)
+//       fread(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
+//   }
+//   fread(&(mesh->nle), sizeof(int), 1, fp);
+//   mesh->edges = malloc(mesh->nle*sizeof(Edges));
+//   for(int i=0; i<mesh->nle; i++) {
+//     fread(&(mesh->edges[i].l0), sizeof(double), 1, fp);
+//     for(int j=0; j<2; j++) {
+//       fread(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
+//       fread(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
+//     }
+//   }
+//   fread(&(mesh->nlt), sizeof(int), 1, fp);
+//   mesh->triangles = malloc(mesh->nlt*sizeof(Triangles));
+//   for(int i=0; i<mesh->nlt; i++) {
+//     fread(&(mesh->triangles[i].refArea), sizeof(double), 1, fp);
+//     for(j=0; j<2; j++) {
+//       foreach_dimension()
+//         fread(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
+//     }
+//     for(j=0; j<3; j++) {
+//       for(int k=0; k<2; k++) {
+//         fread(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
+//       }
+//     }
+//     for(int j=0; j<3; j++)
+//       fread(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
+//     for(int j=0; j<3; j++)
+//       fread(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
+//   }
+//   generate_lag_stencils(mesh);
+//   updated_stretches = false;
+//   updated_normals = false;
+//   updated_curvatures = false;
+//   comp_triangle_area_normals(mesh);
+// }
+//
+// void dump_membranes() {
+//   FILE* file = fopen(filename, "w");
+//   assert(file);
+//   for(int i=0; i<mbs.nbmb; i++) {
+//     dump_lagmesh(fp, &MB(i));
+//   }
+// }
+//
+// void restore_membranes() {
+//   for(int i=0; i<mbs.nbmb; i++) {
+//     restore_lagmesh(fp, &MB(i));
+//   }
+// }

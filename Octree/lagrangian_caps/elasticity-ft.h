@@ -6,7 +6,7 @@ stresses associated to a specific elastic law. The default elastic law is the
 Neo-Hookean law.
 
 In three dimensions, this task is performed using an explicit finite element
-method introduced by Charrier et al.
+method introduced by [Charrier et al.](charrier1989free).
 */
 
 #ifndef DWDL1
@@ -17,6 +17,13 @@ method introduced by Charrier et al.
   #define DWDL2(L1, L2) (E_S/(3.*L2)*(sq(L2) - 1./(sq(L1*L2))))
 #endif
 
+/** For validation purposes, the option is given to the user to print the
+principal stresses on each triangle. They are printed to the standard output
+stream */
+#ifndef OUTPUT_PRINCIPAL_STRESS
+  #define OUTPUT_PRINCIPAL_STRESS 0
+#endif
+
 #if dimension < 3
   #define cnorm(a) (sqrt(sq(a.x) + sq(a.y)))
   #define cdot(a,b) (a.x*b.x + a.y*b.y)
@@ -25,8 +32,13 @@ method introduced by Charrier et al.
   #define cdot(a,b) (a.x*b.x + a.y*b.y + a.z*b.z)
 #endif
 
+/**
+## Finite Element helper functions
+
+*/
 #if dimension > 2
-/** The function below returns the vertices of the triangle $tid$, rotated to
+/**
+The function below returns the vertices of the triangle $tid$, rotated to
 the reference plane. Since node 0 is always located at $(0,0,0)$, this
 function only returns the coordinates of nodes 1 and 2.
 */
@@ -36,14 +48,18 @@ void rotate_to_reference_plane(lagMesh* mesh, int tid, coord rn[2],
   int nodes[3];
   for(int i=0; i<3; i++) nodes[i] = mesh->triangles[tid].node_ids[i];
 
-  /** Step 1. compute the rotation matrix */
+  /** Step 1. compute the rotation matrix $\bm{M}$ from the current plane to the reference plane
+
+  We also compute its inverse $\bm{IM}$ */
+
   coord er[3], ec[3]; // reference and current coordinate systems
   er[0].x = 1.; er[0].y = 0.; er[0].z = 0.;
   er[1].x = 0.; er[1].y = 1.; er[1].z = 0.;
   er[2].x = 0.; er[2].y = 0.; er[2].z = 1.;
-  /** Following Doddi and Bagchi (2008), $ec[0]$ is in the direction of
-  [node0, node2]; $ec[2]$ is the vector normal to the triangle and
-  $ec[1] = ec[2] x ec[0]$*/
+
+  /** Following [Doddi \& Bagchi](doddi2008lateral), $ec[0]$ is in the
+  direction of [node0, node2]; $ec[2]$ is the vector normal to the triangle and
+  $ec[1] = ec[2] \times ec[0]$*/
   foreach_dimension() {
     ec[0].x = GENERAL_1DIST(mesh->nodes[nodes[2]].pos.x,
       mesh->nodes[nodes[0]].pos.x);
@@ -77,12 +93,17 @@ void rotate_to_reference_plane(lagMesh* mesh, int tid, coord rn[2],
       for(int j=0; j<3; j++)
         refNode[i] += M[i][j]*cv[j];
     }
-    rn[k].x = refNode[0];
+    rn[k].x = refNode[0]; //rn for "reference node"
     rn[k].y = refNode[1];
     rn[k].z = refNode[2];
   }
 }
 
+/** The function below computes the shape functions attached to each triangle
+as well as the positions of each triangle's nodes in the reference plane. These
+quantities are stored in the \textit{Triangle} structure and will be used every
+time elastic forces are computed.
+*/
 void store_initial_configuration(lagMesh* mesh) {
   double buff[3][3];
   for(int i=0; i<mesh->nlt; i++) {
@@ -109,15 +130,17 @@ void store_initial_configuration(lagMesh* mesh) {
     mesh->triangles[i].sfc[2][1] = rn[0].x/det;
   }
 }
-
-event init (i = 0) {
-  for(int j=0; j<NCAPS; j++) store_initial_configuration(&MB(j));
-}
 #endif
 
+/**
+## Computation of elastic stresses and nodal forces
+*/
 trace
 void comp_elastic_stress(lagMesh* mesh) {
   #if dimension < 3
+  /** In 2D, the tensions are an explicit function of the edges' lengths and we
+  don't need the finite element framework. For the moment, the Neo-Hookean law
+  is hard-coded below, but other 2D elastic laws will be available soon.*/
   compute_lengths(mesh);
   for(int i=0; i<mesh->nlp; i++) {
     coord T[2];
@@ -141,7 +164,7 @@ void comp_elastic_stress(lagMesh* mesh) {
         ne += sq(e.x);
       }
       ne = sqrt(ne);
-      /** $\bm{T_i} = \frac{E_s}{\lamba_i^{\frac{3}{2}}} (\lambda^3 - 1)
+      /** $\bm{T_i} = \frac{E_s}{\lambda_i^{3/2}} (\lambda^3 - 1)
       \bm{e_i}$ */
       foreach_dimension()
         T[j].x = (fabs(ne) > 1.e-10) ? tension_norm*e.x/ne : 0.;
@@ -149,14 +172,25 @@ void comp_elastic_stress(lagMesh* mesh) {
     foreach_dimension() mesh->nodes[i].lagForce.x += T[0].x - T[1].x;
   }
   #else // dimension == 3
-  /** Loop through each triangle */
+  /**
+  ### Implementation of the Finite Element method
+  In 3D, the elastic stresses are computed using an explicit finite element
+  method inspired from [Charrier et al.](charrier1989free) and
+  [Doddi \& Bagchi](doddi2008lateral).
+
+
+  We start by looping through each triangle of the Lagrangian mesh: */
   for(int i=0; i<mesh->nlt; i++) {
-    /** 1. Rotate triangle to common plane using the rotation matrix $\bm{R}$ */
+    /** #### Step 1. Rotate the current triangle to common plane using the rotation matrix $\bm{R}$ */
     coord cn[2];
     double R[3][3]; // the rotation matrix from the reference to the current plane
     rotate_to_reference_plane(mesh, i, cn, R);
 
-    /** 2. Compute the displacement $v_k$ of each node
+    /** #### Step 2. Compute the displacement $\bm{v_k}$ of each node $k$.
+
+    We only have to compute two displacements since node 0 is always at the
+    origin of the reference plane.
+
     From now on we abandon the convenient use of foreach_dimension() since we
     have to manipulate 2D vectors and matrices. */
     double v[2][2];
@@ -165,9 +199,9 @@ void comp_elastic_stress(lagMesh* mesh) {
       v[k][1] = cn[k].y - mesh->triangles[i].refShape[k].y;
     }
 
-    /** 3. Compute the right Cauchy-Green deformation tensor from $v_k$:
-    $$ \bm{C} = \bm{F^t}\bm{F}\;, \quad \bm{F} =  frac{\partial v_k}{\partial
-    \bm{x^P}} $$
+    /** #### Step 3. Compute the right Cauchy-Green deformation tensor from the displacement $\bm{v_k}$:
+    $$ \bm{C} = \bm{F^t}\bm{F}\;, \quad \bm{F} =  \frac{\partial
+    \bm{v_k}}{\partial\bm{x^P}} $$
     with $\bm{x^P} = [x_p, y_p]$ the two-dimensional coordinates of the common-
     plane
     */
@@ -190,15 +224,25 @@ void comp_elastic_stress(lagMesh* mesh) {
       }
     }
 
-    /** 4. Compute the two principal stretches $\lambda_1$, $\lambda_2$ from
-    \bm{C} */
+    /** #### Step 4. Compute the two principal stretches $\lambda_1$, $\lambda_2$ from the Cauchy-Green deformation tensor $\bm{C}$ */
     double lambda[2];
     lambda[0] = sqrt(.5*(C[0][0] + C[1][1] - sqrt(sq(C[0][0] - C[1][1]) +
       4*sq(C[0][1]))));
     lambda[1] = sqrt(.5*(C[0][0] + C[1][1] + sqrt(sq(C[0][0] - C[1][1]) +
       4*sq(C[0][1]))));
 
-    /** 5. For each node of the triangle, compute the force in the common plane,
+    /** If the user wants to output the two principal stresses (for validation
+  purposes), print them to the standard output */
+    #if OUTPUT_PRINCIPAL_STRESS
+    double e1, e2, t1, t2;
+    e1 = .5*(sq(lambda[0]) - 1.);
+    e2 = .5*(sq(lambda[1]) - 1.);
+    t1 = DWDL1(lambda[0], lambda[1])/lambda[1];
+    t2 = DWDL2(lambda[0], lambda[1])/lambda[0];
+    fprintf(stdout, "%d, %g, %g, %g, %g\n", i, e1, e2, t1, t2);
+    #endif
+
+    /** #### Step 5. For each node of the triangle, compute the force in the common plane,
     then rotate it and add it to the Lagrangian force of the node */
     for(int j=0; j<3; j++) {
       int nodes[3];
@@ -225,10 +269,11 @@ void comp_elastic_stress(lagMesh* mesh) {
         }
       }
 
-      /** 5.2 Compute $f_j^P = \frac{\partial W}{\partial \lambda_1}
+      /** 5.2 Compute $\bm{f_j}^P$ as follows:
+      $$ \bm{f_j}^P = \frac{\partial W}{\partial \lambda_1}
       \frac{\partial \lambda_1}{\partial \bm{v_j}} +
       \frac{\partial W}{\partial \lambda_2}
-      \frac{\partial \lambda_2}{\partial \bm{v_j}} $*/
+      \frac{\partial \lambda_2}{\partial \bm{v_j}} $$*/
       coord fj;
       fj.x = DWDL1(lambda[0], lambda[1])*dldv[0][0] +
         DWDL2(lambda[0], lambda[1])*dldv[1][0];
@@ -236,7 +281,7 @@ void comp_elastic_stress(lagMesh* mesh) {
         DWDL2(lambda[0], lambda[1])*dldv[1][1];
 
       /** 5.3 Rotate the force in the common plane to the current plane:
-      $f_j = \bm{R^T} f_j^P$ */
+      $\bm{f_j} = \bm{R^T} \bm{f_j}^P$ */
       double area = mesh->triangles[i].area;
       mesh->nodes[nodes[j]].lagForce.x -= area*(R[0][0]*fj.x + R[0][1]*fj.y);
       mesh->nodes[nodes[j]].lagForce.y -= area*(R[1][0]*fj.x + R[1][1]*fj.y);
@@ -247,6 +292,59 @@ void comp_elastic_stress(lagMesh* mesh) {
 }
 
 
+/**
+## Call the above functions at the appropriate events
+
+At the beginning of the computation, we compute the shape functions assuming
+the initial configuration is stress-free. If this is not the case, a workaround
+is to modify the shape of the membrane in an event following \textit{init}
+according to the desired pre-stressed conditions. See the
+[constricted_channel.c](tests/lagrangian_caps/constricted_channel.c) case for
+an example of a isotropically pre-stressed membrane.*/
+#if dimension > 2
+event init (i = 0) {
+  for(int j=0; j<NCAPS; j++) store_initial_configuration(&MB(j));
+}
+#endif
+
 event acceleration (i++) {
   for(int i=0; i<mbs.nbmb; i++) comp_elastic_stress(&mbs.mb[i]);
 }
+
+/**
+## References
+~~~bib
+@Article{doddi2008lateral,
+  author    = {Doddi, Sai K and Bagchi, Prosenjit},
+  journal   = {International Journal of Multiphase Flow},
+  title     = {Lateral migration of a capsule in a plane Poiseuille flow in a channel},
+  year      = {2008},
+  number    = {10},
+  pages     = {966--986},
+  volume    = {34},
+  file      = {:bagchi2008.pdf:PDF},
+  groups    = {Biological flows},
+  publisher = {Elsevier},
+}
+
+@Article{charrier1989free,
+  author    = {Charrier, JM and Shrivastava, S and Wu, R},
+  journal   = {The Journal of Strain Analysis for Engineering Design},
+  title     = {Free and constrained inflation of elastic membranes in relation to thermoforming—non-axisymmetric problems},
+  year      = {1989},
+  number    = {2},
+  pages     = {55--74},
+  volume    = {24},
+  file      = {:03093247V242055.pdf:PDF},
+  groups    = {Biological flows},
+  publisher = {SAGE Publications Sage UK: London, England},
+}
+~~~
+
+## Tests
+* [uniaxial_stretch.c](../../tests/lagrangian_caps/uniaxial_stretch.c)
+
+
+* [nh_shear_3d.c](../../tests/lagrangian_caps/nh_shear_3d.c)
+
+*/

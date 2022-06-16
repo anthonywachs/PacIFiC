@@ -1,4 +1,5 @@
-/** In this file we compute the bending force on each Lagrangian node of the
+/**
+In this file we compute the bending force on each Lagrangian node of the
 membrane(s). The expression for the bending force is the following:
 $$ \bm{f_b} = q\bm{n} \quad \text{with} \, q = \frac{dm}{dl} \quad \text{and}
 \, m = E_b (\kappa - \kappa_R) $$

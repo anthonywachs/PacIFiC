@@ -1,9 +1,27 @@
 /**
 # Definition of the IBM regularized Dirac
+
+The Lagrangian and Eulerian meshes communicate thanks to regularized Dirac-delta
+functions: this is the core of the Immersed Boundary Method (IBM) as introduced
+by [Peskin](Peskin1997).
+
+This implementation of the IBM in Basilisk relies on the Cache structure to
+efficiently loop through the Eulerian cells in the vicinity of the Lagrangian
+nodes. Since the Cache structure is only defined for trees, the current
+implementation is \textbf{only compatible with quadtree and octree grids, and
+not with Cartesian nor multigrids}.
 */
 
 #define BGHOSTS 2
 
+/**
+Basilisk provides functions to allocate and de-allocate Cached cells. In
+our case, since the number of Lagrangian nodes is constant and since the level
+of refinement of the Eulerian grid is constant in the vicinity of those nodes,
+the number of Cached cells is unchanged throughout the entire simulation. As
+such, we provide a function to change the index of a Cached cell instead of
+de-allocating and re-allocating it, as performed by the function below.
+*/
 static void change_cache_entry(Cache* s, int i, Point pt, int flag) {
   if (i > s->n) fprintf(stderr, "Error: Cache index out of range.\n");
   s->p[i].i = pt.i;
@@ -15,10 +33,20 @@ static void change_cache_entry(Cache* s, int i, Point pt, int flag) {
   s->p[i].flags = flag;
 }
 
+
+/**
+The function below loops through the Lagrangian nodes and "caches" the Eulerian
+cells in a 5x5(x5) stencil around each node. In case of parallel simulations,
+the cached cells are tagged with the process id.
+*/
 trace
 void generate_lag_stencils(lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) {
     int c = 0;
+    /**
+    The current implementation assumes that the Eulerian cells around Lagrangian
+    node are all at the maximum level.
+    */
     double delta = (L0/(1 << grid->maxdepth));
     for(int ni=-2; ni<=2; ni++) {
       for(int nj=-2; nj<=2; nj++) {
@@ -121,11 +149,20 @@ void eul2lag(lagMesh* mesh) {
     }
   }
 
+  /**
+  In case of parallel simulations, we communicate the Lagrangian velocity
+  so that all processes have the same Lagrangian velocities.
+  */
   #if _MPI
     if (mpi_npe > 1) reduce_lagVel(mesh);
   #endif
 }
 
+/**
+The function below fills a scalar field "stencils" with noise in all "cached"
+cells. Passing this scalar to the \textit{adapt_wavelet} function ensure all
+the 5x5(x5) stencils around the Lagrangian nodes are at the same level.
+*/
 scalar stencils[];
 trace
 void tag_ibm_stencils(lagMesh* mesh) {
@@ -155,3 +192,22 @@ void tag_ibm_stencils(lagMesh* mesh) {
   boundary({stencils});
   #endif
 }
+
+/**
+## References
+
+~~~bib
+@Article{Peskin1977,
+  author    = {Peskin, C.S.},
+  title     = {{Numerical analysis of blood flow in the heart}},
+  journal   = {Journal of Computational Physics},
+  year      = {1977},
+  volume    = {25},
+  number    = {3},
+  pages     = {220--252},
+  file      = {:files/Peskin1977 - Numerical Analysis of Blood Flow in the Heart.pdf:PDF},
+  groups    = {FluidSolid flows},
+  timestamp = {2013.07.18},
+}
+~~~
+*/
