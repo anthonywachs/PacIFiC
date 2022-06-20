@@ -43,7 +43,7 @@ void construct_divG(scalar divG, lagMesh* mesh) {
             double weight =
               (1 + cos(.5*pi*dist.x/Delta))*(1 + cos(.5*pi*dist.y/Delta))/
               (16.*sq(Delta));
-            foreach_dimension() G.x[] -= weight*.5*gg.x; // Why is there a .5??
+            foreach_dimension() G.x[] -= weight*.5*gg.x;
           }
         }
       }
@@ -51,7 +51,7 @@ void construct_divG(scalar divG, lagMesh* mesh) {
   }
   #else
   for(int i=0; i<mesh->nlt; i++) {
-    // compute the grid gradient on the midpoint of the edge
+    /** compute the grid gradient on the midpoint of the edge */
     coord gg; // gg for "grid gradient"
     int tn[3]; // tn for "triangle's nodes"
     tn[0] = mesh->triangles[i].node_ids[0];
@@ -60,8 +60,8 @@ void construct_divG(scalar divG, lagMesh* mesh) {
     foreach_dimension()
       gg.x = mesh->triangles[i].normal.x*mesh->triangles[i].area;
     for(int j=0; j<3; j++) {
-      foreach_cache(mesh->nodes[en[j]].stencil) {
-        //spread half the grid gradient of the edge from each of its nodes
+      foreach_cache(mesh->nodes[tn[j]].stencil) {
+        /** Spread one third of the grid gradient of the triangle to each of its vertices */
         if (point.level >= 0) {
         coord dist;
           dist.x = GENERAL_1DIST(x, mesh->nodes[tn[j]].pos.x);
@@ -72,7 +72,7 @@ void construct_divG(scalar divG, lagMesh* mesh) {
             double weight = (1 + cos(.5*pi*dist.x/Delta))
               *(1 + cos(.5*pi*dist.y/Delta))*(1 + cos(.5*pi*dist.z/Delta))
               /(cube(4*Delta));
-            foreach_dimension() G.x[] -= weight*gg.x;
+            foreach_dimension() G.x[] -= weight*gg.x/3.;
           }
         }
       }
@@ -96,17 +96,27 @@ event defaults (i = 0) {
   mu = new face vector;
   mup = MUP;
   muc = MUC;
-  I[top] = dirichlet(0.);
-  I[bottom] = dirichlet(0.);
-  prevI[top] = dirichlet(0.);
-  prevI[bottom] = dirichlet(0.);
-  divG[top] = dirichlet(0.);
-  divG[bottom] = dirichlet(0.);
+  /** We define below the homogeneous Dirichlet boundary conditions for the
+  grid-gradient, and the indicator function on all walls. A consequence of this
+  is that in the case of bi/tri-periodic boundary conditions in 2D/3D the
+  Poisson solver has no Dirichlet BC to ensure the indicator function lies
+  between 0 and 1. As a result, tri-periodic boxes (or bi-periodic squares)
+  are not recommended with the current implementation. */
+  foreach_dimension() {
+    if (u.x.boundary[left] != periodic_bc) {
+      I[left] = dirichlet(0.);
+      I[right] = dirichlet(0.);
+      prevI[left] = dirichlet(0.);
+      prevI[right] = dirichlet(0.);
+      divG[left] = dirichlet(0.);
+      divG[right] = dirichlet(0.);
+    }
+  }
 }
 
 event properties (i++) {
   construct_divG(divG, &(mbs.mb[0]));
-  poisson(I, divG, tolerance = 1.e-10);
+  poisson(I, divG, tolerance = 1.e-6);
 
   // Simple clamping of I:
   foreach() {

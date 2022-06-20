@@ -34,6 +34,10 @@ static void change_cache_entry(Cache* s, int i, Point pt, int flag) {
 }
 
 
+#define POS_PBC_X(X) ((u.x.boundary[left] != periodic_bc) ? (X) : (((X) > L0/2.) ? (X) - L0 : (X)))
+#define POS_PBC_Y(Y) ((u.x.boundary[top] != periodic_bc) ? (Y) : (((Y) > L0/2.) ? (Y) - L0 : (Y)))
+#define POS_PBC_Z(Z) ((u.x.boundary[top] != periodic_bc) ? (Z) : (((Z) > L0/2.) ? (Z) - L0 : (Z)))
+
 /**
 The function below loops through the Lagrangian nodes and "caches" the Eulerian
 cells in a 5x5(x5) stencil around each node. In case of parallel simulations,
@@ -51,12 +55,13 @@ void generate_lag_stencils(lagMesh* mesh) {
     for(int ni=-2; ni<=2; ni++) {
       for(int nj=-2; nj<=2; nj++) {
         #if dimension < 3
-        Point point = locate(mesh->nodes[i].pos.x + ni*delta,
-          mesh->nodes[i].pos.y + nj*delta);
+        Point point = locate(POS_PBC_X(mesh->nodes[i].pos.x + ni*delta),
+          POS_PBC_Y(mesh->nodes[i].pos.y + nj*delta));
         #else
         for(int nk=-2; nk<=2; nk++) {
-          Point point = locate(mesh->nodes[i].pos.x + ni*delta,
-            mesh->nodes[i].pos.y + nj*delta, mesh->nodes[i].pos.z + nk*delta);
+          Point point = locate(POS_PBC_X(mesh->nodes[i].pos.x + ni*delta),
+            POS_PBC_Y(mesh->nodes[i].pos.y + nj*delta),
+            POS_PBC_Z(mesh->nodes[i].pos.z + nk*delta));
         #endif
         if (point.level >= 0 && point.level != grid->maxdepth)
           fprintf(stderr, "Warning: Lagrangian stencil not fully resolved.\n");

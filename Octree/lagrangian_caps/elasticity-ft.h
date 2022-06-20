@@ -299,7 +299,7 @@ At the beginning of the computation, we compute the shape functions assuming
 the initial configuration is stress-free. If this is not the case, a workaround
 is to modify the shape of the membrane in an event following \textit{init}
 according to the desired pre-stressed conditions. See the
-[constricted_channel.c](tests/lagrangian_caps/constricted_channel.c) case for
+[constricted_channel.c](../../tests/lagrangian_caps/constricted_channel.c) case for
 an example of a isotropically pre-stressed membrane.*/
 #if dimension > 2
 event init (i = 0) {

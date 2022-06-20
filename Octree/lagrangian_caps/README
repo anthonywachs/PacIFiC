@@ -65,8 +65,12 @@ variable viscosity.
 computation of 3D elastic tensions for a flat membrane, for both the
 neo-Hookean and Skalak laws.
 * [nh_shear_3d.c](tests/lagrangian_caps/nh_shear_3d.c): tests the general
-implementation, including the 3D elasticity, and compares the result to various
-authors.
+3D implementation, including the neo-Hookean elastic law, and compares the
+result to various authors.
+* [constricted_channel.c](tests/lagrangian_caps/constricted_channel.c): tests
+the Skalak elasticty law, the interaction with embedded boundaries and compares
+quantitatively the deformation of the capsule to that of Park \&
+Dimitrakopoulos.
 
 #### Limitations and known bugs
 * The bending force currently leads to numerical instabilities, probably due to

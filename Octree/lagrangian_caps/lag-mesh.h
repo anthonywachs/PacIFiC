@@ -220,7 +220,9 @@ the outward property of the normal vectors won't change through the simulation.
 void comp_initial_area_normals(lagMesh* mesh) {
   for(int i=0; i<mesh->nlt; i++) {
     int nid[3]; // node ids
-    coord centroid;
+    coord centroid; /** Note: the centroid is only valid if the triangle is not
+    across periodic boundaries, which is fine for this function since it is
+    assumed the center of the membrane is at the origin. */
     foreach_dimension() centroid.x = 0.;
     for(int j=0; j<3; j++) {
       nid[j] = mesh->triangles[i].node_ids[j];
@@ -255,16 +257,29 @@ triangles of the mesh. */
 void comp_triangle_area_normal(lagMesh* mesh, int i) {
   int nid[3]; // node ids
   for(int j=0; j<3; j++) nid[j] = mesh->triangles[i].node_ids[j];
+  /** The next 15 lines compute the centroid of the triangle, making sure it is
+  valid when the triangle lies across periodic boundaries. */
   foreach_dimension() mesh->triangles[i].centroid.x = 0.;
   for(int j=0; j<3; j++) {
-    nid[j] = mesh->triangles[i].node_ids[j];
-    foreach_dimension()
-      mesh->triangles[i].centroid.x += mesh->nodes[nid[j]].pos.x/3;
+    foreach_dimension() {
+      mesh->triangles[i].centroid.x +=
+        ACROSS_PERIODIC(mesh->nodes[nid[j]].pos.x/3,
+        mesh->nodes[nid[0]].pos.x/3) ? mesh->nodes[nid[j]].pos.x/3 - L0 :
+        mesh->nodes[nid[j]].pos.x/3;
+    }
+  }
+  foreach_dimension() {
+    if (fabs(mesh->triangles[i].centroid.x) > L0/2.) {
+      if (mesh->triangles[i].centroid.x > 0)
+        mesh->triangles[i].centroid.x -= L0;
+      else mesh->triangles[i].centroid.x += L0;
+    }
   }
   coord normal, e[2];
   for(int j=0; j<2; j++)
     foreach_dimension()
-      e[j].x = mesh->nodes[nid[0]].pos.x - mesh->nodes[nid[j+1]].pos.x;
+      e[j].x = GENERAL_1DIST(mesh->nodes[nid[0]].pos.x,
+        mesh->nodes[nid[j+1]].pos.x);
   foreach_dimension() normal.x = e[0].y*e[1].z - e[0].z*e[1].y;
   double norm = sqrt(sq(normal.x) + sq(normal.y) + sq(normal.z));
   foreach_dimension() mesh->triangles[i].normal.x = normal.x/norm;
@@ -306,7 +321,7 @@ void comp_normals(lagMesh* mesh) {
       normn = sqrt(normn);
       foreach_dimension() mesh->nodes[i].normal.x /= normn;
     }
-    #else // dimension = 3
+    #else // dimension == 3
     comp_triangle_area_normals(mesh);
     for(int i=0; i<mesh->nlp; i++) {
       foreach_dimension() mesh->nodes[i].normal.x = 0.;
