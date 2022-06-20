@@ -17,8 +17,10 @@ void construct_divG(scalar divG, lagMesh* mesh) {
   comp_normals(mesh);
   compute_lengths(mesh);
   foreach() {
-    foreach_dimension() G.x[] = 0.;
-    divG[] = 0.;
+    if (cm[] > 1.e-20) {
+      foreach_dimension() G.x[] = 0.;
+      divG[] = 0.;
+    }
   }
   #if OLD_QCC
   boundary((scalar*){divG, G});
@@ -82,7 +84,9 @@ void construct_divG(scalar divG, lagMesh* mesh) {
   #if OLD_QCC
   boundary((scalar*){G});
   #endif
-  foreach() foreach_dimension() divG[] += (G.x[1] - G.x[-1])/(2.*Delta);
+  foreach()
+    if (cm[] > 1.e-20)
+      foreach_dimension() divG[] += (G.x[1] - G.x[-1])/(2.*Delta);
   #if OLD_QCC
   boundary({divG});
   #endif
@@ -96,6 +100,7 @@ event defaults (i = 0) {
   mu = new face vector;
   mup = MUP;
   muc = MUC;
+  foreach() foreach_dimension() divG[] = 0.;
   /** We define below the homogeneous Dirichlet boundary conditions for the
   grid-gradient, and the indicator function on all walls. A consequence of this
   is that in the case of bi/tri-periodic boundary conditions in 2D/3D the

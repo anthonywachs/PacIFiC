@@ -584,9 +584,11 @@ faces, and will be fed as a source term to the Navier-Stokes solver. */
 vector forcing[];
 event acceleration (i++) {
   face vector ae = a;
-  foreach() foreach_dimension() forcing.x[] = 0.;
+  foreach()
+    if (cm[] > 1.e-20) foreach_dimension() forcing.x[] = 0.;
   for(int i=0; i<mbs.nbmb; i++) lag2eul(forcing, &mbs.mb[i]);
-  foreach_face() ae.x[] += .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
+  foreach_face()
+    if (fm.x[] > 1.e-20) ae.x[] += .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
 }
 
 /** At the end of the simulation, we free the allocated memory.*/
