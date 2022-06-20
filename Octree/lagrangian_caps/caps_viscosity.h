@@ -120,22 +120,26 @@ event properties (i++) {
 
   // Simple clamping of I:
   foreach() {
-    if (fabs(divG[]) > 1.e-10) {
+    if (cm[] > 1.e-10) {
+      if (fabs(divG[]) > 1.e-10) {
+        I[] = clamp(I[], 0, 1);
+        prevI[] = I[];
+      }
+      else {
+        prevI[] = round(prevI[]);
+        I[] = prevI[];
+      }
       I[] = clamp(I[], 0, 1);
-      prevI[] = I[];
     }
-    else {
-      prevI[] = round(prevI[]);
-      I[] = prevI[];
-    }
-    I[] = clamp(I[], 0, 1);
   }
   #if OLD_QCC
   boundary({I, prevI});
   #endif
 
   foreach_face() {
-    face vector muv = mu;
-    muv.x[] = mup + (muc - mup)*.5*(I[] + I[-1]);
+    if (fm[].x > 1.e-10) {
+      face vector muv = mu;
+      muv.x[] = (mup + (muc - mup)*.5*(I[] + I[-1]))*fm.x[];
+    }
   }
 }
