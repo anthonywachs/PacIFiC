@@ -138,6 +138,6 @@ event properties (i++) {
 
   face vector muv = mu;
   foreach_face()
-    if (fm[].x > 1.e-20)
+    if (fm.x[] > 1.e-20)
       muv.x[] = (mup + (muc - mup)*.5*(I[] + I[-1]))*fm.x[];
 }
