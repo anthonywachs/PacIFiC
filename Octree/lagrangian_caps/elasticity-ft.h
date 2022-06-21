@@ -9,6 +9,8 @@ In three dimensions, this task is performed using an explicit finite element
 method introduced by [Charrier et al.](charrier1989free).
 */
 
+#define _ELASTICITY_FT 1
+
 #ifndef DWDL1
   #ifndef E_S
     #define E_S 1.

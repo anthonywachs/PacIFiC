@@ -14,8 +14,6 @@
 vector G[];
 // face vector G[];
 void construct_divG(scalar divG, lagMesh* mesh) {
-  comp_normals(mesh);
-  compute_lengths(mesh);
   foreach() {
     if (cm[] > 1.e-20) {
       foreach_dimension() G.x[] = 0.;
@@ -26,7 +24,9 @@ void construct_divG(scalar divG, lagMesh* mesh) {
   boundary((scalar*){divG, G});
   #endif
 
+  comp_normals(mesh);
   #if dimension < 3
+  compute_lengths(mesh);
   for(int i=0; i<mesh->nle; i++) {
     // compute the grid gradient on the midpoint of the edge
     coord gg; // grid gradient
