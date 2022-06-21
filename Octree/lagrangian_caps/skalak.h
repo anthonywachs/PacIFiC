@@ -5,7 +5,7 @@ In this file we define the Skalak strain energy function, used to compute
 the elastic force on each Lagrangian node of the membrane.
 
 The strain energy function is given by, e.g.,
-[Barthès-Biesel](barthes2016motion):
+[Barthès-Biesel](#barthes2016motion):
 
 $$
 W^{\text{Skalak}} = \frac{E_s}{4} \left( I_1^2 + 2I_1 - 2I_2 + CI_2^2 \right),

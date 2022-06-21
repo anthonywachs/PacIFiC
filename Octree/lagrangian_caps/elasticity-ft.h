@@ -6,7 +6,7 @@ stresses associated to a specific elastic law. The default elastic law is the
 Neo-Hookean law.
 
 In three dimensions, this task is performed using an explicit finite element
-method introduced by [Charrier et al.](charrier1989free).
+method introduced by [Charrier et al.](#charrier1989free).
 */
 
 #define _ELASTICITY_FT 1
@@ -177,8 +177,8 @@ void comp_elastic_stress(lagMesh* mesh) {
   /**
   ### Implementation of the Finite Element method
   In 3D, the elastic stresses are computed using an explicit finite element
-  method inspired from [Charrier et al.](charrier1989free) and
-  [Doddi \& Bagchi](doddi2008lateral).
+  method inspired from [Charrier et al.](#charrier1989free) and
+  [Doddi \& Bagchi](#doddi2008lateral).
 
 
   We start by looping through each triangle of the Lagrangian mesh: */

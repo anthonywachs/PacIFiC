@@ -426,10 +426,11 @@ void refine_mesh(lagMesh* mesh) {
 The functions below write/read the lagrangian mesh to/from a file in order
 to restart simulations.
 
-These functions are only valid for three-dimensional simulations.
+At the moment these functions are only valid for three-dimensional simulations.
 */
 
 void dump_lagmesh(FILE* fp, lagMesh* mesh) {
+  /** Step 1: The array of Lagrangian nodes is dumped */
   fwrite(&(mesh->nlp), sizeof(int), 1, fp);
   for(int i=0; i<mesh->nlp; i++) {
     foreach_dimension() fwrite(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
@@ -444,6 +445,7 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
     for(int j=0; j<6; j++)
       fwrite(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
   }
+  /** Step 2: The array of Lagrangian edges is dumped */
   fwrite(&(mesh->nle), sizeof(int), 1, fp);
   for(int i=0; i<mesh->nle; i++) {
     fwrite(&(mesh->edges[i].l0), sizeof(double), 1, fp);
@@ -452,6 +454,9 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
       fwrite(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
     }
   }
+  /** Step 3: The array of Lagrangian triangles is dumped. If the finite element
+  functions are not used, some attributes of the Triangle structure are not
+  initialized and we don't have to dump them. */
   fwrite(&(mesh->nlt), sizeof(int), 1, fp);
   for(int i=0; i<mesh->nlt; i++) {
     fwrite(&(mesh->triangles[i].refArea), sizeof(double), 1, fp);
@@ -474,6 +479,7 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
 }
 
 void restore_lagmesh(FILE* fp, lagMesh* mesh) {
+  /** Step 1: The array of Lagrangian nodes is read */
   fread(&(mesh->nlp), sizeof(int), 1, fp);
   mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
   for(int i=0; i<mesh->nlp; i++) {
@@ -489,6 +495,7 @@ void restore_lagmesh(FILE* fp, lagMesh* mesh) {
     for(int j=0; j<6; j++)
       fread(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
   }
+  /** Step 1: The array of Lagrangian edges is read */
   fread(&(mesh->nle), sizeof(int), 1, fp);
   mesh->edges = malloc(mesh->nle*sizeof(Edge));
   for(int i=0; i<mesh->nle; i++) {
@@ -498,6 +505,9 @@ void restore_lagmesh(FILE* fp, lagMesh* mesh) {
       fread(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
     }
   }
+  /** Step 3: The array of Lagrangian triangles is read. If the finite element
+  functions are not used, some attributes of the Triangle structure are not
+  dumped and we should not read them. */
   fread(&(mesh->nlt), sizeof(int), 1, fp);
   mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
   for(int i=0; i<mesh->nlt; i++) {
@@ -523,6 +533,8 @@ void restore_lagmesh(FILE* fp, lagMesh* mesh) {
   mesh->updated_curvatures = false;
 }
 
+/** If the simulation contains several membranes, we dump and read one mesh at
+a time, but all meshes are stored in the same file. */
 void dump_membranes(char* filename) {
   FILE* file = fopen(filename, "w");
   assert(file);
