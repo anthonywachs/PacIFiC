@@ -215,6 +215,9 @@ class DS_NavierStokes : public MAC_Object,
 
       void calculate_row_indexes ( FV_DiscreteField const* FF);
 
+
+      void compute_velocity_divergence ( );
+
       double divergence_of_U( size_t const& i
                             , size_t const& j
                             , size_t const& k
@@ -230,12 +233,11 @@ class DS_NavierStokes : public MAC_Object,
                                , size_t const& dir
                                , size_t const& field);
 
-      /** @brief Assemble rhs for pressure in any direction */
+      /** @brief Assemble divergence for penelty step */
       double calculate_velocity_divergence ( size_t const& i
                                            , size_t const& j
                                            , size_t const& k
-                                           , size_t const& level
-                                           , FV_TimeIterator const* t_it);
+                                           , size_t const& level);
 
       double assemble_velocity_gradients (class doubleVector& grad
                                         , size_t const& i

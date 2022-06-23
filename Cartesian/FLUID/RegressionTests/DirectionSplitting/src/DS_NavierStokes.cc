@@ -2460,8 +2460,7 @@ double
 DS_NavierStokes:: calculate_velocity_divergence ( size_t const& i,
                                                    size_t const& j,
                                                    size_t const& k,
-                                                   size_t const& level,
-                                                   FV_TimeIterator const* t_it)
+                                                   size_t const& level)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_NavierStokes:: calculate_velocity_divergence" ) ;
@@ -2476,6 +2475,41 @@ DS_NavierStokes:: calculate_velocity_divergence ( size_t const& i,
 }
 
 
+
+
+//---------------------------------------------------------------------------
+void
+DS_NavierStokes:: compute_velocity_divergence ( )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: compute_velocity_divergence" ) ;
+
+	// Get local min and max indices
+	size_t_vector min_unknown_index(3,0);
+	size_t_vector max_unknown_index(3,0);
+
+
+	for (size_t l = 0; l < dim; ++l) {
+		min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
+		max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
+	}
+
+	size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
+	doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
+
+	size_t comp = 0;
+
+	for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+		for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+			for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+				size_t p = PF->DOF_local_number(i,j,k,comp);
+				double vel_div = calculate_velocity_divergence(i,j,k,0);
+	         divergence->operator()(p) = vel_div;
+			}
+		}
+	}
+
+}
 
 
 //---------------------------------------------------------------------------
@@ -2509,10 +2543,9 @@ DS_NavierStokes:: pressure_local_rhs ( size_t const& j
    for (size_t i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
       double dx = PF->get_cell_size( i, 0, dir );
       if (dir == 0) {
-         double vel_div = calculate_velocity_divergence(i,j,k,0,t_it);
+			size_t p = PF->DOF_local_number(i,j,k,0);
+         double vel_div = divergence->operator()(p);
          value = -(rho*vel_div*dx)/(t_it -> time_step());
-         size_t p = PF->DOF_local_number(i,j,k,0);
-         divergence->operator()(p) = vel_div;
       } else if (dir == 1) {
          value = PF->DOF_value( j, i, k, 0, 1 )*dx;
       } else if (dir == 2) {
@@ -2774,6 +2807,8 @@ DS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
   MAC_LABEL( "DS_NavierStokes:: NS_pressure_update" ) ;
 
   double gamma=mu/2.0;
+
+  compute_velocity_divergence();
 
   Solve_i_in_jk (PF,t_it,0,1,2,gamma,1);
   // Synchronize the pressure field
