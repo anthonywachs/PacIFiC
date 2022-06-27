@@ -1341,8 +1341,8 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	   	 m_InitVtrans[X] << ", " << m_InitVtrans[Y] << ", " 
 		 << m_InitVtrans[Z] << " )" << endl; 
 	    cout << GrainsExec::m_shift9 << "angular = ( " << 
-	   	 m_InitVtrans[X] << ", " << m_InitVtrans[Y] << ", " 
-		 << m_InitVtrans[Z] << " )" << endl; 
+	   	 m_InitVrot[X] << ", " << m_InitVrot[Y] << ", " 
+		 << m_InitVrot[Z] << " )" << endl; 
             break;
       
           case IV_RANDOM :
