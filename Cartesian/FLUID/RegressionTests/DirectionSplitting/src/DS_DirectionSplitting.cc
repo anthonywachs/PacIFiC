@@ -71,6 +71,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , mu( 1. )
    , kai( 1. )
    , AdvectionScheme( "TVD" )
+   , DivergenceScheme( "FD" )
    , AdvectionTimeAccuracy( 1 )
    , b_restart( false )
    , is_solids( false )
@@ -115,6 +116,17 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    if ( exp->has_entry( "Kai" ) ) {
      kai = exp->double_data( "Kai" ) ;
      exp->test_data( "Kai", "Kai>=0." ) ;
+   }
+
+   // Divergence scheme
+   if ( exp->has_entry( "DivergenceScheme" ) )
+     DivergenceScheme = exp->string_data( "DivergenceScheme" );
+   if ( DivergenceScheme != "FD"
+     && DivergenceScheme != "CutCell" )
+   {
+     string error_message="   - FD\n   - CutCell";
+     MAC_Error::object()->raise_bad_data_value( exp,
+        "DivergenceScheme", error_message );
    }
 
    // Advection scheme
@@ -277,6 +289,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataNS.mu_ = mu ;
       inputDataNS.kai_ = kai ;
       inputDataNS.AdvectionScheme_ = AdvectionScheme ;
+      inputDataNS.DivergenceScheme_ = DivergenceScheme ;
       inputDataNS.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
       inputDataNS.b_restart_ = b_restart ;
       inputDataNS.is_solids_ = is_solids ;

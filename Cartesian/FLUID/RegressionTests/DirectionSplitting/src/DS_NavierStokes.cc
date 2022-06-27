@@ -62,6 +62,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , mu( fromDS.mu_ )
    , kai( fromDS.kai_ )
    , AdvectionScheme( fromDS.AdvectionScheme_ )
+	, DivergenceScheme( fromDS.DivergenceScheme_ )
    , AdvectionTimeAccuracy( fromDS.AdvectionTimeAccuracy_ )
    , rho( fromDS.rho_ )
 	, b_restart ( fromDS.b_restart_ )

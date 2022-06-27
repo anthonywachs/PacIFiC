@@ -125,6 +125,7 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       double mu;
       double kai;
       string AdvectionScheme;
+      string DivergenceScheme;
       size_t AdvectionTimeAccuracy;
       size_t space_dimensions;
       bool b_restart;
