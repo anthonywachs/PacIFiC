@@ -141,6 +141,8 @@ class DS_NavierStokesSystem : public MAC_Object
       NodeProp get_node_property(size_t const& field, size_t const& time_level);
       /** @brief Return the divergence on pressure node */
       doubleVector* get_node_divergence(size_t const& level);
+      /** @brief Return the pressure field cell volume */
+      doubleVector* get_cell_volume();
       /** @brief Return the velocity diffusive terms */
       vector<doubleVector*> get_velocity_diffusion();
       /** @brief Return the local vector with a vector of row index */
@@ -275,6 +277,7 @@ class DS_NavierStokesSystem : public MAC_Object
       vector<doubleVector*> divergence;
       // Local vector to store diffusive terms
       vector<doubleVector*> vel_diffusion;
+      doubleVector* cell_volume;
 
       size_t dim;
       MAC_Communicator const* pelCOMM;

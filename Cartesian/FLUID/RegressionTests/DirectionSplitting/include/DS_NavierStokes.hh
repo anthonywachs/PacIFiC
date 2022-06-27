@@ -216,8 +216,24 @@ class DS_NavierStokes : public MAC_Object,
 
       void calculate_row_indexes ( FV_DiscreteField const* FF);
 
+      tuple<double,double> divergence_wall_flux ( size_t const& i
+										    , size_t const& j
+      									 , size_t const& k
+      									 , size_t const& normal
+      									 , double const& length
+      									 , size_t const& level);
 
       void compute_velocity_divergence ( );
+
+      double return_face_fraction ( size_t const& i,
+                                    size_t const& j,
+  		                              size_t const& k,
+                                    size_t const& comp,
+	                                 double const& length);
+
+      void redistribute_divergence_flux ( size_t const& i,
+                                     size_t const& j,
+                                     size_t const& k);
 
       double divergence_of_U( size_t const& i
                             , size_t const& j
@@ -235,10 +251,17 @@ class DS_NavierStokes : public MAC_Object,
                                , size_t const& field);
 
       /** @brief Assemble divergence for penelty step */
-      double calculate_velocity_divergence ( size_t const& i
+      double calculate_velocity_divergence_FD ( size_t const& i
                                            , size_t const& j
                                            , size_t const& k
                                            , size_t const& level);
+
+      /** @brief Assemble divergence for penelty step */
+      double calculate_velocity_divergence_cutCell ( size_t const& i
+                                           , size_t const& j
+                                           , size_t const& k
+                                           , size_t const& level);
+
 
       double assemble_velocity_gradients (class doubleVector& grad
                                         , size_t const& i
