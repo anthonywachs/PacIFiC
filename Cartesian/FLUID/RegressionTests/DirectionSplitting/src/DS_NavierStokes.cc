@@ -2912,16 +2912,13 @@ void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
 		// Flux redistribution
 		double sum = wt_lft + wt_rht + wt_bot + wt_top;
 
-		divergence->operator()(p_lft) += wt_lft/sum * divergence->operator()(p);
-		divergence->operator()(p_rht) += wt_rht/sum * divergence->operator()(p);
-		divergence->operator()(p_bot) += wt_bot/sum * divergence->operator()(p);
-		divergence->operator()(p_top) += wt_top/sum * divergence->operator()(p);
-		divergence->operator()(p) = 0.;
-		// cout << p << "," << normal(0)*normal(0)*lft_frac
-		//  			 << "," << normal(0)*normal(0)*rht_frac
-		// 			 << "," << normal(1)*normal(1)*bot_frac
-		// 			 << "," << normal(1)*normal(1)*top_frac
-		// 			 << endl;
+		if (sum > 0.) {
+			divergence->operator()(p_lft) += wt_lft/sum * divergence->operator()(p);
+			divergence->operator()(p_rht) += wt_rht/sum * divergence->operator()(p);
+			divergence->operator()(p_bot) += wt_bot/sum * divergence->operator()(p);
+			divergence->operator()(p_top) += wt_top/sum * divergence->operator()(p);
+			divergence->operator()(p) = 0.;
+		}
 	}
 
 }
@@ -3000,6 +2997,9 @@ double DS_NavierStokes:: return_face_fraction ( size_t const& i,
 			}
 		}
 	}
+
+	// Eliminate contribution if less than 0.01%
+	if (fraction < 0.0001*length) fraction = 0.;
 
 	return(fraction);
 
