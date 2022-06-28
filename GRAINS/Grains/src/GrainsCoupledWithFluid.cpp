@@ -135,23 +135,14 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
       string   cle;
       ifstream simulLoad( restart.c_str() );
       simulLoad >> cle >> m_temps;
-			m_new_reload_format = false ;
+      m_new_reload_format = false ;
       if ( cle == "NEW_RELOAD_FORMAT" )
       {
         m_new_reload_format = true ;
-        simulLoad >> cle >> m_temps;
-      }
-      else if (cle == "NEW_RELOAD_FORMAT_AND_CONTACT_HISTORY")
-      {
-        // Contact history is the new standard - just as reload 2014 - but these
-        // conditions ensure previous cases are still compatible.
-        m_new_reload_format = true ;
-        m_history_storage = true ;
-        simulLoad >> cle >> m_temps;
+	simulLoad >> cle >> m_temps;
       }
       Contact_BuilderFactory::reload( simulLoad );
-      m_composants.read( simulLoad, restart, m_new_reload_format,
-			 										m_history_storage);
+      m_composants.read( simulLoad, restart, m_new_reload_format );
       Contact_BuilderFactory::set_materialsForObstaclesOnly_reload(
       		m_composants.getParticuleClassesReference() );
       simulLoad >> cle;
@@ -207,7 +198,7 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
     DOMNode* cellsize = ReaderXML::getNode( root, "CellSize" );
     if ( cellsize )
       LC_coef = ReaderXML::getNodeAttr_Double( cellsize, "Factor" );
-    if ( LC_coef < 1. ) LC_coef = 1.;
+    if ( LC_coef < 1. ) LC_coef = 1.;    
     defineLinkedCell( LC_coef * m_rayon );
 
     m_sec->Link( m_composants.getObstacles() );
@@ -427,30 +418,31 @@ void GrainsCoupledWithFluid::Chargement( DOMElement* rootElement )
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Set the value Delta_t for one time (for coupling with Basilisk which handles adaptive time-steps)
+// Set the value Delta_t for one time (for coupling with Basilisk which 
+// handles adaptive time step)
 void GrainsCoupledWithFluid::set_timeStep( double const dtfluid )
 {
-
-  if ( m_processorIsActiv ) {
+  if ( m_processorIsActiv ) 
+  {
     double dteff;
     dteff = max(min (m_dtgmax, dtfluid/m_N), m_dtgmin);
     m_N = int(dtfluid/dteff);
 
     m_dt = dtfluid/m_N;
     m_simulTime = dtfluid;
-
+    
     // cout << "Can: granular time-step: dtg " << m_dt << endl;
     // cout << "Can: number of granular time-steps " << m_N << endl;
     // cout << "Can: fluid time-step: dtf within grains " << dtfluid << endl;
-
   }
 
 }
+
 void GrainsCoupledWithFluid::set_ExplicitAddedMasstimeStep( double dtfluid )
 {
 
-  if ( m_processorIsActiv )
-    if ( m_explicitAddedMass )
+  if ( m_processorIsActiv )     
+    if ( m_explicitAddedMass ) 
       dynamic_cast<AddedMass*>(m_explicitAddedMass)->setsimulTime( dtfluid );
 }
 
@@ -702,11 +694,6 @@ void GrainsCoupledWithFluid::Simulation( bool predict,
         break;
       }
     }
-
-    cout << "Grains Time = " <<
-    	Grains_Exec::doubleToString( ios::scientific, 8, m_temps ) << endl;
-    cout << "Grains dtfluid = " <<
-    	Grains_Exec::doubleToString( ios::scientific, 8, time ) << endl;
   }
 }
 
@@ -791,37 +778,6 @@ void GrainsCoupledWithFluid::WritePVGCInFluid(const string &filename) const
 }
 
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-void GrainsCoupledWithFluid::WriteParticulesInFluid( BasiliskDataStructure * is ) const
-{
-  if ( m_processorIsActiv )
-    m_InterfaceFluide->WriteParticulesInFluid(
-    	*m_composants.getParticulesActives(),
-    	m_composants.getObstaclesToFluid(), is );
-}
-
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Modification de la vitesse des particules de Grains par Basilisk
-void GrainsCoupledWithFluid::UpdateParticulesVelocities(
-	BasiliskDataStructure * is,
-	const bool &b_set_velocity_nm1_and_diff )
-{
-  if ( m_processorIsActiv )
-  {
-    // Mise a jour de la vitesse des particules par le fluide
-    m_InterfaceFluide->UpdateParticulesVelocities(
-    	*m_composants.getParticulesActives(),
-  	m_dt, is, b_set_velocity_nm1_and_diff );
-
-    // Copie vers les clones periodiques
-    // On passe NULL pour LinkedCell car a ce stade on souhaite simplement
-    // mettre a jour les vitesse & position
-    m_composants.updateClonesPeriodiques( NULL );
-  }
-}
-
-
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -857,25 +813,25 @@ void GrainsCoupledWithFluid::AddExplicitAddedMass(
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 void GrainsCoupledWithFluid::InitializeExplicitAddedMassRestart(
-	bool const& restart, string const& dirRes,
+	bool const& restart, string const& dirRes_Or_rootfilename, 
 	string const& fluidsolver )
 {
   if ( m_processorIsActiv )
   {
     if ( restart )
     {
-      if ( fluidsolver == "PeliGRIFF" )
+      if ( fluidsolver == "PeliGRIFF" ) 
         m_composants.setVelocityAndVelocityDifferencePreviousTimeRestart(
-      		dirRes );
-
+      		dirRes_Or_rootfilename );
+		
       else
-      {
+      { 
         double previousdtfluid = m_composants.
 		setVelocityAndVelocityDifferencePreviousTimeRestart_Basilisk(
-      		dirRes );
-	dynamic_cast<AddedMass*>(m_explicitAddedMass)->setsimulTime(
+      		dirRes_Or_rootfilename );
+	dynamic_cast<AddedMass*>(m_explicitAddedMass)->setsimulTime( 
 		previousdtfluid );
-      }
+      }	
     }
   }
 }
@@ -966,11 +922,12 @@ void GrainsCoupledWithFluid::setPositionParticulesBloc(const PullMode& mode)
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Sauvegarde par defaut de l'etat initial pour post-processing
-void GrainsCoupledWithFluid::InitialPostProcessing()
+void GrainsCoupledWithFluid::InitialPostProcessing( size_t indent_width )
 {
   // Par defaut l'etat initial est sauvegarde
   if ( m_processorIsActiv )
-    m_composants.PostProcessing_start( m_temps, m_dt, m_sec, m_fenetres );
+    m_composants.PostProcessing_start( m_temps, m_dt, m_sec, m_fenetres,
+    	0, 1, NULL, indent_width );
 }
 
 
@@ -978,12 +935,13 @@ void GrainsCoupledWithFluid::InitialPostProcessing()
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Sauvegarde pour post-processing et restart
-void GrainsCoupledWithFluid::doPostProcessing()
+void GrainsCoupledWithFluid::doPostProcessing( size_t indent_width )
 {
   if ( m_processorIsActiv )
   {
     // Post processing
-    m_composants.PostProcessing( m_temps, m_dt, m_sec );
+    m_composants.PostProcessing( m_temps, m_dt, m_sec,
+    	0, 1, NULL, indent_width );
 
     // Sauvegarde du fichier de fin pour Reload
     saveReload( m_temps );
@@ -1105,19 +1063,18 @@ void GrainsCoupledWithFluid::checkParaviewPostProcessing( const string &name_,
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Verifie que le post processing Paraview est actif pour Basilisk, sinon le cree
-// Can Selcuk 2018
-void GrainsCoupledWithFluid::checkParaviewPostProcessing( const char  * name_,
-	const char * root_,
-  	const bool &isBinary ) {
-
+// Verifie que le post processing Paraview est actif pour Basilisk, sinon le 
+// cree
+void GrainsCoupledWithFluid::checkParaviewPostProcessing( const char* name_,
+	const char* root_,
+  	const bool &isBinary ) 
+{
   string str(name_);
   string str_root(root_);
 
-  if ( m_processorIsActiv ) {
+  if ( m_processorIsActiv )
     m_composants.checkParaviewPostProcessing( m_rank, m_nprocs, str,
-					      str_root, isBinary );
-  }
+	str_root, isBinary );
 }
 
 

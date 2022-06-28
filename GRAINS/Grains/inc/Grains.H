@@ -150,8 +150,6 @@ protected:
       les diff�rentes parties du code */
   bool m_new_reload_format; /** format des fichiers de reload (nouveau ou
       ancien) */
-  bool m_history_storage; /** Indicates if each particle's neighbors are stored
-      in the binary file (not necessary for clear text storage) */
 //  bool m_dragForce_with_fluidAtRest; /** activation de la force hydro
 //      lorsque le fluide n'est pas resolu (fluide suppose au repos) */
   //@}

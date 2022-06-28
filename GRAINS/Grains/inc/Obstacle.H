@@ -217,16 +217,6 @@ public:
   	int const& id );
   //@}
 
-  virtual void copyHistoryContacts( double* &destination, int start_index );
-
-
-  // Copy existing contact in the map
-  virtual void copyContactInMap( std::tuple<int,int,int> const& id,
-    bool const& isActive, int const& nbDtRemember, int const& nbCumulTangent,
-    Vecteur const& tangent, Vecteur const& prev_normal,
-    Vecteur const& cumulSpringTorque );
-
-  virtual int getContactMapSize();
 
   /** @name Methods */
   //@{

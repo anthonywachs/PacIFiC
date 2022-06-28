@@ -356,7 +356,7 @@ public:
   @param ParticuleClassesReference particules de r�f�rence
   	pour chaque classe de particules */
   void read2014_binary( istream &fileSave, vector<Particule*> const*
-  	ParticuleClassesReference, bool const &contact_history_storage = false );
+  	ParticuleClassesReference );
 
   /** @brief Ecriture de l'information de position pour le Fluide */
   virtual void writePositionInFluid( ostream &fluid );
