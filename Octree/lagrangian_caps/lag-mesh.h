@@ -29,6 +29,7 @@ typedef struct lagNode {
   #if dimension < 3
     int edge_ids[2];
   #else
+    double gcurv; // Gaussian curvature
     int nb_neighbors;
     int neighbor_ids[6];
     int nb_edges;
@@ -152,6 +153,15 @@ be the case. */
 #define GENERAL_1DIST(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DIST(a,b) : a - b)
 #define PERIODIC_1DAVG(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 + b : a - L0 + b)
 #define GENERAL_1DAVG(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DAVG(a,b) : a + b)
+
+#if dimension < 3
+  #define cnorm(a) (sqrt(sq(a.x) + sq(a.y)))
+  #define cdot(a,b) (a.x*b.x + a.y*b.y)
+#else
+  #define cnorm(a) (sqrt(sq(a.x) + sq(a.y) + sq(a.z)))
+  #define cdot(a,b) (a.x*b.x + a.y*b.y + a.z*b.z)
+#endif
+
 
 
 /**
@@ -344,105 +354,6 @@ void comp_normals(lagMesh* mesh) {
   }
 }
 
-
-/**
-The function below computes the signed curvature of the Lagrangian mesh at each
-node. It scales in a second-order fashion with the number of Lagrangian points.
-It only works in two dimensions.
-*/
-void comp_curvature(lagMesh* mesh) {
-  if (!mesh->updated_curvatures) {
-    comp_normals(mesh);
-    #if dimension < 3
-    bool up; // decide if we switch the x and y axes
-    lagNode* cn; // current node
-    for(int i=0; i<mesh->nlp; i++) {
-      cn = &(mesh->nodes[i]);
-      up = (fabs(cn->normal.y) > fabs(cn->normal.x)) ? true : false;
-      coord p[5]; // store the coordinates of the current node and of its
-                  // neighbors'
-      for(int j=0; j<5; j++) {
-        int index = (mesh->nlp + i - 2 + j)%mesh->nlp;
-        foreach_dimension() p[j].x = up ? mesh->nodes[index].pos.x :
-          mesh->nodes[index].pos.y;
-      }
-      /** If one of the neighboring nodes is across a periodic boundary, we
-correct its position */
-      for(int j=0; j<5; j++) {
-        if (j!=2) {
-          foreach_dimension() {
-            if (ACROSS_PERIODIC(p[j].x,p[2].x)) {
-              p[j].x += (ACROSS_PERIODIC(p[j].x + L0, p[2].x)) ? -L0 : L0;
-            }
-          }
-        }
-      }
-
-/** Since the bending force will involve taking the laplacian of the curvature,
-we seek a cuvrature to fourth order accuracy, so we need to interpolate the
-membrane with a fourth-degree polynomial, which we need to differentiate twice
-to get the curvature:
-$$P_4(x) = \sum_{j=i-2}^{i+2} y_j \prod_{k \neq j} \frac{x - x_j}{x_k - x_j} $$
-
-$$P'_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
-\right) \sum_{l \neq j}\prod_{m \neq j, m \neq l} x - x_m $$
-
-$$P''_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
-\right) \sum_{l \neq j}\sum_{m \neq j, m \neq l}\sum_{n \neq j, n \neq l, n
-\neq m}x - x_n $$
-*/
-      double dy = 0.;
-      double ddy = 0.;
-      for(int j=0; j<5; j++) {
-        double b1 = 0.; double b2 = 0.;
-        for(int l=0; l<5; l++) {
-          if (l!=j) {
-            double c1 = 1.; double c2 = 0.;
-            for(int m=0; m<5; m++) {
-              if (m!=j && m!=l) {
-                double d2 = 1.;
-                for(int n=0; n<5; n++) {
-                  if (n!=j && n!=l && n!= m) {
-                    d2 *= p[2].x - p[n].x;
-                  }
-                }
-                c1 *= p[2].x - p[m].x;
-                c2 += d2;
-              }
-            }
-            b1 += c1;
-            b2 += c2;
-          }
-        }
-        for(int k=0; k<5; k++) {
-          if (k!=j) {
-            b1 /= (p[k].x - p[j].x);
-            b2 /= (p[k].x - p[j].x);
-          }
-        }
-        dy += b1*p[j].y;
-        ddy += b2*p[j].y;
-      }
-
-      /** The formula for the signed curvature of a function y(x) is
-  $$ \kappa = \frac{y''}{(1 + y'^2)^{\frac{3}{2}}}. $$
-  The sign is dertemined from a parametrization of the curve: walking
-  anticlockwise along the curve, if we turn left the curvature is positive. This
-  statement can be easily written as a dot product between edge i's normal
-  vector and edge (i+1)'s direction vector.*/
-      coord a, b;
-      foreach_dimension() {
-        a.x = mesh->edges[mesh->nodes[i].edge_ids[0]].normal.x;
-        b.x = mesh->edges[mesh->nodes[i].edge_ids[1]].normal.x;
-      }
-      int s = (a.x*b.x + a.y*b.y > 0) ? 1 : -1;
-      cn->curv = s*fabs(ddy)/cube(sqrt(1 + sq(dy)));
-    }
-    #endif
-    mesh->updated_curvatures = true;
-  }
-}
-
 /**
 If a Lagrangian node falls exactly on an edge or a vertex of the Eulerian
 mesh, some issues arise when checking for periodic boundary conditions. As a
@@ -468,6 +379,8 @@ void correct_lag_pos(lagMesh* mesh) {
   mesh->updated_curvatures = false;
 }
 
+
+#include "curvature-ft.h"
 
 /**
 ## Advection of the mesh

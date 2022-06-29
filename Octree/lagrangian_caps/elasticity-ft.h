@@ -26,14 +26,6 @@ stream */
   #define OUTPUT_PRINCIPAL_STRESS 0
 #endif
 
-#if dimension < 3
-  #define cnorm(a) (sqrt(sq(a.x) + sq(a.y)))
-  #define cdot(a,b) (a.x*b.x + a.y*b.y)
-#else
-  #define cnorm(a) (sqrt(sq(a.x) + sq(a.y) + sq(a.z)))
-  #define cdot(a,b) (a.x*b.x + a.y*b.y + a.z*b.z)
-#endif
-
 /**
 ## Finite Element helper functions
 
@@ -44,6 +36,7 @@ The function below returns the vertices of the triangle $tid$, rotated to
 the reference plane. Since node 0 is always located at $(0,0,0)$, this
 function only returns the coordinates of nodes 1 and 2.
 */
+trace
 void rotate_to_reference_plane(lagMesh* mesh, int tid, coord rn[2],
   double IM[3][3]) {
   if (!mesh->updated_normals) comp_normals(mesh);
@@ -308,6 +301,10 @@ event init (i = 0) {
   for(int j=0; j<NCAPS; j++) store_initial_configuration(&MB(j));
 }
 #endif
+
+event stability (i++) {
+  
+}
 
 event acceleration (i++) {
   for(int i=0; i<mbs.nbmb; i++) comp_elastic_stress(&mbs.mb[i]);

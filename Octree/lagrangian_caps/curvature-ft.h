@@ -1,0 +1,235 @@
+/**
+# Compute the curvature of the mesh in 2D and 3D
+
+*/
+
+#if dimension > 2
+#include "matrix_toolbox.h"
+
+void fit_paraboloid(double** XX, double* beta, double* yy, bool perform_least_squares) {
+  if (!perform_least_squares) {
+    int* P = malloc(6*sizeof(int));
+    LUPDecompose(XX, 5, 1.e-10, P);
+    LUPSolve(XX, P, yy, 5, beta);
+    free(P);
+  }
+  else {
+    int* P = malloc(7*sizeof(int));
+    /** We compute $\bm{X^T} \bm{X}$ and its inverse */
+    double** AA = malloc(5*sizeof(double*));
+    for(int i=0; i<5; i++) AA[i] = malloc(5*sizeof(double));
+    double** IAA = malloc(5*sizeof(double*));
+    for(int i=0; i<5; i++) IAA[i] = malloc(5*sizeof(double));
+    for(int i=0; i<5; i++) {
+      for(int j=0; j<5; j++) {
+        AA[i][j] = 0.;
+        for(int k=0; k<6; k++) AA[i][j] += XX[k][j]*XX[k][i];
+      }
+    }
+    LUPDecompose(AA, 5, 1.e-10, P);
+    LUPInvert(AA, P, 5, IAA);
+    /** And then we apply the ordinary linear least squares differences:
+    $$ \bm{\beta} = \left( \bm{X^T} \bm{X} \right)^{-1} \bm{X^T}\bm{y} $$
+    */
+    for(int i=0; i<5; i++) {
+      beta[i] = 0.;
+      for(int j=0; j<5; j++) {
+        double Xty = 0.;
+        for(int k=0; k<6; k++) Xty += XX[k][j]*yy[k];
+        beta[i] += IAA[i][j]*Xty;
+      }
+    }
+    free(P);
+    for(int i=0; i<5; i++) {
+      free(AA[i]);
+      free(IAA[i]);
+    }
+    free(AA);
+    free(IAA);
+  }
+}
+#endif
+
+/**
+The function below computes the signed curvature of the Lagrangian mesh at each
+node. It scales in a second-order fashion with the number of Lagrangian points.
+It only works in two dimensions.
+*/
+void comp_curvature(lagMesh* mesh) {
+  if (!mesh->updated_curvatures) {
+    comp_normals(mesh);
+/**
+## Two-dimensional curvature computation
+
+In 2D, we compute the curvature by fitting a 4th-degree polynomial to the mesh using two neighbours on each side of the node of interest
+*/
+    #if dimension < 3
+    bool up; // decide if we switch the x and y axes
+    lagNode* cn; // current node
+    for(int i=0; i<mesh->nlp; i++) {
+      cn = &(mesh->nodes[i]);
+      up = (fabs(cn->normal.y) > fabs(cn->normal.x)) ? true : false;
+      coord p[5]; // store the coordinates of the current node and of its
+                  // neighbors'
+      for(int j=0; j<5; j++) {
+        int index = (mesh->nlp + i - 2 + j)%mesh->nlp;
+        foreach_dimension() p[j].x = up ? mesh->nodes[index].pos.x :
+          mesh->nodes[index].pos.y;
+      }
+      /** If one of the neighboring nodes is across a periodic boundary, we
+correct its position */
+      for(int j=0; j<5; j++) {
+        if (j!=2) {
+          foreach_dimension() {
+            if (ACROSS_PERIODIC(p[j].x,p[2].x)) {
+              p[j].x += (ACROSS_PERIODIC(p[j].x + L0, p[2].x)) ? -L0 : L0;
+            }
+          }
+        }
+      }
+
+/** Since the bending force will involve taking the laplacian of the curvature,
+we seek a cuvrature to fourth order accuracy, so we need to interpolate the
+membrane with a fourth-degree polynomial, which we need to differentiate twice
+to get the curvature:
+$$P_4(x) = \sum_{j=i-2}^{i+2} y_j \prod_{k \neq j} \frac{x - x_j}{x_k - x_j} $$
+
+$$P'_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
+\right) \sum_{l \neq j}\prod_{m \neq j, m \neq l} x - x_m $$
+
+$$P''_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
+\right) \sum_{l \neq j}\sum_{m \neq j, m \neq l}\sum_{n \neq j, n \neq l, n
+\neq m}x - x_n $$
+*/
+      double dy = 0.;
+      double ddy = 0.;
+      for(int j=0; j<5; j++) {
+        double b1 = 0.; double b2 = 0.;
+        for(int l=0; l<5; l++) {
+          if (l!=j) {
+            double c1 = 1.; double c2 = 0.;
+            for(int m=0; m<5; m++) {
+              if (m!=j && m!=l) {
+                double d2 = 1.;
+                for(int n=0; n<5; n++) {
+                  if (n!=j && n!=l && n!= m) {
+                    d2 *= p[2].x - p[n].x;
+                  }
+                }
+                c1 *= p[2].x - p[m].x;
+                c2 += d2;
+              }
+            }
+            b1 += c1;
+            b2 += c2;
+          }
+        }
+        for(int k=0; k<5; k++) {
+          if (k!=j) {
+            b1 /= (p[k].x - p[j].x);
+            b2 /= (p[k].x - p[j].x);
+          }
+        }
+        dy += b1*p[j].y;
+        ddy += b2*p[j].y;
+      }
+
+      /** The formula for the signed curvature of a function y(x) is
+  $$ \kappa = \frac{y''}{(1 + y'^2)^{\frac{3}{2}}}. $$
+  The sign is dertemined from a parametrization of the curve: walking
+  anticlockwise along the curve, if we turn left the curvature is positive. This
+  statement can be easily written as a dot product between edge i's normal
+  vector and edge (i+1)'s direction vector.*/
+      coord a, b;
+      foreach_dimension() {
+        a.x = mesh->edges[mesh->nodes[i].edge_ids[0]].normal.x;
+        b.x = mesh->edges[mesh->nodes[i].edge_ids[1]].normal.x;
+      }
+      int s = (a.x*b.x + a.y*b.y > 0) ? 1 : -1;
+      cn->curv = s*fabs(ddy)/cube(sqrt(1 + sq(dy)));
+    }
+
+/**
+## Three-dimensional curvature computation
+
+In 3D things are a little more complicated. Fitting a 4-th degree polynomial to
+the two-ring neighbors is too cumbersome and instead we fit a second-degree
+paraboloid to the first-ring neighbors, following the approach of Yazdani and
+Bagchi.
+
+In most cases the node of interest has six neighbors and the system is
+overconstrained: we use the least-square method which we
+perform several times using a new normal vector computed from the paraboloid
+equation.
+*/
+    #else // dimension == 3
+    for(int i=0; i<mesh->nlp; i++) {
+      lagNode* cn = &(mesh->nodes[i]); // cn for "current node"
+      int* ngb = cn->neighbor_ids;
+      /** Create local frame of reference and the linear system to solve */
+      coord ex, ey, ez;
+      foreach_dimension() ez.x = cn->pos.x;
+      foreach_dimension() ey.x = mesh->nodes[ngb[0]].pos.x - ez.x;
+      double eydez, ney, nex;
+      eydez = 0.; ney = 0.; nex = 0.;
+      foreach_dimension() eydez += ey.x*ez.x;
+      foreach_dimension() ey.x -= eydez*ez.x;
+      ney = cnorm(ey);
+      foreach_dimension() ey.x /= ney;
+      foreach_dimension() ex.x = ey.y*ez.z - ey.z*ez.y;
+      nex = cnorm(ex);
+      foreach_dimension() ex.x /= nex;
+      double M[3][3];
+      M[0][0] = ex.x; M[1][0] = ex.y; M[2][0] = ex.z;
+      M[0][1] = ey.x; M[1][1] = ey.y; M[2][1] = ey.z;
+      M[0][2] = ez.x; M[1][2] = ez.y; M[2][2] = ez.z;
+
+      double ipngb[6][3]; // ipngb for "initial position of neighbors"
+      double rpngb[6][3]; // rpngb for "rotated position of neighbors"
+      for(int j=0; j<6; j++) {
+        ipngb[j][0] = mesh->nodes[ngb[j]].pos.x;
+        ipngb[j][1] = mesh->nodes[ngb[j]].pos.y;
+        ipngb[j][2] = mesh->nodes[ngb[j]].pos.z;
+        for(int k=0; k<3; k++) {
+          rpngb[j][k] = 0;
+          for(int l=0; l<3; l++) {
+            rpngb[j][k] += M[l][k]*ipngb[j][l];
+          }
+        }
+      }
+      double** XX = malloc(6*sizeof(double*));
+      for(int j=0; j<6; j++) XX[j] = malloc(5*sizeof(double));
+      double* yy = malloc(6*sizeof(double));
+      for(int j=0; j<6; j++) {
+        yy[j] = rpngb[j][2];
+        XX[j][0] = sq(rpngb[j][0]);
+        XX[j][1] = rpngb[j][0]*rpngb[j][1];
+        XX[j][2] = sq(rpngb[j][1]);
+        XX[j][3] = rpngb[j][0];
+        XX[j][4] = rpngb[j][1];
+      }
+      double* beta = malloc(5*sizeof(double));
+
+      /** Solve the linear system directly (in case of 5 neighbors) or with the
+      least-squares method (in case of 6 neighbors) */
+      bool perform_least_squares = (cn->nb_neighbors > 5);
+      fit_paraboloid(XX, beta, yy, perform_least_squares);
+
+      /** Compute the mean and Gaussian curvatures, as well as a refined normal
+      vector, from the fitted paraboloid. */
+      cn->curv = -(beta[0] + beta[2] + beta[0]*sq(beta[4])
+        + beta[2]*sq(beta[3]) - beta[1]*beta[3]*beta[4])
+        /sqrt(cube(1 + sq(beta[3]) + sq(beta[4])));
+      cn->gcurv = (4*beta[0]*beta[2] - sq(beta[1]))
+        /sq(1 + sq(beta[3]) + sq(beta[4]));
+
+      fprintf(stderr, "curvature at node %d = %g\n", i, cn->curv);
+      for(int j=0; j<6; j++) free(XX[j]);
+      free(XX);
+      free(yy);
+      free(beta);
+    }
+    #endif
+    mesh->updated_curvatures = true;
+  }
+}
