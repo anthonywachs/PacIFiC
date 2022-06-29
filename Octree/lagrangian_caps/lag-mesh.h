@@ -348,6 +348,8 @@ void comp_normals(lagMesh* mesh) {
       }
       foreach_dimension()
         mesh->nodes[i].normal.x /= sw;
+      double normn = cnorm(mesh->nodes[i].normal);
+      foreach_dimension() mesh->nodes[i].normal.x /= normn;
     }
     #endif
     mesh->updated_normals = true;
