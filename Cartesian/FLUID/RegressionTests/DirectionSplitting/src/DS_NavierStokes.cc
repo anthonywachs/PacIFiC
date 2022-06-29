@@ -2309,7 +2309,7 @@ DS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list 
 
 
 //---------------------------------------------------------------------------
-tuple<double,double> DS_NavierStokes:: divergence_wall_flux ( size_t const& i
+tuple<double,double> DS_NavierStokes:: divergence_face_flux ( size_t const& i
 															 , size_t const& j
 															 , size_t const& k
 															 , size_t const& normal
@@ -2317,7 +2317,7 @@ tuple<double,double> DS_NavierStokes:: divergence_wall_flux ( size_t const& i
 															 , size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: divergence_wall_flux" ) ;
+   MAC_LABEL("DDS_NavierStokes:: divergence_face_flux" ) ;
 
    double value;
 	size_t comp = normal;
@@ -2330,6 +2330,7 @@ tuple<double,double> DS_NavierStokes:: divergence_wall_flux ( size_t const& i
 							allrigidbodies->get_intersect_fieldValue_on_grid(UF) : 0;
 	size_t_vector* void_frac = (is_solids) ?
 							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
+	size_t m_nrb = (is_solids) ? allrigidbodies->get_number_rigid_bodies() : 0;
 
 	size_t wall_dir = (normal == 0) ? 1 : 0;
 
@@ -2428,7 +2429,8 @@ tuple<double,double> DS_NavierStokes:: divergence_wall_flux ( size_t const& i
 						 / (xi(2) - xi(0)) / (xi(2) - xi(1));
 			value = (fi(0)*l0 + fi(1)*l1 + fi(2)*l2)*delta;
 
-      } else {
+      } else if ((void_frac->operator()(p) != 0)
+				  && (void_frac->operator()(p) <= m_nrb)) {
 			geomVector xi(2), fi(2);
 			if (intersect_distance->operator()(ptop,2*wall_dir + 0) >
 				 MAC::abs(topY - xC - 0.5*length)) {
@@ -2455,8 +2457,9 @@ tuple<double,double> DS_NavierStokes:: divergence_wall_flux ( size_t const& i
 		   } else {
 				value = 0.;
 			}
-			// value = UF->DOF_value( i, j, k, comp, level )*length;
-      }
+      } else {
+			value = UF->DOF_value( i, j, k, comp, level )*length;
+		}
    } else {
       value = UF->DOF_value( i, j, k, comp, level )*length;
    }
@@ -2628,6 +2631,7 @@ DS_NavierStokes:: calculate_velocity_divergence_cutCell ( size_t const& i,
 
 	double dx = PF->get_cell_size( i, 0, 0 );
    double dy = PF->get_cell_size( j, 0, 1 );
+	size_t p = PF->DOF_local_number(i,j,k,0);
 
 	double xvalue = 0.;
 	double yvalue = 0.;
@@ -2635,19 +2639,19 @@ DS_NavierStokes:: calculate_velocity_divergence_cutCell ( size_t const& i,
 	FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 	doubleVector* cell_volume = GLOBAL_EQ->get_cell_volume();
 
-   auto right = divergence_wall_flux ( shift.i+i, j, k, 0, dy, level);
+   auto right = divergence_face_flux ( shift.i+i, j, k, 0, dy, level);
 	double rht_flux = get<0>(right);
 	double rht_frac = get<1>(right);
 
-	auto left = divergence_wall_flux ( shift.i+i-1, j, k, 0, dy, level);
+	auto left = divergence_face_flux ( shift.i+i-1, j, k, 0, dy, level);
 	double lft_flux = get<0>(left);
 	double lft_frac = get<1>(left);
 
-	auto top = divergence_wall_flux ( i, shift.j+j, k, 1, dx, level);
+	auto top = divergence_face_flux ( i, shift.j+j, k, 1, dx, level);
 	double top_flux = get<0>(top);
 	double top_frac = get<1>(top);
 
-	auto bottom = divergence_wall_flux ( i, shift.j+j-1, k, 1, dx, level);
+	auto bottom = divergence_face_flux ( i, shift.j+j-1, k, 1, dx, level);
 	double bot_flux = get<0>(bottom);
 	double bot_frac = get<1>(bottom);
 
@@ -2693,7 +2697,6 @@ DS_NavierStokes:: calculate_velocity_divergence_cutCell ( size_t const& i,
 		}
 	}
 
-	size_t p = PF->DOF_local_number(i,j,k,0);
 	cell_volume->operator()(p) = area;
 
 	xvalue = (rht_flux - lft_flux);
@@ -2793,7 +2796,7 @@ void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
                                             			   size_t const& k)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DS_NavierStokes:: redistribute_divergence" ) ;
+   MAC_LABEL("DS_NavierStokes:: redistribute_divergence_flux" ) ;
 
 	size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
 	doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
@@ -2934,7 +2937,7 @@ double DS_NavierStokes:: return_face_fraction ( size_t const& i,
 																double const& length)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DS_NavierStokes:: return_fluid_segement" ) ;
+   MAC_LABEL("DS_NavierStokes:: return_face_fraction" ) ;
 
 	double fraction = 0.;
 
