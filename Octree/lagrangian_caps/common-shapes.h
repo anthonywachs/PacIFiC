@@ -241,7 +241,7 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
   for(int i=0; i<3; i++) {
     for(int j=0; j<4; j++) {
       p.mesh->nodes[i*4+j].nb_neighbors = 0;
-      p.mesh->nodes[i*4+j].nb_edges = 0;
+      // p.mesh->nodes[i*4+j].nb_edges = 0;
       p.mesh->nodes[i*4+j].nb_triangles = i;
       foreach_dimension()
         p.mesh->nodes[i*4+j].pos.x = c[i].x*
@@ -348,12 +348,29 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   fprintf(stderr, "Number of Lagrangian triangles: %d\n", p.mesh->nlt);
 
   comp_initial_area_normals(p.mesh);
-  if (shift.x > 1.e-10 || shift.y > 1.e-10 || shift.z > 1.e-10) {
-    for(int i=0; i<p.mesh->nlp; i++)
-      foreach_dimension()
-        p.mesh->nodes[i].pos.x += shift.x;
+  // if (shift.x > 1.e-10 || shift.y > 1.e-10 || shift.z > 1.e-10) {
+  //   for(int i=0; i<p.mesh->nlp; i++)
+  //     foreach_dimension()
+  //       p.mesh->nodes[i].pos.x += shift.x;
+  // }
+  // correct_lag_pos(p.mesh);
+  comp_normals(p.mesh);
+}
+
+void initialize_rbc_mb(struct _initialize_circular_mb p) {
+  initialize_spherical_mb(p);
+  double c0, c1, c2;
+  c0 = 0.2072; c1 = 2.0026; c2 = -1.1228;
+  double radius = (p.radius) ? p.radius : RADIUS;
+  for(int i=0; i<p.mesh->nlp; i++) {
+    double rho = sqrt(sq(p.mesh->nodes[i].pos.x) +
+      sq(p.mesh->nodes[i].pos.z))/radius;
+    rho = (rho > 1) ? 1 : rho;
+    fprintf(stderr, "%g\n", rho);
+    int sign = (p.mesh->nodes[i].pos.y > 0.) ? 1 : -1;
+    p.mesh->nodes[i].pos.y = sign*.5*radius*sqrt(1 - sq(rho))*
+      (c0 + c1*sq(rho) + c2*sq(sq(rho)));
   }
-  correct_lag_pos(p.mesh);
   comp_normals(p.mesh);
 }
 

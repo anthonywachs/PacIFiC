@@ -32,10 +32,10 @@ typedef struct lagNode {
     double gcurv; // Gaussian curvature
     int nb_neighbors;
     int neighbor_ids[6];
-    int nb_edges;
     int edge_ids[6];
     int nb_triangles;
     int triangle_ids[6];
+    int nb_fit_iterations;
   #endif
 } lagNode;
 

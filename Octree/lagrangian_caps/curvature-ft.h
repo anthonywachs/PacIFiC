@@ -248,10 +248,8 @@ equation.
           buff.x = cn->normal.x - prev_n.x;
           if (fabs(buff.x) > normal_change) normal_change = fabs(buff.x);
         }
-        // fprintf(stderr, "refined n = [%g %g %g],\tdifference with previous n = [%g %g %g]\tnb iterations = %d\n", cn->normal.x, cn->normal.y, cn->normal.z, buff.x, buff.y, buff.z, nb_fit_iterations);
+        cn->nb_fit_iterations = nb_fit_iterations;
       }
-      fprintf(stderr, "curvature at node %d = %g\tGaussian curvature = %g\t nb iterations = %d\n", i, cn->curv, cn->gcurv, nb_fit_iterations);
-
       for(int j=0; j<6; j++) free(XX[j]);
       free(XX);
       free(yy);

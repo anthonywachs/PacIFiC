@@ -86,11 +86,9 @@ bool write_edge(struct _write_edge p) {
     if (new_mesh) {
       mesh->nodes[j].neighbor_ids[mesh->nodes[j].nb_neighbors] = k;
       mesh->nodes[k].neighbor_ids[mesh->nodes[k].nb_neighbors] = j;
-      mesh->nodes[j].edge_ids[mesh->nodes[j].nb_edges] = i;
-      mesh->nodes[k].edge_ids[mesh->nodes[k].nb_edges] = i;
-      mesh->nodes[j].nb_edges++;
+      mesh->nodes[j].edge_ids[mesh->nodes[j].nb_neighbors] = i;
+      mesh->nodes[k].edge_ids[mesh->nodes[k].nb_neighbors] = i;
       mesh->nodes[j].nb_neighbors++;
-      mesh->nodes[k].nb_edges++;
       mesh->nodes[k].nb_neighbors++;
     }
     return true;
@@ -108,7 +106,7 @@ void new_edge(lagMesh* mesh, int i, int j) {
     mesh->edges[eid].node_ids[k] = nodes[k];
 
     /** Add the edge id to the newly connected nodes */
-    for(int l=0; l<mesh->nodes[nodes[k]].nb_edges; l++) {
+    for(int l=0; l<mesh->nodes[nodes[k]].nb_neighbors; l++) {
       if (mesh->nodes[nodes[k]].edge_ids[l] == -1) {
         mesh->nodes[nodes[k]].edge_ids[l] = eid;
         break;
@@ -140,7 +138,6 @@ void split_edge(lagMesh* mesh, int i) {
     mesh->nodes[mesh->nlp].pos.x =
       .5*(mesh->nodes[nid[0]].pos.x + mesh->nodes[nid[1]].pos.x);
   mesh->nodes[mesh->nlp].nb_neighbors = 6;
-  mesh->nodes[mesh->nlp].nb_edges = 6;
   mesh->nodes[mesh->nlp].nb_triangles = 6;
   mesh->nodes[mesh->nlp].neighbor_ids[0] = nid[0];
   mesh->nodes[mesh->nlp].neighbor_ids[1] = nid[1];
@@ -169,7 +166,7 @@ void split_edge(lagMesh* mesh, int i) {
   for(int j=0; j<mesh->nodes[nid[1]].nb_neighbors; j++)
     if (mesh->nodes[nid[1]].neighbor_ids[j] == nid[0])
       mesh->nodes[nid[1]].neighbor_ids[j] = mesh->nlp;
-  for(int j=0; j<mesh->nodes[nid[1]].nb_edges; j++)
+  for(int j=0; j<mesh->nodes[nid[1]].nb_neighbors; j++)
     if (mesh->nodes[nid[1]].edge_ids[j] == i)
       mesh->nodes[nid[1]].edge_ids[j] = mesh->nle;
 
@@ -241,8 +238,8 @@ bool write_triangle(struct _write_triangle p) {
       int va = mesh->triangles[tid].node_ids[a];
       int b=(a+1)%3;
       int vb = mesh->triangles[tid].node_ids[b];
-      for(int m=0; m<mesh->nodes[va].nb_edges; m++) {
-        for(int n=0; n<mesh->nodes[vb].nb_edges; n++) {
+      for(int m=0; m<mesh->nodes[va].nb_neighbors; m++) {
+        for(int n=0; n<mesh->nodes[vb].nb_neighbors; n++) {
           if (mesh->nodes[va].edge_ids[m] == mesh->nodes[vb].edge_ids[n]) {
             mesh->triangles[tid].edge_ids[c] = mesh->nodes[va].edge_ids[m];
             c++;
@@ -302,7 +299,7 @@ void new_triangle(lagMesh* mesh, int i, int j, int k, int prev_tid) {
     triangle; (ii) specify the id of the new triangle for the edges */
     /** First, we find the edge that connects node i to node i+1 */
     int ce = -1; // ce for "current edge
-    for(int l=0; l<mesh->nodes[nodes[k]].nb_edges; l++) {
+    for(int l=0; l<mesh->nodes[nodes[k]].nb_neighbors; l++) {
       ce = mesh->nodes[nodes[k]].edge_ids[l];
       int cn = (mesh->edges[ce].node_ids[0] == nodes[k]) ?
         mesh->edges[ce].node_ids[1] : mesh->edges[ce].node_ids[0];
@@ -349,7 +346,7 @@ void overwrite_triangle(lagMesh* mesh, int tid, int i, int j, int k) {
     /** 2. Take care of the egdes of the triangle */
     /** 2.1. Identify the edge id connecting nodes $i$, $i+1$ */
     int eid = -1; // eid for "edge id"
-    for(int j=0; j<mesh->nodes[nodes[i]].nb_edges; j++) {
+    for(int j=0; j<mesh->nodes[nodes[i]].nb_neighbors; j++) {
       eid = mesh->nodes[nodes[i]].edge_ids[j];
       int cn = (mesh->edges[eid].node_ids[0] == nodes[i]) ?
         mesh->edges[eid].node_ids[1] : mesh->edges[eid].node_ids[0];
@@ -438,7 +435,7 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
     fwrite(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
     for(int j=0; j<6; j++)
       fwrite(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
-    fwrite(&(mesh->nodes[i].nb_edges), sizeof(int), 1, fp);
+    fwrite(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
     for(int j=0; j<6; j++)
       fwrite(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
     fwrite(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
@@ -488,7 +485,7 @@ void restore_lagmesh(FILE* fp, lagMesh* mesh) {
     fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
     for(int j=0; j<6; j++)
       fread(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
-    fread(&(mesh->nodes[i].nb_edges), sizeof(int), 1, fp);
+    fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
     for(int j=0; j<6; j++)
       fread(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
     fread(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
