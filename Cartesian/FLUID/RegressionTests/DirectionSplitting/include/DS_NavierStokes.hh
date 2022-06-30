@@ -231,6 +231,10 @@ class DS_NavierStokes : public MAC_Object,
                                     size_t const& comp,
 	                                 double const& length);
 
+      void calculate_divergence_flux_fromRB ( size_t const& i,
+                                              size_t const& j,
+                                              size_t const& k);
+
       void redistribute_divergence_flux ( size_t const& i,
                                      size_t const& j,
                                      size_t const& k);

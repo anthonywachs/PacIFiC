@@ -519,7 +519,8 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         acc(dir) = gg(dir)*(1-m_rho/rho_p) + (viscous_force->operator()(parID,dir)
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
-        vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+        // vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+        vel(dir) = (dir == 1) ? 0.1 : 0;//MAC::cos(2.*MAC::pi()*2.*t_it->time()) : 0.;
         pos(dir) = periodic_transformation(pos(dir)
                                          + vel(dir)*t_it->time_step()
                                                          , dir) ;
@@ -770,7 +771,8 @@ geomVector DS_AllRigidBodies:: rigid_body_velocity( size_t const& parID,
 
   delta(0) = delta_periodic_transformation(pt(0) - pgc->operator()(0), 0);
   delta(1) = delta_periodic_transformation(pt(1) - pgc->operator()(1), 1);
-  delta(2) = delta_periodic_transformation(pt(2) - pgc->operator()(2), 2);
+  if (m_space_dimension == 3)
+     delta(2) = delta_periodic_transformation(pt(2) - pgc->operator()(2), 2);
 
   return (m_allDSrigidbodies[parID]->get_rigid_body_velocity(delta));
 
@@ -1551,7 +1553,8 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
                 surface_point[i]->operator()(0) - pgc->operator()(0), 0);
      delta(1) = delta_periodic_transformation(
                 surface_point[i]->operator()(1) - pgc->operator()(1), 1);
-     delta(2) = delta_periodic_transformation(
+     if (m_space_dimension == 3)
+        delta(2) = delta_periodic_transformation(
                 surface_point[i]->operator()(2) - pgc->operator()(2), 2);
 
      pressure_torque->operator()(parID,0) += value(2)*delta(1)

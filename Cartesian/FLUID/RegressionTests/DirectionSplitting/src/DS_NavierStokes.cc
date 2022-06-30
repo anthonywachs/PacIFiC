@@ -2765,6 +2765,14 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 	}
 
 	if (DivergenceScheme == "CutCell") {
+		// Flux from RB surface
+		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+				for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+					calculate_divergence_flux_fromRB(i,j,k);
+				}
+			}
+		}
 		// Flux redistribution
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
@@ -2785,6 +2793,127 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 		}
 	}
 
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_NavierStokes:: calculate_divergence_flux_fromRB ( size_t const& i,
+                                            			   	 size_t const& j,
+                                            			   	 size_t const& k)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: calculate_divergence_flux_fromRB" ) ;
+
+	doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
+
+	FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
+
+	size_t p = PF->DOF_local_number(i,j,k,0);
+	double dx = PF->get_cell_size( i, 0, 0 );
+   double dy = PF->get_cell_size( j, 0, 1 );
+	double xC = PF->get_DOF_coordinate( i, 0, 0 );
+	double yC = PF->get_DOF_coordinate( j, 0, 1 );
+
+	// Face fraction calculations
+	vector<double> frac;
+	// right face
+	double rht_frac = return_face_fraction(shift.i+i, j, k, 0, dy);
+	frac.push_back(rht_frac);
+	// left face
+	double lft_frac = return_face_fraction(shift.i+i-1, j, k, 0, dy);
+	frac.push_back(lft_frac);
+	// top face
+	double top_frac = return_face_fraction(i, shift.j+j, k, 1, dx);
+	frac.push_back(top_frac);
+	// bottom face
+	double bot_frac = return_face_fraction(i, shift.j+j-1, k, 1, dx);
+	frac.push_back(bot_frac);
+
+	int count = (int)std::count(frac.begin(),frac.end(),0);
+
+	// Normal vector of interface calculation
+	geomVector p1(2), p2(2), pmid(2), pin(2), normal(2);
+	if (count == 0) {
+		return;
+	} else if (count == 1) {
+		if (rht_frac == 0) {
+			p1(0) = xC - 0.5*dx + bot_frac;
+			p2(0) = xC - 0.5*dx + top_frac;
+			p1(1) = yC - 0.5*dy;
+			p2(1) = yC + 0.5*dy;
+			pin(0) = xC + 0.5*dx;
+			pin(1) = yC + 0.5*dy;
+		} else if (lft_frac == 0) {
+			p1(0) = xC + 0.5*dx - bot_frac ;
+			p2(0) = xC + 0.5*dx - top_frac ;
+			p1(1) = yC - 0.5*dy;
+			p2(1) = yC + 0.5*dy;
+			pin(0) = xC - 0.5*dx;
+			pin(1) = yC - 0.5*dy;
+		} else if (top_frac == 0) {
+			p1(0) = xC - 0.5*dx;
+			p2(0) = xC + 0.5*dx;
+			p1(1) = yC - 0.5*dy + lft_frac;
+			p2(1) = yC - 0.5*dy + rht_frac;
+			pin(0) = xC + 0.5*dx;
+			pin(1) = yC + 0.5*dy;
+		} else if (bot_frac == 0) {
+			p1(0) = xC - 0.5*dx;
+			p2(0) = xC + 0.5*dx;
+			p1(1) = yC + 0.5*dy - lft_frac;
+			p2(1) = yC + 0.5*dy - rht_frac;
+			pin(0) = xC - 0.5*dx;
+			pin(1) = yC - 0.5*dy;
+		}
+	} else if (count == 2) {
+		if (rht_frac == 0 && top_frac == 0) {
+			p1(0) = xC - 0.5*dx;
+			p2(0) = xC - 0.5*dx + bot_frac;
+			p1(1) = yC - 0.5*dy + lft_frac;
+			p2(1) = yC - 0.5*dy;
+			pin(0) = xC + 0.5*dx;
+			pin(1) = yC + 0.5*dy;
+		} else if (lft_frac == 0 && top_frac == 0) {
+			p1(0) = xC + 0.5*dx - bot_frac;
+			p2(0) = xC + 0.5*dx;
+			p1(1) = yC - 0.5*dy;
+			p2(1) = yC - 0.5*dy + rht_frac;
+			pin(0) = xC - 0.5*dx;
+			pin(1) = yC + 0.5*dy;
+		} else if (lft_frac == 0 && bot_frac == 0) {
+			p1(0) = xC + 0.5*dx;
+			p2(0) = xC + 0.5*dx - top_frac;
+			p1(1) = yC + 0.5*dy - rht_frac;
+			p2(1) = yC + 0.5*dy;
+			pin(0) = xC - 0.5*dx;
+			pin(1) = yC - 0.5*dy;
+		} else if (bot_frac == 0 && rht_frac == 0) {
+			p1(0) = xC - 0.5*dx + top_frac;
+			p2(0) = xC - 0.5*dx;
+			p1(1) = yC + 0.5*dy;
+			p2(1) = yC + 0.5*dy - lft_frac;
+			pin(0) = xC + 0.5*dx;
+			pin(1) = yC - 0.5*dy;
+		}
+	}
+	pmid(0) = 0.5*(p1(0) + p2(0));
+	pmid(1) = 0.5*(p1(1) + p2(1));
+	normal(0) = p2(1) - p1(1);
+	normal(1) = -(p2(0) - p1(0));
+	if (((pin(0)-pmid(0))*normal(0) + (pin(1)-pmid(1))*normal(1)) > 0.) {
+		normal(0) = -1.*normal(0);
+		normal(1) = -1.*normal(1);
+	}
+
+	size_t par_id = 0;//void_frac->operator()(p) - 1;
+	geomVector pt(0.,0.,0.);
+	geomVector rb_vel = allrigidbodies->rigid_body_velocity(par_id,pt);
+
+	double delta = MAC::sqrt(pow(p1(0)-p2(0),2.) + pow(p1(1)-p2(1),2.));
+
+	divergence->operator()(p) -= delta*(normal(0)*rb_vel(0) + normal(1)*rb_vel(1));
 }
 
 
