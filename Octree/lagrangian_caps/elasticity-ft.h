@@ -302,10 +302,6 @@ event init (i = 0) {
 }
 #endif
 
-event stability (i++) {
-  
-}
-
 event acceleration (i++) {
   for(int i=0; i<mbs.nbmb; i++) comp_elastic_stress(&mbs.mb[i]);
 }

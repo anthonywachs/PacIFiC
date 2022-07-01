@@ -366,7 +366,6 @@ void initialize_rbc_mb(struct _initialize_circular_mb p) {
     double rho = sqrt(sq(p.mesh->nodes[i].pos.x) +
       sq(p.mesh->nodes[i].pos.z))/radius;
     rho = (rho > 1) ? 1 : rho;
-    fprintf(stderr, "%g\n", rho);
     int sign = (p.mesh->nodes[i].pos.y > 0.) ? 1 : -1;
     p.mesh->nodes[i].pos.y = sign*.5*radius*sqrt(1 - sq(rho))*
       (c0 + c1*sq(rho) + c2*sq(sq(rho)));
