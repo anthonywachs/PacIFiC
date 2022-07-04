@@ -370,6 +370,45 @@ bool is_triangle_vertex(lagMesh* mesh, int i, int j) {
 }
 
 /**
+The function below returns the (positive) angle between the two vectors formed
+by the nodes [*n1, *n2] and [*n1, *n3].
+*/
+double comp_angle(lagNode* n1, lagNode* n2, lagNode* n3) {
+  double theta = 0.;
+  foreach_dimension() theta += (n1->pos.x - n2->pos.x)*(n1->pos.x - n3->pos.x);
+  double norm1, norm2;
+  norm1 = 0.; norm2 = 0.;
+  foreach_dimension() {
+    norm1 += sq(n1->pos.x - n2->pos.x);
+    norm2 += sq(n1->pos.x - n3->pos.x);
+  }
+  theta /= sqrt(norm1)*sqrt(norm2);
+  theta = acos(fabs(theta));
+  return theta;
+}
+
+/**
+The function below returns true if the angle of node $i$ ($0 < i < 2$) of
+triangle $tid$ is greater than $\pi$ radians.
+*/
+bool is_obtuse_node(lagMesh* mesh, int tid, int i) {
+  lagNode* n[3];
+  for(int j=0; j<3; j++)
+    n[j] = &(mesh->nodes[mesh->triangles[tid].node_ids[j]]);
+  if (comp_angle(n[i], n[(i+1)%3], n[(i+2)%3]) > pi) return true;
+  else return false;
+}
+
+/**
+The function below returns true if the triangle $tid$ is obtuse at any of its
+three angles.
+*/
+bool is_obtuse_triangle(lagMesh* mesh, int tid) {
+  for(int i=0; i<3; i++) if (is_obtuse_node(mesh, tid, i)) return true;
+  return false;
+}
+
+/**
 ## Uniform refinement of a mesh by subdividing its triangles
 
 The function below loops through all triangles in the mesh and divide them
