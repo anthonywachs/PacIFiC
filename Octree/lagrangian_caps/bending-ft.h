@@ -7,7 +7,7 @@
   #define E_B 1.
 #endif
 #ifndef REF_CURV
-  #definae REF_CURV 1
+  #define REF_CURV 1
 #endif
 #define cot(x) (cos(x)/sin(x))
 
