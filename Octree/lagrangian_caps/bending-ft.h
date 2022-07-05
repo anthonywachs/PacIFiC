@@ -88,7 +88,7 @@ event acceleration (i++) {
   }
 }
 
-event init (i++) {
+event init (i = 0) {
   for(int i=0; i<mbs.nbmb; i++) {
     lagMesh* mesh = &(MB(i));
     #if REF_CURV

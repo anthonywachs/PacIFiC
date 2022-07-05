@@ -91,7 +91,7 @@ double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
 
     double ipngb[6][3]; // ipngb for "initial position of neighbors"
     double rpngb[6][3]; // rpngb for "rotated position of neighbors"
-    for(int j=0; j<6; j++) {
+    for(int j=0; j<cn->nb_neighbors; j++) {
       ipngb[j][0] = mesh->nodes[ngb[j]].pos.x - cn->pos.x;
       ipngb[j][1] = mesh->nodes[ngb[j]].pos.y - cn->pos.y;
       ipngb[j][2] = mesh->nodes[ngb[j]].pos.z - cn->pos.z;
@@ -105,10 +105,9 @@ double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
 
     /** Store the coordinates of the neighboring nodes in the appropriate
     data structure before using the ordinary least squares method.*/
-    for(int j=0; j<6; j++) {
-      // yy[j] = (diff_curv) ? mesh->nodes[ngb[j]].curv -
-      //   mesh->nodes[ngb[j]].ref_curv - cn->curv + cn->ref_curv : rpngb[j][2];
-      yy[j] = (diff_curv) ? mesh->nodes[ngb[j]].curv - cn->curv : rpngb[j][2];
+    for(int j=0; j<cn->nb_neighbors; j++) {
+      yy[j] = (diff_curv) ? mesh->nodes[ngb[j]].curv -
+        mesh->nodes[ngb[j]].ref_curv - cn->curv + cn->ref_curv : rpngb[j][2];
       XX[j][0] = sq(rpngb[j][0]);
       XX[j][1] = rpngb[j][0]*rpngb[j][1];
       XX[j][2] = sq(rpngb[j][1]);
