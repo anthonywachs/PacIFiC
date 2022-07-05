@@ -11,6 +11,11 @@
 #endif
 #define cot(x) (cos(x)/sin(x))
 
+#include "curvature-ft.h"
+
+/**
+The function below computes the nodal area of node $i$.
+*/
 double compute_node_area(lagMesh* mesh, int i) {
   double area = 0.;
   for(int j=0; j<mesh->nodes[i].nb_triangles; j++) {
