@@ -9,6 +9,14 @@
 #ifndef REF_CURV
   #define REF_CURV 1
 #endif
+#ifndef GLOBAL_REF_CURV
+  #if REF_CURV
+    #define GLOBAL_REF_CURV 1
+  #else
+    #define GLOBAL_REF_CURV 0
+  #endif
+#endif
+
 #define cot(x) (cos(x)/sin(x))
 
 #include "curvature-ft.h"
@@ -75,14 +83,19 @@ event acceleration (i++) {
       double rcurv = mesh->nodes[i].ref_curv;
       double gcurv = mesh->nodes[j].gcurv;
       double lbcurv = laplace_beltrami(mesh, j, true);
-      double bending_surface_force =
-        2*E_B*(2*(curv - rcurv)*(sq(curv) - gcurv + rcurv*curv) + lbcurv);
+      #if GLOBAL_REF_CURV
+        double bending_surface_force = E_B*((2*curv + REF_CURV)*(2*sq(curv) -
+          2*gcurv - REF_CURV*curv) + 2*lbcurv);
+      #else
+        double bending_surface_force =
+          2*E_B*(2*(curv - rcurv)*(sq(curv) - gcurv + rcurv*curv) + lbcurv);
+      #endif
       /** We now have to compute the area associated to each node */
       double area = compute_node_area(mesh, j);
       /** The bending force is ready to be added to the Lagrangian force of the
       considered node. */
       foreach_dimension()
-        mesh->nodes[j].lagForce.x -=
+        mesh->nodes[j].lagForce.x +=
           mesh->nodes[j].normal.x*bending_surface_force*area;
     }
   }
@@ -95,7 +108,7 @@ event init (i = 0) {
     comp_curvature(mesh);
     #endif
     for(int j=0; j<mesh->nlp; j++) {
-      #if REF_CURV
+      #if (REF_CURV && !(GLOBAL_REF_CURV))
       mesh->nodes[j].ref_curv = mesh->nodes[j].curv;
       #else
       mesh->nodes[j].ref_curv = 0.;
