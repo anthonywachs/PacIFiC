@@ -1,6 +1,7 @@
 /**
 # Variable viscosity across a membrane
 */
+#include "fractions.h"
 
 #ifndef MUP
   #define MUP 1.;

@@ -132,22 +132,6 @@ void initialize_biconcave_mb(struct _initialize_circular_mb p) {
     p.mesh->edges[i].l0 = edge_length(p.mesh, i);
     p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
-
-  #ifdef CAPS_VISCOSITY
-    /**
-    We define below the local coordinates of the RBC and the parametric angle
-    */
-    #define MY_X ((x - shift.x)*cos(inclination) + \
-      (y - shift.y)*sin(inclination))
-    #define MY_Y (-(x - shift.x)*sin(inclination) + \
-      (y - shift.y)*cos(inclination))
-    #define MY_Z z
-    #define COSPHI2 ((sq(MY_X)+sq(MY_Z))/sq(radius*c))
-    #define LAMBDA (0.207 + 2.003*COSPHI2 - 1.123*sq(COSPHI2))
-    fraction(prevI, 1. - sq(MY_X/(radius*c)) -
-      sq(2*MY_Y/(LAMBDA*radius*c)) -
-      sq(MY_Z/(radius*c)));
-  #endif
 }
 
 
@@ -371,6 +355,19 @@ void initialize_rbc_mb(struct _initialize_circular_mb p) {
       (c0 + c1*sq(rho) + c2*sq(sq(rho)));
   }
   comp_normals(p.mesh);
+
+  #ifdef CAPS_VISCOSITY
+    double a, c;
+    c = 1.3858189;
+    a = RADIUS/c;
+    // We define below the local coordinates of the RBC and the parametric angle
+    #define MX x
+    #define MY y
+    #define MZ z
+    #define COSPHI2 ((sq(MX)+sq(MZ))/sq(a*c))
+    #define RHS (0.207 + 2.003*COSPHI2 - 1.123*sq(COSPHI2))
+    fraction(prevI, 1. - sq(MX/(a*c)) - sq(2*MY/(RHS*a*c)) - sq(MZ/(a*c)));
+  #endif
 }
 
 #endif

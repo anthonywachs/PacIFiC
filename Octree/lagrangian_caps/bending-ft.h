@@ -16,6 +16,11 @@
     #define GLOBAL_REF_CURV 0
   #endif
 #endif
+#if GLOBAL_REF_CURV
+  #ifndef C0
+    #define C0 -2.09
+  #endif
+#endif
 
 #define cot(x) (cos(x)/sin(x))
 

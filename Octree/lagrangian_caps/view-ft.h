@@ -98,13 +98,15 @@ void draw_lag(struct _draw_lag p) {
     #if dimension > 2
       bool facets = p.facets;
       if (facets) {
+        if (p.fc) {my_color[0] = p.fc[0]; my_color[1] = p.fc[1]; my_color[2] = p.fc[2];}
+        else {my_color[0] = 1.; my_color[1] = 1.; my_color[2] = 1.;}
         for (int i=0; i<p.mesh->nlt; i++) {
           int nodes[3];
           for(int j=0; j<3; j++) nodes[j] = p.mesh->triangles[i].node_ids[j];
           if (!(is_triangle_across_periodic(p.mesh, i))) {
             glBegin (GL_POLYGON);
+            glColor3f (my_color[0], my_color[1], my_color[2]);
               for(int j=0; j<3; j++) {
-                glColor3f (255., 255., 255.);
                 glVertex3d(
                   p.mesh->nodes[nodes[j]].pos.x,
                   p.mesh->nodes[nodes[j]].pos.y,
