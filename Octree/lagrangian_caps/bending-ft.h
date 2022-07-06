@@ -64,7 +64,8 @@ double compute_node_area(lagMesh* mesh, int i) {
           // compute the squared length of [i:nid]
           double edge_length = 0.;
           foreach_dimension()
-            edge_length += sq(mesh->nodes[i].pos.x - mesh->nodes[nid].pos.x);
+            edge_length += sq(GENERAL_1DIST(mesh->nodes[i].pos.x,
+              mesh->nodes[nid].pos.x));
           voronoi_area += (cot(theta[0]) + cot(theta[1]))*edge_length;
         }
       }

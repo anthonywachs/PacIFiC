@@ -6,6 +6,12 @@
 #if dimension > 2
 #include "matrix_toolbox.h"
 
+/**
+The function below fits a second-degree paraboloid to the one-ring neighbors
+of a node of the membrane, using a least-squares method. In the rare (exactly
+12) cases where the node has only 5 neighbours, the least squares method
+reduces to a simple 5x5 matrix inversion.
+*/
 void fit_paraboloid(double** XX, double* beta, double* yy, bool perform_least_squares) {
   if (!perform_least_squares) {
     int* P = malloc(6*sizeof(int));
@@ -49,6 +55,20 @@ void fit_paraboloid(double** XX, double* beta, double* yy, bool perform_least_sq
   }
 }
 
+/**
+The function below computes the surface Laplacian (also knows a Laplace-Beltrami
+operator) at node $i$ of either the membrane (diff_curv = false) or the
+curvature of the membrane (diff_curv = true).
+
+If diff_curv is set to false, this
+function populates the curv and gcurv attribute of node i with the mean
+curvature $\kappa = (c_1 + c_2)/2$ and the Gaussian curvature $\kappa_g = c_1
+c_2$, with $c_1$ and $c_2$ the principal curvatures at node $i$. In this case
+the return value is not relevant and set to 0.
+
+If diff_curv is set to true, this function instead returns the surface Laplacian
+of the (previously computed) curvature.
+*/
 double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
   /** If we wish to compute $\Delta_{LB} \kappa$, the result is stored in the
   variable $lbcurv$ and returned by the function. Otherwise the $lbcurv$ is
@@ -74,7 +94,8 @@ double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
     /** Create local frame of reference and the linear system to solve */
     coord ex, ey, ez;
     foreach_dimension() ez.x = cn->normal.x;
-    foreach_dimension() ey.x = mesh->nodes[ngb[0]].pos.x - cn->pos.x;
+    foreach_dimension() ey.x = GENERAL_1DIST(mesh->nodes[ngb[0]].pos.x,
+      cn->pos.x);
     double eydez, ney, nex;
     eydez = 0.; ney = 0.; nex = 0.;
     foreach_dimension() eydez += ey.x*ez.x; // eydez for "ey dot ez"
@@ -92,9 +113,9 @@ double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
     double ipngb[6][3]; // ipngb for "initial position of neighbors"
     double rpngb[6][3]; // rpngb for "rotated position of neighbors"
     for(int j=0; j<cn->nb_neighbors; j++) {
-      ipngb[j][0] = mesh->nodes[ngb[j]].pos.x - cn->pos.x;
-      ipngb[j][1] = mesh->nodes[ngb[j]].pos.y - cn->pos.y;
-      ipngb[j][2] = mesh->nodes[ngb[j]].pos.z - cn->pos.z;
+      ipngb[j][0] = GENERAL_1DIST(mesh->nodes[ngb[j]].pos.x, cn->pos.x);
+      ipngb[j][1] = GENERAL_1DIST(mesh->nodes[ngb[j]].pos.y, cn->pos.y);
+      ipngb[j][2] = GENERAL_1DIST(mesh->nodes[ngb[j]].pos.z, cn->pos.z);
       for(int k=0; k<3; k++) {
         rpngb[j][k] = 0;
         for(int l=0; l<3; l++) {
