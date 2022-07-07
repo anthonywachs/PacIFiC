@@ -361,12 +361,9 @@ void initialize_rbc_mb(struct _initialize_circular_mb p) {
     c = 1.3858189;
     a = RADIUS/c;
     // We define below the local coordinates of the RBC and the parametric angle
-    #define MX x
-    #define MY y
-    #define MZ z
-    #define COSPHI2 ((sq(MX)+sq(MZ))/sq(a*c))
+    #define COSPHI2 ((sq(x)+sq(z))/sq(a*c))
     #define RHS (0.207 + 2.003*COSPHI2 - 1.123*sq(COSPHI2))
-    fraction(prevI, 1. - sq(MX/(a*c)) - sq(2*MY/(RHS*a*c)) - sq(MZ/(a*c)));
+    fraction(prevI, 1. - sq(x/(a*c)) - sq(2*y/(RHS*a*c)) - sq(z/(a*c)));
   #endif
 }
 

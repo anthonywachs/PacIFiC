@@ -18,7 +18,7 @@
 #endif
 #if GLOBAL_REF_CURV
   #ifndef C0
-    #define C0 -2.09
+    #define C0 (-2.09)
   #endif
 #endif
 
@@ -90,8 +90,8 @@ event acceleration (i++) {
       double gcurv = mesh->nodes[j].gcurv;
       double lbcurv = laplace_beltrami(mesh, j, true);
       #if GLOBAL_REF_CURV
-        double bending_surface_force = E_B*((2*curv + REF_CURV)*(2*sq(curv) -
-          2*gcurv - REF_CURV*curv) + 2*lbcurv);
+        double bending_surface_force = E_B*((2*curv + C0)*(2*sq(curv) -
+          2*gcurv - C0*curv) + 2*lbcurv);
       #else
         double bending_surface_force =
           2*E_B*(2*(curv - rcurv)*(sq(curv) - gcurv + rcurv*curv) + lbcurv);
