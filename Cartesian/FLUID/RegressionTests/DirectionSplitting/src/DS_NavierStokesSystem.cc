@@ -130,8 +130,6 @@ DS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 	divergence.push_back(new doubleVector(1,0.));
 	divergence.push_back(new doubleVector(1,0.));
 
-	cell_volume = new doubleVector(1,0.);
-
 	for (size_t field = 0; field < 2; field++) {
 		// Vector to store the presence/absence of particle on the field variable
 		node[field][0].void_frac = LA_SeqVector::create( this, 0 ) ;
@@ -307,8 +305,6 @@ DS_NavierStokesSystem:: re_initialize( void )
 
 	divergence[0]->re_initialize( pf_loc ) ;
 	divergence[1]->re_initialize( pf_loc ) ;
-
-	cell_volume->re_initialize( pf_loc ) ;
 
 	// Vectors to store void fractions and intersection information
 	if (is_solids) {
@@ -596,17 +592,6 @@ DS_NavierStokesSystem::get_node_divergence(size_t const& level)
 {
    MAC_LABEL( "DS_NavierStokesSystem:: get_node_divergence" ) ;
    return (divergence[level]) ;
-}
-
-
-
-
-//----------------------------------------------------------------------
-doubleVector* DS_NavierStokesSystem::get_cell_volume()
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: get_cell_volume" ) ;
-   return (cell_volume) ;
 }
 
 

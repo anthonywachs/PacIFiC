@@ -2338,12 +2338,20 @@ tuple<double,double> DS_NavierStokes:: divergence_face_flux ( size_t const& i
 							        : UF->get_DOF_coordinate( i, comp, wall_dir );
    double botVel = (normal == 0) ? UF->DOF_value( i, j-1, k, comp, level )
   											: UF->DOF_value( i-1, j, k, comp, level );
+	double botVel2 = (normal == 0) ? UF->DOF_value( i, j-2, k, comp, level )
+  											: UF->DOF_value( i-2, j, k, comp, level );
 	double botY = (normal == 0) ? UF->get_DOF_coordinate( j-1, comp, wall_dir )
 										 : UF->get_DOF_coordinate( i-1, comp, wall_dir );
+	double botY2 = (normal == 0) ? UF->get_DOF_coordinate( j-2, comp, wall_dir )
+ 										 : UF->get_DOF_coordinate( i-2, comp, wall_dir );
 	double topVel = (normal == 0) ? UF->DOF_value( i, j+1, k, comp, level )
 	 										: UF->DOF_value( i+1, j, k, comp, level );
+	double topVel2 = (normal == 0) ? UF->DOF_value( i, j+2, k, comp, level )
+	 										: UF->DOF_value( i+2, j, k, comp, level );
 	double topY = (normal == 0) ? UF->get_DOF_coordinate( j+1, comp, wall_dir )
 										 : UF->get_DOF_coordinate( i+1, comp, wall_dir );
+	double topY2 = (normal == 0) ? UF->get_DOF_coordinate( j+2, comp, wall_dir )
+ 										 : UF->get_DOF_coordinate( i+2, comp, wall_dir );
    size_t pbot = (normal == 0) ? UF->DOF_local_number(i,j-1,k,comp)
 										 : UF->DOF_local_number(i-1,j,k,comp);
 	size_t ptop = (normal == 0) ? UF->DOF_local_number(i,j+1,k,comp)
@@ -2420,7 +2428,6 @@ tuple<double,double> DS_NavierStokes:: divergence_face_flux ( size_t const& i
 			geomVector xi(3), fi(3);
 			xi(0) = botY; xi(1) = xC; xi(2) = topY;
 			fi(0) = botVel; fi(1) = cVel; fi(2) = topVel;
-
 			double l0 = (pt - xi(1)) * (pt - xi(2))
 					    / (xi(0) - xi(1)) / (xi(0) - xi(2));
 			double l1 = (pt - xi(0)) * (pt - xi(2))
@@ -2431,29 +2438,57 @@ tuple<double,double> DS_NavierStokes:: divergence_face_flux ( size_t const& i
 
       } else if ((void_frac->operator()(p) != 0)
 				  && (void_frac->operator()(p) <= m_nrb)) {
-			geomVector xi(2), fi(2);
+			geomVector xi(3), fi(3);
 			if (intersect_distance->operator()(ptop,2*wall_dir + 0) >
 				 MAC::abs(topY - xC - 0.5*length)) {
 				pt = (1./2.)*(topY + xC) + (1./2.)*(length/2.
 							  - intersect_distance->operator()(ptop,2*wall_dir + 0));
-			   fi(0) = topVel; fi(1) = cVel;
-				xi(0) = topY;
-				xi(1) = topY - intersect_distance->operator()(ptop,2*wall_dir + 0);
-				delta = 2. * MAC::abs(pt - xi(1));
-				double l0 = (pt - xi(1)) / (xi(0) - xi(1));
-				double l1 = (pt - xi(0)) / (xi(1) - xi(0));
-				value = (fi(0)*l0 + fi(1)*l1)*delta;
+			   // fi(0) = topVel; fi(1) = cVel;
+				// xi(0) = topY;
+				// xi(1) = topY - intersect_distance->operator()(ptop,2*wall_dir + 0);
+				// delta = 2. * MAC::abs(pt - xi(1));
+				// double l0 = (pt - xi(1)) / (xi(0) - xi(1));
+				// double l1 = (pt - xi(0)) / (xi(1) - xi(0));
+				// value = (fi(0)*l0 + fi(1)*l1)*delta;
+				xi(0) = topY - intersect_distance->operator()(ptop,2*wall_dir + 0);
+				fi(0) = cVel;
+				xi(1) = topY;
+				fi(1) = topVel;
+				xi(2) = topY2;//botY;//topY2;
+				fi(2) = topVel2;//botVel;//topVel2;
+				delta = 2. * MAC::abs(pt - xi(0));
+				double l0 = (pt - xi(1)) * (pt - xi(2))
+						    / (xi(0) - xi(1)) / (xi(0) - xi(2));
+				double l1 = (pt - xi(0)) * (pt - xi(2))
+							 / (xi(1) - xi(0)) / (xi(1) - xi(2));
+				double l2 = (pt - xi(0)) * (pt - xi(1))
+							 / (xi(2) - xi(0)) / (xi(2) - xi(1));
+				value = (fi(0)*l0 + fi(1)*l1 + fi(2)*l2)*delta;
 			} else if (intersect_distance->operator()(pbot,2*wall_dir + 1) >
 						  MAC::abs(xC - botY - 0.5*length)) {
 				pt = (1./2.)*(botY + xC) - (1./2.)*(length/2.
 							  - intersect_distance->operator()(pbot,2*wall_dir + 1));
-				fi(0) = botVel; fi(1) = cVel;
-				xi(0) = botY;
-				xi(1) = botY + intersect_distance->operator()(pbot,2*wall_dir + 1);
-				delta = 2. * MAC::abs(xi(1) - pt);
-				double l0 = (pt - xi(1)) / (xi(0) - xi(1));
-				double l1 = (pt - xi(0)) / (xi(1) - xi(0));
-				value = (fi(0)*l0 + fi(1)*l1)*delta;
+				// fi(0) = botVel; fi(1) = cVel;
+				// xi(0) = botY;
+				// xi(1) = botY + intersect_distance->operator()(pbot,2*wall_dir + 1);
+				// delta = 2. * MAC::abs(xi(1) - pt);
+				// double l0 = (pt - xi(1)) / (xi(0) - xi(1));
+				// double l1 = (pt - xi(0)) / (xi(1) - xi(0));
+				// value = (fi(0)*l0 + fi(1)*l1)*delta;
+				xi(0) = botY2;//topY;//botY2;
+				fi(0) = botVel2;//topVel;//botVel2;
+				xi(1) = botY;
+				fi(1) = botVel;
+				xi(2) = botY + intersect_distance->operator()(pbot,2*wall_dir + 1);
+				fi(2) = cVel;
+				delta = 2. * MAC::abs(xi(2) - pt);
+				double l0 = (pt - xi(1)) * (pt - xi(2))
+						    / (xi(0) - xi(1)) / (xi(0) - xi(2));
+				double l1 = (pt - xi(0)) * (pt - xi(2))
+							 / (xi(1) - xi(0)) / (xi(1) - xi(2));
+				double l2 = (pt - xi(0)) * (pt - xi(1))
+							 / (xi(2) - xi(0)) / (xi(2) - xi(1));
+				value = (fi(0)*l0 + fi(1)*l1 + fi(2)*l2)*delta;
 		   } else {
 				value = 0.;
 			}
@@ -2631,13 +2666,11 @@ DS_NavierStokes:: calculate_velocity_divergence_cutCell ( size_t const& i,
 
 	double dx = PF->get_cell_size( i, 0, 0 );
    double dy = PF->get_cell_size( j, 0, 1 );
-	size_t p = PF->DOF_local_number(i,j,k,0);
 
 	double xvalue = 0.;
 	double yvalue = 0.;
 
 	FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
-	doubleVector* cell_volume = GLOBAL_EQ->get_cell_volume();
 
    auto right = divergence_face_flux ( shift.i+i, j, k, 0, dy, level);
 	double rht_flux = get<0>(right);
@@ -2697,7 +2730,11 @@ DS_NavierStokes:: calculate_velocity_divergence_cutCell ( size_t const& i,
 		}
 	}
 
-	cell_volume->operator()(p) = area;
+	// size_t p = PF->DOF_local_number(i,j,k,0);
+	// if (p == 1284) {
+	// 	cout << lft_frac << "," << rht_frac << "," << bot_frac << "," << top_frac << endl;
+	// 	cout << lft_flux << "," << rht_flux << "," << bot_flux << "," << top_flux << endl;
+	// }
 
 	xvalue = (rht_flux - lft_flux);
 	yvalue = (top_flux - bot_flux);
@@ -2748,7 +2785,6 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 	}
 
 	doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
-	doubleVector* cell_volume = GLOBAL_EQ->get_cell_volume();
 
 	size_t comp = 0;
 
@@ -2764,6 +2800,8 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 		}
 	}
 
+	// cout << "Div1: " << divergence->operator()(1284) << endl;
+
 	if (DivergenceScheme == "CutCell") {
 		// Flux from RB surface
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
@@ -2773,6 +2811,7 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 				}
 			}
 		}
+		// cout << "Div2: " << divergence->operator()(1284) << endl;
 		// Flux redistribution
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
@@ -2781,16 +2820,19 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 				}
 			}
 		}
+		// cout << "Div3: " << divergence->operator()(1284) << endl;
 		// Converting flux to divergence
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
 				for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
 					size_t p = PF->DOF_local_number(i,j,k,comp);
-					divergence->operator()(p) = divergence->operator()(p)
-													  / cell_volume->operator()(p);
+					double dx = PF->get_cell_size( i, 0, 0 );
+				   double dy = PF->get_cell_size( j, 0, 1 );
+					divergence->operator()(p) = divergence->operator()(p) / dx/dy;
 				}
 			}
 		}
+		// cout << "Div4: " << divergence->operator()(1284) << endl;
 	}
 
 }
@@ -2807,7 +2849,6 @@ void DS_NavierStokes:: calculate_divergence_flux_fromRB ( size_t const& i,
    MAC_LABEL("DS_NavierStokes:: calculate_divergence_flux_fromRB" ) ;
 
 	doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
-
 	FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 
 	size_t p = PF->DOF_local_number(i,j,k,0);
@@ -2833,39 +2874,57 @@ void DS_NavierStokes:: calculate_divergence_flux_fromRB ( size_t const& i,
 
 	int count = (int)std::count(frac.begin(),frac.end(),0);
 
+	geomVector const* pgc = allrigidbodies->get_gravity_centre(0);
+
 	// Normal vector of interface calculation
 	geomVector p1(2), p2(2), pmid(2), pin(2), normal(2);
+	pin(0) = pgc->operator()(0);
+	pin(1) = pgc->operator()(1);
 	if (count == 0) {
-		return;
+		if ((top_frac < bot_frac) && (rht_frac < lft_frac)) {
+			p1(0) = xC - 0.5*dx + top_frac;
+			p2(0) = xC + 0.5*dx;
+			p1(1) = yC + 0.5*dy;
+			p2(1) = yC - 0.5*dy + rht_frac;
+		} else if ((top_frac < bot_frac) && (lft_frac < rht_frac)) {
+			p1(0) = xC + 0.5*dx - top_frac;
+			p2(0) = xC - 0.5*dx;
+			p1(1) = yC + 0.5*dy;
+			p2(1) = yC - 0.5*dy + lft_frac;
+		} else if ((bot_frac < top_frac) && (rht_frac < lft_frac)) {
+			p1(0) = xC - 0.5*dx + bot_frac;
+			p2(0) = xC + 0.5*dx;
+			p1(1) = yC - 0.5*dy;
+			p2(1) = yC + 0.5*dy - rht_frac;
+		} else if ((bot_frac < top_frac) && (lft_frac < rht_frac)) {
+			p1(0) = xC + 0.5*dx - bot_frac;
+			p2(0) = xC - 0.5*dx;
+			p1(1) = yC - 0.5*dy;
+			p2(1) = yC + 0.5*dy - lft_frac;
+		} else {
+			return;
+		}
 	} else if (count == 1) {
 		if (rht_frac == 0) {
 			p1(0) = xC - 0.5*dx + bot_frac;
 			p2(0) = xC - 0.5*dx + top_frac;
 			p1(1) = yC - 0.5*dy;
 			p2(1) = yC + 0.5*dy;
-			pin(0) = xC + 0.5*dx;
-			pin(1) = yC + 0.5*dy;
 		} else if (lft_frac == 0) {
 			p1(0) = xC + 0.5*dx - bot_frac ;
 			p2(0) = xC + 0.5*dx - top_frac ;
 			p1(1) = yC - 0.5*dy;
 			p2(1) = yC + 0.5*dy;
-			pin(0) = xC - 0.5*dx;
-			pin(1) = yC - 0.5*dy;
 		} else if (top_frac == 0) {
 			p1(0) = xC - 0.5*dx;
 			p2(0) = xC + 0.5*dx;
 			p1(1) = yC - 0.5*dy + lft_frac;
 			p2(1) = yC - 0.5*dy + rht_frac;
-			pin(0) = xC + 0.5*dx;
-			pin(1) = yC + 0.5*dy;
 		} else if (bot_frac == 0) {
 			p1(0) = xC - 0.5*dx;
 			p2(0) = xC + 0.5*dx;
 			p1(1) = yC + 0.5*dy - lft_frac;
 			p2(1) = yC + 0.5*dy - rht_frac;
-			pin(0) = xC - 0.5*dx;
-			pin(1) = yC - 0.5*dy;
 		}
 	} else if (count == 2) {
 		if (rht_frac == 0 && top_frac == 0) {
@@ -2873,47 +2932,67 @@ void DS_NavierStokes:: calculate_divergence_flux_fromRB ( size_t const& i,
 			p2(0) = xC - 0.5*dx + bot_frac;
 			p1(1) = yC - 0.5*dy + lft_frac;
 			p2(1) = yC - 0.5*dy;
-			pin(0) = xC + 0.5*dx;
-			pin(1) = yC + 0.5*dy;
 		} else if (lft_frac == 0 && top_frac == 0) {
 			p1(0) = xC + 0.5*dx - bot_frac;
 			p2(0) = xC + 0.5*dx;
 			p1(1) = yC - 0.5*dy;
 			p2(1) = yC - 0.5*dy + rht_frac;
-			pin(0) = xC - 0.5*dx;
-			pin(1) = yC + 0.5*dy;
 		} else if (lft_frac == 0 && bot_frac == 0) {
 			p1(0) = xC + 0.5*dx;
 			p2(0) = xC + 0.5*dx - top_frac;
 			p1(1) = yC + 0.5*dy - rht_frac;
 			p2(1) = yC + 0.5*dy;
-			pin(0) = xC - 0.5*dx;
-			pin(1) = yC - 0.5*dy;
 		} else if (bot_frac == 0 && rht_frac == 0) {
 			p1(0) = xC - 0.5*dx + top_frac;
 			p2(0) = xC - 0.5*dx;
 			p1(1) = yC + 0.5*dy;
 			p2(1) = yC + 0.5*dy - lft_frac;
-			pin(0) = xC + 0.5*dx;
-			pin(1) = yC - 0.5*dy;
 		}
 	}
 	pmid(0) = 0.5*(p1(0) + p2(0));
 	pmid(1) = 0.5*(p1(1) + p2(1));
 	normal(0) = p2(1) - p1(1);
 	normal(1) = -(p2(0) - p1(0));
-	if (((pin(0)-pmid(0))*normal(0) + (pin(1)-pmid(1))*normal(1)) > 0.) {
+	if (((pin(0)-pmid(0))*normal(0) + (pin(1)-pmid(1))*normal(1)) >= 0.) {
 		normal(0) = -1.*normal(0);
 		normal(1) = -1.*normal(1);
 	}
+
 
 	size_t par_id = 0;//void_frac->operator()(p) - 1;
 	geomVector pt(0.,0.,0.);
 	geomVector rb_vel = allrigidbodies->rigid_body_velocity(par_id,pt);
 
 	double delta = MAC::sqrt(pow(p1(0)-p2(0),2.) + pow(p1(1)-p2(1),2.));
+	double norm_mag = MAC::sqrt(pow(normal(0),2) + pow(normal(1),2));
 
-	divergence->operator()(p) -= delta*(normal(0)*rb_vel(0) + normal(1)*rb_vel(1));
+	// if (p == 1284) {
+	// 	cout << p << "\t"
+	// 	<< count << "\t"
+	// 	<< lft_frac << "\t"
+	// 	<< rht_frac << "\t"
+	// 	<< bot_frac << "\t"
+	// 	<< top_frac << "\t"
+	// 	<< normal(0) << "\t"
+	// 	<< normal(1) << "\t"
+	// 	<< norm_mag << "\t"
+	// 	<< delta << "\t"
+	// 	<< rb_vel(0) << "\t"
+	// 	<< rb_vel(1) << "\t"
+	// 	<< endl;
+	// }
+
+	// if (p == 1284) {
+	// 	cout << p << "\t"
+	// 	<< count << "\t"
+	// 	<< delta*(normal(0)*rb_vel(0) + normal(1)*rb_vel(1))/norm_mag
+	// 	<< endl;
+	// }
+
+	if (norm_mag != 0.) {
+		divergence->operator()(p) -= delta*(normal(0)*rb_vel(0)
+											 		 + normal(1)*rb_vel(1))/norm_mag;
+	}
 }
 
 
@@ -2939,6 +3018,8 @@ void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
 	double yC = PF->get_DOF_coordinate( j, 0, 1 );
 
 	if ((void_frac->operator()(p) != 0) && (divergence->operator()(p) != 0)) {
+		geomVector const* pgc = allrigidbodies
+							->get_gravity_centre(void_frac->operator()(p)-1);
 		// Face fraction calculations
 		vector<double> frac;
 		// right face
@@ -2958,35 +3039,29 @@ void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
 
 		// Normal vector of interface calculation
 		geomVector p1(2), p2(2), pmid(2), pin(2), normal(2);
+		pin(0) = pgc->operator()(0);
+		pin(1) = pgc->operator()(1);
 		if (count == 1) {
 			if (rht_frac == 0) {
 				p1(0) = xC - 0.5*dx + bot_frac;
 				p2(0) = xC - 0.5*dx + top_frac;
 				p1(1) = yC - 0.5*dy;
 				p2(1) = yC + 0.5*dy;
-				pin(0) = xC + 0.5*dx;
-				pin(1) = yC + 0.5*dy;
 			} else if (lft_frac == 0) {
 				p1(0) = xC + 0.5*dx - bot_frac ;
 				p2(0) = xC + 0.5*dx - top_frac ;
 				p1(1) = yC - 0.5*dy;
 				p2(1) = yC + 0.5*dy;
-				pin(0) = xC - 0.5*dx;
-				pin(1) = yC - 0.5*dy;
 			} else if (top_frac == 0) {
 				p1(0) = xC - 0.5*dx;
 				p2(0) = xC + 0.5*dx;
 				p1(1) = yC - 0.5*dy + lft_frac;
 				p2(1) = yC - 0.5*dy + rht_frac;
-				pin(0) = xC + 0.5*dx;
-				pin(1) = yC + 0.5*dy;
 			} else if (bot_frac == 0) {
 				p1(0) = xC - 0.5*dx;
 				p2(0) = xC + 0.5*dx;
 				p1(1) = yC + 0.5*dy - lft_frac;
 				p2(1) = yC + 0.5*dy - rht_frac;
-				pin(0) = xC - 0.5*dx;
-				pin(1) = yC - 0.5*dy;
 			}
 		} else if (count == 2) {
 			if (rht_frac == 0 && top_frac == 0) {
@@ -2994,29 +3069,45 @@ void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
 				p2(0) = xC - 0.5*dx + bot_frac;
 				p1(1) = yC - 0.5*dy + lft_frac;
 				p2(1) = yC - 0.5*dy;
-				pin(0) = xC + 0.5*dx;
-				pin(1) = yC + 0.5*dy;
 			} else if (lft_frac == 0 && top_frac == 0) {
 				p1(0) = xC + 0.5*dx - bot_frac;
 				p2(0) = xC + 0.5*dx;
 				p1(1) = yC - 0.5*dy;
 				p2(1) = yC - 0.5*dy + rht_frac;
-				pin(0) = xC - 0.5*dx;
-				pin(1) = yC + 0.5*dy;
 			} else if (lft_frac == 0 && bot_frac == 0) {
 				p1(0) = xC + 0.5*dx;
 				p2(0) = xC + 0.5*dx - top_frac;
 				p1(1) = yC + 0.5*dy - rht_frac;
 				p2(1) = yC + 0.5*dy;
-				pin(0) = xC - 0.5*dx;
-				pin(1) = yC - 0.5*dy;
 			} else if (bot_frac == 0 && rht_frac == 0) {
 				p1(0) = xC - 0.5*dx + top_frac;
 				p2(0) = xC - 0.5*dx;
 				p1(1) = yC + 0.5*dy;
 				p2(1) = yC + 0.5*dy - lft_frac;
-				pin(0) = xC + 0.5*dx;
-				pin(1) = yC - 0.5*dy;
+			}
+		} else if (count == 0) {
+			if ((top_frac < bot_frac) && (rht_frac < lft_frac)) {
+				p1(0) = xC - 0.5*dx + top_frac;
+				p2(0) = xC + 0.5*dx;
+				p1(1) = yC + 0.5*dy;
+				p2(1) = yC - 0.5*dy + rht_frac;
+			} else if ((top_frac < bot_frac) && (lft_frac < rht_frac)) {
+				p1(0) = xC + 0.5*dx - top_frac;
+				p2(0) = xC - 0.5*dx;
+				p1(1) = yC + 0.5*dy;
+				p2(1) = yC - 0.5*dy + lft_frac;
+			} else if ((bot_frac < top_frac) && (rht_frac < lft_frac)) {
+				p1(0) = xC - 0.5*dx + bot_frac;
+				p2(0) = xC + 0.5*dx;
+				p1(1) = yC - 0.5*dy;
+				p2(1) = yC + 0.5*dy - rht_frac;
+			} else if ((bot_frac < top_frac) && (lft_frac < rht_frac)) {
+				p1(0) = xC + 0.5*dx - bot_frac;
+				p2(0) = xC - 0.5*dx;
+				p1(1) = yC - 0.5*dy;
+				p2(1) = yC + 0.5*dy - lft_frac;
+			} else {
+				return;
 			}
 		}
 		pmid(0) = 0.5*(p1(0) + p2(0));
@@ -3027,6 +3118,11 @@ void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
 			normal(0) = -1.*normal(0);
 			normal(1) = -1.*normal(1);
 		}
+
+		double norm_mag = MAC::sqrt(pow(normal(0),2) + pow(normal(1),2));
+
+		normal(0) /= norm_mag;
+		normal(1) /= norm_mag;
 
 		size_t p_lft = PF->DOF_local_number(i-1,j,k,0);
 		double wt_lft = (void_frac->operator()(p_lft) == 0) ?
@@ -3044,11 +3140,17 @@ void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
 		// Flux redistribution
 		double sum = wt_lft + wt_rht + wt_bot + wt_top;
 
+		// if (p == 776) {
+		// 	cout << lft_frac << "," << rht_frac << "," << bot_frac << "," << top_frac << "," << divergence->operator()(p) << endl;
+		// }
+
 		if (sum > 0.) {
 			divergence->operator()(p_lft) += wt_lft/sum * divergence->operator()(p);
 			divergence->operator()(p_rht) += wt_rht/sum * divergence->operator()(p);
 			divergence->operator()(p_bot) += wt_bot/sum * divergence->operator()(p);
 			divergence->operator()(p_top) += wt_top/sum * divergence->operator()(p);
+			divergence->operator()(p) = 0.;
+		} else {
 			divergence->operator()(p) = 0.;
 		}
 	}

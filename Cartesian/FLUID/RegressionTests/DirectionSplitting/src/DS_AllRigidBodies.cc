@@ -520,7 +520,7 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
         // vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-        vel(dir) = (dir == 1) ? 0.1 : 0;//MAC::cos(2.*MAC::pi()*2.*t_it->time()) : 0.;
+        vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*2.*t_it->time()) : 0.;
         pos(dir) = periodic_transformation(pos(dir)
                                          + vel(dir)*t_it->time_step()
                                                          , dir) ;
@@ -775,6 +775,19 @@ geomVector DS_AllRigidBodies:: rigid_body_velocity( size_t const& parID,
      delta(2) = delta_periodic_transformation(pt(2) - pgc->operator()(2), 2);
 
   return (m_allDSrigidbodies[parID]->get_rigid_body_velocity(delta));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+geomVector const* DS_AllRigidBodies:: get_gravity_centre( size_t const& parID)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: get_gravity_centre(parID)" ) ;
+
+  return(m_allDSrigidbodies[parID]->get_ptr_to_gravity_centre());
 
 }
 
