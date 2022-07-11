@@ -8,9 +8,21 @@
 
 /**
 The function below fits a second-degree paraboloid to the one-ring neighbors
-of a node of the membrane, using a least-squares method. In the rare (exactly
-12) cases where the node has only 5 neighbours, the least squares method
-reduces to a simple 5x5 matrix inversion.
+of a node of the membrane, using the [ordinary least-squares method](https://en.wikipedia.org/wiki/Ordinary_least_squares#Matrix/vector_formulation).
+In the rare (exactly 12) cases where the node has only 5 neighbours, the least
+squares method reduces to a simple 5x5 matrix inversion.
+
+Input:
+
+* $XX$ is the matrix of regressors, of size $5 \times 6$
+* $\beta$ is the $5 \times 1$ vector of unknowns parametes
+* $yy$ is the $6 \times 1$ vector of response variables
+* perform_least_squares is a boolean indicating if the system is over-determined
+
+Output:
+
+The vector $\beta$ is populated with the parameters minimizing the sum of the
+square of the error
 */
 void fit_paraboloid(double** XX, double* beta, double* yy, bool perform_least_squares) {
   if (!perform_least_squares) {

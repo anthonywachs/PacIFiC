@@ -1,3 +1,11 @@
+/**
+# Matrix inversion using LU-decomposition
+
+Let's not reinvent the wheel: the code below is copy-pasted from [wikipedia](https://en.wikipedia.org/wiki/LU_decomposition#C_code_example).
+
+
+*/
+
 /* INPUT: A - array of pointers to rows of a square matrix having dimension N
  *        Tol - small tolerance number to detect failure when the matrix is near degenerate
  * OUTPUT: Matrix A is changed, it contains a copy of both matrices L-E and U as A=(L-E)+U such that P*A=L*U.
