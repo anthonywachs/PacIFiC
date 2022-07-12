@@ -426,7 +426,7 @@ void advect_lagMesh(lagMesh* mesh) {
     correct_lag_pos(&buffer_mesh);
     for(int j=0; j<buffer_mesh.nlp; j++) {
       buffer_mesh.nodes[j].stencil.n = STENCIL_SIZE;
-      buffer_mesh.nodes[j].stencil.nm = STENCIL_SIZE*128;
+      buffer_mesh.nodes[j].stencil.nm = STENCIL_SIZE;
       buffer_mesh.nodes[j].stencil.p = malloc(STENCIL_SIZE*sizeof(Index));
     }
     generate_lag_stencils(&buffer_mesh);

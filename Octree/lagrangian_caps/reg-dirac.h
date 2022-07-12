@@ -12,27 +12,7 @@ implementation is \textbf{only compatible with quadtree and octree grids, and
 not with Cartesian nor multigrids}.
 */
 
-#define BGHOSTS 2
-
-/**
-Basilisk provides functions to allocate and de-allocate Cached cells. In
-our case, since the number of Lagrangian nodes is constant and since the level
-of refinement of the Eulerian grid is constant in the vicinity of those nodes,
-the number of Cached cells is unchanged throughout the entire simulation. As
-such, we provide a function to change the index of a Cached cell instead of
-de-allocating and re-allocating it, as performed by the function below.
-*/
-static void change_cache_entry(Cache* s, int i, Point pt, int flag) {
-  if (i > s->n) fprintf(stderr, "Error: Cache index out of range.\n");
-  s->p[i].i = pt.i;
-  s->p[i].j = pt.j;
-  #if dimension > 2
-  s->p[i].k = pt.k;
-  #endif
-  s->p[i].level = pt.level;
-  s->p[i].flags = flag;
-}
-
+#define BGHOSTS 2 // Having two layers of ghost cells should not be mandatory since the implementation relies on Caches
 
 #define POS_PBC_X(X) ((u.x.boundary[left] != periodic_bc) ? (X) : (((X) > L0/2.) ? (X) - L0 : (X)))
 #define POS_PBC_Y(Y) ((u.x.boundary[top] != periodic_bc) ? (Y) : (((Y) > L0/2.) ? (Y) - L0 : (Y)))
@@ -46,7 +26,7 @@ the cached cells are tagged with the process id.
 trace
 void generate_lag_stencils(lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) {
-    int c = 0;
+    mesh->nodes[i].stencil.n = 0;
     /**
     The current implementation assumes that the Eulerian cells around Lagrangian
     node are all at the maximum level.
@@ -65,7 +45,7 @@ void generate_lag_stencils(lagMesh* mesh) {
         #endif
         if (point.level >= 0 && point.level != grid->maxdepth)
           fprintf(stderr, "Warning: Lagrangian stencil not fully resolved.\n");
-        change_cache_entry(&(mesh->nodes[i].stencil), c, point, 0);
+        cache_append(&(mesh->nodes[i].stencil), point, 0);
         #if _MPI
         #if dimension < 3
         if (ni == 0 && nj == 0) {
@@ -76,7 +56,7 @@ void generate_lag_stencils(lagMesh* mesh) {
           else mesh->nodes[i].pid = -1;
         }
         #endif
-        c++;
+        // c++;
         #if dimension == 3
         }
         #endif
