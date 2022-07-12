@@ -11,9 +11,8 @@
 #endif
 #define CAPS_VISCOSITY 1.
 
-/** We define the "grid gradient" G, according to Tryggvason, JCP 2003.*/
+/** We define the "grid gradient" $\bm{G}$, according to Tryggvason, JCP 2001.*/
 vector G[];
-// face vector G[];
 void construct_divG(scalar divG, lagMesh* mesh) {
   foreach() {
     if (cm[] > 1.e-20) {
@@ -118,11 +117,17 @@ event defaults (i = 0) {
       divG[right] = dirichlet(0.);
     }
   }
+  #if EMBED
+  // I[embed] = dirichlet(0.);
+  I.third = true;
+  #endif
 }
 
-event properties (i++) {
+event viscoprop (i = 1; i++) {
+// event properties (i++) {
+
   construct_divG(divG, &(mbs.mb[0]));
-  poisson(I, divG, tolerance = 1.e-6);
+  poisson(I, divG, tolerance = 1.e-6, minlevel = 4);
 
   // Simple clamping of I:
   foreach() {
@@ -141,7 +146,9 @@ event properties (i++) {
   #if OLD_QCC
   boundary({I, prevI});
   #endif
+}
 
+event properties (i++) {
   face vector muv = mu;
   foreach_face()
     if (fm.x[] > 1.e-20)
