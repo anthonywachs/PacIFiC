@@ -2960,7 +2960,9 @@ void DS_NavierStokes:: calculate_divergence_flux_fromRB ( size_t const& i,
 
 
 	size_t par_id = 0;//void_frac->operator()(p) - 1;
-	geomVector pt(0.,0.,0.);
+	geomVector pt(pgc->operator()(0),
+					  pgc->operator()(1),
+					  pgc->operator()(2));
 	geomVector rb_vel = allrigidbodies->rigid_body_velocity(par_id,pt);
 
 	double delta = MAC::sqrt(pow(p1(0)-p2(0),2.) + pow(p1(1)-p2(1),2.));
