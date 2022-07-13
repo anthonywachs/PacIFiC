@@ -3181,6 +3181,7 @@ double DS_NavierStokes:: return_face_fraction ( size_t const& i,
 
 	size_t wall_dir = (comp == 0) ? 1 : 0;
 	size_t p = UF->DOF_local_number(i, j, k, comp);
+	size_t m_nrb = (is_solids) ? allrigidbodies->get_number_rigid_bodies() : 0;
 
 	size_t pbot = (comp == 0) ? UF->DOF_local_number(i,j-1,k,comp)
 						           : UF->DOF_local_number(i-1,j,k,comp);
@@ -3215,7 +3216,8 @@ double DS_NavierStokes:: return_face_fraction ( size_t const& i,
 		} else {
 			fraction += length/2.;
 		}
-	} else {
+	} else if ((void_frac->operator()(p) != 0)
+			  && (void_frac->operator()(p) <= m_nrb)) {
 		if (intersect_vector->operator()(ptop,2*wall_dir + 0) == 1) {
 			double delta = MAC::abs(topx - xC - 0.5*length);
 			if (intersect_distance->operator()(ptop,2*wall_dir + 0) >= delta) {
@@ -3230,6 +3232,8 @@ double DS_NavierStokes:: return_face_fraction ( size_t const& i,
 							 - delta;
 			}
 		}
+	} else {
+		fraction = length;
 	}
 
 	// Eliminate contribution if less than 0.01%
@@ -3638,7 +3642,7 @@ DS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
   size_t field = (FF == UF) ? 1 : 0 ;
 
   size_t i,j,k;
-  outputFile << "x,y,z,void_frac,div,left,lv"
+  outputFile << "x,y,z,id,void_frac,div,left,lv"
              << ",right,rv"
              << ",bottom,bov"
              << ",top,tv"
@@ -3682,6 +3686,7 @@ DS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
               size_t p = FF->DOF_local_number(i,j,k,comp);
 
               outputFile << xC << "," << yC << "," << zC
+				  << "," << p
               << "," << void_frac->operator()(p)
 				  << "," << divergence->operator()(p)
               << "," << intersect_vector->operator()(p,0)
