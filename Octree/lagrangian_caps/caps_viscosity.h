@@ -14,16 +14,6 @@
 /** We define the "grid gradient" $\bm{G}$, according to Tryggvason, JCP 2001.*/
 vector G[];
 void construct_divG(scalar divG, lagMesh* mesh) {
-  foreach() {
-    if (cm[] > 1.e-20) {
-      foreach_dimension() G.x[] = 0.;
-      divG[] = 0.;
-    }
-  }
-  #if OLD_QCC
-  boundary((scalar*){divG, G});
-  #endif
-
   comp_normals(mesh);
   #if dimension < 3
   compute_lengths(mesh);
@@ -100,7 +90,11 @@ event defaults (i = 0) {
   mu = new face vector;
   mup = MUP;
   muc = MUC;
-  foreach() foreach_dimension() divG[] = 0.;
+  foreach() {
+    prevI[] = 0.;
+    I[] = 0.;
+    foreach_dimension() divG[] = 0.;
+  }
   /** We define below the homogeneous Dirichlet boundary conditions for the
   grid-gradient, and the indicator function on all walls. A consequence of this
   is that in the case of bi/tri-periodic boundary conditions in 2D/3D the
@@ -123,10 +117,19 @@ event defaults (i = 0) {
   #endif
 }
 
-event viscoprop (i = 1; i++) {
-// event properties (i++) {
+// event viscoprop (i = 1; i++) {
+event properties (i++) {
+  foreach() {
+    if (cm[] > 1.e-20) {
+      foreach_dimension() G.x[] = 0.;
+      divG[] = 0.;
+    }
+  }
+  #if OLD_QCC
+  boundary((scalar*){divG, G});
+  #endif
 
-  construct_divG(divG, &(mbs.mb[0]));
+  for (int k=0; k<mbs.nbmb; k++) construct_divG(divG, &MB(k));
   poisson(I, divG, tolerance = 1.e-6, minlevel = 4);
 
   // Simple clamping of I:

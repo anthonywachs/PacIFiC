@@ -98,7 +98,7 @@ void draw_lag(struct _draw_lag p) {
     #if dimension > 2
       bool facets = p.facets;
       if (facets) {
-        if (p.fc) {my_color[0] = p.fc[0]; my_color[1] = p.fc[1]; my_color[2] = p.fc[2];}
+        if (p.fc[0]) {my_color[0] = p.fc[0]; my_color[1] = p.fc[1]; my_color[2] = p.fc[2];}
         else {my_color[0] = 1.; my_color[1] = 1.; my_color[2] = 1.;}
         for (int i=0; i<p.mesh->nlt; i++) {
           int nodes[3];
