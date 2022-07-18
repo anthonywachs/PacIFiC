@@ -13,6 +13,10 @@ DS_RigidBody:: DS_RigidBody()
 {
   MAC_LABEL( "DS_RigidBody:: DS_RigidBody" ) ;
 
+  m_halo_zone.reserve(2);
+  m_halo_zone.push_back(new geomVector(3));
+  m_halo_zone.push_back(new geomVector(3));
+
 }
 
 
@@ -48,102 +52,6 @@ DS_RigidBody:: ~DS_RigidBody()
 
 
 //---------------------------------------------------------------------------
-bool DS_RigidBody:: isIn( geomVector const& pt ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: isIn(pt)" ) ;
-
-  return ( m_geometric_rigid_body->isIn( pt ) );
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-bool DS_RigidBody:: isIn( double const& x, double const& y, double const& z )
-	const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: isIn(x,y,z)" ) ;
-
-  return ( m_geometric_rigid_body->isIn( x, y, z ) );
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-double DS_RigidBody:: level_set_value( geomVector const& pt ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: level_set_value(pt)" ) ;
-
-  return ( m_geometric_rigid_body->level_set_value( pt ) );
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-double DS_RigidBody:: level_set_value( double const& x
-                                     , double const& y
-                                     , double const& z ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: level_set_value(x,y,z)" ) ;
-
-  return ( m_geometric_rigid_body->level_set_value( x, y, z ) );
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-double DS_RigidBody:: get_distanceTo( geomVector const& source,
-                                      geomVector const& rayDir,
-                                      double const& delta ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: get_distanceTo" ) ;
-
-  return (m_geometric_rigid_body->distanceTo(source, rayDir, delta));
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-geomVector DS_RigidBody:: get_rigid_body_velocity( geomVector const& pt ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: rigid_body_velocity(pt)" ) ;
-
-  return (m_geometric_rigid_body->rigid_body_velocity(pt));
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-geomVector DS_RigidBody:: get_rigid_body_angular_velocity( ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: rigid_body_angular_velocity()" ) ;
-
-  return (m_geometric_rigid_body->rigid_body_angular_velocity());
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
 void DS_RigidBody:: translate_surface_points( geomVector const& delta)
 //---------------------------------------------------------------------------
 {
@@ -153,46 +61,6 @@ void DS_RigidBody:: translate_surface_points( geomVector const& delta)
   for (size_t i = 0; i < m_surface_area.size(); i++) {
      m_surface_points[i]->translate(delta);
   }
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-std::tuple<double,double> DS_RigidBody:: get_mass_and_density() const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: get_mass_and_density()" ) ;
-
-  return ( m_geometric_rigid_body->get_mass_and_density() );
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-double DS_RigidBody:: get_circumscribed_radius( ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: get_circumscribed_radius()" ) ;
-
-  return (m_geometric_rigid_body->get_circumscribed_radius());
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-geomVector const* DS_RigidBody:: get_ptr_to_gravity_centre( ) const
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: get_ptr_to_gravity_centre( )" ) ;
-
-  return (dynamic_cast<FS_RigidBody*>(m_geometric_rigid_body)
-                              ->get_ptr_to_gravity_centre());
 
 }
 
@@ -224,24 +92,6 @@ void DS_RigidBody:: initialize_surface_variables( )
         m_surface_Tgrad.push_back( 0. );
      }
    }
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void DS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
-                                                    geomVector const& vel,
-                                                    geomVector const& ang_vel,
-                                   vector<geomVector> const& periodic_directions)
-//---------------------------------------------------------------------------
-{
-  MAC_LABEL( "DS_RigidBody:: update_RB_position_and_velocity" ) ;
-
-  return (m_geometric_rigid_body->update_RB_position_and_velocity(pos,vel
-                                                                  ,ang_vel
-                                                         ,periodic_directions));
 
 }
 

@@ -74,6 +74,8 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , AdvectionTimeAccuracy( 1 )
    , b_restart( false )
    , is_solids( false )
+   , is_GRAINS( false )
+   , is_STL( false )
    , is_HE( false )
    , is_NS( false )
    , is_NSwithHE( false )
@@ -108,8 +110,28 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    }
 
    // Read the presence of particles
-   if ( exp->has_entry( "Particles" ) )
-     is_solids = exp->bool_data( "Particles" ) ;
+   if ( exp->has_entry( "Particles_from_GRAINS" ) )
+     is_GRAINS = exp->bool_data( "Particles_from_GRAINS" ) ;
+
+   // Read the presence of STL
+   if ( exp->has_entry( "STL_as_RB" ) )
+     is_STL = exp->bool_data( "STL_as_RB" ) ;
+
+   // Read STL file name
+   istringstream STL_input;
+   ostringstream STL_features;
+   if ( is_STL ) {
+     STL_file = exp->string_data( "STL_file" ) ;
+     STL_features << STL_file << endl;
+     intVector Halo( 3, 0 );
+     Halo = exp->intVector_data( "HaloZones" );
+     STL_features << Halo(0) << "\t" << Halo(1) << "\t" << Halo(2) << endl;
+     double HaloEnh = exp->double_data( "HaloEnhancement" ) ;
+     STL_features << HaloEnh << endl;
+     bool invertSTL = exp->bool_data ( "InvertSTL" ) ;
+     STL_features << invertSTL << endl;
+   }
+   STL_input.str( STL_features.rdbuf()->str() );
 
    // Read Kai
    if ( exp->has_entry( "Kai" ) ) {
@@ -138,7 +160,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 	                          "AdvectionTimeAccuracy", error_message );
    }
 
-   if (is_solids) {
+   if (is_GRAINS) {
       insertion_type = exp->string_data( "InsertionType" ) ;
       MAC_ASSERT( insertion_type == "Grains3D" ) ;
 
@@ -188,7 +210,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    }
 
    // Read the solids filename
-   if (is_solids && (insertion_type == "Grains3D")) {
+   if (is_GRAINS && (insertion_type == "Grains3D")) {
       solidSolverType = "Grains3D";
       b_solidSolver_parallel = false;
       solidSolver_insertionFile = "Grains/Init/insert.xml";
@@ -211,7 +233,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    }
 
    // Create Grains3D if solidSolverType is Grains3D;
-   if (is_solids) {
+   if (is_GRAINS) {
       int error = 0;
       solidSolver = FS_SolidPlugIn_BuilderFactory:: create( solidSolverType,
          solidSolver_insertionFile,
@@ -234,7 +256,8 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    gravity_vector = MAC_DoubleVector::create( this, gg );
 
    // Create rigid bodies objects depending on which PDE to solve
-   if (is_solids) {
+   if (is_GRAINS || is_STL) {
+      is_solids = true;
       if (is_NS) {
          allrigidbodies = new DS_AllRigidBodies( space_dimensions
                           , *solidFluid_transferStream
@@ -245,7 +268,10 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                           , gravity_vector
                           , surface_cell_scale
                           , macCOMM
-                          , mu );
+                          , mu
+                          , is_GRAINS
+                          , is_STL
+                          , STL_input);
       } else if (is_HE) {
          allrigidbodies = new DS_AllRigidBodies( space_dimensions
                           , *solidFluid_transferStream
@@ -268,7 +294,6 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                           , RBTemp);
       }
    }
-
 
    // Create structure to input in the NS solver
    if (is_NS || is_NSwithHE) {

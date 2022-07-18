@@ -55,6 +55,8 @@ Cartesian/MacWorld/hypre-2.10.1/*
 Cartesian/MacWorld/hypre/*
 Cartesian/MacWorld/hypre
 Cartesian/MacWorld/petsc-3.2.0-p7/*
+Cartesian/MacWorld/MAC/lib/*
+Cartesian/FLUID/lib/*
 GRAINS/Main/bin64*/*
 GRAINS/Grains/lib64-*/*
 GRAINS/Grains/lib64-*
@@ -78,4 +80,3 @@ GRAINS_V1/Grains/lib64-*/*
 GRAINS_V1/Grains/lib64-*
 GRAINS_V1/NotIncluded
 GRAINS_V1/XERCES*
-

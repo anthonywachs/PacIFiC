@@ -254,6 +254,7 @@ void InterfaceFluide3D::WriteParticulesInFluid(
   const double* inertie = NULL;
   string particuleType = "P";
   Scalar masseVol, masse, rayon;
+  Matrix mr;
 
   for (particule=particules.begin(), id=0; particule!=particules.end();
        particule++, id++)
@@ -274,6 +275,7 @@ void InterfaceFluide3D::WriteParticulesInFluid(
       nclonesper    = (*particule)->getNombreClonesPeriodiques();
       particuleType = "P";
       if (nclonesper) particuleType = "PP";
+      mr	    = (*particule)->getForme()->getOrientation();
 
       particles_features << id <<'\t'<< ncorners <<endl;
 
@@ -317,6 +319,24 @@ void InterfaceFluide3D::WriteParticulesInFluid(
 		inertie[4] )  <<'\t'
 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
 		inertie[5] )  <<'\t'
+   << Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[0][0] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[0][1] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[0][2] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[1][0] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[1][1] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[1][2] )  <<'\t'
+   << Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[2][0] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[2][1] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[2][2] )  <<'\t'
 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
 		(*centre)[X] )   <<'\t'
 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
@@ -350,7 +370,8 @@ void InterfaceFluide3D::WriteParticulesInFluid(
 			 << "0. 0. 0. "
 			 << "0. 0. 0. "
 			 << "1e8 1."
-			 << "1  1  1  1  1  1" << endl;
+          << "1.  1.  1.  1.  1.  1. "
+			 << "1. 0. 0. 0. 1. 0. 0. 0. 1." << endl;
       particles_features << "0  1"     << endl;
       particles_features << "0. 0. 0." << endl;
     }
@@ -367,6 +388,7 @@ void InterfaceFluide3D::WriteParticulesInFluid(
     centre     = (*obst)->getPosition();
     rayon      = (*obst)->getRayon();
     ncorners   = (*obst)->getForme()->getConvex()->getNbCorners();
+    mr	       = (*obst)->getForme()->getOrientation();
 
     particles_features << id << '\t' << ncorners << endl;
     particles_features
@@ -374,6 +396,9 @@ void InterfaceFluide3D::WriteParticulesInFluid(
       << (*vitesseT)[X] <<'\t'<< (*vitesseT)[Y] <<'\t'<< (*vitesseT)[Z] <<'\t'
       << (*vitesseR)[X] <<'\t'<< (*vitesseR)[Y] <<'\t'<< (*vitesseR)[Z] <<'\t'
       << "1000.\t 0.\t 0.\t 0.\t 0.\t 0.\t 0.\t 0.\t"
+      << (mr)[0][0] <<'\t'<< (mr)[0][1] <<'\t'<< (mr)[0][2] <<'\t'
+      << (mr)[1][0] <<'\t'<< (mr)[1][1] <<'\t'<< (mr)[1][2] <<'\t'
+      << (mr)[2][0] <<'\t'<< (mr)[2][1] <<'\t'<< (mr)[2][2] <<'\t'
       << (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z]   <<'\t'
       << endl;
     particles_features << rayon ;
@@ -410,6 +435,7 @@ void InterfaceFluide3D::WriteParticulesInFluid(
   const double* inertie = NULL;
   string particuleType = "P";
   Scalar masseVol, masse, rayon;
+  Matrix mr;
 
   for (particule=allProcParticules->begin();
     particule!=allProcParticules->end(); particule++, id++)
@@ -429,6 +455,7 @@ void InterfaceFluide3D::WriteParticulesInFluid(
       ncorners = (*particule)->getForme()->getConvex()->getNbCorners();
       particuleType = "P";
       if ( (*particule)->getNombreClonesPeriodiques() ) particuleType = "PP";
+      mr	    = (*particule)->getForme()->getOrientation();
 
       particles_features << id <<'\t'<< ncorners <<endl;
       particles_features
@@ -438,6 +465,9 @@ void InterfaceFluide3D::WriteParticulesInFluid(
 	<< masseVol    <<'\t'<< masse       <<'\t'
 	<< inertie[0]  <<'\t'<< inertie[1]  <<'\t'<< inertie[2]  <<'\t'
 	<< inertie[3]  <<'\t'<< inertie[4]  <<'\t'<< inertie[5]  <<'\t'
+   << (mr)[0][0] <<'\t'<< (mr)[0][1] <<'\t'<< (mr)[0][2] <<'\t'
+	<< (mr)[1][0] <<'\t'<< (mr)[1][1] <<'\t'<< (mr)[1][2] <<'\t'
+	<< (mr)[2][0] <<'\t'<< (mr)[2][1] <<'\t'<< (mr)[2][2] <<'\t'
 	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z]   <<'\t'
 	<< endl;
       // Attention dorenavant le rayon est deplace de Forme.cpp l.556
@@ -452,7 +482,8 @@ void InterfaceFluide3D::WriteParticulesInFluid(
 			 << "0. 0. 0. "
 			 << "0. 0. 0. "
 			 << "1e8 1."
-			 << "1  1  1  1  1  1" << endl;
+          << "1.  1.  1.  1.  1.  1. "
+			 << "1. 0. 0. 0. 1. 0. 0. 0. 1." << endl;
       particles_features << "0  1"     << endl;
       particles_features << "0. 0. 0." << endl;
     }
@@ -469,6 +500,7 @@ void InterfaceFluide3D::WriteParticulesInFluid(
     centre     = (*obst)->getPosition();
     rayon      = (*obst)->getRayon();
     ncorners   = (*obst)->getForme()->getConvex()->getNbCorners();
+    mr	       = (*obst)->getForme()->getOrientation();
 
     particles_features << id << '\t' << ncorners << endl;
     particles_features
@@ -476,6 +508,9 @@ void InterfaceFluide3D::WriteParticulesInFluid(
       << (*vitesseT)[X] <<'\t'<< (*vitesseT)[Y] <<'\t'<< (*vitesseT)[Z] <<'\t'
       << (*vitesseR)[X] <<'\t'<< (*vitesseR)[Y] <<'\t'<< (*vitesseR)[Z] <<'\t'
       << "1000.\t 0.\t 0.\t 0.\t 0.\t 0.\t 0.\t 0.\t"
+      << (mr)[0][0] <<'\t'<< (mr)[0][1] <<'\t'<< (mr)[0][2] <<'\t'
+      << (mr)[1][0] <<'\t'<< (mr)[1][1] <<'\t'<< (mr)[1][2] <<'\t'
+      << (mr)[2][0] <<'\t'<< (mr)[2][1] <<'\t'<< (mr)[2][2] <<'\t'
       << (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z]   <<'\t'
       << endl;
     particles_features << rayon ;

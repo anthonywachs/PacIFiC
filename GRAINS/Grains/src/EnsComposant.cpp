@@ -1526,7 +1526,7 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
   vector<Particule*>* particulespost = NULL;
   list<PostProcessingWriter*>::iterator pp;
   bool written = false ;
-  string const siw( indent_width, ' ' ) ;  
+  string const siw( indent_width, ' ' ) ;
 
   if ( rang == 0 )
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
@@ -1557,7 +1557,7 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
   if ( nprocs > 1 && m_hasSerialPostProcessors )
   {
     if ( rang == 0 )
-      cout << siw << "Copie des particules sur le master pour Post-processing" 
+      cout << siw << "Copie des particules sur le master pour Post-processing"
       	<< endl;
 
     // Collecte les particules de tous les processeurs dans un vecteur
@@ -1674,8 +1674,8 @@ void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
   list<Particule*>* postProcessingWait = NULL;
   list<Particule*>* postProcessingPeriodiques = NULL;
   vector<Particule*>* particulespost = NULL;
-  string const siw( indent_width, ' ' ) ;  
-  
+  string const siw( indent_width, ' ' ) ;
+
   if ( rang == 0 )
     cout << siw << "Sortie resultats: START" << endl;
 
@@ -1693,7 +1693,7 @@ void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
   if ( nprocs > 1 && m_hasSerialPostProcessors )
   {
     if ( rang == 0 )
-      cout << siw << "Copie des particules sur le master pour Post-processing" 
+      cout << siw << "Copie des particules sur le master pour Post-processing"
       	<< endl;
 
     // Collecte les particules de tous les processeurs dans un vecteur
@@ -1738,7 +1738,7 @@ void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
 	postProcessingPeriodiques,
 	&m_ParticuleClassesReference,
 	m_obstacle,
-	LC );   	
+	LC );
     }
     else
     {
@@ -1748,7 +1748,7 @@ void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
 	&m_particulesClonesPeriodiques,
 	&m_ParticuleClassesReference,
 	m_obstacle,
-	LC ); 	
+	LC );
     }
 
   if ( nprocs > 1 && m_hasSerialPostProcessors )
@@ -2641,7 +2641,7 @@ double EnsComposant::
   	omynm1, omznm1;
   int i = 0 ;
   list<Particule*>::iterator particule;
-  
+
   for (particule=m_particulesActives.begin(),i=0;
   	particule!=m_particulesActives.end(); particule++)
   {
@@ -2650,7 +2650,7 @@ double EnsComposant::
     {
       ifstream pdata( ( rootfilename + "_" + Grains_Exec::intToString(i)
       	+ ".dat" ).c_str(), ios::in );
-	
+
       while ( !pdata.eof() )
       {
         getline( pdata, sbuffer, '\n' );
@@ -2659,30 +2659,30 @@ double EnsComposant::
           linetnm1 = linet ;
           linet = sbuffer ;
         }
-      } 
-          	
+      }
+
       iss.str( linetnm1 );
       iss >> time_nm1 >> sbuffer >> sbuffer >> sbuffer >> vxnm1 >> vynm1 >>
 	vznm1 >> omxnm1 >> omynm1 >> omznm1;
       iss.clear();
-      
+
       iss.str( linet );
       iss >> time_n;
-      iss.clear(); 
-      
+      iss.clear();
+
       previousdtfluid = time_n - time_nm1;
-      
+
 //      cout << previousdtfluid << " " << vznm1 << endl;
-      
+
       (*particule)->setVelocityPreviousTimeRestart( vxnm1,
   	vynm1, vznm1, omxnm1, omynm1, omznm1 ) ;
-      (*particule)->setVelocityAndVelocityDifferencePreviousTime() ;           
-      
-      pdata.close();	      
+      (*particule)->setVelocityAndVelocityDifferencePreviousTime() ;
+
+      pdata.close();
     }
   }
-  
-  return ( previousdtfluid );  
+
+  return ( previousdtfluid );
 }
 
 
