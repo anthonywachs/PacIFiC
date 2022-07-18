@@ -104,6 +104,160 @@ void DS_3Dbox:: compute_rigid_body_halozone( )
 
 
 //---------------------------------------------------------------------------
+bool DS_3Dbox:: isIn( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: isIn(pt)" ) ;
+
+  return ( m_geometric_rigid_body->isIn( pt ) );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+bool DS_3Dbox:: isIn( double const& x, double const& y, double const& z )
+	const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: isIn(x,y,z)" ) ;
+
+  return ( m_geometric_rigid_body->isIn( x, y, z ) );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_3Dbox:: level_set_value( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: level_set_value(pt)" ) ;
+
+  return ( m_geometric_rigid_body->level_set_value( pt ) );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_3Dbox:: level_set_value( double const& x
+                                     , double const& y
+                                     , double const& z ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: level_set_value(x,y,z)" ) ;
+
+  return ( m_geometric_rigid_body->level_set_value( x, y, z ) );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_3Dbox:: get_distanceTo( geomVector const& source,
+                                      geomVector const& rayDir,
+                                      double const& delta ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: get_distanceTo" ) ;
+
+  return (m_geometric_rigid_body->distanceTo(source, rayDir, delta));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+geomVector DS_3Dbox:: get_rigid_body_velocity( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: rigid_body_velocity(pt)" ) ;
+
+  return (m_geometric_rigid_body->rigid_body_velocity(pt));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+geomVector DS_3Dbox:: get_rigid_body_angular_velocity( ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: rigid_body_angular_velocity()" ) ;
+
+  return (m_geometric_rigid_body->rigid_body_angular_velocity());
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+std::tuple<double,double> DS_3Dbox:: get_mass_and_density() const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: get_mass_and_density()" ) ;
+
+  return ( m_geometric_rigid_body->get_mass_and_density() );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_3Dbox:: get_circumscribed_radius( ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: get_circumscribed_radius()" ) ;
+
+  return (m_geometric_rigid_body->get_circumscribed_radius());
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+geomVector const* DS_3Dbox:: get_ptr_to_gravity_centre( ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: get_ptr_to_gravity_centre( )" ) ;
+
+  return (dynamic_cast<FS_RigidBody*>(m_geometric_rigid_body)
+                              ->get_ptr_to_gravity_centre());
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_3Dbox:: update_RB_position_and_velocity(geomVector const& pos,
+                                                    geomVector const& vel,
+                                                    geomVector const& ang_vel,
+                                   vector<geomVector> const& periodic_directions)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: update_RB_position_and_velocity" ) ;
+
+  return (m_geometric_rigid_body->update_RB_position_and_velocity(pos,vel
+                                                                  ,ang_vel
+                                                         ,periodic_directions));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_3Dbox:: compute_surface_points(  )
 //---------------------------------------------------------------------------
 {

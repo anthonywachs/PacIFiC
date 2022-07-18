@@ -72,7 +72,10 @@ class DS_AllRigidBodies
                        , MAC_DoubleVector const* arb_gv
                        , double const& arb_scs
                        , MAC_Communicator const* arb_macCOMM
-                       , double const& arb_mu );
+                       , double const& arb_mu
+                       , bool const& is_GRAINS
+                       , bool const& is_STL
+                       , istream& STL_input );
 
       /** @brief Constructor with arguments
       @param dimens number of space dimensions
@@ -113,8 +116,6 @@ class DS_AllRigidBodies
                        , MAC_Communicator const* arb_macCOMM
                        , double const& arb_mu
                        , double const& arb_RBTemp);
-
-
 
       /** @brief Destructor */
       ~DS_AllRigidBodies();
@@ -253,8 +254,10 @@ class DS_AllRigidBodies
 
       /** @brief Computes the void fraction on the grid nodes
       of a given fluid field
-      @param FF the fluid field (PF, UF) */
-      void compute_void_fraction_on_grid( FV_DiscreteField const* FF );
+      @param FF the fluid field (PF, UF)
+      @param is_in_time_iter true if method called in time iteration */
+      void compute_void_fraction_on_grid( FV_DiscreteField const* FF
+                                        , bool const& is_in_time_iter );
 
       /** @brief Computes the void fraction on the epsilon grid for PP
       of a given fluid field
@@ -263,8 +266,15 @@ class DS_AllRigidBodies
 
       /** @brief Computes the intersection of grid nodes of a given fluid field
       with the nearest rigid body of a given fluid field
+      @param FF the fluid field (PF, UF)
+      @param is_in_time_iter true if method called in time iteration */
+      void compute_grid_intersection_with_rigidbody(FV_DiscreteField const* FF
+                                                , bool const& is_in_time_iter);
+
+      /** @brief Clear the void fraction and intersection belonging to
+      rigid bodies coming from GRAINS
       @param FF the fluid field (PF, UF) */
-      void compute_grid_intersection_with_rigidbody(FV_DiscreteField const* FF);
+      void clear_GrainsRB_data_on_grid( FV_DiscreteField const* FF );
 
       /** @brief Computes the rigid body velocity including the rotation speed
       at a given geometric vector pt
@@ -504,6 +514,9 @@ class DS_AllRigidBodies
       vector<vector<size_t>> neighbour_list;
 
       vector<size_t> local_RB_list; /**< Stores a list of local RB */
+
+      bool b_GRAINS;
+      bool b_STL;
 
       //@}
 

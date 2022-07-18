@@ -180,9 +180,9 @@ DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
 		// Build void frac and intersection variable
 		allrigidbodies->build_solid_variables_on_fluid_grid(TF);
 		// Compute void fraction for temperature field
-		allrigidbodies->compute_void_fraction_on_grid(TF);
+		allrigidbodies->compute_void_fraction_on_grid(TF, false);
 		// Compute intersection with RB for temperature field
-		allrigidbodies->compute_grid_intersection_with_rigidbody(TF);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(TF, false);
 		if (my_rank == 0)
 			cout << "HE: Finished void fraction and grid intersection... \n" << endl;
 	}

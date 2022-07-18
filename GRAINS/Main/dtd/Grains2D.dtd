@@ -1,0 +1,155 @@
+<!-- Grains2D DTD -->
+
+<!ENTITY % Convex.dtd SYSTEM "/home/goyal001/Documents/GIT/pacific/GRAINS/Main/dtd/Convex.dtd">
+%Convex.dtd;
+
+<!ENTITY % Contact.dtd SYSTEM "/home/goyal001/Documents/GIT/pacific/GRAINS/Main/dtd/Contact.dtd">
+%Contact.dtd;
+
+<!ELEMENT Point EMPTY>
+<!ATTLIST Point X CDATA #REQUIRED>
+<!ATTLIST Point Y CDATA #REQUIRED>
+<!ATTLIST Point Z CDATA #REQUIRED>
+
+<!ELEMENT Centre EMPTY>
+<!ATTLIST Centre X CDATA #REQUIRED>
+<!ATTLIST Centre Y CDATA #REQUIRED>
+<!ATTLIST Centre Z CDATA #REQUIRED>
+
+<!ELEMENT Vecteur EMPTY>
+<!ATTLIST Vecteur X CDATA #REQUIRED>
+<!ATTLIST Vecteur Y CDATA #REQUIRED>
+<!ATTLIST Vecteur Z CDATA #REQUIRED>
+
+
+<!ELEMENT Grains2D (Construction, Forces, Simulation)>
+<!ATTLIST Grains2D Type (Standard|MPI) "Standard">
+
+  <!ELEMENT Construction (Recipient, DomainDecomposition?, MPI?, Contacts, 
+  		 Particules?, Obstacles?, Reload?, Periode?,
+		 ContactsParticuleObstacle?)>
+    <!ELEMENT Recipient EMPTY>
+    <!ATTLIST Recipient LX CDATA #REQUIRED>
+    <!ATTLIST Recipient LY CDATA #REQUIRED>
+    <!ATTLIST Recipient LZ CDATA #REQUIRED>
+
+    <!ELEMENT DomainDecomposition EMPTY>
+    <!ATTLIST DomainDecomposition NX CDATA #REQUIRED>
+    <!ATTLIST DomainDecomposition NY CDATA #REQUIRED>
+
+    <!ELEMENT MPI EMPTY>
+    <!ATTLIST MPI Strategie (AllgatherGlobal|AllgatherLocal|SRLocal
+    	|SRLocalCommFirst|SRLocalCommOpt) "AllgatherGlobal"> 
+    <!ATTLIST MPI VerbosityLevel (0|1|2) "2">	 
+    	
+    <!ELEMENT ContactsParticuleObstacle EMPTY>
+    <!ATTLIST ContactsParticuleObstacle Strategie (LinkedBox|LinkedCell) 
+    	"LinkedCell"> 	
+
+    <!ELEMENT Contacts (Default?, Contact*)>
+
+    <!ELEMENT Particules (Particule+)>
+      <!ELEMENT Particule (Convex, Orientation, Materiau, Couleur)>
+      <!ATTLIST Particule Nombre         CDATA #REQUIRED>
+      <!ATTLIST Particule MasseVolumique CDATA #REQUIRED>
+
+
+    <!ELEMENT Obstacles  (Composite+)>
+    <!ELEMENT Composite (Obstacle+)>
+    <!ATTLIST Composite name CDATA #REQUIRED>
+
+      <!ELEMENT Obstacle (Convex, Centre, 
+                          Orientation, Materiau, Couleur)>
+      <!ATTLIST Obstacle name CDATA #REQUIRED>
+      <!ATTLIST Obstacle Type (Standard|Absorbant) "Standard">
+
+    <!ELEMENT Periode (Convex, Centre, Orientation, Couleur, Vecteur)>
+    <!ATTLIST Periode name CDATA #REQUIRED>
+
+        <!ELEMENT Convex (Disque?, Box?, Polygon?)>
+        <!ATTLIST Convex RayonInteraction CDATA #REQUIRED>
+
+        <!ELEMENT Orientation (#PCDATA)>
+        <!ATTLIST Orientation Type (Unite|Matrice) "Unite">
+
+        <!ELEMENT Materiau (#PCDATA)>
+
+        <!ELEMENT Couleur EMPTY>
+        <!ATTLIST Couleur R CDATA #REQUIRED>
+        <!ATTLIST Couleur V CDATA #REQUIRED>
+        <!ATTLIST Couleur B CDATA #REQUIRED>
+
+    <!ELEMENT Reload EMPTY>
+    <!ATTLIST Reload Fichier CDATA #REQUIRED>
+    <!ATTLIST Reload Vitesse (Reset|NoReset) "NoReset">
+    <!ATTLIST Reload Type (new|same) "new"> 
+    
+
+  <!ELEMENT Forces (Gravite?, Ressort?)>
+    <!ELEMENT Gravite EMPTY>
+    <!ATTLIST Gravite GX CDATA #REQUIRED>
+    <!ATTLIST Gravite GY CDATA #REQUIRED>
+    <!ATTLIST Gravite GZ CDATA #REQUIRED>
+
+    <!ELEMENT Ressort (Point, Raideur, Equilibre)>
+      <!ELEMENT Raideur EMPTY>
+      <!ATTLIST Raideur k CDATA #REQUIRED>
+
+      <!ELEMENT Equilibre EMPTY>
+      <!ATTLIST Equilibre d CDATA #REQUIRED>
+
+
+
+  <!ELEMENT Simulation (Temps, IncreTemps, TempsSave+, Fichier,
+                        Insertion?, Chargements?, PostProcessingWriters?)>
+    <!ELEMENT Temps EMPTY>
+    <!ATTLIST Temps Debut CDATA #REQUIRED>
+    <!ATTLIST Temps Fin   CDATA #REQUIRED>
+
+    <!ELEMENT IncreTemps EMPTY>
+    <!ATTLIST IncreTemps dt (1.e-5|1.e-4|1.e-6) "1.e-5">
+
+    <!ELEMENT AdaptationTemps EMPTY>
+    <!ATTLIST AdaptationTemps Vmin CDATA #REQUIRED>
+    <!ATTLIST AdaptationTemps Vmax CDATA #REQUIRED>
+    <!ATTLIST AdaptationTemps C    CDATA #REQUIRED>
+
+    <!ELEMENT TempsSave EMPTY>
+    <!ATTLIST TempsSave Debut CDATA #REQUIRED>
+    <!ATTLIST TempsSave Fin   CDATA #REQUIRED>
+    <!ATTLIST TempsSave Dt    CDATA #REQUIRED>
+
+    <!ELEMENT Fichier (#PCDATA)>
+
+    <!ELEMENT Insertion (Position?, Fenetres?)>
+    <!ATTLIST Insertion Methode (Preinstall|Inline)    "Inline">
+    <!ATTLIST Insertion Mode    (Sequentiel|Aleatoire) "Sequentiel">
+    <!ATTLIST Insertion Configuration (Fixe|Aleatoire) "Fixe">
+    <!ATTLIST Insertion Frequence CDATA "1">
+    <!ATTLIST Insertion Aleatoire CDATA "Reproductible">
+      <!ELEMENT Position (#PCDATA)>
+      <!ELEMENT Fenetres (Fenetre+)>
+        <!ELEMENT Fenetre (Point, Point)>
+
+    <!ELEMENT Chargements (Chargement+)>
+      <!ELEMENT Chargement (Temps, Vecteur)>
+      <!ATTLIST Chargement NomObstacle CDATA #REQUIRED>
+      <!ATTLIST Chargement Mode (Translation|Rotation) "Translation">
+
+    <!ELEMENT PostProcessingWriters (Paraview?, Visual?, GMV?, 
+                                     PositionVitesse?)>
+    <!ELEMENT Paraview EMPTY>
+    <!ATTLIST Paraview Name CDATA #REQUIRED>
+    <!ATTLIST Paraview Root CDATA #REQUIRED>
+    <!ATTLIST Paraview InitialCycleNumber CDATA "0">
+    <!ATTLIST Paraview Mode (text|binary) "text">
+        
+    <!ELEMENT Visual EMPTY>
+    <!ATTLIST Visual Name CDATA #REQUIRED>
+
+    <!ELEMENT GMV EMPTY>
+    <!ATTLIST GMV Name CDATA #REQUIRED>
+    <!ATTLIST GMV InitialCycleNumber CDATA "0"> 
+    
+    <!ELEMENT PositionVitesse EMPTY>
+    <!ATTLIST PositionVitesse Name CDATA #REQUIRED>             

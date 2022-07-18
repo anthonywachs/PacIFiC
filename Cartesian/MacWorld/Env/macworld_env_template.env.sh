@@ -96,7 +96,7 @@ echo -e '\033[93mMACWORLD_PETSC_WITH_MUMPS\033[0m =' $MACWORLD_PETSC_WITH_MUMPS
 echo -e '  '
 
 
-# HYPRE / Petsc 
+# HYPRE / Petsc
 echo -e '\033[96m*** Petsc/Hypre shell variables\033[0m'
 source ${MACWORLD_ROOT}/hypre-2.10.1/hypre.env.sh
 source ${MACWORLD_ROOT}/petsc-3.2.0-p7/petsc.env.sh
@@ -109,5 +109,5 @@ if [[ ${PACIFIC_AUTO_CONFIG} -eq 1 ]]
 then
   echo -e '\033[33mUsing MAC template Linux and extra-Linux makefiles\033[0m'
   cp ${MACWORLD_ROOT}/MAC/etc/Linux_template.mak ${MACWORLD_ROOT}/MAC/etc/${MAC_ARCH}.mak
-  cp ${MACWORLD_ROOT}/MAC/etc/extra-Linux_template.mak ${MACWORLD_ROOT}/MAC/etc/extra-${MAC_ARCH}.mak  
+  cp ${MACWORLD_ROOT}/MAC/etc/extra-Linux_template.mak ${MACWORLD_ROOT}/MAC/etc/extra-${MAC_ARCH}.mak
 fi

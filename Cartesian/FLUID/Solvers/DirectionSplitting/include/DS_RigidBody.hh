@@ -63,19 +63,20 @@ class DS_RigidBody
 
       /** @brief Returns rigid body velocity including rotation speed at pt
       @param pt the point */
-      geomVector get_rigid_body_velocity( geomVector const& pt ) const;
+      virtual geomVector get_rigid_body_velocity( geomVector const& pt )
+                                                      const = 0;
 
       /** @brief Returns rigid body angular velocity */
-      geomVector get_rigid_body_angular_velocity( ) const;
+      virtual geomVector get_rigid_body_angular_velocity( ) const = 0;
 
       /** @brief Returns pointer to the rigid body gravity center */
-      geomVector const* get_ptr_to_gravity_centre( ) const;
+      virtual geomVector const* get_ptr_to_gravity_centre( ) const = 0;
 
       /** @brief Returns circumscribed radius */
-      double get_circumscribed_radius( ) const;
+      virtual double get_circumscribed_radius( ) const = 0;
 
       /** @brief Returns a tuple of mass and density of RB */
-      std::tuple<double,double> get_mass_and_density() const;
+      virtual std::tuple<double,double> get_mass_and_density() const = 0;
 
       /** @brief Returns the distance of a point with the rigid body
       with a given ray vector and source
@@ -83,9 +84,9 @@ class DS_RigidBody
       @param direction x, y or z (=0, 1 or 2)
       @param positive true if search in the positive direction of the coordinate
       axis and false otherwise */
-      double get_distanceTo( geomVector const& source,
-                             geomVector const& rayDir,
-                             double const& delta ) const;
+      virtual double get_distanceTo( geomVector const& source,
+                                     geomVector const& rayDir,
+                                     double const& delta ) const = 0;
 
       /** @brief Return the surface points on the rigid body */
       vector<geomVector*> get_rigid_body_surface_points( ) const;
@@ -115,25 +116,26 @@ class DS_RigidBody
 
       /** @brief Returns whether a point is inside the rigid body
       @param pt the point */
-      bool isIn( geomVector const& pt ) const;
+      virtual bool isIn( geomVector const& pt ) const = 0;
 
       /** @brief Returns whether a point is inside the rigid body
       @param x x-coordinate of the point
       @param y x-coordinate of the point
       @param z x-coordinate of the point */
-      bool isIn( double const& x, double const& y, double const& z ) const;
+      virtual bool isIn( double const& x, double const& y, double const& z )
+         const = 0;
 
       /** @brief Returns the level set value of a point from the rigid body
       @param pt the point */
-      double level_set_value( geomVector const& pt ) const;
+      virtual double level_set_value( geomVector const& pt ) const = 0;
 
       /** @brief Returns the level set value of a point from the rigid body
       @param x x-coordinate of the point
       @param y x-coordinate of the point
       @param z x-coordinate of the point */
-      double level_set_value( double const& x
-                            , double const& y
-                            , double const& z ) const;
+      virtual double level_set_value( double const& x
+                                    , double const& y
+                                    , double const& z ) const = 0;
 
       /** @brief Compute the surface points by discretizing the rigid body
       surface in approximately equal areas (if possible) */
@@ -182,10 +184,10 @@ class DS_RigidBody
       /** @brief Update the RB position and velocity
       @param pos updated position
       @param vel updated translation velocity */
-      void update_RB_position_and_velocity(geomVector const& pos,
-                                           geomVector const& vel,
-                                           geomVector const& ang_vel,
-                         vector<geomVector> const& periodic_directions);
+      virtual void update_RB_position_and_velocity(geomVector const& pos,
+                                                   geomVector const& vel,
+                                                   geomVector const& ang_vel,
+                         vector<geomVector> const& periodic_directions) = 0;
 
       //@}
 

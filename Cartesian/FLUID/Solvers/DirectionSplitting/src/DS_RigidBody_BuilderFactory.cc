@@ -6,6 +6,7 @@
 #include <DS_3Dcylinder.hh>
 #include <DS_2Dcylinder.hh>
 #include <DS_3Dbox.hh>
+#include <DS_STL.hh>
 using std::endl;
 
 
@@ -40,6 +41,25 @@ DS_RigidBody* DS_RigidBody_BuilderFactory:: create( FS_RigidBody* pgrb )
       MAC::out() << "Unknown geometric shape in "
       	"DS_RigidBody_BuilderFactory::create" << endl;
   }
+
+  return ( dsrb );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+DS_RigidBody* DS_RigidBody_BuilderFactory:: create( FV_Mesh const* MESH,
+                                                    istream& STL_input)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_RigidBody_BuilderFactory:: create" ) ;
+
+  DS_RigidBody* dsrb = NULL;
+
+  // Build the Direction Splitting STL
+  dsrb = new DS_STL( MESH, STL_input );
 
   return ( dsrb );
 

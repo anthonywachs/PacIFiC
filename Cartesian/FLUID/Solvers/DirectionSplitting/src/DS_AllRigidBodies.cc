@@ -35,9 +35,14 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , MAC_DoubleVector const* arb_gv
                                   , double const& arb_scs
                                   , MAC_Communicator const* arb_macCOMM
-                                  , double const& arb_mu )
+                                  , double const& arb_mu
+                                  , bool const& is_GRAINS
+                                  , bool const& is_STL
+                                  , istream& STL_input)
 //---------------------------------------------------------------------------
   : m_space_dimension( dimens )
+  , m_npart ( 0 )
+  , m_nrb ( 0 )
   , UF ( arb_UF )
   , PF ( arb_PF )
   , MESH ( UF->primary_grid() )
@@ -46,20 +51,35 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   , m_mu ( arb_mu )
   , m_rho ( arb_rho )
   , gravity_vector ( arb_gv )
+  , b_GRAINS ( is_GRAINS )
+  , b_STL ( is_STL )
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
 
-  m_FSallrigidbodies = new FS_AllRigidBodies( m_space_dimension, in,
-  	b_particles_as_fixed_obstacles );
-  m_nrb = m_FSallrigidbodies->get_number_rigid_bodies();
-  m_npart = m_FSallrigidbodies->get_number_particles();
+  if (b_GRAINS) { // if GRAINS with or without STL
+     m_FSallrigidbodies = new FS_AllRigidBodies( m_space_dimension, in,
+     	b_particles_as_fixed_obstacles );
+     m_nrb = m_FSallrigidbodies->get_number_rigid_bodies();
+     m_npart = m_FSallrigidbodies->get_number_particles();
+     m_allDSrigidbodies.reserve( m_nrb );
+  } else { // if only STL
+     m_allDSrigidbodies.reserve( 1 );
+  }
+
   DS_RigidBody* dsrb = NULL;
-  m_allDSrigidbodies.reserve( m_nrb );
+
   for (size_t i = 0; i < m_nrb; ++i)
   {
-    m_allDSrigidbodies.push_back( dsrb );
-    m_allDSrigidbodies[i] = DS_RigidBody_BuilderFactory::create(
-    	m_FSallrigidbodies->get_ptr_rigid_body(i) );
+     m_allDSrigidbodies.push_back( dsrb );
+     m_allDSrigidbodies[i] = DS_RigidBody_BuilderFactory::create(
+                           m_FSallrigidbodies->get_ptr_rigid_body(i) );
+  }
+
+  if (b_STL) {
+     m_nrb = m_nrb + 1;
+     m_allDSrigidbodies.push_back( dsrb );
+     m_allDSrigidbodies[m_nrb-1] = DS_RigidBody_BuilderFactory::
+                                                create(MESH,STL_input);
   }
 
   generate_list_of_local_RB();
@@ -188,7 +208,7 @@ DS_AllRigidBodies:: ~DS_AllRigidBodies()
 
   for (size_t i = 0; i < m_nrb; ++i) delete m_allDSrigidbodies[i];
   m_allDSrigidbodies.clear();
-  if ( m_FSallrigidbodies ) delete m_FSallrigidbodies;
+  if ( m_FSallrigidbodies && b_GRAINS) delete m_FSallrigidbodies;
 
 }
 
@@ -770,7 +790,8 @@ geomVector DS_AllRigidBodies:: rigid_body_velocity( size_t const& parID,
 
   delta(0) = delta_periodic_transformation(pt(0) - pgc->operator()(0), 0);
   delta(1) = delta_periodic_transformation(pt(1) - pgc->operator()(1), 1);
-  delta(2) = delta_periodic_transformation(pt(2) - pgc->operator()(2), 2);
+  delta(2) = (m_space_dimension == 3) ?
+             delta_periodic_transformation(pt(2) - pgc->operator()(2), 2) : 0.;
 
   return (m_allDSrigidbodies[parID]->get_rigid_body_velocity(delta));
 
@@ -939,7 +960,8 @@ void DS_AllRigidBodies:: compute_void_fraction_on_epsilon_grid(
 
 //---------------------------------------------------------------------------
 void DS_AllRigidBodies:: compute_void_fraction_on_grid(
-                                                FV_DiscreteField const* FF )
+                                                FV_DiscreteField const* FF
+                                              , bool const& is_in_time_iter)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_AllRigidBodies:: compute_void_fraction_on_grid" ) ;
@@ -947,7 +969,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
   size_t nb_comps = FF->nb_components() ;
   size_t field = field_num(FF) ;
 
-  void_fraction[field]->set(0);
+  // void_fraction[field]->set(0);
 
   boolVector const* periodic_comp = MESH->get_periodic_directions();
 
@@ -963,6 +985,8 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
   for (vector<size_t>::iterator it = local_RB_list.begin() ;
                                it != local_RB_list.end() ; ++it) {
      size_t parID = *it;
+
+     if (b_STL && is_in_time_iter && parID == m_nrb-1) continue;
   // for (size_t parID = 0; parID < m_nrb; ++parID) {
      vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
                                                    ->get_rigid_body_haloZone();
@@ -1197,7 +1221,8 @@ void DS_AllRigidBodies:: compute_halo_zones_for_all_rigid_body( )
 
 //---------------------------------------------------------------------------
 void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
-                                                   FV_DiscreteField const* FF )
+                                                   FV_DiscreteField const* FF
+                                                 , bool const& is_in_time_iter )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody" ) ;
@@ -1205,15 +1230,16 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
   size_t nb_comps = FF->nb_components() ;
   size_t field = field_num(FF) ;
 
-  intersect_vector[field]->set(0);
-  intersect_distance[field]->set(0.);
-  intersect_fieldValue[field]->set(0.);
+  // intersect_vector[field]->set(0);
+  // intersect_distance[field]->set(0.);
+  // intersect_fieldValue[field]->set(0.);
 
   boolVector const* periodic_comp = MESH->get_periodic_directions();
 
   for (vector<size_t>::iterator it = local_RB_list.begin() ;
                                it != local_RB_list.end() ; ++it) {
      size_t parID = *it;
+     if (b_STL && is_in_time_iter && parID == m_nrb-1) continue;
   // for (size_t parID = 0; parID < m_nrb; ++parID) {
      vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
                                                    ->get_rigid_body_haloZone();
@@ -1342,6 +1368,121 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                        }
                     }
                  }
+              }
+           }
+        }
+     }
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_AllRigidBodies:: clear_GrainsRB_data_on_grid(
+                                                   FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: clear_GrainsRB_data_on_grid" ) ;
+
+  size_t nb_comps = FF->nb_components() ;
+  size_t field = field_num(FF) ;
+
+  boolVector const* periodic_comp = MESH->get_periodic_directions();
+
+  for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                               it != local_RB_list.end() ; ++it) {
+     size_t parID = *it;
+     if (b_STL && parID == m_nrb-1) continue;
+  // for (size_t parID = 0; parID < m_nrb; ++parID) {
+     vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
+                                                   ->get_rigid_body_haloZone();
+     size_t_vector min_unknown_index(3,0);
+     size_t_vector max_unknown_index(3,0);
+     size_t_vector min_nearest_index(3,0);
+     size_t_vector max_nearest_index(3,0);
+     size_t_vector ipos(3,0);
+     size_t_array2D local_extents(3,2,0);
+     size_t i0_temp = 0;
+
+     for (size_t comp = 0; comp < nb_comps; comp++) {
+
+        for (size_t dir = 0; dir < m_space_dimension; dir++) {
+          // To include knowns at dirichlet boundary in the intersection
+          // calculation as well, modification of the looping extents are required
+          min_unknown_index(dir) =
+                              FF->get_min_index_unknown_on_proc( comp, dir );
+          max_unknown_index(dir) =
+                              FF->get_max_index_unknown_on_proc( comp, dir );
+          local_extents(dir,0) = 0;
+          local_extents(dir,1) = max_unknown_index(dir)
+                               - min_unknown_index(dir);
+
+          bool is_periodic = periodic_comp->operator()( dir );
+
+          double domain_min = MESH->get_main_domain_min_coordinate(dir);
+          double domain_max = MESH->get_main_domain_max_coordinate(dir);
+          bool found =
+                  FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir)
+                                 , haloZone[0]->operator()(dir)
+                                 , i0_temp) ;
+          size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
+          found = FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir )
+                                  , haloZone[1]->operator()(dir)
+                                  , i0_temp) ;
+          size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
+
+          if (is_periodic &&
+              ((haloZone[1]->operator()(dir) > domain_max)
+          || (haloZone[0]->operator()(dir) < domain_min))) {
+              index_min = min_unknown_index(dir);
+              index_max = max_unknown_index(dir);
+          }
+
+          min_nearest_index(dir) = MAC::max(min_unknown_index(dir),index_min);
+          max_nearest_index(dir) = MAC::min(max_unknown_index(dir),index_max);
+
+        }
+
+        max_nearest_index(2) = (m_space_dimension == 2) ? 1
+                                                        : max_nearest_index(2);
+
+        for (size_t i = min_nearest_index(0); i < max_nearest_index(0); ++i) {
+          ipos(0) = i - min_unknown_index(0);
+          for (size_t j = min_nearest_index(1); j < max_nearest_index(1); ++j) {
+              ipos(1) = j - min_unknown_index(1);
+              for (size_t k = min_nearest_index(2);k < max_nearest_index(2); ++k) {
+                 ipos(2) = k - min_unknown_index(2);
+
+                 size_t p = FF->DOF_local_number(i,j,k,comp);
+
+                 if (void_fraction[field]->operator()(p) == parID + 1) {
+                    for (size_t dir = 0; dir < m_space_dimension; dir++) {
+                       for (size_t off = 0; off < 2; off++) {
+                          size_t col = (off == 0 ) ? 2*dir + 1 : 2*dir;
+
+                          geomVector rayDir(0.,0.,0.);
+                          rayDir(dir) = (off == 0) ? -1 : 1 ;
+
+                          // Checking if the nodes are on domain boundary or not,
+                          // if so, the check the intersection only on one side
+                          if (ipos(dir) != local_extents(dir,off)) {
+                            geomVector ineigh((double)i,(double)j,(double)k);
+                            ineigh += rayDir;
+
+                            size_t pn = FF->DOF_local_number(
+                           (size_t)ineigh(0),(size_t)ineigh(1),(size_t)ineigh(2)
+                                                                         ,comp);
+
+                            intersect_vector[field]->operator()(pn,col) = 0;
+                            intersect_distance[field]->operator()(pn,col) = 0;
+                            intersect_fieldValue[field]->operator()(pn,col) = 0;
+                          }
+                       }
+                    }
+                 }
+                 void_fraction[field]->operator()(p) = 0;
               }
            }
         }
@@ -1551,8 +1692,8 @@ void DS_AllRigidBodies:: first_order_pressure_stress( size_t const& parID )
                 surface_point[i]->operator()(0) - pgc->operator()(0), 0);
      delta(1) = delta_periodic_transformation(
                 surface_point[i]->operator()(1) - pgc->operator()(1), 1);
-     delta(2) = delta_periodic_transformation(
-                surface_point[i]->operator()(2) - pgc->operator()(2), 2);
+     delta(2) = (m_space_dimension == 3) ? delta_periodic_transformation(
+                surface_point[i]->operator()(2) - pgc->operator()(2), 2) : 0.;
 
      pressure_torque->operator()(parID,0) += value(2)*delta(1)
                                            - value(1)*delta(2);
