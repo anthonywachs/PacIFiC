@@ -19,7 +19,7 @@ struct _initialize_circular_mb {
   int level;
   double inclination;
   coord shift;
-  bool intermediate_shape;
+  bool disregard_shift;
 };
 
 void initialize_circular_mb(struct _initialize_circular_mb p) {
@@ -322,7 +322,7 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
     }
   }
   else {
-    fprintf(stderr, "Error: number of Lagrangian nodes or Lagrangian mesh ",
+    fprintf(stderr, "Error: number of Lagrangian nodes or Lagrangian mesh "
       "levels need to be specified.\n");
   }
   ne = 30*pow(4,ns);
@@ -348,7 +348,7 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   fprintf(stderr, "Number of Lagrangian triangles: %d\n", p.mesh->nlt);
 
   comp_initial_area_normals(p.mesh);
-  if (!p.intermediate_shape) {
+  if (!p.disregard_shift) {
     if (shift.x > 1.e-10 || shift.y > 1.e-10 || shift.z > 1.e-10) {
       for(int i=0; i<p.mesh->nlp; i++)
         foreach_dimension()
@@ -367,7 +367,7 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
 
 void initialize_rbc_mb(struct _initialize_circular_mb p) {
   initialize_spherical_mb(mesh = p.mesh, radius = p.radius, nlp = p.nlp,
-    level = p.level, intermediate_shape = true);
+    level = p.level, disregard_shift = true);
 
   double c0, c1, c2;
   c0 = 0.2072; c1 = 2.0026; c2 = -1.1228;
@@ -387,7 +387,8 @@ void initialize_rbc_mb(struct _initialize_circular_mb p) {
   if (p.shift.x || p.shift.y || p.shift.z)
     {shift.x = p.shift.x; shift.y = p.shift.y; shift.z = p.shift.z;}
   else {shift.x = 0.; shift.y = 0.; shift.z = 0.;}
-  if (shift.x > 1.e-10 || shift.y > 1.e-10 || shift.z > 1.e-10) {
+  if (fabs(shift.x) > 1.e-10 || fabs(shift.y) > 1.e-10 ||
+    fabs(shift.z) > 1.e-10) {
     for(int i=0; i<p.mesh->nlp; i++)
       foreach_dimension()
         p.mesh->nodes[i].pos.x += shift.x;

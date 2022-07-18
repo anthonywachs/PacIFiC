@@ -495,7 +495,6 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
   initialized and we don't have to dump them. */
   fwrite(&(mesh->nlt), sizeof(int), 1, fp);
   for(int i=0; i<mesh->nlt; i++) {
-    fwrite(&(mesh->triangles[i].refArea), sizeof(double), 1, fp);
     #if _ELASTICITY_FT
     for(int j=0; j<2; j++) {
       foreach_dimension()
@@ -547,7 +546,6 @@ void restore_lagmesh(FILE* fp, lagMesh* mesh) {
   fread(&(mesh->nlt), sizeof(int), 1, fp);
   mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
   for(int i=0; i<mesh->nlt; i++) {
-    fread(&(mesh->triangles[i].refArea), sizeof(double), 1, fp);
     #if _ELASTICITY_FT
     for(int j=0; j<2; j++) {
       foreach_dimension()

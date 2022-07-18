@@ -24,7 +24,7 @@ cells in a 5x5(x5) stencil around each node. In case of parallel simulations,
 the cached cells are tagged with the process id.
 */
 trace
-void generate_lag_stencils(lagMesh* mesh) {
+void generate_lag_stencils_one_caps(lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) {
     mesh->nodes[i].stencil.n = 0;
     /**
@@ -63,6 +63,11 @@ void generate_lag_stencils(lagMesh* mesh) {
       }
     }
   }
+}
+
+trace
+void generate_lag_stencils() {
+  for(int k=0; k<NCAPS; k++) generate_lag_stencils_one_caps(&MB(k));
 }
 
 
@@ -150,8 +155,7 @@ the 5x5(x5) stencils around the Lagrangian nodes are at the same level.
 */
 scalar stencils[];
 trace
-void tag_ibm_stencils(lagMesh* mesh) {
-  foreach() stencils[] = 0.;
+void tag_ibm_stencils_one_caps(lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) {
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
@@ -176,6 +180,12 @@ void tag_ibm_stencils(lagMesh* mesh) {
   #if OLD_QCC
   boundary({stencils});
   #endif
+}
+
+trace
+void tag_ibm_stencils() {
+  foreach() stencils[] = 0.;
+  for(int k=0; k<NCAPS; k++) tag_ibm_stencils_one_caps(&MB(k));
 }
 
 /**

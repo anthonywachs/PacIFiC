@@ -56,7 +56,7 @@ typedef struct Edge {
   typedef struct Triangle {
     int node_ids[3];
     int edge_ids[3];
-    double area, refArea;
+    double area;
     coord normal;
     coord centroid;
     coord refShape[2];
@@ -429,7 +429,7 @@ void advect_lagMesh(lagMesh* mesh) {
       buffer_mesh.nodes[j].stencil.nm = STENCIL_SIZE;
       buffer_mesh.nodes[j].stencil.p = malloc(STENCIL_SIZE*sizeof(Index));
     }
-    generate_lag_stencils(&buffer_mesh);
+    generate_lag_stencils_one_caps(&buffer_mesh);
     eul2lag(&buffer_mesh);
     for(int i=0; i<mesh->nlp; i++) {
       // Step 2 of RK2
@@ -440,7 +440,7 @@ void advect_lagMesh(lagMesh* mesh) {
     free(buffer_mesh.nodes);
   #endif
   correct_lag_pos(mesh);
-  generate_lag_stencils(mesh);
+  generate_lag_stencils_one_caps(mesh);
 }
 
 
@@ -475,10 +475,10 @@ event init (i = 0) {
   for(int i=0; i<mbs.nbmb; i++) {
     for(int j=0; j<MB(i).nlp; j++) {
       MB(i).nodes[j].stencil.n = STENCIL_SIZE;
-      MB(i).nodes[j].stencil.nm = STENCIL_SIZE*128;
+      MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
       MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
     }
-    generate_lag_stencils(&MB(i));
+    generate_lag_stencils_one_caps(&MB(i));
   }
 }
 
