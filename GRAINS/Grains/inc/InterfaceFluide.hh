@@ -6,7 +6,6 @@
 #include <sstream>
 #include <vector>
 #include <list>
-#include "BasiliskInterfaceDataStructure.h"
 using namespace std;
 
 class Particule;
@@ -106,52 +105,6 @@ public:
   virtual void WritePVGCInFluid( vector<Particule*> const* allProcParticules,
   	istringstream &is ) const = 0;
   //@}
-
-  /**
-  @brief Ecriture des particules dans le BasiliskDataStructure 
-  @param allProcParticules vecteur contenant l'ensemble des particules sur tous
-   les processeurs
-  @param obstaclesToFluid liste des particules
-  @param is structure Basilisk
-  */
-
-  virtual void WriteParticulesInFluid(list<Particule*> const& particules,list<Obstacle*> const& obstaclesToFluid, BasiliskDataStructure * b) const = 0;
-
-  /**
-  @brief Write particle data from grains to Direction Splitting NS solver
-  @param particules vecteur contenant l'ensemble des particules sur tous
-   les processeurs
-  @param is structure DS
-  */
-
-  virtual void WriteParticulesInDSFluid(list<Particule*> const& particules, istringstream &is ) const = 0;
-
-  /**
-  @brief Read particle data to grains from Direction Splitting NS solver
-  @param particules vecteur contenant l'ensemble des particules sur tous
-   les processeurs
-  @param is structure DS
-  */
-
-  virtual void ReadParticulesFromDSFluid(list<Particule*> const& particules, istringstream &is ) const = 0;
-
-  /** @brief Mise � jour de la vitesse des particules par Basilisk.
-  @param particules liste des particules
-  @param dt Valeur de l'increment de temps
-  @param Structure de donne Basilisk
-  @param b_set_velocity_nm1_and_diff mise ou non a jour des vitesses et des
-     differences de vitesse du pas de temps flduide precedent
-  @param b_MPI si Grains tourne en MPI ou en sequentiel; en sequentiel, les
-  particules sont numerotees de 0 � N-1 (N nombre de particules) et elles
-     se trouvent toutes sur le meme processeur (le master), en MPI ce n'est
-  plus le cas et il faut utliser l'ID (numero) des particules */
-  virtual void UpdateParticulesVelocities( list<Particule*>& particules,
-   Scalar dt,
-   BasiliskDataStructure * b,
-  const bool &b_set_velocity_nm1_and_diff,
-  const bool &b_MPI = false ) = 0;
-
-
 
 };
 

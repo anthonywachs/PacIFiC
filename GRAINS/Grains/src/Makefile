@@ -161,7 +161,7 @@ MPIFLAGS    = -L$(MPILIB) $(LIBMPI_FOR_GRAINS___)
 ZLIB = /usr/lib$(GRAINS_BITS_EXT)
 ZFLAGS = -L$(ZLIB) -lz
 
-INCFLAGS  = $(INCDIR:%=-I%) -I$(OCTREE_HOME)/DLMFD  $(XERCESINC:%=-I%) $(MPIINC:%=-I%)
+INCFLAGS  = $(INCDIR:%=-I%) $(XERCESINC:%=-I%) $(MPIINC:%=-I%)
 COMPFLAGS = $(DEBUG) $(INCFLAGS) -fPIC
 
 #------------------------------------------------------------------------------
@@ -177,9 +177,9 @@ grains : MESS UTL 3D SOLID 2D GRAINS APP
 	@echo 'Package GRAINS genere !'
 
 Basilisk :
-	$(COMP) $(COMPFLAGS) -shared $(SRCDIR)/InterfaceGrains.cpp -L$(LIBDIR) -lgrains $(XERCESFLAGS) -o $(LIBDIR)/libInterfaceGrains.so
-	rm -f $(BASILISK_DLMFD)/InterfaceGrains.h
-	ln -s $(GRAINS_ROOT)/inc/InterfaceGrains.h $(BASILISK_DLMFD)/InterfaceGrains.h
+	$(COMP) $(COMPFLAGS) -shared $(SRCDIR)/InterfaceGrains3DBasilisk.cpp -L$(LIBDIR) -lgrains $(XERCESFLAGS) -o $(LIBDIR)/libInterfaceGrains3DBasilisk.so
+	rm -f $(BASILISK_DLMFD)/InterfaceGrains3DBasilisk.h
+	ln -s $(GRAINS_ROOT)/inc/InterfaceGrains3DBasilisk.h $(BASILISK_DLMFD)/InterfaceGrains3DBasilisk.h
 
 APP    :  $(OBJS_APP)
 	@echo 'Package App genere'

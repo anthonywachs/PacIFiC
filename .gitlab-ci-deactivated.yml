@@ -1,0 +1,42 @@
+stages:
+  - build
+  - test-grains
+  - test-fluid
+  - test-basilisk
+
+build:
+  stage: build
+  script:
+    - cd tests
+    - ./build_env.sh
+    - ./build_grains.sh
+    - ./build_mac.sh
+    - ./build_fluid.sh
+    - $(! grep -q "1" build_success.txt)
+  artifacts:
+    untracked: true
+    paths:
+      - Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+      - GRAINS/Env/grains-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+      - GRAINS/Env/grains_default.env.sh
+      - GRAINS/Env/grains_default.env.csh
+      - Cartesian/FLUID/Env/fluid-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+      - Cartesian/MacWorld/Env/macworld-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+      - Cartesian/MacWorld/MAC/etc/Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0.mak
+      - Cartesian/MacWorld/MAC/etc/extra-Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0.mak
+      - GRAINS/Main/bin64-OpenMPI-2.1.1-GNU-8.2.1/grains
+      - GRAINS/Main/obj64-OpenMPI-2.1.1-GNU-8.2.1/main.o
+      - Cartesian/MacWorld/MAC/lib/Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0/libmac0.so
+      - Cartesian/MacWorld/MAC/lib/Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0/libmac2.so
+      - Cartesian/FLUID/lib/Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0/exe0
+      - Cartesian/FLUID/lib/Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0/exe2
+      - Octree/Env/octree.env.sh
+
+
+### Tests for Grains3D
+memory-model:
+  stage: test-grains
+  script:
+    - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+    - cd tests/test-grains/spheres-settling
+    - ./spheres-settling.sh

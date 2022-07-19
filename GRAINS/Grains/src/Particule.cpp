@@ -2545,12 +2545,6 @@ void Particule::write_polygonsPts_PARAVIEW( ostream &f,
   getForme()->write_polygonsPts_PARAVIEW( f, translation );
 }
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Ecriture de la position de la particule pour Basilisk
-void Particule::writePositionInFluid (BasiliskDataStructure * b)
-{
-  m_geoFormeVdw->writePositionInFluid (b);
-}
 
 
 

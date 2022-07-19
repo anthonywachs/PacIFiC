@@ -1,0 +1,23 @@
+<!-- Convex Definition DTD -->
+
+<!ELEMENT Sphere EMPTY>
+  <!ATTLIST Sphere Radius CDATA #REQUIRED>
+
+<!ELEMENT Box EMPTY>
+  <!ATTLIST Box LX CDATA #REQUIRED>
+  <!ATTLIST Box LY CDATA #REQUIRED>
+  <!ATTLIST Box LZ CDATA #REQUIRED>
+
+<!ELEMENT Polyhedron EMPTY>
+  <!ATTLIST Polyhedron Name CDATA #REQUIRED>
+
+<!ELEMENT Cylinder EMPTY>
+  <!ATTLIST Cylinder Radius  CDATA #REQUIRED>
+  <!ATTLIST Cylinder Height CDATA #REQUIRED>
+
+<!ELEMENT Disc EMPTY>
+  <!ATTLIST Disc Radius  CDATA #REQUIRED>
+
+<!ELEMENT Polygon EMPTY>
+  <!ATTLIST Polygon Name CDATA #REQUIRED>
+

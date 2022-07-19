@@ -19,7 +19,7 @@ echo -e '\033[33mMAC_ARCH\033[0m =' ${MAC_ARCH}
 echo -e '\033[33mMAC_OPT_FLAGS\033[0m =' ${MAC_OPT_FLAGS}
 
 # LD_LIBRARY_PATH
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${MAC_HOME}/lib/${MAC_ARCH}"
+export LD_LIBRARY_PATH="${MAC_HOME}/lib/${MAC_ARCH}:${LD_LIBRARY_PATH}"
 
 if [ -z "$PATH" ]
 then

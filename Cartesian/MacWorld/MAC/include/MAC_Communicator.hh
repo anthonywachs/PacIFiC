@@ -10,6 +10,7 @@ class MAC_ObjectRegister ;
 class size_t_vector ;
 class size_t_array2D ;
 class intVector ;
+class longLongIntVector ;
 class intArray2D ;
 class doubleVector ;
 class doubleArray2D ;
@@ -68,6 +69,9 @@ class MAC_Communicator : public MAC_Object
       void send( size_t dest, intVector const& value ) const ;
       void receive( size_t src, intVector& value ) const ;
       
+      void send( size_t dest, longLongIntVector const& value ) const ;
+      void receive( size_t src, longLongIntVector& value ) const ;      
+      
       void send( size_t dest, intArray2D const& value ) const ;
       void receive( size_t src, intArray2D& value ) const ;
 
@@ -97,6 +101,11 @@ class MAC_Communicator : public MAC_Object
       
       virtual void send( size_t dest, int const* value, int nb ) const  = 0 ;
       virtual void receive( size_t src, int* value, int nb ) const = 0 ;
+      
+      virtual void send( size_t dest, long long int const* value, int nb ) 
+      	const  = 0 ;
+      virtual void receive( size_t src, long long int* value, int nb ) 
+      	const = 0 ;      
 
       virtual void send( size_t dest, double const* value, int nb ) const = 0 ;
       virtual void receive( size_t src, double* value, int nb ) const  = 0 ;
@@ -428,11 +437,17 @@ class MAC_Communicator : public MAC_Object
       
       virtual bool send_PRE( size_t dest, int const* value, int nb ) const ;
       
+      virtual bool send_PRE( size_t dest, long long int const* value, int nb ) 
+      	const ;      
+      
       virtual bool send_PRE( size_t dest, double const* value, int nb ) const ;
       
       virtual bool send_PRE( size_t dest, char const* value, int nb ) const ;
 
       virtual bool receive_PRE( size_t src, int const* value, int nb ) const ;
+
+      virtual bool receive_PRE( size_t src, long long int const* value, int nb )
+	const ;
       
       virtual bool receive_PRE( size_t src, double const* value, int nb ) const ;
       

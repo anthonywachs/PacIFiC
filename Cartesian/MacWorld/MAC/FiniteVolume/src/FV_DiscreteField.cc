@@ -480,8 +480,9 @@ FV_DiscreteField:: create_clone( MAC_Object* a_owner,
    for (size_t comp=0;comp<NB_COMPS;++comp)
      (*result->UNK_LOCAL_NUMBERING)[comp] = (*UNK_LOCAL_NUMBERING)[comp] ;
 
-   result->UNK_GLOBAL_NUMBERING = new vector< intArray3D >(
-   	UNK_GLOBAL_NUMBERING->size(), work_int ) ;
+   longLongIntArray3D work_llint( 1, 1, 1, 0 ) ;
+   result->UNK_GLOBAL_NUMBERING = new vector< longLongIntArray3D >(
+   	UNK_GLOBAL_NUMBERING->size(), work_llint ) ;
    for (size_t comp=0;comp<NB_COMPS;++comp)
      (*result->UNK_GLOBAL_NUMBERING)[comp] = (*UNK_GLOBAL_NUMBERING)[comp] ;
 
@@ -626,7 +627,57 @@ FV_DiscreteField:: create_clone( MAC_Object* a_owner,
    }
 
    // Copy synchronization features
-   // TO DO
+   if ( synchronization_ready )
+   {
+     list< vector< vector< FV_TRIPLET > > >::const_iterator ihr, ibs;
+     for (ihr=halozone_received.begin();ihr!=halozone_received.end();ihr++)
+       result->halozone_received.push_back( *ihr );
+
+     for (ibs=bufferzone_sent.begin();ibs!=bufferzone_sent.end();ibs++)
+       result->halozone_received.push_back( *ibs );
+
+     list< size_t >::const_iterator il;
+     for (il=synchronization_MPI_rank_neighbors.begin();
+     	il!=synchronization_MPI_rank_neighbors.end();il++)
+       result->synchronization_MPI_rank_neighbors.push_back( *il );
+     for (il=halozone_received_data_size.begin();
+     	il!=halozone_received_data_size.end();il++)
+       result->halozone_received_data_size.push_back( *il );
+     for (il=bufferzone_sent_data_size.begin();
+     	il!=bufferzone_sent_data_size.end();il++)
+       result->bufferzone_sent_data_size.push_back( *il );
+
+     double* pnull = NULL;
+     list< double* >::const_iterator ild;
+     list< double* >::iterator ildr;
+     size_t nhal = halozone_received_data.size();
+     for (size_t i=0;i<nhal;++i)
+       result->halozone_received_data.push_back( pnull );
+     for (ild=halozone_received_data.begin(),
+     	ildr=result->halozone_received_data.begin(),
+	il=halozone_received_data_size.begin();
+	ild!=halozone_received_data.end();
+     	ild++,il++,ildr++)
+     {
+       size_t vecsize = *il;
+       (*ildr) = new double[vecsize];
+       for (size_t i=0;i<vecsize;++i) (*ildr)[i] = (*ild)[i];
+     }
+
+     size_t nbuf = bufferzone_sent.size();
+     for (size_t i=0;i<nbuf;++i)
+       result->bufferzone_sent_data.push_back( pnull );
+     for (ild=bufferzone_sent_data.begin(),
+     	ildr=result->bufferzone_sent_data.begin(),
+	il=bufferzone_sent_data_size.begin();
+	ild!=bufferzone_sent_data.end();
+     	ild++,il++,ildr++)
+     {
+       size_t vecsize = *il;
+       (*ildr) = new double[vecsize];
+       for (size_t i=0;i<vecsize;++i) (*ildr)[i] = (*ild)[i];
+     }
+   }
 
    MAC_CHECK_POST( result != 0 ) ;
    MAC_CHECK_POST( result->owner() == a_owner ) ;
@@ -1925,7 +1976,8 @@ FV_DiscreteField:: build_field_numbering( void )
    // Allocate numbering arrays
    intArray3D work(1,1,1);
    UNK_LOCAL_NUMBERING = new vector< intArray3D >( NB_COMPS, work ) ;
-   UNK_GLOBAL_NUMBERING = new vector< intArray3D >( NB_COMPS, work ) ;
+   longLongIntArray3D llwork(1,1,1);
+   UNK_GLOBAL_NUMBERING = new vector< longLongIntArray3D >( NB_COMPS, llwork ) ;
    for (size_t comp=0;comp<NB_COMPS;comp++)
    {
      locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
@@ -2041,7 +2093,7 @@ FV_DiscreteField:: build_field_numbering( void )
    // Global numbering for unknowns in halozone
    size_t width = 5 ;
    bool send_numbering = false ;
-   intVector global_num_comm(
+   longLongIntVector global_num_comm(
    	NB_LOCAL_UNKNOWNS_HANDLED_BY_PROC_IN_BUFFERZONE*width, 0 );
    size_t positionIndex = 0 ;
 
@@ -2095,7 +2147,7 @@ FV_DiscreteField:: build_field_numbering( void )
      }
      else
      {
-       intVector global_num_from_r(1) ;
+       longLongIntVector global_num_from_r(1) ;
        macCOMM->receive( *r, global_num_from_r ) ;
        size_t vecsize = global_num_from_r.size(), ig, jg, kg = 0, comp, gnum;
 
@@ -2517,7 +2569,7 @@ FV_DiscreteField:: build_periodic_numbering( void )
 
    // Transfer the lists into a single vector
    size_t width = 5 ;
-   intVector global_num_comm( ijk.size()*width, 0 );
+   longLongIntVector global_num_comm( ijk.size()*width, 0 );
    size_t positionIndex = 0 ;
    list<FV_TRIPLET>::iterator imac = ijk.begin();
    list<size_t>::iterator icomp = comps.begin(),iglobnum;
@@ -2555,7 +2607,7 @@ FV_DiscreteField:: build_periodic_numbering( void )
      }
      else
      {
-       intVector global_num_from_r(1) ;
+       longLongIntVector global_num_from_r(1) ;
        macCOMM->receive( *r, global_num_from_r ) ;
        size_t vecsize = global_num_from_r.size() ;
 
@@ -2598,94 +2650,6 @@ FV_DiscreteField:: build_periodic_numbering( void )
 		= gnum ;
 
       positionIndex += width ;
-   }
-}
-
-
-
-
-//----------------------------------------------------------------------
-void
-FV_DiscreteField:: check_field_numbering( void ) const
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "FV_DiscreteField:: check_field_numbering" ) ;
-   MAC_CHECK_PRE( DOFcolors != 0 );
-   MAC_CHECK_PRE( DOFstatus != 0 );
-
-   size_t locNum = 0 ;
-   size_t width = 5 ;
-   MAC_Communicator const* macCOMM = MAC_Exec::communicator();
-   size_t nb_ranks = macCOMM->nb_ranks();
-   size_t rank = macCOMM->rank();
-   intVector global_num_comm(
-   	NB_LOCAL_UNKNOWNS_HANDLED_BY_PROC_IN_BUFFERZONE*width, 0 );
-   size_t positionIndex = 0 ;
-
-   for (size_t comp=0;comp<NB_COMPS;comp++)
-   {
-     locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
-     size_t kmax = DIM == 2 ? 1 : (*local_dof_number)[locNum](2);
-     for (size_t i=0;i<(*local_dof_number)[locNum](0);++i)
-       for (size_t j=0;j<(*local_dof_number)[locNum](1);++j)
-         for (size_t k=0;k<kmax;++k)
-	 {
-	   if ( (*UNK_GLOBAL_NUMBERING)[comp](i,j,k) != -1 )
-	     if ( (*DOFstatus)[locNum](i,j,k) == FV_DOF_BUFFERZONE
-	     	|| (*DOFstatus)[locNum](i,j,k)
-			== FV_DOF_BUFFERZONE_PERIODIC_BUFFERZONE )
-	     {
-               global_num_comm(positionIndex) = i +
-	     	(*local_min_index_in_global)[locNum](0) ;
-               global_num_comm(positionIndex+1) = j +
-	     	(*local_min_index_in_global)[locNum](1) ;
-               global_num_comm(positionIndex+2) = DIM == 2 ? 0 :
-	     	k + (*local_min_index_in_global)[locNum](2) ;
-	       global_num_comm(positionIndex+3) = comp ;
-               global_num_comm(positionIndex+4) =
-	     	(*UNK_GLOBAL_NUMBERING)[comp](i,j,k) ;
-	       positionIndex += width ;
-	     }
-	 }
-   }
-
-   // Send global numbering in bufferzone to other processors
-   // for update if they own the unknown in their own halozone
-   for (size_t r=0;r<nb_ranks;++r)
-   {
-     if ( r == rank )
-     {
-       for (size_t k=0;k<nb_ranks;++k)
-         if ( k != r )
-	   macCOMM->send( k, global_num_comm ) ;
-     }
-     else
-     {
-       intVector global_num_from_r(1) ;
-       macCOMM->receive( r, global_num_from_r ) ;
-       size_t vecsize = global_num_from_r.size(), ig, jg, kg = 0, comp ;
-       int gnum ;
-
-       for (positionIndex=0;positionIndex<vecsize; )
-       {
-         ig = global_num_from_r(positionIndex);
-         jg = global_num_from_r(positionIndex+1);
-         kg = global_num_from_r(positionIndex+2);
-	 comp = global_num_from_r(positionIndex+3);
-	 gnum = global_num_from_r(positionIndex+4);
-
-         locNum = ALL_COMPS_SAME_LOCATION == false ? comp : 0 ;
-	 if ( is_global_triplet_local_DOF( ig, jg, kg, locNum ) )
-	   if ( (*UNK_GLOBAL_NUMBERING)[comp](
-	   	ig-(*local_min_index_in_global)[locNum](0),
-	   	jg-(*local_min_index_in_global)[locNum](1),
-		DIM == 2 ? 0 : kg - (*local_min_index_in_global)[locNum](2) )
-		!= gnum )
-	     FV_DiscreteField_ERROR::n4( FNAME ) ;
-
-         positionIndex += width ;
-       }
-     }
    }
 }
 
@@ -2738,7 +2702,6 @@ FV_DiscreteField:: set_synchronization_features( void )
                buffer_features(positionIndex+2) = DIM == 2 ? 0 : k +
 	     	(*local_min_index_in_global)[locNum](2) ;
 	       buffer_features(positionIndex+3) = comp ;
-
 	       positionIndex += width ;
 	     }
 	 }
@@ -2953,60 +2916,60 @@ FV_DiscreteField:: set_synchronization_features( void )
    }
 
 
-   // Debug
-   // size_t nb_ranks = macCOMM->nb_ranks() ;
-   // size_t RANK = macCOMM->rank() ;
-   // for (size_t i=0;i<nb_ranks;++i)
-   // {
-   //   if ( i == RANK )
-   //   {
-   //     cout << "Rank " << RANK << endl ;
-   //     cout << "   Buffer data" << endl;
-   //     for ( r=synchronization_MPI_rank_neighbors.begin(),
-  	// ibs=bufferzone_sent.begin(),
-	// ils=bufferzone_sent_data_size.begin();
-  	// r!=synchronization_MPI_rank_neighbors.end();
-	// r++,ibs++,ils++ )
-   //     {
-   //       cout << "   To rank " << *r << endl;
-	//  cout << "   Buffer data size = " << *ils << endl;
-	//  cout << "   Number of triplets per comp = " << *ils << endl;
-	//  for (comp=0;comp<NB_COMPS;comp++)
-	//  {
-	//    cout << "      Comp = " << comp << " n = " << (*ibs)[comp].size()
-	//    	<< endl;
-	//    nijk = (*ibs)[comp].size();
-	//    for (m=0;m<nijk;++m)
-	//      cout << "      " << (*ibs)[comp][m].i << " " << (*ibs)[comp][m].j
-	//      	<< " " << (*ibs)[comp][m].k << endl;
-	//  }
-   //     }
-   //     cout << endl;
-   //     cout << "   Halozone data" << endl;
-   //     for ( r=synchronization_MPI_rank_neighbors.begin(),
-  	// ihr=halozone_received.begin(),
-	// ils=halozone_received_data_size.begin();
-  	// r!=synchronization_MPI_rank_neighbors.end();
-	// r++,ihr++,ils++ )
-   //     {
-   //       cout << "   From rank " << *r << endl;
-	//  cout << "   Received data size = " << *ils << endl;
-	//  cout << "   Number of triplets per comp = " << *ils << endl;
-	//  for (comp=0;comp<NB_COMPS;comp++)
-	//  {
-	//    cout << "      Comp = " << comp << " n = " << (*ihr)[comp].size()
-	//    	<< endl;
-	//    nijk = (*ihr)[comp].size();
-	//    for (m=0;m<nijk;++m)
-	//      cout << "      " << (*ihr)[comp][m].i << " " << (*ihr)[comp][m].j
-	//      	<< " " << (*ihr)[comp][m].k << endl;
-	//  }
-   //     }
-   //     cout << endl;
-   //   }
-   //   macCOMM->barrier();
-   // }
-   // if ( RANK == 0 ) cout << endl;
+//    // Debug
+//    size_t nb_ranks = macCOMM->nb_ranks() ;
+//    size_t RANK = macCOMM->rank() ;
+//    for (size_t i=0;i<nb_ranks;++i)
+//    {
+//      if ( i == RANK )
+//      {
+//        cout << "Rank " << RANK << endl ;
+//        cout << "   Buffer data" << endl;
+//        for ( r=synchronization_MPI_rank_neighbors.begin(),
+//   	ibs=bufferzone_sent.begin(),
+// 	ils=bufferzone_sent_data_size.begin();
+//   	r!=synchronization_MPI_rank_neighbors.end();
+// 	r++,ibs++,ils++ )
+//        {
+//          cout << "   To rank " << *r << endl;
+// 	 cout << "   Buffer data size = " << *ils << endl;
+// 	 cout << "   Number of triplets per comp = " << *ils << endl;
+// 	 for (comp=0;comp<NB_COMPS;comp++)
+// 	 {
+// 	   cout << "      Comp = " << comp << " n = " << (*ibs)[comp].size()
+// 	   	<< endl;
+// 	   nijk = (*ibs)[comp].size();
+// 	   for (m=0;m<nijk;++m)
+// 	     cout << "      " << (*ibs)[comp][m].i << " " << (*ibs)[comp][m].j
+// 	     	<< " " << (*ibs)[comp][m].k << endl;
+// 	 }
+//        }
+//        cout << endl;
+//        cout << "   Halozone data" << endl;
+//        for ( r=synchronization_MPI_rank_neighbors.begin(),
+//   	ihr=halozone_received.begin(),
+// 	ils=halozone_received_data_size.begin();
+//   	r!=synchronization_MPI_rank_neighbors.end();
+// 	r++,ihr++,ils++ )
+//        {
+//          cout << "   From rank " << *r << endl;
+// 	 cout << "   Received data size = " << *ils << endl;
+// 	 cout << "   Number of triplets per comp = " << *ils << endl;
+// 	 for (comp=0;comp<NB_COMPS;comp++)
+// 	 {
+// 	   cout << "      Comp = " << comp << " n = " << (*ihr)[comp].size()
+// 	   	<< endl;
+// 	   nijk = (*ihr)[comp].size();
+// 	   for (m=0;m<nijk;++m)
+// 	     cout << "      " << (*ihr)[comp][m].i << " " << (*ihr)[comp][m].j
+// 	     	<< " " << (*ihr)[comp][m].k << endl;
+// 	 }
+//        }
+//        cout << endl;
+//      }
+//      macCOMM->barrier();
+//    }
+//    if ( RANK == 0 ) cout << endl;
 }
 
 
@@ -3600,14 +3563,15 @@ FV_DiscreteField:: set_periodic_synchronization_features( void )
 	   vec_kept_ijk_per_comp[comp][m] = *imt;
        }
 
-       // Remark: in the case of 2 procs only in the periodic direction,
+       // Important remark:
+       // In the case of 2 procs only in the periodic direction,
        // these 2 procs already exchange data through their interior boundary
        // Now they also exchange data through their periodic boundary
        // Consequently, a MPI rank of a neighboring proc can appear multiple
        // times (once for interior boundary and once for periodic boundary)
        // We therefore send-receive a few more messages as 2 neighboring procs
-       // may exchange 2 messages instead of 1, but this simplifies the
-       // programming
+       // may exchange 2 (or more ) messages instead of 1, but this simplifies
+       // the programming
 
        // Store the vector of vector into halozone_received
        halozone_received.push_back( vec_kept_ijk_per_comp );
@@ -3790,6 +3754,17 @@ FV_DiscreteField:: synchronize( size_t level )
   void* sreq = NULL;
   vector<void*> idreq( synchronization_MPI_rank_neighbors.size(), sreq );
   size_t ireq;
+
+  // Important remark:
+  // When a proc sends 2 separate messages to another proc with the same tag and
+  // matching receives, the MPI standard guarantees that messages are received
+  // in the order that they were sent (Messages are non-overtaking) provided
+  // (i) multi-threading is no performed
+  // (ii) MPI_ANY_SOURCE is
+  // Here, the send-receive method implemented in MAC_Communicator uses a tag
+  // per data type, hence below double vectors are all sent with the same tag.
+  // We use neither multi-threading nor MPI_ANY_SOURCE anywhere, therefore the
+  // programming model below is robust while same tag + (i) + (ii) is fulfilled.
 
   // Send bufferzone data to neighboring procs
   for ( r=synchronization_MPI_rank_neighbors.begin(),

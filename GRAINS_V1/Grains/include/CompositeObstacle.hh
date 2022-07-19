@@ -1,0 +1,279 @@
+#ifndef _COMPOSITEOBSTACLE_HH_
+#define _COMPOSITEOBSTACLE_HH_
+
+#include "Obstacle.hh"
+#include "SimpleObstacle.hh"
+
+#include <list>
+using namespace std;
+
+#include "ReaderXML.hh"
+
+
+/** @brief The class CompositeObstacle
+
+    Cluster of obstacles that can be either single obstacles or composite
+    obstacles. Useful to impose the same motion to the whole cluster or to
+    compose motions.
+
+    @author G.FERRER - Institut Francais du Petrole - 2002 - Creation
+    @author D. RAKOTONIRINA - IFP Energies nouvelles - 2014 - Modification 
+    @author A.WACHS - 2019 - Major cleaning & refactoring */
+// ============================================================================
+class CompositeObstacle : public Obstacle
+{
+  public:
+    /** @name Constructors */
+    //@{
+    /** @brief Constructor with name as input parameter
+    @param s obstacle name */
+    CompositeObstacle( string const& s = "" );
+
+    /** @brief Constructor with an XML node as an input parameter
+    @param root XML node */
+    CompositeObstacle( DOMNode* root );
+
+    /** @brief Destructor */
+    ~CompositeObstacle();
+    //@}
+
+
+    /** @name Methods Get */
+    //@{
+    /**
+    @brief Returns a pointer to the obstacle if the name matches. Searches all
+    leaves of the composite obstacle tree
+    @param nom_ obstacle name */
+    Obstacle const* getObstacleFromName( string const& nom_ ) const;
+
+    /** @brief Returns a list of simple obstacles that belong to the composite 
+    obstacle */
+    list<SimpleObstacle*> getObstacles() ;
+
+    /** @brief Returns a list of obstacles to be sent to the fluid solver
+    in case of coupling with a fluid */
+    list<Obstacle*> getObstaclesToFluid() ;
+
+    /** @brief Returns obstacle type */
+    string getObstacleType() ; 
+    //@}
+
+
+    /** @name Set methods Set */
+    //@{  
+    /** @brief Initializes all contact map entries to false */
+    virtual void setContactMapToFalse();       
+    //@}
+
+
+    /** @name Methods */
+    //@{
+    /** @brief Links imposed kinematics to the obstacle and returns true if the
+    linking process is successful
+    @param imposed the imposed kinematics */
+    virtual bool LinkImposedMotion( ObstacleImposedVelocity& imposed );
+ 
+    /** @brief Links imposed force kinematics to the obstacle and returns true 
+    if the linking process is successful
+    @param imposed the imposed force */
+    virtual bool LinkImposedMotion( ObstacleImposedForce& imposed );
+
+    /** @brief Adds an obstacle (single or composite) to the composite obstacle
+    tree
+    @param obstacle obstacle to be added */
+    void append( Obstacle* obstacle ) ;
+
+    /** @brief Moves the composite obstacle and returns a list of moved 
+    obstacles
+    @param time physical time
+    @param dt time step magnitude
+    @param b_deplaceCine_Comp whether to move the composite that the composite 
+    obstacle belongs to (imposed velocity)
+    @param b_deplaceF_Comp whether to move the composite that the composite 
+    obstacle belongs to (imposed force) */
+    list<SimpleObstacle*> Move( double time,
+	double dt, bool const& b_deplaceCine_Comp, 
+        bool const& b_deplaceF_Comp ) ;
+
+    /** @brief Returns whether the component is a composite obstacle ? */
+    virtual bool isCompositeObstacle() const {return ( true ); }
+
+    /** @brief Returns whether there is geometric contact with another
+    component 
+    @param voisin the other component */
+    virtual bool isContact( Component const* voisin ) const;
+
+    /** @brief Returns whether there is geometric contact with another
+    component accounting for crust thickness 
+    @param voisin the other component */
+    virtual bool isContactWithCrust( Component const* voisin ) const;
+
+    /** @brief Returns whether there is geometric proximity with another
+    component in the sense of whether their respective bounding boxes overlap 
+    @param voisin the other component */
+    virtual bool isClose( Component const* voisin ) const;
+
+    /** @brief Returns whether there is geometric proximity with another
+    component in the sense of whether their respective bounding boxes minus 
+    their crust thickness overlap 
+    @param voisin the other component */
+    virtual bool isCloseWithCrust( Component const* voisin ) const;  
+
+    /** @brief Resets kinematics to 0 */
+    void resetKinematics();
+
+    /** @brief Rotates the composite obstacle with a quaternion
+    @param rotation the quaternion defining the rotation */
+    void Rotate( Quaternion const& rotation ) ;
+
+    /** @brief Deletes the composite obstacle if it belongs to a prescribed box
+    @param box the box */
+    void Suppression( BBox const& box ) ;
+
+    /** @brief Translates the composite obstacle
+    @param translation translation vector */
+    void Translate( Vector3 const& translation ) ;
+
+    /** @brief Initializes the composite obstacle's torsor
+    @param withWeight intializes the force to the composite obstacle weight if 
+    true or to 0 is false */
+    void InitializeForce( bool const& withWeight ); 
+
+    /** @brief Deletes an obstacle in the obstacle tree
+    @param name_ name of obstacle to be deleted */
+    void DestroyObstacle( string const& name_ ) ; 
+  
+    /** @brief Deletes an obstacle in the obstacle tree and removes 
+    it from the LinkedCell
+    @param name_ name of obstacle to be deleted
+    @param LC linked-cell grid */
+    void ClearObstacle( string const& name_, LinkedCell* LC ) ;
+  
+    /** @brief Returns a pointer to the torsor exerted on the composite 
+    obstacle */
+    Torsor const* getTorsor();  
+      
+    /** @brief Updates contact map */
+    virtual void updateContactMap(); 
+  
+    /** @brief Does the contact exist in the map, if yes return the pointer to 
+    the cumulative tangential displacement 
+    @param tangentialDepl pointer to the cumulative tangential displacement 
+    @param id id number of the other component */
+    virtual bool ContactInMapIsActive( double*& tangentialDepl, int const& id );
+  
+    /** @brief Adds new contact in the map
+    @param tangentialDepl initial tangential displacement 
+    @param id id number of the other component */
+    virtual void addNewContactInMap( double const& tangentialDepl, 
+  	int const& id ); 
+
+    /** @brief Increases cumulative tangential displacement with component id
+    @param tangentialDepl additional tangential displacement 
+    @param id id number of the other component */
+    virtual void addDeplContactInMap( double const& tangentialDepl, 
+  	int const& id ); 
+	
+    /** @ brief Returns whether a point lies inside the composite obstacle
+    @param pt point */
+    bool isIn( Point3 const& pt ) const;			
+    //@}
+
+
+    /** @name State storing/restoring methods */
+    //@{
+    /** @brief Creates obstacle state and adds state to the list of states of
+    all obstacles 
+    @param obsStates list of states of all obstacles  */
+    void createState( list<struct ObstacleState*>& obsStates ) ; 
+  
+    /** @brief Restores obstacle state
+    @param obsStates list of states of all obstacles */
+    void restoreState( list<struct ObstacleState*>& obsStates ) ;  
+    //@}
+
+
+    /** @name I/O methods */
+    //@{
+    /** @brief Reloads the composite obstacle and links it to the higher level 
+    obstacle in the obstacle tree
+    @param mother higher level obstacle
+    @param file input stream */
+    virtual void reload( Obstacle& mother, istream& file ) ;    
+    
+    /** @brief Outputs the composite obstacle for reload
+    @param fileSave output stream */
+    virtual void write( ostream& fileSave ) const;
+
+    /** @brief Writes the composite obstacle position
+    @param position output stream */
+    virtual void writePosition( ostream& position );
+
+    /** @brief Writes the composite obstacle's "static" data
+    @param fileOut output stream */
+    virtual void writeStatic( ostream& fileOut ) const;
+  
+    /** @brief Updates indicator for Paraview post-processing
+    @param time physical time
+    @param dt time step magnitude */
+    virtual void updateIndicator( double time, double dt );
+
+    /** @brief Returns the number of points to write the composite obstacle in a
+    Paraview format */
+    virtual int numberOfPoints_PARAVIEW() const ;
+
+    /** @brief Returns the number of elementary polytopes to write the 
+    composite obstacle shape in a Paraview format */
+    virtual int numberOfCells_PARAVIEW() const;
+
+    /** @brief Returns a list of points describing the composite obstacle in a
+    Paraview format 
+    @param translation additional center of mass translation */
+    virtual list<Point3> get_polygonsPts_PARAVIEW(
+  	Vector3 const* translation = NULL ) const ;
+
+    /** @brief Writes the points describing the composite obstacle in a
+    Paraview format 
+    @param f output stream
+    @param translation additional center of mass translation */
+    virtual void write_polygonsPts_PARAVIEW( ostream& f, 
+  	Vector3 const* translation = NULL ) const ; 
+  
+    /** @brief Writes the composite obstacle in a Paraview format
+    @param connectivity connectivity of Paraview polytopes
+    @param offsets connectivity offsets
+    @param cellstype Paraview polytopes type
+    @param firstpoint_globalnumber global number of the 1st point
+    @param last_offset last offset used for the previous convex shape */
+    virtual void write_polygonsStr_PARAVIEW( list<int>& connectivity,
+    	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
+	int& last_offset ) const ;
+
+    /**  @brief Outputs information to be transferred to the fluid
+    @param fluid output stream */
+    virtual void writePositionInFluid( ostream& fluid );
+    //@}
+
+
+  protected:
+    /** @name Methods */
+    //@{  
+    /** @brief Computes center of mass position */
+    void EvalPosition();
+    //@}
+
+    /** @name Parameters */
+    //@{  
+    list<Obstacle*> m_obstacles; /**< list of obstacles in the composite
+    	obstacle */
+    //@}
+
+
+  private:
+    /** @name Methods */
+    //@{  
+
+    //@}
+};
+
+#endif

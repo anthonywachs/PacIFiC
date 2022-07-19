@@ -130,6 +130,9 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       size_t space_dimensions;
       bool b_restart;
       bool is_solids;
+      bool is_GRAINS;
+      bool is_STL;
+      string STL_file;
       bool is_HE, is_NS, is_NSwithHE;
       double RBTemp;
 

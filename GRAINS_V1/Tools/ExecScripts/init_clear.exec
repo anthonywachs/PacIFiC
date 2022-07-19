@@ -1,0 +1,36 @@
+#!/bin/bash
+# .result files
+for file in $1*.result
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+# .result.bin files
+for file in $1*.result.bin
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+# .xml files other than data file
+for file in $1*.xml
+  do
+    if [ -f $file ]
+      then
+        if [ $file != $1.xml ] && [ $file != $1_follow.xml ]
+          then
+            rm -f $file
+        fi
+    fi
+  done
+# _RFTable.txt files
+for file in $1*_RFTable.txt
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done

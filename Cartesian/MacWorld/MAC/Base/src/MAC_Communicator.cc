@@ -14,6 +14,7 @@
 #include <doubleVector.hh>
 #include <intArray2D.hh>
 #include <intVector.hh>
+#include <longLongIntVector.hh>
 #include <size_t_vector.hh>
 #include <size_t_array2D.hh>
 #include <stringVector.hh>
@@ -234,6 +235,25 @@ MAC_Communicator:: send( size_t dest, intVector const& value ) const
 
 //----------------------------------------------------------------------
 void
+MAC_Communicator:: send( size_t dest, longLongIntVector const& value ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "MAC_Communicator:: send longLongIntVector" ) ;
+   MAC_CHECK_PRE( dest < nb_ranks() ) ;
+   MAC_CHECK_PRE( dest != rank() ) ;
+
+   if( trace() ) print_method() ;
+
+   int dim = (int) value.size() ;
+   send( dest, &dim, 1 ) ;
+   if( dim>0 )
+   {
+      send( dest, value.data(), dim ) ;
+   }
+}
+
+//----------------------------------------------------------------------
+void
 MAC_Communicator:: receive( size_t src, intVector& value ) const
 //----------------------------------------------------------------------
 {
@@ -250,6 +270,27 @@ MAC_Communicator:: receive( size_t src, intVector& value ) const
    if( dim>0 )
    {
       receive( src, const_cast<int*>( value.data() ), dim ) ;
+   }
+}
+
+//----------------------------------------------------------------------
+void
+MAC_Communicator:: receive( size_t src, longLongIntVector& value ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "MAC_Communicator:: receive longLongIntVector" ) ;
+   MAC_CHECK_PRE( src < nb_ranks() ) ;
+   MAC_CHECK_PRE( src != rank() ) ;
+
+   if( trace() ) print_method() ;
+
+   int dim = MAC::bad_int() ;
+   receive( src, &dim, 1 ) ;
+   if( dim<0 ) MAC_Communicator_ERROR::n0() ;
+   value.re_initialize( (size_t) dim ) ;
+   if( dim>0 )
+   {
+      receive( src, const_cast<long long int*>( value.data() ), dim ) ;
    }
 }
 
@@ -1499,6 +1540,19 @@ MAC_Communicator:: send_PRE( size_t dest, int const* value, int nb ) const
 
 //----------------------------------------------------------------------
 bool
+MAC_Communicator:: send_PRE( size_t dest, long long int const* value, int nb ) 
+	const
+//----------------------------------------------------------------------
+{
+   MAC_ASSERT( dest < nb_ranks() ) ;
+   MAC_ASSERT( dest != rank() ) ;
+   MAC_ASSERT( nb > 0 ) ;
+   MAC_ASSERT( value != 0 ) ;
+   return( true ) ;
+}
+
+//----------------------------------------------------------------------
+bool
 MAC_Communicator:: send_PRE( size_t dest, double const* value, int nb ) const
 //----------------------------------------------------------------------
 {
@@ -1524,6 +1578,19 @@ MAC_Communicator:: send_PRE( size_t dest, char const* value, int nb ) const
 //----------------------------------------------------------------------
 bool
 MAC_Communicator:: receive_PRE( size_t src, int const* value, int nb ) const
+//----------------------------------------------------------------------
+{
+   MAC_ASSERT( src < nb_ranks() ) ;
+   MAC_ASSERT( src != rank() ) ;
+   MAC_ASSERT( nb > 0 ) ;
+   MAC_ASSERT( value != 0 ) ;
+   return( true ) ;
+}
+
+//----------------------------------------------------------------------
+bool
+MAC_Communicator:: receive_PRE( size_t src, long long int const* value, int nb )
+	const
 //----------------------------------------------------------------------
 {
    MAC_ASSERT( src < nb_ranks() ) ;

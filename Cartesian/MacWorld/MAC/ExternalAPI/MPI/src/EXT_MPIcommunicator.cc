@@ -113,6 +113,22 @@ EXT_MPIcommunicator:: send( size_t dest, int const* value, int nb  ) const
 
 //----------------------------------------------------------------------
 void
+EXT_MPIcommunicator:: send( size_t dest, long long int const* value, int nb  ) 
+	const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "EXT_MPIcommunicator:: send( long long int const* )" ) ;
+   MAC_CHECK( send_PRE( dest, value, nb ) ) ;
+
+   int mpierr =  MPI_Send( (void*)const_cast<long long int*>(value),
+                           nb, MPI_LONG_LONG, dest, TAG_LONG_LONG, 
+			   MPI_COMM_WORLD ) ;
+   if( mpierr != MPI_SUCCESS )
+      EXT_MPIcommunicator_ERROR::n0( "MPI_Send(long long int*)" ) ;
+}
+
+//----------------------------------------------------------------------
+void
 EXT_MPIcommunicator:: send( size_t dest, double const* value, int nb  ) const
 //----------------------------------------------------------------------
 {
@@ -241,6 +257,25 @@ EXT_MPIcommunicator:: receive( size_t src, int* value, int nb  ) const
 
    static MPI_Status status ;
    int mpierr = MPI_Recv( (void*)value, nb, MPI_INT, src, TAG_INT,
+                          MPI_COMM_WORLD, &status ) ;
+   if( mpierr!=MPI_SUCCESS || status.MPI_ERROR!=MPI_SUCCESS )
+      EXT_MPIcommunicator_ERROR::n0( "MPI_Recv(int*)" ) ;
+
+   MAC_CHECK( MPI_Get_count( &status, MPI_INT, &count )==MPI_SUCCESS &&
+              count==nb ) ;
+}
+
+//----------------------------------------------------------------------
+void
+EXT_MPIcommunicator:: receive( size_t src, long long int* value, int nb  ) 
+	const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "EXT_MPIcommunicator:: receive( long long int const* )" ) ;
+   MAC_CHECK( receive_PRE( src, value, nb ) ) ;
+
+   static MPI_Status status ;
+   int mpierr = MPI_Recv( (void*)value, nb, MPI_LONG_LONG, src, TAG_LONG_LONG,
                           MPI_COMM_WORLD, &status ) ;
    if( mpierr!=MPI_SUCCESS || status.MPI_ERROR!=MPI_SUCCESS )
       EXT_MPIcommunicator_ERROR::n0( "MPI_Recv(int*)" ) ;

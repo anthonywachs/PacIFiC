@@ -262,11 +262,11 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 		allrigidbodies->build_solid_variables_on_fluid_grid(PF);
 		allrigidbodies->build_solid_variables_on_fluid_grid(UF);
 		// Compute void fraction for pressure and velocity field
-		allrigidbodies->compute_void_fraction_on_grid(PF);
-		allrigidbodies->compute_void_fraction_on_grid(UF);
+		allrigidbodies->compute_void_fraction_on_grid(PF, false);
+		allrigidbodies->compute_void_fraction_on_grid(UF, false);
 		// Compute intersection with RB for pressure and velocity field
-		allrigidbodies->compute_grid_intersection_with_rigidbody(PF);
-		allrigidbodies->compute_grid_intersection_with_rigidbody(UF);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(PF, false);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, false);
 
 		if (my_rank == 0)
          cout << "Finished void fraction and grid intersection... \n" << endl;
@@ -307,7 +307,7 @@ DS_NavierStokes:: do_after_time_stepping( void )
    // Elapsed time by sub-problems
 
    // SCT_set_start( "Writing CSV" );
-   write_output_field(PF);
+   // write_output_field(PF);
    // write_output_field(UF,1);
    // SCT_get_elapsed_time( "Writing CSV" );
 
@@ -347,12 +347,15 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		allrigidbodies->compute_surface_variables_for_all_RB();
 		allrigidbodies->compute_halo_zones_for_all_rigid_body();
 		allrigidbodies->create_neighbour_list_for_AllRB();
+		// Clear void fraction and intersection data
+		allrigidbodies->clear_GrainsRB_data_on_grid(PF);
+		allrigidbodies->clear_GrainsRB_data_on_grid(UF);
 		// Compute void fraction for pressure and velocity field
-		allrigidbodies->compute_void_fraction_on_grid(PF);
-		allrigidbodies->compute_void_fraction_on_grid(UF);
+		allrigidbodies->compute_void_fraction_on_grid(PF, true);
+		allrigidbodies->compute_void_fraction_on_grid(UF, true);
 		// Compute intersection with RB for pressure and velocity field
-		allrigidbodies->compute_grid_intersection_with_rigidbody(PF);
-		allrigidbodies->compute_grid_intersection_with_rigidbody(UF);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(PF, true);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, true);
 
 		// Field initialization
 		vector<size_t> vec{ 0, 1, 3};

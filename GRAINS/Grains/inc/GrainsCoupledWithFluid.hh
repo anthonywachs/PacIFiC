@@ -93,26 +93,6 @@ public:
   @param is flux d'entr�e */
   virtual void WriteParticulesInFluid( istringstream &is ) const;
 
-  /** @brief Ecriture des particules dans un flux for direction splitting
-  @param is flux d'entr�e */
-  virtual void WriteParticulesInDSFluid( istringstream &is ) const;
-
-  /** @brief Ecriture des particules dans un flux for direction splitting
-  @param is flux d'entr�e */
-  virtual void ReadParticulesFromDSFluid( istringstream &is ) const;
-
-  /** @brief Ecriture des particules dans une structure Basilisk
-  @param is structure Basilisk d'entr�e */
-  virtual void WriteParticulesInFluid (BasiliskDataStructure * is) const;
-
-  /** @brief Modification de la vitesse des particules de Grains par Basilisk
-      @param is structure de donnee basilisk contenant les vitesses de translation et rotation
-*/
-  virtual void UpdateParticulesVelocities (
-	BasiliskDataStructure * is,
-	const bool &b_set_velocity_nm1_and_diff);
-
-
   /** @brief Ecriture de la vitesse et du centre de gravite des particules dans
   un fichier
   @param filename nom du fichier */
@@ -134,13 +114,14 @@ public:
   @param dirRes repertoire de resultats
   @param fluidsolver nom du solveur fluide (PeliGRIFF ou Basilisk) */
   void InitializeExplicitAddedMassRestart( bool const& restart,
-  	string const& dirRes, string const& fluidsolver = "PeliGRIFF" );
+  	string const& dirRes_Or_rootfilename,
+	string const& fluidsolver = "PeliGRIFF" );
 
   /** @brief Sauvegarde par defaut de l'etat initial pour post-processing */
-  virtual void InitialPostProcessing();
+  virtual void InitialPostProcessing( size_t indent_width = 0 );
 
   /** @brief Sauvegarde pour post-processing et restart */
-  virtual void doPostProcessing();
+  virtual void doPostProcessing( size_t indent_width = 0 );
 
   /** @brief Sauvegarde pour post-processing evolution et restart */
   virtual void doPostProcessingEvo( const double &time );
@@ -191,13 +172,13 @@ public:
   void checkParaviewPostProcessing( const string &name_, const string &root_,
   	const bool &isBinary );
 
-  /** @brief Verifie que le post processing Paraview est actif pour Basilisk, sinon le cree
+  /** @brief Verifie que le post processing Paraview est actif pour Basilisk,
+  sinon le cree
   @param name_ nom des fichiers
   @param root_ racine du nom des fichiers
   @param isBinary ecriture en mode binaire */
   void checkParaviewPostProcessing( const char * name_, const char * root_,
   	const bool &isBinary );
-
 
   /** @brief Verifie que le post processing Matlab est actif, sinon le cree
   @param name_ nom des fichiers
@@ -205,7 +186,6 @@ public:
   @param isBinary ecriture en mode binaire */
   void checkMatlabPostProcessing( const string &name_, const string &root_,
   	const bool &isBinary );
-
 
   /** @brief Force le code a activer le mode reload "same" */
   void setReloadSame() { m_forceReloadSame = true ; } ;

@@ -1,0 +1,44 @@
+//----------------------------------------------------------------------
+inline
+size_t
+longLongIntVector:: size( void ) const
+//----------------------------------------------------------------------
+{
+   return( LENGTH ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+long long int const&
+longLongIntVector:: operator()( size_t i ) const
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "intVector:: operator()" ) ;
+   MAC_CHECK_PRE( i < size() ) ;
+
+   return( VECTOR[i] ) ;
+}
+
+//----------------------------------------------------------------------
+inline
+long long int&
+longLongIntVector:: operator()( size_t i )
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "intVector:: operator()" ) ;
+   MAC_CHECK_PRE( i < size() ) ;
+
+   return( VECTOR[i] ) ;
+}
+
+
+
+//----------------------------------------------------------------------
+inline
+long long int const*
+longLongIntVector:: data( void ) const
+//----------------------------------------------------------------------
+{   
+   return( VECTOR ) ;
+}
+

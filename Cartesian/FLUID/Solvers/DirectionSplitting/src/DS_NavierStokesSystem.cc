@@ -582,9 +582,6 @@ DS_NavierStokesSystem::get_node_property(size_t const& field, size_t const& time
    return (node[field][time_level]) ;
 }
 
-
-
-
 //----------------------------------------------------------------------
 doubleVector*
 DS_NavierStokesSystem::get_node_divergence(size_t const& level)

@@ -279,56 +279,71 @@ void InterfaceFluide3D::WriteParticulesInFluid(
 
       particles_features << id <<'\t'<< ncorners <<endl;
 
-      particles_features
-        << particuleType <<'\t'
-        << (*vitesseT)[X] <<'\t'<< (*vitesseT)[Y] <<'\t'<< (*vitesseT)[Z] <<'\t'
-        << (*vitesseR)[X] <<'\t'<< (*vitesseR)[Y] <<'\t'<< (*vitesseR)[Z] <<'\t'
-        << masseVol    <<'\t'<< masse       <<'\t'
-        << inertie[0]  <<'\t'<< inertie[1]  <<'\t'<< inertie[2]  <<'\t'
-        << inertie[3]  <<'\t'<< inertie[4]  <<'\t'<< inertie[5]  <<'\t'
-	<< (mr)[0][0] <<'\t'<< (mr)[0][1] <<'\t'<< (mr)[0][2] <<'\t'
-	<< (mr)[1][0] <<'\t'<< (mr)[1][1] <<'\t'<< (mr)[1][2] <<'\t'
-	<< (mr)[2][0] <<'\t'<< (mr)[2][1] <<'\t'<< (mr)[2][2] <<'\t'
-        << (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z] <<'\t'
-        << endl;
-
 //       particles_features
-// 	<< particuleType <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		(*vitesseT)[X] ) <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		(*vitesseT)[Y] ) <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		(*vitesseT)[Z] ) <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		(*vitesseR)[X] ) <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		(*vitesseR)[Y] ) <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		(*vitesseR)[Z] ) <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		masseVol )    <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		masse )       <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		inertie[0] )  <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		inertie[1] )  <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		inertie[2] )  <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		inertie[3] )  <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		inertie[4] )  <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		inertie[5] )  <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		(*centre)[X] )   <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		(*centre)[Y] )   <<'\t'
-// 	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
-// 		(*centre)[Z] )   <<'\t'
-// 	<< endl;
+//         << particuleType <<'\t'
+//         << (*vitesseT)[X] <<'\t'<< (*vitesseT)[Y] <<'\t'<< (*vitesseT)[Z] <<'\t'
+//         << (*vitesseR)[X] <<'\t'<< (*vitesseR)[Y] <<'\t'<< (*vitesseR)[Z] <<'\t'
+//         << masseVol    <<'\t'<< masse       <<'\t'
+//         << inertie[0]  <<'\t'<< inertie[1]  <<'\t'<< inertie[2]  <<'\t'
+//         << inertie[3]  <<'\t'<< inertie[4]  <<'\t'<< inertie[5]  <<'\t'
+//         << (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z]   <<'\t'
+//         << endl;
+
+      particles_features
+	<< particuleType <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*vitesseT)[X] ) <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*vitesseT)[Y] ) <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*vitesseT)[Z] ) <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*vitesseR)[X] ) <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*vitesseR)[Y] ) <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*vitesseR)[Z] ) <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		masseVol )    <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		masse )       <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		inertie[0] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		inertie[1] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		inertie[2] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		inertie[3] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		inertie[4] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		inertie[5] )  <<'\t'
+   << Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[0][0] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[0][1] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[0][2] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[1][0] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[1][1] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[1][2] )  <<'\t'
+   << Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[2][0] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[2][1] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(mr)[2][2] )  <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*centre)[X] )   <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*centre)[Y] )   <<'\t'
+	<< Grains_Exec::doubleToString( ios::scientific, POSITIONFORMAT,
+		(*centre)[Z] )   <<'\t'
+	<< endl;
 
       if ( particuleType == "PP" )
       {
@@ -354,8 +369,8 @@ void InterfaceFluide3D::WriteParticulesInFluid(
       particles_features << "P "
 			 << "0. 0. 0. "
 			 << "0. 0. 0. "
-			 << "1e8 1. "
-			 << "1.  1.  1.  1.  1.  1. "
+			 << "1e8 1."
+          << "1.  1.  1.  1.  1.  1. "
 			 << "1. 0. 0. 0. 1. 0. 0. 0. 1." << endl;
       particles_features << "0  1"     << endl;
       particles_features << "0. 0. 0." << endl;
@@ -450,10 +465,10 @@ void InterfaceFluide3D::WriteParticulesInFluid(
 	<< masseVol    <<'\t'<< masse       <<'\t'
 	<< inertie[0]  <<'\t'<< inertie[1]  <<'\t'<< inertie[2]  <<'\t'
 	<< inertie[3]  <<'\t'<< inertie[4]  <<'\t'<< inertie[5]  <<'\t'
-	<< (mr)[0][0] <<'\t'<< (mr)[0][1] <<'\t'<< (mr)[0][2] <<'\t'
+   << (mr)[0][0] <<'\t'<< (mr)[0][1] <<'\t'<< (mr)[0][2] <<'\t'
 	<< (mr)[1][0] <<'\t'<< (mr)[1][1] <<'\t'<< (mr)[1][2] <<'\t'
 	<< (mr)[2][0] <<'\t'<< (mr)[2][1] <<'\t'<< (mr)[2][2] <<'\t'
-	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z] <<'\t'
+	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z]   <<'\t'
 	<< endl;
       // Attention dorenavant le rayon est deplace de Forme.cpp l.556
       // vers cette sturcture car il peut evoluer en fonction du temps
@@ -466,8 +481,8 @@ void InterfaceFluide3D::WriteParticulesInFluid(
       particles_features << "P "
 			 << "0. 0. 0. "
 			 << "0. 0. 0. "
-			 << "1e8 1. "
-			 << "1.  1.  1.  1.  1.  1. "
+			 << "1e8 1."
+          << "1.  1.  1.  1.  1.  1. "
 			 << "1. 0. 0. 0. 1. 0. 0. 0. 1." << endl;
       particles_features << "0  1"     << endl;
       particles_features << "0. 0. 0." << endl;
@@ -626,300 +641,4 @@ void InterfaceFluide3D::WritePVGCInFluid(
 
   is.str( particles_velpos.rdbuf()->str() );
 
-}
-
-// ============================================================================
-// Sequential version to read particle data in istringstream from
-// Direction Splitting solver on fluid side
-// Added by Aashish Goyal, Feb 2021
-void InterfaceFluide3D::ReadParticulesFromDSFluid(
-	list<Particule*> const& particules,
-	istringstream &is ) const
-{
-  ostringstream particles_features;
-
-  particles_features.precision(10);
-  list<Particule*>::const_iterator particule;
-  Vecteur bodyF;
-  Point const* centre;
-
-  for (particule=particules.begin();
-      particule!=particules.end(); particule++)
-  {
-    if ( (*particule)->getActivity() == COMPUTE
-    	&& (*particule)->getID() >= 0 )
-    {
-
-      centre   = (*particule)->getPosition();
-      bodyF = Vecteur(100000.,100000.,0.);
-
-//      (*particule)->addBodyForce(bodyF);
-//      (*particule)->addForceMoment(1000,1000,0,0,0,0);
-      (*particule)->addForce(*centre,bodyF);
-/*
-      // Informations : donnees de la particule
-      vitesseT = (*particule)->getVitesseTranslation();
-      vitesseR = (*particule)->getVitesseRotation();
-      masseVol = (*particule)->getMasseVolumique();
-      masse    = (*particule)->getMasse();
-      centre   = (*particule)->getPosition();
-      orient   = (*particule)->getForme()->getOrientation();
-
-      particles_features << "P" << '\t'
-	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'
-	<< masseVol       <<'\t'<< masse          <<'\t'
-	<< (*vitesseT)[X] <<'\t'<< (*vitesseT)[Y] <<'\t'
-	<< (*vitesseR)[Z] <<
-	endl;
-
-      particles_features << "O" << '\t'
-        << (orient)[0][0]   <<'\t'<< (orient)[0][1]   <<'\t'<< (orient)[0][2]   <<'\t'
-        << (orient)[1][0]   <<'\t'<< (orient)[1][1]   <<'\t'<< (orient)[1][2]   <<'\t'
-        << (orient)[2][0]   <<'\t'<< (orient)[2][1]   <<'\t'<< (orient)[2][2]   <<'\t'
-        << endl;
-*/
-    }
-  }
-  is.str( particles_features.rdbuf()->str() );
-}
-
-// ============================================================================
-// Sequential version to write particle data in istringstream for the
-// use in Direction Splitting solver
-// Added by Aashish Goyal, Feb 2021
-void InterfaceFluide3D::WriteParticulesInDSFluid(
-	list<Particule*> const& particules,
-	istringstream &is ) const
-{
-  ostringstream particles_features;
-
-  particles_features.precision(10);
-  list<Particule*>::const_iterator particule;
-  Vecteur const* vitesseT;
-  Vecteur const* vitesseR;
-  Point const* centre;
-//  Quaternion const* qrot;
-  Matrix orient;
-  Scalar masseVol, masse;
-
-  for (particule=particules.begin();
-      particule!=particules.end(); particule++)
-  {
-    if ( (*particule)->getActivity() == COMPUTE
-    	&& (*particule)->getID() >= 0 )
-    {
-      // Informations : donnees de la particule
-      vitesseT = (*particule)->getVitesseTranslation();
-      vitesseR = (*particule)->getVitesseRotation();
-      masseVol = (*particule)->getMasseVolumique();
-      masse    = (*particule)->getMasse();
-      centre   = (*particule)->getPosition();
-//      qrot     = (*particule)->getRotation();
-      orient   = (*particule)->getForme()->getOrientation();
-
-      particles_features << "P" << '\t'
-	<< (*centre)[X]   <<'\t'<< (*centre)[Y]   <<'\t'<< (*centre)[Z]   <<'\t'
-	<< masseVol       <<'\t'<< masse          <<'\t'
-//	<< (*qrot)[0]     <<'\t'<< (*qrot)[1]     <<'\t'<< (*qrot)[2]     <<'\t'<< (*qrot)[3]    <<'\t'
-	<< (*vitesseT)[X] <<'\t'<< (*vitesseT)[Y] <<'\t'<< (*vitesseT)[Z] <<'\t'
-	<< (*vitesseR)[X] <<'\t'<< (*vitesseR)[Y] <<'\t'<< (*vitesseR)[Z] <<
-	endl;
-
-      particles_features << "O" << '\t'
-	<< (orient)[0][0]   <<'\t'<< (orient)[0][1]   <<'\t'<< (orient)[0][2]   <<'\t'
-	<< (orient)[1][0]   <<'\t'<< (orient)[1][1]   <<'\t'<< (orient)[1][2]   <<'\t'
-	<< (orient)[2][0]   <<'\t'<< (orient)[2][1]   <<'\t'<< (orient)[2][2]   <<'\t'
-	<< endl;
-    }
-  }
-  is.str( particles_features.rdbuf()->str() );
-}
-
-// ============================================================================
-// Version sequentielle avec ecriture dans une structure de donne
-// Pour couplage avec Basilisk C code
-void InterfaceFluide3D::WriteParticulesInFluid(
-	list<Particule*> const& particules,
-	list<Obstacle*> const& obstaclesToFluid,
-	BasiliskDataStructure * basiliskdata) const
-{
-
-
-
-  list<Particule*>::const_iterator particule,clone;
-  int id = 0, ncorners;
-  // size_t nclonesper;
-  Vecteur const* vitesseT;
-  Vecteur const* vitesseR;
-  Point const* centre;
-  const double* inertie = NULL;
-  // string particuleType = "P";
-  Scalar masseVol, masse, rayon;
-  int ii = 0;
-  for (particule=particules.begin(), id=0; particule!=particules.end();
-       particule++, id++)
-  {
-    if ( (*particule)->getActivity() == COMPUTE
-    	&& (*particule)->getID() >= 0 )
-    {
-      basiliskdata[ii].particlessize = particules.size();
-
-      // Informations : donnees de la particule
-      vitesseT      = (*particule)->getVitesseTranslation();
-      vitesseR      = (*particule)->getVitesseRotation();
-      centre        = (*particule)->getPosition();
-      masseVol      = (*particule)->getMasseVolumique();
-      masse         = (*particule)->getMasse();
-      inertie       = (*particule)->getInertie();
-      rayon         = (*particule)->getRayon();
-      ncorners = (*particule)->getNbCorners();
-
-      // nclonesper    = (*particule)->getNombreClonesPeriodiques();
-      // particuleType = "P";
-      // if (nclonesper) particuleType = "PP";
-
-      /* Geometric aspect */
-      basiliskdata[ii].ncorners = (int) ncorners;
-      basiliskdata[ii].centreX = (double)(*centre)[X];
-      basiliskdata[ii].centreY = (double)(*centre)[Y];
-      basiliskdata[ii].centreZ = (double) (*centre)[Z];
-      basiliskdata[ii].rayon = (double) rayon;
-
-      /* Corners coordinates */
-      (*particule)->writePositionInFluid (&basiliskdata[ii]);
-
-      /* Velocities */
-      basiliskdata[ii].vitesseTX = (double) (*vitesseT)[X];
-      basiliskdata[ii].vitesseTY = (double) (*vitesseT)[Y];
-      basiliskdata[ii].vitesseTZ = (double) (*vitesseT)[Z];
-      basiliskdata[ii].vitesseRX = (double) (*vitesseR)[X];
-      basiliskdata[ii].vitesseRY = (double) (*vitesseR)[Y];
-      basiliskdata[ii].vitesseRZ = (double) (*vitesseR)[Z];
-
-      /* Physical properties */
-      basiliskdata[ii].masseVol = (double) masseVol;
-      basiliskdata[ii].masse = (double) masse;
-
-      // Inertia tensor: Grains store them as
-      // inertie[0] = Ixx;
-      // inertie[1] = Ixy;
-      // inertie[2] = Ixz;
-      // inertie[3] = Iyy;
-      // inertie[4] = Iyz;
-      // inertie[5] = Izz;
-
-	for (int ip = 0; ip < 6; ip++) {
-	basiliskdata[ii].inertie[ip] = inertie[ip];
-      }
-      ii++;
-    }
-    else
-    {
-      // particles_features << id << '\t' << "1" << endl;
-      // particles_features << "P "
-      // 			 << "0. 0. 0. "
-      // 			 << "0. 0. 0. "
-      // 			 << "1e8 1."
-      // 			 << "1  1  1  1  1  1" << endl;
-      // particles_features << "0  1"     << endl;
-      // particles_features << "0. 0. 0." << endl;
-    }
-  }
-}
-
-
-
-// ============================================================================
-// Version sequentielle ou parallele avec lecture a partir d'un tableau
-// Pour couplage avec Basilisk
-void InterfaceFluide3D::UpdateParticulesVelocities(
-	list<Particule*>& particules,
-	Scalar dt,
-	BasiliskDataStructure * b,
-	const bool &b_set_velocity_nm1_and_diff,
-	const bool &b_MPI )
-{
-  Vecteur translation, rotation;
-  list<Particule*>::iterator particule;
-  unsigned id = 0;
-  //cout << "Inside UpdateParticulesVelocities for Basilisk" << endl;
-  if ( b_MPI )
-  {
-    // Rem:
-    // 1. le vecteur velocities contient l'ensemble des particules
-    // dans le systeme et la particule numerotee ID correspond bien �
-    // velocities[ID]
-    // 2. en MPI, chaque processeur poss�de une partie des particules dans
-    // le systeme, donc pour la mise a jour, il faut d'abord chercher si la
-    // particule de numero (ID) i est situee sur ce processeur: si oui on met �
-    // jour sa vitesse, si non on ne fait rien.
-
-    // list<Particule*> particules_ = particules;
-    // bool found = false;
-    // for (id=0;id<velocities.size();id++)
-    // {
-    //   found = false;
-    //   for (particule=particules_.begin();
-    //   	particule!=particules_.end() && !found;)
-    //   {
-    //     if ( (*particule)->getID() == int(id) )
-    // 	{
-    //       // size_t vecSize =  (velocities[id]).size();
-    //       // if ( vecSize != 6 )
-    // 	  //   cout << "ERROR: the vector size of velocities in AppFluide2D_FEM "
-    // 	  // 	<< "is not 6, but " << vecSize << endl;
-
-    // 	  translation[X] = b[id].vitesseTX;
-    // 	  translation[Y] = b[id].vitesseTY;
-    // 	  translation[Z] = b[id].vitesseTZ;
-    // 	  rotation[X] = b[id].vitesseRX;
-    // 	  rotation[Y] = b[id].vitesseRY;
-    // 	  rotation[Z] = b[id].vitesseRZ;
-
-    //       (*particule)->setVitesseTranslation( translation );
-    //       (*particule)->setVitesseRotation( rotation );
-
-    //       if ( b_set_velocity_nm1_and_diff )
-    //         (*particule)->setVelocityAndVelocityDifferencePreviousTime();
-
-    // 	  found = true;
-    // 	  particule = particules_.erase( particule );
-    // 	}
-    // 	else particule++;
-    //   }
-    // }
-
-  }
-  else
-  {
-    for (particule=particules.begin(); particule!=particules.end();
-  	particule++, id++)
-    {
-      if ( (*particule)->getActivity() == COMPUTE
-    	&& (*particule)->getID() >= 0 )
-      {
-
-        translation[X] = b[id].vitesseTX;
-        translation[Y] = b[id].vitesseTY;
-        translation[Z] = b[id].vitesseTZ;
-        rotation[X] = b[id].vitesseRX;
-        rotation[Y] = b[id].vitesseRY;
-        rotation[Z] = b[id].vitesseRZ;
-
-        (*particule)->setVitesseTranslation( translation );
-        (*particule)->setVitesseRotation( rotation );
-
-        if ( b_set_velocity_nm1_and_diff )
-          (*particule)->setVelocityAndVelocityDifferencePreviousTime();
-	// cout << "Tx = " << translation[X] << endl;
-	// cout << "Ty = " << translation[Y] << endl;
-	// cout << "Tz = " << translation[Z] << endl;
-
-	// cout << "Rx = " << rotation[X] << endl;
-	// cout << "Ry = " << rotation[Y] << endl;
-	// cout << "Rz = " << rotation[Z] << endl;
-
-      }
-    }
-  }
 }

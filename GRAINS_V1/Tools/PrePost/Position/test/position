@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ $GRAINS_BITS_DEFAULT -eq 64 ]
+  then
+    EXT=64
+fi
+${GRAINSHOME}/Utils/Position/bin$EXT-gcc-$GCC_VERSION/position $1

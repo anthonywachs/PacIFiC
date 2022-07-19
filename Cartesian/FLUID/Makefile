@@ -66,17 +66,17 @@ exeg    : MACLIB=mac1
 exegg   : MACLIB=macg
 exepgpg : MACLIB=$(MAC_HOME)/$(libdir)/optpg
 
-$(libdir)/optg/Makefile: 
+$(libdir)/optg/Makefile:
 	$(BEGIN_TARGET) $@
 	$(MKDIR) $(@D)
 	mac depend -l mac1 -compiler $(CCC) dbg $(@D) $(SRC)
 
-$(libdir)/optg%/Makefile: 
+$(libdir)/optg%/Makefile:
 	$(BEGIN_TARGET) $@
 	$(MKDIR) $(@D)
 	mac depend -l mac$* -compiler $(CCC) dbg $(@D) $(SRC)
 
-$(libdir)/optpg%/Makefile: 
+$(libdir)/optpg%/Makefile:
 	$(BEGIN_TARGET) $@
 	$(MKDIR) $(@D)
 	mac depend -l $(MACLIB) -compiler $(CCC) optpg $(@D) $(SRC)
@@ -94,7 +94,7 @@ $(libdir)/%/Makefile:
 	-path $(MACWORLD_GFORTRAN_LIBDIR) -l $(MACWORLD_GFORTRAN_LIBS) \
 	-compiler $(CCC) $* $(@D) $(SRC)
 	$(END_TARGET) $@
-	
+
 exe% : $(libdir)/exe%
 	$(END_TARGET) $@
 
@@ -144,7 +144,6 @@ FORCE:
 RM    := rm -fr
 MKDIR := mkdir -p
 BEGIN_TARGET := @printf "****************************************\n* \
-Begin target : %s \n****\n" 
+Begin target : %s \n****\n"
 END_TARGET := @printf "****\n* \
 target %s completed\n****************************************\n"
-
