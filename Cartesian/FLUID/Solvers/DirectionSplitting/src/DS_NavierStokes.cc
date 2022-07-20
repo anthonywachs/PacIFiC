@@ -2318,7 +2318,7 @@ DS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list 
 
 
 //---------------------------------------------------------------------------
-tuple<double,double> DS_NavierStokes:: divergence_face_flux ( size_t const& i
+double DS_NavierStokes:: divergence_face_flux ( size_t const& i
 															 , size_t const& j
 															 , size_t const& k
 															 , size_t const& normal
@@ -2452,19 +2452,12 @@ tuple<double,double> DS_NavierStokes:: divergence_face_flux ( size_t const& i
 				 MAC::abs(topY - xC - 0.5*length)) {
 				pt = (1./2.)*(topY + xC) + (1./2.)*(length/2.
 							  - intersect_distance->operator()(ptop,2*wall_dir + 0));
-			   // fi(0) = topVel; fi(1) = cVel;
-				// xi(0) = topY;
-				// xi(1) = topY - intersect_distance->operator()(ptop,2*wall_dir + 0);
-				// delta = 2. * MAC::abs(pt - xi(1));
-				// double l0 = (pt - xi(1)) / (xi(0) - xi(1));
-				// double l1 = (pt - xi(0)) / (xi(1) - xi(0));
-				// value = (fi(0)*l0 + fi(1)*l1)*delta;
 				xi(0) = topY - intersect_distance->operator()(ptop,2*wall_dir + 0);
 				fi(0) = cVel;
 				xi(1) = topY;
 				fi(1) = topVel;
-				xi(2) = topY2;//botY;//topY2;
-				fi(2) = topVel2;//botVel;//topVel2;
+				xi(2) = topY2;
+				fi(2) = topVel2;
 				delta = 2. * MAC::abs(pt - xi(0));
 				double l0 = (pt - xi(1)) * (pt - xi(2))
 						    / (xi(0) - xi(1)) / (xi(0) - xi(2));
@@ -2477,15 +2470,8 @@ tuple<double,double> DS_NavierStokes:: divergence_face_flux ( size_t const& i
 						  MAC::abs(xC - botY - 0.5*length)) {
 				pt = (1./2.)*(botY + xC) - (1./2.)*(length/2.
 							  - intersect_distance->operator()(pbot,2*wall_dir + 1));
-				// fi(0) = botVel; fi(1) = cVel;
-				// xi(0) = botY;
-				// xi(1) = botY + intersect_distance->operator()(pbot,2*wall_dir + 1);
-				// delta = 2. * MAC::abs(xi(1) - pt);
-				// double l0 = (pt - xi(1)) / (xi(0) - xi(1));
-				// double l1 = (pt - xi(0)) / (xi(1) - xi(0));
-				// value = (fi(0)*l0 + fi(1)*l1)*delta;
-				xi(0) = botY2;//topY;//botY2;
-				fi(0) = botVel2;//topVel;//botVel2;
+				xi(0) = botY2;
+				fi(0) = botVel2;
 				xi(1) = botY;
 				fi(1) = botVel;
 				xi(2) = botY + intersect_distance->operator()(pbot,2*wall_dir + 1);
@@ -2508,7 +2494,7 @@ tuple<double,double> DS_NavierStokes:: divergence_face_flux ( size_t const& i
       value = UF->DOF_value( i, j, k, comp, level )*length;
    }
 
-   return(make_tuple(value,delta));
+   return(value);
 }
 
 
@@ -2676,77 +2662,18 @@ DS_NavierStokes:: calculate_velocity_divergence_cutCell ( size_t const& i,
 	double dx = PF->get_cell_size( i, 0, 0 );
    double dy = PF->get_cell_size( j, 0, 1 );
 
-	double xvalue = 0.;
-	double yvalue = 0.;
-
 	FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 
-   auto right = divergence_face_flux ( shift.i+i, j, k, 0, dy, level);
-	double rht_flux = get<0>(right);
-	double rht_frac = get<1>(right);
+   double rht_flux = divergence_face_flux ( shift.i+i, j, k, 0, dy, level);
 
-	auto left = divergence_face_flux ( shift.i+i-1, j, k, 0, dy, level);
-	double lft_flux = get<0>(left);
-	double lft_frac = get<1>(left);
+	double lft_flux = divergence_face_flux ( shift.i+i-1, j, k, 0, dy, level);
 
-	auto top = divergence_face_flux ( i, shift.j+j, k, 1, dx, level);
-	double top_flux = get<0>(top);
-	double top_frac = get<1>(top);
+	double top_flux = divergence_face_flux ( i, shift.j+j, k, 1, dx, level);
 
-	auto bottom = divergence_face_flux ( i, shift.j+j-1, k, 1, dx, level);
-	double bot_flux = get<0>(bottom);
-	double bot_frac = get<1>(bottom);
+	double bot_flux = divergence_face_flux ( i, shift.j+j-1, k, 1, dx, level);
 
-	// Face fraction calculations
-	vector<double> frac;
-	frac.push_back(rht_frac);
-	frac.push_back(lft_frac);
-	frac.push_back(top_frac);
-	frac.push_back(bot_frac);
-
-	int count = (int)std::count(frac.begin(),frac.end(),0);
-
-	// Cell area calculation
-	// Triangular cell
-	double area = dx * dy;
-	if (count == 2) {
-		area = 0.5;
-		for (vector<double>::iterator it = frac.begin(); it != frac.end() ; ++it) {
-			double length = *it;
-			if (length != 0.) area *= length;
-		}
-	// Trapezoid cell
-	} else if (count == 1) {
-		if (rht_frac == 0) {
-			area = 0.5*(top_frac + bot_frac)*lft_frac;
-		} else if (lft_frac == 0) {
-			area = 0.5*(top_frac + bot_frac)*rht_frac;
-		} else if (top_frac == 0) {
-			area = 0.5*(rht_frac + lft_frac)*bot_frac;
-		} else if (bot_frac == 0) {
-			area = 0.5*(rht_frac + lft_frac)*top_frac;
-		}
-	// Trapezoid and rectangle
-	} else if (count == 0) {
-		if ((top_frac == dx) && (rht_frac == dy)) {
-			area = 0.5*(top_frac + bot_frac)*(rht_frac - lft_frac) + dx*lft_frac;
-		} else if ((bot_frac == dx) && (rht_frac == dy)) {
-			area = 0.5*(top_frac + bot_frac)*(rht_frac - lft_frac) + dx*lft_frac;
-		} else if ((bot_frac == dx) && (lft_frac == dy)) {
-			area = 0.5*(top_frac + bot_frac)*(lft_frac - rht_frac) + dx*rht_frac;
-		} else if ((top_frac == dx) && (lft_frac == dy)) {
-			area = 0.5*(top_frac + bot_frac)*(lft_frac - rht_frac) + dx*rht_frac;
-		}
-	}
-
-	// size_t p = PF->DOF_local_number(i,j,k,0);
-	// if (p == 1284) {
-	// 	cout << lft_frac << "," << rht_frac << "," << bot_frac << "," << top_frac << endl;
-	// 	cout << lft_flux << "," << rht_flux << "," << bot_flux << "," << top_flux << endl;
-	// }
-
-	xvalue = (rht_flux - lft_flux);
-	yvalue = (top_flux - bot_flux);
+	double xvalue = (rht_flux - lft_flux);
+	double yvalue = (top_flux - bot_flux);
 
    return(xvalue + yvalue);
 }
