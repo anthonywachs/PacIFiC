@@ -56,7 +56,6 @@ void generate_lag_stencils_one_caps(lagMesh* mesh) {
           else mesh->nodes[i].pid = -1;
         }
         #endif
-        // c++;
         #if dimension == 3
         }
         #endif
