@@ -1069,6 +1069,106 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
 
 //---------------------------------------------------------------------------
+void DS_AllRigidBodies:: compute_face_fractions(FV_DiscreteField const* FF)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: compute_face_fractions" ) ;
+
+  size_t nb_comps = FF->nb_components() ;
+  size_t field = field_num(FF) ;
+
+  // Get local min and max indices
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
+
+
+  for (size_t comp = 0; comp < nb_comps; comp++) {
+     for (size_t l = 0; l < m_space_dimension; ++l) {
+        min_unknown_index(l) =
+                        FF->get_min_index_unknown_handled_by_proc( comp,l );
+        max_unknown_index(l) =
+                        FF->get_max_index_unknown_handled_by_proc( comp,l );
+     }
+
+     for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+        for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+           for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+              double fraction = 0.;
+
+              double length = (comp == 0) ? FF->get_cell_size( j, comp, 1 )
+                                          : FF->get_cell_size( i, comp, 0 );
+              size_t wall_dir = (comp == 0) ? 1 : 0;
+              size_t p = FF->DOF_local_number(i, j, k, comp);
+
+              size_t pbot = (comp == 0) ? FF->DOF_local_number(i,j-1,k,comp)
+                                        : FF->DOF_local_number(i-1,j,k,comp);
+              size_t ptop = (comp == 0) ? FF->DOF_local_number(i,j+1,k,comp)
+                                        : FF->DOF_local_number(i+1,j,k,comp);
+
+              double xC = (comp == 0) ? UF->get_DOF_coordinate( j, comp, wall_dir )
+                                      : UF->get_DOF_coordinate( i, comp, wall_dir );
+
+              double botx = (comp == 0) ? UF->get_DOF_coordinate( j-1, comp, wall_dir )
+                                        : UF->get_DOF_coordinate( i-1, comp, wall_dir );
+              double topx = (comp == 0) ? UF->get_DOF_coordinate( j+1, comp, wall_dir )
+                                        : UF->get_DOF_coordinate( i+1, comp, wall_dir );
+
+              if (void_fraction[field]->operator()(p) == 0) {
+                 if (intersect_vector[field]->operator()(p,2*wall_dir + 0) == 1) {
+                    if (intersect_distance[field]->operator()(p,2*wall_dir + 0) <= length/2.) {
+                       fraction += intersect_distance[field]->operator()(p,2*wall_dir + 0);
+                    } else {
+                       fraction += length/2.;
+                    }
+                 } else {
+                    fraction += length/2.;
+                 }
+
+                 if (intersect_vector[field]->operator()(p,2*wall_dir + 1) == 1) {
+                    if (intersect_distance[field]->operator()(p,2*wall_dir + 1) <= length/2.) {
+                       fraction += intersect_distance[field]->operator()(p,2*wall_dir + 1);
+                    } else {
+                       fraction += length/2.;
+                    }
+                 } else {
+                    fraction += length/2.;
+                 }
+              } else if ((void_fraction[field]->operator()(p) != 0)
+                    && (void_fraction[field]->operator()(p) <= m_nrb)) {
+                 if (intersect_vector[field]->operator()(ptop,2*wall_dir + 0) == 1) {
+                    double delta = MAC::abs(topx - xC - 0.5*length);
+                    if (intersect_distance[field]->operator()(ptop,2*wall_dir + 0) >= delta) {
+                       fraction += intersect_distance[field]->operator()(ptop,2*wall_dir + 0)
+                              - delta ;
+                    }
+                 }
+
+                 if (intersect_vector[field]->operator()(pbot,2*wall_dir + 1) == 1) {
+                    double delta = MAC::abs(xC - botx - 0.5*length);
+                    if (intersect_distance[field]->operator()(pbot,2*wall_dir + 1) >= delta) {
+                       fraction += intersect_distance[field]->operator()(pbot,2*wall_dir + 1)
+                              - delta;
+                    }
+                 }
+              } else {
+                 fraction = length;
+              }
+
+              // Eliminate contribution if less than 0.01%
+              if (fraction < 0.0001*length) fraction = 0.;
+
+              face_fraction[field]->operator()(p) = fraction;
+           }
+        }
+     }
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 double DS_AllRigidBodies:: delta_periodic_transformation( double const& delta
                                                      , size_t const& dir)
 //---------------------------------------------------------------------------
@@ -1530,6 +1630,10 @@ void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
    intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
    intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
    intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
+   face_fraction.reserve(3);
+   face_fraction.push_back(new doubleVector(1,0.));
+   face_fraction.push_back(new doubleVector(1,0.));
+   face_fraction.push_back(new doubleVector(1,0.));
 
    // Intialization of force and torque variables
    viscous_force = new doubleArray2D(1,1,0.);
@@ -3826,6 +3930,11 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    intersect_distance[field]->re_initialize(FF_LOC_UNK,6);
    intersect_fieldValue[field]->re_initialize(FF_LOC_UNK,6);
 
+   // Face fractions only for the UF field
+   if (field == 1) {
+      face_fraction[field]->re_initialize(FF_LOC_UNK);
+   }
+
 }
 
 
@@ -3859,6 +3968,20 @@ size_t_vector* DS_AllRigidBodies:: get_void_fraction_on_grid(
   size_t field = field_num(FF);
 
   return (void_fraction[field]);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+doubleVector* DS_AllRigidBodies:: get_face_fraction_on_grid(
+                                                FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+  size_t field = field_num(FF);
+
+  return (face_fraction[field]);
 
 }
 

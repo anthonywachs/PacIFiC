@@ -267,6 +267,9 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 		// Compute intersection with RB for pressure and velocity field
 		allrigidbodies->compute_grid_intersection_with_rigidbody(PF, false);
 		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, false);
+		// Compute the face fractions of CutCell is active
+		if (DivergenceScheme == "CutCell")
+			allrigidbodies->compute_face_fractions(UF);
 
 		if (my_rank == 0)
          cout << "Finished void fraction and grid intersection... \n" << endl;
@@ -356,6 +359,9 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		// Compute intersection with RB for pressure and velocity field
 		allrigidbodies->compute_grid_intersection_with_rigidbody(PF, true);
 		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, true);
+		// Compute the face fractions of CutCell is active
+		if (DivergenceScheme == "CutCell")
+			allrigidbodies->compute_face_fractions(UF);
 
 		// Field initialization
 		vector<size_t> vec{ 0, 1, 3};
@@ -2860,19 +2866,26 @@ void DS_NavierStokes:: calculate_divergence_flux_fromRB ( size_t const& i,
 	double xC = PF->get_DOF_coordinate( i, 0, 0 );
 	double yC = PF->get_DOF_coordinate( j, 0, 1 );
 
+	doubleVector* face_frac = (is_solids) ?
+							allrigidbodies->get_face_fraction_on_grid(UF) : 0;
+
 	// Face fraction calculations
 	vector<double> frac;
 	// right face
-	double rht_frac = return_face_fraction(shift.i+i, j, k, 0, dy);
+	size_t p_rht = UF->DOF_local_number(shift.i+i, j, k, 0);
+	double rht_frac = face_frac->operator()(p_rht);
 	frac.push_back(rht_frac);
 	// left face
-	double lft_frac = return_face_fraction(shift.i+i-1, j, k, 0, dy);
+	size_t p_lft = UF->DOF_local_number(shift.i+i-1, j, k, 0);
+	double lft_frac = face_frac->operator()(p_lft);
 	frac.push_back(lft_frac);
 	// top face
-	double top_frac = return_face_fraction(i, shift.j+j, k, 1, dx);
+	size_t p_top = UF->DOF_local_number(i, shift.j+j, k, 1);
+	double top_frac = face_frac->operator()(p_top);
 	frac.push_back(top_frac);
 	// bottom face
-	double bot_frac = return_face_fraction(i, shift.j+j-1, k, 1, dx);
+	size_t p_bot = UF->DOF_local_number(i, shift.j+j-1, k, 1);
+	double bot_frac = face_frac->operator()(p_bot);
 	frac.push_back(bot_frac);
 
 	int count = (int)std::count(frac.begin(),frac.end(),0);
@@ -3013,6 +3026,8 @@ void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
 
 	size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
 	doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
+	doubleVector* face_frac = (is_solids) ?
+							allrigidbodies->get_face_fraction_on_grid(UF) : 0;
 
 	FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 
@@ -3028,16 +3043,20 @@ void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
 		// Face fraction calculations
 		vector<double> frac;
 		// right face
-		double rht_frac = return_face_fraction(shift.i+i, j, k, 0, dy);
+		size_t pp_rht = UF->DOF_local_number(shift.i+i, j, k, 0);
+		double rht_frac = face_frac->operator()(pp_rht);
 		frac.push_back(rht_frac);
 		// left face
-		double lft_frac = return_face_fraction(shift.i+i-1, j, k, 0, dy);
+		size_t pp_lft = UF->DOF_local_number(shift.i+i-1, j, k, 0);
+		double lft_frac = face_frac->operator()(pp_lft);
 		frac.push_back(lft_frac);
 		// top face
-		double top_frac = return_face_fraction(i, shift.j+j, k, 1, dx);
+		size_t pp_top = UF->DOF_local_number(i, shift.j+j, k, 1);
+		double top_frac = face_frac->operator()(pp_top);
 		frac.push_back(top_frac);
 		// bottom face
-		double bot_frac = return_face_fraction(i, shift.j+j-1, k, 1, dx);
+		size_t pp_bot = UF->DOF_local_number(i, shift.j+j-1, k, 1);
+		double bot_frac = face_frac->operator()(pp_bot);
 		frac.push_back(bot_frac);
 
 		int count = (int)std::count(frac.begin(),frac.end(),0);
@@ -3159,92 +3178,6 @@ void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
 			divergence->operator()(p) = 0.;
 		}
 	}
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-double DS_NavierStokes:: return_face_fraction ( size_t const& i,
-                                                size_t const& j,
-                                            		size_t const& k,
-																size_t const& comp,
-																double const& length)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DS_NavierStokes:: return_face_fraction" ) ;
-
-	double fraction = 0.;
-
-	size_t_vector* void_frac = (is_solids) ?
-							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
-	size_t_array2D* intersect_vector = (is_solids) ?
-							allrigidbodies->get_intersect_vector_on_grid(UF) : 0;
-	doubleArray2D* intersect_distance = (is_solids) ?
-							allrigidbodies->get_intersect_distance_on_grid(UF) : 0;
-
-	size_t wall_dir = (comp == 0) ? 1 : 0;
-	size_t p = UF->DOF_local_number(i, j, k, comp);
-	size_t m_nrb = (is_solids) ? allrigidbodies->get_number_rigid_bodies() : 0;
-
-	size_t pbot = (comp == 0) ? UF->DOF_local_number(i,j-1,k,comp)
-						           : UF->DOF_local_number(i-1,j,k,comp);
-	size_t ptop = (comp == 0) ? UF->DOF_local_number(i,j+1,k,comp)
-									  : UF->DOF_local_number(i+1,j,k,comp);
-
-   double xC = (comp == 0) ? UF->get_DOF_coordinate( j, comp, wall_dir )
-			        				: UF->get_DOF_coordinate( i, comp, wall_dir );
-
-	double botx = (comp == 0) ? UF->get_DOF_coordinate( j-1, comp, wall_dir )
-								 	  : UF->get_DOF_coordinate( i-1, comp, wall_dir );
-	double topx = (comp == 0) ? UF->get_DOF_coordinate( j+1, comp, wall_dir )
-								 	  : UF->get_DOF_coordinate( i+1, comp, wall_dir );
-
-	if (void_frac->operator()(p) == 0) {
-	 	if (intersect_vector->operator()(p,2*wall_dir + 0) == 1) {
-	 		if (intersect_distance->operator()(p,2*wall_dir + 0) <= length/2.) {
-	 			fraction += intersect_distance->operator()(p,2*wall_dir + 0);
-	 		} else {
-				fraction += length/2.;
-			}
-	 	} else {
-			fraction += length/2.;
-		}
-
-		if (intersect_vector->operator()(p,2*wall_dir + 1) == 1) {
-	 		if (intersect_distance->operator()(p,2*wall_dir + 1) <= length/2.) {
-	 			fraction += intersect_distance->operator()(p,2*wall_dir + 1);
-		 	} else {
-				fraction += length/2.;
-			}
-		} else {
-			fraction += length/2.;
-		}
-	} else if ((void_frac->operator()(p) != 0)
-			  && (void_frac->operator()(p) <= m_nrb)) {
-		if (intersect_vector->operator()(ptop,2*wall_dir + 0) == 1) {
-			double delta = MAC::abs(topx - xC - 0.5*length);
-			if (intersect_distance->operator()(ptop,2*wall_dir + 0) >= delta) {
-				fraction += intersect_distance->operator()(ptop,2*wall_dir + 0)
-							 - delta ;
-			}
-		}
-		if (intersect_vector->operator()(pbot,2*wall_dir + 1) == 1) {
-			double delta = MAC::abs(xC - botx - 0.5*length);
-			if (intersect_distance->operator()(pbot,2*wall_dir + 1) >= delta) {
-				fraction += intersect_distance->operator()(pbot,2*wall_dir + 1)
-							 - delta;
-			}
-		}
-	} else {
-		fraction = length;
-	}
-
-	// Eliminate contribution if less than 0.01%
-	if (fraction < 0.0001*length) fraction = 0.;
-
-	return(fraction);
 
 }
 

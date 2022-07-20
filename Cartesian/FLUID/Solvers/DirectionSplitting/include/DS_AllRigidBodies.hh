@@ -148,6 +148,9 @@ class DS_AllRigidBodies
       /** @brief Returns the void_fraction on field FF */
       size_t_vector* get_void_fraction_on_grid( FV_DiscreteField const* FF );
 
+      /** @brief Returns the face_fraction on field FF */
+      doubleVector* get_face_fraction_on_grid( FV_DiscreteField const* FF );
+
       /** @brief Returns the ID of rigid body present on the field FF */
       size_t_vector* get_rigidbodyIDs_on_grid( FV_DiscreteField const* FF );
 
@@ -263,6 +266,11 @@ class DS_AllRigidBodies
       of a given fluid field
       @param FF the fluid field (PP_EPSILON) */
       void compute_void_fraction_on_epsilon_grid( FV_DiscreteField * FF );
+
+      /** @brief Computes the face fraction belonging the each node
+      of a given fluid field
+      @param FF the fluid field */
+      void compute_face_fractions(FV_DiscreteField const* FF);
 
       /** @brief Computes the intersection of grid nodes of a given fluid field
       with the nearest rigid body of a given fluid field
@@ -477,6 +485,10 @@ class DS_AllRigidBodies
 
       vector<size_t_vector*> void_fraction; /**< vector of void fraction the
       field grid nodes, 0 in fluid and (parID+1) in the rigid bodies*/
+
+      vector<doubleVector*> face_fraction; /**< vector of field grid nodes
+      face fraction, only for UF*/
+
       vector<size_t_vector*> rb_ID; /**< vector of rigid body ID on the
       field grid node, if any */
 
