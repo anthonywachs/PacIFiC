@@ -311,7 +311,7 @@ DS_NavierStokes:: do_after_time_stepping( void )
 
    // SCT_set_start( "Writing CSV" );
    // write_output_field(PF);
-   // write_output_field(UF,1);
+   // write_output_field(UF);
    // SCT_get_elapsed_time( "Writing CSV" );
 
    output_L2norm_velocity(0);

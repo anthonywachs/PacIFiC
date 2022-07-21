@@ -539,7 +539,8 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         acc(dir) = gg(dir)*(1-m_rho/rho_p) + (viscous_force->operator()(parID,dir)
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
-        vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+        // vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+        vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*2.*t_it->time()) : 0.;
         pos(dir) = periodic_transformation(pos(dir)
                                          + vel(dir)*t_it->time_step()
                                                          , dir) ;
@@ -1069,94 +1070,74 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
 
 //---------------------------------------------------------------------------
-void DS_AllRigidBodies:: compute_face_fractions(FV_DiscreteField const* FF)
+void DS_AllRigidBodies:: compute_face_fractions()
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_AllRigidBodies:: compute_face_fractions" ) ;
 
-  size_t nb_comps = FF->nb_components() ;
-  size_t field = field_num(FF) ;
+  size_t nb_comps = UF->nb_components() ;
+  size_t field = field_num(UF) ;
+
+  double dh = MESH->get_smallest_grid_size();
+  double threshold = pow(THRES,0.5)*dh;
+  size_t parID = 0;
 
   // Get local min and max indices
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
 
-
   for (size_t comp = 0; comp < nb_comps; comp++) {
+
      for (size_t l = 0; l < m_space_dimension; ++l) {
         min_unknown_index(l) =
-                        FF->get_min_index_unknown_handled_by_proc( comp,l );
+                        UF->get_min_index_unknown_handled_by_proc( comp,l );
         max_unknown_index(l) =
-                        FF->get_max_index_unknown_handled_by_proc( comp,l );
+                        UF->get_max_index_unknown_handled_by_proc( comp,l );
      }
 
      for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+        double xC = UF->get_DOF_coordinate( i, comp, 0 ) ;
         for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+           double yC = UF->get_DOF_coordinate( j, comp, 1 ) ;
            for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+              double zC = (m_space_dimension == 2) ? 0.
+                        : UF->get_DOF_coordinate( k, comp, 2 ) ;
               double fraction = 0.;
 
-              double length = (comp == 0) ? FF->get_cell_size( j, comp, 1 )
-                                          : FF->get_cell_size( i, comp, 0 );
+              double length = (comp == 0) ? UF->get_cell_size( j, comp, 1 )
+                                          : UF->get_cell_size( i, comp, 0 );
               size_t wall_dir = (comp == 0) ? 1 : 0;
-              size_t p = FF->DOF_local_number(i, j, k, comp);
+              size_t p = UF->DOF_local_number(i, j, k, comp);
 
-              size_t pbot = (comp == 0) ? FF->DOF_local_number(i,j-1,k,comp)
-                                        : FF->DOF_local_number(i-1,j,k,comp);
-              size_t ptop = (comp == 0) ? FF->DOF_local_number(i,j+1,k,comp)
-                                        : FF->DOF_local_number(i+1,j,k,comp);
+              geomVector top(xC, yC, zC);
+              geomVector bot(xC, yC, zC);
+              geomVector rayDir(3);
 
-              double xC = (comp == 0) ? UF->get_DOF_coordinate( j, comp, wall_dir )
-                                      : UF->get_DOF_coordinate( i, comp, wall_dir );
+              top(wall_dir) = top(wall_dir) + length/2.;
+              bot(wall_dir) = bot(wall_dir) - length/2.;
 
-              double botx = (comp == 0) ? UF->get_DOF_coordinate( j-1, comp, wall_dir )
-                                        : UF->get_DOF_coordinate( i-1, comp, wall_dir );
-              double topx = (comp == 0) ? UF->get_DOF_coordinate( j+1, comp, wall_dir )
-                                        : UF->get_DOF_coordinate( i+1, comp, wall_dir );
+              bool top_solid = (level_set_value(parID,top) < threshold) ? true
+                                                                   : false ;
+              bool bot_solid = (level_set_value(parID,bot) < threshold) ? true
+                                                                   : false ;
 
-              if (void_fraction[field]->operator()(p) == 0) {
-                 if (intersect_vector[field]->operator()(p,2*wall_dir + 0) == 1) {
-                    if (intersect_distance[field]->operator()(p,2*wall_dir + 0) <= length/2.) {
-                       fraction += intersect_distance[field]->operator()(p,2*wall_dir + 0);
-                    } else {
-                       fraction += length/2.;
-                    }
-                 } else {
-                    fraction += length/2.;
-                 }
-
-                 if (intersect_vector[field]->operator()(p,2*wall_dir + 1) == 1) {
-                    if (intersect_distance[field]->operator()(p,2*wall_dir + 1) <= length/2.) {
-                       fraction += intersect_distance[field]->operator()(p,2*wall_dir + 1);
-                    } else {
-                       fraction += length/2.;
-                    }
-                 } else {
-                    fraction += length/2.;
-                 }
-              } else if ((void_fraction[field]->operator()(p) != 0)
-                    && (void_fraction[field]->operator()(p) <= m_nrb)) {
-                 if (intersect_vector[field]->operator()(ptop,2*wall_dir + 0) == 1) {
-                    double delta = MAC::abs(topx - xC - 0.5*length);
-                    if (intersect_distance[field]->operator()(ptop,2*wall_dir + 0) >= delta) {
-                       fraction += intersect_distance[field]->operator()(ptop,2*wall_dir + 0)
-                              - delta ;
-                    }
-                 }
-
-                 if (intersect_vector[field]->operator()(pbot,2*wall_dir + 1) == 1) {
-                    double delta = MAC::abs(xC - botx - 0.5*length);
-                    if (intersect_distance[field]->operator()(pbot,2*wall_dir + 1) >= delta) {
-                       fraction += intersect_distance[field]->operator()(pbot,2*wall_dir + 1)
-                              - delta;
-                    }
-                 }
-              } else {
+              // top in solid and bot in fluid
+              if (top_solid && !bot_solid) {
+                 rayDir(wall_dir) = 1.;
+                 fraction = m_allDSrigidbodies[parID]
+                          ->get_distanceTo( bot, rayDir, length );
+              } else if (!top_solid && bot_solid) {  // top in fluid and bot in solid
+                 rayDir(wall_dir) = -1.;
+                 fraction = m_allDSrigidbodies[parID]
+                          ->get_distanceTo( top, rayDir, length );
+              } else if (!top_solid && !bot_solid) { // both top and bot in fluid
                  fraction = length;
+              } else if (top_solid && bot_solid) {   // both top and bot in solid
+                 fraction = 0.;
               }
 
               // Eliminate contribution if less than 0.01%
               if (fraction < 0.0001*length) fraction = 0.;
-
               face_fraction[field]->operator()(p) = fraction;
            }
         }

@@ -268,9 +268,8 @@ class DS_AllRigidBodies
       void compute_void_fraction_on_epsilon_grid( FV_DiscreteField * FF );
 
       /** @brief Computes the face fraction belonging the each node
-      of a given fluid field
-      @param FF the fluid field */
-      void compute_face_fractions(FV_DiscreteField const* FF);
+      of a given fluid field */
+      void compute_face_fractions();
 
       /** @brief Computes the intersection of grid nodes of a given fluid field
       with the nearest rigid body of a given fluid field
