@@ -269,7 +269,7 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, false);
 		// Compute the face fractions of CutCell is active
 		if (DivergenceScheme == "CutCell")
-			allrigidbodies->compute_face_fractions(UF);
+			allrigidbodies->compute_face_fractions();
 
 		if (my_rank == 0)
          cout << "Finished void fraction and grid intersection... \n" << endl;
@@ -361,7 +361,7 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, true);
 		// Compute the face fractions of CutCell is active
 		if (DivergenceScheme == "CutCell")
-			allrigidbodies->compute_face_fractions(UF);
+			allrigidbodies->compute_face_fractions();
 
 		// Field initialization
 		vector<size_t> vec{ 0, 1, 3};
