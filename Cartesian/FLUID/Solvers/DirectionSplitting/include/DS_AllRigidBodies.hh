@@ -251,6 +251,12 @@ class DS_AllRigidBodies
                               double const& y,
                               double const& z ) const;
 
+      /** @brief Returns the length of side in fluid
+      @param pt1 Point 1
+      @param pt2 Point 2 */
+      double return_side_fraction(geomVector const& pt1
+                                , geomVector const& pt2 );
+
       /** @brief Computes the halo zone for all rigid bodies, required for
       void fraction and intersection calculation on the grid nodes */
       void compute_halo_zones_for_all_rigid_body( );

@@ -6,6 +6,7 @@
 #include <FV_DiscreteField.hh>
 #include <FV_Mesh.hh>
 #include <cmath>
+#include <algorithm>
 #define EPSILON 1.e-7
 #define THRES 1.e-4
 using std::endl;
@@ -1070,6 +1071,43 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
 
 //---------------------------------------------------------------------------
+double DS_AllRigidBodies:: return_side_fraction(geomVector const& pt1
+                                              , geomVector const& pt2 )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: return_side_fraction" ) ;
+
+  double fraction = 0.;
+  size_t parID = 0;
+  double dh = MESH->get_smallest_grid_size();
+  double threshold = pow(THRES,0.5)*dh;
+
+  bool pt1_solid = (level_set_value(parID,pt1) < threshold) ? true : false ;
+  bool pt2_solid = (level_set_value(parID,pt2) < threshold) ? true : false ;
+
+  geomVector rayVec = pt2 - pt1;
+  double vecMag = rayVec.calcNorm();
+  rayVec = (1./vecMag) * rayVec;
+
+  // pt1 in solid and pt2 in fluid
+  if (pt1_solid && !pt2_solid) {
+     fraction = m_allDSrigidbodies[parID]
+             ->get_distanceTo( pt2, -1.*rayVec, vecMag );
+  } else if (!pt1_solid && pt2_solid) {  // pt1 in fluid and pt2 in solid
+     fraction = m_allDSrigidbodies[parID]
+             ->get_distanceTo( pt1, rayVec, vecMag );
+  } else if (!pt1_solid && !pt2_solid) { // both pt1 and pt2 in fluid
+     fraction = vecMag;
+  } else if (pt1_solid && pt2_solid) {   // both pt1 and pt2 in solid
+     fraction = 0.;
+  }
+
+  return(fraction);
+
+}
+
+
+//---------------------------------------------------------------------------
 void DS_AllRigidBodies:: compute_face_fractions()
 //---------------------------------------------------------------------------
 {
@@ -1078,15 +1116,15 @@ void DS_AllRigidBodies:: compute_face_fractions()
   size_t nb_comps = UF->nb_components() ;
   size_t field = field_num(UF) ;
 
-  double dh = MESH->get_smallest_grid_size();
-  double threshold = pow(THRES,0.5)*dh;
-  size_t parID = 0;
-
   // Get local min and max indices
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
 
   for (size_t comp = 0; comp < nb_comps; comp++) {
+     size_t face_normal = comp;
+     geomVector face_plane(1.,1.,1.);
+     face_plane(face_normal) = 0.;
+     size_t wall_dir = (comp == 0) ? 1 : 0;
 
      for (size_t l = 0; l < m_space_dimension; ++l) {
         min_unknown_index(l) =
@@ -1097,47 +1135,121 @@ void DS_AllRigidBodies:: compute_face_fractions()
 
      for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
         double xC = UF->get_DOF_coordinate( i, comp, 0 ) ;
+        double dx = UF->get_cell_size( i, comp, 0 ) ;
+        face_plane(0) = (face_plane(0) != 0) ? dx : 0;
         for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
            double yC = UF->get_DOF_coordinate( j, comp, 1 ) ;
+           double dy = UF->get_cell_size( j, comp, 1 ) ;
+           face_plane(1) = (face_plane(1) != 0) ? dy : 0;
            for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
               double zC = (m_space_dimension == 2) ? 0.
                         : UF->get_DOF_coordinate( k, comp, 2 ) ;
-              double fraction = 0.;
+              double dz = (m_space_dimension == 2) ? 0.
+                        : UF->get_cell_size( k, comp, 2 ) ;
+              face_plane(2) = (face_plane(2) != 0) ? dz : 0;
 
-              double length = (comp == 0) ? UF->get_cell_size( j, comp, 1 )
-                                          : UF->get_cell_size( i, comp, 0 );
-              size_t wall_dir = (comp == 0) ? 1 : 0;
+              double fraction = 0.;
+              double plane_mag = face_plane.calcNorm();
               size_t p = UF->DOF_local_number(i, j, k, comp);
 
-              geomVector top(xC, yC, zC);
-              geomVector bot(xC, yC, zC);
-              geomVector rayDir(3);
+              if (m_space_dimension == 2) {
+                 geomVector top(xC, yC, zC);
+                 geomVector bot(xC, yC, zC);
+                 top = top + 0.5*face_plane;
+                 bot = bot - 0.5*face_plane;
+                 fraction = return_side_fraction(top, bot);
+              } else {
+                 geomVector topLeft(xC, yC, zC);
+                 geomVector topRight(xC, yC, zC);
+                 geomVector botLeft(xC, yC, zC);
+                 geomVector botRight(xC, yC, zC);
+                 geomVector rayDir(3);
 
-              top(wall_dir) = top(wall_dir) + length/2.;
-              bot(wall_dir) = bot(wall_dir) - length/2.;
+                 topRight(0) = topRight(0) + 0.5*face_plane(0);
+                 topRight(1) = topRight(1) + 0.5*face_plane(1);
+                 topRight(2) = topRight(2) + 0.5*face_plane(2);
 
-              bool top_solid = (level_set_value(parID,top) < threshold) ? true
-                                                                   : false ;
-              bool bot_solid = (level_set_value(parID,bot) < threshold) ? true
-                                                                   : false ;
+                 botLeft(0) = botLeft(0) - 0.5*face_plane(0);
+                 botLeft(1) = botLeft(1) - 0.5*face_plane(1);
+                 botLeft(2) = botLeft(2) - 0.5*face_plane(2);
 
-              // top in solid and bot in fluid
-              if (top_solid && !bot_solid) {
-                 rayDir(wall_dir) = 1.;
-                 fraction = m_allDSrigidbodies[parID]
-                          ->get_distanceTo( bot, rayDir, length );
-              } else if (!top_solid && bot_solid) {  // top in fluid and bot in solid
-                 rayDir(wall_dir) = -1.;
-                 fraction = m_allDSrigidbodies[parID]
-                          ->get_distanceTo( top, rayDir, length );
-              } else if (!top_solid && !bot_solid) { // both top and bot in fluid
-                 fraction = length;
-              } else if (top_solid && bot_solid) {   // both top and bot in solid
-                 fraction = 0.;
+                 double area = 0;
+                 // yz plane
+                 if (face_normal == 0) {
+                    area = face_plane(1)*face_plane(2);
+                    botRight(1) = botRight(1) - 0.5*face_plane(1);
+                    botRight(2) = botRight(2) + 0.5*face_plane(2);
+                    topLeft(1) = topLeft(1) + 0.5*face_plane(1);
+                    topLeft(2) = topLeft(2) - 0.5*face_plane(2);
+                 } else if (face_normal == 1) {// zx plane
+                    area = face_plane(0)*face_plane(2);
+                    botRight(0) = botRight(0) + 0.5*face_plane(0);
+                    botRight(2) = botRight(2) - 0.5*face_plane(2);
+                    topLeft(0) = topLeft(0) - 0.5*face_plane(0);
+                    topLeft(2) = topLeft(2) + 0.5*face_plane(2);
+                 } else if (face_normal == 2) {// yx plane
+                    area = face_plane(1)*face_plane(0);
+                    botRight(0) = botRight(0) + 0.5*face_plane(0);
+                    botRight(1) = botRight(1) - 0.5*face_plane(1);
+                    topLeft(0) = topLeft(0) - 0.5*face_plane(0);
+                    topLeft(1) = topLeft(1) + 0.5*face_plane(1);
+                 }
+
+                 double rht_frac = return_side_fraction(topRight, botRight);
+                 double lft_frac = return_side_fraction(topLeft, botLeft);
+                 double top_frac = return_side_fraction(topLeft, topRight);
+                 double bot_frac = return_side_fraction(botLeft, botRight);
+
+                 // Face fraction calculations
+                 vector<double> frac;
+                 frac.push_back(rht_frac);
+                 frac.push_back(lft_frac);
+                 frac.push_back(top_frac);
+                 frac.push_back(bot_frac);
+
+                 int count = (int)std::count(frac.begin(),frac.end(),0);
+
+                 if (count == 2) {
+              	     area = 0.5;
+              		  for (vector<double>::iterator it = frac.begin();
+                                                  it != frac.end() ; ++it) {
+              			  double length = *it;
+              			  if (length != 0.) area *= length;
+              		  }
+              	     // Trapezoid cell
+           	     } else if (count == 1) {
+        		        if (rht_frac == 0) {
+     			           area = 0.5*(top_frac + bot_frac)*lft_frac;
+        		        } else if (lft_frac == 0) {
+     			           area = 0.5*(top_frac + bot_frac)*rht_frac;
+        		        } else if (top_frac == 0) {
+     			           area = 0.5*(rht_frac + lft_frac)*bot_frac;
+        		        } else if (bot_frac == 0) {
+     			           area = 0.5*(rht_frac + lft_frac)*top_frac;
+     		           }
+                 // Trapezoid and rectangle
+                 } else if (count == 0) {
+                    if ((top_frac == dx) && (rht_frac == dy)) {
+                 		  area = 0.5*(top_frac + bot_frac)*(rht_frac - lft_frac)
+                            + dx*lft_frac;
+                 	  } else if ((bot_frac == dx) && (rht_frac == dy)) {
+                 	     area = 0.5*(top_frac + bot_frac)*(rht_frac - lft_frac)
+                            + dx*lft_frac;
+                 	  } else if ((bot_frac == dx) && (lft_frac == dy)) {
+                 		  area = 0.5*(top_frac + bot_frac)*(lft_frac - rht_frac)
+                            + dx*rht_frac;
+                 	  } else if ((top_frac == dx) && (lft_frac == dy)) {
+                 	     area = 0.5*(top_frac + bot_frac)*(lft_frac - rht_frac)
+                            + dx*rht_frac;
+                 	  }
+                 }
+
+                 fraction = area;
+
               }
 
               // Eliminate contribution if less than 0.01%
-              if (fraction < 0.0001*length) fraction = 0.;
+              if (fraction < 0.0001*plane_mag) fraction = 0.;
               face_fraction[field]->operator()(p) = fraction;
            }
         }
