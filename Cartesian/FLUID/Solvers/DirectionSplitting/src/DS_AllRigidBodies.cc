@@ -1071,7 +1071,8 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
 
 //---------------------------------------------------------------------------
-double DS_AllRigidBodies:: return_side_fraction(geomVector const& pt1
+std::tuple<double, geomVector> DS_AllRigidBodies::
+                           return_side_fraction(geomVector const& pt1
                                               , geomVector const& pt2 )
 //---------------------------------------------------------------------------
 {
@@ -1085,6 +1086,7 @@ double DS_AllRigidBodies:: return_side_fraction(geomVector const& pt1
   bool pt1_solid = (level_set_value(parID,pt1) < threshold) ? true : false ;
   bool pt2_solid = (level_set_value(parID,pt2) < threshold) ? true : false ;
 
+  geomVector intersection_pt(0.,0.,0.);
   geomVector rayVec = pt2 - pt1;
   double vecMag = rayVec.calcNorm();
   rayVec = (1./vecMag) * rayVec;
@@ -1093,16 +1095,18 @@ double DS_AllRigidBodies:: return_side_fraction(geomVector const& pt1
   if (pt1_solid && !pt2_solid) {
      fraction = m_allDSrigidbodies[parID]
              ->get_distanceTo( pt2, -1.*rayVec, vecMag );
+     intersection_pt = pt2 - fraction*rayVec;
   } else if (!pt1_solid && pt2_solid) {  // pt1 in fluid and pt2 in solid
      fraction = m_allDSrigidbodies[parID]
              ->get_distanceTo( pt1, rayVec, vecMag );
+     intersection_pt = pt1 + fraction*rayVec;
   } else if (!pt1_solid && !pt2_solid) { // both pt1 and pt2 in fluid
      fraction = vecMag;
   } else if (pt1_solid && pt2_solid) {   // both pt1 and pt2 in solid
      fraction = 0.;
   }
 
-  return(fraction);
+  return(std::make_tuple(fraction, intersection_pt));
 
 }
 
@@ -1119,12 +1123,12 @@ void DS_AllRigidBodies:: compute_face_fractions()
   // Get local min and max indices
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
+  geomVector ZERO(0.,0.,0.);
 
   for (size_t comp = 0; comp < nb_comps; comp++) {
      size_t face_normal = comp;
      geomVector face_plane(1.,1.,1.);
      face_plane(face_normal) = 0.;
-     size_t wall_dir = (comp == 0) ? 1 : 0;
 
      for (size_t l = 0; l < m_space_dimension; ++l) {
         min_unknown_index(l) =
@@ -1148,16 +1152,27 @@ void DS_AllRigidBodies:: compute_face_fractions()
                         : UF->get_cell_size( k, comp, 2 ) ;
               face_plane(2) = (face_plane(2) != 0) ? dz : 0;
 
+
+              vector<geomVector> intersect_pt;
               double fraction = 0.;
               double plane_mag = face_plane.calcNorm();
               size_t p = UF->DOF_local_number(i, j, k, comp);
+
+              vector<geomVector> vgV = {ZERO};
+              intersect_points[p] = vgV;
 
               if (m_space_dimension == 2) {
                  geomVector top(xC, yC, zC);
                  geomVector bot(xC, yC, zC);
                  top = top + 0.5*face_plane;
                  bot = bot - 0.5*face_plane;
-                 fraction = return_side_fraction(top, bot);
+                 auto int_pt = return_side_fraction(top, bot);
+                 fraction = std::get<0>(int_pt);
+                 geomVector pt = std::get<1>(int_pt);
+                 if (pt == ZERO) {
+                 } else {
+                    intersect_pt.push_back(pt);
+                 }
               } else {
                  geomVector topLeft(xC, yC, zC);
                  geomVector topRight(xC, yC, zC);
@@ -1195,10 +1210,17 @@ void DS_AllRigidBodies:: compute_face_fractions()
                     topLeft(1) = topLeft(1) + 0.5*face_plane(1);
                  }
 
-                 double rht_frac = return_side_fraction(topRight, botRight);
-                 double lft_frac = return_side_fraction(topLeft, botLeft);
-                 double top_frac = return_side_fraction(topLeft, topRight);
-                 double bot_frac = return_side_fraction(botLeft, botRight);
+                 auto rht = return_side_fraction(topRight, botRight);
+                 double rht_frac = std::get<0>(rht);
+
+                 auto lft = return_side_fraction(topLeft, botLeft);
+                 double lft_frac = std::get<0>(lft);
+
+                 auto top = return_side_fraction(topLeft, topRight);
+                 double top_frac = std::get<0>(top);
+
+                 auto bot = return_side_fraction(botLeft, botRight);
+                 double bot_frac = std::get<0>(bot);
 
                  // Face fraction calculations
                  vector<double> frac;
@@ -1251,6 +1273,7 @@ void DS_AllRigidBodies:: compute_face_fractions()
               // Eliminate contribution if less than 0.01%
               if (fraction < 0.0001*plane_mag) fraction = 0.;
               face_fraction[field]->operator()(p) = fraction;
+              intersect_points[p] = intersect_pt;
            }
         }
      }
@@ -4026,6 +4049,11 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    // Face fractions only for the UF field
    if (field == 1) {
       face_fraction[field]->re_initialize(FF_LOC_UNK);
+      intersect_points.reserve(FF_LOC_UNK);
+      geomVector vvv(0.,0.,0.);
+      vector<geomVector> vgV = {vvv};
+      for (size_t i = 0; i < FF_LOC_UNK; i++)
+         intersect_points.push_back(vgV);
    }
 
 }

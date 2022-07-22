@@ -254,7 +254,7 @@ class DS_AllRigidBodies
       /** @brief Returns the length of side in fluid
       @param pt1 Point 1
       @param pt2 Point 2 */
-      double return_side_fraction(geomVector const& pt1
+      std::tuple<double, geomVector> return_side_fraction(geomVector const& pt1
                                 , geomVector const& pt2 );
 
       /** @brief Computes the halo zone for all rigid bodies, required for
@@ -494,11 +494,8 @@ class DS_AllRigidBodies
       vector<doubleVector*> face_fraction; /**< vector of field grid nodes
       face fraction, only for UF*/
 
-      vector<size_t_vector*> rb_ID; /**< vector of rigid body ID on the
-      field grid node, if any */
-
-      vector<struct BoundaryBisec*> rb_intersect; /**< 2DArray of intersection
-      of field grid node near the rigid body with the rigid */
+      vector<vector<geomVector>> intersect_points; /**< vector of set of
+      intersection points on UF field grid faces*/
 
       // Columns in each variable are (left,right,bottom,top,behind,front)
       vector<size_t_array2D*> intersect_vector;  /**<Direction of intersection*/
