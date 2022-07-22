@@ -257,6 +257,14 @@ class DS_AllRigidBodies
       std::tuple<double, geomVector> return_side_fraction(geomVector const& pt1
                                 , geomVector const& pt2 );
 
+      /** @brief Returns the flux from RB given the PF node index
+      @param i index i
+      @param j index j
+      @param k index k */
+      double calculate_divergence_flux_fromRB ( size_t const& i,
+                                                size_t const& j,
+                                           		size_t const& k);
+
       /** @brief Computes the halo zone for all rigid bodies, required for
       void fraction and intersection calculation on the grid nodes */
       void compute_halo_zones_for_all_rigid_body( );

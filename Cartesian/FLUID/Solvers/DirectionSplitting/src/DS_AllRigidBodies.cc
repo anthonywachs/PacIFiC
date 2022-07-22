@@ -1285,6 +1285,89 @@ void DS_AllRigidBodies:: compute_face_fractions()
 
 
 //---------------------------------------------------------------------------
+double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
+                                            			   	     size_t const& j,
+                                      			   	           size_t const& k)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_AllRigidBodies:: calculate_divergence_flux_fromRB" ) ;
+
+   FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
+
+   size_t parID = 0;
+
+   vector<geomVector> point_on_plane;
+   vector<size_t> p;
+   geomVector ZERO(0.,0.,0.);
+
+   p.push_back(UF->DOF_local_number(shift.i+i, j, k, 0));
+   p.push_back(UF->DOF_local_number(shift.i+i-1, j, k, 0));
+   p.push_back(UF->DOF_local_number(i, shift.j+j, k, 1));
+   p.push_back(UF->DOF_local_number(i, shift.j+j-1, k, 1));
+
+   for (auto iter = p.begin(); iter != p.end(); iter++) {
+      for (auto it = intersect_points[*iter].begin();
+                it != intersect_points[*iter].end(); it++) {
+         if (*it == ZERO) {
+         } else {
+            bool present = false;
+            for (auto itt = point_on_plane.begin();
+                      itt != point_on_plane.end(); itt++) {
+               if (*it == *itt) {
+                  present = true;
+               }
+            }
+            if (!present) point_on_plane.push_back(*it);
+         }
+      }
+   }
+
+   if (!point_on_plane.empty()) {
+      // Normal vector of interface calculation
+      geomVector const* pgc = get_gravity_centre(parID);
+      geomVector p1(2), p2(2), pmid(2), pin(2), normal(2);
+      pin(0) = pgc->operator()(0);
+   	pin(1) = pgc->operator()(1);
+
+      p1(0) = point_on_plane[0](0);
+      p1(1) = point_on_plane[0](1);
+      p2(0) = point_on_plane[1](0);
+      p2(1) = point_on_plane[1](1);
+
+      pmid(0) = 0.5*(p1(0) + p2(0));
+   	pmid(1) = 0.5*(p1(1) + p2(1));
+   	normal(0) = p2(1) - p1(1);
+   	normal(1) = -(p2(0) - p1(0));
+   	if (((pin(0)-pmid(0))*normal(0) + (pin(1)-pmid(1))*normal(1)) >= 0.) {
+   		normal(0) = -1.*normal(0);
+   		normal(1) = -1.*normal(1);
+   	}
+
+      geomVector pt(pgc->operator()(0),
+   					  pgc->operator()(1),
+   					  pgc->operator()(2));
+   	geomVector rb_vel = rigid_body_velocity(parID,pt);
+
+   	double delta = MAC::sqrt(pow(p1(0)-p2(0),2.) + pow(p1(1)-p2(1),2.));
+   	double norm_mag = MAC::sqrt(pow(normal(0),2) + pow(normal(1),2));
+
+      if (norm_mag != 0.) {
+   		return(-delta*(normal(0)*rb_vel(0)+ normal(1)*rb_vel(1))/norm_mag);
+   	}
+   }
+   // for (auto iter = point_on_plane.begin(); iter != point_on_plane.end(); iter++) {
+   //    std::cout << i << "," << j << "," << k << "," << *iter << endl;
+   // }
+
+   return(0.);
+
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 double DS_AllRigidBodies:: delta_periodic_transformation( double const& delta
                                                      , size_t const& dir)
 //---------------------------------------------------------------------------
