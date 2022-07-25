@@ -2321,6 +2321,30 @@ DS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list 
 double DS_NavierStokes:: divergence_face_flux ( size_t const& i
 															 , size_t const& j
 															 , size_t const& k
+														 	 , size_t const& comp)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DDS_NavierStokes:: divergence_face_flux" ) ;
+
+
+	doubleVector* face_frac = (is_solids) ?
+							allrigidbodies->get_face_fraction_on_grid(UF) : 0;
+
+	double cVel = UF->DOF_value( i, j, k, comp, 0 );
+	size_t p = UF->DOF_local_number(i, j, k, comp);
+	double frac = face_frac->operator()(p);
+
+	return(cVel*frac);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_NavierStokes:: divergence_face_flux ( size_t const& i
+															 , size_t const& j
+															 , size_t const& k
 															 , size_t const& normal
 															 , double const& length
 															 , size_t const& level)
@@ -2347,20 +2371,12 @@ double DS_NavierStokes:: divergence_face_flux ( size_t const& i
 							        : UF->get_DOF_coordinate( i, comp, wall_dir );
    double botVel = (normal == 0) ? UF->DOF_value( i, j-1, k, comp, level )
   											: UF->DOF_value( i-1, j, k, comp, level );
-	double botVel2 = (normal == 0) ? UF->DOF_value( i, j-2, k, comp, level )
-  											: UF->DOF_value( i-2, j, k, comp, level );
 	double botY = (normal == 0) ? UF->get_DOF_coordinate( j-1, comp, wall_dir )
 										 : UF->get_DOF_coordinate( i-1, comp, wall_dir );
-	double botY2 = (normal == 0) ? UF->get_DOF_coordinate( j-2, comp, wall_dir )
- 										 : UF->get_DOF_coordinate( i-2, comp, wall_dir );
 	double topVel = (normal == 0) ? UF->DOF_value( i, j+1, k, comp, level )
 	 										: UF->DOF_value( i+1, j, k, comp, level );
-	double topVel2 = (normal == 0) ? UF->DOF_value( i, j+2, k, comp, level )
-	 										: UF->DOF_value( i+2, j, k, comp, level );
 	double topY = (normal == 0) ? UF->get_DOF_coordinate( j+1, comp, wall_dir )
 										 : UF->get_DOF_coordinate( i+1, comp, wall_dir );
-	double topY2 = (normal == 0) ? UF->get_DOF_coordinate( j+2, comp, wall_dir )
- 										 : UF->get_DOF_coordinate( i+2, comp, wall_dir );
    size_t pbot = (normal == 0) ? UF->DOF_local_number(i,j-1,k,comp)
 										 : UF->DOF_local_number(i-1,j,k,comp);
 	size_t ptop = (normal == 0) ? UF->DOF_local_number(i,j+1,k,comp)
@@ -2452,6 +2468,12 @@ double DS_NavierStokes:: divergence_face_flux ( size_t const& i
 				 MAC::abs(topY - xC - 0.5*length)) {
 				pt = (1./2.)*(topY + xC) + (1./2.)*(length/2.
 							  - intersect_distance->operator()(ptop,2*wall_dir + 0));
+
+				double topVel2 = (normal == 0) ? UF->DOF_value( i, j+2, k, comp, level )
+				  										 : UF->DOF_value( i+2, j, k, comp, level );
+				double topY2 = (normal == 0) ? UF->get_DOF_coordinate( j+2, comp, wall_dir )
+				  									  : UF->get_DOF_coordinate( i+2, comp, wall_dir );
+
 				xi(0) = topY - intersect_distance->operator()(ptop,2*wall_dir + 0);
 				fi(0) = cVel;
 				xi(1) = topY;
@@ -2470,6 +2492,11 @@ double DS_NavierStokes:: divergence_face_flux ( size_t const& i
 						  MAC::abs(xC - botY - 0.5*length)) {
 				pt = (1./2.)*(botY + xC) - (1./2.)*(length/2.
 							  - intersect_distance->operator()(pbot,2*wall_dir + 1));
+
+			   double botVel2 = (normal == 0) ? UF->DOF_value( i, j-2, k, comp, level )
+							  							 : UF->DOF_value( i-2, j, k, comp, level );
+			 	double botY2 = (normal == 0) ? UF->get_DOF_coordinate( j-2, comp, wall_dir )
+								  					  : UF->get_DOF_coordinate( i-2, comp, wall_dir );
 				xi(0) = botY2;
 				fi(0) = botVel2;
 				xi(1) = botY;
@@ -2664,18 +2691,29 @@ DS_NavierStokes:: calculate_velocity_divergence_cutCell ( size_t const& i,
 
 	FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 
-   double rht_flux = divergence_face_flux ( shift.i+i, j, k, 0, dy, level);
+   double rht_flux = (dim == 2) ? divergence_face_flux ( shift.i+i, j, k, 0, dy, level)
+										  : divergence_face_flux ( shift.i+i, j, k, 0);
 
-	double lft_flux = divergence_face_flux ( shift.i+i-1, j, k, 0, dy, level);
+	double lft_flux = (dim == 2) ? divergence_face_flux ( shift.i+i-1, j, k, 0, dy, level)
+										  : divergence_face_flux ( shift.i+i-1, j, k, 0);
 
-	double top_flux = divergence_face_flux ( i, shift.j+j, k, 1, dx, level);
+	double top_flux = (dim == 2) ? divergence_face_flux ( i, shift.j+j, k, 1, dx, level)
+										  : divergence_face_flux ( i, shift.j+j, k, 1);
 
-	double bot_flux = divergence_face_flux ( i, shift.j+j-1, k, 1, dx, level);
+	double bot_flux = (dim == 2) ? divergence_face_flux ( i, shift.j+j-1, k, 1, dx, level)
+										  : divergence_face_flux ( i, shift.j+j-1, k, 1);
+
+	double fnt_flux = (dim == 2) ? 0.
+  										  : divergence_face_flux ( i, j, shift.k+k, 2);
+
+  	double bnd_flux = (dim == 2) ? 0.
+  										  : divergence_face_flux ( i, j, shift.k+k, 2);
 
 	double xvalue = (rht_flux - lft_flux);
 	double yvalue = (top_flux - bot_flux);
+	double zvalue = (fnt_flux - bnd_flux);
 
-   return(xvalue + yvalue);
+   return(xvalue + yvalue + zvalue);
 }
 
 
@@ -2762,12 +2800,13 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 		// cout << "Div3: " << divergence->operator()(1284) << endl;
 		// Converting flux to divergence
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+			double dx = PF->get_cell_size( i, 0, 0 );
 			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+				double dy = PF->get_cell_size( j, 0, 1 );
 				for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+					double dz = (dim == 3) ? PF->get_cell_size( k, 0, 2 ) : 1.;
 					size_t p = PF->DOF_local_number(i,j,k,comp);
-					double dx = PF->get_cell_size( i, 0, 0 );
-				   double dy = PF->get_cell_size( j, 0, 1 );
-					divergence->operator()(p) = divergence->operator()(p) / dx/dy;
+					divergence->operator()(p) = divergence->operator()(p) /dx/dy/dz;
 				}
 			}
 		}

@@ -217,6 +217,11 @@ class DS_NavierStokes : public MAC_Object,
       void calculate_row_indexes ( FV_DiscreteField const* FF);
 
       double divergence_face_flux ( size_t const& i
+                                  , size_t const& j
+                                  , size_t const& k
+                                  , size_t const& comp);
+
+      double divergence_face_flux ( size_t const& i
 										    , size_t const& j
       									 , size_t const& k
       									 , size_t const& normal
