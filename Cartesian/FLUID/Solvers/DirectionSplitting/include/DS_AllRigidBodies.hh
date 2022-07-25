@@ -265,6 +265,12 @@ class DS_AllRigidBodies
                                                 size_t const& j,
                                            		size_t const& k);
 
+      /** @brief Calculates the area of RB section with given vector
+      of polygon corners
+      @param points vector of points */
+      double calculate_area_of_RBplane( vector<geomVector> const& points
+                                      , geomVector const& normal);
+
       /** @brief Computes the halo zone for all rigid bodies, required for
       void fraction and intersection calculation on the grid nodes */
       void compute_halo_zones_for_all_rigid_body( );

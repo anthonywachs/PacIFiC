@@ -1212,15 +1212,35 @@ void DS_AllRigidBodies:: compute_face_fractions()
 
                  auto rht = return_side_fraction(topRight, botRight);
                  double rht_frac = std::get<0>(rht);
+                 geomVector pt = std::get<1>(rht);
+                 if (pt == ZERO) {
+                 } else {
+                    intersect_pt.push_back(pt);
+                 }
 
                  auto lft = return_side_fraction(topLeft, botLeft);
                  double lft_frac = std::get<0>(lft);
+                 pt = std::get<1>(lft);
+                 if (pt == ZERO) {
+                 } else {
+                    intersect_pt.push_back(pt);
+                 }
 
                  auto top = return_side_fraction(topLeft, topRight);
                  double top_frac = std::get<0>(top);
+                 pt = std::get<1>(top);
+                 if (pt == ZERO) {
+                 } else {
+                    intersect_pt.push_back(pt);
+                 }
 
                  auto bot = return_side_fraction(botLeft, botRight);
                  double bot_frac = std::get<0>(bot);
+                 pt = std::get<1>(bot);
+                 if (pt == ZERO) {
+                 } else {
+                    intersect_pt.push_back(pt);
+                 }
 
                  // Face fraction calculations
                  vector<double> frac;
@@ -1305,6 +1325,12 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
    p.push_back(UF->DOF_local_number(i, shift.j+j, k, 1));
    p.push_back(UF->DOF_local_number(i, shift.j+j-1, k, 1));
 
+   if (m_space_dimension == 3) {
+      p.push_back(UF->DOF_local_number(i, j, shift.k+k, 2));
+      p.push_back(UF->DOF_local_number(i, j, shift.k+k-1, 2));
+   }
+   
+   // Creating a vector of unique points of the intersect plane
    for (auto iter = p.begin(); iter != p.end(); iter++) {
       for (auto it = intersect_points[*iter].begin();
                 it != intersect_points[*iter].end(); it++) {
@@ -1325,42 +1351,136 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
    if (!point_on_plane.empty()) {
       // Normal vector of interface calculation
       geomVector const* pgc = get_gravity_centre(parID);
-      geomVector p1(2), p2(2), pmid(2), pin(2), normal(2);
+      geomVector p1(3), p2(3), pmid(3), pin(3), normal(3);
       pin(0) = pgc->operator()(0);
    	pin(1) = pgc->operator()(1);
+      pin(2) = pgc->operator()(2);
 
-      p1(0) = point_on_plane[0](0);
-      p1(1) = point_on_plane[0](1);
-      p2(0) = point_on_plane[1](0);
-      p2(1) = point_on_plane[1](1);
+      // std::cout << "Number of points in the box: " << point_on_plane.size() << endl;
 
-      pmid(0) = 0.5*(p1(0) + p2(0));
-   	pmid(1) = 0.5*(p1(1) + p2(1));
-   	normal(0) = p2(1) - p1(1);
-   	normal(1) = -(p2(0) - p1(0));
-   	if (((pin(0)-pmid(0))*normal(0) + (pin(1)-pmid(1))*normal(1)) >= 0.) {
-   		normal(0) = -1.*normal(0);
-   		normal(1) = -1.*normal(1);
-   	}
+      // Calulation of the vector normal to RB plane
+      if (point_on_plane.size() == 1) {
+         std::cout << "WARNING check your code: Possibly a bug !!!" << endl;
+      } else if (point_on_plane.size() == 2) {
+         p1(0) = point_on_plane[0](0);
+         p1(1) = point_on_plane[0](1);
+         p2(0) = point_on_plane[1](0);
+         p2(1) = point_on_plane[1](1);
+
+         pmid(0) = 0.5*(p1(0) + p2(0));
+      	pmid(1) = 0.5*(p1(1) + p2(1));
+      	normal(0) = p2(1) - p1(1);
+      	normal(1) = -(p2(0) - p1(0));
+      } else {
+         // Compute centeroid of plane
+         for (auto iter = point_on_plane.begin();
+                   iter != point_on_plane.end(); iter++) {
+            geomVector temp = *iter;
+            pmid += *iter;
+         }
+         pmid /= (double) point_on_plane.size();
+
+         normal = (point_on_plane[1] - point_on_plane[0])
+                ^ (point_on_plane[2] - point_on_plane[0]);
+      }
+
+      if (((pin(0)-pmid(0))*normal(0)
+         + (pin(1)-pmid(1))*normal(1)
+         + (pin(2)-pmid(2))*normal(2)) >= 0.) {
+         normal = -1.*normal;
+      }
 
       geomVector pt(pgc->operator()(0),
    					  pgc->operator()(1),
    					  pgc->operator()(2));
    	geomVector rb_vel = rigid_body_velocity(parID,pt);
 
-   	double delta = MAC::sqrt(pow(p1(0)-p2(0),2.) + pow(p1(1)-p2(1),2.));
+   	double area = calculate_area_of_RBplane(point_on_plane, normal);
    	double norm_mag = MAC::sqrt(pow(normal(0),2) + pow(normal(1),2));
 
       if (norm_mag != 0.) {
-   		return(-delta*(normal(0)*rb_vel(0)+ normal(1)*rb_vel(1))/norm_mag);
+   		return(-area*(normal(0)*rb_vel(0)+ normal(1)*rb_vel(1))/norm_mag);
    	}
    }
-   // for (auto iter = point_on_plane.begin(); iter != point_on_plane.end(); iter++) {
-   //    std::cout << i << "," << j << "," << k << "," << *iter << endl;
-   // }
 
    return(0.);
 
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_AllRigidBodies:: calculate_area_of_RBplane(
+                                        vector<geomVector> const& points
+                                      , geomVector const& normal)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: calculate_area_of_RBplane" ) ;
+
+  size_t nbPts = points.size();
+  double area = 0.;
+
+  if (nbPts == 2) {
+     area = MAC::sqrt(pow(points[0](0) - points[1](0),2)
+                    + pow(points[0](1) - points[1](1),2)
+                    + pow(points[0](2) - points[1](2),2));
+  } else {
+     geomVector centroid(3);
+     for (auto iter = points.begin(); iter != points.end(); iter++) {
+         centroid += *iter;
+     }
+     centroid /= (double) nbPts;
+
+     // ------------Sort the vertices------------------------------------------
+     struct PtStruct {
+        geomVector pt;
+        double angle;
+     };
+     vector<PtStruct> point_struct;
+     vector<double> angle;
+     geomVector ref_vec = points[0] - centroid;
+     PtStruct temp;
+     temp.pt = points[0];
+     temp.angle = 0.;
+     point_struct.push_back(temp);
+     for (auto iter = points.begin() + 1; iter != points.end(); iter++) {
+        geomVector test_vec = *iter - centroid;
+        geomVector cross = ref_vec^test_vec;
+        double dot = (cross,normal);
+        double norm = cross.calcNorm();
+        if (dot < 0) norm *= -1 ;
+        temp.pt = *iter;
+        temp.angle = atan2(norm,(ref_vec,test_vec));
+        point_struct.push_back(temp);
+     }
+     std::sort(point_struct.begin(), point_struct.end(),
+                          [](const PtStruct& i, const PtStruct& j)
+                           { return i.angle < j.angle; } );
+     //------------------------------------------------------------------------
+     // Area integration
+     for (size_t i = 0; i < nbPts-1; i++) {
+         geomVector pt1 = point_struct[i].pt;
+         geomVector pt2 = point_struct[i+1].pt;
+         double a = centroid.calcDist(pt1);
+         double b = centroid.calcDist(pt2);
+         double c = pt1.calcDist(pt2);
+         double s = 0.5 * (a + b + c);
+         area += MAC::sqrt(s * (s - a) * (s - b) * (s - c));
+     }
+
+     geomVector pt1 = point_struct[0].pt;
+     geomVector pt2 = point_struct[nbPts-1].pt;
+     double a = centroid.calcDist(pt1);
+     double b = centroid.calcDist(pt2);
+     double c = pt1.calcDist(pt2);
+     double s = 0.5 * (a + b + c);
+     area += MAC::sqrt(s * (s - a) * (s - b) * (s - c));
+
+  }
+
+  return(area);
 
 }
 
