@@ -1315,26 +1315,34 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
    FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 
    size_t parID = 0;
+   size_t UNK_MAX = UF->nb_local_unknowns();
 
    vector<geomVector> point_on_plane;
    vector<size_t> p;
    geomVector ZERO(0.,0.,0.);
 
-   p.push_back(UF->DOF_local_number(shift.i+i, j, k, 0));
-   p.push_back(UF->DOF_local_number(shift.i+i-1, j, k, 0));
-   p.push_back(UF->DOF_local_number(i, shift.j+j, k, 1));
-   p.push_back(UF->DOF_local_number(i, shift.j+j-1, k, 1));
+   size_t rht = UF->DOF_local_number(shift.i+i, j, k, 0);
+   if (rht <= UNK_MAX) p.push_back(rht);
+   size_t lft = UF->DOF_local_number(shift.i+i-1, j, k, 0);
+   if (lft <= UNK_MAX) p.push_back(lft);
+   size_t top = UF->DOF_local_number(i, shift.j+j, k, 1);
+   if (top <= UNK_MAX) p.push_back(top);
+   size_t bot = UF->DOF_local_number(i, shift.j+j-1, k, 1);
+   if (bot <= UNK_MAX) p.push_back(bot);
 
    if (m_space_dimension == 3) {
-      p.push_back(UF->DOF_local_number(i, j, shift.k+k, 2));
-      p.push_back(UF->DOF_local_number(i, j, shift.k+k-1, 2));
+      size_t fnt = UF->DOF_local_number(i, j, shift.k+k, 2);
+      if (fnt <= UNK_MAX) p.push_back(fnt);
+      size_t bnd = UF->DOF_local_number(i, j, shift.k+k-1, 2);
+      if (bnd <= UNK_MAX) p.push_back(bnd);
    }
-   
+
    // Creating a vector of unique points of the intersect plane
-   for (auto iter = p.begin(); iter != p.end(); iter++) {
+   for (auto iter = p.begin(); iter < p.end(); iter++) {
       for (auto it = intersect_points[*iter].begin();
-                it != intersect_points[*iter].end(); it++) {
+                it < intersect_points[*iter].end(); it++) {
          if (*it == ZERO) {
+            continue;
          } else {
             bool present = false;
             for (auto itt = point_on_plane.begin();
@@ -2888,8 +2896,8 @@ DS_AllRigidBodies:: second_order_viscous_stress(size_t const& parID)
                 surface_point[i]->operator()(0) - pgc->operator()(0), 0);
      delta(1) = delta_periodic_transformation(
                 surface_point[i]->operator()(1) - pgc->operator()(1), 1);
-     delta(2) = delta_periodic_transformation(
-                surface_point[i]->operator()(2) - pgc->operator()(2), 2);
+     delta(2) = (m_space_dimension == 3) ? delta_periodic_transformation(
+                surface_point[i]->operator()(2) - pgc->operator()(2), 2) : 0;
 
      viscous_torque->operator()(parID,0) += value(2)*delta(1)
                                           - value(1)*delta(2);
@@ -3159,8 +3167,8 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
                 surface_point[i]->operator()(0) - pgc->operator()(0), 0);
      delta(1) = delta_periodic_transformation(
                 surface_point[i]->operator()(1) - pgc->operator()(1), 1);
-     delta(2) = delta_periodic_transformation(
-                surface_point[i]->operator()(2) - pgc->operator()(2), 2);
+     delta(2) = (m_space_dimension == 3) ? delta_periodic_transformation(
+                surface_point[i]->operator()(2) - pgc->operator()(2), 2) : 0.;
 
      viscous_torque->operator()(parID,0) += value(2)*delta(1)
                                           - value(1)*delta(2);

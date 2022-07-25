@@ -2324,7 +2324,7 @@ double DS_NavierStokes:: divergence_face_flux ( size_t const& i
 														 	 , size_t const& comp)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: divergence_face_flux" ) ;
+   MAC_LABEL("DS_NavierStokes:: divergence_face_flux" ) ;
 
 
 	doubleVector* face_frac = (is_solids) ?
@@ -2350,7 +2350,7 @@ double DS_NavierStokes:: divergence_face_flux ( size_t const& i
 															 , size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DDS_NavierStokes:: divergence_face_flux" ) ;
+   MAC_LABEL("DS_NavierStokes:: divergence_face_flux" ) ;
 
    double value;
 	size_t comp = normal;
@@ -2387,11 +2387,15 @@ double DS_NavierStokes:: divergence_face_flux ( size_t const& i
 
 	double delta = length;
 
+	size_t p = UF->DOF_local_number(i,j,k,comp);
+
+	if (p > UF->nb_local_unknowns()) {
+		return(UF->DOF_value( i, j, k, comp, level )*length);
+	}
+
    if (is_solids) {
       value = 0.;
 		delta = 0.;
-
-		size_t p = UF->DOF_local_number(i,j,k,comp);
 
       if (void_frac->operator()(p) == 0) {
          if ((intersect_vector->operator()(p,2*wall_dir + 0) == 1) &&
