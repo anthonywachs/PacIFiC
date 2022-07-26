@@ -540,8 +540,8 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         acc(dir) = gg(dir)*(1-m_rho/rho_p) + (viscous_force->operator()(parID,dir)
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
-        // vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-        vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*2.*t_it->time()) : 0.;
+        vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+        // vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*2.*t_it->time()) : 0.;
         pos(dir) = periodic_transformation(pos(dir)
                                          + vel(dir)*t_it->time_step()
                                                          , dir) ;
@@ -1132,9 +1132,9 @@ void DS_AllRigidBodies:: compute_face_fractions()
 
      for (size_t l = 0; l < m_space_dimension; ++l) {
         min_unknown_index(l) =
-                        UF->get_min_index_unknown_handled_by_proc( comp,l );
+                        UF->get_min_index_unknown_on_proc( comp,l );
         max_unknown_index(l) =
-                        UF->get_max_index_unknown_handled_by_proc( comp,l );
+                        UF->get_max_index_unknown_on_proc( comp,l );
      }
 
      for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
@@ -1151,7 +1151,6 @@ void DS_AllRigidBodies:: compute_face_fractions()
               double dz = (m_space_dimension == 2) ? 0.
                         : UF->get_cell_size( k, comp, 2 ) ;
               face_plane(2) = (face_plane(2) != 0) ? dz : 0;
-
 
               vector<geomVector> intersect_pt;
               double fraction = 0.;
@@ -1368,7 +1367,7 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
 
       // Calulation of the vector normal to RB plane
       if (point_on_plane.size() == 1) {
-         std::cout << "WARNING check your code: Possibly a bug !!!" << endl;
+         std::cout << "WARNING:: Check your code. Possibly a bug !!!" << endl;
       } else if (point_on_plane.size() == 2) {
          p1(0) = point_on_plane[0](0);
          p1(1) = point_on_plane[0](1);
