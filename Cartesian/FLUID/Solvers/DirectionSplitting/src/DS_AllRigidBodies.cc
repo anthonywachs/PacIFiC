@@ -574,11 +574,11 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         double Dmin = MESH->get_main_domain_min_coordinate( dir );
         double Dmax = MESH->get_main_domain_max_coordinate( dir );
         if (periodic_comp->operator()(dir)) {
-           if (MAC::abs(pos(dir)-Dmin) <= radius) {
+           if (MAC::abs(pos(dir)-Dmin) <= 2.*radius) {
               geomVector delta_clone(3);
               delta_clone(dir) = (Dmax - Dmin);
               m_periodic_directions.push_back(delta_clone);
-           } else if (MAC::abs(pos(dir)-Dmax) <= radius) {
+           } else if (MAC::abs(pos(dir)-Dmax) <= 2.*radius) {
               geomVector delta_clone(3);
               delta_clone(dir) = - (Dmax - Dmin);
               m_periodic_directions.push_back(delta_clone);
@@ -1391,9 +1391,13 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
                 ^ (point_on_plane[2] - point_on_plane[0]);
       }
 
-      if (((pin(0)-pmid(0))*normal(0)
-         + (pin(1)-pmid(1))*normal(1)
-         + (pin(2)-pmid(2))*normal(2)) >= 0.) {
+      geomVector delta = pin - pmid;
+      delta(0) = delta_periodic_transformation(delta(0), 0);
+      delta(1) = delta_periodic_transformation(delta(1), 1);
+      delta(2) = (m_space_dimension == 3) ?
+                 delta_periodic_transformation(delta(2), 2) : delta(2);
+
+      if ((delta(0)*normal(0)+delta(1)*normal(1)+delta(2)*normal(2)) >= 0.) {
          normal = -1.*normal;
       }
 
