@@ -2,9 +2,121 @@
 # Compute the curvature of the mesh in 2D and 3D
 
 */
+#if dimension < 3
 
-#if dimension > 2
-#include "matrix_toolbox.h"
+/**
+## Two-dimensional curvature computation
+
+In 2D, we compute the curvature by fitting a 4th-degree polynomial to the mesh using two neighbours on each side of the node of interest
+*/
+
+void compute_2d_curvature(lagMesh*) {
+  bool up; // decide if we switch the x and y axes
+  lagNode* cn; // current node
+  for(int i=0; i<mesh->nlp; i++) {
+    cn = &(mesh->nodes[i]);
+    up = (fabs(cn->normal.y) > fabs(cn->normal.x)) ? true : false;
+    coord p[5]; // store the coordinates of the current node and of its
+                // neighbors'
+    for(int j=0; j<5; j++) {
+      int index = (mesh->nlp + i - 2 + j)%mesh->nlp;
+      foreach_dimension() p[j].x = up ? mesh->nodes[index].pos.x :
+        mesh->nodes[index].pos.y;
+    }
+    /** If one of the neighboring nodes is across a periodic boundary, we
+correct its position */
+    for(int j=0; j<5; j++) {
+      if (j!=2) {
+        foreach_dimension() {
+          if (ACROSS_PERIODIC(p[j].x,p[2].x)) {
+            p[j].x += (ACROSS_PERIODIC(p[j].x + L0, p[2].x)) ? -L0 : L0;
+          }
+        }
+      }
+    }
+
+/** Since the bending force will involve taking the laplacian of the curvature,
+we seek a cuvrature to fourth order accuracy, so we need to interpolate the
+membrane with a fourth-degree polynomial, which we need to differentiate twice
+to get the curvature:
+$$P_4(x) = \sum_{j=i-2}^{i+2} y_j \prod_{k \neq j} \frac{x - x_j}{x_k - x_j} $$
+
+$$P'_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
+\right) \sum_{l \neq j}\prod_{m \neq j, m \neq l} x - x_m $$
+
+$$P''_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
+\right) \sum_{l \neq j}\sum_{m \neq j, m \neq l}\sum_{n \neq j, n \neq l, n
+\neq m}x - x_n $$
+*/
+    double dy = 0.;
+    double ddy = 0.;
+    for(int j=0; j<5; j++) {
+      double b1 = 0.; double b2 = 0.;
+      for(int l=0; l<5; l++) {
+        if (l!=j) {
+          double c1 = 1.; double c2 = 0.;
+          for(int m=0; m<5; m++) {
+            if (m!=j && m!=l) {
+              double d2 = 1.;
+              for(int n=0; n<5; n++) {
+                if (n!=j && n!=l && n!= m) {
+                  d2 *= p[2].x - p[n].x;
+                }
+              }
+              c1 *= p[2].x - p[m].x;
+              c2 += d2;
+            }
+          }
+          b1 += c1;
+          b2 += c2;
+        }
+      }
+      for(int k=0; k<5; k++) {
+        if (k!=j) {
+          b1 /= (p[k].x - p[j].x);
+          b2 /= (p[k].x - p[j].x);
+        }
+      }
+      dy += b1*p[j].y;
+      ddy += b2*p[j].y;
+    }
+
+    /** The formula for the signed curvature of a function y(x) is
+$$ \kappa = \frac{y''}{(1 + y'^2)^{\frac{3}{2}}}. $$
+The sign is dertemined from a parametrization of the curve: walking
+anticlockwise along the curve, if we turn left the curvature is positive. This
+statement can be easily written as a dot product between edge i's normal
+vector and edge (i+1)'s direction vector.*/
+    coord a, b;
+    foreach_dimension() {
+      a.x = mesh->edges[mesh->nodes[i].edge_ids[0]].normal.x;
+      b.x = mesh->edges[mesh->nodes[i].edge_ids[1]].normal.x;
+    }
+    int s = (a.x*b.x + a.y*b.y > 0) ? 1 : -1;
+    cn->curv = s*fabs(ddy)/cube(sqrt(1 + sq(dy)));
+  }
+}
+
+/**
+## Three-dimensional curvature computation
+
+In 3D things are a little more complicated. Fitting a 4-th degree polynomial to
+the two-ring neighbors is too cumbersome and instead we fit a second-degree
+paraboloid to the first-ring neighbors, following the approach of Yazdani and
+Bagchi.
+
+In most cases the node of interest has six neighbors and the system is
+overconstrained: we use the least-square method which we
+perform several times using a new normal vector computed from the paraboloid
+equation.
+
+Since this method involves inverting small $5 \times 5$ matrices, we include the
+header file [matrix_toolbox.h](matrix_toolbox.h) containing helper functions to
+perform this operation using the LU-decomposition.
+*/
+
+#else // dimension == 3
+#include "matrix-toolbox.h"
 
 /**
 The function below fits a second-degree paraboloid to the one-ring neighbors
@@ -190,121 +302,20 @@ double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
 #endif
 
 /**
+## General computation of the nodal curvatures
+
 The function below computes the signed curvature of the Lagrangian mesh at each
-node. It scales in a second-order fashion with the number of Lagrangian points.
-It only works in two dimensions.
+node.
 */
 void comp_curvature(lagMesh* mesh) {
   if (!mesh->updated_curvatures) {
     comp_normals(mesh);
-/**
-## Two-dimensional curvature computation
-
-In 2D, we compute the curvature by fitting a 4th-degree polynomial to the mesh using two neighbours on each side of the node of interest
-*/
     #if dimension < 3
-    bool up; // decide if we switch the x and y axes
-    lagNode* cn; // current node
-    for(int i=0; i<mesh->nlp; i++) {
-      cn = &(mesh->nodes[i]);
-      up = (fabs(cn->normal.y) > fabs(cn->normal.x)) ? true : false;
-      coord p[5]; // store the coordinates of the current node and of its
-                  // neighbors'
-      for(int j=0; j<5; j++) {
-        int index = (mesh->nlp + i - 2 + j)%mesh->nlp;
-        foreach_dimension() p[j].x = up ? mesh->nodes[index].pos.x :
-          mesh->nodes[index].pos.y;
+      compute_2d_curvature(mesh);
+    #else
+      for(int i=0; i<mesh->nlp; i++) {
+        laplace_beltrami(mesh, i, false);
       }
-      /** If one of the neighboring nodes is across a periodic boundary, we
-correct its position */
-      for(int j=0; j<5; j++) {
-        if (j!=2) {
-          foreach_dimension() {
-            if (ACROSS_PERIODIC(p[j].x,p[2].x)) {
-              p[j].x += (ACROSS_PERIODIC(p[j].x + L0, p[2].x)) ? -L0 : L0;
-            }
-          }
-        }
-      }
-
-/** Since the bending force will involve taking the laplacian of the curvature,
-we seek a cuvrature to fourth order accuracy, so we need to interpolate the
-membrane with a fourth-degree polynomial, which we need to differentiate twice
-to get the curvature:
-$$P_4(x) = \sum_{j=i-2}^{i+2} y_j \prod_{k \neq j} \frac{x - x_j}{x_k - x_j} $$
-
-$$P'_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
-\right) \sum_{l \neq j}\prod_{m \neq j, m \neq l} x - x_m $$
-
-$$P''_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
-\right) \sum_{l \neq j}\sum_{m \neq j, m \neq l}\sum_{n \neq j, n \neq l, n
-\neq m}x - x_n $$
-*/
-      double dy = 0.;
-      double ddy = 0.;
-      for(int j=0; j<5; j++) {
-        double b1 = 0.; double b2 = 0.;
-        for(int l=0; l<5; l++) {
-          if (l!=j) {
-            double c1 = 1.; double c2 = 0.;
-            for(int m=0; m<5; m++) {
-              if (m!=j && m!=l) {
-                double d2 = 1.;
-                for(int n=0; n<5; n++) {
-                  if (n!=j && n!=l && n!= m) {
-                    d2 *= p[2].x - p[n].x;
-                  }
-                }
-                c1 *= p[2].x - p[m].x;
-                c2 += d2;
-              }
-            }
-            b1 += c1;
-            b2 += c2;
-          }
-        }
-        for(int k=0; k<5; k++) {
-          if (k!=j) {
-            b1 /= (p[k].x - p[j].x);
-            b2 /= (p[k].x - p[j].x);
-          }
-        }
-        dy += b1*p[j].y;
-        ddy += b2*p[j].y;
-      }
-
-      /** The formula for the signed curvature of a function y(x) is
-  $$ \kappa = \frac{y''}{(1 + y'^2)^{\frac{3}{2}}}. $$
-  The sign is dertemined from a parametrization of the curve: walking
-  anticlockwise along the curve, if we turn left the curvature is positive. This
-  statement can be easily written as a dot product between edge i's normal
-  vector and edge (i+1)'s direction vector.*/
-      coord a, b;
-      foreach_dimension() {
-        a.x = mesh->edges[mesh->nodes[i].edge_ids[0]].normal.x;
-        b.x = mesh->edges[mesh->nodes[i].edge_ids[1]].normal.x;
-      }
-      int s = (a.x*b.x + a.y*b.y > 0) ? 1 : -1;
-      cn->curv = s*fabs(ddy)/cube(sqrt(1 + sq(dy)));
-    }
-
-/**
-## Three-dimensional curvature computation
-
-In 3D things are a little more complicated. Fitting a 4-th degree polynomial to
-the two-ring neighbors is too cumbersome and instead we fit a second-degree
-paraboloid to the first-ring neighbors, following the approach of Yazdani and
-Bagchi.
-
-In most cases the node of interest has six neighbors and the system is
-overconstrained: we use the least-square method which we
-perform several times using a new normal vector computed from the paraboloid
-equation.
-*/
-    #else // dimension == 3
-    for(int i=0; i<mesh->nlp; i++) {
-      laplace_beltrami(mesh, i, false);
-    }
     #endif
     mesh->updated_curvatures = true;
   }

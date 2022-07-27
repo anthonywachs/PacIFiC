@@ -36,15 +36,25 @@ neo-Hookean elatic law.
 * [skalak.h](src/lagrangian_caps/skalak.h): Implementation of the
 Skalak elatic law, describing lipid-bilayer biological membranes. Not valid in
 two dimensions.
+* [higer-order-neo-hookean.h](src/lagrangian_caps/ho-neo-hookean.h):
+Implementation of the higher-order neo-Hookean elastic force, for extreme
+deformation of red blood cells.
+* [bending-ft.h](src/lagrangian_caps/bending-ft.h): Implementation of a bending
+force (in 3D only, the 2D implementation is located [here](src/lagrangian_caps/bending-2d.c) but might be bugged).
+* [curvature-ft.h](src/lagrangian_caps/curvature-ft.h): Implementation of the
+nodal curvature computations for 2D and 3D membranes, by fitting polynomial to
+the nearest neighbors (and using the ordinary least-squares method in 3D).
 * [caps-viscosity.h](src/lagrangian_caps/caps-viscosity.h): Allows non-unity
-viscosity ratios between the fluids inner and outer the capsule. Based on the
-method of Tryggvason.
-* [bending-2d.h](src/lagrangian_caps/bending-2d.h): Implementation of a bending
-force, in process of debugging.
+viscosity ratios between the fluids inner and outer to the capsule. Based on the
+method of Tryggvason et al.
 * [view-ft.h](src/lagrangian_caps/view-ft.h): Allows visualization of the
 Lagrangian mesh using bview.
 * [common-shapes.h](src/lagrangian_caps/common-shapes.h): Some pre-defined
 initial shapes for the capsules.
+* [matrix-toolbox](src/lagrangian_caps/matrix-toolbox.h): An implementation in
+C of the inversion of matrices using LU-decomposition, copy-pasted entirely
+from this
+[Wikipedia page](https://en.wikipedia.org/wiki/LU_decomposition#C_code_example).
 * [linear_elasticity.h](src/lagrangian_caps/linear-elasticity.h): Implementation
 of a linear elastic law, useful only for comparison with some papers from
 Pozrikidis.
@@ -71,13 +81,19 @@ result to various authors.
 the Skalak elasticty law, the interaction with embedded boundaries and compares
 quantitatively the deformation of the capsule to that of Park \&
 Dimitrakopoulos.
+* [Capsules interception](tests/lagrangian_caps/caps_interception.c): tests the
+interaction of two elastic capsules, and compares to the work of Lu and
+Barthès-Biesel, JFM, 2007.
 
 #### Limitations and known bugs
-* The bending force currently leads to numerical instabilities, probably due to
-a wrong understanding of the force formulation on my part. More on this later.
+* The 2D bending force currently leads to numerical instabilities, probably due
+to a wrong understanding of the force formulation on my part.
 * Multigrid: since the Cache structure is used in the IBM implementation, the
 code on this sandbox is compatible with quad/octree grids but not Cartesian or
 multigrid.
+* Visualization tools: visualizing the edges of the mesh in 3D is necessary to
+get some visual perspective because the textures on triangular faces (i.e. the
+shades) have not been implemented.
 
 
 ## Eulerian framework
