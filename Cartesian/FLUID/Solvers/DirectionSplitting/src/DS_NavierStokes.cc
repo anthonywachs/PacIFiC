@@ -2811,7 +2811,7 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 														->flux_redistribution_factor(i,j,k);
 
 					// Flux redistribution
-					double sum = wht[0] + wht[1] + wht[2] + wht[3];
+					double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];
 
 					if (sum > 0.) {
 						if (p_lft <= PF_UNK_MAX)
