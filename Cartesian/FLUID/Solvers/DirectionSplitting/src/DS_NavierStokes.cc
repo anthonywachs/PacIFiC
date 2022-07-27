@@ -2756,6 +2756,8 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 	size_t_vector min_unknown_index(3,0);
 	size_t_vector max_unknown_index(3,0);
 
+	size_t PF_UNK_MAX = PF->nb_local_unknowns();
+
 
 	for (size_t l = 0; l < dim; ++l) {
 		min_unknown_index(l) = PF->get_min_index_unknown_on_proc( 0, l ) ;
@@ -2797,7 +2799,33 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
 				for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
-					redistribute_divergence_flux(i,j,k);
+					size_t p_lft = PF->DOF_local_number(i-1,j,k,0);
+					size_t p_rht = PF->DOF_local_number(i+1,j,k,0);
+					size_t p_bot = PF->DOF_local_number(i,j-1,k,0);
+					size_t p_top = PF->DOF_local_number(i,j+1,k,0);
+					size_t p = PF->DOF_local_number(i,j,k,0);
+
+					vector<double> wht = allrigidbodies
+														->flux_redistribution_factor(i,j,k);
+
+					// Flux redistribution
+					double sum = wht[0] + wht[1] + wht[2] + wht[3];
+
+					if (sum > 0.) {
+						if (p_lft <= PF_UNK_MAX)
+							divergence->operator()(p_lft) +=
+													wht[0]/sum * divergence->operator()(p);
+						if (p_rht <= PF_UNK_MAX)
+							divergence->operator()(p_rht) +=
+													wht[1]/sum * divergence->operator()(p);
+						if (p_bot <= PF_UNK_MAX)
+							divergence->operator()(p_bot) +=
+													wht[2]/sum * divergence->operator()(p);
+						if (p_top <= PF_UNK_MAX)
+							divergence->operator()(p_top) +=
+													wht[3]/sum * divergence->operator()(p);
+						divergence->operator()(p) = 0.;
+					}
 				}
 			}
 		}
@@ -2810,193 +2838,11 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 				for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
 					double dz = (dim == 3) ? PF->get_cell_size( k, 0, 2 ) : 1.;
 					size_t p = PF->DOF_local_number(i,j,k,comp);
-					divergence->operator()(p) = divergence->operator()(p) /dx/dy/dz;
+					divergence->operator()(p) = divergence->operator()(p)/dx/dy/dz;
 				}
 			}
 		}
 		// cout << "Div4: " << divergence->operator()(1284) << endl;
-	}
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void DS_NavierStokes:: redistribute_divergence_flux ( size_t const& i,
-                                            			   size_t const& j,
-                                            			   size_t const& k)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DS_NavierStokes:: redistribute_divergence_flux" ) ;
-
-	size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
-	doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
-	doubleVector* face_frac = (is_solids) ?
-							allrigidbodies->get_face_fraction_on_grid(UF) : 0;
-
-	FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
-	size_t UNK_MAX = UF->nb_local_unknowns();
-
-	size_t p = PF->DOF_local_number(i,j,k,0);
-	double dx = PF->get_cell_size( i, 0, 0 );
-   double dy = PF->get_cell_size( j, 0, 1 );
-	double xC = PF->get_DOF_coordinate( i, 0, 0 );
-	double yC = PF->get_DOF_coordinate( j, 0, 1 );
-
-	if ((void_frac->operator()(p) != 0) && (divergence->operator()(p) != 0)) {
-		geomVector const* pgc = allrigidbodies
-							->get_gravity_centre(void_frac->operator()(p)-1);
-		// Face fraction calculations
-		vector<double> frac;
-		// right face
-		size_t pp_rht = UF->DOF_local_number(shift.i+i, j, k, 0);
-		double rht_frac = (pp_rht <= UNK_MAX) ? face_frac->operator()(pp_rht) : 0.;
-		frac.push_back(rht_frac);
-		// left face
-		size_t pp_lft = UF->DOF_local_number(shift.i+i-1, j, k, 0);
-		double lft_frac = (pp_lft <= UNK_MAX) ? face_frac->operator()(pp_lft) : 0.;
-		frac.push_back(lft_frac);
-		// top face
-		size_t pp_top = UF->DOF_local_number(i, shift.j+j, k, 1);
-		double top_frac = (pp_top <= UNK_MAX) ? face_frac->operator()(pp_top) : 0.;
-		frac.push_back(top_frac);
-		// bottom face
-		size_t pp_bot = UF->DOF_local_number(i, shift.j+j-1, k, 1);
-		double bot_frac = (pp_bot <= UNK_MAX) ? face_frac->operator()(pp_bot) : 0.;
-		frac.push_back(bot_frac);
-
-		int count = (int)std::count(frac.begin(),frac.end(),0);
-
-		// Normal vector of interface calculation
-		geomVector p1(2), p2(2), pmid(2), pin(2), normal(2);
-		pin(0) = pgc->operator()(0);
-		pin(1) = pgc->operator()(1);
-		if (count == 1) {
-			if (rht_frac == 0) {
-				p1(0) = xC - 0.5*dx + bot_frac;
-				p2(0) = xC - 0.5*dx + top_frac;
-				p1(1) = yC - 0.5*dy;
-				p2(1) = yC + 0.5*dy;
-			} else if (lft_frac == 0) {
-				p1(0) = xC + 0.5*dx - bot_frac ;
-				p2(0) = xC + 0.5*dx - top_frac ;
-				p1(1) = yC - 0.5*dy;
-				p2(1) = yC + 0.5*dy;
-			} else if (top_frac == 0) {
-				p1(0) = xC - 0.5*dx;
-				p2(0) = xC + 0.5*dx;
-				p1(1) = yC - 0.5*dy + lft_frac;
-				p2(1) = yC - 0.5*dy + rht_frac;
-			} else if (bot_frac == 0) {
-				p1(0) = xC - 0.5*dx;
-				p2(0) = xC + 0.5*dx;
-				p1(1) = yC + 0.5*dy - lft_frac;
-				p2(1) = yC + 0.5*dy - rht_frac;
-			}
-		} else if (count == 2) {
-			if (rht_frac == 0 && top_frac == 0) {
-				p1(0) = xC - 0.5*dx;
-				p2(0) = xC - 0.5*dx + bot_frac;
-				p1(1) = yC - 0.5*dy + lft_frac;
-				p2(1) = yC - 0.5*dy;
-			} else if (lft_frac == 0 && top_frac == 0) {
-				p1(0) = xC + 0.5*dx - bot_frac;
-				p2(0) = xC + 0.5*dx;
-				p1(1) = yC - 0.5*dy;
-				p2(1) = yC - 0.5*dy + rht_frac;
-			} else if (lft_frac == 0 && bot_frac == 0) {
-				p1(0) = xC + 0.5*dx;
-				p2(0) = xC + 0.5*dx - top_frac;
-				p1(1) = yC + 0.5*dy - rht_frac;
-				p2(1) = yC + 0.5*dy;
-			} else if (bot_frac == 0 && rht_frac == 0) {
-				p1(0) = xC - 0.5*dx + top_frac;
-				p2(0) = xC - 0.5*dx;
-				p1(1) = yC + 0.5*dy;
-				p2(1) = yC + 0.5*dy - lft_frac;
-			}
-		} else if (count == 0) {
-			if ((top_frac < bot_frac) && (rht_frac < lft_frac)) {
-				p1(0) = xC - 0.5*dx + top_frac;
-				p2(0) = xC + 0.5*dx;
-				p1(1) = yC + 0.5*dy;
-				p2(1) = yC - 0.5*dy + rht_frac;
-			} else if ((top_frac < bot_frac) && (lft_frac < rht_frac)) {
-				p1(0) = xC + 0.5*dx - top_frac;
-				p2(0) = xC - 0.5*dx;
-				p1(1) = yC + 0.5*dy;
-				p2(1) = yC - 0.5*dy + lft_frac;
-			} else if ((bot_frac < top_frac) && (rht_frac < lft_frac)) {
-				p1(0) = xC - 0.5*dx + bot_frac;
-				p2(0) = xC + 0.5*dx;
-				p1(1) = yC - 0.5*dy;
-				p2(1) = yC + 0.5*dy - rht_frac;
-			} else if ((bot_frac < top_frac) && (lft_frac < rht_frac)) {
-				p1(0) = xC + 0.5*dx - bot_frac;
-				p2(0) = xC - 0.5*dx;
-				p1(1) = yC - 0.5*dy;
-				p2(1) = yC + 0.5*dy - lft_frac;
-			} else {
-				return;
-			}
-		}
-		pmid(0) = 0.5*(p1(0) + p2(0));
-		pmid(1) = 0.5*(p1(1) + p2(1));
-		normal(0) = p2(1) - p1(1);
-		normal(1) = -(p2(0) - p1(0));
-
-		geomVector delta = pin - pmid;
-      delta(0) = allrigidbodies->delta_periodic_transformation(delta(0), 0);
-      delta(1) = allrigidbodies->delta_periodic_transformation(delta(1), 1);
-		if ((delta(0)*normal(0) + delta(1)*normal(1)) > 0.) {
-			normal(0) = -1.*normal(0);
-			normal(1) = -1.*normal(1);
-		}
-
-		double norm_mag = MAC::sqrt(pow(normal(0),2) + pow(normal(1),2));
-
-		normal(0) /= norm_mag;
-		normal(1) /= norm_mag;
-
-		size_t p_lft = PF->DOF_local_number(i-1,j,k,0);
-		size_t p_rht = PF->DOF_local_number(i+1,j,k,0);
-		size_t p_bot = PF->DOF_local_number(i,j-1,k,0);
-		size_t p_top = PF->DOF_local_number(i,j+1,k,0);
-
-		size_t PF_UNK_MAX = PF->nb_local_unknowns();
-
-		double wt_lft, wt_rht, wt_bot, wt_top;
-
-		if (p_lft <= PF_UNK_MAX)
-			wt_lft = (void_frac->operator()(p_lft) == 0) ?
-													normal(0)*normal(0)*lft_frac : 0.;
-		if (p_rht <= PF_UNK_MAX)
-			wt_rht = (void_frac->operator()(p_rht) == 0) ?
-													normal(0)*normal(0)*rht_frac : 0.;
-		if (p_bot <= PF_UNK_MAX)
-			wt_bot = (void_frac->operator()(p_bot) == 0) ?
-													normal(1)*normal(1)*bot_frac : 0.;
-		if (p_top <= PF_UNK_MAX)
-			wt_top = (void_frac->operator()(p_top) == 0) ?
-													normal(1)*normal(1)*top_frac : 0.;
-
-		// Flux redistribution
-		double sum = wt_lft + wt_rht + wt_bot + wt_top;
-
-		if (sum > 0.) {
-			if (p_lft <= PF_UNK_MAX)
-				divergence->operator()(p_lft) += wt_lft/sum * divergence->operator()(p);
-			if (p_rht <= PF_UNK_MAX)
-				divergence->operator()(p_rht) += wt_rht/sum * divergence->operator()(p);
-			if (p_bot <= PF_UNK_MAX)
-				divergence->operator()(p_bot) += wt_bot/sum * divergence->operator()(p);
-			if (p_top <= PF_UNK_MAX)
-				divergence->operator()(p_top) += wt_top/sum * divergence->operator()(p);
-			divergence->operator()(p) = 0.;
-		} else {
-			divergence->operator()(p) = 0.;
-		}
 	}
 
 }

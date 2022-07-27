@@ -265,6 +265,15 @@ class DS_AllRigidBodies
                                                 size_t const& j,
                                            		size_t const& k);
 
+      /** @brief Calculate the divergenceredistribution factor for each PF node
+      using the normal of RB intersect
+      @param i index i
+      @param j index j
+      @param k index k */
+      vector<double> flux_redistribution_factor ( size_t const& i,
+                                                  size_t const& j,
+                                                  size_t const& k);
+
       /** @brief Calculates the area of RB section with given vector
       of polygon corners
       @param points vector of points */
@@ -510,6 +519,9 @@ class DS_AllRigidBodies
 
       vector<vector<geomVector>> intersect_points; /**< vector of set of
       intersection points on UF field grid faces*/
+
+      vector<geomVector> normalRB; /**< vector of rigid body normal
+      intersecting a pressure cell, if any*/
 
       // Columns in each variable are (left,right,bottom,top,behind,front)
       vector<size_t_array2D*> intersect_vector;  /**<Direction of intersection*/

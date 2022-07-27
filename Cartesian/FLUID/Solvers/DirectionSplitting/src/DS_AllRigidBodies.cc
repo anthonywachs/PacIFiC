@@ -1320,6 +1320,9 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
    vector<size_t> p;
    geomVector ZERO(0.,0.,0.);
 
+   size_t PF_p = PF->DOF_local_number(i, j, k, 0);
+   normalRB[PF_p] = ZERO;
+
    size_t rht = UF->DOF_local_number(shift.i+i, j, k, 0);
    if (rht <= UNK_MAX) p.push_back(rht);
    size_t lft = UF->DOF_local_number(shift.i+i-1, j, k, 0);
@@ -1401,16 +1404,22 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
          normal = -1.*normal;
       }
 
+      normalRB[PF_p] = normal;
+
       geomVector pt(pgc->operator()(0),
    					  pgc->operator()(1),
    					  pgc->operator()(2));
    	geomVector rb_vel = rigid_body_velocity(parID,pt);
 
-   	double area = calculate_area_of_RBplane(point_on_plane, normal);
-   	double norm_mag = MAC::sqrt(pow(normal(0),2) + pow(normal(1),2));
+   	double area = calculate_area_of_RBplane(point_on_plane, normalRB[PF_p]);
+   	double norm_mag = MAC::sqrt(pow(normalRB[PF_p](0),2)
+                                + pow(normalRB[PF_p](1),2)
+                                + pow(normalRB[PF_p](2),2));
 
       if (norm_mag != 0.) {
-   		return(-area*(normal(0)*rb_vel(0)+ normal(1)*rb_vel(1))/norm_mag);
+   		return(-area*(normalRB[PF_p](0)*rb_vel(0)
+                     + normalRB[PF_p](1)*rb_vel(1)
+                     + normalRB[PF_p](2)*rb_vel(2))/norm_mag);
    	}
    }
 
@@ -1418,6 +1427,81 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
 
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+vector<double> DS_AllRigidBodies:: flux_redistribution_factor ( size_t const& i,
+                                            			   size_t const& j,
+                                            			   size_t const& k)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_AllRigidBodies:: flux_redistribution_factor" ) ;
+
+   vector<double> wht(6);
+
+	FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
+	size_t UNK_MAX = UF->nb_local_unknowns();
+
+	size_t p = PF->DOF_local_number(i,j,k,0);
+
+	if (void_fraction[0]->operator()(p) != 0) {
+		double norm_mag = MAC::sqrt(pow(normalRB[p](0),2)
+                                + pow(normalRB[p](1),2)
+                                + pow(normalRB[p](2),2));
+
+		normalRB[p](0) /= norm_mag;
+		normalRB[p](1) /= norm_mag;
+      normalRB[p](2) /= norm_mag;
+
+      size_t pp_rht = UF->DOF_local_number(shift.i+i, j, k, 0);
+      double rht_frac = (pp_rht <= UNK_MAX) ?
+                        face_fraction[1]->operator()(pp_rht) : 0.;
+      // left face
+      size_t pp_lft = UF->DOF_local_number(shift.i+i-1, j, k, 0);
+      double lft_frac = (pp_lft <= UNK_MAX) ?
+                        face_fraction[1]->operator()(pp_lft) : 0.;
+      // top face
+      size_t pp_top = UF->DOF_local_number(i, shift.j+j, k, 1);
+      double top_frac = (pp_top <= UNK_MAX) ?
+                        face_fraction[1]->operator()(pp_top) : 0.;
+      // bottom face
+      size_t pp_bot = UF->DOF_local_number(i, shift.j+j-1, k, 1);
+      double bot_frac = (pp_bot <= UNK_MAX) ?
+                        face_fraction[1]->operator()(pp_bot) : 0.;
+
+		size_t p_lft = PF->DOF_local_number(i-1,j,k,0);
+		size_t p_rht = PF->DOF_local_number(i+1,j,k,0);
+		size_t p_bot = PF->DOF_local_number(i,j-1,k,0);
+		size_t p_top = PF->DOF_local_number(i,j+1,k,0);
+
+		size_t PF_UNK_MAX = PF->nb_local_unknowns();
+
+		double wt_lft = 0., wt_rht = 0.,
+             wt_bot = 0., wt_top = 0.,
+             wt_bhd = 0., wt_frt = 0.;
+
+		if (p_lft <= PF_UNK_MAX)
+			wt_lft = (void_fraction[0]->operator()(p_lft) == 0) ?
+										  normalRB[p](0)*normalRB[p](0)*lft_frac : 0.;
+		if (p_rht <= PF_UNK_MAX)
+			wt_rht = (void_fraction[0]->operator()(p_rht) == 0) ?
+										  normalRB[p](0)*normalRB[p](0)*rht_frac : 0.;
+		if (p_bot <= PF_UNK_MAX)
+			wt_bot = (void_fraction[0]->operator()(p_bot) == 0) ?
+								        normalRB[p](1)*normalRB[p](1)*bot_frac : 0.;
+		if (p_top <= PF_UNK_MAX)
+			wt_top = (void_fraction[0]->operator()(p_top) == 0) ?
+										  normalRB[p](1)*normalRB[p](1)*top_frac : 0.;
+
+      wht = {wt_lft, wt_rht, wt_bot, wt_top, wt_bhd, wt_frt};
+	}
+
+   return(wht);
+
+}
+
 
 
 
@@ -4270,6 +4354,13 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
          intersect_points.push_back(vgV);
    }
 
+   // RB normal vector only for the PF field
+   if (field == 0) {
+      normalRB.reserve(FF_LOC_UNK);
+      geomVector vvv(0.,0.,0.);
+      for (size_t i = 0; i < FF_LOC_UNK; i++)
+         normalRB.push_back(vvv);
+   }
 }
 
 

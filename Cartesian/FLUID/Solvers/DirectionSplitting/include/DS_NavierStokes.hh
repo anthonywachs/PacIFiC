@@ -230,10 +230,6 @@ class DS_NavierStokes : public MAC_Object,
 
       void compute_velocity_divergence ( );
 
-      void redistribute_divergence_flux ( size_t const& i,
-                                     size_t const& j,
-                                     size_t const& k);
-
       double divergence_of_U( size_t const& i
                             , size_t const& j
                             , size_t const& k
