@@ -254,7 +254,8 @@ class DS_AllRigidBodies
       /** @brief Returns the length of side in fluid
       @param pt1 Point 1
       @param pt2 Point 2 */
-      std::tuple<double, geomVector> return_side_fraction(geomVector const& pt1
+      std::tuple<double, geomVector, int>
+             return_side_fraction(geomVector const& pt1
                                 , geomVector const& pt2 );
 
       /** @brief Returns the flux from RB given the PF node index
@@ -298,7 +299,14 @@ class DS_AllRigidBodies
 
       /** @brief Computes the face fraction belonging the each node
       of a given fluid field */
-      void compute_face_fractions();
+      void compute_cutCell_geometric_parameters();
+
+      /** @brief Compute the velocity face flux from the UF face */
+      double divergence_face_flux ( size_t const& p_PF
+                                  , size_t const& i
+                                  , size_t const& j
+                                  , size_t const& k
+										    , size_t const& comp);
 
       /** @brief Computes the intersection of grid nodes of a given fluid field
       with the nearest rigid body of a given fluid field
@@ -517,11 +525,17 @@ class DS_AllRigidBodies
       vector<doubleVector*> face_fraction; /**< vector of field grid nodes
       face fraction, only for UF*/
 
+      vector<geomVector> face_centroid; /**< centroid of the cut faces
+      on UF field, if any*/
+
       vector<vector<geomVector>> intersect_points; /**< vector of set of
       intersection points on UF field grid faces*/
 
       vector<geomVector> normalRB; /**< vector of rigid body normal
       intersecting a pressure cell, if any*/
+
+      vector<double> CutRBarea; /**< vector of area of section of RB intersect
+      with a pressure cell, if any*/
 
       // Columns in each variable are (left,right,bottom,top,behind,front)
       vector<size_t_array2D*> intersect_vector;  /**<Direction of intersection*/

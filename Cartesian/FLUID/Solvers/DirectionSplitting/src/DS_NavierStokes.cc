@@ -269,7 +269,7 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, false);
 		// Compute the face fractions of CutCell is active
 		if (DivergenceScheme == "CutCell")
-			allrigidbodies->compute_face_fractions();
+			allrigidbodies->compute_cutCell_geometric_parameters();
 
 		if (my_rank == 0)
          cout << "Finished void fraction and grid intersection... \n" << endl;
@@ -361,7 +361,7 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, true);
 		// Compute the face fractions of CutCell is active
 		if (DivergenceScheme == "CutCell")
-			allrigidbodies->compute_face_fractions();
+			allrigidbodies->compute_cutCell_geometric_parameters();
 
 		// Field initialization
 		vector<size_t> vec{ 0, 1, 3};
@@ -2318,220 +2318,6 @@ DS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list 
 
 
 //---------------------------------------------------------------------------
-double DS_NavierStokes:: divergence_face_flux ( size_t const& i
-															 , size_t const& j
-															 , size_t const& k
-														 	 , size_t const& comp)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DS_NavierStokes:: divergence_face_flux" ) ;
-
-
-	doubleVector* face_frac = (is_solids) ?
-							allrigidbodies->get_face_fraction_on_grid(UF) : 0;
-
-	double cVel = UF->DOF_value( i, j, k, comp, 0 );
-	size_t p = UF->DOF_local_number(i, j, k, comp);
-	double frac = face_frac->operator()(p);
-
-	return(cVel*frac);
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-double DS_NavierStokes:: divergence_face_flux ( size_t const& i
-															 , size_t const& j
-															 , size_t const& k
-															 , size_t const& normal
-															 , double const& length
-															 , size_t const& level)
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL("DS_NavierStokes:: divergence_face_flux" ) ;
-
-   double value;
-	size_t comp = normal;
-
-	size_t_array2D* intersect_vector = (is_solids) ?
-							allrigidbodies->get_intersect_vector_on_grid(UF) : 0;
-	doubleArray2D* intersect_distance = (is_solids) ?
-							allrigidbodies->get_intersect_distance_on_grid(UF) : 0;
-	doubleArray2D* intersect_fieldVal = (is_solids) ?
-							allrigidbodies->get_intersect_fieldValue_on_grid(UF) : 0;
-	size_t_vector* void_frac = (is_solids) ?
-							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
-	size_t m_nrb = (is_solids) ? allrigidbodies->get_number_rigid_bodies() : 0;
-
-	size_t wall_dir = (normal == 0) ? 1 : 0;
-
-	double xC = (normal == 0) ? UF->get_DOF_coordinate( j, comp, wall_dir )
-							        : UF->get_DOF_coordinate( i, comp, wall_dir );
-   double botVel = (normal == 0) ? UF->DOF_value( i, j-1, k, comp, level )
-  											: UF->DOF_value( i-1, j, k, comp, level );
-	double botY = (normal == 0) ? UF->get_DOF_coordinate( j-1, comp, wall_dir )
-										 : UF->get_DOF_coordinate( i-1, comp, wall_dir );
-	double topVel = (normal == 0) ? UF->DOF_value( i, j+1, k, comp, level )
-	 										: UF->DOF_value( i+1, j, k, comp, level );
-	double topY = (normal == 0) ? UF->get_DOF_coordinate( j+1, comp, wall_dir )
-										 : UF->get_DOF_coordinate( i+1, comp, wall_dir );
-   size_t pbot = (normal == 0) ? UF->DOF_local_number(i,j-1,k,comp)
-										 : UF->DOF_local_number(i-1,j,k,comp);
-	size_t ptop = (normal == 0) ? UF->DOF_local_number(i,j+1,k,comp)
-										 : UF->DOF_local_number(i+1,j,k,comp);
-
-	double cVel = UF->DOF_value( i, j, k, comp, level );
-	double pt = xC;
-
-	double delta = length;
-
-	size_t p = UF->DOF_local_number(i,j,k,comp);
-
-	if (p > UF->nb_local_unknowns()) {
-		return(UF->DOF_value( i, j, k, comp, level )*length);
-	}
-
-   if (is_solids) {
-      value = 0.;
-		delta = 0.;
-
-      if (void_frac->operator()(p) == 0) {
-         if ((intersect_vector->operator()(p,2*wall_dir + 0) == 1) &&
-				 (intersect_vector->operator()(p,2*wall_dir + 1) != 1)) {
-
-				botVel = intersect_fieldVal->operator()(p,2*wall_dir + 0);
-            botY = xC - intersect_distance->operator()(p,2*wall_dir + 0);
-
-            if (MAC::abs(xC - botY) <= length/2.) {
-					pt = (1./2.)*(xC + botY + length/2.);
-					delta = length/2. + (xC - botY);
-				} else {
-					pt = xC;
-					delta = length;
-				}
-         } else if ((intersect_vector->operator()(p,2*wall_dir + 0) != 1) &&
-				        (intersect_vector->operator()(p,2*wall_dir + 1) == 1)) {
-
-				topVel = intersect_fieldVal->operator()(p,2*wall_dir + 1);
-			   topY = xC + intersect_distance->operator()(p,2*wall_dir + 1);
-
-				if (MAC::abs(xC - topY) <= length/2.) {
-					pt = (1./2.)*(xC + topY - length/2.);
-					delta = length/2. + (topY - xC);
-				} else {
-					pt = xC;
-					delta = length;
-				}
-			} else if ((intersect_vector->operator()(p,2*wall_dir + 0) == 1) &&
-				        (intersect_vector->operator()(p,2*wall_dir + 1) == 1)) {
-
-				botVel = intersect_fieldVal->operator()(p,2*wall_dir + 0);
-			   botY = xC - intersect_distance->operator()(p,2*wall_dir + 0);
-
-				topVel = intersect_fieldVal->operator()(p,2*wall_dir + 1);
-				topY = xC + intersect_distance->operator()(p,2*wall_dir + 1);
-
-				if ((MAC::abs(xC - botY) <= length/2.) &&
-					 (MAC::abs(xC - topY) <= length/2.)) {
-				   pt = (1./2.)*(botY + topY);
-					delta = topY - botY;
-				} else if ((MAC::abs(xC - botY) <= length/2.) &&
-					 		  (MAC::abs(xC - topY) > length/2.)) {
-				   pt = (1./2.)*(xC + botY + length/2.);
-					delta = length/2. + (xC - botY);
-				} else if ((MAC::abs(xC - botY) > length/2.) &&
-					 		  (MAC::abs(xC - topY) <= length/2.)) {
-				   pt = (1./2.)*(xC + topY - length/2.);
-					delta = length/2. + (topY - xC);
-				} else {
-					pt = xC;
-					delta = length;
-				}
-			} else {
-				pt = xC;
-				delta = length;
-			}
-
-			geomVector xi(3), fi(3);
-			xi(0) = botY; xi(1) = xC; xi(2) = topY;
-			fi(0) = botVel; fi(1) = cVel; fi(2) = topVel;
-			double l0 = (pt - xi(1)) * (pt - xi(2))
-					    / (xi(0) - xi(1)) / (xi(0) - xi(2));
-			double l1 = (pt - xi(0)) * (pt - xi(2))
-						 / (xi(1) - xi(0)) / (xi(1) - xi(2));
-			double l2 = (pt - xi(0)) * (pt - xi(1))
-						 / (xi(2) - xi(0)) / (xi(2) - xi(1));
-			value = (fi(0)*l0 + fi(1)*l1 + fi(2)*l2)*delta;
-
-      } else if ((void_frac->operator()(p) != 0)
-				  && (void_frac->operator()(p) <= m_nrb)) {
-			geomVector xi(3), fi(3);
-			if (intersect_distance->operator()(ptop,2*wall_dir + 0) >
-				 MAC::abs(topY - xC - 0.5*length)) {
-				pt = (1./2.)*(topY + xC) + (1./2.)*(length/2.
-							  - intersect_distance->operator()(ptop,2*wall_dir + 0));
-
-				double topVel2 = (normal == 0) ? UF->DOF_value( i, j+2, k, comp, level )
-				  										 : UF->DOF_value( i+2, j, k, comp, level );
-				double topY2 = (normal == 0) ? UF->get_DOF_coordinate( j+2, comp, wall_dir )
-				  									  : UF->get_DOF_coordinate( i+2, comp, wall_dir );
-
-				xi(0) = topY - intersect_distance->operator()(ptop,2*wall_dir + 0);
-				fi(0) = cVel;
-				xi(1) = topY;
-				fi(1) = topVel;
-				xi(2) = topY2;
-				fi(2) = topVel2;
-				delta = 2. * MAC::abs(pt - xi(0));
-				double l0 = (pt - xi(1)) * (pt - xi(2))
-						    / (xi(0) - xi(1)) / (xi(0) - xi(2));
-				double l1 = (pt - xi(0)) * (pt - xi(2))
-							 / (xi(1) - xi(0)) / (xi(1) - xi(2));
-				double l2 = (pt - xi(0)) * (pt - xi(1))
-							 / (xi(2) - xi(0)) / (xi(2) - xi(1));
-				value = (fi(0)*l0 + fi(1)*l1 + fi(2)*l2)*delta;
-			} else if (intersect_distance->operator()(pbot,2*wall_dir + 1) >
-						  MAC::abs(xC - botY - 0.5*length)) {
-				pt = (1./2.)*(botY + xC) - (1./2.)*(length/2.
-							  - intersect_distance->operator()(pbot,2*wall_dir + 1));
-
-			   double botVel2 = (normal == 0) ? UF->DOF_value( i, j-2, k, comp, level )
-							  							 : UF->DOF_value( i-2, j, k, comp, level );
-			 	double botY2 = (normal == 0) ? UF->get_DOF_coordinate( j-2, comp, wall_dir )
-								  					  : UF->get_DOF_coordinate( i-2, comp, wall_dir );
-				xi(0) = botY2;
-				fi(0) = botVel2;
-				xi(1) = botY;
-				fi(1) = botVel;
-				xi(2) = botY + intersect_distance->operator()(pbot,2*wall_dir + 1);
-				fi(2) = cVel;
-				delta = 2. * MAC::abs(xi(2) - pt);
-				double l0 = (pt - xi(1)) * (pt - xi(2))
-						    / (xi(0) - xi(1)) / (xi(0) - xi(2));
-				double l1 = (pt - xi(0)) * (pt - xi(2))
-							 / (xi(1) - xi(0)) / (xi(1) - xi(2));
-				double l2 = (pt - xi(0)) * (pt - xi(1))
-							 / (xi(2) - xi(0)) / (xi(2) - xi(1));
-				value = (fi(0)*l0 + fi(1)*l1 + fi(2)*l2)*delta;
-		   } else {
-				value = 0.;
-			}
-      } else {
-			value = UF->DOF_value( i, j, k, comp, level )*length;
-		}
-   } else {
-      value = UF->DOF_value( i, j, k, comp, level )*length;
-   }
-
-   return(value);
-}
-
-
-
-
-//---------------------------------------------------------------------------
 double
 DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
                                               , size_t const& i
@@ -2690,32 +2476,27 @@ DS_NavierStokes:: calculate_velocity_divergence_cutCell ( size_t const& i,
 {
    MAC_LABEL("DS_NavierStokes:: calculate_velocity_divergence_cutCell" ) ;
 
-	double dx = PF->get_cell_size( i, 0, 0 );
-   double dy = PF->get_cell_size( j, 0, 1 );
-
 	FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
 
-   double rht_flux = (dim == 2) ? divergence_face_flux ( shift.i+i, j, k, 0, dy, level)
-										  : divergence_face_flux ( shift.i+i, j, k, 0);
+	size_t p = PF->DOF_local_number(i, j, k, 0);
 
-	double lft_flux = (dim == 2) ? divergence_face_flux ( shift.i+i-1, j, k, 0, dy, level)
-										  : divergence_face_flux ( shift.i+i-1, j, k, 0);
+	double rht_flux = allrigidbodies->divergence_face_flux(p,shift.i+i,j,k,0);
 
-	double top_flux = (dim == 2) ? divergence_face_flux ( i, shift.j+j, k, 1, dx, level)
-										  : divergence_face_flux ( i, shift.j+j, k, 1);
+	double lft_flux = allrigidbodies->divergence_face_flux(p,shift.i+i-1,j,k,0);
 
-	double bot_flux = (dim == 2) ? divergence_face_flux ( i, shift.j+j-1, k, 1, dx, level)
-										  : divergence_face_flux ( i, shift.j+j-1, k, 1);
+	double top_flux = allrigidbodies->divergence_face_flux(p,i,shift.j+j,k,1);
+
+	double bot_flux = allrigidbodies->divergence_face_flux(p,i,shift.j+j-1,k,1);
 
 	double fnt_flux = (dim == 2) ? 0.
-  										  : divergence_face_flux ( i, j, shift.k+k, 2);
+					    : allrigidbodies->divergence_face_flux (p,i,j,shift.k+k,2);
 
-  	double bnd_flux = (dim == 2) ? 0.
-  										  : divergence_face_flux ( i, j, shift.k+k, 2);
+  	double bhd_flux = (dim == 2) ? 0.
+					    : allrigidbodies->divergence_face_flux (p,i,j,shift.k+k-1,2);
 
 	double xvalue = (rht_flux - lft_flux);
 	double yvalue = (top_flux - bot_flux);
-	double zvalue = (fnt_flux - bnd_flux);
+	double zvalue = (fnt_flux - bhd_flux);
 
    return(xvalue + yvalue + zvalue);
 }
@@ -2780,7 +2561,7 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 		}
 	}
 
-	// cout << "Div1: " << divergence->operator()(1284) << endl;
+	// cout << "Div1: " << divergence->operator()(8188) << endl;
 
 	if (DivergenceScheme == "CutCell") {
 		// Flux from RB surface
@@ -2794,7 +2575,7 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 				}
 			}
 		}
-		// cout << "Div2: " << divergence->operator()(1284) << endl;
+		// cout << "Div2: " << divergence->operator()(8188) << endl;
 		// Flux redistribution
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
@@ -2837,7 +2618,7 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 				}
 			}
 		}
-		// cout << "Div3: " << divergence->operator()(1284) << endl;
+		// cout << "Div3: " << divergence->operator()(8188) << endl;
 		// Converting flux to divergence
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 			double dx = PF->get_cell_size( i, 0, 0 );
@@ -2850,7 +2631,7 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 				}
 			}
 		}
-		// cout << "Div4: " << divergence->operator()(1284) << endl;
+		// cout << "Div4: " << divergence->operator()(8188) << endl;
 	}
 
 }

@@ -7,7 +7,7 @@
 #include <FV_Mesh.hh>
 #include <cmath>
 #include <algorithm>
-#define EPSILON 1.e-7
+#define EPSILON 1.e-14
 #define THRES 1.e-4
 using std::endl;
 
@@ -1071,7 +1071,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
 
 //---------------------------------------------------------------------------
-std::tuple<double, geomVector> DS_AllRigidBodies::
+std::tuple<double, geomVector, int> DS_AllRigidBodies::
                            return_side_fraction(geomVector const& pt1
                                               , geomVector const& pt2 )
 //---------------------------------------------------------------------------
@@ -1086,6 +1086,8 @@ std::tuple<double, geomVector> DS_AllRigidBodies::
   bool pt1_solid = (level_set_value(parID,pt1) < threshold) ? true : false ;
   bool pt2_solid = (level_set_value(parID,pt2) < threshold) ? true : false ;
 
+  int point_in_fluid = -1;
+
   geomVector intersection_pt(0.,0.,0.);
   geomVector rayVec = pt2 - pt1;
   double vecMag = rayVec.calcNorm();
@@ -1096,26 +1098,29 @@ std::tuple<double, geomVector> DS_AllRigidBodies::
      fraction = m_allDSrigidbodies[parID]
              ->get_distanceTo( pt2, -1.*rayVec, vecMag );
      intersection_pt = pt2 - fraction*rayVec;
+     point_in_fluid = 1;
   } else if (!pt1_solid && pt2_solid) {  // pt1 in fluid and pt2 in solid
      fraction = m_allDSrigidbodies[parID]
              ->get_distanceTo( pt1, rayVec, vecMag );
      intersection_pt = pt1 + fraction*rayVec;
+     point_in_fluid = 0;
   } else if (!pt1_solid && !pt2_solid) { // both pt1 and pt2 in fluid
      fraction = vecMag;
+     point_in_fluid = 2;
   } else if (pt1_solid && pt2_solid) {   // both pt1 and pt2 in solid
      fraction = 0.;
   }
 
-  return(std::make_tuple(fraction, intersection_pt));
+  return(std::make_tuple(fraction, intersection_pt, point_in_fluid));
 
 }
 
 
 //---------------------------------------------------------------------------
-void DS_AllRigidBodies:: compute_face_fractions()
+void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_AllRigidBodies:: compute_face_fractions" ) ;
+  MAC_LABEL( "DS_AllRigidBodies:: compute_cutCell_geometric_parameters" ) ;
 
   size_t nb_comps = UF->nb_components() ;
   size_t field = field_num(UF) ;
@@ -1125,6 +1130,7 @@ void DS_AllRigidBodies:: compute_face_fractions()
   size_t_vector max_unknown_index(3,0);
   geomVector ZERO(0.,0.,0.);
 
+  // Estimate the face fractions and centroids of the velocity (UF) centered faces
   for (size_t comp = 0; comp < nb_comps; comp++) {
      size_t face_normal = comp;
      geomVector face_plane(1.,1.,1.);
@@ -1159,6 +1165,7 @@ void DS_AllRigidBodies:: compute_face_fractions()
 
               vector<geomVector> vgV = {ZERO};
               intersect_points[p] = vgV;
+              face_centroid[p] = ZERO;
 
               if (m_space_dimension == 2) {
                  geomVector top(xC, yC, zC);
@@ -1168,9 +1175,18 @@ void DS_AllRigidBodies:: compute_face_fractions()
                  auto int_pt = return_side_fraction(top, bot);
                  fraction = std::get<0>(int_pt);
                  geomVector pt = std::get<1>(int_pt);
+                 int point_in_fluid = std::get<2>(int_pt);
                  if (pt == ZERO) {
                  } else {
                     intersect_pt.push_back(pt);
+                 }
+
+                 if (point_in_fluid == 0) {
+                    face_centroid[p] = 0.5*(top + pt);
+                 } else if (point_in_fluid == 1) {
+                    face_centroid[p] = 0.5*(bot + pt);
+                 } else if (point_in_fluid == 2) {
+                    face_centroid[p] = 0.5*(top + bot);
                  }
               } else {
                  geomVector topLeft(xC, yC, zC);
@@ -1209,37 +1225,106 @@ void DS_AllRigidBodies:: compute_face_fractions()
                     topLeft(1) = topLeft(1) + 0.5*face_plane(1);
                  }
 
+                 vector<geomVector> edge_centroid;
+
+                 // Right edge
                  auto rht = return_side_fraction(topRight, botRight);
                  double rht_frac = std::get<0>(rht);
                  geomVector pt = std::get<1>(rht);
+                 int rht_in_fluid = std::get<2>(rht);
                  if (pt == ZERO) {
                  } else {
                     intersect_pt.push_back(pt);
                  }
 
+                 geomVector tmpV(3);
+                 if (rht_in_fluid == 0) {
+                    tmpV = 0.5*(topRight + pt);
+                 } else if (rht_in_fluid == 1) {
+                    tmpV = 0.5*(botRight + pt);
+                 } else if (rht_in_fluid == 2) {
+                    tmpV = 0.5*(topRight + botRight);
+                 }
+                 if (rht_in_fluid != -1) edge_centroid.push_back(tmpV);
+
+
+                 // Left edge
                  auto lft = return_side_fraction(topLeft, botLeft);
                  double lft_frac = std::get<0>(lft);
                  pt = std::get<1>(lft);
+                 int lft_in_fluid = std::get<2>(lft);
                  if (pt == ZERO) {
                  } else {
                     intersect_pt.push_back(pt);
                  }
 
+                 if (lft_in_fluid == 0) {
+                    tmpV = 0.5*(topLeft + pt);
+                 } else if (lft_in_fluid == 1) {
+                    tmpV = 0.5*(botLeft + pt);
+                 } else if (lft_in_fluid == 2) {
+                    tmpV = 0.5*(topLeft + botLeft);
+                 }
+                 if (lft_in_fluid != -1) edge_centroid.push_back(tmpV);
+
+
+                 // Top edge
                  auto top = return_side_fraction(topLeft, topRight);
                  double top_frac = std::get<0>(top);
                  pt = std::get<1>(top);
+                 int top_in_fluid = std::get<2>(top);
                  if (pt == ZERO) {
                  } else {
                     intersect_pt.push_back(pt);
                  }
 
+                 if (top_in_fluid == 0) {
+                    tmpV = 0.5*(topLeft + pt);
+                 } else if (top_in_fluid == 1) {
+                    tmpV = 0.5*(topRight + pt);
+                 } else if (top_in_fluid == 2) {
+                    tmpV = 0.5*(topLeft + topRight);
+                 }
+                 if (top_in_fluid != -1) edge_centroid.push_back(tmpV);
+
+
+                 // Bottom edge
                  auto bot = return_side_fraction(botLeft, botRight);
                  double bot_frac = std::get<0>(bot);
                  pt = std::get<1>(bot);
+                 int bot_in_fluid = std::get<2>(bot);
                  if (pt == ZERO) {
                  } else {
                     intersect_pt.push_back(pt);
                  }
+
+                 if (bot_in_fluid == 0) {
+                    tmpV = 0.5*(botLeft + pt);
+                 } else if (bot_in_fluid == 1) {
+                    tmpV = 0.5*(botRight + pt);
+                 } else if (bot_in_fluid == 2) {
+                    tmpV = 0.5*(botLeft + botRight);
+                 }
+                 if (bot_in_fluid != -1) edge_centroid.push_back(tmpV);
+
+
+                 // Face centroid calculations
+                 if (edge_centroid.size() > 0) {
+                    for (vector<geomVector>::iterator it = edge_centroid.begin();
+                                                      it < edge_centroid.end();
+                                                      it++ ) {
+                        geomVector temp = *it;
+                        face_centroid[p] += temp;
+                    }
+                    face_centroid[p] /= (double)edge_centroid.size();
+                 }
+
+                 // if (p == 7162)
+                 //    std::cout << edge_centroid.size() << ","
+                 //              << top_in_fluid << ","
+                 //              << bot_in_fluid << ","
+                 //              << lft_in_fluid << ","
+                 //              << rht_in_fluid << endl;
 
                  // Face fraction calculations
                  vector<double> frac;
@@ -1270,18 +1355,18 @@ void DS_AllRigidBodies:: compute_face_fractions()
      		           }
                  // Trapezoid and rectangle
                  } else if (count == 0) {
-                    if ((top_frac == dx) && (rht_frac == dy)) {
+                    if ((top_in_fluid == 2) && (rht_in_fluid == 2)) {
                  		  area = 0.5*(top_frac + bot_frac)*(rht_frac - lft_frac)
-                            + dx*lft_frac;
-                 	  } else if ((bot_frac == dx) && (rht_frac == dy)) {
+                            + (topRight - topLeft).calcNorm() * lft_frac;
+                 	  } else if ((bot_in_fluid == 2) && (rht_in_fluid == 2)) {
                  	     area = 0.5*(top_frac + bot_frac)*(rht_frac - lft_frac)
-                            + dx*lft_frac;
-                 	  } else if ((bot_frac == dx) && (lft_frac == dy)) {
+                            + (topRight - topLeft).calcNorm() * lft_frac;
+                 	  } else if ((bot_in_fluid == 2) && (lft_in_fluid == 2)) {
                  		  area = 0.5*(top_frac + bot_frac)*(lft_frac - rht_frac)
-                            + dx*rht_frac;
-                 	  } else if ((top_frac == dx) && (lft_frac == dy)) {
+                            + (topRight - topLeft).calcNorm() * rht_frac;
+                 	  } else if ((top_in_fluid == 2) && (lft_in_fluid == 2)) {
                  	     area = 0.5*(top_frac + bot_frac)*(lft_frac - rht_frac)
-                            + dx*rht_frac;
+                            + (topRight - topLeft).calcNorm() * rht_frac;
                  	  }
                  }
 
@@ -1298,6 +1383,210 @@ void DS_AllRigidBodies:: compute_face_fractions()
      }
   }
 
+  size_t comp = 0;
+
+  // Estimate the RB intersect areas and normals
+  for (size_t l = 0; l < m_space_dimension; ++l) {
+     min_unknown_index(l) = PF->get_min_index_unknown_on_proc( comp,l );
+     max_unknown_index(l) = PF->get_max_index_unknown_on_proc( comp,l );
+  }
+
+  FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered();
+  size_t parID = 0;
+
+  size_t UF_UNK_MAX = UF->nb_local_unknowns();
+
+  for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+     for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+        for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+           size_t p = PF->DOF_local_number(i,j,k,comp);
+           normalRB[p] = ZERO;
+           CutRBarea[p] = 0.;
+           vector<size_t> pList;
+
+           size_t rht = UF->DOF_local_number(shift.i+i, j, k, 0);
+           if (rht <= UF_UNK_MAX) pList.push_back(rht);
+           size_t lft = UF->DOF_local_number(shift.i+i-1, j, k, 0);
+           if (lft <= UF_UNK_MAX) pList.push_back(lft);
+           size_t top = UF->DOF_local_number(i, shift.j+j, k, 1);
+           if (top <= UF_UNK_MAX) pList.push_back(top);
+           size_t bot = UF->DOF_local_number(i, shift.j+j-1, k, 1);
+           if (bot <= UF_UNK_MAX) pList.push_back(bot);
+
+           if (m_space_dimension == 3) {
+              size_t fnt = UF->DOF_local_number(i, j, shift.k+k, 2);
+              if (fnt <= UF_UNK_MAX) pList.push_back(fnt);
+              size_t bnd = UF->DOF_local_number(i, j, shift.k+k-1, 2);
+              if (bnd <= UF_UNK_MAX) pList.push_back(bnd);
+           }
+
+           // Creating a vector of unique points of the intersect plane
+           vector<geomVector> point_on_plane;
+           for (auto iter = pList.begin(); iter < pList.end(); iter++) {
+              for (auto it = intersect_points[*iter].begin();
+                        it < intersect_points[*iter].end(); it++) {
+                 if (*it == ZERO) {
+                    continue;
+                 } else {
+                    bool present = false;
+                    for (auto itt = point_on_plane.begin();
+                              itt != point_on_plane.end(); itt++) {
+                       if (*it == *itt) {
+                          present = true;
+                       }
+                    }
+                    if (!present) point_on_plane.push_back(*it);
+                 }
+              }
+           }
+
+           // if (p == 8188) {
+           //   std::cout << "Number of points: " << point_on_plane.size() << endl;
+           // }
+
+           if (!point_on_plane.empty()) {
+             // Normal vector of interface calculation
+             geomVector const* pgc = get_gravity_centre(parID);
+             geomVector p1(3), p2(3), pmid(3), pin(3), normal(3);
+             pin(0) = pgc->operator()(0);
+             pin(1) = pgc->operator()(1);
+             pin(2) = pgc->operator()(2);
+
+             // Calulation of the vector normal to RB plane
+             if (point_on_plane.size() == 1) {
+                 std::cout << "WARNING:: Check your code. \
+                              Possibly a bug !!!" << endl;
+             } else if (point_on_plane.size() == 2) {
+                 p1(0) = point_on_plane[0](0);
+                 p1(1) = point_on_plane[0](1);
+                 p2(0) = point_on_plane[1](0);
+                 p2(1) = point_on_plane[1](1);
+
+                 pmid(0) = 0.5*(p1(0) + p2(0));
+                 pmid(1) = 0.5*(p1(1) + p2(1));
+                 normal(0) = p2(1) - p1(1);
+                 normal(1) = -(p2(0) - p1(0));
+             } else {
+                 // Compute centeroid of plane
+                 for (auto iter = point_on_plane.begin();
+                           iter != point_on_plane.end(); iter++) {
+                    geomVector temp = *iter;
+                    pmid += *iter;
+                 }
+                 pmid /= (double) point_on_plane.size();
+
+                 normal = (point_on_plane[1] - point_on_plane[0])
+                        ^ (point_on_plane[2] - point_on_plane[0]);
+             }
+
+             // Test the direction of normal vector to be away from RB center
+             geomVector delta = pin - pmid;
+             delta(0) = delta_periodic_transformation(delta(0), 0);
+             delta(1) = delta_periodic_transformation(delta(1), 1);
+             delta(2) = (m_space_dimension == 3) ?
+                        delta_periodic_transformation(delta(2), 2) : delta(2);
+
+             if ((delta(0)*normal(0)
+                + delta(1)*normal(1)
+                + delta(2)*normal(2)) >= 0.) {
+                 normal = -1.*normal;
+             }
+
+
+             // Store the normal vector in the global variable define on PF
+             normalRB[p] = normal;
+
+             geomVector pt(pgc->operator()(0),
+                          pgc->operator()(1),
+                          pgc->operator()(2));
+             geomVector rb_vel = rigid_body_velocity(parID,pt);
+
+             CutRBarea[p] = calculate_area_of_RBplane(point_on_plane
+                                                    , normalRB[p]);
+           }
+        }
+     }
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_AllRigidBodies:: divergence_face_flux ( size_t const& p_PF
+                                                , size_t const& i
+                                                , size_t const& j
+                                                , size_t const& k
+															   , size_t const& comp)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_AllRigidBodies:: divergence_face_flux" ) ;
+
+   size_t p_UF = UF->DOF_local_number(i, j, k, comp);
+   size_t parID = 0;
+   geomVector ZERO(0.,0.,0.);
+
+	size_t_vector i0_new(3,0);
+   vector<int> sign(3,0);
+
+   double value = UF->DOF_value( i, j, k, comp, 0 );
+
+   geomVector pt = face_centroid[p_UF];
+
+   double dx = UF->get_cell_size( i, comp, 0 ) ;
+   double dy = UF->get_cell_size( j, comp, 1 ) ;
+   double dz = (m_space_dimension == 2) ? 1.
+                                        : UF->get_cell_size( k, comp, 2 ) ;
+   double area_max = dx*dy;
+
+   if (m_space_dimension == 3) {
+      if (comp == 0) {
+         area_max = dy*dz;
+      } else if (comp == 1) {
+         area_max = dx*dz;
+      } else {
+         area_max = dx*dy;
+      }
+   }
+
+   // If the face is completly in solid
+   if (face_fraction[1]->operator()(p_UF) == 0.) {
+      return(0.);
+   } else if (face_fraction[1]->operator()(p_UF) < area_max - EPSILON) {
+      // Finding the grid indexes next to ghost points
+      for (size_t l = 0; l < m_space_dimension; l++) {
+         size_t i0_temp;
+         bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
+                                        pt(l) + EPSILON, i0_temp);
+         if (found) i0_new(l) = i0_temp;
+         sign[l] = (normalRB[p_PF](l) > -EPSILON) ? 1 : -1 ;
+      }
+
+      size_t interpol_dir = (comp == 0) ? 1 : 0 ;
+
+      value = (m_space_dimension == 2) ?
+                           Biquadratic_interpolation(UF, comp, &pt, i0_new
+                                                   , interpol_dir
+                                                   , sign[interpol_dir], {0})
+                         : Triquadratic_interpolation(UF
+                                                   , comp
+                                                   , &pt
+                                                   , i0_new
+                                                   , parID
+                                                   , comp
+                                                   , sign
+                                                   , {0}) ;
+   }
+
+   // if (p_PF == 8188) {
+   //    std::cout << "!!!--------------------------------------!!!" << endl;
+   //    std::cout << p_UF << "," << pt(0) << "," << pt(1) << "," << pt(2) << endl;
+   //    std::cout << value << "," << face_fraction[1]->operator()(p_UF) << endl;
+   // }
+
+   return(value * face_fraction[1]->operator()(p_UF));
+
 }
 
 
@@ -1311,121 +1600,31 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
 {
    MAC_LABEL("DS_AllRigidBodies:: calculate_divergence_flux_fromRB" ) ;
 
-   FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered() ;
-
    size_t parID = 0;
-   size_t UNK_MAX = UF->nb_local_unknowns();
+   geomVector const* pgc = get_gravity_centre(parID);
+   size_t p = PF->DOF_local_number(i,j,k,0);
 
-   vector<geomVector> point_on_plane;
-   vector<size_t> p;
-   geomVector ZERO(0.,0.,0.);
+   geomVector pt(pgc->operator()(0),
+					  pgc->operator()(1),
+					  pgc->operator()(2));
+	geomVector rb_vel = rigid_body_velocity(parID,pt);
 
-   size_t PF_p = PF->DOF_local_number(i, j, k, 0);
-   normalRB[PF_p] = ZERO;
+	double area = CutRBarea[p];
+	double norm_mag = MAC::sqrt(pow(normalRB[p](0),2)
+                             + pow(normalRB[p](1),2)
+                             + pow(normalRB[p](2),2));
 
-   size_t rht = UF->DOF_local_number(shift.i+i, j, k, 0);
-   if (rht <= UNK_MAX) p.push_back(rht);
-   size_t lft = UF->DOF_local_number(shift.i+i-1, j, k, 0);
-   if (lft <= UNK_MAX) p.push_back(lft);
-   size_t top = UF->DOF_local_number(i, shift.j+j, k, 1);
-   if (top <= UNK_MAX) p.push_back(top);
-   size_t bot = UF->DOF_local_number(i, shift.j+j-1, k, 1);
-   if (bot <= UNK_MAX) p.push_back(bot);
+   // if (p == 8188) {
+   //    std::cout << area << "," << normalRB[p](0) << "," << normalRB[p](1) << "," << normalRB[p](2) << endl;
+   // }
 
-   if (m_space_dimension == 3) {
-      size_t fnt = UF->DOF_local_number(i, j, shift.k+k, 2);
-      if (fnt <= UNK_MAX) p.push_back(fnt);
-      size_t bnd = UF->DOF_local_number(i, j, shift.k+k-1, 2);
-      if (bnd <= UNK_MAX) p.push_back(bnd);
-   }
-
-   // Creating a vector of unique points of the intersect plane
-   for (auto iter = p.begin(); iter < p.end(); iter++) {
-      for (auto it = intersect_points[*iter].begin();
-                it < intersect_points[*iter].end(); it++) {
-         if (*it == ZERO) {
-            continue;
-         } else {
-            bool present = false;
-            for (auto itt = point_on_plane.begin();
-                      itt != point_on_plane.end(); itt++) {
-               if (*it == *itt) {
-                  present = true;
-               }
-            }
-            if (!present) point_on_plane.push_back(*it);
-         }
-      }
-   }
-
-   if (!point_on_plane.empty()) {
-      // Normal vector of interface calculation
-      geomVector const* pgc = get_gravity_centre(parID);
-      geomVector p1(3), p2(3), pmid(3), pin(3), normal(3);
-      pin(0) = pgc->operator()(0);
-   	pin(1) = pgc->operator()(1);
-      pin(2) = pgc->operator()(2);
-
-      // std::cout << "Number of points in the box: " << point_on_plane.size() << endl;
-
-      // Calulation of the vector normal to RB plane
-      if (point_on_plane.size() == 1) {
-         std::cout << "WARNING:: Check your code. Possibly a bug !!!" << endl;
-      } else if (point_on_plane.size() == 2) {
-         p1(0) = point_on_plane[0](0);
-         p1(1) = point_on_plane[0](1);
-         p2(0) = point_on_plane[1](0);
-         p2(1) = point_on_plane[1](1);
-
-         pmid(0) = 0.5*(p1(0) + p2(0));
-      	pmid(1) = 0.5*(p1(1) + p2(1));
-      	normal(0) = p2(1) - p1(1);
-      	normal(1) = -(p2(0) - p1(0));
-      } else {
-         // Compute centeroid of plane
-         for (auto iter = point_on_plane.begin();
-                   iter != point_on_plane.end(); iter++) {
-            geomVector temp = *iter;
-            pmid += *iter;
-         }
-         pmid /= (double) point_on_plane.size();
-
-         normal = (point_on_plane[1] - point_on_plane[0])
-                ^ (point_on_plane[2] - point_on_plane[0]);
-      }
-
-      geomVector delta = pin - pmid;
-      delta(0) = delta_periodic_transformation(delta(0), 0);
-      delta(1) = delta_periodic_transformation(delta(1), 1);
-      delta(2) = (m_space_dimension == 3) ?
-                 delta_periodic_transformation(delta(2), 2) : delta(2);
-
-      if ((delta(0)*normal(0)+delta(1)*normal(1)+delta(2)*normal(2)) >= 0.) {
-         normal = -1.*normal;
-      }
-
-      normalRB[PF_p] = normal;
-
-      geomVector pt(pgc->operator()(0),
-   					  pgc->operator()(1),
-   					  pgc->operator()(2));
-   	geomVector rb_vel = rigid_body_velocity(parID,pt);
-
-   	double area = calculate_area_of_RBplane(point_on_plane, normalRB[PF_p]);
-   	double norm_mag = MAC::sqrt(pow(normalRB[PF_p](0),2)
-                                + pow(normalRB[PF_p](1),2)
-                                + pow(normalRB[PF_p](2),2));
-
-      if (norm_mag != 0.) {
-   		return(-area*(normalRB[PF_p](0)*rb_vel(0)
-                     + normalRB[PF_p](1)*rb_vel(1)
-                     + normalRB[PF_p](2)*rb_vel(2))/norm_mag);
-   	}
-   }
+   if (area != 0.) {
+		return(-area*(normalRB[p](0)*rb_vel(0)
+                  + normalRB[p](1)*rb_vel(1)
+                  + normalRB[p](2)*rb_vel(2))/norm_mag);
+	}
 
    return(0.);
-
-
 }
 
 
@@ -4365,18 +4564,24 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    if (field == 1) {
       face_fraction[field]->re_initialize(FF_LOC_UNK);
       intersect_points.reserve(FF_LOC_UNK);
+      face_centroid.reserve(FF_LOC_UNK);
       geomVector vvv(0.,0.,0.);
       vector<geomVector> vgV = {vvv};
-      for (size_t i = 0; i < FF_LOC_UNK; i++)
+      for (size_t i = 0; i < FF_LOC_UNK; i++) {
          intersect_points.push_back(vgV);
+         face_centroid.push_back(vvv);
+      }
    }
 
    // RB normal vector only for the PF field
    if (field == 0) {
       normalRB.reserve(FF_LOC_UNK);
+      CutRBarea.reserve(FF_LOC_UNK);
       geomVector vvv(0.,0.,0.);
-      for (size_t i = 0; i < FF_LOC_UNK; i++)
+      for (size_t i = 0; i < FF_LOC_UNK; i++) {
          normalRB.push_back(vvv);
+         CutRBarea.push_back(0.);
+      }
    }
 }
 
