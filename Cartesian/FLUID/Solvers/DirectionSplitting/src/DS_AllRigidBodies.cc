@@ -1319,13 +1319,6 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                     face_centroid[p] /= (double)edge_centroid.size();
                  }
 
-                 // if (p == 7162)
-                 //    std::cout << edge_centroid.size() << ","
-                 //              << top_in_fluid << ","
-                 //              << bot_in_fluid << ","
-                 //              << lft_in_fluid << ","
-                 //              << rht_in_fluid << endl;
-
                  // Face fraction calculations
                  vector<double> frac;
                  frac.push_back(rht_frac);
@@ -1426,12 +1419,13 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
               for (auto it = intersect_points[*iter].begin();
                         it < intersect_points[*iter].end(); it++) {
                  if (*it == ZERO) {
-                    continue;
                  } else {
                     bool present = false;
                     for (auto itt = point_on_plane.begin();
                               itt != point_on_plane.end(); itt++) {
-                       if (*it == *itt) {
+                       geomVector delta(*it - *itt);
+                       // if (*it == *itt) {
+                       if (delta.calcNorm() < EPSILON) {
                           present = true;
                        }
                     }
@@ -1439,10 +1433,6 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  }
               }
            }
-
-           // if (p == 8188) {
-           //   std::cout << "Number of points: " << point_on_plane.size() << endl;
-           // }
 
            if (!point_on_plane.empty()) {
              // Normal vector of interface calculation
@@ -1503,6 +1493,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
 
              CutRBarea[p] = calculate_area_of_RBplane(point_on_plane
                                                     , normalRB[p]);
+             // std::cout << pmid(0) << "," << pmid(1) << "," << pmid(2) << ","
+             //           << normalRB[p](0) << "," << normalRB[p](1) << "," << normalRB[p](2) << ","
+             //           << CutRBarea[p] << "," << p << endl;
            }
         }
      }
