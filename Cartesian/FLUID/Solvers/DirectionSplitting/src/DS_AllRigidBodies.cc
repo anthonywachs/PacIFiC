@@ -989,7 +989,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
   boolVector const* periodic_comp = MESH->get_periodic_directions();
 
   double dh = MESH->get_smallest_grid_size();
-  double threshold = pow(THRES,0.5)*dh;
+  double threshold = THRES*dh;//pow(THRES,0.5)*dh;
 
   // Get local min and max indices;
   size_t_vector min_unknown_index(3,0);
