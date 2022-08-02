@@ -1664,11 +1664,11 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor ( size_t const& i,
                         face_fraction[1]->operator()(pp_bot) : 0.;
 
       // behind face
-      size_t pp_bhd = UF->DOF_local_number(i, j, shift.k+k-1, 1);
+      size_t pp_bhd = UF->DOF_local_number(i, j, shift.k+k-1, 2);
       double bhd_frac = (pp_bhd <= UNK_MAX) ?
                         face_fraction[1]->operator()(pp_bhd) : 0.;
       // front face
-      size_t pp_frt = UF->DOF_local_number(i, j, shift.k+k, 1);
+      size_t pp_frt = UF->DOF_local_number(i, j, shift.k+k, 2);
       double frt_frac = (pp_frt <= UNK_MAX) ?
                         face_fraction[1]->operator()(pp_frt) : 0.;
 

@@ -2576,6 +2576,7 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 			}
 		}
 		// cout << "Div2: " << divergence->operator()(8188) << endl;
+		size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
 		// Flux redistribution
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
@@ -2613,6 +2614,8 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 						if (p_frt <= PF_UNK_MAX)
 							divergence->operator()(p_frt) +=
 													wht[5]/sum * divergence->operator()(p);
+						divergence->operator()(p) = 0.;
+					} else if ((sum == 0.) && (void_frac->operator()(p) != 0)) {
 						divergence->operator()(p) = 0.;
 					}
 				}
