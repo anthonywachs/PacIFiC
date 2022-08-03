@@ -1543,8 +1543,10 @@ double DS_AllRigidBodies:: divergence_face_flux ( size_t const& p_PF
       }
    }
 
-   // If the face is completly in solid
-   if (face_fraction[1]->operator()(p_UF) == 0.) {
+   if (UF->DOF_has_imposed_Dirichlet_value(i,j,k,comp)) {
+      return(value*area_max);
+   } else if (face_fraction[1]->operator()(p_UF) == 0.) {
+      // If the face is completly in solid
       return(0.);
    } else if (face_fraction[1]->operator()(p_UF) < area_max - EPSILON) {
       // Finding the grid indexes next to ghost points
