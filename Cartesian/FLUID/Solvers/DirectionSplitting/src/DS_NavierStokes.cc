@@ -310,7 +310,7 @@ DS_NavierStokes:: do_after_time_stepping( void )
    // Elapsed time by sub-problems
 
    // SCT_set_start( "Writing CSV" );
-   // write_output_field(PF);
+   write_output_field(PF);
    // write_output_field(UF);
    // SCT_get_elapsed_time( "Writing CSV" );
 
@@ -2498,7 +2498,14 @@ DS_NavierStokes:: calculate_velocity_divergence_cutCell ( size_t const& i,
 	double yvalue = (top_flux - bot_flux);
 	double zvalue = (fnt_flux - bhd_flux);
 
-   return(xvalue + yvalue + zvalue);
+	double value = xvalue + yvalue + zvalue;
+
+	// In case of nodes at the boundary of proc, especially
+	// nodes not handled by the proc
+	if (isnan(value))
+		return (0.);
+
+   return(value);
 }
 
 
