@@ -2578,7 +2578,6 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 					size_t p = PF->DOF_local_number(i,j,k,comp);
 					double temp = allrigidbodies->calculate_divergence_flux_fromRB(i,j,k);
 					divergence->operator()(p) += temp;
-
 				}
 			}
 		}

@@ -540,8 +540,9 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         acc(dir) = gg(dir)*(1-m_rho/rho_p) + (viscous_force->operator()(parID,dir)
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
-        vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-        // vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*2.*t_it->time()) : 0.;
+        // vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+        // vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*(3.2/2./MAC::pi())*t_it->time()) : 0.;
+        vel(dir) = (dir == 1) ? 1. : 0.;
         pos(dir) = periodic_transformation(pos(dir)
                                          + vel(dir)*t_it->time_step()
                                                          , dir) ;
@@ -1388,6 +1389,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
   size_t parID = 0;
 
   size_t UF_UNK_MAX = UF->nb_local_unknowns();
+  double dx_min = MESH->get_smallest_grid_size();
 
   for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
      for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
@@ -1425,16 +1427,21 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                               itt != point_on_plane.end(); itt++) {
                        geomVector delta(*it - *itt);
                        // if (*it == *itt) {
-                       if (delta.calcNorm() < EPSILON) {
+                       if (delta.calcNorm() < 1.E-6 * dx_min) {
                           present = true;
                        }
                     }
-                    if (!present) point_on_plane.push_back(*it);
+                    if (!present) {
+                       point_on_plane.push_back(*it);
+                       geomVector pttt = *it;
+                       // if (p == 29780) std::cout << pttt(0) << "," << pttt(1) << "," << pttt(2) << endl;
+                    }
                  }
               }
            }
 
-           if (!point_on_plane.empty()) {
+           // if (!point_on_plane.empty()) {
+           if (point_on_plane.size() >= m_space_dimension) {
              // Normal vector of interface calculation
              geomVector const* pgc = get_gravity_centre(parID);
              geomVector p1(3), p2(3), pmid(3), pin(3), normal(3);
@@ -1443,10 +1450,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
              pin(2) = pgc->operator()(2);
 
              // Calulation of the vector normal to RB plane
-             if (point_on_plane.size() == 1) {
-                 std::cout << "WARNING:: Check your code. \
-                              Possibly a bug !!!" << endl;
-             } else if (point_on_plane.size() == 2) {
+             if (point_on_plane.size() == 2 && m_space_dimension == 2) {
                  p1(0) = point_on_plane[0](0);
                  p1(1) = point_on_plane[0](1);
                  p2(0) = point_on_plane[1](0);
@@ -1456,7 +1460,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  pmid(1) = 0.5*(p1(1) + p2(1));
                  normal(0) = p2(1) - p1(1);
                  normal(1) = -(p2(0) - p1(0));
-             } else {
+             } else if (point_on_plane.size() > 2 && m_space_dimension == 3){
                  // Compute centeroid of plane
                  for (auto iter = point_on_plane.begin();
                            iter != point_on_plane.end(); iter++) {
@@ -1465,9 +1469,41 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  }
                  pmid /= (double) point_on_plane.size();
 
-                 normal = (point_on_plane[1] - point_on_plane[0])
-                        ^ (point_on_plane[2] - point_on_plane[0]);
+                 // ------------Sort the vertices-----------------------------//
+                 struct PtStruct {
+                   geomVector pt;
+                   double angle;
+                 };
+                 vector<PtStruct> point_struct;
+                 vector<double> angle;
+                 geomVector ref_vec = point_on_plane[0] - pmid;
+                 PtStruct temp;
+                 temp.pt = point_on_plane[0];
+                 temp.angle = 0.;
+                 point_struct.push_back(temp);
+                 for (auto iter = point_on_plane.begin() + 1;
+                           iter != point_on_plane.end(); iter++) {
+                   geomVector test_vec = *iter - pmid;
+                   geomVector cross = ref_vec^test_vec;
+                   double norm = cross.calcNorm();
+                   temp.pt = *iter;
+                   temp.angle = atan2(norm,(ref_vec,test_vec));
+                   point_struct.push_back(temp);
+                 }
+                 std::sort(point_struct.begin(), point_struct.end(),
+                       [](const PtStruct& iii, const PtStruct& jjj)
+                                  { return iii.angle < jjj.angle; } );
+
+                 for (size_t ii = 0; ii < point_on_plane.size(); ii++) {
+                    point_on_plane[ii] = point_struct[ii].pt;
+                 }
+                 // ------------Sorting complete------------------------------//
+
+                 normal = (point_on_plane[0] - pmid)
+                        ^ (point_on_plane[1] - pmid);
              }
+
+             CutRBarea[p] = calculate_area_of_RBplane(point_on_plane);
 
              // Test the direction of normal vector to be away from RB center
              geomVector delta = pin - pmid;
@@ -1482,20 +1518,12 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  normal = -1.*normal;
              }
 
-
              // Store the normal vector in the global variable define on PF
              normalRB[p] = normal;
 
-             geomVector pt(pgc->operator()(0),
-                          pgc->operator()(1),
-                          pgc->operator()(2));
-             geomVector rb_vel = rigid_body_velocity(parID,pt);
-
-             CutRBarea[p] = calculate_area_of_RBplane(point_on_plane
-                                                    , normalRB[p]);
-             // std::cout << pmid(0) << "," << pmid(1) << "," << pmid(2) << ","
-             //           << normalRB[p](0) << "," << normalRB[p](1) << "," << normalRB[p](2) << ","
-             //           << CutRBarea[p] << "," << p << endl;
+             std::cout << pmid(0) << "," << pmid(1) << "," << pmid(2) << ","
+                       << normalRB[p](0) << "," << normalRB[p](1) << "," << normalRB[p](2) << ","
+                       << CutRBarea[p] << "," << p << endl;
            }
         }
      }
@@ -1609,11 +1637,12 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
                              + pow(normalRB[p](1),2)
                              + pow(normalRB[p](2),2));
 
-   // if (p == 8188) {
-   //    std::cout << area << "," << normalRB[p](0) << "," << normalRB[p](1) << "," << normalRB[p](2) << endl;
-   // }
-
    if (area != 0.) {
+      // std::cout << area << ","
+      //           << normalRB[p](0) << ","
+      //           << normalRB[p](1) << ","
+      //           << normalRB[p](2) << ","
+      //           << rb_vel(0) << "," << rb_vel(1) << "," << rb_vel(2) << endl;
 		return(-area*(normalRB[p](0)*rb_vel(0)
                   + normalRB[p](1)*rb_vel(1)
                   + normalRB[p](2)*rb_vel(2))/norm_mag);
@@ -1719,8 +1748,7 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor ( size_t const& i,
 
 //---------------------------------------------------------------------------
 double DS_AllRigidBodies:: calculate_area_of_RBplane(
-                                        vector<geomVector> const& points
-                                      , geomVector const& normal)
+                                        vector<geomVector> const& points)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_AllRigidBodies:: calculate_area_of_RBplane" ) ;
@@ -1739,36 +1767,10 @@ double DS_AllRigidBodies:: calculate_area_of_RBplane(
      }
      centroid /= (double) nbPts;
 
-     // ------------Sort the vertices------------------------------------------
-     struct PtStruct {
-        geomVector pt;
-        double angle;
-     };
-     vector<PtStruct> point_struct;
-     vector<double> angle;
-     geomVector ref_vec = points[0] - centroid;
-     PtStruct temp;
-     temp.pt = points[0];
-     temp.angle = 0.;
-     point_struct.push_back(temp);
-     for (auto iter = points.begin() + 1; iter != points.end(); iter++) {
-        geomVector test_vec = *iter - centroid;
-        geomVector cross = ref_vec^test_vec;
-        double dot = (cross,normal);
-        double norm = cross.calcNorm();
-        if (dot < 0) norm *= -1 ;
-        temp.pt = *iter;
-        temp.angle = atan2(norm,(ref_vec,test_vec));
-        point_struct.push_back(temp);
-     }
-     std::sort(point_struct.begin(), point_struct.end(),
-                          [](const PtStruct& i, const PtStruct& j)
-                           { return i.angle < j.angle; } );
-     //------------------------------------------------------------------------
      // Area integration
      for (size_t i = 0; i < nbPts-1; i++) {
-         geomVector pt1 = point_struct[i].pt;
-         geomVector pt2 = point_struct[i+1].pt;
+         geomVector pt1 = points[i];
+         geomVector pt2 = points[i+1];
          double a = centroid.calcDist(pt1);
          double b = centroid.calcDist(pt2);
          double c = pt1.calcDist(pt2);
@@ -1776,8 +1778,8 @@ double DS_AllRigidBodies:: calculate_area_of_RBplane(
          area += MAC::sqrt(s * (s - a) * (s - b) * (s - c));
      }
 
-     geomVector pt1 = point_struct[0].pt;
-     geomVector pt2 = point_struct[nbPts-1].pt;
+     geomVector pt1 = points[0];
+     geomVector pt2 = points[nbPts-1];
      double a = centroid.calcDist(pt1);
      double b = centroid.calcDist(pt2);
      double c = pt1.calcDist(pt2);
