@@ -541,8 +541,7 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
         // vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-        // vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*(3.2/2./MAC::pi())*t_it->time()) : 0.;
-        vel(dir) = (dir == 1) ? 1. : 0.;
+        vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*(3.2/2./MAC::pi())*t_it->time()) : 0.;
         pos(dir) = periodic_transformation(pos(dir)
                                          + vel(dir)*t_it->time_step()
                                                          , dir) ;
@@ -1131,6 +1130,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
   size_t_vector max_unknown_index(3,0);
   geomVector ZERO(0.,0.,0.);
 
+  // double total_surface_area = 0.;
+  // geomVector total_surface_normal(3);
+
   // Estimate the face fractions and centroids of the velocity (UF) centered faces
   for (size_t comp = 0; comp < nb_comps; comp++) {
      size_t face_normal = comp;
@@ -1431,11 +1433,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                           present = true;
                        }
                     }
-                    if (!present) {
-                       point_on_plane.push_back(*it);
-                       geomVector pttt = *it;
-                       // if (p == 29780) std::cout << pttt(0) << "," << pttt(1) << "," << pttt(2) << endl;
-                    }
+                    if (!present) point_on_plane.push_back(*it);
                  }
               }
            }
@@ -1469,6 +1467,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  }
                  pmid /= (double) point_on_plane.size();
 
+                 normal = (point_on_plane[0] - pmid)
+                        ^ (point_on_plane[1] - pmid);
+
                  // ------------Sort the vertices-----------------------------//
                  struct PtStruct {
                    geomVector pt;
@@ -1498,9 +1499,6 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                     point_on_plane[ii] = point_struct[ii].pt;
                  }
                  // ------------Sorting complete------------------------------//
-
-                 normal = (point_on_plane[0] - pmid)
-                        ^ (point_on_plane[1] - pmid);
              }
 
              CutRBarea[p] = calculate_area_of_RBplane(point_on_plane);
@@ -1519,15 +1517,20 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
              }
 
              // Store the normal vector in the global variable define on PF
-             normalRB[p] = normal;
+             normalRB[p] = normal * (CutRBarea[p] / normal.calcNorm());
 
-             std::cout << pmid(0) << "," << pmid(1) << "," << pmid(2) << ","
-                       << normalRB[p](0) << "," << normalRB[p](1) << "," << normalRB[p](2) << ","
-                       << CutRBarea[p] << "," << p << endl;
+             // total_surface_area += CutRBarea[p];
+             // total_surface_normal += normalRB[p];
+             // std::cout << pmid(0) << "," << pmid(1) << "," << pmid(2) << ","
+             //           << normalRB[p](0) << "," << normalRB[p](1) << "," << normalRB[p](2) << ","
+             //           << CutRBarea[p] << "," << p << endl;
            }
         }
      }
   }
+
+  // std::cout << "Computed surface area of RB: " << total_surface_area << endl;
+  // std::cout << "Surface normal Residual: " << total_surface_normal.calcNorm() << endl;
 
 }
 
