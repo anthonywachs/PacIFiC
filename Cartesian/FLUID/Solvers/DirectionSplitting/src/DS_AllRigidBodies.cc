@@ -1487,6 +1487,8 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                    geomVector test_vec = *iter - pmid;
                    geomVector cross = ref_vec^test_vec;
                    double norm = cross.calcNorm();
+                   double dot = (cross,normal);
+                   if (dot < 0.) norm *= -1.;
                    temp.pt = *iter;
                    temp.angle = atan2(norm,(ref_vec,test_vec));
                    point_struct.push_back(temp);
