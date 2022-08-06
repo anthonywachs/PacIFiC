@@ -1331,7 +1331,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
 
                  int count = (int)std::count(frac.begin(),frac.end(),0);
 
-                 if (count == 2) {
+                 if (count == 4) {
+                    area = 0.;
+                 } else if (count == 2) {
               	     area = 0.5;
               		  for (vector<double>::iterator it = frac.begin();
                                                   it != frac.end() ; ++it) {
