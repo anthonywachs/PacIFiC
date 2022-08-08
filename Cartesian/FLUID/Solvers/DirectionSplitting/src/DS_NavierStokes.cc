@@ -2591,8 +2591,8 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 					size_t p_rht = PF->DOF_local_number(i+1,j,k,0);
 					size_t p_bot = PF->DOF_local_number(i,j-1,k,0);
 					size_t p_top = PF->DOF_local_number(i,j+1,k,0);
-					size_t p_bhd = PF->DOF_local_number(i,j,k-1,0);
-					size_t p_frt = PF->DOF_local_number(i,j,k+1,0);
+					size_t p_bhd = (dim == 2) ? 0 : PF->DOF_local_number(i,j,k-1,0);
+					size_t p_frt = (dim == 2) ? 0 : PF->DOF_local_number(i,j,k+1,0);
 					size_t p = PF->DOF_local_number(i,j,k,0);
 
 					vector<double> wht = allrigidbodies
@@ -2614,12 +2614,14 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 						if (p_top <= PF_UNK_MAX)
 							divergence->operator()(p_top) +=
 													wht[3]/sum * divergence->operator()(p);
-						if (p_bhd <= PF_UNK_MAX)
-							divergence->operator()(p_bhd) +=
+						if (dim == 3) {
+							if (p_bhd <= PF_UNK_MAX)
+								divergence->operator()(p_bhd) +=
 													wht[4]/sum * divergence->operator()(p);
-						if (p_frt <= PF_UNK_MAX)
-							divergence->operator()(p_frt) +=
+							if (p_frt <= PF_UNK_MAX)
+								divergence->operator()(p_frt) +=
 													wht[5]/sum * divergence->operator()(p);
+						}
 						divergence->operator()(p) = 0.;
 					} else if ((sum == 0.) && (void_frac->operator()(p) != 0)) {
 						divergence->operator()(p) = 0.;

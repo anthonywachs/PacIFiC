@@ -1701,21 +1701,14 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor ( size_t const& i,
       double bot_frac = (pp_bot <= UNK_MAX) ?
                         face_fraction[1]->operator()(pp_bot) : 0.;
 
-      // behind face
-      size_t pp_bhd = UF->DOF_local_number(i, j, shift.k+k-1, 2);
-      double bhd_frac = (pp_bhd <= UNK_MAX) ?
-                        face_fraction[1]->operator()(pp_bhd) : 0.;
-      // front face
-      size_t pp_frt = UF->DOF_local_number(i, j, shift.k+k, 2);
-      double frt_frac = (pp_frt <= UNK_MAX) ?
-                        face_fraction[1]->operator()(pp_frt) : 0.;
-
 		size_t p_lft = PF->DOF_local_number(i-1,j,k,0);
 		size_t p_rht = PF->DOF_local_number(i+1,j,k,0);
 		size_t p_bot = PF->DOF_local_number(i,j-1,k,0);
 		size_t p_top = PF->DOF_local_number(i,j+1,k,0);
-      size_t p_bhd = PF->DOF_local_number(i,j,k-1,0);
-		size_t p_frt = PF->DOF_local_number(i,j,k+1,0);
+      size_t p_bhd = (m_space_dimension == 2) ? 0 :
+                     PF->DOF_local_number(i,j,k-1,0);
+		size_t p_frt = (m_space_dimension == 2) ? 0 :
+                     PF->DOF_local_number(i,j,k+1,0);
 
 		size_t PF_UNK_MAX = PF->nb_local_unknowns();
 
@@ -1735,12 +1728,23 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor ( size_t const& i,
 		if (p_top <= PF_UNK_MAX)
 			wt_top = (void_fraction[0]->operator()(p_top) == 0) ?
 										  normalRB[p](1)*normalRB[p](1)*top_frac : 0.;
-      if (p_bhd <= PF_UNK_MAX)
-			wt_bhd = (void_fraction[0]->operator()(p_bhd) == 0) ?
+      if (m_space_dimension == 3) {
+         // behind face
+         size_t pp_bhd = UF->DOF_local_number(i, j, shift.k+k-1, 2);
+         double bhd_frac = (pp_bhd <= UNK_MAX) ?
+                           face_fraction[1]->operator()(pp_bhd) : 0.;
+         // front face
+         size_t pp_frt = UF->DOF_local_number(i, j, shift.k+k, 2);
+         double frt_frac = (pp_frt <= UNK_MAX) ?
+                           face_fraction[1]->operator()(pp_frt) : 0.;
+
+         if (p_bhd <= PF_UNK_MAX)
+   			wt_bhd = (void_fraction[0]->operator()(p_bhd) == 0) ?
 										  normalRB[p](2)*normalRB[p](2)*bhd_frac : 0.;
-      if (p_frt <= PF_UNK_MAX)
-         wt_frt = (void_fraction[0]->operator()(p_frt) == 0) ?
+         if (p_frt <= PF_UNK_MAX)
+            wt_frt = (void_fraction[0]->operator()(p_frt) == 0) ?
                                 normalRB[p](2)*normalRB[p](2)*frt_frac : 0.;
+      }
 
       wht = {wt_lft, wt_rht, wt_bot, wt_top, wt_bhd, wt_frt};
 	}
