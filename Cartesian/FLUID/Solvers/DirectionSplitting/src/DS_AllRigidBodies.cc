@@ -1568,14 +1568,12 @@ double DS_AllRigidBodies:: divergence_face_flux ( size_t const& p_PF
                                         : UF->get_cell_size( k, comp, 2 ) ;
    double area_max = dx*dy;
 
-   if (m_space_dimension == 3) {
-      if (comp == 0) {
-         area_max = dy*dz;
-      } else if (comp == 1) {
-         area_max = dx*dz;
-      } else {
-         area_max = dx*dy;
-      }
+   if (comp == 0) {
+      area_max = (m_space_dimension == 3) ? dy*dz : dy;
+   } else if (comp == 1) {
+      area_max = (m_space_dimension == 3) ? dx*dz : dx;
+   } else {
+      area_max = dx*dy;
    }
 
    if (UF->DOF_has_imposed_Dirichlet_value(i,j,k,comp)) {
