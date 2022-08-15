@@ -1374,7 +1374,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
 
               // Eliminate contribution if less than 0.01%
               if (fraction < 0.0001*plane_mag) fraction = 0.;
-              face_fraction[field]->operator()(p) = fraction;
+              face_fraction->operator()(p) = fraction;
               intersect_points[p] = intersect_pt;
            }
         }
@@ -1578,10 +1578,10 @@ double DS_AllRigidBodies:: divergence_face_flux ( size_t const& p_PF
 
    if (UF->DOF_has_imposed_Dirichlet_value(i,j,k,comp)) {
       return(value*area_max);
-   } else if (face_fraction[1]->operator()(p_UF) == 0.) {
+   } else if (face_fraction->operator()(p_UF) == 0.) {
       // If the face is completly in solid
       return(0.);
-   } else if (face_fraction[1]->operator()(p_UF) < area_max - EPSILON) {
+   } else if (face_fraction->operator()(p_UF) < area_max - EPSILON) {
       // Finding the grid indexes next to ghost points
       for (size_t l = 0; l < m_space_dimension; l++) {
          size_t i0_temp;
@@ -1610,10 +1610,10 @@ double DS_AllRigidBodies:: divergence_face_flux ( size_t const& p_PF
    // if (p_PF == 8188) {
    //    std::cout << "!!!--------------------------------------!!!" << endl;
    //    std::cout << p_UF << "," << pt(0) << "," << pt(1) << "," << pt(2) << endl;
-   //    std::cout << value << "," << face_fraction[1]->operator()(p_UF) << endl;
+   //    std::cout << value << "," << face_fraction->operator()(p_UF) << endl;
    // }
 
-   return(value * face_fraction[1]->operator()(p_UF));
+   return(value * face_fraction->operator()(p_UF));
 
 }
 
@@ -1685,19 +1685,19 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor ( size_t const& i,
 
       size_t pp_rht = UF->DOF_local_number(shift.i+i, j, k, 0);
       double rht_frac = (pp_rht <= UNK_MAX) ?
-                        face_fraction[1]->operator()(pp_rht) : 0.;
+                        face_fraction->operator()(pp_rht) : 0.;
       // left face
       size_t pp_lft = UF->DOF_local_number(shift.i+i-1, j, k, 0);
       double lft_frac = (pp_lft <= UNK_MAX) ?
-                        face_fraction[1]->operator()(pp_lft) : 0.;
+                        face_fraction->operator()(pp_lft) : 0.;
       // top face
       size_t pp_top = UF->DOF_local_number(i, shift.j+j, k, 1);
       double top_frac = (pp_top <= UNK_MAX) ?
-                        face_fraction[1]->operator()(pp_top) : 0.;
+                        face_fraction->operator()(pp_top) : 0.;
       // bottom face
       size_t pp_bot = UF->DOF_local_number(i, shift.j+j-1, k, 1);
       double bot_frac = (pp_bot <= UNK_MAX) ?
-                        face_fraction[1]->operator()(pp_bot) : 0.;
+                        face_fraction->operator()(pp_bot) : 0.;
 
 		size_t p_lft = PF->DOF_local_number(i-1,j,k,0);
 		size_t p_rht = PF->DOF_local_number(i+1,j,k,0);
@@ -1730,11 +1730,11 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor ( size_t const& i,
          // behind face
          size_t pp_bhd = UF->DOF_local_number(i, j, shift.k+k-1, 2);
          double bhd_frac = (pp_bhd <= UNK_MAX) ?
-                           face_fraction[1]->operator()(pp_bhd) : 0.;
+                           face_fraction->operator()(pp_bhd) : 0.;
          // front face
          size_t pp_frt = UF->DOF_local_number(i, j, shift.k+k, 2);
          double frt_frac = (pp_frt <= UNK_MAX) ?
-                           face_fraction[1]->operator()(pp_frt) : 0.;
+                           face_fraction->operator()(pp_frt) : 0.;
 
          if (p_bhd <= PF_UNK_MAX)
    			wt_bhd = (void_fraction[0]->operator()(p_bhd) == 0) ?
@@ -2266,10 +2266,7 @@ void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
    intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
    intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
    intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
-   face_fraction.reserve(3);
-   face_fraction.push_back(new doubleVector(1,0.));
-   face_fraction.push_back(new doubleVector(1,0.));
-   face_fraction.push_back(new doubleVector(1,0.));
+   face_fraction = new doubleVector(1,0.);
 
    // Intialization of force and torque variables
    viscous_force = new doubleArray2D(1,1,0.);
@@ -4568,7 +4565,7 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
 
    // Face fractions only for the UF field
    if (field == 1) {
-      face_fraction[field]->re_initialize(FF_LOC_UNK);
+      face_fraction->re_initialize(FF_LOC_UNK);
       intersect_points.reserve(FF_LOC_UNK);
       face_centroid.reserve(FF_LOC_UNK);
       geomVector vvv(0.,0.,0.);
@@ -4622,20 +4619,6 @@ size_t_vector* DS_AllRigidBodies:: get_void_fraction_on_grid(
   size_t field = field_num(FF);
 
   return (void_fraction[field]);
-
-}
-
-
-
-
-//---------------------------------------------------------------------------
-doubleVector* DS_AllRigidBodies:: get_face_fraction_on_grid(
-                                                FV_DiscreteField const* FF )
-//---------------------------------------------------------------------------
-{
-  size_t field = field_num(FF);
-
-  return (face_fraction[field]);
 
 }
 
