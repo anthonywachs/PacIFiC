@@ -207,6 +207,18 @@ class DS_AllRigidBodies
                         double const& y,
                         double const& z ) const;
 
+      /** @brief Returns the parID if the point is inside parID, based on levelset
+      @param pt the point */
+      int levelset_any_RB( geomVector const& pt ) const;
+
+      /** @brief Returns the parID if the point is inside parID, based on levelset
+      @param x x-coordinate of the point
+      @param y x-coordinate of the point
+      @param z x-coordinate of the point */
+      int levelset_any_RB( double const& x,
+                           double const& y,
+                           double const& z ) const;
+
 
       /** @brief Returns the parID if the point is inside parID, based on levelset
       @param ownID ID of RB owning the pt
@@ -251,7 +263,7 @@ class DS_AllRigidBodies
       /** @brief Returns the length of side in fluid
       @param pt1 Point 1
       @param pt2 Point 2 */
-      std::tuple<double, geomVector, int>
+      std::tuple<double, geomVector, int, int>
              return_side_fraction(geomVector const& pt1
                                 , geomVector const& pt2 );
 
@@ -520,6 +532,12 @@ class DS_AllRigidBodies
       field grid nodes, 0 in fluid and (parID+1) in the rigid bodies*/
 
       doubleVector* face_fraction; /**< vector of field grid nodes
+      face fraction, only for UF*/
+
+      intVector* face_ownerID; /**< vector of field grid nodes
+      face fraction, only for UF*/
+
+      intVector* cell_ownerID; /**< vector of field grid nodes
       face fraction, only for UF*/
 
       vector<geomVector> face_centroid; /**< centroid of the cut faces

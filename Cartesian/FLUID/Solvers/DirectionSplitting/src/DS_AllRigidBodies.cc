@@ -540,8 +540,8 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         acc(dir) = gg(dir)*(1-m_rho/rho_p) + (viscous_force->operator()(parID,dir)
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
-        // vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-        vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*(3.2/2./MAC::pi())*t_it->time()) : 0.;
+        vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+        // vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*(3.2/2./MAC::pi())*t_it->time()) : 0.;
         pos(dir) = periodic_transformation(pos(dir)
                                          + vel(dir)*t_it->time_step()
                                                          , dir) ;
@@ -660,6 +660,52 @@ int DS_AllRigidBodies:: isIn_any_RB( size_t const& ownID,
   for (size_t i = 0; i < neighbour_list[ownID].size(); ++i) {
      size_t neighID = neighbour_list[ownID][i];
      if (m_allDSrigidbodies[neighID]->isIn( x, y, z )) return ((int)neighID);
+  }
+
+  return (-1);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+int DS_AllRigidBodies:: levelset_any_RB( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: levelset_any_RB(pt)" ) ;
+
+  // To avoid any jumps while RB motion
+  double dh = MESH->get_smallest_grid_size();
+  double threshold = pow(THRES,0.5)*dh;
+
+  for (size_t i = 0; i < m_nrb; ++i) {
+     if (m_allDSrigidbodies[i]->level_set_value( pt ) < threshold )
+        return ((int)i);
+  }
+
+  return (-1);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+int DS_AllRigidBodies:: levelset_any_RB( double const& x,
+                                        double const& y,
+                                        double const& z ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: levelset_any_RB(x,y,z)" ) ;
+
+  // To avoid any jumps while RB motion
+  double dh = MESH->get_smallest_grid_size();
+  double threshold = pow(THRES,0.5)*dh;
+
+  for (size_t i = 0; i < m_nrb; ++i) {
+     if (m_allDSrigidbodies[i]->level_set_value( x, y, z ) < threshold)
+        return ((int)i);
   }
 
   return (-1);
@@ -1071,7 +1117,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
 
 //---------------------------------------------------------------------------
-std::tuple<double, geomVector, int> DS_AllRigidBodies::
+std::tuple<double, geomVector, int, int> DS_AllRigidBodies::
                            return_side_fraction(geomVector const& pt1
                                               , geomVector const& pt2 )
 //---------------------------------------------------------------------------
@@ -1079,14 +1125,15 @@ std::tuple<double, geomVector, int> DS_AllRigidBodies::
   MAC_LABEL( "DS_AllRigidBodies:: return_side_fraction" ) ;
 
   double fraction = 0.;
-  size_t parID = 0;
-  double dh = MESH->get_smallest_grid_size();
-  double threshold = pow(THRES,0.5)*dh;
 
-  bool pt1_solid = (level_set_value(parID,pt1) < threshold) ? true : false ;
-  bool pt2_solid = (level_set_value(parID,pt2) < threshold) ? true : false ;
+  int pt1_parID = levelset_any_RB(pt1);
+  int pt2_parID = levelset_any_RB(pt2);
+
+  bool pt1_solid = (pt1_parID != -1) ? true : false ;
+  bool pt2_solid = (pt2_parID != -1) ? true : false ;
 
   int point_in_fluid = -1;
+  int ownerID = -1;
 
   geomVector intersection_pt(0.,0.,0.);
   geomVector rayVec = pt2 - pt1;
@@ -1095,12 +1142,14 @@ std::tuple<double, geomVector, int> DS_AllRigidBodies::
 
   // pt1 in solid and pt2 in fluid
   if (pt1_solid && !pt2_solid) {
-     fraction = m_allDSrigidbodies[parID]
+     ownerID = pt1_parID;
+     fraction = m_allDSrigidbodies[ownerID]
              ->get_distanceTo( pt2, -1.*rayVec, vecMag );
      intersection_pt = pt2 - fraction*rayVec;
      point_in_fluid = 1;
   } else if (!pt1_solid && pt2_solid) {  // pt1 in fluid and pt2 in solid
-     fraction = m_allDSrigidbodies[parID]
+     ownerID = pt2_parID;
+     fraction = m_allDSrigidbodies[ownerID]
              ->get_distanceTo( pt1, rayVec, vecMag );
      intersection_pt = pt1 + fraction*rayVec;
      point_in_fluid = 0;
@@ -1109,9 +1158,10 @@ std::tuple<double, geomVector, int> DS_AllRigidBodies::
      point_in_fluid = 2;
   } else if (pt1_solid && pt2_solid) {   // both pt1 and pt2 in solid
      fraction = 0.;
+     ownerID = pt1_parID;
   }
 
-  return(std::make_tuple(fraction, intersection_pt, point_in_fluid));
+  return(std::make_tuple(fraction, intersection_pt, point_in_fluid, ownerID));
 
 }
 
@@ -1123,7 +1173,6 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
   MAC_LABEL( "DS_AllRigidBodies:: compute_cutCell_geometric_parameters" ) ;
 
   size_t nb_comps = UF->nb_components() ;
-  size_t field = field_num(UF) ;
 
   // Get local min and max indices
   size_t_vector min_unknown_index(3,0);
@@ -1179,6 +1228,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  fraction = std::get<0>(int_pt);
                  geomVector pt = std::get<1>(int_pt);
                  int point_in_fluid = std::get<2>(int_pt);
+                 face_ownerID->operator()(p) = std::get<3>(int_pt);
                  if (pt == ZERO) {
                  } else {
                     intersect_pt.push_back(pt);
@@ -1229,12 +1279,14 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  }
 
                  vector<geomVector> edge_centroid;
+                 vector<int> ownerID;
 
                  // Right edge
                  auto rht = return_side_fraction(topRight, botRight);
                  double rht_frac = std::get<0>(rht);
                  geomVector pt = std::get<1>(rht);
                  int rht_in_fluid = std::get<2>(rht);
+                 ownerID.push_back(std::get<3>(rht));
                  if (pt == ZERO) {
                  } else {
                     intersect_pt.push_back(pt);
@@ -1256,6 +1308,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  double lft_frac = std::get<0>(lft);
                  pt = std::get<1>(lft);
                  int lft_in_fluid = std::get<2>(lft);
+                 ownerID.push_back(std::get<3>(lft));
                  if (pt == ZERO) {
                  } else {
                     intersect_pt.push_back(pt);
@@ -1276,6 +1329,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  double top_frac = std::get<0>(top);
                  pt = std::get<1>(top);
                  int top_in_fluid = std::get<2>(top);
+                 ownerID.push_back(std::get<3>(top));
                  if (pt == ZERO) {
                  } else {
                     intersect_pt.push_back(pt);
@@ -1296,6 +1350,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  double bot_frac = std::get<0>(bot);
                  pt = std::get<1>(bot);
                  int bot_in_fluid = std::get<2>(bot);
+                 ownerID.push_back(std::get<3>(bot));
                  if (pt == ZERO) {
                  } else {
                     intersect_pt.push_back(pt);
@@ -1321,6 +1376,10 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                     }
                     face_centroid[p] /= (double)edge_centroid.size();
                  }
+
+                 // Storing particle owner of the face
+                 face_ownerID->operator()(p) = *max_element(ownerID.begin()
+                                                          , ownerID.end());
 
                  // Face fraction calculations
                  vector<double> frac;
@@ -1390,7 +1449,6 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
   }
 
   FV_SHIFT_TRIPLET shift = PF->shift_staggeredToCentered();
-  size_t parID = 0;
 
   size_t UF_UNK_MAX = UF->nb_local_unknowns();
   double dx_min = MESH->get_smallest_grid_size();
@@ -1421,7 +1479,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
 
            // Creating a vector of unique points of the intersect plane
            vector<geomVector> point_on_plane;
+           vector<int> ownerID;
            for (auto iter = pList.begin(); iter < pList.end(); iter++) {
+              ownerID.push_back(face_ownerID->operator()(*iter));
               for (auto it = intersect_points[*iter].begin();
                         it < intersect_points[*iter].end(); it++) {
                  if (*it == ZERO) {
@@ -1439,10 +1499,13 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
                  }
               }
            }
+           cell_ownerID->operator()(p) =
+                           *max_element(ownerID.begin(), ownerID.end());
 
            // if (!point_on_plane.empty()) {
            if (point_on_plane.size() >= m_space_dimension) {
              // Normal vector of interface calculation
+             size_t parID = cell_ownerID->operator()(p);
              geomVector const* pgc = get_gravity_centre(parID);
              geomVector p1(3), p2(3), pmid(3), pin(3), normal(3);
              pin(0) = pgc->operator()(0);
@@ -1552,7 +1615,7 @@ double DS_AllRigidBodies:: divergence_face_flux ( size_t const& p_PF
    MAC_LABEL("DS_AllRigidBodies:: divergence_face_flux" ) ;
 
    size_t p_UF = UF->DOF_local_number(i, j, k, comp);
-   size_t parID = 0;
+   size_t parID = face_ownerID->operator()(p_UF);
    geomVector ZERO(0.,0.,0.);
 
 	size_t_vector i0_new(3,0);
@@ -1628,15 +1691,7 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
 {
    MAC_LABEL("DS_AllRigidBodies:: calculate_divergence_flux_fromRB" ) ;
 
-   size_t parID = 0;
-   geomVector const* pgc = get_gravity_centre(parID);
    size_t p = PF->DOF_local_number(i,j,k,0);
-
-   geomVector pt(pgc->operator()(0),
-					  pgc->operator()(1),
-					  pgc->operator()(2));
-	geomVector rb_vel = rigid_body_velocity(parID,pt);
-
 	double area = CutRBarea[p];
 	double norm_mag = MAC::sqrt(pow(normalRB[p](0),2)
                              + pow(normalRB[p](1),2)
@@ -1648,6 +1703,14 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
       //           << normalRB[p](1) << ","
       //           << normalRB[p](2) << ","
       //           << rb_vel(0) << "," << rb_vel(1) << "," << rb_vel(2) << endl;
+
+      size_t parID = cell_ownerID->operator()(p);
+      geomVector const* pgc = get_gravity_centre(parID);
+      geomVector pt(pgc->operator()(0),
+      pgc->operator()(1),
+      pgc->operator()(2));
+      geomVector rb_vel = rigid_body_velocity(parID,pt);
+
 		return(-area*(normalRB[p](0)*rb_vel(0)
                   + normalRB[p](1)*rb_vel(1)
                   + normalRB[p](2)*rb_vel(2))/norm_mag);
@@ -2266,7 +2329,6 @@ void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
    intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
    intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
    intersect_fieldValue.push_back(new doubleArray2D(1,1,0.));
-   face_fraction = new doubleVector(1,0.);
 
    // Intialization of force and torque variables
    viscous_force = new doubleArray2D(1,1,0.);
@@ -2288,6 +2350,10 @@ void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
    avg_pressure_torque = vvv;
    avg_viscous_torque = vvv;
    avg_temperature_gradient = 0.;
+
+   face_fraction = new doubleVector(1,0.);
+   face_ownerID = new intVector(1,-1);
+   cell_ownerID = new intVector(1,-1);
 
 }
 
@@ -4566,6 +4632,7 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    // Face fractions only for the UF field
    if (field == 1) {
       face_fraction->re_initialize(FF_LOC_UNK);
+      face_ownerID->re_initialize(FF_LOC_UNK,-1);
       intersect_points.reserve(FF_LOC_UNK);
       face_centroid.reserve(FF_LOC_UNK);
       geomVector vvv(0.,0.,0.);
@@ -4580,6 +4647,7 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    if (field == 0) {
       normalRB.reserve(FF_LOC_UNK);
       CutRBarea.reserve(FF_LOC_UNK);
+      cell_ownerID->re_initialize(FF_LOC_UNK,-1);
       geomVector vvv(0.,0.,0.);
       for (size_t i = 0; i < FF_LOC_UNK; i++) {
          normalRB.push_back(vvv);
