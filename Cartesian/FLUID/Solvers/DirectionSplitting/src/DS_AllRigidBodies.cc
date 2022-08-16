@@ -2230,8 +2230,8 @@ void DS_AllRigidBodies:: clear_GrainsRB_data_on_grid(
                           }
                        }
                     }
+                    void_fraction[field]->operator()(p) = 0;
                  }
-                 void_fraction[field]->operator()(p) = 0;
               }
            }
         }
