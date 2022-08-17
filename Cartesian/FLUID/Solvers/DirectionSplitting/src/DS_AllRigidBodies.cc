@@ -535,17 +535,20 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
      // Solving equation of motion
      for (size_t dir = 0; dir < m_space_dimension;dir++) {
         pos(dir) = pgc->operator()(dir);
+        double temp = pos(dir);
         vel(dir) = pv(dir);
 
         acc(dir) = gg(dir)*(1-m_rho/rho_p) + (viscous_force->operator()(parID,dir)
                                          +  pressure_force->operator()(parID,dir))
                                          / mass_p ;
+        // vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
+        pos(dir) = pos(dir) + vel(dir)*t_it->time_step()
+                 + 0.5 * acc(dir) * MAC::pow(t_it->time_step(),2.);
+        pos(dir) = periodic_transformation(pos(dir), dir) ;
+        // pos(dir) = periodic_transformation(pos(dir)
+        //                                  + vel(dir)*t_it->time_step(), dir) ;
         vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
-        // vel(dir) = (dir == 1) ? MAC::cos(2.*MAC::pi()*(3.2/2./MAC::pi())*t_it->time()) : 0.;
-        pos(dir) = periodic_transformation(pos(dir)
-                                         + vel(dir)*t_it->time_step()
-                                                         , dir) ;
-        delta(dir) = vel(dir)*t_it->time_step() ;
+        delta(dir) = pos(dir) - temp;
      }
 
      if (m_space_dimension == 2) {
