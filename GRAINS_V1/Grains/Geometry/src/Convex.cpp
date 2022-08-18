@@ -8,14 +8,14 @@ double rel_error = EPSILON;   // relative error in the computed distance
 double abs_error = EPSILON2;  // absolute error if the distance is almost zero
 int num_iterations = 0;
 
-static Point3 p[4];         // support points of object A in local coordinates 
-static Point3 q[4];         // support points of object B in local coordinates 
+static Point3 p[4];         // support points of object A in local coordinates
+static Point3 q[4];         // support points of object B in local coordinates
 static Vector3 y[4];       // support points of A - B in world coordinates
 
 static int bits;           // identifies current simplex
 static int last;           // identifies last found support point
 static int last_bit;       // last_bit = 1<<last
-static int all_bits;       // all_bits = bits|last_bit 
+static int all_bits;       // all_bits = bits|last_bit
 
 static double det[16][4];  // cached sub-determinants
 
@@ -38,16 +38,16 @@ Convex::~Convex()
 
 // ----------------------------------------------------------------------------
 // Returns the convex shape bounding box
-BBox Convex::bbox( Transform const& t) const 
+BBox Convex::bbox( Transform const& t) const
 {
   Point3 const* ori = t.getOrigin() ;
-  
+
   Point3 min( (*ori)[X] + t.getBasis()[X] * support(-t.getBasis()[X]),
 	    (*ori)[Y] + t.getBasis()[Y] * support(-t.getBasis()[Y]),
-	    (*ori)[Z] + t.getBasis()[Z] * support(-t.getBasis()[Z]) ); 
+	    (*ori)[Z] + t.getBasis()[Z] * support(-t.getBasis()[Z]) );
   Point3 max( (*ori)[X] + t.getBasis()[X] * support(t.getBasis()[X]),
 	    (*ori)[Y] + t.getBasis()[Y] * support(t.getBasis()[Y]),
-	    (*ori)[Z] + t.getBasis()[Z] * support(t.getBasis()[Z]) ); 
+	    (*ori)[Z] + t.getBasis()[Z] * support(t.getBasis()[Z]) );
 
   return ( BBox( min, max ) );
 }
@@ -114,14 +114,14 @@ int Convex::numberOfPoints_PARAVIEW() const
        << "Need for an assistance ! Stop running !\n";
   exit(10);
 
-  return ( 0 );  
+  return ( 0 );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of elementary polytopes to write the convex 
+// Returns the number of elementary polytopes to write the convex
 // shape in a Paraview format
 int Convex::numberOfCells_PARAVIEW() const
 {
@@ -130,7 +130,7 @@ int Convex::numberOfCells_PARAVIEW() const
        << "Need for an assistance ! Stop running !\n";
   exit(10);
 
-  return ( 0 );  
+  return ( 0 );
 }
 
 
@@ -138,7 +138,7 @@ int Convex::numberOfCells_PARAVIEW() const
 
 // ----------------------------------------------------------------------------
 // Writes the points describing the convex shape in a Paraview format
-void Convex::write_polygonsPts_PARAVIEW( ostream& f, 
+void Convex::write_polygonsPts_PARAVIEW( ostream& f,
   	Transform const& transform, Vector3 const* translation ) const
 {
   cout << "Warning for this Convex the method "
@@ -187,7 +187,7 @@ void Convex::write_polygonsStr_PARAVIEW( list<int>& connectivity,
        << "Convex::write_polygonsStr_PARAVIEW() is not yet implemented !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);
-}	 
+}
 
 
 
@@ -205,11 +205,11 @@ Vector3 Convex::computeOrientationVector( Transform const* transform ) const
 // ----------------------------------------------------------------------------
 // SOLID Software low-level routines
 // ----------------------------------------------------------------------------
-void compute_det() 
+void compute_det()
 {
   static double dp[4][4];
 
-  for (int i = 0, bit = 1; i < 4; ++i, bit <<=1) 
+  for (int i = 0, bit = 1; i < 4; ++i, bit <<=1)
     if (bits & bit) dp[i][last] = dp[last][i] = y[i] * y[last];
   dp[last][last] = y[last] * y[last];
 
@@ -217,33 +217,33 @@ void compute_det()
   for (int j = 0, sj = 1; j < 4; ++j, sj <<= 1) {
     if (bits & sj) {
       int s2 = sj|last_bit;
-      det[s2][j] = dp[last][last] - dp[last][j]; 
+      det[s2][j] = dp[last][last] - dp[last][j];
       det[s2][last] = dp[j][j] - dp[j][last];
       for (int k = 0, sk = 1; k < j; ++k, sk <<= 1) {
 	if (bits & sk) {
 	  int s3 = sk|s2;
-	  det[s3][k] = det[s2][j] * (dp[j][j] - dp[j][k]) + 
+	  det[s3][k] = det[s2][j] * (dp[j][j] - dp[j][k]) +
 	               det[s2][last] * (dp[last][j] - dp[last][k]);
-	  det[s3][j] = det[sk|last_bit][k] * (dp[k][k] - dp[k][j]) + 
+	  det[s3][j] = det[sk|last_bit][k] * (dp[k][k] - dp[k][j]) +
 	               det[sk|last_bit][last] * (dp[last][k] - dp[last][j]);
-	  det[s3][last] = det[sk|sj][k] * (dp[k][k] - dp[k][last]) + 
+	  det[s3][last] = det[sk|sj][k] * (dp[k][k] - dp[k][last]) +
 	                  det[sk|sj][j] * (dp[j][k] - dp[j][last]);
 	}
       }
     }
   }
   if (all_bits == 15) {
-    det[15][0] = det[14][1] * (dp[1][1] - dp[1][0]) + 
-                 det[14][2] * (dp[2][1] - dp[2][0]) + 
+    det[15][0] = det[14][1] * (dp[1][1] - dp[1][0]) +
+                 det[14][2] * (dp[2][1] - dp[2][0]) +
                  det[14][3] * (dp[3][1] - dp[3][0]);
-    det[15][1] = det[13][0] * (dp[0][0] - dp[0][1]) + 
-                 det[13][2] * (dp[2][0] - dp[2][1]) + 
+    det[15][1] = det[13][0] * (dp[0][0] - dp[0][1]) +
+                 det[13][2] * (dp[2][0] - dp[2][1]) +
                  det[13][3] * (dp[3][0] - dp[3][1]);
-    det[15][2] = det[11][0] * (dp[0][0] - dp[0][2]) + 
-                 det[11][1] * (dp[1][0] - dp[1][2]) +  
+    det[15][2] = det[11][0] * (dp[0][0] - dp[0][2]) +
+                 det[11][1] * (dp[1][0] - dp[1][2]) +
                  det[11][3] * (dp[3][0] - dp[3][2]);
-    det[15][3] = det[7][0] * (dp[0][0] - dp[0][3]) + 
-                 det[7][1] * (dp[1][0] - dp[1][3]) + 
+    det[15][3] = det[7][0] * (dp[0][0] - dp[0][3]) +
+                 det[7][1] * (dp[1][0] - dp[1][3]) +
                  det[7][2] * (dp[2][0] - dp[2][3]);
   }
 }
@@ -252,26 +252,26 @@ void compute_det()
 
 
 // ----------------------------------------------------------------------------
-inline bool valid( int s ) 
-{  
+inline bool valid( int s )
+{
   for (int i = 0, bit = 1; i < 4; ++i, bit <<= 1) {
     if (all_bits & bit) {
-      if (s & bit) { 
-	if (det[s][i] <= EPSILON3) 
-	  return false; 
-      } else if (det[s|bit][i] > 0.) 
+      if (s & bit) {
+	if (det[s][i] <= EPSILON3)
+	  return false;
+      } else if (det[s|bit][i] > 0.)
 	return false;
     }
   }
 
-  return ( true );  
+  return ( true );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-inline void compute_vector( int bits_, Vector3& v ) 
+inline void compute_vector( int bits_, Vector3& v )
 {
   double sum = 0.;
   v.setValue(0., 0., 0.);
@@ -288,7 +288,7 @@ inline void compute_vector( int bits_, Vector3& v )
 
 
 // ----------------------------------------------------------------------------
-inline void compute_points( int bits_, Point3& p1, Point3& p2 ) 
+inline void compute_points( int bits_, Point3& p1, Point3& p2 )
 {
   double sum = 0;
   p1.setValue(0, 0, 0);
@@ -309,8 +309,8 @@ inline void compute_points( int bits_, Point3& p1, Point3& p2 )
 
 
 // ----------------------------------------------------------------------------
-inline bool proper( int s ) 
-{  
+inline bool proper( int s )
+{
   for (int i = 0, bit = 1; i < 4; ++i, bit <<= 1)
     if ((s & bit) && det[s][i] <= EPSILON3) return ( false );
 
@@ -321,7 +321,7 @@ inline bool proper( int s )
 
 
 // ----------------------------------------------------------------------------
-inline bool closest( Vector3& v ) 
+inline bool closest( Vector3& v )
 {
   int s;
   compute_det();
@@ -363,11 +363,11 @@ inline bool closest( Vector3& v )
 
 
 // ----------------------------------------------------------------------------
-// The next function is used for detecting degenerate cases that cause 
-// termination problems due to rounding errors.  
-inline bool degenerate(const Vector3& w) 
+// The next function is used for detecting degenerate cases that cause
+// termination problems due to rounding errors.
+inline bool degenerate(const Vector3& w)
 {
-  for (int i = 0, bit = 1; i < 4; ++i, bit <<= 1) 
+  for (int i = 0, bit = 1; i < 4; ++i, bit <<= 1)
     if ((all_bits & bit) && y[i] == w) return ( true );
 
   return ( false );
@@ -378,7 +378,7 @@ inline bool degenerate(const Vector3& w)
 
 // ----------------------------------------------------------------------------
 // For num_iterations > 1000
-void catch_me() 
+void catch_me()
 {
   cerr << "closest_points : Out on iteration > 1000\n";
 }
@@ -391,21 +391,21 @@ void catch_me()
 // ----------------------------------------------------------------------------
 // Returns whether 2 convex shapes intersect
 bool intersect( Convex const& a, Convex const& b, Transform const& a2w,
-	Transform const& b2w, Vector3& v  ) 
+	Transform const& b2w, Vector3& v  )
 {
   Vector3 w;
 
   bits = 0;
   all_bits = 0;
- 
+
   double prod;
 
   do {
     last = 0;
     last_bit = 1;
     while (bits & last_bit) { ++last; last_bit <<= 1; }
-    w = a2w(a.support((-v) * a2w.getBasis())) - 
-      b2w(b.support(v * b2w.getBasis())); 
+    w = a2w(a.support((-v) * a2w.getBasis())) -
+      b2w(b.support(v * b2w.getBasis()));
     prod = v * w;
     if (prod > 0. || fabs(prod) < EPSILON2) {
       return false;
@@ -418,8 +418,8 @@ bool intersect( Convex const& a, Convex const& b, Transform const& a2w,
     if (!closest(v)) {
       return false;
     }
-  } 
-  while (bits < 15 && !approxZero(v)); 
+  }
+  while (bits < 15 && !approxZero(v));
 
   return ( true );
 }
@@ -430,14 +430,14 @@ bool intersect( Convex const& a, Convex const& b, Transform const& a2w,
 // ----------------------------------------------------------------------------
 // Returns whether 2 convex shapes intersect
 bool intersect( Convex const& a, Convex const& b, Transform const& b2a,
-	Vector3& v ) 
+	Vector3& v )
 {
   Vector3 w;
 
   bits = 0;
   all_bits = 0;
   double prod;
-  
+
   do {
     last = 0;
     last_bit = 1;
@@ -455,8 +455,8 @@ bool intersect( Convex const& a, Convex const& b, Transform const& b2a,
     if (!closest(v)) {
       return false;
     }
-  } 
-  while (bits < 15 && !approxZero(v)); 
+  }
+  while (bits < 15 && !approxZero(v));
 
   return ( true );
 }
@@ -468,14 +468,14 @@ bool intersect( Convex const& a, Convex const& b, Transform const& b2a,
 // Returns whether 2 convex shapes intersect and if they intersect
 // returns an intersection point per convex shape in each convex reference frame
 bool common_point( Convex const& a, Convex const& b, Transform const& a2w,
-	Transform const& b2w, Vector3& v, Point3& pa, Point3& pb ) 
+	Transform const& b2w, Vector3& v, Point3& pa, Point3& pb )
 {
   Vector3 w;
 
   bits = 0;
   all_bits = 0;
   double prod;
-  
+
   do {
     last = 0;
     last_bit = 1;
@@ -509,10 +509,10 @@ bool common_point( Convex const& a, Convex const& b, Transform const& a2w,
 // Returns whether 2 convex shapes intersect and if they intersect
 // returns an intersection point per convex shape in each convex reference frame
 bool common_point( Convex const& a, Convex const& b, Transform const& b2a,
-	Vector3& v, Point3& pa, Point3& pb ) 
+	Vector3& v, Point3& pa, Point3& pb )
 {
   Vector3 w;
-  
+
   bits = 0;
   all_bits = 0;
   double prod;
@@ -537,7 +537,7 @@ bool common_point( Convex const& a, Convex const& b, Transform const& b2a,
       return false;
     }
   }
-  while (bits < 15 && !approxZero(v) );   
+  while (bits < 15 && !approxZero(v) );
   compute_points(bits, pa, pb);
 
   return ( true );
@@ -554,12 +554,12 @@ bool common_point( Convex const& a, Convex const& b, Transform const& b2a,
 // ----------------------------------------------------------------------------
 // Returns the minimal distance between 2 convex shapes and a point per
 // convex shape that represents the tips of the minimal distance segment
-double closest_points( Convex const& a, Convex const& b, Transform const& a2w, 
-	Transform const& b2w, Point3& pa, Point3& pb, int& nbIter ) 
+double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
+	Transform const& b2w, Point3& pa, Point3& pb, int& nbIter )
 {
-//  static Vector3 zero(-EPSILON, EPSILON, EPSILON);
-  static Vector3 zero(0., 0., 0.);
-  
+   static Vector3 zero(-EPSILON, EPSILON, EPSILON);
+  // static Vector3 zero(0., 0., 0.);
+
   Vector3 v = a2w(a.support(zero)) - b2w(b.support(zero));
   double dist = Norm(v);
 
@@ -572,19 +572,20 @@ double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
   num_iterations = 0;
 
   while (bits < 15 && dist > abs_error && num_iterations < 1000) {
+
     last = 0;
     last_bit = 1;
     while (bits & last_bit) { ++last; last_bit <<= 1; }
     p[last] = a.support((-v) * a2w.getBasis());
- 
+
     q[last] = b.support(v * b2w.getBasis());
     w = a2w(p[last]) - b2w(q[last]);
- 
+
     set_max(mu, v*w / dist);
-    if (dist - mu <= dist * rel_error) break; 
-    if (degenerate(w)) {
+    if (dist - mu <= dist * rel_error)
       break;
-    }
+    if (degenerate(w))
+      break;
     y[last] = w;
     all_bits = bits|last_bit;
 
@@ -598,7 +599,7 @@ double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
   compute_points(bits, pa, pb);
   if (num_iterations > 1000) catch_me();
   else nbIter=num_iterations;
-  
+
   return ( dist );
 }
 
@@ -618,7 +619,7 @@ ostream& operator << ( ostream& fileOut, Convex const& convex )
 
 
 // ----------------------------------------------------------------------------
-// Input operator 
+// Input operator
 istream& operator >> ( istream& fileIn, Convex& convex )
 {
   convex.readShape( fileIn );
@@ -631,17 +632,17 @@ istream& operator >> ( istream& fileIn, Convex& convex )
 
 // ----------------------------------------------------------------------------
 // Returns shape type
-ShapeType Convex::getType() const 
-{ 
-  return ( CONVEX ); 
-} 
+ShapeType Convex::getType() const
+{
+  return ( CONVEX );
+}
 
 
 
 
 // ----------------------------------------------------------------------------
 // Returns whether the convex shape is a sphere
-bool Convex::isSphere() const 
-{ 
-  return ( false ); 
+bool Convex::isSphere() const
+{
+  return ( false );
 }
