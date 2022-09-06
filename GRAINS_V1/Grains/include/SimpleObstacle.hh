@@ -113,7 +113,7 @@ class SimpleObstacle : public Obstacle
     @param time physical time
     @param LC linked-cell grid */
     virtual void InterAction( Component* voisin,
-	double dt, double const& time, LinkedCell* LC ) throw (ContactError);
+	double dt, double const& time, LinkedCell* LC );
 
     /** @brief Rotates the obstacle with a quaternion
     @param rotation the quaternion defining the rotation */

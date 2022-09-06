@@ -317,12 +317,17 @@ void Obstacle::setIndicator( double const& value )
 // Contact between an obstacle and a component. If contact exists,
 // computes the contact force and torque and adds to each component
 void Obstacle::InterAction( Component* voisin,
-	double dt, double const& time, LinkedCell* LC ) throw (ContactError)
+	double dt, double const& time, LinkedCell* LC )
 {
+  try{
   cout << "Warning when calling Obstacle::InterAction() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);
+  }
+  catch (const ContactError&) {
+    throw ContactError();
+  }
 }
 
 

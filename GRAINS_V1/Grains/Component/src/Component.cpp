@@ -486,17 +486,34 @@ Vector3 const* Component::getTranslationalVelocity_fluide() const
 }
 
 
-
+// ----------------------------------------------------------------------------
+// Searches and stores all contact points between a composite particle and a
+// component.
+void Component::InterAction( Component* voisin, double dt,
+      double const& time, LinkedCell *LC)
+{
+  try{
+  cout << "WARNING !!! Component::SearchContact"
+  	" should never be called, this is a design problem !!!" << endl;
+  }
+  catch (const ContactError&) {
+    throw ContactError();
+  }
+}
 
 // ----------------------------------------------------------------------------
 // Searches and stores all contact points between a composite particle and a
 // component.
 void Component::SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC, list<ContactInfos*>& listContact )
-  throw ( ContactError )
 {
+  try{
   cout << "WARNING !!! Component::SearchContact"
   	" should never be called, this is a design problem !!!" << endl;
+  }
+  catch (const ContactError&) {
+    throw ContactError();
+  }
 }
 
 

@@ -293,8 +293,7 @@ class Component
     @param time physical time
     @param LC linked-cell grid */
     virtual void InterAction( Component* voisin,
-	double dt, double const& time, LinkedCell* LC )
-	throw (ContactError) = 0;
+	double dt, double const& time, LinkedCell* LC );
 
     /** @brief Searches and stores all contact points between a composite
     particle and a component.
@@ -307,7 +306,7 @@ class Component
     @param listContact list of information about contacts */
     virtual void SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC,
-      list<ContactInfos*>& listContact ) throw (ContactError);
+      list<ContactInfos*>& listContact );
 
     /** @brief Increments the coordination number by nc
     @param nc increment of the coordination number */

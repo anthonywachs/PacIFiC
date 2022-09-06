@@ -217,8 +217,8 @@ list<Obstacle*> SimpleObstacle::getObstaclesToFluid()
 // exists, computes the contact force and torque and adds to each component
 void SimpleObstacle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
-  throw (ContactError)
 {
+  try{
   bool contactProbable = m_obstacleBox.InZone( voisin->getPosition(),
     	voisin->getCircumscribedRadius() );
 
@@ -262,6 +262,10 @@ void SimpleObstacle::InterAction( Component* voisin,
       voisin->addToCoordinationNumber( 1 );
   }
 
+  }
+  catch (const ContactError&) {
+    throw ContactError();
+  }
 }
 
 
