@@ -50,6 +50,7 @@ Cartesian/MacWorld/Env/macworld-*.env.sh
 *.tst
 
 # Folders
+GRAINS_V1/*
 Cartesian/MacWorld/hypre-2.10.1/*
 Cartesian/MacWorld/hypre/*
 Cartesian/MacWorld/hypre
