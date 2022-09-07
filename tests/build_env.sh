@@ -23,7 +23,7 @@ source Env/PacIFiC-CI-RUNNER-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PAC
 mv ${MAC_HOME}/etc/Linux_template.mak ${MAC_HOME}/etc/Linux-${MAC_FULL_EXT}.mak
 mv ${MAC_HOME}/etc/extra-Linux_template.mak ${MAC_HOME}/etc/extra-Linux-${MAC_FULL_EXT}.mak
 
-if [ ! -L ${BASILISK}/eulerian_caps ]
-then
-  ln -s ${OCTREE_HOME}/eulerian_caps ${BASILISK}/eulerian_caps
-fi
+# if [ ! -L ${BASILISK}/eulerian_caps ]
+# then
+#   ln -s ${OCTREE_HOME}/eulerian_caps ${BASILISK}/eulerian_caps
+# fi
