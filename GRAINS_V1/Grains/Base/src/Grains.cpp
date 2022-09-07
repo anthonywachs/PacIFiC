@@ -127,7 +127,6 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
     	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmax )
 	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmean )
 	<< endl;
-  fVitMax.close();
 
   // Display memory used by Grains
   display_used_memory();

@@ -113,16 +113,14 @@
     <CollisionalRelativeVelocity value="1.5"/>
 
     <ParticleInsertion>
-      <Mode Type="InitialTime"/>
+      <Mode Type="OverTime"/>
       <Order Type="Ordered"/>
-      <InitialAngularPosition Type="Random"/>
+      <InitialAngularPosition Type="Fixed as defined in input file particle class"/>
       <RandomGeneratorSeed Type="Default"/>
       <Frequency TryEvery="1"/>
       <ForceInsertion Value="False"/>
       <ParticlePosition>
-        <File>
-          <Name = "Grains/Init/initial_position.result">
-        </File>
+        <File Name="Grains/Init/initial_position.result"/>
       </ParticlePosition>
 
       <InitialVelocity Mode="Zero">

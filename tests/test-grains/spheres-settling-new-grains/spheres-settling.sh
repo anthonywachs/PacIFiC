@@ -7,7 +7,7 @@
 echo "success assessment:"
 
 # 2.i) We first check that the maximum velocity is under 1.e-10 m/s
-MAX_VEL=$(awk '{print $2}' Grains/Init/insert_VitesseMaxMean.dat | tail -1)
+MAX_VEL=$(awk '{print $2}' Grains/Init/insert_VelocityMaxMean.dat | tail -1)
 echo $(python3 -c $"if ${MAX_VEL}<1.e-10:"$'\n'$"    print(\"0\")"$'\n'$"else:"$'\n'$"    print(\"1\")") >> spheres-settling-success.txt
 output="maximum velocity: "
 output+=$(tail -n 1 spheres-settling-success.txt)
@@ -28,4 +28,3 @@ cd ..
 
 # 2.iii) We run a command that fails if any of the above success assessments failed
 [ $(grep -c "0" spheres-settling-success.txt) -eq $nb_assessments ]
-
