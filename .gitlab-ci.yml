@@ -24,8 +24,8 @@ build:
       # - Cartesian/MacWorld/Env/macworld-OpenMPI-2.1.1-GNU-8.2.1.env.sh
       # - Cartesian/MacWorld/MAC/etc/Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0.mak
       # - Cartesian/MacWorld/MAC/etc/extra-Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0.mak
-      # - GRAINS/Main/bin64-OpenMPI-2.1.1-GNU-8.2.1/grains
-      # - GRAINS/Main/obj64-OpenMPI-2.1.1-GNU-8.2.1/main.o
+      - GRAINS/Main/bin64-OpenMPI-2.1.1-GNU-8.2.1/grains
+      - GRAINS/Main/obj64-OpenMPI-2.1.1-GNU-8.2.1/main.o
       # - Cartesian/MacWorld/MAC/lib/Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0/libmac0.so
       # - Cartesian/MacWorld/MAC/lib/Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0/libmac2.so
       # - Cartesian/FLUID/lib/Linux-64-OpenMPI-2.1.1-GNU-8.2.1-MAC-1.0.0-PETSC-3.2.0-HYPRE-2.10.1-MUMPS-4.10.0/exe0
