@@ -318,9 +318,6 @@ map<string,double> MemoryContactForceModel::defineParameters( DOMNode* & root )
     parameters["eps"]  = value;
   }
   else parameters["eps"] = 1.e-10;
-  parameter = ReaderXML::getNode(root, "color");
-  value     = ReaderXML::getNodeValue_Double(parameter);
-  parameters["color"]  = value;
 
   return ( parameters );
 }
