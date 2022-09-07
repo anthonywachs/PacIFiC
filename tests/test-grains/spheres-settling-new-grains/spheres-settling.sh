@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # 1) Run the test
-./grains_seq Grains/Init/insert.xml 1> /dev/null 2> log
+# ./grains_seq Grains/Init/insert.xml 1> /dev/null 2> log
+./grains_seq Grains/Init/insert.xml
 
 # 2) Define success
 echo "success assessment:"
