@@ -1687,7 +1687,7 @@ void Particle::computeInertiaTensorSpaceFixed( vector<double>& inertia ) const
   Matrix inertiaBodyFixed( m_inertia[0], m_inertia[1], m_inertia[2],
   	m_inertia[1], m_inertia[3], m_inertia[4],
 	m_inertia[2], m_inertia[4], m_inertia[5] );
-	
+
   // Compute the inertia matrix in the space fixed frame
   // I_space = Mr * I_body * Mr^t
   Matrix inertiaSpaceFixed = mr * ( inertiaBodyFixed * mrt );

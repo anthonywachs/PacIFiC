@@ -132,7 +132,6 @@ class Particle : public Component
 
     /** @brief Sets the fluid density
     @param rho fluid density */
-<<<<<<< HEAD
     static void setFluidDensity( double rho );
 
     /** @brief Defines whether the particle acceleration (i.e. change of
@@ -146,17 +145,6 @@ class Particle : public Component
     bodies */
     static bool getFluidCorrectedAcceleration();
 
-=======
-    static void setFluidDensity( double rho );
-
-    /** @brief Defines whether explicit added mass is used
-    @param is_explicit vrai si explicite, faux sinon */
-    static void setExplicitMassCorrection( bool is_explicit );
-
-    /** @brief Returns whether explicit added mass is used */
-    static bool getExplicitMassCorrection();
-
->>>>>>> NewGrains-memory
     /** @brief Returns the viscosity of the surrounding fluid */
     static double getFluidViscosity();
 
@@ -349,19 +337,11 @@ class Particle : public Component
 
     /** @brief Updates geographic localisation in the LinkedCell. Note that
     this method uses the cell from the previous time m_cellule_nm1 */
-<<<<<<< HEAD
     void updateGeoPosition();
 
     /** @brief Creates the VelocityInfosNm1 structure */
     void createVelocityInfosNm1();
 
-=======
-    void updateGeoPosition();
-
-    /** @brief Creates the AddedMassInfos structure */
-    void createAddedMassInfos();
-
->>>>>>> NewGrains-memory
     /** @brief Returns an orientation vector to describe the angular position of
     the particle */
     Vector3 computeOrientationVector() const;
@@ -423,7 +403,6 @@ class Particle : public Component
 
     /** @brief Compose the component transformation on the right by another
     transformation: this = this o t (t first followed by this)
-<<<<<<< HEAD
     @param t the other affine transformation */
     virtual void composePositionRightByTransform( Transform const& t );
 
@@ -431,10 +410,6 @@ class Particle : public Component
     frame
     @param inertia inertia tensor in the space fixed coordinate frame */
     void computeInertiaTensorSpaceFixed( vector<double>& inertia ) const;
-=======
-    @param t the other affine transformation */
-    virtual void composePositionRightByTransform( Transform const& t );
->>>>>>> NewGrains-memory
     //@}
 
 
@@ -459,16 +434,10 @@ class Particle : public Component
     /** @brief Returns angular velocity difference at the previous
     discrete time */
     Vector3 getRotationalVelocityDifferencePreviousTime() const;
-<<<<<<< HEAD
 
     /** @brief Returns particle inertia tensor in the body fixed coordinate
     frame */
     double const* getInertiaTensorBodyFixed() const;
-=======
-
-    /** @brief Returns particle inertia tensor */
-    virtual double const* getInertiaTensor() const;
->>>>>>> NewGrains-memory
 
     /** @brief Returns inverse of particle inertia tensor in the body fixed
     coordinate frame */
@@ -545,15 +514,10 @@ class Particle : public Component
 
     /**@name I/O methods */
     //@{
-<<<<<<< HEAD
     /** @brief Reads a (in practice reference) particle data from a stream
     @param fileIn input stream
     @param elemPart true if the particle is an elementary particle of a
     composite particle, false otherwise */
-=======
-    /** @brief Reads a (in practice reference) particle data from a stream
-    @param fileIn input stream */
->>>>>>> NewGrains-memory
     void read( istream& fileIn, bool elemPart = false );
 
     /** @brief Reads particle data from a stream. Usage: for standard particles
@@ -654,7 +618,6 @@ class Particle : public Component
     double m_density; /**< Density */
     static double m_fluidDensity; /**< Surrounding fluid density */
     static double m_fluidViscosity; /**< Surrounding fluid viscosity */
-<<<<<<< HEAD
     static bool m_fluidCorrectedAcceleration; /**< Whether the particle
     	acceleration is corrected by the fluid density */
     static bool m_splitExplicitAcceleration; /**< Whether part of the particle
@@ -683,34 +646,6 @@ class Particle : public Component
     int m_GeomType; /**< particle geometric type */
     int m_coordination_number; /**< coordination number */
     Vector3 m_weight; /**< particle weight */
-=======
-    static bool m_explicitAddedMass; /** Whether part of the particle
-    	acceleration is treated explicitly */
-    double m_inertia[6]; /** Inertia tensor I={I(1,1), I(1,2), I(1,3),
-  	I(2,2), I(2,3), I(3,3)} */
-    double m_inertia_1[6]; /** Inverse inertia tensor */
-    ParticleActivity m_activity; /** Particle activity */
-    struct AddedMassInfos* m_addedMassInfos; /** data to compute the
-    	contribution of the particle acceleration treated explicitly (used for
-	neutrally buoyant or lighter particles than the fluid) */
-    int m_tag; /** tag of the cell the particle belongs to at the
-    	current time: 0=interior, 1=buffer zone, 2=halo zone */
-    GeoPosition m_GeoLoc; /** geographic position of the particle in the
-    	Linked cell, i.e. geographic position of the cell the particle belongs
-	to at the current time */
-    Cell* m_cellule; /** Cell that the particle belongs to at the
-    	current time */
-    int m_tag_nm1; /** tag of the cell the particle belonged to at the
-    	previous time: 0=interior, 1=buffer zone, 2=halo zone */
-    GeoPosition m_GeoLoc_nm1; /** geographic position of the particle in the
-    	Linked cell, i.e. geographic position of the cell the particle belonged
-	to at the previous time */
-    Cell* m_cellule_nm1; /** Cell that the particle belonged to at the
-    	previous time */
-    int m_GeomType; /** particle geometric type */
-    int m_coordination_number; /** coordination number */
-    Vector3 m_weight; /** particle weight */
->>>>>>> NewGrains-memory
     //@}
 
 
