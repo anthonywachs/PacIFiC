@@ -35,22 +35,24 @@
     </ContactForceModels>
 
     <CompositeParticles>
-      <CompositeParticle Number="1" Density="2500.">
+      <CompositeParticle Number="20" Density="2500.">
+        <Material>matP</Material>
+        <AngularPosition Type="Identity"></AngularPosition>
         <ElementaryParticles>
           <ElementaryParticle>
             <Convex CrustThickness="5.e-5">
               <Sphere Radius="0.005"/>
             </Convex>
-            <RelativePosition X="-0.0025" Y="0" Z="0"/>
             <AngularPosition Type="Identity"></AngularPosition>
+            <RelativePosition X="-0.0025" Y="0" Z="0"/>
           </ElementaryParticle>
-          <!-- <ElementaryParticle>
+          <ElementaryParticle>
             <Convex CrustThickness="5.e-5">
               <Sphere Radius="0.005"/>
             </Convex>
-            <RelativePosition X="0.0025" Y="0" Z="0"/>
             <AngularPosition Type="Identity"></AngularPosition>
-          </ElementaryParticle> -->
+            <RelativePosition X="0.0025" Y="0" Z="0"/>
+          </ElementaryParticle>
         </ElementaryParticles>
         <Volume Value="1.0471975511965978e-06"/>
         <MomentOfInertiaTensor>
@@ -61,7 +63,6 @@
           <Ixz Value="0."/>
           <Iyz Value="0."/>
         </MomentOfInertiaTensor>
-        <Material>matP</Material>
       </CompositeParticle>
     </CompositeParticles>
 
@@ -71,7 +72,7 @@
           <Convex CrustThickness="5.e-5">
             <Box LX="0.031" LY="0.031" LZ="0.0005"/>
           </Convex>
-          <Centre X="0.015" Y="0.015" Z="0.03525"/>
+          <Centre X="0.015" Y="0.015" Z="0.06525"/>
           <AngularPosition Type="Identity"></AngularPosition>
           <Material>matP</Material>
         </Obstacle>
@@ -85,33 +86,33 @@
         </Obstacle>
         <Obstacle name="Box_Left">
           <Convex CrustThickness="5.e-5">
-            <Box LX="0.0005" LY="0.031" LZ="0.036"/>
+            <Box LX="0.0005" LY="0.031" LZ="0.066"/>
           </Convex>
-          <Centre X="-0.00025" Y="0.015" Z="0.0175"/>
+          <Centre X="-0.00025" Y="0.015" Z="0.0325"/>
           <AngularPosition Type="Identity"></AngularPosition>
           <Material>matP</Material>
         </Obstacle>
         <Obstacle name="Box_Right">
           <Convex CrustThickness="5.e-5">
-            <Box LX="0.0005" LY="0.031" LZ="0.036"/>
+            <Box LX="0.0005" LY="0.031" LZ="0.066"/>
           </Convex>
-          <Centre X="0.03025" Y="0.015" Z="0.0175"/>
+          <Centre X="0.03025" Y="0.015" Z="0.0325"/>
           <AngularPosition Type="Identity"></AngularPosition>
           <Material>matP</Material>
         </Obstacle>
         <Obstacle name="Box_Bottom">
           <Convex CrustThickness="5.e-5">
-            <Box LX="0.031" LY="0.0005" LZ="0.036"/>
+            <Box LX="0.031" LY="0.0005" LZ="0.066"/>
           </Convex>
-          <Centre X="0.015" Y="-0.00025" Z="0.0175"/>
+          <Centre X="0.015" Y="-0.00025" Z="0.0325"/>
           <AngularPosition Type="Identity"></AngularPosition>
           <Material>matP</Material>
         </Obstacle>
         <Obstacle name="Box_Top">
           <Convex CrustThickness="5.e-5">
-            <Box LX="0.031" LY="0.0005" LZ="0.036"/>
+            <Box LX="0.031" LY="0.0005" LZ="0.066"/>
           </Convex>
-          <Centre X="0.015" Y="0.03025" Z="0.0175"/>
+          <Centre X="0.015" Y="0.03025" Z="0.0325"/>
           <AngularPosition Type="Identity"></AngularPosition>
           <Material>matP</Material>
         </Obstacle>
@@ -135,13 +136,18 @@
 
     <ParticleInsertion>
       <Mode Type="OverTime"/>
-      <Order Type="Ordered"/>
-      <InitialAngularPosition Type="Fixed as defined in input file particle class"/>
+      <Order Type="Random"/>
+      <InitialAngularPosition Type="Random"/>
       <RandomGeneratorSeed Type="Default"/>
       <Frequency TryEvery="1"/>
       <ForceInsertion Value="False"/>
       <ParticlePosition>
-        <File Name="Grains/Init/initial_position.result"/>
+        <Windows>
+  				<Window Type="Box">
+  					<Point X="0" Y="0" Z="0"/>
+  					<Point X="0.03" Y="0.03" Z="0.065"/>
+  				</Window>
+			  </Windows>
       </ParticlePosition>
 
       <InitialVelocity Mode="Zero">
