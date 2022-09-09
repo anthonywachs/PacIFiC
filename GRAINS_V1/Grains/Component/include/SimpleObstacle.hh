@@ -19,7 +19,7 @@ class PeriodicObstacle;
 
     A simple obstacle is an obstacle composed of a single convex rigid body.
 
-    @author G.FERRER - Institut Francais du Petrole - 2002 - Creation 
+    @author G.FERRER - Institut Francais du Petrole - 2002 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class SimpleObstacle : public Obstacle
@@ -28,7 +28,7 @@ class SimpleObstacle : public Obstacle
     /** @name Constructeurs */
     //@{
     /** @brief Constructor with name as input parameter
-    @param s obstacle name */ 
+    @param s obstacle name */
     SimpleObstacle( string const& s = "" );
 
     /** @brief Constructor with an XML node as an input parameter
@@ -36,10 +36,10 @@ class SimpleObstacle : public Obstacle
     SimpleObstacle( DOMNode* root );
 
     /** @brief Copy constructor from a Component
-    @param copy copied Component 
+    @param copy copied Component
     @param s obstacle name */
     SimpleObstacle( Component& copy, char const* s = "obstacle" );
-  
+
     /** @brief Constructor with a rigid body, a name and a material as input
     parameters
     @param geoRBWC rigid body
@@ -48,7 +48,7 @@ class SimpleObstacle : public Obstacle
     @param transferToFluid_ whether the obstacle is transferred to the fluid */
     SimpleObstacle( RigidBodyWithCrust* geoRBWC, string const& name = "",
       string const& materialName = "", bool const& transferToFluid_ = false );
-  
+
     /** @brief Destructor */
     ~SimpleObstacle();
     //@}
@@ -67,21 +67,21 @@ class SimpleObstacle : public Obstacle
     /** @brief Returns a list of obstacles to be sent to the fluid solver
     in case of coupling with a fluid. Here returns this (i.e. itself) */
     list<Obstacle*> getObstaclesToFluid() ;
-  
-    /** @brief Returns a pointer to the list of cells the obstacle is linked 
+
+    /** @brief Returns a pointer to the list of cells the obstacle is linked
     to */
     list<Cell*> const* getInCells() const;
-  
+
     /** @brief Returns the bounding box of the obstacle */
-    BBox const* getObstacleBox() const;  
-  
+    BBox const* getObstacleBox() const;
+
     /** @brief Returns the frequency at which the obstacle link to the cells of
     the linked-cell grid is upadted */
-    int getObstacleLinkedCellUpdateFrequency() const 
+    int getObstacleLinkedCellUpdateFrequency() const
   	{ return m_LinkUpdate_frequency; }
 
     /** @brief Returns obstacle type */
-    string getObstacleType() ; 
+    string getObstacleType() ;
     //@}
 
 
@@ -92,19 +92,19 @@ class SimpleObstacle : public Obstacle
     @param obstacle obstacle to be added */
     void append( Obstacle* obstacle ) ;
 
-    /** @brief Moves the simple obstacle and returns a list of moved 
+    /** @brief Moves the simple obstacle and returns a list of moved
     obstacles (here itself)
     @param time physical time
     @param dt time step magnitude
-    @param b_deplaceCine_Comp whether to move the composite that the composite 
+    @param b_deplaceCine_Comp whether to move the composite that the composite
     obstacle belongs to (imposed velocity)
-    @param b_deplaceF_Comp whether to move the composite that the composite 
+    @param b_deplaceF_Comp whether to move the composite that the composite
     obstacle belongs to (imposed force) */
     list<SimpleObstacle*> Move( double time,
-	double dt, bool const& b_deplaceCine_Comp, 
+	double dt, bool const& b_deplaceCine_Comp,
         bool const& b_deplaceF_Comp ) ;
-	
-    /** @brief Contact between a simple obstacle and a component. If contact 
+
+    /** @brief Contact between a simple obstacle and a component. If contact
     exists, computes the contact force and torque and adds to each component
     @exception ContactError if overlapping distance is larger than the sum of
     the crust thicknesses of the components
@@ -112,8 +112,8 @@ class SimpleObstacle : public Obstacle
     @param dt time step magnitude
     @param time physical time
     @param LC linked-cell grid */
-    virtual void InterAction( Component* voisin, 
-	double dt, double const& time, LinkedCell* LC ) throw (ContactError);	
+    virtual void InterAction( Component* voisin,
+	double dt, double const& time, LinkedCell* LC );
 
     /** @brief Rotates the obstacle with a quaternion
     @param rotation the quaternion defining the rotation */
@@ -126,85 +126,100 @@ class SimpleObstacle : public Obstacle
     /** @brief Translates the obstacle
     @param translation translation vector */
     void Translate( Vector3 const& translation );
-  
+
     /** @brief Deletes an obstacle in the obstacle tree
     @param name_ name of obstacle to be deleted */
-    void DestroyObstacle( string const& name_ ); 
-  
+    void DestroyObstacle( string const& name_ );
+
     /** @brief Deletes an obstacle in the obstacle tree and removes it from the
     LinkedCell
     @param name_ name of obstacle to be deleted
     @param LC linked-cell grid */
     void ClearObstacle( string const& name_, LinkedCell* LC );
-		  
+
     /** @brief Adds a cell to the list of cells the obstacle is linked to
     @param cel_ the cell */
-    void add( Cell* cel_ ); 
-  
+    void add( Cell* cel_ );
+
     /** @brief Empties the list of cells the obstacle is linked to and deletes
     the pointer to the obstacle is these cells */
     void resetInCells();
-	
+
     /** @brief Returns whether an update of the link between the obstacle and the
     linked-cell grid is required. If yes, returns true and sets the counter to
     0, if no, returns false and increments the counter */
-    bool performLinkUpdate(); 
-  
-    /** @brief Returns the maximum of the absolute value of the obstacle 
+    bool performLinkUpdate();
+
+    /** @brief Returns the maximum of the absolute value of the obstacle
     velocity in each direction */
     Vector3 vitesseMaxPerDirection() const;
-  
-    /** @brief Updates contact map */
-    void updateContactMap(); 
-  
-    /** @brief Does the contact exist in the map, if yes return the pointer to 
-    the cumulative tangential displacement 
-    @param tangentialDepl pointer to the cumulative tangential displacement 
-    @param id id number of the other component */
-    bool ContactInMapIsActive( double*& tangentialDepl, int const& id );
-  
-    /** @brief Adds new contact in the map
-    @param tangentialDepl initial tangential displacement 
-    @param id id number of the other component */
-    void addNewContactInMap( double const& tangentialDepl, 
-  	int const& id ); 
 
-    /** @brief Increases cumulative tangential displacement with component id
-    @param tangentialDepl additional tangential displacement 
+    /** @brief Update contact map */
+    virtual void updateContactMap();
+
+    /** @brief Does the contact exist in the map, if yes return the pointer to the
+    cumulative tangential displacement
+    @param tangentialDepl pointer to the cumulative tangential displacement
     @param id id number of the other component */
-    void addDeplContactInMap( double const& tangentialDepl, 
-  	int const& id );  	     		    
+    virtual bool getContactMemory( std::tuple<int,int,int> const& id,
+  Vector3* &tangent, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+  bool createContact);
+
+    /** @brief Add new contact in the map
+    @param tangentialDepl initial tangential displacement
+    @param id id number of the other component */
+    virtual void addNewContactInMap( std::tuple<int,int,int> const& id,
+  Vector3 const& tangent, Vector3 const& prev_normal,
+  Vector3 const& cumulSpringTorque );
+
+    /** @brief Increase cumulative tangential displacement with component id
+    @param tangentialDepl additional tangential displacement
+    @param id id number of the other component */
+    virtual void addDeplContactInMap( std::tuple<int,int,int> const& id,
+  Vector3 const& tangent, Vector3 const& prev_normal,
+  Vector3 const& cumulSpringTorque );
     //@}
+
+    void updateContactMapId( int prev_id, int new_id);
+
+    virtual void copyHistoryContacts( double* &destination, int start_index );
+
+    // Copy existing contact in the map
+    virtual void copyContactInMap( std::tuple<int,int,int> const& id,
+  bool const& isActive, Vector3 const& tangent, Vector3 const& prev_normal,
+  Vector3 const& cumulSpringTorque );
+
+    virtual int getContactMapSize();
 
 
     /** @name Set methods */
     //@{
     /** @brief Initializes all contact map entries to false */
     void setContactMapToFalse();
-  
-    /** @brief Sets the frequency at which the obstacle link to 
-    the cells of the linked-cell grid is updated 
+
+    /** @brief Sets the frequency at which the obstacle link to
+    the cells of the linked-cell grid is updated
     @param updateFreq updating frequency */
-    void setObstacleLinkedCellUpdateFrequency( int const& updateFreq );      
+    void setObstacleLinkedCellUpdateFrequency( int const& updateFreq );
     //@}
 
 
     /** @name State storing/restoring methods */
     //@{
     /** @brief Creates obstacle state and adds state to the list of states of
-    all obstacles 
+    all obstacles
     @param obsStates list of states of all obstacles  */
-    void createState( list<struct ObstacleState*>& obsStates ) ; 
-  
+    void createState( list<struct ObstacleState*>& obsStates ) ;
+
     /** @brief Restores obstacle state
     @param obsStates list of states of all obstacles */
-    void restoreState( list<struct ObstacleState*>& obsStates ) ;  
+    void restoreState( list<struct ObstacleState*>& obsStates ) ;
     //@}
 
 
     /** @name I/O methods */
     //@{
-    /** @brief Reloads the simple obstacle and links it to the higher level 
+    /** @brief Reloads the simple obstacle and links it to the higher level
     obstacle in the obstacle tree
     @param mother higher level obstacle
     @param file input stream */
@@ -218,23 +233,23 @@ class SimpleObstacle : public Obstacle
     Paraview format */
     virtual int numberOfPoints_PARAVIEW() const ;
 
-    /** @brief Returns the number of elementary polytopes to write the 
+    /** @brief Returns the number of elementary polytopes to write the
     simple obstacle shape in a Paraview format */
     virtual int numberOfCells_PARAVIEW() const;
 
     /** @brief Returns a list of points describing the simple obstacle in a
-    Paraview format 
+    Paraview format
     @param translation additional center of mass translation */
     virtual list<Point3> get_polygonsPts_PARAVIEW(
   	Vector3 const* translation = NULL ) const ;
 
     /** @brief Writes the points describing the simple obstacle in a
-    Paraview format 
+    Paraview format
     @param f output stream
     @param translation additional center of mass translation */
-    virtual void write_polygonsPts_PARAVIEW( ostream& f, 
-  	Vector3 const* translation = NULL ) const ; 
-  
+    virtual void write_polygonsPts_PARAVIEW( ostream& f,
+  	Vector3 const* translation = NULL ) const ;
+
     /** @brief Writes the simple obstacle in a Paraview format
     @param connectivity connectivity of Paraview polytopes
     @param offsets connectivity offsets
@@ -250,21 +265,20 @@ class SimpleObstacle : public Obstacle
     virtual void writePositionInFluid( ostream& fluid );
     //@}
 
-  
+
   protected:
     /**@name Parameters */
-    //@{  
+    //@{
     BBox m_obstacleBox; /**< bounding box of the obstacle */
     list<Cell*> m_inCells; /**< cells the obstacle is linked to */
-    int m_LinkUpdate_frequency; /**< frequency at which the obstacle link to 
+    int m_LinkUpdate_frequency; /**< frequency at which the obstacle link to
     	the cells of the linked-cell grid is upadted */
-    int m_LinkUpdate_counter; /**< counter of updates between the obstacle and 
+    int m_LinkUpdate_counter; /**< counter of updates between the obstacle and
     	the linked-cell grid */
     bool m_transferToFluid; /**< whether to transfer the obstacle to the fluid
   	solver or not in case of coupling to a fluid solver */
     //@}
-  	  
+
 };
 
 #endif
-
