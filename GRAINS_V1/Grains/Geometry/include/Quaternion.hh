@@ -17,10 +17,10 @@ istream& operator >> (istream& fileIn, Quaternion& q );
 
 /** @brief The class Quaternion.
 
-    A quaternion in a 3D space, i.e., a scalar w plus a Vector3 vector vqt 
+    A quaternion in a 3D space, i.e., a scalar w plus a Vector3 vector vqt
     as [ w, vqt ].
 
-    @author F.PRADEL - Institut Francais du Petrole - 2000 - Modification 
+    @author F.PRADEL - Institut Francais du Petrole - 2000 - Modification
     @author A.WACHS  - 2019 - Modification */
 // ============================================================================
 class Quaternion
@@ -31,19 +31,19 @@ class Quaternion
     /** @brief Default constructor */
     Quaternion();
 
-    /** @brief Constructor with 2 scalar as input parameters q and d. 
-    Quaternion is initialized as [ d, (q,q,q) ]  
+    /** @brief Constructor with 2 scalar as input parameters q and d.
+    Quaternion is initialized as [ d, (q,q,q) ]
     @param q value of all 3 components of the vector
     @param d value of the scalar */
     Quaternion( double q, double d=0.0 );
 
-    /** @brief Constructor with a Vector3 vector vec and a scalar d. Quaternion 
-    is initialized as [ d, vec ]  
-    @param vec the Vector3 vector 
-    @param d value of the scalar */ 
+    /** @brief Constructor with a Vector3 vector vec and a scalar d. Quaternion
+    is initialized as [ d, vec ]
+    @param vec the Vector3 vector
+    @param d value of the scalar */
     Quaternion( Vector3 const& vec, double d=0.0 );
 
-    /** @brief Constructor with a vector given by its 3 components (x,y,z) and 
+    /** @brief Constructor with a vector given by its 3 components (x,y,z) and
     a scalar d. Quaternion is initialized as [ d, (x,y,z) ]
     @param x x-component of the vector
     @param y y-component of the vector
@@ -67,57 +67,57 @@ class Quaternion
 
     /** @brief Returns the inverse of the quaternion */
     Quaternion Inverse() const;
-  
-    /** @brief Multiplies the quaternion on the left by a vector lhs, i.e., 
+
+    /** @brief Multiplies the quaternion on the left by a vector lhs, i.e.,
     performs [ 0, lhs ] x this and return the product that is a quaternion
     @param lhs the left hand side vector */
     Quaternion multLeftVec( Vector3 const& lhs ) const;
-  
+
     /** @brief Multiplies the quaternion on the right by another quaternion rhs,
     i.e., performs this x rhs, and return the vectorial part of this x rhs
-    @param rhs the other quaternion */  
-    Vector3 multToVector3( Quaternion const& rhs ) const; 
-  
-    /** @brief Multiplies the quaternion on the right by the conjugate of 
-    another quaternion rhs, i.e., perform this x rhs^t, and return the 
+    @param rhs the other quaternion */
+    Vector3 multToVector3( Quaternion const& rhs ) const;
+
+    /** @brief Multiplies the quaternion on the right by the conjugate of
+    another quaternion rhs, i.e., perform this x rhs^t, and return the
     vectorial part of this x rhs^t
-    @param rhs the other quaternion */   
-    Vector3 multConjugateToVector3( Quaternion const& rhs ) const; 
-  
+    @param rhs the other quaternion */
+    Vector3 multConjugateToVector3( Quaternion const& rhs ) const;
+
     /** @brief Writes the object with a high precision format given by
     POSITIONFORMAT defined in GrainsExec.hh
     @param fileOut output stream */
     void writeQuaternion( ostream &fileOut ) const;
-  
+
     /** @brief Writes the object in binary format
     @param fileOut output stream */
-    void writeQuaternion_binary( ostream &fileOut ); 
+    void writeQuaternion_binary( ostream &fileOut );
 
     /** @brief Reads the object in binary format
     @param StreamIN input stream */
-    void readQuaternion_binary( istream &StreamIN );              
+    void readQuaternion_binary( istream &StreamIN );
     //@}
 
 
     /**@name Methods Get */
-    //@{ 
+    //@{
     /** @brief Returns the value of the scalar part of the quaternion */
     double getdouble() const;
 
     /** @brief Returns the pointer to the vectorial part of the quaternion */
-    Vector3 const* getVector3() const;  
+    Vector3 const* getVector3() const;
     //@}
 
 
     /**@name Methods Set */
-    //@{ 
-    /** @brief Sets the quaternion with a Vector3 vector vec and a scalar d. 
-    Quaternion is set to [ d, vec ]  
-    @param vec the Vector3 vector 
+    //@{
+    /** @brief Sets the quaternion with a Vector3 vector vec and a scalar d.
+    Quaternion is set to [ d, vec ]
+    @param vec the Vector3 vector
     @param d value of the scalar */
     void setQuaternion( Vector3 const& vec, double d );
 
-    /** @brief Sets the quaternion with a vector given by its 3 components 
+    /** @brief Sets the quaternion with a vector given by its 3 components
     (x,y,z) and a scalar d. Quaternion is set to [ d, (x,y,z) ]
     @param x x-component of the vector
     @param y y-component of the vector
@@ -132,30 +132,39 @@ class Quaternion
     /** @brief Sets the vectorial part of the quaternion
     @param vec the Vector3 vector */
     void setVector3( Vector3 const& vec );
-    
+
     /** @brief Sets the quaternion with a rotation matrix
     @param rot rotation matrix */
-    void setQuaternion( Matrix const& rot );    
+    void setQuaternion( Matrix const& rot );
     //@}
-  
+
+    /** @brief Builds a unit quaternion representing the rotation,from u to v.
+    The input vectors need not be normalised.
+    @param u First vector
+    @param v Second vector */
+    void setRotFromTwoVectors(const Vector3& u, const Vector3& v);
+
+    /** @brief Rotates a vector using the quaternion *this
+    @param v The vector to be rotated */
+    Vector3 rotateVector(const Vector3 v);
 
     /**@name Operators */
     //@{
-    /** @brief ith-component accessor: (0,1,2) for the vector components and 3 
+    /** @brief ith-component accessor: (0,1,2) for the vector components and 3
     for the scalar
     @param i index */
     double& operator [] ( int i );
 
-    /** @brief ith-component accessor: (0,1,2) for the vector components and 3 
+    /** @brief ith-component accessor: (0,1,2) for the vector components and 3
     for the scalar
     @param i index */
     double operator [] ( int i ) const;
 
-    /** @brief double product this x rhs of 2 quaternions 
+    /** @brief double product this x rhs of 2 quaternions
     @param rhs the other quaternion */
     Quaternion operator * ( Quaternion const& rhs ) const;
 
-    /** @brief double product on the right of a quaternion by a vector 
+    /** @brief double product on the right of a quaternion by a vector
     [ 0, rhs ]
     @param rhs the Vector3 vector */
     Quaternion operator , ( Vector3 const& rhs ) const;
@@ -167,11 +176,11 @@ class Quaternion
     /** @brief Unitary operator -. Return a quaternion with negative elements */
     Quaternion operator-();
 
-    /** @brief Sum of 2 quaternions 
+    /** @brief Sum of 2 quaternions
     @param rhs the other quaternion */
     Quaternion operator + ( Quaternion const& rhs ) const;
 
-    /** @brief Subtraction of 2 quaternions, i.e., compute this - rhs 
+    /** @brief Subtraction of 2 quaternions, i.e., compute this - rhs
     @param rhs the other quaternion */
     Quaternion operator - ( Quaternion const& rhs );
 
@@ -187,7 +196,7 @@ class Quaternion
     @param rhs the other Quaternion object */
     Quaternion& operator = ( Quaternion const& rhs );
 
-    /** @brief Equal operator to a scalar d, the result is [ d, (d,d,d) ] 
+    /** @brief Equal operator to a scalar d, the result is [ d, (d,d,d) ]
     @param d scalar */
     Quaternion operator = ( const double d );
 
@@ -209,12 +218,12 @@ class Quaternion
     //@{
     /** @brief Output operator
     @param fileOut output stream
-    @param q the quaternion */ 
+    @param q the quaternion */
     friend ostream& operator << ( ostream& fileOut, Quaternion const& q );
-  
+
     /** @brief Input operator
     @param fileIn input stream
-    @param q the quaternion */   
+    @param q the quaternion */
     friend istream& operator >> ( istream& fileIn, Quaternion& q );
 
     /** @brief Returns the norm of the quaternion
@@ -229,8 +238,8 @@ class Quaternion
 
   protected:
     /**@name Parameters */
-    //@{  
-    double m_w; /**< double part of the quaternion */  
+    //@{
+    double m_w; /**< double part of the quaternion */
     Vector3 m_vqt; /**< Vectorial part of the quaternion */
     //@}
 };
@@ -239,7 +248,7 @@ class Quaternion
 /**@name Quaternion : External methods */
 //@{
 /** @brief Product by a scalar
-@param d the scalar 
+@param d the scalar
 @param rhs the quaternion */
 Quaternion operator * ( double d, Quaternion const& rhs );
 
@@ -251,4 +260,3 @@ Quaternion operator , ( Vector3 const& lhs, Quaternion const& q );
 //@}
 
 #endif
-

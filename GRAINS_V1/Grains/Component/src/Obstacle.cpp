@@ -16,9 +16,9 @@ bool Obstacle::m_isConfinement = false;
 
 //-----------------------------------------------------------------------------
 // Constructor with name and autonumbering as input parameters
-Obstacle::Obstacle( string const& s, bool const& autonumbering ) : 
-  Component( autonumbering ), 
-  m_name( s ), 
+Obstacle::Obstacle( string const& s, bool const& autonumbering ) :
+  Component( autonumbering ),
+  m_name( s ),
   m_ismoving( false ),
   m_indicator( 0. ),
   m_ObstacleType ( "0" )
@@ -30,8 +30,8 @@ Obstacle::Obstacle( string const& s, bool const& autonumbering ) :
 // ----------------------------------------------------------------------------
 // Copy constructor from a Component
 Obstacle::Obstacle( Component& copy, char const* s ) :
-  Component( copy ), 
-  m_name( s ), 
+  Component( copy ),
+  m_name( s ),
   m_ismoving( false ),
   m_indicator( 0. ),
   m_ObstacleType ( "0" )
@@ -54,12 +54,12 @@ Obstacle::~Obstacle()
 bool Obstacle::LinkImposedMotion( ObstacleImposedVelocity& imposed )
 {
   bool status = false;
-  if ( m_name == imposed.getNom() ) 
+  if ( m_name == imposed.getNom() )
   {
     m_kinematics.append( imposed );
     status = true;
   }
-  
+
   return ( status );
 }
 
@@ -71,7 +71,7 @@ bool Obstacle::LinkImposedMotion( ObstacleImposedVelocity& imposed )
 Torsor const* Obstacle::getTorsor()
 {
   return ( &m_torsor );
-} 	   
+}
 
 
 
@@ -82,7 +82,7 @@ Torsor const* Obstacle::getTorsor()
 bool Obstacle::LinkImposedMotion( ObstacleImposedForce& imposed )
 {
   bool status = false;
-  if ( m_name == imposed.getNom() ) 
+  if ( m_name == imposed.getNom() )
   {
     m_confinement.append( imposed );
     Obstacle::m_isConfinement = status = true;
@@ -94,9 +94,9 @@ bool Obstacle::LinkImposedMotion( ObstacleImposedForce& imposed )
 
 
 // ----------------------------------------------------------------------------
-// Composes the obstacle kinematics with another "higher level" velocity 
+// Composes the obstacle kinematics with another "higher level" velocity
 // kinematics
-void Obstacle::Compose( ObstacleKinematicsVelocity const& other, 
+void Obstacle::Compose( ObstacleKinematicsVelocity const& other,
 	Vector3 const& lever )
 {
   m_kinematics.Compose( other, lever );
@@ -106,9 +106,9 @@ void Obstacle::Compose( ObstacleKinematicsVelocity const& other,
 
 
 // ----------------------------------------------------------------------------
-// Composes the obstacle kinematics with another "higher level" force 
+// Composes the obstacle kinematics with another "higher level" force
 // kinematics
-void Obstacle::Compose( ObstacleKinematicsForce const& other, 
+void Obstacle::Compose( ObstacleKinematicsForce const& other,
 	Point3 const& centre )
 {
   m_confinement.Compose( other, centre );
@@ -133,11 +133,11 @@ int Obstacle::getTotalNbSingleObstacles()
 // that the point belongs to the obstacle but this assumption is not verified.
 Vector3 Obstacle::getVelocityAtPoint( Point3 const& pt ) const
 {
-  Vector3 lever = pt - *m_geoRBWC->getCentre();  
+  Vector3 lever = pt - *m_geoRBWC->getCentre();
 
-  if ( Obstacle::m_isConfinement ) 
+  if ( Obstacle::m_isConfinement )
     return ( m_confinement.Velocity( lever ) );
-  else  
+  else
     return ( m_kinematics.Velocity( lever ) );
 }
 
@@ -163,7 +163,7 @@ Vector3 const* Obstacle::getTranslationalVelocity() const
 
 
 
- 
+
 // ----------------------------------------------------------------------------
 // Resets kinematics to 0
 void Obstacle::resetKinematics()
@@ -190,7 +190,7 @@ void Obstacle::setKinematics( ObstacleKinematicsVelocity& kine_ )
 void Obstacle::setVelocity( Vector3 const* vtrans, Vector3 const* vrot )
 {
   m_kinematics.setVelocity( vtrans, vrot );
-}  
+}
 
 
 
@@ -213,7 +213,7 @@ void Obstacle::writeStatic( ostream& fileOut ) const
 {
   fileOut << "*Obstacle\n" << m_name << endl;
   Component::writeStatic( fileOut );
-  fileOut << "*EndObstacle\n\n";  
+  fileOut << "*EndObstacle\n\n";
 }
 
 
@@ -234,7 +234,7 @@ void Obstacle::writeIdentity( ostream& file ) const
 double Obstacle::getIndicator() const
 {
   return ( m_indicator );
-} 
+}
 
 
 
@@ -274,7 +274,7 @@ void Obstacle::restoreState()
 
 
 // ----------------------------------------------------------------------------
-// Sets the boolean to actually move obstacles 
+// Sets the boolean to actually move obstacles
 void Obstacle::setMoveObstacle( bool const& depObs )
 {
   Obstacle::m_MoveObstacle = depObs ;
@@ -297,7 +297,7 @@ bool Obstacle::getMoveObstacle()
 // Returns obstacle name
 string Obstacle::getName() const
 {
-  return ( m_name ); 
+  return ( m_name );
 }
 
 
@@ -305,9 +305,9 @@ string Obstacle::getName() const
 
 // ----------------------------------------------------------------------------
 // Sets indicator for Paraview post-processing
-void Obstacle::setIndicator( double const& value ) 
-{ 
-  m_indicator = value; 
+void Obstacle::setIndicator( double const& value )
+{
+  m_indicator = value;
 }
 
 
@@ -316,13 +316,18 @@ void Obstacle::setIndicator( double const& value )
 // ----------------------------------------------------------------------------
 // Contact between an obstacle and a component. If contact exists,
 // computes the contact force and torque and adds to each component
-void Obstacle::InterAction( Component* voisin, 
-	double dt, double const& time, LinkedCell* LC ) throw (ContactError)
+void Obstacle::InterAction( Component* voisin,
+	double dt, double const& time, LinkedCell* LC )
 {
+  try{
   cout << "Warning when calling Obstacle::InterAction() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);
+  }
+  catch (const ContactError&) {
+    throw ContactError();
+  }
 }
 
 
@@ -343,7 +348,7 @@ int Obstacle::numberOfPoints_PARAVIEW() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of elementary polytopes to write the obstacle 
+// Returns the number of elementary polytopes to write the obstacle
 // shape in a Paraview format
 int Obstacle::numberOfCells_PARAVIEW() const
 {
@@ -371,8 +376,8 @@ const
 
 
 // ----------------------------------------------------------------------------
-// Writes the points describing the obstacle in a Paraview format 
-void Obstacle::write_polygonsPts_PARAVIEW( ostream &f, 
+// Writes the points describing the obstacle in a Paraview format
+void Obstacle::write_polygonsPts_PARAVIEW( ostream &f,
   	Vector3 const* translation ) const
 {
   cout << "Warning when calling Obstacle::write_polygonsPts_PARAVIEW() "
@@ -467,7 +472,7 @@ void Obstacle::addNewContactInMap( double const& tangentialDepl, int const& id )
 
 // ----------------------------------------------------------------------------
 // Increases cumulative tangential displacement with component id
-void Obstacle::addDeplContactInMap( double const& tangentialDepl, 
+void Obstacle::addDeplContactInMap( double const& tangentialDepl,
 	int const& id )
 {
   cout << "Warning when calling Obstacle::addDeplContactInMap() "

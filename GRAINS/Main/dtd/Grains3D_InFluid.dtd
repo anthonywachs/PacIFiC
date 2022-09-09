@@ -1,0 +1,91 @@
+<!-- Grains3D_InFluid DTD -->
+
+<!ENTITY % Convex.dtd SYSTEM "/home/damien/phd/pacific/GRAINS/Main/dtd/Convex.dtd">
+%Convex.dtd;
+
+<!ENTITY % Contact.dtd SYSTEM "/home/damien/phd/pacific/GRAINS/Main/dtd/Contact.dtd">
+%Contact.dtd;
+
+<!ELEMENT Point EMPTY>
+<!ATTLIST Point X CDATA #REQUIRED>
+<!ATTLIST Point Y CDATA #REQUIRED>
+<!ATTLIST Point Z CDATA #REQUIRED>
+
+<!ELEMENT Centre EMPTY>
+<!ATTLIST Centre X CDATA #REQUIRED>
+<!ATTLIST Centre Y CDATA #REQUIRED>
+<!ATTLIST Centre Z CDATA #REQUIRED>
+
+<!ELEMENT Vecteur EMPTY>
+<!ATTLIST Vecteur X CDATA #REQUIRED>
+<!ATTLIST Vecteur Y CDATA #REQUIRED>
+<!ATTLIST Vecteur Z CDATA #REQUIRED>
+
+
+<!ELEMENT Grains3D (Construction, Forces, Simulation)>
+<!ATTLIST Grains3D Type (CoupledFluid|CoupledFluidMPI) "CoupledFluid">
+
+  <!ELEMENT Construction (Recipient, Contacts?, Reload?)>
+    <!ELEMENT Recipient EMPTY>
+    <!ATTLIST Recipient LX CDATA #REQUIRED>
+    <!ATTLIST Recipient LY CDATA #REQUIRED>
+    <!ATTLIST Recipient LZ CDATA #REQUIRED>
+
+    <!ELEMENT DomainDecomposition EMPTY>
+    <!ATTLIST DomainDecomposition NX CDATA #REQUIRED>
+    <!ATTLIST DomainDecomposition NY CDATA #REQUIRED>
+    <!ATTLIST DomainDecomposition NZ CDATA #REQUIRED> 
+    
+    <!ELEMENT MPI EMPTY>
+    <!ATTLIST MPI Strategie (AllgatherGlobal|AllgatherLocal|SRLocal
+    	|SRLocalCommFirst|SRLocalCommOpt) "AllgatherGlobal">
+    <!ATTLIST MPI VerbosityLevel (0|1|2) "0">	 
+	
+    <!ELEMENT ContactsParticuleObstacle EMPTY>
+    <!ATTLIST ContactsParticuleObstacle Strategie (LinkedBox|LinkedCell) 
+    	"LinkedCell"> 	      
+
+    <!ELEMENT Contacts (Default?, Contact*)>
+
+    <!ELEMENT Reload EMPTY>
+    <!ATTLIST Reload Fichier CDATA #REQUIRED>
+    <!ATTLIST Reload Vitesse (Reset|NoReset) "NoReset">
+    <!ATTLIST Reload Type (new|same) "new"> 
+
+  <!ELEMENT Forces (Gravite?, Ressort?)>
+    <!ELEMENT Gravite EMPTY>
+    <!ATTLIST Gravite GX CDATA #REQUIRED>
+    <!ATTLIST Gravite GY CDATA #REQUIRED>
+    <!ATTLIST Gravite GZ CDATA #REQUIRED>
+
+  <!ELEMENT Simulation (IncreTemps, SimulTemps, TempsSave+, Fichier, PostProcessingWriters?)>
+    <!ELEMENT IncreTemps EMPTY>
+    <!ATTLIST IncreTemps dt (1.e-5|1.e-4|1.e-6) "1.e-5">
+
+    <!ELEMENT SimulTemps EMPTY>
+    <!ATTLIST SimulTemps t CDATA #REQUIRED>
+
+    <!ELEMENT TempsSave EMPTY>
+    <!ATTLIST TempsSave Debut CDATA #REQUIRED>
+    <!ATTLIST TempsSave Fin   CDATA #REQUIRED>
+    <!ATTLIST TempsSave Dt    CDATA #REQUIRED>
+
+    <!ELEMENT Fichier (#PCDATA)>
+
+    <!ELEMENT PostProcessingWriters (Paraview?, Visual?, GMV?, 
+                                     PositionVitesse?)>
+    <!ELEMENT Paraview EMPTY>
+    <!ATTLIST Paraview Name CDATA #REQUIRED>
+    <!ATTLIST Paraview Root CDATA #REQUIRED>
+    <!ATTLIST Paraview InitialCycleNumber CDATA "0">
+    <!ATTLIST Paraview Mode (text|binary) "text">
+    
+    <!ELEMENT Visual EMPTY>
+    <!ATTLIST Visual Name CDATA #REQUIRED>
+
+    <!ELEMENT GMV EMPTY>
+    <!ATTLIST GMV Name CDATA #REQUIRED>
+    <!ATTLIST GMV InitialCycleNumber CDATA "0"> 
+    
+    <!ELEMENT PositionVitesse EMPTY>
+    <!ATTLIST PositionVitesse Name CDATA #REQUIRED> 
