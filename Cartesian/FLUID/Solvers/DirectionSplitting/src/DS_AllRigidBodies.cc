@@ -538,9 +538,10 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         double temp = pos(dir);
         vel(dir) = pv(dir);
 
-        acc(dir) = gg(dir)*(1-m_rho/rho_p) + (viscous_force->operator()(parID,dir)
-                                         +  pressure_force->operator()(parID,dir))
-                                         / mass_p ;
+        // if (t_it->iteration_number() > 10)
+           acc(dir) = gg(dir)*(1-m_rho/rho_p)
+                    + (viscous_force->operator()(parID,dir)
+                    +  pressure_force->operator()(parID,dir)) / mass_p ;
         // vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
         pos(dir) = pos(dir) + vel(dir)*t_it->time_step()
                  + 0.5 * acc(dir) * MAC::pow(t_it->time_step(),2.);
@@ -553,7 +554,8 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
 
      if (m_space_dimension == 2) {
         ang_vel(2) = pav(2);
-        ang_acc(2) = (viscous_torque->operator()(parID,2)
+        // if (t_it->iteration_number() > 10)
+           ang_acc(2) = (viscous_torque->operator()(parID,2)
                       + pressure_torque->operator()(parID,2)) / moi ;
         ang_vel(2) = ang_vel(2) + ang_acc(2)*t_it->time_step();
      } else {
@@ -3341,12 +3343,12 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
   for (size_t i = 0; i < surface_area.size(); i++) {
      // Check it the point is in the current domain
      ghost_pt[0] = *surface_point[i];
-     bool status = (ghost_pt[0](0) > Dmin(0))
-                && (ghost_pt[0](0) <= Dmax(0))
-                && (ghost_pt[0](1) > Dmin(1))
-                && (ghost_pt[0](1) <= Dmax(1))
-                && (ghost_pt[0](2) > Dmin(2))
-                && (ghost_pt[0](2) <= Dmax(2));
+     bool status = (m_space_dimension == 2) ?
+                   (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
+                && (ghost_pt[0](1) > Dmin(1)) && (ghost_pt[0](1) <= Dmax(1)) :
+                   (ghost_pt[0](0) > Dmin(0)) && (ghost_pt[0](0) <= Dmax(0))
+                && (ghost_pt[0](1) > Dmin(1)) && (ghost_pt[0](1) <= Dmax(1))
+                && (ghost_pt[0](2) > Dmin(2)) && (ghost_pt[0](2) <= Dmax(2));
 
      doubleVector stress(6,0.);
 
