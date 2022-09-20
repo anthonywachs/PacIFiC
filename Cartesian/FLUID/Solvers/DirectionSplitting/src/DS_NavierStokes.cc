@@ -721,10 +721,10 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 				         // First proc has non zero value in Aie,Aei for first & last index
 				         if (rank_in_i[dir] == 0) {
 				            A[dir].ie[comp][r_index]->set_item(m,nb_ranks_comm_i[dir]-1,left);
-				            A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,right);
+				            A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,left);
 				         } else {
 				            A[dir].ie[comp][r_index]->set_item(m,rank_in_i[dir]-1,left);
-				            A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,right);
+				            A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,left);
 				         }
 				      }
 
@@ -732,7 +732,7 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 				         // Periodic boundary condition at maximum unknown index
 				         // For last index, Aee comes from this proc as it
 				         // is interface unknown wrt this proc
-				         A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],right);
+				         A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],left);
 				         Aee_diagcoef = value;
 				         A[dir].ei[comp][r_index]->set_item(rank_in_i[dir],m-1,left);
 				      }
