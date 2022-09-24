@@ -18,13 +18,20 @@ not with Cartesian nor multigrids}.
 #define POS_PBC_Y(Y) ((u.x.boundary[top] != periodic_bc) ? (Y) : (((Y) > L0/2.) ? (Y) - L0 : (Y)))
 #define POS_PBC_Z(Z) ((u.x.boundary[top] != periodic_bc) ? (Z) : (((Z) > L0/2.) ? (Z) - L0 : (Z)))
 
+struct _generate_lag_stencils_one_caps {
+  lagMesh* mesh;
+  bool no_warning;
+};
+
 /**
 The function below loops through the Lagrangian nodes and "caches" the Eulerian
 cells in a 5x5(x5) stencil around each node. In case of parallel simulations,
 the cached cells are tagged with the process id.
 */
 trace
-void generate_lag_stencils_one_caps(lagMesh* mesh) {
+void generate_lag_stencils_one_caps(struct _generate_lag_stencils_one_caps p) {
+  lagMesh* mesh = p.mesh;
+  bool no_warning = p.no_warning;
   for(int i=0; i<mesh->nlp; i++) {
     mesh->nodes[i].stencil.n = 0;
     /**
@@ -43,7 +50,7 @@ void generate_lag_stencils_one_caps(lagMesh* mesh) {
             POS_PBC_Y(mesh->nodes[i].pos.y + nj*delta),
             POS_PBC_Z(mesh->nodes[i].pos.z + nk*delta));
         #endif
-        if (point.level >= 0 && point.level != grid->maxdepth)
+        if (!(no_warning) && point.level >= 0 && point.level != grid->maxdepth)
           fprintf(stderr, "Warning: Lagrangian stencil not fully resolved.\n");
         cache_append(&(mesh->nodes[i].stencil), point, 0);
         #if _MPI
@@ -64,9 +71,15 @@ void generate_lag_stencils_one_caps(lagMesh* mesh) {
   }
 }
 
+
+struct _generate_lag_stencils {
+  bool no_warning;
+};
+
 trace
-void generate_lag_stencils() {
-  for(int k=0; k<NCAPS; k++) generate_lag_stencils_one_caps(&MB(k));
+void generate_lag_stencils(struct _generate_lag_stencils p) {
+  for(int k=0; k<NCAPS; k++) generate_lag_stencils_one_caps(mesh = &MB(k),
+    no_warning = p.no_warning);
 }
 
 

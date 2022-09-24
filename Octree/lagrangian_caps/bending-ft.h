@@ -96,7 +96,7 @@ event acceleration (i++) {
         double bending_surface_force =
           2*E_B*(2*(curv - rcurv)*(sq(curv) - gcurv + rcurv*curv) + lbcurv);
       #endif
-      /** We now have to compute the area associated to each node */
+      /** We now have to compute the area associated with each node */
       double area = compute_node_area(mesh, j);
       /** The bending force is ready to be added to the Lagrangian force of the
       considered node. */

@@ -382,7 +382,7 @@ void correct_lag_pos(lagMesh* mesh) {
 }
 
 
-#include "curvature-ft.h"
+// #include "curvature-ft.h"
 
 /**
 ## Advection of the mesh

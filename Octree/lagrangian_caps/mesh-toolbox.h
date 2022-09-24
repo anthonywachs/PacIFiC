@@ -586,3 +586,26 @@ void restore_membranes(char* filename) {
   }
   fclose(file);
 }
+
+/** In case we add membranes to a simulation after restart, we need to call
+the function below. */
+void initialize_membranes() {
+  mbs.nbmb = NCAPS;
+  for(int i=0; i<mbs.nbmb; i++) {
+    initialize_empty_mb(&mbs.mb[i]);
+  }
+  if (is_constant(a.x)) {
+    a = new face vector;
+    foreach_face() a.x[] = 0.;
+  }
+}
+
+void initialize_membranes_stencils() {
+  for(int i=0; i<mbs.nbmb; i++) {
+    for(int j=0; j<MB(i).nlp; j++) {
+      MB(i).nodes[j].stencil.n = STENCIL_SIZE;
+      MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
+      MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
+    }
+  }
+}
