@@ -458,6 +458,32 @@ void refine_mesh(lagMesh* mesh) {
 }
 
 /**
+## Adding capsules after restart
+
+In case we add membranes to a simulation after restart, we need to call
+the function below. */
+void initialize_membranes() {
+  mbs.nbmb = NCAPS;
+  for(int i=0; i<mbs.nbmb; i++) {
+    initialize_empty_mb(&mbs.mb[i]);
+  }
+  if (is_constant(a.x)) {
+    a = new face vector;
+    foreach_face() a.x[] = 0.;
+  }
+}
+
+void initialize_membranes_stencils() {
+  for(int i=0; i<mbs.nbmb; i++) {
+    for(int j=0; j<MB(i).nlp; j++) {
+      MB(i).nodes[j].stencil.n = STENCIL_SIZE;
+      MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
+      MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
+    }
+  }
+}
+
+/**
 ## Output
 The functions below write/read the lagrangian mesh to/from a file in order
 to restart simulations.
@@ -587,25 +613,54 @@ void restore_membranes(char* filename) {
   fclose(file);
 }
 
-/** In case we add membranes to a simulation after restart, we need to call
-the function below. */
-void initialize_membranes() {
-  mbs.nbmb = NCAPS;
-  for(int i=0; i<mbs.nbmb; i++) {
-    initialize_empty_mb(&mbs.mb[i]);
-  }
-  if (is_constant(a.x)) {
-    a = new face vector;
-    foreach_face() a.x[] = 0.;
-  }
-}
 
-void initialize_membranes_stencils() {
-  for(int i=0; i<mbs.nbmb; i++) {
-    for(int j=0; j<MB(i).nlp; j++) {
-      MB(i).nodes[j].stencil.n = STENCIL_SIZE;
-      MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
-      MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
+/** ### Visualization in paraview */
+#ifndef PARAVIEW_CAPSULE
+  #define PARAVIEW_CAPSULE 0
+#endif
+
+#if PARAVIEW_CAPSULE
+int pv_timestep = 0;
+
+void pv_output_ascii() {
+  char filename[128];
+  FILE* file;
+  sprintf(filename, "caps_T%d.vtk", pv_timestep);
+  file = fopen(filename, "w");
+
+  /** Populate the header and other non-data fields */
+  fprintf(file, "# vtk DataFile Version 4.2\n");
+  fprintf(file, "Capsules at time %g\n", t);
+  fprintf(file, "ASCII\n");
+  fprintf(file, "DATASET POLYDATA\n");
+
+  /** Populate the coordinates of all the Lagrangian nodes */
+  int nbpts_tot = 0;
+  for(int j=0; j<NCAPS; j++) nbpts_tot += MB(j).nlp;
+  fprintf(file, "POINTS %d double\n", nbpts_tot);
+  for(int j=0; j<NCAPS; j++) {
+    for(int k=0; k<MB(j).nlp; k++) {
+      fprintf(file, "%g %g %g\n", MB(j).nodes[k].pos.x, MB(j).nodes[k].pos.y,
+        MB(j).nodes[k].pos.z);
     }
   }
+
+  /** Populate the connectivity of the triangles */
+  int nbtri_tot = 0;
+  for(int j=0; j<NCAPS; j++) nbtri_tot += MB(j).nlt;
+  fprintf(file, "TRIANGLE_STRIPS %d %d\n", nbtri_tot, 4*nbtri_tot);
+  for(int j=0; j<NCAPS; j++) {
+    int offset = 0;
+    for(int k=0; k<MB(j).nlt; k++) {
+      fprintf(file, "%d %d %d %d\n", 3,
+        offset + MB(j).triangles[k].node_ids[0],
+        offset + MB(j).triangles[k].node_ids[1],
+        offset + MB(j).triangles[k].node_ids[2]);
+    }
+    offset += MB(j).nlp;
+  }
+
+  fclose(file);
+  pv_timestep++;
 }
+#endif
