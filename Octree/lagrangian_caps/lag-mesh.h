@@ -139,8 +139,6 @@ void free_caps(Capsules* caps) {
 /** By default, the mesh is advected using a second-order two-step Runge Kutta
 scheme. If the following macro is set to $0$, a first-order forward Euler schme
 is used instead.
-
-FIXME: RK2 is not yet compatible with embedded boundaries.
 */
 #ifndef ADVECT_LAG_RK2
   #define ADVECT_LAG_RK2 1

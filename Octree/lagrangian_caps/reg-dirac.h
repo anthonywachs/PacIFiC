@@ -155,7 +155,6 @@ void generate_lag_stencils(struct _generate_lag_stencils p) {
       free(total_ibm_wr);
       free(ibm_wr_one_proc);
     }
-    fprintf(stderr, "Hi1\n");
   #endif
 }
 
@@ -168,9 +167,7 @@ the intention is to include them in the forcing).
 */
 trace
 void lag2eul(vector forcing, lagMesh* mesh) {
-  fprintf(stderr, "Hi4\n");
   for(int i=0; i<mesh->nlp; i++) {
-    double sum_weights = 0.;
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
         coord dist;
@@ -196,17 +193,12 @@ void lag2eul(vector forcing, lagMesh* mesh) {
             #endif
             (1 + cos(.5*pi*dist.x/Delta))*(1 + cos(.5*pi*dist.y/Delta))
             *(1 + cos(.5*pi*dist.z/Delta))/(cube(4*Delta));
-          sum_weights += weight*cube(Delta);
         #endif
           foreach_dimension() forcing.x[] += weight*mesh->nodes[i].lagForce.x;
         }
       }
     }
-    double all_weights = 0.;
-    MPI_Allreduce(&sum_weights, &all_weights, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    fprintf(stderr, "total weight in lag2eul at node %d: %g\n", i, all_weights);
   }
-  fprintf(stderr, "Hi5\n");
 }
 
 /**
@@ -215,10 +207,8 @@ the Lagrangian mesh.
 */
 trace
 void eul2lag(lagMesh* mesh) {
-  fprintf(stderr, "Hi2\n");
   for(int i=0; i<mesh->nlp; i++) {
     foreach_dimension() mesh->nodes[i].lagVel.x = 0.;
-    double sum_weights = 0.;
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
         coord dist;
@@ -242,15 +232,11 @@ void eul2lag(lagMesh* mesh) {
               cm[]/mesh->ibm_wr[i]*
             #endif
             (1 + cos(.5*pi*dist.y/Delta))*(1 + cos(.5*pi*dist.z/Delta))/64.;
-          sum_weights += weight;
         #endif
           foreach_dimension() mesh->nodes[i].lagVel.x += weight*u.x[];
         }
       }
     }
-    double all_weights = 0.;
-    MPI_Allreduce(&sum_weights, &all_weights, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    fprintf(stderr, "total weight in eul2lag at node %d: %g\n", i, all_weights);
   }
 
   /**
@@ -260,7 +246,6 @@ void eul2lag(lagMesh* mesh) {
   #if _MPI
     if (mpi_npe > 1) reduce_lagVel(mesh);
   #endif
-  fprintf(stderr, "Hi3\n");
 }
 
 /**
