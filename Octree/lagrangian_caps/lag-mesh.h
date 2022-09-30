@@ -143,7 +143,7 @@ is used instead.
 FIXME: RK2 is not yet compatible with embedded boundaries.
 */
 #ifndef ADVECT_LAG_RK2
-  #define ADVECT_LAG_RK2 0
+  #define ADVECT_LAG_RK2 1
 #endif
 
 /** We specify the size of the 5x5(x5) stencil in 2D or 3D. */
@@ -415,44 +415,58 @@ to zero, a simple forward Euler scheme is used as a scheme.
 */
 trace
 void advect_all_capsules() {
-  for (int k=0; k<NCAPS; k++) {
-    lagMesh* mesh = &MB(k);
-    eul2lag(mesh);
-    #if !(ADVECT_LAG_RK2)
+  #if !(ADVECT_LAG_RK2)
+    for (int k=0; k<NCAPS; k++) {
+      lagMesh* mesh = &MB(k);
+      eul2lag(mesh);
       for(int i=0; i < mesh->nlp; i++) {
         foreach_dimension() {
           mesh->nodes[i].pos.x += dt*mesh->nodes[i].lagVel.x;
         }
       }
-    #else
-      lagMesh buffer_mesh;
-      buffer_mesh.nlp = mesh->nlp;
-      buffer_mesh.nodes = malloc(mesh->nlp*sizeof(lagNode));
+      correct_lag_pos(mesh);
+    }
+    generate_lag_stencils();
+  #else
+    lagMesh buffer_mesh[NCAPS];
+    for(int k=0; k<NCAPS; k++) {
+      lagMesh* mesh = &MB(k);
+      eul2lag(mesh);
+      buffer_mesh[k].nlp = mesh->nlp;
+      buffer_mesh[k].nodes = malloc(mesh->nlp*sizeof(lagNode));
       for(int i=0; i<mesh->nlp; i++) {
         // Step 1 of RK2
         foreach_dimension()
-          buffer_mesh.nodes[i].pos.x = mesh->nodes[i].pos.x +
+          buffer_mesh[k].nodes[i].pos.x = mesh->nodes[i].pos.x +
             .5*dt*mesh->nodes[i].lagVel.x;
       }
-      correct_lag_pos(&buffer_mesh);
-      for(int j=0; j<buffer_mesh.nlp; j++) {
-        buffer_mesh.nodes[j].stencil.n = STENCIL_SIZE;
-        buffer_mesh.nodes[j].stencil.nm = STENCIL_SIZE;
-        buffer_mesh.nodes[j].stencil.p = malloc(STENCIL_SIZE*sizeof(Index));
+      correct_lag_pos(&(buffer_mesh[k]));
+      for(int j=0; j<buffer_mesh[k].nlp; j++) {
+        buffer_mesh[k].nodes[j].stencil.n = STENCIL_SIZE;
+        buffer_mesh[k].nodes[j].stencil.nm = STENCIL_SIZE;
+        buffer_mesh[k].nodes[j].stencil.p = malloc(STENCIL_SIZE*sizeof(Index));
       }
-      generate_lag_stencils_one_caps(&buffer_mesh);
-      eul2lag(&buffer_mesh);
+      #if EMBED
+        buffer_mesh[k].ibm_wr =
+          (double*) malloc(buffer_mesh[k].nlp*sizeof(double));
+      #endif
+    }
+    generate_lag_stencils(meshes = buffer_mesh, nb_caps = NCAPS);
+    for(int k=0; k<NCAPS; k++) {
+      lagMesh* mesh = &MB(k);
+      eul2lag(&buffer_mesh[k]);
       for(int i=0; i<mesh->nlp; i++) {
         // Step 2 of RK2
         foreach_dimension()
-          mesh->nodes[i].pos.x += dt*buffer_mesh.nodes[i].lagVel.x;
+          mesh->nodes[i].pos.x += dt*buffer_mesh[k].nodes[i].lagVel.x;
       }
-      for(int i=0; i<buffer_mesh.nlp; i++) free(buffer_mesh.nodes[i].stencil.p);
-      free(buffer_mesh.nodes);
-    #endif
-    correct_lag_pos(mesh);
-  }
-  generate_lag_stencils();
+      for(int i=0; i<buffer_mesh[k].nlp; i++)
+        free(buffer_mesh[k].nodes[i].stencil.p);
+      free(buffer_mesh[k].nodes);
+      correct_lag_pos(mesh);
+    }
+    generate_lag_stencils();
+  #endif
 }
 
 

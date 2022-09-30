@@ -113,12 +113,16 @@ void generate_lag_stencils_one_caps(struct _generate_lag_stencils_one_caps p) {
 
 struct _generate_lag_stencils {
   bool no_warning;
+  lagMesh* meshes;
+  int nb_caps;
 };
 
 trace
 void generate_lag_stencils(struct _generate_lag_stencils p) {
-  for(int k=0; k<NCAPS; k++) {
-    generate_lag_stencils_one_caps(mesh = &MB(k), no_warning = p.no_warning);
+  lagMesh* meshes = (p.meshes) ? p.meshes : mbs.mb;
+  int nb_caps = (p.nb_caps) ? p.nb_caps : NCAPS;
+  for(int k=0; k<nb_caps; k++) {
+    generate_lag_stencils_one_caps(mesh = &meshes[k], no_warning = p.no_warning);
   }
 
   #if (EMBED && _MPI)
@@ -126,27 +130,27 @@ void generate_lag_stencils(struct _generate_lag_stencils p) {
       double* total_ibm_wr;
       double* ibm_wr_one_proc;
       int total_nodes = 0;
-      for(int i=0; i<NCAPS; i++) total_nodes += MB(i).nlp;
+      for(int i=0; i<nb_caps; i++) total_nodes += meshes[i].nlp;
       total_ibm_wr = (double*) malloc(total_nodes*sizeof(double));
       ibm_wr_one_proc = (double*) malloc(total_nodes*sizeof(double));
 
       int offset = 0;
-      for(int i=0; i<NCAPS; i++) {
-        for(int j=0; j<MB(i).nlp; j++) {
-          ibm_wr_one_proc[offset + j] = MB(i).ibm_wr[j];
+      for(int i=0; i<nb_caps; i++) {
+        for(int j=0; j<meshes[i].nlp; j++) {
+          ibm_wr_one_proc[offset + j] = meshes[i].ibm_wr[j];
         }
-        offset += MB(i).nlp;
+        offset += meshes[i].nlp;
       }
 
       MPI_Allreduce(ibm_wr_one_proc, total_ibm_wr, total_nodes, MPI_DOUBLE,
         MPI_SUM, MPI_COMM_WORLD);
 
       offset = 0;
-      for(int i=0; i<NCAPS; i++) {
-        for(int j=0; j<MB(i).nlp; j++) {
-          MB(i).ibm_wr[j] = total_ibm_wr[offset + j];
+      for(int i=0; i<nb_caps; i++) {
+        for(int j=0; j<meshes[i].nlp; j++) {
+          meshes[i].ibm_wr[j] = total_ibm_wr[offset + j];
         }
-        offset += MB(i).nlp;
+        offset += meshes[i].nlp;
       }
       free(total_ibm_wr);
       free(ibm_wr_one_proc);
