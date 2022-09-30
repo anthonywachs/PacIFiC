@@ -480,7 +480,11 @@ void initialize_membranes_stencils() {
       MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
       MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
     }
+    #if EMBED
+      MB(i).ibm_wr = (double*) malloc(MB(i).nlp*sizeof(double));
+    #endif
   }
+  generate_lag_stencils(no_warning = true);
 }
 
 /**

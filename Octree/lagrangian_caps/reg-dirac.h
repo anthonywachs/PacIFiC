@@ -69,6 +69,45 @@ void generate_lag_stencils_one_caps(struct _generate_lag_stencils_one_caps p) {
       }
     }
   }
+
+  /**
+  If some walls are present, we need to treat the case of IBM stencils
+  overlapping with non-fluid cells. To do so, each processor computes the weight
+  it sees, then all of their weights are added and redistributed to all the
+  processors.
+
+  FIXME: walls that are not represented by embedded boundaries are still not
+  considered (e.g. a domain boundary with zero Dirichlet condition on the
+  velocity).
+  */
+  #if EMBED
+    for(int i=0; i<mesh->nlp; i++) {
+      double my_weight = 0;
+      foreach_cache(mesh->nodes[i].stencil) {
+        if (point.level >= 0) {
+          coord dist;
+          dist.x = GENERAL_1DIST(x, mesh->nodes[i].pos.x);
+          dist.y = GENERAL_1DIST(y, mesh->nodes[i].pos.y);
+          #if dimension > 2
+            dist.z = GENERAL_1DIST(z, mesh->nodes[i].pos.z);
+          #endif
+          #if dimension < 3
+            if (fabs(dist.x) <= 2*Delta && fabs(dist.y) <= 2*Delta) {
+              my_weight += cm[]*(1 + cos(.5*pi*dist.x/Delta))
+                *(1 + cos(.5*pi*dist.y/Delta))/16.;
+          #else
+            if (fabs(dist.x) <= 2*Delta && fabs(dist.y) <= 2*Delta &&
+              fabs(dist.z) <= 2*Delta) {
+              my_weight += cm[]*(1 + cos(.5*pi*dist.x/Delta))
+                *(1 + cos(.5*pi*dist.y/Delta))
+                *(1 + cos(.5*pi*dist.z/Delta))/64.;
+          #endif
+          }
+        }
+      }
+      mesh->ibm_wr[i] = my_weight;
+    }
+  #endif
 }
 
 
@@ -78,8 +117,42 @@ struct _generate_lag_stencils {
 
 trace
 void generate_lag_stencils(struct _generate_lag_stencils p) {
-  for(int k=0; k<NCAPS; k++) generate_lag_stencils_one_caps(mesh = &MB(k),
-    no_warning = p.no_warning);
+  for(int k=0; k<NCAPS; k++) {
+    generate_lag_stencils_one_caps(mesh = &MB(k), no_warning = p.no_warning);
+  }
+
+  #if (EMBED && _MPI)
+    if (mpi_npe > 1) {
+      double* total_ibm_wr;
+      double* ibm_wr_one_proc;
+      int total_nodes = 0;
+      for(int i=0; i<NCAPS; i++) total_nodes += MB(i).nlp;
+      total_ibm_wr = (double*) malloc(total_nodes*sizeof(double));
+      ibm_wr_one_proc = (double*) malloc(total_nodes*sizeof(double));
+
+      int offset = 0;
+      for(int i=0; i<NCAPS; i++) {
+        for(int j=0; j<MB(i).nlp; j++) {
+          ibm_wr_one_proc[offset + j] = MB(i).ibm_wr[j];
+        }
+        offset += MB(i).nlp;
+      }
+
+      MPI_Allreduce(ibm_wr_one_proc, total_ibm_wr, total_nodes, MPI_DOUBLE,
+        MPI_SUM, MPI_COMM_WORLD);
+
+      offset = 0;
+      for(int i=0; i<NCAPS; i++) {
+        for(int j=0; j<MB(i).nlp; j++) {
+          MB(i).ibm_wr[j] = total_ibm_wr[offset + j];
+        }
+        offset += MB(i).nlp;
+      }
+      free(total_ibm_wr);
+      free(ibm_wr_one_proc);
+    }
+    fprintf(stderr, "Hi1\n");
+  #endif
 }
 
 
@@ -91,7 +164,9 @@ the intention is to include them in the forcing).
 */
 trace
 void lag2eul(vector forcing, lagMesh* mesh) {
+  fprintf(stderr, "Hi4\n");
   for(int i=0; i<mesh->nlp; i++) {
+    double sum_weights = 0.;
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
         coord dist;
@@ -103,20 +178,31 @@ void lag2eul(vector forcing, lagMesh* mesh) {
         #if dimension < 3
         if (fabs(dist.x) <= 2*Delta && fabs(dist.y) <= 2*Delta) {
           double weight =
+            #if EMBED
+              cm[]/mesh->ibm_wr[i]*
+            #endif
             (1 + cos(.5*pi*dist.x/Delta))*(1 + cos(.5*pi*dist.y/Delta))
             /(sq(4*Delta));
         #else
         if (fabs(dist.x) <= 2*Delta && fabs(dist.y) <= 2*Delta &&
           fabs(dist.z) <= 2*Delta) {
           double weight =
+            #if EMBED
+              cm[]/mesh->ibm_wr[i]*
+            #endif
             (1 + cos(.5*pi*dist.x/Delta))*(1 + cos(.5*pi*dist.y/Delta))
             *(1 + cos(.5*pi*dist.z/Delta))/(cube(4*Delta));
+          sum_weights += weight*cube(Delta);
         #endif
           foreach_dimension() forcing.x[] += weight*mesh->nodes[i].lagForce.x;
         }
       }
     }
+    double all_weights = 0.;
+    MPI_Allreduce(&sum_weights, &all_weights, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    fprintf(stderr, "total weight in lag2eul at node %d: %g\n", i, all_weights);
   }
+  fprintf(stderr, "Hi5\n");
 }
 
 /**
@@ -125,30 +211,42 @@ the Lagrangian mesh.
 */
 trace
 void eul2lag(lagMesh* mesh) {
-  for(int ii=0; ii<mesh->nlp; ii++) {
-    foreach_dimension() mesh->nodes[ii].lagVel.x = 0.;
-    foreach_cache(mesh->nodes[ii].stencil) {
+  fprintf(stderr, "Hi2\n");
+  for(int i=0; i<mesh->nlp; i++) {
+    foreach_dimension() mesh->nodes[i].lagVel.x = 0.;
+    double sum_weights = 0.;
+    foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
         coord dist;
-        dist.x = GENERAL_1DIST(x, mesh->nodes[ii].pos.x);
-        dist.y = GENERAL_1DIST(y, mesh->nodes[ii].pos.y);
+        dist.x = GENERAL_1DIST(x, mesh->nodes[i].pos.x);
+        dist.y = GENERAL_1DIST(y, mesh->nodes[i].pos.y);
         #if dimension > 2
-        dist.z = GENERAL_1DIST(z, mesh->nodes[ii].pos.z);
+        dist.z = GENERAL_1DIST(z, mesh->nodes[i].pos.z);
         #endif
         #if dimension < 3
         if (fabs(dist.x) <= 2*Delta && fabs(dist.y) <= 2*Delta) {
           double weight = (1 + cos(.5*pi*dist.x/Delta))*
+            #if EMBED
+              cm[]/mesh->ibm_wr[i]*
+            #endif
             (1 + cos(.5*pi*dist.y/Delta))/16.;
         #else
         if (fabs(dist.x) <= 2*Delta && fabs(dist.y) <= 2*Delta
           && fabs(dist.z) <= 2*Delta) {
           double weight = (1 + cos(.5*pi*dist.x/Delta))*
+            #if EMBED
+              cm[]/mesh->ibm_wr[i]*
+            #endif
             (1 + cos(.5*pi*dist.y/Delta))*(1 + cos(.5*pi*dist.z/Delta))/64.;
+          sum_weights += weight;
         #endif
-        foreach_dimension() mesh->nodes[ii].lagVel.x += weight*u.x[];
+          foreach_dimension() mesh->nodes[i].lagVel.x += weight*u.x[];
         }
       }
     }
+    double all_weights = 0.;
+    MPI_Allreduce(&sum_weights, &all_weights, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    fprintf(stderr, "total weight in eul2lag at node %d: %g\n", i, all_weights);
   }
 
   /**
@@ -158,6 +256,7 @@ void eul2lag(lagMesh* mesh) {
   #if _MPI
     if (mpi_npe > 1) reduce_lagVel(mesh);
   #endif
+  fprintf(stderr, "Hi3\n");
 }
 
 /**

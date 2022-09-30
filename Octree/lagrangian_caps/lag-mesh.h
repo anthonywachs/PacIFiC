@@ -80,6 +80,9 @@ typedef struct lagMesh {
   bool updated_stretches;
   bool updated_normals;
   bool updated_curvatures;
+  #if EMBED
+    double* ibm_wr;
+  #endif
 } lagMesh;
 
 /** We denote by $NCAPS$ the number of Lagrangian meshes, or capsules, in the
@@ -124,6 +127,9 @@ void free_mesh(lagMesh* mesh) {
   #if dimension > 2
     free(mesh->triangles);
   #endif
+  #if EMBED
+    free(mesh->ibm_wr);
+  #endif
 }
 
 void free_caps(Capsules* caps) {
@@ -132,9 +138,12 @@ void free_caps(Capsules* caps) {
 
 /** By default, the mesh is advected using a second-order two-step Runge Kutta
 scheme. If the following macro is set to $0$, a first-order forward Euler schme
-is used instead. */
+is used instead.
+
+FIXME: RK2 is not yet compatible with embedded boundaries.
+*/
 #ifndef ADVECT_LAG_RK2
-  #define ADVECT_LAG_RK2 1
+  #define ADVECT_LAG_RK2 0
 #endif
 
 /** We specify the size of the 5x5(x5) stencil in 2D or 3D. */
@@ -405,42 +414,45 @@ second-order Runge Kutta scheme is used. By setting the macro $ADVECT\_LAG\_RK2$
 to zero, a simple forward Euler scheme is used as a scheme.
 */
 trace
-void advect_lagMesh(lagMesh* mesh) {
-  eul2lag(mesh);
-  #if !(ADVECT_LAG_RK2)
-    for(int i=0; i < mesh->nlp; i++) {
-      foreach_dimension() {
-        mesh->nodes[i].pos.x += dt*mesh->nodes[i].lagVel.x;
+void advect_all_capsules() {
+  for (int k=0; k<NCAPS; k++) {
+    lagMesh* mesh = &MB(k);
+    eul2lag(mesh);
+    #if !(ADVECT_LAG_RK2)
+      for(int i=0; i < mesh->nlp; i++) {
+        foreach_dimension() {
+          mesh->nodes[i].pos.x += dt*mesh->nodes[i].lagVel.x;
+        }
       }
-    }
-  #else
-    lagMesh buffer_mesh;
-    buffer_mesh.nlp = mesh->nlp;
-    buffer_mesh.nodes = malloc(mesh->nlp*sizeof(lagNode));
-    for(int i=0; i<mesh->nlp; i++) {
-      // Step 1 of RK2
-      foreach_dimension()
-        buffer_mesh.nodes[i].pos.x = mesh->nodes[i].pos.x +
-          .5*dt*mesh->nodes[i].lagVel.x;
-    }
-    correct_lag_pos(&buffer_mesh);
-    for(int j=0; j<buffer_mesh.nlp; j++) {
-      buffer_mesh.nodes[j].stencil.n = STENCIL_SIZE;
-      buffer_mesh.nodes[j].stencil.nm = STENCIL_SIZE;
-      buffer_mesh.nodes[j].stencil.p = malloc(STENCIL_SIZE*sizeof(Index));
-    }
-    generate_lag_stencils_one_caps(&buffer_mesh);
-    eul2lag(&buffer_mesh);
-    for(int i=0; i<mesh->nlp; i++) {
-      // Step 2 of RK2
-      foreach_dimension()
-        mesh->nodes[i].pos.x += dt*buffer_mesh.nodes[i].lagVel.x;
-    }
-    for(int i=0; i<buffer_mesh.nlp; i++) free(buffer_mesh.nodes[i].stencil.p);
-    free(buffer_mesh.nodes);
-  #endif
-  correct_lag_pos(mesh);
-  generate_lag_stencils_one_caps(mesh);
+    #else
+      lagMesh buffer_mesh;
+      buffer_mesh.nlp = mesh->nlp;
+      buffer_mesh.nodes = malloc(mesh->nlp*sizeof(lagNode));
+      for(int i=0; i<mesh->nlp; i++) {
+        // Step 1 of RK2
+        foreach_dimension()
+          buffer_mesh.nodes[i].pos.x = mesh->nodes[i].pos.x +
+            .5*dt*mesh->nodes[i].lagVel.x;
+      }
+      correct_lag_pos(&buffer_mesh);
+      for(int j=0; j<buffer_mesh.nlp; j++) {
+        buffer_mesh.nodes[j].stencil.n = STENCIL_SIZE;
+        buffer_mesh.nodes[j].stencil.nm = STENCIL_SIZE;
+        buffer_mesh.nodes[j].stencil.p = malloc(STENCIL_SIZE*sizeof(Index));
+      }
+      generate_lag_stencils_one_caps(&buffer_mesh);
+      eul2lag(&buffer_mesh);
+      for(int i=0; i<mesh->nlp; i++) {
+        // Step 2 of RK2
+        foreach_dimension()
+          mesh->nodes[i].pos.x += dt*buffer_mesh.nodes[i].lagVel.x;
+      }
+      for(int i=0; i<buffer_mesh.nlp; i++) free(buffer_mesh.nodes[i].stencil.p);
+      free(buffer_mesh.nodes);
+    #endif
+    correct_lag_pos(mesh);
+  }
+  generate_lag_stencils();
 }
 
 
@@ -478,16 +490,19 @@ event init (i = 0) {
       MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
       MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
     }
-    generate_lag_stencils_one_caps(&MB(i));
+    #if EMBED
+      MB(i).ibm_wr = (double*) malloc(MB(i).nlp*sizeof(double));
+    #endif
   }
+  generate_lag_stencils();
 }
 
 /** Below, we advect each Lagrangian node using the interpolated Eulerian
 velocities. We also use this loop as an opportunity to
 re-initialize the Lagrangian forces to zero. */
 event tracer_advection(i++) {
+  advect_all_capsules();
   for(int i=0; i<mbs.nbmb; i++) {
-    advect_lagMesh(&mbs.mb[i]);
     for(int j=0; j<mbs.mb[i].nlp; j++)
       foreach_dimension() mbs.mb[i].nodes[j].lagForce.x = 0.;
   }
