@@ -461,6 +461,9 @@ void advect_all_capsules() {
       for(int i=0; i<buffer_mesh[k].nlp; i++)
         free(buffer_mesh[k].nodes[i].stencil.p);
       free(buffer_mesh[k].nodes);
+      #if EMBED
+        free(buffer_mesh[k].ibm_wr);
+      #endif
       correct_lag_pos(mesh);
     }
     generate_lag_stencils();
