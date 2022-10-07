@@ -3,6 +3,7 @@
 
 
 */
+#define _BENDING_FT 1
 #ifndef E_B
   #define E_B 1.
 #endif
@@ -18,7 +19,7 @@
 #endif
 #if GLOBAL_REF_CURV
   #ifndef C0
-    #define C0 (-2.09)
+    #define C0 (-2.09/RADIUS)
   #endif
 #endif
 
@@ -107,18 +108,21 @@ event acceleration (i++) {
   }
 }
 
+void initialize_refcurv(lagMesh* mesh) {
+  #if REF_CURV
+    comp_curvature(mesh);
+  #endif
+  for(int j=0; j<mesh->nlp; j++) {
+    #if (REF_CURV && !(GLOBAL_REF_CURV))
+    mesh->nodes[j].ref_curv = mesh->nodes[j].curv;
+    #else
+    mesh->nodes[j].ref_curv = 0.;
+    #endif
+  }
+}
+
 event init (i = 0) {
   for(int i=0; i<mbs.nbmb; i++) {
-    lagMesh* mesh = &(MB(i));
-    #if REF_CURV
-    comp_curvature(mesh);
-    #endif
-    for(int j=0; j<mesh->nlp; j++) {
-      #if (REF_CURV && !(GLOBAL_REF_CURV))
-      mesh->nodes[j].ref_curv = mesh->nodes[j].curv;
-      #else
-      mesh->nodes[j].ref_curv = 0.;
-      #endif
-    }
+    initialize_refcurv(&MB(i));
   }
 }
