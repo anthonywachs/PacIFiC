@@ -251,8 +251,14 @@ double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
     /** Store the coordinates of the neighboring nodes in the appropriate
     data structure before using the ordinary least squares method.*/
     for(int j=0; j<cn->nb_neighbors; j++) {
-      yy[j] = (diff_curv) ? mesh->nodes[ngb[j]].curv -
-        mesh->nodes[ngb[j]].ref_curv - cn->curv + cn->ref_curv : rpngb[j][2];
+      yy[j] = (diff_curv) ?
+        #if GLOBAL_REF_CURV
+          mesh->nodes[ngb[j]].curv - cn->curv
+        #else
+          mesh->nodes[ngb[j]].curv - mesh->nodes[ngb[j]].ref_curv
+            - cn->curv + cn->ref_curv
+        #endif
+        : rpngb[j][2];
       XX[j][0] = sq(rpngb[j][0]);
       XX[j][1] = rpngb[j][0]*rpngb[j][1];
       XX[j][2] = sq(rpngb[j][1]);
