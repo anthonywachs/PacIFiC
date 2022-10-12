@@ -90,13 +90,8 @@ event acceleration (i++) {
       double rcurv = mesh->nodes[i].ref_curv;
       double gcurv = mesh->nodes[j].gcurv;
       double lbcurv = laplace_beltrami(mesh, j, true);
-      #if GLOBAL_REF_CURV
-        double bending_surface_force = E_B*((2*curv + C0)*(2*sq(curv) -
-          2*gcurv - C0*curv) + 2*lbcurv);
-      #else
-        double bending_surface_force =
-          2*E_B*(2*(curv - rcurv)*(sq(curv) - gcurv + rcurv*curv) + lbcurv);
-      #endif
+      double bending_surface_force =
+        2*E_B*(2*(curv - rcurv)*(sq(curv) - gcurv + rcurv*curv) + lbcurv);
       /** We now have to compute the area associated with each node */
       double area = compute_node_area(mesh, j);
       /** The bending force is ready to be added to the Lagrangian force of the
@@ -105,24 +100,5 @@ event acceleration (i++) {
         mesh->nodes[j].lagForce.x +=
           mesh->nodes[j].normal.x*bending_surface_force*area;
     }
-  }
-}
-
-void initialize_refcurv(lagMesh* mesh) {
-  #if REF_CURV
-    comp_curvature(mesh);
-  #endif
-  for(int j=0; j<mesh->nlp; j++) {
-    #if (REF_CURV && !(GLOBAL_REF_CURV))
-    mesh->nodes[j].ref_curv = mesh->nodes[j].curv;
-    #else
-    mesh->nodes[j].ref_curv = 0.;
-    #endif
-  }
-}
-
-event init (i = 0) {
-  for(int i=0; i<mbs.nbmb; i++) {
-    initialize_refcurv(&MB(i));
   }
 }
