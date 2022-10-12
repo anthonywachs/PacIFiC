@@ -356,7 +356,7 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
     }
 
     #ifdef CAPS_VISCOSITY
-      fraction(I, 1. - sq(x - shift.x) - sq(y - shift.y)
+      fraction(I, sq(RADIUS) - sq(x - shift.x) - sq(y - shift.y)
         - sq(z - shift.z));
       foreach() if (I[] > 1.e-6) prevI[] = I[];
     #endif

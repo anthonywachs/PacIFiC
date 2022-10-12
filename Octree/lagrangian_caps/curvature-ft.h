@@ -251,14 +251,8 @@ double laplace_beltrami(lagMesh* mesh, int i, bool diff_curv) {
     /** Store the coordinates of the neighboring nodes in the appropriate
     data structure before using the ordinary least squares method.*/
     for(int j=0; j<cn->nb_neighbors; j++) {
-      yy[j] = (diff_curv) ?
-        #if GLOBAL_REF_CURV
-          mesh->nodes[ngb[j]].curv - cn->curv
-        #else
-          mesh->nodes[ngb[j]].curv - mesh->nodes[ngb[j]].ref_curv
-            - cn->curv + cn->ref_curv
-        #endif
-        : rpngb[j][2];
+      yy[j] = (diff_curv) ? (mesh->nodes[ngb[j]].curv -
+        mesh->nodes[ngb[j]].ref_curv - cn->curv + cn->ref_curv) : rpngb[j][2];
       XX[j][0] = sq(rpngb[j][0]);
       XX[j][1] = rpngb[j][0]*rpngb[j][1];
       XX[j][2] = sq(rpngb[j][1]);
@@ -324,5 +318,28 @@ void comp_curvature(lagMesh* mesh) {
       }
     #endif
     mesh->updated_curvatures = true;
+  }
+}
+
+void initialize_refcurv(lagMesh* mesh) {
+  #if REF_CURV
+    comp_curvature(mesh);
+  #endif
+  for(int j=0; j<mesh->nlp; j++) {
+    #if (REF_CURV)
+      #if GLOBAL_REF_CURV
+        mesh->nodes[j].ref_curv = C0;
+      #else
+        mesh->nodes[j].ref_curv = mesh->nodes[j].curv;
+      #endif
+    #else
+      mesh->nodes[j].ref_curv = 0.;
+    #endif
+  }
+}
+
+event init (i = 0) {
+  for(int i=0; i<mbs.nbmb; i++) {
+    initialize_refcurv(&MB(i));
   }
 }
