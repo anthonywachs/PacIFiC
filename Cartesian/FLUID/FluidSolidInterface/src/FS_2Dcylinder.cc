@@ -135,6 +135,12 @@ void FS_2Dcylinder:: set( istream& in )
   // Set radius
   m_agp_2Dcylinder.radius = m_circumscribed_radius;
 
+  // Force moi of a 2D disk
+  m_inertia[0][0] = (1./2.) * m_mass
+                            * m_circumscribed_radius * m_circumscribed_radius;
+  m_inertia[1][1] = m_inertia[0][0];
+  m_inertia[2][2] = m_inertia[0][0];
+
 }
 
 

@@ -76,7 +76,7 @@ class DS_RigidBody
       virtual double get_circumscribed_radius( ) const = 0;
 
       /** @brief Returns a tuple of mass and density of RB */
-      virtual std::tuple<double,double> get_mass_and_density() const = 0;
+      virtual std::tuple<double,double,double> get_mass_and_density_and_moi() const = 0;
 
       /** @brief Returns the distance of a point with the rigid body
       with a given ray vector and source

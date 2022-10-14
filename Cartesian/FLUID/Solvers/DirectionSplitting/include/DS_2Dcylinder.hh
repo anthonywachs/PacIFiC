@@ -105,7 +105,7 @@ class DS_2Dcylinder: public DS_RigidBody
       double get_circumscribed_radius( ) const;
 
       /** @brief Returns a tuple of mass and density of RB */
-      std::tuple<double,double> get_mass_and_density() const;
+      std::tuple<double,double,double> get_mass_and_density_and_moi() const;
 
       /** @brief Update the RB position and velocity
       @param pos updated position

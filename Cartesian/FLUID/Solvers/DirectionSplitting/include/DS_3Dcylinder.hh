@@ -103,7 +103,7 @@ class DS_3Dcylinder: public DS_RigidBody
       geomVector const* get_ptr_to_gravity_centre( ) const;
 
       /** @brief Returns a tuple of mass and density of RB */
-      std::tuple<double,double> get_mass_and_density() const;
+      std::tuple<double,double,double> get_mass_and_density_and_moi() const;
 
       /** @brief Returns circumscribed radius */
       double get_circumscribed_radius( ) const;

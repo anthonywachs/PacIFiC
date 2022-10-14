@@ -72,7 +72,7 @@ class FS_RigidBody
       double get_circumscribed_radius() const;
 
       /** @brief Returns a tuple of mass and density of RB */
-      std::tuple<double,double> get_mass_and_density() const;
+      std::tuple<double,double,double> get_mass_and_density_and_moi() const;
       //@}
 
 

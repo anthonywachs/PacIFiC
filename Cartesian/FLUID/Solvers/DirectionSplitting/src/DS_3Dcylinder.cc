@@ -198,12 +198,12 @@ geomVector DS_3Dcylinder:: get_rigid_body_angular_velocity( ) const
 
 
 //---------------------------------------------------------------------------
-std::tuple<double,double> DS_3Dcylinder:: get_mass_and_density() const
+std::tuple<double,double,double> DS_3Dcylinder:: get_mass_and_density_and_moi() const
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_3Dcylinder:: get_mass_and_density()" ) ;
 
-  return ( m_geometric_rigid_body->get_mass_and_density() );
+  return ( m_geometric_rigid_body->get_mass_and_density_and_moi() );
 
 }
 

@@ -321,12 +321,12 @@ double FS_RigidBody:: get_circumscribed_radius() const
 
 
 //---------------------------------------------------------------------------
-std::tuple<double,double> FS_RigidBody:: get_mass_and_density() const
+std::tuple<double,double,double> FS_RigidBody:: get_mass_and_density_and_moi() const
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "FS_RigidBody:: get_mass_and_density()" ) ;
 
-  return ( std::make_tuple(m_mass,m_density) );
+  return ( std::make_tuple(m_mass,m_density,m_inertia[0][0]) );
 
 }
 

@@ -517,9 +517,10 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
      geomVector pav = rigid_body_angular_velocity(parID);
 
      // Get solid mass and density from FS class
-     auto value = m_allDSrigidbodies[parID]->get_mass_and_density();
+     auto value = m_allDSrigidbodies[parID]->get_mass_and_density_and_moi();
      double mass_p = std::get<0>(value);
      double rho_p = std::get<1>(value);
+     double moi = std::get<2>(value);
      double radius = m_allDSrigidbodies[parID]->get_circumscribed_radius();
 
      geomVector pos(3);
@@ -528,9 +529,6 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
      geomVector delta(3);
      geomVector ang_vel(3);
      geomVector ang_acc(3);
-
-     double moi = (m_space_dimension == 2) ? (1./2.)*mass_p*radius*radius :
-                                             (2./5.)*mass_p*radius*radius ;
 
      // Solving equation of motion
      for (size_t dir = 0; dir < m_space_dimension;dir++) {
