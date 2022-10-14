@@ -300,7 +300,7 @@ double FS_3Dbox:: level_set_value( geomVector const& pt ) const
                                  m_agp_3dbox.corners[ (*faceIter)[idxPts] ],
                                  m_gravity_center, pt );
 
-        if (temp > 0.) {
+        if (temp >= -1.e-7) {
            value = std::max(temp, value);
         } else {
            value = temp;
@@ -337,7 +337,7 @@ double FS_3Dbox:: level_set_value( double const& x
                                  m_agp_3dbox.corners[ (*faceIter)[idxPts] ],
                                  m_gravity_center, pt );
 
-        if (temp > 0.) {
+        if (temp >= -1.e-7) {
            value = std::min(temp, value);
         } else {
            value = temp;
@@ -421,7 +421,7 @@ bool FS_3Dbox::checkPointInTetrahedron( const geomVector &pointOne,
 
   double sumSubElem = detOne + detTwo + detThree + detFour;
 
-  if ( fabs( detTot - sumSubElem ) > 1e-7  )
+  if ( fabs( detTot - sumSubElem ) > 1.e-7  )
         std::cout << "ERROR: summation error in determinat 3D : "
         << detTot - sumSubElem << endl;
 
@@ -464,7 +464,7 @@ double FS_3Dbox::DistOfPointFromTetrahedron( const geomVector &pointOne,
 
   double sumSubElem = detOne + detTwo + detThree + detFour;
 
-  if ( fabs( detTot - sumSubElem ) > 1e-7  )
+  if ( fabs( detTot - sumSubElem ) > 1.e-7  )
      std::cout << "ERROR: summation error in determinat 3D : "
                << detTot - sumSubElem << endl;
 
@@ -475,15 +475,9 @@ double FS_3Dbox::DistOfPointFromTetrahedron( const geomVector &pointOne,
 
   if ( ( detTot*detOne >= -1.e-7 )  && ( detTot*detTwo >= -1.e-7 ) &&
        ( detTot*detThree >= -1.e-7 ) && ( detTot*detFour >= -1.e-7 ) ) {
-     out_dist = std::max(detTot*detOne,detTot*detTwo);
-     out_dist = std::max(detTot*detThree,out_dist);
-     out_dist = std::max(detTot*detFour,out_dist);
-     out_dist *= -1.;
+     out_dist = -1.*fabs(sumSubElem);
   } else {
-     out_dist = std::max(detTot*detOne,detTot*detTwo);
-     out_dist = std::max(detTot*detThree,out_dist);
-     out_dist = std::max(detTot*detFour,out_dist);
-     out_dist = fabs(out_dist);
+     out_dist = fabs(sumSubElem);
   }
 
   return out_dist;
