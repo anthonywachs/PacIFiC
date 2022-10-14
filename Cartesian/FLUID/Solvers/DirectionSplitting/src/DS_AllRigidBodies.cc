@@ -1172,12 +1172,12 @@ std::tuple<double, geomVector, int, int> DS_AllRigidBodies::
 
 
 //---------------------------------------------------------------------------
-void DS_AllRigidBodies:: compute_cutCell_geometric_parameters()
+void DS_AllRigidBodies:: compute_cutCell_geometric_parameters_PF()
 //---------------------------------------------------------------------------
 {
-  MAC_LABEL( "DS_AllRigidBodies:: compute_cutCell_geometric_parameters" ) ;
+  MAC_LABEL( "DS_AllRigidBodies:: compute_cutCell_geometric_parameters_PF" ) ;
 
-  size_t nb_comps = UF->nb_components() ;
+  size_t nb_comps = UF->nb_components();
 
   // Get local min and max indices
   size_t_vector min_unknown_index(3,0);

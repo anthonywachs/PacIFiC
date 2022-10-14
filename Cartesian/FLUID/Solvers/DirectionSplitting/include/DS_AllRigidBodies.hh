@@ -308,7 +308,7 @@ class DS_AllRigidBodies
 
       /** @brief Computes the face fraction belonging the each node
       of a given fluid field */
-      void compute_cutCell_geometric_parameters();
+      void compute_cutCell_geometric_parameters_PF();
 
       /** @brief Compute the velocity face flux from the UF face */
       double divergence_face_flux ( size_t const& p_PF

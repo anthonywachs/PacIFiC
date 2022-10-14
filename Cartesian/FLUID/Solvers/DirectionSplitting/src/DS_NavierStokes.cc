@@ -269,7 +269,7 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, false);
 		// Compute the face fractions of CutCell is active
 		if (DivergenceScheme == "CutCell")
-			allrigidbodies->compute_cutCell_geometric_parameters();
+			allrigidbodies->compute_cutCell_geometric_parameters_PF();
 
 		if (my_rank == 0)
          cout << "Finished void fraction and grid intersection... \n" << endl;
@@ -361,7 +361,7 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, true);
 		// Compute the face fractions of CutCell is active
 		if (DivergenceScheme == "CutCell")
-			allrigidbodies->compute_cutCell_geometric_parameters();
+			allrigidbodies->compute_cutCell_geometric_parameters_PF();
 
 		// Field initialization
 		vector<size_t> vec{ 0, 1, 3};
@@ -1784,8 +1784,11 @@ DS_NavierStokes:: compute_adv_component ( size_t const& comp,
    } else if ( AdvectionScheme == "Upwind" ) {
       ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp)
              - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
-   } else if ( AdvectionScheme == "Centered" ) {
-      ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp)
+	} else if ( AdvectionScheme == "Centered" ) {
+ 		ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp)
+ 			 	 - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
+	} else if ( AdvectionScheme == "Centered_CutCell" ) {
+      ugradu = assemble_advection_Centered_CutCell(i,j,k,comp,1)
              - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
    }
 
@@ -3828,6 +3831,580 @@ DS_NavierStokes:: assemble_advection_Centered( size_t const& advecting_level,
       flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
    }
    return ( coef * flux );
+}
+
+
+
+
+//----------------------------------------------------------------------
+double
+DS_NavierStokes:: assemble_advection_Centered_CutCell(size_t const& i,
+                                                	   size_t const& j,
+                                                		size_t const& k,
+                                                		size_t const& comp,
+																	 	size_t const& level)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_NavierStokes:: assemble_advection_Centered_CutCell" );
+
+   FV_SHIFT_TRIPLET shift = UF->shift_staggeredToStaggered( comp );
+
+	size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+	doubleArray2D* intersect_distance = allrigidbodies
+								->get_intersect_distance_on_grid(UF);
+	doubleArray2D* intersect_fieldVal = allrigidbodies
+								->get_intersect_fieldValue_on_grid(UF);
+
+   double dxC = UF->get_cell_size(i,comp,0) ;
+   double dyC = UF->get_cell_size(j,comp,1) ;
+   double dzC = (dim == 3) ? UF->get_cell_size(k,comp,2) : 0.;
+
+   double ValueC = UF->DOF_value( i, j, k, comp, level );
+
+	double fri = 0., fle = 0., fto = 0., fbo = 0.;
+
+	size_t_vector face_vector(3,0);
+	face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
+
+	size_t_vector min_unknown_index(3,0);
+	size_t_vector max_unknown_index(3,0);
+
+	for (size_t l=0;l<dim;++l) {
+		min_unknown_index(l) =
+								UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+		max_unknown_index(l) =
+								UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+	}
+
+   // The First Component (u)
+   if ( comp == 0 ) {
+		size_t p = UF->DOF_local_number(i, j, k, comp);
+		size_t p_top = //(j == max_unknown_index(1)) ? 0 :
+							UF->DOF_local_number(i, j+1, k, comp);
+		size_t p_bot = //(j == min_unknown_index(1)) ? 0 :
+							UF->DOF_local_number(i, j-1, k, comp);
+		size_t p_rht = //(i == max_unknown_index(0)) ? 0 :
+							UF->DOF_local_number(i+1, j, k, comp);
+		size_t p_lft = //(i == min_unknown_index(0)) ? 0 :
+							UF->DOF_local_number(i-1, j, k, comp);
+		size_t p_topRht = UF->DOF_local_number(shift.i+i, shift.j+j, k, 1);
+		size_t p_topLft = UF->DOF_local_number(shift.i+i-1, shift.j+j, k, 1);
+		size_t p_botRht = UF->DOF_local_number(shift.i+i, shift.j+j-1, k, 1);
+		size_t p_botLft = UF->DOF_local_number(shift.i+i-1, shift.j+j-1, k, 1);
+
+		// Right (U_X)
+      if ( UF->DOF_color( i, j, k, comp ) == FV_BC_RIGHT )
+         fri = ValueC * ValueC * dyC;
+      else {
+			// Both vertex in fluid
+			if ((void_frac->operator()(p_topRht) == 0) &&
+				 (void_frac->operator()(p_botRht) == 0)) {
+				double ValueRi = UF->DOF_value(i+1, j, k, comp, level );
+				double uface = 0.5 * ( ValueC + ValueRi );
+				if (void_frac->operator()(p_rht) != 0) {
+					double int_dis = intersect_distance->operator()(p,2*0+1);
+					double int_val = intersect_fieldVal->operator()(p,2*0+1);
+					uface = (dxC/2. * int_val + (int_dis - dxC/2.) * ValueC) / int_dis;
+				}
+				fri = uface * uface * dyC;
+			// Bottom vertex in fluid
+			} else if ((void_frac->operator()(p_topRht) != 0) &&
+				 		  (void_frac->operator()(p_botRht) == 0)) {
+			   double int_dis = intersect_distance->operator()(p_botRht,2*1+1);
+
+				geomVector pt(3);
+				pt(0) = UF->get_DOF_coordinate( shift.i+i, 1, 0 );
+				pt(1) = UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) + 0.5*int_dis;
+
+				size_t_vector i0(3);
+				i0(0) = i; i0(1) = j-1; i0(2) = k;
+
+				double ur = allrigidbodies->
+					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+				fri = ur * ur * int_dis;
+			// Top vertex in fluid
+			} else if ((void_frac->operator()(p_topRht) == 0) &&
+				 		  (void_frac->operator()(p_botRht) != 0)) {
+			   double int_dis = intersect_distance->operator()(p_topRht,2*1+0);
+
+				geomVector pt(3);
+				pt(0) = UF->get_DOF_coordinate( shift.i+i, 1, 0 );
+				pt(1) = UF->get_DOF_coordinate( shift.j+j, 1, 1 ) - 0.5*int_dis;
+
+				size_t_vector i0(3);
+				i0(0) = i; i0(1) = j; i0(2) = k;
+
+				double ur = allrigidbodies->
+					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+				fri = ur * ur * int_dis;
+			}
+      }
+
+      // Left (U_X)
+      if ( UF->DOF_color( i, j, k, comp ) == FV_BC_LEFT )
+         fle = ValueC * ValueC * dyC;
+      else {
+			cout << p_top << "," << p_botLft << "," << p_rht << "," << p_topLft << endl;
+			// Both vertex in fluid
+			if ((void_frac->operator()(p_topLft) == 0) &&
+				 (void_frac->operator()(p_botLft) == 0)) {
+				double ValueLe = UF->DOF_value(i-1, j, k, comp, level );
+				double uface = 0.5 * ( ValueC + ValueLe );
+				if (void_frac->operator()(p_lft) != 0) {
+					double int_dis = intersect_distance->operator()(p,2*0+0);
+					double int_val = intersect_fieldVal->operator()(p,2*0+0);
+					uface = (dxC/2. * int_val + (int_dis - dxC/2.) * ValueC) / int_dis;
+				}
+				fle = uface * uface * dyC;
+			// Bottom vertex in fluid
+			} else if ((void_frac->operator()(p_topLft) != 0) &&
+						  (void_frac->operator()(p_botLft) == 0)) {
+				double int_dis = intersect_distance->operator()(p_botLft,2*1+1);
+
+				geomVector pt(3);
+				pt(0) = UF->get_DOF_coordinate( shift.i+i-1, 1, 0 );
+				pt(1) = UF->get_DOF_coordinate( shift.j+j-1, 1, 1 ) + 0.5*int_dis;
+
+				size_t_vector i0(3);
+				i0(0) = i-1; i0(1) = j-1; i0(2) = k;
+
+				double ul = allrigidbodies->
+					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+				fle = ul * ul * int_dis;
+			// Top vertex in fluid
+			} else if ((void_frac->operator()(p_topLft) == 0) &&
+						  (void_frac->operator()(p_botLft) != 0)) {
+				double int_dis = intersect_distance->operator()(p_topLft,2*1+0);
+
+				geomVector pt(3);
+				pt(0) = UF->get_DOF_coordinate( shift.i+i-1, 1, 0 );
+				pt(1) = UF->get_DOF_coordinate( shift.j+j, 1, 1 ) - 0.5*int_dis;
+
+				size_t_vector i0(3);
+				i0(0) = i-1; i0(1) = j; i0(2) = k;
+
+				double ul = allrigidbodies->
+					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+				fle = ul * ul * int_dis;
+			}
+		}
+
+      // Top (U_Y)
+		// Both vertex in fluid
+		if ((void_frac->operator()(p_topLft) == 0) &&
+			 (void_frac->operator()(p_topRht) == 0)) {
+			double AdvectorValue = 0.5
+						* (UF->DOF_value(i+shift.i-1, j+shift.j, k, 1, level) +
+							UF->DOF_value(i+shift.i, j+shift.j, k, 1, level ));
+			double ValueTop = UF->DOF_value(i, j+1, k, comp, level );
+			double AdvectedValue = 0.5 * ( ValueC + ValueTop );
+			if (void_frac->operator()(p_top) != 0) {
+				double int_dis = intersect_distance->operator()(p,2*1+1);
+				double int_val = intersect_fieldVal->operator()(p,2*1+1);
+				AdvectedValue = (dyC/2. * int_val + (int_dis - dyC/2.) * ValueC)/int_dis;
+			}
+			fto = AdvectorValue * AdvectedValue * dxC;
+		// Right vertex in fluid
+		} else if ((void_frac->operator()(p_topLft) != 0) &&
+					  (void_frac->operator()(p_topRht) == 0)) {
+			double int_dis = intersect_distance->operator()(p_topRht,2*0+0);
+			double int_val = intersect_fieldVal->operator()(p_topRht,2*0+0);
+			double topRht_Advector = UF->DOF_value(i+shift.i, j+shift.j, k, 1, level );
+			double AdvectorValue = 0.5 * (int_val + topRht_Advector);
+
+			geomVector pt(3);
+			pt(0) = UF->get_DOF_coordinate( shift.i+i, 1, 0 ) - 0.5*int_dis;
+			pt(1) = UF->get_DOF_coordinate( shift.j+j, 1, 1 );
+
+			size_t_vector i0(3);
+			i0(0) = i; i0(1) = j; i0(2) = k;
+
+			double AdvectedValue = allrigidbodies->
+				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+
+			fto = AdvectorValue * AdvectedValue * int_dis;
+		// Left vertex in fluid
+		} else if ((void_frac->operator()(p_topLft) == 0) &&
+					  (void_frac->operator()(p_topRht) != 0)) {
+			double int_dis = intersect_distance->operator()(p_topLft,2*0+1);
+			double int_val = intersect_fieldVal->operator()(p_topLft,2*0+1);
+			double topLft_Advector = UF->DOF_value(i+shift.i-1, j+shift.j, k, 1, level );
+			double AdvectorValue = 0.5 * (int_val + topLft_Advector);
+
+			geomVector pt(3);
+			pt(0) = UF->get_DOF_coordinate( shift.i+i-1, 1, 0 ) + 0.5*int_dis;
+			pt(1) = UF->get_DOF_coordinate( shift.j+j, 1, 1 );
+
+			size_t_vector i0(3);
+			i0(0) = i-1; i0(1) = j; i0(2) = k;
+
+			double AdvectedValue = allrigidbodies->
+				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+
+			fto = AdvectorValue * AdvectedValue * int_dis;
+		}
+
+		// Bottom (U_Y)
+		// Both vertex in fluid
+		if ((void_frac->operator()(p_botLft) == 0) &&
+			 (void_frac->operator()(p_botRht) == 0)) {
+			double AdvectorValue = 0.5
+						* (UF->DOF_value(i+shift.i-1, j+shift.j-1, k, 1, level) +
+							UF->DOF_value(i+shift.i, j+shift.j-1, k, 1, level ));
+			double ValueBot = UF->DOF_value(i, j-1, k, comp, level );
+			double AdvectedValue = 0.5 * ( ValueC + ValueBot );
+			if (void_frac->operator()(p_bot) != 0) {
+				double int_dis = intersect_distance->operator()(p,2*1+0);
+				double int_val = intersect_fieldVal->operator()(p,2*1+0);
+				AdvectedValue = (dyC/2. * int_val + (int_dis - dyC/2.) * ValueC)/int_dis;
+			}
+			fbo = AdvectorValue * AdvectedValue * dxC;
+		// Right vertex in fluid
+		} else if ((void_frac->operator()(p_botLft) != 0) &&
+					  (void_frac->operator()(p_botRht) == 0)) {
+			double int_dis = intersect_distance->operator()(p_botRht,2*0+0);
+			double int_val = intersect_fieldVal->operator()(p_botRht,2*0+0);
+			double botRht_Advector = UF->DOF_value(i+shift.i, j+shift.j-1, k, 1, level );
+		   double AdvectorValue = 0.5 * (int_val + botRht_Advector);
+
+			geomVector pt(3);
+			pt(0) = UF->get_DOF_coordinate( shift.i+i, 1, 0 ) - 0.5*int_dis;
+			pt(1) = UF->get_DOF_coordinate( shift.j+j-1, 1, 1 );
+
+			size_t_vector i0(3);
+			i0(0) = i; i0(1) = j-1; i0(2) = k;
+
+			double AdvectedValue = allrigidbodies->
+				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+
+			fbo = AdvectorValue * AdvectedValue * int_dis;
+		// Left vertex in fluid
+		} else if ((void_frac->operator()(p_botLft) == 0) &&
+					  (void_frac->operator()(p_botRht) != 0)) {
+			double int_dis = intersect_distance->operator()(p_botLft,2*0+1);
+			double int_val = intersect_fieldVal->operator()(p_botLft,2*0+1);
+			double botLft_Advector = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, 1, level );
+		   double AdvectorValue = 0.5 * (int_val + botLft_Advector);
+
+			geomVector pt(3);
+			pt(0) = UF->get_DOF_coordinate( shift.i+i-1, 1, 0 ) + 0.5*int_dis;
+			pt(1) = UF->get_DOF_coordinate( shift.j+j-1, 1, 1 );
+
+			size_t_vector i0(3);
+			i0(0) = i-1; i0(1) = j-1; i0(2) = k;
+
+			double AdvectedValue = allrigidbodies->
+				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+
+			fbo = AdvectorValue * AdvectedValue * int_dis;
+		}
+
+
+   //    if (dim == 3) {
+   //       // Front (U_Z)
+   //       AdvectedValueFr = UF->DOF_value(i, j, k+1, component, advected_level );
+   //       AdvectorValueFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, 2, advecting_level );
+   //       AdvectorValueFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, 2, advecting_level );
+   //       wf = 0.5 * ( AdvectorValueFrLe + AdvectorValueFrRi );
+   //       ffr = wf * 0.5 * ( AdvectedValueC + AdvectedValueFr);
+	//
+   //       // Behind (U_Z)
+   //       AdvectedValueBe = UF->DOF_value(i, j, k-1, component, advected_level );
+   //       AdvectorValueBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, 2, advecting_level );
+   //       AdvectorValueBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, 2, advecting_level );
+   //       wb = 0.5 * ( AdvectorValueBeLe + AdvectorValueBeRi );
+   //       fbe = wb * 0.5 * ( AdvectedValueBe + AdvectedValueC );
+   //    }
+   } else if (comp == 1) {
+		// The second Component (v)
+		size_t p = UF->DOF_local_number(i, j, k, comp);
+		size_t p_top = UF->DOF_local_number(i, j+1, k, comp);
+		size_t p_bot = UF->DOF_local_number(i, j-1, k, comp);
+		size_t p_rht = UF->DOF_local_number(i+1, j, k, comp);
+		size_t p_lft = UF->DOF_local_number(i-1, j, k, comp);
+		size_t p_topRht = UF->DOF_local_number(shift.i+i, shift.j+j, k, 0);
+		size_t p_topLft = UF->DOF_local_number(shift.i+i-1, shift.j+j, k, 0);
+		size_t p_botRht = UF->DOF_local_number(shift.i+i, shift.j+j-1, k, 0);
+		size_t p_botLft = UF->DOF_local_number(shift.i+i-1, shift.j+j-1, k, 0);
+
+      // Right (V_X)
+		// Both vertex in fluid
+		if ((void_frac->operator()(p_topRht) == 0) &&
+			 (void_frac->operator()(p_botRht) == 0)) {
+			double AdvectorValue = 0.5
+						* (UF->DOF_value(i+shift.i, j+shift.j, k, 0, level) +
+							UF->DOF_value(i+shift.i, j+shift.j-1, k, 0, level ));
+			double ValueRht = UF->DOF_value(i+1, j, k, comp, level );
+			double AdvectedValue = 0.5 * ( ValueC + ValueRht );
+			if (void_frac->operator()(p_rht) != 0) {
+				double int_dis = intersect_distance->operator()(p,2*0+1);
+				double int_val = intersect_fieldVal->operator()(p,2*0+1);
+				AdvectedValue = (dxC/2. * int_val + (int_dis - dxC/2.) * ValueC)/int_dis;
+			}
+			fri = AdvectorValue * AdvectedValue * dyC;
+		// Top vertex in fluid
+		} else if ((void_frac->operator()(p_botRht) != 0) &&
+					  (void_frac->operator()(p_topRht) == 0)) {
+			double int_dis = intersect_distance->operator()(p_topRht,2*1+0);
+			double int_val = intersect_fieldVal->operator()(p_topRht,2*1+0);
+			double topRht_Advector = UF->DOF_value(i+shift.i, j+shift.j, k, 0, level );
+			double AdvectorValue = 0.5 * (int_val + topRht_Advector);
+
+			geomVector pt(3);
+			pt(0) = UF->get_DOF_coordinate( shift.i+i, 0, 0 );
+			pt(1) = UF->get_DOF_coordinate( shift.j+j, 0, 1 ) - 0.5*int_dis;
+
+			size_t_vector i0(3);
+			i0(0) = i; i0(1) = j; i0(2) = k;
+
+			double AdvectedValue = allrigidbodies->
+				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+
+			fri = AdvectorValue * AdvectedValue * int_dis;
+		// Bottom vertex in fluid
+		} else if ((void_frac->operator()(p_botRht) == 0) &&
+					  (void_frac->operator()(p_topRht) != 0)) {
+			double int_dis = intersect_distance->operator()(p_botRht,2*1+1);
+			double int_val = intersect_fieldVal->operator()(p_botRht,2*1+1);
+			double botRht_Advector = UF->DOF_value(i+shift.i, j+shift.j-1, k, 0, level );
+			double AdvectorValue = 0.5 * (int_val + botRht_Advector);
+
+			geomVector pt(3);
+			pt(0) = UF->get_DOF_coordinate( shift.i+i, 0, 0 );
+			pt(1) = UF->get_DOF_coordinate( shift.j+j-1, 0, 1 ) + 0.5*int_dis;
+
+			size_t_vector i0(3);
+			i0(0) = i; i0(1) = j-1; i0(2) = k;
+
+			double AdvectedValue = allrigidbodies->
+				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+
+			fri = AdvectorValue * AdvectedValue * int_dis;
+		}
+
+      // Left (V_X)
+		// Both vertex in fluid
+		if ((void_frac->operator()(p_topLft) == 0) &&
+			 (void_frac->operator()(p_botLft) == 0)) {
+			double AdvectorValue = 0.5
+						* (UF->DOF_value(i+shift.i-1, j+shift.j, k, 0, level) +
+							UF->DOF_value(i+shift.i-1, j+shift.j-1, k, 0, level ));
+			double ValueLft = UF->DOF_value(i-1, j, k, comp, level );
+			double AdvectedValue = 0.5 * ( ValueC + ValueLft );
+			if (void_frac->operator()(p_lft) != 0) {
+				double int_dis = intersect_distance->operator()(p,2*0+0);
+				double int_val = intersect_fieldVal->operator()(p,2*0+0);
+				AdvectedValue = (dxC/2. * int_val + (int_dis - dxC/2.) * ValueC)/int_dis;
+			}
+			fle = AdvectorValue * AdvectedValue * dyC;
+		// Top vertex in fluid
+		} else if ((void_frac->operator()(p_botLft) != 0) &&
+					  (void_frac->operator()(p_topLft) == 0)) {
+			double int_dis = intersect_distance->operator()(p_topLft,2*1+0);
+			double int_val = intersect_fieldVal->operator()(p_topLft,2*1+0);
+			double topLft_Advector = UF->DOF_value(i+shift.i-1, j+shift.j, k, 0, level );
+			double AdvectorValue = 0.5 * (int_val + topLft_Advector);
+
+			geomVector pt(3);
+			pt(0) = UF->get_DOF_coordinate( shift.i+i-1, 0, 0 );
+			pt(1) = UF->get_DOF_coordinate( shift.j+j, 0, 1 ) - 0.5*int_dis;
+
+			size_t_vector i0(3);
+			i0(0) = i-1; i0(1) = j; i0(2) = k;
+
+			double AdvectedValue = allrigidbodies->
+				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+
+			fle = AdvectorValue * AdvectedValue * int_dis;
+		// Bottom vertex in fluid
+		} else if ((void_frac->operator()(p_botLft) == 0) &&
+					  (void_frac->operator()(p_topLft) != 0)) {
+			double int_dis = intersect_distance->operator()(p_botLft,2*1+1);
+			double int_val = intersect_fieldVal->operator()(p_botLft,2*1+1);
+			double botLft_Advector = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, 0, level );
+			double AdvectorValue = 0.5 * (int_val + botLft_Advector);
+
+			geomVector pt(3);
+			pt(0) = UF->get_DOF_coordinate( shift.i+i-1, 0, 0 );
+			pt(1) = UF->get_DOF_coordinate( shift.j+j-1, 0, 1 ) + 0.5*int_dis;
+
+			size_t_vector i0(3);
+			i0(0) = i-1; i0(1) = j-1; i0(2) = k;
+
+			double AdvectedValue = allrigidbodies->
+				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+
+			fle = AdvectorValue * AdvectedValue * int_dis;
+		}
+
+      // Top (V_Y)
+		if ( UF->DOF_color( i, j, k, comp ) == FV_BC_TOP )
+			fto = ValueC * ValueC * dxC;
+		else {
+			// Both vertex in fluid
+			if ((void_frac->operator()(p_topRht) == 0) &&
+				 (void_frac->operator()(p_topLft) == 0)) {
+				double ValueTop = UF->DOF_value(i, j+1, k, comp, level );
+				double uface = 0.5 * ( ValueC + ValueTop );
+				if (void_frac->operator()(p_top) != 0) {
+					double int_dis = intersect_distance->operator()(p,2*1+1);
+					double int_val = intersect_fieldVal->operator()(p,2*1+1);
+					uface = (dyC/2. * int_val + (int_dis - dyC/2.) * ValueC) / int_dis;
+				}
+				fto = uface * uface * dxC;
+			// Left vertex in fluid
+			} else if ((void_frac->operator()(p_topRht) != 0) &&
+						  (void_frac->operator()(p_topLft) == 0)) {
+				double int_dis = intersect_distance->operator()(p_topLft,2*0+1);
+
+				geomVector pt(3);
+				pt(0) = UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) + 0.5*int_dis;
+				pt(1) = UF->get_DOF_coordinate( shift.j+j, 0, 1 );
+
+				size_t_vector i0(3);
+				i0(0) = i-1; i0(1) = j; i0(2) = k;
+
+				double ur = allrigidbodies->
+					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+				fto = ur * ur * int_dis;
+			// Right vertex in fluid
+			} else if ((void_frac->operator()(p_topRht) == 0) &&
+						  (void_frac->operator()(p_topLft) != 0)) {
+				double int_dis = intersect_distance->operator()(p_topRht,2*0+0);
+
+				geomVector pt(3);
+				pt(0) = UF->get_DOF_coordinate( shift.i+i, 0, 0 ) - 0.5*int_dis;
+				pt(1) = UF->get_DOF_coordinate( shift.j+j, 0, 1 );
+
+				size_t_vector i0(3);
+				i0(0) = i; i0(1) = j; i0(2) = k;
+
+				double ur = allrigidbodies->
+					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+				fto = ur * ur * int_dis;
+			}
+		}
+
+      // Bottom (V_Y)
+		if ( UF->DOF_color( i, j, k, comp ) == FV_BC_BOTTOM )
+			fbo = ValueC * ValueC * dxC;
+		else {
+			// Both vertex in fluid
+			if ((void_frac->operator()(p_botRht) == 0) &&
+				 (void_frac->operator()(p_botLft) == 0)) {
+				double ValueBot = UF->DOF_value(i, j-1, k, comp, level );
+				double uface = 0.5 * ( ValueC + ValueBot );
+				if (void_frac->operator()(p_bot) != 0) {
+					double int_dis = intersect_distance->operator()(p,2*1+0);
+					double int_val = intersect_fieldVal->operator()(p,2*1+0);
+					uface = (dyC/2. * int_val + (int_dis - dyC/2.) * ValueC) / int_dis;
+				}
+				fbo = uface * uface * dxC;
+			// Left vertex in fluid
+			} else if ((void_frac->operator()(p_botRht) != 0) &&
+						  (void_frac->operator()(p_botLft) == 0)) {
+				double int_dis = intersect_distance->operator()(p_botLft,2*0+1);
+
+				geomVector pt(3);
+				pt(0) = UF->get_DOF_coordinate( shift.i+i-1, 0, 0 ) + 0.5*int_dis;
+				pt(1) = UF->get_DOF_coordinate( shift.j+j-1, 0, 1 );
+
+				size_t_vector i0(3);
+				i0(0) = i-1; i0(1) = j-1; i0(2) = k;
+
+				double ur = allrigidbodies->
+					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+				fbo = ur * ur * int_dis;
+			// Right vertex in fluid
+			} else if ((void_frac->operator()(p_botRht) == 0) &&
+						  (void_frac->operator()(p_botLft) != 0)) {
+				double int_dis = intersect_distance->operator()(p_botRht,2*0+0);
+
+				geomVector pt(3);
+				pt(0) = UF->get_DOF_coordinate( shift.i+i, 0, 0 ) - 0.5*int_dis;
+				pt(1) = UF->get_DOF_coordinate( shift.j+j-1, 0, 1 );
+
+				size_t_vector i0(3);
+				i0(0) = i; i0(1) = j-1; i0(2) = k;
+
+				double ur = allrigidbodies->
+					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
+				fbo = ur * ur * int_dis;
+			}
+		}
+
+   //    if (dim == 3) {
+   //       // Front (V_Z)
+   //       AdvectedValueFr = UF->DOF_value(i, j, k+1, component, advected_level );
+   //       AdvectorValueFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, 2, advecting_level );
+   //       AdvectorValueFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, 2, advecting_level );
+   //       wf = 0.5 * ( AdvectorValueFrTo + AdvectorValueFrBo );
+   //       ffr = wf * 0.5 * ( AdvectedValueC + AdvectedValueFr );
+	//
+   //       // Behind (V_Z)
+   //       AdvectedValueBe = UF->DOF_value(i, j, k-1, component, advected_level );
+   //       AdvectorValueBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, 2, advecting_level );
+   //       AdvectorValueBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, 2, advecting_level );
+   //       wb = 0.5 * ( AdvectorValueBeTo + AdvectorValueBeBo );
+   //       fbe = wb * 0.5 * ( AdvectedValueBe + AdvectedValueC );
+   //    }
+   // } else {
+   //    // The Third Component (w)
+   //    // Right (W_X)
+   //    AdvectedValueRi = UF->DOF_value(i+1, j, k, component, advected_level );
+   //    AdvectorValueFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, 0, advecting_level );
+   //    AdvectorValueBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, 0, advecting_level );
+   //    ur = 0.5 * ( AdvectorValueFrRi + AdvectorValueBeRi );
+   //    fri = ur * 0.5 * ( AdvectedValueC + AdvectedValueRi );
+	//
+   //    // Left (W_X)
+   //    AdvectedValueLe = UF->DOF_value(i-1, j, k, component, advected_level );
+   //    AdvectorValueFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, 0, advecting_level );
+   //    AdvectorValueBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, 0, advecting_level );
+   //    ul = 0.5 * ( AdvectorValueFrLe + AdvectorValueBeLe );
+   //    fle = ul * 0.5 * ( AdvectedValueLe + AdvectedValueC );
+	//
+   //    // Top (W_Y)
+   //    AdvectedValueTo = UF->DOF_value(i, j+1, k, component, advected_level );
+   //    AdvectorValueFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, 1, advecting_level );
+   //    AdvectorValueBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, 1, advecting_level );
+   //    vt = 0.5 * ( AdvectorValueFrTo + AdvectorValueBeTo );
+   //    fto = vt * 0.5 * ( AdvectedValueC + AdvectedValueTo );
+	//
+   //    // Bottom (W_Y)
+   //    AdvectedValueBo = UF->DOF_value(i, j-1, k, component, advected_level );
+   //    AdvectorValueFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, 1, advecting_level );
+   //    AdvectorValueBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, 1, advecting_level );
+   //    vb = 0.5 * ( AdvectorValueFrBo + AdvectorValueBeBo );
+   //    fbo = vb * 0.5 * ( AdvectedValueBo + AdvectedValueC );
+	//
+   //    // Front (W_Z)
+   //    if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
+   //       ffr = AdvectorValueC * AdvectedValueC;
+   //    else {
+   //       AdvectedValueFr = UF->DOF_value(i, j, k+1, component, advected_level );
+   //       AdvectorValueFr = UF->DOF_value(i, j, k+1, component, advecting_level );
+   //       wf = 0.5 * ( AdvectorValueFr + AdvectorValueC );
+   //       ffr = wf * 0.5 * ( AdvectedValueC + AdvectedValueFr );
+   //    }
+	//
+   //    // Behind (W_Z)
+   //    if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND )
+   //       fbe = AdvectorValueC * AdvectedValueC;
+   //    else {
+   //       AdvectedValueBe = UF->DOF_value(i, j, k-1, component, advected_level );
+   //       AdvectorValueBe = UF->DOF_value(i, j, k-1, component, advecting_level );
+   //       wb = 0.5 * ( AdvectorValueBe + AdvectorValueC );
+   //       fbe = wb * 0.5 * ( AdvectedValueBe + AdvectedValueC );
+   //    }
+   }
+
+   // if (dim == 2) {
+   //    flux = ((fto - fbo) * dxC + (fri - fle) * dyC);
+   // } else if (dim == 3) {
+   //    flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
+   // }
+   return ( (fto - fbo) + (fri - fle) );
 }
 
 
