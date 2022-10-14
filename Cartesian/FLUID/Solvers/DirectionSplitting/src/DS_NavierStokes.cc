@@ -3866,31 +3866,28 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(size_t const& i,
 	size_t_vector face_vector(3,0);
 	face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
 
-	size_t_vector min_unknown_index(3,0);
-	size_t_vector max_unknown_index(3,0);
-
-	for (size_t l=0;l<dim;++l) {
-		min_unknown_index(l) =
-								UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
-		max_unknown_index(l) =
-								UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
-	}
-
    // The First Component (u)
    if ( comp == 0 ) {
 		size_t p = UF->DOF_local_number(i, j, k, comp);
-		size_t p_top = //(j == max_unknown_index(1)) ? 0 :
-							UF->DOF_local_number(i, j+1, k, comp);
-		size_t p_bot = //(j == min_unknown_index(1)) ? 0 :
-							UF->DOF_local_number(i, j-1, k, comp);
-		size_t p_rht = //(i == max_unknown_index(0)) ? 0 :
-							UF->DOF_local_number(i+1, j, k, comp);
-		size_t p_lft = //(i == min_unknown_index(0)) ? 0 :
-							UF->DOF_local_number(i-1, j, k, comp);
-		size_t p_topRht = UF->DOF_local_number(shift.i+i, shift.j+j, k, 1);
-		size_t p_topLft = UF->DOF_local_number(shift.i+i-1, shift.j+j, k, 1);
-		size_t p_botRht = UF->DOF_local_number(shift.i+i, shift.j+j-1, k, 1);
-		size_t p_botLft = UF->DOF_local_number(shift.i+i-1, shift.j+j-1, k, 1);
+		size_t p_top = (!UF->DOF_on_BC(i, j+1, k, comp)) ?
+							UF->DOF_local_number(i, j+1, k, comp) : 0;
+		size_t p_bot = (!UF->DOF_on_BC(i, j-1, k, comp)) ?
+							UF->DOF_local_number(i, j-1, k, comp) : 0;
+		size_t p_rht = (!UF->DOF_on_BC(i+1, j, k, comp)) ?
+							UF->DOF_local_number(i+1, j, k, comp) : 0;
+		size_t p_lft = (!UF->DOF_on_BC(i-1, j, k, comp)) ?
+							UF->DOF_local_number(i-1, j, k, comp) : 0;
+		size_t p_topRht = (!UF->DOF_on_BC(shift.i+i, shift.j+j, k, 1)) ?
+								UF->DOF_local_number(shift.i+i, shift.j+j, k, 1) : 0;
+		size_t p_topLft = (!UF->DOF_on_BC(shift.i+i-1, shift.j+j, k, 1)) ?
+								UF->DOF_local_number(shift.i+i-1, shift.j+j, k, 1) : 0;
+		size_t p_botRht = (!UF->DOF_on_BC(shift.i+i, shift.j+j-1, k, 1)) ?
+								UF->DOF_local_number(shift.i+i, shift.j+j-1, k, 1) : 0;
+		size_t p_botLft = (!UF->DOF_on_BC(shift.i+i-1, shift.j+j-1, k, 1)) ?
+								UF->DOF_local_number(shift.i+i-1, shift.j+j-1, k, 1) : 0;
+
+		// cout << p_top << "," << p_bot << "," << p_rht << "," << p_lft << endl;
+		// cout << p_topRht << "," << p_topLft << "," << p_botRht << "," << p_botLft << endl;
 
 		// Right (U_X)
       if ( UF->DOF_color( i, j, k, comp ) == FV_BC_RIGHT )
@@ -3944,7 +3941,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(size_t const& i,
       if ( UF->DOF_color( i, j, k, comp ) == FV_BC_LEFT )
          fle = ValueC * ValueC * dyC;
       else {
-			cout << p_top << "," << p_botLft << "," << p_rht << "," << p_topLft << endl;
 			// Both vertex in fluid
 			if ((void_frac->operator()(p_topLft) == 0) &&
 				 (void_frac->operator()(p_botLft) == 0)) {
@@ -4118,14 +4114,22 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(size_t const& i,
    } else if (comp == 1) {
 		// The second Component (v)
 		size_t p = UF->DOF_local_number(i, j, k, comp);
-		size_t p_top = UF->DOF_local_number(i, j+1, k, comp);
-		size_t p_bot = UF->DOF_local_number(i, j-1, k, comp);
-		size_t p_rht = UF->DOF_local_number(i+1, j, k, comp);
-		size_t p_lft = UF->DOF_local_number(i-1, j, k, comp);
-		size_t p_topRht = UF->DOF_local_number(shift.i+i, shift.j+j, k, 0);
-		size_t p_topLft = UF->DOF_local_number(shift.i+i-1, shift.j+j, k, 0);
-		size_t p_botRht = UF->DOF_local_number(shift.i+i, shift.j+j-1, k, 0);
-		size_t p_botLft = UF->DOF_local_number(shift.i+i-1, shift.j+j-1, k, 0);
+		size_t p_top = (!UF->DOF_on_BC(i, j+1, k, comp)) ?
+							UF->DOF_local_number(i, j+1, k, comp) : 0;
+		size_t p_bot = (!UF->DOF_on_BC(i, j-1, k, comp)) ?
+							UF->DOF_local_number(i, j-1, k, comp) : 0;
+		size_t p_rht = (!UF->DOF_on_BC(i+1, j, k, comp)) ?
+							UF->DOF_local_number(i+1, j, k, comp) : 0;
+		size_t p_lft = (!UF->DOF_on_BC(i-1, j, k, comp)) ?
+							UF->DOF_local_number(i-1, j, k, comp) : 0;
+		size_t p_topRht = (!UF->DOF_on_BC(shift.i+i, shift.j+j, k, 0)) ?
+								UF->DOF_local_number(shift.i+i, shift.j+j, k, 0) : 0;
+		size_t p_topLft = (!UF->DOF_on_BC(shift.i+i-1, shift.j+j, k, 0)) ?
+								UF->DOF_local_number(shift.i+i-1, shift.j+j, k, 0) : 0;
+		size_t p_botRht = (!UF->DOF_on_BC(shift.i+i, shift.j+j-1, k, 0)) ?
+								UF->DOF_local_number(shift.i+i, shift.j+j-1, k, 0) : 0;
+		size_t p_botLft = (!UF->DOF_on_BC(shift.i+i-1, shift.j+j-1, k, 0)) ?
+								UF->DOF_local_number(shift.i+i-1, shift.j+j-1, k, 0) : 0;
 
       // Right (V_X)
 		// Both vertex in fluid
