@@ -115,9 +115,10 @@ class DS_STL: public DS_RigidBody
       @param pos updated position
       @param vel updated translation velocity */
       void update_RB_position_and_velocity(geomVector const& pos,
-          geomVector const& vel,
-          geomVector const& ang_vel,
-          vector<geomVector> const& periodic_directions);
+                                                   geomVector const& vel,
+                                                   geomVector const& ang_vel,
+                         vector<geomVector> const& periodic_directions,
+                         double const& time_step);
 
 
 

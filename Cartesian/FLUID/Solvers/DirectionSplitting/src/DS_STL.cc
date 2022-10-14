@@ -658,7 +658,8 @@ geomVector const* DS_STL:: get_ptr_to_gravity_centre( ) const
 void DS_STL:: update_RB_position_and_velocity(geomVector const& pos,
                                                     geomVector const& vel,
                                                     geomVector const& ang_vel,
-                                   vector<geomVector> const& periodic_directions)
+                                   vector<geomVector> const& periodic_directions,
+                                    double const& time_step)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_STL:: update_RB_position_and_velocity" ) ;

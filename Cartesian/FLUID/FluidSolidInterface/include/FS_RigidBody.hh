@@ -102,7 +102,8 @@ class FS_RigidBody
       void update_RB_position_and_velocity(geomVector const& pos,
                                            geomVector const& vel,
                                            geomVector const& ang_vel,
-                                           vector<geomVector> const& periodic_directions);
+                                           vector<geomVector> const& periodic_directions,
+                                           double const& time_step);
       //@}
 
 
@@ -183,6 +184,7 @@ class FS_RigidBody
       Matrix3D m_rotation_matrix; /**< Rotation matrix */
       geomVector m_translational_velocity; /**< Translational velocity */
       geomVector m_angular_velocity; /**< Angular velocity */
+      geomVector m_orientation; /**< roll, pitch, yaw */
       geomVector m_hydro_force; /**< Hydrodynamic force */
       geomVector m_hydro_torque; /**< Hydrodynamic torque */
       double m_temperature; /**< Temperature */

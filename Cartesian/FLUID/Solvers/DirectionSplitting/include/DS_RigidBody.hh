@@ -187,7 +187,8 @@ class DS_RigidBody
       virtual void update_RB_position_and_velocity(geomVector const& pos,
                                                    geomVector const& vel,
                                                    geomVector const& ang_vel,
-                         vector<geomVector> const& periodic_directions) = 0;
+                         vector<geomVector> const& periodic_directions,
+                         double const& time_step) = 0;
 
       //@}
 

@@ -239,14 +239,15 @@ geomVector const* DS_Sphere:: get_ptr_to_gravity_centre( ) const
 void DS_Sphere:: update_RB_position_and_velocity(geomVector const& pos,
                                                     geomVector const& vel,
                                                     geomVector const& ang_vel,
-                                   vector<geomVector> const& periodic_directions)
+                                   vector<geomVector> const& periodic_directions
+                                   , double const& time_step)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_Sphere:: update_RB_position_and_velocity" ) ;
 
   return (m_geometric_rigid_body->update_RB_position_and_velocity(pos,vel
                                                                   ,ang_vel
-                                                         ,periodic_directions));
+                                             ,periodic_directions, time_step));
 
 }
 
