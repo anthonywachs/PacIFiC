@@ -175,7 +175,8 @@ class DS_NavierStokes : public MAC_Object,
                                         , size_t const& component );
 
       /** @brief Assemble advection term for Centered spacial scheme */
-      double assemble_advection_Centered_CutCell( size_t const& i
+      double assemble_advection_Centered_CutCell( double const& coef
+                                                , size_t const& i
                                                 , size_t const& j
                                                 , size_t const& k
                                                 , size_t const& comp

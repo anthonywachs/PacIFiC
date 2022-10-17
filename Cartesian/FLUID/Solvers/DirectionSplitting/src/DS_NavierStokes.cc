@@ -1788,7 +1788,7 @@ DS_NavierStokes:: compute_adv_component ( size_t const& comp,
  		ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp)
  			 	 - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
 	} else if ( AdvectionScheme == "Centered_CutCell" ) {
-      ugradu = assemble_advection_Centered_CutCell(i,j,k,comp,1)
+      ugradu = assemble_advection_Centered_CutCell(rho,i,j,k,comp,1)
              - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
    }
 
@@ -3838,7 +3838,8 @@ DS_NavierStokes:: assemble_advection_Centered( size_t const& advecting_level,
 
 //----------------------------------------------------------------------
 double
-DS_NavierStokes:: assemble_advection_Centered_CutCell(size_t const& i,
+DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
+																		size_t const& i,
                                                 	   size_t const& j,
                                                 		size_t const& k,
                                                 		size_t const& comp,
@@ -4336,79 +4337,9 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(size_t const& i,
 				fbo = ur * ur * int_dis;
 			}
 		}
-
-   //    if (dim == 3) {
-   //       // Front (V_Z)
-   //       AdvectedValueFr = UF->DOF_value(i, j, k+1, component, advected_level );
-   //       AdvectorValueFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, 2, advecting_level );
-   //       AdvectorValueFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, 2, advecting_level );
-   //       wf = 0.5 * ( AdvectorValueFrTo + AdvectorValueFrBo );
-   //       ffr = wf * 0.5 * ( AdvectedValueC + AdvectedValueFr );
-	//
-   //       // Behind (V_Z)
-   //       AdvectedValueBe = UF->DOF_value(i, j, k-1, component, advected_level );
-   //       AdvectorValueBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, 2, advecting_level );
-   //       AdvectorValueBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, 2, advecting_level );
-   //       wb = 0.5 * ( AdvectorValueBeTo + AdvectorValueBeBo );
-   //       fbe = wb * 0.5 * ( AdvectedValueBe + AdvectedValueC );
-   //    }
-   // } else {
-   //    // The Third Component (w)
-   //    // Right (W_X)
-   //    AdvectedValueRi = UF->DOF_value(i+1, j, k, component, advected_level );
-   //    AdvectorValueFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, 0, advecting_level );
-   //    AdvectorValueBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, 0, advecting_level );
-   //    ur = 0.5 * ( AdvectorValueFrRi + AdvectorValueBeRi );
-   //    fri = ur * 0.5 * ( AdvectedValueC + AdvectedValueRi );
-	//
-   //    // Left (W_X)
-   //    AdvectedValueLe = UF->DOF_value(i-1, j, k, component, advected_level );
-   //    AdvectorValueFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, 0, advecting_level );
-   //    AdvectorValueBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, 0, advecting_level );
-   //    ul = 0.5 * ( AdvectorValueFrLe + AdvectorValueBeLe );
-   //    fle = ul * 0.5 * ( AdvectedValueLe + AdvectedValueC );
-	//
-   //    // Top (W_Y)
-   //    AdvectedValueTo = UF->DOF_value(i, j+1, k, component, advected_level );
-   //    AdvectorValueFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, 1, advecting_level );
-   //    AdvectorValueBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, 1, advecting_level );
-   //    vt = 0.5 * ( AdvectorValueFrTo + AdvectorValueBeTo );
-   //    fto = vt * 0.5 * ( AdvectedValueC + AdvectedValueTo );
-	//
-   //    // Bottom (W_Y)
-   //    AdvectedValueBo = UF->DOF_value(i, j-1, k, component, advected_level );
-   //    AdvectorValueFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, 1, advecting_level );
-   //    AdvectorValueBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, 1, advecting_level );
-   //    vb = 0.5 * ( AdvectorValueFrBo + AdvectorValueBeBo );
-   //    fbo = vb * 0.5 * ( AdvectedValueBo + AdvectedValueC );
-	//
-   //    // Front (W_Z)
-   //    if ( UF->DOF_color( i, j, k, component ) == FV_BC_FRONT )
-   //       ffr = AdvectorValueC * AdvectedValueC;
-   //    else {
-   //       AdvectedValueFr = UF->DOF_value(i, j, k+1, component, advected_level );
-   //       AdvectorValueFr = UF->DOF_value(i, j, k+1, component, advecting_level );
-   //       wf = 0.5 * ( AdvectorValueFr + AdvectorValueC );
-   //       ffr = wf * 0.5 * ( AdvectedValueC + AdvectedValueFr );
-   //    }
-	//
-   //    // Behind (W_Z)
-   //    if ( UF->DOF_color( i, j, k, component ) == FV_BC_BEHIND )
-   //       fbe = AdvectorValueC * AdvectedValueC;
-   //    else {
-   //       AdvectedValueBe = UF->DOF_value(i, j, k-1, component, advected_level );
-   //       AdvectorValueBe = UF->DOF_value(i, j, k-1, component, advecting_level );
-   //       wb = 0.5 * ( AdvectorValueBe + AdvectorValueC );
-   //       fbe = wb * 0.5 * ( AdvectedValueBe + AdvectedValueC );
-   //    }
    }
 
-   // if (dim == 2) {
-   //    flux = ((fto - fbo) * dxC + (fri - fle) * dyC);
-   // } else if (dim == 3) {
-   //    flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
-   // }
-   return ( (fto - fbo) + (fri - fle) );
+   return ( coef * ((fto - fbo) + (fri - fle)) );
 }
 
 
