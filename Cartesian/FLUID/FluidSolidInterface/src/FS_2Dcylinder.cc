@@ -286,3 +286,16 @@ struct FS_2Dcylinder_Additional_Param const* FS_2Dcylinder::
   return ( &m_agp_2Dcylinder );
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_2Dcylinder::update_additional_parameters( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_2Dcylinder:: update_additional_parameters( )" ) ;
+
+
+
+}

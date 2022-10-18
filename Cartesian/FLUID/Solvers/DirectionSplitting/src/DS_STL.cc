@@ -620,7 +620,7 @@ double DS_STL:: get_circumscribed_radius( ) const
   double Ymax = m_MESH->get_main_domain_max_coordinate(1);
   double Zmin = m_MESH->get_main_domain_min_coordinate(2);
   double Zmax = m_MESH->get_main_domain_max_coordinate(2);
-  
+
   double value = MAC::max(Xmax - Xmin, MAC::max(Ymax - Ymin, Zmax - Zmin));
 
   return(value);
@@ -663,6 +663,18 @@ void DS_STL:: update_RB_position_and_velocity(geomVector const& pos,
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_STL:: update_RB_position_and_velocity" ) ;
+
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_STL:: update_additional_parameters()
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_STL:: update_additional_parameters" ) ;
 
 
 }

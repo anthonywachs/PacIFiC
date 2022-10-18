@@ -318,3 +318,16 @@ struct FS_3Dcylinder_Additional_Param const* FS_3Dcylinder::
   return( &m_agp_3dcyl );
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_3Dcylinder::update_additional_parameters( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_3Dcylinder:: update_additional_parameters( )" ) ;
+
+
+
+}

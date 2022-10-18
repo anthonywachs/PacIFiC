@@ -120,6 +120,14 @@ class FS_3Dbox: public FS_RigidBody
       reference 3D box
       @param pt point to transform */
       void compute_reverseTransformationOfCorners( );
+
+      /** @brief Tranform the corners of the reference 3D box to the
+      actual 3D box
+      @param pt point to transform */
+      void compute_TransformationOfCorners( );
+
+      /** @brief Update additional parameters */
+      void update_additional_parameters( );
       //@}
 
 

@@ -190,6 +190,9 @@ class DS_RigidBody
                          vector<geomVector> const& periodic_directions,
                          double const& time_step) = 0;
 
+      /** @brief Update additional parameters of each RB type */
+      virtual void update_additional_parameters( ) = 0;
+
       //@}
 
 

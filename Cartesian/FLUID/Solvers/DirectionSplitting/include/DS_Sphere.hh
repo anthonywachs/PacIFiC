@@ -116,6 +116,9 @@ class DS_Sphere: public DS_RigidBody
                          vector<geomVector> const& periodic_directions,
                          double const& time_step);
 
+      /** @brief Update additional parameters of each RB type */
+      void update_additional_parameters( );
+
       /** @brief Compute number of points on a sphere
       @param surface_cell_scale scale of surface cell compared with the grid
       @param dx grid size */

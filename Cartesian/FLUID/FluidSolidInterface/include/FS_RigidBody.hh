@@ -104,6 +104,9 @@ class FS_RigidBody
                                            geomVector const& ang_vel,
                                            vector<geomVector> const& periodic_directions,
                                            double const& time_step);
+
+      /** @brief Update additional parameters of each RB type */
+      virtual void update_additional_parameters( ) = 0;
       //@}
 
 

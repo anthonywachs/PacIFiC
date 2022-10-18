@@ -260,6 +260,19 @@ void DS_3Dbox:: update_RB_position_and_velocity(geomVector const& pos,
 
 
 //---------------------------------------------------------------------------
+void DS_3Dbox:: update_additional_parameters()
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: update_additional_parameters" ) ;
+
+  m_geometric_rigid_body->update_additional_parameters();
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_3Dbox:: compute_surface_points(  )
 //---------------------------------------------------------------------------
 {

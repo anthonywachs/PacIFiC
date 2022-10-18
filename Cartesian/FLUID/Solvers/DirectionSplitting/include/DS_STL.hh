@@ -120,7 +120,8 @@ class DS_STL: public DS_RigidBody
                          vector<geomVector> const& periodic_directions,
                          double const& time_step);
 
-
+      /** @brief Update additional parameters of each RB type */
+      void update_additional_parameters( );
 
       /** @brief Compute number of points on a rigid body
       @param surface_cell_scale scale of surface cell compared with the grid
@@ -251,7 +252,7 @@ class DS_STL: public DS_RigidBody
 
       FV_Mesh const* m_MESH;
 
-      geomVector* ptr_gravity_centre; 
+      geomVector* ptr_gravity_centre;
 
       //@}
 };

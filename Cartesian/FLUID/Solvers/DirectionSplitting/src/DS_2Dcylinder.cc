@@ -254,6 +254,19 @@ void DS_2Dcylinder:: update_RB_position_and_velocity(geomVector const& pos,
 
 
 //---------------------------------------------------------------------------
+void DS_2Dcylinder:: update_additional_parameters()
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_2Dcylinder:: update_additional_parameters" ) ;
+
+  m_geometric_rigid_body->update_additional_parameters();
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_2Dcylinder:: compute_surface_points( )
 //---------------------------------------------------------------------------
 {
