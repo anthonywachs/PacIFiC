@@ -382,36 +382,41 @@ void DS_3Dbox:: compute_number_of_surface_variables(
                         dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
                            ->get_ptr_FS_3Dbox_Additional_Param();
 
-  if (box_min.empty()) box_min.assign(3,1.e14);
-  if (box_max.empty()) box_max.assign(3,-1.e14);
+  geomVector const* pgc = dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
+                            ->get_ptr_to_gravity_centre();
 
-  for (int i = 0; i < (int) pagp->ref_corners.size(); i++) {
-     for (int dir = 0; dir < 3; dir++) {
-        if (pagp->ref_corners[i](dir) < box_min[dir])
-           box_min[dir] = pagp->ref_corners[i](dir);
+  if (box_min.empty() && box_max.empty()) {
+     box_min.assign(3,1.e14);
+     box_max.assign(3,-1.e14);
 
-        if (pagp->ref_corners[i](dir) > box_max[dir])
-           box_max[dir] = pagp->ref_corners[i](dir);
+     for (int i = 0; i < (int) pagp->ref_corners.size(); i++) {
+        for (int dir = 0; dir < 3; dir++) {
+           if (pagp->ref_corners[i](dir) < box_min[dir] - pgc->operator()(dir))
+              box_min[dir] = pagp->ref_corners[i](dir) + pgc->operator()(dir);
 
+           if (pagp->ref_corners[i](dir) > box_max[dir] - pgc->operator()(dir))
+              box_max[dir] = pagp->ref_corners[i](dir) + pgc->operator()(dir);
+
+        }
      }
+
+     doubleVector delta(3,0.);
+
+     delta(0) = (box_max[0]-box_min[0]);
+     delta(1) = (box_max[1]-box_min[1]);
+     delta(2) = (box_max[2]-box_min[2]);
+
+     double scale = 1. / sqrt(surface_cell_scale) / dx;
+
+     if (Npoints.empty()) Npoints.reserve(3);
+
+     Npoints[0] = (size_t) round(scale * delta(0) );
+     Npoints[1] = (size_t) round(scale * delta(1) );
+     Npoints[2] = (size_t) round(scale * delta(2) );
+
+     Ntot = 2 * (Npoints[0]*Npoints[1]
+               + Npoints[1]*Npoints[2]
+               + Npoints[2]*Npoints[0]);
   }
-
-  doubleVector delta(3,0.);
-
-  delta(0) = (box_max[0]-box_min[0]);
-  delta(1) = (box_max[1]-box_min[1]);
-  delta(2) = (box_max[2]-box_min[2]);
-
-  double scale = 1. / sqrt(surface_cell_scale) / dx;
-
-  if (Npoints.empty()) Npoints.reserve(3);
-
-  Npoints[0] = (size_t) round(scale * delta(0) );
-  Npoints[1] = (size_t) round(scale * delta(1) );
-  Npoints[2] = (size_t) round(scale * delta(2) );
-
-  Ntot = 2 * (Npoints[0]*Npoints[1]
-            + Npoints[1]*Npoints[2]
-            + Npoints[2]*Npoints[0]);
 
 }
