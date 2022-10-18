@@ -1,6 +1,7 @@
 #include <FS_3Dbox.hh>
 #include <math.h>
 using std::endl;
+#define THRESHOLD 1.e-12
 
 
 //---------------------------------------------------------------------------
@@ -181,11 +182,15 @@ void FS_3Dbox:: set( istream& in )
   double yaw = (MAC::pi()/180.)*m_orientation(2);
 
   m_rotation_matrix[0][0] = MAC::cos(yaw)*MAC::cos(pitch);
-  m_rotation_matrix[0][1] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll) - MAC::sin(yaw)*MAC::cos(roll);
-  m_rotation_matrix[0][2] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll) + MAC::sin(yaw)*MAC::sin(roll);
+  m_rotation_matrix[0][1] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+                          - MAC::sin(yaw)*MAC::cos(roll);
+  m_rotation_matrix[0][2] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+                          + MAC::sin(yaw)*MAC::sin(roll);
   m_rotation_matrix[1][0] = MAC::sin(yaw)*MAC::cos(pitch);
-  m_rotation_matrix[1][1] = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll) + MAC::cos(yaw)*MAC::cos(roll);
-  m_rotation_matrix[1][2] = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll) - MAC::cos(yaw)*MAC::sin(roll);
+  m_rotation_matrix[1][1] = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+                          + MAC::cos(yaw)*MAC::cos(roll);
+  m_rotation_matrix[1][2] = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+                          - MAC::cos(yaw)*MAC::sin(roll);
   m_rotation_matrix[2][0] = -MAC::sin(pitch);
   m_rotation_matrix[2][1] = MAC::cos(pitch)*MAC::sin(roll);
   m_rotation_matrix[2][2] = MAC::cos(pitch)*MAC::cos(roll);
@@ -300,7 +305,7 @@ double FS_3Dbox:: level_set_value( geomVector const& pt ) const
                                  m_agp_3dbox.corners[ (*faceIter)[idxPts] ],
                                  m_gravity_center, pt );
 
-        if (temp >= -1.e-7) {
+        if (temp >= -THRESHOLD) {
            value = std::max(temp, value);
         } else {
            value = temp;
@@ -337,7 +342,7 @@ double FS_3Dbox:: level_set_value( double const& x
                                  m_agp_3dbox.corners[ (*faceIter)[idxPts] ],
                                  m_gravity_center, pt );
 
-        if (temp >= -1.e-7) {
+        if (temp >= -THRESHOLD) {
            value = std::min(temp, value);
         } else {
            value = temp;
@@ -421,7 +426,7 @@ bool FS_3Dbox::checkPointInTetrahedron( const geomVector &pointOne,
 
   double sumSubElem = detOne + detTwo + detThree + detFour;
 
-  if ( fabs( detTot - sumSubElem ) > 1.e-7  )
+  if ( fabs( detTot - sumSubElem ) > THRESHOLD  )
         std::cout << "ERROR: summation error in determinat 3D : "
         << detTot - sumSubElem << endl;
 
@@ -430,8 +435,8 @@ bool FS_3Dbox::checkPointInTetrahedron( const geomVector &pointOne,
         abort();
   }
 
-  if ( ( detTot*detOne >= -1.e-7 )  && ( detTot*detTwo >= -1.e-7 ) &&
-       ( detTot*detThree >= -1.e-7 ) && ( detTot*detFour >= -1.e-7 ) )
+  if ( ( detTot*detOne >= -THRESHOLD )  && ( detTot*detTwo >= -THRESHOLD ) &&
+       ( detTot*detThree >= -THRESHOLD ) && ( detTot*detFour >= -THRESHOLD ) )
       in=true;
 
   return in;
@@ -464,7 +469,7 @@ double FS_3Dbox::DistOfPointFromTetrahedron( const geomVector &pointOne,
 
   double sumSubElem = detOne + detTwo + detThree + detFour;
 
-  if ( fabs( detTot - sumSubElem ) > 1.e-7  )
+  if ( fabs( detTot - sumSubElem ) > THRESHOLD  )
      std::cout << "ERROR: summation error in determinat 3D : "
                << detTot - sumSubElem << endl;
 
@@ -473,8 +478,8 @@ double FS_3Dbox::DistOfPointFromTetrahedron( const geomVector &pointOne,
      abort();
   }
 
-  if ( ( detTot*detOne >= -1.e-7 )  && ( detTot*detTwo >= -1.e-7 ) &&
-       ( detTot*detThree >= -1.e-7 ) && ( detTot*detFour >= -1.e-7 ) ) {
+  if ( ( detTot*detOne >= -THRESHOLD )  && ( detTot*detTwo >= -THRESHOLD ) &&
+       ( detTot*detThree >= -THRESHOLD ) && ( detTot*detFour >= -THRESHOLD ) ) {
      out_dist = -1.*fabs(sumSubElem);
   } else {
      out_dist = fabs(sumSubElem);
