@@ -177,9 +177,9 @@ void FS_3Dbox:: set( istream& in )
   m_volume = m_mass / m_density ;
 
   // Reset the rotation matrix
-  double roll = (MAC::pi()/180.)*m_orientation(0);
-  double pitch = (MAC::pi()/180.)*m_orientation(1);
-  double yaw = (MAC::pi()/180.)*m_orientation(2);
+  double roll = m_orientation(0);
+  double pitch = m_orientation(1);
+  double yaw = m_orientation(2);
 
   m_rotation_matrix[0][0] = MAC::cos(yaw)*MAC::cos(pitch);
   m_rotation_matrix[0][1] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll)

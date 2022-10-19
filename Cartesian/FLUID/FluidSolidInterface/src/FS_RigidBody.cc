@@ -358,9 +358,9 @@ void FS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
   m_orientation(2) += ang_vel(2)*time_step;
 
   // Reset the rotation matrix
-  double roll = (MAC::pi()/180.)*m_orientation(0);
-  double pitch = (MAC::pi()/180.)*m_orientation(1);
-  double yaw = (MAC::pi()/180.)*m_orientation(2);
+  double roll = m_orientation(0);
+  double pitch = m_orientation(1);
+  double yaw = m_orientation(2);
 
   m_rotation_matrix[0][0] = MAC::cos(yaw)*MAC::cos(pitch);
   m_rotation_matrix[0][1] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll)
@@ -456,5 +456,20 @@ void FS_RigidBody:: rotate(geomVector* pt)
   pt->operator()(0) = delta_x;
   pt->operator()(1) = delta_y;
   pt->operator()(2) = delta_z;
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_RigidBody:: translate(geomVector* pt)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: translate" ) ;
+
+  pt->operator()(0) += m_gravity_center(0);
+  pt->operator()(1) += m_gravity_center(1);
+  pt->operator()(2) += m_gravity_center(2);
 
 }

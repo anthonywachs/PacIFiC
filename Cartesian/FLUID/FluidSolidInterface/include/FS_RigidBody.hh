@@ -164,6 +164,11 @@ class FS_RigidBody
       /** @brief Rotate the pt using the rigid body rotation matrix
       @param pt the point to rotate */
       void rotate(geomVector* pt);
+
+      /** @brief Translate the pt using the rigid body gravity centers
+      @param pt the point to rotate */
+      void translate(geomVector* pt);
+
       //@}
 
 

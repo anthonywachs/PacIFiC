@@ -363,6 +363,7 @@ void DS_3Dbox:: compute_surface_points(  )
   for (size_t i = 0; i < m_surface_area.size(); i++) {
      m_geometric_rigid_body->rotate(m_surface_points[i]);
      m_geometric_rigid_body->rotate(m_surface_normal[i]);
+     m_geometric_rigid_body->translate(m_surface_points[i]);
   }
 
 }
@@ -390,11 +391,11 @@ void DS_3Dbox:: compute_number_of_surface_variables(
 
   for (int i = 0; i < (int) pagp->ref_corners.size(); i++) {
      for (int dir = 0; dir < 3; dir++) {
-        if (pagp->ref_corners[i](dir) < box_min[dir] - pgc->operator()(dir))
-           box_min[dir] = pagp->ref_corners[i](dir) + pgc->operator()(dir);
+        if (pagp->ref_corners[i](dir) < box_min[dir])
+           box_min[dir] = pagp->ref_corners[i](dir);
 
-        if (pagp->ref_corners[i](dir) > box_max[dir] - pgc->operator()(dir))
-           box_max[dir] = pagp->ref_corners[i](dir) + pgc->operator()(dir);
+        if (pagp->ref_corners[i](dir) > box_max[dir])
+           box_max[dir] = pagp->ref_corners[i](dir);
      }
   }
 
