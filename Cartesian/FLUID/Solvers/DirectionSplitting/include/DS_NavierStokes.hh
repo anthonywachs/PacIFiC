@@ -221,6 +221,8 @@ class DS_NavierStokes : public MAC_Object,
 
       void assemble_velocity_diffusion_terms ( );
 
+      void assemble_velocity_advection_terms ( );
+
       void calculate_row_indexes ( FV_DiscreteField const* FF);
 
       void compute_velocity_divergence ( );

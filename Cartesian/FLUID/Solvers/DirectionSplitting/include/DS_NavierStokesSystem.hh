@@ -5,6 +5,7 @@
 #include <utility>
 #include <boolVector.hh>
 #include <size_t_array2D.hh>
+#include <doubleArray2D.hh>
 #include <vector>
 using namespace std;
 
@@ -15,6 +16,7 @@ class MAC_Timer ;
 class size_t_vector ;
 class intVector ;
 class doubleVector;
+class doubleArray2D;
 class LA_Matrix ;
 class LA_SeqMatrix ;
 class LA_Vector ;
@@ -143,6 +145,11 @@ class DS_NavierStokesSystem : public MAC_Object
       doubleVector* get_node_divergence(size_t const& level);
       /** @brief Return the velocity diffusive terms */
       vector<doubleVector*> get_velocity_diffusion();
+      /** @brief Return the velocity advection terms */
+      vector<doubleVector*> get_velocity_advection();
+      /** @brief Return the velocity field face fractions */
+      vector<doubleArray2D*> get_velocity_face_fractions();
+      vector<doubleArray2D*> get_velocity_normalRB();
       /** @brief Return the local vector with a vector of row index */
       size_t_array2D* get_row_indexes(size_t const& field
                                   , size_t const& dir
@@ -275,6 +282,11 @@ class DS_NavierStokesSystem : public MAC_Object
       vector<doubleVector*> divergence;
       // Local vector to store diffusive terms
       vector<doubleVector*> vel_diffusion;
+      // Local vector to store advection terms
+      vector<doubleVector*> vel_advection;
+      // Face fraction for UF cell
+      vector<doubleArray2D*> face_frac_UF;
+      vector<doubleArray2D*> normalRB;
 
       size_t dim;
       MAC_Communicator const* pelCOMM;
