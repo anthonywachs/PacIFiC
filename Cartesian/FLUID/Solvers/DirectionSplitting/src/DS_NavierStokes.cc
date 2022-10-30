@@ -3992,6 +3992,8 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 
 	size_t p = UF->DOF_local_number(i, j, k, comp);
 
+	size_t local_parID = 0;
+
    // The First Component (u)
    if ( comp == 0 ) {
 		size_t p_top = (!UF->DOF_on_BC(i, j+1, k, comp)) ?
@@ -4050,6 +4052,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fri = ur * ur * int_dis;
 				face_fraction[0]->operator()(p,1) = int_dis;
+				local_parID = void_frac->operator()(p_topRht) - 1;
 			// Top vertex in fluid
 			} else if ((void_frac->operator()(p_topRht) == 0) &&
 				 		  (void_frac->operator()(p_botRht) != 0)) {
@@ -4068,6 +4071,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fri = ur * ur * int_dis;
 				face_fraction[0]->operator()(p,1) = int_dis;
+				local_parID = void_frac->operator()(p_botRht) - 1;
 			}
       }
 
@@ -4107,6 +4111,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fle = ul * ul * int_dis;
 				face_fraction[0]->operator()(p,0) = int_dis;
+				local_parID = void_frac->operator()(p_topLft) - 1;
 			// Top vertex in fluid
 			} else if ((void_frac->operator()(p_topLft) == 0) &&
 						  (void_frac->operator()(p_botLft) != 0)) {
@@ -4125,6 +4130,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fle = ul * ul * int_dis;
 				face_fraction[0]->operator()(p,0) = int_dis;
+				local_parID = void_frac->operator()(p_botLft) - 1;
 			}
 		}
 
@@ -4167,6 +4173,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 
 			fto = AdvectorValue * AdvectedValue * int_dis;
 			face_fraction[0]->operator()(p,3) = int_dis;
+			local_parID = void_frac->operator()(p_topLft) - 1;
 		// Left vertex in fluid
 		} else if ((void_frac->operator()(p_topLft) == 0) &&
 					  (void_frac->operator()(p_topRht) != 0)) {
@@ -4189,6 +4196,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 
 			fto = AdvectorValue * AdvectedValue * int_dis;
 			face_fraction[0]->operator()(p,3) = int_dis;
+			local_parID = void_frac->operator()(p_topRht) - 1;
 		}
 
 		// Bottom (U_Y)
@@ -4230,6 +4238,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 
 			fbo = AdvectorValue * AdvectedValue * int_dis;
 			face_fraction[0]->operator()(p,2) = int_dis;
+			local_parID = void_frac->operator()(p_botLft) - 1;
 		// Left vertex in fluid
 		} else if ((void_frac->operator()(p_botLft) == 0) &&
 					  (void_frac->operator()(p_botRht) != 0)) {
@@ -4252,6 +4261,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 
 			fbo = AdvectorValue * AdvectedValue * int_dis;
 			face_fraction[0]->operator()(p,2) = int_dis;
+			local_parID = void_frac->operator()(p_botRht) - 1;
 		}
 
    //    if (dim == 3) {
@@ -4327,6 +4337,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 
 			fri = AdvectorValue * AdvectedValue * int_dis;
 			face_fraction[0]->operator()(p,1) = int_dis;
+			local_parID = void_frac->operator()(p_botRht) - 1;
 		// Bottom vertex in fluid
 		} else if ((void_frac->operator()(p_botRht) == 0) &&
 					  (void_frac->operator()(p_topRht) != 0)) {
@@ -4349,6 +4360,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 
 			fri = AdvectorValue * AdvectedValue * int_dis;
 			face_fraction[0]->operator()(p,1) = int_dis;
+			local_parID = void_frac->operator()(p_topRht) - 1;
 		}
 
       // Left (V_X)
@@ -4390,6 +4402,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 
 			fle = AdvectorValue * AdvectedValue * int_dis;
 			face_fraction[0]->operator()(p,0) = int_dis;
+			local_parID = void_frac->operator()(p_botLft) - 1;
 		// Bottom vertex in fluid
 		} else if ((void_frac->operator()(p_botLft) == 0) &&
 					  (void_frac->operator()(p_topLft) != 0)) {
@@ -4412,6 +4425,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 
 			fle = AdvectorValue * AdvectedValue * int_dis;
 			face_fraction[0]->operator()(p,0) = int_dis;
+			local_parID = void_frac->operator()(p_topLft) - 1;
 		}
 
       // Top (V_Y)
@@ -4450,6 +4464,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fto = ur * ur * int_dis;
 				face_fraction[0]->operator()(p,3) = int_dis;
+				local_parID = void_frac->operator()(p_topRht) - 1;
 			// Right vertex in fluid
 			} else if ((void_frac->operator()(p_topRht) == 0) &&
 						  (void_frac->operator()(p_topLft) != 0)) {
@@ -4468,6 +4483,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fto = ur * ur * int_dis;
 				face_fraction[0]->operator()(p,3) = int_dis;
+				local_parID = void_frac->operator()(p_topLft) - 1;
 			}
 		}
 
@@ -4507,6 +4523,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fbo = ur * ur * int_dis;
 				face_fraction[0]->operator()(p,2) = int_dis;
+				local_parID = void_frac->operator()(p_botRht) - 1;
 			// Right vertex in fluid
 			} else if ((void_frac->operator()(p_botRht) == 0) &&
 						  (void_frac->operator()(p_botLft) != 0)) {
@@ -4525,6 +4542,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fbo = ur * ur * int_dis;
 				face_fraction[0]->operator()(p,2) = int_dis;
+				local_parID = void_frac->operator()(p_botLft) - 1;
 			}
 		}
    }
@@ -4540,7 +4558,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 		// 	std::cout << intersect_pt[ii](0) << "," << intersect_pt[ii](1) << "," << 0 << "," << intersect_pt.size() << endl;
 		// }
 		// std::cout << "Cut surface length: " << intersect_pt[0].calcDist(intersect_pt[1]) << endl;
-		geomVector const* pgc = allrigidbodies->get_gravity_centre(0);
+		geomVector const* pgc = allrigidbodies->get_gravity_centre(local_parID);
 		geomVector pin(3), normal(3), pmid(3);
 		pin(0) = pgc->operator()(0);
 		pin(1) = pgc->operator()(1);
@@ -4570,7 +4588,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 		normalRB[0]->operator()(p,1) = normal(1);
 		normalRB[0]->operator()(p,2) = normal(2);
 
-		geomVector rbVel = allrigidbodies->rigid_body_velocity(0,pmid);
+		geomVector rbVel = allrigidbodies->rigid_body_velocity(local_parID,pmid);
 
 		double segment_length = intersect_pt[0].calcDist(intersect_pt[1]);
 
