@@ -369,11 +369,14 @@ bool on_face(double p, int n, double l0) {
 
 void correct_lag_pos(lagMesh* mesh) {
   for(int i=0; i < mesh->nlp; i++) {
+    coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
     foreach_dimension() {
       if (on_face(mesh->nodes[i].pos.x, N, L0))
         mesh->nodes[i].pos.x += 1.e-10;
-      if(fabs(mesh->nodes[i].pos.x) > L0/2)
-        mesh->nodes[i].pos.x -= L0*sign(mesh->nodes[i].pos.x);
+      if (mesh->nodes[i].pos.x > origin.x + L0/2)
+        mesh->nodes[i].pos.x -= L0;
+      else if (mesh->nodes[i].pos.x < origin.x - L0/2)
+        mesh->nodes[i].pos.x += L0;
     }
   }
   mesh->updated_stretches = false;
