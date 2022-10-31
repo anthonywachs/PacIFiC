@@ -3993,25 +3993,26 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 	size_t p = UF->DOF_local_number(i, j, k, comp);
 
 	size_t local_parID = 0;
+	size_t UF_UNK_MAX = UF->nb_local_unknowns();
 
    // The First Component (u)
    if ( comp == 0 ) {
-		size_t p_top = (!UF->DOF_on_BC(i, j+1, k, comp)) ?
-							UF->DOF_local_number(i, j+1, k, comp) : 0;
-		size_t p_bot = (!UF->DOF_on_BC(i, j-1, k, comp)) ?
-							UF->DOF_local_number(i, j-1, k, comp) : 0;
-		size_t p_rht = (!UF->DOF_on_BC(i+1, j, k, comp)) ?
-							UF->DOF_local_number(i+1, j, k, comp) : 0;
-		size_t p_lft = (!UF->DOF_on_BC(i-1, j, k, comp)) ?
-							UF->DOF_local_number(i-1, j, k, comp) : 0;
-		size_t p_topRht = (!UF->DOF_on_BC(shift.i+i, shift.j+j, k, 1)) ?
-								UF->DOF_local_number(shift.i+i, shift.j+j, k, 1) : 0;
-		size_t p_topLft = (!UF->DOF_on_BC(shift.i+i-1, shift.j+j, k, 1)) ?
-								UF->DOF_local_number(shift.i+i-1, shift.j+j, k, 1) : 0;
-		size_t p_botRht = (!UF->DOF_on_BC(shift.i+i, shift.j+j-1, k, 1)) ?
-								UF->DOF_local_number(shift.i+i, shift.j+j-1, k, 1) : 0;
-		size_t p_botLft = (!UF->DOF_on_BC(shift.i+i-1, shift.j+j-1, k, 1)) ?
-								UF->DOF_local_number(shift.i+i-1, shift.j+j-1, k, 1) : 0;
+		size_t p_top = UF->DOF_local_number(i, j+1, k, comp);
+		if (p_top > UF_UNK_MAX) p_top = UF_UNK_MAX;
+		size_t p_bot = UF->DOF_local_number(i, j-1, k, comp);
+		if (p_bot > UF_UNK_MAX) p_bot = UF_UNK_MAX;
+		size_t p_rht = UF->DOF_local_number(i+1, j, k, comp);
+		if (p_rht > UF_UNK_MAX) p_rht = UF_UNK_MAX;
+		size_t p_lft = UF->DOF_local_number(i-1, j, k, comp);
+		if (p_lft > UF_UNK_MAX) p_lft = UF_UNK_MAX;
+		size_t p_topRht = UF->DOF_local_number(shift.i+i, shift.j+j, k, 1);
+		if (p_topRht > UF_UNK_MAX) p_topRht = UF_UNK_MAX;
+		size_t p_topLft = UF->DOF_local_number(shift.i+i-1, shift.j+j, k, 1);
+		if (p_topLft > UF_UNK_MAX) p_topLft = UF_UNK_MAX;
+		size_t p_botRht = UF->DOF_local_number(shift.i+i, shift.j+j-1, k, 1);
+		if (p_botRht > UF_UNK_MAX) p_botRht = UF_UNK_MAX;
+		size_t p_botLft = UF->DOF_local_number(shift.i+i-1, shift.j+j-1, k, 1);
+		if (p_botLft > UF_UNK_MAX) p_botLft = UF_UNK_MAX;
 
 		// cout << p_top << "," << p_bot << "," << p_rht << "," << p_lft << endl;
 		// cout << p_topRht << "," << p_topLft << "," << p_botRht << "," << p_botLft << endl;
@@ -4281,22 +4282,22 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
    //    }
    } else if (comp == 1) {
 		// The second Component (v)
-		size_t p_top = (!UF->DOF_on_BC(i, j+1, k, comp)) ?
-							UF->DOF_local_number(i, j+1, k, comp) : 0;
-		size_t p_bot = (!UF->DOF_on_BC(i, j-1, k, comp)) ?
-							UF->DOF_local_number(i, j-1, k, comp) : 0;
-		size_t p_rht = (!UF->DOF_on_BC(i+1, j, k, comp)) ?
-							UF->DOF_local_number(i+1, j, k, comp) : 0;
-		size_t p_lft = (!UF->DOF_on_BC(i-1, j, k, comp)) ?
-							UF->DOF_local_number(i-1, j, k, comp) : 0;
-		size_t p_topRht = (!UF->DOF_on_BC(shift.i+i, shift.j+j, k, 0)) ?
-								UF->DOF_local_number(shift.i+i, shift.j+j, k, 0) : 0;
-		size_t p_topLft = (!UF->DOF_on_BC(shift.i+i-1, shift.j+j, k, 0)) ?
-								UF->DOF_local_number(shift.i+i-1, shift.j+j, k, 0) : 0;
-		size_t p_botRht = (!UF->DOF_on_BC(shift.i+i, shift.j+j-1, k, 0)) ?
-								UF->DOF_local_number(shift.i+i, shift.j+j-1, k, 0) : 0;
-		size_t p_botLft = (!UF->DOF_on_BC(shift.i+i-1, shift.j+j-1, k, 0)) ?
-								UF->DOF_local_number(shift.i+i-1, shift.j+j-1, k, 0) : 0;
+		size_t p_top = UF->DOF_local_number(i, j+1, k, comp);
+		if (p_top > UF_UNK_MAX) p_top = UF_UNK_MAX;
+		size_t p_bot = UF->DOF_local_number(i, j-1, k, comp);
+		if (p_bot > UF_UNK_MAX) p_bot = UF_UNK_MAX;
+		size_t p_rht = UF->DOF_local_number(i+1, j, k, comp);
+		if (p_rht > UF_UNK_MAX) p_rht = UF_UNK_MAX;
+		size_t p_lft = UF->DOF_local_number(i-1, j, k, comp);
+		if (p_lft > UF_UNK_MAX) p_lft = UF_UNK_MAX;
+		size_t p_topRht = UF->DOF_local_number(shift.i+i, shift.j+j, k, 0);
+		if (p_topRht > UF_UNK_MAX) p_topRht = UF_UNK_MAX;
+		size_t p_topLft = UF->DOF_local_number(shift.i+i-1, shift.j+j, k, 0);
+		if (p_topLft > UF_UNK_MAX) p_topLft = UF_UNK_MAX;
+		size_t p_botRht = UF->DOF_local_number(shift.i+i, shift.j+j-1, k, 0);
+		if (p_botRht > UF_UNK_MAX) p_botRht = UF_UNK_MAX;
+		size_t p_botLft = UF->DOF_local_number(shift.i+i-1, shift.j+j-1, k, 0);
+		if (p_botLft > UF_UNK_MAX) p_botLft = UF_UNK_MAX;
 
       // Right (V_X)
 		face_fraction[0]->operator()(p,1) = 0.;
