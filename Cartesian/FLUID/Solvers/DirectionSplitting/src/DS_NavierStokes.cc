@@ -310,7 +310,7 @@ DS_NavierStokes:: do_after_time_stepping( void )
    // Elapsed time by sub-problems
 
    // SCT_set_start( "Writing CSV" );
-   write_output_field(PF);
+   // write_output_field(PF);
    // write_output_field(UF);
    // SCT_get_elapsed_time( "Writing CSV" );
 
@@ -2547,7 +2547,8 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( )
    MAC_LABEL("DS_NavierStokes:: assemble_velocity_advection_terms" ) ;
 
 	vector<doubleVector*> advection = GLOBAL_EQ->get_velocity_advection();
-	size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+	size_t_vector* void_frac = (is_solids) ?
+							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
 	vector<doubleArray2D*> face_fraction = GLOBAL_EQ
 								->get_velocity_face_fractions();
@@ -2577,70 +2578,73 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( )
 			}
 		}
 
-		// Flux redistribution
-		for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
-			for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
-				for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
-					size_t p = UF->DOF_local_number(i,j,k,comp);
-					size_t p_lft = UF->DOF_local_number(i-1,j,k,comp);
-					size_t p_rht = UF->DOF_local_number(i+1,j,k,comp);
-					size_t p_bot = UF->DOF_local_number(i,j-1,k,comp);
-					size_t p_top = UF->DOF_local_number(i,j+1,k,comp);
-					size_t p_bhd = (dim == 2) ? 0 : UF->DOF_local_number(i,j,k-1,comp);
-					size_t p_frt = (dim == 2) ? 0 : UF->DOF_local_number(i,j,k+1,comp);
+		size_t UF_UNK_MAX = UF->nb_local_unknowns();
 
-					size_t UF_UNK_MAX = UF->nb_local_unknowns();
+		if (is_solids) {
+			// Flux redistribution
+			for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+				for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+					for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+						size_t p = UF->DOF_local_number(i,j,k,comp);
+						size_t p_lft = UF->DOF_local_number(i-1,j,k,comp);
+						size_t p_rht = UF->DOF_local_number(i+1,j,k,comp);
+						size_t p_bot = UF->DOF_local_number(i,j-1,k,comp);
+						size_t p_top = UF->DOF_local_number(i,j+1,k,comp);
+						size_t p_bhd = (dim == 2) ? 0
+														  : UF->DOF_local_number(i,j,k-1,comp);
+						size_t p_frt = (dim == 2) ? 0
+														  : UF->DOF_local_number(i,j,k+1,comp);
 
-					double wt_lft = 0., wt_rht = 0.,
-							 wt_bot = 0., wt_top = 0.,
-							 wt_bhd = 0., wt_frt = 0.;
+						double wt_lft = 0., wt_rht = 0.,
+								 wt_bot = 0., wt_top = 0.,
+								 wt_bhd = 0., wt_frt = 0.;
 
-					if (void_frac->operator()(p) != 0) {
-						if (p_lft <= UF_UNK_MAX)
-							wt_lft = (void_frac->operator()(p_lft) == 0) ?
-											normalRB[0]->operator()(p,0)
-										 * normalRB[0]->operator()(p,0)
-										 * face_fraction[0]->operator()(p,0) : 0;
+						if (void_frac->operator()(p) != 0) {
+							if (p_lft <= UF_UNK_MAX)
+								wt_lft = (void_frac->operator()(p_lft) == 0) ?
+												normalRB[0]->operator()(p,0)
+											 * normalRB[0]->operator()(p,0)
+											 * face_fraction[0]->operator()(p,0) : 0;
 
-						if (p_rht <= UF_UNK_MAX)
-						 	wt_rht = (void_frac->operator()(p_rht) == 0) ?
-						 					normalRB[0]->operator()(p,0)
-						 				 * normalRB[0]->operator()(p,0)
-						 				 * face_fraction[0]->operator()(p,1) : 0;
+							if (p_rht <= UF_UNK_MAX)
+							 	wt_rht = (void_frac->operator()(p_rht) == 0) ?
+							 					normalRB[0]->operator()(p,0)
+							 				 * normalRB[0]->operator()(p,0)
+							 				 * face_fraction[0]->operator()(p,1) : 0;
 
-						if (p_bot <= UF_UNK_MAX)
- 							wt_bot = (void_frac->operator()(p_bot) == 0) ?
- 											normalRB[0]->operator()(p,1)
- 										 * normalRB[0]->operator()(p,1)
- 										 * face_fraction[0]->operator()(p,2) : 0;
+							if (p_bot <= UF_UNK_MAX)
+	 							wt_bot = (void_frac->operator()(p_bot) == 0) ?
+	 											normalRB[0]->operator()(p,1)
+	 										 * normalRB[0]->operator()(p,1)
+	 										 * face_fraction[0]->operator()(p,2) : 0;
 
- 						if (p_top <= UF_UNK_MAX)
- 						 	wt_top = (void_frac->operator()(p_top) == 0) ?
- 						 					normalRB[0]->operator()(p,1)
- 						 				 * normalRB[0]->operator()(p,1)
- 						 				 * face_fraction[0]->operator()(p,3) : 0;
+	 						if (p_top <= UF_UNK_MAX)
+	 						 	wt_top = (void_frac->operator()(p_top) == 0) ?
+	 						 					normalRB[0]->operator()(p,1)
+	 						 				 * normalRB[0]->operator()(p,1)
+	 						 				 * face_fraction[0]->operator()(p,3) : 0;
 
-					   // Flux redistribution
-					   double sum = wt_lft + wt_rht + wt_bot + wt_top;
+						   // Flux redistribution
+						   double sum = wt_lft + wt_rht + wt_bot + wt_top;
 
-                  if (sum > 0.) {
-					 		if (p_lft <= UF_UNK_MAX)
-					 			advection[0]->operator()(p_lft) +=
-					 								wt_lft/sum * advection[0]->operator()(p);
- 							if (p_rht <= UF_UNK_MAX)
-					 			advection[0]->operator()(p_rht) +=
-					 								wt_rht/sum * advection[0]->operator()(p);
- 							if (p_bot <= UF_UNK_MAX)
-					 			advection[0]->operator()(p_bot) +=
-					 								wt_bot/sum * advection[0]->operator()(p);
- 							if (p_top <= UF_UNK_MAX)
-					 			advection[0]->operator()(p_top) +=
-					 								wt_top/sum * advection[0]->operator()(p);
- 							advection[0]->operator()(p) = 0.;
-					 	} else if (sum == 0.) {
-					 		advection[0]->operator()(p) = 0.;
-					 	}
-
+	                  if (sum > 0.) {
+						 		if (p_lft <= UF_UNK_MAX)
+						 			advection[0]->operator()(p_lft) +=
+						 								wt_lft/sum * advection[0]->operator()(p);
+	 							if (p_rht <= UF_UNK_MAX)
+						 			advection[0]->operator()(p_rht) +=
+						 								wt_rht/sum * advection[0]->operator()(p);
+	 							if (p_bot <= UF_UNK_MAX)
+						 			advection[0]->operator()(p_bot) +=
+						 								wt_bot/sum * advection[0]->operator()(p);
+	 							if (p_top <= UF_UNK_MAX)
+						 			advection[0]->operator()(p_top) +=
+						 								wt_top/sum * advection[0]->operator()(p);
+	 							advection[0]->operator()(p) = 0.;
+						 	} else if (sum == 0.) {
+						 		advection[0]->operator()(p) = 0.;
+						 	}
+						}
 					}
 				}
 			}
