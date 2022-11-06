@@ -1,7 +1,7 @@
 #include <FS_3Dbox.hh>
 #include <math.h>
 using std::endl;
-#define THRESHOLD 1.e-12
+#define THRESHOLD 1.e-14
 
 
 //---------------------------------------------------------------------------
@@ -292,7 +292,7 @@ double FS_3Dbox:: level_set_value( geomVector const& pt ) const
 {
   MAC_LABEL( "FS_3Dbox:: level_set_value(pt)" ) ;
 
-  double value = 1.e10;
+  double value = 1.;
 
   for (vector< vector<size_t> >::const_iterator
            faceIter = m_agp_3dbox.facesVec.begin();
@@ -305,7 +305,7 @@ double FS_3Dbox:: level_set_value( geomVector const& pt ) const
                                  m_agp_3dbox.corners[ (*faceIter)[idxPts] ],
                                  m_gravity_center, pt );
 
-        if (temp >= -THRESHOLD) {
+        if (temp >= 0.) {
            value = std::max(temp, value);
         } else {
            value = temp;
@@ -327,7 +327,7 @@ double FS_3Dbox:: level_set_value( double const& x
 {
   MAC_LABEL( "FS_3Dbox:: level_set_value(x,y,z)" ) ;
 
-  double value = 1.e10;       // +ve outside, -ve inside
+  double value = 1.;       // +ve outside, -ve inside
 
   geomVector pt( x, y, z );
 
@@ -342,8 +342,8 @@ double FS_3Dbox:: level_set_value( double const& x
                                  m_agp_3dbox.corners[ (*faceIter)[idxPts] ],
                                  m_gravity_center, pt );
 
-        if (temp >= -THRESHOLD) {
-           value = std::min(temp, value);
+        if (temp >= 0.) {
+           value = std::max(temp, value);
         } else {
            value = temp;
         }
