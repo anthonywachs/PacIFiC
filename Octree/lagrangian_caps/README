@@ -5,7 +5,8 @@
 
 Welcome to my sandbox. Here, I provide documentation, test cases and references related to the implementation of liquid-enclosed capsules - such as biological vesicles - at low Reynolds number.
 
-I implement both an Eulerian and a Lagrangian descriptions of the capsules.
+I implement a Lagrangian description of the capsules, after an attempted
+Eulerian description did not lead to satisfactory results.
 
 ## Lagrangian framework
 In the Lagrangian description, also referred to as _front-tracking method_, we
@@ -24,23 +25,23 @@ computation of geometrical quantities, advection of the mesh.
 * [lag-mesh-mpi.h](src/lagrangian_caps/lag-mesh-mpi.h): helper functions
 for compatibility with MPI
 * [mesh-toolbox.h](src/lagrangian_caps/mesh-toolbox.h): helper functions for
-Lagrangian meshes (mainly for creating 3D meshed surfaces)
+Lagrangian meshes: mainly for creating 3D meshed surfaces, but also to create
+restart files, and soon Paraview visualization of the membranes.
 * [reg-dirac.h](src/lagrangian_caps/reg-dirac.h): Implementation of the immersed
-boundary method. In process of making use of the Cache structure for better
-computational efficiency and compatibility with MPI.
+boundary method. Because we use the Cache structures, the code in this sandbox
+is only compatible with quadtree and octree grids.
 * [elasticity-ft.h](src/lagrangian_caps/elasticity-ft.h): Implementation of the
 membrane elasticity in the front-tracking framework. In 3D, this is an explicit
 finite element method.
 * [neo-hookean.h](src/lagrangian_caps/neo-hookean.h): Implementation of the
 neo-Hookean elatic law.
 * [skalak.h](src/lagrangian_caps/skalak.h): Implementation of the
-Skalak elatic law, describing lipid-bilayer biological membranes. Not valid in
-two dimensions.
+Skalak elatic law, describing lipid-bilayer biological membranes.
 * [higer-order-neo-hookean.h](src/lagrangian_caps/ho-neo-hookean.h):
 Implementation of the higher-order neo-Hookean elastic force, for extreme
 deformation of red blood cells.
 * [bending-ft.h](src/lagrangian_caps/bending-ft.h): Implementation of a bending
-force (in 3D only, the 2D implementation is located [here](src/lagrangian_caps/bending-2d.c) but might be bugged).
+force (in 3D only, the 2D implementation is located [here](src/lagrangian_caps/bending-2d.c) but it failed validation).
 * [curvature-ft.h](src/lagrangian_caps/curvature-ft.h): Implementation of the
 nodal curvature computations for 2D and 3D membranes, by fitting polynomial to
 the nearest neighbors (and using the ordinary least-squares method in 3D).
@@ -59,35 +60,46 @@ from this
 of a linear elastic law, useful only for comparison with some papers from
 Pozrikidis.
 
-#### Test cases
+#### Validation cases
 * [advect_caps.c](tests/lagrangian_caps/advect_caps.c): tests the simple advection
 of a capsule devoid of elasticity.
 * [curvature.c](tests/lagrangian_caps/curvature.c): tests the computations of
-the normal vectors and curvature of a capsule.
-* [impose-forcing.c](): Coming soon. Tests the force coupling from the capsule
-to the fluid.
-* [neo-hookean-stretch.c](): Coming soon. Tests the computations of the edges'
-lengths and the neo-Hookean forces, including across periodic boundary
-conditions.
-* [advected-viscosity.c](): Coming soon. Tests the implementation of the
-variable viscosity.
+the normal vectors and curvature of a capsule in 2 dimensions.
 * [uniaxial_stretch.c](tests/lagrangian_caps/uniaxial_stretch.c): tests the
 computation of 3D elastic tensions for a flat membrane, for both the
 neo-Hookean and Skalak laws.
-* [nh_shear_3d.c](tests/lagrangian_caps/nh_shear_3d.c): tests the general
+* [biconcave_curvatures.c](tests/lagrangian_caps/biconcave_curvatures.c) tests
+the computations of the mean, Gaussian, surface Laplacian and total Helfrich's
+bending force on a 3D biconcave membrane in the absence of reference curvature.
+* [nh_shear.c](tests/lagrangian_caps/nh_shear.c): tests the general
 3D implementation, including the neo-Hookean elastic law, and compares the
 result to various authors.
+* [bending_shear.c](tests/lagrangian_caps/bending_shear.c): same test as
+[nh_shear.c](tests/lagrangian_caps/nh_shear.c) with the addition of a bending
+stress. Results are compared to various authors.
 * [constricted_channel.c](tests/lagrangian_caps/constricted_channel.c): tests
 the Skalak elasticty law, the interaction with embedded boundaries and compares
 quantitatively the deformation of the capsule to that of Park \&
 Dimitrakopoulos.
-* [Capsules interception](tests/lagrangian_caps/caps_interception.c): tests the
+* [caps_interception.c](tests/lagrangian_caps/caps_interception.c): tests the
 interaction of two elastic capsules, and compares to the work of Lu and
 Barthès-Biesel, JFM, 2007.
+* [caps_interception_inertia.c](tests/lagrangian_caps/caps_interception_inertia.c):
+tests the interaction of two elastic capsules in the presence of inerta
+($Re = 3, 10, 50$), and compares to the work of Doddi \& Bagchi (2008).
+
+#### Original results
+* [narrow_constricted_channel.c](tests/lagrangian_caps/narrow_constricted_channel.c):
+same case as [constricted_channel.c](tests/lagrangian_caps/constricted_channel.c) but with a narrower constriction size, a finer grid
+resolution, and the addition of bending effects.
+* [helix.c](cases/lagrangian_caps/helix.c): a demonstration case in a large 3D
+domain featuring a helicoidal channel. Inertial migration of a capsule is
+observed for $Re = 10, 50$.
 
 #### Limitations and known bugs
 * The 2D bending force currently leads to numerical instabilities, probably due
-to a wrong understanding of the force formulation on my part.
+to a wrong understanding of the force formulation on my part. The 3D version is
+working and well validated, however.
 * Multigrid: since the Cache structure is used in the IBM implementation, the
 code on this sandbox is compatible with quad/octree grids but not Cartesian or
 multigrid.
@@ -97,14 +109,20 @@ shades) have not been implemented.
 
 
 ## Eulerian framework
-In the Eulerian framework, we do not mesh the capsules. The present work aims at reproducing and improving the method of Ii et al ([\[1\]](#ii2012full), [\[2\]](#ii2018continuum)).
+In the Eulerian framework, we do not mesh the capsules. The source files
+below aimed at reproducing and improving the method of Ii et al (2012, 2018).
+However, they did not lead to quantitatively satisfactory results and this
+approach has been abandoned for now.
 
-The employed Eulerian approach uses the VOF framework provided by Basilisk to track the position of the membrane. It has the main advantage of requiring only one common mesh for the background fluid and the capsules, thus greatly simplifying the implementation when adaptive mesh refinement (AMR) is considered. We can expect that for a large number of capsules, such an Eulerian description provides better computational performances than the Lagrangian alternative representation. Quantifying this improvement will be one of the sub-goals of this study.
+The Eulerian approach uses the VOF framework provided by Basilisk to track the position of the membrane. It has the main advantage of requiring only one common mesh for the background fluid and the capsules, thus greatly simplifying the implementation when adaptive mesh refinement (AMR) is considered. We can expect that for a large number of capsules, such an Eulerian description provides better computational performances than the Lagrangian alternative representation. Quantifying this improvement would have been one of the sub-goals of this study.
 
 Obviously, this Eulerian approach comes with downsides too:
 
 * The membrane representation is not sharp, as the Eulerian quantity describing the membrane stretches (the surface left Cauchy-Green deformation tensor) need to be defined in a region of space of typical width 5 to 7 grid cells.
 * When the Eulerian quantities are advected, diffusion will imply that the membrane "forgets" parts of its initial, unstressed configuration. As such, great care has to be taken to minimize diffusion in the advection step.
+* Representing the membrane stresses on the Eulerian grid might present more
+stability issues than using a Lagrangian mesh + immersed boundary method
+approach, although this is only speculation at this point.
 
 
 #### Source files
@@ -117,41 +135,15 @@ Obviously, this Eulerian approach comes with downsides too:
 
 
 #### Test cases
-* constant_elongation.h: (to be uploaded soon) tests the computation of the source terms of the advection equations for $J$ and $\mathbf{G}$, as well as the computation of the stress tensor.
-* linear_elongation.h: (to be uploaded soon) tests the full advection equation for $J$ and $\mathbf{G}$, since the gradient terms are non zero. Also tests the computation of the acceleration.
-* normal_scalar_extension.h: (to be uploaded soon) tests the extension of a scalar quantity from the interfactial cells to the rest of the extended membrane region along the normals.
-* normal_vector_extension.h: (to be uploaded soon) tests the extension of normal vectors themselves from the interfacial cells to the rest of the membrane region.
+* constant_elongation.h: (not uploaded yet) tests the computation of the source terms of the advection equations for $J$ and $\mathbf{G}$, as well as the computation of the stress tensor.
+* linear_elongation.h: (not uploaded yet) tests the full advection equation for $J$ and $\mathbf{G}$, since the gradient terms are non zero. Also tests the computation of the acceleration.
+* normal_scalar_extension.h: (not uploaded yet) tests the extension of a scalar quantity from the interfactial cells to the rest of the extended membrane region along the normals.
+* normal_vector_extension.h: (not uploaded yet) tests the extension of normal vectors themselves from the interfacial cells to the rest of the membrane region.
 
 
 #### Known bugs
+* __It never reproduced quantitatively acceptable results__. Don't use these Eulerian source files unless you want to fix the implementation/the method yourself.
 * The normal vectors provided *on* the interface by the height functions are assumed to be provided at the center of the interfacial cells by the current implementation.
 * Default boundary conditions of 3D tensors are not defined. This is fine as long as the developers/users are aware of it.
 
-## References
-~~~bib
-@article{ii2012full,
-  author  = {Ii, Satoshi and Gong, Xiaobo and Sugiyama, Kazuyasu and Wu, Jinbiao and Huang, Huaxiong and Takagi, Shu},
-  journal = {Communications in Computational Physics},
-  title   = {A full Eulerian fluid-membrane coupling method with a smoothed volume-of-fluid approach},
-  year    = {2012},
-  number  = {2},
-  pages   = {544},
-  volume  = {12},
-  file    = {:ii2012full - A Full Eulerian Fluid Membrane Coupling Method with a Smoothed Volume of Fluid Approach.pdf:PDF},
-  groups  = {Biological flows},
-  doi     = {https://doi.org/10.4208/cicp.141210.110811s}
-}
-@article{ii2018continuum,
-  author    = {Ii, Satoshi and Shimizu, Kazuya and Sugiyama, Kazuyasu and Takagi, Shu},
-  journal   = {Journal of Computational Physics},
-  title     = {Continuum and stochastic approach for cell adhesion process based on Eulerian fluid-capsule coupling with Lagrangian markers},
-  year      = {2018},
-  pages     = {769--786},
-  volume    = {374},
-  file      = {:ii2018continuum - Continuum and Stochastic Approach for Cell Adhesion Process Based on Eulerian Fluid Capsule Coupling with Lagrangian Markers.pdf:PDF},
-  groups    = {Biological flows},
-  publisher = {Elsevier},
-  doi       = {https://doi.org/10.1016/j.jcp.2018.08.002}
-}
-~~~
 */
