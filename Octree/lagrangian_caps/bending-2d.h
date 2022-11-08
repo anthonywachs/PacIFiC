@@ -59,34 +59,6 @@ void bending(lagMesh* mesh) {
   free(raw_bending);
 }
 
-// void bending(lagMesh* mesh) {
-//   compute_lengths(mesh);
-//   comp_curvature(mesh);
-//   for(int i=0; i<mesh->nlp; i++) {
-//     /** For each node, we compute the bending moment at the midpoint of each
-//     connecting edge. The current and reference curvature at the midpoint of the
-//     edges are simply the average of those at their nodes. */
-//     double m[2]; // the bending moment
-//     double l[2]; // the length of the edges
-//     for(int j=0; j<2; j++) {
-//       int edge_id = mesh->nodes[i].edge_ids[j];
-//       int edge_nodes[2];
-//       edge_nodes[0] = mesh->edges[edge_id].node_ids[0];
-//       edge_nodes[1] = mesh->edges[edge_id].node_ids[1];
-//       l[j] = mesh->edges[edge_id].length;
-//       m[j] = .5*E_B*(mesh->nodes[edge_nodes[0]].curv +
-//         mesh->nodes[edge_nodes[1]].curv - mesh->nodes[edge_nodes[0]].ref_curv -
-//           mesh->nodes[edge_nodes[1]].ref_curv);
-//     }
-//     /** We then differentiate the bending moment to obtain q=dm/dl at the
-//     considered node. */
-//     double q = (m[1] - m[0])/(.5*(l[0] + l[1]));
-//     foreach_dimension() mesh->nodes[i].lagForce.x += q*mesh->nodes[i].normal.x;
-//   }
-// }
-
-
-
 event acceleration (i++) {
   for(int i=0; i<mbs.nbmb; i++) bending(&mbs.mb[i]);
 }

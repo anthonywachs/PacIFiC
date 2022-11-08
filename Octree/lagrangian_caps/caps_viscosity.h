@@ -112,12 +112,11 @@ event defaults (i = 0) {
     }
   }
   #if EMBED
-  // I[embed] = dirichlet(0.);
-  I.third = true;
+    I[embed] = dirichlet(0.);
+    I.third = true;
   #endif
 }
 
-// event viscoprop (i = 1; i++) {
 event properties (i++) {
   foreach() {
     if (cm[] > 1.e-20) {
@@ -125,9 +124,6 @@ event properties (i++) {
       divG[] = 0.;
     }
   }
-  #if OLD_QCC
-  boundary((scalar*){divG, G});
-  #endif
 
   for (int k=0; k<mbs.nbmb; k++) construct_divG(divG, &MB(k));
   poisson(I, divG, tolerance = 1.e-6, minlevel = 4);
@@ -146,9 +142,6 @@ event properties (i++) {
       I[] = clamp(I[], 0, 1);
     }
   }
-  #if OLD_QCC
-  boundary({I, prevI});
-  #endif
 }
 
 event properties (i++) {
