@@ -2311,6 +2311,7 @@ DS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list 
               if (void_frac->operator()(p) != 0) {
                  size_t par_id = void_frac->operator()(p) - 1;
                  geomVector rb_vel = allrigidbodies->rigid_body_velocity(par_id,pt);
+					  // geomVector rb_vel = allrigidbodies->rigid_body_GC_velocity(par_id);
                  for (size_t level : list)
                   UF->set_DOF_value( i, j, k, comp, level,rb_vel(comp));
               }

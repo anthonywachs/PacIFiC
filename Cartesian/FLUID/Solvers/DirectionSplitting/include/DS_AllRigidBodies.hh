@@ -335,6 +335,11 @@ class DS_AllRigidBodies
       geomVector rigid_body_velocity( size_t const& parID,
                                           geomVector const& pt );
 
+      /** @brief Computes the rigid body velocity translation velocity
+      without the rotation speed
+      @param parID rigid body ID */
+      geomVector rigid_body_GC_velocity( size_t const& parID);
+
       /** @brief Returns pointer to gravity center of parID
       @param parID ID of rigid body*/
       geomVector const* get_gravity_centre( size_t const& parID);

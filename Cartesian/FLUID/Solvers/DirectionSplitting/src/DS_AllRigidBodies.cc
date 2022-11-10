@@ -530,6 +530,9 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
      geomVector ang_vel(3);
      geomVector ang_acc(3);
 
+     // double Amp = 1., freq = 0.;
+     // vel(1) = Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
+
      // Solving equation of motion
      for (size_t dir = 0; dir < m_space_dimension;dir++) {
         pos(dir) = pgc->operator()(dir);
@@ -844,6 +847,23 @@ geomVector DS_AllRigidBodies:: rigid_body_velocity( size_t const& parID,
   delta(1) = delta_periodic_transformation(pt(1) - pgc->operator()(1), 1);
   delta(2) = (m_space_dimension == 3) ?
              delta_periodic_transformation(pt(2) - pgc->operator()(2), 2) : 0.;
+
+  return (m_allDSrigidbodies[parID]->get_rigid_body_velocity(delta));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+geomVector DS_AllRigidBodies:: rigid_body_GC_velocity( size_t const& parID)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: rigid_body_GC_velocity()" ) ;
+
+  geomVector delta(3);
+
+  delta(0) = 0.; delta(1) = 0.; delta(2) = 0.;
 
   return (m_allDSrigidbodies[parID]->get_rigid_body_velocity(delta));
 
