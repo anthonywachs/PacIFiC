@@ -94,6 +94,9 @@ void lag2eul(vector forcing, lagMesh* mesh) {
   for(int i=0; i<mesh->nlp; i++) {
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
+        #if EMBED
+          if (cs[] > 1.e-10) {
+        #endif
         coord dist;
         dist.x = GENERAL_1DIST(x, mesh->nodes[i].pos.x);
         dist.y = GENERAL_1DIST(y, mesh->nodes[i].pos.y);
@@ -114,6 +117,9 @@ void lag2eul(vector forcing, lagMesh* mesh) {
         #endif
           foreach_dimension() forcing.x[] += weight*mesh->nodes[i].lagForce.x;
         }
+        #if EMBED
+          }
+        #endif
       }
     }
   }
