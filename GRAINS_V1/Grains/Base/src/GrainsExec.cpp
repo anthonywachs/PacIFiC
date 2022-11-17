@@ -23,6 +23,7 @@ string GrainsExec::m_reloadFile_suffix = "B";
 bool GrainsExec::m_exception_Contact = false; 
 bool GrainsExec::m_exception_Displacement = false;
 bool GrainsExec::m_exception_Simulation = false;
+string GrainsExec::m_shift0 = "";
 string GrainsExec::m_shift1 = " ";
 string GrainsExec::m_shift2 = "  ";
 string GrainsExec::m_shift3 = "   ";

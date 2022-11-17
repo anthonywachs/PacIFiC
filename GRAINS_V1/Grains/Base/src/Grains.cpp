@@ -1060,200 +1060,8 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
               for (XMLSize_t i=0; i<allWindows->getLength(); i++)
 	      {
 	        DOMNode* nWindow = allWindows->item( i );
-
-	        // Insertion window type
-	        string iwindow_type = "Box";
-	        if ( ReaderXML::hasNodeAttr( nWindow, "Type" ) )
-	          iwindow_type = ReaderXML::getNodeAttr_String( nWindow,
-		  	"Type" );
-
-	        Window iwindow;
-	        if ( iwindow_type == "Cylinder" )
-		  iwindow.ftype = WINDOW_CYLINDER;
-	        else if ( iwindow_type == "Annulus" )
-	          iwindow.ftype = WINDOW_ANNULUS;
-	        else if ( iwindow_type == "Line" )
-	         iwindow.ftype = WINDOW_LINE;
-	        else if ( iwindow_type == "Box" )
-	          iwindow.ftype = WINDOW_BOX;
-	        else iwindow.ftype = WINDOW_NONE;
-
-	        DOMNodeList* points = NULL;
-	        DOMNode* pointA = NULL;
-	        DOMNode* pointB = NULL;
-	        DOMNode* cylGeom = NULL;
-	        DOMNode* annGeom = NULL;
-	        string axisdir_str = "W";
-
-	        // Read features depending on the type
-	        switch( iwindow.ftype )
-	        {
-	          case WINDOW_BOX:
- 	            points = ReaderXML::getNodes( nWindow );
-	            pointA = points->item( 0 );
-	            pointB = points->item( 1 );
-
-	            iwindow.radius = iwindow.radius_int = iwindow.height = 0. ;
-	            iwindow.axisdir = NONE ;
-	            iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"X" );
-	            iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Y" );
-                    iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Z" );
-	            iwindow.ptB[X] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"X" );
-	            iwindow.ptB[Y] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"Y" );
-	            iwindow.ptB[Z] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"Z" );
-
-		    if ( m_rank == 0 )
-		    {
-		      cout << GrainsExec::m_shift12 << "Type = " <<
-		    	iwindow_type << endl;
-                      cout << GrainsExec::m_shift15 << "Point3 min = " <<
-	    		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-                	iwindow.ptA[Z] << endl;
-                      cout << GrainsExec::m_shift15 << "Point3 max = " <<
-	    		iwindow.ptB[X] << " " << iwindow.ptB[Y] << " " <<
-                	iwindow.ptB[Z] << endl;
-		    }
-		    break;
-
-	          case WINDOW_CYLINDER:
-	            pointA = ReaderXML::getNode( nWindow, "BottomCentre" );
-	            iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"X" );
-	            iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Y" );
-                    iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Z" );
-	            iwindow.ptB[X] = iwindow.ptB[Y] = iwindow.ptB[Z] = 0.;
-	            cylGeom = ReaderXML::getNode( nWindow, "Cylinder" );
-	            iwindow.radius = ReaderXML::getNodeAttr_Double( cylGeom,
-			"Radius" );
-	            iwindow.radius_int = 0.;
-	            iwindow.height = ReaderXML::getNodeAttr_Double( cylGeom,
-			"Height" );
-	            axisdir_str = ReaderXML::getNodeAttr_String( cylGeom,
-	          	"Direction" );
-	            if ( axisdir_str == "X" ) iwindow.axisdir = X;
-	            else if ( axisdir_str == "Y" ) iwindow.axisdir = Y;
-	            else if ( axisdir_str == "Z" ) iwindow.axisdir = Z;
-	            else
-	            {
-                      if ( m_rank == 0 )
-                        cout << "Wrong axis direction in cylindrical "
-                       		<< "insertion window; values: X, Y or Z"
-				<< endl;
-                      grainsAbort();
-                    }
-
-		    if ( m_rank == 0 )
-		    {
-		      cout << GrainsExec::m_shift12 << "Type = " <<
-		    	iwindow_type << endl;
-                      cout << GrainsExec::m_shift15 << "Bottom centre = " <<
-	    		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-                	iwindow.ptA[Z] << endl;
-		      cout << GrainsExec::m_shift15 << "Radius = " <<
-		    	iwindow.radius << endl;
-		      cout << GrainsExec::m_shift15 << "Height = " <<
-		    	iwindow.height << endl;
-		      cout << GrainsExec::m_shift15 << "Direction = " <<
-		    	axisdir_str << endl;
-		    }
-                    break;
-
-                  case WINDOW_ANNULUS:
-                    pointA = ReaderXML::getNode( nWindow, "BottomCentre" );
-                    iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"X" );
-                    iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Y" );
-                    iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Z" );
-                    iwindow.ptB[X] = iwindow.ptB[Y] = iwindow.ptB[Z] = 0.;
-                    annGeom = ReaderXML::getNode( nWindow, "Annulus" );
-                    iwindow.radius = ReaderXML::getNodeAttr_Double( annGeom,
-                  	"RadiusExt" );
-                    iwindow.radius_int = ReaderXML::getNodeAttr_Double( annGeom,
-                  	"RadiusInt" );
-                    iwindow.height = ReaderXML::getNodeAttr_Double( annGeom,
-                  	"Height" );
-                    axisdir_str = ReaderXML::getNodeAttr_String( annGeom,
-                  	"Direction" );
-	            if ( axisdir_str == "X" ) iwindow.axisdir = X;
-	            else if ( axisdir_str == "Y" ) iwindow.axisdir = Y;
-	            else if ( axisdir_str == "Z" ) iwindow.axisdir = Z;
-	            else
-	            {
-                      if ( m_rank == 0 )
-                        cout << "Wrong axis direction in cylindrical "
-                       		<< "insertion window; values: X, Y or Z"
-				<< endl;
-                      grainsAbort();
-                    }
-
-		    if ( m_rank == 0 )
-		    {
-		      cout << GrainsExec::m_shift12 << "Type = " <<
-		    	iwindow_type << endl;
-                      cout << GrainsExec::m_shift15 << "Bottom centre = " <<
-	    		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-                	iwindow.ptA[Z] << endl;
-		      cout << GrainsExec::m_shift15 << "External radius = " <<
-		    	iwindow.radius << endl;
-		      cout << GrainsExec::m_shift15 << "Internal radius = " <<
-		    	iwindow.radius_int << endl;
-		      cout << GrainsExec::m_shift15 << "Height = " <<
-		    	iwindow.height << endl;
-		      cout << GrainsExec::m_shift15 << "Direction = " <<
-		    	axisdir_str << endl;
-		    }
-                    break;
-
-	          case WINDOW_LINE:
- 	            points = ReaderXML::getNodes( nWindow );
-	            pointA = points->item( 0 );
-	            pointB = points->item( 1 );
-
-	            iwindow.radius = iwindow.radius_int = iwindow.height = 0. ;
-	            iwindow.axisdir = NONE ;
-	            iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"X" );
-	            iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Y" );
-	            iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Z" );
-	            iwindow.ptB[X] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"X" );
-	            iwindow.ptB[Y] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"Y" );
-	            iwindow.ptB[Z] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"Z" );
-
-		    if ( m_rank == 0 )
-		    {
-		      cout << GrainsExec::m_shift12 << "Type = " <<
-		    	iwindow_type << endl;
-                      cout << GrainsExec::m_shift15 << "Point3 A = " <<
-	    		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-                	iwindow.ptA[Z] << endl;
-                      cout << GrainsExec::m_shift15 << "Point3 B = " <<
-	    		iwindow.ptB[X] << " " << iwindow.ptB[Y] << " " <<
-                	iwindow.ptB[Z] << endl;
-		    }
-	          break;
-
-	          default:
-	            if ( m_rank == 0 ) cout << "Unknown insertion window "
-		  	"type" << endl;
-	            grainsAbort();
-	            break;
-	        }
-
+                Window iwindow;
+		readWindow( nWindow, iwindow, GrainsExec::m_shift12 );
 	        m_insertion_windows.insert( m_insertion_windows.begin(),
 	      		iwindow );
               }
@@ -2146,3 +1954,177 @@ void Grains::display_used_memory() const
 // Synchronizes the PPWindow boolean relative to each sub-domain
 void Grains::synchronize_PPWindow()
 {}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads a window 
+void Grains::readWindow( DOMNode* nWindow, Window& iwindow, 
+	string const& oshift )
+{
+  // Insertion window type
+  string iwindow_type = "Box";
+  if ( ReaderXML::hasNodeAttr( nWindow, "Type" ) )
+    iwindow_type = ReaderXML::getNodeAttr_String( nWindow,
+		  	"Type" );
+
+  if ( iwindow_type == "Cylinder" )
+    iwindow.ftype = WINDOW_CYLINDER;
+  else if ( iwindow_type == "Annulus" )
+    iwindow.ftype = WINDOW_ANNULUS;
+  else if ( iwindow_type == "Line" )
+    iwindow.ftype = WINDOW_LINE;
+  else if ( iwindow_type == "Box" )
+    iwindow.ftype = WINDOW_BOX;
+  else iwindow.ftype = WINDOW_NONE;
+
+  DOMNodeList* points = NULL;
+  DOMNode* pointA = NULL;
+  DOMNode* pointB = NULL;
+  DOMNode* cylGeom = NULL;
+  DOMNode* annGeom = NULL;
+  string axisdir_str = "W";
+
+  // Read features depending on the type
+  switch( iwindow.ftype )
+  {
+    case WINDOW_BOX:
+      points = ReaderXML::getNodes( nWindow );
+      pointA = points->item( 0 );
+      pointB = points->item( 1 );
+
+      iwindow.radius = iwindow.radius_int = iwindow.height = 0. ;
+      iwindow.axisdir = NONE ;
+      iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
+      iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
+      iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
+      iwindow.ptB[X] = ReaderXML::getNodeAttr_Double( pointB, "X" );
+      iwindow.ptB[Y] = ReaderXML::getNodeAttr_Double( pointB, "Y" );
+      iwindow.ptB[Z] = ReaderXML::getNodeAttr_Double( pointB, "Z" );
+
+      if ( m_rank == 0 )
+      {
+        cout << oshift << "Type = " << iwindow_type << endl;
+	cout << oshift << GrainsExec::m_shift3 << "Point3 min = " <<
+		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
+		iwindow.ptA[Z] << endl;
+        cout << oshift << GrainsExec::m_shift3 << "Point3 max = " <<
+		iwindow.ptB[X] << " " << iwindow.ptB[Y] << " " <<
+		iwindow.ptB[Z] << endl;
+      }
+      break;
+
+    case WINDOW_CYLINDER:
+      pointA = ReaderXML::getNode( nWindow, "BottomCentre" );
+      iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
+      iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
+      iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
+      iwindow.ptB[X] = iwindow.ptB[Y] = iwindow.ptB[Z] = 0.;
+      cylGeom = ReaderXML::getNode( nWindow, "Cylinder" );
+      iwindow.radius = ReaderXML::getNodeAttr_Double( cylGeom, "Radius" );
+      iwindow.radius_int = 0.;
+      iwindow.height = ReaderXML::getNodeAttr_Double( cylGeom, "Height" );
+      axisdir_str = ReaderXML::getNodeAttr_String( cylGeom, "Direction" );
+      if ( axisdir_str == "X" ) iwindow.axisdir = X;
+      else if ( axisdir_str == "Y" ) iwindow.axisdir = Y;
+      else if ( axisdir_str == "Z" ) iwindow.axisdir = Z;
+      else
+      {
+	if ( m_rank == 0 )
+          cout << "Wrong axis direction in cylindrical "
+		<< "insertion window; values: X, Y or Z" << endl;
+        grainsAbort();
+      }
+
+      if ( m_rank == 0 )
+      {
+	cout << oshift << "Type = " << iwindow_type << endl;
+        cout << oshift << GrainsExec::m_shift3 << "Bottom centre = " <<
+		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
+		iwindow.ptA[Z] << endl;
+	cout << oshift << GrainsExec::m_shift3 << "Radius = " << 
+	  	iwindow.radius << endl;
+        cout << oshift << GrainsExec::m_shift3 << "Height = " <<
+		iwindow.height << endl;
+        cout << oshift << GrainsExec::m_shift3 << "Direction = " <<
+		axisdir_str << endl;
+      }
+      break;
+
+    case WINDOW_ANNULUS:
+      pointA = ReaderXML::getNode( nWindow, "BottomCentre" );
+      iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
+      iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
+      iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
+      iwindow.ptB[X] = iwindow.ptB[Y] = iwindow.ptB[Z] = 0.;
+      annGeom = ReaderXML::getNode( nWindow, "Annulus" );
+      iwindow.radius = ReaderXML::getNodeAttr_Double( annGeom, 
+	  	"RadiusExt" );
+      iwindow.radius_int = ReaderXML::getNodeAttr_Double( annGeom,
+		"RadiusInt" );
+      iwindow.height = ReaderXML::getNodeAttr_Double( annGeom,
+		"Height" );
+      axisdir_str = ReaderXML::getNodeAttr_String( annGeom,
+		"Direction" );
+      if ( axisdir_str == "X" ) iwindow.axisdir = X;
+      else if ( axisdir_str == "Y" ) iwindow.axisdir = Y;
+      else if ( axisdir_str == "Z" ) iwindow.axisdir = Z;
+      else
+      {
+        if ( m_rank == 0 )
+          cout << "Wrong axis direction in cylindrical "
+		<< "insertion window; values: X, Y or Z" << endl;
+        grainsAbort();
+      }
+
+      if ( m_rank == 0 )
+      {
+	cout << oshift << "Type = " << iwindow_type << endl;
+        cout << oshift << GrainsExec::m_shift3 << "Bottom centre = " <<
+		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
+		iwindow.ptA[Z] << endl;
+	cout << oshift << GrainsExec::m_shift3 << "External radius = " <<
+		iwindow.radius << endl;
+        cout << oshift << GrainsExec::m_shift3 << "Internal radius = " <<
+		iwindow.radius_int << endl;
+        cout << oshift << GrainsExec::m_shift3 << "Height = " <<
+		iwindow.height << endl;
+        cout << oshift << GrainsExec::m_shift3 << "Direction = " <<
+		axisdir_str << endl;
+      }
+      break;
+
+    case WINDOW_LINE:
+      points = ReaderXML::getNodes( nWindow );
+      pointA = points->item( 0 );
+      pointB = points->item( 1 );
+
+      iwindow.radius = iwindow.radius_int = iwindow.height = 0. ;
+      iwindow.axisdir = NONE ;
+      iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA, "X" );
+      iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA, "Y" );
+      iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
+      iwindow.ptB[X] = ReaderXML::getNodeAttr_Double( pointB, "X" );
+      iwindow.ptB[Y] = ReaderXML::getNodeAttr_Double( pointB, "Y" );
+      iwindow.ptB[Z] = ReaderXML::getNodeAttr_Double( pointB, "Z" );
+
+      if ( m_rank == 0 )
+      {
+        cout << oshift << "Type = " << iwindow_type << endl;
+        cout << oshift << GrainsExec::m_shift3 << "Point3 A = " <<
+		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
+		iwindow.ptA[Z] << endl;
+        cout << oshift << GrainsExec::m_shift3 << "Point3 B = " <<
+		iwindow.ptB[X] << " " << iwindow.ptB[Y] << " " <<
+		iwindow.ptB[Z] << endl;
+      }
+      break;
+
+    default:
+      if ( m_rank == 0 ) cout << "Unknown insertion window "
+		"type" << endl;
+      grainsAbort();
+      break;
+  }
+}

@@ -350,7 +350,6 @@ void Cylinder::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 // Returns whether a point lies inside the cylinder
 bool Cylinder::isIn( Point3 const& pt ) const
 {
-  // TO DO
-  
-  return ( false );
+  return ( pt[Y] > - m_halfHeight && pt[Y] < m_halfHeight 
+  	&& sqrt( pt[X] * pt[X] + pt[Z] * pt[Z] ) < m_radius );
 }  

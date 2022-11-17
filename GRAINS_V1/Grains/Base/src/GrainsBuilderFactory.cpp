@@ -3,6 +3,7 @@
 #include "GrainsCRBFeatures.hh"
 #include "GrainsTestDev.hh"
 #include "GrainsCoupledWithFluid.hh"
+#include "GrainsPostProcessing.hh"
 #include <string>
 using namespace std;
 
@@ -27,7 +28,8 @@ Grains* GrainsBuilderFactory::create( DOMElement* root )
   if ( option == "Standard" ) grains = new Grains();
   else if ( option == "Parameters" ) grains = new GrainsParameters();
   else if ( option == "CompositeRigidBody" ) grains = new GrainsCRBFeatures();
-  else if ( option == "TestDev" ) grains = new GrainsTestDev();     
+  else if ( option == "TestDev" ) grains = new GrainsTestDev(); 
+  else if ( option == "PostProcessing" ) grains = new GrainsPostProcessing();
     
   // Postconditions
   assert( grains != NULL );

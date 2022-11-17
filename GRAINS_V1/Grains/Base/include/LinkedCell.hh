@@ -187,6 +187,11 @@ class LinkedCell : public AppCollision
     /** @brief Returns a pointer to the vector of all cells of the linked cell
     grid */
     vector<Cell*> const* getAllCells() const;
+    
+    /** @brief Returns a list of pointers to the cell that contains a point
+    and the neighboring cells to that cell
+    @param position the point coordinates */
+    list<Cell*> getCellAndCellNeighborhood( Point3 const& position ) const;    
     //@}
 
 

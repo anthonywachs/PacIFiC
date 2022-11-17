@@ -178,7 +178,12 @@ class Cell
     /** @brief Removes an obstacle from the list of obstacles in the vicinity of
     the cell
     @param obs obstacle to be removed */
-    void remove( SimpleObstacle* obs );  
+    void remove( SimpleObstacle* obs ); 
+    
+    /** @brief Returns whether a point belongs to any particle that belogs to 
+    the cell
+    @param position the point coordinates */
+    bool isInParticle( Point3 const& position ) const;     
   
     /** @brief Output operator
     @param f output stream

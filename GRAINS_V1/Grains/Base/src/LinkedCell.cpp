@@ -1311,6 +1311,33 @@ Cell* LinkedCell::getCell( const Point3 &position ) const
 
 
 // ----------------------------------------------------------------------------
+// Returns a list of pointers to the cell that contains a point
+// and the neighboring cells to that cell
+list<Cell*> LinkedCell::getCellAndCellNeighborhood( Point3 const& position ) 
+	const
+{
+  list<Cell*> cells;
+  Cell* neighborc = NULL;  
+  
+  int id[3];
+  Cell::GetCell( position, id );
+  cells.push_back( getCell( id[X], id[Y], id[Z] ) );
+  
+  for (int k=-1;k<2;++k)
+    for (int l=-1;l<2;++l)
+      for (int m=-1;m<2;++m)
+        if ( k || l || m )
+        {
+          neighborc = getCell( id[X]+k, id[Y]+l, id[Z]+m );
+          if ( neighborc ) cells.push_back( neighborc );
+        }  
+    
+  return ( cells ) ;
+}
+
+
+
+// ----------------------------------------------------------------------------
 // Returns a pointer to the cell given its ijk indexing
 int LinkedCell::getCellNumber( int i, int j, int k ) const
 {
@@ -1974,10 +2001,6 @@ void LinkedCell::DestroyOutOfDomainClones( double time,
   }
 
 }
-
-
-
-
 
 
 
