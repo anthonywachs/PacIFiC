@@ -180,10 +180,17 @@ class Cell
     @param obs obstacle to be removed */
     void remove( SimpleObstacle* obs ); 
     
-    /** @brief Returns whether a point belongs to any particle that belogs to 
+    /** @brief Returns whether a point belongs to any particle that belongs to 
     the cell
     @param position the point coordinates */
-    bool isInParticle( Point3 const& position ) const;     
+    bool isInParticle( Point3 const& position ) const;
+    
+    /** @brief Returns whether a point belongs to a specific particle that 
+    belongs to the cell
+    @param position the point coordinates 
+    @param particle_ the specific particle */
+    bool isInParticle( Point3 const& position, Particle const* particle_ ) 
+    	const;                 
   
     /** @brief Output operator
     @param f output stream

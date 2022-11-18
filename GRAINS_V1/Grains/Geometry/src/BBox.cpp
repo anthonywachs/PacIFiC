@@ -283,3 +283,19 @@ ostream& operator << ( ostream& f, BBox const& B )
   f << "      Extent = " << B.m_extent;
   return ( f );  
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether the bounding box fully contains the other bounding box
+bool BBox::fullyContain( BBox const& a )
+{
+  return ( 
+    a.m_center[X] - a.m_extent[X] >= m_center[X] - m_extent[X] &&
+    a.m_center[X] + a.m_extent[X] <= m_center[X] + m_extent[X] &&    
+    a.m_center[Y] - a.m_extent[Y] >= m_center[Y] - m_extent[Y] &&
+    a.m_center[Y] + a.m_extent[Y] <= m_center[Y] + m_extent[Y] && 
+    a.m_center[Z] - a.m_extent[Z] >= m_center[Z] - m_extent[Z] &&
+    a.m_center[Z] + a.m_extent[Z] <= m_center[Z] + m_extent[Z] ) ;      
+}

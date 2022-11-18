@@ -112,30 +112,99 @@ void GrainsPostProcessing::Simulation( double time_interval )
     list<Cell*>::const_iterator ic;
     bool found = false;
     
-    for (size_t i=0;i<m_global_porosity->nintervals[X];++i)
-      for (size_t j=0;j<m_global_porosity->nintervals[Y];++j)    
-        for (size_t k=0;k<m_global_porosity->nintervals[Z];++k)
+    if ( m_global_porosity->domain.ftype == WINDOW_BOX )
+    {
+      list<Particle*> const* allpart = m_allcomponents.getActiveParticles();
+      list<Particle*>::const_iterator il;            
+      BBox BBdomain( m_global_porosity->domain.ptA,
+      	 m_global_porosity->domain.ptB ), BBintVol;
+      Point3 intVolptA;	
+      Vector3 intVolExtent;
+      size_t nx, ny, nz;
+      double dxl, dyl, dzl, dvl; 
+      
+      for (il=allpart->begin();il!=allpart->end();il++)
+      {
+        BBox BBpart = (*il)->BoundingBox(); 
+	
+	// The particle is not fully contained, we pixelate the part
+	// that belongs to the porosity domain
+	if ( !BBdomain.fullyContain( BBpart ) )
 	{
-	  // Coordinates of the center of the elementary volume
-	  elemVolCenter[X] = m_global_porosity->domain.ptA[X]
+	  // We 1st check that the particle bounding box is not fully
+	  // outside the porosity domain
+	  if ( intersect( BBdomain, BBpart ) ) 
+	  {
+	    BBintVol.closest( BBdomain, BBpart );
+	    intVolptA.setValue( BBintVol.getLower( X ), BBintVol.getLower( Y ),
+	    	BBintVol.getLower( Z ) );
+	    intVolExtent = BBintVol.getExtent();
+	    nx = size_t( 2. * intVolExtent[X] / dx ) + 1;
+	    ny = size_t( 2. * intVolExtent[Y] / dy ) + 1;
+	    nz = size_t( 2. * intVolExtent[Z] / dz ) + 1;
+	    dxl = 2. * intVolExtent[X] / double(nx);
+	    dyl = 2. * intVolExtent[Y] / double(ny); 
+	    dzl = 2. * intVolExtent[Z] / double(nz);
+	    dvl = dxl * dyl * dzl;
+
+            for (size_t i=0;i<nx;++i)
+              for (size_t j=0;j<ny;++j)    
+                for (size_t k=0;k<nz;++k)
+	        {
+	          // Coordinates of the center of the elementary volume
+	          elemVolCenter[X] = intVolptA[X] + ( double(i) + 0.5 ) * dxl;
+	          elemVolCenter[Y] = intVolptA[Y] + ( double(j) + 0.5 ) * dyl;
+	          elemVolCenter[Z] = intVolptA[Z] + ( double(k) + 0.5 ) * dzl;
+	  
+	          // List of cells containing the cell that elemVolCenter 
+		  // belongs to and its neighboring cells
+	          cells = m_collision->getCellAndCellNeighborhood( 
+		  	elemVolCenter );
+	  
+	          // Loops over the cells and check whether elemVolCenter 
+		  // belongs to this particle in any of these cells
+	          found = false;
+	          for (ic=cells.begin();ic!=cells.end() && !found;ic++)
+	            found = (*ic)->isInParticle( elemVolCenter, *il );
+	    
+                  if ( found ) volparticles += dvl;	  
+	        }
+	     	
+	  }
+	}
+	// The particle is fully contained in the porosity domain
+	// We simply add the volume
+	else
+	  volparticles += (*il)->getVolume();
+      }
+    }
+    else
+    {
+      for (size_t i=0;i<m_global_porosity->nintervals[X];++i)
+        for (size_t j=0;j<m_global_porosity->nintervals[Y];++j)    
+          for (size_t k=0;k<m_global_porosity->nintervals[Z];++k)
+	  {
+	    // Coordinates of the center of the elementary volume
+	    elemVolCenter[X] = m_global_porosity->domain.ptA[X]
 	  	+ ( double(i) + 0.5 ) * dx;
-	  elemVolCenter[Y] = m_global_porosity->domain.ptA[Y]
+	    elemVolCenter[Y] = m_global_porosity->domain.ptA[Y]
 	  	+ ( double(j) + 0.5 ) * dy;	  
-	  elemVolCenter[Z] = m_global_porosity->domain.ptA[Z]
+	    elemVolCenter[Z] = m_global_porosity->domain.ptA[Z]
 	  	+ ( double(k) + 0.5 ) * dz;	  
 	  
-	  // List of cells containing the cell that elemVolCenter belongs
-	  // to and its neighboring cells
-	  cells = m_collision->getCellAndCellNeighborhood( elemVolCenter );
+	    // List of cells containing the cell that elemVolCenter belongs
+	    // to and its neighboring cells
+	    cells = m_collision->getCellAndCellNeighborhood( elemVolCenter );
 	  
-	  // Loops over the cells and check whether elemVolCenter belongs
-	  // to any particle in any of these cells
-	  found = false;
-	  for (ic=cells.begin();ic!=cells.end() && !found;ic++)
-	    found = (*ic)->isInParticle( elemVolCenter );
+	    // Loops over the cells and check whether elemVolCenter belongs
+	    // to any particle in any of these cells
+	    found = false;
+	    for (ic=cells.begin();ic!=cells.end() && !found;ic++)
+	      found = (*ic)->isInParticle( elemVolCenter );
 	    
-          if ( found ) volparticles += dv;	  
-	}
+            if ( found ) volparticles += dv;	  
+	  }
+    }
          
     double porosity = ( volporodomain - volparticles ) / volporodomain;    
     cout << "Average porosity = " << porosity << endl;
