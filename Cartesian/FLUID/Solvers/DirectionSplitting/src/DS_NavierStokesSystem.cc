@@ -134,12 +134,6 @@ DS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 	vel_advection.reserve(1);
 	vel_advection.push_back(new doubleVector(1,0.));
 
-	face_frac_UF.reserve(1);
-	face_frac_UF.push_back(new doubleArray2D(1,1,0.));
-
-	normalRB.reserve(1);
-	normalRB.push_back(new doubleArray2D(1,1,0.));
-
 	for (size_t field = 0; field < 2; field++) {
 		// Vector to store the presence/absence of particle on the field variable
 		node[field][0].void_frac = LA_SeqVector::create( this, 0 ) ;
@@ -314,9 +308,6 @@ DS_NavierStokesSystem:: re_initialize( void )
 	vel_diffusion[2]->re_initialize( UF_loc );
 
 	vel_advection[0]->re_initialize( UF_loc );
-
-	face_frac_UF[0]->re_initialize(UF_loc,6,0.);
-	normalRB[0]->re_initialize(UF_loc,3,0.);
 
 	divergence[0]->re_initialize( pf_loc ) ;
 	divergence[1]->re_initialize( pf_loc ) ;
@@ -630,30 +621,6 @@ DS_NavierStokesSystem::get_velocity_diffusion()
 {
    MAC_LABEL( "DS_NavierStokesSystem:: get_velocity_diffusion" ) ;
    return (vel_diffusion) ;
-}
-
-
-
-
-//----------------------------------------------------------------------
-vector<doubleArray2D*>
-DS_NavierStokesSystem::get_velocity_face_fractions()
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: get_velocity_face_fractions" ) ;
-   return (face_frac_UF) ;
-}
-
-
-
-
-//----------------------------------------------------------------------
-vector<doubleArray2D*>
-DS_NavierStokesSystem::get_velocity_normalRB()
-//----------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokesSystem:: get_velocity_normalRB" ) ;
-   return (normalRB) ;
 }
 
 

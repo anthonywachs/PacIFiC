@@ -5,6 +5,7 @@
 #include <size_t_vector.hh>
 #include <size_t_array2D.hh>
 #include <doubleArray2D.hh>
+#include <doubleArray3D.hh>
 #include <boolArray2D.hh>
 #include <MAC_Communicator.hh>
 #include <MAC_DoubleVector.hh>
@@ -160,6 +161,12 @@ class DS_AllRigidBodies
       /** @brief Returns the Dirichlet BC on the near rigid body on FF */
       doubleArray2D* get_intersect_fieldValue_on_grid( FV_DiscreteField const* FF );
 
+      /** @brief Returns the RB normal in the Cut Cell */
+      doubleArray2D* get_CC_RB_normal(FV_DiscreteField const* FF);
+
+      /** @brief Returns the face fraction for the Cut Cell */
+      doubleArray2D* get_CC_face_fraction(FV_DiscreteField const* FF);
+
       //@}
 
 
@@ -264,8 +271,8 @@ class DS_AllRigidBodies
       @param pt1 Point 1
       @param pt2 Point 2 */
       std::tuple<double, geomVector, int, int>
-             return_side_fraction(geomVector const& pt1
-                                , geomVector const& pt2 );
+            return_side_fraction(geomVector const& pt1
+                               , geomVector const& pt2 );
 
       /** @brief Returns the flux from RB given the PF node index
       @param i index i
@@ -308,14 +315,19 @@ class DS_AllRigidBodies
 
       /** @brief Computes the face fraction belonging the each node
       of a given fluid field */
-      void compute_cutCell_geometric_parameters_PF();
+      void compute_cutCell_geometric_parameters( FV_DiscreteField const* FF );
+
+      /** @brief Outputs the cutcell parameters in a csv for debugging */
+      void write_CutCell_parameters(FV_DiscreteField const* FF);
 
       /** @brief Compute the velocity face flux from the UF face */
       double divergence_face_flux ( size_t const& p_PF
                                   , size_t const& i
                                   , size_t const& j
                                   , size_t const& k
-										    , size_t const& comp);
+                                  , size_t const& comp
+                                  , size_t const& side
+                                  , size_t const& dir);
 
       /** @brief Computes the intersection of grid nodes of a given fluid field
       with the nearest rigid body of a given fluid field
@@ -536,26 +548,23 @@ class DS_AllRigidBodies
       vector<size_t_vector*> void_fraction; /**< vector of void fraction the
       field grid nodes, 0 in fluid and (parID+1) in the rigid bodies*/
 
-      doubleVector* face_fraction; /**< vector of field grid nodes
-      face fraction, only for UF*/
+      vector<doubleArray3D*> CC_face_centroid; /**< centroid of the cut faces
+      for all fields, if any. [field]->[index][face][x,y,z]*/
 
-      intVector* face_ownerID; /**< vector of field grid nodes
-      face fraction, only for UF*/
+      vector<doubleArray2D*> CC_face_fraction; /**< Face fraction of the cell faces
+      for all fields. [field]->[index][face]*/
 
-      intVector* cell_ownerID; /**< vector of field grid nodes
-      face fraction, only for UF*/
+      vector<doubleVector*> CC_RB_area; /**< Intersection points
+      of rigid body with the grid cell. [field][index][points]*/
 
-      vector<geomVector> face_centroid; /**< centroid of the cut faces
-      on UF field, if any*/
+      vector<intVector> CC_ownerID; /**< Stores the RB's ID
+      intersecting the grid cell*/
 
-      vector<vector<geomVector>> intersect_points; /**< vector of set of
-      intersection points on UF field grid faces*/
+      vector<doubleArray2D*> CC_RB_normal; /**< Normal vector of RB surface
+      in the grid cell, if any*/
 
-      vector<geomVector> normalRB; /**< vector of rigid body normal
-      intersecting a pressure cell, if any*/
-
-      vector<double> CutRBarea; /**< vector of area of section of RB intersect
-      with a pressure cell, if any*/
+      vector<doubleArray2D*> CC_RB_centroid; /**< RB centroid
+      in the grid cell, if any*/
 
       // Columns in each variable are (left,right,bottom,top,behind,front)
       vector<size_t_array2D*> intersect_vector;  /**<Direction of intersection*/

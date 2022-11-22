@@ -63,7 +63,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , mu( fromDS.mu_ )
    , kai( fromDS.kai_ )
    , AdvectionScheme( fromDS.AdvectionScheme_ )
-	, DivergenceScheme( fromDS.DivergenceScheme_ )
+	, StencilCorrection( fromDS.StencilCorrection_ )
    , AdvectionTimeAccuracy( fromDS.AdvectionTimeAccuracy_ )
    , rho( fromDS.rho_ )
 	, b_restart ( fromDS.b_restart_ )
@@ -268,8 +268,10 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 		allrigidbodies->compute_grid_intersection_with_rigidbody(PF, false);
 		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, false);
 		// Compute the face fractions of CutCell is active
-		if (DivergenceScheme == "CutCell")
-			allrigidbodies->compute_cutCell_geometric_parameters_PF();
+		if (StencilCorrection == "CutCell") {
+			allrigidbodies->compute_cutCell_geometric_parameters(PF);
+			allrigidbodies->compute_cutCell_geometric_parameters(UF);
+		}
 
 		if (my_rank == 0)
          cout << "Finished void fraction and grid intersection... \n" << endl;
@@ -360,8 +362,10 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		allrigidbodies->compute_grid_intersection_with_rigidbody(PF, true);
 		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, true);
 		// Compute the face fractions of CutCell is active
-		if (DivergenceScheme == "CutCell")
-			allrigidbodies->compute_cutCell_geometric_parameters_PF();
+		if (StencilCorrection == "CutCell") {
+			allrigidbodies->compute_cutCell_geometric_parameters(PF);
+			allrigidbodies->compute_cutCell_geometric_parameters(UF);
+		}
 
 		// Field initialization
 		vector<size_t> vec{ 0, 1, 3};
@@ -1787,7 +1791,7 @@ DS_NavierStokes:: compute_adv_component ( size_t const& comp,
 	} else if ( AdvectionScheme == "Centered" ) {
  		ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp)
  			 	 - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
-	} else if ( AdvectionScheme == "Centered_CutCell" ) {
+	} else if ( AdvectionScheme == "Centered" && StencilCorrection == "CutCell" ) {
       ugradu = assemble_advection_Centered_CutCell(rho,i,j,k,comp,1)
              - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
    }
@@ -2487,19 +2491,19 @@ DS_NavierStokes:: calculate_velocity_divergence_cutCell ( size_t const& i,
 
 	size_t p = PF->DOF_local_number(i, j, k, 0);
 
-	double rht_flux = allrigidbodies->divergence_face_flux(p,shift.i+i,j,k,0);
+   double rht_flux = allrigidbodies->divergence_face_flux(p,shift.i+i,j,k,0,1,0);
 
-	double lft_flux = allrigidbodies->divergence_face_flux(p,shift.i+i-1,j,k,0);
+   double lft_flux = allrigidbodies->divergence_face_flux(p,shift.i+i-1,j,k,0,0,0);
 
-	double top_flux = allrigidbodies->divergence_face_flux(p,i,shift.j+j,k,1);
+   double top_flux = allrigidbodies->divergence_face_flux(p,i,shift.j+j,k,1,1,1);
 
-	double bot_flux = allrigidbodies->divergence_face_flux(p,i,shift.j+j-1,k,1);
+   double bot_flux = allrigidbodies->divergence_face_flux(p,i,shift.j+j-1,k,1,0,1);
 
-	double fnt_flux = (dim == 2) ? 0.
-					    : allrigidbodies->divergence_face_flux (p,i,j,shift.k+k,2);
+   double fnt_flux = (dim == 2) ? 0.
+ 	       			 : allrigidbodies->divergence_face_flux (p,i,j,shift.k+k,2,1,2);
 
-  	double bhd_flux = (dim == 2) ? 0.
-					    : allrigidbodies->divergence_face_flux (p,i,j,shift.k+k-1,2);
+   double bhd_flux = (dim == 2) ? 0.
+ 	    				 : allrigidbodies->divergence_face_flux (p,i,j,shift.k+k-1,2,0,2);
 
 	double xvalue = (rht_flux - lft_flux);
 	double yvalue = (top_flux - bot_flux);
@@ -2551,10 +2555,8 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( )
 	size_t_vector* void_frac = (is_solids) ?
 							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
-	vector<doubleArray2D*> face_fraction = GLOBAL_EQ
-								->get_velocity_face_fractions();
-	vector<doubleArray2D*> normalRB = GLOBAL_EQ
-								->get_velocity_normalRB();
+	doubleArray2D* normalRB = allrigidbodies->get_CC_RB_normal(UF);
+	doubleArray2D* face_fraction = allrigidbodies->get_CC_face_fraction(UF);
 
 	size_t_vector min_unknown_index(3,0);
 	size_t_vector max_unknown_index(3,0);
@@ -2603,27 +2605,27 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( )
 						if (void_frac->operator()(p) != 0) {
 							if (p_lft <= UF_UNK_MAX)
 								wt_lft = (void_frac->operator()(p_lft) == 0) ?
-												normalRB[0]->operator()(p,0)
-											 * normalRB[0]->operator()(p,0)
-											 * face_fraction[0]->operator()(p,0) : 0;
+												normalRB->operator()(p,0)
+											 * normalRB->operator()(p,0)
+											 * face_fraction->operator()(p,0) : 0;
 
 							if (p_rht <= UF_UNK_MAX)
 							 	wt_rht = (void_frac->operator()(p_rht) == 0) ?
-							 					normalRB[0]->operator()(p,0)
-							 				 * normalRB[0]->operator()(p,0)
-							 				 * face_fraction[0]->operator()(p,1) : 0;
+							 					normalRB->operator()(p,0)
+							 				 * normalRB->operator()(p,0)
+							 				 * face_fraction->operator()(p,1) : 0;
 
 							if (p_bot <= UF_UNK_MAX)
 	 							wt_bot = (void_frac->operator()(p_bot) == 0) ?
-	 											normalRB[0]->operator()(p,1)
-	 										 * normalRB[0]->operator()(p,1)
-	 										 * face_fraction[0]->operator()(p,2) : 0;
+	 											normalRB->operator()(p,1)
+	 										 * normalRB->operator()(p,1)
+	 										 * face_fraction->operator()(p,2) : 0;
 
 	 						if (p_top <= UF_UNK_MAX)
 	 						 	wt_top = (void_frac->operator()(p_top) == 0) ?
-	 						 					normalRB[0]->operator()(p,1)
-	 						 				 * normalRB[0]->operator()(p,1)
-	 						 				 * face_fraction[0]->operator()(p,3) : 0;
+	 						 					normalRB->operator()(p,1)
+	 						 				 * normalRB->operator()(p,1)
+	 						 				 * face_fraction->operator()(p,3) : 0;
 
 						   // Flux redistribution
 						   double sum = wt_lft + wt_rht + wt_bot + wt_top;
@@ -2685,7 +2687,7 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 		for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
 			for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
 				size_t p = PF->DOF_local_number(i,j,k,comp);
-				double vel_div = (DivergenceScheme == "CutCell") ?
+				double vel_div = (StencilCorrection == "CutCell") ?
 									calculate_velocity_divergence_cutCell(i,j,k,0)
 								 : calculate_velocity_divergence_FD(i,j,k,0);
 	         divergence->operator()(p) = vel_div;
@@ -2695,7 +2697,7 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 
 	// cout << "Div1: " << divergence->operator()(8188) << endl;
 
-	if (DivergenceScheme == "CutCell") {
+	if (StencilCorrection == "CutCell") {
 		// Flux from RB surface
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
@@ -3977,10 +3979,9 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 								->get_intersect_distance_on_grid(UF);
 	doubleArray2D* intersect_fieldVal = allrigidbodies
 								->get_intersect_fieldValue_on_grid(UF);
-	vector<doubleArray2D*> face_fraction = GLOBAL_EQ
-								->get_velocity_face_fractions();
-	vector<doubleArray2D*> normalRB = GLOBAL_EQ
-								->get_velocity_normalRB();
+
+	doubleArray2D* normalRB = allrigidbodies->get_CC_RB_normal(UF);
+	doubleArray2D* face_fraction = allrigidbodies->get_CC_face_fraction(UF);
 
 	vector<geomVector>  intersect_pt;
 
@@ -4023,10 +4024,8 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 		// cout << p_topRht << "," << p_topLft << "," << p_botRht << "," << p_botLft << endl;
 
 		// Right (U_X)
-		face_fraction[0]->operator()(p,1) = 0.;
       if ( UF->DOF_color( i, j, k, comp ) == FV_BC_RIGHT ) {
          fri = ValueC * ValueC * dyC;
-			face_fraction[0]->operator()(p,1) = dyC;
       } else {
 			// Both vertex in fluid
 			if ((void_frac->operator()(p_topRht) == 0) &&
@@ -4039,7 +4038,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					uface = (dxC/2. * int_val + (int_dis - dxC/2.) * ValueC) / int_dis;
 				}
 				fri = uface * uface * dyC;
-				face_fraction[0]->operator()(p,1) = dyC;
 			// Bottom vertex in fluid
 			} else if ((void_frac->operator()(p_topRht) != 0) &&
 				 		  (void_frac->operator()(p_botRht) == 0)) {
@@ -4057,7 +4055,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				double ur = allrigidbodies->
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fri = ur * ur * int_dis;
-				face_fraction[0]->operator()(p,1) = int_dis;
 				local_parID = void_frac->operator()(p_topRht) - 1;
 			// Top vertex in fluid
 			} else if ((void_frac->operator()(p_topRht) == 0) &&
@@ -4076,16 +4073,13 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				double ur = allrigidbodies->
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fri = ur * ur * int_dis;
-				face_fraction[0]->operator()(p,1) = int_dis;
 				local_parID = void_frac->operator()(p_botRht) - 1;
 			}
       }
 
       // Left (U_X)
-		face_fraction[0]->operator()(p,0) = 0.;
       if ( UF->DOF_color( i, j, k, comp ) == FV_BC_LEFT ) {
          fle = ValueC * ValueC * dyC;
-			face_fraction[0]->operator()(p,0) = dyC;
       } else {
 			// Both vertex in fluid
 			if ((void_frac->operator()(p_topLft) == 0) &&
@@ -4098,7 +4092,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					uface = (dxC/2. * int_val + (int_dis - dxC/2.) * ValueC) / int_dis;
 				}
 				fle = uface * uface * dyC;
-				face_fraction[0]->operator()(p,0) = dyC;
 			// Bottom vertex in fluid
 			} else if ((void_frac->operator()(p_topLft) != 0) &&
 						  (void_frac->operator()(p_botLft) == 0)) {
@@ -4116,7 +4109,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				double ul = allrigidbodies->
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fle = ul * ul * int_dis;
-				face_fraction[0]->operator()(p,0) = int_dis;
 				local_parID = void_frac->operator()(p_topLft) - 1;
 			// Top vertex in fluid
 			} else if ((void_frac->operator()(p_topLft) == 0) &&
@@ -4135,13 +4127,11 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				double ul = allrigidbodies->
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fle = ul * ul * int_dis;
-				face_fraction[0]->operator()(p,0) = int_dis;
 				local_parID = void_frac->operator()(p_botLft) - 1;
 			}
 		}
 
       // Top (U_Y)
-		face_fraction[0]->operator()(p,3) = 0.;
 		// Both vertex in fluid
 		if ((void_frac->operator()(p_topLft) == 0) &&
 			 (void_frac->operator()(p_topRht) == 0)) {
@@ -4156,7 +4146,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				AdvectedValue = (dyC/2. * int_val + (int_dis - dyC/2.) * ValueC)/int_dis;
 			}
 			fto = AdvectorValue * AdvectedValue * dxC;
-			face_fraction[0]->operator()(p,3) = dxC;
 		// Right vertex in fluid
 		} else if ((void_frac->operator()(p_topLft) != 0) &&
 					  (void_frac->operator()(p_topRht) == 0)) {
@@ -4178,7 +4167,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 
 			fto = AdvectorValue * AdvectedValue * int_dis;
-			face_fraction[0]->operator()(p,3) = int_dis;
 			local_parID = void_frac->operator()(p_topLft) - 1;
 		// Left vertex in fluid
 		} else if ((void_frac->operator()(p_topLft) == 0) &&
@@ -4201,12 +4189,10 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 
 			fto = AdvectorValue * AdvectedValue * int_dis;
-			face_fraction[0]->operator()(p,3) = int_dis;
 			local_parID = void_frac->operator()(p_topRht) - 1;
 		}
 
 		// Bottom (U_Y)
-		face_fraction[0]->operator()(p,2) = 0.;
 		// Both vertex in fluid
 		if ((void_frac->operator()(p_botLft) == 0) &&
 			 (void_frac->operator()(p_botRht) == 0)) {
@@ -4221,7 +4207,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				AdvectedValue = (dyC/2. * int_val + (int_dis - dyC/2.) * ValueC)/int_dis;
 			}
 			fbo = AdvectorValue * AdvectedValue * dxC;
-			face_fraction[0]->operator()(p,2) = dxC;
 		// Right vertex in fluid
 		} else if ((void_frac->operator()(p_botLft) != 0) &&
 					  (void_frac->operator()(p_botRht) == 0)) {
@@ -4243,7 +4228,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 
 			fbo = AdvectorValue * AdvectedValue * int_dis;
-			face_fraction[0]->operator()(p,2) = int_dis;
 			local_parID = void_frac->operator()(p_botLft) - 1;
 		// Left vertex in fluid
 		} else if ((void_frac->operator()(p_botLft) == 0) &&
@@ -4266,7 +4250,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 
 			fbo = AdvectorValue * AdvectedValue * int_dis;
-			face_fraction[0]->operator()(p,2) = int_dis;
 			local_parID = void_frac->operator()(p_botRht) - 1;
 		}
 
@@ -4305,7 +4288,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 		if (p_botLft > UF_UNK_MAX) p_botLft = UF_UNK_MAX;
 
       // Right (V_X)
-		face_fraction[0]->operator()(p,1) = 0.;
 		// Both vertex in fluid
 		if ((void_frac->operator()(p_topRht) == 0) &&
 			 (void_frac->operator()(p_botRht) == 0)) {
@@ -4320,7 +4302,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				AdvectedValue = (dxC/2. * int_val + (int_dis - dxC/2.) * ValueC)/int_dis;
 			}
 			fri = AdvectorValue * AdvectedValue * dyC;
-			face_fraction[0]->operator()(p,1) = dyC;
 		// Top vertex in fluid
 		} else if ((void_frac->operator()(p_botRht) != 0) &&
 					  (void_frac->operator()(p_topRht) == 0)) {
@@ -4342,7 +4323,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 
 			fri = AdvectorValue * AdvectedValue * int_dis;
-			face_fraction[0]->operator()(p,1) = int_dis;
 			local_parID = void_frac->operator()(p_botRht) - 1;
 		// Bottom vertex in fluid
 		} else if ((void_frac->operator()(p_botRht) == 0) &&
@@ -4365,12 +4345,10 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 
 			fri = AdvectorValue * AdvectedValue * int_dis;
-			face_fraction[0]->operator()(p,1) = int_dis;
 			local_parID = void_frac->operator()(p_topRht) - 1;
 		}
 
       // Left (V_X)
-		face_fraction[0]->operator()(p,0) = 0.;
 		// Both vertex in fluid
 		if ((void_frac->operator()(p_topLft) == 0) &&
 			 (void_frac->operator()(p_botLft) == 0)) {
@@ -4385,7 +4363,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				AdvectedValue = (dxC/2. * int_val + (int_dis - dxC/2.) * ValueC)/int_dis;
 			}
 			fle = AdvectorValue * AdvectedValue * dyC;
-			face_fraction[0]->operator()(p,0) = dyC;
 		// Top vertex in fluid
 		} else if ((void_frac->operator()(p_botLft) != 0) &&
 					  (void_frac->operator()(p_topLft) == 0)) {
@@ -4407,7 +4384,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 
 			fle = AdvectorValue * AdvectedValue * int_dis;
-			face_fraction[0]->operator()(p,0) = int_dis;
 			local_parID = void_frac->operator()(p_botLft) - 1;
 		// Bottom vertex in fluid
 		} else if ((void_frac->operator()(p_botLft) == 0) &&
@@ -4430,15 +4406,12 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 
 			fle = AdvectorValue * AdvectedValue * int_dis;
-			face_fraction[0]->operator()(p,0) = int_dis;
 			local_parID = void_frac->operator()(p_topLft) - 1;
 		}
 
       // Top (V_Y)
-		face_fraction[0]->operator()(p,3) = 0.;
 		if ( UF->DOF_color( i, j, k, comp ) == FV_BC_TOP ) {
 			fto = ValueC * ValueC * dxC;
-			face_fraction[0]->operator()(p,3) = dxC;
 		} else {
 			// Both vertex in fluid
 			if ((void_frac->operator()(p_topRht) == 0) &&
@@ -4451,7 +4424,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					uface = (dyC/2. * int_val + (int_dis - dyC/2.) * ValueC) / int_dis;
 				}
 				fto = uface * uface * dxC;
-				face_fraction[0]->operator()(p,3) = dxC;
 			// Left vertex in fluid
 			} else if ((void_frac->operator()(p_topRht) != 0) &&
 						  (void_frac->operator()(p_topLft) == 0)) {
@@ -4469,7 +4441,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				double ur = allrigidbodies->
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fto = ur * ur * int_dis;
-				face_fraction[0]->operator()(p,3) = int_dis;
 				local_parID = void_frac->operator()(p_topRht) - 1;
 			// Right vertex in fluid
 			} else if ((void_frac->operator()(p_topRht) == 0) &&
@@ -4488,16 +4459,13 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				double ur = allrigidbodies->
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fto = ur * ur * int_dis;
-				face_fraction[0]->operator()(p,3) = int_dis;
 				local_parID = void_frac->operator()(p_topLft) - 1;
 			}
 		}
 
       // Bottom (V_Y)
-		face_fraction[0]->operator()(p,2) = 0.;
 		if ( UF->DOF_color( i, j, k, comp ) == FV_BC_BOTTOM ) {
 			fbo = ValueC * ValueC * dxC;
-			face_fraction[0]->operator()(p,2) = dxC;
 		} else {
 			// Both vertex in fluid
 			if ((void_frac->operator()(p_botRht) == 0) &&
@@ -4510,7 +4478,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 					uface = (dyC/2. * int_val + (int_dis - dyC/2.) * ValueC) / int_dis;
 				}
 				fbo = uface * uface * dxC;
-				face_fraction[0]->operator()(p,2) = dxC;
 			// Left vertex in fluid
 			} else if ((void_frac->operator()(p_botRht) != 0) &&
 						  (void_frac->operator()(p_botLft) == 0)) {
@@ -4528,7 +4495,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				double ur = allrigidbodies->
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fbo = ur * ur * int_dis;
-				face_fraction[0]->operator()(p,2) = int_dis;
 				local_parID = void_frac->operator()(p_botRht) - 1;
 			// Right vertex in fluid
 			} else if ((void_frac->operator()(p_botRht) == 0) &&
@@ -4547,17 +4513,12 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 				double ur = allrigidbodies->
 					  Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
 				fbo = ur * ur * int_dis;
-				face_fraction[0]->operator()(p,2) = int_dis;
 				local_parID = void_frac->operator()(p_botLft) - 1;
 			}
 		}
    }
 
 	double fsurf = 0.;
-
-	normalRB[0]->operator()(p,0) = 0.;
-	normalRB[0]->operator()(p,1) = 0.;
-	normalRB[0]->operator()(p,2) = 0.;
 
 	if (intersect_pt.size() == 2) {
 		// for (size_t ii = 0; ii < intersect_pt.size(); ii++) {
@@ -4589,10 +4550,6 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 		}
 
 		normal *= 1./normal.calcNorm();
-
-		normalRB[0]->operator()(p,0) = normal(0);
-		normalRB[0]->operator()(p,1) = normal(1);
-		normalRB[0]->operator()(p,2) = normal(2);
 
 		geomVector rbVel = allrigidbodies->rigid_body_velocity(local_parID,pmid);
 

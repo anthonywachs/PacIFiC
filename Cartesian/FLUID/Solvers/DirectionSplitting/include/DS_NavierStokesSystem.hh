@@ -284,9 +284,6 @@ class DS_NavierStokesSystem : public MAC_Object
       vector<doubleVector*> vel_diffusion;
       // Local vector to store advection terms
       vector<doubleVector*> vel_advection;
-      // Face fraction for UF cell
-      vector<doubleArray2D*> face_frac_UF;
-      vector<doubleArray2D*> normalRB;
 
       size_t dim;
       MAC_Communicator const* pelCOMM;
