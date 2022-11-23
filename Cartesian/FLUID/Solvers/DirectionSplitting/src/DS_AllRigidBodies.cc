@@ -1211,7 +1211,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
   CC_face_centroid[field]->set(0.);
   CC_face_fraction[field]->set(0.);
   CC_RB_area[field]->set(0.);
-  CC_ownerID[field].set(-1);
+  CC_ownerID[field]->set(-1);
   CC_RB_normal[field]->set(0.);
   CC_RB_centroid[field]->set(0.);
 
@@ -1271,7 +1271,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                        fraction = std::get<0>(int_pt);
                        geomVector pt = std::get<1>(int_pt);
                        int point_in_fluid = std::get<2>(int_pt);
-                       CC_ownerID[field](p) = std::max(CC_ownerID[field](p), std::get<3>(int_pt));
+                       CC_ownerID[field]->operator()(p) = std::max(CC_ownerID[field]->operator()(p), std::get<3>(int_pt));
                        if ((std::get<3>(int_pt) != -1) && (fraction != 0)) {
                           bool present = false;
                           for (auto itt = intersection_pts.begin();
@@ -1344,7 +1344,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                        double rht_frac = std::get<0>(rht);
                        geomVector pt = std::get<1>(rht);
                        int rht_in_fluid = std::get<2>(rht);
-                       CC_ownerID[field](p) = std::max(CC_ownerID[field](p), std::get<3>(rht));
+                       CC_ownerID[field]->operator()(p) = std::max(CC_ownerID[field]->operator()(p), std::get<3>(rht));
                        if ((std::get<3>(rht) != -1) && (rht_frac != 0)) {
                           bool present = false;
                           for (auto itt = intersection_pts.begin();
@@ -1373,7 +1373,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                        double lft_frac = std::get<0>(lft);
                        pt = std::get<1>(lft);
                        int lft_in_fluid = std::get<2>(lft);
-                       CC_ownerID[field](p) = std::max(CC_ownerID[field](p), std::get<3>(lft));
+                       CC_ownerID[field]->operator()(p) = std::max(CC_ownerID[field]->operator()(p), std::get<3>(lft));
                        if ((std::get<3>(lft) != -1) && (lft_frac != 0)) {
                           bool present = false;
                           for (auto itt = intersection_pts.begin();
@@ -1401,7 +1401,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                        double top_frac = std::get<0>(top);
                        pt = std::get<1>(top);
                        int top_in_fluid = std::get<2>(top);
-                       CC_ownerID[field](p) = std::max(CC_ownerID[field](p), std::get<3>(top));
+                       CC_ownerID[field]->operator()(p) = std::max(CC_ownerID[field]->operator()(p), std::get<3>(top));
                        if ((std::get<3>(top) != -1) && (top_frac != 0)) {
                           bool present = false;
                           for (auto itt = intersection_pts.begin();
@@ -1429,7 +1429,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                        double bot_frac = std::get<0>(bot);
                        pt = std::get<1>(bot);
                        int bot_in_fluid = std::get<2>(bot);
-                       CC_ownerID[field](p) = std::max(CC_ownerID[field](p), std::get<3>(bot));
+                       CC_ownerID[field]->operator()(p) = std::max(CC_ownerID[field]->operator()(p), std::get<3>(bot));
                        if ((std::get<3>(bot) != -1) && (bot_frac != 0)) {
                           bool present = false;
                           for (auto itt = intersection_pts.begin();
@@ -1524,7 +1524,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
 
               if (intersection_pts.size() >= m_space_dimension) {
                  // Normal vector of interface calculation
-                 size_t parID = CC_ownerID[field](p);
+                 size_t parID = CC_ownerID[field]->operator()(p);
                  geomVector const* pgc = get_gravity_centre(parID);
                  geomVector p1(3), p2(3), pmid(3), pin(3), normal(3);
                  pin(0) = pgc->operator()(0);
@@ -1609,7 +1609,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                     normal = -1.*normal;
                  }
 
-                 // Store the normal vector in the global variable define on PF
+                 // Store the normal vector in the global variable
                  geomVector normalRB1 = normal * (area / normal.calcNorm());
                  CC_RB_normal[field]->operator()(p,0) = normalRB1(0);
                  CC_RB_normal[field]->operator()(p,1) = normalRB1(1);
@@ -1620,7 +1620,8 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
      }  // i
   } // comp
 
-  // write_CutCell_parameters(FF);
+  // if (FF == UF)
+  //    write_CutCell_parameters(FF);
 
 }
 
@@ -1703,7 +1704,7 @@ double DS_AllRigidBodies:: divergence_face_flux ( size_t const& p_PF
 {
    MAC_LABEL("DS_AllRigidBodies:: divergence_face_flux" ) ;
 
-   size_t parID = CC_ownerID[0](p_PF);
+   size_t parID = CC_ownerID[0]->operator()(p_PF);
    geomVector ZERO(0.,0.,0.);
 
 	size_t_vector i0_new(3,0);
@@ -1789,7 +1790,7 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
                              + pow(CC_RB_normal[0]->operator()(p,2),2));
 
    if (area != 0.) {
-      size_t parID = CC_ownerID[0](p);
+      size_t parID = CC_ownerID[0]->operator()(p);
       geomVector const* pgc = get_gravity_centre(parID);
       geomVector pt(pgc->operator()(0),
                     pgc->operator()(1),
@@ -2412,11 +2413,10 @@ void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
    CC_face_fraction.push_back(new doubleArray2D(1,1,0.));
    CC_face_fraction.push_back(new doubleArray2D(1,1,0.));
    CC_face_fraction.push_back(new doubleArray2D(1,1,0.));
-   intVector dV(1,0.);
    CC_ownerID.reserve(3);
-   CC_ownerID.push_back(dV);
-   CC_ownerID.push_back(dV);
-   CC_ownerID.push_back(dV);
+   CC_ownerID.push_back(new intVector(1,0.));
+   CC_ownerID.push_back(new intVector(1,0.));
+   CC_ownerID.push_back(new intVector(1,0.));
    CC_RB_area.reserve(3);
    CC_RB_area.push_back(new doubleVector(1,0));
    CC_RB_area.push_back(new doubleVector(1,0));
@@ -4726,7 +4726,7 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    // Cut Cell parameters initialization
    CC_face_centroid[field]->re_initialize(FF_LOC_UNK,6,3);
    CC_face_fraction[field]->re_initialize(FF_LOC_UNK,6);
-   CC_ownerID[field].re_initialize(FF_LOC_UNK,-1.);
+   CC_ownerID[field]->re_initialize(FF_LOC_UNK,-1.);
    CC_RB_area[field]->re_initialize(FF_LOC_UNK);
    CC_RB_normal[field]->re_initialize(FF_LOC_UNK,3);
    CC_RB_centroid[field]->re_initialize(FF_LOC_UNK,3);
@@ -4803,6 +4803,42 @@ DS_AllRigidBodies::get_CC_face_fraction(FV_DiscreteField const* FF)
 {
    size_t field = field_num(FF);
    return (CC_face_fraction[field]) ;
+}
+
+
+
+
+//----------------------------------------------------------------------
+intVector*
+DS_AllRigidBodies::get_CC_ownerID(FV_DiscreteField const* FF)
+//----------------------------------------------------------------------
+{
+   size_t field = field_num(FF);
+   return (CC_ownerID[field]) ;
+}
+
+
+
+
+//----------------------------------------------------------------------
+doubleVector*
+DS_AllRigidBodies::get_CC_RB_area(FV_DiscreteField const* FF)
+//----------------------------------------------------------------------
+{
+   size_t field = field_num(FF);
+   return (CC_RB_area[field]) ;
+}
+
+
+
+
+//----------------------------------------------------------------------
+doubleArray3D*
+DS_AllRigidBodies::get_CC_face_centroid(FV_DiscreteField const* FF)
+//----------------------------------------------------------------------
+{
+   size_t field = field_num(FF);
+   return (CC_face_centroid[field]) ;
 }
 
 

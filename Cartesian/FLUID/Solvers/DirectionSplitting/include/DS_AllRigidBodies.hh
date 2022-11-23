@@ -164,6 +164,15 @@ class DS_AllRigidBodies
       /** @brief Returns the RB normal in the Cut Cell */
       doubleArray2D* get_CC_RB_normal(FV_DiscreteField const* FF);
 
+      /** @brief Returns the RB area in the Cut Cell */
+      doubleVector* get_CC_RB_area(FV_DiscreteField const* FF);
+
+      /** @brief Returns the RB ID in the Cut Cell */
+      intVector* get_CC_ownerID(FV_DiscreteField const* FF);
+
+      /** @brief Returns the face centroid in the Cut Cell */
+      doubleArray3D* get_CC_face_centroid(FV_DiscreteField const* FF);
+
       /** @brief Returns the face fraction for the Cut Cell */
       doubleArray2D* get_CC_face_fraction(FV_DiscreteField const* FF);
 
@@ -557,7 +566,7 @@ class DS_AllRigidBodies
       vector<doubleVector*> CC_RB_area; /**< Intersection points
       of rigid body with the grid cell. [field][index][points]*/
 
-      vector<intVector> CC_ownerID; /**< Stores the RB's ID
+      vector<intVector*> CC_ownerID; /**< Stores the RB's ID
       intersecting the grid cell*/
 
       vector<doubleArray2D*> CC_RB_normal; /**< Normal vector of RB surface
