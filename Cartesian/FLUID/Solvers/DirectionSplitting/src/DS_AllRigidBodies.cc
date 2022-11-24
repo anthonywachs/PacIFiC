@@ -530,8 +530,9 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
      geomVector ang_vel(3);
      geomVector ang_acc(3);
 
-     // double Amp = 1., freq = 0.;
+     // double Amp = 1., freq = 1.;
      // vel(1) = Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
+     // pav(2) = 4.;
 
      // Solving equation of motion
      for (size_t dir = 0; dir < m_space_dimension;dir++) {
@@ -539,25 +540,20 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
         double temp = pos(dir);
         vel(dir) = pv(dir);
 
-        // if (t_it->iteration_number() > 10)
-           acc(dir) = gg(dir)*(1-m_rho/rho_p)
+        acc(dir) = gg(dir)*(1-m_rho/rho_p)
                     + (viscous_force->operator()(parID,dir)
                     +  pressure_force->operator()(parID,dir)) / mass_p ;
-        // vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
         pos(dir) = pos(dir) + vel(dir)*t_it->time_step()
                  + 0.5 * acc(dir) * MAC::pow(t_it->time_step(),2.);
         pos(dir) = periodic_transformation(pos(dir), dir) ;
-        // pos(dir) = periodic_transformation(pos(dir)
-        //                                  + vel(dir)*t_it->time_step(), dir) ;
         vel(dir) = vel(dir) + acc(dir)*t_it->time_step();
         delta(dir) = pos(dir) - temp;
      }
 
      if (m_space_dimension == 2) {
         ang_vel(2) = pav(2);
-        // if (t_it->iteration_number() > 10)
-           ang_acc(2) = (viscous_torque->operator()(parID,2)
-                      + pressure_torque->operator()(parID,2)) / moi ;
+        ang_acc(2) = (viscous_torque->operator()(parID,2)
+                   + pressure_torque->operator()(parID,2)) / moi ;
         ang_vel(2) = ang_vel(2) + ang_acc(2)*t_it->time_step();
      } else {
         for (size_t dir = 0; dir < m_space_dimension;dir++) {
@@ -1678,7 +1674,7 @@ DS_AllRigidBodies::write_CutCell_parameters(FV_DiscreteField const* FF)
                     << "," << CC_RB_normal[field]->operator()(p,1)
                     << "," << CC_RB_normal[field]->operator()(p,2)
                     << "," << CC_face_fraction[field]->operator()(p,iter)
-                    << "," << CC_ownerID[field](p)
+                    << "," << CC_ownerID[field]->operator()(p)
                     << "," << CC_RB_area[field]->operator()(p)
                     << endl;
               }
