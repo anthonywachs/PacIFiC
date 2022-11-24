@@ -2582,9 +2582,8 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( )
 			}
 		}
 
-		size_t UF_UNK_MAX = UF->nb_local_unknowns();
-
 		if (is_solids && StencilCorrection == "CutCell") {
+			size_t UF_UNK_MAX = UF->nb_local_unknowns();
 			// Flux redistribution
 			for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
 				for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
@@ -2599,55 +2598,36 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( )
 						size_t p_frt = (dim == 2) ? 0
 														  : UF->DOF_local_number(i,j,k+1,comp);
 
-						double wt_lft = 0., wt_rht = 0.,
-								 wt_bot = 0., wt_top = 0.,
-								 wt_bhd = 0., wt_frt = 0.;
+						vector<double> wht = allrigidbodies->
+											flux_redistribution_factor(UF,i,j,k,comp);
 
-						if (void_frac->operator()(p) != 0) {
+					   // Flux redistribution
+					   double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];
+
+						if (sum > 0.) {
 							if (p_lft <= UF_UNK_MAX)
-								wt_lft = (void_frac->operator()(p_lft) == 0) ?
-												normalRB->operator()(p,0)
-											 * normalRB->operator()(p,0)
-											 * face_fraction->operator()(p,0) : 0;
-
+								advection[0]->operator()(p_lft) +=
+														wht[0]/sum * advection[0]->operator()(p);
 							if (p_rht <= UF_UNK_MAX)
-							 	wt_rht = (void_frac->operator()(p_rht) == 0) ?
-							 					normalRB->operator()(p,0)
-							 				 * normalRB->operator()(p,0)
-							 				 * face_fraction->operator()(p,1) : 0;
-
+								advection[0]->operator()(p_rht) +=
+														wht[1]/sum * advection[0]->operator()(p);
 							if (p_bot <= UF_UNK_MAX)
-	 							wt_bot = (void_frac->operator()(p_bot) == 0) ?
-	 											normalRB->operator()(p,1)
-	 										 * normalRB->operator()(p,1)
-	 										 * face_fraction->operator()(p,2) : 0;
-
-	 						if (p_top <= UF_UNK_MAX)
-	 						 	wt_top = (void_frac->operator()(p_top) == 0) ?
-	 						 					normalRB->operator()(p,1)
-	 						 				 * normalRB->operator()(p,1)
-	 						 				 * face_fraction->operator()(p,3) : 0;
-
-						   // Flux redistribution
-						   double sum = wt_lft + wt_rht + wt_bot + wt_top;
-
-	                  if (sum > 0.) {
-						 		if (p_lft <= UF_UNK_MAX)
-						 			advection[0]->operator()(p_lft) +=
-						 								wt_lft/sum * advection[0]->operator()(p);
-	 							if (p_rht <= UF_UNK_MAX)
-						 			advection[0]->operator()(p_rht) +=
-						 								wt_rht/sum * advection[0]->operator()(p);
-	 							if (p_bot <= UF_UNK_MAX)
-						 			advection[0]->operator()(p_bot) +=
-						 								wt_bot/sum * advection[0]->operator()(p);
-	 							if (p_top <= UF_UNK_MAX)
-						 			advection[0]->operator()(p_top) +=
-						 								wt_top/sum * advection[0]->operator()(p);
-	 							advection[0]->operator()(p) = 0.;
-						 	} else if (sum == 0.) {
-						 		advection[0]->operator()(p) = 0.;
-						 	}
+								advection[0]->operator()(p_bot) +=
+														wht[2]/sum * advection[0]->operator()(p);
+							if (p_top <= UF_UNK_MAX)
+								advection[0]->operator()(p_top) +=
+														wht[3]/sum * advection[0]->operator()(p);
+							if (dim == 3) {
+								if (p_bhd <= UF_UNK_MAX)
+									advection[0]->operator()(p_bhd) +=
+														wht[4]/sum * advection[0]->operator()(p);
+								if (p_frt <= UF_UNK_MAX)
+									advection[0]->operator()(p_frt) +=
+														wht[5]/sum * advection[0]->operator()(p);
+							}
+							advection[0]->operator()(p) = 0.;
+						} else if ((sum == 0.) && (void_frac->operator()(p) != 0)) {
+							advection[0]->operator()(p) = 0.;
 						}
 					}
 				}
@@ -2724,7 +2704,7 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 					size_t p = PF->DOF_local_number(i,j,k,0);
 
 					vector<double> wht = allrigidbodies
-														->flux_redistribution_factor(i,j,k);
+														->flux_redistribution_factor(PF,i,j,k,0);
 
 					// Flux redistribution
 					double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];
@@ -3976,246 +3956,97 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 	double dh = UF->primary_grid()->get_smallest_grid_size();
    double threshold = 0.0001*dh;
 
+	intVector color(6);
+	color(0) = FV_BC_LEFT; color(1) = FV_BC_RIGHT;
+	color(2) = FV_BC_BOTTOM; color(3) = FV_BC_TOP;
+	if (dim == 3) {color(4) = FV_BC_BEHIND; color(5) = FV_BC_FRONT;}
+
 	doubleArray2D* face_fraction = allrigidbodies->get_CC_face_fraction(UF);
 	doubleArray3D* face_centroid = allrigidbodies->get_CC_face_centroid(UF);
 
+	doubleVector flux(6,0.);
+
+	// Area of the faces without even considering the RB
+	doubleVector GridfaceArea(3,0.);
    double dxC = UF->get_cell_size(i,comp,0) ;
    double dyC = UF->get_cell_size(j,comp,1) ;
-   double dzC = (dim == 3) ? UF->get_cell_size(k,comp,2) : 0.;
+   double dzC = (dim == 3) ? UF->get_cell_size(k,comp,2) : 1.;
+	GridfaceArea(0) = dyC * dzC ;
+	GridfaceArea(1) = dxC * dzC ;
+	GridfaceArea(2) = dxC * dyC ;
 
    double ValueC = UF->DOF_value( i, j, k, comp, level );
-
-	double fri = 0., fle = 0., fto = 0., fbo = 0.;
 
 	size_t_vector face_vector(3,0);
 	face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
 
 	size_t p = UF->DOF_local_number(i, j, k, comp);
 
-   // The First Component (u)
-   if ( comp == 0 ) {
-		// Right (U_X)
-      if ( UF->DOF_color( i, j, k, comp ) == FV_BC_RIGHT ) {
-         fri = ValueC * ValueC * dyC;
-      } else {
-			if ((face_fraction->operator()(p,2*0+1) <= dyC + threshold)
-			 && (face_fraction->operator()(p,2*0+1) != 0.) ) {
-				geomVector pt(3);
-				pt(0) = face_centroid->operator()(p,2*0+1,0);
-				pt(1) = face_centroid->operator()(p,2*0+1,1);
-				// pt(2) = face_centroid->operator()(p,2*0+1,2);
+	for (size_t dir = 0; dir < dim; dir++) {
+		for (size_t side = 0; side < 2; side++) {
+			if (comp == dir) {
+				if ( UF->DOF_color( i, j, k, comp ) == color(2*dir+side) ) {
+		         flux(2*dir+side) = ValueC * ValueC * GridfaceArea(dir);
+				} else {
+					if ((face_fraction->operator()(p,2*dir+side) <= GridfaceArea(dir) + threshold)
+					 && (face_fraction->operator()(p,2*dir+side) != 0.) ) {
+						geomVector pt(3);
+						pt(0) = face_centroid->operator()(p,2*dir+side,0);
+						pt(1) = face_centroid->operator()(p,2*dir+side,1);
+						pt(2) = face_centroid->operator()(p,2*dir+side,2);
 
-				size_t_vector i0(3);
-				for (size_t l = 0; l < dim; l++) {
-		         size_t i0_temp;
-		         bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
-		                                        pt(l) + threshold, i0_temp);
-		         if (found) i0(l) = i0_temp;
+						size_t_vector i0(3);
+						for (size_t l = 0; l < dim; l++) {
+				         size_t i0_temp;
+				         bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
+				                                        pt(l) + threshold, i0_temp);
+				         if (found) i0(l) = i0_temp;
+						}
+						double uface = (dim == 2) ? allrigidbodies->
+							Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level})
+														  : allrigidbodies->
+						   Trilinear_interpolation(UF, comp, &pt, i0, {level});
+						flux(2*dir+side) = uface * uface * face_fraction->operator()(p,2*dir+side);
+					}
 				}
-				double uface = allrigidbodies->Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
-				fri = uface * uface * face_fraction->operator()(p,2*0+1);
-			}
-      }
+			} else {
+				if ((face_fraction->operator()(p,2*dir+side) <= GridfaceArea(dir) + threshold)
+				 && (face_fraction->operator()(p,2*dir+side) != 0.) ) {
+					geomVector pt(3);
+					pt(0) = face_centroid->operator()(p,2*dir+side,0);
+					pt(1) = face_centroid->operator()(p,2*dir+side,1);
+					pt(2) = face_centroid->operator()(p,2*dir+side,2);
 
-      // Left (U_X)
-      if ( UF->DOF_color( i, j, k, comp ) == FV_BC_LEFT ) {
-         fle = ValueC * ValueC * dyC;
-      } else {
-			if ((face_fraction->operator()(p,2*0+0) <= dyC + threshold)
-			 && (face_fraction->operator()(p,2*0+0) != 0.) ) {
-				geomVector pt(3);
-				pt(0) = face_centroid->operator()(p,2*0+0,0);
-				pt(1) = face_centroid->operator()(p,2*0+0,1);
-				// pt(2) = face_centroid->operator()(p,2*0+0,2);
-
-				size_t_vector i0(3);
-				for (size_t l = 0; l < dim; l++) {
-		         size_t i0_temp;
-		         bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
-		                                        pt(l) + threshold, i0_temp);
-		         if (found) i0(l) = i0_temp;
+					size_t_vector i0(3);
+					// Advector value
+					for (size_t l = 0; l < dim; l++) {
+						size_t i0_temp;
+						bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(dir,l),
+																 pt(l) + threshold, i0_temp);
+						if (found) i0(l) = i0_temp;
+					}
+					double uAdvector = (dim == 2) ? allrigidbodies->
+						Bilinear_interpolation(UF, dir, &pt, i0, face_vector, {level})
+															: allrigidbodies->
+						Trilinear_interpolation(UF, dir, &pt, i0, {level});
+					// Advected value
+					for (size_t l = 0; l < dim; l++) {
+						size_t i0_temp;
+						bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
+																 pt(l) + threshold, i0_temp);
+						if (found) i0(l) = i0_temp;
+					}
+					double uAdvected = (dim == 2) ? allrigidbodies->
+						Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level})
+										  					: allrigidbodies->
+					  	Trilinear_interpolation(UF, comp, &pt, i0, {level});
+					flux(2*dir+side) = uAdvected * uAdvector * face_fraction->operator()(p,2*dir+side);
 				}
-				double uface = allrigidbodies->Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
-				fle = uface * uface * face_fraction->operator()(p,2*0+0);
 			}
 		}
+	}
 
-      // Top (U_Y)
-		if ((face_fraction->operator()(p,2*1+1) <= dxC + threshold)
-		 && (face_fraction->operator()(p,2*1+1) != 0.) ) {
-			geomVector pt(3);
-			pt(0) = face_centroid->operator()(p,2*1+1,0);
-			pt(1) = face_centroid->operator()(p,2*1+1,1);
-			// pt(2) = face_centroid->operator()(p,2*1+1,2);
-
-			size_t_vector i0(3);
-			// Advector value
-			for (size_t l = 0; l < dim; l++) {
-				size_t i0_temp;
-				bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(1,l),
-														 pt(l) + threshold, i0_temp);
-				if (found) i0(l) = i0_temp;
-			}
-			double uAdvector = allrigidbodies->Bilinear_interpolation(UF, 1, &pt, i0, face_vector, {level});
-			// Advected value
-			for (size_t l = 0; l < dim; l++) {
-				size_t i0_temp;
-				bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
-														 pt(l) + threshold, i0_temp);
-				if (found) i0(l) = i0_temp;
-			}
-			double uAdvected = allrigidbodies->Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
-			fto = uAdvected * uAdvector * face_fraction->operator()(p,2*1+1);
-		}
-
-		// Bottom (U_Y)
-		if ((face_fraction->operator()(p,2*1+0) <= dxC + threshold)
-		 && (face_fraction->operator()(p,2*1+0) != 0.) ) {
-			geomVector pt(3);
-			pt(0) = face_centroid->operator()(p,2*1+0,0);
-			pt(1) = face_centroid->operator()(p,2*1+0,1);
-			// pt(2) = face_centroid->operator()(p,2*1+0,2);
-
-			size_t_vector i0(3);
-			// Advector value
-			for (size_t l = 0; l < dim; l++) {
-				size_t i0_temp;
-				bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(1,l),
-														 pt(l) + threshold, i0_temp);
-				if (found) i0(l) = i0_temp;
-			}
-			double uAdvector = allrigidbodies->Bilinear_interpolation(UF, 1, &pt, i0, face_vector, {level});
-			// Advected value
-			for (size_t l = 0; l < dim; l++) {
-				size_t i0_temp;
-				bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
-														 pt(l) + threshold, i0_temp);
-				if (found) i0(l) = i0_temp;
-			}
-			double uAdvected = allrigidbodies->Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
-			fbo = uAdvected * uAdvector * face_fraction->operator()(p,2*1+0);
-		}
-
-   //    if (dim == 3) {
-   //       // Front (U_Z)
-   //       AdvectedValueFr = UF->DOF_value(i, j, k+1, component, advected_level );
-   //       AdvectorValueFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, 2, advecting_level );
-   //       AdvectorValueFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, 2, advecting_level );
-   //       wf = 0.5 * ( AdvectorValueFrLe + AdvectorValueFrRi );
-   //       ffr = wf * 0.5 * ( AdvectedValueC + AdvectedValueFr);
-	//
-   //       // Behind (U_Z)
-   //       AdvectedValueBe = UF->DOF_value(i, j, k-1, component, advected_level );
-   //       AdvectorValueBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, 2, advecting_level );
-   //       AdvectorValueBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, 2, advecting_level );
-   //       wb = 0.5 * ( AdvectorValueBeLe + AdvectorValueBeRi );
-   //       fbe = wb * 0.5 * ( AdvectedValueBe + AdvectedValueC );
-   //    }
-   } else if (comp == 1) {
-		// The second Component (v)
-      // Right (V_X)
-		if ((face_fraction->operator()(p,2*0+1) <= dyC + threshold)
-		 && (face_fraction->operator()(p,2*0+1) != 0.) ) {
-			geomVector pt(3);
-			pt(0) = face_centroid->operator()(p,2*0+1,0);
-			pt(1) = face_centroid->operator()(p,2*0+1,1);
-			// pt(2) = face_centroid->operator()(p,2*1+1,2);
-
-			size_t_vector i0(3);
-			// Advector value
-			for (size_t l = 0; l < dim; l++) {
-				size_t i0_temp;
-				bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(0,l),
-														 pt(l) + threshold, i0_temp);
-				if (found) i0(l) = i0_temp;
-			}
-			double uAdvector = allrigidbodies->Bilinear_interpolation(UF, 0, &pt, i0, face_vector, {level});
-			// Advected value
-			for (size_t l = 0; l < dim; l++) {
-				size_t i0_temp;
-				bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
-														 pt(l) + threshold, i0_temp);
-				if (found) i0(l) = i0_temp;
-			}
-			double uAdvected = allrigidbodies->Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
-			fri = uAdvected * uAdvector * face_fraction->operator()(p,2*0+1);
-		}
-
-      // Left (V_X)
-		if ((face_fraction->operator()(p,2*0+0) <= dyC + threshold)
-		 && (face_fraction->operator()(p,2*0+0) != 0.) ) {
-			geomVector pt(3);
-			pt(0) = face_centroid->operator()(p,2*0+0,0);
-			pt(1) = face_centroid->operator()(p,2*0+0,1);
-			// pt(2) = face_centroid->operator()(p,2*1+1,2);
-
-			size_t_vector i0(3);
-			// Advector value
-			for (size_t l = 0; l < dim; l++) {
-				size_t i0_temp;
-				bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(0,l),
-														 pt(l) + threshold, i0_temp);
-				if (found) i0(l) = i0_temp;
-			}
-			double uAdvector = allrigidbodies->Bilinear_interpolation(UF, 0, &pt, i0, face_vector, {level});
-			// Advected value
-			for (size_t l = 0; l < dim; l++) {
-				size_t i0_temp;
-				bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
-														 pt(l) + threshold, i0_temp);
-				if (found) i0(l) = i0_temp;
-			}
-			double uAdvected = allrigidbodies->Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
-			fle = uAdvected * uAdvector * face_fraction->operator()(p,2*0+0);
-		}
-
-      // Top (V_Y)
-		if ( UF->DOF_color( i, j, k, comp ) == FV_BC_TOP ) {
-			fto = ValueC * ValueC * dxC;
-		} else {
-			if ((face_fraction->operator()(p,2*1+1) <= dxC + threshold)
-			 && (face_fraction->operator()(p,2*1+1) != 0.) ) {
-				geomVector pt(3);
-				pt(0) = face_centroid->operator()(p,2*1+1,0);
-				pt(1) = face_centroid->operator()(p,2*1+1,1);
-				// pt(2) = face_centroid->operator()(p,2*1+1,2);
-
-				size_t_vector i0(3);
-				for (size_t l = 0; l < dim; l++) {
-		         size_t i0_temp;
-		         bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
-		                                        pt(l) + threshold, i0_temp);
-		         if (found) i0(l) = i0_temp;
-				}
-				double uface = allrigidbodies->Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
-				fto = uface * uface * face_fraction->operator()(p,2*1+1);
-			}
-      }
-
-      // Bottom (V_Y)
-		if ( UF->DOF_color( i, j, k, comp ) == FV_BC_BOTTOM ) {
-			fbo = ValueC * ValueC * dxC;
-		} else {
-			if ((face_fraction->operator()(p,2*1+0) <= dxC + threshold)
-			 && (face_fraction->operator()(p,2*1+0) != 0.) ) {
-				geomVector pt(3);
-				pt(0) = face_centroid->operator()(p,2*1+0,0);
-				pt(1) = face_centroid->operator()(p,2*1+0,1);
-				// pt(2) = face_centroid->operator()(p,2*1+0,2);
-
-				size_t_vector i0(3);
-				for (size_t l = 0; l < dim; l++) {
-		         size_t i0_temp;
-		         bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
-		                                        pt(l) + threshold, i0_temp);
-		         if (found) i0(l) = i0_temp;
-				}
-				double uface = allrigidbodies->Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level});
-				fbo = uface * uface * face_fraction->operator()(p,2*1+0);
-			}
-      }
-   }
-
+	// RB contribution
 	intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
 	doubleArray2D* normalRB = allrigidbodies->get_CC_RB_normal(UF);
 	doubleVector* RBarea = allrigidbodies->get_CC_RB_area(UF);
@@ -4236,7 +4067,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 		fsurf = rbVel(comp) * rbVel.operator,(normVec) * RBarea->operator()(p);
 	}
 
-   return ( coef * ((fto - fbo) + (fri - fle) - fsurf) );
+   return ( coef * ((flux(3) - flux(2)) + (flux(1) - flux(0)) + (flux(5) - flux(4)) - fsurf) );
 }
 
 

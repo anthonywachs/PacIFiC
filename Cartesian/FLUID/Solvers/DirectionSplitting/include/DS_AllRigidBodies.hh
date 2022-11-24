@@ -293,12 +293,16 @@ class DS_AllRigidBodies
 
       /** @brief Calculate the divergenceredistribution factor for each PF node
       using the normal of RB intersect
+      @param FF field
       @param i index i
       @param j index j
-      @param k index k */
-      vector<double> flux_redistribution_factor ( size_t const& i,
-                                                  size_t const& j,
-                                                  size_t const& k);
+      @param k index k
+      @param comp component */
+      vector<double> flux_redistribution_factor ( FV_DiscreteField const* FF,
+                                                   size_t const& i,
+                                                   size_t const& j,
+                                                   size_t const& k,
+                                                   size_t const& comp);
 
       /** @brief Calculates the area of RB section with given vector
       of polygon corners
@@ -457,6 +461,12 @@ class DS_AllRigidBodies
                                      , geomVector const* pt
                                      , size_t_vector const& i0
                                      , size_t const& parID
+                                     , vector<size_t> const& list);
+
+      double Trilinear_interpolation ( FV_DiscreteField const* FF
+                                     , size_t const& comp
+                                     , geomVector const* pt
+                                     , size_t_vector const& i0
                                      , vector<size_t> const& list);
 
       /** @brief Calculate the first order pressure force and torque on parID

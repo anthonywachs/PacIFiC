@@ -1805,77 +1805,53 @@ double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
 
 
 //---------------------------------------------------------------------------
-vector<double> DS_AllRigidBodies:: flux_redistribution_factor ( size_t const& i,
+vector<double> DS_AllRigidBodies:: flux_redistribution_factor (
+                                                      FV_DiscreteField const* FF,
+                                                      size_t const& i,
                                             			   size_t const& j,
-                                            			   size_t const& k)
+                                            			   size_t const& k,
+                                                      size_t const& comp)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_AllRigidBodies:: flux_redistribution_factor" ) ;
 
    vector<double> wht(6);
+   vector<double> frac(6);
+   vector<size_t> p_face(6);
+   size_t field = field_num(FF);
 
-	size_t p = PF->DOF_local_number(i,j,k,0);
+	size_t p = FF->DOF_local_number(i,j,k,comp);
 
-	if (void_fraction[0]->operator()(p) != 0) {
-      double norm_mag = MAC::sqrt(pow(CC_RB_normal[0]->operator()(p,0),2)
-                                + pow(CC_RB_normal[0]->operator()(p,1),2)
-                                + pow(CC_RB_normal[0]->operator()(p,2),2));
+	if (void_fraction[field]->operator()(p) != 0) {
+      double norm_mag = MAC::sqrt(pow(CC_RB_normal[field]->operator()(p,0),2)
+                                + pow(CC_RB_normal[field]->operator()(p,1),2)
+                                + pow(CC_RB_normal[field]->operator()(p,2),2));
 
-		CC_RB_normal[0]->operator()(p,0) /= norm_mag;
-		CC_RB_normal[0]->operator()(p,1) /= norm_mag;
-      CC_RB_normal[0]->operator()(p,2) /= norm_mag;
+		CC_RB_normal[field]->operator()(p,0) /= norm_mag;
+		CC_RB_normal[field]->operator()(p,1) /= norm_mag;
+      CC_RB_normal[field]->operator()(p,2) /= norm_mag;
 
-      // right face
-      double rht_frac = CC_face_fraction[0]->operator()(p,2*0+1);
-      // left face
-      double lft_frac = CC_face_fraction[0]->operator()(p,2*0+0);
-      // top face
-      double top_frac = CC_face_fraction[0]->operator()(p,2*1+1);
-      // bottom face
-      double bot_frac = CC_face_fraction[0]->operator()(p,2*1+0);
+      p_face[0] = FF->DOF_local_number(i-1,j,k,comp);
+      p_face[1] = FF->DOF_local_number(i+1,j,k,comp);
+      p_face[2] = FF->DOF_local_number(i,j-1,k,comp);
+      p_face[3] = FF->DOF_local_number(i,j+1,k,comp);
+      p_face[4] = (m_space_dimension == 2) ? 0 :
+                     FF->DOF_local_number(i,j,k-1,comp);
+		p_face[5] = (m_space_dimension == 2) ? 0 :
+                     FF->DOF_local_number(i,j,k+1,comp);
 
-		size_t p_lft = PF->DOF_local_number(i-1,j,k,0);
-		size_t p_rht = PF->DOF_local_number(i+1,j,k,0);
-		size_t p_bot = PF->DOF_local_number(i,j-1,k,0);
-		size_t p_top = PF->DOF_local_number(i,j+1,k,0);
-      size_t p_bhd = (m_space_dimension == 2) ? 0 :
-                     PF->DOF_local_number(i,j,k-1,0);
-		size_t p_frt = (m_space_dimension == 2) ? 0 :
-                     PF->DOF_local_number(i,j,k+1,0);
+		size_t FF_UNK_MAX = FF->nb_local_unknowns();
 
-		size_t PF_UNK_MAX = PF->nb_local_unknowns();
-
-		double wt_lft = 0., wt_rht = 0.,
-             wt_bot = 0., wt_top = 0.,
-             wt_bhd = 0., wt_frt = 0.;
-
-		if (p_lft <= PF_UNK_MAX)
-			wt_lft = (void_fraction[0]->operator()(p_lft) == 0) ?
-		           CC_RB_normal[0]->operator()(p,0)*CC_RB_normal[0]->operator()(p,0)*lft_frac : 0.;
-		if (p_rht <= PF_UNK_MAX)
-			wt_rht = (void_fraction[0]->operator()(p_rht) == 0) ?
-		        	  CC_RB_normal[0]->operator()(p,0)*CC_RB_normal[0]->operator()(p,0)*rht_frac : 0.;
-		if (p_bot <= PF_UNK_MAX)
-			wt_bot = (void_fraction[0]->operator()(p_bot) == 0) ?
-			        CC_RB_normal[0]->operator()(p,1)*CC_RB_normal[0]->operator()(p,1)*bot_frac : 0.;
-		if (p_top <= PF_UNK_MAX)
-			wt_top = (void_fraction[0]->operator()(p_top) == 0) ?
-					  CC_RB_normal[0]->operator()(p,1)*CC_RB_normal[0]->operator()(p,1)*top_frac : 0.;
-      if (m_space_dimension == 3) {
-         // behind face
-         double bhd_frac = CC_face_fraction[0]->operator()(p,2*2+0);
-         // front face
-         double frt_frac = CC_face_fraction[0]->operator()(p,2*2+1);
-
-         if (p_bhd <= PF_UNK_MAX)
-   			wt_bhd = (void_fraction[0]->operator()(p_bhd) == 0) ?
-				  CC_RB_normal[0]->operator()(p,2)*CC_RB_normal[0]->operator()(p,2)*bhd_frac : 0.;
-         if (p_frt <= PF_UNK_MAX)
-            wt_frt = (void_fraction[0]->operator()(p_frt) == 0) ?
-              CC_RB_normal[0]->operator()(p,2)*CC_RB_normal[0]->operator()(p,2)*frt_frac : 0.;
+      for (size_t dir = 0; dir < m_space_dimension; dir++) {
+         for (size_t side = 0; side < 2; side++) {
+            if (p_face[2*dir+side] <= FF_UNK_MAX)
+               wht[2*dir+side] = (void_fraction[field]->operator()(p_face[2*dir+side]) == 0) ?
+      		                     CC_RB_normal[field]->operator()(p,dir)
+                               * CC_RB_normal[field]->operator()(p,dir)
+                               * CC_face_fraction[field]->operator()(p,2*dir+side)
+                               : 0.;
+         }
       }
-
-      wht = {wt_lft, wt_rht, wt_bot, wt_top, wt_bhd, wt_frt};
 	}
 
    return(wht);
@@ -3641,6 +3617,109 @@ void DS_AllRigidBodies:: first_order_viscous_stress( size_t const& parID )
 
   }
 
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_AllRigidBodies:: Trilinear_interpolation ( FV_DiscreteField const* FF
+                                                   , size_t const& comp
+                                                   , geomVector const* pt
+                                                   , size_t_vector const& i0
+                                                   , vector<size_t> const& list)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_AllRigidBodies:: Trilinear_interpolation" ) ;
+
+   vector<size_t_vector> face_vec;
+   face_vec.reserve(3);
+   size_t_vector vvv(3,0);
+   face_vec.push_back(vvv);
+   face_vec.push_back(vvv);
+   face_vec.push_back(vvv);
+   face_vec[0](0) = 0; face_vec[0](1) = 1; face_vec[0](2) = 1;
+   face_vec[1](0) = 1; face_vec[1](1) = 0; face_vec[1](2) = 1;
+   face_vec[2](0) = 1; face_vec[2](1) = 1; face_vec[2](2) = 0;
+   double dh = MESH->get_smallest_grid_size();
+   double value = 0.;
+   geomVector netVel(3);
+   geomVector pt_at_face(3);
+   int in_RB = -1;
+
+   for (size_t face_norm = 0; face_norm < 3; face_norm++) {
+      geomVector rayDir(3);
+      double dl = 0., dr = 0.;
+      double fl = 0., fr = 0.;
+
+      // Left face
+      size_t_vector i0_left = i0;
+
+      // pt_at_face = *pt;
+      pt_at_face(0) = pt->operator()(0);
+      pt_at_face(1) = pt->operator()(1);
+      pt_at_face(2) = pt->operator()(2);
+
+      pt_at_face(face_norm) = FF->get_DOF_coordinate(i0_left(face_norm)
+                                                   , comp
+                                                   , face_norm);
+      rayDir(face_norm) = -1.;
+
+      in_RB = (FF == PF) ? -1 : levelset_any_RB(pt_at_face) ;
+
+      if (in_RB != -1) {
+         dl = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
+         geomVector rayVec(3);
+         rayVec(0) = pt->operator()(0) + dl * rayDir(0);
+         rayVec(1) = pt->operator()(1) + dl * rayDir(1);
+         rayVec(2) = pt->operator()(2) + dl * rayDir(2);
+         netVel = (FF == UF) ? rigid_body_velocity(in_RB, rayVec) :
+                               rigid_body_temperature(in_RB, rayVec) ;
+         fl = netVel(comp);
+      } else {
+         fl = Bilinear_interpolation(FF, comp, &pt_at_face, i0_left
+                                             , face_vec[face_norm], list);
+         dl = MAC::abs(pt_at_face(face_norm) - pt->operator()(face_norm));
+      }
+
+      // Right face
+      size_t_vector i0_right = i0;
+      i0_right(face_norm) += 1;
+
+      // pt_at_face = *pt;
+      pt_at_face(0) = pt->operator()(0);
+      pt_at_face(1) = pt->operator()(1);
+      pt_at_face(2) = pt->operator()(2);
+
+      pt_at_face(face_norm) = FF->get_DOF_coordinate(i0_right(face_norm)
+                                                   , comp
+                                                   , face_norm);
+      rayDir(face_norm) = 1.;
+
+      in_RB = (FF == PF) ? -1 : levelset_any_RB(pt_at_face) ;
+
+      if (in_RB != -1) {
+         dr = m_allDSrigidbodies[in_RB]->get_distanceTo(*pt, rayDir, dh);
+         geomVector rayVec(3);
+         rayVec(0) = pt->operator()(0) + dr * rayDir(0);
+         rayVec(1) = pt->operator()(1) + dr * rayDir(1);
+         rayVec(2) = pt->operator()(2) + dr * rayDir(2);
+         netVel = (FF == UF) ? rigid_body_velocity(in_RB, rayVec) :
+                               rigid_body_temperature(in_RB, rayVec) ;
+         fr = netVel(comp);
+      } else {
+         fr = Bilinear_interpolation(FF, comp, &pt_at_face, i0_right
+                                             , face_vec[face_norm], list);
+         dr = MAC::abs(pt_at_face(face_norm) - pt->operator()(face_norm));
+      }
+
+      value += (dr*fl + dl*fr)/(dl + dr);
+
+   }
+
+   value *= (1./3.);
+
+   return(value);
 }
 
 

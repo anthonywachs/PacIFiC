@@ -170,8 +170,8 @@ void FS_RigidBody:: nullify_velocity()
 {
   MAC_LABEL( "FS_RigidBody:: nullify_velocity" ) ;
 
-  m_translational_velocity.setVecZero();
-  m_angular_velocity.setVecZero();
+  // m_translational_velocity.setVecZero();
+  // m_angular_velocity.setVecZero();
 
 }
 
