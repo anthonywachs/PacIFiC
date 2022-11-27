@@ -167,6 +167,9 @@ class DS_AllRigidBodies
       /** @brief Returns the RB area in the Cut Cell */
       doubleVector* get_CC_RB_area(FV_DiscreteField const* FF);
 
+      /** @brief Returns the cell volume */
+      doubleVector* get_CC_cell_volume(FV_DiscreteField const* FF);
+
       /** @brief Returns the RB ID in the Cut Cell */
       intVector* get_CC_ownerID(FV_DiscreteField const* FF);
 
@@ -332,6 +335,8 @@ class DS_AllRigidBodies
 
       /** @brief Outputs the cutcell parameters in a csv for debugging */
       void write_CutCell_parameters(FV_DiscreteField const* FF);
+
+      void write_volume_conservation(FV_TimeIterator const* t_it);
 
       /** @brief Compute the velocity face flux from the UF face */
       double divergence_face_flux ( size_t const& p_PF
@@ -572,6 +577,9 @@ class DS_AllRigidBodies
 
       vector<doubleArray2D*> CC_face_fraction; /**< Face fraction of the cell faces
       for all fields. [field]->[index][face]*/
+
+      vector<doubleVector*> CC_cell_volume; /**< Stores cell volume
+      . [field][index]*/
 
       vector<doubleVector*> CC_RB_area; /**< Intersection points
       of rigid body with the grid cell. [field][index][points]*/

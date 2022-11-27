@@ -1220,9 +1220,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
   for (size_t comp = 0; comp < nb_comps; comp++) {
      for (size_t l = 0; l < m_space_dimension; ++l) {
        min_unknown_index(l) =
-                        FF->get_min_index_unknown_on_proc( comp,l );
+                        FF->get_min_index_unknown_handled_by_proc( comp,l );
        max_unknown_index(l) =
-                        FF->get_max_index_unknown_on_proc( comp,l );
+                        FF->get_max_index_unknown_handled_by_proc( comp,l );
      }
 
      for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
@@ -1611,6 +1611,25 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                  CC_RB_normal[field]->operator()(p,1) = normalRB1(1);
                  CC_RB_normal[field]->operator()(p,2) = normalRB1(2);
               }
+
+              // Cell volume calculations
+              double volume = 0.;
+              for (size_t dir = 0; dir < m_space_dimension; dir++) {
+                 for (size_t side = 0; side < 2; side++) {
+                    volume += 0.5 * cell_size(dir)
+                        * CC_face_fraction[field]->operator()(p,2*dir+side);
+                 }
+              }
+
+              geomVector cellCen(xC, yC, zC);
+              geomVector RBcen(CC_RB_centroid[field]->operator()(p,0)
+                             , CC_RB_centroid[field]->operator()(p,1)
+                             , CC_RB_centroid[field]->operator()(p,2));
+              geomVector RBnorm(CC_RB_normal[field]->operator()(p,0)
+                              , CC_RB_normal[field]->operator()(p,1)
+                              , CC_RB_normal[field]->operator()(p,2));
+              volume += (cellCen - RBcen).operator,(RBnorm);
+              CC_cell_volume[field]->operator()(p) = volume * (1./m_space_dimension);
            }  // k
         }  // j
      }  // i
@@ -1626,13 +1645,102 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
 
 //----------------------------------------------------------------------
 void
+DS_AllRigidBodies::write_volume_conservation(FV_TimeIterator const* t_it)
+//----------------------------------------------------------------------
+{
+
+  string fileName = "./DS_results/volume_conservation.csv" ;
+  std::ofstream MyFile;
+
+  if (m_macCOMM->rank() == 0) {
+     MyFile.open( fileName.c_str(), std::ios::app ) ;
+     MyFile << t_it->time();
+     std::cout << t_it->time();
+  }
+
+  size_t field = field_num(PF);
+  size_t nb_comps = PF->nb_components();
+
+  size_t_vector min_unknown_index(m_space_dimension,0);
+  size_t_vector max_unknown_index(m_space_dimension,0);
+
+
+  for (size_t comp = 0; comp < nb_comps; comp++) {
+     double solid_volume = 0.;
+     // Get local min and max indices
+     for (size_t l = 0; l < m_space_dimension; ++l) {
+       min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( comp,l );
+       max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( comp,l );
+     }
+
+     for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+        double dx = PF->get_cell_size( i, comp, 0 ) ;
+        for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+           double dy = PF->get_cell_size( j, comp, 1 ) ;
+           for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+              double dz = (m_space_dimension == 2) ? 1.
+                                          : PF->get_cell_size( k, comp, 2 ) ;
+              size_t p = PF->DOF_local_number(i,j,k,comp);
+              solid_volume += dx * dy * dz - CC_cell_volume[field]->operator()(p) ;
+           }
+        }
+     }
+     solid_volume = m_macCOMM->sum(solid_volume);
+     if (m_macCOMM->rank() == 0) {
+        std::cout << "," << solid_volume;
+        MyFile << "," << solid_volume;
+     }
+  }
+
+  field = field_num(UF);
+  nb_comps = UF->nb_components();
+
+  for (size_t comp = 0; comp < nb_comps; comp++) {
+     double solid_volume = 0.;
+     // Get local min and max indices
+     for (size_t l = 0; l < m_space_dimension; ++l) {
+       min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp,l );
+       max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp,l );
+     }
+
+     for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+        double dx = UF->get_cell_size( i, comp, 0 ) ;
+        for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+           double dy = UF->get_cell_size( j, comp, 1 ) ;
+           for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+              double dz = (m_space_dimension == 2) ? 1.
+                                          : UF->get_cell_size( k, comp, 2 ) ;
+              size_t p = UF->DOF_local_number(i,j,k,comp);
+              solid_volume += dx * dy * dz - CC_cell_volume[field]->operator()(p) ;
+           }
+        }
+     }
+     solid_volume = m_macCOMM->sum(solid_volume);
+     if (m_macCOMM->rank() == 0) {
+        std::cout << "," << solid_volume;
+        MyFile << "," << solid_volume;
+     }
+  }
+
+  if (m_macCOMM->rank() == 0) {
+     std::cout << endl;
+     MyFile << endl;
+     MyFile.close();
+  }
+}
+
+
+
+
+//----------------------------------------------------------------------
+void
 DS_AllRigidBodies::write_CutCell_parameters(FV_DiscreteField const* FF)
 //----------------------------------------------------------------------
 {
   std::ofstream outputFile ;
 
   std::ostringstream os2;
-  os2 << "./DS_results/CutCell_parameteres.csv";
+  os2 << "./DS_results/CutCell_parameteres_" << m_macCOMM->rank() << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 
@@ -1653,8 +1761,8 @@ DS_AllRigidBodies::write_CutCell_parameters(FV_DiscreteField const* FF)
   for (size_t comp = 0; comp < nb_comps; comp++) {
      // Get local min and max indices
      for (size_t l = 0; l < m_space_dimension; ++l) {
-       min_unknown_index(l) = FF->get_min_index_unknown_on_proc( comp,l );
-       max_unknown_index(l) = FF->get_max_index_unknown_on_proc( comp,l );
+       min_unknown_index(l) = FF->get_min_index_unknown_handled_by_proc( comp,l );
+       max_unknown_index(l) = FF->get_max_index_unknown_handled_by_proc( comp,l );
      }
 
      for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
@@ -1663,20 +1771,21 @@ DS_AllRigidBodies::write_CutCell_parameters(FV_DiscreteField const* FF)
               size_t p = FF->DOF_local_number(i,j,k,comp);
               for (size_t iter = 0; iter < 6; iter++) {
                  if (CC_face_fraction[field]->operator()(p,iter) != 0.)
-                    outputFile <<  p
-                    << "," << CC_face_centroid[field]->operator()(p,iter,0)
-                    << "," << CC_face_centroid[field]->operator()(p,iter,1)
-                    << "," << CC_face_centroid[field]->operator()(p,iter,2)
-                    // << "," << CC_RB_centroid[field]->operator()(p,0)
-                    // << "," << CC_RB_centroid[field]->operator()(p,1)
-                    // << "," << CC_RB_centroid[field]->operator()(p,2)
-                    << "," << CC_RB_normal[field]->operator()(p,0)
-                    << "," << CC_RB_normal[field]->operator()(p,1)
-                    << "," << CC_RB_normal[field]->operator()(p,2)
-                    << "," << CC_face_fraction[field]->operator()(p,iter)
-                    << "," << CC_ownerID[field]->operator()(p)
-                    << "," << CC_RB_area[field]->operator()(p)
-                    << endl;
+                    if (CC_RB_area[field]->operator()(p) != 0.)
+                       outputFile <<  p
+                       << "," << CC_face_centroid[field]->operator()(p,iter,0)
+                       << "," << CC_face_centroid[field]->operator()(p,iter,1)
+                       << "," << CC_face_centroid[field]->operator()(p,iter,2)
+                       // << "," << CC_RB_centroid[field]->operator()(p,0)
+                       // << "," << CC_RB_centroid[field]->operator()(p,1)
+                       // << "," << CC_RB_centroid[field]->operator()(p,2)
+                       << "," << CC_RB_normal[field]->operator()(p,0)
+                       << "," << CC_RB_normal[field]->operator()(p,1)
+                       << "," << CC_RB_normal[field]->operator()(p,2)
+                       << "," << CC_face_fraction[field]->operator()(p,iter)
+                       << "," << CC_ownerID[field]->operator()(p)
+                       << "," << CC_RB_area[field]->operator()(p)
+                       << endl;
               }
            }
         }
@@ -2393,6 +2502,10 @@ void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
    CC_RB_area.push_back(new doubleVector(1,0));
    CC_RB_area.push_back(new doubleVector(1,0));
    CC_RB_area.push_back(new doubleVector(1,0));
+   CC_cell_volume.reserve(3);
+   CC_cell_volume.push_back(new doubleVector(1,0));
+   CC_cell_volume.push_back(new doubleVector(1,0));
+   CC_cell_volume.push_back(new doubleVector(1,0));
    CC_RB_normal.reserve(3);
    CC_RB_normal.push_back(new doubleArray2D(1,1,0.));
    CC_RB_normal.push_back(new doubleArray2D(1,1,0.));
@@ -4803,6 +4916,7 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    CC_face_fraction[field]->re_initialize(FF_LOC_UNK,6);
    CC_ownerID[field]->re_initialize(FF_LOC_UNK,-1.);
    CC_RB_area[field]->re_initialize(FF_LOC_UNK);
+   CC_cell_volume[field]->re_initialize(FF_LOC_UNK);
    CC_RB_normal[field]->re_initialize(FF_LOC_UNK,3);
    CC_RB_centroid[field]->re_initialize(FF_LOC_UNK,3);
 
@@ -4902,6 +5016,18 @@ DS_AllRigidBodies::get_CC_RB_area(FV_DiscreteField const* FF)
 {
    size_t field = field_num(FF);
    return (CC_RB_area[field]) ;
+}
+
+
+
+
+//----------------------------------------------------------------------
+doubleVector*
+DS_AllRigidBodies::get_CC_cell_volume(FV_DiscreteField const* FF)
+//----------------------------------------------------------------------
+{
+   size_t field = field_num(FF);
+   return (CC_cell_volume[field]) ;
 }
 
 

@@ -419,6 +419,8 @@ DS_NavierStokes:: do_after_inner_iterations_stage(
    if ( my_rank == is_master )
       MAC::out() << "CFL: "<< cfl <<endl;
 
+	// allrigidbodies->write_volume_conservation(t_it);
+
    // Projection translation
    if ( b_projection_translation ) {
 
@@ -2555,9 +2557,6 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( )
 	vector<doubleVector*> advection = GLOBAL_EQ->get_velocity_advection();
 	size_t_vector* void_frac = (is_solids) ?
 							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
-
-	doubleArray2D* normalRB = allrigidbodies->get_CC_RB_normal(UF);
-	doubleArray2D* face_fraction = allrigidbodies->get_CC_face_fraction(UF);
 
 	size_t_vector min_unknown_index(3,0);
 	size_t_vector max_unknown_index(3,0);
