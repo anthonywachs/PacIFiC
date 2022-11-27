@@ -1795,8 +1795,14 @@ DS_NavierStokes:: compute_adv_component ( size_t const& comp,
  		ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp)
  			 	 - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
 	} else if ( AdvectionScheme == "Centered" && StencilCorrection == "CutCell" ) {
-      ugradu = assemble_advection_Centered_CutCell(rho,i,j,k,comp,1)
-             - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
+		intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
+		size_t p = UF->DOF_local_number(i, j, k, comp);
+		if (ownerID->operator()(p) != -1) {
+			ugradu = assemble_advection_Centered_CutCell(rho,i,j,k,comp,1);
+		} else {
+			ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp);
+		}
+      ugradu -= rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
    }
 
    if ( AdvectionTimeAccuracy == 1 ) {

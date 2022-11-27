@@ -1267,7 +1267,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                        fraction = std::get<0>(int_pt);
                        geomVector pt = std::get<1>(int_pt);
                        int point_in_fluid = std::get<2>(int_pt);
-                       CC_ownerID[field]->operator()(p) = std::max(CC_ownerID[field]->operator()(p), std::get<3>(int_pt));
+                       CC_ownerID[field]->operator()(p) =
+                                    std::max(CC_ownerID[field]->operator()(p)
+                                           , std::get<3>(int_pt));
                        if ((std::get<3>(int_pt) != -1) && (fraction != 0)) {
                           bool present = false;
                           for (auto itt = intersection_pts.begin();
@@ -1340,7 +1342,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                        double rht_frac = std::get<0>(rht);
                        geomVector pt = std::get<1>(rht);
                        int rht_in_fluid = std::get<2>(rht);
-                       CC_ownerID[field]->operator()(p) = std::max(CC_ownerID[field]->operator()(p), std::get<3>(rht));
+                       CC_ownerID[field]->operator()(p) =
+                                    std::max(CC_ownerID[field]->operator()(p)
+                                           , std::get<3>(rht));
                        if ((std::get<3>(rht) != -1) && (rht_frac != 0)) {
                           bool present = false;
                           for (auto itt = intersection_pts.begin();
@@ -1369,7 +1373,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                        double lft_frac = std::get<0>(lft);
                        pt = std::get<1>(lft);
                        int lft_in_fluid = std::get<2>(lft);
-                       CC_ownerID[field]->operator()(p) = std::max(CC_ownerID[field]->operator()(p), std::get<3>(lft));
+                       CC_ownerID[field]->operator()(p) =
+                                    std::max(CC_ownerID[field]->operator()(p)
+                                           , std::get<3>(lft));
                        if ((std::get<3>(lft) != -1) && (lft_frac != 0)) {
                           bool present = false;
                           for (auto itt = intersection_pts.begin();
@@ -1397,7 +1403,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                        double top_frac = std::get<0>(top);
                        pt = std::get<1>(top);
                        int top_in_fluid = std::get<2>(top);
-                       CC_ownerID[field]->operator()(p) = std::max(CC_ownerID[field]->operator()(p), std::get<3>(top));
+                       CC_ownerID[field]->operator()(p) =
+                                    std::max(CC_ownerID[field]->operator()(p)
+                                           , std::get<3>(top));
                        if ((std::get<3>(top) != -1) && (top_frac != 0)) {
                           bool present = false;
                           for (auto itt = intersection_pts.begin();
@@ -1425,7 +1433,9 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                        double bot_frac = std::get<0>(bot);
                        pt = std::get<1>(bot);
                        int bot_in_fluid = std::get<2>(bot);
-                       CC_ownerID[field]->operator()(p) = std::max(CC_ownerID[field]->operator()(p), std::get<3>(bot));
+                       CC_ownerID[field]->operator()(p) =
+                                    std::max(CC_ownerID[field]->operator()(p)
+                                           , std::get<3>(bot));
                        if ((std::get<3>(bot) != -1) && (bot_frac != 0)) {
                           bool present = false;
                           for (auto itt = intersection_pts.begin();
