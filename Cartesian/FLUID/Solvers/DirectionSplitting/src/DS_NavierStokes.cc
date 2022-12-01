@@ -2013,6 +2013,7 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    // min_unknown_index(2) = (dim == 3) ? 0 : 0;
    // max_unknown_index(2) = (dim == 3) ? 0 : 1;
 
+	doubleVector* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
 	vector<doubleVector*> advection = GLOBAL_EQ->get_velocity_advection();
    vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
    size_t_vector* void_frac = (is_solids) ?
@@ -2034,7 +2035,14 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
             for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                double dzC = (dim == 3) ? UF->get_cell_size( k, comp, 2 ) : 1 ;
 
-               size_t p = UF->DOF_local_number(i,j,k,comp);
+					size_t p = UF->DOF_local_number(i,j,k,comp);
+					// Cell volume
+					double cellV = dxC * dyC * dzC;
+					// if ((StencilCorrection == "CutCell")
+					//  && (CC_vol->operator()(p) > 0.5*cellV)) {
+					//  	cellV = CC_vol->operator()(p);
+					// }
+
                // Dxx for un
                double xvalue = vel_diffusion[0]->operator()(p);
                // Dyy for un
@@ -2056,20 +2064,20 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
                                  + yvalue*dxC*dzC
                                  + zvalue*dxC*dyC)
                           - pvalue - adv_value
-                          + (UF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC*rho)
+                          + (UF->DOF_value( i, j, k, comp, 1 )*cellV*rho)
                                                          /(t_it -> time_step());
 
 
-               if ( cpp==comp ) rhs += - bodyterm*dxC*dyC*dzC;
+               if ( cpp==comp ) rhs += - bodyterm*cellV;
 
                if (is_solids) {
                   if (void_frac->operator()(p) != 0) {
-                     if ( cpp==comp ) rhs += bodyterm*dxC*dyC*dzC;
+                     if ( cpp==comp ) rhs += bodyterm*cellV;
                   }
                }
 
                UF->set_DOF_value( i, j, k, comp, 0,
-                                  rhs*(t_it -> time_step())/(dxC*dyC*dzC*rho));
+                                  rhs*(t_it -> time_step())/(cellV*rho));
             }
          }
       }
@@ -2743,6 +2751,9 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 			}
 		}
 		// cout << "Div3: " << divergence->operator()(8188) << endl;
+
+		doubleVector* CC_vol = allrigidbodies->get_CC_cell_volume(PF);
+
 		// Converting flux to divergence
 		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 			double dx = PF->get_cell_size( i, 0, 0 );
@@ -2751,7 +2762,10 @@ DS_NavierStokes:: compute_velocity_divergence ( )
 				for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
 					double dz = (dim == 3) ? PF->get_cell_size( k, 0, 2 ) : 1.;
 					size_t p = PF->DOF_local_number(i,j,k,comp);
-					divergence->operator()(p) = divergence->operator()(p)/dx/dy/dz;
+					double volume = dx * dy * dz;
+					if (is_solids && (void_frac->operator()(p) == 0))
+						volume = CC_vol->operator()(p);
+					divergence->operator()(p) = divergence->operator()(p)/volume;
 				}
 			}
 		}
