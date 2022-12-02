@@ -278,94 +278,120 @@ void DS_GeneralPolyhedron:: compute_surface_points(  )
 {
   MAC_LABEL( "DS_GeneralPolyhedron:: compute_surface_points" ) ;
 
-  doubleVector di(3,0.);
-
-  di(0) = (box_max[0] - box_min[0])/(double)Npoints[0];
-  di(1) = (box_max[1] - box_min[1])/(double)Npoints[1];
-  di(2) = (box_max[2] - box_min[2])/(double)Npoints[2];
-
   size_t cntr = 0;
 
-  // x face
-  for (size_t i = 0; i < Npoints[1]; i++) {
-     for (size_t j = 0; j < Npoints[2]; j++) {
-        geomVector point_min (box_min[0]
-                            , box_min[1] + (0.5+(double)i)*di(1)
-                            , box_min[2] + (0.5+(double)j)*di(2) );
-        geomVector point_max (box_max[0]
-                            , box_min[1] + (0.5+(double)i)*di(1)
-                            , box_min[2] + (0.5+(double)j)*di(2) );
-        m_surface_points[cntr]->operator=(point_min);
-        m_surface_points[Npoints[1]*Npoints[2] + cntr]->operator=(point_max);
+  struct FS_GeneralPolyhedron_Additional_Param const* pagp =
+   dynamic_cast<FS_GeneralPolyhedron*>(m_geometric_rigid_body)
+      ->get_ptr_FS_GeneralPolyhedron_Additional_Param();
 
-        m_surface_area[cntr]->operator()(0) = di(1)*di(2);
-        m_surface_area[Npoints[1]*Npoints[2]+cntr]->operator()(0) = di(1)*di(2);
+  geomVector const* pgc = dynamic_cast<FS_GeneralPolyhedron*>(m_geometric_rigid_body)
+                          ->get_ptr_to_gravity_centre();
 
-        geomVector normal(-1., 0., 0.);
-        m_surface_normal[cntr]->operator=(normal);
-        m_surface_normal[Npoints[1]*Npoints[2] + cntr]->operator=(-1.*normal);
+  geomVector gc(3);
+  gc(0) = pgc->operator()(0);
+  gc(1) = pgc->operator()(1);
+  gc(2) = pgc->operator()(2);
 
-        cntr++;
+  size_t nfaces = pagp->faceCen.size();
+
+  for (size_t iface = 0; iface < nfaces; iface++) {
+     size_t n_vertex = pagp->facesVec[iface].size();
+     if (n_vertex == 3) {
+        // Vertex ID
+        size_t v1 = pagp->facesVec[iface][0];
+        size_t v2 = pagp->facesVec[iface][1];
+        size_t v3 = pagp->facesVec[iface][2];
+
+        geomVector p1 = pagp->corners[v1];
+        geomVector p2 = pagp->corners[v2];
+        geomVector p3 = pagp->corners[v3];
+
+        geomVector vec1 = (1./(dis_level+1.)) * (p2 - p1);
+        geomVector vec2 = (1./(dis_level+1.)) * (p3 - p1);
+        geomVector cross = (vec1^vec2);
+        double area = 0.5*cross.calcNorm();
+
+        // Test the direction of normal vector to be away from RB center
+        geomVector delta = pagp->ref_corners[v1];
+
+        if ((delta(0)*cross(0)
+           + delta(1)*cross(1)
+           + delta(2)*cross(2)) < 0.) {
+           cross = -1.*cross;
+        }
+        cross *= (1./cross.calcNorm());
+        //-----------------------------------------------------------------
+
+        for (size_t i = 0; i <= dis_level; i++) {
+           for (size_t j = 0; j <= dis_level - i; j++) {
+             // four points of parallelogram
+             geomVector par1 = p1 + i * vec1 + j * vec2;
+             geomVector par2 = par1 + vec1;
+             geomVector par3 = par1 + vec2;
+             geomVector par4 = par1 + vec1 + vec2;
+             m_surface_points[cntr]->operator=((1./3.) * (par1 + par2 + par3));
+             m_surface_normal[cntr]->operator=(cross);
+             m_surface_area[cntr]->operator()(0) = area;
+             cntr++;
+             if (j < dis_level - i) {
+                m_surface_points[cntr]->operator=((1./3.) * (par2 + par3 + par4));
+                m_surface_normal[cntr]->operator=(cross);
+                m_surface_area[cntr]->operator()(0) = area;
+                cntr++;
+             }
+           }
+        }
+     } else {
+        for (size_t idxPts = 0; idxPts < n_vertex; ++idxPts ) {
+           // Vertex index
+           size_t i0 = idxPts;
+           size_t i1 = (idxPts + 1 == n_vertex) ? 0 : idxPts + 1;
+           // Vertex ID
+           size_t v1 = pagp->facesVec[iface][i0];
+           size_t v2 = pagp->facesVec[iface][i1];
+
+           geomVector p1 = pagp->faceCen[iface];
+           geomVector p2 = pagp->corners[v1];
+           geomVector p3 = pagp->corners[v2];
+
+           geomVector vec1 = (1./(dis_level+1.)) * (p2 - p1);
+           geomVector vec2 = (1./(dis_level+1.)) * (p3 - p1);
+           geomVector cross = (vec1^vec2);
+           double area = 0.5*cross.calcNorm();
+
+           // Test the direction of normal vector to be away from RB center
+           geomVector delta = pagp->ref_corners[v1];
+
+           if ((delta(0)*cross(0)
+              + delta(1)*cross(1)
+              + delta(2)*cross(2)) < 0.) {
+              cross = -1.*cross;
+           }
+           cross *= (1./cross.calcNorm());
+           //-----------------------------------------------------------------
+
+           for (size_t i = 0; i <= dis_level; i++) {
+              for (size_t j = 0; j <= dis_level - i; j++) {
+                // four points of parallelogram
+                geomVector par1 = p1 + i * vec1 + j * vec2;
+                geomVector par2 = par1 + vec1;
+                geomVector par3 = par1 + vec2;
+                geomVector par4 = par1 + vec1 + vec2;
+                m_surface_points[cntr]->operator=((1./3.) * (par1 + par2 + par3));
+                m_surface_normal[cntr]->operator=(cross);
+                m_surface_area[cntr]->operator()(0) = area;
+                cntr++;
+                if (j < dis_level - i) {
+                   m_surface_points[cntr]->operator=((1./3.) * (par2 + par3 + par4));
+                   m_surface_normal[cntr]->operator=(cross);
+                   m_surface_area[cntr]->operator()(0) = area;
+                   cntr++;
+                }
+             }
+           }
+        }
      }
   }
-
-  cntr = cntr + Npoints[1]*Npoints[2];
-
-  // y face
-  for (size_t i = 0; i < Npoints[0]; i++) {
-     for (size_t j = 0; j < Npoints[2]; j++) {
-        geomVector point_min (box_min[0] + (0.5+(double)i)*di(0)
-                            , box_min[1]
-                            , box_min[2] + (0.5+(double)j)*di(2) );
-        geomVector point_max (box_min[0] + (0.5+(double)i)*di(0)
-                            , box_max[1]
-                            , box_min[2] + (0.5+(double)j)*di(2) );
-        m_surface_points[cntr]->operator=(point_min);
-        m_surface_points[Npoints[0]*Npoints[2] + cntr]->operator=(point_max);
-
-        m_surface_area[cntr]->operator()(0) = di(0)*di(2);
-        m_surface_area[Npoints[0]*Npoints[2]+cntr]->operator()(0) = di(0)*di(2);
-
-        geomVector normal(0., -1., 0.);
-        m_surface_normal[cntr]->operator=(normal);
-        m_surface_normal[Npoints[0]*Npoints[2] + cntr]->operator=(-1.*normal);
-
-        cntr++;
-     }
-  }
-
-  cntr = cntr + Npoints[0]*Npoints[2];
-
-  // z face
-  for (size_t i = 0; i < Npoints[0]; i++) {
-     for (size_t j = 0; j < Npoints[1]; j++) {
-        geomVector point_min (box_min[0] + (0.5+(double)i)*di(0)
-                            , box_min[1] + (0.5+(double)j)*di(1)
-                            , box_min[2] );
-        geomVector point_max (box_min[0] + (0.5+(double)i)*di(0)
-                            , box_min[1] + (0.5+(double)j)*di(1)
-                            , box_max[2] );
-        m_surface_points[cntr]->operator=(point_min);
-        m_surface_points[Npoints[0]*Npoints[1] + cntr]->operator=(point_max);
-
-        m_surface_area[cntr]->operator()(0) = di(0)*di(1);
-        m_surface_area[Npoints[0]*Npoints[1]+cntr]->operator()(0) = di(0)*di(1);
-
-        geomVector normal(0., 0., -1.);
-        m_surface_normal[cntr]->operator=(normal);
-        m_surface_normal[Npoints[0]*Npoints[1] + cntr]->operator=(-1.*normal);
-
-        cntr++;
-     }
-  }
-
-  // Translate and rotate
-  for (size_t i = 0; i < m_surface_area.size(); i++) {
-     m_geometric_rigid_body->rotate(m_surface_points[i]);
-     m_geometric_rigid_body->rotate(m_surface_normal[i]);
-     m_geometric_rigid_body->translate(m_surface_points[i]);
-  }
-
 }
 
 
@@ -383,38 +409,18 @@ void DS_GeneralPolyhedron:: compute_number_of_surface_variables(
                         dynamic_cast<FS_GeneralPolyhedron*>(m_geometric_rigid_body)
                            ->get_ptr_FS_GeneralPolyhedron_Additional_Param();
 
-  geomVector const* pgc = dynamic_cast<FS_GeneralPolyhedron*>(m_geometric_rigid_body)
-                            ->get_ptr_to_gravity_centre();
-
-  box_min.assign(3,1.e14);
-  box_max.assign(3,-1.e14);
-
-  for (int i = 0; i < (int) pagp->ref_corners.size(); i++) {
-     for (int dir = 0; dir < 3; dir++) {
-        if (pagp->ref_corners[i](dir) < box_min[dir])
-           box_min[dir] = pagp->ref_corners[i](dir);
-
-        if (pagp->ref_corners[i](dir) > box_max[dir])
-           box_max[dir] = pagp->ref_corners[i](dir);
-     }
-  }
-
-  doubleVector delta(3,0.);
-
-  delta(0) = (box_max[0]-box_min[0]);
-  delta(1) = (box_max[1]-box_min[1]);
-  delta(2) = (box_max[2]-box_min[2]);
+  double size = get_circumscribed_radius();
 
   double scale = 1. / sqrt(surface_cell_scale) / dx;
 
-  if (Npoints.empty()) Npoints.reserve(3);
+  dis_level = MAC::floor(size*scale);
 
-  Npoints[0] = (size_t) round(scale * delta(0) );
-  Npoints[1] = (size_t) round(scale * delta(1) );
-  Npoints[2] = (size_t) round(scale * delta(2) );
+  size_t nfaces = pagp->faceCen.size();
 
-  Ntot = 2 * (Npoints[0]*Npoints[1]
-            + Npoints[1]*Npoints[2]
-            + Npoints[2]*Npoints[0]);
+  size_t faceEdges = pagp->facesVec[0].size();
+
+  Ntot = (faceEdges == 3) ?
+         (size_t) nfaces * (dis_level + 1.) * (dis_level + 1.)
+       : (size_t) nfaces * (dis_level + 1.) * (dis_level + 1.) * faceEdges;
 
 }

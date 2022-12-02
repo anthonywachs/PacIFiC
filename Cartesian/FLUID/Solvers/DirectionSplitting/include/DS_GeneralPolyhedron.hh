@@ -135,7 +135,8 @@ class DS_GeneralPolyhedron: public DS_RigidBody
 
       /**@name Parameters */
       //@{
-      vector<double> box_min, box_max;
+      double dis_level;          /** Level of surface discretization
+                                    (higher value finer discretization).*/
       vector<size_t> Npoints;    /** Surface points on each direction
                                      of 3D box.*/
       //@}
