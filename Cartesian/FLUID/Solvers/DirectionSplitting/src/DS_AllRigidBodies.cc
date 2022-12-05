@@ -2142,6 +2142,8 @@ DS_AllRigidBodies::is_bounding_box_in_local_domain( class doubleVector& bounds
 
   double local_min = MESH->get_min_coordinate_on_current_processor(dir);
   double local_max = MESH->get_max_coordinate_on_current_processor(dir);
+  double global_min = MESH->get_main_domain_min_coordinate(dir);
+  double global_max = MESH->get_main_domain_max_coordinate(dir);
 
   // Getting the minimum grid index in control volume (CV)
   if (bounds(0) < bounds(1)) {// Non-periodic CV
@@ -2170,6 +2172,10 @@ DS_AllRigidBodies::is_bounding_box_in_local_domain( class doubleVector& bounds
      } else {
         value = true;
      }
+
+     // Added for particle size equivalent to local domain size
+     if (MAC::abs(bounds(1) - bounds(0)) >= 0.3*(global_max - global_min))
+        value = true;
   }
 
   return (value);
