@@ -313,6 +313,7 @@ void DS_GeneralPolyhedron:: compute_surface_points(  )
 
         // Test the direction of normal vector to be away from RB center
         geomVector delta = pagp->ref_corners[v1];
+        m_geometric_rigid_body->rotate(&delta);
 
         if ((delta(0)*cross(0)
            + delta(1)*cross(1)
@@ -361,6 +362,7 @@ void DS_GeneralPolyhedron:: compute_surface_points(  )
 
            // Test the direction of normal vector to be away from RB center
            geomVector delta = pagp->ref_corners[v1];
+           m_geometric_rigid_body->rotate(&delta);
 
            if ((delta(0)*cross(0)
               + delta(1)*cross(1)
