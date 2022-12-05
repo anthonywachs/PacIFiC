@@ -2173,10 +2173,11 @@ DS_AllRigidBodies::is_bounding_box_in_local_domain( class doubleVector& bounds
         value = true;
      }
 
-     // Added for particle size equivalent to local domain size
-     if (MAC::abs(bounds(1) - bounds(0)) >= 0.3*(global_max - global_min))
-        value = true;
   }
+  
+  // Added for particle size equivalent to local domain size
+  if (MAC::abs(bounds(1) - bounds(0)) >= 0.3*(global_max - global_min))
+  value = true;
 
   return (value);
 
