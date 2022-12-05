@@ -680,7 +680,7 @@ int DS_AllRigidBodies:: levelset_any_RB( geomVector const& pt ) const
 
   // To avoid any jumps while RB motion
   double dh = MESH->get_smallest_grid_size();
-  double threshold = pow(THRES,0.5)*dh;
+  double threshold = THRES*dh;//pow(THRES,0.5)*dh;
 
   for (size_t i = 0; i < m_nrb; ++i) {
      if (m_allDSrigidbodies[i]->level_set_value( pt ) < threshold )
@@ -704,7 +704,7 @@ int DS_AllRigidBodies:: levelset_any_RB( double const& x,
 
   // To avoid any jumps while RB motion
   double dh = MESH->get_smallest_grid_size();
-  double threshold = pow(THRES,0.5)*dh;
+  double threshold = THRES*dh;//pow(THRES,0.5)*dh;
 
   for (size_t i = 0; i < m_nrb; ++i) {
      if (m_allDSrigidbodies[i]->level_set_value( x, y, z ) < threshold)
@@ -727,7 +727,7 @@ int DS_AllRigidBodies:: levelset_any_RB( size_t const& ownID
 
   // To avoid any jumps while RB motion
   double dh = MESH->get_smallest_grid_size();
-  double threshold = pow(THRES,0.5)*dh;
+  double threshold = THRES*dh;//pow(THRES,0.5)*dh;
 
   for (size_t i = 0; i < neighbour_list[ownID].size(); ++i) {
      size_t neighID = neighbour_list[ownID][i];
@@ -753,7 +753,7 @@ int DS_AllRigidBodies:: levelset_any_RB( size_t const& ownID,
 
   // To avoid any jumps while RB motion
   double dh = MESH->get_smallest_grid_size();
-  double threshold = pow(THRES,0.5)*dh;
+  double threshold = THRES*dh;//pow(THRES,0.5)*dh;
 
   for (size_t i = 0; i < neighbour_list[ownID].size(); ++i) {
      size_t neighID = neighbour_list[ownID][i];
@@ -961,7 +961,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_epsilon_grid(
   boolVector const* periodic_comp = MESH->get_periodic_directions();
 
   double dh = MESH->get_smallest_grid_size();
-  double threshold = pow(THRES,0.5)*dh;
+  double threshold = THRES*dh;//pow(THRES,0.5)*dh;
 
   // Get local min and max indices;
   size_t_vector min_unknown_index(3,0);
@@ -4246,6 +4246,8 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
 
    geomVector xi(3), fi(3);
 
+   double dh = MESH->get_smallest_grid_size();
+
    // Creating ghost points for quadratic interpolation
    intVector i0_temp(3,0);
 
@@ -4300,9 +4302,10 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
           (in_solid(1) == 0) &&
           (in_solid(2) == 0)) {
 	      if (FF == UF) {
-            xi(0) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
-               - intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
+            double del = intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
+            xi(0) = xi(1) - del;
             fi(0) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 0);
+            if (del < THRES * dh) scheme = linear12;
          } else {
             scheme = linear12;
          }
@@ -4311,9 +4314,10 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                  (in_solid(1) == 0) &&
                  (in_solid(2) != 0)) {
          if (FF == UF) {
-            xi(2) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
-               + intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
+            double del = intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
+            xi(2) = xi(1) + del;
             fi(2) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 1);
+            if (del < THRES * dh) scheme = linear01;
          } else {
             scheme = linear01;
          }
@@ -4322,12 +4326,14 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                  (in_solid(1) == 0) &&
                  (in_solid(2) != 0)) {
          if (FF == UF) {
-            xi(0) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
-               - intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
+            double del = intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
+            xi(0) = xi(1) - del;
             fi(0) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 0);
-            xi(2) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
-               + intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
+            if (del < THRES * dh) scheme = linear1;
+            del = intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
+            xi(2) = xi(1) + del;
             fi(2) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 1);
+            if (del < THRES * dh) scheme = linear1;
          } else {
             scheme = linear1;
          }
@@ -4336,10 +4342,11 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                  (in_solid(1) != 0) &&
                  (in_solid(2) == 0)) {
          if (FF == UF) {
-            xi(1) = FF->get_DOF_coordinate(i0_ghost[2](interpol_dir), comp, interpol_dir)
-               - intersect_distance[field]->operator()(node_index(2),2*interpol_dir + 0);
+            double del = intersect_distance[field]->operator()(node_index(2),2*interpol_dir + 0);
+            xi(1) = xi(2) - del;
             fi(1) = intersect_fieldValue[field]->operator()(node_index(2),2*interpol_dir + 0);
-            scheme = linear12;
+            if (del < THRES * dh) scheme = linear2;
+            else scheme = linear12;
          } else {
             scheme = linear2;
          }
@@ -4348,10 +4355,11 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
                  (in_solid(1) != 0) &&
                  (in_solid(2) != 0)) {
          if (FF == UF) {
-            xi(1) = FF->get_DOF_coordinate(i0_ghost[0](interpol_dir), comp, interpol_dir)
-            + intersect_distance[field]->operator()(node_index(0),2*interpol_dir + 1);
+            double del = intersect_distance[field]->operator()(node_index(0),2*interpol_dir + 1);
+            xi(1) = xi(0) + del;
             fi(1) = intersect_fieldValue[field]->operator()(node_index(0),2*interpol_dir + 1);
-            scheme = linear01;
+            if (del < THRES * dh) scheme = linear0;
+            else scheme = linear01;
          } else {
             scheme = linear0;
          }
@@ -4363,9 +4371,10 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
       if ((in_solid(0) == 0) &&
           (in_solid(1) != 0)) {
          if (FF == UF) {
-            xi(1) = FF->get_DOF_coordinate(i0_ghost[0](interpol_dir), comp, interpol_dir)
-               + intersect_distance[field]->operator()(node_index(0),2*interpol_dir + 1);
+            double del = intersect_distance[field]->operator()(node_index(0),2*interpol_dir + 1);
+            xi(1) = xi(0) + del;
             fi(1) = intersect_fieldValue[field]->operator()(node_index(0),2*interpol_dir + 1);
+            if (del < THRES * dh) scheme = linear0;
          } else {
             scheme = linear0;
          }
@@ -4373,9 +4382,10 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
       } else if ((in_solid(0) != 0) &&
                  (in_solid(1) == 0)) {
         if (FF == UF) {
-            xi(0) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
-               - intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
-            fi(0) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 0);
+           double del = intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 0);
+           xi(0) = xi(1) - del;
+           fi(0) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 0);
+           if (del < THRES * dh) scheme = linear1;
         } else {
             scheme = linear1;
         }
@@ -4387,9 +4397,10 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
       if ((in_solid(1) == 0) &&
           (in_solid(2) != 0)) {
          if (FF == UF) {
-            xi(2) = FF->get_DOF_coordinate(i0_ghost[1](interpol_dir), comp, interpol_dir)
-               + intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
+            double del = intersect_distance[field]->operator()(node_index(1),2*interpol_dir + 1);
+            xi(2) = xi(1) + del;
             fi(2) = intersect_fieldValue[field]->operator()(node_index(1),2*interpol_dir + 1);
+            if (del < THRES * dh) scheme = linear1;
          } else {
             scheme = linear1;
          }
@@ -4397,9 +4408,10 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
       } else if ((in_solid(1) != 0) &&
                  (in_solid(2) == 0)) {
          if (FF == UF) {
-            xi(1) = FF->get_DOF_coordinate(i0_ghost[2](interpol_dir), comp, interpol_dir)
-               - intersect_distance[field]->operator()(node_index(2),2*interpol_dir + 0);
+            double del = intersect_distance[field]->operator()(node_index(2),2*interpol_dir + 0);
+            xi(1) = xi(2) - del;
             fi(1) = intersect_fieldValue[field]->operator()(node_index(2),2*interpol_dir + 0);
+            if (del < THRES * dh) scheme = linear2;
          } else {
             scheme = linear2;
          }
@@ -4550,8 +4562,6 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
   double dh = MESH->get_smallest_grid_size();
 
-
-
   // Stores rigid body ID if inside solid; -1 otherwise
   in_parID[0] = levelset_any_RB(parID, coord_g[0]);
   in_parID[1] = levelset_any_RB(parID, coord_g[1]);
@@ -4606,6 +4616,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
            x0 = x1 - del;
            f0 = netVel(comp);
+           if (del < THRES * dh) scheme = linear12;
 	     } else {
            scheme = linear12;
 	     }
@@ -4629,6 +4640,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
             x2 = x1 + del;
             f2 = netVel(comp);
+            if (del < THRES * dh) scheme = linear01;
    	   } else {
             scheme = linear01;
 	      }
@@ -4652,6 +4664,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
             x0 = x1 - del;
             f0 = netVel(comp);
+            if (del < THRES * dh) scheme = linear1;
 
             rayDir(sec_ghost_dir) = 1. ;
 
@@ -4667,6 +4680,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
             x2 = x1 + del;
             f2 = netVel(comp);
+            if (del < THRES * dh) scheme = linear1;
 	      } else {
 	         scheme = linear1;
          }
@@ -4691,6 +4705,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
             x1 = x2 - del;
             f1 = netVel(comp);
             scheme = linear12;
+            if (del < THRES * dh) scheme = linear2;
          } else {
             scheme = linear2;
          }
@@ -4715,6 +4730,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
             x1 = x0 + del;
             f1 = netVel(comp);
             scheme = linear01;
+            if (del < THRES * dh) scheme = linear0;
          } else {
             scheme = linear0;
          }
@@ -4741,6 +4757,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
              x1 = x0 + del;
              f1 = netVel(comp);
+             if (del < THRES * dh) scheme = linear0;
 	       } else {
              scheme = linear0;
           }
@@ -4763,6 +4780,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
              x0 = x1 - del;
              f0 = netVel(comp);
+             if (del < THRES * dh) scheme = linear1;
       	 } else {
       	    scheme = linear1;
       	 }
@@ -4789,6 +4807,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
               x2 = x1 + del;
               f2 = netVel(comp);
+              if (del < THRES * dh) scheme = linear1;
            } else {
               scheme = linear1;
            }
@@ -4811,6 +4830,7 @@ DS_AllRigidBodies:: Triquadratic_interpolation ( FV_DiscreteField const* FF
 
               x1 = x2 - del;
               f1 = netVel(comp);
+              if (del < THRES * dh) scheme = linear2;
            } else {
               scheme = linear2;
            }

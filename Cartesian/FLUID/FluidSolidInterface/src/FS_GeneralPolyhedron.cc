@@ -314,7 +314,7 @@ double FS_GeneralPolyhedron:: level_set_value( geomVector const& pt ) const
                                       m_agp_poly.corners[v2],
                                       m_gravity_center, pt );
         if (temp >= 0.) {
-           value = std::max(temp, value);
+           value = std::min(temp, value);
         } else {
            value = temp;
         }
