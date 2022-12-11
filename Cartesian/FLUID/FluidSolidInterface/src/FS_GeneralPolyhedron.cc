@@ -1,7 +1,7 @@
 #include <FS_GeneralPolyhedron.hh>
 #include <math.h>
 using std::endl;
-#define THRESHOLD 1.e-12
+#define THRESHOLD 1.e-10
 
 
 //---------------------------------------------------------------------------
