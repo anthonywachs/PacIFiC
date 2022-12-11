@@ -126,9 +126,9 @@ DS_NavierStokesSystem:: build_system( MAC_ModuleExplorer const* exp )
 	vel_diffusion.push_back(new doubleVector(1,0.));
 	vel_diffusion.push_back(new doubleVector(1,0.));
 
-	divergence.reserve(2);
-	divergence.push_back(new doubleVector(1,0.));
-	divergence.push_back(new doubleVector(1,0.));
+	vel_divergence.reserve(2);
+	vel_divergence.push_back(new doubleArray2D(1,1,0.));
+	vel_divergence.push_back(new doubleArray2D(1,1,0.));
 
 	// Local vector for advection
 	vel_advection.reserve(1);
@@ -309,8 +309,8 @@ DS_NavierStokesSystem:: re_initialize( void )
 
 	vel_advection[0]->re_initialize( UF_loc );
 
-	divergence[0]->re_initialize( pf_loc ) ;
-	divergence[1]->re_initialize( pf_loc ) ;
+	vel_divergence[0]->re_initialize( pf_loc, 2 ) ;
+	vel_divergence[1]->re_initialize( UF_loc, 2 ) ;
 
 	// Vectors to store void fractions and intersection information
 	if (is_solids) {
@@ -589,12 +589,12 @@ DS_NavierStokesSystem::get_node_property(size_t const& field, size_t const& time
 }
 
 //----------------------------------------------------------------------
-doubleVector*
-DS_NavierStokesSystem::get_node_divergence(size_t const& level)
+doubleArray2D*
+DS_NavierStokesSystem::get_node_divergence(size_t const& field)
 //----------------------------------------------------------------------
 {
    MAC_LABEL( "DS_NavierStokesSystem:: get_node_divergence" ) ;
-   return (divergence[level]) ;
+   return (vel_divergence[field]) ;
 }
 
 

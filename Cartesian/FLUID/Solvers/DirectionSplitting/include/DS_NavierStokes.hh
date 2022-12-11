@@ -225,12 +225,12 @@ class DS_NavierStokes : public MAC_Object,
 
       void calculate_row_indexes ( FV_DiscreteField const* FF);
 
-      void compute_velocity_divergence ( );
+      void compute_velocity_divergence ( FV_DiscreteField const* FF );
 
-      double divergence_of_U( size_t const& i
+      double divergence_of_U_noCorrection( size_t const& i
                             , size_t const& j
                             , size_t const& k
-                            , size_t const& component
+                            , size_t const& comp
                             , size_t const& level);
 
       /** @brief Call functions to assemble rhs for pressure or velocity fields in any direction */

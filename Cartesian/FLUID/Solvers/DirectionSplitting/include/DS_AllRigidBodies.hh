@@ -168,7 +168,7 @@ class DS_AllRigidBodies
       doubleVector* get_CC_RB_area(FV_DiscreteField const* FF);
 
       /** @brief Returns the cell volume */
-      doubleVector* get_CC_cell_volume(FV_DiscreteField const* FF);
+      doubleArray2D* get_CC_cell_volume(FV_DiscreteField const* FF);
 
       /** @brief Returns the RB ID in the Cut Cell */
       intVector* get_CC_ownerID(FV_DiscreteField const* FF);
@@ -286,13 +286,11 @@ class DS_AllRigidBodies
             return_side_fraction(geomVector const& pt1
                                , geomVector const& pt2 );
 
-      /** @brief Returns the flux from RB given the PF node index
-      @param i index i
-      @param j index j
-      @param k index k */
-      double calculate_divergence_flux_fromRB ( size_t const& i,
-                                                size_t const& j,
-                                           		size_t const& k);
+      /** @brief Returns the flux from RB given the FF cell center
+      @param FF field
+      @param pCen cell center */
+      double calculate_velocity_flux_fromRB ( FV_DiscreteField const* FF,
+                                              size_t const& pCen);
 
       /** @brief Calculate the divergenceredistribution factor for each PF node
       using the normal of RB intersect
@@ -339,13 +337,12 @@ class DS_AllRigidBodies
       void write_volume_conservation(FV_TimeIterator const* t_it);
 
       /** @brief Compute the velocity face flux from the UF face */
-      double divergence_face_flux ( size_t const& p_PF
-                                  , size_t const& i
-                                  , size_t const& j
-                                  , size_t const& k
-                                  , size_t const& comp
-                                  , size_t const& side
-                                  , size_t const& dir);
+      double velocity_flux ( FV_DiscreteField const* FF
+                           , size_t const& pCen
+                           , size_t const& comp
+                           , size_t const& dir
+                           , size_t const& side
+                           , size_t const& level);
 
       /** @brief Computes the intersection of grid nodes of a given fluid field
       with the nearest rigid body of a given fluid field
@@ -578,8 +575,8 @@ class DS_AllRigidBodies
       vector<doubleArray2D*> CC_face_fraction; /**< Face fraction of the cell faces
       for all fields. [field]->[index][face]*/
 
-      vector<doubleVector*> CC_cell_volume; /**< Stores cell volume
-      . [field][index]*/
+      vector<doubleArray2D*> CC_cell_volume; /**< Stores cell volume
+      . [field]->[index][level]*/
 
       vector<doubleVector*> CC_RB_area; /**< Intersection points
       of rigid body with the grid cell. [field][index][points]*/

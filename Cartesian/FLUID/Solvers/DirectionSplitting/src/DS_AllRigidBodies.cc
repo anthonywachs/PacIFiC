@@ -530,7 +530,7 @@ void DS_AllRigidBodies:: solve_RB_equation_of_motion(
      geomVector ang_vel(3);
      geomVector ang_acc(3);
 
-     // double Amp = 1., freq = 1.;
+     // double Amp = 1., freq = 2.;
      // vel(1) = Amp*MAC::cos(2.*MAC::pi()*freq*t_it->time());
      // pav(2) = 4.;
 
@@ -1639,7 +1639,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                               , CC_RB_normal[field]->operator()(p,1)
                               , CC_RB_normal[field]->operator()(p,2));
               volume += (cellCen - RBcen).operator,(RBnorm);
-              CC_cell_volume[field]->operator()(p) = volume * (1./m_space_dimension);
+              CC_cell_volume[field]->operator()(p,0) = volume * (1./m_space_dimension);
            }  // k
         }  // j
      }  // i
@@ -1691,7 +1691,7 @@ DS_AllRigidBodies::write_volume_conservation(FV_TimeIterator const* t_it)
               double dz = (m_space_dimension == 2) ? 1.
                                           : PF->get_cell_size( k, comp, 2 ) ;
               size_t p = PF->DOF_local_number(i,j,k,comp);
-              solid_volume += dx * dy * dz - CC_cell_volume[field]->operator()(p) ;
+              solid_volume += dx * dy * dz - CC_cell_volume[field]->operator()(p,0) ;
            }
         }
      }
@@ -1721,7 +1721,7 @@ DS_AllRigidBodies::write_volume_conservation(FV_TimeIterator const* t_it)
               double dz = (m_space_dimension == 2) ? 1.
                                           : UF->get_cell_size( k, comp, 2 ) ;
               size_t p = UF->DOF_local_number(i,j,k,comp);
-              solid_volume += dx * dy * dz - CC_cell_volume[field]->operator()(p) ;
+              solid_volume += dx * dy * dz - CC_cell_volume[field]->operator()(p,0) ;
            }
         }
      }
@@ -1808,82 +1808,52 @@ DS_AllRigidBodies::write_CutCell_parameters(FV_DiscreteField const* FF)
 
 
 //---------------------------------------------------------------------------
-double DS_AllRigidBodies:: divergence_face_flux ( size_t const& p_PF
-                                                , size_t const& i
-                                                , size_t const& j
-                                                , size_t const& k
-															   , size_t const& comp
-                                                , size_t const& side
-                                                , size_t const& dir)
+double DS_AllRigidBodies:: velocity_flux ( FV_DiscreteField const* FF
+                                         , size_t const& pCen
+                                         , size_t const& comp
+				                             , size_t const& dir
+                                         , size_t const& side
+                                         , size_t const& level)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DS_AllRigidBodies:: divergence_face_flux" ) ;
+   MAC_LABEL("DS_AllRigidBodies:: velocity_flux" ) ;
 
-   size_t parID = CC_ownerID[0]->operator()(p_PF);
-   geomVector ZERO(0.,0.,0.);
+   size_t field = field_num(FF);
 
-	size_t_vector i0_new(3,0);
-   vector<int> sign(3,0);
-
-   double value = UF->DOF_value( i, j, k, comp, 0 );
+   size_t parID = CC_ownerID[field]->operator()(pCen);
 
    geomVector pt(3);
-   pt(0) = CC_face_centroid[0]->operator()(p_PF,2*dir+side,0);
-   pt(1) = CC_face_centroid[0]->operator()(p_PF,2*dir+side,1);
-   pt(2) = CC_face_centroid[0]->operator()(p_PF,2*dir+side,2);
+   pt(0) = CC_face_centroid[field]->operator()(pCen,2*dir+side,0);
+   pt(1) = CC_face_centroid[field]->operator()(pCen,2*dir+side,1);
+   pt(2) = CC_face_centroid[field]->operator()(pCen,2*dir+side,2);
 
-   double dx = UF->get_cell_size( i, comp, 0 ) ;
-   double dy = UF->get_cell_size( j, comp, 1 ) ;
-   double dz = (m_space_dimension == 2) ? 1.
-                                        : UF->get_cell_size( k, comp, 2 ) ;
-   double area_max = dx*dy;
-
-   if (comp == 0) {
-      area_max = (m_space_dimension == 3) ? dy*dz : dy;
-   } else if (comp == 1) {
-      area_max = (m_space_dimension == 3) ? dx*dz : dx;
-   } else {
-      area_max = dx*dy;
+   // Finding the grid indexes next to ghost points
+   vector<int> sign(3,0);
+   size_t_vector i0_new(3,0);
+   for (size_t l = 0; l < m_space_dimension; l++) {
+      size_t i0_temp;
+      bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
+                                     pt(l) + EPSILON, i0_temp);
+      if (found) i0_new(l) = i0_temp;
+      sign[l] = (CC_RB_normal[field]->operator()(pCen,l) > -EPSILON) ? 1 : -1 ;
    }
 
-   if (UF->DOF_has_imposed_Dirichlet_value(i,j,k,comp)) {
-      return(value*area_max);
-   } else if (CC_face_fraction[0]->operator()(p_PF,2*dir+side) == 0.) {
-      // If the face is completly in solid
-      return(0.);
-   } else if (CC_face_fraction[0]->operator()(p_PF,2*dir+side) < area_max - EPSILON) {
-      // Finding the grid indexes next to ghost points
-      for (size_t l = 0; l < m_space_dimension; l++) {
-         size_t i0_temp;
-         bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
-                                        pt(l) + EPSILON, i0_temp);
-         if (found) i0_new(l) = i0_temp;
-         sign[l] = (CC_RB_normal[0]->operator()(p_PF,l) > -EPSILON) ? 1 : -1 ;
-      }
+   // size_t interpol_dir = (comp == 0) ? 1 : 0 ;
+   size_t_vector face_vector(3,0);
+   face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
 
-      size_t interpol_dir = (comp == 0) ? 1 : 0 ;
+   double value = 0.;
 
+   if (CC_face_fraction[field]->operator()(pCen,2*dir+side) != 0)
       value = (m_space_dimension == 2) ?
-                           Biquadratic_interpolation(UF, comp, &pt, i0_new
-                                                   , interpol_dir
-                                                   , sign[interpol_dir], {0})
-                         : Triquadratic_interpolation(UF
-                                                   , comp
-                                                   , &pt
-                                                   , i0_new
-                                                   , parID
-                                                   , comp
-                                                   , sign
-                                                   , {0}) ;
-   }
+                  Bilinear_interpolation(UF, comp, &pt, i0_new, face_vector, {level})
+                : Trilinear_interpolation(UF, comp, &pt, i0_new, parID, {level}) ;
+       //   Biquadratic_interpolation(UF, comp, &pt, i0_new, interpol_dir
+       //                           , sign[interpol_dir], {level})
+       // : Triquadratic_interpolation(UF, comp, &pt, i0_new, parID
+       //                           , dir, sign, {level}) ;
 
-   // if (p_PF == 8188) {
-   //    std::cout << "!!!--------------------------------------!!!" << endl;
-   //    std::cout << p_UF << "," << pt(0) << "," << pt(1) << "," << pt(2) << endl;
-   //    std::cout << value << "," << face_fraction->operator()(p_UF) << endl;
-   // }
-
-   return(value * CC_face_fraction[0]->operator()(p_PF,2*dir+side));
+   return(value * CC_face_fraction[field]->operator()(pCen,2*dir+side));
 
 }
 
@@ -1891,30 +1861,29 @@ double DS_AllRigidBodies:: divergence_face_flux ( size_t const& p_PF
 
 
 //---------------------------------------------------------------------------
-double DS_AllRigidBodies:: calculate_divergence_flux_fromRB ( size_t const& i,
-                                            			   	     size_t const& j,
-                                      			   	           size_t const& k)
+double DS_AllRigidBodies:: calculate_velocity_flux_fromRB ( FV_DiscreteField const* FF,
+                                                           size_t const& pCen)
 //---------------------------------------------------------------------------
 {
-   MAC_LABEL("DS_AllRigidBodies:: calculate_divergence_flux_fromRB" ) ;
+   MAC_LABEL("DS_AllRigidBodies:: calculate_velocity_flux_fromRB" ) ;
 
-   size_t p = PF->DOF_local_number(i,j,k,0);
-	double area = CC_RB_area[0]->operator()(p);
-	double norm_mag = MAC::sqrt(pow(CC_RB_normal[0]->operator()(p,0),2)
-                             + pow(CC_RB_normal[0]->operator()(p,1),2)
-                             + pow(CC_RB_normal[0]->operator()(p,2),2));
+   size_t field = field_num(FF);
+	double area = CC_RB_area[field]->operator()(pCen);
+	double norm_mag = MAC::sqrt(pow(CC_RB_normal[field]->operator()(pCen,0),2)
+                             + pow(CC_RB_normal[field]->operator()(pCen,1),2)
+                             + pow(CC_RB_normal[field]->operator()(pCen,2),2));
 
    if (area != 0.) {
-      size_t parID = CC_ownerID[0]->operator()(p);
+      size_t parID = CC_ownerID[field]->operator()(pCen);
       geomVector const* pgc = get_gravity_centre(parID);
       geomVector pt(pgc->operator()(0),
                     pgc->operator()(1),
                     pgc->operator()(2));
       geomVector rb_vel = rigid_body_velocity(parID,pt);
 
-		return(-area*(CC_RB_normal[0]->operator()(p,0)*rb_vel(0)
-                  + CC_RB_normal[0]->operator()(p,1)*rb_vel(1)
-                  + CC_RB_normal[0]->operator()(p,2)*rb_vel(2))/norm_mag);
+		return(-area*(CC_RB_normal[field]->operator()(pCen,0)*rb_vel(0)
+                  + CC_RB_normal[field]->operator()(pCen,1)*rb_vel(1)
+                  + CC_RB_normal[field]->operator()(pCen,2)*rb_vel(2))/norm_mag);
 	}
 
    return(0.);
@@ -2174,7 +2143,7 @@ DS_AllRigidBodies::is_bounding_box_in_local_domain( class doubleVector& bounds
      }
 
   }
-  
+
   // Added for particle size equivalent to local domain size
   if (MAC::abs(bounds(1) - bounds(0)) >= 0.3*(global_max - global_min))
   value = true;
@@ -2520,9 +2489,9 @@ void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
    CC_RB_area.push_back(new doubleVector(1,0));
    CC_RB_area.push_back(new doubleVector(1,0));
    CC_cell_volume.reserve(3);
-   CC_cell_volume.push_back(new doubleVector(1,0));
-   CC_cell_volume.push_back(new doubleVector(1,0));
-   CC_cell_volume.push_back(new doubleVector(1,0));
+   CC_cell_volume.push_back(new doubleArray2D(1,1,0));
+   CC_cell_volume.push_back(new doubleArray2D(1,1,0));
+   CC_cell_volume.push_back(new doubleArray2D(1,1,0));
    CC_RB_normal.reserve(3);
    CC_RB_normal.push_back(new doubleArray2D(1,1,0.));
    CC_RB_normal.push_back(new doubleArray2D(1,1,0.));
@@ -4953,7 +4922,7 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    CC_face_fraction[field]->re_initialize(FF_LOC_UNK,6);
    CC_ownerID[field]->re_initialize(FF_LOC_UNK,-1.);
    CC_RB_area[field]->re_initialize(FF_LOC_UNK);
-   CC_cell_volume[field]->re_initialize(FF_LOC_UNK);
+   CC_cell_volume[field]->re_initialize(FF_LOC_UNK,2);
    CC_RB_normal[field]->re_initialize(FF_LOC_UNK,3);
    CC_RB_centroid[field]->re_initialize(FF_LOC_UNK,3);
 
@@ -5059,7 +5028,7 @@ DS_AllRigidBodies::get_CC_RB_area(FV_DiscreteField const* FF)
 
 
 //----------------------------------------------------------------------
-doubleVector*
+doubleArray2D*
 DS_AllRigidBodies::get_CC_cell_volume(FV_DiscreteField const* FF)
 //----------------------------------------------------------------------
 {

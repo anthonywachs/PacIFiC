@@ -142,7 +142,7 @@ class DS_NavierStokesSystem : public MAC_Object
       /** @brief Return the (presence/absence) of particle vector */
       NodeProp get_node_property(size_t const& field, size_t const& time_level);
       /** @brief Return the divergence on pressure node */
-      doubleVector* get_node_divergence(size_t const& level);
+      doubleArray2D* get_node_divergence(size_t const& field);
       /** @brief Return the velocity diffusive terms */
       vector<doubleVector*> get_velocity_diffusion();
       /** @brief Return the velocity advection terms */
@@ -279,7 +279,7 @@ class DS_NavierStokesSystem : public MAC_Object
       // 2 rows are for fields; 2 columns are for time level (current and last)
       struct NodeProp node[2][2];
       // 0 current timestep, 1 last time step
-      vector<doubleVector*> divergence;
+      vector<doubleArray2D*> vel_divergence;
       // Local vector to store diffusive terms
       vector<doubleVector*> vel_diffusion;
       // Local vector to store advection terms
