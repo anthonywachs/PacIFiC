@@ -2036,7 +2036,7 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
 
-	doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
+	// doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
 	vector<doubleVector*> advection = GLOBAL_EQ->get_velocity_advection();
    vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
    size_t_vector* void_frac = (is_solids) ?
@@ -2577,50 +2577,51 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( FV_TimeIterator const* t_i
 
 		if (is_solids && StencilCorrection == "CutCell") {
 			size_t UF_UNK_MAX = UF->nb_local_unknowns();
+			intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
 			// Flux redistribution
 			for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
 				for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
 					for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
 						size_t p = UF->DOF_local_number(i,j,k,comp);
-						size_t p_lft = UF->DOF_local_number(i-1,j,k,comp);
-						size_t p_rht = UF->DOF_local_number(i+1,j,k,comp);
-						size_t p_bot = UF->DOF_local_number(i,j-1,k,comp);
-						size_t p_top = UF->DOF_local_number(i,j+1,k,comp);
-						size_t p_bhd = (dim == 2) ? 0
-														  : UF->DOF_local_number(i,j,k-1,comp);
-						size_t p_frt = (dim == 2) ? 0
-														  : UF->DOF_local_number(i,j,k+1,comp);
+						if (ownerID->operator()(p) != -1) {
+							size_t p_lft = UF->DOF_local_number(i-1,j,k,comp);
+							size_t p_rht = UF->DOF_local_number(i+1,j,k,comp);
+							size_t p_bot = UF->DOF_local_number(i,j-1,k,comp);
+							size_t p_top = UF->DOF_local_number(i,j+1,k,comp);
+							size_t p_bhd = (dim == 2) ? 0 : UF->DOF_local_number(i,j,k-1,comp);
+							size_t p_frt = (dim == 2) ? 0 : UF->DOF_local_number(i,j,k+1,comp);
 
-						vector<double> wht = allrigidbodies->
-											flux_redistribution_factor(UF,i,j,k,comp);
+							vector<double> wht = allrigidbodies->
+												flux_redistribution_factor(UF,i,j,k,comp);
 
-					   // Flux redistribution
-					   double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];
+						   // Flux redistribution
+						   double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];
 
-						if (sum > 0.) {
-							if (p_lft <= UF_UNK_MAX)
-								advection[0]->operator()(p_lft) +=
-														wht[0]/sum * advection[0]->operator()(p);
-							if (p_rht <= UF_UNK_MAX)
-								advection[0]->operator()(p_rht) +=
-														wht[1]/sum * advection[0]->operator()(p);
-							if (p_bot <= UF_UNK_MAX)
-								advection[0]->operator()(p_bot) +=
-														wht[2]/sum * advection[0]->operator()(p);
-							if (p_top <= UF_UNK_MAX)
-								advection[0]->operator()(p_top) +=
-														wht[3]/sum * advection[0]->operator()(p);
-							if (dim == 3) {
-								if (p_bhd <= UF_UNK_MAX)
-									advection[0]->operator()(p_bhd) +=
-														wht[4]/sum * advection[0]->operator()(p);
-								if (p_frt <= UF_UNK_MAX)
-									advection[0]->operator()(p_frt) +=
-														wht[5]/sum * advection[0]->operator()(p);
+							if (sum > 0.) {
+								if (p_lft <= UF_UNK_MAX)
+									advection[0]->operator()(p_lft) +=
+													wht[0]/sum * advection[0]->operator()(p);
+								if (p_rht <= UF_UNK_MAX)
+									advection[0]->operator()(p_rht) +=
+													wht[1]/sum * advection[0]->operator()(p);
+								if (p_bot <= UF_UNK_MAX)
+									advection[0]->operator()(p_bot) +=
+													wht[2]/sum * advection[0]->operator()(p);
+								if (p_top <= UF_UNK_MAX)
+									advection[0]->operator()(p_top) +=
+													wht[3]/sum * advection[0]->operator()(p);
+								if (dim == 3) {
+									if (p_bhd <= UF_UNK_MAX)
+										advection[0]->operator()(p_bhd) +=
+													wht[4]/sum * advection[0]->operator()(p);
+									if (p_frt <= UF_UNK_MAX)
+										advection[0]->operator()(p_frt) +=
+													wht[5]/sum * advection[0]->operator()(p);
+								}
+								advection[0]->operator()(p) = 0.;
+							} else if ((sum == 0.) && (void_frac->operator()(p) != 0)) {
+								advection[0]->operator()(p) = 0.;
 							}
-							advection[0]->operator()(p) = 0.;
-						} else if ((sum == 0.) && (void_frac->operator()(p) != 0)) {
-							advection[0]->operator()(p) = 0.;
 						}
 					}
 				}
@@ -2644,7 +2645,7 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 	size_t field = (FF == PF) ? 0 : 1;
 	size_t UNK_MAX = FF->nb_local_unknowns();
 	doubleArray2D* divergence = GLOBAL_EQ->get_node_divergence(field);
-	doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(FF);
+	// doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(FF);
 	intVector* ownerID = allrigidbodies->get_CC_ownerID(FF);
 
 	for (size_t comp = 0; comp < nb_comps[field]; comp++) {
@@ -2700,49 +2701,51 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 
 		size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(FF);
 
+		// Flux redistribution
 		if (StencilCorrection == "CutCell") {
-			// Flux redistribution
 			for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 				for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
 					for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
-						size_t p_lft = FF->DOF_local_number(i-1,j,k,comp);
-						size_t p_rht = FF->DOF_local_number(i+1,j,k,comp);
-						size_t p_bot = FF->DOF_local_number(i,j-1,k,comp);
-						size_t p_top = FF->DOF_local_number(i,j+1,k,comp);
-						size_t p_bhd = (dim == 2) ? 0 : FF->DOF_local_number(i,j,k-1,comp);
-						size_t p_frt = (dim == 2) ? 0 : FF->DOF_local_number(i,j,k+1,comp);
 						size_t p = FF->DOF_local_number(i,j,k,comp);
+						if (ownerID->operator()(p) != -1) {
+							size_t p_lft = FF->DOF_local_number(i-1,j,k,comp);
+							size_t p_rht = FF->DOF_local_number(i+1,j,k,comp);
+							size_t p_bot = FF->DOF_local_number(i,j-1,k,comp);
+							size_t p_top = FF->DOF_local_number(i,j+1,k,comp);
+							size_t p_bhd = (dim == 2) ? 0 : FF->DOF_local_number(i,j,k-1,comp);
+							size_t p_frt = (dim == 2) ? 0 : FF->DOF_local_number(i,j,k+1,comp);
 
-						vector<double> wht = allrigidbodies
-												->flux_redistribution_factor(FF,i,j,k,comp);
+							vector<double> wht = allrigidbodies
+													->flux_redistribution_factor(FF,i,j,k,comp);
 
-						// Flux redistribution
-						double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];
+							// Flux redistribution
+							double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];
 
-						if (sum > 0.) {
-							if (p_lft <= UNK_MAX)
-								divergence->operator()(p_lft,0) +=
+							if (sum > 0.) {
+								if (p_lft <= UNK_MAX)
+									divergence->operator()(p_lft,0) +=
 													wht[0]/sum * divergence->operator()(p,0);
-							if (p_rht <= UNK_MAX)
-								divergence->operator()(p_rht,0) +=
+								if (p_rht <= UNK_MAX)
+									divergence->operator()(p_rht,0) +=
 													wht[1]/sum * divergence->operator()(p,0);
-							if (p_bot <= UNK_MAX)
-								divergence->operator()(p_bot,0) +=
+								if (p_bot <= UNK_MAX)
+									divergence->operator()(p_bot,0) +=
 													wht[2]/sum * divergence->operator()(p,0);
-							if (p_top <= UNK_MAX)
-								divergence->operator()(p_top,0) +=
+								if (p_top <= UNK_MAX)
+									divergence->operator()(p_top,0) +=
 													wht[3]/sum * divergence->operator()(p,0);
-							if (dim == 3) {
-								if (p_bhd <= UNK_MAX)
-									divergence->operator()(p_bhd,0) +=
+								if (dim == 3) {
+									if (p_bhd <= UNK_MAX)
+										divergence->operator()(p_bhd,0) +=
 													wht[4]/sum * divergence->operator()(p,0);
-								if (p_frt <= UNK_MAX)
-									divergence->operator()(p_frt,0) +=
+									if (p_frt <= UNK_MAX)
+										divergence->operator()(p_frt,0) +=
 													wht[5]/sum * divergence->operator()(p,0);
+								}
+								divergence->operator()(p,0) = 0.;
+							} else if ((sum == 0.) && (void_frac->operator()(p) != 0)) {
+								divergence->operator()(p,0) = 0.;
 							}
-							divergence->operator()(p,0) = 0.;
-						} else if ((sum == 0.) && (void_frac->operator()(p) != 0)) {
-							divergence->operator()(p,0) = 0.;
 						}
 					}
 				}

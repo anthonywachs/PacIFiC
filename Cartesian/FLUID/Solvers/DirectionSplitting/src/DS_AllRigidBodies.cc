@@ -1910,7 +1910,8 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor (
 
 	size_t p = FF->DOF_local_number(i,j,k,comp);
 
-	if (void_fraction[field]->operator()(p) != 0) {
+	// if (void_fraction[field]->operator()(p) != 0) {
+   if (CC_cell_volume[field]->operator()(p,0) < 0.5) {
       double norm_mag = MAC::sqrt(pow(CC_RB_normal[field]->operator()(p,0),2)
                                 + pow(CC_RB_normal[field]->operator()(p,1),2)
                                 + pow(CC_RB_normal[field]->operator()(p,2),2));
@@ -1923,21 +1924,23 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor (
       p_face[1] = FF->DOF_local_number(i+1,j,k,comp);
       p_face[2] = FF->DOF_local_number(i,j-1,k,comp);
       p_face[3] = FF->DOF_local_number(i,j+1,k,comp);
-      p_face[4] = (m_space_dimension == 2) ? 0 :
-                     FF->DOF_local_number(i,j,k-1,comp);
-		p_face[5] = (m_space_dimension == 2) ? 0 :
-                     FF->DOF_local_number(i,j,k+1,comp);
+      p_face[4] = (m_space_dimension == 2) ? 0 : FF->DOF_local_number(i,j,k-1,comp);
+		p_face[5] = (m_space_dimension == 2) ? 0 : FF->DOF_local_number(i,j,k+1,comp);
 
 		size_t FF_UNK_MAX = FF->nb_local_unknowns();
 
       for (size_t dir = 0; dir < m_space_dimension; dir++) {
          for (size_t side = 0; side < 2; side++) {
-            if (p_face[2*dir+side] <= FF_UNK_MAX)
-               wht[2*dir+side] = (void_fraction[field]->operator()(p_face[2*dir+side]) == 0) ?
-      		                     CC_RB_normal[field]->operator()(p,dir)
+            if ((p_face[2*dir+side] <= FF_UNK_MAX)
+             && (void_fraction[field]->operator()(p_face[2*dir+side]) == 0)
+             && (CC_cell_volume[field]->operator()(p_face[2*dir+side],0) >= 0.5)) {
+               // wht[2*dir+side] = (void_fraction[field]->operator()(p_face[2*dir+side]) == 0) ?
+               wht[2*dir+side] = CC_RB_normal[field]->operator()(p,dir)
                                * CC_RB_normal[field]->operator()(p,dir)
-                               * CC_face_fraction[field]->operator()(p,2*dir+side)
-                               : 0.;
+                               * CC_face_fraction[field]->operator()(p,2*dir+side);
+            } else {
+               wht[2*dir+side] = 0.;
+            }
          }
       }
 	}
