@@ -175,7 +175,8 @@ class DS_NavierStokes : public MAC_Object,
                                         , size_t const& component );
 
       /** @brief Assemble advection term for Centered spacial scheme */
-      double assemble_advection_Centered_CutCell( double const& coef
+      double assemble_advection_Centered_CutCell( FV_TimeIterator const* t_it
+                                                , double const& coef
                                                 , size_t const& i
                                                 , size_t const& j
                                                 , size_t const& k
@@ -211,7 +212,8 @@ class DS_NavierStokes : public MAC_Object,
                                  , size_t const& j
                                  , size_t const& k);
       /** @brief Compute advective term based on either Upwind or TVD spacial scheme */
-      double compute_adv_component ( size_t const& comp
+      double compute_adv_component ( FV_TimeIterator const* t_it
+                                   , size_t const& comp
                                    , size_t const& i
                                    , size_t const& j
                                    , size_t const& k);
@@ -221,7 +223,7 @@ class DS_NavierStokes : public MAC_Object,
 
       void assemble_velocity_diffusion_terms ( );
 
-      void assemble_velocity_advection_terms ( );
+      void assemble_velocity_advection_terms ( FV_TimeIterator const* t_it );
 
       void calculate_row_indexes ( FV_DiscreteField const* FF);
 

@@ -1778,7 +1778,8 @@ DS_NavierStokes:: compute_p_component ( size_t const& comp
 
 //---------------------------------------------------------------------------
 double
-DS_NavierStokes:: compute_adv_component ( size_t const& comp,
+DS_NavierStokes:: compute_adv_component ( FV_TimeIterator const* t_it,
+														 size_t const& comp,
                                            size_t const& i,
                                            size_t const& j,
                                            size_t const& k)
@@ -1812,7 +1813,7 @@ DS_NavierStokes:: compute_adv_component ( size_t const& comp,
 		intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
 		doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
 		if (ownerID->operator()(p) != -1) {
-			ugradu = assemble_advection_Centered_CutCell(rho,i,j,k,comp,1);
+			ugradu = assemble_advection_Centered_CutCell(t_it,rho,i,j,k,comp,1);
 		} else {
 			ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp);
 		}
@@ -2019,7 +2020,7 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    // Assemble the diffusive components of velocity once in each iteration
    assemble_velocity_diffusion_terms ( );
 	compute_velocity_divergence(UF);
-	assemble_velocity_advection_terms ( );
+	assemble_velocity_advection_terms ( t_it );
 
    double bodyterm=0.;
    size_t cpp = 10;
@@ -2542,7 +2543,7 @@ DS_NavierStokes:: calculate_velocity_divergence_FD ( size_t const& i,
 
 //---------------------------------------------------------------------------
 void
-DS_NavierStokes:: assemble_velocity_advection_terms ( )
+DS_NavierStokes:: assemble_velocity_advection_terms ( FV_TimeIterator const* t_it )
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_NavierStokes:: assemble_velocity_advection_terms" ) ;
@@ -2569,7 +2570,7 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( )
 				for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
 					size_t p = UF->DOF_local_number(i,j,k,comp);
 					// Advection contribution
-					advection[0]->operator()(p) = compute_adv_component(comp,i,j,k);
+					advection[0]->operator()(p) = compute_adv_component(t_it,comp,i,j,k);
 				}
 			}
 		}
@@ -3962,7 +3963,8 @@ DS_NavierStokes:: assemble_advection_Centered( size_t const& advecting_level,
 
 //----------------------------------------------------------------------
 double
-DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
+DS_NavierStokes:: assemble_advection_Centered_CutCell(FV_TimeIterator const* t_it,
+																		double const& coef,
 																		size_t const& i,
                                                 	   size_t const& j,
                                                 		size_t const& k,
@@ -4071,7 +4073,7 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 	doubleVector* RBarea = allrigidbodies->get_CC_RB_area(UF);
 	double fsurf = 0.;
 	// // Effect of volume change, based on Seo and Mittal 2011; and Arthur Ghigo CutCell
-	// doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
+	doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
 	double dFV = 0.;
 
 	if ((ownerID->operator()(p) != -1) && (RBarea->operator()(p) != 0.)) {
@@ -4088,8 +4090,8 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(double const& coef,
 
 		fsurf = rbVel(comp) * rbVel.operator,(normVec) * RBarea->operator()(p);
 
-		// dFV = (CC_vol->operator()(p,0) - CC_vol->operator()(p,1))
-		// 	 * (ValueC - rbVel(comp)) / 0.001;
+		dFV = (CC_vol->operator()(p,0) - CC_vol->operator()(p,1))
+			 * (ValueC - rbVel(comp)) / t_it->time_step();
 	}
 
    return ( coef * ((flux(3) - flux(2)) + (flux(1) - flux(0)) + (flux(5) - flux(4)) - fsurf + dFV) );
