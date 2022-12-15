@@ -2036,7 +2036,7 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
 
-	// doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
+	doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
 	vector<doubleVector*> advection = GLOBAL_EQ->get_velocity_advection();
    vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
    size_t_vector* void_frac = (is_solids) ?
@@ -2061,10 +2061,10 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
 					size_t p = UF->DOF_local_number(i,j,k,comp);
 					// Cell volume
 					double cellV = dxC * dyC * dzC;
-					// if ((StencilCorrection == "CutCell")
-					//  && (CC_vol->operator()(p,0) > 0.5*cellV)) {
-					//  	cellV = CC_vol->operator()(p,0);
-					// }
+					if ((StencilCorrection == "CutCell")
+					 && (CC_vol->operator()(p,0) >= 0.5*cellV)) {
+					 	cellV = CC_vol->operator()(p,0);
+					}
 
                // Dxx for un
                double xvalue = vel_diffusion[0]->operator()(p);
@@ -2645,7 +2645,7 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 	size_t field = (FF == PF) ? 0 : 1;
 	size_t UNK_MAX = FF->nb_local_unknowns();
 	doubleArray2D* divergence = GLOBAL_EQ->get_node_divergence(field);
-	// doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(FF);
+	doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(FF);
 	intVector* ownerID = allrigidbodies->get_CC_ownerID(FF);
 
 	for (size_t comp = 0; comp < nb_comps[field]; comp++) {
@@ -2761,8 +2761,8 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 					double dz = (dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1.;
 					size_t p = FF->DOF_local_number(i, j, k, comp);
 					double volume = dx * dy * dz;
-					// if (is_solids && (void_frac->operator()(p) == 0) && (StencilCorrection == "CutCell"))
-					// 	volume = CC_vol->operator()(p,0);
+					if (is_solids && (void_frac->operator()(p) == 0) && (StencilCorrection == "CutCell"))
+						volume = CC_vol->operator()(p,0);
 					divergence->operator()(p,0) = divergence->operator()(p,0)/volume;
 				}
 			}

@@ -1909,9 +1909,12 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor (
    size_t field = field_num(FF);
 
 	size_t p = FF->DOF_local_number(i,j,k,comp);
+   double dx = FF->get_cell_size(i,comp,0);
+   double dy = FF->get_cell_size(j,comp,1);
+   double dz = (m_space_dimension == 3) ? FF->get_cell_size(k,comp,2) : 1.;
 
 	// if (void_fraction[field]->operator()(p) != 0) {
-   if (CC_cell_volume[field]->operator()(p,0) < 0.5) {
+   if (CC_cell_volume[field]->operator()(p,0) < 0.5 * dx * dy * dz) {
       double norm_mag = MAC::sqrt(pow(CC_RB_normal[field]->operator()(p,0),2)
                                 + pow(CC_RB_normal[field]->operator()(p,1),2)
                                 + pow(CC_RB_normal[field]->operator()(p,2),2));
@@ -1933,7 +1936,7 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor (
          for (size_t side = 0; side < 2; side++) {
             if ((p_face[2*dir+side] <= FF_UNK_MAX)
              && (void_fraction[field]->operator()(p_face[2*dir+side]) == 0)
-             && (CC_cell_volume[field]->operator()(p_face[2*dir+side],0) >= 0.5)) {
+             && (CC_cell_volume[field]->operator()(p_face[2*dir+side],0) >= 0.5 * dx * dy * dz)) {
                // wht[2*dir+side] = (void_fraction[field]->operator()(p_face[2*dir+side]) == 0) ?
                wht[2*dir+side] = CC_RB_normal[field]->operator()(p,dir)
                                * CC_RB_normal[field]->operator()(p,dir)
