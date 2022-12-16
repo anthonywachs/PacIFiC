@@ -303,7 +303,8 @@ class DS_AllRigidBodies
                                                    size_t const& i,
                                                    size_t const& j,
                                                    size_t const& k,
-                                                   size_t const& comp);
+                                                   size_t const& comp,
+                                                   double const& factor);
 
       /** @brief Calculates the area of RB section with given vector
       of polygon corners

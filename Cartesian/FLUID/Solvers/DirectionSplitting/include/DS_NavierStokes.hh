@@ -32,6 +32,7 @@ struct DS2NS
   double kai_ ;
   string AdvectionScheme_ ;
   string StencilCorrection_ ;
+  double FluxRedistThres_ ;
   size_t AdvectionTimeAccuracy_ ;
   bool b_restart_ ;
   bool is_solids_ ;
@@ -428,6 +429,7 @@ class DS_NavierStokes : public MAC_Object,
       double kai;
       string AdvectionScheme;
       string StencilCorrection;
+      double FluxRedistThres;
       size_t AdvectionTimeAccuracy;
       double rho;
       bool b_restart ;

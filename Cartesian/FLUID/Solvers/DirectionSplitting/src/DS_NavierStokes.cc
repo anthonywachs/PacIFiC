@@ -64,6 +64,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , kai( fromDS.kai_ )
    , AdvectionScheme( fromDS.AdvectionScheme_ )
 	, StencilCorrection( fromDS.StencilCorrection_ )
+	, FluxRedistThres( fromDS.FluxRedistThres_ )
    , AdvectionTimeAccuracy( fromDS.AdvectionTimeAccuracy_ )
    , rho( fromDS.rho_ )
 	, b_restart ( fromDS.b_restart_ )
@@ -2062,7 +2063,7 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
 					// Cell volume
 					double cellV = dxC * dyC * dzC;
 					if ((StencilCorrection == "CutCell")
-					 && (CC_vol->operator()(p,0) >= 0.5*cellV)) {
+					 && (CC_vol->operator()(p,0) >= FluxRedistThres*cellV)) {
 					 	cellV = CC_vol->operator()(p,0);
 					}
 
@@ -2592,7 +2593,7 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( FV_TimeIterator const* t_i
 							size_t p_frt = (dim == 2) ? 0 : UF->DOF_local_number(i,j,k+1,comp);
 
 							vector<double> wht = allrigidbodies->
-												flux_redistribution_factor(UF,i,j,k,comp);
+							flux_redistribution_factor(UF,i,j,k,comp,FluxRedistThres);
 
 						   // Flux redistribution
 						   double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];
@@ -2716,7 +2717,7 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 							size_t p_frt = (dim == 2) ? 0 : FF->DOF_local_number(i,j,k+1,comp);
 
 							vector<double> wht = allrigidbodies
-													->flux_redistribution_factor(FF,i,j,k,comp);
+							->flux_redistribution_factor(FF,i,j,k,comp,FluxRedistThres);
 
 							// Flux redistribution
 							double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];

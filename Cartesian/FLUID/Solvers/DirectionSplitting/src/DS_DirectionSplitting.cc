@@ -72,6 +72,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , kai( 1. )
    , AdvectionScheme( "TVD" )
    , StencilCorrection( "FD" )
+   , FluxRedistThres( 0.5 )
    , AdvectionTimeAccuracy( 1 )
    , b_restart( false )
    , is_solids( false )
@@ -150,6 +151,9 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
      MAC_Error::object()->raise_bad_data_value( exp,
         "StencilCorrection", error_message );
    }
+
+   if ( exp->has_entry( "FluxRedistributionThreshold" ) )
+      FluxRedistThres = exp->double_data( "FluxRedistributionThreshold" );
 
    // Advection scheme
    if ( exp->has_entry( "AdvectionScheme" ) )
@@ -316,6 +320,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataNS.kai_ = kai ;
       inputDataNS.AdvectionScheme_ = AdvectionScheme ;
       inputDataNS.StencilCorrection_ = StencilCorrection ;
+      inputDataNS.FluxRedistThres_ = FluxRedistThres ;
       inputDataNS.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
       inputDataNS.b_restart_ = b_restart ;
       inputDataNS.is_solids_ = is_solids ;
