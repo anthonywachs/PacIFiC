@@ -1140,6 +1140,33 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
 {
    MAC_LABEL("DS_NavierStokes:: compute_un_component" ) ;
 
+	double value = 0.;
+
+	if (StencilCorrection == "CutCell") {
+		value = compute_un_component_FV(comp,i,j,k,dir,level);
+	} else {
+		value = compute_un_component_FD(comp,i,j,k,dir,level);
+	}
+
+	return(value);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double
+DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
+                                          size_t const& i,
+                                          size_t const& j,
+                                          size_t const& k,
+                                          size_t const& dir,
+                                          size_t const& level)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: compute_un_component_FD" ) ;
+
    double xhr=1.,xhl=1.,xright=0.,xleft=0.,yhr=1.,yhl=1.,yright=0.,yleft=0.;
    double zhr=1.,zhl=1.,zright=0.,zleft=0., value=0.;
 
@@ -1283,6 +1310,65 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
             value = zright/zhr;
          break;
    }
+
+   return(value);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double
+DS_NavierStokes:: compute_un_component_FV ( size_t const& comp,
+                                       	  size_t const& i,
+                                            size_t const& j,
+                                            size_t const& k,
+                                            size_t const& dir,
+                                            size_t const& level)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: compute_un_component_FV" ) ;
+
+	intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
+	doubleArray3D* CC_face_cen = allrigidbodies->get_CC_face_centroid(UF);
+	doubleArray2D* CC_face_frac = allrigidbodies->get_CC_face_fraction(UF);
+	size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+
+	size_t p = UF->DOF_local_number(i,j,k,comp);
+	double dxC = UF->get_cell_size( i, comp, 0 ) ;
+	double dyC = UF->get_cell_size( j, comp, 1 ) ;
+	double dzC = (dim == 3) ? UF->get_cell_size( k, comp, 2 ) : 1.;
+
+	geomVector xL(3), xR(3);
+	xL(0) = CC_face_cen->operator()(p,2*dir+0,0);
+	xL(1) = CC_face_cen->operator()(p,2*dir+0,1);
+	xL(2) = CC_face_cen->operator()(p,2*dir+0,2);
+
+	xR(0) = CC_face_cen->operator()(p,2*dir+1,0);
+	xR(1) = CC_face_cen->operator()(p,2*dir+1,1);
+	xR(2) = CC_face_cen->operator()(p,2*dir+1,2);
+
+	double value = 0.;
+
+	if ((ownerID->operator()(p) != -1) && (void_frac->operator()(p) == 0)) {
+		double fleft = 0.;
+		if (CC_face_frac->operator()(p,2*dir+0) != 0.) {
+			fleft = allrigidbodies->calculate_diffusive_flux(p, comp,dir, xL,ownerID->operator()(p),level)
+					* CC_face_frac->operator()(p,2*dir+0);
+		}
+		double fright = 0.;
+		if (CC_face_frac->operator()(p,2*dir+1) != 0.) {
+		   fright = allrigidbodies->calculate_diffusive_flux(p, comp,dir, xR,ownerID->operator()(p),level)
+					 * CC_face_frac->operator()(p,2*dir+1);
+		}
+
+		double RBflux = allrigidbodies->calculate_diffusive_flux_fromRB(UF,p,comp,dir,level);
+
+		value = (fright - fleft + RBflux) / (dxC * dyC * dzC);
+	} else {
+		value = compute_un_component_FD(comp, i, j, k, dir, level);
+	}
 
    return(value);
 

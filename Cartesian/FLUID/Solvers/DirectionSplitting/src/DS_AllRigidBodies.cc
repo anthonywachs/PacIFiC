@@ -1893,6 +1893,198 @@ double DS_AllRigidBodies:: calculate_velocity_flux_fromRB ( FV_DiscreteField con
 
 
 //---------------------------------------------------------------------------
+double
+DS_AllRigidBodies:: calculate_diffusive_flux(size_t const& p,
+														  size_t const& comp,
+                                            size_t const& dir,
+														  geomVector const& pt,
+														  size_t const& ownID,
+                                            size_t const& level)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: calculate_diffusive_flux" ) ;
+
+	// Calculate second-order accurate first derivative of FF comp in dir using
+	// three points a(0), b(pt) and c(1)
+	// Assumes the point (pt) is in the fluid
+
+	geomVector rayDir(3);
+	geomVector x0(pt);
+	geomVector x1(pt);
+
+	size_t interpol_dir = (dir == 0) ? 1 : 0 ;
+	size_t_vector i0(3);
+	for (size_t l = 0; l < m_space_dimension; l++) {
+		size_t i0_temp;
+		bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
+		pt(l), i0_temp);
+		if (found) i0(l) = i0_temp;
+	}
+
+	x0(dir) = UF->get_DOF_coordinate(i0(dir), comp, dir);
+	x1(dir) = UF->get_DOF_coordinate(i0(dir)+1, comp, dir);
+
+	// Calculation of fpt
+	size_t_vector face_vector(3,0);
+	face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
+
+	double fpt = (m_space_dimension == 2) ?
+                Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level})
+				  : Trilinear_interpolation(UF, comp, &pt, i0, ownID, {level}) ;
+
+	double f0 = 0.;
+	double f1 = 0.;
+
+	vector<int> sign(3,0);
+	for (size_t l = 0; l < m_space_dimension; l++)
+		sign[l] = (CC_RB_normal[1]->operator()(p,l) > -EPSILON) ? 1 : -1 ;
+
+	// Correction if x0 in solid
+	int targetID = isIn_any_RB(ownID,x0);
+	if (targetID != -1) {
+		rayDir(dir) = -1.;
+		double delta = m_allDSrigidbodies[targetID]->get_distanceTo(pt,rayDir,pt(dir)-x0(dir));
+		x0(dir) = pt(dir) - delta;
+		geomVector fV = rigid_body_velocity(targetID,x0);
+		f0 = fV(comp);
+	} else {
+		f0 = (m_space_dimension == 2) ? Biquadratic_interpolation(
+                                                   UF, comp, &x0, i0, interpol_dir
+													         , sign[interpol_dir], {level})
+	   				  	 : Triquadratic_interpolation(UF, comp, &x0, i0, ownID
+												            , dir, sign, {level}) ;
+	}
+
+	// Correction if x1 in solid
+	targetID = isIn_any_RB(ownID,x1);
+	if (targetID != -1) {
+		rayDir(dir) = 1.;
+		double delta = m_allDSrigidbodies[targetID]->get_distanceTo(pt,rayDir,x1(dir)-pt(dir));
+		x1(dir) = pt(dir) + delta;
+		geomVector fV = rigid_body_velocity(targetID,x1);
+		f1 = fV(comp);
+	} else {
+		i0(dir) = i0(dir) + 1;
+		f1 = (m_space_dimension == 2) ? Biquadratic_interpolation(
+                                                   UF, comp, &x1, i0, interpol_dir
+												            , sign[interpol_dir], {level})
+	   				  	 : Triquadratic_interpolation(UF, comp, &x1, i0, ownID
+												            , dir, sign, {level}) ;
+	}
+
+	// Derivative
+	double dx1 = pt(dir) - x0(dir);
+	double dx2 = x1(dir) - pt(dir);
+
+	double value = 1./(dx1 + dx2) * ((dx1/dx2)*(f1-fpt) - (dx2/dx1)*(f0-fpt));
+
+	return(value);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double DS_AllRigidBodies:: calculate_diffusive_flux_fromRB ( FV_DiscreteField const* FF,
+                                                           size_t const& pCen,
+                                                           size_t const& comp,
+                                                           size_t const& dir,
+                                                           size_t const& level)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_AllRigidBodies:: calculate_diffusive_flux_fromRB" ) ;
+
+   size_t field = field_num(FF);
+	double area = CC_RB_area[field]->operator()(pCen);
+	double norm_mag = MAC::sqrt(pow(CC_RB_normal[field]->operator()(pCen,0),2)
+                             + pow(CC_RB_normal[field]->operator()(pCen,1),2)
+                             + pow(CC_RB_normal[field]->operator()(pCen,2),2));
+
+   geomVector pt0(3), pt1(3), pt2(3);
+   size_t_vector i0(3,0), i1(3,0), i2(3,0);
+   double f0 = 0., f1 = 0., f2 = 0.;
+   pt0(0) = CC_RB_centroid[field]->operator()(pCen,0);
+   pt0(1) = CC_RB_centroid[field]->operator()(pCen,1);
+   pt0(2) = CC_RB_centroid[field]->operator()(pCen,2);
+
+   pt1 = pt0; pt2 = pt0;
+
+   if (area != 0.) {
+      vector<int> sign(3,0);
+
+      for (size_t l = 0; l < m_space_dimension; l++) {
+         size_t i0_temp;
+         sign[l] = (CC_RB_normal[field]->operator()(pCen,l) > -EPSILON) ? 1 : -1 ;
+         bool found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,l),
+                                       pt0(l), i0_temp);
+         if (found) i0(l) = i0_temp;
+      }
+      i1 = i0; i2 = i0;
+
+      // Ghost points in i dir for the calculation of i-derivative of field
+      i1(dir) = (sign[dir] == 1) ? (int(i0(dir)) + 2*sign[dir])
+                                 : (int(i0(dir)) + 1*sign[dir]);
+      i2(dir) = (sign[dir] == 1) ? (int(i0(dir)) + 3*sign[dir])
+                                 : (int(i0(dir)) + 2*sign[dir]);
+
+      pt1(dir) = FF->get_DOF_coordinate(i1(dir), comp, dir);
+      pt2(dir) = FF->get_DOF_coordinate(i2(dir), comp, dir);
+
+      size_t parID = CC_ownerID[field]->operator()(pCen);
+      geomVector const* pgc = get_gravity_centre(parID);
+      geomVector pt(pgc->operator()(0),
+                    pgc->operator()(1),
+                    pgc->operator()(2));
+      geomVector rb_vel = rigid_body_velocity(parID,pt);
+      f0 = rb_vel(comp);
+
+      size_t interpol_dir = (dir == 0) ? 1 : 0 ;
+      f1 = (m_space_dimension == 2) ? Biquadratic_interpolation(FF
+                                             , comp
+                                             , &pt1
+                                             , i1
+                                             , interpol_dir
+                                             , sign[interpol_dir]
+                                             , {level})
+                                    : Triquadratic_interpolation(FF
+                                              , comp
+                                              , &pt1
+                                              , i1
+                                              , parID
+                                              , dir
+                                              , sign
+                                              , {level}) ;
+       f2 = (m_space_dimension == 2) ? Biquadratic_interpolation(FF
+                                              , comp
+                                              , &pt2
+                                              , i2
+                                              , interpol_dir
+                                              , sign[interpol_dir]
+                                              , {level})
+                                     : Triquadratic_interpolation(FF
+                                               , comp
+                                               , &pt2
+                                               , i2
+                                               , parID
+                                               , dir
+                                               , sign
+                                               , {level}) ;
+
+      double dx1 = pt1(dir) - pt0(dir);
+      double dx2 = pt2(dir) - pt0(dir);
+      double dfdi = ((f1 - f0)*dx2/dx1 - (f2 - f0)*dx1/dx2) / (dx2-dx1);
+
+		return(-area*dfdi*CC_RB_normal[field]->operator()(pCen,dir)/norm_mag);
+	}
+
+   return(0.);
+}
+
+
+
+
+//---------------------------------------------------------------------------
 vector<double> DS_AllRigidBodies:: flux_redistribution_factor (
                                                       FV_DiscreteField const* FF,
                                                       size_t const& i,

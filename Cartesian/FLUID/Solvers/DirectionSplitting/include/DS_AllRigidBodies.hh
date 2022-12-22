@@ -292,6 +292,18 @@ class DS_AllRigidBodies
       double calculate_velocity_flux_fromRB ( FV_DiscreteField const* FF,
                                               size_t const& pCen);
 
+      double calculate_diffusive_flux_fromRB ( FV_DiscreteField const* FF,
+                                               size_t const& pCen,
+                                               size_t const& comp,
+                                               size_t const& dir,
+                                               size_t const& level);
+
+      double calculate_diffusive_flux( size_t const& p,                                               														  size_t const& comp,
+                                       size_t const& dir,
+ 											      geomVector const& pt,
+												   size_t const& ownID,
+                                       size_t const& level);
+
       /** @brief Calculate the divergenceredistribution factor for each PF node
       using the normal of RB intersect
       @param FF field

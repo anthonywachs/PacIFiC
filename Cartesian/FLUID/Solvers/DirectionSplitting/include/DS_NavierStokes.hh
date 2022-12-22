@@ -202,11 +202,25 @@ class DS_NavierStokes : public MAC_Object,
                                , size_t const& dir );
       /** @brief Compute diffusive term of velocity field from previous timestep */
       double compute_un_component ( size_t const& comp
+                               , size_t const& i
+                               , size_t const& j
+                               , size_t const& k
+                               , size_t const& dir
+                               , size_t const& level);
+      /** @brief Compute diffusive term of velocity field from previous timestep */
+      double compute_un_component_FD ( size_t const& comp
                                   , size_t const& i
                                   , size_t const& j
                                   , size_t const& k
                                   , size_t const& dir
                                   , size_t const& level);
+      /** @brief Compute diffusive term of velocity field from previous timestep */
+      double compute_un_component_FV ( size_t const& comp
+                                , size_t const& i
+                                , size_t const& j
+                                , size_t const& k
+                                , size_t const& dir
+                                , size_t const& level);
       /** @brief Compute diffusive term of pressure field from previous timestep */
       double compute_p_component ( size_t const& comp
                                  , size_t const& i
