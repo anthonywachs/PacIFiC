@@ -8,6 +8,7 @@
 #include <boolVector.hh>
 #include <solvercomputingtime.hh>
 #include <MAC_DoubleVector.hh>
+#include <DS_PID.hh>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -298,6 +299,10 @@ class DS_NavierStokes : public MAC_Object,
 
       void correct_mean_pressure (size_t const& level );
 
+      void predicted_pressure_drop (FV_TimeIterator const* t_it);
+
+      double get_current_mean_flow_speed();
+
       /** @brief Solve interface unknowns for
       both fields in any particular direction */
       void solve_interface_unknowns( FV_DiscreteField* FF
@@ -418,6 +423,7 @@ class DS_NavierStokes : public MAC_Object,
       FV_DiscreteField* PF;
 
       DS_NavierStokesSystem* GLOBAL_EQ ;
+      DS_PID* controller;
 
       size_t nb_procs;
       size_t my_rank;
@@ -467,6 +473,9 @@ class DS_NavierStokes : public MAC_Object,
       size_t translation_direction;
       double bottom_coordinate;
       double translated_distance;
+
+      double pressure_drop, Qold;
+      bool exceed, turn;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;

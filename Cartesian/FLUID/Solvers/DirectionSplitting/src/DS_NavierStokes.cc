@@ -169,6 +169,10 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    GLOBAL_EQ = DS_NavierStokesSystem::create( this, se, UF, PF, inputData ) ;
    se->destroy() ;
 
+	if (UF->primary_grid()->is_periodic_flow_rate())
+		controller = DS_PID::create(-1,0,1,1,1);
+
+
    // Timing routines
    if ( my_rank == is_master ) {
      SCT_insert_app("Matrix_Assembly&Initialization");
@@ -2096,6 +2100,128 @@ DS_NavierStokes:: divergence_of_U_noCorrection( size_t const& i
    return ( flux );
 }
 
+
+
+
+//---------------------------------------------------------------------------
+double
+DS_NavierStokes:: get_current_mean_flow_speed()
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokesSystem:: get_current_mean_flow_speed" ) ;
+
+   size_t comp = UF->primary_grid()->get_periodic_flow_direction();
+
+   size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
+
+   // Get local min and max indices
+   for (size_t l = 0; l < dim; ++l) {
+     min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp,l );
+     max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp,l );
+   }
+
+   double value = 0.;
+   double volume = 0.;
+
+   for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+      double dx = UF->get_cell_size( i, comp, 0 );
+      for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+         double dy = UF->get_cell_size( j, comp, 1 );
+         for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+            double dz = (dim == 3) ? UF->get_cell_size( k, comp, 2 ) : 1.;
+            value += UF->DOF_value(i, j, k, comp, 0) * dx * dy * dz;
+            volume += dx * dy * dz;
+         }
+      }
+   }
+
+   value = macCOMM->sum( value ) ;
+   volume = macCOMM->sum( volume ) ;
+
+   return(value/volume);
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void
+DS_NavierStokes:: predicted_pressure_drop (FV_TimeIterator const* t_it)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: predicted_pressure_drop" ) ;
+
+	size_t p_flow_dir = UF->primary_grid()->get_periodic_flow_direction();
+	double Lx = UF->primary_grid()->get_main_domain_max_coordinate( 0 )
+				 - UF->primary_grid()->get_main_domain_min_coordinate( 0 );
+	double Ly = UF->primary_grid()->get_main_domain_max_coordinate( 1 )
+				 - UF->primary_grid()->get_main_domain_min_coordinate( 1 );
+   double Lz = (dim == 3) ? UF->primary_grid()->get_main_domain_max_coordinate( 2 )
+				 				  - UF->primary_grid()->get_main_domain_min_coordinate( 2 )
+								  : 1.;
+
+   double cross_sec_area = Lx * Ly * Lz;
+
+	if (p_flow_dir == 0) {
+		cross_sec_area = Ly * Lz;
+	} else if (p_flow_dir == 1) {
+		cross_sec_area = Lx * Lz;
+	} else if (p_flow_dir == 2) {
+		cross_sec_area = Lx * Ly;
+	}
+
+	double Um = get_current_mean_flow_speed();
+	double Qc = cross_sec_area * Um;
+	double Qset = UF->primary_grid()->get_periodic_flow_rate();
+
+	// At t=0
+	if (Um == 0.) {
+		pressure_drop = -100.;
+		return;
+	}
+
+	if ((fabs(Qc - Qset) / Qset > 1e-5) && (t_it->iteration_number() % 1 == 0)) {
+		// pressure_drop += controller->calculate(Qset,Qc,t_it->time_step());
+      if ((Qc / Qset) > 1.) {
+         exceed = true;
+	      if (turn == false) {
+	         pressure_drop *= 0.5;
+	         if ((Qc - Qold) < 0.) turn = true;
+         } else {
+            if ((Qc / Qold) > 1.) {
+               pressure_drop *= (Qset / Qc);
+            } else {
+               if (fabs(Qc - Qold) / Qc < 1e-7)
+                  pressure_drop *= (Qset / Qc);
+            }
+         }
+      } else {
+         if (exceed == true) {
+            if ((Qc / Qold) < 1.) {
+               pressure_drop *= (Qset / Qc);
+            } else {
+               if (fabs(Qc - Qold) / Qc < 1e-7)
+                  pressure_drop *= (Qset / Qc);
+            }
+         }
+      }
+	}
+   Qold = Qc;
+
+	string fileName = "./DS_results/flow_pressure_history.csv" ;
+	std::ofstream MyFile;
+
+	if (macCOMM->rank() == 0) {
+		MyFile.open( fileName.c_str(), std::ios::app ) ;
+      MyFile << t_it->time() << " , " << Qc << " , " << pressure_drop << endl;
+   }
+
+}
+
+
+
+
 //---------------------------------------------------------------------------
 void
 DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
@@ -2115,9 +2241,17 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    // Periodic pressure gradient
    if ( UF->primary_grid()->is_periodic_flow() ) {
       cpp = UF->primary_grid()->get_periodic_flow_direction() ;
-      bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
-               ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
-               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
+		if (UF->primary_grid()->is_periodic_pressure_drop() &&
+	      !UF->primary_grid()->is_periodic_flow_rate()) {
+	      bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
+	               ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
+	               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
+		} else if (UF->primary_grid()->is_periodic_flow_rate()) {
+			predicted_pressure_drop(t_it);
+			bodyterm = pressure_drop /
+	               ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
+	               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
+		}
    }
 
    size_t_vector min_unknown_index(3,0);
