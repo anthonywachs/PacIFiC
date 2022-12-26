@@ -1948,11 +1948,11 @@ DS_AllRigidBodies:: calculate_diffusive_flux(size_t const& p,
 		geomVector fV = rigid_body_velocity(targetID,x0);
 		f0 = fV(comp);
 	} else {
-		f0 = (m_space_dimension == 2) ? Biquadratic_interpolation(
-                                                   UF, comp, &x0, i0, interpol_dir
-													         , sign[interpol_dir], {level})
-	   				  	 : Triquadratic_interpolation(UF, comp, &x0, i0, ownID
-												            , dir, sign, {level}) ;
+		f0 = (m_space_dimension == 2) ?
+                     Biquadratic_interpolation(UF, comp, &x0, i0, interpol_dir
+												         , sign[interpol_dir], {level})
+   				  	 : Triquadratic_interpolation(UF, comp, &x0, i0, ownID
+											            , dir, sign, {level}) ;
 	}
 
 	// Correction if x1 in solid
@@ -1965,11 +1965,11 @@ DS_AllRigidBodies:: calculate_diffusive_flux(size_t const& p,
 		f1 = fV(comp);
 	} else {
 		i0(dir) = i0(dir) + 1;
-		f1 = (m_space_dimension == 2) ? Biquadratic_interpolation(
-                                                   UF, comp, &x1, i0, interpol_dir
-												            , sign[interpol_dir], {level})
-	   				  	 : Triquadratic_interpolation(UF, comp, &x1, i0, ownID
-												            , dir, sign, {level}) ;
+		f1 = (m_space_dimension == 2) ?
+                     Biquadratic_interpolation(UF, comp, &x1, i0, interpol_dir
+											            , sign[interpol_dir], {level})
+   				  	 : Triquadratic_interpolation(UF, comp, &x1, i0, ownID
+											            , dir, sign, {level}) ;
 	}
 
 	// Derivative
