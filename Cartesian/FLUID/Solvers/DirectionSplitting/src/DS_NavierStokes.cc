@@ -643,36 +643,15 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 				         xL = 0.;
 				      }
 
-      				double dx = FF->get_cell_size( i, comp, dir);
-						double dy = FF->get_cell_size( j, comp, dir_j);
-						double dz = (dim == 3) ? FF->get_cell_size( k, comp, dir_k) : 1.;
-
       				double dxr = xR - xC;
       				double dxl = xC - xL;
-
-						size_t p = 0;
-						if (dir == 0) {
-							p = FF->DOF_local_number(i,j,k,comp);
-						} else if (dir == 1) {
-							p = FF->DOF_local_number(j,i,k,comp);
-						} else if (dir == 2) {
-							p = FF->DOF_local_number(j,k,i,comp);
-						}
+						double dx = FF->get_cell_size( i, comp, dir);
 
 						double right = (FF == PF) ? -1.0/dxr : -gamma/dxr ;
 						double left = (FF == PF) ? -1.0/dxl : -gamma/dxl ;
-						double unsteady_term = (FF == PF) ? 1.0
-																	 : rho/t_it->time_step();
+						double unsteady_term = (FF == PF) ? 1.0*dx
+																	 : rho*dx/t_it->time_step();
 
-                  // if ((StencilCorrection == "CutCell") && (FF == UF)) {
-						//    right *= CC_face_frac->operator()(p,2*dir+1);
-						//    left *= CC_face_frac->operator()(p,2*dir+0);
-						//    unsteady_term *= CC_vol->operator()(p,0);
-						// } else {
-							right *= dy * dz;
-							left *= dy * dz;
-							unsteady_term *= dx * dy * dz;
-						// }
 						double center = - (right+left);
 
 				      if ((is_solids) && (FF == UF)) {
@@ -682,6 +661,15 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 														->get_intersect_distance_on_grid(FF);
 				         size_t_vector* void_frac = allrigidbodies
 														->get_void_fraction_on_grid(FF);
+
+							size_t p = 0;
+							if (dir == 0) {
+								p = FF->DOF_local_number(i,j,k,comp);
+							} else if (dir == 1) {
+								p = FF->DOF_local_number(j,i,k,comp);
+							} else if (dir == 2) {
+								p = FF->DOF_local_number(j,k,i,comp);
+							}
 
 				         if (void_frac->operator()(p) == 0) {
 				            // if left node is inside the solid particle
@@ -695,14 +683,6 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 				            left = 0.;
 				            right = 0.;
 				         }
-
-							// if ((StencilCorrection == "CutCell") && (FF == UF)) {
-							// 	right *= CC_face_frac->operator()(p,2*dir+1);
-							// 	left *= CC_face_frac->operator()(p,2*dir+0);
-							// } else {
-								right *= dy * dz;
-								left *= dy * dz;
-							// }
 
          				center = -(right+left);
 
@@ -1475,23 +1455,23 @@ DS_NavierStokes:: velocity_local_rhs ( size_t const& j
       size_t pos = i - min_unknown_index(dir);
       size_t p = UF->DOF_local_number(ii,jj,kk,comp);
 
-      double value = vel_diffusion[dir]->operator()(p);
+      double value = vel_diffusion[dir]->operator()(p)/area;
 
       if (is_solids) {
          if (intersect_vector->operator()(p,2*dir+0) == 1) {
             value = value - intersect_fieldVal->operator()(p,2*dir+0)
-                           /intersect_distance->operator()(p,2*dir+0) * area;
+                           /intersect_distance->operator()(p,2*dir+0);
          }
          if (intersect_vector->operator()(p,2*dir+1) == 1) {
             value = value - intersect_fieldVal->operator()(p,2*dir+1)
-                           /intersect_distance->operator()(p,2*dir+1) * area;
+                           /intersect_distance->operator()(p,2*dir+1);
          }
       }
 
-      // double dC = UF->get_cell_size(i,comp,dir);
+      double dC = UF->get_cell_size(i,comp,dir);
 
       double temp_val = UF->DOF_value(ii,jj,kk,comp,level)
-                        *dxC*dyC*dzC*rho/t_it->time_step() - gamma*value;
+                        *dC*rho/t_it->time_step() - gamma*value;
 
       if (is_periodic[1][dir] == 0) {
         if (rank_in_i[dir] == nb_ranks_comm_i[dir]-1) {
@@ -1522,25 +1502,12 @@ DS_NavierStokes:: velocity_local_rhs ( size_t const& j
       ii = j; jj = k; kk = m;
    }
 
-	double dxC = UF->get_cell_size(ii, comp, 0);
-	double dyC = UF->get_cell_size(jj, comp, 1);
-	double dzC = (dim == 3) ? UF->get_cell_size(kk, comp, 2) : 1.;
-	double area = 0.;
-
-	if (dir == 0) {
-		area = dyC * dzC;
-	} else if (dir == 1) {
-		area = dxC * dzC;
-	} else if (dir == 2) {
-		area = dxC * dyC;
-	}
-
    if ( UF->DOF_in_domain((int)ii,(int)jj,(int)kk,comp))
       if ( UF->DOF_has_imposed_Dirichlet_value(ii,jj,kk,comp)) {
          double ai = 1. / (UF->get_DOF_coordinate(m+1,comp,dir)
                          - UF->get_DOF_coordinate(m,comp,dir));
          double dirichlet_value = UF->DOF_value(ii,jj,kk,comp,1) ;
-         VEC[dir].local_T[comp]->add_to_item( 0, + area*gamma*ai*dirichlet_value );
+         VEC[dir].local_T[comp]->add_to_item( 0, + gamma*ai*dirichlet_value );
       }
 
    m = int(max_unknown_index(dir)) + 1;
@@ -1559,7 +1526,7 @@ DS_NavierStokes:: velocity_local_rhs ( size_t const& j
                          - UF->get_DOF_coordinate(m-1,comp,dir));
          double dirichlet_value = UF->DOF_value(ii,jj,kk,comp,1) ;
         VEC[dir].local_T[comp]->add_to_item(VEC[dir].local_T[comp]->nb_rows()-1,
-                                                 + area*gamma*ai*dirichlet_value );
+                                                 + gamma*ai*dirichlet_value );
       }
 
    return fe;
@@ -3072,28 +3039,15 @@ DS_NavierStokes:: pressure_local_rhs ( size_t const& j
    doubleArray2D* divergence = GLOBAL_EQ->get_node_divergence(0);
 
    for (size_t i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
-		size_t ii=0, jj=0, kk=0;
-		if (dir == 0) {
-			ii = i; jj = j; kk = k;
-		} else if (dir == 1) {
-			ii = j; jj = i; kk = k;
-		} else if (dir == 2) {
-			ii = j; jj = k; kk = i;
-		}
-
-		double dxC = PF->get_cell_size(ii, 0, 0);
-		double dyC = PF->get_cell_size(jj, 0, 1);
-		double dzC = (dim == 3) ? PF->get_cell_size(kk, 0, 2) : 1.;
-		double cellV = dxC * dyC * dzC;
-      // double dx = PF->get_cell_size( i, 0, dir );
+      double dx = PF->get_cell_size( i, 0, dir );
       if (dir == 0) {
 			size_t p = PF->DOF_local_number(i,j,k,0);
          double vel_div = divergence->operator()(p,0);
-         value = -(rho*vel_div*cellV)/(t_it -> time_step());
+         value = -(rho*vel_div*dx)/(t_it -> time_step());
       } else if (dir == 1) {
-         value = PF->DOF_value( j, i, k, 0, 1 )*cellV;
+         value = PF->DOF_value( j, i, k, 0, 1 )*dx;
       } else if (dir == 2) {
-         value = PF->DOF_value( j, k, i, 0, 1 )*cellV;
+         value = PF->DOF_value( j, k, i, 0, 1 )*dx;
       }
 
       pos = i - min_unknown_index(dir);
