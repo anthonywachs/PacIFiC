@@ -676,12 +676,12 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 				            // if left node is inside the solid particle
 				            if (intersect_vector->operator()(p,2*dir+0) == 1) {
 				               left = -gamma/intersect_distance->operator()(p,2*dir+0);
-									pre_factor = (2. * dx) / (dxr + intersect_distance->operator()(p,2*dir+0));
+									// pre_factor = (2. * dx) / (dxr + intersect_distance->operator()(p,2*dir+0));
 								}
 				            // if right node is inside the solid particle
 				            if (intersect_vector->operator()(p,2*dir+1) == 1) {
 				               right = -gamma/intersect_distance->operator()(p,2*dir+1);
-									pre_factor = (2. * dx) / (dxl + intersect_distance->operator()(p,2*dir+1));
+									// pre_factor = (2. * dx) / (dxl + intersect_distance->operator()(p,2*dir+1));
 								}
 				         } else if (void_frac->operator()(p) != 0) {
 				            // if center node is inside the solid particle
