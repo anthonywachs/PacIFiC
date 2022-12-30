@@ -676,12 +676,12 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 				            // if left node is inside the solid particle
 				            if (intersect_vector->operator()(p,2*dir+0) == 1) {
 				               left = -gamma/intersect_distance->operator()(p,2*dir+0);
-									// pre_factor = (2. * dx) / (dxr + intersect_distance->operator()(p,2*dir+0));
+									pre_factor = (2. * dx) / (dxr + intersect_distance->operator()(p,2*dir+0));
 								}
 				            // if right node is inside the solid particle
 				            if (intersect_vector->operator()(p,2*dir+1) == 1) {
 				               right = -gamma/intersect_distance->operator()(p,2*dir+1);
-									// pre_factor = (2. * dx) / (dxl + intersect_distance->operator()(p,2*dir+1));
+									pre_factor = (2. * dx) / (dxl + intersect_distance->operator()(p,2*dir+1));
 								}
 				         } else if (void_frac->operator()(p) != 0) {
 				            // if center node is inside the solid particle
@@ -1199,6 +1199,7 @@ DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
 	double dxC = UF->get_cell_size(i, comp, 0);
 	double dyC = UF->get_cell_size(j, comp, 1);
 	double dzC = (dim == 3) ? UF->get_cell_size(k, comp, 2) : 1.;
+	double pre_factor = 1.;
 
    switch (dir) {
       case 0:
@@ -1236,13 +1237,17 @@ DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
 
          //xvalue = xright/xhr - xleft/xhl;
          if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)
-            && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp))
+            && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
             value = xright/xhr - xleft/xhl;
-         else if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp))
+				pre_factor = (2.* dxC) / (xhl + xhr);
+         } else if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)) {
             value = - xleft/xhl;
-         else
+				pre_factor = dxC / xhl;
+         } else {
             value = xright/xhr;
-			value *= dyC * dzC;
+				pre_factor = dxC/ xhr;
+			}
+			value *= pre_factor * dyC * dzC;
          break;
       case 1:
          if (UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
@@ -1279,13 +1284,17 @@ DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
 
          //yvalue = yright/yhr - yleft/yhl;
          if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)
-            && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp))
+            && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
             value = yright/yhr - yleft/yhl;
-         else if(UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp))
+				pre_factor = (2. * dyC) / (yhr + yhl);
+         } else if(UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)) {
             value = - yleft/yhl;
-         else
+				pre_factor = dyC / yhl;
+         } else {
             value = yright/yhr;
-			value *= dxC * dzC;
+				pre_factor = dyC / yhr;
+			}
+			value *= pre_factor * dxC * dzC;
          break;
       case 2:
          if (UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
@@ -1322,13 +1331,17 @@ DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
 
          //zvalue = zright/zhr - zleft/zhl;
          if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)
-            && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp))
+            && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
             value = zright/zhr - zleft/zhl;
-         else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp))
+				pre_factor = (2. * dzC) / (zhl + zhr);
+         } else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
             value = - zleft/zhl;
-         else
+				pre_factor = dzC / zhl;
+         } else {
             value = zright/zhr;
-			value *= dxC * dyC;
+				pre_factor = dzC / zhr;
+			}
+			value *= pre_factor * dxC * dyC;
          break;
    }
 
@@ -1463,21 +1476,30 @@ DS_NavierStokes:: velocity_local_rhs ( size_t const& j
 
       size_t pos = i - min_unknown_index(dir);
       size_t p = UF->DOF_local_number(ii,jj,kk,comp);
+		double dC = UF->get_cell_size(i,comp,dir);
 
       double value = vel_diffusion[dir]->operator()(p)/area;
 
       if (is_solids) {
-         if (intersect_vector->operator()(p,2*dir+0) == 1) {
+			if ((intersect_vector->operator()(p,2*dir+0) == 1)
+			 && (intersect_vector->operator()(p,2*dir+1) == 1)) {
+				 double pre_factor = 2 * dC / (intersect_distance->operator()(p,2*dir+0)
+			 										  + intersect_distance->operator()(p,2*dir+1));
+				 value = value - (intersect_fieldVal->operator()(p,2*dir+0)
+                            /intersect_distance->operator()(p,2*dir+0)
+								   + intersect_fieldVal->operator()(p,2*dir+1)
+                            /intersect_distance->operator()(p,2*dir+1)) * pre_factor;
+			} else if (intersect_vector->operator()(p,2*dir+0) == 1) {
+				double pre_factor = 2 * dC / (dC + intersect_distance->operator()(p,2*dir+0));
             value = value - intersect_fieldVal->operator()(p,2*dir+0)
-                           /intersect_distance->operator()(p,2*dir+0);
-         }
-         if (intersect_vector->operator()(p,2*dir+1) == 1) {
+                           /intersect_distance->operator()(p,2*dir+0) * pre_factor;
+         } else if (intersect_vector->operator()(p,2*dir+1) == 1) {
+				double pre_factor = 2 * dC / (dC + intersect_distance->operator()(p,2*dir+1));
             value = value - intersect_fieldVal->operator()(p,2*dir+1)
-                           /intersect_distance->operator()(p,2*dir+1);
+                           /intersect_distance->operator()(p,2*dir+1) * pre_factor;
          }
       }
 
-      double dC = UF->get_cell_size(i,comp,dir);
 
       double temp_val = UF->DOF_value(ii,jj,kk,comp,level)
                         *dC*rho/t_it->time_step() - gamma*value;
