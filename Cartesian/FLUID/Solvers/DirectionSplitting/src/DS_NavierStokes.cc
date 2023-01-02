@@ -1137,6 +1137,39 @@ DS_NavierStokes:: assemble_velocity_diffusion_terms ( )
             }
          }
       }
+
+		// Flux redistribution
+		if (is_solids && (StencilCorrection == "CutCell")) {
+			size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+			intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
+			for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+				for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+					for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+						size_t p = UF->DOF_local_number(i,j,k,comp);
+						if ((ownerID->operator()(p) != -1) && (void_frac->operator()(p) != 0)) {
+							for (size_t dir = 0; dir < dim; dir++) {
+								size_t_vector i0_r(3), i0_l(3);
+								i0_l(0) = i; i0_l(1) = j; i0_l(2) = k;
+								i0_r = i0_l;
+								i0_l(dir) = i0_l(dir) - 1;
+								i0_r(dir) = i0_r(dir) + 1;
+								size_t p_lft = UF->DOF_local_number(i0_l(0),i0_l(1),i0_l(2),comp);
+								size_t p_rht = UF->DOF_local_number(i0_r(0),i0_r(1),i0_r(2),comp);
+								if (vel_diffusion[dir]->operator()(p) != 0.) {
+									if (void_frac->operator()(p_lft) == 0) {
+										vel_diffusion[dir]->operator()(p_lft) += vel_diffusion[dir]->operator()(p);
+										vel_diffusion[dir]->operator()(p) = 0.;
+									} else if (vel_diffusion[dir]->operator()(p_rht) == 0) {
+										vel_diffusion[dir]->operator()(p_rht) += vel_diffusion[dir]->operator()(p);
+										vel_diffusion[dir]->operator()(p) = 0.;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
    }
 }
 
@@ -1382,7 +1415,8 @@ DS_NavierStokes:: compute_un_component_FV ( size_t const& comp,
 
 	double value = 0.;
 
-	if ((ownerID->operator()(p) != -1) && (void_frac->operator()(p) == 0)) {
+	// if ((ownerID->operator()(p) != -1) && (void_frac->operator()(p) == 0)) {
+	if (ownerID->operator()(p) != -1) {
 		double fleft = 0.;
 		if (CC_face_frac->operator()(p,2*dir+0) != 0.) {
 			fleft = allrigidbodies->calculate_diffusive_flux(p, comp,dir, xL,ownerID->operator()(p),level)
