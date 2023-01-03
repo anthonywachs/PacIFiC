@@ -475,13 +475,13 @@ class DS_NavierStokes : public MAC_Object,
       double translated_distance;
 
       double pressure_drop, Qold;
-      bool exceed, turn;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;
       MAC_DoubleVector* gravity_vector ;
       bool is_periodic[2][3];
 
+      bool exceed, turn;
 } ;
 
 #endif

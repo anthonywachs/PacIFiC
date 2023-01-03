@@ -83,6 +83,8 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , bottom_coordinate( 0. )
    , translated_distance( 0. )
    , gravity_vector( 0 )
+	, exceed (false)
+	, turn (false)
 {
    MAC_LABEL( "DS_NavierStokes:: DS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -169,8 +171,8 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    GLOBAL_EQ = DS_NavierStokesSystem::create( this, se, UF, PF, inputData ) ;
    se->destroy() ;
 
-	if (UF->primary_grid()->is_periodic_flow_rate())
-		controller = DS_PID::create(-1,0,1,1,1);
+	// if (UF->primary_grid()->is_periodic_flow_rate())
+	// 	controller = DS_PID::create(0.5,1.,0);
 
 
    // Timing routines
@@ -2268,9 +2270,9 @@ DS_NavierStokes:: predicted_pressure_drop (FV_TimeIterator const* t_it)
 	}
 
 	if ((fabs(Qc - Qset) / Qset > 1e-5) && (t_it->iteration_number() % 1 == 0)) {
-		// pressure_drop += controller->calculate(Qset,Qc,t_it->time_step());
       if ((Qc / Qset) > 1.) {
          exceed = true;
+			// pressure_drop -= controller->calculate(Qset,Qc,t_it->time_step());
 	      if (turn == false) {
 	         pressure_drop *= 0.5;
 	         if ((Qc - Qold) < 0.) turn = true;
@@ -2278,16 +2280,19 @@ DS_NavierStokes:: predicted_pressure_drop (FV_TimeIterator const* t_it)
             if ((Qc / Qold) > 1.) {
                pressure_drop *= (Qset / Qc);
             } else {
-               if (fabs(Qc - Qold) / Qc < 1e-7)
+					// Threshold controls the oscillation
+               if (fabs(Qc - Qold) / Qc < 1e-6)
                   pressure_drop *= (Qset / Qc);
             }
          }
       } else {
          if (exceed == true) {
+				// pressure_drop -= controller->calculate(Qset,Qc,t_it->time_step());
             if ((Qc / Qold) < 1.) {
                pressure_drop *= (Qset / Qc);
             } else {
-               if (fabs(Qc - Qold) / Qc < 1e-7)
+					// Threshold controls the oscillation
+               if (fabs(Qc - Qold) / Qc < 1e-6)
                   pressure_drop *= (Qset / Qc);
             }
          }
@@ -2343,7 +2348,8 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
 
-	doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
+	doubleArray2D* CC_vol = (is_solids) ?
+							allrigidbodies->get_CC_cell_volume(UF) : 0;
 	vector<doubleVector*> advection = GLOBAL_EQ->get_velocity_advection();
    vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
    size_t_vector* void_frac = (is_solids) ?
@@ -2950,8 +2956,8 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 	size_t field = (FF == PF) ? 0 : 1;
 	size_t UNK_MAX = FF->nb_local_unknowns();
 	doubleArray2D* divergence = GLOBAL_EQ->get_node_divergence(field);
-	doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(FF);
-	intVector* ownerID = allrigidbodies->get_CC_ownerID(FF);
+	doubleArray2D* CC_vol = (is_solids) ? allrigidbodies->get_CC_cell_volume(FF) : 0;
+	intVector* ownerID = (is_solids) ? allrigidbodies->get_CC_ownerID(FF) : 0;
 
 	for (size_t comp = 0; comp < nb_comps[field]; comp++) {
 		// Get local min and max indices
@@ -2971,40 +2977,47 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 				for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
 					double dz = (dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1.;
 					size_t p = FF->DOF_local_number(i,j,k,comp);
-					if (ownerID->operator()(p) == -1) {
+					if (is_solids) {
+						if (ownerID->operator()(p) == -1) {
+							double vel_div = (FF == UF) ?
+												divergence_of_U_noCorrection(i,j,k,comp,0)
+											 : calculate_velocity_divergence_FD(i,j,k,0);
+				         divergence->operator()(p,0) = vel_div * dx * dy * dz;
+						} else if (ownerID->operator()(p) != -1) {
+						   double rht_flux = allrigidbodies->velocity_flux(FF,p,0,0,1,0);
+						   double lft_flux = allrigidbodies->velocity_flux(FF,p,0,0,0,0);
+						   double top_flux = allrigidbodies->velocity_flux(FF,p,1,1,1,0);
+						   double bot_flux = allrigidbodies->velocity_flux(FF,p,1,1,0,0);
+						   double fnt_flux = (dim == 2) ? 0.
+						 	       			 : allrigidbodies->velocity_flux(FF,p,2,2,1,0);
+						   double bhd_flux = (dim == 2) ? 0.
+						 	    				 : allrigidbodies->velocity_flux(FF,p,2,2,0,0);
+
+							double xvalue = (rht_flux - lft_flux);
+							double yvalue = (top_flux - bot_flux);
+							double zvalue = (fnt_flux - bhd_flux);
+							double RB_flux = allrigidbodies->calculate_velocity_flux_fromRB(FF,p);
+							double dFV = 0.;//(CC_vol->operator()(p,0) - CC_vol->operator()(p,1))/0.001;
+
+							double value = xvalue + yvalue + zvalue + RB_flux + dFV;
+
+							// In case of nodes at the boundary of proc, especially
+							// nodes not handled by the proc
+							value = isnan(value) ? 0. : value;
+
+				         divergence->operator()(p,0) = value;
+						}
+					} else {
 						double vel_div = (FF == UF) ?
 											divergence_of_U_noCorrection(i,j,k,comp,0)
 										 : calculate_velocity_divergence_FD(i,j,k,0);
-			         divergence->operator()(p,0) = vel_div * dx * dy * dz;
-					} else if (ownerID->operator()(p) != -1) {
-					   double rht_flux = allrigidbodies->velocity_flux(FF,p,0,0,1,0);
-					   double lft_flux = allrigidbodies->velocity_flux(FF,p,0,0,0,0);
-					   double top_flux = allrigidbodies->velocity_flux(FF,p,1,1,1,0);
-					   double bot_flux = allrigidbodies->velocity_flux(FF,p,1,1,0,0);
-					   double fnt_flux = (dim == 2) ? 0.
-					 	       			 : allrigidbodies->velocity_flux(FF,p,2,2,1,0);
-					   double bhd_flux = (dim == 2) ? 0.
-					 	    				 : allrigidbodies->velocity_flux(FF,p,2,2,0,0);
-
-						double xvalue = (rht_flux - lft_flux);
-						double yvalue = (top_flux - bot_flux);
-						double zvalue = (fnt_flux - bhd_flux);
-						double RB_flux = allrigidbodies->calculate_velocity_flux_fromRB(FF,p);
-						double dFV = 0.;//(CC_vol->operator()(p,0) - CC_vol->operator()(p,1))/0.001;
-
-						double value = xvalue + yvalue + zvalue + RB_flux + dFV;
-
-						// In case of nodes at the boundary of proc, especially
-						// nodes not handled by the proc
-						value = isnan(value) ? 0. : value;
-
-			         divergence->operator()(p,0) = value;
+						divergence->operator()(p,0) = vel_div * dx * dy * dz;
 					}
 				}
 			}
 		}
 
-		size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(FF);
+		size_t_vector* void_frac = (is_solids) ? allrigidbodies->get_void_fraction_on_grid(FF) : 0;
 
 		// Flux redistribution
 		if (StencilCorrection == "CutCell") {
@@ -3413,8 +3426,8 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 
    doubleArray2D* divergencePF = GLOBAL_EQ->get_node_divergence(0);
 	doubleArray2D* divergenceUF = GLOBAL_EQ->get_node_divergence(1);
-	doubleArray2D* CC_volPF = allrigidbodies->get_CC_cell_volume(PF);
-	doubleArray2D* CC_volUF = allrigidbodies->get_CC_cell_volume(UF);
+	doubleArray2D* CC_volPF = (is_solids) ? allrigidbodies->get_CC_cell_volume(PF) : 0;
+	doubleArray2D* CC_volUF = (is_solids) ? allrigidbodies->get_CC_cell_volume(UF) : 0;
 
    for (size_t l=0;l<dim;++l) {
       min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
@@ -3447,13 +3460,13 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    // Store the divergence to be used in the next time iteration
    for (size_t i = 0; i < PF->nb_local_unknowns() ; i++) {
       divergencePF->operator()(i,1) = divergencePF->operator()(i,0);
-		CC_volPF->operator()(i,1) = CC_volPF->operator()(i,0);
+		if (is_solids) CC_volPF->operator()(i,1) = CC_volPF->operator()(i,0);
 	}
 
 	// Store the divergence to be used in the next time iteration
 	for (size_t i = 0; i < UF->nb_local_unknowns() ; i++) {
 		divergenceUF->operator()(i,1) = divergenceUF->operator()(i,0);
-		CC_volUF->operator()(i,1) = CC_volUF->operator()(i,0);
+		if (is_solids) CC_volUF->operator()(i,1) = CC_volUF->operator()(i,0);
 	}
 
    if (is_solids) {

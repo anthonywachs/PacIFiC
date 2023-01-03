@@ -16,18 +16,13 @@ class DS_PID
       // Ki -  Integral gain
       // Kd -  derivative gain
       // dt -  loop interval time
-      // max - maximum value of manipulated variable
-      // min - minimum value of manipulated variable
-      DS_PID( double const& max,
-              double const& min,
-              double const& Kp,
+      DS_PID( double const& Kp,
               double const& Kd,
               double const& Ki );
 
 
       ~DS_PID(void);
 
-      double _max, _min;
       double _Kp;
       double _Kd;
       double _Ki;
@@ -35,11 +30,9 @@ class DS_PID
       double _pre_error;
 
    public:
-      static DS_PID* create(double const& max,
-                         double const& min,
-                         double const& Kp,
-                         double const& Kd,
-                         double const& Ki);
+      static DS_PID* create( double const& Kp,
+                             double const& Kd,
+                             double const& Ki);
 
       // Returns the manipulated variable given a setpoint and current process value
       double calculate( double const& setpoint,
