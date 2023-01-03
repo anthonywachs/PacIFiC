@@ -22,6 +22,9 @@
     #define C0 (-2.09/RADIUS)
   #endif
 #endif
+#ifndef LINEAR_BENDING
+  #define LINEAR_BENDING 0
+#endif
 
 #define cot(x) (cos(x)/sin(x))
 
@@ -86,12 +89,17 @@ event acceleration (i++) {
     lagMesh* mesh = &(MB(i));
     comp_curvature(mesh);
     for(int j=0; j<mesh->nlp; j++) {
-      double curv = mesh->nodes[j].curv;
-      double rcurv = mesh->nodes[i].ref_curv;
-      double gcurv = mesh->nodes[j].gcurv;
+      #if (!LINEAR_BENDING)
+        double curv = mesh->nodes[j].curv;
+        double rcurv = mesh->nodes[i].ref_curv;
+        double gcurv = mesh->nodes[j].gcurv;
+      #endif
       double lbcurv = laplace_beltrami(mesh, j, true);
-      double bending_surface_force =
-        2*E_B*(2*(curv - rcurv)*(sq(curv) - gcurv + rcurv*curv) + lbcurv);
+      double bending_surface_force = 2*E_B*(lbcurv
+        #if (!LINEAR_BENDING)
+          + 2*(curv - rcurv)*(sq(curv) - gcurv + rcurv*curv)
+        #endif
+        );
       /** We now have to compute the area associated with each node */
       double area = compute_node_area(mesh, j);
       /** The bending force is ready to be added to the Lagrangian force of the
