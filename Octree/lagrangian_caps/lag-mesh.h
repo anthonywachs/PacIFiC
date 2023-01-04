@@ -1,27 +1,41 @@
 /**
 # Lagrangian mesh
 
-In this file, we implement a Lagrangian mesh meant to track the position and
-compute the stresses of an elasitc membrane.
+In this file, we implement a Lagrangian mesh for the front-tracking method,
+meant to track the position and compute the stresses of an elasitc membrane.
 
 
 ## Structure of the mesh
 
-In the Lagrangian mesh, each node is assigned coordinates, the IDs of its
-two connecting edges (in 2D), an elastic force, a velocity, a normal vector,
-a current and a reference curvature (i.e. the curvature of the unstressed
-resting shape) and a stencil used for averaging the neighboring velocities and
-spreading the Lagrangian force as a body force on the neighboring Eulerian
-nodes. In the case of MPI, we also store the rank of the processor which owns
-the Eulerian cell containing the Node.
+In the Lagrangian mesh, each node is assigned several attributes:
+
+* ```pos```, the node coordinates
+* ```lagVel```, the node velocity vector
+* ```normal```, the vector normal to the membrane at the node coordinates
+* ```curv```, the (mean) curvature of the membrane at the node coordinates
+* ```ref_curv```, the reference (mean) curvature of the membrane at the node coordinates (default is zero)
+* ```lagForce```, an elastic and/or bending force exerted by the membrane on its surrounding fluid
+* ```stencil```, a [Cache](http://basilisk.fr/src/grid/tree.h#82) structure used for averaging the neighboring velocities and spreading the Lagrangian force as a body force on the neighboring Eulerian nodes
+* in case of MPI simulations, ```pid```, the rank of the processor owning the Eulerian cell which contains the lagNode
+* ```edge_ids```, the IDs of its connecting edges: 2 in 2D, up to 6 in 3D (because every considered shape is derived by subdividing in icosahedron, leading to 5 or 6 neighbors only).
+
+In case of 3D simulations, other attributes are introduced:
+
+* ```nb_neighbors```, the number of neighbors of the node, which should only be 5 or 6
+* ```neighbor_ids```, the IDs of the node neighbors
+* ```nb_triangles```, the number of triangles having the node as a vertex
+* ```triangle_ids```, the ids of the above triangles
+* ```gcurv```, the Gaussian curvature of the membrane at the node coordinates
+* ```nb_fit_iterations```, the number of iterations needed to compute the membrane curvature and normal vector to the desired convergence threshold.
+
 */
 typedef struct lagNode {
   coord pos;
-  coord lagForce;
   coord lagVel;
   coord normal;
   double curv;
   double ref_curv;
+  coord lagForce;
   Cache stencil;
   #if _MPI
     int pid;
@@ -29,29 +43,46 @@ typedef struct lagNode {
   #if dimension < 3
     int edge_ids[2];
   #else
-    double gcurv; // Gaussian curvature
+    int edge_ids[6];
     int nb_neighbors;
     int neighbor_ids[6];
-    int edge_ids[6];
     int nb_triangles;
     int triangle_ids[6];
+    double gcurv;
     int nb_fit_iterations;
   #endif
 } lagNode;
 
-/** Similarly, the edges of the mesh are assigned the IDs of the two nodes they
-connect, an undeformed and a deformed lengths $l_0$ and $l$, and a normal
-vector.  */
+/** Similarly, the edges of the mesh are assigned:
+
+* ```node_ids```, the IDs of the two nodes they connect
+* In case of 3D simulations, ```triangle_ids```, the IDs of the two triangles they separate
+* ```l0```, the length of the edge in the initial stress-free configuration
+* ```length```, the current length of the edge
+* ```normal```, a vector normal to the membrane at the edge midpoint.
+
+*/
 typedef struct Edge {
   int node_ids[2];
   #if dimension > 2
     int triangle_ids[2];
   #endif
-  double l0, length; // Initial edge length, current stretch
+  double l0;
+  double length;
   coord normal;
 } Edge;
 
-/** In 3 dimensions, we define triangle faces */
+/** In case of 3D simulations, we define triangle faces. Each ```Triangle``` structure has the following attributes:
+
+* ```node_ids```, the IDs of the triangle vertices
+* ```edge_ids```, the IDs of the triangle edges
+* ```area```, the current area of the triangle
+* ```normal```, the normal vector to the triangle pointing outside the membrane
+* ```centroid```, the coordinates of the triangle centroid
+* ```refShape```, the coordinates of the vertices in the Common Plane in the stress-free configuration. By convention the first vertex is always placed at $(0, 0, 0)$, so only the coordinates of the second and third vertex are stored in ```refShape```
+* ```sfc```, the shape function coefficients used in the finite elements method and computed in [store_initial_configuration](elasticity-ft.h#store_initial_configuration). There are two coefficients per vertex, hence the $3 \times 2$ array structure of ```sfc```.
+
+ */
 #if dimension > 2
   typedef struct Triangle {
     int node_ids[3];
@@ -64,17 +95,30 @@ typedef struct Edge {
   } Triangle;
 #endif
 
-/** The lagMesh struct stores an array of nodes, edges as well as their
+/** The ```lagMesh``` structure contains arrays of the previously introduced nodes, edges and triangles. It defines an unstructured mesh, the membrane of our capsule. Its attributes are:
+
+*  ```nlp``` the number of Lagrangian nodes (or Lagrangian points, hence the ``p")
+* ```nodes```, the array of Lagrangian nodes
+* ```nle```, the number of Lagrangian edges
+* ```edges```, the array of Lagrangian edges
+* In case of 3D simulations:
+  * ```nlt```, the number of Lagrangian triangles
+  * ```triangles```, the array of Lagrangian triangles
+* ```updated_stretches```, a boolean used to check if the current length of the edges has been updated since the last advection of the Lagrangian nodes
+* ```updated_normals```, a similar boolean telling if the nodal normal vectors should be recomputed
+* ```updated_curvatures```, a last boolean telling if the nodal curvatures should be recomputed.
+an array of nodes, edges as well as their
 respective sizes. The three booleans are used to check if the stretches, normal
 vectors and curvatures have been re-computed since the position of the mesh was
-advected. */
+updated. */
+
 typedef struct lagMesh {
-  int nlp;  // Number of Lagrangian points
-  int nle;  // Number of Lagrangian Edges
-  lagNode* nodes;  // Array of nodes
-  Edge* edges;  // Array of edges
+  int nlp;
+  lagNode* nodes;
+  int nle;
+  Edge* edges;
   #if dimension > 2
-    int nlt; // Number of Lagrangian triangles
+    int nlt;
     Triangle* triangles;
   #endif
   bool updated_stretches;

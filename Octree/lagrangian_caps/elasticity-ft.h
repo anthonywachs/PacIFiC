@@ -106,7 +106,7 @@ void store_initial_configuration(lagMesh* mesh) {
     coordinates of nodes 1 and 2 (node 0 has coordinates (0,0)).*/
     rotate_to_reference_plane(mesh, i, mesh->triangles[i].refShape, buff);
 
-    /** 2. Compute the shape functions $N_k = a_k x + b_k y + c_k $.
+    /** 2. Compute the shape functions $N_k = a_k x + b_k y + c_k$.
     We only compute the coefficient $a_k$, $b_k$ because $c_k$ will be lost in
     the derivations. */
     coord rn[2];
