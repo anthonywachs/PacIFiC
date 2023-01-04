@@ -97,20 +97,17 @@ typedef struct Edge {
 
 /** The ```lagMesh``` structure contains arrays of the previously introduced nodes, edges and triangles. It defines an unstructured mesh, the membrane of our capsule. Its attributes are:
 
-*  ```nlp``` the number of Lagrangian nodes (or Lagrangian points, hence the ``p")
+*  ```nlp``` the number of Lagrangian nodes (or Lagrangian points, hence the "p")
 * ```nodes```, the array of Lagrangian nodes
 * ```nle```, the number of Lagrangian edges
 * ```edges```, the array of Lagrangian edges
 * In case of 3D simulations:
-  * ```nlt```, the number of Lagrangian triangles
-  * ```triangles```, the array of Lagrangian triangles
+    * ```nlt```, the number of Lagrangian triangles
+    * ```triangles```, the array of Lagrangian triangles
 * ```updated_stretches```, a boolean used to check if the current length of the edges has been updated since the last advection of the Lagrangian nodes
 * ```updated_normals```, a similar boolean telling if the nodal normal vectors should be recomputed
 * ```updated_curvatures```, a last boolean telling if the nodal curvatures should be recomputed.
-an array of nodes, edges as well as their
-respective sizes. The three booleans are used to check if the stretches, normal
-vectors and curvatures have been re-computed since the position of the mesh was
-updated. */
+*/
 
 typedef struct lagMesh {
   int nlp;
@@ -126,8 +123,8 @@ typedef struct lagMesh {
   bool updated_curvatures;
 } lagMesh;
 
-/** We denote by $NCAPS$ the number of Lagrangian meshes, or capsules, in the
-simulation. It is one by default. */
+/** We denote by ```NCAPS``` the number of Lagrangian meshes, or capsules, in
+the simulation. It is one by default. */
 #ifndef NCAPS
   #define NCAPS 1
 #endif
@@ -175,7 +172,7 @@ void free_caps(Capsules* caps) {
 }
 
 /** By default, the mesh is advected using a second-order two-step Runge Kutta
-scheme. If the following macro is set to $0$, a first-order forward Euler schme
+scheme. If the following macro is set to 0, a first-order forward Euler schme
 is used instead. */
 #ifndef ADVECT_LAG_RK2
   #define ADVECT_LAG_RK2 1
@@ -226,9 +223,9 @@ double edge_length(lagMesh* mesh, int i) {
 }
 
 /**
-The function below computes the membrane stretch $\lambda = \frac{l}{l_0}$,
-with $l$ the current length of an edge and $l_0$ its reference length
-(in the untressed resting shape).
+The function ```compute_lengths``` below computes the lengths of all edges. It
+takes as an argument a pointer to the mesh. If the optional argument
+```force``` is set to ```true```, the edges' lengths are computed no matter the value of ```updated_stretches```.
 */
 struct _compute_lengths{
   lagMesh* mesh;
@@ -248,7 +245,7 @@ void compute_lengths(struct _compute_lengths p) {
 #if dimension < 3
 /**
 The two functions below compute the outward normal vector to all the edges of
-a Lagrangian mesh.
+a Lagrangian mesh, for 2D simulations.
 */
 void comp_edge_normal(lagMesh* mesh, int i) {
     int node_id[2];
@@ -266,7 +263,7 @@ void comp_edge_normals(lagMesh* mesh) {
   for(int i=0; i<mesh->nle; i++) comp_edge_normal(mesh, i);
 }
 #else // dimension > 2
-/** The function below assumes that the Lagrangian mesh contains the origin and
+/** In 3D simulations, the function below assumes that the Lagrangian mesh contains the origin and
 is convex, and swaps the order of the nodes in order to compute an outward
 normal vector. This only need to be performed at the creation of the mesh since
 the outward property of the normal vectors won't change through the simulation.
@@ -306,8 +303,8 @@ void comp_initial_area_normals(lagMesh* mesh) {
   }
 }
 
-/** The two function below compute the outward normal vector to all the
-triangles of the mesh. */
+/** The two functions below compute the outward normal vector to all the
+triangles of the mesh, for 3D simulations. */
 void comp_triangle_area_normal(lagMesh* mesh, int i) {
   int nid[3]; // node ids
   for(int j=0; j<3; j++) nid[j] = mesh->triangles[i].node_ids[j];
@@ -429,8 +426,6 @@ void correct_lag_pos(lagMesh* mesh) {
 }
 
 
-// #include "curvature-ft.h"
-
 /**
 ## Advection of the mesh
 
@@ -448,8 +443,8 @@ nodes.
 /**
 The function below advects each Lagrangian node by
 interpolating the velocities around the node of interest. By default, a
-second-order Runge Kutta scheme is used. By setting the macro $ADVECT\_LAG\_RK2$
-to zero, a simple forward Euler scheme is used as a scheme.
+second-order Runge Kutta scheme is used. By setting the macro
+```ADVECT_LAG_RK2``` to 0, a simple forward Euler scheme is used.
 */
 trace
 void advect_lagMesh(lagMesh* mesh) {
@@ -494,11 +489,11 @@ void advect_lagMesh(lagMesh* mesh) {
 /**
 ## Putting the pieces together
 
-Below with call the above functions at the appropriate time using the Basilisk
+Below, we call the above functions at the appropriate time using the Basilisk
 event syntax.
 
 We start by creating empty Lagrangian meshes, and allocating an acceleration
-field in case it isn't done yet by another Basilisk module.
+field in case it isn't done yet by another Basilisk solver.
 */
 event defaults (i = 0) {
   mbs.nbmb = NCAPS;
