@@ -171,9 +171,27 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    GLOBAL_EQ = DS_NavierStokesSystem::create( this, se, UF, PF, inputData ) ;
    se->destroy() ;
 
-	// if (UF->primary_grid()->is_periodic_flow_rate())
-	// 	controller = DS_PID::create(0.5,1.,0);
-
+	if (UF->primary_grid()->is_periodic_flow_rate()) {
+		// controller = DS_PID::create(0.5,1.,0);
+		// Set the initial pressure drop, required in case of given flow rate
+		if (!b_restart) {
+			pressure_drop = -100.;
+			string fileName = "./DS_results/flow_pressure_history.csv" ;
+			std::ofstream MyFile;
+			if (macCOMM->rank() == 0) {
+				MyFile.open( fileName.c_str()) ;
+				MyFile << "t Qc dP exceed turn" << endl;
+			}
+			MyFile.close();
+		} else if (b_restart) {
+			string fileName = "./DS_results/flow_pressure_history.csv" ;
+			std::ifstream MyFile;
+			MyFile.open( fileName.c_str() ) ;
+			MyFile.seekg(-31,ios_base::end);
+	      MyFile >> Qold >> pressure_drop >> exceed >> turn;
+			MyFile.close();
+		}
+	}
 
    // Timing routines
    if ( my_rank == is_master ) {
@@ -2263,12 +2281,6 @@ DS_NavierStokes:: predicted_pressure_drop (FV_TimeIterator const* t_it)
 	double Qc = cross_sec_area * Um;
 	double Qset = UF->primary_grid()->get_periodic_flow_rate();
 
-	// At t=0
-	if (Um == 0.) {
-		pressure_drop = -100.;
-		return;
-	}
-
 	if ((fabs(Qc - Qset) / Qset > 1e-5) && (t_it->iteration_number() % 1 == 0)) {
       if ((Qc / Qset) > 1.) {
          exceed = true;
@@ -2305,7 +2317,10 @@ DS_NavierStokes:: predicted_pressure_drop (FV_TimeIterator const* t_it)
 
 	if (macCOMM->rank() == 0) {
 		MyFile.open( fileName.c_str(), std::ios::app ) ;
-      MyFile << t_it->time() << " , " << Qc << " , " << pressure_drop << endl;
+      MyFile << t_it->time() << " " << MAC::doubleToString( ios::scientific, 6, Qc)
+									  << " " << MAC::doubleToString( ios::scientific, 6, pressure_drop)
+									  << " " << exceed
+									  << " " << turn << endl;
    }
 
 }
