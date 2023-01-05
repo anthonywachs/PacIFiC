@@ -115,7 +115,7 @@ void store_initial_configuration(lagMesh* mesh) {
     double det;
     /** 2.1. Compute $a_0$, $b_0$ */
     det = rn[0].x*rn[1].y - rn[0].y*rn[1].x;
-    assert(fabs(det) > 1.e-12);
+    assert(fabs(det) > 1.e-9*TOLERANCE);
     mesh->triangles[i].sfc[0][0] = (rn[0].y - rn[1].y)/det;
     mesh->triangles[i].sfc[0][1] = (rn[1].x - rn[0].x)/det;
     /** 2.2. Compute $a_1$, $b_1$, $a_2$, $b_2$ */
