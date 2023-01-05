@@ -613,6 +613,17 @@ void restore_membranes(char* filename) {
   fclose(file);
 }
 
+/** ### Output membrane position for external post-processing */
+void dump_plain_nodes_pos(lagMesh* mesh, char* filename) {
+  FILE* file = fopen(filename, "a");
+  assert(file);
+  fprintf(file, "%g ", t);
+  for(int i=0; i<mesh->nlp; i++) {
+    foreach_dimension() fprintf(file, "%g ", mesh->nodes[i].pos.x);
+  }
+  fprintf(file, "\n");
+  fclose(file);
+}
 
 /** ### Visualization in paraview */
 #ifndef PARAVIEW_CAPSULE
