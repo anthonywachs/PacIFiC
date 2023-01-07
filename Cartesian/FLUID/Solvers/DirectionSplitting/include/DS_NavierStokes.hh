@@ -176,7 +176,15 @@ class DS_NavierStokes : public MAC_Object,
                                         , size_t const& k
                                         , size_t const& component );
 
-      /** @brief Assemble advection term for Centered spacial scheme */
+      /** @brief Assemble advection term for Centered spacial scheme with FD corrections*/
+      double assemble_advection_Centered_FD( double const& coef
+                                                , size_t const& i
+                                                , size_t const& j
+                                                , size_t const& k
+                                                , size_t const& comp
+                                                , size_t const& level);
+
+      /** @brief Assemble advection term for Centered spacial scheme with CutCell corrections */
       double assemble_advection_Centered_CutCell( FV_TimeIterator const* t_it
                                                 , double const& coef
                                                 , size_t const& i
@@ -201,6 +209,16 @@ class DS_NavierStokes : public MAC_Object,
                                , FV_TimeIterator const* t_it
                                , size_t const& comp
                                , size_t const& dir );
+
+      /** @brief Compute first derivative */
+      std::tuple<double, double>
+            compute_first_derivative ( size_t const& comp
+                             , size_t const& i
+                             , size_t const& j
+                             , size_t const& k
+                             , size_t const& dir
+                             , size_t const& level);
+
       /** @brief Compute diffusive term of velocity field from previous timestep */
       double compute_un_component ( size_t const& comp
                                , size_t const& i

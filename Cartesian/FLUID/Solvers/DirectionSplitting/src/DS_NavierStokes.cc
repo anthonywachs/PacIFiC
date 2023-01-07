@@ -1224,6 +1224,193 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
 
 
 //---------------------------------------------------------------------------
+std::tuple<double,double>
+DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
+	                                          size_t const& i,
+	                                          size_t const& j,
+	                                          size_t const& k,
+	                                          size_t const& dir,
+	                                          size_t const& level)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: compute_first_derivative" ) ;
+
+   size_t_array2D* intersect_vector = (is_solids) ?
+                           allrigidbodies->get_intersect_vector_on_grid(UF)
+									: 0;
+   doubleArray2D* intersect_distance = (is_solids) ?
+                           allrigidbodies->get_intersect_distance_on_grid(UF)
+									: 0;
+   doubleArray2D* intersect_fieldVal = (is_solids) ?
+                           allrigidbodies->get_intersect_fieldValue_on_grid(UF)
+									: 0;
+
+   size_t p = UF->DOF_local_number(i,j,k,comp);
+	double value = 0., dC = 1.;
+	double fc = UF->DOF_value( i, j, k, comp, level );
+
+   if (dir == 0) {
+		dC = UF->get_cell_size(i, comp, 0);
+		double xc = UF->get_DOF_coordinate( i,comp, 0 );
+		double xl = xc, xr = xc;
+		double fr = fc, fl = fc;
+
+      if (UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
+         fr = UF->DOF_value( i+1, j, k, comp, level );
+         xr = UF->get_DOF_coordinate( i+1,comp, 0 );
+      }
+
+      if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)) {
+         fl = UF->DOF_value( i-1, j, k, comp, level ) ;
+         xl = UF->get_DOF_coordinate( i-1, comp, 0 ) ;
+      }
+
+		double dx = xr - xl;
+
+      if (is_solids) {
+         size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+         if (void_frac->operator()(p) == 0) {
+            if (intersect_vector->operator()(p,2*dir+0) == 1) {
+               fl = intersect_fieldVal->operator()(p,2*dir+0);
+               xl = xc - intersect_distance->operator()(p,2*dir+0);
+					dC = ((xc - xl) < 0.5*dC ) ? 0.5 * dC + (xc - xl) : dC;
+            }
+            if (intersect_vector->operator()(p,2*dir+1) == 1) {
+               fr = intersect_fieldVal->operator()(p,2*dir+1);
+               xr = xc + intersect_distance->operator()(p,2*dir+1);
+					dC = ((xr - xc) < 0.5*dC ) ? 0.5 * dC + (xr - xc) : dC;
+            }
+         }
+      }
+
+		// Derivative
+		double dx1 = xc - xl;
+		double dx2 = xr - xc;
+
+		// dx = dx2 - dx1;
+
+      if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)
+         && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
+			value = 1./dx * ((dx1/dx2)*(fr-fc) - (dx2/dx1)*(fl-fc));
+      } else if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)) {
+         value = - (fl - fc)/dx1;
+      } else if (UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
+         value = (fr - fc)/dx2;
+		} else {
+			value = 0.;
+		}
+
+	} else if (dir == 1) {
+		dC = UF->get_cell_size(j, comp, 1);
+		double xc = UF->get_DOF_coordinate( j,comp, 1 );
+		double xl = xc, xr = xc;
+		double fr = fc, fl = fc;
+
+      if (UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
+         fr = UF->DOF_value( i, j+1, k, comp, level );
+         xr = UF->get_DOF_coordinate( j+1,comp, 1 );
+      }
+
+      if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)) {
+         fl = UF->DOF_value( i, j-1, k, comp, level ) ;
+         xl = UF->get_DOF_coordinate( j-1, comp, 1 ) ;
+      }
+
+		double dx = xr - xl;
+
+      if (is_solids) {
+         size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+         if (void_frac->operator()(p) == 0) {
+            if (intersect_vector->operator()(p,2*dir+0) == 1) {
+               fl = intersect_fieldVal->operator()(p,2*dir+0);
+               xl = xc - intersect_distance->operator()(p,2*dir+0);
+					dC = ((xc - xl) < 0.5*dC ) ? 0.5 * dC + (xc - xl) : dC;
+            }
+            if (intersect_vector->operator()(p,2*dir+1) == 1) {
+               fr = intersect_fieldVal->operator()(p,2*dir+1);
+               xr = xc + intersect_distance->operator()(p,2*dir+1);
+					dC = ((xr - xc) < 0.5*dC ) ? 0.5 * dC + (xr - xc) : dC;
+            }
+         }
+      }
+
+		// Derivative
+		double dx1 = xc - xl;
+		double dx2 = xr - xc;
+
+		// dx = dx2 - dx1;
+
+      if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)
+         && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
+			value = 1./dx * ((dx1/dx2)*(fr-fc) - (dx2/dx1)*(fl-fc));
+      } else if(UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)) {
+         value = - (fl - fc)/dx1;
+      } else if(UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
+         value = (fr - fc)/dx2;
+		} else {
+			value = 0.;
+		}
+
+	} else if (dir == 2) {
+		dC = UF->get_cell_size(k, comp, 2);
+		double xc = UF->get_DOF_coordinate( k,comp, 2 );
+		double xl = xc, xr = xc;
+		double fr = fc, fl = fc;
+
+      if (UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
+         fr = UF->DOF_value( i, j, k+1, comp, level );
+         xr = UF->get_DOF_coordinate( k+1,comp, 2 );
+      }
+
+      if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
+         fl = UF->DOF_value( i, j, k-1, comp, level ) ;
+         xl = UF->get_DOF_coordinate( k-1, comp, 2 ) ;
+      }
+
+		double dx = xr - xl;
+
+      if (is_solids) {
+         size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+         if (void_frac->operator()(p) == 0) {
+            if (intersect_vector->operator()(p,2*dir+0) == 1) {
+               fl = intersect_fieldVal->operator()(p,2*dir+0);
+               xl = xc - intersect_distance->operator()(p,2*dir+0);
+					dC = ((xc - xl) < 0.5*dC ) ? 0.5 * dC + (xc - xl) : dC;
+            }
+            if (intersect_vector->operator()(p,2*dir+1) == 1) {
+               fr = intersect_fieldVal->operator()(p,2*dir+1);
+               xr = xc + intersect_distance->operator()(p,2*dir+1);
+					dC = ((xr - xc) < 0.5*dC ) ? 0.5 * dC + (xr - xc) : dC;
+            }
+         }
+      }
+
+		// Derivative
+		double dx1 = xc - xl;
+		double dx2 = xr - xc;
+
+		// dx = dx2 - dx1;
+
+      if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)
+         && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
+			value = 1./dx * ((dx1/dx2)*(fr-fc) - (dx2/dx1)*(fl-fc));
+      } else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
+         value = - (fl - fc)/dx1;
+      } else if(UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
+         value = (fr - fc)/dx2;
+		} else {
+			value = 0.;
+		}
+	}
+
+   return(std::make_tuple(value,dC));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
 double
 DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
                                           size_t const& i,
@@ -2001,6 +2188,8 @@ DS_NavierStokes:: compute_adv_component ( FV_TimeIterator const* t_it,
 				 - rho * UF->DOF_value(i,j,k,comp,1)
 				       * divergence->operator()(p,0)
 					    * dxC * dyC * dzC;
+	} else if ( AdvectionScheme == "CenteredFD" ) {
+		ugradu = assemble_advection_Centered_FD(rho,i,j,k,comp,1);
 	} else if ( AdvectionScheme == "Centered" && StencilCorrection == "FD" ) {
  		ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp)
 				 - rho * UF->DOF_value(i,j,k,comp,1)
@@ -4295,6 +4484,132 @@ DS_NavierStokes:: assemble_advection_Centered( size_t const& advecting_level,
       flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
    }
    return ( coef * flux );
+}
+
+
+
+
+//----------------------------------------------------------------------
+double
+DS_NavierStokes:: assemble_advection_Centered_FD(double const& coef,
+													          size_t const& i,
+                                                 size_t const& j,
+                                                 size_t const& k,
+                                                 size_t const& comp,
+																 size_t const& level)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_NavierStokes:: assemble_advection_Centered_FD" );
+
+	double dh = UF->primary_grid()->get_smallest_grid_size();
+   double threshold = 0.0001*dh;
+	FV_SHIFT_TRIPLET shift = UF->shift_staggeredToStaggered( comp );
+
+	double dxC = UF->get_cell_size(i,comp,0) ;
+	double dyC = UF->get_cell_size(j,comp,1) ;
+	double dzC = (dim == 3) ? UF->get_cell_size(k,comp,2) : 1.;
+
+	geomVector pt(3,0.);
+	pt(0) = UF->get_DOF_coordinate( i, comp, 0 );
+	pt(1) = UF->get_DOF_coordinate( j, comp, 1 );
+	pt(2) = (dim == 3) ? UF->get_DOF_coordinate( k, comp, 2 ) : 0. ;
+
+	size_t_vector face_vector(3,0);
+	face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
+
+	doubleVector ui(3,0.);
+	doubleVector dui(3,0.);
+	doubleVector dC(3,1.);
+
+	dC(0) = dxC; dC(1) = dyC; dC(2) = dzC;
+
+	size_t p = UF->DOF_local_number(i,j,k,comp);
+
+	size_t_array2D* intersect_vector = (is_solids) ?
+						allrigidbodies->get_intersect_vector_on_grid(UF) : 0;
+
+	bool nearRB = false;
+	if (is_solids)
+		for (size_t dir = 0; dir < dim && !nearRB ; dir++) {
+			nearRB = (intersect_vector->operator()(p,2*dir+0) == 1)
+					|| (intersect_vector->operator()(p,2*dir+1) == 1);
+		}
+
+	for (size_t cpt = 0; cpt < dim; cpt++) {
+		auto value = compute_first_derivative(comp,i,j,k,cpt,level);
+		dui(cpt) = std::get<0>(value);
+		dC(cpt) = std::get<1>(value);
+
+		if (is_solids && nearRB) {
+			if (cpt != comp) {
+				size_t_vector i0(3);
+				for (size_t l = 0; l < dim; l++) {
+					size_t i0_temp;
+					bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(cpt,l),
+					pt(l) + threshold, i0_temp);
+					if (found) i0(l) = i0_temp;
+				}
+				ui(cpt) = (dim == 2) ? allrigidbodies->
+						Bilinear_interpolation(UF, cpt, &pt, i0, face_vector, {level})
+												: allrigidbodies->
+						Trilinear_interpolation(UF, cpt, &pt, i0, {level});
+			} else {
+				ui(cpt) = UF->DOF_value( i, j, k, comp, level );
+			}
+		} else {
+			if (comp == 0) {
+				if (cpt == 0) {
+					ui(cpt) = UF->DOF_value( i, j, k, comp, level );
+				} else if (cpt == 1) {
+					double uToLe = UF->DOF_value(i+shift.i-1, j+shift.j, k, cpt, level );
+			      double uToRi = UF->DOF_value(i+shift.i, j+shift.j, k, cpt, level );
+					double uBoLe = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, cpt, level );
+			      double uBoRi = UF->DOF_value(i+shift.i, j+shift.j-1, k, cpt, level );
+					ui(cpt) = 0.25 * (uToLe + uToRi + uBoLe + uBoRi);
+				} else if (cpt == 2) {
+					double uFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, cpt, level );
+					double uFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, cpt, level );
+					double uBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, cpt, level );
+					double uBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, cpt, level );
+					ui(cpt) = 0.25 * (uFrLe + uFrRi + uBeLe + uBeRi);
+				}
+			} else if (comp == 1) {
+				if (cpt == 0) {
+					double uToLe = UF->DOF_value(i+shift.i-1, j+shift.j, k, cpt, level );
+			      double uToRi = UF->DOF_value(i+shift.i, j+shift.j, k, cpt, level );
+					double uBoLe = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, cpt, level );
+			      double uBoRi = UF->DOF_value(i+shift.i, j+shift.j-1, k, cpt, level );
+					ui(cpt) = 0.25 * (uToLe + uToRi + uBoLe + uBoRi);
+				} else if (cpt == 1) {
+					ui(cpt) = UF->DOF_value( i, j, k, comp, level );
+				} else if (cpt == 2) {
+					double uFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, cpt, level );
+					double uFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, cpt, level );
+					double uBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, cpt, level );
+					double uBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, cpt, level );
+					ui(cpt) = 0.25 * (uFrBo + uFrTo + uBeBo + uBeTo);
+				}
+			} else if (comp == 2) {
+				if (cpt == 0) {
+					double uFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, cpt, level );
+					double uFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, cpt, level );
+					double uBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, cpt, level );
+					double uBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, cpt, level );
+					ui(cpt) = 0.25 * (uFrLe + uFrRi + uBeLe + uBeRi);
+				} else if (cpt == 1) {
+					double uFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, cpt, level );
+					double uFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, cpt, level );
+					double uBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, cpt, level );
+					double uBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, cpt, level );
+					ui(cpt) = 0.25 * (uFrBo + uFrTo + uBeBo + uBeTo);
+				} else if (cpt == 2) {
+					ui(cpt) = UF->DOF_value( i, j, k, comp, level );
+				}
+			}
+		}
+	}
+
+   return ( coef*(ui(0)*dui(0)+ui(1)*dui(1)+ui(2)*dui(2))*dC(0)*dC(1)*dC(2));
 }
 
 

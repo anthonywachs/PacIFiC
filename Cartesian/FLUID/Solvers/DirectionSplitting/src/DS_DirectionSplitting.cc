@@ -160,10 +160,11 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
      AdvectionScheme = exp->string_data( "AdvectionScheme" );
    if ( AdvectionScheme != "Upwind"
      && AdvectionScheme != "TVD"
+     && AdvectionScheme != "CenteredFD"
      && AdvectionScheme != "Centered" )
    {
      string error_message=
-            "   - Upwind\n   - TVD\n   - Centered";
+            "   - Upwind\n   - TVD\n   - CenteredFD\n   - Centered";
      MAC_Error::object()->raise_bad_data_value( exp,
         "AdvectionScheme", error_message );
    }
