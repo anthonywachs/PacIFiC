@@ -1248,6 +1248,8 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
    size_t p = UF->DOF_local_number(i,j,k,comp);
 	double value = 0., dC = 1.;
 	double fc = UF->DOF_value( i, j, k, comp, level );
+	double dxl_act = 1., dxr_act = 1.;
+	double dxl = 1., dxr = 1.;
 
    if (dir == 0) {
 		dC = UF->get_cell_size(i, comp, 0);
@@ -1265,7 +1267,10 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
          xl = UF->get_DOF_coordinate( i-1, comp, 0 ) ;
       }
 
-		double dx = xr - xl;
+		dxl_act = xc - xl;
+		dxr_act = xr - xc;
+		dxl = dxl_act;
+		dxr = dxr_act;
 
       if (is_solids) {
          size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
@@ -1274,28 +1279,38 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
                fl = intersect_fieldVal->operator()(p,2*dir+0);
                xl = xc - intersect_distance->operator()(p,2*dir+0);
 					dC = ((xc - xl) < 0.5*dC ) ? 0.5 * dC + (xc - xl) : dC;
+					dxl = xc - xl;
             }
             if (intersect_vector->operator()(p,2*dir+1) == 1) {
                fr = intersect_fieldVal->operator()(p,2*dir+1);
                xr = xc + intersect_distance->operator()(p,2*dir+1);
 					dC = ((xr - xc) < 0.5*dC ) ? 0.5 * dC + (xr - xc) : dC;
+					dxr = xr - xc;
             }
          }
       }
 
 		// Derivative
-		double dx1 = xc - xl;
-		double dx2 = xr - xc;
-
-		// dx = dx2 - dx1;
-
       if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)
          && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
-			value = 1./dx * ((dx1/dx2)*(fr-fc) - (dx2/dx1)*(fl-fc));
+			if (dxl != dxl_act) {
+				value = 1./(dxl_act + dxr_act)
+						* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+				// value = 1./(dxl + dxr_act)
+				// 		* ((dxl/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+			} else if (dxr != dxr_act) {
+				value = 1./(dxl_act + dxr_act)
+						* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+				// value = 1./(dxl_act + dxr)
+				// 		* ((dxl_act/dxr)*(fr-fc) - (dxr/dxl_act)*(fl-fc));
+			} else {
+				value = 1./(dxl_act + dxr_act)
+						* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+			}
       } else if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)) {
-         value = - (fl - fc)/dx1;
+         value = - (fl - fc)/dxl;
       } else if (UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
-         value = (fr - fc)/dx2;
+         value = (fr - fc)/dxr;
 		} else {
 			value = 0.;
 		}
@@ -1316,7 +1331,10 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
          xl = UF->get_DOF_coordinate( j-1, comp, 1 ) ;
       }
 
-		double dx = xr - xl;
+		dxl_act = xc - xl;
+		dxr_act = xr - xc;
+		dxl = dxl_act;
+		dxr = dxr_act;
 
       if (is_solids) {
          size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
@@ -1325,28 +1343,38 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
                fl = intersect_fieldVal->operator()(p,2*dir+0);
                xl = xc - intersect_distance->operator()(p,2*dir+0);
 					dC = ((xc - xl) < 0.5*dC ) ? 0.5 * dC + (xc - xl) : dC;
+					dxl = xc - xl;
             }
             if (intersect_vector->operator()(p,2*dir+1) == 1) {
                fr = intersect_fieldVal->operator()(p,2*dir+1);
                xr = xc + intersect_distance->operator()(p,2*dir+1);
 					dC = ((xr - xc) < 0.5*dC ) ? 0.5 * dC + (xr - xc) : dC;
+					dxr = xr - xc;
             }
          }
       }
 
 		// Derivative
-		double dx1 = xc - xl;
-		double dx2 = xr - xc;
-
-		// dx = dx2 - dx1;
-
       if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)
          && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
-			value = 1./dx * ((dx1/dx2)*(fr-fc) - (dx2/dx1)*(fl-fc));
+				if (dxl != dxl_act) {
+					value = 1./(dxl_act + dxr_act)
+							* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+					// value = 1./(dxl + dxr_act)
+					// 		* ((dxl/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+				} else if (dxr != dxr_act) {
+					value = 1./(dxl_act + dxr_act)
+							* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+					// value = 1./(dxl_act + dxr)
+					// 		* ((dxl_act/dxr)*(fr-fc) - (dxr/dxl_act)*(fl-fc));
+				} else {
+					value = 1./(dxl_act + dxr_act)
+							* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+				}
       } else if(UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)) {
-         value = - (fl - fc)/dx1;
+         value = - (fl - fc)/dxl;
       } else if(UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
-         value = (fr - fc)/dx2;
+         value = (fr - fc)/dxr;
 		} else {
 			value = 0.;
 		}
@@ -1367,7 +1395,10 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
          xl = UF->get_DOF_coordinate( k-1, comp, 2 ) ;
       }
 
-		double dx = xr - xl;
+		dxl_act = xc - xl;
+		dxr_act = xr - xc;
+		dxl = dxl_act;
+		dxr = dxr_act;
 
       if (is_solids) {
          size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
@@ -1376,28 +1407,38 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
                fl = intersect_fieldVal->operator()(p,2*dir+0);
                xl = xc - intersect_distance->operator()(p,2*dir+0);
 					dC = ((xc - xl) < 0.5*dC ) ? 0.5 * dC + (xc - xl) : dC;
+					dxl = xc - xl;
             }
             if (intersect_vector->operator()(p,2*dir+1) == 1) {
                fr = intersect_fieldVal->operator()(p,2*dir+1);
                xr = xc + intersect_distance->operator()(p,2*dir+1);
 					dC = ((xr - xc) < 0.5*dC ) ? 0.5 * dC + (xr - xc) : dC;
+					dxr = xr - xc;
             }
          }
       }
 
 		// Derivative
-		double dx1 = xc - xl;
-		double dx2 = xr - xc;
-
-		// dx = dx2 - dx1;
-
       if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)
          && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
-			value = 1./dx * ((dx1/dx2)*(fr-fc) - (dx2/dx1)*(fl-fc));
+			if (dxl != dxl_act) {
+				value = 1./(dxl_act + dxr_act)
+						* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+				// value = 1./(dxl + dxr_act)
+				// 		* ((dxl/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+			} else if (dxr != dxr_act) {
+				value = 1./(dxl_act + dxr_act)
+						* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+				// value = 1./(dxl_act + dxr)
+				// 		* ((dxl_act/dxr)*(fr-fc) - (dxr/dxl_act)*(fl-fc));
+			} else {
+				value = 1./(dxl_act + dxr_act)
+						* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+			}
       } else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
-         value = - (fl - fc)/dx1;
+         value = - (fl - fc)/dxl;
       } else if(UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
-         value = (fr - fc)/dx2;
+         value = (fr - fc)/dxr;
 		} else {
 			value = 0.;
 		}
