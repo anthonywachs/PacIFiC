@@ -618,9 +618,10 @@ void dump_plain_nodes_pos(lagMesh* mesh, char* filename) {
   if (pid() == 0) {
     FILE* file = fopen(filename, "a");
     assert(file);
-    fprintf(file, "%g ", t);
+    fprintf(file, "%g", t);
     for(int i=0; i<mesh->nlp; i++) {
-      foreach_dimension() fprintf(file, "%g ", mesh->nodes[i].pos.x);
+      fprintf(file, ",%g %g %g", mesh->nodes[i].pos.x, mesh->nodes[i].pos.y,
+        mesh->nodes[i].pos.z);
     }
     fprintf(file, "\n");
     fclose(file);
