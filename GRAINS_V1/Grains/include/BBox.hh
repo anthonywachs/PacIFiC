@@ -35,7 +35,7 @@ class BBox
     @param bbox_ La boite de reference */
     BBox( BBox const& bbox_ );
   
-    /** @brief Destructeur */
+    /** @brief Destructor */
     ~BBox();
     //@}
 
@@ -119,6 +119,11 @@ class BBox
     /** @brief Debugging method
     @param s debugging message to be printed on the default error output cerr */
     void debug( char const* s) const;
+    
+    /** @brief Returns whether the bounding box fully contains the other
+    bounding box
+    @param a the other bounding box */
+    bool fullyContain( BBox const& a );     
     //@}
   
 

@@ -228,6 +228,7 @@ class GrainsExec
     static bool m_exception_Contact; /**< Contact exception */
     static bool m_exception_Displacement; /**< Displacement exception */
     static bool m_exception_Simulation; /**< Simulation exception */
+    static string m_shift0; /**< string of 0 blank space */
     static string m_shift1; /**< string of 1 blank space */
     static string m_shift2; /**< string of 2 blank spaces */
     static string m_shift3; /**< string of 3 blank spaces */
