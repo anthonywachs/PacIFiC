@@ -1241,405 +1241,409 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
               size_t p = FF->DOF_local_number(i, j, k, comp);
               vector<geomVector> intersection_pts;
 
-              for (size_t dir = 0; dir < m_space_dimension; dir++) {
-                 // face_size: variable to store dimension of
-                 // the face in all directions
-                 geomVector face_size(dx,dy,dz);
-                 face_size(dir) = 0.;
+              if (is_neighbor_inSolids(FF,i,j,k,comp)) {
+                 for (size_t dir = 0; dir < m_space_dimension; dir++) {
+                    // face_size: variable to store dimension of
+                    // the face in all directions
+                    geomVector face_size(dx,dy,dz);
+                    face_size(dir) = 0.;
 
-                 // Loop for the face on positive(1) and
-                 // negative(0) side of the cell center
-                 for (size_t side = 0; side < 2; side++) {
-                    double factor = (side == 0) ? -1. : 1. ;
-                    double fraction = 0.;
+                    // Loop for the face on positive(1) and
+                    // negative(0) side of the cell center
+                    for (size_t side = 0; side < 2; side++) {
+                       double factor = (side == 0) ? -1. : 1. ;
+                       double fraction = 0.;
 
-                    if (m_space_dimension == 2) {
-                       // Face center calculation
-                       geomVector top(xC, yC, zC);
-                       geomVector bot(xC, yC, zC);
-                       top(dir) = top(dir) + 0.5 * factor * cell_size(dir);
-                       bot(dir) = bot(dir) + 0.5 * factor * cell_size(dir);
-                       // Face vertex calculation
-                       top = top + 0.5 * face_size;
-                       bot = bot - 0.5 * face_size;
+                       if (m_space_dimension == 2) {
+                          // Face center calculation
+                          geomVector top(xC, yC, zC);
+                          geomVector bot(xC, yC, zC);
+                          top(dir) = top(dir) + 0.5 * factor * cell_size(dir);
+                          bot(dir) = bot(dir) + 0.5 * factor * cell_size(dir);
+                          // Face vertex calculation
+                          top = top + 0.5 * face_size;
+                          bot = bot - 0.5 * face_size;
 
-                       auto int_pt = return_side_fraction(top, bot);
-                       fraction = std::get<0>(int_pt);
-                       geomVector pt = std::get<1>(int_pt);
-                       int point_in_fluid = std::get<2>(int_pt);
-                       CC_ownerID[field]->operator()(p) =
-                                    std::max(CC_ownerID[field]->operator()(p)
-                                           , std::get<3>(int_pt));
-                       if ((std::get<3>(int_pt) != -1) && (fraction != 0)) {
-                          bool present = false;
-                          for (auto itt = intersection_pts.begin();
-                                    itt != intersection_pts.end(); itt++) {
-                             geomVector delta(pt - *itt);
-                             if (delta.calcNorm() < 1.E-6 * dx_min) {
-                                present = true;
+                          auto int_pt = return_side_fraction(top, bot);
+                          fraction = std::get<0>(int_pt);
+                          geomVector pt = std::get<1>(int_pt);
+                          int point_in_fluid = std::get<2>(int_pt);
+                          CC_ownerID[field]->operator()(p) =
+                                       std::max(CC_ownerID[field]->operator()(p)
+                                              , std::get<3>(int_pt));
+                          if ((std::get<3>(int_pt) != -1) && (fraction != 0)) {
+                             bool present = false;
+                             for (auto itt = intersection_pts.begin();
+                                       itt != intersection_pts.end(); itt++) {
+                                geomVector delta(pt - *itt);
+                                if (delta.calcNorm() < 1.E-6 * dx_min) {
+                                   present = true;
+                                }
                              }
+                             if (!present) intersection_pts.push_back(pt);
                           }
-                          if (!present) intersection_pts.push_back(pt);
-                       }
 
-                       // Store iff atleast one cell vertex is in fluid
-                       geomVector point(3);
-                       if (point_in_fluid == 0) {
-                          point = 0.5*(top + pt);
-                       } else if (point_in_fluid == 1) {
-                          point = 0.5*(bot + pt);
-                       } else if (point_in_fluid == 2) {
-                          point = 0.5*(top + bot);
-                       }
-                       CC_face_centroid[field]->operator()(p,2*dir+side,0) = point(0);
-                       CC_face_centroid[field]->operator()(p,2*dir+side,1) = point(1);
-                       CC_face_centroid[field]->operator()(p,2*dir+side,2) = point(2);
+                          // Store iff atleast one cell vertex is in fluid
+                          geomVector point(3);
+                          if (point_in_fluid == 0) {
+                             point = 0.5*(top + pt);
+                          } else if (point_in_fluid == 1) {
+                             point = 0.5*(bot + pt);
+                          } else if (point_in_fluid == 2) {
+                             point = 0.5*(top + bot);
+                          }
+                          CC_face_centroid[field]->operator()(p,2*dir+side,0) = point(0);
+                          CC_face_centroid[field]->operator()(p,2*dir+side,1) = point(1);
+                          CC_face_centroid[field]->operator()(p,2*dir+side,2) = point(2);
 
-                    } else {
-                       geomVector topLeft(xC, yC, zC);
-                       geomVector topRight(xC, yC, zC);
-                       geomVector botLeft(xC, yC, zC);
-                       geomVector botRight(xC, yC, zC);
-                       topLeft(dir) = topLeft(dir) + 0.5 * factor * cell_size(dir);
-                       topRight(dir) = topRight(dir) + 0.5 * factor * cell_size(dir);
-                       botLeft(dir) = botLeft(dir) + 0.5 * factor * cell_size(dir);
-                       botRight(dir) = botRight(dir) + 0.5 * factor * cell_size(dir);
+                       } else {
+                          geomVector topLeft(xC, yC, zC);
+                          geomVector topRight(xC, yC, zC);
+                          geomVector botLeft(xC, yC, zC);
+                          geomVector botRight(xC, yC, zC);
+                          topLeft(dir) = topLeft(dir) + 0.5 * factor * cell_size(dir);
+                          topRight(dir) = topRight(dir) + 0.5 * factor * cell_size(dir);
+                          botLeft(dir) = botLeft(dir) + 0.5 * factor * cell_size(dir);
+                          botRight(dir) = botRight(dir) + 0.5 * factor * cell_size(dir);
 
-                       topRight(0) = topRight(0) + 0.5*face_size(0);
-                       topRight(1) = topRight(1) + 0.5*face_size(1);
-                       topRight(2) = topRight(2) + 0.5*face_size(2);
+                          topRight(0) = topRight(0) + 0.5*face_size(0);
+                          topRight(1) = topRight(1) + 0.5*face_size(1);
+                          topRight(2) = topRight(2) + 0.5*face_size(2);
 
-                       botLeft(0) = botLeft(0) - 0.5*face_size(0);
-                       botLeft(1) = botLeft(1) - 0.5*face_size(1);
-                       botLeft(2) = botLeft(2) - 0.5*face_size(2);
+                          botLeft(0) = botLeft(0) - 0.5*face_size(0);
+                          botLeft(1) = botLeft(1) - 0.5*face_size(1);
+                          botLeft(2) = botLeft(2) - 0.5*face_size(2);
 
-                       double area = 0;
-                       // yz plane
-                       if (dir == 0) {
-                          area = face_size(1)*face_size(2);
-                          botRight(1) = botRight(1) - 0.5*face_size(1);
-                          botRight(2) = botRight(2) + 0.5*face_size(2);
-                          topLeft(1) = topLeft(1) + 0.5*face_size(1);
-                          topLeft(2) = topLeft(2) - 0.5*face_size(2);
-                       } else if (dir == 1) {// zx plane
-                          area = face_size(0)*face_size(2);
-                          botRight(0) = botRight(0) + 0.5*face_size(0);
-                          botRight(2) = botRight(2) - 0.5*face_size(2);
-                          topLeft(0) = topLeft(0) - 0.5*face_size(0);
-                          topLeft(2) = topLeft(2) + 0.5*face_size(2);
-                       } else if (dir == 2) {// yx plane
-                          area = face_size(1)*face_size(0);
-                          botRight(0) = botRight(0) + 0.5*face_size(0);
-                          botRight(1) = botRight(1) - 0.5*face_size(1);
-                          topLeft(0) = topLeft(0) - 0.5*face_size(0);
-                          topLeft(1) = topLeft(1) + 0.5*face_size(1);
-                       }
+                          double area = 0;
+                          // yz plane
+                          if (dir == 0) {
+                             area = face_size(1)*face_size(2);
+                             botRight(1) = botRight(1) - 0.5*face_size(1);
+                             botRight(2) = botRight(2) + 0.5*face_size(2);
+                             topLeft(1) = topLeft(1) + 0.5*face_size(1);
+                             topLeft(2) = topLeft(2) - 0.5*face_size(2);
+                          } else if (dir == 1) {// zx plane
+                             area = face_size(0)*face_size(2);
+                             botRight(0) = botRight(0) + 0.5*face_size(0);
+                             botRight(2) = botRight(2) - 0.5*face_size(2);
+                             topLeft(0) = topLeft(0) - 0.5*face_size(0);
+                             topLeft(2) = topLeft(2) + 0.5*face_size(2);
+                          } else if (dir == 2) {// yx plane
+                             area = face_size(1)*face_size(0);
+                             botRight(0) = botRight(0) + 0.5*face_size(0);
+                             botRight(1) = botRight(1) - 0.5*face_size(1);
+                             topLeft(0) = topLeft(0) - 0.5*face_size(0);
+                             topLeft(1) = topLeft(1) + 0.5*face_size(1);
+                          }
 
-                       vector<geomVector> edge_centroid;
+                          vector<geomVector> edge_centroid;
 
-                       // Right edge
-                       auto rht = return_side_fraction(topRight, botRight);
-                       double rht_frac = std::get<0>(rht);
-                       geomVector pt = std::get<1>(rht);
-                       int rht_in_fluid = std::get<2>(rht);
-                       CC_ownerID[field]->operator()(p) =
-                                    std::max(CC_ownerID[field]->operator()(p)
-                                           , std::get<3>(rht));
-                       if ((std::get<3>(rht) != -1) && (rht_frac != 0)) {
-                          bool present = false;
-                          for (auto itt = intersection_pts.begin();
-                                    itt != intersection_pts.end(); itt++) {
-                             geomVector delta(pt - *itt);
-                             if (delta.calcNorm() < 1.E-6 * dx_min) {
-                                present = true;
+                          // Right edge
+                          auto rht = return_side_fraction(topRight, botRight);
+                          double rht_frac = std::get<0>(rht);
+                          geomVector pt = std::get<1>(rht);
+                          int rht_in_fluid = std::get<2>(rht);
+                          CC_ownerID[field]->operator()(p) =
+                                       std::max(CC_ownerID[field]->operator()(p)
+                                              , std::get<3>(rht));
+                          if ((std::get<3>(rht) != -1) && (rht_frac != 0)) {
+                             bool present = false;
+                             for (auto itt = intersection_pts.begin();
+                                       itt != intersection_pts.end(); itt++) {
+                                geomVector delta(pt - *itt);
+                                if (delta.calcNorm() < 1.E-6 * dx_min) {
+                                   present = true;
+                                }
                              }
+                             if (!present) intersection_pts.push_back(pt);
                           }
-                          if (!present) intersection_pts.push_back(pt);
-                       }
 
-                       geomVector tmpV(3);
-                       if (rht_in_fluid == 0) {
-                          tmpV = 0.5*(topRight + pt);
-                       } else if (rht_in_fluid == 1) {
-                          tmpV = 0.5*(botRight + pt);
-                       } else if (rht_in_fluid == 2) {
-                          tmpV = 0.5*(topRight + botRight);
-                       }
-                       if (rht_in_fluid != -1) edge_centroid.push_back(tmpV);
+                          geomVector tmpV(3);
+                          if (rht_in_fluid == 0) {
+                             tmpV = 0.5*(topRight + pt);
+                          } else if (rht_in_fluid == 1) {
+                             tmpV = 0.5*(botRight + pt);
+                          } else if (rht_in_fluid == 2) {
+                             tmpV = 0.5*(topRight + botRight);
+                          }
+                          if (rht_in_fluid != -1) edge_centroid.push_back(tmpV);
 
 
-                       // Left edge
-                       auto lft = return_side_fraction(topLeft, botLeft);
-                       double lft_frac = std::get<0>(lft);
-                       pt = std::get<1>(lft);
-                       int lft_in_fluid = std::get<2>(lft);
-                       CC_ownerID[field]->operator()(p) =
-                                    std::max(CC_ownerID[field]->operator()(p)
-                                           , std::get<3>(lft));
-                       if ((std::get<3>(lft) != -1) && (lft_frac != 0)) {
-                          bool present = false;
-                          for (auto itt = intersection_pts.begin();
-                                    itt != intersection_pts.end(); itt++) {
-                             geomVector delta(pt - *itt);
-                             if (delta.calcNorm() < 1.E-6 * dx_min) {
-                                present = true;
+                          // Left edge
+                          auto lft = return_side_fraction(topLeft, botLeft);
+                          double lft_frac = std::get<0>(lft);
+                          pt = std::get<1>(lft);
+                          int lft_in_fluid = std::get<2>(lft);
+                          CC_ownerID[field]->operator()(p) =
+                                       std::max(CC_ownerID[field]->operator()(p)
+                                              , std::get<3>(lft));
+                          if ((std::get<3>(lft) != -1) && (lft_frac != 0)) {
+                             bool present = false;
+                             for (auto itt = intersection_pts.begin();
+                                       itt != intersection_pts.end(); itt++) {
+                                geomVector delta(pt - *itt);
+                                if (delta.calcNorm() < 1.E-6 * dx_min) {
+                                   present = true;
+                                }
                              }
+                             if (!present) intersection_pts.push_back(pt);
                           }
-                          if (!present) intersection_pts.push_back(pt);
-                       }
 
-                       if (lft_in_fluid == 0) {
-                          tmpV = 0.5*(topLeft + pt);
-                       } else if (lft_in_fluid == 1) {
-                          tmpV = 0.5*(botLeft + pt);
-                       } else if (lft_in_fluid == 2) {
-                          tmpV = 0.5*(topLeft + botLeft);
-                       }
-                       if (lft_in_fluid != -1) edge_centroid.push_back(tmpV);
+                          if (lft_in_fluid == 0) {
+                             tmpV = 0.5*(topLeft + pt);
+                          } else if (lft_in_fluid == 1) {
+                             tmpV = 0.5*(botLeft + pt);
+                          } else if (lft_in_fluid == 2) {
+                             tmpV = 0.5*(topLeft + botLeft);
+                          }
+                          if (lft_in_fluid != -1) edge_centroid.push_back(tmpV);
 
 
-                       // Top edge
-                       auto top = return_side_fraction(topLeft, topRight);
-                       double top_frac = std::get<0>(top);
-                       pt = std::get<1>(top);
-                       int top_in_fluid = std::get<2>(top);
-                       CC_ownerID[field]->operator()(p) =
-                                    std::max(CC_ownerID[field]->operator()(p)
-                                           , std::get<3>(top));
-                       if ((std::get<3>(top) != -1) && (top_frac != 0)) {
-                          bool present = false;
-                          for (auto itt = intersection_pts.begin();
-                                    itt != intersection_pts.end(); itt++) {
-                             geomVector delta(pt - *itt);
-                             if (delta.calcNorm() < 1.E-6 * dx_min) {
-                                present = true;
+                          // Top edge
+                          auto top = return_side_fraction(topLeft, topRight);
+                          double top_frac = std::get<0>(top);
+                          pt = std::get<1>(top);
+                          int top_in_fluid = std::get<2>(top);
+                          CC_ownerID[field]->operator()(p) =
+                                       std::max(CC_ownerID[field]->operator()(p)
+                                              , std::get<3>(top));
+                          if ((std::get<3>(top) != -1) && (top_frac != 0)) {
+                             bool present = false;
+                             for (auto itt = intersection_pts.begin();
+                                       itt != intersection_pts.end(); itt++) {
+                                geomVector delta(pt - *itt);
+                                if (delta.calcNorm() < 1.E-6 * dx_min) {
+                                   present = true;
+                                }
                              }
+                             if (!present) intersection_pts.push_back(pt);
                           }
-                          if (!present) intersection_pts.push_back(pt);
-                       }
 
-                       if (top_in_fluid == 0) {
-                          tmpV = 0.5*(topLeft + pt);
-                       } else if (top_in_fluid == 1) {
-                          tmpV = 0.5*(topRight + pt);
-                       } else if (top_in_fluid == 2) {
-                          tmpV = 0.5*(topLeft + topRight);
-                       }
-                       if (top_in_fluid != -1) edge_centroid.push_back(tmpV);
+                          if (top_in_fluid == 0) {
+                             tmpV = 0.5*(topLeft + pt);
+                          } else if (top_in_fluid == 1) {
+                             tmpV = 0.5*(topRight + pt);
+                          } else if (top_in_fluid == 2) {
+                             tmpV = 0.5*(topLeft + topRight);
+                          }
+                          if (top_in_fluid != -1) edge_centroid.push_back(tmpV);
 
 
-                       // Bottom edge
-                       auto bot = return_side_fraction(botLeft, botRight);
-                       double bot_frac = std::get<0>(bot);
-                       pt = std::get<1>(bot);
-                       int bot_in_fluid = std::get<2>(bot);
-                       CC_ownerID[field]->operator()(p) =
-                                    std::max(CC_ownerID[field]->operator()(p)
-                                           , std::get<3>(bot));
-                       if ((std::get<3>(bot) != -1) && (bot_frac != 0)) {
-                          bool present = false;
-                          for (auto itt = intersection_pts.begin();
-                                    itt != intersection_pts.end(); itt++) {
-                             geomVector delta(pt - *itt);
-                             if (delta.calcNorm() < 1.E-6 * dx_min) {
-                                present = true;
+                          // Bottom edge
+                          auto bot = return_side_fraction(botLeft, botRight);
+                          double bot_frac = std::get<0>(bot);
+                          pt = std::get<1>(bot);
+                          int bot_in_fluid = std::get<2>(bot);
+                          CC_ownerID[field]->operator()(p) =
+                                       std::max(CC_ownerID[field]->operator()(p)
+                                              , std::get<3>(bot));
+                          if ((std::get<3>(bot) != -1) && (bot_frac != 0)) {
+                             bool present = false;
+                             for (auto itt = intersection_pts.begin();
+                                       itt != intersection_pts.end(); itt++) {
+                                geomVector delta(pt - *itt);
+                                if (delta.calcNorm() < 1.E-6 * dx_min) {
+                                   present = true;
+                                }
                              }
+                             if (!present) intersection_pts.push_back(pt);
                           }
-                          if (!present) intersection_pts.push_back(pt);
-                       }
 
-                       if (bot_in_fluid == 0) {
-                          tmpV = 0.5*(botLeft + pt);
-                       } else if (bot_in_fluid == 1) {
-                          tmpV = 0.5*(botRight + pt);
-                       } else if (bot_in_fluid == 2) {
-                          tmpV = 0.5*(botLeft + botRight);
-                       }
-                       if (bot_in_fluid != -1) edge_centroid.push_back(tmpV);
-
-
-                       geomVector centeriod(3);
-                       // Face centroid calculations
-                       if (edge_centroid.size() > 0) {
-                          for (vector<geomVector>::iterator it = edge_centroid.begin();
-                                                            it < edge_centroid.end();
-                                                            it++ ) {
-                              geomVector temp = *it;
-                              centeriod += temp;
+                          if (bot_in_fluid == 0) {
+                             tmpV = 0.5*(botLeft + pt);
+                          } else if (bot_in_fluid == 1) {
+                             tmpV = 0.5*(botRight + pt);
+                          } else if (bot_in_fluid == 2) {
+                             tmpV = 0.5*(botLeft + botRight);
                           }
-                          centeriod /= (double)edge_centroid.size();
-                          CC_face_centroid[field]->operator()(p,2*dir+side,0) = centeriod(0);
-                          CC_face_centroid[field]->operator()(p,2*dir+side,1) = centeriod(1);
-                          CC_face_centroid[field]->operator()(p,2*dir+side,2) = centeriod(2);
+                          if (bot_in_fluid != -1) edge_centroid.push_back(tmpV);
+
+
+                          geomVector centeriod(3);
+                          // Face centroid calculations
+                          if (edge_centroid.size() > 0) {
+                             for (vector<geomVector>::iterator it = edge_centroid.begin();
+                                                               it < edge_centroid.end();
+                                                               it++ ) {
+                                 geomVector temp = *it;
+                                 centeriod += temp;
+                             }
+                             centeriod /= (double)edge_centroid.size();
+                             CC_face_centroid[field]->operator()(p,2*dir+side,0) = centeriod(0);
+                             CC_face_centroid[field]->operator()(p,2*dir+side,1) = centeriod(1);
+                             CC_face_centroid[field]->operator()(p,2*dir+side,2) = centeriod(2);
+                          }
+
+                          // Face fraction calculations
+                          vector<double> frac;
+                          frac.push_back(rht_frac);
+                          frac.push_back(lft_frac);
+                          frac.push_back(top_frac);
+                          frac.push_back(bot_frac);
+
+                          int count = (int)std::count(frac.begin(),frac.end(),0);
+
+                          if (count == 4) {
+                             area = 0.;
+                          } else if (count == 2) {
+                       	     area = 0.5;
+                       		  for (vector<double>::iterator it = frac.begin();
+                                                           it != frac.end() ; ++it) {
+                       			  double length = *it;
+                       			  if (length != 0.) area *= length;
+                       		  }
+                    	     // Trapezoid cell
+                    	     } else if (count == 1) {
+                 		        if (rht_frac == 0) {
+              			           area = 0.5*(top_frac + bot_frac)*lft_frac;
+                 		        } else if (lft_frac == 0) {
+              			           area = 0.5*(top_frac + bot_frac)*rht_frac;
+                 		        } else if (top_frac == 0) {
+              			           area = 0.5*(rht_frac + lft_frac)*bot_frac;
+                 		        } else if (bot_frac == 0) {
+              			           area = 0.5*(rht_frac + lft_frac)*top_frac;
+              		           }
+                          // Trapezoid and rectangle
+                          } else if (count == 0) {
+                             if ((top_in_fluid == 2) && (rht_in_fluid == 2)) {
+                          		  area = 0.5*(top_frac + bot_frac)*(rht_frac - lft_frac)
+                                     + (topRight - topLeft).calcNorm() * lft_frac;
+                          	  } else if ((bot_in_fluid == 2) && (rht_in_fluid == 2)) {
+                          	     area = 0.5*(top_frac + bot_frac)*(rht_frac - lft_frac)
+                                     + (topRight - topLeft).calcNorm() * lft_frac;
+                          	  } else if ((bot_in_fluid == 2) && (lft_in_fluid == 2)) {
+                          		  area = 0.5*(top_frac + bot_frac)*(lft_frac - rht_frac)
+                                     + (topRight - topLeft).calcNorm() * rht_frac;
+                          	  } else if ((top_in_fluid == 2) && (lft_in_fluid == 2)) {
+                          	     area = 0.5*(top_frac + bot_frac)*(lft_frac - rht_frac)
+                                     + (topRight - topLeft).calcNorm() * rht_frac;
+                          	  }
+                          }
+
+                          fraction = area;
                        }
+                       // Eliminate face fraction contribution if less than 0.01%
+                       if (fraction < 0.0001*face_size.calcNorm()) fraction = 0.;
+                       CC_face_fraction[field]->operator()(p,2*dir+side) = fraction;
 
-                       // Face fraction calculations
-                       vector<double> frac;
-                       frac.push_back(rht_frac);
-                       frac.push_back(lft_frac);
-                       frac.push_back(top_frac);
-                       frac.push_back(bot_frac);
+                    }   // side
+                 }   // dir
 
-                       int count = (int)std::count(frac.begin(),frac.end(),0);
+                 if (intersection_pts.size() >= m_space_dimension) {
+                    // Normal vector of interface calculation
+                    size_t parID = CC_ownerID[field]->operator()(p);
+                    geomVector const* pgc = get_gravity_centre(parID);
+                    geomVector p1(3), p2(3), pmid(3), pin(3), normal(3);
+                    pin(0) = pgc->operator()(0);
+                    pin(1) = pgc->operator()(1);
+                    pin(2) = pgc->operator()(2);
 
-                       if (count == 4) {
-                          area = 0.;
-                       } else if (count == 2) {
-                    	     area = 0.5;
-                    		  for (vector<double>::iterator it = frac.begin();
-                                                        it != frac.end() ; ++it) {
-                    			  double length = *it;
-                    			  if (length != 0.) area *= length;
-                    		  }
-                 	     // Trapezoid cell
-                 	     } else if (count == 1) {
-              		        if (rht_frac == 0) {
-           			           area = 0.5*(top_frac + bot_frac)*lft_frac;
-              		        } else if (lft_frac == 0) {
-           			           area = 0.5*(top_frac + bot_frac)*rht_frac;
-              		        } else if (top_frac == 0) {
-           			           area = 0.5*(rht_frac + lft_frac)*bot_frac;
-              		        } else if (bot_frac == 0) {
-           			           area = 0.5*(rht_frac + lft_frac)*top_frac;
-           		           }
-                       // Trapezoid and rectangle
-                       } else if (count == 0) {
-                          if ((top_in_fluid == 2) && (rht_in_fluid == 2)) {
-                       		  area = 0.5*(top_frac + bot_frac)*(rht_frac - lft_frac)
-                                  + (topRight - topLeft).calcNorm() * lft_frac;
-                       	  } else if ((bot_in_fluid == 2) && (rht_in_fluid == 2)) {
-                       	     area = 0.5*(top_frac + bot_frac)*(rht_frac - lft_frac)
-                                  + (topRight - topLeft).calcNorm() * lft_frac;
-                       	  } else if ((bot_in_fluid == 2) && (lft_in_fluid == 2)) {
-                       		  area = 0.5*(top_frac + bot_frac)*(lft_frac - rht_frac)
-                                  + (topRight - topLeft).calcNorm() * rht_frac;
-                       	  } else if ((top_in_fluid == 2) && (lft_in_fluid == 2)) {
-                       	     area = 0.5*(top_frac + bot_frac)*(lft_frac - rht_frac)
-                                  + (topRight - topLeft).calcNorm() * rht_frac;
-                       	  }
+                    // Calulation of the vector normal to RB plane
+                    if (intersection_pts.size() == 2 && m_space_dimension == 2) {
+                       p1(0) = intersection_pts[0](0);
+                       p1(1) = intersection_pts[0](1);
+                       p2(0) = intersection_pts[1](0);
+                       p2(1) = intersection_pts[1](1);
+
+                       pmid(0) = 0.5*(p1(0) + p2(0));
+                       pmid(1) = 0.5*(p1(1) + p2(1));
+                       CC_RB_centroid[field]->operator()(p,0) = pmid(0);
+                       CC_RB_centroid[field]->operator()(p,1) = pmid(1);
+                       CC_RB_centroid[field]->operator()(p,2) = pmid(2);
+                       normal(0) = p2(1) - p1(1);
+                       normal(1) = -(p2(0) - p1(0));
+                    } else if (intersection_pts.size() > 2 && m_space_dimension == 3){
+                       // Compute centeroid of plane
+                       for (auto iter = intersection_pts.begin();
+                                 iter != intersection_pts.end(); iter++) {
+                          geomVector temp = *iter;
+                          pmid += *iter;
                        }
+                       pmid /= (double) intersection_pts.size();
+                       CC_RB_centroid[field]->operator()(p,0) = pmid(0);
+                       CC_RB_centroid[field]->operator()(p,1) = pmid(1);
+                       CC_RB_centroid[field]->operator()(p,2) = pmid(2);
 
-                       fraction = area;
-                    }
-                    // Eliminate face fraction contribution if less than 0.01%
-                    if (fraction < 0.0001*face_size.calcNorm()) fraction = 0.;
-                    CC_face_fraction[field]->operator()(p,2*dir+side) = fraction;
+                       normal = (intersection_pts[0] - pmid)
+                              ^ (intersection_pts[1] - pmid);
 
-                 }   // side
-              }   // dir
-
-              if (intersection_pts.size() >= m_space_dimension) {
-                 // Normal vector of interface calculation
-                 size_t parID = CC_ownerID[field]->operator()(p);
-                 geomVector const* pgc = get_gravity_centre(parID);
-                 geomVector p1(3), p2(3), pmid(3), pin(3), normal(3);
-                 pin(0) = pgc->operator()(0);
-                 pin(1) = pgc->operator()(1);
-                 pin(2) = pgc->operator()(2);
-
-                 // Calulation of the vector normal to RB plane
-                 if (intersection_pts.size() == 2 && m_space_dimension == 2) {
-                    p1(0) = intersection_pts[0](0);
-                    p1(1) = intersection_pts[0](1);
-                    p2(0) = intersection_pts[1](0);
-                    p2(1) = intersection_pts[1](1);
-
-                    pmid(0) = 0.5*(p1(0) + p2(0));
-                    pmid(1) = 0.5*(p1(1) + p2(1));
-                    CC_RB_centroid[field]->operator()(p,0) = pmid(0);
-                    CC_RB_centroid[field]->operator()(p,1) = pmid(1);
-                    CC_RB_centroid[field]->operator()(p,2) = pmid(2);
-                    normal(0) = p2(1) - p1(1);
-                    normal(1) = -(p2(0) - p1(0));
-                 } else if (intersection_pts.size() > 2 && m_space_dimension == 3){
-                    // Compute centeroid of plane
-                    for (auto iter = intersection_pts.begin();
-                              iter != intersection_pts.end(); iter++) {
-                       geomVector temp = *iter;
-                       pmid += *iter;
-                    }
-                    pmid /= (double) intersection_pts.size();
-                    CC_RB_centroid[field]->operator()(p,0) = pmid(0);
-                    CC_RB_centroid[field]->operator()(p,1) = pmid(1);
-                    CC_RB_centroid[field]->operator()(p,2) = pmid(2);
-
-                    normal = (intersection_pts[0] - pmid)
-                           ^ (intersection_pts[1] - pmid);
-
-                    // ------------Sort the vertices-----------------------------//
-                    struct PtStruct {
-                      geomVector pt;
-                      double angle;
-                    };
-                    vector<PtStruct> point_struct;
-                    vector<double> angle;
-                    geomVector ref_vec = intersection_pts[0] - pmid;
-                    PtStruct temp;
-                    temp.pt = intersection_pts[0];
-                    temp.angle = 0.;
-                    point_struct.push_back(temp);
-                    for (auto iter = intersection_pts.begin() + 1;
-                              iter != intersection_pts.end(); iter++) {
-                       geomVector test_vec = *iter - pmid;
-                       geomVector cross = ref_vec^test_vec;
-                       double norm = cross.calcNorm();
-                       double dot = (cross,normal);
-                       if (dot < 0.) norm *= -1.;
-                       temp.pt = *iter;
-                       temp.angle = atan2(norm,(ref_vec,test_vec));
+                       // ------------Sort the vertices-----------------------------//
+                       struct PtStruct {
+                         geomVector pt;
+                         double angle;
+                       };
+                       vector<PtStruct> point_struct;
+                       vector<double> angle;
+                       geomVector ref_vec = intersection_pts[0] - pmid;
+                       PtStruct temp;
+                       temp.pt = intersection_pts[0];
+                       temp.angle = 0.;
                        point_struct.push_back(temp);
+                       for (auto iter = intersection_pts.begin() + 1;
+                                 iter != intersection_pts.end(); iter++) {
+                          geomVector test_vec = *iter - pmid;
+                          geomVector cross = ref_vec^test_vec;
+                          double norm = cross.calcNorm();
+                          double dot = (cross,normal);
+                          if (dot < 0.) norm *= -1.;
+                          temp.pt = *iter;
+                          temp.angle = atan2(norm,(ref_vec,test_vec));
+                          point_struct.push_back(temp);
+                       }
+                       std::sort(point_struct.begin(), point_struct.end(),
+                             [](const PtStruct& iii, const PtStruct& jjj)
+                                        { return iii.angle < jjj.angle; } );
+
+                       for (size_t ii = 0; ii < intersection_pts.size(); ii++) {
+                          intersection_pts[ii] = point_struct[ii].pt;
+                       }
+                       // ------------Sorting complete------------------------------//
                     }
-                    std::sort(point_struct.begin(), point_struct.end(),
-                          [](const PtStruct& iii, const PtStruct& jjj)
-                                     { return iii.angle < jjj.angle; } );
 
-                    for (size_t ii = 0; ii < intersection_pts.size(); ii++) {
-                       intersection_pts[ii] = point_struct[ii].pt;
+                    double area = calculate_area_of_RBplane(intersection_pts);
+                    CC_RB_area[field]->operator()(p) = area;
+
+                    // Test the direction of normal vector to be away from RB center
+                    geomVector delta = pin - pmid;
+                    delta(0) = delta_periodic_transformation(delta(0), 0);
+                    delta(1) = delta_periodic_transformation(delta(1), 1);
+                    delta(2) = (m_space_dimension == 3) ?
+                              delta_periodic_transformation(delta(2), 2) : delta(2);
+
+                    if ((delta(0)*normal(0)
+                       + delta(1)*normal(1)
+                       + delta(2)*normal(2)) >= 0.) {
+                       normal = -1.*normal;
                     }
-                    // ------------Sorting complete------------------------------//
+
+                    // Store the normal vector in the global variable
+                    geomVector normalRB1 = normal * (area / normal.calcNorm());
+                    CC_RB_normal[field]->operator()(p,0) = normalRB1(0);
+                    CC_RB_normal[field]->operator()(p,1) = normalRB1(1);
+                    CC_RB_normal[field]->operator()(p,2) = normalRB1(2);
                  }
 
-                 double area = calculate_area_of_RBplane(intersection_pts);
-                 CC_RB_area[field]->operator()(p) = area;
-
-                 // Test the direction of normal vector to be away from RB center
-                 geomVector delta = pin - pmid;
-                 delta(0) = delta_periodic_transformation(delta(0), 0);
-                 delta(1) = delta_periodic_transformation(delta(1), 1);
-                 delta(2) = (m_space_dimension == 3) ?
-                           delta_periodic_transformation(delta(2), 2) : delta(2);
-
-                 if ((delta(0)*normal(0)
-                    + delta(1)*normal(1)
-                    + delta(2)*normal(2)) >= 0.) {
-                    normal = -1.*normal;
+                 // Cell volume calculations
+                 double volume = 0.;
+                 for (size_t dir = 0; dir < m_space_dimension; dir++) {
+                    for (size_t side = 0; side < 2; side++) {
+                       volume += 0.5 * cell_size(dir)
+                           * CC_face_fraction[field]->operator()(p,2*dir+side);
+                    }
                  }
 
-                 // Store the normal vector in the global variable
-                 geomVector normalRB1 = normal * (area / normal.calcNorm());
-                 CC_RB_normal[field]->operator()(p,0) = normalRB1(0);
-                 CC_RB_normal[field]->operator()(p,1) = normalRB1(1);
-                 CC_RB_normal[field]->operator()(p,2) = normalRB1(2);
-              }
-
-              // Cell volume calculations
-              double volume = 0.;
-              for (size_t dir = 0; dir < m_space_dimension; dir++) {
-                 for (size_t side = 0; side < 2; side++) {
-                    volume += 0.5 * cell_size(dir)
-                        * CC_face_fraction[field]->operator()(p,2*dir+side);
-                 }
-              }
-
-              geomVector cellCen(xC, yC, zC);
-              geomVector RBcen(CC_RB_centroid[field]->operator()(p,0)
-                             , CC_RB_centroid[field]->operator()(p,1)
-                             , CC_RB_centroid[field]->operator()(p,2));
-              geomVector RBnorm(CC_RB_normal[field]->operator()(p,0)
-                              , CC_RB_normal[field]->operator()(p,1)
-                              , CC_RB_normal[field]->operator()(p,2));
-              volume += (cellCen - RBcen).operator,(RBnorm);
-              CC_cell_volume[field]->operator()(p,0) = volume * (1./m_space_dimension);
+                 geomVector cellCen(xC, yC, zC);
+                 geomVector RBcen(CC_RB_centroid[field]->operator()(p,0)
+                                , CC_RB_centroid[field]->operator()(p,1)
+                                , CC_RB_centroid[field]->operator()(p,2));
+                 geomVector RBnorm(CC_RB_normal[field]->operator()(p,0)
+                                 , CC_RB_normal[field]->operator()(p,1)
+                                 , CC_RB_normal[field]->operator()(p,2));
+                 volume += (cellCen - RBcen).operator,(RBnorm);
+                 CC_cell_volume[field]->operator()(p,0) = volume * (1./m_space_dimension);
+              } else {
+                 CC_cell_volume[field]->operator()(p,0) = (m_space_dimension == 2) ? dx * dy : dx * dy * dz;
+              }// is_neighbor_inSolids
            }  // k
         }  // j
      }  // i
@@ -2145,6 +2149,46 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor (
 
 }
 
+
+
+
+//---------------------------------------------------------------------------
+bool DS_AllRigidBodies:: is_neighbor_inSolids(FV_DiscreteField const* FF
+                                            , size_t const& i
+                                            , size_t const& j
+                                            , size_t const& k
+                                            , size_t const& comp)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: is_neighbor_inSolids" ) ;
+
+  size_t FF_UNK_MAX = FF->nb_local_unknowns();
+  size_t field = field_num(FF);
+  bool flag = false;
+
+  if (m_space_dimension == 2) {
+     for (int di = -1; di <= 1 && !flag; di++) {
+        for (int dj = -1; dj <= 1 && !flag; dj++) {
+           size_t p = FF->DOF_local_number(i+di, j+dj, k, comp);
+           if ((p <= FF_UNK_MAX) && (void_fraction[field]->operator()(p) != 0))
+             flag = true;
+        }
+     }
+  } else {
+     for (int di = -1; di <= 1 && !flag; di++) {
+       for (int dj = -1; dj <= 1 && !flag; dj++) {
+          for (int dk = -1; dk <= 1 && !flag; dk++) {
+             size_t p = FF->DOF_local_number(i+di, j+dj, k+dk, comp);
+             if ((p <= FF_UNK_MAX) && (void_fraction[field]->operator()(p) != 0))
+                flag = true;
+          }
+       }
+     }
+  }
+
+  return (flag);
+
+}
 
 
 

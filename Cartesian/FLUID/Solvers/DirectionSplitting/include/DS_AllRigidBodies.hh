@@ -226,6 +226,18 @@ class DS_AllRigidBodies
                         double const& y,
                         double const& z ) const;
 
+      /** @brief Check if any neighbour field node is in solid or not
+      @param FF field
+      @param comp component
+      @param i index i
+      @param j index j
+      @param k index k */
+      bool is_neighbor_inSolids(FV_DiscreteField const* FF
+                              , size_t const& i
+                              , size_t const& j
+                              , size_t const& k
+                              , size_t const& comp);
+
       /** @brief Returns the parID if the point is inside parID, based on levelset
       @param pt the point */
       int levelset_any_RB( geomVector const& pt ) const;
