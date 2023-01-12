@@ -91,37 +91,38 @@ void GrainsPostProcessing::Simulation( double time_interval )
   if ( m_global_porosity )
   {    
     double volparticles = 0.;
-    double volporodomain = ( m_global_porosity->domain.ptB[X] 
+    double volporodomain = 0.;
+    double dx = 0., dy = 0., dz = 0.;
+    Point3 elemVolCenter;
+    list<Cell*> cells;
+    list<Cell*>::const_iterator ic;
+    bool found = false;
+    list<Particle*> const* allpart = m_allcomponents.getActiveParticles();
+    list<Particle*>::const_iterator il;      
+    size_t nx, ny, nz;
+    Point3 intVolptA;	
+    Vector3 intVolExtent;
+    double dxl, dyl, dzl, dvl; 
+        
+    if ( m_global_porosity->domain.ftype == WINDOW_BOX )
+    {       
+      volporodomain = ( m_global_porosity->domain.ptB[X] 
     	- m_global_porosity->domain.ptA[X] ) *
 	( m_global_porosity->domain.ptB[Y] 
     	- m_global_porosity->domain.ptA[Y] ) *
 	( m_global_porosity->domain.ptB[Z] 
     	- m_global_porosity->domain.ptA[Z] );
-    double dx = ( m_global_porosity->domain.ptB[X] 
+      dx = ( m_global_porosity->domain.ptB[X] 
     	- m_global_porosity->domain.ptA[X] ) 
 	/ double(m_global_porosity->nintervals[X]);
-    double dy = ( m_global_porosity->domain.ptB[Y] 
+      dy = ( m_global_porosity->domain.ptB[Y] 
     	- m_global_porosity->domain.ptA[Y] ) 
 	/ double(m_global_porosity->nintervals[Y]);
-    double dz = ( m_global_porosity->domain.ptB[Z] 
+      dz = ( m_global_porosity->domain.ptB[Z] 
     	- m_global_porosity->domain.ptA[Z] ) 
-	/ double(m_global_porosity->nintervals[Z]);
-    double dv = dx * dy * dz;
-    Point3 elemVolCenter;
-    list<Cell*> cells;
-    list<Cell*>::const_iterator ic;
-    bool found = false;
-    
-    if ( m_global_porosity->domain.ftype == WINDOW_BOX )
-    {
-      list<Particle*> const* allpart = m_allcomponents.getActiveParticles();
-      list<Particle*>::const_iterator il;            
+	/ double(m_global_porosity->nintervals[Z]);    
       BBox BBdomain( m_global_porosity->domain.ptA,
       	 m_global_porosity->domain.ptB ), BBintVol;
-      Point3 intVolptA;	
-      Vector3 intVolExtent;
-      size_t nx, ny, nz;
-      double dxl, dyl, dzl, dvl; 
       
       for (il=allpart->begin();il!=allpart->end();il++)
       {
@@ -178,32 +179,107 @@ void GrainsPostProcessing::Simulation( double time_interval )
 	  volparticles += (*il)->getVolume();
       }
     }
-    else
+    else if ( m_global_porosity->domain.ftype == WINDOW_CYLINDER )
     {
-      for (size_t i=0;i<m_global_porosity->nintervals[X];++i)
-        for (size_t j=0;j<m_global_porosity->nintervals[Y];++j)    
-          for (size_t k=0;k<m_global_porosity->nintervals[Z];++k)
-	  {
-	    // Coordinates of the center of the elementary volume
-	    elemVolCenter[X] = m_global_porosity->domain.ptA[X]
-	  	+ ( double(i) + 0.5 ) * dx;
-	    elemVolCenter[Y] = m_global_porosity->domain.ptA[Y]
-	  	+ ( double(j) + 0.5 ) * dy;	  
-	    elemVolCenter[Z] = m_global_porosity->domain.ptA[Z]
-	  	+ ( double(k) + 0.5 ) * dz;	  
+      volporodomain = PI * m_global_porosity->domain.radius
+      	* m_global_porosity->domain.radius * m_global_porosity->domain.height;
+      dx = ( m_global_porosity->domain.axisdir == X ?
+      	m_global_porosity->domain.height 
+		: 2. * m_global_porosity->domain.radius )
+	/ double(m_global_porosity->nintervals[X]);
+      dy = ( m_global_porosity->domain.axisdir == Y ?
+      	m_global_porosity->domain.height 
+		: 2. * m_global_porosity->domain.radius )
+	/ double(m_global_porosity->nintervals[Y]);
+      dz = ( m_global_porosity->domain.axisdir == Z ?
+      	m_global_porosity->domain.height 
+		: 2. * m_global_porosity->domain.radius )
+	/ double(m_global_porosity->nintervals[Z]); 
+      Point3 center;
+      double circumscribed_radius = 0.;
+      size_t intersect = 0;
+      BBox BBdomain, BBintVol;
+      Point3 BBCenter = m_global_porosity->domain.ptA;
+      BBCenter[m_global_porosity->domain.axisdir] += 
+      	0.5 * m_global_porosity->domain.height;
+      Vector3 BBextent( m_global_porosity->domain.axisdir == X ?
+      	0.5 * m_global_porosity->domain.height 
+		: m_global_porosity->domain.radius,
+	m_global_porosity->domain.axisdir == Y ?
+      	0.5 * m_global_porosity->domain.height 
+		: m_global_porosity->domain.radius,
+	m_global_porosity->domain.axisdir == Z ?
+      	0.5 * m_global_porosity->domain.height 
+		: m_global_porosity->domain.radius );
+      BBdomain.setCenter( BBCenter );
+      BBdomain.setExtent( BBextent );					
+	            
+      for (il=allpart->begin();il!=allpart->end();il++)
+      {
+        center = *((*il)->getPosition());
+	circumscribed_radius = (*il)->getCircumscribedRadius();
+	intersect = GrainsExec::AACylinderSphereIntersection( center,
+    		circumscribed_radius,
+		m_global_porosity->domain.ptA,
+		m_global_porosity->domain.radius,
+		m_global_porosity->domain.height,
+		m_global_porosity->domain.axisdir );
+
+        // If the circumscribed sphere of the particle is fully contained
+	// in the porosity domain, we simply add the volume
+	if ( intersect == 0 )
+	  volparticles += (*il)->getVolume();
+
+        // If the circumscribed sphere of the particle intersects the cylinder
+	// boundary, we pixelate both the part that belongs to the porosity
+	// domain and the cylindrical porosity domain
+	else if ( intersect == 2 )
+	{
+	  BBox BBpart = (*il)->BoundingBox(); 
+	  BBintVol.closest( BBdomain, BBpart );
+	  intVolptA.setValue( BBintVol.getLower( X ), BBintVol.getLower( Y ),
+	    	BBintVol.getLower( Z ) );
+	  intVolExtent = BBintVol.getExtent();
+	  nx = size_t( 2. * intVolExtent[X] / dx ) + 1;
+	  ny = size_t( 2. * intVolExtent[Y] / dy ) + 1;
+	  nz = size_t( 2. * intVolExtent[Z] / dz ) + 1;
+	  dxl = 2. * intVolExtent[X] / double(nx);
+	  dyl = 2. * intVolExtent[Y] / double(ny); 
+	  dzl = 2. * intVolExtent[Z] / double(nz);
+	  dvl = dxl * dyl * dzl;
+
+          for (size_t i=0;i<nx;++i)
+            for (size_t j=0;j<ny;++j)    
+              for (size_t k=0;k<nz;++k)
+              {
+	        // Coordinates of the center of the elementary volume
+	        elemVolCenter[X] = intVolptA[X] + ( double(i) + 0.5 ) * dxl;
+	        elemVolCenter[Y] = intVolptA[Y] + ( double(j) + 0.5 ) * dyl;
+	        elemVolCenter[Z] = intVolptA[Z] + ( double(k) + 0.5 ) * dzl;
+		
+		// If the cell center belongs to the cylindrical porosity domain
+		if ( GrainsExec::isPointInAACylinder( elemVolCenter,
+			m_global_porosity->domain.ptA,
+			m_global_porosity->domain.radius,
+			m_global_porosity->domain.height,
+			m_global_porosity->domain.axisdir ) )		 
+	        {
+	          // List of cells containing the cell that elemVolCenter 
+		  // belongs to and its neighboring cells
+	          cells = m_collision->getCellAndCellNeighborhood( 
+		  	elemVolCenter );
 	  
-	    // List of cells containing the cell that elemVolCenter belongs
-	    // to and its neighboring cells
-	    cells = m_collision->getCellAndCellNeighborhood( elemVolCenter );
-	  
-	    // Loops over the cells and check whether elemVolCenter belongs
-	    // to any particle in any of these cells
-	    found = false;
-	    for (ic=cells.begin();ic!=cells.end() && !found;ic++)
-	      found = (*ic)->isInParticle( elemVolCenter );
+	          // Loops over the cells and check whether elemVolCenter 
+		  // belongs to this particle in any of these cells
+	          found = false;
+	          for (ic=cells.begin();ic!=cells.end() && !found;ic++)
+	            found = (*ic)->isInParticle( elemVolCenter, *il );
 	    
-            if ( found ) volparticles += dv;	  
-	  }
+                  if ( found ) volparticles += dvl;	  
+	        }
+	      }	
+	}	
+      }
     }
          
     double porosity = ( volporodomain - volparticles ) / volporodomain;    

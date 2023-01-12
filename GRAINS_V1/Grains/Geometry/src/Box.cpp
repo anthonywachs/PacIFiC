@@ -11,7 +11,7 @@ vector< vector<int> > Box::m_allFaces;
 // Constructor with a vector containing the edge half-lengths as
 // input parameters
 Box::Box( Vector3 const& extent_ )
-  : m_extent(extent_)
+  : m_extent( extent_ )
   , m_corners2D_XY( NULL )
 {
   setCornersFaces();
