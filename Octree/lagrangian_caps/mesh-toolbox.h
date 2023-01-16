@@ -628,6 +628,21 @@ void dump_plain_nodes_pos(lagMesh* mesh, char* filename) {
   }
 }
 
+void dump_plain_triangles(lagMesh* mesh, char* filename) {
+  if (pid() == 0) {
+    FILE* file = fopen(filename, "a");
+    assert(file);
+    fprintf(file, "%g", t);
+    for(int i=0; i<mesh->nlt; i++) {
+      fprintf(file, ",%d %d %d %g", mesh->triangles[i].node_ids[0],
+        mesh->triangles[i].node_ids[1], mesh->triangles[i].node_ids[2],
+        mesh->triangles[i].area);
+    }
+    fprintf(file, "\n");
+    fclose(file);
+  }
+}
+
 /** ### Visualization in paraview */
 #ifndef PARAVIEW_CAPSULE
   #define PARAVIEW_CAPSULE 0
