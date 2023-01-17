@@ -2253,8 +2253,12 @@ DS_NavierStokes:: compute_adv_component ( FV_TimeIterator const* t_it,
 						  * CC_vol->operator()(p,0);
    }
 
-   if ( AdvectionTimeAccuracy == 1 ) {
+	boolVector* fresh_node = (is_solids) ? allrigidbodies->get_fresh_nodes(UF) : 0;
+
+   if (( AdvectionTimeAccuracy == 1 ) || (fresh_node->operator()(p))) {
       value = ugradu;
+		if (fresh_node->operator()(p))
+			UF->set_DOF_value(i,j,k,comp,2,ugradu);
    } else {
       value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
       UF->set_DOF_value(i,j,k,comp,2,ugradu);
@@ -2641,7 +2645,7 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
                //
                if (is_solids) {
                   if (void_frac->operator()(p,0) != 0) {
-                     pvalue = 0.; adv_value = 0.;
+                     pvalue = 0.;
                   }
                }
 
@@ -4590,11 +4594,14 @@ DS_NavierStokes:: assemble_advection_Centered_FD(double const& coef,
 						allrigidbodies->get_intersect_vector_on_grid(UF) : 0;
 
 	bool nearRB = false;
-	if (is_solids)
+	if (is_solids) {
 		for (size_t dir = 0; dir < dim && !nearRB ; dir++) {
 			nearRB = (intersect_vector->operator()(p,2*dir+0) == 1)
 					|| (intersect_vector->operator()(p,2*dir+1) == 1);
 		}
+		size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+		if (void_frac->operator()(p,0) != 0) return(0.);
+	}
 
 	for (size_t cpt = 0; cpt < dim; cpt++) {
 		auto value = compute_first_derivative(comp,i,j,k,cpt,level);
