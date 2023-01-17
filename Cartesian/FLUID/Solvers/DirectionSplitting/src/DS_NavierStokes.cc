@@ -391,6 +391,9 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 			allrigidbodies->compute_cutCell_geometric_parameters(PF);
 			allrigidbodies->compute_cutCell_geometric_parameters(UF);
 		}
+		// Compute the fresh node coming in fluid in this step
+		allrigidbodies->compute_fresh_nodes(PF);
+		allrigidbodies->compute_fresh_nodes(UF);
 
 		// Field initialization
 		vector<size_t> vec{ 0, 1, 3};
@@ -1651,7 +1654,7 @@ DS_NavierStokes:: compute_un_component_FV ( size_t const& comp,
 	intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
 	doubleArray3D* CC_face_cen = allrigidbodies->get_CC_face_centroid(UF);
 	doubleArray2D* CC_face_frac = allrigidbodies->get_CC_face_fraction(UF);
-	size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+	// size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
 
 	size_t p = UF->DOF_local_number(i,j,k,comp);
 
@@ -3678,6 +3681,8 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 	doubleArray2D* divergenceUF = GLOBAL_EQ->get_node_divergence(1);
 	doubleArray2D* CC_volPF = (is_solids) ? allrigidbodies->get_CC_cell_volume(PF) : 0;
 	doubleArray2D* CC_volUF = (is_solids) ? allrigidbodies->get_CC_cell_volume(UF) : 0;
+	size_t_array2D* void_fracPF = (is_solids) ? allrigidbodies->get_void_fraction_on_grid(PF) : 0;
+	size_t_array2D* void_fracUF = (is_solids) ? allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
    for (size_t l=0;l<dim;++l) {
       min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
@@ -3710,13 +3715,19 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    // Store the divergence to be used in the next time iteration
    for (size_t i = 0; i < PF->nb_local_unknowns() ; i++) {
       divergencePF->operator()(i,1) = divergencePF->operator()(i,0);
-		if (is_solids) CC_volPF->operator()(i,1) = CC_volPF->operator()(i,0);
+		if (is_solids) {
+			CC_volPF->operator()(i,1) = CC_volPF->operator()(i,0);
+			void_fracPF->operator()(i,1) = void_fracPF->operator()(i,0);
+		}
 	}
 
 	// Store the divergence to be used in the next time iteration
 	for (size_t i = 0; i < UF->nb_local_unknowns() ; i++) {
 		divergenceUF->operator()(i,1) = divergenceUF->operator()(i,0);
-		if (is_solids) CC_volUF->operator()(i,1) = CC_volUF->operator()(i,0);
+		if (is_solids) {
+			CC_volUF->operator()(i,1) = CC_volUF->operator()(i,0);
+			void_fracUF->operator()(i,1) = void_fracUF->operator()(i,0);
+		}
 	}
 
    if (is_solids) {
@@ -3751,12 +3762,15 @@ DS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
              << ",top,tv"
              << ",behind,bev"
              << ",front,fv"
+				 << ",fresh"
 				 << ",field"
 				 << endl;
 
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
 
+  boolVector* fresh_node = (is_solids) ?
+                    allrigidbodies->get_fresh_nodes(FF) : 0;
   size_t_array2D* void_frac = (is_solids) ?
                     allrigidbodies->get_void_fraction_on_grid(FF) : 0;
   size_t_array2D* intersect_vector = (is_solids) ?
@@ -3806,6 +3820,7 @@ DS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
               << "," << intersect_distance->operator()(p,4)
               << "," << intersect_vector->operator()(p,5)
               << "," << intersect_distance->operator()(p,5)
+				  << "," << fresh_node->operator()(p)
 				  << "," << FF->DOF_value(i,j,k,comp,0)
               << endl;
            }

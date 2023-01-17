@@ -1040,6 +1040,85 @@ void DS_AllRigidBodies:: compute_void_fraction_on_epsilon_grid(
 
 
 //---------------------------------------------------------------------------
+void DS_AllRigidBodies:: compute_fresh_nodes(FV_DiscreteField const* FF)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: compute_fresh_nodes" ) ;
+
+  size_t nb_comps = FF->nb_components() ;
+  size_t field = field_num(FF) ;
+
+  boolVector const* periodic_comp = MESH->get_periodic_directions();
+
+  // Get local min and max indices;
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
+
+  size_t i0_temp = 0;
+
+  for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                               it != local_RB_list.end() ; ++it) {
+     size_t parID = *it;
+
+     vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
+                                                   ->get_rigid_body_haloZone();
+     // Calculation on the indexes near the rigid body
+     for (size_t comp = 0; comp < nb_comps; ++comp) {
+        for (size_t dir = 0; dir < m_space_dimension; ++dir) {
+           // Calculations for solids on the total unknown on the proc
+           min_unknown_index(dir) =
+                   FF->get_min_index_unknown_on_proc( comp, dir );
+           max_unknown_index(dir) =
+                   FF->get_max_index_unknown_on_proc( comp, dir );
+
+           bool is_periodic = periodic_comp->operator()( dir );
+           double domain_min = MESH->get_main_domain_min_coordinate( dir );
+           double domain_max = MESH->get_main_domain_max_coordinate( dir );
+
+           bool found =FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+                                       , haloZone[0]->operator()(dir)
+                                       , i0_temp) ;
+           size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
+
+
+           found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+                                   , haloZone[1]->operator()(dir)
+                                   , i0_temp) ;
+           size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
+
+           if (is_periodic &&
+              ((haloZone[1]->operator()(dir) > domain_max)
+            || (haloZone[0]->operator()(dir) < domain_min))) {
+              index_min = min_unknown_index(dir);
+              index_max = max_unknown_index(dir);
+           }
+
+           min_unknown_index(dir) = MAC::max(min_unknown_index(dir),index_min);
+           max_unknown_index(dir) = MAC::min(max_unknown_index(dir),index_max);
+
+        }
+
+        for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+           for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+             for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+               size_t p = FF->DOF_local_number(i,j,k,comp);
+               if ((void_fraction[field]->operator()(p,1) != 0)
+                && (void_fraction[field]->operator()(p,0) == 0)) {
+                  fresh_node[field]->operator()(p) = true;
+               } else {
+                  fresh_node[field]->operator()(p) = false;
+               }
+             }
+           }
+        }
+     }
+  }
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_AllRigidBodies:: compute_void_fraction_on_grid(
                                                 FV_DiscreteField const* FF
                                               , bool const& is_in_time_iter)
@@ -2701,6 +2780,10 @@ void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
    void_fraction.push_back(new size_t_array2D(1,1,0));
    void_fraction.push_back(new size_t_array2D(1,1,0));
    void_fraction.push_back(new size_t_array2D(1,1,0));
+   fresh_node.reserve(3);
+   fresh_node.push_back(new boolVector(1,0));
+   fresh_node.push_back(new boolVector(1,0));
+   fresh_node.push_back(new boolVector(1,0));
    intersect_vector.reserve(3);
    intersect_vector.push_back(new size_t_array2D(1,1,0));
    intersect_vector.push_back(new size_t_array2D(1,1,0));
@@ -5154,6 +5237,9 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    // void fraction on the computational grid
    void_fraction[field]->re_initialize(FF_LOC_UNK,2);
 
+   // fresh nodes on the computational grid
+   fresh_node[field]->re_initialize(FF_LOC_UNK);
+
    // Intersection parameters on the computational grid
    // For PF and UF
    intersect_vector[field]->re_initialize(FF_LOC_UNK,6);
@@ -5202,6 +5288,19 @@ size_t_array2D* DS_AllRigidBodies:: get_void_fraction_on_grid(
   size_t field = field_num(FF);
 
   return (void_fraction[field]);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+boolVector* DS_AllRigidBodies:: get_fresh_nodes(FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+  size_t field = field_num(FF);
+
+  return (fresh_node[field]);
 
 }
 

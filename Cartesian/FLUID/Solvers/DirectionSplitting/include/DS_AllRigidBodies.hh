@@ -149,6 +149,9 @@ class DS_AllRigidBodies
       /** @brief Returns the void_fraction on field FF */
       size_t_array2D* get_void_fraction_on_grid( FV_DiscreteField const* FF );
 
+      /** @brief Returns the void_fraction on field FF */
+      boolVector* get_fresh_nodes( FV_DiscreteField const* FF );
+
       /** @brief Returns the ID of rigid body present on the field FF */
       size_t_vector* get_rigidbodyIDs_on_grid( FV_DiscreteField const* FF );
 
@@ -346,6 +349,10 @@ class DS_AllRigidBodies
       @param is_in_time_iter true if method called in time iteration */
       void compute_void_fraction_on_grid( FV_DiscreteField const* FF
                                         , bool const& is_in_time_iter );
+
+      /** @brief Compute fresh nodes in the computational domain
+      @param FF the fluid field (PF, UF) */
+      void compute_fresh_nodes(FV_DiscreteField const* FF);
 
       /** @brief Computes the void fraction on the epsilon grid for PP
       of a given fluid field
@@ -593,6 +600,9 @@ class DS_AllRigidBodies
 
       vector<size_t_array2D*> void_fraction; /**< vector of void fraction the
       field grid nodes, 0 in fluid and (parID+1) in the rigid bodies*/
+
+      vector<boolVector*> fresh_node; /**< vector on field grid to to store
+      if the node is fresh(1) or not(0)*/
 
       vector<doubleArray3D*> CC_face_centroid; /**< centroid of the cut faces
       for all fields, if any. [field]->[index][face][x,y,z]*/
