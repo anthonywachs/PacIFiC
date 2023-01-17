@@ -2230,6 +2230,7 @@ DS_NavierStokes:: compute_adv_component ( FV_TimeIterator const* t_it,
 				       * divergence->operator()(p,0)
 					    * dxC * dyC * dzC;
 	} else if ( AdvectionScheme == "CenteredFD" ) {
+		// No divergence correction requried as we calculate the u div(u) instead of div(uu)
 		ugradu = assemble_advection_Centered_FD(rho,i,j,k,comp,1);
 	} else if ( AdvectionScheme == "Centered" && StencilCorrection == "FD" ) {
  		ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp)
@@ -4610,13 +4611,25 @@ DS_NavierStokes:: assemble_advection_Centered_FD(double const& coef,
 			      double uToRi = UF->DOF_value(i+shift.i, j+shift.j, k, cpt, level );
 					double uBoLe = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, cpt, level );
 			      double uBoRi = UF->DOF_value(i+shift.i, j+shift.j-1, k, cpt, level );
-					ui(cpt) = 0.25 * (uToLe + uToRi + uBoLe + uBoRi);
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_RIGHT) {
+						ui(cpt) = 0.5 * (uToLe + uBoLe);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_LEFT) {
+						ui(cpt) = 0.5 * (uToRi + uBoRi);
+					} else {
+						ui(cpt) = 0.25 * (uToLe + uToRi + uBoLe + uBoRi);
+					}
 				} else if (cpt == 2) {
 					double uFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, cpt, level );
 					double uFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, cpt, level );
 					double uBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, cpt, level );
 					double uBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, cpt, level );
-					ui(cpt) = 0.25 * (uFrLe + uFrRi + uBeLe + uBeRi);
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_RIGHT) {
+						ui(cpt) = 0.5 * (uFrLe + uBeLe);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_LEFT) {
+						ui(cpt) = 0.5 * (uFrRi + uBeRi);
+					} else {
+						ui(cpt) = 0.25 * (uFrLe + uFrRi + uBeLe + uBeRi);
+					}
 				}
 			} else if (comp == 1) {
 				if (cpt == 0) {
@@ -4624,7 +4637,13 @@ DS_NavierStokes:: assemble_advection_Centered_FD(double const& coef,
 			      double uToRi = UF->DOF_value(i+shift.i, j+shift.j, k, cpt, level );
 					double uBoLe = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, cpt, level );
 			      double uBoRi = UF->DOF_value(i+shift.i, j+shift.j-1, k, cpt, level );
-					ui(cpt) = 0.25 * (uToLe + uToRi + uBoLe + uBoRi);
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_TOP) {
+						ui(cpt) = 0.5 * (uBoLe + uBoRi);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_BOTTOM) {
+						ui(cpt) = 0.5 * (uToLe + uToRi);
+					} else {
+						ui(cpt) = 0.25 * (uToLe + uToRi + uBoLe + uBoRi);
+					}
 				} else if (cpt == 1) {
 					ui(cpt) = UF->DOF_value( i, j, k, comp, level );
 				} else if (cpt == 2) {
@@ -4632,7 +4651,13 @@ DS_NavierStokes:: assemble_advection_Centered_FD(double const& coef,
 					double uFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, cpt, level );
 					double uBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, cpt, level );
 					double uBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, cpt, level );
-					ui(cpt) = 0.25 * (uFrBo + uFrTo + uBeBo + uBeTo);
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_TOP) {
+						ui(cpt) = 0.5 * (uFrBo + uBeBo);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_BOTTOM) {
+						ui(cpt) = 0.5 * (uFrTo + uBeTo);
+					} else {
+						ui(cpt) = 0.25 * (uFrBo + uFrTo + uBeBo + uBeTo);
+					}
 				}
 			} else if (comp == 2) {
 				if (cpt == 0) {
@@ -4640,13 +4665,25 @@ DS_NavierStokes:: assemble_advection_Centered_FD(double const& coef,
 					double uFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, cpt, level );
 					double uBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, cpt, level );
 					double uBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, cpt, level );
-					ui(cpt) = 0.25 * (uFrLe + uFrRi + uBeLe + uBeRi);
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_FRONT) {
+						ui(cpt) = 0.5 * (uBeLe + uBeRi);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_BEHIND) {
+						ui(cpt) = 0.5 * (uFrLe + uFrRi);
+					} else {
+						ui(cpt) = 0.25 * (uFrLe + uFrRi + uBeLe + uBeRi);
+					}
 				} else if (cpt == 1) {
 					double uFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, cpt, level );
 					double uFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, cpt, level );
 					double uBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, cpt, level );
 					double uBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, cpt, level );
-					ui(cpt) = 0.25 * (uFrBo + uFrTo + uBeBo + uBeTo);
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_FRONT) {
+						ui(cpt) = 0.5 * (uBeBo + uBeTo);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_BEHIND) {
+						ui(cpt) = 0.5 * (uFrBo + uFrTo);
+					} else {
+						ui(cpt) = 0.25 * (uFrBo + uFrTo + uBeBo + uBeTo);
+					}
 				} else if (cpt == 2) {
 					ui(cpt) = UF->DOF_value( i, j, k, comp, level );
 				}
