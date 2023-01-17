@@ -680,7 +680,7 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 														->get_intersect_vector_on_grid(FF);
 				         doubleArray2D* intersect_distance = allrigidbodies
 														->get_intersect_distance_on_grid(FF);
-				         size_t_vector* void_frac = allrigidbodies
+				         size_t_array2D* void_frac = allrigidbodies
 														->get_void_fraction_on_grid(FF);
 
 							size_t p = 0;
@@ -692,7 +692,7 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 								p = FF->DOF_local_number(j,k,i,comp);
 							}
 
-				         if (void_frac->operator()(p) == 0) {
+				         if (void_frac->operator()(p,0) == 0) {
 				            // if left node is inside the solid particle
 				            if (intersect_vector->operator()(p,2*dir+0) == 1) {
 				               left = -gamma/intersect_distance->operator()(p,2*dir+0);
@@ -703,7 +703,7 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 				               right = -gamma/intersect_distance->operator()(p,2*dir+1);
 									// pre_factor = (2. * dx) / (dxl + intersect_distance->operator()(p,2*dir+1));
 								}
-				         } else if (void_frac->operator()(p) != 0) {
+				         } else if (void_frac->operator()(p,0) != 0) {
 				            // if center node is inside the solid particle
 				            left = 0.;
 				            right = 0.;
@@ -1160,13 +1160,13 @@ DS_NavierStokes:: assemble_velocity_diffusion_terms ( )
 
 		// Flux redistribution
 		if (is_solids && (StencilCorrection == "CutCell")) {
-			size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+			size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
 			intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
 			for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
 				for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
 					for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
 						size_t p = UF->DOF_local_number(i,j,k,comp);
-						if ((ownerID->operator()(p) != -1) && (void_frac->operator()(p) != 0)) {
+						if ((ownerID->operator()(p) != -1) && (void_frac->operator()(p,0) != 0)) {
 							for (size_t dir = 0; dir < dim; dir++) {
 								size_t_vector i0_r(3), i0_l(3);
 								i0_l(0) = i; i0_l(1) = j; i0_l(2) = k;
@@ -1176,7 +1176,7 @@ DS_NavierStokes:: assemble_velocity_diffusion_terms ( )
 								size_t p_lft = UF->DOF_local_number(i0_l(0),i0_l(1),i0_l(2),comp);
 								size_t p_rht = UF->DOF_local_number(i0_r(0),i0_r(1),i0_r(2),comp);
 								if (vel_diffusion[dir]->operator()(p) != 0.) {
-									if (void_frac->operator()(p_lft) == 0) {
+									if (void_frac->operator()(p_lft,0) == 0) {
 										vel_diffusion[dir]->operator()(p_lft) += vel_diffusion[dir]->operator()(p);
 										vel_diffusion[dir]->operator()(p) = 0.;
 									} else if (vel_diffusion[dir]->operator()(p_rht) == 0) {
@@ -1273,8 +1273,8 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
 		dxr = dxr_act;
 
       if (is_solids) {
-         size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-         if (void_frac->operator()(p) == 0) {
+         size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+         if (void_frac->operator()(p,0) == 0) {
             if (intersect_vector->operator()(p,2*dir+0) == 1) {
                fl = intersect_fieldVal->operator()(p,2*dir+0);
                xl = xc - intersect_distance->operator()(p,2*dir+0);
@@ -1337,8 +1337,8 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
 		dxr = dxr_act;
 
       if (is_solids) {
-         size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-         if (void_frac->operator()(p) == 0) {
+         size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+         if (void_frac->operator()(p,0) == 0) {
             if (intersect_vector->operator()(p,2*dir+0) == 1) {
                fl = intersect_fieldVal->operator()(p,2*dir+0);
                xl = xc - intersect_distance->operator()(p,2*dir+0);
@@ -1401,8 +1401,8 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
 		dxr = dxr_act;
 
       if (is_solids) {
-         size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-         if (void_frac->operator()(p) == 0) {
+         size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+         if (void_frac->operator()(p,0) == 0) {
             if (intersect_vector->operator()(p,2*dir+0) == 1) {
                fl = intersect_fieldVal->operator()(p,2*dir+0);
                xl = xc - intersect_distance->operator()(p,2*dir+0);
@@ -1499,8 +1499,8 @@ DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
          }
 
          if (is_solids) {
-            size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-            if (void_frac->operator()(p) == 0) {
+            size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+            if (void_frac->operator()(p,0) == 0) {
                if (intersect_vector->operator()(p,2*dir+0) == 1) {
                   xleft = UF->DOF_value( i, j, k, comp, level )
                         - intersect_fieldVal->operator()(p,2*dir+0);
@@ -1547,8 +1547,8 @@ DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
          }
 
          if (is_solids) {
-            size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-            if (void_frac->operator()(p) == 0) {
+            size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+            if (void_frac->operator()(p,0) == 0) {
                if (intersect_vector->operator()(p,2*dir+0) == 1) {
                   yleft = UF->DOF_value( i, j, k, comp, level )
                         - intersect_fieldVal->operator()(p,2*dir+0);
@@ -1595,8 +1595,8 @@ DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
          }
 
          if (is_solids) {
-            size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-            if (void_frac->operator()(p) == 0) {
+            size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+            if (void_frac->operator()(p,0) == 0) {
                if (intersect_vector->operator()(p,2*dir+0) == 1) {
                   zleft = UF->DOF_value( i, j, k, comp, level )
                         - intersect_fieldVal->operator()(p,2*dir+0);
@@ -1651,7 +1651,7 @@ DS_NavierStokes:: compute_un_component_FV ( size_t const& comp,
 	intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
 	doubleArray3D* CC_face_cen = allrigidbodies->get_CC_face_centroid(UF);
 	doubleArray2D* CC_face_frac = allrigidbodies->get_CC_face_fraction(UF);
-	size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+	size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
 
 	size_t p = UF->DOF_local_number(i,j,k,comp);
 
@@ -2304,9 +2304,9 @@ DS_NavierStokes:: divergence_of_U_noCorrection( size_t const& i
    AdvectorValueC = UF->DOF_value( i, j, k, component, level );
 
 	if (is_solids) {
-		size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+		size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
 		size_t p = UF->DOF_local_number(i, j, k, component);
-		if (void_frac->operator()(p) != 0) return(flux);
+		if (void_frac->operator()(p,0) != 0) return(flux);
 	}
 
    // The First Component (u)
@@ -2598,7 +2598,7 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
 							allrigidbodies->get_CC_cell_volume(UF) : 0;
 	vector<doubleVector*> advection = GLOBAL_EQ->get_velocity_advection();
    vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
-   size_t_vector* void_frac = (is_solids) ?
+   size_t_array2D* void_frac = (is_solids) ?
 							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
    for (size_t comp=0;comp<nb_comps[1];comp++) {
@@ -2637,7 +2637,7 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
                double adv_value = advection[0]->operator()(p);
                //
                if (is_solids) {
-                  if (void_frac->operator()(p) != 0) {
+                  if (void_frac->operator()(p,0) != 0) {
                      pvalue = 0.; adv_value = 0.;
                   }
                }
@@ -2651,7 +2651,7 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
                if ( cpp==comp ) rhs += - bodyterm*cellV;
 
                if (is_solids) {
-                  if (void_frac->operator()(p) != 0) {
+                  if (void_frac->operator()(p,0) != 0) {
                      if ( cpp==comp ) rhs += bodyterm*cellV;
                   }
                }
@@ -2885,7 +2885,7 @@ DS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list 
   size_t_vector max_unknown_index(3,0);
 
   // Vector for solid presence
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+  size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
 
   for (size_t comp = 0; comp < nb_comps[1]; comp++) {
      // Get local min and max indices
@@ -2911,8 +2911,8 @@ DS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list 
               double zC = (dim == 2) ? 0 : UF->get_DOF_coordinate( k, comp, 2 );
               geomVector pt(xC,yC,zC);
               size_t p = UF->DOF_local_number(i,j,k,comp);
-              if (void_frac->operator()(p) != 0) {
-                 size_t par_id = void_frac->operator()(p) - 1;
+              if (void_frac->operator()(p,0) != 0) {
+                 size_t par_id = void_frac->operator()(p,0) - 1;
                  geomVector rb_vel = allrigidbodies->rigid_body_velocity(par_id,pt);
 					  // geomVector rb_vel = allrigidbodies->rigid_body_GC_velocity(par_id);
                  for (size_t level : list)
@@ -2948,7 +2948,7 @@ DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
                      allrigidbodies->get_intersect_distance_on_grid(PF) : 0;
    doubleArray2D* intersect_fieldVal = (is_solids) ?
                      allrigidbodies->get_intersect_fieldValue_on_grid(PF) : 0;
-   size_t_vector* void_frac = (is_solids) ?
+   size_t_array2D* void_frac = (is_solids) ?
 							allrigidbodies->get_void_fraction_on_grid(PF) : 0;
 
    size_t p = PF->DOF_local_number(i,j,k,comp);
@@ -2968,7 +2968,7 @@ DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
    double by = yh;
 
    if (is_solids && StencilCorrection == "FD") {
-      if (void_frac->operator()(p) == 0) {
+      if (void_frac->operator()(p,0) == 0) {
          if (intersect_vector->operator()(p,2*0+0) == 1) {
             xvalue = UF->DOF_value( shift.i+i, j, k, 0, level)
                    - intersect_fieldVal->operator()(p,2*0+0);
@@ -2994,7 +2994,7 @@ DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
    }
 
    if (is_solids && StencilCorrection == "FD") {
-      if (void_frac->operator()(p) == 0) {
+      if (void_frac->operator()(p,0) == 0) {
          if (intersect_vector->operator()(p,2*1+0) == 1) {
             yvalue = UF->DOF_value( i, shift.j+j, k, 1, level)
                    - intersect_fieldVal->operator()(p,2*1+0);
@@ -3034,7 +3034,7 @@ DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
       double bz = zh;
 
       if (is_solids && StencilCorrection == "FD") {
-         if (void_frac->operator()(p) == 0) {
+         if (void_frac->operator()(p,0) == 0) {
             if (intersect_vector->operator()(p,2*2+0) == 1) {
                zvalue = UF->DOF_value( i, j, shift.k+k, 2, level)
                       - intersect_fieldVal->operator()(p,2*2+0);
@@ -3106,7 +3106,7 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( FV_TimeIterator const* t_i
    MAC_LABEL("DS_NavierStokes:: assemble_velocity_advection_terms" ) ;
 
 	vector<doubleVector*> advection = GLOBAL_EQ->get_velocity_advection();
-	size_t_vector* void_frac = (is_solids) ?
+	size_t_array2D* void_frac = (is_solids) ?
 							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
 	size_t_vector min_unknown_index(3,0);
@@ -3176,7 +3176,7 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( FV_TimeIterator const* t_i
 													wht[5]/sum * advection[0]->operator()(p);
 								}
 								advection[0]->operator()(p) = 0.;
-							} else if ((sum == 0.) && (void_frac->operator()(p) != 0)) {
+							} else if ((sum == 0.) && (void_frac->operator()(p,0) != 0)) {
 								advection[0]->operator()(p) = 0.;
 							}
 						}
@@ -3263,7 +3263,7 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 			}
 		}
 
-		size_t_vector* void_frac = (is_solids) ? allrigidbodies->get_void_fraction_on_grid(FF) : 0;
+		size_t_array2D* void_frac = (is_solids) ? allrigidbodies->get_void_fraction_on_grid(FF) : 0;
 
 		// Flux redistribution
 		if ((StencilCorrection == "CutCell") && (FF == UF)) {
@@ -3307,7 +3307,7 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 													wht[5]/sum * divergence->operator()(p,0);
 								}
 								divergence->operator()(p,0) = 0.;
-							} else if ((sum == 0.) && (void_frac->operator()(p) != 0)) {
+							} else if ((sum == 0.) && (void_frac->operator()(p,0) != 0)) {
 								divergence->operator()(p,0) = 0.;
 							}
 						}
@@ -3422,7 +3422,7 @@ DS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
   }
 
   NodeProp node = GLOBAL_EQ->get_node_property(0,0);
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
+  size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
 
   size_t comp = 0;
 
@@ -3431,28 +3431,28 @@ DS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
         for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
            size_t p = PF->DOF_local_number(i,j,k,comp);
            node.bound_cell->set_item(p,0.);
-           if (void_frac->operator()(p) != 0) {
+           if (void_frac->operator()(p,0) != 0) {
               double value = 0., count = 0.;
               size_t p1 = PF->DOF_local_number(i+1,j,k,comp);
               size_t p2 = PF->DOF_local_number(i-1,j,k,comp);
               size_t p3 = PF->DOF_local_number(i,j+1,k,comp);
               size_t p4 = PF->DOF_local_number(i,j-1,k,comp);
-              if (void_frac->operator()(p1) == 0) {
+              if (void_frac->operator()(p1,0) == 0) {
                  node.bound_cell->set_item(p,1.);
                  value += PF->DOF_value( i+1, j, k, comp, level );
                  count += 1.;
               }
-              if (void_frac->operator()(p2) == 0) {
+              if (void_frac->operator()(p2,0) == 0) {
                  node.bound_cell->set_item(p,1.);
                  value += PF->DOF_value( i-1, j, k, comp, level );
                  count += 1.;
               }
-              if (void_frac->operator()(p3) == 0) {
+              if (void_frac->operator()(p3,0) == 0) {
                  node.bound_cell->set_item(p,1.);
                  value += PF->DOF_value( i, j+1, k, comp, level );
                  count += 1.;
               }
-              if (void_frac->operator()(p4) == 0) {
+              if (void_frac->operator()(p4,0) == 0) {
                  node.bound_cell->set_item(p,1.);
                  value += PF->DOF_value( i, j-1, k, comp, level );
                  count += 1.;
@@ -3462,12 +3462,12 @@ DS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
                  size_t p5 = PF->DOF_local_number(i,j,k+1,comp);
                  size_t p6 = PF->DOF_local_number(i,j,k-1,comp);
 
-                 if (void_frac->operator()(p5) == 0) {
+                 if (void_frac->operator()(p5,0) == 0) {
                     node.bound_cell->set_item(p,1.);
                     value += PF->DOF_value( i, j, k+1, comp, level );
                     count += 1.;
                  }
-                 if (void_frac->operator()(p6) == 0) {
+                 if (void_frac->operator()(p6,0) == 0) {
                     node.bound_cell->set_item(p,1.);
                     value += PF->DOF_value( i, j, k-1, comp, level );
                     count += 1.;
@@ -3501,7 +3501,7 @@ DS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
   }
 
   NodeProp node = GLOBAL_EQ->get_node_property(0,0);
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
+  size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
 
   size_t comp = 0;
 
@@ -3509,7 +3509,7 @@ DS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
      for (size_t j = min_unknown_index(1);j <= max_unknown_index(1); ++j) {
         for (size_t k = min_unknown_index(2);k <= max_unknown_index(2); ++k) {
            size_t p = PF->DOF_local_number(i,j,k,comp);
-           if ((void_frac->operator()(p) != 0)
+           if ((void_frac->operator()(p,0) != 0)
             && (node.bound_cell->item(p) == 0)) {
               double value = 0., count = 0.;
               size_t p1 = PF->DOF_local_number(i+1,j,k,comp);
@@ -3581,7 +3581,7 @@ DS_NavierStokes:: correct_mean_pressure (size_t const& level )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
-  size_t_vector* void_frac = (is_solids) ?
+  size_t_array2D* void_frac = (is_solids) ?
   						allrigidbodies->get_void_fraction_on_grid(PF) : 0;
   size_t comp = 0;
 
@@ -3592,7 +3592,7 @@ DS_NavierStokes:: correct_mean_pressure (size_t const& level )
         for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
            if (is_solids) {
               size_t p = PF->DOF_local_number(i,j,k,comp);
-              if (void_frac->operator()(p) == 0) {
+              if (void_frac->operator()(p,0) == 0) {
                  mean += PF->DOF_value( i, j, k, comp, level );
                  nb_global_unknown += 1.;
               }
@@ -3611,7 +3611,7 @@ DS_NavierStokes:: correct_mean_pressure (size_t const& level )
         for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
            if (is_solids) {
               size_t p = PF->DOF_local_number(i,j,k,comp);
-              if (void_frac->operator()(p) == 0) {
+              if (void_frac->operator()(p,0) == 0) {
                  double value = PF->DOF_value( i, j, k, comp, level );
 					  PF->set_DOF_value( i, j, k, comp, level, value-mean);
               }
@@ -3757,7 +3757,7 @@ DS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
 
-  size_t_vector* void_frac = (is_solids) ?
+  size_t_array2D* void_frac = (is_solids) ?
                     allrigidbodies->get_void_fraction_on_grid(FF) : 0;
   size_t_array2D* intersect_vector = (is_solids) ?
                     allrigidbodies->get_intersect_vector_on_grid(FF) : 0;
@@ -3792,7 +3792,7 @@ DS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
 
               outputFile << xC << "," << yC << "," << zC
 				  << "," << p
-              << "," << void_frac->operator()(p)
+              << "," << void_frac->operator()(p,0)
 				  << "," << divergence->operator()(p,0)
               << "," << intersect_vector->operator()(p,0)
               << "," << intersect_distance->operator()(p,0)
@@ -3893,7 +3893,7 @@ DS_NavierStokes::output_L2norm_pressure( size_t const& level )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
-  size_t_vector* void_frac = (is_solids) ?
+  size_t_array2D* void_frac = (is_solids) ?
   									  allrigidbodies->get_void_fraction_on_grid(PF) : 0;
 
   for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
@@ -3906,7 +3906,7 @@ DS_NavierStokes::output_L2norm_pressure( size_t const& level )
            max_P = MAC::max( MAC::abs(cell_P), max_P );
            if (is_solids) {
               size_t p = PF->DOF_local_number(i,j,k,0);
-              if (void_frac->operator()(p) == 0) {
+              if (void_frac->operator()(p,0) == 0) {
                  L2normP += cell_P * cell_P * dx * dy * dz;
               }
            } else {
@@ -3980,7 +3980,7 @@ DS_NavierStokes::output_L2norm_velocity( size_t const& level )
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
 
-  size_t_vector* void_frac = (is_solids) ?
+  size_t_array2D* void_frac = (is_solids) ?
   									allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
   for (size_t comp = 0; comp < nb_comps[1]; comp++) {
@@ -4004,7 +4004,7 @@ DS_NavierStokes::output_L2norm_velocity( size_t const& level )
               max_U = MAC::max( MAC::abs(cell_U), max_U );
               if (is_solids) {
                  size_t p = UF->DOF_local_number(i,j,k,comp);
-                 if (void_frac->operator()(p) == 0) {
+                 if (void_frac->operator()(p,0) == 0) {
                     L2normU += cell_U * cell_U * dx * dy * dz;
                  }
               } else {

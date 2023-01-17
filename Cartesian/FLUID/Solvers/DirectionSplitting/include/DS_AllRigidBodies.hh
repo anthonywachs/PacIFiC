@@ -147,7 +147,7 @@ class DS_AllRigidBodies
       DS_RigidBody* get_ptr_rigid_body( size_t i );
 
       /** @brief Returns the void_fraction on field FF */
-      size_t_vector* get_void_fraction_on_grid( FV_DiscreteField const* FF );
+      size_t_array2D* get_void_fraction_on_grid( FV_DiscreteField const* FF );
 
       /** @brief Returns the ID of rigid body present on the field FF */
       size_t_vector* get_rigidbodyIDs_on_grid( FV_DiscreteField const* FF );
@@ -591,7 +591,7 @@ class DS_AllRigidBodies
       double surface_cell_scale; /**< a variable to store the scale of surface
       cell on the RB as compared with computational grid cell size */
 
-      vector<size_t_vector*> void_fraction; /**< vector of void fraction the
+      vector<size_t_array2D*> void_fraction; /**< vector of void fraction the
       field grid nodes, 0 in fluid and (parID+1) in the rigid bodies*/
 
       vector<doubleArray3D*> CC_face_centroid; /**< centroid of the cut faces

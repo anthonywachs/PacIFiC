@@ -1125,7 +1125,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
                if (level_set_value(parID,xC,yC,zC) < threshold)
                // if (isIn(parID,xC,yC,zC))
-                    void_fraction[field]->operator()(p) = 1 + parID;
+                    void_fraction[field]->operator()(p,0) = 1 + parID;
              }
            }
         }
@@ -2132,7 +2132,7 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor (
       for (size_t dir = 0; dir < m_space_dimension; dir++) {
          for (size_t side = 0; side < 2; side++) {
             if ((p_face[2*dir+side] <= FF_UNK_MAX)
-             && (void_fraction[field]->operator()(p_face[2*dir+side]) == 0)
+             && (void_fraction[field]->operator()(p_face[2*dir+side],0) == 0)
              && (CC_cell_volume[field]->operator()(p_face[2*dir+side],0) >= factor * dx * dy * dz)) {
                // wht[2*dir+side] = (void_fraction[field]->operator()(p_face[2*dir+side]) == 0) ?
                wht[2*dir+side] = CC_RB_normal[field]->operator()(p,dir)
@@ -2170,7 +2170,7 @@ bool DS_AllRigidBodies:: is_neighbor_inSolids(FV_DiscreteField const* FF
      for (int di = -1; di <= 1 && !flag; di++) {
         for (int dj = -1; dj <= 1 && !flag; dj++) {
            size_t p = FF->DOF_local_number(i+di, j+dj, k, comp);
-           if ((p <= FF_UNK_MAX) && (void_fraction[field]->operator()(p) != 0))
+           if ((p <= FF_UNK_MAX) && (void_fraction[field]->operator()(p,0) != 0))
              flag = true;
         }
      }
@@ -2179,7 +2179,7 @@ bool DS_AllRigidBodies:: is_neighbor_inSolids(FV_DiscreteField const* FF
        for (int dj = -1; dj <= 1 && !flag; dj++) {
           for (int dk = -1; dk <= 1 && !flag; dk++) {
              size_t p = FF->DOF_local_number(i+di, j+dj, k+dk, comp);
-             if ((p <= FF_UNK_MAX) && (void_fraction[field]->operator()(p) != 0))
+             if ((p <= FF_UNK_MAX) && (void_fraction[field]->operator()(p,0) != 0))
                 flag = true;
           }
        }
@@ -2509,7 +2509,7 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                  size_t p = FF->DOF_local_number(i,j,k,comp);
                  geomVector source(xC,yC,zC);
 
-                 if (void_fraction[field]->operator()(p) == 0) {
+                 if (void_fraction[field]->operator()(p,0) == 0) {
                     for (size_t dir = 0; dir < m_space_dimension; dir++) {
                        for (size_t off = 0; off < 2; off++) {
                           size_t col = 2*dir + off;
@@ -2528,7 +2528,7 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                            (size_t)ineigh(0),(size_t)ineigh(1),(size_t)ineigh(2)
                                                                          ,comp);
 
-                            if (void_fraction[field]->operator()(neigh_num)
+                            if (void_fraction[field]->operator()(neigh_num,0)
                                                                   == parID+1) {
                                double t = m_allDSrigidbodies[parID]
                                     ->get_distanceTo( source, rayDir, delta );
@@ -2651,7 +2651,7 @@ void DS_AllRigidBodies:: clear_GrainsRB_data_on_grid(
 
                  size_t p = FF->DOF_local_number(i,j,k,comp);
 
-                 if (void_fraction[field]->operator()(p) == parID + 1) {
+                 if (void_fraction[field]->operator()(p,0) == parID + 1) {
                     for (size_t dir = 0; dir < m_space_dimension; dir++) {
                        for (size_t off = 0; off < 2; off++) {
                           size_t col = (off == 0 ) ? 2*dir + 1 : 2*dir;
@@ -2675,7 +2675,7 @@ void DS_AllRigidBodies:: clear_GrainsRB_data_on_grid(
                           }
                        }
                     }
-                    void_fraction[field]->operator()(p) = 0;
+                    void_fraction[field]->operator()(p,0) = 0;
                  }
               }
            }
@@ -2698,9 +2698,9 @@ void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
 
    // Reserving three location in memory for PF, UF, TF grid, respectively.
    void_fraction.reserve(3);
-   void_fraction.push_back(new size_t_vector(1,0));
-   void_fraction.push_back(new size_t_vector(1,0));
-   void_fraction.push_back(new size_t_vector(1,0));
+   void_fraction.push_back(new size_t_array2D(1,1,0));
+   void_fraction.push_back(new size_t_array2D(1,1,0));
+   void_fraction.push_back(new size_t_array2D(1,1,0));
    intersect_vector.reserve(3);
    intersect_vector.push_back(new size_t_array2D(1,1,0));
    intersect_vector.push_back(new size_t_array2D(1,1,0));
@@ -4243,14 +4243,14 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
    for (size_t i = 0; i < 2; i++) {     // 0 --> left; 1 --> right
       size_t col_top = 2*dir2 + 1;
       size_t col_bot = 2*dir2 + 0;
-      if ((field == 0) || ((void_fraction[field]->operator()(p(i,0)) == 0)
-                        && (void_fraction[field]->operator()(p(i,1)) == 0))) {
+      if ((field == 0) || ((void_fraction[field]->operator()(p(i,0),0) == 0)
+                        && (void_fraction[field]->operator()(p(i,1),0) == 0))) {
          fwall(0,i) = ((extents(dir2,1) - pt->operator()(dir2))*f(i,0)
                      + (pt->operator()(dir2) - extents(dir2,0))*f(i,1))
                      / (extents(dir2,1)-extents(dir2,0));
          del_wall(0,i) = MAC::abs(extents(dir1,i) - pt->operator()(dir1));
       // if bottom vertex is in fluid domain
-      } else if ((void_fraction[field]->operator()(p(i,0)) == 0)
+      } else if ((void_fraction[field]->operator()(p(i,0),0) == 0)
            && (intersect_vector[field]->operator()(p(i,0),col_top) == 1)) {
          double yint = intersect_distance[field]->operator()(p(i,0),col_top);
          // Condition where intersection distance is more than
@@ -4265,7 +4265,7 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
          // Ghost point cannot be projected on the cell wall
          // as the solid surface come first
          } else {
-            size_t id = void_fraction[field]->operator()(p(i,1)) - 1;
+            size_t id = void_fraction[field]->operator()(p(i,1),0) - 1;
             geomVector rayDir(3);
             rayDir(dir1) = (i == 0) ? -1 : 1 ;
             del_wall(0,i) = m_allDSrigidbodies[id]
@@ -4280,7 +4280,7 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             fwall(0,i) = net_vel(comp);
          }
       // if top vertex is in fluid domain
-      } else if ((void_fraction[field]->operator()(p(i,1)) == 0)
+      } else if ((void_fraction[field]->operator()(p(i,1),0) == 0)
            && (intersect_vector[field]->operator()(p(i,1),col_bot) == 1)) {
          double yint = intersect_distance[field]->operator()(p(i,1),col_bot);
          // Condition where intersection distance is more than
@@ -4295,7 +4295,7 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
          // Ghost point cannot be projected on the cell wall
          // as the solid surface come first
          } else {
-            size_t id = void_fraction[field]->operator()(p(i,0)) - 1;
+            size_t id = void_fraction[field]->operator()(p(i,0),0) - 1;
             geomVector rayDir(3);
             rayDir(dir1) = (i == 0) ? -1 : 1 ;
             del_wall(0,i) = m_allDSrigidbodies[id]
@@ -4310,10 +4310,10 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             fwall(0,i) = net_vel(comp);
          }
       // if both vertex's are in solid domain
-      } else if ((void_fraction[field]->operator()(p(i,0)) != 0)
-              && (void_fraction[field]->operator()(p(i,1)) != 0)) {
+      } else if ((void_fraction[field]->operator()(p(i,0),0) != 0)
+              && (void_fraction[field]->operator()(p(i,1),0) != 0)) {
 
-         size_t id = void_fraction[field]->operator()(p(i,0)) - 1;
+         size_t id = void_fraction[field]->operator()(p(i,0),0) - 1;
          geomVector rayDir(3);
          rayDir(dir1) = (i == 0) ? -1 : 1 ;
          del_wall(0,i) = m_allDSrigidbodies[id]
@@ -4333,14 +4333,14 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
    for (size_t j = 0; j < 2; j++) {         // 0 --> bottom; 1 --> top
       size_t col_right = 2*dir1 + 1;
       size_t col_left = 2*dir1 + 0;
-      if ((field == 0) || ((void_fraction[field]->operator()(p(0,j)) == 0)
-                        && (void_fraction[field]->operator()(p(1,j)) == 0))) {
+      if ((field == 0) || ((void_fraction[field]->operator()(p(0,j),0) == 0)
+                        && (void_fraction[field]->operator()(p(1,j),0) == 0))) {
          fwall(1,j) = ((extents(dir1,1) - pt->operator()(dir1)) * f(0,j)
                      + (pt->operator()(dir1) - extents(dir1,0)) * f(1,j))
                      / (extents(dir1,1) - extents(dir1,0));
          del_wall(1,j) = MAC::abs(extents(dir2,j) - pt->operator()(dir2));
       // if left vertex is in fluid domain
-      } else if ((void_fraction[field]->operator()(p(0,j)) == 0)
+      } else if ((void_fraction[field]->operator()(p(0,j),0) == 0)
            && (intersect_vector[field]->operator()(p(0,j),col_right) == 1)) {
          double xint = intersect_distance[field]->operator()(p(0,j),col_right);
          // Condition where intersection distance is more than
@@ -4355,7 +4355,7 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
          // Ghost point cannot be projected on the cell wall
          // as the solid surface come first
          } else {
-            size_t id = void_fraction[field]->operator()(p(1,j)) - 1;
+            size_t id = void_fraction[field]->operator()(p(1,j),0) - 1;
             geomVector rayDir(3);
             rayDir(dir2) = (j == 0) ? -1 : 1 ;
             del_wall(1,j) = m_allDSrigidbodies[id]
@@ -4370,7 +4370,7 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             fwall(1,j) = net_vel(comp);
          }
       // if right vertex is in fluid domain
-      } else if ((void_fraction[field]->operator()(p(1,j)) == 0)
+      } else if ((void_fraction[field]->operator()(p(1,j),0) == 0)
            && (intersect_vector[field]->operator()(p(1,j),col_left) == 1)) {
 
          double xint = intersect_distance[field]->operator()(p(1,j),col_left);
@@ -4386,7 +4386,7 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
          // Ghost point cannot be projected on the cell wall
          // as the solid surface come first
          } else {
-            size_t id = void_fraction[field]->operator()(p(0,j)) - 1;
+            size_t id = void_fraction[field]->operator()(p(0,j),0) - 1;
             geomVector rayDir(3);
             rayDir(dir2) = (j == 0) ? -1 : 1 ;
             del_wall(1,j) = m_allDSrigidbodies[id]
@@ -4401,9 +4401,9 @@ double DS_AllRigidBodies:: Bilinear_interpolation ( FV_DiscreteField const* FF
             fwall(1,j) = net_vel(comp);
          }
       // if both vertex's are in solid domain
-      } else if ((void_fraction[field]->operator()(p(0,j)) != 0)
-              && (void_fraction[field]->operator()(p(1,j)) != 0)) {
-         size_t id = void_fraction[field]->operator()(p(0,j)) - 1 ;
+      } else if ((void_fraction[field]->operator()(p(0,j),0) != 0)
+              && (void_fraction[field]->operator()(p(1,j),0) != 0)) {
+         size_t id = void_fraction[field]->operator()(p(0,j),0) - 1 ;
          geomVector rayDir(3);
          rayDir(dir2) = (j == 0) ? -1 : 1 ;
          del_wall(1,j) = m_allDSrigidbodies[id]
@@ -4509,7 +4509,7 @@ DS_AllRigidBodies:: Biquadratic_interpolation ( FV_DiscreteField const* FF
          node_index(l) = FF->DOF_local_number( i0_ghost[l](0)
                                              , i0_ghost[l](1)
                                              , i0_ghost[l](2),comp);
-         in_solid(l) = void_fraction[field]->operator()(node_index(l));
+         in_solid(l) = void_fraction[field]->operator()(node_index(l),0);
       }
    }
 
@@ -5152,7 +5152,7 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    size_t FF_LOC_UNK = FF->nb_local_unknowns();
 
    // void fraction on the computational grid
-   void_fraction[field]->re_initialize(FF_LOC_UNK);
+   void_fraction[field]->re_initialize(FF_LOC_UNK,2);
 
    // Intersection parameters on the computational grid
    // For PF and UF
@@ -5195,7 +5195,7 @@ int DS_AllRigidBodies:: field_num( FV_DiscreteField const* FF )
 
 
 //---------------------------------------------------------------------------
-size_t_vector* DS_AllRigidBodies:: get_void_fraction_on_grid(
+size_t_array2D* DS_AllRigidBodies:: get_void_fraction_on_grid(
                                                 FV_DiscreteField const* FF )
 //---------------------------------------------------------------------------
 {
