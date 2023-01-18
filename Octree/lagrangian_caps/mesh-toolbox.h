@@ -660,13 +660,13 @@ void pv_output_ascii() {
   sprintf(filename, "caps_%d_T%d.vtk", j, pv_timestep);
   file = fopen(filename, "w");
 
-  // Populate the header and other non-data fields 
+  /* Populate the header and other non-data fields */
   fprintf(file, "# vtk DataFile Version 4.2\n");
   fprintf(file, "Capsules at time %g\n", t);
   fprintf(file, "ASCII\n");
   fprintf(file, "DATASET POLYDATA\n");
 
-  // Populate the coordinates of all the Lagrangian nodes 
+  /* Populate the coordinates of all the Lagrangian nodes */ 
   int nbpts_tot = MB(j).nlp;
   fprintf(file, "POINTS %d double\n", nbpts_tot);
     for(int k=0; k<nbpts_tot; k++) {
@@ -674,7 +674,7 @@ void pv_output_ascii() {
         MB(j).nodes[k].pos.z);
     }
   
-  // Populate the connectivity of the triangles 
+  /* Populate the connectivity of the triangles */
   int nbtri_tot = MB(j).nlt;
   fprintf(file, "TRIANGLE_STRIPS %d %d\n", nbtri_tot, 4*nbtri_tot);
     for(int k=0; k<nbtri_tot; k++) {
