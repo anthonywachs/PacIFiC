@@ -30,7 +30,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies()
 DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , istream& in
                                   , bool const& b_particles_as_fixed_obstacles
-                                  , FV_DiscreteField const* arb_UF
+                                  , FV_DiscreteField * arb_UF
                                   , FV_DiscreteField const* arb_PF
                                   , double const& arb_rho
                                   , MAC_DoubleVector const* arb_gv
@@ -1040,6 +1040,137 @@ void DS_AllRigidBodies:: compute_void_fraction_on_epsilon_grid(
 
 
 //---------------------------------------------------------------------------
+void DS_AllRigidBodies:: extrapolate_on_fresh_nodes(FV_DiscreteField * FF
+                                                  , vector<size_t> const& list)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: extrapolate_on_fresh_nodes" ) ;
+
+  size_t nb_comps = FF->nb_components() ;
+  size_t field = field_num(FF) ;
+
+  boolVector const* periodic_comp = MESH->get_periodic_directions();
+
+  // Get local min and max indices;
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
+
+  size_t i0_temp = 0;
+
+  for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                               it != local_RB_list.end() ; ++it) {
+     size_t parID = *it;
+     geomVector const* pgc = m_allDSrigidbodies[parID]->get_ptr_to_gravity_centre();
+
+     vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
+                                                   ->get_rigid_body_haloZone();
+     // Calculation on the indexes near the rigid body
+     for (size_t comp = 0; comp < nb_comps; ++comp) {
+        for (size_t dir = 0; dir < m_space_dimension; ++dir) {
+           // Calculations for solids on the total unknown on the proc
+           min_unknown_index(dir) =
+                   FF->get_min_index_unknown_handled_by_proc( comp, dir );
+           max_unknown_index(dir) =
+                   FF->get_max_index_unknown_handled_by_proc( comp, dir );
+
+           bool is_periodic = periodic_comp->operator()( dir );
+           double domain_min = MESH->get_main_domain_min_coordinate( dir );
+           double domain_max = MESH->get_main_domain_max_coordinate( dir );
+
+           bool found =FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+                                       , haloZone[0]->operator()(dir)
+                                       , i0_temp) ;
+           size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
+
+
+           found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+                                   , haloZone[1]->operator()(dir)
+                                   , i0_temp) ;
+           size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
+
+           if (is_periodic &&
+              ((haloZone[1]->operator()(dir) > domain_max)
+            || (haloZone[0]->operator()(dir) < domain_min))) {
+              index_min = min_unknown_index(dir);
+              index_max = max_unknown_index(dir);
+           }
+
+           min_unknown_index(dir) = MAC::max(min_unknown_index(dir),index_min);
+           max_unknown_index(dir) = MAC::min(max_unknown_index(dir),index_max);
+
+        }
+
+        for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+           double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
+           double dx = FF->get_cell_size(i, comp, 0);
+           for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+              double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
+              double dy = FF->get_cell_size( j, comp, 1 ) ;
+              for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+                 double zC = (m_space_dimension == 3)
+                           ? FF->get_DOF_coordinate( k, comp, 2 ) : 0.;
+                 double dz = (m_space_dimension == 3)
+                           ? FF->get_cell_size( k, comp, 2 ) : 0.;
+
+                 size_t p = FF->DOF_local_number(i,j,k,comp);
+                 if (fresh_node[field]->operator()(p)
+                 && (void_fraction[field]->operator()(p,1) == parID+1)) {
+                    geomVector normal(3);
+                    geomVector pt0(xC, yC, zC);
+                    geomVector pt1(3), pt2(3);
+                    normal(0) = pt0(0) - pgc->operator()(0);
+                    normal(1) = pt0(1) - pgc->operator()(1);
+                    normal(2) = pt0(2) - pgc->operator()(2);
+
+                    normal /= normal.calcNorm();
+
+                    double delta = MAC::sqrt(dx*dx + dy*dy + dz*dz);
+                    pt1 = pt0 + delta*normal;
+                    pt2 = pt1 + delta*normal;
+
+                    size_t_vector i1(3), i2(3);
+                 	  for (size_t l = 0; l < m_space_dimension; l++) {
+              		     bool found = FV_Mesh::between( FF->get_DOF_coordinates_vector(comp,l),
+                 		                                   pt1(l), i0_temp);
+                       if (found) i1(l) = i0_temp;
+                       found = FV_Mesh::between( FF->get_DOF_coordinates_vector(comp,l),
+                 		                                   pt2(l), i0_temp);
+                       if (found) i2(l) = i0_temp;
+                 	  }
+
+                 	  // Calculation of fpt1
+                 	  size_t_vector face_vector(3,0);
+                 	  face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
+                    for (size_t level : list) {
+                    	  double fpt1 = (m_space_dimension == 2) ?
+                                    Bilinear_interpolation(FF, comp, &pt1, i1, face_vector, {level})
+           				             : Trilinear_interpolation(FF, comp, &pt1, i1, parID, {level}) ;
+
+                       double fpt2 = (m_space_dimension == 2) ?
+                                   Bilinear_interpolation(FF, comp, &pt2, i2, face_vector, {level})
+          				             : Trilinear_interpolation(FF, comp, &pt2, i2, parID, {level}) ;
+                       double value = (2. * fpt1 - fpt2);
+
+                       if (level == 0) {
+                          std::cout << pt0(0) << "," << pt0(1) << "," << pt0(2) << "," << value << endl;
+                          std::cout << pt1(0) << "," << pt1(1) << "," << pt1(2) << "," << fpt1 << endl;
+                          std::cout << pt2(0) << "," << pt2(1) << "," << pt2(2) << "," << fpt2 << endl;
+                       }
+
+                       FF->set_DOF_value(i, j, k, comp, level, value);
+                    }
+                 }
+              }
+           }
+        }
+     }
+  }
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_AllRigidBodies:: compute_fresh_nodes(FV_DiscreteField const* FF)
 //---------------------------------------------------------------------------
 {
@@ -1719,7 +1850,7 @@ void DS_AllRigidBodies:: compute_cutCell_geometric_parameters(
                                  , CC_RB_normal[field]->operator()(p,1)
                                  , CC_RB_normal[field]->operator()(p,2));
                  volume += (cellCen - RBcen).operator,(RBnorm);
-                 CC_cell_volume[field]->operator()(p,0) = volume * (1./m_space_dimension);
+                 CC_cell_volume[field]->operator()(p,0) = volume * (1./(double)m_space_dimension);
               } else {
                  CC_cell_volume[field]->operator()(p,0) = (m_space_dimension == 2) ? dx * dy : dx * dy * dz;
               }// is_neighbor_inSolids

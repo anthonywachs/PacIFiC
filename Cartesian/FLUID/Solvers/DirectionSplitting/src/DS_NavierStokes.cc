@@ -400,6 +400,9 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		if (dim == 3) vec.push_back(4);
 		initialize_grid_nodes_on_rigidbody(vec);
 
+		// Extrapolate advecvtion term on fresh nodes
+		allrigidbodies->extrapolate_on_fresh_nodes(UF,{2});
+
 	   // Direction splitting
       // Assemble 1D tridiagonal matrices
       assemble_1D_matrices(PF,t_it);
@@ -2253,12 +2256,12 @@ DS_NavierStokes:: compute_adv_component ( FV_TimeIterator const* t_it,
 						  * CC_vol->operator()(p,0);
    }
 
-	boolVector* fresh_node = (is_solids) ? allrigidbodies->get_fresh_nodes(UF) : 0;
+	// boolVector* fresh_node = (is_solids) ? allrigidbodies->get_fresh_nodes(UF) : 0;
 
-   if (( AdvectionTimeAccuracy == 1 ) || (fresh_node->operator()(p))) {
+   if (( AdvectionTimeAccuracy == 1 )) {// || (fresh_node->operator()(p))) {
       value = ugradu;
-		if (fresh_node->operator()(p))
-			UF->set_DOF_value(i,j,k,comp,2,ugradu);
+		// if (fresh_node->operator()(p))
+		// 	UF->set_DOF_value(i,j,k,comp,2,ugradu);
    } else {
       value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
       UF->set_DOF_value(i,j,k,comp,2,ugradu);

@@ -67,7 +67,7 @@ class DS_AllRigidBodies
       DS_AllRigidBodies( size_t& dimens
                        , istream& in
                        , bool const& b_particles_as_fixed_obstacles
-                       , FV_DiscreteField const* arb_UF
+                       , FV_DiscreteField * arb_UF
                        , FV_DiscreteField const* arb_PF
                        , double const& arb_rho
                        , MAC_DoubleVector const* arb_gv
@@ -349,6 +349,12 @@ class DS_AllRigidBodies
       @param is_in_time_iter true if method called in time iteration */
       void compute_void_fraction_on_grid( FV_DiscreteField const* FF
                                         , bool const& is_in_time_iter );
+
+      /** @brief Extrapolate the field value on fresh nodes at level
+      @param FF the fluid field (PF, UF)
+      @param level level */
+      void extrapolate_on_fresh_nodes(FV_DiscreteField * FF
+                                    , vector<size_t> const& list);
 
       /** @brief Compute fresh nodes in the computational domain
       @param FF the fluid field (PF, UF) */
