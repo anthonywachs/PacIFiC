@@ -652,44 +652,42 @@ void dump_plain_triangles(lagMesh* mesh, char* filename) {
 int pv_timestep = 0;
 
 void pv_output_ascii() {
+
+  for(int j=0; j<NCAPS; j++) { 
+
   char filename[128];
   FILE* file;
-  sprintf(filename, "caps_T%d.vtk", pv_timestep);
+  sprintf(filename, "caps_%d_T%d.vtk", j, pv_timestep);
   file = fopen(filename, "w");
 
-  /** Populate the header and other non-data fields */
+  // Populate the header and other non-data fields 
   fprintf(file, "# vtk DataFile Version 4.2\n");
   fprintf(file, "Capsules at time %g\n", t);
   fprintf(file, "ASCII\n");
   fprintf(file, "DATASET POLYDATA\n");
 
-  /** Populate the coordinates of all the Lagrangian nodes */
-  int nbpts_tot = 0;
-  for(int j=0; j<NCAPS; j++) nbpts_tot += MB(j).nlp;
+  // Populate the coordinates of all the Lagrangian nodes 
+  int nbpts_tot = MB(j).nlp;
   fprintf(file, "POINTS %d double\n", nbpts_tot);
-  for(int j=0; j<NCAPS; j++) {
-    for(int k=0; k<MB(j).nlp; k++) {
+    for(int k=0; k<nbpts_tot; k++) {
       fprintf(file, "%g %g %g\n", MB(j).nodes[k].pos.x, MB(j).nodes[k].pos.y,
         MB(j).nodes[k].pos.z);
     }
-  }
-
-  /** Populate the connectivity of the triangles */
-  int nbtri_tot = 0;
-  for(int j=0; j<NCAPS; j++) nbtri_tot += MB(j).nlt;
+  
+  // Populate the connectivity of the triangles 
+  int nbtri_tot = MB(j).nlt;
   fprintf(file, "TRIANGLE_STRIPS %d %d\n", nbtri_tot, 4*nbtri_tot);
-  for(int j=0; j<NCAPS; j++) {
-    int offset = 0;
-    for(int k=0; k<MB(j).nlt; k++) {
+    for(int k=0; k<nbtri_tot; k++) {
       fprintf(file, "%d %d %d %d\n", 3,
-        offset + MB(j).triangles[k].node_ids[0],
-        offset + MB(j).triangles[k].node_ids[1],
-        offset + MB(j).triangles[k].node_ids[2]);
+        MB(j).triangles[k].node_ids[0],
+        MB(j).triangles[k].node_ids[1],
+        MB(j).triangles[k].node_ids[2]);
     }
-    offset += MB(j).nlp;
-  }
 
   fclose(file);
+
+  }
+
   pv_timestep++;
 }
 #endif
