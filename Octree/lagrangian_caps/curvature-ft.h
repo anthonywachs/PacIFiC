@@ -321,7 +321,7 @@ void comp_curvature(lagMesh* mesh) {
   }
 }
 
-void initialize_refcurv(lagMesh* mesh) {
+void initialize_refcurv_onecaps(lagMesh* mesh) {
   #if REF_CURV
     comp_curvature(mesh);
   #endif
@@ -338,8 +338,12 @@ void initialize_refcurv(lagMesh* mesh) {
   }
 }
 
-event init (i = 0) {
+void initialize_refcurv() {
   for(int i=0; i<mbs.nbmb; i++) {
-    initialize_refcurv(&MB(i));
+    initialize_refcurv_onecaps(&MB(i));
   }
+}
+
+event init (i = 0) {
+  initialize_refcurv();
 }
