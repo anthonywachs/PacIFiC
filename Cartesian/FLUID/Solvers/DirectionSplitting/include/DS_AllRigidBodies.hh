@@ -67,7 +67,7 @@ class DS_AllRigidBodies
       DS_AllRigidBodies( size_t& dimens
                        , istream& in
                        , bool const& b_particles_as_fixed_obstacles
-                       , FV_DiscreteField * arb_UF
+                       , FV_DiscreteField const* arb_UF
                        , FV_DiscreteField const* arb_PF
                        , double const& arb_rho
                        , MAC_DoubleVector const* arb_gv
@@ -350,11 +350,14 @@ class DS_AllRigidBodies
       void compute_void_fraction_on_grid( FV_DiscreteField const* FF
                                         , bool const& is_in_time_iter );
 
-      /** @brief Extrapolate the field value on fresh nodes at level
-      @param FF the fluid field (PF, UF)
-      @param level level */
-      void extrapolate_on_fresh_nodes(FV_DiscreteField * FF
-                                    , vector<size_t> const& list);
+      /** @brief Extrapolate the adv field value on fresh nodes */
+      void extrapolate_scalar_on_fresh_nodes(FV_DiscreteField * FF
+                                          , size_t const& level);
+
+
+      /** @brief Extrapolate the PF value on 1st layer of node in solid */
+      void extrapolate_pressure_inside_RB(FV_DiscreteField * FF
+                                          , size_t const& level);
 
       /** @brief Compute fresh nodes in the computational domain
       @param FF the fluid field (PF, UF) */
@@ -489,6 +492,24 @@ class DS_AllRigidBodies
                                         , vector<int> const& sign
                                         , vector<size_t> const& list);
 
+      // Only for quantities except UF (i.e. PF and Adv)
+      double Biquadratic_interpolation_for_scalars ( FV_DiscreteField const* FF
+                                      , size_t const& comp
+                                      , geomVector const* pt
+                                      , size_t_vector const& i0
+                                      , size_t const& interpol_dir
+                                      , int const& sign
+                                      , vector<size_t> const& list);
+
+      double Triquadratic_interpolation_for_scalars ( FV_DiscreteField const* FF
+                                       , size_t const& comp
+                                       , geomVector const* pt
+                                       , size_t_vector const& i0
+                                       , size_t const& parID
+                                       , size_t const& ghost_points_dir
+                                       , vector<int> const& sign
+                                       , vector<size_t> const& list);
+
       /** @brief Return the sum of interpolated field for all
       given list of levels on a point in 3D box including
       the corrections near the solid interface
@@ -513,6 +534,11 @@ class DS_AllRigidBodies
       @param parID rigid body ID */
       void first_order_pressure_stress( size_t const& parID );
 
+      /** @brief Calculate the second order pressure force and torque on parID
+      using extrapolations on fluid cells
+      @param parID rigid body ID */
+      void second_order_pressure_stress( size_t const& parID );
+
       /** @brief Calculate the first order viscous force and torque on parID
       @param parID rigid body ID */
       void first_order_viscous_stress( size_t const& parID );
@@ -530,7 +556,7 @@ class DS_AllRigidBodies
       void second_order_temperature_flux( size_t const& parID );
 
       /** @brief Calculate the pressure force and torque on all rigid bodies */
-      void compute_pressure_force_and_torque_for_allRB ();
+      void compute_pressure_force_and_torque_for_allRB (string const& StressOrder);
 
       /** @brief Calculate the viscous force and torque on all rigid bodies */
       void compute_viscous_force_and_torque_for_allRB (string const& StressOrder);

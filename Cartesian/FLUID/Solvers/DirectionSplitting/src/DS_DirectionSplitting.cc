@@ -84,6 +84,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , insertion_type ( "Grains3D" )
    , is_stressCal ( false )
    , ViscousStressOrder ( "second" )
+   , PressureStressOrder ( "first" )
    , surface_cell_scale ( 1. )
    , is_surfacestressOUT ( false )
    , stressCalFreq ( 1 )
@@ -194,6 +195,15 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
               string error_message="- first\n   - second";
               MAC_Error::object()->raise_bad_data_value( exp,
                  "ViscousStressOrder", error_message );
+           }
+         }
+         if ( exp->has_entry( "PressureStressOrder" ) ) {
+           PressureStressOrder = exp->string_data( "PressureStressOrder" );
+           if ( PressureStressOrder != "first"
+           && PressureStressOrder != "second") {
+              string error_message="- first\n   - second";
+              MAC_Error::object()->raise_bad_data_value( exp,
+                 "PressureStressOrder", error_message );
            }
          }
          surface_cell_scale = exp->double_data( "SurfaceCellScale" ) ;
@@ -327,6 +337,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataNS.is_solids_ = is_solids ;
       inputDataNS.is_stressCal_ = is_stressCal;
       inputDataNS.ViscousStressOrder_ = ViscousStressOrder;
+      inputDataNS.PressureStressOrder_ = PressureStressOrder;
       inputDataNS.stressCalFreq_ = stressCalFreq;
       inputDataNS.is_par_motion_ = is_par_motion;
       inputDataNS.dom_ = dom;

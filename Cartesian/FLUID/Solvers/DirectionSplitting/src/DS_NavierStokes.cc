@@ -71,6 +71,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , is_solids( fromDS.is_solids_ )
 	, is_stressCal ( fromDS.is_stressCal_ )
 	, ViscousStressOrder ( fromDS.ViscousStressOrder_ )
+	, PressureStressOrder ( fromDS.PressureStressOrder_ )
 	, stressCalFreq ( fromDS.stressCalFreq_ )
 	, is_par_motion ( fromDS.is_par_motion_ )
 	, allrigidbodies ( fromDS.allrigidbodies_ )
@@ -401,7 +402,9 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		initialize_grid_nodes_on_rigidbody(vec);
 
 		// Extrapolate advecvtion term on fresh nodes
-		allrigidbodies->extrapolate_on_fresh_nodes(UF,{2});
+		allrigidbodies->extrapolate_scalar_on_fresh_nodes(UF,2);
+		// allrigidbodies->extrapolate_scalar_on_fresh_nodes(PF,0);
+		// allrigidbodies->extrapolate_scalar_on_fresh_nodes(PF,1);
 
 	   // Direction splitting
       // Assemble 1D tridiagonal matrices
@@ -1105,12 +1108,18 @@ DS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
   // Synchronize pressure field
   PF->synchronize(1);
 
+  if (is_solids) {
+  	// allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
+  	correct_pressure_1st_layer_solid(1);
+  	correct_pressure_2nd_layer_solid(1);
+  }
+
   PF->set_neumann_DOF_values();
 
   // Calculate pressure forces on the solid particles
   if ( my_rank == is_master ) SCT_set_start( "Pressure stress" );
   if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0)) {
-     allrigidbodies->compute_pressure_force_and_torque_for_allRB();
+     allrigidbodies->compute_pressure_force_and_torque_for_allRB(PressureStressOrder);
   }
   if ( my_rank == is_master ) SCT_get_elapsed_time( "Pressure stress" );
 
@@ -2256,12 +2265,8 @@ DS_NavierStokes:: compute_adv_component ( FV_TimeIterator const* t_it,
 						  * CC_vol->operator()(p,0);
    }
 
-	// boolVector* fresh_node = (is_solids) ? allrigidbodies->get_fresh_nodes(UF) : 0;
-
-   if (( AdvectionTimeAccuracy == 1 )) {// || (fresh_node->operator()(p))) {
+   if (( AdvectionTimeAccuracy == 1 )) {
       value = ugradu;
-		// if (fresh_node->operator()(p))
-		// 	UF->set_DOF_value(i,j,k,comp,2,ugradu);
    } else {
       value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
       UF->set_DOF_value(i,j,k,comp,2,ugradu);
@@ -3666,8 +3671,9 @@ DS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
   }
 
   if (is_solids) {
-     correct_pressure_1st_layer_solid(1);
-     correct_pressure_2nd_layer_solid(1);
+	  // allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
+	  correct_pressure_1st_layer_solid(1);
+	  correct_pressure_2nd_layer_solid(1);
   }
 }
 
@@ -3738,8 +3744,9 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 	}
 
    if (is_solids) {
-      correct_pressure_1st_layer_solid(0);
-      correct_pressure_2nd_layer_solid(0);
+		// allrigidbodies->extrapolate_pressure_inside_RB(PF,0);
+		correct_pressure_1st_layer_solid(0);
+		correct_pressure_2nd_layer_solid(0);
    }
    // Propagate values to the boundaries depending on BC conditions
    PF->set_neumann_DOF_values();

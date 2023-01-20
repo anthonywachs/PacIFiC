@@ -140,6 +140,7 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       string insertion_type;
       bool is_stressCal;
       string ViscousStressOrder;
+      string PressureStressOrder;
       double surface_cell_scale;
       bool is_surfacestressOUT;
       size_t stressCalFreq;
