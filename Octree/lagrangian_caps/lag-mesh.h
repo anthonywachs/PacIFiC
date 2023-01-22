@@ -352,7 +352,7 @@ void comp_centroid(lagMesh* mesh) {
   foreach_dimension() mesh->centroid.x = 0.;
   for(int i=0; i<mesh->nlp; i++)
     foreach_dimension() mesh->centroid.x += mesh->nodes[i].pos.x;
-  foreach_dimension() mesh->cendtroid.x /= mesh->nlp;
+  foreach_dimension() mesh->centroid.x /= mesh->nlp;
 }
 
 /** The function below updates the normal vectors on all the nodes as well as
