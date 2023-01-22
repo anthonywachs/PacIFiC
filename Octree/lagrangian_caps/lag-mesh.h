@@ -118,6 +118,7 @@ typedef struct lagMesh {
     int nlt;
     Triangle* triangles;
   #endif
+  coord centroid;
   bool updated_stretches;
   bool updated_normals;
   bool updated_curvatures;
@@ -342,6 +343,18 @@ void comp_triangle_area_normals(lagMesh* mesh) {
 }
 #endif
 
+/**
+The function below computes the centroid of the capsule as the average of the
+coordinates of all its nodes. The centroid is stored as an attribute of the
+caps structure.
+*/
+void comp_centroid(lagMesh* mesh) {
+  foreach_dimension() mesh->centroid.x = 0.;
+  for(int i=0; i<mesh->nlp; i++)
+    foreach_dimension() mesh->centroid.x += mesh->nodes[i].pos.x;
+  foreach_dimension() mesh->cendtroid.x /= mesh->nlp;
+}
+
 /** The function below updates the normal vectors on all the nodes as well as
 the lengths and midpoints of all the edges (in 2D) or the area and centroids of
 all the triangles (in 3D). */
@@ -483,6 +496,7 @@ void advect_lagMesh(lagMesh* mesh) {
   #endif
   correct_lag_pos(mesh);
   generate_lag_stencils_one_caps(mesh);
+  comp_centroid(mesh);
 }
 
 

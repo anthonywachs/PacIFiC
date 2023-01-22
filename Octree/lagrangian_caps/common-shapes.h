@@ -74,6 +74,8 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   #ifdef CAPS_VISCOSITY
     fraction(prevI, sq(radius) - sq(x - shift.x) - sq(y - shift.y));
   #endif
+
+  comp_centroid(p.mesh);
 }
 
 /**
@@ -134,6 +136,7 @@ void initialize_biconcave_mb(struct _initialize_circular_mb p) {
     p.mesh->edges[i].l0 = edge_length(p.mesh, i);
     p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
+  comp_centroid(p.mesh);
 }
 
 
@@ -198,6 +201,8 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
   #ifdef CAPS_VISCOSITY
     fraction(prevI, 1 - sq(x/a) - sq(y/b));
   #endif
+
+  comp_centroid(p.mesh);
 }
 
 #if dimension > 2
@@ -277,6 +282,8 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
       }
     }
   }
+
+  comp_centroid(p.mesh);
 }
 
 /**
@@ -363,6 +370,7 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   }
   correct_lag_pos(p.mesh);
   comp_normals(p.mesh);
+  comp_centroid(p.mesh);
 }
 
 void initialize_rbc_mb(struct _initialize_circular_mb p) {
@@ -394,6 +402,7 @@ void initialize_rbc_mb(struct _initialize_circular_mb p) {
         p.mesh->nodes[i].pos.x += shift.x;
   }
   correct_lag_pos(p.mesh);
+  comp_centroid(p.mesh);
 
   #ifdef CAPS_VISCOSITY
     double a, c;
