@@ -1144,12 +1144,8 @@ void DS_AllRigidBodies:: extrapolate_scalar_on_fresh_nodes(FV_DiscreteField * FF
 
                     intVector i0_temp(2,0);
                     // Ghost points in i for the calculation of i-derivative of field
-                    i0_temp(0) = (sign[major_dir] == 1)
-                               ? (int(i0(major_dir)) + 2*sign[major_dir])
-                               : (int(i0(major_dir)) + 1*sign[major_dir]);
-                    i0_temp(1) = (sign[major_dir] == 1)
-                               ? (int(i0(major_dir)) + 3*sign[major_dir])
-                               : (int(i0(major_dir)) + 2*sign[major_dir]);
+                    i0_temp(0) = int(i0(major_dir)) + 1*sign[major_dir];
+                    i0_temp(1) = int(i0(major_dir)) + 2*sign[major_dir];
 
                     pt1(major_dir) =
                            FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
@@ -1281,7 +1277,7 @@ void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
                            ? FF->get_DOF_coordinate( k, comp, 2 ) : 0.;
                  size_t p = FF->DOF_local_number(i,j,k,comp);
 
-                 int stencil = 2;
+                 int stencil = 1;
                  bool on_RB_boundary = false;
                  bool in_RB_bulk = false;
                  if (void_fraction[field]->operator()(p,0) != 0) {
@@ -1343,12 +1339,8 @@ void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
 
                     intVector i0_temp(2,0);
                     // Ghost points in i for the calculation of i-derivative of field
-                    i0_temp(0) = (sign[major_dir] == 1)
-                               ? (int(i0(major_dir)) + 2*sign[major_dir])
-                               : (int(i0(major_dir)) + 1*sign[major_dir]);
-                    i0_temp(1) = (sign[major_dir] == 1)
-                               ? (int(i0(major_dir)) + 3*sign[major_dir])
-                               : (int(i0(major_dir)) + 2*sign[major_dir]);
+                   i0_temp(0) = int(i0(major_dir)) + 2*sign[major_dir];
+                   i0_temp(1) = int(i0(major_dir)) + 3*sign[major_dir];
 
                     pt1(major_dir) =
                            FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
