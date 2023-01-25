@@ -354,6 +354,9 @@ class DS_AllRigidBodies
       void extrapolate_scalar_on_fresh_nodes(FV_DiscreteField * FF
                                           , size_t const& level);
 
+      /** @brief Interpolate velocity on the fresh nodes */
+      void interpolate_vector_on_fresh_nodes(FV_DiscreteField * FF
+                                          , size_t const& level);
 
       /** @brief Extrapolate the PF value on 1st layer of node in solid */
       void extrapolate_pressure_inside_RB(FV_DiscreteField * FF

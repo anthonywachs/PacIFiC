@@ -1050,6 +1050,7 @@ void DS_AllRigidBodies:: extrapolate_scalar_on_fresh_nodes(FV_DiscreteField * FF
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_AllRigidBodies:: extrapolate_scalar_on_fresh_nodes" ) ;
+  MAC_ASSERT((FF == UF) && (level == 2));
 
   size_t nb_comps = FF->nb_components() ;
   size_t field = field_num(FF) ;
@@ -1209,6 +1210,118 @@ void DS_AllRigidBodies:: extrapolate_scalar_on_fresh_nodes(FV_DiscreteField * FF
 
 
 //---------------------------------------------------------------------------
+void DS_AllRigidBodies:: interpolate_vector_on_fresh_nodes(FV_DiscreteField * FF
+                                                          , size_t const& level)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies:: interpolate_vector_on_fresh_nodes" ) ;
+  MAC_ASSERT((FF == UF) && (level != 2));
+
+  size_t nb_comps = FF->nb_components() ;
+  size_t field = field_num(FF) ;
+
+  boolVector const* periodic_comp = MESH->get_periodic_directions();
+
+  // Get local min and max indices;
+  size_t_vector min_unknown_index(3,0);
+  size_t_vector max_unknown_index(3,0);
+
+  for (vector<size_t>::iterator it = local_RB_list.begin() ;
+                               it != local_RB_list.end() ; ++it) {
+     size_t parID = *it;
+
+     vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
+                                                   ->get_rigid_body_haloZone();
+     // Calculation on the indexes near the rigid body
+     for (size_t comp = 0; comp < nb_comps; ++comp) {
+        for (size_t dir = 0; dir < m_space_dimension; ++dir) {
+           // Calculations for solids on the total unknown on the proc
+           min_unknown_index(dir) =
+                   FF->get_min_index_unknown_handled_by_proc( comp, dir );
+           max_unknown_index(dir) =
+                   FF->get_max_index_unknown_handled_by_proc( comp, dir );
+
+           bool is_periodic = periodic_comp->operator()( dir );
+           double domain_min = MESH->get_main_domain_min_coordinate( dir );
+           double domain_max = MESH->get_main_domain_max_coordinate( dir );
+
+           size_t i0_temp = 0;
+           bool found =FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+                                       , haloZone[0]->operator()(dir)
+                                       , i0_temp) ;
+           size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
+
+
+           found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
+                                   , haloZone[1]->operator()(dir)
+                                   , i0_temp) ;
+           size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
+
+           if (is_periodic &&
+              ((haloZone[1]->operator()(dir) > domain_max)
+            || (haloZone[0]->operator()(dir) < domain_min))) {
+              index_min = min_unknown_index(dir);
+              index_max = max_unknown_index(dir);
+           }
+
+           min_unknown_index(dir) = MAC::max(min_unknown_index(dir),index_min);
+           max_unknown_index(dir) = MAC::min(max_unknown_index(dir),index_max);
+
+        }
+
+        for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+           double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
+           for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+              double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
+              for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+                 double zC = (m_space_dimension == 3)
+                           ? FF->get_DOF_coordinate( k, comp, 2 ) : 0.;
+                 size_t p = FF->DOF_local_number(i,j,k,comp);
+                 size_t_vector i0(3,0);
+                 doubleVector coord(3,0.);
+                 coord(0) = xC; coord(1) = yC; coord(2) = zC;
+
+                 if (fresh_node[field]->operator()(p)
+                 && (void_fraction[field]->operator()(p,1) == parID+1)) {
+                    double value = 0.;
+                    for (size_t dir = 0; dir < m_space_dimension; dir++) {
+                       i0(0) = i; i0(1) = j; i0(2) = k;
+                       i0(dir) -= 1;
+                       double fl = FF->DOF_value(i0(0), i0(1), i0(2), comp, level);
+                       double xl = coord(dir) - FF->get_DOF_coordinate(i0(dir), comp, dir);
+
+                       i0(0) = i; i0(1) = j; i0(2) = k;
+                       i0(dir) += 1;
+                       double fr = FF->DOF_value(i0(0), i0(1), i0(2), comp, level);
+                       double xr = FF->get_DOF_coordinate(i0(dir), comp, dir) - coord(dir);
+
+                       if (intersect_vector[field]->operator()(p,2*dir+0) == 1) {
+                          fl = intersect_fieldValue[field]->operator()(p,2*dir+0);
+                          xl = intersect_distance[field]->operator()(p,2*dir+0);
+                       }
+
+                       if (intersect_vector[field]->operator()(p,2*dir+1) == 1) {
+                         fr = intersect_fieldValue[field]->operator()(p,2*dir+1);
+                         xr = intersect_distance[field]->operator()(p,2*dir+1);
+                       }
+
+                       value += (xr*fl + xl*fr) / (xr + xl);
+                    }
+                    value /= (double)m_space_dimension;
+
+                    FF->set_DOF_value(i, j, k, comp, level, value);
+                 }
+              }
+           }
+        }
+     }
+  }
+}
+
+
+
+
+//---------------------------------------------------------------------------
 void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
                                                       , size_t const& level)
 //---------------------------------------------------------------------------
@@ -1228,6 +1341,7 @@ void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
                                it != local_RB_list.end() ; ++it) {
      size_t parID = *it;
      geomVector const* pgc = m_allDSrigidbodies[parID]->get_ptr_to_gravity_centre();
+     double Rp = m_allDSrigidbodies[parID]->get_circumscribed_radius();
 
      vector<geomVector*> haloZone = m_allDSrigidbodies[parID]
                                                    ->get_rigid_body_haloZone();
@@ -1283,10 +1397,12 @@ void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
                  if (void_fraction[field]->operator()(p,0) != 0) {
                     for (int in = -1*stencil; in <= stencil; in++) {
                        for (int jn = -1*stencil; jn <= stencil; jn++) {
-                          size_t pn = FF->DOF_local_number(i+in,j+jn,k,comp);
-                          if (void_fraction[field]->operator()(pn,0) == 0) {
-                             on_RB_boundary = true;
-                             break;
+                          if (abs(in) != abs(jn)) {
+                             size_t pn = FF->DOF_local_number(i+in,j+jn,k,comp);
+                             if (void_fraction[field]->operator()(pn,0) == 0) {
+                                on_RB_boundary = true;
+                                break;
+                             }
                           }
                        }
                     }
@@ -1295,102 +1411,91 @@ void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
                  }
 
                  if (on_RB_boundary) {
-                    geomVector normal(3);
-                    geomVector pt0(xC, yC, zC);
-                    geomVector pt1(3), pt2(3);
+                    doubleVector normal(3);
+                    doubleVector pt0(3), pt1(3), pt2(3);
                     size_t_vector i0(3), i1(3), i2(3);
+                    pt0(0) = xC; pt0(1) = yC; pt0(2) = zC;
                     i0(0) = i; i0(1) = j; i0(2) = k;
-                    size_t major_dir = 0;
                     normal(0) = pt0(0) - pgc->operator()(0);
                     normal(1) = pt0(1) - pgc->operator()(1);
                     normal(2) = pt0(2) - pgc->operator()(2);
 
-                    double norm_mag = normal.calcNorm();
+                    double norm_mag = MAC::sqrt(pow(normal(0),2.)
+                                              + pow(normal(1),2.)
+                                              + pow(normal(2),2.));
 
-                    normal /= norm_mag;
+                    normal(0) /= norm_mag;
+                    normal(1) /= norm_mag;
+                    normal(2) /= norm_mag;
 
-                    // std::cout << pt0(0) << "," << pt0(1) << "," << pt0(2) << "," << 0. << endl;
+                    // Valid only for spherical RB, would require advance Calculations
+                    // to estimate the ghost points of non-spherical RB's
+                    pt0(0) = pt0(0) + 2.* (Rp - norm_mag) * normal(0);
+                    pt0(1) = pt0(1) + 2.* (Rp - norm_mag) * normal(1);
+                    pt0(2) = pt0(2) + 2.* (Rp - norm_mag) * normal(2);
 
-                    // pt0 = pt0 + 2.* (0.1 - norm_mag) * normal;
-                    //
-                    // for (size_t l = 0; l < m_space_dimension; l++) {
-                    //    size_t i_temp;
-                    //    bool found = FV_Mesh::between(
-                    //                 FF->get_DOF_coordinates_vector(comp,l),
-                    //                 pt0(l), i_temp);
-                    //    if (found) i0(l) = i_temp;
-                    // }
-
-                    double max_comp = MAC::max(MAC::abs(normal(0))
-                                    , MAC::max(MAC::abs(normal(1))
-                                             , MAC::abs(normal(2))));
-                    vector<int> sign(3,0);
                     for (size_t l = 0; l < m_space_dimension; l++) {
-                       sign[l] = (normal(l) > -EPSILON) ? 1 : -1 ;
-                       if (MAC::abs(normal(l)) == max_comp)
-                          major_dir = l;
+                       size_t i_temp;
+                       bool found = FV_Mesh::between(
+                                    FF->get_DOF_coordinates_vector(comp,l),
+                                    pt0(l), i_temp);
+                       if (found) i0(l) = i_temp;
                     }
 
-                    // Ghost points generation
-                    pt1 = pt0;
-                    pt2 = pt0;
-                    i1 = i0;
-                    i2 = i0;
+                    vector<double> wht;
+                    vector<double> f_wht;
 
-                    intVector i0_temp(2,0);
-                    // Ghost points in i for the calculation of i-derivative of field
-                   i0_temp(0) = int(i0(major_dir)) + 2*sign[major_dir];
-                   i0_temp(1) = int(i0(major_dir)) + 3*sign[major_dir];
-
-                    pt1(major_dir) =
-                           FF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
-                    i1(major_dir) = i0_temp(0);
-
-                    pt2(major_dir) =
-                           FF->get_DOF_coordinate(i0_temp(1), comp, major_dir);
-                    i2(major_dir) = i0_temp(1);
-
-                    doubleVector di(2,0.);
-                    di(0) = (pt1(major_dir) - pt0(major_dir)) / normal(major_dir);
-                    di(1) = (pt2(major_dir) - pt0(major_dir)) / normal(major_dir);
-
-                    for (size_t l = 0; l < m_space_dimension; l++) {
-                       if (l != major_dir) {
-                          pt1(l) = pt0(l) + di(0) * normal(l);
-                          size_t i_temp;
-                          bool found = FV_Mesh::between(
-                                          FF->get_DOF_coordinates_vector(comp,l),
-                                          pt1(l), i_temp);
-                          if (found) i1(l) = i_temp;
-
-                          pt2(l) = pt0(l) + di(1) * normal(l);
-                          found = FV_Mesh::between(
-                                          FF->get_DOF_coordinates_vector(comp,l),
-                                          pt2(l), i_temp);
-                          if (found) i2(l) = i_temp;
+                    // Interpolation using inverse distance weighting
+                    if (m_space_dimension == 2) {
+                       for (int in = 0; in <= stencil; in++) {
+                          for (int jn = 0; jn <= stencil; jn++) {
+                             size_t pn = FF->DOF_local_number(i0(0)+in,i0(1)+jn,i0(2),comp);
+                             if (void_fraction[field]->operator()(pn,0) == 0) {
+                                doubleVector node(2);
+                                node(0) = FF->get_DOF_coordinate( i0(0)+in, comp, 0 );
+                                node(1) = FF->get_DOF_coordinate( i0(1)+jn, comp, 1 );
+                                double dist = MAC::sqrt(pow(node(0)-pt0(0),2.)
+                                                      + pow(node(1)-pt0(1),2.));
+                                wht.push_back(1./dist);
+                                f_wht.push_back(FF->DOF_value(i0(0)+in
+                                                             ,i0(1)+jn
+                                                             ,i0(2)
+                                                             ,comp,level));
+                             }
+                          }
+                       }
+                    } else {
+                       for (int in = 0; in <= stencil; in++) {
+                          for (int jn = 0; jn <= stencil; jn++) {
+                             for (int kn = 0; kn <= stencil; kn++) {
+                                size_t pn = FF->DOF_local_number(i0(0)+in,i0(1)+jn,i0(2)+kn,comp);
+                                if (void_fraction[field]->operator()(pn,0) == 0) {
+                                   doubleVector node(3);
+                                   node(0) = FF->get_DOF_coordinate( i0(0)+in, comp, 0 );
+                                   node(1) = FF->get_DOF_coordinate( i0(1)+jn, comp, 1 );
+                                   node(2) = FF->get_DOF_coordinate( i0(2)+kn, comp, 2 );
+                                   double dist = MAC::sqrt(pow(node(0)-pt0(0),2.)
+                                                         + pow(node(1)-pt0(1),2.)
+                                                         + pow(node(2)-pt0(2),2.));
+                                   wht.push_back(1./dist);
+                                   f_wht.push_back(FF->DOF_value(i0(0)+in
+                                                                ,i0(1)+jn
+                                                                ,i0(2)+kn
+                                                                ,comp,level));
+                                }
+                             }
+                          }
                        }
                     }
 
-                    size_t interpol_dir = (major_dir == 0) ? 1 : 0;
+                    double value = 0.;
+                    double tot_wht = 0.;
+                    for (int ivec = 0; ivec < (int)wht.size(); ivec++) {
+                       value += wht[ivec]*f_wht[ivec];
+                       tot_wht += wht[ivec];
+                    }
 
-                    double fpt1 = (m_space_dimension == 2) ?
-                        Biquadratic_interpolation_for_scalars(FF, comp, &pt1, i1, interpol_dir
-                                               , sign[interpol_dir], {level})
-                      : Triquadratic_interpolation_for_scalars(FF, comp, &pt1, i1, parID
-                                               , major_dir, sign, {level}) ;
-
-                    double fpt2 = (m_space_dimension == 2) ?
-                        Biquadratic_interpolation_for_scalars(FF, comp, &pt2, i2, interpol_dir
-                                               , sign[interpol_dir], {level})
-                      : Triquadratic_interpolation_for_scalars(FF, comp, &pt2, i2, parID
-                                               , major_dir, sign, {level}) ;
-
-                    double value = (fpt1 * di(1) - fpt2 * di(0)) / (di(1) - di(0));
-
-                    // std::cout << pt0(0) << "," << pt0(1) << "," << pt0(2) << "," << value << endl;
-                    // std::cout << pt1(0) << "," << pt1(1) << "," << pt1(2) << "," << fpt1 << endl;
-                    // std::cout << pt2(0) << "," << pt2(1) << "," << pt2(2) << "," << fpt2 << endl;
-
+                    if (wht.size() != 0) value = value/tot_wht;
                     FF->set_DOF_value(i, j, k, comp, level, value);
                  } else if (in_RB_bulk) {
                     FF->set_DOF_value(i, j, k, comp, level, 0);

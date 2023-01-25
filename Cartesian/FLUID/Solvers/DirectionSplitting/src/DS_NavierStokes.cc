@@ -403,6 +403,12 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 
 		// Extrapolate advecvtion term on fresh nodes
 		allrigidbodies->extrapolate_scalar_on_fresh_nodes(UF,2);
+		// Interpolate velocity on the fresh nodes in fluid domain
+		allrigidbodies->interpolate_vector_on_fresh_nodes(UF,0);
+		allrigidbodies->interpolate_vector_on_fresh_nodes(UF,1);
+		allrigidbodies->interpolate_vector_on_fresh_nodes(UF,3);
+		if (dim == 3)
+			allrigidbodies->interpolate_vector_on_fresh_nodes(UF,4);
 		// allrigidbodies->extrapolate_scalar_on_fresh_nodes(PF,0);
 		// allrigidbodies->extrapolate_scalar_on_fresh_nodes(PF,1);
 
@@ -1109,9 +1115,9 @@ DS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
   PF->synchronize(1);
 
   if (is_solids) {
-  	// allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
-  	correct_pressure_1st_layer_solid(1);
-  	correct_pressure_2nd_layer_solid(1);
+	  allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
+  	// correct_pressure_1st_layer_solid(1);
+  	// correct_pressure_2nd_layer_solid(1);
   }
 
   PF->set_neumann_DOF_values();
@@ -3671,9 +3677,9 @@ DS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
   }
 
   if (is_solids) {
-	  // allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
-	  correct_pressure_1st_layer_solid(1);
-	  correct_pressure_2nd_layer_solid(1);
+	  allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
+	  // correct_pressure_1st_layer_solid(1);
+	  // correct_pressure_2nd_layer_solid(1);
   }
 }
 
@@ -3744,9 +3750,9 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 	}
 
    if (is_solids) {
-		// allrigidbodies->extrapolate_pressure_inside_RB(PF,0);
-		correct_pressure_1st_layer_solid(0);
-		correct_pressure_2nd_layer_solid(0);
+		allrigidbodies->extrapolate_pressure_inside_RB(PF,0);
+		// correct_pressure_1st_layer_solid(0);
+		// correct_pressure_2nd_layer_solid(0);
    }
    // Propagate values to the boundaries depending on BC conditions
    PF->set_neumann_DOF_values();
