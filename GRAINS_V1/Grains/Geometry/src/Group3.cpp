@@ -6,7 +6,7 @@
 namespace solid
 {
   // --------------------------------------------------------------------------
-  // Default constructor 
+  // Default constructor
   Group3::Group3( double def )
   {
     m_comp[X] = m_comp[Y] = m_comp[Z] = def;
@@ -16,8 +16,8 @@ namespace solid
 
 
   // --------------------------------------------------------------------------
-  // Constructor with 3 components as inputs 
-  Group3::Group3( double x, double y, double z ) 
+  // Constructor with 3 components as inputs
+  Group3::Group3( double x, double y, double z )
   {
     m_comp[X] = x;
     m_comp[Y] = y;
@@ -41,7 +41,7 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // Destructor
-  Group3::~Group3() 
+  Group3::~Group3()
   {
   }
 
@@ -50,7 +50,7 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // Returns the const pointer to the array
-  double const* Group3::getValue() const 
+  double const* Group3::getValue() const
   {
     return ( m_comp );
   }
@@ -60,7 +60,7 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // Returns the pointer to the array
-  double* Group3::getValue() 
+  double* Group3::getValue()
   {
     return ( m_comp );
   }
@@ -104,14 +104,14 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // Returns the number of components, always return 3
-  int Group3::size() const 
+  int Group3::size() const
   {
     return ( 3 );
   }
 
 
 
- 
+
   // --------------------------------------------------------------------------
   // ith component accessor
   double& Group3::operator[]( size_t i )
@@ -124,7 +124,7 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // ith component accessor
-  double const& Group3::operator[]( size_t i ) const 
+  double const& Group3::operator[]( size_t i ) const
   {
     return ( m_comp[i] );
   }
@@ -146,7 +146,7 @@ namespace solid
   // double product
   double Group3::operator * ( Group3 const& g ) const
   {
-    return ( m_comp[X] * g.m_comp[X] + m_comp[Y] * g.m_comp[Y] 
+    return ( m_comp[X] * g.m_comp[X] + m_comp[Y] * g.m_comp[Y]
     	+ m_comp[Z] * g.m_comp[Z] );
   }
 
@@ -177,7 +177,7 @@ namespace solid
   // Addition
   Group3 Group3::operator + ( Group3 const& g2 ) const
   {
-    return ( Group3( m_comp[X] + g2.m_comp[X], 
+    return ( Group3( m_comp[X] + g2.m_comp[X],
     	m_comp[Y] + g2.m_comp[Y], m_comp[Z] + g2.m_comp[Z] ) );
   }
 
@@ -188,7 +188,7 @@ namespace solid
   // Subtraction
   Group3 Group3::operator - ( Group3 const& g2 ) const
   {
-    return ( Group3( m_comp[X] - g2.m_comp[X], 
+    return ( Group3( m_comp[X] - g2.m_comp[X],
     	m_comp[Y] - g2.m_comp[Y], m_comp[Z] - g2.m_comp[Z] ) );
   }
 
@@ -220,7 +220,7 @@ namespace solid
   Group3& Group3::operator = ( Group3 const& g2 )
   {
     if ( &g2 != this )
-    {      
+    {
       m_comp[X] = g2.m_comp[X];
       m_comp[Y] = g2.m_comp[Y];
       m_comp[Z] = g2.m_comp[Z];
@@ -268,13 +268,13 @@ namespace solid
 
 
   // --------------------------------------------------------------------------
-  // Operator += 
+  // Operator +=
   Group3& Group3::operator += ( Group3 const& g2 )
   {
     m_comp[X] += g2.m_comp[X];
     m_comp[Y] += g2.m_comp[Y];
     m_comp[Z] += g2.m_comp[Z];
-    return ( *this );  
+    return ( *this );
   }
 
 
@@ -287,7 +287,7 @@ namespace solid
     m_comp[X] -= g2.m_comp[X];
     m_comp[Y] -= g2.m_comp[Y];
     m_comp[Z] -= g2.m_comp[Z];
-    return ( *this );  
+    return ( *this );
   }
 
 
@@ -297,12 +297,12 @@ namespace solid
   // Mixed product of 3 Group3 objects
   double triple( Group3 const& g1, Group3 const& g2, Group3 const& g3 )
   {
-    return ( 
-    	g1.m_comp[X] * ( g2.m_comp[Y] * g3.m_comp[Z] 
+    return (
+    	g1.m_comp[X] * ( g2.m_comp[Y] * g3.m_comp[Z]
 		- g2.m_comp[Z] * g3.m_comp[Y] ) +
-      	g1.m_comp[Y] * ( g2.m_comp[Z] * g3.m_comp[X] 
+      	g1.m_comp[Y] * ( g2.m_comp[Z] * g3.m_comp[X]
 		- g2.m_comp[X] * g3.m_comp[Z] ) +
-      	g1.m_comp[Z] * ( g2.m_comp[X] * g3.m_comp[Y] 
+      	g1.m_comp[Z] * ( g2.m_comp[X] * g3.m_comp[Y]
 		- g2.m_comp[Y] * g3.m_comp[X] ) );
   }
 
@@ -323,7 +323,7 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // Output operator
-  ostream& operator << ( ostream& fileOut, Group3 const& g ) 
+  ostream& operator << ( ostream& fileOut, Group3 const& g )
   {
     fileOut << g[X] << " " << g[Y] << " " << g[Z];
     return ( fileOut );
@@ -334,49 +334,61 @@ namespace solid
 
   // --------------------------------------------------------------------------
   // Input operator
-  istream& operator >> ( istream& fileIn, Group3& g ) 
+  istream& operator >> ( istream& fileIn, Group3& g )
   {
     fileIn >> g[X] >> g[Y] >> g[Z];
     return ( fileIn );
   }
-  
 
 
-  
+
+
   // --------------------------------------------------------------------------
   // Writes the object with a high precision format given by
   // POSITIONFORMAT defined in GrainsExec.hh
   void Group3::writeGroup3( ostream& fileOut ) const
   {
     fileOut << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-  	m_comp[X] ) << " " << 
+  	m_comp[X] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-  	m_comp[Y] ) << " " << 
+  	m_comp[Y] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
   	m_comp[Z] );
   }
-  
-  
 
-  
+
+
+
   // --------------------------------------------------------------------------
   // Writes the object in binary format
   void Group3::writeGroup3_binary( ostream& fileOut )
   {
     fileOut.write( reinterpret_cast<char*>( &m_comp[X] ), sizeof(double) );
-    fileOut.write( reinterpret_cast<char*>( &m_comp[Y] ), sizeof(double) );  
-    fileOut.write( reinterpret_cast<char*>( &m_comp[Z] ), sizeof(double) );     
+    fileOut.write( reinterpret_cast<char*>( &m_comp[Y] ), sizeof(double) );
+    fileOut.write( reinterpret_cast<char*>( &m_comp[Z] ), sizeof(double) );
   }
-  
 
 
-  
+
+
   // --------------------------------------------------------------------------
   // Reads the object in binary format
   void Group3::readGroup3_binary( istream& StreamIN )
   {
     StreamIN.read( reinterpret_cast<char*>( &m_comp[X] ), sizeof(double) );
-    StreamIN.read( reinterpret_cast<char*>( &m_comp[Y] ), sizeof(double) );  
-    StreamIN.read( reinterpret_cast<char*>( &m_comp[Z] ), sizeof(double) );     
-  }        
+    StreamIN.read( reinterpret_cast<char*>( &m_comp[Y] ), sizeof(double) );
+    StreamIN.read( reinterpret_cast<char*>( &m_comp[Z] ), sizeof(double) );
+  }
+
+
+
+
+  // ---------------------------------------------------------------------------
+  // Rounds components to +-tol
+  void Group3::round( double tol )
+  {
+    m_comp[X] = fabs( m_comp[X] ) < tol ? 0. : m_comp[X];
+    m_comp[Y] = fabs( m_comp[Y] ) < tol ? 0. : m_comp[Y];
+    m_comp[Z] = fabs( m_comp[Z] ) < tol ? 0. : m_comp[Z];
+  }
 }

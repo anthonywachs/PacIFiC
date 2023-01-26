@@ -407,6 +407,7 @@ void Particle::InterAction( Component* voisin,
 
   LC->addToContactsFeatures( time, closestPoint );
   delta = closestPoint.getOverlapDistance();
+
   if( delta < 0. )
   {
     if ( ContactBuilderFactory::contactForceModel(

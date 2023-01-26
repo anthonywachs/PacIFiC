@@ -4,10 +4,11 @@
 #include "Convex.hh"
 #include "ReaderXML.hh"
 #include "Vector3.hh"
+#include "Transform.hh"
 #include "Error.hh"
 using namespace solid;
 
-
+class Transform;
 /** @brief The class Box.
 
     Convex with a box shape. From GJK Engine - A Fast and
@@ -139,7 +140,7 @@ class Box : public Convex
     there is contact and returns the origin as contact point */
     Point3 IntersectionPointSPHERE( Point3 const& SphereCenter,
   	double const& SphereRadius, double& overlap,
-	bool warningSphereCenterInBox = true ) const;    
+	  bool warningSphereCenterInBox = true ) const;    
 
     /** @brief Same as IntersectionPointSPHERE except that it returns a non zero
     normal distance only for a configuration sphere-face (i.e. returns zero with
@@ -156,6 +157,9 @@ class Box : public Convex
     /** @ brief Returns whether a point lies inside the box
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+
+    /** @ Returns the bounding cylinder to box */
+    BCylinder getBCylinder() const;
     //@}
 
 

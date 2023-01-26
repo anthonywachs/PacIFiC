@@ -1,6 +1,7 @@
 #include "GrainsExec.hh"
 #include "GrainsBuilderFactory.hh"
 #include "Box.hh"
+#include "BCylinder.hh"
 #include <sstream>
 
 // Static attribute
@@ -954,4 +955,23 @@ bool Box::isIn( Point3 const& pt ) const
   return ( pt[X] <= m_extent[X] && pt[X] >= - m_extent[X]
 	&& pt[Y] <= m_extent[Y] && pt[Y] >= - m_extent[Y]
 	&& pt[Z] <= m_extent[Z] && pt[Z] >= - m_extent[Z] );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the bounding cylinder to box
+BCylinder Box::getBCylinder() const
+{
+  double a[2];
+  int axis = ( a[X] = fabs( m_extent[X] ) ) < ( a[Y] = fabs( m_extent[Y] ) )
+    ? Y : X;
+  int i = a[axis] < fabs( m_extent[Z] ) ? Z : axis;
+  Vector3 e( 0., 0., 0. );
+  e[i] = 1.;
+  double h = 2. * m_extent[i];
+  double r = sqrt( Norm2(m_extent) - m_extent[i]*m_extent[i]);
+
+  return( BCylinder( r, h, e ) );
 }

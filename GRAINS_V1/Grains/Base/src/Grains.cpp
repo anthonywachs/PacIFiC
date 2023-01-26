@@ -1959,8 +1959,8 @@ void Grains::synchronize_PPWindow()
 
 
 // ----------------------------------------------------------------------------
-// Reads a window 
-void Grains::readWindow( DOMNode* nWindow, Window& iwindow, 
+// Reads a window
+void Grains::readWindow( DOMNode* nWindow, Window& iwindow,
 	string const& oshift )
 {
   // Insertion window type
@@ -2043,7 +2043,7 @@ void Grains::readWindow( DOMNode* nWindow, Window& iwindow,
         cout << oshift << GrainsExec::m_shift3 << "Bottom centre = " <<
 		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
 		iwindow.ptA[Z] << endl;
-	cout << oshift << GrainsExec::m_shift3 << "Radius = " << 
+	cout << oshift << GrainsExec::m_shift3 << "Radius = " <<
 	  	iwindow.radius << endl;
         cout << oshift << GrainsExec::m_shift3 << "Height = " <<
 		iwindow.height << endl;
@@ -2059,7 +2059,7 @@ void Grains::readWindow( DOMNode* nWindow, Window& iwindow,
       iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA, "Z" );
       iwindow.ptB[X] = iwindow.ptB[Y] = iwindow.ptB[Z] = 0.;
       annGeom = ReaderXML::getNode( nWindow, "Annulus" );
-      iwindow.radius = ReaderXML::getNodeAttr_Double( annGeom, 
+      iwindow.radius = ReaderXML::getNodeAttr_Double( annGeom,
 	  	"RadiusExt" );
       iwindow.radius_int = ReaderXML::getNodeAttr_Double( annGeom,
 		"RadiusInt" );

@@ -6,9 +6,10 @@
 #include "PointC.hh"
 #include "GrainsExec.hh"
 #include "Particle.hh"
+#include "BCylinder.hh"
 #include <fstream>
 #include <sstream>
-
+#include <iostream>
 
 // ----------------------------------------------------------------------------
 // Default constructor
@@ -182,11 +183,11 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
   // of overlap_vector
 
   // In case the 2 rigid bodies are spheres or discs
-  if ( convexA->getConvexType() == SPHERE
-  	&& convexB->getConvexType() == SPHERE )
+  if ( convexA->getConvexType() == SPHERE &&
+       convexB->getConvexType() == SPHERE )
     return ( ClosestPointSPHERE( *this, neighbor ) );
-  if ( convexA->getConvexType() == DISC2D
-   		&& convexB->getConvexType() == DISC2D )
+  if ( convexA->getConvexType() == DISC2D &&
+       convexB->getConvexType() == DISC2D )
     return ( ClosestPointSPHERE( *this, neighbor ) );
 
   // In case one rigid body is a sphere/disc and the other rigid body is a box
@@ -199,60 +200,76 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
   if ( convexA->getConvexType() == BOX && convexB->getConvexType() == DISC2D )
     return ( ClosestPointSPHEREBOX( *this, neighbor ) );
 
+  // In case the rigid bodies are cylinders
+  if ( convexA->getConvexType() == CYLINDER &&
+       convexB->getConvexType() == CYLINDER )
+    return( ClosestPointCYLINDERS( *this, neighbor ) );
+
   // General case for any pair of convex rigid bodies
   Vector3 gcagcb = *m_transform.getOrigin() - *neighbor.m_transform.getOrigin();
   if ( Norm(gcagcb) < m_circumscribedRadius + neighbor.m_circumscribedRadius )
   {
-    // Distance between the 2 rigid bodies shrunk by their crust thickness
-    Point3 pointA, pointB;
-    int nbIterGJK = 0;
-    Transform const* a2w = this->getTransformWithCrust();
-    Transform const* b2w = neighbor.getTransformWithCrust();
-    double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w,
-    	*b2w, pointA, pointB, nbIterGJK );
-    if ( distance < EPSILON )
+    // In case one rigid body is a rectangle
+    if ( convexA->getConvexType() == RECTANGLE2D ||
+         convexB->getConvexType() == RECTANGLE2D )
+      return ( ClosestPointRECTANGLE( *this, neighbor ) );
+
+    // General case
+    if ( isContactCYLINDERS( *this, neighbor ) )
     {
-      cout << "ERR RigidBodyWithCrust::ClosestPoint on Processor "
-      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
-	<< endl;
-      throw ContactError();
+      // Distance between the 2 rigid bodies shrunk by their crust thickness
+      Transform const* a2w = this->getTransformWithCrust();
+      Transform const* b2w = neighbor.getTransformWithCrust();
+      Point3 pointA, pointB;
+      int nbIterGJK = 0;
+      double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w,
+      	                                *b2w, pointA, pointB, nbIterGJK );
+      if ( distance < EPSILON )
+      {
+        cout << "ERR RigidBodyWithCrust::ClosestPoint on Processor "
+        << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+  	    << endl;
+        throw ContactError();
+      }
+
+      // Points A and B are in their respective local coordinate systems
+      // Thus we transform them into the world coordinate system
+      pointA = (*a2w)( pointA );
+      pointB = (*b2w)( pointB );
+
+      // Comment on the ba vector
+      // pointA is the point realizing the shortest distance in rigid body A
+      // pointB is the point realizing the shortest distance in rigid body B
+      // thus pointA - pointB = ba is directed from B to A
+      Vector3 ba = pointA - pointB;
+
+      // Contact point definition as the mid point between pointA and pointB
+      Point3 contact = pointA / 2.0 + pointB / 2.0;
+
+      // Computation of the actual overlap vector
+      // If contact, crustA + crustB - distance > 0, the overlap vector is
+      // directed from B to A
+      // If no contact, crustA + crustB - distance < 0 and we do not care about
+      // the direction of the overlap vector
+      Vector3 overlap_vector = ba / distance;
+      overlap_vector.round();
+      overlap_vector *= m_crustThickness + neighbor.m_crustThickness - distance;
+
+      // Computation of the actual overlap distance = distance - crustA - crustB
+      // If actual overlap distance < 0 => contact
+      // otherwise no contact
+      distance -= m_crustThickness + neighbor.m_crustThickness;
+
+      return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
     }
-
-    // Points A and B are in their respective local coordinate systems
-    // Thus we transform them into the world coordinate system
-    pointA = (*a2w)( pointA );
-    pointB = (*b2w)( pointB );
-
-    // Comment on the ba vector
-    // pointA is the point realizing the shortest distance in rigid body A
-    // pointB is the point realizing the shortest distance in rigid body B
-    // thus pointA - pointB = ba is directed from B to A
-    Vector3 ba = pointA - pointB;
-
-    // Contact point definition as the mid point between pointA and pointB
-    Point3 contact = pointA / 2.0 + pointB / 2.0;
-
-    // Computation of the actual overlap vector
-    // If contact, crustA + crustB - distance > 0, the overlap vector is
-    // directed from B to A
-    // If no contact, crustA + crustB - distance < 0 and we do not care about
-    // the direction of the overlap vector
-    Vector3 overlap_vector = ba / distance;
-    overlap_vector.round();
-    overlap_vector *= m_crustThickness + neighbor.m_crustThickness - distance;
-
-    // Computation of the actual overlap distance = distance - crustA - crustB
-    // If actual overlap distance < 0 => contact
-    // otherwise no contact
-    distance -= m_crustThickness + neighbor.m_crustThickness;
-
-    return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
   }
-  else return ( PointNoContact );
+
+  return ( PointNoContact );
   }
   catch (const ContactError&) {
     throw ContactError();
   }
+
 }
 
 
@@ -285,18 +302,18 @@ PointContact RigidBodyWithCrust::ClosestPoint_ErreurHandling(
   if ( distance < EPSILON )
   {
       cout << "ERR RigidBodyWithCrust::ClosestPoint_ErreurHandling on "
-      	<< " Processor " << (GrainsExec::m_MPI ?
-	GrainsExec::getComm()->get_rank_active() : 0 )
-	<< " between components " << id << " and " << id_neighbor
-	<< endl;
+      << " Processor " << (GrainsExec::m_MPI ?
+	    GrainsExec::getComm()->get_rank_active() : 0 )
+	    << " between components " << id << " and " << id_neighbor
+	    << endl;
       throw ContactError();
   }
   else
   {
     cout << "Handling contact error on Processor "
-	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
-	<< " between components " << id << " and " << id_neighbor
-	<< endl;
+	   << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+	   << " between components " << id << " and " << id_neighbor
+	   << endl;
   }
 
   // Points A and B are in their respective local coordinate systems
@@ -461,7 +478,6 @@ PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
     throw ContactError();
   }
 }
-
 
 
 
@@ -660,7 +676,7 @@ bool isContactSPHEREBOX( RigidBodyWithCrust const& rbA,
 
   const Convex* convexA = rbA.getConvex();
   const Convex* convexB = rbB.getConvex();
-  double overlap=0.;
+  double overlap = 0.;
   Point3 contactPoint;
 
   if ( convexA->getConvexType() == SPHERE
@@ -727,4 +743,130 @@ bool intersect( RigidBodyWithCrust const& a, RigidBodyWithCrust const& b )
 void RigidBodyWithCrust::initialize_transformWithCrust_to_notComputed()
 {
   m_transformWithCrust_computed = false;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the features of the contact when the 2 rigid bodies are cylinders
+PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
+  RigidBodyWithCrust const& rbB )
+  throw(ContactError)
+{
+  const Convex* convexA = rbA.getConvex();
+  const Convex* convexB = rbB.getConvex();
+  Transform const* a2wNoCrust = rbA.getTransform();
+  Transform const* b2wNoCrust = rbB.getTransform();
+  Vector3 gcagcb = *( a2wNoCrust->getOrigin() ) - *( b2wNoCrust->getOrigin() );
+
+  if ( Norm(gcagcb) < rbA.getCircumscribedRadius() +
+                      rbB.getCircumscribedRadius() )
+  {
+    BCylinder a = convexA->getBCylinder();
+    BCylinder b = convexB->getBCylinder();
+    PointContact PPP = intersect( a, b, *a2wNoCrust, *b2wNoCrust );
+    // ofstream BCylinderOutput;
+    // BCylinderOutput.open("BCylinderOutput.dat", ios::app);
+    // BCylinderOutput << PPP.getContact() << " " << PPP.getOverlapVector() << " " << PPP.getOverlapDistance() << "\n";
+    // BCylinderOutput.close();
+    return( PPP );
+
+    // Transform const* a2w = this->getTransformWithCrust();
+    // Transform const* b2w = neighbor.getTransformWithCrust();
+    // Point3 pointA, pointB;
+    // int nbIterGJK = 0;
+    // double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w,
+    // 	*b2w, pointA, pointB, nbIterGJK );
+    // pointA = (*a2w)( pointA );
+    // pointB = (*b2w)( pointB );
+    // Vector3 ba = pointA - pointB;
+    // Point3 contact = pointA / 2.0 + pointB / 2.0;
+    // Vector3 overlap_vector = ba / distance;
+    // overlap_vector.round();
+    // overlap_vector *= m_crustThickness + neighbor.m_crustThickness - distance;
+    // distance -= m_crustThickness + neighbor.m_crustThickness;
+    // ofstream GJKOutput;
+    // GJKOutput.open("GJKOutput.dat", ios::app);
+    // GJKOutput << contact << " " << overlap_vector << " " << distance << "\n";
+    // GJKOutput.close();
+    // return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
+  }
+  else return ( PointNoContact );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether there is a contact between the circumscribed cylinders of
+// two rigid bodies
+bool isContactCYLINDERS( RigidBodyWithCrust const& rbA,
+                         RigidBodyWithCrust const& rbB )
+{
+  BCylinder a = rbA.getConvex()->getBCylinder();
+  BCylinder b = rbB.getConvex()->getBCylinder();
+  Transform const* a2wNoCrust = rbA.getTransform();
+  Transform const* b2wNoCrust = rbB.getTransform();
+  return ( isContact( a, b, *a2wNoCrust, *b2wNoCrust ) );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the features of the contact when the 1 rigid body is a rectangle
+PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
+  RigidBodyWithCrust const& rbB )
+  throw(ContactError)
+{
+  Convex const* convexA = rbA.getConvex();
+  Convex const* convexB = rbB.getConvex();
+  Transform const* a2w = rbA.getTransform();
+  Transform const* b2w = rbB.getTransform();
+  double overlap = 0.;
+
+  if ( convexA->getConvexType() == RECTANGLE2D )
+  {
+    Point3 const* rPt = a2w->getOrigin(); // rectangle center
+    Point3 cPt = *( b2w->getOrigin() ); // center of the convex body
+    Vector3 rNorm = a2w->getBasis() * Vector3( 0., 0., 1. ); // rectangle normal
+    rNorm.normalized();
+    rNorm = copysign( 1., rNorm * ( cPt - *rPt ) ) * rNorm;
+    Point3 pointA = (*b2w)
+                    ( convexB->support( ( -rNorm ) * b2w->getBasis() ) );
+    if ( ( rNorm * (pointA - *rPt) ) * ( rNorm * (cPt - *rPt) ) < 0. )
+    {
+      Point3 pointB = pointA - ( rNorm * pointA ) * rNorm;
+      // if ( Rectangle::isIn( pointB ) )
+
+      Point3 contact = pointA / 2.0 + pointB / 2.0;
+      Vector3 overlap_vector = pointA - pointB;
+      overlap = -Norm( overlap_vector );
+
+      return ( PointContact( contact, overlap_vector, overlap, 0 ) );
+    }
+  }
+  else
+  {
+    Point3 const* rPt = b2w->getOrigin(); // rectangle center
+    Point3 cPt = *( a2w->getOrigin() ); // center of the convex body
+    Vector3 rNorm = b2w->getBasis() * Vector3( 0., 0., 1. ); // rectangle normal
+    rNorm.normalized();
+    rNorm = copysign( 1., rNorm * ( cPt - *rPt ) ) * rNorm;
+    Point3 pointA = (*a2w)
+                    ( convexA->support( ( -rNorm ) * a2w->getBasis() ) );
+    if ( ( rNorm * (pointA - *rPt) ) * ( rNorm * (cPt - *rPt) ) < 0. )
+    {
+      Point3 pointB = ( ( *rPt - pointA ) * rNorm ) * rNorm + pointA;
+      // if ( Rectangle::isIn( pointB ) )
+
+      Point3 contact = pointA / 2.0 + pointB / 2.0;
+      Vector3 overlap_vector = pointB - pointA;
+      overlap = -Norm( overlap_vector );
+
+      return ( PointContact( contact, overlap_vector, overlap, 0 ) );
+    }
+  }
+  return ( PointNoContact );
 }

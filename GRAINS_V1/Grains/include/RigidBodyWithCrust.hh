@@ -91,7 +91,7 @@ class RigidBodyWithCrust : public RigidBody
     crust thickness artificially already touch or overlap */
     PointContact ClosestPoint_ErreurHandling(
     	RigidBodyWithCrust const& neighbor, double const& factor, int const& id,
-	int const& id_neighbor );
+	    int const& id_neighbor );
 
     /** @brief Returns whether the rigid body is close to another rigid body in
     the sense of whether their respective bounding boxes minus their crust
@@ -208,5 +208,28 @@ body is a box, i.e., a SPHERE-BOX contact
 @param rbB 2nd rigid body */
 bool isContactSPHEREBOX( RigidBodyWithCrust const& rbA,
 	RigidBodyWithCrust const& rbB );
+
+/** @brief Returns the features of the contact when the 2 rigid bodies
+are cylinders
+@param rbA 1st rigid body
+@param rbB 2nd rigid body */
+PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
+  RigidBodyWithCrust const& rbB )
+  throw(ContactError);
+
+/** @brief Returns whether there is a contact between the circumscribed
+cylinders of two rigid bodies
+@param rbA 1st rigid body
+@param rbB 2nd rigid body */
+bool isContactCYLINDERS( RigidBodyWithCrust const& rbA,
+  RigidBodyWithCrust const& rbB );
+
+/** @brief Returns the features of the contact when the 1 rigid body is
+a rectangle
+@param rbA 1st rigid body
+@param rbB 2nd rigid body */
+PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA ,
+  RigidBodyWithCrust const& rbB )
+  throw(ContactError);
 
 #endif

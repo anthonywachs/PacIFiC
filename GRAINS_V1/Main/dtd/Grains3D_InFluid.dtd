@@ -1,9 +1,9 @@
 <!-- Grains3D_InFluid DTD -->
 
-<!ENTITY % Convex.dtd SYSTEM "/home/wachs/Multiphase/PacIFiC-NewGrains/pacific/GRAINS_V1/Main/dtd/Convex.dtd">
+<!ENTITY % Convex.dtd SYSTEM "/home/alireza/Desktop/NewGrainsDev/pacific/GRAINS_V1/Main/dtd/Convex.dtd">
 %Convex.dtd;
 
-<!ENTITY % Contact.dtd SYSTEM "/home/wachs/Multiphase/PacIFiC-NewGrains/pacific/GRAINS_V1/Main/dtd/Contact.dtd">
+<!ENTITY % Contact.dtd SYSTEM "/home/alireza/Desktop/NewGrainsDev/pacific/GRAINS_V1/Main/dtd/Contact.dtd">
 %Contact.dtd;
 
 <!ELEMENT Point EMPTY>
@@ -45,22 +45,22 @@
     <!ATTLIST LinkedCell MX CDATA #REQUIRED>
     <!ATTLIST LinkedCell MY CDATA #REQUIRED>
     <!ATTLIST LinkedCell MZ CDATA #REQUIRED>
-    <!ATTLIST LinkedCell CellSizeFactor CDATA "1">    
-    
+    <!ATTLIST LinkedCell CellSizeFactor CDATA "1">
+
     <!ELEMENT DomainDecomposition EMPTY>
     <!ATTLIST DomainDecomposition NX CDATA #REQUIRED>
     <!ATTLIST DomainDecomposition NY CDATA #REQUIRED>
-    <!ATTLIST DomainDecomposition NZ CDATA #REQUIRED> 
-    
+    <!ATTLIST DomainDecomposition NZ CDATA #REQUIRED>
+
     <!ELEMENT MPI EMPTY>
-    <!ATTLIST MPI VerbosityLevel (0|1|2) "2">	 
+    <!ATTLIST MPI VerbosityLevel (0|1|2) "2">
 
     <!ELEMENT ContactForceModels (Default?, ContactForceModel*)>
 
     <!ELEMENT Reload EMPTY>
     <!ATTLIST Reload File CDATA #REQUIRED>
     <!ATTLIST Reload Velocity (Reset|NoReset) "NoReset">
-    <!ATTLIST Reload Type (new|same) "new"> 
+    <!ATTLIST Reload Type (new|same) "new">
 
 
   <!ELEMENT Forces (Gravity?)>
@@ -75,15 +75,15 @@
     <!ATTLIST TimeStep dt CDATA #REQUIRED>
 
     <!ELEMENT TimeIntegration EMPTY>
-    <!ATTLIST TimeIntegration Type (FirstOrderExplicit|SecondOrderExplicit|SecondOrderLeapFrog|SecondOrderAdamsBashforth) "SecondOrderLeapFrog">   
+    <!ATTLIST TimeIntegration Type (FirstOrderExplicit|SecondOrderExplicit|SecondOrderLeapFrog|SecondOrderAdamsBashforth) "SecondOrderLeapFrog">
 
     <!ELEMENT RestartFile EMPTY>
     <!ATTLIST RestartFile Name CDATA #REQUIRED>
-    <!ATTLIST RestartFile WritingMode (Text|Hybrid) "Text">   
+    <!ATTLIST RestartFile WritingMode (Text|Hybrid) "Text">
 
     <!ELEMENT MovingObstacles EMPTY>
     <!ATTLIST MovingObstacles LinkUpdateEvery CDATA #REQUIRED>
-    <!ATTLIST MovingObstacles GeometricallyDisplace (True|False) "True">    
+    <!ATTLIST MovingObstacles GeometricallyDisplace (True|False) "True">
 
     <!ELEMENT ObstacleLoadings (ObstacleLoading+)>
       <!ELEMENT ObstacleLoading (ObstacleName, Type, TimeInterval, VTranslation?)>
@@ -91,29 +91,29 @@
         <!ATTLIST ObstacleLoading Type (Force|Velocity) "Velocity">
 	<!ELEMENT TimeInterval EMPTY>
         <!ATTLIST TimeInterval Start CDATA #REQUIRED>
-        <!ATTLIST TimeInterval End   CDATA #REQUIRED>      
+        <!ATTLIST TimeInterval End   CDATA #REQUIRED>
 	<!ELEMENT VTranslation (TranslationalVelocity)>
           <!ELEMENT TranslationalVelocity EMPTY>
           <!ATTLIST TranslationalVelocity VX CDATA #REQUIRED>
           <!ATTLIST TranslationalVelocity VY CDATA #REQUIRED>
-          <!ATTLIST TranslationalVelocity VZ CDATA #REQUIRED>	
-      
+          <!ATTLIST TranslationalVelocity VZ CDATA #REQUIRED>
+
     <!ELEMENT PostProcessingWriters (Domain?, Writers?, ForceTorqueObstacles?)>
       <!ELEMENT Domain (Point, Point)>
-      <!ELEMENT Writers (Paraview?, RawData?)> 
+      <!ELEMENT Writers (Paraview?, RawData?)>
         <!ELEMENT Paraview EMPTY>
         <!ATTLIST Paraview RootName CDATA #REQUIRED>
         <!ATTLIST Paraview Directory CDATA #REQUIRED>
         <!ATTLIST Paraview InitialCycleNumber CDATA "0">
         <!ATTLIST Paraview WritingMode (Text|Binary) "Text">
 	<!ATTLIST Paraview ForceNetwork (True|False) "False">
-	<!ATTLIST Paraview Obstacle (True|False) "True">	    
-    
+	<!ATTLIST Paraview Obstacle (True|False) "True">
+
         <!ELEMENT RawData EMPTY>
-        <!ATTLIST RawData Name CDATA #REQUIRED> 
-      
-      <!ELEMENT ForceTorqueObstacles (Every, Directory, Obstacle+)> 
-        <!ATTLIST ForceTorqueObstacles Every CDATA #REQUIRED>  
+        <!ATTLIST RawData Name CDATA #REQUIRED>
+
+      <!ELEMENT ForceTorqueObstacles (Every, Directory, Obstacle+)>
+        <!ATTLIST ForceTorqueObstacles Every CDATA #REQUIRED>
 	<!ATTLIST ForceTorqueObstacles Directory CDATA #REQUIRED>
-	<!ELEMENT Obstacle EMPTY> 
-	<!ATTLIST Obstacle ObstacleName CDATA #REQUIRED> 
+	<!ELEMENT Obstacle EMPTY>
+	<!ATTLIST Obstacle ObstacleName CDATA #REQUIRED>
