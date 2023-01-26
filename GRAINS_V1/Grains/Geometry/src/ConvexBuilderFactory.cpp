@@ -7,6 +7,7 @@
 #include "Sphere.hh"
 #include "PointC.hh"
 #include "Superquadric.hh"
+#include "Rectangle.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -27,6 +28,7 @@ Convex* ConvexBuilderFactory::create( DOMNode* root )
   else if ( type == "Polyhedron" ) convex = Polyhedron::create( element );
   else if ( type == "Sphere" ) convex = new Sphere( element );
   else if ( type == "Superquadric" ) convex = new Superquadric( element );
+  else if ( type == "Rectangle" ) convex = new Rectangle( element );
 
   assert( convex != NULL );
 
@@ -50,6 +52,7 @@ Convex* ConvexBuilderFactory::create( string& type, istream& fileIn )
   else if ( type == "*Sphere" ) convex = new Sphere( fileIn );
   else if ( type == "*PointC" ) convex = new PointC();
   else if ( type == "*Superquadric" ) convex = new Superquadric( fileIn );
+  else if ( type == "Rectangle" ) convex = new Rectangle( fileIn );
   else
   {
     cout << "Invalid convex type : " << type.c_str() << endl;

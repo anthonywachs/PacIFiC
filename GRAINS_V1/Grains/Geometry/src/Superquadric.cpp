@@ -280,7 +280,7 @@ void Superquadric::writeShape( ostream &fileOut ) const
 
 
 // ----------------------------------------------------------------------------
-// !Input operator
+// Input operator
 void Superquadric::readShape( istream &fileIn )
 {
   cerr << "Program Error :\n" << "Superquadric::readShape non accessible.\n";
@@ -348,8 +348,7 @@ void Superquadric::write_polygonsPts_PARAVIEW( ostream &f,
     else
       costeps1 = pow( cost, eps1 );
 
-    // Theta is always strictly between 0 and pi so sint is
-    // strictly positive
+    // Theta is always strictly between 0 and pi so sint is strictly positive
     sinteps1 = pow( sint, eps1 );
 
     for ( int j = 0; j < visuNodeNbOnPer; j++ )

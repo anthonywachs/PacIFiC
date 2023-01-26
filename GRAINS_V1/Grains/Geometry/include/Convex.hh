@@ -3,6 +3,7 @@
 
 #include "Shape.hh"
 #include "BBox.hh"
+#include "BCylinder.hh"
 #include "Transform.hh"
 #include "Point3.hh"
 #include "ReaderXML.hh"
@@ -29,7 +30,8 @@ enum ConvexType {
   CYLINDER,
   POINT,
   SEGMENT,
-  SUPERQUADRIC
+  SUPERQUADRIC,
+  RECTANGLE2D
 };
 
 
@@ -60,6 +62,10 @@ class Convex : public Shape
     /** @brief Returns the convex shape bounding box
     @param t geometric transformation */
     virtual BBox bbox( Transform const& t ) const;
+
+    /** @brief Returns the convex shape bounding box
+    @param t geometric transformation */
+    virtual BCylinder getBCylinder() const;
 
     /** @brief Convex support function, returns the support point P, i.e. the
     point on the surface of the convex shape that satisfies max(P.v)

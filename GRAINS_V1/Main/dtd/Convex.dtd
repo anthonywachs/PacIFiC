@@ -27,3 +27,7 @@
   <!ATTLIST Superquadric c CDATA #REQUIRED>
   <!ATTLIST Superquadric n1 CDATA #REQUIRED>
   <!ATTLIST Superquadric n2 CDATA #REQUIRED>
+  
+ <!ELEMENT Rectangle EMPTY>
+  <!ATTLIST Rectangle LX CDATA #REQUIRED>
+  <!ATTLIST Rectangle LY CDATA #REQUIRED>

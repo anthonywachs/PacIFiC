@@ -6,35 +6,35 @@
 using namespace solid;
 
 class BBox;
-ostream& operator << ( ostream& f, BBox const& B ); 
+// ostream& operator << ( ostream& f, BBox const& B ); 
 
 
 /** @brief The class BBox.
 
     Bounding box oriented along the axis of the world reference frame (no
-    orientation). From GJK Engine - A Fast and 
+    orientation). From GJK Engine - A Fast and
     Robust GJK Implementation, Copyright (C) 1998  Gino van den Bergen.
-    
+
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
-class BBox 
+class BBox
 {
   public:
     /**@name Constructors */
     //@{
     /** @brief Default constructor */
-    BBox(); 
-  
-    /** @brief Constructor with 2 corners as inputs, the 1st point with the 
-    lowest coordinates and the 2nd point with the largest coordinates 
+    BBox();
+
+    /** @brief Constructor with 2 corners as inputs, the 1st point with the
+    lowest coordinates and the 2nd point with the largest coordinates
     @param min point with the lowest coordinates
     @param max point with the largest coordinates */
     BBox( Point3 const& min, Point3 const& max );
 
-    /** @brief Copy constructor 
+    /** @brief Copy constructor
     @param bbox_ La boite de reference */
     BBox( BBox const& bbox_ );
-  
+
     /** @brief Destructeur */
     ~BBox();
     //@}
@@ -51,7 +51,7 @@ class BBox
     a and b
     @param a 1st bounding box
     @param b 2nd bounding box */
-    void enclose( BBox const& a, BBox const& b ); 
+    void enclose( BBox const& a, BBox const& b );
 
     /** @brief Returns the bounding box center */
     Point3 const& getCenter() const;
@@ -71,56 +71,56 @@ class BBox
     /** @brief Extends the bounding box to a point p if p is outside the box
     @param p point */
     void include( Point3 const& p );
-  
+
     /** @brief Sets the bounding box to the union of itself and another bounding
     box
     @param b the other bounding box */
     void include ( BBox const& b );
 
-    /** @brief Returns whether a cubic box defined by its center and its half 
+    /** @brief Returns whether a cubic box defined by its center and its half
     edge length intersects the bounding box
     @param p center of the cubic box
     @param halfEdgeLength half-edge length of the cubic box */
     bool InZone( Point3 const* p, double halfEdgeLength ) const;
 
-    /** @brief Returns whether a box defined by its center and its half 
-    edge lengths intersects the bounding box 
+    /** @brief Returns whether a box defined by its center and its half
+    edge lengths intersects the bounding box
     @param p center of the cubic box
-    @param halfEdgeLength_X half-edge length of the box in the X direction 
-    @param halfEdgeLength_Y half-edge length of the box in the Y direction     
+    @param halfEdgeLength_X half-edge length of the box in the X direction
+    @param halfEdgeLength_Y half-edge length of the box in the Y direction
     @param halfEdgeLength_Z half-edge length of the box in the Z direction */
-    bool InZone( Point3 const* p, double halfEdgeLength_X, 
+    bool InZone( Point3 const* p, double halfEdgeLength_X,
     	double halfEdgeLength_Y, double halfEdgeLength_Z ) const;
 
     /** @brief Returns the direction of longest edge */
     int longestAxis() const;
 
-    /** @brief Sets the bounding box center 
+    /** @brief Sets the bounding box center
     @param p new center */
     void setCenter( Point3 const& p );
 
     /** @brief Sets the bounding box to an empty bounding box. This is done by
     assigning minus infinity extensions */
-    void setEmpty(); 
+    void setEmpty();
 
-    /** @brief Sets the bounding boxes half lengths 
+    /** @brief Sets the bounding boxes half lengths
     @param v new extension vector */
     void setExtent( Vector3 const& v );
 
-    /** @brief Sets the box dimensions using the point with the 
-    lowest coordinates and the point with the largest coordinates 
+    /** @brief Sets the box dimensions using the point with the
+    lowest coordinates and the point with the largest coordinates
     @param min point with the lowest coordinates
     @param max point with the largest coordinates */
     void setValue( Point3 const& min, Point3 const& max );
 
     /** @brief Returns the largest half length of the bounding box */
     double size() const ;
-  
+
     /** @brief Debugging method
     @param s debugging message to be printed on the default error output cerr */
     void debug( char const* s) const;
     //@}
-  
+
 
     /** @name Friend methods */
     //@{
@@ -128,11 +128,11 @@ class BBox
     @param a 1st bounding box
     @param b 2nd bounding box */
     friend bool intersect( BBox const& a, BBox const& b );
-  
+
     /** @brief Output operator
     @param f output stream
     @param B BBox object */
-    friend ostream& operator << ( ostream& f, BBox const& B );   
+    friend ostream& operator << ( ostream& f, BBox const& B );
     //@}
 
 
@@ -146,12 +146,10 @@ class BBox
 
   private:
     /** @name Parameters */
-    //@{  
+    //@{
     Point3 m_center; /**< bounding box center */
     Vector3 m_extent; /**< bounding box half lengths */
     //@}
 };
 
 #endif
-
-

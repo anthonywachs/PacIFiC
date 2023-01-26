@@ -38,7 +38,7 @@ Convex::~Convex()
 
 // ----------------------------------------------------------------------------
 // Returns the convex shape bounding box
-BBox Convex::bbox( Transform const& t) const
+BBox Convex::bbox( Transform const& t ) const
 {
   Point3 const* ori = t.getOrigin() ;
 
@@ -50,6 +50,21 @@ BBox Convex::bbox( Transform const& t) const
 	    (*ori)[Z] + t.getBasis()[Z] * support(t.getBasis()[Z]) );
 
   return ( BBox( min, max ) );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the convex shape bounding cylinder
+BCylinder Convex::getBCylinder() const
+{
+  cout << "Warning for this Convex the method Convex::bCylinder() "
+       << "is not yet implemented !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+
+  return( BCylinder() );
 }
 
 
@@ -561,8 +576,8 @@ double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
   // static Vector3 zero(0., 0., 0.);
 
   Vector3 v = a2w(a.support(zero)) - b2w(b.support(zero));
-  double dist = Norm(v);
 
+  double dist = Norm(v);
   Vector3 w;
 
   bits = 0;

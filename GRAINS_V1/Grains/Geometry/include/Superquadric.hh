@@ -2,7 +2,6 @@
 #define _SUPERQUADRIC_H_
 
 #include "Convex.hh"
-
 #include "ReaderXML.hh"
 
 
