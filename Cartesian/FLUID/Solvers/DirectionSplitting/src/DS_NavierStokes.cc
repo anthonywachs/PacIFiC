@@ -1315,15 +1315,19 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
       if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)
          && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
 			if (dxl != dxl_act) {
-				value = 1./(dxl_act + dxr_act)
-						* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
-				// value = 1./(dxl + dxr_act)
-				// 		* ((dxl/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+				if (dxl < 0.5 * dxl_act) {
+					value = (fr - fl) / (dxr + dxl);
+				} else {
+					value = 1./(dxl_act + dxr_act)
+							* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+				}
 			} else if (dxr != dxr_act) {
-				value = 1./(dxl_act + dxr_act)
-						* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
-				// value = 1./(dxl_act + dxr)
-				// 		* ((dxl_act/dxr)*(fr-fc) - (dxr/dxl_act)*(fl-fc));
+				if (dxr < 0.5 * dxr_act) {
+					value = (fr - fl) / (dxr + dxl);
+				} else {
+					value = 1./(dxl_act + dxr_act)
+							* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+				}
 			} else {
 				value = 1./(dxl_act + dxr_act)
 						* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
@@ -1379,15 +1383,19 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
       if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)
          && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
 				if (dxl != dxl_act) {
-					value = 1./(dxl_act + dxr_act)
-							* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
-					// value = 1./(dxl + dxr_act)
-					// 		* ((dxl/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+					if (dxl < 0.5 * dxl_act) {
+						value = (fr - fl) / (dxr + dxl);
+					} else {
+						value = 1./(dxl_act + dxr_act)
+								* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+					}
 				} else if (dxr != dxr_act) {
-					value = 1./(dxl_act + dxr_act)
-							* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
-					// value = 1./(dxl_act + dxr)
-					// 		* ((dxl_act/dxr)*(fr-fc) - (dxr/dxl_act)*(fl-fc));
+					if (dxr < 0.5 * dxr_act) {
+						value = (fr - fl) / (dxr + dxl);
+					} else {
+						value = 1./(dxl_act + dxr_act)
+								* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+					}
 				} else {
 					value = 1./(dxl_act + dxr_act)
 							* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
@@ -1442,20 +1450,24 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
 		// Derivative
       if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)
          && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
-			if (dxl != dxl_act) {
-				value = 1./(dxl_act + dxr_act)
-						* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
-				// value = 1./(dxl + dxr_act)
-				// 		* ((dxl/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
-			} else if (dxr != dxr_act) {
-				value = 1./(dxl_act + dxr_act)
-						* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
-				// value = 1./(dxl_act + dxr)
-				// 		* ((dxl_act/dxr)*(fr-fc) - (dxr/dxl_act)*(fl-fc));
-			} else {
-				value = 1./(dxl_act + dxr_act)
-						* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
-			}
+				if (dxl != dxl_act) {
+					if (dxl < 0.5 * dxl_act) {
+						value = (fr - fl) / (dxr + dxl);
+					} else {
+						value = 1./(dxl_act + dxr_act)
+								* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+					}
+				} else if (dxr != dxr_act) {
+					if (dxr < 0.5 * dxr_act) {
+						value = (fr - fl) / (dxr + dxl);
+					} else {
+						value = 1./(dxl_act + dxr_act)
+								* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+					}
+				} else {
+					value = 1./(dxl_act + dxr_act)
+							* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+				}
       } else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
          value = - (fl - fc)/dxl;
       } else if(UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
@@ -4640,6 +4652,9 @@ DS_NavierStokes:: assemble_advection_Centered_FD(double const& coef,
 			} else {
 				ui(cpt) = UF->DOF_value( i, j, k, comp, level );
 			}
+			// if (p == 10584) {
+			// 	cout << cpt << "," << dui(cpt) << "," << dC(cpt) << "," << ui(cpt) << endl;
+			// }
 		} else {
 			if (comp == 0) {
 				if (cpt == 0) {
