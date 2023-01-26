@@ -172,7 +172,7 @@ class GrainsExec
 	size_t const& CylAxisDir,
 	double const& tol = EPSILON );
 	
-    /** @brief Returns whether a point belongs to  an axis-aligned cylinder. 
+    /** @brief Returns whether a point belongs to an axis-aligned cylinder. 
     @param pt the point 
     @param CylBottomCentre center of lower disk of the cylinder 
     @param CylRadius cylinder radius  
@@ -266,10 +266,11 @@ class GrainsExec
     static string m_shift6; /**< string of 6 blank spaces */
     static string m_shift9; /**< string of 9 blank spaces */
     static string m_shift12; /**< string of 12 blank spaces */
-    static string m_shift15; /**< string of 12 blank spaces */ 
+    static string m_shift15; /**< string of 15 blank spaces */ 
     static bool m_output_data_at_this_time; /**< writes data in
     	result files at this time */
     static string m_inputFile; /**< Grains3D major input file */
+    static int m_return_syscmd; /**< Returned value of system command */
     //@}      
   
   

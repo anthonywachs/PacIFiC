@@ -1930,7 +1930,7 @@ void Grains::clearResultXmlFiles() const
   {
     string cmd = "bash " + GrainsExec::m_GRAINS_HOME
      	+ "/Tools/ExecScripts/init_clear.exec " + m_fileSave;
-    system( cmd.c_str() );
+    GrainsExec::m_return_syscmd = system( cmd.c_str() );
   }
 
 }

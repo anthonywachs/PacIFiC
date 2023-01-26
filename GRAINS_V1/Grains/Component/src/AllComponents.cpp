@@ -1436,7 +1436,7 @@ void AllComponents::initialiseOutputObstaclesLoadFiles( int rank,
       string cmd = "bash " + GrainsExec::m_GRAINS_HOME
      	+ "/Tools/ExecScripts/ObstaclesLoadFiles_clear.exec "
 	+ m_outputTorsorObstacles_dir;
-      system( cmd.c_str() );
+      GrainsExec::m_return_syscmd = system( cmd.c_str() );
     }
     else
       for (list<Obstacle*>::iterator

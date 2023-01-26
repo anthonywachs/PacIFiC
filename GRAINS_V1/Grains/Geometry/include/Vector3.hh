@@ -6,7 +6,6 @@
 
 class Quaternion;
 
-
 namespace solid
 {
   /** @brief The class Vector3.
@@ -32,6 +31,10 @@ namespace solid
       @param y 2nd component
       @param z 3rd component*/
       Vector3( double x, double y, double z );
+
+      /** @brief Copy constructor
+      @param g copied Group3 object */
+      Vector3( Vector3 const& g );
 
       /** @brief Copy constructor
       @param g copied Group3 object */
@@ -67,7 +70,7 @@ namespace solid
       //@{
       /** @brief Equal operator to another Vector3 object
       @param g2 the other Vector3 object */
-      Vector3& operator = ( Vector3 const& g2 );
+      Vector3& operator = ( Vector3 const& g2 );    
 
       /** @brief Cross product this x rhv
       @param rhv 2nd Vector3 object */

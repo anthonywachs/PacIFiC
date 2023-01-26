@@ -40,6 +40,7 @@ list<IndexArray*> GrainsExec::m_allPolytopeNodeNeighbors;
 list<IndexArray*> GrainsExec::m_allPolytopeNodesIndex;
 list<vector< vector<int> >*> GrainsExec::m_allPolyhedronFacesConnectivity;
 string GrainsExec::m_inputFile;
+int GrainsExec::m_return_syscmd = 0;
 
 
 
@@ -358,7 +359,7 @@ void GrainsExec::checkTime_outputFile( string const& filename,
       fileOUT.close(); 
     
       syscom = "mv " + filename + ".tmp" + " " + filename ;
-      system(syscom.c_str());
+      m_return_syscmd = system(syscom.c_str());
     }      
   }
 }
@@ -420,7 +421,7 @@ void GrainsExec::checkAllFilesForReload()
       cmd += " " + *is + " " + fileName + " " + m_SaveDirectory; 
     } 
 
-    system( cmd.c_str() );       
+    m_return_syscmd = system( cmd.c_str() );       
   }  
 }
 
@@ -568,7 +569,7 @@ size_t GrainsExec::AACylinderSphereIntersection( Point3 const& SphereCenter,
 
  
 // ----------------------------------------------------------------------------
-// Returns whether a point belongs to  an axis-aligned cylinder
+// Returns whether a point belongs to an axis-aligned cylinder
 bool GrainsExec::isPointInAACylinder( Point3 const& pt,
 	Point3 const& CylBottomCentre,
 	double const& CylRadius,
