@@ -1394,7 +1394,7 @@ void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
                  int stencil = 1;
                  bool on_RB_boundary = false;
                  bool in_RB_bulk = false;
-                 if (void_fraction[field]->operator()(p,0) != 0) {
+                 if (void_fraction[field]->operator()(p,0) == parID + 1) {
                     for (int in = -1*stencil; in <= stencil; in++) {
                        for (int jn = -1*stencil; jn <= stencil; jn++) {
                           if (abs(in) != abs(jn)) {
