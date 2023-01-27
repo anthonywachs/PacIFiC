@@ -1435,6 +1435,11 @@ void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
                     normal(1) = pt0(1) - pgc->operator()(1);
                     normal(2) = pt0(2) - pgc->operator()(2);
 
+                    normal(0) = delta_periodic_transformation(normal(0),0);
+                    normal(1) = delta_periodic_transformation(normal(1),1);
+                    if (m_space_dimension == 3)
+                       normal(2) = delta_periodic_transformation(normal(2),2);
+
                     double norm_mag = MAC::sqrt(pow(normal(0),2.)
                                               + pow(normal(1),2.)
                                               + pow(normal(2),2.));
@@ -1469,8 +1474,9 @@ void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
                                 doubleVector node(2);
                                 node(0) = FF->get_DOF_coordinate( i0(0)+in, comp, 0 );
                                 node(1) = FF->get_DOF_coordinate( i0(1)+jn, comp, 1 );
-                                double dist = MAC::sqrt(pow(node(0)-pt0(0),2.)
-                                                      + pow(node(1)-pt0(1),2.));
+                                double dx = delta_periodic_transformation(node(0)-pt0(0), 0);
+                                double dy = delta_periodic_transformation(node(1)-pt0(1), 1);
+                                double dist = MAC::sqrt(pow(dx,2.) + pow(dy,2.));
                                 wht.push_back(1./dist);
                                 f_wht.push_back(FF->DOF_value(i0(0)+in
                                                              ,i0(1)+jn
@@ -1489,9 +1495,10 @@ void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
                                    node(0) = FF->get_DOF_coordinate( i0(0)+in, comp, 0 );
                                    node(1) = FF->get_DOF_coordinate( i0(1)+jn, comp, 1 );
                                    node(2) = FF->get_DOF_coordinate( i0(2)+kn, comp, 2 );
-                                   double dist = MAC::sqrt(pow(node(0)-pt0(0),2.)
-                                                         + pow(node(1)-pt0(1),2.)
-                                                         + pow(node(2)-pt0(2),2.));
+                                   double dx = delta_periodic_transformation(node(0)-pt0(0), 0);
+                                   double dy = delta_periodic_transformation(node(1)-pt0(1), 1);
+                                   double dz = delta_periodic_transformation(node(2)-pt0(2), 2);
+                                   double dist = MAC::sqrt(pow(dx,2.) + pow(dy,2.) + pow(dz,2.));
                                    wht.push_back(1./dist);
                                    f_wht.push_back(FF->DOF_value(i0(0)+in
                                                                 ,i0(1)+jn
