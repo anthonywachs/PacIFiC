@@ -1,9 +1,11 @@
 update:
 	cd Main/src ; make ; cd ../..
+	cd Utils ; make ; cd ..
 
 depend:
 	cd Main/src ; make depend ; cd ../..
 	cd Grains/src ; make depend ; cd ../..
+	cd Utils/ ; make depend ; cd ../
 
 xerces:
 	cd $(XERCES_DIR) ; $(INSTALL_XERCES) ; cd ..
@@ -25,6 +27,7 @@ cleanxerces:
 
 clean:
 	cd Main/src ; make clean ; cd ../..
+	cd Utils ; make clean ; cd ..
 	@echo 'GRAINS supprime'
 
 cleandtd:

@@ -25,6 +25,15 @@ namespace solid
 
   // ---------------------------------------------------------------------------
   // Copy constructor
+  Vector3::Vector3( Vector3 const& point )
+    : Group3( point )
+  {}
+
+
+
+
+  // ---------------------------------------------------------------------------
+  // Copy constructor
   Vector3::Vector3( Group3 const& point )
     : Group3( point )
   {}
@@ -85,7 +94,7 @@ namespace solid
 
 
 
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // ---------------------------------------------------------------------------
   // Equal operator to another Vector3 object
   Vector3& Vector3::operator = ( Vector3 const& g2 )
   {
@@ -97,7 +106,6 @@ namespace solid
     }
     return (*this);
   }
-
 
 
 

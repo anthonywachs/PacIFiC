@@ -23,6 +23,7 @@ string GrainsExec::m_reloadFile_suffix = "B";
 bool GrainsExec::m_exception_Contact = false; 
 bool GrainsExec::m_exception_Displacement = false;
 bool GrainsExec::m_exception_Simulation = false;
+string GrainsExec::m_shift0 = "";
 string GrainsExec::m_shift1 = " ";
 string GrainsExec::m_shift2 = "  ";
 string GrainsExec::m_shift3 = "   ";
@@ -39,6 +40,7 @@ list<IndexArray*> GrainsExec::m_allPolytopeNodeNeighbors;
 list<IndexArray*> GrainsExec::m_allPolytopeNodesIndex;
 list<vector< vector<int> >*> GrainsExec::m_allPolyhedronFacesConnectivity;
 string GrainsExec::m_inputFile;
+int GrainsExec::m_return_syscmd = 0;
 
 
 
@@ -357,7 +359,7 @@ void GrainsExec::checkTime_outputFile( string const& filename,
       fileOUT.close(); 
     
       syscom = "mv " + filename + ".tmp" + " " + filename ;
-      system(syscom.c_str());
+      m_return_syscmd = system(syscom.c_str());
     }      
   }
 }
@@ -419,7 +421,7 @@ void GrainsExec::checkAllFilesForReload()
       cmd += " " + *is + " " + fileName + " " + m_SaveDirectory; 
     } 
 
-    system( cmd.c_str() );       
+    m_return_syscmd = system( cmd.c_str() );       
   }  
 }
 
@@ -496,4 +498,115 @@ Vector3 GrainsExec::RandomUnitVector( size_t dim )
   vec.normalize();      
   
   return( vec );
+} 
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether a sphere is fully in, fully out or intersects
+// an axis-aligned cylinder. Returned values are 0, 1 and 2 respectively
+size_t GrainsExec::AACylinderSphereIntersection( Point3 const& SphereCenter,
+    	double const& SphereRadius,
+	Point3 const& CylBottomCentre,
+	double const& CylRadius,
+	double const& CylHeight,
+	size_t const& CylAxisDir,
+	double const& tol )
+{
+  size_t inter = 1;
+  Vector3 CtoC = SphereCenter - CylBottomCentre;
+  double radial_distance = 0.;
+  
+  switch( CylAxisDir )
+  {
+    case 0:
+      radial_distance = sqrt( CtoC[Y] * CtoC[Y] + CtoC[Z] * CtoC[Z] );
+      if ( radial_distance <= CylRadius - SphereRadius + tol
+      	&& SphereCenter[X] >= CylBottomCentre[X] + SphereRadius - tol
+	&& SphereCenter[X] <= CylBottomCentre[X] + CylHeight - SphereRadius 
+		+ tol )
+	inter = 0;
+      else if ( radial_distance > CylRadius + SphereRadius
+      	|| SphereCenter[X] < CylBottomCentre[X] - SphereRadius
+	|| SphereCenter[X] > CylBottomCentre[X] + CylHeight + SphereRadius )
+	inter = 1;
+      else inter = 2;
+      break;
+    
+    case 1: 
+      radial_distance = sqrt( CtoC[X] * CtoC[X] + CtoC[Z] * CtoC[Z] );
+      if ( radial_distance <= CylRadius - SphereRadius + tol
+      	&& SphereCenter[Y] >= CylBottomCentre[Y] + SphereRadius - tol
+	&& SphereCenter[Y] <= CylBottomCentre[Y] + CylHeight - SphereRadius 
+		+ tol )
+	inter = 0;
+      else if ( radial_distance > CylRadius + SphereRadius
+      	|| SphereCenter[Y] < CylBottomCentre[Y] - SphereRadius
+	|| SphereCenter[Y] > CylBottomCentre[Y] + CylHeight + SphereRadius )
+	inter = 1;
+      else inter = 2;   
+      break;
+      
+    default: // i.e. 2
+      radial_distance = sqrt( CtoC[X] * CtoC[X] + CtoC[Y] * CtoC[Y] );
+      if ( radial_distance <= CylRadius - SphereRadius + tol
+      	&& SphereCenter[Z] >= CylBottomCentre[Z] + SphereRadius - tol
+	&& SphereCenter[Z] <= CylBottomCentre[Z] + CylHeight - SphereRadius 
+		+ tol )
+	inter = 0;
+      else if ( radial_distance > CylRadius + SphereRadius
+      	|| SphereCenter[Z] < CylBottomCentre[Z] - SphereRadius
+	|| SphereCenter[Z] > CylBottomCentre[Z] + CylHeight + SphereRadius )
+	inter = 1;
+      else inter = 2;    
+      break;
+  }
+  
+  return ( inter ) ;
+}
+
+
+
+ 
+// ----------------------------------------------------------------------------
+// Returns whether a point belongs to an axis-aligned cylinder
+bool GrainsExec::isPointInAACylinder( Point3 const& pt,
+	Point3 const& CylBottomCentre,
+	double const& CylRadius,
+	double const& CylHeight,
+	size_t const& CylAxisDir,
+	double const& tol )
+{
+  bool isIn = false;
+  Vector3 PtoC = pt - CylBottomCentre;
+  double radial_distance = 0.;
+  
+  switch( CylAxisDir )
+  {
+    case 0:
+      radial_distance = sqrt( PtoC[Y] * PtoC[Y] + PtoC[Z] * PtoC[Z] );
+      if ( radial_distance <= CylRadius + tol
+      	&& pt[X] >= CylBottomCentre[X] - tol
+	&& pt[X] <= CylBottomCentre[X] + CylHeight + tol )
+	isIn = true;
+      break;
+    
+    case 1: 
+      radial_distance = sqrt( PtoC[X] * PtoC[X] + PtoC[Z] * PtoC[Z] );
+      if ( radial_distance <= CylRadius + tol
+      	&& pt[Y] >= CylBottomCentre[Y] - tol
+	&& pt[Y] <= CylBottomCentre[Y] + CylHeight + tol )
+	isIn = true;
+      break;
+      
+    default: // i.e. 2
+      radial_distance = sqrt( PtoC[X] * PtoC[X] + PtoC[Y] * PtoC[Y] );
+      if ( radial_distance <= CylRadius + tol
+      	&& pt[Z] >= CylBottomCentre[Z] - tol
+	&& pt[Z] <= CylBottomCentre[Z] + CylHeight + tol )
+	isIn = true;
+      break;
+  }
+  
+  return ( isIn ) ;
 } 

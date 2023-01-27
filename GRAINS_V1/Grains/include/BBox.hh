@@ -6,7 +6,11 @@
 using namespace solid;
 
 class BBox;
+<<<<<<< HEAD
 // ostream& operator << ( ostream& f, BBox const& B ); 
+=======
+// ostream& operator << ( ostream& f, BBox const& B );
+>>>>>>> NewGrains
 
 
 /** @brief The class BBox.
@@ -35,7 +39,11 @@ class BBox
     @param bbox_ La boite de reference */
     BBox( BBox const& bbox_ );
 
+<<<<<<< HEAD
     /** @brief Destructeur */
+=======
+    /** @brief Destructor */
+>>>>>>> NewGrains
     ~BBox();
     //@}
 
@@ -119,6 +127,11 @@ class BBox
     /** @brief Debugging method
     @param s debugging message to be printed on the default error output cerr */
     void debug( char const* s) const;
+
+    /** @brief Returns whether the bounding box fully contains the other
+    bounding box
+    @param a the other bounding box */
+    bool fullyContain( BBox const& a );
     //@}
 
 

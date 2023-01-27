@@ -34,8 +34,12 @@ namespace solid
       Point3( double x, double y, double z );
 
       /** @brief Copy constructor
-      @param g copied Group3 object */
-      Point3( Group3 const& g );
+      @param g copied Point3 object */
+      Point3( Point3 const& g );
+      
+      /** @brief Copy constructor
+      @param g copied Group3 object */      
+      Point3( Group3 const& g );      
 
       /** @brief Destructor */
       ~Point3();
@@ -74,6 +78,14 @@ namespace solid
       @param z Position en Z */
       double DistanceTo( double x, double y, double z ) const;
       //@}
+
+
+      /**@name Operators */
+      //@{      
+      /** @brief Equal operator to another Group3 object
+      @param g2 the other Group3 object */
+      Point3& operator = ( Point3 const& g2 );  
+      //@}      
   };
   
   static Point3 OriginePoint; /**< Origine (0.,0.,0.)  */

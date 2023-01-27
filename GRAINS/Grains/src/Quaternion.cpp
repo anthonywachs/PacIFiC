@@ -65,7 +65,7 @@ Quaternion::~Quaternion()
 
 // ----------------------------------------------------------------------------
 // F.PRADEL - Janvier 2000 - Creation
-// creation du conjugue du quaternion
+// creation du conjugue du quaternion 
 Quaternion Quaternion::Conjugate() const
 {
   return (Quaternion(-vqt,w));
@@ -77,7 +77,7 @@ Quaternion Quaternion::Conjugate() const
 // ----------------------------------------------------------------------------
 // Acces a la composante scalaire
 // F.PRADEL - Janv.2000 - Creation
-Scalar Quaternion::getScalaire() const
+Scalar Quaternion::getScalaire() const 
 {
   return (w);
 }
@@ -108,7 +108,7 @@ Vecteur Quaternion::getVecteurRotation() const
   } else {
     vTmp=Vecteur(0.0,0.0,0.0);
   }
-  return vTmp;
+  return vTmp;   
 }
 
 
@@ -159,7 +159,7 @@ void Quaternion::setQuaternion( const Vecteur &vecteur )
 // ----------------------------------------------------------------------------
 // Modification du quaternion
 // D.PETIT - Sept.2000 - Creation
-void Quaternion::setQuaternion( const Scalar &vecteur0,
+void Quaternion::setQuaternion( const Scalar &vecteur0, 
 	const Scalar &vecteur1,
 	const Scalar &vecteur2,
 	Scalar scalaire )
@@ -197,11 +197,11 @@ void Quaternion::setVecteur( const Vecteur &vecteur )
 
 // ----------------------------------------------------------------------------
 // F.PRADEL - Janvier 2000 - Creation
-// Affectation
+// Affectation 
 Quaternion& Quaternion::operator = ( const Quaternion& rhs )
 {
   if ( &rhs != this )
-  {
+  {   
     w   = rhs.w;
     vqt = rhs.vqt;
   }
@@ -240,7 +240,7 @@ Scalar& Quaternion::operator [] ( int i )
 // F.PRADEL - Janvier 2000 - Creation
 // A.WACHS - Sept 2009 - Modif
 // indexation des composantes des points
-Scalar Quaternion::operator [] ( int i ) const
+Scalar Quaternion::operator [] ( int i ) const 
 {
   return (i==3 ? w :  vqt[i]);
 }
@@ -404,48 +404,12 @@ Vecteur Quaternion::multConjugateToVecteur( const Quaternion& rhs ) const
 
 
 
-/* Build a unit quaternion representing the rotation
- * from u to v. The input vectors need not be normalised. */
-void Quaternion::setFromRotTwoVectors( const Vecteur& u, const Vecteur& v)
-{
-    double norm_u_norm_v = sqrt( (u*u) * (v*v) );
-    double real_part = norm_u_norm_v + u*v;
-    Vecteur vect;
-
-    if (real_part < 1.e-6 * norm_u_norm_v)
-    {
-        /* If u and v are exactly opposite, rotate 180 degrees
-         * around an arbitrary orthogonal axis. Axis normalisation
-         * can happen later, when we normalise the quaternion. */
-        real_part = 0.;
-        vect = fabs(u[0]) > fabs(u[2]) ? Vecteur(-u[1], u[0], 0.)
-                                : Vecteur(0., -u[2], u[1]);
-    }
-    else
-    {
-        /* Otherwise, build quaternion the standard way. */
-        vect = u^v;
-    }
-
-    *this = Quaternion(vect[0],vect[1],vect[2],real_part) * (1/
-            Norm( Quaternion(vect[0],vect[1],vect[2],real_part)) );
-}
-
-
-Vecteur Quaternion::rotateVector(const Vecteur v)
-{
-  Vecteur v_rotated;
-  v_rotated = (w*w - Norm(vqt)*Norm(vqt))*v + 2*(v*vqt)*vqt
-              + 2*w*(vqt^v);
-  return v_rotated ;
-}
-
 
 // ----------------------------------------------------------------------------
 // F.PRADEL - Janvier 2000 - Creation
 bool Quaternion::operator== ( const Quaternion& rhs )
 {
-  return (w==rhs.w &&
+  return (w==rhs.w && 
 	  vqt[0]==rhs.vqt[0] && vqt[1]==rhs.vqt[1] && vqt[2]==rhs.vqt[2]);
 }
 
@@ -464,7 +428,7 @@ bool Quaternion::operator!= ( const Quaternion& rhs )
 
 // ----------------------------------------------------------------------------
 // F.PRADEL - Janvier 2000 - Creation
-// surcharge de l'operateur de sortie d'un quaternion : scalaire
+// surcharge de l'operateur de sortie d'un quaternion : scalaire 
 // puis les composantes du vecteur.
 ostream &operator << ( ostream &fileOut, const Quaternion &objet )
 {
@@ -487,7 +451,7 @@ void Quaternion::writeQuaternion( ostream &fileOut ) const
 {
   fileOut << Grains_Exec::doubleToString(ios::scientific,POSITIONFORMAT,
   	w) << " ";
-  vqt.writeGroup3(fileOut);
+  vqt.writeGroup3(fileOut);   
 }
 
 
@@ -499,7 +463,7 @@ void Quaternion::writeQuaternion( ostream &fileOut ) const
 void Quaternion::writeQuaternion_binary( ostream &fileOut )
 {
   fileOut.write( reinterpret_cast<char*>( &w ), sizeof(double) );
-  vqt.writeGroup3_binary( fileOut );
+  vqt.writeGroup3_binary( fileOut );   
 }
 
 
@@ -511,7 +475,7 @@ void Quaternion::writeQuaternion_binary( ostream &fileOut )
 void Quaternion::readQuaternion_binary( istream &StreamIN )
 {
   StreamIN.read( reinterpret_cast<char*>( &w ), sizeof(double) );
-  vqt.readGroup3_binary( StreamIN );
+  vqt.readGroup3_binary( StreamIN );   
 }
 
 
@@ -522,7 +486,7 @@ void Quaternion::readQuaternion_binary( istream &StreamIN )
 // norme d'un quaternion
 Scalar ABS( const Quaternion& v )
 {
-  return (sqrt(v.w*v.w +
+  return (sqrt(v.w*v.w + 
 	       v.vqt[0]*v.vqt[0] + v.vqt[1]*v.vqt[1] + v.vqt[2]*v.vqt[2]));
 }
 

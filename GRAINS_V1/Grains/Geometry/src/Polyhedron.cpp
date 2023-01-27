@@ -271,6 +271,7 @@ void Polyhedron::computeVolumeInertiaContrib( const Point3 &A2,
 
 
 
+
 // -------------------------------------------------------------------
 // Allocates the inertia tensor array and sets its component and the 
 // volume to 0
@@ -389,7 +390,7 @@ void Polyhedron::BuildPolyhedron( int nbface, IndexArray const* face )
   // Initialize volume and moment of inertia tensor to 0
   Initialisation();
 
-  // Compute volume and moment of inertia tenso
+  // Compute volume and moment of inertia tensor
   Point3 G_ ;
   int i, j, k;
   for(i=0; i<nbface; i++)

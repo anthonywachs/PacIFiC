@@ -60,7 +60,7 @@ then
   GCCFLAGS="-pedantic -W -Wno-long-long -Wno-ctor-dtor-privacy -Wno-unused-parameter -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11 "
 fi
 export GRAINS_GENCCFLAGS="-m${GRAINS_BITS_DEFAULT} ${GRAINS_COMPIL_OPT} -fPIC -Wall -Wwrite-strings -Wconversion -Wshadow -Wno-deprecated -Wno-comment ${GCCFLAGS}"
-export GRAINS_MPICCFLAGS="-DMPICH_IGNORE_CXX_SEEK -DMPICH_SKIP_MPICXX"
+export GRAINS_MPICCFLAGS="-DMPICH_IGNORE_CXX_SEEK -DMPICH_SKIP_MPICXX -DOMPI_IGNORE_CXX_SEEK -DOMPI_SKIP_MPICXX"
 
 
 # System include directories to generate dependencies 

@@ -153,7 +153,38 @@ class GrainsExec
     
     /** @brief Returns a random unit vector
     @param dim number of space dimensions */
-    static Vector3 RandomUnitVector( size_t dim );    	    	  
+    static Vector3 RandomUnitVector( size_t dim ); 
+    
+    /** @brief Returns whether a sphere is fully in, fully out or intersects
+    an axis-aligned cylinder. Returned values are 0, 1 and 2 respectively 
+    @param SphereCenter sphere center 
+    @param SphereRadius sphere radius   
+    @param CylBottomCentre center of lower disk of the cylinder 
+    @param CylRadius cylinder radius  
+    @param CylHeight cylinder height   
+    @param CylAxisDir cylinder axis direction   
+    @param tol tolerance for the test fully in */
+    static size_t AACylinderSphereIntersection( Point3 const& SphereCenter,
+    	double const& SphereRadius,
+	Point3 const& CylBottomCentre,
+	double const& CylRadius,
+	double const& CylHeight,
+	size_t const& CylAxisDir,
+	double const& tol = EPSILON );
+	
+    /** @brief Returns whether a point belongs to an axis-aligned cylinder. 
+    @param pt the point 
+    @param CylBottomCentre center of lower disk of the cylinder 
+    @param CylRadius cylinder radius  
+    @param CylHeight cylinder height   
+    @param CylAxisDir cylinder axis direction   
+    @param tol tolerance */
+    static bool isPointInAACylinder( Point3 const& pt,
+	Point3 const& CylBottomCentre,
+	double const& CylRadius,
+	double const& CylHeight,
+	size_t const& CylAxisDir,
+	double const& tol = EPSILON );	       	    	  
     //@}   
 
 
@@ -228,16 +259,18 @@ class GrainsExec
     static bool m_exception_Contact; /**< Contact exception */
     static bool m_exception_Displacement; /**< Displacement exception */
     static bool m_exception_Simulation; /**< Simulation exception */
+    static string m_shift0; /**< string of 0 blank space */
     static string m_shift1; /**< string of 1 blank space */
     static string m_shift2; /**< string of 2 blank spaces */
     static string m_shift3; /**< string of 3 blank spaces */
     static string m_shift6; /**< string of 6 blank spaces */
     static string m_shift9; /**< string of 9 blank spaces */
     static string m_shift12; /**< string of 12 blank spaces */
-    static string m_shift15; /**< string of 12 blank spaces */ 
+    static string m_shift15; /**< string of 15 blank spaces */ 
     static bool m_output_data_at_this_time; /**< writes data in
     	result files at this time */
     static string m_inputFile; /**< Grains3D major input file */
+    static int m_return_syscmd; /**< Returned value of system command */
     //@}      
   
   

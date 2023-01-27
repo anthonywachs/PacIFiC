@@ -140,8 +140,12 @@ class Box : public Convex
     there is contact and returns the origin as contact point */
     Point3 IntersectionPointSPHERE( Point3 const& SphereCenter,
   	double const& SphereRadius, double& overlap,
+<<<<<<< HEAD
 	bool warningSphereCenterInBox = true ) const
     	throw(ContactError);
+=======
+	  bool warningSphereCenterInBox = true ) const;    
+>>>>>>> NewGrains
 
     /** @brief Same as IntersectionPointSPHERE except that it returns a non zero
     normal distance only for a configuration sphere-face (i.e. returns zero with

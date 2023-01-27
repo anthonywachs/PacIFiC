@@ -62,6 +62,7 @@ Paraview_PostProcessingWriter::Paraview_PostProcessingWriter(
   m_binary( isBinary ),
   m_postProcessObstacle( true ),
   m_initialCycleNumber_forced( false ),
+  m_network( false ),
   BUFFER( NULL ),
   ALLOCATED( 0 ),
   OFFSET( 0 )
@@ -1755,10 +1756,6 @@ void Paraview_PostProcessingWriter::writeForceChain_Paraview(
   ofstream f( ( m_ParaviewFilename_root + "/" + filename ).c_str(),
   	ios::out );
   size_t nbContact = pallContacts->size();
-  int nbContactsWithObstacles = 0;
-  for (contact=pallContacts->begin();contact!=pallContacts->end();contact++){
-    if (contact->contactWithObstacle) nbContactsWithObstacles++;
-  }
   f << "<?xml version=\"1.0\"?>" << endl;
   f << "<VTKFile type=\"PolyData\" version=\"0.1\" "
     	<< "byte_order=\"LittleEndian\" ";
@@ -1769,9 +1766,7 @@ void Paraview_PostProcessingWriter::writeForceChain_Paraview(
     << "\" NumberOfVerts=\"" << 0
     << "\" NumberOfLines=\"" << nbContact
     << "\" NumberOfStrips=\"" << 0
-    << "\" NumberOfPolys=\"" << 0
-    << "\" NumberOfContactsWithObstacles=\"" << nbContactsWithObstacles <<
-    "\">" << endl;
+    << "\" NumberOfPolys=\"" << 0 << "\">" << endl;
   f << "<Points>" << endl;
   f << "<DataArray type=\"Float32\" NumberOfComponents=\"3\"";
   if ( binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
@@ -1823,8 +1818,8 @@ void Paraview_PostProcessingWriter::writeForceChain_Paraview(
   f << endl;
   f << "</DataArray>" << endl;
   f << "</Points>" << endl;
-  f << "<PointData Scalars=\"Norm_F\">" << endl;
-  f << "<DataArray type=\"Float32\" Name=\"Norm_F\" ";
+  f << "<PointData Scalars=\"F_N\">" << endl;
+  f << "<DataArray type=\"Float32\" Name=\"F_N\" ";
   if ( binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
   else f << "format=\"ascii\">";
   f << endl;
@@ -1834,12 +1829,12 @@ void Paraview_PostProcessingWriter::writeForceChain_Paraview(
   {
     if ( binary )
       for ( int i=0; i<2; ++i )
-	write_double_binary( Norm( contact->contactForce ) );
+	write_double_binary( fabs( contact->contactForce[Z] ) );
     else
       for ( int i=0; i<2; ++i )
-	f << Norm( contact->contactForce ) << " " ;
+	f << fabs( contact->contactForce[Z] ) << " " ;
   }
-  if ( binary ) flush_binary( f, "writeForceChain_Paraview/Norm_F" );
+  if ( binary ) flush_binary( f, "writeForceChain_Paraview/F_N" );
   f << endl;
   f << "</DataArray>" << endl;
   f << "</PointData>" << endl;
@@ -2348,8 +2343,8 @@ void Paraview_PostProcessingWriter::writePVTP_Paraview( const string &filename,
   f << "<PPoints>" << endl;
   f << "<PDataArray type=\"Float32\" NumberOfComponents=\"3\"/>" << endl;
   f << "</PPoints>" << endl;
-  f << "<PPointData Scalars=\"Norm_F\">" << endl;
-  f << "<PDataArray type=\"Float32\" Name=\"Norm_F\"/>" << endl;
+  f << "<PPointData Scalars=\"F_N\">" << endl;
+  f << "<PDataArray type=\"Float32\" Name=\"F_N\"/>" << endl;
   f << "</PPointData>" << endl;
   f << "<PLines>" << endl;
   f << "<PDataArray Name=\"connectivity\" type=\"Int32\" format=\"ascii\">"

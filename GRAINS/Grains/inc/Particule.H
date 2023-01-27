@@ -858,11 +858,6 @@ public:
   /** @brief Restauration de l'etat */
   void restaureState();
 
-
-  /** @brief Ecriture de l'information de position pour Basilisk */
-  virtual void writePositionInFluid (struct BasiliskDataStructure * b);
-
-
   /** @brief Restauration de l'etat
   @param Pmemento_ configuration
   @param Cmemento_ cinematique
@@ -902,7 +897,7 @@ public:
   @param ParticuleClassesReference particules de r�f�rence
   	pour chaque classe de particules */
   virtual void read2014_binary( istream &fileSave, vector<Particule*> const*
-  	ParticuleClassesReference, bool const& contact_history_storage = false );
+  	ParticuleClassesReference );
 
   /** @brief Sauvegarde de la particule pour Reload
   @param fileSave Flux de sauvegarde
@@ -930,6 +925,7 @@ public:
   @param P particule */
   friend ostream& operator << ( ostream &f, const Particule &P );
   //@}
+
 
   /** @name Methods Virtual pour la Periodicite */
   //@{
@@ -1046,16 +1042,6 @@ public:
 
   Scalar set_shrinking_mass(); /** set the current mass */
     //@}
-
-  virtual void copyHistoryContacts( double* &destination, int start_index );
-
-  // ----------------------------------------------------------------------------
-  // Copy existing contact in the map
-  virtual void copyContactInMap( std::tuple<int,int,int> const& id,
-    bool const& isActive, Vecteur const& tangent, Vecteur const& prev_normal,
-    Vecteur const& cumulSpringTorque );
-
-  virtual int getContactMapSize();
 
 protected:
   /**@name Parameters */

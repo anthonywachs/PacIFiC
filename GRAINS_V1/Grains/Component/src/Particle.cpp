@@ -345,8 +345,9 @@ Particle::~Particle()
 
 // ----------------------------------------------------------------------------
 // Solves the Newton's law and move particle to their new position
-void Particle::Move( double time, double dt ) throw(DisplacementError)
+void Particle::Move( double time, double dt )
 {
+  try {
   // Time integration of Newton's law followed and kinematic equations
   m_kinematics->computeMomentumChangeOverDt( m_torsor, dt, this );
   double depl = m_kinematics->Move( this, dt );
@@ -362,6 +363,11 @@ void Particle::Move( double time, double dt ) throw(DisplacementError)
     DisplacementError erreur( this, depl, rayon, time );
     throw erreur;
   }
+
+  }
+  catch (const DisplacementError&) {
+    throw DisplacementError();
+  }
 }
 
 
@@ -372,8 +378,8 @@ void Particle::Move( double time, double dt ) throw(DisplacementError)
 // computes the contact force and torque and adds to each component
 void Particle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
-  throw ( ContactError )
 {
+  try{
   PointContact closestPoint;
   double delta=0.;
 
@@ -414,6 +420,14 @@ void Particle::InterAction( Component* voisin,
       this->addToCoordinationNumber( 1 );
       voisin->addToCoordinationNumber( 1 );
     }
+<<<<<<< HEAD
+=======
+  }
+
+  }
+  catch (const ContactError&) {
+    throw ContactError();
+>>>>>>> NewGrains
   }
 }
 
@@ -425,8 +439,8 @@ void Particle::InterAction( Component* voisin,
 // component.
 void Particle::SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC, list<ContactInfos*>& listContact )
-  throw ( ContactError )
 {
+  try{
   PointContact closestPoint;
 
   try {
@@ -460,6 +474,13 @@ void Particle::SearchContact( Component* voisin, double dt,
     result->p1 = voisin;
     listContact.push_back( result );
   }
+<<<<<<< HEAD
+=======
+  }
+  catch (const ContactError&) {
+    throw ContactError();
+  }
+>>>>>>> NewGrains
 }
 
 

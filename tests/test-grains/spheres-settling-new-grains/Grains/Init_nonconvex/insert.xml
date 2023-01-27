@@ -1,0 +1,159 @@
+<Grains3D Type="Standard">
+  <Construction>
+    <LinkedCell MX="1." MY="0.3" MZ="0.6" CellSizeFactor="1."/>
+    <Origin OX="0." OY="0." OZ="0."/>
+    <Periodicity PX="0" PY="0" PZ="0"/>
+
+    <ContactForceModels>
+      <ContactForceModel>
+        <Material materialA="matP" materialB="matP"/>
+	        <Memory>
+	          <stiff>4.5e+5</stiff>
+	          <muc>0.46</muc>
+	          <en>0.85</en>
+	          <mut>1.e+3</mut>
+            <ks>3.e+2</ks>
+        	  <kms>0.</kms>
+        	  <mur>0.2</mur>
+        	  <eps>1.e-10</eps>
+	        </Memory>
+      </ContactForceModel>
+
+      <ContactForceModel>
+        <Material materialA="matP" materialB="matW"/>
+	        <Memory>
+	          <stiff>4.5e+5</stiff>
+	          <muc>0.62</muc>
+	          <en>0.85</en>
+	          <mut>1.e+3</mut>
+            <ks>3.e+2</ks>
+        	  <kms>0.</kms>
+        	  <mur>0.2</mur>
+        	  <eps>1.e-10</eps>
+	        </Memory>
+      </ContactForceModel>
+    </ContactForceModels>
+
+    <CompositeParticles>
+      <CompositeParticle Number="1" Density="2500.">
+        <ElementaryParticles>
+          <ElementaryParticle>
+            <Convex CrustThickness="5.e-5">
+              <Sphere Radius="0.005"/>
+            </Convex>
+            <RelativePosition X="-0.0025" Y="0" Z="0"/>
+            <AngularPosition Type="Identity"></AngularPosition>
+          </ElementaryParticle>
+          <!-- <ElementaryParticle>
+            <Convex CrustThickness="5.e-5">
+              <Sphere Radius="0.005"/>
+            </Convex>
+            <RelativePosition X="0.0025" Y="0" Z="0"/>
+            <AngularPosition Type="Identity"></AngularPosition>
+          </ElementaryParticle> -->
+        </ElementaryParticles>
+        <Volume Value="1.0471975511965978e-06"/>
+        <MomentOfInertiaTensor>
+          <Ixx Value="1.0471975511965977e-11"/>
+          <Iyy Value="1.0471975511965977e-11"/>
+          <Izz Value="1.0471975511965977e-11"/>
+          <Ixy Value="0."/>
+          <Ixz Value="0."/>
+          <Iyz Value="0."/>
+        </MomentOfInertiaTensor>
+        <Material>matP</Material>
+      </CompositeParticle>
+    </CompositeParticles>
+
+    <Obstacles>
+      <Composite name="Box">
+        <Obstacle name="Box_Front">
+          <Convex CrustThickness="5.e-5">
+            <Box LX="0.031" LY="0.031" LZ="0.0005"/>
+          </Convex>
+          <Centre X="0.015" Y="0.015" Z="0.03525"/>
+          <AngularPosition Type="Identity"></AngularPosition>
+          <Material>matP</Material>
+        </Obstacle>
+        <Obstacle name="Box_Behind">
+          <Convex CrustThickness="5.e-5">
+            <Box LX="0.031" LY="0.031" LZ="0.0005"/>
+          </Convex>
+          <Centre X="0.015" Y="0.015" Z="-0.00025"/>
+          <AngularPosition Type="Identity"></AngularPosition>
+          <Material>matP</Material>
+        </Obstacle>
+        <Obstacle name="Box_Left">
+          <Convex CrustThickness="5.e-5">
+            <Box LX="0.0005" LY="0.031" LZ="0.036"/>
+          </Convex>
+          <Centre X="-0.00025" Y="0.015" Z="0.0175"/>
+          <AngularPosition Type="Identity"></AngularPosition>
+          <Material>matP</Material>
+        </Obstacle>
+        <Obstacle name="Box_Right">
+          <Convex CrustThickness="5.e-5">
+            <Box LX="0.0005" LY="0.031" LZ="0.036"/>
+          </Convex>
+          <Centre X="0.03025" Y="0.015" Z="0.0175"/>
+          <AngularPosition Type="Identity"></AngularPosition>
+          <Material>matP</Material>
+        </Obstacle>
+        <Obstacle name="Box_Bottom">
+          <Convex CrustThickness="5.e-5">
+            <Box LX="0.031" LY="0.0005" LZ="0.036"/>
+          </Convex>
+          <Centre X="0.015" Y="-0.00025" Z="0.0175"/>
+          <AngularPosition Type="Identity"></AngularPosition>
+          <Material>matP</Material>
+        </Obstacle>
+        <Obstacle name="Box_Top">
+          <Convex CrustThickness="5.e-5">
+            <Box LX="0.031" LY="0.0005" LZ="0.036"/>
+          </Convex>
+          <Centre X="0.015" Y="0.03025" Z="0.0175"/>
+          <AngularPosition Type="Identity"></AngularPosition>
+          <Material>matP</Material>
+        </Obstacle>
+      </Composite>
+    </Obstacles>
+
+  </Construction>
+
+
+  <Forces>
+    <Gravity GX="0." GY="0." GZ="-9.81"/>
+  </Forces>
+
+
+  <Simulation>
+    <TimeInterval Start="0." End="1.5"/>
+    <TimeStep dt="2.5e-6"/>
+    <RestartFile Name="Grains/Init/insert" WritingMode="Hybrid"/>
+    <TimeSave Start="0." End="1.5" Every="0.01"/>
+    <CollisionalRelativeVelocity value="1.5"/>
+
+    <ParticleInsertion>
+      <Mode Type="OverTime"/>
+      <Order Type="Ordered"/>
+      <InitialAngularPosition Type="Fixed as defined in input file particle class"/>
+      <RandomGeneratorSeed Type="Default"/>
+      <Frequency TryEvery="1"/>
+      <ForceInsertion Value="False"/>
+      <ParticlePosition>
+        <File Name="Grains/Init/initial_position.result"/>
+      </ParticlePosition>
+
+      <InitialVelocity Mode="Zero">
+      </InitialVelocity>
+    </ParticleInsertion>
+
+
+    <PostProcessing>
+      <Writers>
+        <Paraview RootName="insert" Directory="Grains/Init" WritingMode="Text"/>
+        <RawData Name="Grains/Init/insert"/>
+      </Writers>
+    </PostProcessing>
+  </Simulation>
+</Grains3D>

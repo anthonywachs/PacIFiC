@@ -5,7 +5,7 @@
 
 # Sets here the directories where the mac scripts will recursively
 # find the source files of the application
-SRC = RegressionTests Misc Solvers
+SRC = RegressionTests Misc Solvers FluidSolidInterface PostProcessing
 
 # default compilation system (used to find the architecture)
 CCC := gcc

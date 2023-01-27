@@ -28,7 +28,6 @@ Grains::Grains() :
   m_dimension( 3 ),
   m_allProcTiming( true ),
   m_new_reload_format( false ),
-  m_history_storage( false ),
 //  m_dragForce_with_fluidAtRest( false ),
   m_mode_insertion_particules( NONE ),
   m_methode_insertion_particules( NOINSERT ),
@@ -148,18 +147,8 @@ void Grains::Construction( DOMElement* rootElement )
         m_new_reload_format = true ;
         simulLoad >> cle >> m_temps;
       }
-      else if (cle == "NEW_RELOAD_FORMAT_AND_CONTACT_HISTORY")
-      {
-        // Contact history is the new standard - just as reload 2014 - but these
-        // conditions ensure previous cases are still compatible.
-        m_new_reload_format = true ;
-        m_history_storage = true ;
-        simulLoad >> cle >> m_temps;
-      }
-
       Contact_BuilderFactory::reload( simulLoad );
-      m_composants.read( simulLoad, restart, m_new_reload_format,
-                          m_history_storage );
+      m_composants.read( simulLoad, restart, m_new_reload_format );
       Contact_BuilderFactory::set_materialsForObstaclesOnly_reload(
           m_composants.getParticuleClassesReference() );
       simulLoad >> cle;
@@ -315,8 +304,6 @@ void Grains::Construction( DOMElement* rootElement )
            << endl;
       cout << "   Format du fichier de restart = " << ( m_new_reload_format ?
     	"2014" : "ancien" ) << endl;
-      cout << "   Storage of the particle's contact history = "
-      << ( m_history_storage ? "yes" : "no" ) << endl;
     }
     cout << "   Restart du fichier " << restart << endl;
   }
@@ -339,11 +326,13 @@ void Grains::Construction( DOMElement* rootElement )
     DOMNode* cellsize = ReaderXML::getNode( root, "CellSize" );
     if ( cellsize )
       LC_coef = ReaderXML::getNodeAttr_Double( cellsize, "Factor" );
-    if ( LC_coef < 1. ) LC_coef = 1.;
+    if ( LC_coef < 1. ) LC_coef = 1.;    
     if( Grains_Exec::m_withCohesion && LC_coef < 1.2 )
       LC_coef *= 1.2;
     defineLinkedCell( LC_coef * rayon );
+
     m_sec->Link( m_composants.getObstacles() );
+
     if ( m_rank == 0 )
     {
       cout << "Traitement des contacts particule-obstacle "
@@ -1055,17 +1044,6 @@ void Grains::Simulation( bool predict, bool isPredictorCorrector,
     InsertCreateNewParticules();
     SCT_get_elapsed_time( "ParticulesInsertion" );
 
-    // vector<Cellule*>::const_iterator mycell;
-    // for(mycell=m_sec->getAllCellules()->begin();
-    //     mycell!=m_sec->getAllCellules()->end(); mycell++)
-    //   {
-    //     if ((*mycell)->nombreObstacles())
-    //     {
-    //       cout << (*mycell)->nombreObstacles() << " obstacle in the current cell" << endl;
-    //       cout << "obs id3 = " << ((*mycell)->getObstacle()->front())->getID() << endl;
-    //     }
-    //   }
-
     // Verifie l'allocation de la structure des infos du fluide pour
     // le calcul de la force de trainee avec le fluide au repos (non resolu)
     // dans les particules deja actives (cas de reload)
@@ -1078,6 +1056,7 @@ void Grains::Simulation( bool predict, bool isPredictorCorrector,
       app_FluidTemperature->InitializeTemperature( 0., m_dt,
         m_composants.getParticulesActives(), 0. );
     }
+
     SCT_set_start( "InitialisationSortieResultats" );
     // Nombre de particules inserees et nombre total de particules dans le
     // syst�me sur tous les procs
@@ -1090,6 +1069,7 @@ void Grains::Simulation( bool predict, bool isPredictorCorrector,
     // Dans le cas d'un mouvement initial aleatoire
     m_composants.setRandomMotion( m_RandomMotionCoefTrans,
 	m_RandomMotionCoefRot );
+
     // Par defaut l'etat initial est conserve pour Post-Processing
     m_composants.PostProcessing_start( m_temps, m_dt, m_sec, m_fenetres );
     ofstream fVitMax( (m_fileSave + "_VitesseMaxMean.dat").c_str(), ios::out );
@@ -1110,7 +1090,9 @@ void Grains::Simulation( bool predict, bool isPredictorCorrector,
     list<Scalar>::iterator tempsSave = m_save.begin();
     while ( *tempsSave - m_temps < 0.01 * m_dt && tempsSave != m_save.end() )
       tempsSave++;
+
     SCT_get_elapsed_time( "InitialisationSortieResultats" );
+
     // If cohesive contact, check for particle initially glued
     if( Grains_Exec::m_withCohesion )
     {
@@ -1121,14 +1103,17 @@ void Grains::Simulation( bool predict, bool isPredictorCorrector,
     // Algorithme de simulation
     // ~~~~~~~~~~~~~~~~~~~~~~~~
     cout << "Time \t TO \tend \tParticules \tIn \tOut" << endl;
+
     while ( m_tfin - m_temps > 0.01 * m_dt )
     {
       try {
         m_temps += m_dt;
         b_lastTime_save = false;
 
-        // If shrinking choice in Insert.xml is set to 1 it enters this if
+	// If shrinking choice in Insert.xml is set to 1 it enters this if
         if( m_composants.IsShrinking() ) m_composants.ShrinkingRate( m_temps );
+
+
         // Initialisation de l'indicateur de calcul
         // de la transformation avec epaiseur de croute a faux
         SCT_set_start( "CalculerForces" );
@@ -1161,7 +1146,7 @@ void Grains::Simulation( bool predict, bool isPredictorCorrector,
         SCT_get_elapsed_time( "ParticulesPeriodiques" );
 
         // Initialisation des maps de contact
-	      m_composants.setAllContactMapToFalse();
+	    m_composants.setAllContactMapToFalse();
 
         // Calcul des forces
         SCT_set_start( "CalculerForces" );
@@ -1189,7 +1174,7 @@ void Grains::Simulation( bool predict, bool isPredictorCorrector,
           m_composants.ComputeTemperature( m_temps, m_dt );
 
         // Mise a jour des maps de contact
-	      m_composants.updateAllContactMaps();
+	    m_composants.updateAllContactMaps();
 
         // Deplacement des particules en fonction des forces exercees
         SCT_set_start( "Deplacer" );
@@ -1227,8 +1212,10 @@ void Grains::Simulation( bool predict, bool isPredictorCorrector,
                << "\t" << Grains_Exec::doubleToString( ios::scientific, 6,
                vmax ) << "\t" << Grains_Exec::doubleToString( ios::scientific,
                6, vmean ) << endl;
-
-          display_used_memory();
+          //  // Contact features: friction
+          //  cout << "Proportion de frottements de Coulomb : " <<
+          //                    AppSec::getNbCoulombRegimes() << endl;
+          // display_used_memory();
           saveReload( m_temps );
           m_composants.PostProcessing( m_temps, m_dt, m_sec );
           while ( *tempsSave - m_temps < 0.01 * m_dt
@@ -1280,6 +1267,13 @@ void Grains::Simulation( bool predict, bool isPredictorCorrector,
 
     if ( !b_lastTime_save )
     {
+      // Debug ERHContacts
+      // cout << "Debug of ERHContacts: infos on forces regime" << endl;
+      // cout <<"Nb of coulomb regimes: " << NbCoulombRegime << "\t"
+      //           << "Nb of static regimes: " << NbStaticRegime << endl;
+      // cout << "Proportion of Coulomb regimes: "
+      //           << NbCoulombRegime/(NbCoulombRegime + NbStaticRegime) << endl;
+
       // Max vitesse
       m_composants.ComputeMaxMeanVelocity( vmax, vmean );
       cout << "Vitesse des composants : max = " << vmax << " moyenne = "
@@ -1337,14 +1331,8 @@ void Grains::InsertCreateNewParticules()
   // Dans le cas de reload avec insertion supplementaire, cela necessite de
   // renumeroter les obstacles
 
-  int first_obstacle_id;
   int numPartMax = numeroMaxParticules();
-  if (numPartMax == -1)
-  {
-    first_obstacle_id = 0;
-    numPartMax = 0;
-  }
-  else first_obstacle_id = numPartMax+1;
+  if ( numPartMax ) ++numPartMax;
   list< pair<Particule*,int> >::iterator ipart;
 
   // Construction des nouvelles particules
@@ -1360,7 +1348,7 @@ void Grains::InsertCreateNewParticules()
   }
 
   // Renumerotation des obstacles
-  int numInitObstacles = first_obstacle_id;
+  int numInitObstacles = numPartMax;
   for (ipart=m_newParticules.begin();ipart!=m_newParticules.end();ipart++)
     numInitObstacles += ipart->second;
   list<MonObstacle*> lisObstaclesPrimaires =
@@ -1370,7 +1358,6 @@ void Grains::InsertCreateNewParticules()
   for (iobs=lisObstaclesPrimaires.begin();iobs!=lisObstaclesPrimaires.end();
     	iobs++)
   {
-    // m_composants.updateContactMapId( (*iobs)->getID(), ObstacleID );
     (*iobs)->setID( ObstacleID );
     ++ObstacleID;
   }
@@ -1941,9 +1928,7 @@ void Grains::saveReload( Scalar const& temps )
 
   // Save current reload file
   ofstream result( reload.c_str() );
-  // The contact history is stored regardless of the contact law considered (if
-  // the contact law is without history, it only adds one int per particle)
-  result << "NEW_RELOAD_FORMAT_AND_CONTACT_HISTORY 2014" << endl;
+  result << "NEW_RELOAD_FORMAT 2014" << endl;
   result << "#Temps\t" << temps << endl;
   Contact_BuilderFactory::save( result, m_fileSave, m_rank );
   m_composants.write( result, reload.c_str() );

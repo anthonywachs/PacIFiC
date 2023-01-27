@@ -34,7 +34,7 @@ extern "C" {
     ReaderXML::terminate();
     
     string cmd = "/bin/rm " + simulation_file_exe;
-    system( cmd.c_str() ); 
+    GrainsExec::m_return_syscmd = system( cmd.c_str() ); 
          
     cout << "Construction of Grains completed" << endl;
   }

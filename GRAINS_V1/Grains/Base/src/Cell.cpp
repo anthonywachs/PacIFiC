@@ -590,3 +590,38 @@ string Cell::getGeoPositionName_generic( int geoloc_ )
       
   return ( name );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether a point belongs to any particle that belongs to the cell
+bool Cell::isInParticle( Point3 const& position ) const
+{
+  bool isIn = false;
+  
+  for ( list<Particle*>::const_iterator particle = m_particles.begin(); 
+  	particle!=m_particles.end() && !isIn; particle++) 
+   isIn = (*particle)->isIn( position );    
+      
+  return ( isIn );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether a point belongs to a specific particle that 
+// belongs to the cell
+bool Cell::isInParticle( Point3 const& position, Particle const* particle_ ) 
+	const
+{
+  bool isIn = false;
+  
+  for ( list<Particle*>::const_iterator particle = m_particles.begin(); 
+  	particle!=m_particles.end() && !isIn; particle++)
+    if ( *particle == particle_ ) 
+      isIn = (*particle)->isIn( position );    
+      
+  return ( isIn );
+}
