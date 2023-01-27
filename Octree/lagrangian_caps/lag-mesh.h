@@ -320,9 +320,10 @@ void comp_triangle_area_normal(lagMesh* mesh, int i) {
         mesh->nodes[nid[j]].pos.x/3;
     }
   }
+  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
   foreach_dimension() {
-    if (fabs(mesh->triangles[i].centroid.x) > L0/2.) {
-      if (mesh->triangles[i].centroid.x > 0)
+    if (fabs(mesh->triangles[i].centroid.x - origin.x) > L0/2.) {
+      if (mesh->triangles[i].centroid.x - origin.x > 0)
         mesh->triangles[i].centroid.x -= L0;
       else mesh->triangles[i].centroid.x += L0;
     }
