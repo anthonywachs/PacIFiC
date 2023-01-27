@@ -19,6 +19,7 @@
 #endif
 #if GLOBAL_REF_CURV
   #ifndef C0
+  /** $c_0/a = -2.09$ is the typical reference curvature of a red blood cell. */
     #define C0 (-2.09/RADIUS)
   #endif
 #endif

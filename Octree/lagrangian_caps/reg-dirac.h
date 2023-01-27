@@ -14,9 +14,12 @@ not with Cartesian nor multigrids}.
 
 #define BGHOSTS 2 // Having two layers of ghost cells should not be mandatory since the implementation relies on Caches
 
-#define POS_PBC_X(X) ((u.x.boundary[left] != periodic_bc) ? (X) : (((X) > L0/2.) ? (X) - L0 : (X)))
-#define POS_PBC_Y(Y) ((u.x.boundary[top] != periodic_bc) ? (Y) : (((Y) > L0/2.) ? (Y) - L0 : (Y)))
-#define POS_PBC_Z(Z) ((u.x.boundary[top] != periodic_bc) ? (Z) : (((Z) > L0/2.) ? (Z) - L0 : (Z)))
+#define POS_PBC_X(X) ((u.x.boundary[left] != periodic_bc) ? (X) : (((X - (X0 +\
+  L0/2)) > L0/2.) ? (X) - L0 : (X)))
+#define POS_PBC_Y(Y) ((u.x.boundary[top] != periodic_bc) ? (Y) : (((Y - (Y0 +\
+  L0/2)) > L0/2.) ? (Y) - L0 : (Y)))
+#define POS_PBC_Z(Z) ((u.x.boundary[front] != periodic_bc) ? (Z) : (((Z - (Z0 +\
+  L0/2)) > L0/2.) ? (Z) - L0 : (Z)))
 
 struct _generate_lag_stencils_one_caps {
   lagMesh* mesh;

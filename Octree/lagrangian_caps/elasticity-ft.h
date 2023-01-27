@@ -154,13 +154,14 @@ void comp_elastic_stress(lagMesh* mesh) {
       foreach_dimension() {
         double x1 = mesh->nodes[edge_node1].pos.x;
         double x2 = mesh->nodes[edge_node2].pos.x;
+        /** Warning: the line below was not tested when the origin is not
+        (0,0,0): it might be wrong in that case.*/
         e.x = (fabs(x1 - x2) < L0/2.) ? x1 - x2 : ((fabs(x1 - L0 - x2) > L0/2.)
           ? x1 + L0 - x2 : x1 - L0 - x2) ;
         ne += sq(e.x);
       }
       ne = sqrt(ne);
-      /** $\bm{T_i} = \frac{E_s}{\lambda_i^{3/2}} (\lambda^3 - 1)
-      \bm{e_i}$ */
+      /** $\bm{T_i} = \frac{E_s}{\lambda_i^{3/2}} (\lambda^3 - 1) \bm{e_i}$ */
       foreach_dimension()
         T[j].x = (fabs(ne) > 1.e-10) ? tension_norm*e.x/ne : 0.;
     }
