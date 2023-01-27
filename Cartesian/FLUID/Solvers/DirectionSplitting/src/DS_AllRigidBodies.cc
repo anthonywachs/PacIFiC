@@ -1211,11 +1211,11 @@ void DS_AllRigidBodies:: extrapolate_scalar_on_fresh_nodes(FV_DiscreteField * FF
 
 //---------------------------------------------------------------------------
 void DS_AllRigidBodies:: interpolate_vector_on_fresh_nodes(FV_DiscreteField * FF
-                                                          , size_t const& level)
+                                                 , vector<size_t> const& list )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_AllRigidBodies:: interpolate_vector_on_fresh_nodes" ) ;
-  MAC_ASSERT((FF == UF) && (level != 2));
+  MAC_ASSERT((FF == UF));
 
   size_t nb_comps = FF->nb_components() ;
   size_t field = field_num(FF) ;
@@ -1283,33 +1283,35 @@ void DS_AllRigidBodies:: interpolate_vector_on_fresh_nodes(FV_DiscreteField * FF
 
                  if (fresh_node[field]->operator()(p)
                  && (void_fraction[field]->operator()(p,1) == parID+1)) {
-                    double value = 0.;
-                    for (size_t dir = 0; dir < m_space_dimension; dir++) {
-                       i0(0) = i; i0(1) = j; i0(2) = k;
-                       i0(dir) -= 1;
-                       double fl = FF->DOF_value(i0(0), i0(1), i0(2), comp, level);
-                       double xl = coord(dir) - FF->get_DOF_coordinate(i0(dir), comp, dir);
+                    for (size_t level : list) {
+                       double value = 0.;
+                       for (size_t dir = 0; dir < m_space_dimension; dir++) {
+                          i0(0) = i; i0(1) = j; i0(2) = k;
+                          i0(dir) -= 1;
+                          double fl = FF->DOF_value(i0(0), i0(1), i0(2), comp, level);
+                          double xl = coord(dir) - FF->get_DOF_coordinate(i0(dir), comp, dir);
 
-                       i0(0) = i; i0(1) = j; i0(2) = k;
-                       i0(dir) += 1;
-                       double fr = FF->DOF_value(i0(0), i0(1), i0(2), comp, level);
-                       double xr = FF->get_DOF_coordinate(i0(dir), comp, dir) - coord(dir);
+                          i0(0) = i; i0(1) = j; i0(2) = k;
+                          i0(dir) += 1;
+                          double fr = FF->DOF_value(i0(0), i0(1), i0(2), comp, level);
+                          double xr = FF->get_DOF_coordinate(i0(dir), comp, dir) - coord(dir);
 
-                       if (intersect_vector[field]->operator()(p,2*dir+0) == 1) {
-                          fl = intersect_fieldValue[field]->operator()(p,2*dir+0);
-                          xl = intersect_distance[field]->operator()(p,2*dir+0);
+                          if (intersect_vector[field]->operator()(p,2*dir+0) == 1) {
+                             fl = intersect_fieldValue[field]->operator()(p,2*dir+0);
+                             xl = intersect_distance[field]->operator()(p,2*dir+0);
+                          }
+
+                          if (intersect_vector[field]->operator()(p,2*dir+1) == 1) {
+                            fr = intersect_fieldValue[field]->operator()(p,2*dir+1);
+                            xr = intersect_distance[field]->operator()(p,2*dir+1);
+                          }
+
+                          value += (xr*fl + xl*fr) / (xr + xl);
                        }
+                       value /= (double)m_space_dimension;
 
-                       if (intersect_vector[field]->operator()(p,2*dir+1) == 1) {
-                         fr = intersect_fieldValue[field]->operator()(p,2*dir+1);
-                         xr = intersect_distance[field]->operator()(p,2*dir+1);
-                       }
-
-                       value += (xr*fl + xl*fr) / (xr + xl);
+                       FF->set_DOF_value(i, j, k, comp, level, value);
                     }
-                    value /= (double)m_space_dimension;
-
-                    FF->set_DOF_value(i, j, k, comp, level, value);
                  }
               }
            }
