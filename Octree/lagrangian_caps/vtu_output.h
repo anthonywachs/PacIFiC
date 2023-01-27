@@ -1,9 +1,9 @@
 /**
 # Wrapper for output functions with Paraview
-
-Modified from Oystein Lande's original version by Guodong Gai. Main changes: compatible with the new AST-friendly qcc.
 */
 /*Here we defined the directory of the results*/
+# define result_dir "Res" 
+# define result_fluid_rootfilename "fluid_basilisk"
 
 
 
@@ -48,7 +48,7 @@ defined at the center points. Results are recorded on binary format. If one writ
 one *.vtu file per PID process this function may be combined with
 output_pvtu_bin() above to read in parallel. Tested in (quad- and oct-)trees
 using MPI. Also works with solids (when not using MPI).
-Bug correction: %g turns into scientific notation for high integer values. This is
+Bug correction: %g turns into scientific notation for high integer values. This is 
 not supported by paraview. Hence a fix was needed.
 Oystein Lande 2017
 */
@@ -62,7 +62,7 @@ void output_vtu_bin_foreach (scalar * list, vector * vlist, FILE * fp, bool line
   vertex scalar marker[];
   int no_cells = 0;
   int no_points = 0;
-
+ 
   foreach_cache(tree->vertices){
     marker[] = _k;
     no_points += 1;
@@ -207,12 +207,13 @@ void output_pvd( FILE * fp, char const* times_series )
 
 
 //----------------------------------------------------------------------------
-void save_data( scalar * list, vector * vlist, double const time, char* result_dir, char* result_fluid_rootfilename )
+void save_data( scalar * list, vector * vlist, double const time )
 //----------------------------------------------------------------------------
 {
 
   char vtk_times_series[100000] = "";
   static int cycle_number = 0;
+  //if ( !cycle_number ) cycle_number = init_cycle_number;//ggd
 
   FILE * fpvtk;
   char filename_vtu[80] = "";
@@ -295,3 +296,54 @@ void save_data( scalar * list, vector * vlist, double const time, char* result_d
 
   ++cycle_number;
 }
+
+/*
+//----------------------------------------------------------------------------
+void reinitialize_vtk_restart( void )
+//----------------------------------------------------------------------------
+{
+  // Get the last cycle cumber from previous simulation
+  char filename_lcn[80] = "";
+  sprintf( filename_lcn, "%s", result_dir );
+  strcat( filename_lcn, "/" );
+  strcat( filename_lcn, result_fluid_rootfilename );
+  strcat( filename_lcn, "_lcn_vtk.txt" );
+
+  FILE * fpvtk = fopen( filename_lcn, "r" );
+
+  fscanf ( fpvtk, "%d", &init_cycle_number );
+  ++init_cycle_number;
+
+  fclose( fpvtk );
+
+  // Re-initialize the time output series string
+  if ( pid() == 0 )
+  {
+    char filename_pvd[80] = "";
+    char time_line[256] = "";
+    char start[20] = "";
+    char start_ref[20] = "<DataSet";
+    sprintf( filename_pvd, "%s", result_dir );
+    strcat( filename_pvd, "/" );
+    strcat( filename_pvd, result_fluid_rootfilename );
+    strcat( filename_pvd, ".pvd" );
+
+    fpvtk = fopen( filename_pvd, "r" );
+
+    while ( fgets( time_line, sizeof(time_line), fpvtk ) )
+    {
+      // Extract 8 first characters
+      strncpy( start, time_line, 8 );
+
+      // If 8 first characters equal "<DataSet", it is an output time line
+      // We add to the vtk time series string
+      if ( ! strcmp( start, start_ref ) )
+        strcat( vtk_times_series, time_line );
+    }
+
+    fclose( fpvtk );
+  }
+}
+*/
+
+
