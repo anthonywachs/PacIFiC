@@ -1395,19 +1395,32 @@ void DS_AllRigidBodies:: extrapolate_pressure_inside_RB(FV_DiscreteField * FF
                  bool on_RB_boundary = false;
                  bool in_RB_bulk = false;
                  if (void_fraction[field]->operator()(p,0) == parID + 1) {
-                    for (int in = -1*stencil; in <= stencil; in++) {
-                       for (int jn = -1*stencil; jn <= stencil; jn++) {
-                          if (abs(in) != abs(jn)) {
-                             size_t pn = FF->DOF_local_number(i+in,j+jn,k,comp);
-                             if (void_fraction[field]->operator()(pn,0) == 0) {
-                                on_RB_boundary = true;
-                                break;
+                    if (m_space_dimension == 2) {
+                       for (int in = -1*stencil; in <= stencil; in++) {
+                          for (int jn = -1*stencil; jn <= stencil; jn++) {
+                             if (abs(in) != abs(jn)) {
+                                size_t pn = FF->DOF_local_number(i+in,j+jn,k,comp);
+                                if (void_fraction[field]->operator()(pn,0) == 0) {
+                                   on_RB_boundary = true;
+                                   break;
+                                }
+                             }
+                          }
+                       }
+                    } else if (m_space_dimension == 3) {
+                       for (int in = -1*stencil; in <= stencil; in++) {
+                          for (int jn = -1*stencil; jn <= stencil; jn++) {
+                             for (int kn = -1*stencil; kn <= stencil; kn++) {
+                                size_t pn = FF->DOF_local_number(i+in,j+jn,k+kn,comp);
+                                if (void_fraction[field]->operator()(pn,0) == 0) {
+                                   on_RB_boundary = true;
+                                   break;
+                                }
                              }
                           }
                        }
                     }
-                    if (!on_RB_boundary)
-                       in_RB_bulk = true;
+                    if (!on_RB_boundary) in_RB_bulk = true;
                  }
 
                  if (on_RB_boundary) {
