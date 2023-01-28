@@ -1111,9 +1111,9 @@ DS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
   PF->synchronize(1);
 
   if (is_solids) {
-	  allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
-  	// correct_pressure_1st_layer_solid(1);
-  	// correct_pressure_2nd_layer_solid(1);
+	  // allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
+  	correct_pressure_1st_layer_solid(1);
+  	correct_pressure_2nd_layer_solid(1);
   }
 
   PF->set_neumann_DOF_values();
@@ -3278,7 +3278,7 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 
 							// In case of nodes at the boundary of proc, especially
 							// nodes not handled by the proc
-							value = isnan(value) ? 0. : value;
+							value = std::isnan(value) ? 0. : value;
 
 				         divergence->operator()(p,0) = value;
 						}
@@ -3685,9 +3685,9 @@ DS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
   }
 
   if (is_solids) {
-	  allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
-	  // correct_pressure_1st_layer_solid(1);
-	  // correct_pressure_2nd_layer_solid(1);
+	  // allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
+	  correct_pressure_1st_layer_solid(1);
+	  correct_pressure_2nd_layer_solid(1);
   }
 }
 
@@ -3758,9 +3758,9 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 	}
 
    if (is_solids) {
-		allrigidbodies->extrapolate_pressure_inside_RB(PF,0);
-		// correct_pressure_1st_layer_solid(0);
-		// correct_pressure_2nd_layer_solid(0);
+		// allrigidbodies->extrapolate_pressure_inside_RB(PF,0);
+		correct_pressure_1st_layer_solid(0);
+		correct_pressure_2nd_layer_solid(0);
    }
    // Propagate values to the boundaries depending on BC conditions
    PF->set_neumann_DOF_values();
