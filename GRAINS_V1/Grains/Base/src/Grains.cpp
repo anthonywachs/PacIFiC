@@ -127,10 +127,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
     	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmax )
 	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmean )
 	<< endl;
-<<<<<<< HEAD
   fVitMax.close();
-=======
->>>>>>> NewGrains
 
   // Display memory used by Grains
   display_used_memory();
@@ -1057,228 +1054,30 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  {
 	    // Random particle positions from a collection of insertion windows
 	    DOMNode* nWindows = ReaderXML::getNode( nPosition, "Windows" );
-            if ( nWindows )
+      if ( nWindows )
 	    {
 	      cout << GrainsExec::m_shift9 << "Insertion windows" << endl;
 	      DOMNodeList* allWindows = ReaderXML::getNodes( nWindows );
-              for (XMLSize_t i=0; i<allWindows->getLength(); i++)
+        for (XMLSize_t i=0; i<allWindows->getLength(); i++)
 	      {
 	        DOMNode* nWindow = allWindows->item( i );
-<<<<<<< HEAD
-
-	        // Insertion window type
-	        string iwindow_type = "Box";
-	        if ( ReaderXML::hasNodeAttr( nWindow, "Type" ) )
-	          iwindow_type = ReaderXML::getNodeAttr_String( nWindow,
-		  	"Type" );
-
-	        Window iwindow;
-	        if ( iwindow_type == "Cylinder" )
-		  iwindow.ftype = WINDOW_CYLINDER;
-	        else if ( iwindow_type == "Annulus" )
-	          iwindow.ftype = WINDOW_ANNULUS;
-	        else if ( iwindow_type == "Line" )
-	         iwindow.ftype = WINDOW_LINE;
-	        else if ( iwindow_type == "Box" )
-	          iwindow.ftype = WINDOW_BOX;
-	        else iwindow.ftype = WINDOW_NONE;
-
-	        DOMNodeList* points = NULL;
-	        DOMNode* pointA = NULL;
-	        DOMNode* pointB = NULL;
-	        DOMNode* cylGeom = NULL;
-	        DOMNode* annGeom = NULL;
-	        string axisdir_str = "W";
-
-	        // Read features depending on the type
-	        switch( iwindow.ftype )
-	        {
-	          case WINDOW_BOX:
- 	            points = ReaderXML::getNodes( nWindow );
-	            pointA = points->item( 0 );
-	            pointB = points->item( 1 );
-
-	            iwindow.radius = iwindow.radius_int = iwindow.height = 0. ;
-	            iwindow.axisdir = NONE ;
-	            iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"X" );
-	            iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Y" );
-                    iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Z" );
-	            iwindow.ptB[X] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"X" );
-	            iwindow.ptB[Y] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"Y" );
-	            iwindow.ptB[Z] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"Z" );
-
-		    if ( m_rank == 0 )
-		    {
-		      cout << GrainsExec::m_shift12 << "Type = " <<
-		    	iwindow_type << endl;
-                      cout << GrainsExec::m_shift15 << "Point3 min = " <<
-	    		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-                	iwindow.ptA[Z] << endl;
-                      cout << GrainsExec::m_shift15 << "Point3 max = " <<
-	    		iwindow.ptB[X] << " " << iwindow.ptB[Y] << " " <<
-                	iwindow.ptB[Z] << endl;
-		    }
-		    break;
-
-	          case WINDOW_CYLINDER:
-	            pointA = ReaderXML::getNode( nWindow, "BottomCentre" );
-	            iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"X" );
-	            iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Y" );
-                    iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Z" );
-	            iwindow.ptB[X] = iwindow.ptB[Y] = iwindow.ptB[Z] = 0.;
-	            cylGeom = ReaderXML::getNode( nWindow, "Cylinder" );
-	            iwindow.radius = ReaderXML::getNodeAttr_Double( cylGeom,
-			"Radius" );
-	            iwindow.radius_int = 0.;
-	            iwindow.height = ReaderXML::getNodeAttr_Double( cylGeom,
-			"Height" );
-	            axisdir_str = ReaderXML::getNodeAttr_String( cylGeom,
-	          	"Direction" );
-	            if ( axisdir_str == "X" ) iwindow.axisdir = X;
-	            else if ( axisdir_str == "Y" ) iwindow.axisdir = Y;
-	            else if ( axisdir_str == "Z" ) iwindow.axisdir = Z;
-	            else
-	            {
-                      if ( m_rank == 0 )
-                        cout << "Wrong axis direction in cylindrical "
-                       		<< "insertion window; values: X, Y or Z"
-				<< endl;
-                      grainsAbort();
-                    }
-
-		    if ( m_rank == 0 )
-		    {
-		      cout << GrainsExec::m_shift12 << "Type = " <<
-		    	iwindow_type << endl;
-                      cout << GrainsExec::m_shift15 << "Bottom centre = " <<
-	    		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-                	iwindow.ptA[Z] << endl;
-		      cout << GrainsExec::m_shift15 << "Radius = " <<
-		    	iwindow.radius << endl;
-		      cout << GrainsExec::m_shift15 << "Height = " <<
-		    	iwindow.height << endl;
-		      cout << GrainsExec::m_shift15 << "Direction = " <<
-		    	axisdir_str << endl;
-		    }
-                    break;
-
-                  case WINDOW_ANNULUS:
-                    pointA = ReaderXML::getNode( nWindow, "BottomCentre" );
-                    iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"X" );
-                    iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Y" );
-                    iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Z" );
-                    iwindow.ptB[X] = iwindow.ptB[Y] = iwindow.ptB[Z] = 0.;
-                    annGeom = ReaderXML::getNode( nWindow, "Annulus" );
-                    iwindow.radius = ReaderXML::getNodeAttr_Double( annGeom,
-                  	"RadiusExt" );
-                    iwindow.radius_int = ReaderXML::getNodeAttr_Double( annGeom,
-                  	"RadiusInt" );
-                    iwindow.height = ReaderXML::getNodeAttr_Double( annGeom,
-                  	"Height" );
-                    axisdir_str = ReaderXML::getNodeAttr_String( annGeom,
-                  	"Direction" );
-	            if ( axisdir_str == "X" ) iwindow.axisdir = X;
-	            else if ( axisdir_str == "Y" ) iwindow.axisdir = Y;
-	            else if ( axisdir_str == "Z" ) iwindow.axisdir = Z;
-	            else
-	            {
-                      if ( m_rank == 0 )
-                        cout << "Wrong axis direction in cylindrical "
-                       		<< "insertion window; values: X, Y or Z"
-				<< endl;
-                      grainsAbort();
-                    }
-
-		    if ( m_rank == 0 )
-		    {
-		      cout << GrainsExec::m_shift12 << "Type = " <<
-		    	iwindow_type << endl;
-                      cout << GrainsExec::m_shift15 << "Bottom centre = " <<
-	    		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-                	iwindow.ptA[Z] << endl;
-		      cout << GrainsExec::m_shift15 << "External radius = " <<
-		    	iwindow.radius << endl;
-		      cout << GrainsExec::m_shift15 << "Internal radius = " <<
-		    	iwindow.radius_int << endl;
-		      cout << GrainsExec::m_shift15 << "Height = " <<
-		    	iwindow.height << endl;
-		      cout << GrainsExec::m_shift15 << "Direction = " <<
-		    	axisdir_str << endl;
-		    }
-                    break;
-
-	          case WINDOW_LINE:
- 	            points = ReaderXML::getNodes( nWindow );
-	            pointA = points->item( 0 );
-	            pointB = points->item( 1 );
-
-	            iwindow.radius = iwindow.radius_int = iwindow.height = 0. ;
-	            iwindow.axisdir = NONE ;
-	            iwindow.ptA[X] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"X" );
-	            iwindow.ptA[Y] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Y" );
-	            iwindow.ptA[Z] = ReaderXML::getNodeAttr_Double( pointA,
-		    	"Z" );
-	            iwindow.ptB[X] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"X" );
-	            iwindow.ptB[Y] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"Y" );
-	            iwindow.ptB[Z] = ReaderXML::getNodeAttr_Double( pointB,
-		    	"Z" );
-
-		    if ( m_rank == 0 )
-		    {
-		      cout << GrainsExec::m_shift12 << "Type = " <<
-		    	iwindow_type << endl;
-                      cout << GrainsExec::m_shift15 << "Point3 A = " <<
-	    		iwindow.ptA[X] << " " << iwindow.ptA[Y] << " " <<
-                	iwindow.ptA[Z] << endl;
-                      cout << GrainsExec::m_shift15 << "Point3 B = " <<
-	    		iwindow.ptB[X] << " " << iwindow.ptB[Y] << " " <<
-                	iwindow.ptB[Z] << endl;
-		    }
-	          break;
-
-	          default:
-	            if ( m_rank == 0 ) cout << "Unknown insertion window "
-		  	"type" << endl;
-	            grainsAbort();
-	            break;
-	        }
-
-=======
-                Window iwindow;
-		readWindow( nWindow, iwindow, GrainsExec::m_shift12 );
->>>>>>> NewGrains
-	        m_insertion_windows.insert( m_insertion_windows.begin(),
-	      		iwindow );
-              }
+          Window iwindow;
+		      readWindow( nWindow, iwindow, GrainsExec::m_shift12 );
+	        m_insertion_windows.insert( m_insertion_windows.begin(), iwindow );
+        }
 	    }
-            else
+      else
 	    {
-              if ( m_insertion_mode != IM_NOINSERT )
-              {
-                if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
-			"Insertion positions or windows are mandatory !!"
-			<< endl;
-                grainsAbort();
-              }
+        if ( m_insertion_mode != IM_NOINSERT )
+        {
+          if ( m_rank == 0 )
+            cout << GrainsExec::m_shift6 <<
+            "Insertion positions or windows are mandatory !!" << endl;
+          grainsAbort();
+        }
 	    }
 	  }
-        }
+  }
       }
       else
       {
@@ -1358,13 +1157,8 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	   	 m_InitVtrans[X] << ", " << m_InitVtrans[Y] << ", "
 		 << m_InitVtrans[Z] << " )" << endl;
 	    cout << GrainsExec::m_shift9 << "angular = ( " <<
-<<<<<<< HEAD
-	   	 m_InitVtrans[X] << ", " << m_InitVtrans[Y] << ", "
-		 << m_InitVtrans[Z] << " )" << endl;
-=======
 	   	 m_InitVrot[X] << ", " << m_InitVrot[Y] << ", "
 		 << m_InitVrot[Z] << " )" << endl;
->>>>>>> NewGrains
             break;
 
           case IV_RANDOM :
@@ -2136,11 +1930,7 @@ void Grains::clearResultXmlFiles() const
   {
     string cmd = "bash " + GrainsExec::m_GRAINS_HOME
      	+ "/Tools/ExecScripts/init_clear.exec " + m_fileSave;
-<<<<<<< HEAD
-    system( cmd.c_str() );
-=======
     GrainsExec::m_return_syscmd = system( cmd.c_str() );
->>>>>>> NewGrains
   }
 
 }

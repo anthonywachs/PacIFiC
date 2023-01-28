@@ -12,11 +12,7 @@ vector< vector<int> > Box::m_allFaces;
 // Constructor with a vector containing the edge half-lengths as
 // input parameters
 Box::Box( Vector3 const& extent_ )
-<<<<<<< HEAD
-  : m_extent(extent_)
-=======
   : m_extent( extent_ )
->>>>>>> NewGrains
   , m_corners2D_XY( NULL )
 {
   setCornersFaces();
@@ -645,18 +641,12 @@ Point3 Box::IntersectionPointSPHERE( Point3 const& SphereCenter,
       }
     }
   }
-<<<<<<< HEAD
-
-  return ( contactPoint );
-
-=======
 
   return ( contactPoint );
   }
   catch (ContactError&){
     throw ContactError();
   }
->>>>>>> NewGrains
 }
 
 

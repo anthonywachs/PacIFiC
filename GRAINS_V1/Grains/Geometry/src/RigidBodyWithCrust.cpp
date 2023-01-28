@@ -266,7 +266,7 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
 
   return ( PointNoContact );
   }
-  catch (const ContactError&) {
+  catch ( const ContactError& ) {
     throw ContactError();
   }
 
@@ -338,7 +338,7 @@ PointContact RigidBodyWithCrust::ClosestPoint_ErreurHandling(
   return ( PointContact( contact, imposed_overlap_distance * ba,
   	- imposed_overlap_distance, nbIterGJK ) );
   }
-  catch (const ContactError&) {
+  catch ( const ContactError& ) {
     throw ContactError();
   }
 }
@@ -352,7 +352,7 @@ PointContact RigidBodyWithCrust::ClosestPoint_ErreurHandling(
 PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
 	RigidBodyWithCrust const& rbB )
 {
-  try{
+  try {
   // Comment on the direction of the overlap vector
   // Assuming A and B are the centers of the 2 convex bodies
   // overlap_vector = overlap * Vector3(A to B)
@@ -391,7 +391,7 @@ PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
     return ( PointContact( contact, overlap_vector, distance, 1 ) );
   }
   }
-  catch (const ContactError&) {
+  catch ( const ContactError& ) {
     throw ContactError();
   }
 }
@@ -405,7 +405,7 @@ PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
 PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
 	RigidBodyWithCrust const& rbB )
 {
-  try{
+  try {
   // Comment on the direction of the overlap vector
   // Assuming A and B are the centers of the 2 convex bodies
   // overlap_vector = overlap * Vector3(A to B)
@@ -437,8 +437,8 @@ PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
       {
         cout << "ERR RigidBodyWithCrust::ClosestPointSPHEREBOX on Processor "
       	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
-	<< ": " << - overlap << " & " << rdwA + rdwB << endl;
-	throw ContactError();
+	      << ": " << - overlap << " & " << rdwA + rdwB << endl;
+	      throw ContactError();
       }
       contact = (*transfB)( contactPoint );
       Vector3 AB = contact - *pointA;
@@ -463,8 +463,8 @@ PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
       {
         cout << "ERR RigidBodyWithCrust::ClosestPointSPHEREBOX on Processor "
       	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
-	<< ": " << - overlap << " & " << rdwA + rdwB << endl;
-	throw ContactError();
+	      << ": " << - overlap << " & " << rdwA + rdwB << endl;
+	      throw ContactError();
       }
       contact = (*transfA)( contactPoint );
       Vector3 AB = *pointB - contact;
@@ -474,7 +474,7 @@ PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
     else return ( PointNoContact );
   }
   }
-  catch (const ContactError&) {
+  catch ( const ContactError& ) {
     throw ContactError();
   }
 }
@@ -752,8 +752,8 @@ void RigidBodyWithCrust::initialize_transformWithCrust_to_notComputed()
 // Returns the features of the contact when the 2 rigid bodies are cylinders
 PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
   RigidBodyWithCrust const& rbB )
-  throw(ContactError)
 {
+  try {
   const Convex* convexA = rbA.getConvex();
   const Convex* convexB = rbB.getConvex();
   Transform const* a2wNoCrust = rbA.getTransform();
@@ -792,7 +792,12 @@ PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
     // GJKOutput.close();
     // return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
   }
+
   else return ( PointNoContact );
+  }
+  catch ( const ContactError& ) {
+    throw ContactError();
+  }
 }
 
 
@@ -818,8 +823,8 @@ bool isContactCYLINDERS( RigidBodyWithCrust const& rbA,
 // Returns the features of the contact when the 1 rigid body is a rectangle
 PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
   RigidBodyWithCrust const& rbB )
-  throw(ContactError)
 {
+  try {
   Convex const* convexA = rbA.getConvex();
   Convex const* convexB = rbB.getConvex();
   Transform const* a2w = rbA.getTransform();
@@ -869,4 +874,8 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     }
   }
   return ( PointNoContact );
+  }
+  catch ( const ContactError& ) {
+    throw ContactError();
+  }
 }

@@ -6,11 +6,7 @@
 using namespace solid;
 
 class BBox;
-<<<<<<< HEAD
-// ostream& operator << ( ostream& f, BBox const& B ); 
-=======
 // ostream& operator << ( ostream& f, BBox const& B );
->>>>>>> NewGrains
 
 
 /** @brief The class BBox.
@@ -39,11 +35,7 @@ class BBox
     @param bbox_ La boite de reference */
     BBox( BBox const& bbox_ );
 
-<<<<<<< HEAD
-    /** @brief Destructeur */
-=======
     /** @brief Destructor */
->>>>>>> NewGrains
     ~BBox();
     //@}
 

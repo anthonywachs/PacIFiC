@@ -68,12 +68,7 @@ class RigidBodyWithCrust : public RigidBody
     @exception if the minimal distance between the shrunk rigid bodies is 0, in
     practice less than EPSILON defined in Basic.H, which means that the shrunk
     rigid bodies already touch or overlap */
-<<<<<<< HEAD
-    PointContact ClosestPoint( RigidBodyWithCrust &neighbor )
-      throw(ContactError);
-=======
     PointContact ClosestPoint( RigidBodyWithCrust &neighbor );
->>>>>>> NewGrains
 
     /** @brief Returns the features of the contact when the overlap computed by
     ClosestPoint is too large, the method artificially increases the size of the
@@ -96,12 +91,7 @@ class RigidBodyWithCrust : public RigidBody
     crust thickness artificially already touch or overlap */
     PointContact ClosestPoint_ErreurHandling(
     	RigidBodyWithCrust const& neighbor, double const& factor, int const& id,
-<<<<<<< HEAD
-	int const& id_neighbor )
-      throw(ContactError);
-=======
 	    int const& id_neighbor );
->>>>>>> NewGrains
 
     /** @brief Returns whether the rigid body is close to another rigid body in
     the sense of whether their respective bounding boxes minus their crust
@@ -194,24 +184,14 @@ spheres, i.e., a SPHERE-SPHERE contact
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
 PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
-<<<<<<< HEAD
-	RigidBodyWithCrust const& rbB )
-  throw(ContactError);
-=======
 	RigidBodyWithCrust const& rbB );
->>>>>>> NewGrains
 
 /** @brief Returns the features of the contact when the 1 rigid body is a sphere
 and the other rigid body is a box, i.e., a SPHERE-BOX contact
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
 PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
-<<<<<<< HEAD
-	RigidBodyWithCrust const& rbB )
-  throw(ContactError);
-=======
 	RigidBodyWithCrust const& rbB );
->>>>>>> NewGrains
 
 /** @brief Returns whether there is geometric contact with another rigid body
 in the sense of ClosestPoint when the 2 rigid bodies are spheres, i.e., a
@@ -234,8 +214,7 @@ are cylinders
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
 PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
-  RigidBodyWithCrust const& rbB )
-  throw(ContactError);
+  RigidBodyWithCrust const& rbB );
 
 /** @brief Returns whether there is a contact between the circumscribed
 cylinders of two rigid bodies
@@ -249,7 +228,6 @@ a rectangle
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
 PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA ,
-  RigidBodyWithCrust const& rbB )
-  throw(ContactError);
+  RigidBodyWithCrust const& rbB );
 
 #endif

@@ -52,7 +52,7 @@ Convex* ConvexBuilderFactory::create( string& type, istream& fileIn )
   else if ( type == "*Sphere" ) convex = new Sphere( fileIn );
   else if ( type == "*PointC" ) convex = new PointC();
   else if ( type == "*Superquadric" ) convex = new Superquadric( fileIn );
-  else if ( type == "Rectangle" ) convex = new Rectangle( fileIn );
+  else if ( type == "*Rectangle" ) convex = new Rectangle( fileIn );
   else
   {
     cout << "Invalid convex type : " << type.c_str() << endl;
