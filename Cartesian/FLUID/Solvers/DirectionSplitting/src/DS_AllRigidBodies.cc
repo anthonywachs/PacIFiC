@@ -1125,6 +1125,11 @@ void DS_AllRigidBodies:: extrapolate_scalar_on_fresh_nodes(FV_DiscreteField * FF
                     normal(1) = pt0(1) - pgc->operator()(1);
                     normal(2) = pt0(2) - pgc->operator()(2);
 
+                    normal(0) = delta_periodic_transformation(normal(0),0);
+                    normal(1) = delta_periodic_transformation(normal(1),1);
+                    if (m_space_dimension == 3)
+                       normal(2) = delta_periodic_transformation(normal(2),2);
+
                     normal /= normal.calcNorm();
 
                     double max_comp = MAC::max(MAC::abs(normal(0))
