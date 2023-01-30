@@ -2872,23 +2872,27 @@ DS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    assemble_DS_un_at_rhs(t_it,gamma);
    // Update gamma based for invidual direction
    gamma = mu/2.0;
+	UF->set_neumann_DOF_values();
 
    Solve_i_in_jk(UF,t_it,0,1,2,gamma,3);
    // Synchronize the velocity field
 	UF->synchronize( 3 );
    if (is_solids) initialize_grid_nodes_on_rigidbody({3});
+	UF->set_neumann_DOF_values();
 
 	size_t level = (dim == 2) ? 0 : 4 ;
    Solve_i_in_jk(UF,t_it,1,0,2,gamma,level);
 	// Synchronize the velocity field
 	UF->synchronize( level );
    if (is_solids) initialize_grid_nodes_on_rigidbody({level});
+	UF->set_neumann_DOF_values();
 
    if (dim == 3) {
       Solve_i_in_jk(UF,t_it,2,0,1,gamma,0);
 		// Synchronize the velocity field
 		UF->synchronize( 0 );
       if (is_solids) initialize_grid_nodes_on_rigidbody({0});
+		UF->set_neumann_DOF_values();
    }
 
 	// Compute velocity change over the time step
