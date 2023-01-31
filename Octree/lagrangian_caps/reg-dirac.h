@@ -199,9 +199,6 @@ void tag_ibm_stencils_one_caps(lagMesh* mesh) {
       }
     }
   }
-  #if OLD_QCC
-  boundary({stencils});
-  #endif
 }
 
 trace

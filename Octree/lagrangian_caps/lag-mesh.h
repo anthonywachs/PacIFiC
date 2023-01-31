@@ -534,18 +534,18 @@ event defaults (i = 0) {
 /** Before the iterations start, we allocate memory for the stencils and
 generate them. Note that this implementation assumes the membrane was
 initialized in the init event. */
-event init (i = 0) {
-  for(int i=0; i<mbs.nbmb; i++) {
-    if (mbs.mb[i].isactive) {
-      for(int j=0; j<MB(i).nlp; j++) {
-        MB(i).nodes[j].stencil.n = STENCIL_SIZE;
-        MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
-        MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
-      }
-      generate_lag_stencils_one_caps(&MB(i));
-    }
-  }
-}
+// event init (i = 0) {
+//   for(int i=0; i<mbs.nbmb; i++) {
+//     if (mbs.mb[i].isactive) {
+//       for(int j=0; j<MB(i).nlp; j++) {
+//         MB(i).nodes[j].stencil.n = STENCIL_SIZE;
+//         MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
+//         MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
+//       }
+//       generate_lag_stencils_one_caps(&MB(i));
+//     }
+//   }
+// }
 
 /** Below, we advect each Lagrangian node using the interpolated Eulerian
 velocities. We also use this loop as an opportunity to
