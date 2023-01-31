@@ -465,7 +465,7 @@ the function below. */
 void initialize_membranes() {
   mbs.nbmb = NCAPS;
   for(int i=0; i<mbs.nbmb; i++) {
-    initialize_empty_mb(&mbs.mb[i]);
+    if (mbs.mb[i].isactive) initialize_empty_mb(&mbs.mb[i]);
   }
   if (is_constant(a.x)) {
     a = new face vector;
@@ -473,14 +473,33 @@ void initialize_membranes() {
   }
 }
 
-void initialize_membranes_stencils() {
-  for(int i=0; i<mbs.nbmb; i++) {
-    for(int j=0; j<MB(i).nlp; j++) {
-      MB(i).nodes[j].stencil.n = STENCIL_SIZE;
-      MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
-      MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
-    }
+void initialize_membrane_stencils(lagMesh* mesh) {
+  for(int j=0; j<mesh->nlp; j++) {
+    mesh->nodes[j].stencil.n = STENCIL_SIZE;
+    mesh->nodes[j].stencil.nm = STENCIL_SIZE;
+    mesh->nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
   }
+}
+
+void initialize_membranes_stencils() {
+  for(int i=0; i<mbs.nbmb; i++)
+    if (mbs.mb[i].isactive)
+      initialize_membrane_stencils(&MB(i));
+}
+
+void activate_membrane(lagMesh* mesh) {
+  initialize_empty_mb(mesh);
+  mesh->isactive = true;
+  initialize_membrane_stencils(mesh);
+}
+
+void initialize_zero_stress(lagMesh* mesh) {
+  #if _ELASTICITY_FT
+    store_initial_configuration(mesh);
+  #endif
+  #if _BENDING_FT
+    initialize_refcurv_onecaps(mesh);
+  #endif
 }
 
 /**
@@ -591,6 +610,9 @@ void restore_lagmesh(FILE* fp, lagMesh* mesh) {
   mesh->updated_stretches = false;
   mesh->updated_normals = false;
   mesh->updated_curvatures = false;
+
+  initialize_membranes_stencils();
+  generate_lag_stencils();
 }
 
 /** If the simulation contains several membranes, we dump and read one mesh at
@@ -599,7 +621,7 @@ void dump_membranes(char* filename) {
   FILE* file = fopen(filename, "w");
   assert(file);
   for(int i=0; i<mbs.nbmb; i++) {
-    dump_lagmesh(file, &MB(i));
+    if (mbs.mb[i].isactive) dump_lagmesh(file, &MB(i));
   }
   fclose(file);
 }
@@ -608,7 +630,7 @@ void restore_membranes(char* filename) {
   FILE* file = fopen(filename, "r");
   assert(file);
   for(int i=0; i<mbs.nbmb; i++) {
-    restore_lagmesh(file, &MB(i));
+    if (mbs.mb[i].isactive) restore_lagmesh(file, &MB(i));
   }
   fclose(file);
 }
@@ -653,7 +675,7 @@ int pv_timestep = 0;
 
 void pv_output_ascii() {
 
-  for(int j=0; j<NCAPS; j++) { 
+  for(int j=0; j<NCAPS; j++) {
 
   char filename[128];
   FILE* file;
@@ -666,14 +688,14 @@ void pv_output_ascii() {
   fprintf(file, "ASCII\n");
   fprintf(file, "DATASET POLYDATA\n");
 
-  /* Populate the coordinates of all the Lagrangian nodes */ 
+  /* Populate the coordinates of all the Lagrangian nodes */
   int nbpts_tot = MB(j).nlp;
   fprintf(file, "POINTS %d double\n", nbpts_tot);
     for(int k=0; k<nbpts_tot; k++) {
       fprintf(file, "%g %g %g\n", MB(j).nodes[k].pos.x, MB(j).nodes[k].pos.y,
         MB(j).nodes[k].pos.z);
     }
-  
+
   /* Populate the connectivity of the triangles */
   int nbtri_tot = MB(j).nlt;
   fprintf(file, "TRIANGLE_STRIPS %d %d\n", nbtri_tot, 4*nbtri_tot);

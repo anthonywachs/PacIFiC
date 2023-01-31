@@ -39,5 +39,7 @@ void linear_elasticity(lagMesh* mesh) {
 }
 
 event acceleration (i++) {
-  for(int i=0; i<mbs.nbmb; i++) linear_elasticity(&mbs.mb[i]);
+  for(int i=0; i<mbs.nbmb; i++)
+    if (mbs.mb[i].isactive)
+      linear_elasticity(&mbs.mb[i]);
 }

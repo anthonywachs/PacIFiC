@@ -107,6 +107,8 @@ typedef struct Edge {
 * ```updated_stretches```, a boolean used to check if the current length of the edges has been updated since the last advection of the Lagrangian nodes
 * ```updated_normals```, a similar boolean telling if the nodal normal vectors should be recomputed
 * ```updated_curvatures```, a last boolean telling if the nodal curvatures should be recomputed.
+* ```active```, a boolean indicating if the capsule exists in the flow (useful
+when capsules are introduced during a simulation)
 */
 
 typedef struct lagMesh {
@@ -122,6 +124,7 @@ typedef struct lagMesh {
   bool updated_stretches;
   bool updated_normals;
   bool updated_curvatures;
+  bool isactive;
 } lagMesh;
 
 /** We denote by ```NCAPS``` the number of Lagrangian meshes, or capsules, in
@@ -157,6 +160,7 @@ void initialize_empty_mb(lagMesh* mesh) {
   mesh->updated_stretches = false;
   mesh->updated_normals = false;
   mesh->updated_curvatures = false;
+  mesh->isactive = false;
 }
 
 void free_mesh(lagMesh* mesh) {
@@ -169,7 +173,9 @@ void free_mesh(lagMesh* mesh) {
 }
 
 void free_caps(Capsules* caps) {
-  for(int i=0; i<caps->nbmb; i++) free_mesh(&(caps->mb[i]));
+  for(int i=0; i<caps->nbmb; i++)
+    if (mbs.mb[i].isactive)
+      free_mesh(&(caps->mb[i]));
 }
 
 /** By default, the mesh is advected using a second-order two-step Runge Kutta
@@ -513,7 +519,7 @@ field in case it isn't done yet by another Basilisk solver.
 event defaults (i = 0) {
   mbs.nbmb = NCAPS;
   for(int i=0; i<mbs.nbmb; i++) {
-    initialize_empty_mb(&mbs.mb[i]);
+    if (mbs.mb[i].isactive) initialize_empty_mb(&mbs.mb[i]);
   }
   if (is_constant(a.x)) {
     a = new face vector;
@@ -530,12 +536,14 @@ generate them. Note that this implementation assumes the membrane was
 initialized in the init event. */
 event init (i = 0) {
   for(int i=0; i<mbs.nbmb; i++) {
-    for(int j=0; j<MB(i).nlp; j++) {
-      MB(i).nodes[j].stencil.n = STENCIL_SIZE;
-      MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
-      MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
+    if (mbs.mb[i].isactive) {
+      for(int j=0; j<MB(i).nlp; j++) {
+        MB(i).nodes[j].stencil.n = STENCIL_SIZE;
+        MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
+        MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
+      }
+      generate_lag_stencils_one_caps(&MB(i));
     }
-    generate_lag_stencils_one_caps(&MB(i));
   }
 }
 
@@ -544,9 +552,11 @@ velocities. We also use this loop as an opportunity to
 re-initialize the Lagrangian forces to zero. */
 event tracer_advection(i++) {
   for(int i=0; i<mbs.nbmb; i++) {
-    advect_lagMesh(&mbs.mb[i]);
-    for(int j=0; j<mbs.mb[i].nlp; j++)
-      foreach_dimension() mbs.mb[i].nodes[j].lagForce.x = 0.;
+    if (mbs.mb[i].isactive) {
+      advect_lagMesh(&mbs.mb[i]);
+      for(int j=0; j<mbs.mb[i].nlp; j++)
+        foreach_dimension() mbs.mb[i].nodes[j].lagForce.x = 0.;
+    }
   }
 }
 
@@ -558,7 +568,9 @@ event acceleration (i++) {
   face vector ae = a;
   foreach()
     if (cm[] > 1.e-20) foreach_dimension() forcing.x[] = 0.;
-  for(int i=0; i<mbs.nbmb; i++) lag2eul(forcing, &mbs.mb[i]);
+  for(int i=0; i<mbs.nbmb; i++) {
+    if (mbs.mb[i].isactive) lag2eul(forcing, &mbs.mb[i]);
+  }
   foreach_face()
     if (fm.x[] > 1.e-20) ae.x[] += .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
 }

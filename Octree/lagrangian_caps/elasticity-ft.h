@@ -299,12 +299,15 @@ according to the desired pre-stressed conditions. See the
 an example of a isotropically pre-stressed membrane.*/
 #if dimension > 2
 event init (i = 0) {
-  for(int j=0; j<NCAPS; j++) store_initial_configuration(&MB(j));
+  for(int j=0; j<NCAPS; j++)
+    if (mbs.mb[i].isactive) store_initial_configuration(&MB(j));
 }
 #endif
 
 event acceleration (i++) {
-  for(int i=0; i<mbs.nbmb; i++) comp_elastic_stress(&mbs.mb[i]);
+  for(int i=0; i<mbs.nbmb; i++)
+    if (mbs.mb[i].isactive)
+      comp_elastic_stress(&mbs.mb[i]);
 }
 
 /**

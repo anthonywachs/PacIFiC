@@ -417,4 +417,17 @@ void initialize_rbc_mb(struct _initialize_circular_mb p) {
   #endif
 }
 
+void activate_spherical_capsule(struct _initialize_circular_mb p) {
+  initialize_empty_mb(p.mesh);
+  p.mesh->isactive = true;
+  initialize_spherical_mb(p);
+  initialize_membrane_stencils(p.mesh);
+  #if _ELASTICITY_FT
+    store_initial_configuration(p.mesh);
+  #endif
+  #if _BENDING_FT
+    initialize_refcurv_onecaps(p.mesh);
+  #endif
+}
+
 #endif
