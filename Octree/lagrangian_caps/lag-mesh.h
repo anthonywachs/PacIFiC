@@ -520,7 +520,7 @@ field in case it isn't done yet by another Basilisk solver.
 event defaults (i = 0) {
   mbs.nbmb = NCAPS;
   for(int i=0; i<mbs.nbmb; i++) {
-    if (mbs.mb[i].isactive) initialize_empty_mb(&mbs.mb[i]);
+    initialize_empty_mb(&mbs.mb[i]);
   }
   if (is_constant(a.x)) {
     a = new face vector;
