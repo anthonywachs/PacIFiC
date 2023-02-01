@@ -477,6 +477,7 @@ void advect_lagMesh(lagMesh* mesh) {
     }
   #else
     lagMesh buffer_mesh;
+    buffer_mesh.isactive = true;
     buffer_mesh.nlp = mesh->nlp;
     buffer_mesh.nodes = malloc(mesh->nlp*sizeof(lagNode));
     for(int i=0; i<mesh->nlp; i++) {
