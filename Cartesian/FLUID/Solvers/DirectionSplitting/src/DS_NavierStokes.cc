@@ -1473,6 +1473,26 @@ DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
 		}
 	}
 
+	if (comp == 0) {
+		// Check of Neumann BC
+		if (((UF->DOF_color(i,j,k,comp) == FV_BC_LEFT) ||
+			 (UF->DOF_color(i,j,k,comp) == FV_BC_RIGHT))
+		 && (!is_periodic[1][0]))
+			value = 0.;
+	} else if (comp == 1) {
+		// Check of Neumann BC
+		if (((UF->DOF_color(i,j,k,comp) == FV_BC_TOP) ||
+			 (UF->DOF_color(i,j,k,comp) == FV_BC_BOTTOM))
+		 && (!is_periodic[1][1]))
+			value = 0.;
+	} else if (comp == 2) {
+		// Check of Neumann BC
+		if (((UF->DOF_color(i,j,k,comp) == FV_BC_FRONT) ||
+			 (UF->DOF_color(i,j,k,comp) == FV_BC_BEHIND))
+		 && (!is_periodic[1][2]))
+			value = 0.;
+	}
+
    return(std::make_tuple(value,dC));
 
 }
