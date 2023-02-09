@@ -1578,6 +1578,27 @@ DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
 				// pre_factor = dxC/ xhr;
 			}
 			// value *= pre_factor * dyC * dzC;
+
+			if (comp == 0) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_LEFT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_RIGHT))
+				 && (!is_periodic[1][0]))
+					value = 0.;
+			} else if (comp == 1) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_TOP) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BOTTOM))
+				 && (!is_periodic[1][1]))
+					value = 0.;
+			} else if (comp == 2) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_FRONT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BEHIND))
+				 && (!is_periodic[1][2]))
+					value = 0.;
+			}
+
 			value *= dyC * dzC;
          break;
       case 1:
@@ -1626,6 +1647,27 @@ DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
 				// pre_factor = dyC / yhr;
 			}
 			// value *= pre_factor * dxC * dzC;
+
+			if (comp == 0) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_LEFT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_RIGHT))
+				 && (!is_periodic[1][0]))
+					value = 0.;
+			} else if (comp == 1) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_TOP) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BOTTOM))
+				 && (!is_periodic[1][1]))
+					value = 0.;
+			} else if (comp == 2) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_FRONT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BEHIND))
+				 && (!is_periodic[1][2]))
+					value = 0.;
+			}
+
 			value *= dxC * dzC;
          break;
       case 2:
@@ -1674,6 +1716,27 @@ DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
 				// pre_factor = dzC / zhr;
 			}
 			// value *= pre_factor * dxC * dyC;
+
+			if (comp == 0) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_LEFT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_RIGHT))
+				 && (!is_periodic[1][0]))
+					value = 0.;
+			} else if (comp == 1) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_TOP) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BOTTOM))
+				 && (!is_periodic[1][1]))
+					value = 0.;
+			} else if (comp == 2) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_FRONT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BEHIND))
+				 && (!is_periodic[1][2]))
+					value = 0.;
+			}
+
 			value *= dxC * dyC;
          break;
    }
