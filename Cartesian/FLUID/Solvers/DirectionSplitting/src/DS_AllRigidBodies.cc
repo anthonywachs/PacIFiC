@@ -8,7 +8,7 @@
 #include <cmath>
 #include <algorithm>
 #define EPSILON 1.e-14
-#define THRES 1.e-4
+#define THRES 1.e-8
 using std::endl;
 
 
