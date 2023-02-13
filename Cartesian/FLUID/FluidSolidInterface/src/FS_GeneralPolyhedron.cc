@@ -283,6 +283,30 @@ bool FS_GeneralPolyhedron:: isIn( geomVector const& pt ) const
      }
   }
 
+  if (m_periodic_directions) {
+     for (size_t i = 0; i < m_periodic_directions->size() && !b_isIn; ++i) {
+
+        for (size_t iface = 0; iface < nfaces; iface++) {
+           size_t n_vertex = m_agp_poly.facesVec[iface].size();
+           for (size_t idxPts = 0; idxPts < n_vertex && !b_isIn; ++idxPts ) {
+              // Vertex index
+              size_t i0 = idxPts;
+              size_t i1 = (idxPts + 1 == n_vertex) ? 0 : idxPts + 1;
+              // Vertex ID
+              size_t v1 = m_agp_poly.facesVec[iface][i0];
+              size_t v2 = m_agp_poly.facesVec[iface][i1];
+              if ( checkPointInTetrahedron(
+                        m_agp_poly.faceCen[iface] + (*m_periodic_directions)[i],
+                        m_agp_poly.corners[v1] + (*m_periodic_directions)[i],
+                        m_agp_poly.corners[v2] + (*m_periodic_directions)[i],
+                        m_gravity_center + (*m_periodic_directions)[i], pt ) )
+                 b_isIn = true;
+           }
+        }
+
+     }
+  }
+
   return ( b_isIn );
 
 }
@@ -318,6 +342,34 @@ double FS_GeneralPolyhedron:: level_set_value( geomVector const& pt ) const
         } else {
            value = temp;
         }
+     }
+  }
+
+  if (m_periodic_directions) {
+     for (size_t i = 0; i < m_periodic_directions->size() && (value > 0.); ++i) {
+
+        for (size_t iface = 0; iface < nfaces; iface++) {
+           size_t n_vertex = m_agp_poly.facesVec[iface].size();
+           for (size_t idxPts = 0; idxPts < n_vertex && (value > 0.); ++idxPts ) {
+              // Vertex index
+              size_t i0 = idxPts;
+              size_t i1 = (idxPts + 1 == n_vertex) ? 0 : idxPts + 1;
+              // Vertex ID
+              size_t v1 = m_agp_poly.facesVec[iface][i0];
+              size_t v2 = m_agp_poly.facesVec[iface][i1];
+              double temp = DistOfPointFromTetrahedron(
+                        m_agp_poly.faceCen[iface] + (*m_periodic_directions)[i],
+                        m_agp_poly.corners[v1] + (*m_periodic_directions)[i],
+                        m_agp_poly.corners[v2] + (*m_periodic_directions)[i],
+                        m_gravity_center + (*m_periodic_directions)[i], pt );
+              if (temp >= 0.) {
+                 value = std::min(temp, value);
+              } else {
+                 value = temp;
+              }
+           }
+        }
+
      }
   }
 
