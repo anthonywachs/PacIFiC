@@ -494,7 +494,7 @@ class DS_NavierStokes : public MAC_Object,
       double bottom_coordinate;
       double translated_distance;
 
-      double pressure_drop, Qold;
+      double Qold;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;

@@ -176,7 +176,8 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
 		// controller = DS_PID::create(0.5,1.,0);
 		// Set the initial pressure drop, required in case of given flow rate
 		if (!b_restart) {
-			pressure_drop = -100.;
+			const_cast<FV_Mesh*>(UF->primary_grid())
+							->set_periodic_pressure_drop( -100. ) ;
 			string fileName = "./DS_results/flow_pressure_history.csv" ;
 			std::ofstream MyFile;
 			if (macCOMM->rank() == 0) {
@@ -185,12 +186,15 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
 			}
 			MyFile.close();
 		} else if (b_restart) {
+			double temp_press;
 			string fileName = "./DS_results/flow_pressure_history.csv" ;
 			std::ifstream MyFile;
 			MyFile.open( fileName.c_str() ) ;
 			MyFile.seekg(-31,ios_base::end);
-	      MyFile >> Qold >> pressure_drop >> exceed >> turn;
+	      MyFile >> Qold >> temp_press >> exceed >> turn;
 			MyFile.close();
+			const_cast<FV_Mesh*>(UF->primary_grid())
+							->set_periodic_pressure_drop( temp_press ) ;
 		}
 	}
 
@@ -2623,6 +2627,7 @@ DS_NavierStokes:: predicted_pressure_drop (FV_TimeIterator const* t_it)
 	double Um = get_current_mean_flow_speed();
 	double Qc = cross_sec_area * Um;
 	double Qset = UF->primary_grid()->get_periodic_flow_rate();
+	double pressure_drop = UF->primary_grid()->get_periodic_pressure_drop();
 
 	if ((fabs(Qc - Qset) / Qset > 1e-5) && (t_it->iteration_number() % 1 == 0)) {
       if ((Qc / Qset) > 1.) {
@@ -2654,6 +2659,9 @@ DS_NavierStokes:: predicted_pressure_drop (FV_TimeIterator const* t_it)
       }
 	}
    Qold = Qc;
+
+   const_cast<FV_Mesh*>(UF->primary_grid())
+											->set_periodic_pressure_drop( pressure_drop ) ;
 
 	string fileName = "./DS_results/flow_pressure_history.csv" ;
 	std::ofstream MyFile;
@@ -2697,7 +2705,7 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
 	               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
 		} else if (UF->primary_grid()->is_periodic_flow_rate()) {
 			predicted_pressure_drop(t_it);
-			bodyterm = pressure_drop /
+			bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
 	               ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
 	               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
 		}
