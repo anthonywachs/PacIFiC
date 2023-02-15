@@ -405,12 +405,12 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 		if (dim == 3) vec.push_back(4);
 		initialize_grid_nodes_on_rigidbody(vec);
 
-		// Extrapolate advecvtion term on fresh nodes
-		allrigidbodies->extrapolate_scalar_on_fresh_nodes(UF,2);
-		// Interpolate velocity on the fresh nodes in fluid domain
-		allrigidbodies->interpolate_vector_on_fresh_nodes(UF,vec);
-		// allrigidbodies->extrapolate_scalar_on_fresh_nodes(PF,0);
-		// allrigidbodies->extrapolate_scalar_on_fresh_nodes(PF,1);
+		// // Extrapolate advecvtion term on fresh nodes
+		// allrigidbodies->extrapolate_scalar_on_fresh_nodes(UF,2);
+		// // Interpolate velocity on the fresh nodes in fluid domain
+		// allrigidbodies->interpolate_vector_on_fresh_nodes(UF,vec);
+		// // allrigidbodies->extrapolate_scalar_on_fresh_nodes(PF,0);
+		// // allrigidbodies->extrapolate_scalar_on_fresh_nodes(PF,1);
 
 	   // Direction splitting
       // Assemble 1D tridiagonal matrices
