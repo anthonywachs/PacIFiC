@@ -393,6 +393,8 @@ class DS_NavierStokes : public MAC_Object,
 
       void output_L2norm_velocity( size_t const& level );
 
+      doubleVector compute_outOfDomain_Pressure(size_t const& level);
+
       /** @brief Compute velocity change from one time step to the
       next one with the direction splitting solution method */
       double compute_DS_velocity_change( void );
@@ -493,6 +495,7 @@ class DS_NavierStokes : public MAC_Object,
       size_t translation_direction;
       double bottom_coordinate;
       double translated_distance;
+      int outOfDomain_boundaryID;
 
       double Qold;
 

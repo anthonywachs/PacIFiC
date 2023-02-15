@@ -4418,6 +4418,62 @@ DS_NavierStokes::build_links_translation()
    UF->create_transproj_interpolation() ;
    PF->create_transproj_interpolation() ;
 
+	double translation_magnitude = UF->primary_grid()->get_translation_magnitude();
+
+	string outOfDomain_boundaryName;
+   switch( translation_direction )
+   {
+     case 0:
+       if ( translation_magnitude > 0. ) outOfDomain_boundaryName = "right" ;
+       else outOfDomain_boundaryName = "left" ;
+       break;
+     case 1:
+       if ( translation_magnitude > 0. ) outOfDomain_boundaryName = "top" ;
+       else outOfDomain_boundaryName = "bottom" ;
+       break;
+     case 2:
+       if ( translation_magnitude > 0. ) outOfDomain_boundaryName = "front" ;
+       else outOfDomain_boundaryName = "behind" ;
+       break;
+   }
+
+
+	outOfDomain_boundaryID = int( FV_DomainBuilder::get_color_number(
+        outOfDomain_boundaryName ) );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+doubleVector
+DS_NavierStokes::compute_outOfDomain_Pressure(size_t const& level)
+//---------------------------------------------------------------------------
+{
+	MAC_LABEL( "DS_NavierStokes:: compute_outOfDomain_Pressure" ) ;
+
+	size_t_vector nb_local_dof( dim, 0 );
+	doubleVector Pref(1,0.);
+	for (size_t l= 0; l < dim; l++)
+		nb_local_dof(l) = PF->get_local_nb_dof( 0, l ) ;
+
+	bool b_gotIt = false;
+
+	for (size_t i = 0; (i <= nb_local_dof(0)) && (!b_gotIt); i++) {
+		for (size_t j = 0; (j <= nb_local_dof(1)) && (!b_gotIt); j++) {
+			for (size_t k = 0; (k <= nb_local_dof(2)) && (!b_gotIt); k++) {
+				if ( PF->DOF_color( i, j, k, 0 ) == outOfDomain_boundaryID ) {
+					Pref(0) = PF->DOF_value( i, j, k, 0, level ) ;
+					b_gotIt = true;
+				}
+			}
+		}
+	}
+
+	Pref(0) = macCOMM->sum(Pref(0));
+
+	return(Pref);
 }
 
 
@@ -4446,13 +4502,15 @@ DS_NavierStokes::fields_projection()
    UF->translation_projection( 3, 5, 0 ) ;
 	UF->synchronize( 3 ) ;
 
-   UF->translation_projection( 4, 5 ) ;
+   UF->translation_projection( 4, 5, 1 ) ;
 	UF->synchronize( 4 ) ;
 
-   PF->translation_projection( 0, 2, 0 ) ;
+	doubleVector POut = compute_outOfDomain_Pressure(0);
+   PF->translation_projection( 0, 2, 0, &POut ) ;
 	PF->synchronize( 0 );
 
-   PF->translation_projection( 1, 2 ) ;
+	POut = compute_outOfDomain_Pressure(1);
+   PF->translation_projection( 1, 2, 1, &POut ) ;
 	PF->synchronize( 1 );
 
 }
