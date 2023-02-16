@@ -119,7 +119,7 @@ class Cylinder : public Convex
     bool isIn( Point3 const& pt ) const;
 
     /** @ Returns the bounding cylinder to cylinder */
-    BCylinder getBCylinder() const;
+    BCylinder bcylinder() const;
     //@}
 
 

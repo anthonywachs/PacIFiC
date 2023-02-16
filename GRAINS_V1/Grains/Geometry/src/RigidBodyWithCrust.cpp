@@ -110,7 +110,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( DOMNode* root )
   // Transformation
   m_transform.load( root );
 
-  // Circumscribed radius and bounding box
+  // Circumscribed radius, bounding box, bounding cylinder
   m_circumscribedRadius = m_convex->computeCircumscribedRadius();
   m_scaling = new Vector3;
   BBox box = m_convex->bbox( TransformIdentity );
@@ -754,46 +754,15 @@ PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
   RigidBodyWithCrust const& rbB )
 {
   try {
-  const Convex* convexA = rbA.getConvex();
-  const Convex* convexB = rbB.getConvex();
   Transform const* a2wNoCrust = rbA.getTransform();
   Transform const* b2wNoCrust = rbB.getTransform();
   Vector3 gcagcb = *( a2wNoCrust->getOrigin() ) - *( b2wNoCrust->getOrigin() );
-
   if ( Norm(gcagcb) < rbA.getCircumscribedRadius() +
                       rbB.getCircumscribedRadius() )
-  {
-    BCylinder a = convexA->getBCylinder();
-    BCylinder b = convexB->getBCylinder();
-    PointContact PPP = intersect( a, b, *a2wNoCrust, *b2wNoCrust );
-    // ofstream BCylinderOutput;
-    // BCylinderOutput.open("BCylinderOutput.dat", ios::app);
-    // BCylinderOutput << PPP.getContact() << " " << PPP.getOverlapVector() << " " << PPP.getOverlapDistance() << "\n";
-    // BCylinderOutput.close();
-    return( PPP );
-
-    // Transform const* a2w = this->getTransformWithCrust();
-    // Transform const* b2w = neighbor.getTransformWithCrust();
-    // Point3 pointA, pointB;
-    // int nbIterGJK = 0;
-    // double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w,
-    // 	*b2w, pointA, pointB, nbIterGJK );
-    // pointA = (*a2w)( pointA );
-    // pointB = (*b2w)( pointB );
-    // Vector3 ba = pointA - pointB;
-    // Point3 contact = pointA / 2.0 + pointB / 2.0;
-    // Vector3 overlap_vector = ba / distance;
-    // overlap_vector.round();
-    // overlap_vector *= m_crustThickness + neighbor.m_crustThickness - distance;
-    // distance -= m_crustThickness + neighbor.m_crustThickness;
-    // ofstream GJKOutput;
-    // GJKOutput.open("GJKOutput.dat", ios::app);
-    // GJKOutput << contact << " " << overlap_vector << " " << distance << "\n";
-    // GJKOutput.close();
-    // return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
-  }
-
-  else return ( PointNoContact );
+    return( intersect( rbA.getBCylinder(), rbB.getBCylinder(),
+                       *a2wNoCrust, *b2wNoCrust ) );
+  else
+    return ( PointNoContact );
   }
   catch ( const ContactError& ) {
     throw ContactError();
@@ -809,11 +778,10 @@ PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
 bool isContactCYLINDERS( RigidBodyWithCrust const& rbA,
                          RigidBodyWithCrust const& rbB )
 {
-  BCylinder a = rbA.getConvex()->getBCylinder();
-  BCylinder b = rbB.getConvex()->getBCylinder();
   Transform const* a2wNoCrust = rbA.getTransform();
   Transform const* b2wNoCrust = rbB.getTransform();
-  return ( isContact( a, b, *a2wNoCrust, *b2wNoCrust ) );
+  return ( isContact( rbA.getBCylinder(), rbB.getBCylinder(),
+                      *a2wNoCrust, *b2wNoCrust ) );
 }
 
 

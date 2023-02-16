@@ -57,12 +57,12 @@ BBox Convex::bbox( Transform const& t ) const
 
 // ----------------------------------------------------------------------------
 // Returns the convex shape bounding cylinder
-BCylinder Convex::getBCylinder() const
+BCylinder Convex::bcylinder() const
 {
-  cout << "Warning for this Convex the method Convex::bCylinder() "
+  cout << "Warning for this Convex the method Convex::bcylinder() "
        << "is not yet implemented !\n"
        << "Need for an assistance ! Stop running !\n";
-  exit(10);
+  // exit(10);
 
   return( BCylinder() );
 }

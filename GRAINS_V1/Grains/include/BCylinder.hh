@@ -1,8 +1,6 @@
 #ifndef _BCYLINDER_HH_
 #define _BCYLINDER_HH_
 
-#include "Point3.hh"
-#include "Vector3.hh"
 #include "Matrix.hh"
 #include "Transform.hh"
 #include "PointContact.hh"
@@ -101,22 +99,6 @@ class BCylinder
 
 /** @name BCylinder : External methods */
 //@{
-/** @brief Wrapper function for analytical contacts between cylinders.
-@param rA cylinder A radius
-@param hA cylinder A height
-@param rB cylinder B radius
-@param hB cylinder B height
-@param e_B2A orientation of cylinder B w.r.t. to cylinder A - A is along Z axis
-@param x_B2A position of cylinder B center w.r.t. to cylinder A center (origin)
-@param e_A2B orientation of cylinder A w.r.t. to cylinder B - B is along Z axis
-@param x_A2B position of cylinder A center w.r.t. to cylinder B center (origin)
-@param method type of contact: F2F, F2B, ...
-@param ptCont contact variables */
-void BCylinderContactWrapper( double rA, double hA, double rB, double hB,
-                              Vector3 const& e_B2A, Point3 const& x_B2A,
-                              Vector3 const& e_A2B, Point3 const& x_A2B,
-                              int method, PointContact& ptCont );
-
 /** @brief Returns the contact point of two cylinders in the world of cylidner A
 if the contact is either Face-Face or Band-Band (Parallel). Cylinder A is at
 origin oriented along Z-axis.
@@ -128,7 +110,7 @@ origin oriented along Z-axis.
 @param x position of cylinder B center w.r.t. to cylinder A center (origin)
 @param ptCont contact variables */
 void F2FB2BParContact( double rA, double hA, double rB, double hB,
-                       Vector3 const& e, Point3 const& x, PointContact& ptCont );
+                       Vector3 const& e, Point3 const& x, PointContact& ptCont);
 
 /** @brief Returns the contact point of two cylinders in the world of cylidner A
 if the contact is Face-Band. Cylinder A is at origin oriented along Z-axis.
@@ -141,7 +123,6 @@ if the contact is Face-Band. Cylinder A is at origin oriented along Z-axis.
 @param ptCont contact variables */
 void F2BContact( double rA, double hA, double rB, double hB,
                  Vector3 const& e, Point3 const& x, PointContact& ptCont );
-
 
 /** @brief Returns the contact point of two cylinders in the world of cylidner A
 if the contact is Face-Edge. Cylinder A is at origin oriented along Z-axis.
@@ -180,68 +161,44 @@ if the contact is Band-Edge. Cylinder A is at origin oriented along Z-axis.
 void B2EContact( double rA, double hA, double rB, double hB,
                  Vector3 const& e, Point3 const& x, PointContact& ptCont );
 
-/** @brief Returns the contact point of two cylinders in the world of cylidner A
-if the contact is Edge-Edge. Cylinder A is at origin oriented along Z-axis.
+/** @brief Returns the contact point of two cylinders in the global world if
+the contact is Edge-Edge.
 @param rA cylinder A radius
 @param hA cylinder A height
 @param rB cylinder B radius
 @param hB cylinder B height
-@param e orientation of cylinder B w.r.t. to cylinder A - A is along Z axis
-@param x position of cylinder B center w.r.t. to cylinder A center (origin)
+@param e1 orientation of cylinder B w.r.t. to cylinder A - A is along Z axis
+@param x1 position of cylinder B center w.r.t. to cylinder A center (origin)
 @param ptCont contact variables */
 void E2EContact( double rA, double hA, double rB, double hB,
-                 Vector3 const& e, Point3 const& x, PointContact& ptCont );
+                 Vector3 const& e1, Point3 const& x1, PointContact& ptCont );
 
-/** @brief Returns the band (ptA) and Face (ptB) points of the given circle
-// intersecting with a cylinder oriented along Z axis and centered at the
-// origin with radius rA and height hA
-@param */
-void edgePointClose2Z( double rA, double r, Vector3 const& e, Point3 const& c,
-                       Point3& ptA );
+// /** @brief Returns the real solutions to the quartic equation
+// x^4 + bx^3 + cx^2 + dx + e = 0
+// @param b coefficient of x^3
+// @param c coefficient of x^2
+// @param d coefficient of x^1
+// @param e coefficient of 1
+// @param sol array of solutions
+// @param nbRoots number of real roots */
+// void solveQuartic( double const b, double const c, double const d,
+//                    double const e, double sol[4], int& nbRoots );
 
-/** @brief Returns the band (ptA) and Face (ptB) points of the given circle
-intersecting with a cylinder oriented along Z axis and centered at the  origin
-with radius R and height h
-@param rA radius of the master circle
-@param hA height of the master circle
-@param rB radius of the slave circle
-@param hB height of the slave circle
-@param e orientation of the slave circle
-@param c center of the slave circle
-@param ptA contact point with Band
-@param ptB contact point with Face */
-void edgePointsOnCyl( double rA, double hA, double rB, Vector3 const& e,
-                      Point3 const& c, Point3& ptA, Point3& ptB );
-
-/** @brief // Returns the solutions to a quartic equation
-apearing in this class
-@param a coefficient of x^4
-@param b coefficient of x^3
-@param c coefficient of x^2
-@param d coefficient of x^1
-@param e coefficient of 1
-@param sol array of solutions */
-void solveQuartic( double a, double b, double c, double d, double e,
-                   double sol[4] );
-
-/** @brief Returns a REAL solution to a cubic equation
-apearing in this class
-@param a coefficient of x^3
-@param b coefficient of x^2
-@param c coefficient of x^1
-@param d coefficient of 1 */
-double solveCubicReal( double a, double b, double c, double d );
-
-/** @brief Returns a SPECIFIC solution for the quadrature ax^2 + bx + c = 0
-apearing in this class
-@param a coefficient of x^2
-@param b coefficient of x
-@param c coefficient of 1
-@param sol array of solutions */
-void solveQuadratic( double a, double b, double c, double sol[2] );
-
-/** @brief Type-proof sign function
-@param val parameter whose sign is needed */
-template < typename T > int sgn( T val );
-//@}
+// /** @brief Returns the solutions to the quadrature ax^2 + bx + c = 0
+// @param a coefficient of x^2
+// @param b coefficient of x
+// @param c coefficient of 1
+// @param sol array of solutions */
+// void solveQuadratic( double const a, double const b, double const c,
+//                      double sol[2] );
+//
+// /** @brief Returns the rotation matrix, trasforming v to z-axis
+// @param v the source vector whose transformation to the z-axis is needed
+// @param rotMat the rotation matrix */
+// void rotateVec2VecZ( Vector3 const& v, Matrix& rotMat );
+//
+// /** @brief Type-proof sign function
+// @param val parameter whose sign is needed */
+// template < typename T > int sgn( T val );
+// //@}
 #endif

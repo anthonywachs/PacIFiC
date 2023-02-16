@@ -159,7 +159,7 @@ class Box : public Convex
     bool isIn( Point3 const& pt ) const;
 
     /** @ Returns the bounding cylinder to box */
-    BCylinder getBCylinder() const;
+    BCylinder bcylinder() const;
     //@}
 
 
