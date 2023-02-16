@@ -295,8 +295,8 @@ PostProcessing::compute_fieldVolumeAverageInBox()
          intVector temp =
          get_local_index_of_extents(box_extents, EPSILON, dir, 0);
 
-         min_local_index(dir) = temp(0);
-         max_local_index(dir) = temp(1);
+         min_local_index(dir) = MAC::min(temp(0),temp(1));
+         max_local_index(dir) = MAC::max(temp(0),temp(1));
       }
 
       for (size_t comp = 0; comp < ncomps; comp++) {
@@ -444,8 +444,8 @@ PostProcessing::compute_fieldVolumeAverageAroundRB()
             intVector temp =
             get_local_index_of_extents(box_extents, EPSILON, dir, 0);
 
-            min_local_index(dir) = temp(0);
-            max_local_index(dir) = temp(1);
+            min_local_index(dir) = MAC::min(temp(0),temp(1));
+            max_local_index(dir) = MAC::max(temp(0),temp(1));
          }
 
          for (size_t comp = 0; comp < ncomps; comp++) {
