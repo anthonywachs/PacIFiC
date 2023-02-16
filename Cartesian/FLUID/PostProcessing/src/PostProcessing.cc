@@ -404,24 +404,22 @@ PostProcessing::compute_fieldVolumeAverageAroundRB()
   size_t m_nrb = m_allrigidbodies->get_number_rigid_bodies();
   list<struct fieldVolumeAverageAroundRB>::const_iterator it;
 
-  for (size_t parID = 0; parID < m_nrb; parID++) {
-     for ( it = m_fieldVolumeAverageAroundRB_list.begin()
-         ; it != m_fieldVolumeAverageAroundRB_list.end()
-         ; it++ ) {
-
-         if (m_macCOMM->rank() == 0) {
-            MyFile << "# Average "
-                   << it->field_name
-                   << " around rigid body "
-                   << parID
-                   << " with kernel "
-                   << it->kernelType
-                   << ", the box size "
-                   << it->volumeWidth
-                   << ", and porosity "
-                   << it->withPorosity
-                   << endl;
-         }
+  for ( it = m_fieldVolumeAverageAroundRB_list.begin()
+      ; it != m_fieldVolumeAverageAroundRB_list.end()
+      ; it++ ) {
+      if (m_macCOMM->rank() == 0) {
+         MyFile << "# Average "
+         << it->field_name
+         << " around all rigid bodies"
+         << " with kernel "
+         << it->kernelType
+         << ", the box size "
+         << it->volumeWidth
+         << ", and porosity "
+         << it->withPorosity
+         << endl;
+      }
+     for (size_t parID = 0; parID < m_nrb; parID++) {
 
          FS_RigidBody const* rigidBody = m_allrigidbodies
                                              ->get_ptr_rigid_body(parID);
