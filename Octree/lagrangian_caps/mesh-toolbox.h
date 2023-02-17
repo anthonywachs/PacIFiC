@@ -672,9 +672,6 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
     mesh->updated_normals = false;
     mesh->updated_curvatures = false;
     mesh->isactive = true; // Super dirty...
-
-    initialize_membranes_stencils();
-    generate_lag_stencils();
   }
 #else
   void restore_lagmesh(FILE* fp, lagMesh* mesh) {
