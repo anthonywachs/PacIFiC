@@ -299,8 +299,10 @@ according to the desired pre-stressed conditions. See the
 an example of a isotropically pre-stressed membrane.*/
 #if dimension > 2
 event init (i = 0) {
-  for(int j=0; j<NCAPS; j++)
-    if (mbs.mb[j].isactive) store_initial_configuration(&(MB(j)));
+  #if (RESTART_CASE == 0)
+    for(int j=0; j<NCAPS; j++)
+      if (mbs.mb[j].isactive) store_initial_configuration(&(MB(j)));
+  #endif
 }
 #endif
 

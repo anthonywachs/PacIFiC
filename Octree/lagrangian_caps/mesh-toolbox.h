@@ -510,128 +510,213 @@ to restart simulations.
 At the moment these functions are only valid for three-dimensional simulations.
 */
 
+void dump_lagnode(FILE* fp, lagNode* node) {
+  foreach_dimension() fwrite(&(node->pos.x), sizeof(double), 1, fp);
+  foreach_dimension() fwrite(&(node->lagVel.x), sizeof(double), 1, fp);
+  foreach_dimension() fwrite(&(node->normal.x), sizeof(double), 1, fp);
+  fwrite(&(node->curv), sizeof(double), 1, fp);
+  fwrite(&(node->ref_curv), sizeof(double), 1, fp);
+  foreach_dimension() fwrite(&(node->lagForce.x), sizeof(double), 1, fp);
+  fwrite(&(node->nb_neighbors), sizeof(int), 1, fp);
+  for(int j=0; j<6; j++)
+    fwrite(&(node->neighbor_ids[j]), sizeof(int), 1, fp);
+  for(int j=0; j<6; j++)
+    fwrite(&(node->edge_ids[j]), sizeof(int), 1, fp);
+  fwrite(&(node->nb_triangles), sizeof(int), 1, fp);
+  for(int j=0; j<6; j++)
+    fwrite(&(node->triangle_ids[j]), sizeof(int), 1, fp);
+  fwrite(&(node->nb_fit_iterations), sizeof(int), 1, fp);
+}
+
+void restore_lagnode(FILE* fp, lagNode* node) {
+  foreach_dimension() fread(&(node->pos.x), sizeof(double), 1, fp);
+  foreach_dimension() fread(&(node->lagVel.x), sizeof(double), 1, fp);
+  foreach_dimension() fread(&(node->normal.x), sizeof(double), 1, fp);
+  fread(&(node->curv), sizeof(double), 1, fp);
+  fread(&(node->ref_curv), sizeof(double), 1, fp);
+  foreach_dimension() fread(&(node->lagForce.x), sizeof(double), 1, fp);
+  fread(&(node->nb_neighbors), sizeof(int), 1, fp);
+  for(int j=0; j<6; j++)
+    fread(&(node->neighbor_ids[j]), sizeof(int), 1, fp);
+  for(int j=0; j<6; j++)
+    fread(&(node->edge_ids[j]), sizeof(int), 1, fp);
+  fread(&(node->nb_triangles), sizeof(int), 1, fp);
+  for(int j=0; j<6; j++)
+    fread(&(node->triangle_ids[j]), sizeof(int), 1, fp);
+  fread(&(node->nb_fit_iterations), sizeof(int), 1, fp);
+}
+
+void dump_edge(FILE* fp, Edge* edge) {
+  fwrite(&(edge->node_ids[0]), sizeof(int), 1, fp);
+  fwrite(&(edge->node_ids[1]), sizeof(int), 1, fp);
+  fwrite(&(edge->triangle_ids[0]), sizeof(int), 1, fp);
+  fwrite(&(edge->triangle_ids[1]), sizeof(int), 1, fp);
+  fwrite(&(edge->l0), sizeof(double), 1, fp);
+  fwrite(&(edge->length), sizeof(double), 1, fp);
+  foreach_dimension() fwrite(&(edge->normal.x), sizeof(double), 1, fp);
+}
+
+void restore_edge(FILE* fp, Edge* edge) {
+  fread(&(edge->node_ids[0]), sizeof(int), 1, fp);
+  fread(&(edge->node_ids[1]), sizeof(int), 1, fp);
+  fread(&(edge->triangle_ids[0]), sizeof(int), 1, fp);
+  fread(&(edge->triangle_ids[1]), sizeof(int), 1, fp);
+  fread(&(edge->l0), sizeof(double), 1, fp);
+  fread(&(edge->length), sizeof(double), 1, fp);
+  foreach_dimension() fread(&(edge->normal.x), sizeof(double), 1, fp);
+}
+
+void dump_triangle(FILE* fp, Triangle* triangle) {
+  for(int k=0; k<3; k++) {
+    fwrite(&(triangle->node_ids[k]), sizeof(int), 1, fp);
+    fwrite(&(triangle->edge_ids[k]), sizeof(int), 1, fp);
+  }
+  fwrite(&(triangle->area), sizeof(double), 1, fp);
+  foreach_dimension() fwrite(&(triangle->normal.x), sizeof(double), 1, fp);
+  foreach_dimension() fwrite(&(triangle->centroid.x), sizeof(double), 1, fp);
+  foreach_dimension() {
+    fwrite(&(triangle->refshape[0].x), sizeof(double), 1, fp);
+    fwrite(&(triangle->refshape[1].x), sizeof(double), 1, fp);
+  }
+  for(int k=0; k<3; k++)
+    for(int l=0; l<2; l++)
+      fwrite(&(triangle->sfc[k][l]), sizeof(double), 1, fp);
+}
+
+void restore_triangle(FILE* fp, Triangle* triangle) {
+  for(int k=0; k<3; k++) {
+    fread(&(triangle->node_ids[k]), sizeof(int), 1, fp);
+    fread(&(triangle->edge_ids[k]), sizeof(int), 1, fp);
+  }
+  fread(&(triangle->area), sizeof(double), 1, fp);
+  foreach_dimension() fread(&(triangle->normal.x), sizeof(double), 1, fp);
+  foreach_dimension() fread(&(triangle->centroid.x), sizeof(double), 1, fp);
+  foreach_dimension() {
+    fread(&(triangle->refshape[0].x), sizeof(double), 1, fp);
+    fread(&(triangle->refshape[1].x), sizeof(double), 1, fp);
+  }
+  for(int k=0; k<3; k++)
+    for(int l=0; l<2; l++)
+      fread(&(triangle->sfc[k][l]), sizeof(double), 1, fp);
+}
+
 void dump_lagmesh(FILE* fp, lagMesh* mesh) {
-  /** Step 1: The array of Lagrangian nodes is dumped */
   fwrite(&(mesh->nlp), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nlp; i++) {
-    foreach_dimension() fwrite(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
-    fwrite(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
-    fwrite(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fwrite(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
-    fwrite(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fwrite(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
-    fwrite(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fwrite(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
-  }
-  /** Step 2: The array of Lagrangian edges is dumped */
+  for(int i=0; i<mesh->nlp; i++) dump_lagnode(fp, &mesh->nodes[i]);
   fwrite(&(mesh->nle), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nle; i++) {
-    fwrite(&(mesh->edges[i].l0), sizeof(double), 1, fp);
-    for(int j=0; j<2; j++) {
-      fwrite(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
-      fwrite(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
-    }
-  }
-  /** Step 3: The array of Lagrangian triangles is dumped. If the finite element
-  functions are not used, some attributes of the Triangle structure are not
-  initialized and we don't have to dump them. */
+  for(int i=0; i<mesh->nle; i++) dump_edge(fp, &mesh->edges[i]);
   fwrite(&(mesh->nlt), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nlt; i++) {
-    #if _ELASTICITY_FT
-    for(int j=0; j<2; j++) {
-      foreach_dimension()
-        fwrite(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
-    }
-    for(int j=0; j<3; j++) {
-      for(int k=0; k<2; k++) {
-        fwrite(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
-      }
-    }
-    #endif
-    for(int j=0; j<3; j++)
-      fwrite(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
-    for(int j=0; j<3; j++)
-      fwrite(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
-  }
+  for(int i=0; i<mesh->nlt; i++) dump_triangle(fp, &mesh->triangles[i]);
+  foreach_dimension() fwrite(&(mesh->centroid.x), sizeof(double), 1, fp);
+  int tmp;
+  tmp = mesh->updated_stretches ? 1 : 0; fwrite(&(tmp), sizeof(int), 1, fp);
+  tmp = mesh->updated_normals ? 1 : 0; fwrite(&(tmp), sizeof(int), 1, fp);
+  tmp = mesh->updated_curvatures ? 1 : 0; fwrite(&(tmp), sizeof(int), 1, fp);
+  tmp = mesh->isactive ? 1 : 0; fwrite(&(tmp), sizeof(int), 1, fp);
 }
 
-void restore_lagmesh(FILE* fp, lagMesh* mesh) {
-  /** Step 1: The array of Lagrangian nodes is read */
-  fread(&(mesh->nlp), sizeof(int), 1, fp);
-  mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
-  for(int i=0; i<mesh->nlp; i++) {
-    foreach_dimension() fread(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
-    fread(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
-    fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fread(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
-    fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fread(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
-    fread(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fread(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
-  }
-  /** Step 1: The array of Lagrangian edges is read */
-  fread(&(mesh->nle), sizeof(int), 1, fp);
-  mesh->edges = malloc(mesh->nle*sizeof(Edge));
-  for(int i=0; i<mesh->nle; i++) {
-    fread(&(mesh->edges[i].l0), sizeof(double), 1, fp);
-    for(int j=0; j<2; j++) {
-      fread(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
-      fread(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
+#ifndef RESTORE_OLD_DUMP
+ #define RESTORE_OLD_DUMP 0
+#endif
+#if RESTORE_OLD_DUMP
+  void restore_lagmesh(FILE* fp, lagMesh* mesh) {
+    /** Step 1: The array of Lagrangian nodes is read */
+    fread(&(mesh->nlp), sizeof(int), 1, fp);
+    mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
+    for(int i=0; i<mesh->nlp; i++) {
+      foreach_dimension() fread(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
+      fread(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
+      fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
+      for(int j=0; j<6; j++)
+        fread(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
+      fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
+      for(int j=0; j<6; j++)
+        fread(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
+      fread(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
+      for(int j=0; j<6; j++)
+        fread(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
     }
-  }
-  /** Step 3: The array of Lagrangian triangles is read. If the finite element
-  functions are not used, some attributes of the Triangle structure are not
-  dumped and we should not read them. */
-  fread(&(mesh->nlt), sizeof(int), 1, fp);
-  mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
-  for(int i=0; i<mesh->nlt; i++) {
-    #if _ELASTICITY_FT
-    for(int j=0; j<2; j++) {
-      foreach_dimension()
-        fread(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
-    }
-    for(int j=0; j<3; j++) {
-      for(int k=0; k<2; k++) {
-        fread(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
+    /** Step 1: The array of Lagrangian edges is read */
+    fread(&(mesh->nle), sizeof(int), 1, fp);
+    mesh->edges = malloc(mesh->nle*sizeof(Edge));
+    for(int i=0; i<mesh->nle; i++) {
+      fread(&(mesh->edges[i].l0), sizeof(double), 1, fp);
+      for(int j=0; j<2; j++) {
+        fread(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
+        fread(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
       }
     }
-    #endif
-    for(int j=0; j<3; j++)
-      fread(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
-    for(int j=0; j<3; j++)
-      fread(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
-  }
-  mesh->updated_stretches = false;
-  mesh->updated_normals = false;
-  mesh->updated_curvatures = false;
+    /** Step 3: The array of Lagrangian triangles is read. If the finite element
+    functions are not used, some attributes of the Triangle structure are not
+    dumped and we should not read them. */
+    fread(&(mesh->nlt), sizeof(int), 1, fp);
+    mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
+    for(int i=0; i<mesh->nlt; i++) {
+      #if _ELASTICITY_FT
+      for(int j=0; j<2; j++) {
+        foreach_dimension()
+          fread(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
+      }
+      for(int j=0; j<3; j++) {
+        for(int k=0; k<2; k++) {
+          fread(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
+        }
+      }
+      #endif
+      for(int j=0; j<3; j++)
+        fread(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
+      for(int j=0; j<3; j++)
+        fread(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
+    }
+    mesh->updated_stretches = false;
+    mesh->updated_normals = false;
+    mesh->updated_curvatures = false;
+    mesh->isactive = true; // Super dirty...
 
-  initialize_membranes_stencils();
-  generate_lag_stencils();
-}
+    initialize_membranes_stencils();
+    generate_lag_stencils();
+  }
+#else
+  restore_lagmesh(FILE* fp, lagMesh* mesh) {
+    fread(&(mesh->nlp), sizeof(int), 1, fp);
+    mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
+    for(int i=0; i<mesh->nlp; i++) restore_lagnode(fp, &mesh->nodes[i]);
+    fread(&(mesh->nle), sizeof(int), 1, fp);
+    mesh->edges = malloc(mesh->nle*sizeof(Edge));
+    for(int i=0; i<mesh->nle; i++) restore_edge(fp, &mesh->edges[i]);
+    fread(&(mesh->nlt), sizeof(int), 1, fp);
+    mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
+    for(int i=0; i<mesh->nlt; i++) restore_triangle(fp, &mesh->triangles[i]);
+    foreach_dimension() fread(&(mesh->centroid.x), sizeof(double), 1, fp);
+    int tmp;
+    fread(&(tmp), sizeof(int), 1, fp);
+    mesh->updated_stretches = (tmp == 0) ? false : true;
+    fread(&(tmp), sizeof(int), 1, fp);
+    mesh->updated_normals = (tmp == 0) ? false : true;
+    fread(&(tmp), sizeof(int), 1, fp);
+    mesh->updated_curvatures = (tmp == 0) ? false : true;
+    fread(&(tmp), sizeof(int), 1, fp);
+    mesh->isactive = (tmp == 0) ? false : true;
+    if (mesh->isactive) {
+      initialize_membranes_stencils();
+      generate_lag_stencils();
+    }
+  }
+#endif
 
 /** If the simulation contains several membranes, we dump and read one mesh at
 a time, but all meshes are stored in the same file. */
 void dump_membranes(char* filename) {
   FILE* file = fopen(filename, "w");
   assert(file);
-  for(int i=0; i<mbs.nbmb; i++) {
-    if (mbs.mb[i].isactive) dump_lagmesh(file, &MB(i));
-  }
+  for(int i=0; i<mbs.nbmb; i++) dump_lagmesh(file, &MB(i));
   fclose(file);
 }
 
 void restore_membranes(char* filename) {
   FILE* file = fopen(filename, "r");
   assert(file);
-  for(int i=0; i<mbs.nbmb; i++) {
-    if (mbs.mb[i].isactive) restore_lagmesh(file, &MB(i));
-  }
+  for(int i=0; i<mbs.nbmb; i++) restore_lagmesh(file, &MB(i));
   fclose(file);
 }
 

@@ -346,5 +346,7 @@ void initialize_refcurv() {
 }
 
 event init (i = 0) {
-  initialize_refcurv();
+  #if (RESTART_CASE == 0)
+    initialize_refcurv();
+  #endif
 }

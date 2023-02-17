@@ -43,9 +43,9 @@ typedef struct lagNode {
   #if dimension < 3
     int edge_ids[2];
   #else
-    int edge_ids[6];
     int nb_neighbors;
     int neighbor_ids[6];
+    int edge_ids[6];
     int nb_triangles;
     int triangle_ids[6];
     double gcurv;
@@ -131,6 +131,9 @@ typedef struct lagMesh {
 the simulation. It is one by default. */
 #ifndef NCAPS
   #define NCAPS 1
+#endif
+#ifndef RESTART_CASE
+  #define RESTART_CASE 0
 #endif
 
 /** The Lagrangian mesh is accessible in the code thanks to the structure
@@ -519,34 +522,16 @@ field in case it isn't done yet by another Basilisk solver.
 */
 event defaults (i = 0) {
   mbs.nbmb = NCAPS;
-  for(int i=0; i<mbs.nbmb; i++) {
-    initialize_empty_mb(&mbs.mb[i]);
-  }
+  #if (RESTART_CASE == 0)
+    for(int i=0; i<mbs.nbmb; i++) {
+      initialize_empty_mb(&mbs.mb[i]);
+    }
+  #endif
   if (is_constant(a.x)) {
     a = new face vector;
-    foreach_face()
-      a.x[] = 0.;
-    #if OLD_QCC
-    boundary ((scalar *){a});
-    #endif
+    foreach_face() a.x[] = 0.;
   }
 }
-
-/** Before the iterations start, we allocate memory for the stencils and
-generate them. Note that this implementation assumes the membrane was
-initialized in the init event. */
-// event init (i = 0) {
-//   for(int i=0; i<mbs.nbmb; i++) {
-//     if (mbs.mb[i].isactive) {
-//       for(int j=0; j<MB(i).nlp; j++) {
-//         MB(i).nodes[j].stencil.n = STENCIL_SIZE;
-//         MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
-//         MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
-//       }
-//       generate_lag_stencils_one_caps(&MB(i));
-//     }
-//   }
-// }
 
 /** Below, we advect each Lagrangian node using the interpolated Eulerian
 velocities. We also use this loop as an opportunity to
