@@ -575,8 +575,8 @@ void dump_triangle(FILE* fp, Triangle* triangle) {
   foreach_dimension() fwrite(&(triangle->normal.x), sizeof(double), 1, fp);
   foreach_dimension() fwrite(&(triangle->centroid.x), sizeof(double), 1, fp);
   foreach_dimension() {
-    fwrite(&(triangle->refshape[0].x), sizeof(double), 1, fp);
-    fwrite(&(triangle->refshape[1].x), sizeof(double), 1, fp);
+    fwrite(&(triangle->refShape[0].x), sizeof(double), 1, fp);
+    fwrite(&(triangle->refShape[1].x), sizeof(double), 1, fp);
   }
   for(int k=0; k<3; k++)
     for(int l=0; l<2; l++)
@@ -592,8 +592,8 @@ void restore_triangle(FILE* fp, Triangle* triangle) {
   foreach_dimension() fread(&(triangle->normal.x), sizeof(double), 1, fp);
   foreach_dimension() fread(&(triangle->centroid.x), sizeof(double), 1, fp);
   foreach_dimension() {
-    fread(&(triangle->refshape[0].x), sizeof(double), 1, fp);
-    fread(&(triangle->refshape[1].x), sizeof(double), 1, fp);
+    fread(&(triangle->refShape[0].x), sizeof(double), 1, fp);
+    fread(&(triangle->refShape[1].x), sizeof(double), 1, fp);
   }
   for(int k=0; k<3; k++)
     for(int l=0; l<2; l++)
@@ -602,11 +602,11 @@ void restore_triangle(FILE* fp, Triangle* triangle) {
 
 void dump_lagmesh(FILE* fp, lagMesh* mesh) {
   fwrite(&(mesh->nlp), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nlp; i++) dump_lagnode(fp, &mesh->nodes[i]);
+  for(int i=0; i<mesh->nlp; i++) dump_lagnode(fp, &(mesh->nodes[i]));
   fwrite(&(mesh->nle), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nle; i++) dump_edge(fp, &mesh->edges[i]);
+  for(int i=0; i<mesh->nle; i++) dump_edge(fp, &(mesh->edges[i]));
   fwrite(&(mesh->nlt), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nlt; i++) dump_triangle(fp, &mesh->triangles[i]);
+  for(int i=0; i<mesh->nlt; i++) dump_triangle(fp, &(mesh->triangles[i]));
   foreach_dimension() fwrite(&(mesh->centroid.x), sizeof(double), 1, fp);
   int tmp;
   tmp = mesh->updated_stretches ? 1 : 0; fwrite(&(tmp), sizeof(int), 1, fp);
@@ -677,7 +677,7 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
     generate_lag_stencils();
   }
 #else
-  restore_lagmesh(FILE* fp, lagMesh* mesh) {
+  void restore_lagmesh(FILE* fp, lagMesh* mesh) {
     fread(&(mesh->nlp), sizeof(int), 1, fp);
     mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
     for(int i=0; i<mesh->nlp; i++) restore_lagnode(fp, &mesh->nodes[i]);
@@ -697,10 +697,6 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
     mesh->updated_curvatures = (tmp == 0) ? false : true;
     fread(&(tmp), sizeof(int), 1, fp);
     mesh->isactive = (tmp == 0) ? false : true;
-    if (mesh->isactive) {
-      initialize_membranes_stencils();
-      generate_lag_stencils();
-    }
   }
 #endif
 
@@ -718,6 +714,8 @@ void restore_membranes(char* filename) {
   assert(file);
   for(int i=0; i<mbs.nbmb; i++) restore_lagmesh(file, &MB(i));
   fclose(file);
+  initialize_membranes_stencils();
+  generate_lag_stencils(no_warning = true);
 }
 
 /** ### Output membrane position for external post-processing */
