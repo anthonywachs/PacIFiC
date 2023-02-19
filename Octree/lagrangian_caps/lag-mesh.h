@@ -522,11 +522,11 @@ field in case it isn't done yet by another Basilisk solver.
 */
 event defaults (i = 0) {
   mbs.nbmb = NCAPS;
-  #if (RESTART_CASE == 0)
+  // #if (RESTART_CASE == 0)
     for(int i=0; i<mbs.nbmb; i++) {
       initialize_empty_mb(&mbs.mb[i]);
     }
-  #endif
+  // #endif
   if (is_constant(a.x)) {
     a = new face vector;
     foreach_face() a.x[] = 0.;
