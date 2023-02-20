@@ -615,87 +615,27 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
   tmp = mesh->isactive ? 1 : 0; fwrite(&(tmp), sizeof(int), 1, fp);
 }
 
-#ifndef RESTORE_OLD_DUMP
- #define RESTORE_OLD_DUMP 0
-#endif
-#if RESTORE_OLD_DUMP
-  void restore_lagmesh(FILE* fp, lagMesh* mesh) {
-    /** Step 1: The array of Lagrangian nodes is read */
-    fread(&(mesh->nlp), sizeof(int), 1, fp);
-    mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
-    for(int i=0; i<mesh->nlp; i++) {
-      foreach_dimension() fread(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
-      fread(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
-      fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-      for(int j=0; j<6; j++)
-        fread(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
-      fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-      for(int j=0; j<6; j++)
-        fread(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
-      fread(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
-      for(int j=0; j<6; j++)
-        fread(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
-    }
-    /** Step 1: The array of Lagrangian edges is read */
-    fread(&(mesh->nle), sizeof(int), 1, fp);
-    mesh->edges = malloc(mesh->nle*sizeof(Edge));
-    for(int i=0; i<mesh->nle; i++) {
-      fread(&(mesh->edges[i].l0), sizeof(double), 1, fp);
-      for(int j=0; j<2; j++) {
-        fread(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
-        fread(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
-      }
-    }
-    /** Step 3: The array of Lagrangian triangles is read. If the finite element
-    functions are not used, some attributes of the Triangle structure are not
-    dumped and we should not read them. */
-    fread(&(mesh->nlt), sizeof(int), 1, fp);
-    mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
-    for(int i=0; i<mesh->nlt; i++) {
-      #if _ELASTICITY_FT
-      for(int j=0; j<2; j++) {
-        foreach_dimension()
-          fread(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
-      }
-      for(int j=0; j<3; j++) {
-        for(int k=0; k<2; k++) {
-          fread(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
-        }
-      }
-      #endif
-      for(int j=0; j<3; j++)
-        fread(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
-      for(int j=0; j<3; j++)
-        fread(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
-    }
-    mesh->updated_stretches = false;
-    mesh->updated_normals = false;
-    mesh->updated_curvatures = false;
-    mesh->isactive = true; // Super dirty...
-  }
-#else
-  void restore_lagmesh(FILE* fp, lagMesh* mesh) {
-    fread(&(mesh->nlp), sizeof(int), 1, fp);
-    mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
-    for(int i=0; i<mesh->nlp; i++) restore_lagnode(fp, &mesh->nodes[i]);
-    fread(&(mesh->nle), sizeof(int), 1, fp);
-    mesh->edges = malloc(mesh->nle*sizeof(Edge));
-    for(int i=0; i<mesh->nle; i++) restore_edge(fp, &mesh->edges[i]);
-    fread(&(mesh->nlt), sizeof(int), 1, fp);
-    mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
-    for(int i=0; i<mesh->nlt; i++) restore_triangle(fp, &mesh->triangles[i]);
-    foreach_dimension() fread(&(mesh->centroid.x), sizeof(double), 1, fp);
-    int tmp;
-    fread(&(tmp), sizeof(int), 1, fp);
-    mesh->updated_stretches = (tmp == 0) ? false : true;
-    fread(&(tmp), sizeof(int), 1, fp);
-    mesh->updated_normals = (tmp == 0) ? false : true;
-    fread(&(tmp), sizeof(int), 1, fp);
-    mesh->updated_curvatures = (tmp == 0) ? false : true;
-    fread(&(tmp), sizeof(int), 1, fp);
-    mesh->isactive = (tmp == 0) ? false : true;
-  }
-#endif
+void restore_lagmesh(FILE* fp, lagMesh* mesh) {
+  fread(&(mesh->nlp), sizeof(int), 1, fp);
+  mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
+  for(int i=0; i<mesh->nlp; i++) restore_lagnode(fp, &mesh->nodes[i]);
+  fread(&(mesh->nle), sizeof(int), 1, fp);
+  mesh->edges = malloc(mesh->nle*sizeof(Edge));
+  for(int i=0; i<mesh->nle; i++) restore_edge(fp, &mesh->edges[i]);
+  fread(&(mesh->nlt), sizeof(int), 1, fp);
+  mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
+  for(int i=0; i<mesh->nlt; i++) restore_triangle(fp, &mesh->triangles[i]);
+  foreach_dimension() fread(&(mesh->centroid.x), sizeof(double), 1, fp);
+  int tmp;
+  fread(&(tmp), sizeof(int), 1, fp);
+  mesh->updated_stretches = (tmp == 0) ? false : true;
+  fread(&(tmp), sizeof(int), 1, fp);
+  mesh->updated_normals = (tmp == 0) ? false : true;
+  fread(&(tmp), sizeof(int), 1, fp);
+  mesh->updated_curvatures = (tmp == 0) ? false : true;
+  fread(&(tmp), sizeof(int), 1, fp);
+  mesh->isactive = (tmp == 0) ? false : true;
+}
 
 /** If the simulation contains several membranes, we dump and read one mesh at
 a time, but all meshes are stored in the same file. */
