@@ -5034,8 +5034,8 @@ DS_NavierStokes:: assemble_advection_Centered_CutCell(FV_TimeIterator const* t_i
 
 		fsurf = rbVel(comp) * rbVel.operator,(normVec) * RBarea->operator()(p);
 
-		dFV = (CC_vol->operator()(p,0) - CC_vol->operator()(p,1))
-			 * (ValueC - rbVel(comp)) / t_it->time_step();
+		dFV = 0.;//(CC_vol->operator()(p,0) - CC_vol->operator()(p,1))
+			 // * (ValueC - rbVel(comp)) / t_it->time_step();
 	}
 
    return ( coef * ((flux(3) - flux(2)) + (flux(1) - flux(0)) + (flux(5) - flux(4)) - fsurf + dFV) );
