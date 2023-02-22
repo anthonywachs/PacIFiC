@@ -4505,12 +4505,12 @@ DS_NavierStokes::fields_projection()
    UF->translation_projection( 4, 5, 1 ) ;
 	UF->synchronize( 4 ) ;
 
-	doubleVector POut = compute_outOfDomain_Pressure(0);
-   PF->translation_projection( 0, 2, 0, &POut ) ;
+	// doubleVector POut = compute_outOfDomain_Pressure(0);
+   PF->translation_projection( 0, 2, 0);//, &POut ) ;
 	PF->synchronize( 0 );
 
-	POut = compute_outOfDomain_Pressure(1);
-   PF->translation_projection( 1, 2, 1, &POut ) ;
+	// POut = compute_outOfDomain_Pressure(1);
+   PF->translation_projection( 1, 2, 1);//, &POut ) ;
 	PF->synchronize( 1 );
 
 }
