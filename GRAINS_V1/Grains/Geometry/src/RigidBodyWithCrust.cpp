@@ -7,6 +7,7 @@
 #include "GrainsExec.hh"
 #include "Particle.hh"
 #include "BCylinder.hh"
+
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -214,62 +215,61 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
          convexB->getConvexType() == RECTANGLE2D )
       return ( ClosestPointRECTANGLE( *this, neighbor ) );
 
-    // General case
-    if ( isContactCYLINDERS( *this, neighbor ) )
+    // Pre-collision Test
+    if(GrainsExec::m_preCollision_cyl && !isContactCYLINDERS( *this, neighbor ))
+         return ( PointNoContact );
+
+    // Distance between the 2 rigid bodies shrunk by their crust thickness
+    Transform const* a2w = this->getTransformWithCrust();
+    Transform const* b2w = neighbor.getTransformWithCrust();
+    Point3 pointA, pointB;
+    int nbIterGJK = 0;
+    double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w,
+    	                                *b2w, pointA, pointB, nbIterGJK );
+    if ( distance < EPSILON )
     {
-      // Distance between the 2 rigid bodies shrunk by their crust thickness
-      Transform const* a2w = this->getTransformWithCrust();
-      Transform const* b2w = neighbor.getTransformWithCrust();
-      Point3 pointA, pointB;
-      int nbIterGJK = 0;
-      double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w,
-      	                                *b2w, pointA, pointB, nbIterGJK );
-      if ( distance < EPSILON )
-      {
-        cout << "ERR RigidBodyWithCrust::ClosestPoint on Processor "
-        << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
-  	    << endl;
-        throw ContactError();
-      }
-
-      // Points A and B are in their respective local coordinate systems
-      // Thus we transform them into the world coordinate system
-      pointA = (*a2w)( pointA );
-      pointB = (*b2w)( pointB );
-
-      // Comment on the ba vector
-      // pointA is the point realizing the shortest distance in rigid body A
-      // pointB is the point realizing the shortest distance in rigid body B
-      // thus pointA - pointB = ba is directed from B to A
-      Vector3 ba = pointA - pointB;
-
-      // Contact point definition as the mid point between pointA and pointB
-      Point3 contact = pointA / 2.0 + pointB / 2.0;
-
-      // Computation of the actual overlap vector
-      // If contact, crustA + crustB - distance > 0, the overlap vector is
-      // directed from B to A
-      // If no contact, crustA + crustB - distance < 0 and we do not care about
-      // the direction of the overlap vector
-      Vector3 overlap_vector = ba / distance;
-      overlap_vector.round();
-      overlap_vector *= m_crustThickness + neighbor.m_crustThickness - distance;
-
-      // Computation of the actual overlap distance = distance - crustA - crustB
-      // If actual overlap distance < 0 => contact
-      // otherwise no contact
-      distance -= m_crustThickness + neighbor.m_crustThickness;
-
-      return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
+      cout << "ERR RigidBodyWithCrust::ClosestPoint on Processor "
+      << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+	    << endl;
+      throw ContactError();
     }
-  }
 
-  return ( PointNoContact );
+    // Points A and B are in their respective local coordinate systems
+    // Thus we transform them into the world coordinate system
+    pointA = (*a2w)( pointA );
+    pointB = (*b2w)( pointB );
+
+    // Comment on the ba vector
+    // pointA is the point realizing the shortest distance in rigid body A
+    // pointB is the point realizing the shortest distance in rigid body B
+    // thus pointA - pointB = ba is directed from B to A
+    Vector3 ba = pointA - pointB;
+
+    // Contact point definition as the mid point between pointA and pointB
+    Point3 contact = pointA / 2.0 + pointB / 2.0;
+
+    // Computation of the actual overlap vector
+    // If contact, crustA + crustB - distance > 0, the overlap vector is
+    // directed from B to A
+    // If no contact, crustA + crustB - distance < 0 and we do not care about
+    // the direction of the overlap vector
+    Vector3 overlap_vector = ba / distance;
+    overlap_vector.round();
+    overlap_vector *= m_crustThickness + neighbor.m_crustThickness - distance;
+
+    // Computation of the actual overlap distance = distance - crustA - crustB
+    // If actual overlap distance < 0 => contact
+    // otherwise no contact
+    distance -= m_crustThickness + neighbor.m_crustThickness;
+
+    return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
+  }
+  else
+    return ( PointNoContact );
   }
   catch ( const ContactError& ) {
     throw ContactError();
   }
-
 }
 
 

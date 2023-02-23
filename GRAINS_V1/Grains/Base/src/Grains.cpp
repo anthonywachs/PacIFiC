@@ -788,6 +788,19 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
     if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Time integration scheme = " << GrainsExec::m_TIScheme << endl;
 
+    // Bounding cylinders precollision test
+    DOMNode* nPreCollision = ReaderXML::getNode( root, "PreCollision" );
+    if ( nPreCollision )
+      GrainsExec::m_preCollision_cyl =
+        ( ReaderXML::getNodeAttr_String( nPreCollision, "Type" )
+                                                      == "BoundingCylinders" );
+    if ( m_rank == 0 && GrainsExec::m_preCollision_cyl )
+      cout << GrainsExec::m_shift6 <<
+      "Pre-collision Test with bounding cylinders is on." << endl;
+    else if ( m_rank == 0 && !GrainsExec::m_preCollision_cyl )
+      cout << GrainsExec::m_shift6 <<
+      "Pre-collision Test with bounding cylinders is off." << endl;
+
 
     // Restart file and writing mode
     DOMNode* nRestartFile = ReaderXML::getNode( root, "RestartFile" );

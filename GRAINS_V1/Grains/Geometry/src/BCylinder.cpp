@@ -332,13 +332,6 @@ PointContact intersect( BCylinder const& a, BCylinder const& b,
     }
   }
 
-  // // double delta = ptCont.getOverlapDistance();
-  // // if ( -delta > 5.e-4 && counter < 10 )
-  // // {
-  // //   std::cout << delta << " " << counter << '\n';
-  // //   std::cout << e_B2A << " " << x_B2A << " " << e_A2B << " " << x_A2B << '\n';
-  // // }
-
   switch ( counter )
   {
     case 1: case 2: case 4: case 6: case 7: case 9:
@@ -506,7 +499,7 @@ bool isContact( BCylinder const& a, BCylinder const& b,
       }
     }
   }
-
+  
   return ( false );
 }
 
