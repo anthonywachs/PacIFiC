@@ -64,6 +64,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , kai( fromDS.kai_ )
    , AdvectionScheme( fromDS.AdvectionScheme_ )
 	, StencilCorrection( fromDS.StencilCorrection_ )
+	, is_CConlyDivergence ( fromDS.is_CConlyDivergence_ )
 	, FluxRedistThres( fromDS.FluxRedistThres_ )
    , AdvectionTimeAccuracy( fromDS.AdvectionTimeAccuracy_ )
    , rho( fromDS.rho_ )
@@ -1180,7 +1181,7 @@ DS_NavierStokes:: assemble_velocity_diffusion_terms ( )
       }
 
 		// Flux redistribution
-		if (is_solids && (StencilCorrection == "CutCell")) {
+		if (is_solids && (StencilCorrection == "CutCell") && !is_CConlyDivergence) {
 			size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
 			intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
 			for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
@@ -1231,7 +1232,7 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
 
 	double value = 0.;
 
-	if (StencilCorrection == "CutCell") {
+	if ((StencilCorrection == "CutCell") && !is_CConlyDivergence) {
 		value = compute_un_component_FV(comp,i,j,k,dir,level);
 	} else {
 		value = compute_un_component_FD(comp,i,j,k,dir,level);
@@ -3256,7 +3257,7 @@ DS_NavierStokes:: assemble_velocity_advection_terms ( FV_TimeIterator const* t_i
 			}
 		}
 
-		if (is_solids && StencilCorrection == "CutCell") {
+		if (is_solids && StencilCorrection == "CutCell" && !is_CConlyDivergence) {
 			size_t UF_UNK_MAX = UF->nb_local_unknowns();
 			intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
 			// Flux redistribution

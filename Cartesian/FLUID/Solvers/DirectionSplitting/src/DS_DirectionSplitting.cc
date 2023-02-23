@@ -72,6 +72,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , kai( 1. )
    , AdvectionScheme( "TVD" )
    , StencilCorrection( "FD" )
+   , is_CConlyDivergence( false )
    , FluxRedistThres( 0.5 )
    , AdvectionTimeAccuracy( 1 )
    , b_restart( false )
@@ -152,6 +153,9 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
      MAC_Error::object()->raise_bad_data_value( exp,
         "StencilCorrection", error_message );
    }
+
+   if ((StencilCorrection == "CutCell") && (exp->has_entry( "CutCell_Only_Divergence" )))
+     is_CConlyDivergence = exp->bool_data( "CutCell_Only_Divergence" ) ;
 
    if ( exp->has_entry( "FluxRedistributionThreshold" ) )
       FluxRedistThres = exp->double_data( "FluxRedistributionThreshold" );
@@ -331,6 +335,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataNS.kai_ = kai ;
       inputDataNS.AdvectionScheme_ = AdvectionScheme ;
       inputDataNS.StencilCorrection_ = StencilCorrection ;
+      inputDataNS.is_CConlyDivergence_ = is_CConlyDivergence ;
       inputDataNS.FluxRedistThres_ = FluxRedistThres ;
       inputDataNS.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
       inputDataNS.b_restart_ = b_restart ;
