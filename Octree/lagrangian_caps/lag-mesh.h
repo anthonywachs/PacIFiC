@@ -204,6 +204,8 @@ be the case. */
 #define GENERAL_1DIST(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DIST(a,b) : a - b)
 #define PERIODIC_1DAVG(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 + b : a - L0 + b)
 #define GENERAL_1DAVG(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DAVG(a,b) : a + b)
+#define GENERAL_SQNORM(a,b) (sq(GENERAL_1DIST(a.x, b.x)) + \
+  sq(GENERAL_1DIST(a.y, b.y)) + sq(GENERAL_1DIST(a.z, b.z)))
 
 #if dimension < 3
   #define cnorm(a) (sqrt(sq(a.x) + sq(a.y)))
