@@ -191,15 +191,6 @@ void FS_GeneralPolyhedron:: set( istream& in )
   // Set volume
   m_volume = m_mass / m_density ;
 
-  // To avoid intial translation and rotation velocity of RB in case the Particles
-  // from grains are created using random motion
-  m_translational_velocity(0) = 0.;
-  m_translational_velocity(1) = 0.;
-  m_translational_velocity(2) = 0.;
-  m_angular_velocity(0) = 0.;
-  m_angular_velocity(1) = 0.;
-  m_angular_velocity(2) = 0.;
-
   // display(std::cout, 3);
 
   // // Reset the rotation matrix

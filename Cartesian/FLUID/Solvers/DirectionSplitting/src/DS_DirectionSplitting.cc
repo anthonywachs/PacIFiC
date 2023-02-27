@@ -226,6 +226,11 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
         b_particles_as_fixed_obstacles = !is_par_motion;
       }
 
+      // Cases for non-moving rigib bodies but non-zero velocity
+      if (!is_par_motion && exp->has_entry( "Particles_as_fixed_obstacles" ) ) {
+         b_particles_as_fixed_obstacles = exp->bool_data( "Particles_as_fixed_obstacles" );
+      }
+
       // Critical distance
       if ( dom->primary_grid()->is_translation_active() ) {
         if ( exp->has_entry( "Critical_Distance_Translation" ) )
