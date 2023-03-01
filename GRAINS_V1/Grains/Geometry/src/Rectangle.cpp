@@ -290,8 +290,10 @@ bool Rectangle::isRectangle() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a point lies in the rectangle
+// Returns whether a point lies in the rectangle
 bool Rectangle::isIn( Point3 const& pt ) const
 {
-  return ( true );
+  return ( fabs( pt[Z] ) < EPSILON &&
+           fabs( pt[Y] ) < m_LY/2. &&
+           fabs( pt[X] ) < m_LX/2. );
 }

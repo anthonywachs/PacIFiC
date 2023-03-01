@@ -811,13 +811,15 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     if ( ( rNorm * (pointA - *rPt) ) * ( rNorm * (cPt - *rPt) ) < 0. )
     {
       Point3 pointB = pointA - ( rNorm * pointA ) * rNorm;
-      // if ( Rectangle::isIn( pointB ) )
+      // The projection point lies in the rectangle?
+      if ( convexA->isIn( pointB * a2w->getBasis() ) )
+      {
+        Point3 contact = pointA / 2.0 + pointB / 2.0;
+        Vector3 overlap_vector = pointA - pointB;
+        overlap = -Norm( overlap_vector );
 
-      Point3 contact = pointA / 2.0 + pointB / 2.0;
-      Vector3 overlap_vector = pointA - pointB;
-      overlap = -Norm( overlap_vector );
-
-      return ( PointContact( contact, overlap_vector, overlap, 0 ) );
+        return ( PointContact( contact, overlap_vector, overlap, 0 ) );
+      }
     }
   }
   else
@@ -832,15 +834,18 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     if ( ( rNorm * (pointA - *rPt) ) * ( rNorm * (cPt - *rPt) ) < 0. )
     {
       Point3 pointB = ( ( *rPt - pointA ) * rNorm ) * rNorm + pointA;
-      // if ( Rectangle::isIn( pointB ) )
+      // The projection point lies in the rectangle?
+      if ( convexB->isIn( pointB * b2w->getBasis() ) )
+      {
+        Point3 contact = pointA / 2.0 + pointB / 2.0;
+        Vector3 overlap_vector = pointB - pointA;
+        overlap = -Norm( overlap_vector );
 
-      Point3 contact = pointA / 2.0 + pointB / 2.0;
-      Vector3 overlap_vector = pointB - pointA;
-      overlap = -Norm( overlap_vector );
-
-      return ( PointContact( contact, overlap_vector, overlap, 0 ) );
+        return ( PointContact( contact, overlap_vector, overlap, 0 ) );
+      }
     }
   }
+
   return ( PointNoContact );
   }
   catch ( const ContactError& ) {
