@@ -812,7 +812,7 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     {
       Point3 pointB = pointA - ( rNorm * pointA ) * rNorm;
       // The projection point lies in the rectangle?
-      if ( convexA->isIn( pointB * a2w->getBasis() ) )
+      // if ( convexA->isIn( pointB * a2w->getBasis() ) )
       {
         Point3 contact = pointA / 2.0 + pointB / 2.0;
         Vector3 overlap_vector = pointA - pointB;
@@ -835,7 +835,7 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     {
       Point3 pointB = ( ( *rPt - pointA ) * rNorm ) * rNorm + pointA;
       // The projection point lies in the rectangle?
-      if ( convexB->isIn( pointB * b2w->getBasis() ) )
+      // if ( convexB->isIn( pointB * b2w->getBasis() ) )
       {
         Point3 contact = pointA / 2.0 + pointB / 2.0;
         Vector3 overlap_vector = pointB - pointA;

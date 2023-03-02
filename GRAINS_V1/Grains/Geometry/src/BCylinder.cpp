@@ -437,32 +437,34 @@ bool isContact( BCylinder const& a, BCylinder const& b,
   {
     Point3 c1 = x_B2A + .5 * hB * e_B2A;
     Point3 c2 = x_B2A - .5 * hB * e_B2A;
-    double d1 = pow( sqrt( normXY( c1 ) ) - rA, 2 ) +
-                pow( fabs( c1[Z] ) - .5 * hA, 2 );
-    double d2 = pow( sqrt( normXY( c2 ) ) - rA, 2 ) +
-                pow( fabs( c2[Z] ) - .5 * hA, 2 );
-    Point3 const& ptCenter = d2 < d1 ? c2 : c1; // decide on edge of B
+    Point3 const& ptCenter = normXY( c1 ) < normXY( c2 ) ? c1 : c2;
 
-    // Misc variables
-    double const p = rB * rB * ( normXY( v1 ) - normXY( u1 ) ) / 2.;
-    double const q = rB * dotXY( ptCenter, u1 ) / p;
-    double const r = rB * dotXY( ptCenter, v1 ) / p;
-    double const s = ( rA*rA - normXY( ptCenter ) - rB*rB*normXY( u1 ) ) / p;
-
-    double sint[4];
-    int nbRoots;
-    solveQuartic( 2.*r, q*q + r*r - s, -r*s, s*s/4. - q*q, sint, nbRoots );
-
-    Point3 ptA;
-    double cost;
-    for ( int i = 0; i < nbRoots; i++ )
+    // additional condition to avoid solving the polynomial
+    if ( ( fabs( ptCenter[Z] ) < 0.5 * hA + rB ) &&
+         ( fabs( sqrt( normXY( ptCenter ) ) - rA ) < rB ) )
     {
-      if ( fabs( sint[i] ) <= 1 )
+      // Misc variables
+      double const p = rB * ( normXY( v1 ) - normXY( u1 ) );
+      double const q = dotXY( u1, ptCenter ) / p;
+      double const r = dotXY( ptCenter, v1 ) / p;
+
+      double sint[4];
+      int nbRoots = 0;
+      solveQuartic( 2.*r, q*q + r*r - 1., -2.*r, -r*r, sint, nbRoots );
+
+      Point3 ptA;
+      double cost;
+      for ( int i = 0; i < nbRoots; i++ )
       {
-        cost = ( s/2. - r*sint[i] - sint[i]*sint[i] ) / q;
-        ptA = ptCenter + rB * cost * u1 + rB * sint[i] * v1;
-        if ( fabs( ptA[Z] ) < .5 * hA )
-          return ( true );
+        if ( fabs( sint[i] ) <= 1. )
+        {
+          cost = ( q * sint[i] ) / ( r + sint[i] );
+          if ( fabs( cost ) > 1. )
+            cost = sgn( cost ) * sqrt( 1. - sint[i]*sint[i] );
+          ptA = ptCenter + rB * cost * u1 + rB * sint[i] * v1;
+          if ( normXY( ptA ) < rA * rA && fabs( ptA[Z] ) < .5 * hA )
+            return ( true );
+        }
       }
     }
   }
@@ -470,36 +472,74 @@ bool isContact( BCylinder const& a, BCylinder const& b,
   {
     Point3 c1 = x_A2B + .5 * hA * e_A2B;
     Point3 c2 = x_A2B - .5 * hA * e_A2B;
-    double d1 = pow( sqrt( normXY( c1 ) ) - rB, 2 ) +
-                pow( fabs( c1[Z] ) - .5 * hB, 2 );
-    double d2 = pow( sqrt( normXY( c2 ) ) - rB, 2 ) +
-                pow( fabs( c2[Z] ) - .5 * hB, 2 );
-    Point3 const& ptCenter = d2 < d1 ? c2 : c1; // decide on edge of A
+    Point3 const& ptCenter = normXY( c1 ) < normXY( c2 ) ? c1 : c2;
 
-    // Misc variables
-    double const p = rA * rA * ( normXY( v2 ) - normXY( u2 ) ) / 2.;
-    double const q = rA * dotXY( ptCenter, u2 ) / p;
-    double const r = rA * dotXY( ptCenter, v2 ) / p;
-    double const s = ( rB*rB - normXY( ptCenter ) - rA*rA*normXY( u2 ) ) / p;
-
-    double sint[4];
-    int nbRoots;
-    solveQuartic( 2.*r, q*q + r*r - s, -r*s, s*s/4. - q*q, sint, nbRoots );
-
-    Point3 ptA;
-    double cost;
-    for ( int i = 0; i < nbRoots; i++ )
+    // additional condition to avoid solving the polynomial
+    if ( ( fabs( ptCenter[Z] ) < 0.5 * hB + rA ) &&
+         ( fabs( sqrt( normXY( ptCenter ) ) - rB ) < rA ) )
     {
-      if ( fabs( sint[i] ) <= 1 )
+      // Misc variables
+      double const p = rA * ( normXY( v2 ) - normXY( u2 ) );
+      double const q = dotXY( u2, ptCenter ) / p;
+      double const r = dotXY( ptCenter, v2 ) / p;
+
+      double sint[4];
+      int nbRoots = 0;
+      solveQuartic( 2.*r, q*q + r*r - 1., -2.*r, -r*r, sint, nbRoots );
+
+      Point3 ptA;
+      double cost;
+      for ( int i = 0; i < nbRoots; i++ )
       {
-        cost = ( s/2. - r*sint[i] - sint[i]*sint[i] ) / q;
-        ptA = ptCenter + rA * cost * u2 + rA * sint[i] * v2;
-        if ( fabs( ptA[Z] ) < .5 * hB )
-          return ( true );
+        if ( fabs( sint[i] ) <= 1. )
+        {
+          cost = ( q * sint[i] ) / ( r + sint[i] );
+          if ( fabs( cost ) > 1. )
+            cost = sgn( cost ) * sqrt( 1. - sint[i]*sint[i] );
+          ptA = ptCenter + rA * cost * u2 + rA * sint[i] * v2;
+          if ( normXY( ptA ) < rB * rB && fabs( ptA[Z] ) < .5 * hB )
+            return ( true );
+        }
       }
     }
   }
-  
+  // Edge-Edge
+  {
+    Point3 c1 = x_B2A + .5 * hB * e_B2A;
+    Point3 c2 = x_B2A - .5 * hB * e_B2A;
+    double d1 = pow( sqrt( normXY( c1 ) ) - rA, 2 ) +
+                pow( fabs( c1[Z] ) - .5 * hA, 2 );
+    double d2 = pow( sqrt( normXY( c2 ) ) - rA, 2 ) +
+                pow( fabs( c2[Z] ) - .5 * hA, 2 );
+    Point3 const& ptCenter = d1 < d2 ? c1 : c2; // decide on edge of B
+
+    if ( ( d1 < d2 ? d1 : d2 ) <= rB * rB )
+    {
+      // Misc variables
+      double const p = rB * rB * ( normXY( v1 ) - normXY( u1 ) ) / 2.;
+      double const q = rB * dotXY( ptCenter, u1 ) / p;
+      double const r = rB * dotXY( ptCenter, v1 ) / p;
+      double const s = ( rA*rA - normXY( ptCenter ) - rB*rB*normXY( u1 ) ) / p;
+
+      double sint[4];
+      int nbRoots;
+      solveQuartic( 2.*r, q*q + r*r - s, -r*s, s*s/4. - q*q, sint, nbRoots );
+
+      Point3 ptA;
+      double cost;
+      for ( int i = 0; i < nbRoots; i++ )
+      {
+        if ( fabs( sint[i] ) <= 1 )
+        {
+          cost = ( s/2. - r*sint[i] - sint[i]*sint[i] ) / q;
+          ptA = ptCenter + rB * cost * u1 + rB * sint[i] * v1;
+          if ( fabs( ptA[Z] ) < .5 * hA )
+          return ( true );
+        }
+      }
+    }
+  }
+
   return ( false );
 }
 
@@ -720,7 +760,7 @@ void B2BSkewContact( double rA, double hA, double rB, double hB,
 // Returns the contact point of two cylinders in the world of the first cylinder
 // if the contact is Band-Edge
 void B2EContact( double rA, double hA, double rB, double hB,
-                        Vector3 const& e, Point3 const& x, PointContact& ptCont )
+                 Vector3 const& e, Point3 const& x, PointContact& ptCont )
 {
   // Contact happens if
   bool contCond = false; // TRUE if contact occurs in this scenario
@@ -728,6 +768,10 @@ void B2EContact( double rA, double hA, double rB, double hB,
   Point3 const& c1 = x + .5 * hB * e;
   Point3 const& c2 = x - .5 * hB * e;
   Point3 const& ptCenter = normXY( c1 ) < normXY( c2 ) ? c1 : c2;
+  // additional condition to avoid solving the polynomial
+  if ( ( fabs( ptCenter[Z] ) > 0.5 * hA + rB ) ||
+       ( fabs( sqrt( normXY( ptCenter ) ) - rA ) > rB ) )
+    return;
 
   // Vector3 const& u = ( e ^ Vector3( 0., 0., 1. ) ).normalized();
   Vector3 const& u = ( Vector3( e[Y], -e[X], 0. ) ).normalized();
@@ -804,6 +848,9 @@ void E2EContact( double rA, double hA, double rB, double hB,
   double d_b = pow( sqrt( normXY( c_b ) ) - rA, 2 ) +
                pow( fabs( c_b[Z] ) - .5 * hA, 2 );
   Point3 const& ptCenter1 = d_b < d_t ? c_b : c_t; // decide on edge of B
+  // additional condition to avoid solving the polynomial
+  if ( d_t > rB * rB && d_b > rB * rB )
+    return;
 
   // Vector3 const& u1 = ( e1 ^ Vector3( 0., 0., 1. ) ).normalized();
   Vector3 const& u1 = ( Vector3( e[Y], -e[X], 0. ) ).normalized();

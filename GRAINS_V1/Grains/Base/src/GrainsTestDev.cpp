@@ -130,7 +130,7 @@ void GrainsTestDev::Simulation( double time_interval )
     { cos(aZ)*cos(aY), cos(aZ)*sin(aY)*sin(aX) - sin(aZ)*cos(aX), cos(aZ)*sin(aY)*cos(aX) + sin(aZ)*sin(aX),
       sin(aZ)*cos(aY), sin(aZ)*sin(aY)*sin(aX) + cos(aZ)*cos(aX), sin(aZ)*sin(aY)*cos(aX) - cos(aZ)*sin(aX),
       -sin(aY), cos(aY)*sin(aX), cos(aY)*cos(aX),
-      0., 3., 3.};
+      0., 0., 2.5};
     Transform const* trB = new Transform( BBB );
 
 
