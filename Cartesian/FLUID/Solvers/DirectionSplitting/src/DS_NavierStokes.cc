@@ -3391,7 +3391,7 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 		size_t_array2D* void_frac = (is_solids) ? allrigidbodies->get_void_fraction_on_grid(FF) : 0;
 
 		// Flux redistribution
-		if ((StencilCorrection == "CutCell") && (FF == UF)) {
+		if ((StencilCorrection == "CutCell")) {// && (FF == UF)) {
 			for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
 				for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
 					for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
@@ -3450,8 +3450,10 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 					double dz = (dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1.;
 					size_t p = FF->DOF_local_number(i, j, k, comp);
 					double volume = dx * dy * dz;
-					if (is_solids && (FF == UF) && (StencilCorrection == "CutCell")
-					 && (CC_vol->operator()(p,0) >= FluxRedistThres*volume)) {
+					// if (is_solids && (FF == UF) && (StencilCorrection == "CutCell")
+					//  && (CC_vol->operator()(p,0) >= FluxRedistThres*volume)) {
+					if (is_solids && (StencilCorrection == "CutCell")
+ 					 && (CC_vol->operator()(p,0) >= FluxRedistThres*volume)) {
 					 	volume = CC_vol->operator()(p,0);
 					}
 					// if (is_solids && (void_frac->operator()(p) == 0) && (StencilCorrection == "CutCell"))
