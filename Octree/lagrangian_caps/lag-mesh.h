@@ -439,6 +439,7 @@ void correct_lag_pos(lagMesh* mesh) {
     foreach_dimension() {
       if (on_face(mesh->nodes[i].pos.x, N, L0))
         mesh->nodes[i].pos.x += 1.e-10;
+      //FIXME: the nodes should not be sent to the other side of the domain if the boundary is not periodic...
       if (mesh->nodes[i].pos.x > origin.x + L0/2)
         mesh->nodes[i].pos.x -= L0;
       else if (mesh->nodes[i].pos.x < origin.x - L0/2)

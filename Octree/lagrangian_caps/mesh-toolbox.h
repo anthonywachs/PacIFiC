@@ -493,15 +493,6 @@ void activate_membrane(lagMesh* mesh) {
   initialize_membrane_stencils(mesh);
 }
 
-void initialize_zero_stress(lagMesh* mesh) {
-  #if _ELASTICITY_FT
-    store_initial_configuration(mesh);
-  #endif
-  #if _BENDING_FT
-    initialize_refcurv_onecaps(mesh);
-  #endif
-}
-
 /**
 ## Output
 The functions below write/read the lagrangian mesh to/from a file in order
