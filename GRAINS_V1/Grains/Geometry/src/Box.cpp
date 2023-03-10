@@ -962,7 +962,7 @@ bool Box::isIn( Point3 const& pt ) const
 
 // ----------------------------------------------------------------------------
 // Returns the bounding cylinder to box
-BCylinder Box::getBCylinder() const
+BCylinder Box::bcylinder() const
 {
   double a[2];
   int axis = ( a[X] = fabs( m_extent[X] ) ) < ( a[Y] = fabs( m_extent[Y] ) )

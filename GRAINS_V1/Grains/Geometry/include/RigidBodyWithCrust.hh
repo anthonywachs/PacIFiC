@@ -214,8 +214,7 @@ are cylinders
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
 PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
-  RigidBodyWithCrust const& rbB )
-  throw(ContactError);
+  RigidBodyWithCrust const& rbB );
 
 /** @brief Returns whether there is a contact between the circumscribed
 cylinders of two rigid bodies
@@ -229,7 +228,6 @@ a rectangle
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
 PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA ,
-  RigidBodyWithCrust const& rbB )
-  throw(ContactError);
+  RigidBodyWithCrust const& rbB );
 
 #endif

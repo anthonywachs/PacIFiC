@@ -65,7 +65,7 @@ class Convex : public Shape
 
     /** @brief Returns the convex shape bounding box
     @param t geometric transformation */
-    virtual BCylinder getBCylinder() const;
+    virtual BCylinder bcylinder() const;
 
     /** @brief Convex support function, returns the support point P, i.e. the
     point on the surface of the convex shape that satisfies max(P.v)

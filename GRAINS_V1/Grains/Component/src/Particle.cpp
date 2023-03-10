@@ -379,7 +379,7 @@ void Particle::Move( double time, double dt )
 void Particle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
 {
-  try{
+  try {
   PointContact closestPoint;
   double delta=0.;
 
@@ -471,6 +471,7 @@ void Particle::SearchContact( Component* voisin, double dt,
     result->p1 = voisin;
     listContact.push_back( result );
   }
+
   }
   catch (const ContactError&) {
     throw ContactError();

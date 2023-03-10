@@ -140,7 +140,7 @@ class Box : public Convex
     there is contact and returns the origin as contact point */
     Point3 IntersectionPointSPHERE( Point3 const& SphereCenter,
   	double const& SphereRadius, double& overlap,
-	  bool warningSphereCenterInBox = true ) const;    
+	  bool warningSphereCenterInBox = true ) const;
 
     /** @brief Same as IntersectionPointSPHERE except that it returns a non zero
     normal distance only for a configuration sphere-face (i.e. returns zero with
@@ -152,14 +152,14 @@ class Box : public Convex
     */
     Point3 ProjectedPointSPHERE( Point3 const& SphereCenter,
   	double const& SphereRadius,
-	double& gap ) const;
+	  double& gap ) const;
 
     /** @ brief Returns whether a point lies inside the box
     @param pt point */
     bool isIn( Point3 const& pt ) const;
 
     /** @ Returns the bounding cylinder to box */
-    BCylinder getBCylinder() const;
+    BCylinder bcylinder() const;
     //@}
 
 
@@ -201,8 +201,8 @@ class Box : public Convex
     */
     Point3 ContactCornerSPHERE( Point3 const& SphereCenter,
   	double const& SphereRadius,
-	int cornerNumber,
-	double& overlap ) const;
+	  int cornerNumber,
+	  double& overlap ) const;
 
     /** @brief Returns the contact point in the box reference frame and the
     overlapping distance between a sphere and a box edge. If no contact,
@@ -216,9 +216,9 @@ class Box : public Convex
     */
     Point3 ContactEdgeSPHERE( Point3 const& SphereCenter,
   	double const& SphereRadius,
-	int cornerNumber,
-	int projectionDirection,
-	double& overlap ) const;
+	  int cornerNumber,
+    int projectionDirection,
+	  double& overlap ) const;
     //@}
 };
 

@@ -127,6 +127,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
     	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmax )
 	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmean )
 	<< endl;
+  fVitMax.close();
 
   // Display memory used by Grains
   display_used_memory();
@@ -787,6 +788,19 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
     if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Time integration scheme = " << GrainsExec::m_TIScheme << endl;
 
+    // Bounding cylinders precollision test
+    DOMNode* nPreCollision = ReaderXML::getNode( root, "PreCollision" );
+    if ( nPreCollision )
+      GrainsExec::m_preCollision_cyl =
+        ( ReaderXML::getNodeAttr_String( nPreCollision, "Type" )
+                                                      == "BoundingCylinders" );
+    if ( m_rank == 0 && GrainsExec::m_preCollision_cyl )
+      cout << GrainsExec::m_shift6 <<
+      "Pre-collision Test with bounding cylinders is on." << endl;
+    else if ( m_rank == 0 && !GrainsExec::m_preCollision_cyl )
+      cout << GrainsExec::m_shift6 <<
+      "Pre-collision Test with bounding cylinders is off." << endl;
+
 
     // Restart file and writing mode
     DOMNode* nRestartFile = ReaderXML::getNode( root, "RestartFile" );
@@ -1053,31 +1067,30 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  {
 	    // Random particle positions from a collection of insertion windows
 	    DOMNode* nWindows = ReaderXML::getNode( nPosition, "Windows" );
-            if ( nWindows )
+      if ( nWindows )
 	    {
 	      cout << GrainsExec::m_shift9 << "Insertion windows" << endl;
 	      DOMNodeList* allWindows = ReaderXML::getNodes( nWindows );
-              for (XMLSize_t i=0; i<allWindows->getLength(); i++)
+        for (XMLSize_t i=0; i<allWindows->getLength(); i++)
 	      {
 	        DOMNode* nWindow = allWindows->item( i );
-                Window iwindow;
-		readWindow( nWindow, iwindow, GrainsExec::m_shift12 );
-	        m_insertion_windows.insert( m_insertion_windows.begin(),
-	      		iwindow );
-              }
+          Window iwindow;
+		      readWindow( nWindow, iwindow, GrainsExec::m_shift12 );
+	        m_insertion_windows.insert( m_insertion_windows.begin(), iwindow );
+        }
 	    }
-            else
+      else
 	    {
-              if ( m_insertion_mode != IM_NOINSERT )
-              {
-                if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
-			"Insertion positions or windows are mandatory !!"
-			<< endl;
-                grainsAbort();
-              }
+        if ( m_insertion_mode != IM_NOINSERT )
+        {
+          if ( m_rank == 0 )
+            cout << GrainsExec::m_shift6 <<
+            "Insertion positions or windows are mandatory !!" << endl;
+          grainsAbort();
+        }
 	    }
 	  }
-        }
+  }
       }
       else
       {

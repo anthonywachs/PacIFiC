@@ -360,7 +360,7 @@ bool Cylinder::isIn( Point3 const& pt ) const
 
 // ----------------------------------------------------------------------------
 // Returns the bounding cylinder to cylinder
-BCylinder Cylinder::getBCylinder() const
+BCylinder Cylinder::bcylinder() const
 {
   Vector3 e = Vector3( 0., 1., 0. );
   return( BCylinder( m_radius, 2*m_halfHeight, e ) );

@@ -9,9 +9,10 @@
 
 // ----------------------------------------------------------------------------
 // Default constructor
-RigidBody::RigidBody() 
+RigidBody::RigidBody()
   : m_convex( NULL )
   , m_circumscribedRadius( 0.0 )
+  , m_cylinder( BCylinder() )
 {}
 
 
@@ -19,7 +20,7 @@ RigidBody::RigidBody()
 
 // ----------------------------------------------------------------------------
 // Constructor with a convex and a transformation as input parameters
-RigidBody::RigidBody( Convex* convex_, Transform const& position_ ) 
+RigidBody::RigidBody( Convex* convex_, Transform const& position_ )
   : m_transform( position_ )
   , m_convex( convex_ )
 {
@@ -31,10 +32,11 @@ RigidBody::RigidBody( Convex* convex_, Transform const& position_ )
 
 // ----------------------------------------------------------------------------
 // Copy constructor
-RigidBody::RigidBody( RigidBody const& form ) 
+RigidBody::RigidBody( RigidBody const& form )
   : m_transform( form.m_transform )
   , m_convex( NULL )
   , m_circumscribedRadius( form.m_circumscribedRadius )
+  , m_cylinder( form.m_cylinder )
 {
   if ( form.m_convex ) m_convex = form.m_convex->clone();
 }
@@ -54,7 +56,7 @@ RigidBody::~RigidBody()
 
 // ----------------------------------------------------------------------------
 // Returns the bounding box of the rigid body in its current configuration
-BBox RigidBody::BoxRigidBody() const 
+BBox RigidBody::BoxRigidBody() const
 {
   return ( m_convex->bbox( m_transform ) );
 }
@@ -75,14 +77,14 @@ bool RigidBody::BuildInertia( double *inertia, double *inertia_1 ) const
 	inertia_1[1], inertia_1[3], inertia_1[4],
 	inertia_1[2], inertia_1[4], inertia_1[5] );
 
-  // Using mr = m_transform.getBasis() is wrong, as the angular position 
-  // of the particle is tracked from its reference non-rotated position and 
+  // Using mr = m_transform.getBasis() is wrong, as the angular position
+  // of the particle is tracked from its reference non-rotated position and
   // the rotation matrix m_transform.getBasis() accounts for the complete
   // rotation from the reference position
   //   Matrix mr = m_transform.getBasis();
-  // We must use mr = identity and compute the inertia tensor in the 
-  // reference non-rotated position. Indeed this function is only called at 
-  // the initial time, so the moment of inertia tensor must be in the reference 
+  // We must use mr = identity and compute the inertia tensor in the
+  // reference non-rotated position. Indeed this function is only called at
+  // the initial time, so the moment of inertia tensor must be in the reference
   // non-rotated position of the rigid body
   // Consequently most of the operations done in this method are unnecessary
   // but I (Anthony) leave them here for now just in case I made a mistake
@@ -112,11 +114,11 @@ bool RigidBody::BuildInertia( double *inertia, double *inertia_1 ) const
 
 // ----------------------------------------------------------------------------
 // Returns the distance to another rigid body
-double RigidBody::DistanceTo( RigidBody const& neighbor ) const 
+double RigidBody::DistanceTo( RigidBody const& neighbor ) const
 {
   Point3 A, B;
   int nbIter;
-  return ( closest_points( *m_convex, *neighbor.m_convex, m_transform, 
+  return ( closest_points( *m_convex, *neighbor.m_convex, m_transform,
   	neighbor.m_transform, A, B, nbIter ) );
 }
 
@@ -134,10 +136,10 @@ Point3 const* RigidBody::getCentre() const
 
 
 // ----------------------------------------------------------------------------
-// Copies the rigid body' center of mass position in a 3-element 1D array 
+// Copies the rigid body' center of mass position in a 3-element 1D array
 void RigidBody::getCentre( double *pos ) const
 {
-  Point3 const* ori = m_transform.getOrigin() ;  
+  Point3 const* ori = m_transform.getOrigin() ;
   pos[X] =  (*ori)[X];
   pos[Y] =  (*ori)[Y];
   pos[Z] =  (*ori)[Z];
@@ -197,12 +199,22 @@ double RigidBody::getVolume() const
 
 
 // ----------------------------------------------------------------------------
-// Returns whether 2 rigid bodies intersect 
+// Returns the rigid body bounding cylinder
+BCylinder RigidBody::getBCylinder() const
+{
+  return ( m_convex->bcylinder() );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether 2 rigid bodies intersect
 bool intersect( RigidBody const& a, RigidBody const& b )
 {
   Vector3 v = *(b.m_transform.getOrigin()) - *(a.m_transform.getOrigin());
-  if ( Norm(v) < EPSILON ) return true;  
-  return ( intersect( *a.m_convex, *b.m_convex, a.m_transform, b.m_transform, 
+  if ( Norm(v) < EPSILON ) return true;
+  return ( intersect( *a.m_convex, *b.m_convex, a.m_transform, b.m_transform,
   	v ) );
 }
 
@@ -211,16 +223,16 @@ bool intersect( RigidBody const& a, RigidBody const& b )
 
 // ----------------------------------------------------------------------------
 // Returns whether there is geometric contact with another rigid body
-bool RigidBody::isContact( RigidBody const& neighbor ) const 
+bool RigidBody::isContact( RigidBody const& neighbor ) const
 {
   bool contact;
 
   Vector3 v = *(neighbor.m_transform.getOrigin()) - *(m_transform.getOrigin());
-  
+
   if ( Norm(v) < EPSILON ) return true;
-  
-  contact = intersect( *m_convex, *(neighbor.m_convex), 
-	m_transform, neighbor.m_transform, v );    
+
+  contact = intersect( *m_convex, *(neighbor.m_convex),
+	m_transform, neighbor.m_transform, v );
 
   return ( contact );
 }
@@ -246,7 +258,7 @@ bool RigidBody::isClose( RigidBody const& neighbor ) const
 
 // ----------------------------------------------------------------------------
 // Applies a rotation defined by a quaternion to the rigid body
-void RigidBody::Rotate( Quaternion const& q ) 
+void RigidBody::Rotate( Quaternion const& q )
 {
   m_transform.composeLeftByRotation( q );
 }
@@ -256,7 +268,7 @@ void RigidBody::Rotate( Quaternion const& q )
 
 // ----------------------------------------------------------------------------
 // Sets the origin of the rigid body's transformation
-void RigidBody::setOrigin( double const* pos ) 
+void RigidBody::setOrigin( double const* pos )
 {
   m_transform.setOrigin( pos );
 }
@@ -266,7 +278,7 @@ void RigidBody::setOrigin( double const* pos )
 
 // ----------------------------------------------------------------------------
 // Sets the origin of the rigid body's transformation
-void RigidBody::setOrigin( double gx, double gy, double gz ) 
+void RigidBody::setOrigin( double gx, double gy, double gz )
 {
   m_transform.setOrigin( gx, gy, gz );
 }
@@ -276,7 +288,7 @@ void RigidBody::setOrigin( double gx, double gy, double gz )
 
 // ----------------------------------------------------------------------------
 // Sets the origin of the rigid body's transformation
-void RigidBody::setOrigin( Point3 const& pos ) 
+void RigidBody::setOrigin( Point3 const& pos )
 {
   m_transform.setOrigin( pos[X], pos[Y], pos[Z] );
 }
@@ -285,9 +297,9 @@ void RigidBody::setOrigin( Point3 const& pos )
 
 
 // ----------------------------------------------------------------------------
-// Sets the rigid body's transformation with an 1D array of 12 
+// Sets the rigid body's transformation with an 1D array of 12
 // values (see class Transform for details)
-void RigidBody::setTransform( double const* pos ) 
+void RigidBody::setTransform( double const* pos )
 {
   m_transform.setValue( pos );
 }
@@ -297,7 +309,7 @@ void RigidBody::setTransform( double const* pos )
 
 // ----------------------------------------------------------------------------
 // Sets the rigid body's circumscribed radius
-void RigidBody::setCircumscribedRadius( double r ) 
+void RigidBody::setCircumscribedRadius( double r )
 {
   m_circumscribedRadius = r;
 }
@@ -316,46 +328,46 @@ void RigidBody::setTransform( Transform const& transform_ )
 
 
 // ----------------------------------------------------------------------------
-// Applies a transformation trot to the right, i.e., this = this o trot 
+// Applies a transformation trot to the right, i.e., this = this o trot
 void RigidBody::composeRightByTransform( Transform const& trot )
 {
   m_transform.composeRightByTransform( trot );
-}  
+}
 
 
 
 
 // ----------------------------------------------------------------------------
-// Applies a transformation trot to the left, i.e., this = trot o 
+// Applies a transformation trot to the left, i.e., this = trot o
 // this, which means first this then trot
 void RigidBody::composeLeftByTransform( Transform const& trot )
 {
   m_transform.composeLeftByTransform( trot );
-} 
+}
 
 
 
 
 // ----------------------------------------------------------------------------
-// Applies a rotation defined by a transformation trot to the left, 
+// Applies a rotation defined by a transformation trot to the left,
 // i.e., this = trot o this, which means first this then trot. This composition
-// leaves the origin unchanged but does not check that trot is indeed a 
+// leaves the origin unchanged but does not check that trot is indeed a
 // rotation
 void RigidBody::composeLeftByRotation( Transform const& trot )
 {
   m_transform.composeLeftByRotation( trot );
-} 
+}
 
 
 
 
 // ----------------------------------------------------------------------------
-// Applies a translation to the left, i.e., this = translation o this, which 
-// means first this then translation. 
+// Applies a translation to the left, i.e., this = translation o this, which
+// means first this then translation.
 void RigidBody::composeLeftByTranslation( Vector3 const& v )
 {
   m_transform.composeLeftByTranslation( v );
-} 
+}
 
 
 
@@ -373,7 +385,7 @@ void RigidBody::readPosition( istream& fileIn )
 
 // ----------------------------------------------------------------------------
 // Reads the rigid body's transformation from an input stream with
-// the 2014 reload format 
+// the 2014 reload format
 void RigidBody::readPosition2014( istream& fileIn )
 {
   m_transform.readTransform2014( fileIn );
@@ -384,7 +396,7 @@ void RigidBody::readPosition2014( istream& fileIn )
 
 
 // ----------------------------------------------------------------------------
-// Reads the rigid body's transformation in binary format from an 
+// Reads the rigid body's transformation in binary format from an
 // input stream with the 2014 reload format
 void RigidBody::readPosition2014_binary( istream& fileIn )
 {
@@ -399,7 +411,7 @@ void RigidBody::readPosition2014_binary( istream& fileIn )
 // Writes the rigid body's transformation in an output stream
 void RigidBody::writePosition( ostream& fileOut ) const
 {
-  m_transform.writeTransform( fileOut ); 
+  m_transform.writeTransform( fileOut );
 }
 
 
@@ -418,44 +430,44 @@ void RigidBody::writeStatic( ostream& fileOut ) const
 
 // ----------------------------------------------------------------------------
 // Writes the geometric features of the rigid body in its current
-// position in an output stream in a format suitable to the coupling with a 
-// fluid solver. Note: this method works for discs, polygons, polyhedrons, 
+// position in an output stream in a format suitable to the coupling with a
+// fluid solver. Note: this method works for discs, polygons, polyhedrons,
 // spheres and 3D cylinders
 void RigidBody::writePositionInFluid( ostream& fluid )
 {
   Point3 pointEnvelop;
   vector<Point3> allPoints = m_convex->getEnvelope();
   vector<Point3>::iterator point;
-  
+
   fluid << " " << allPoints.size() << endl;
 
   // 2D case
   if ( GrainsBuilderFactory::getContext() == DIM_2 )
   {
     // Points describing the shape
-    for (point=allPoints.begin(); point!=allPoints.end(); point++) 
+    for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
       pointEnvelop = m_transform(*point);
       fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[X] ) << " " << 
+		pointEnvelop[X] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Y] ) << endl;     
+		pointEnvelop[Y] ) << endl;
     }
   }
-  
-  // 3D case 
+
+  // 3D case
   else if ( GrainsBuilderFactory::getContext() == DIM_3 )
   {
     // Points describing the shape
-    for (point=allPoints.begin(); point!=allPoints.end(); point++) 
+    for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
       pointEnvelop = m_transform(*point);
       fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[X] ) << " " <<  
+		pointEnvelop[X] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Y] ) << " " <<  
+		pointEnvelop[Y] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Z] ) << endl; 
+		pointEnvelop[Z] ) << endl;
     }
 
     // Faces describing the shape
@@ -464,7 +476,7 @@ void RigidBody::writePositionInFluid( ostream& fluid )
     if ( allFaces )
     {
       fluid << allFaces->size() << endl;
-      for (face=allFaces->begin(); face!=allFaces->end(); face++) 
+      for (face=allFaces->begin(); face!=allFaces->end(); face++)
       {
         vector<int>::const_iterator index;
         fluid << (*face).size() << " ";
@@ -473,13 +485,13 @@ void RigidBody::writePositionInFluid( ostream& fluid )
         fluid << endl;
       }
     }
-    else fluid << "0" << endl;  
+    else fluid << "0" << endl;
   }
-  
+
   // Problem with dimension
   else
   {
-    cout << "!!! Warning: Physical dimension undefined (DIM_2 or DIM_3)" 
+    cout << "!!! Warning: Physical dimension undefined (DIM_2 or DIM_3)"
     	<< endl;
     exit(0);
   }
@@ -499,7 +511,7 @@ void RigidBody::copyTransform( double* vit, int i ) const
 
 
 // ----------------------------------------------------------------------------
-// Copies the rigid body transformation in a 1D array composed on 
+// Copies the rigid body transformation in a 1D array composed on
 // the left by a translation (useful for periodic particles in parallel)
 void RigidBody::copyTransform( double* vit, int i, Vector3 const& vec ) const
 {
@@ -510,9 +522,9 @@ void RigidBody::copyTransform( double* vit, int i, Vector3 const& vec ) const
 
 
 // ----------------------------------------------------------------------------
-// Writes a list of points describing the rigid body's convex shape 
-// in a Paraview format 
-void RigidBody::write_polygonsPts_PARAVIEW( ostream& f, 
+// Writes a list of points describing the rigid body's convex shape
+// in a Paraview format
+void RigidBody::write_polygonsPts_PARAVIEW( ostream& f,
 	Vector3 const* translation ) const
 {
   m_convex->write_polygonsPts_PARAVIEW( f, m_transform, translation );
@@ -534,7 +546,7 @@ void RigidBody::write_convex_STL( ostream& f ) const
 // ----------------------------------------------------------------------------
 // Returns a list of points describing the rigid body's convex shape
 // in a Paraview format
-list<Point3> RigidBody::get_polygonsPts_PARAVIEW( Vector3 const* translation ) 
+list<Point3> RigidBody::get_polygonsPts_PARAVIEW( Vector3 const* translation )
 	const
 {
   return ( m_convex->get_polygonsPts_PARAVIEW( m_transform, translation ) );
@@ -547,7 +559,7 @@ list<Point3> RigidBody::get_polygonsPts_PARAVIEW( Vector3 const* translation )
 // Returns whether a point lies inside the rigid body
 bool RigidBody::isIn( Point3 const& pt ) const
 {
-  Transform invT; 
+  Transform invT;
   invT.setToInverseTransform( m_transform );
   return ( m_convex->isIn( invT( pt ) ) );
 }

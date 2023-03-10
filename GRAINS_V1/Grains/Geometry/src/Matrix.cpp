@@ -584,18 +584,37 @@ Matrix multTransposeLeft( Matrix const& m1, Matrix const& m2 )
 // Returns the matrix rotates vector src to vector dest, i.e. dest = mat * src
 Matrix getRotationMatrix( Vector3 const& src, Vector3 const& dest )
 {
+  // double c = src * dest;
+  // if ( fabs( c + 1. ) < EPSILON )
+  //   return( Matrix( -1.,  0.,  0.,
+  //                    0., -1.,  0.,
+  //                    0.,  0., -1.) );
+  // Vector3 v = src ^ dest;
+  // Matrix skewV  = Matrix(    0., -v[Z],  v[Y],
+  //                          v[Z],    0., -v[X],
+  //                         -v[Y],  v[X],    0.);
+  //
+  // Matrix rotMat = Matrix( 1., 1., 1. ) + skewV +
+  //                 ( 1. / ( 1. + c ) ) * ( skewV * skewV );
+  // rotMat.round( EPSILON );
+
+  // More efficient approach
   double c = src * dest;
-  if ( fabs( c + 1. ) < EPSILON )
+  if ( fabs( c + 1. ) < sqrt(EPSILON) )
     return( Matrix( -1.,  0.,  0.,
                      0., -1.,  0.,
                      0.,  0., -1.) );
+  double den = 1. / ( 1. + c );
   Vector3 v = src ^ dest;
-  Matrix skewV  = Matrix(    0., -v[Z],  v[Y],
-                           v[Z],    0., -v[X],
-                          -v[Y],  v[X],    0.);
-
-  Matrix rotMat = Matrix( 1., 1., 1. ) + skewV +
-                                        ( 1. / ( 1. + c ) ) * ( skewV * skewV );
+  Matrix rotMat = Matrix( 1. - (v[Y]*v[Y] + v[Z]*v[Z]) * den,
+                          -v[Z] + v[X]*v[Y] * den,
+                          v[Y] + v[X]*v[Z] * den,
+                          v[Z] + v[X]*v[Y] * den,
+                          1. - (v[X]*v[X] + v[Z]*v[Z]) * den,
+                          -v[X] + v[Y]*v[Z] * den,
+                          -v[Y] + v[X]*v[Z] * den,
+                          v[X] + v[Y]*v[Z] * den,
+                          1. - (v[X]*v[X] + v[Y]*v[Y]) * den );
   rotMat.round( EPSILON );
   return ( rotMat );
 }
