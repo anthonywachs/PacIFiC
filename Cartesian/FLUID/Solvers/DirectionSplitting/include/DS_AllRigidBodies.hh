@@ -589,6 +589,12 @@ class DS_AllRigidBodies
       void write_force_and_flux_summary( FV_TimeIterator const* t_it
                                        , bool const& b_restart);
 
+      /** @brief Return the local index of a bounding box on a given field FF */
+      intVector get_local_index_of_extents( class doubleVector& bounds
+                                          , FV_DiscreteField const* FF
+                                          , size_t const& dir
+                                          , size_t const& comp);
+
       /** @brief Returns true if a box is within the local domain
       extents
       @param bounds vector with min and max in dir

@@ -53,7 +53,7 @@ class DS_2Dcylinder: public DS_RigidBody
 
       /** @brief Computes the min and max extents of the 2Dcylinder halozone
       , required for the computation of void fraction */
-      void compute_rigid_body_halozone( );
+      void compute_rigid_body_halozone( double const& dx );
 
       /** @brief Compute the surface points by discretizing the 2Dcylinder
       surface in approximately equal areas (if possible) */

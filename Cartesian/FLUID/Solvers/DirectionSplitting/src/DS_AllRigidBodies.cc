@@ -963,17 +963,12 @@ void DS_AllRigidBodies:: compute_void_fraction_on_epsilon_grid(
 
   size_t nb_comps = FF->nb_components() ;
 
-  boolVector const* periodic_comp = MESH->get_periodic_directions();
-
   double dh = MESH->get_smallest_grid_size();
   double threshold = THRES*dh;//pow(THRES,0.5)*dh;
 
   // Get local min and max indices;
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
-
-  size_t i0_temp = 0;
-
 
   for (vector<size_t>::iterator it = local_RB_list.begin() ;
                                it != local_RB_list.end() ; ++it) {
@@ -984,36 +979,14 @@ void DS_AllRigidBodies:: compute_void_fraction_on_epsilon_grid(
      // Calculation on the indexes near the rigid body
      for (size_t comp = 0; comp < nb_comps; ++comp) {
         for (size_t dir = 0; dir < m_space_dimension; ++dir) {
-           // Calculations for solids on the total unknown on the proc
-           min_unknown_index(dir) =
-                   FF->get_min_index_unknown_on_proc( comp, dir );
-           max_unknown_index(dir) =
-                   FF->get_max_index_unknown_on_proc( comp, dir );
+           doubleVector box_extents(2,0.);
+           box_extents(0) = haloZone[0]->operator()(dir);
+           box_extents(1) = haloZone[1]->operator()(dir);
 
-           bool is_periodic = periodic_comp->operator()( dir );
-           double domain_min = MESH->get_main_domain_min_coordinate( dir );
-           double domain_max = MESH->get_main_domain_max_coordinate( dir );
+           intVector temp = get_local_index_of_extents(box_extents, FF, dir, comp);
 
-           bool found =FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-                                       , haloZone[0]->operator()(dir)
-                                       , i0_temp) ;
-           size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
-
-
-           found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-                                   , haloZone[1]->operator()(dir)
-                                   , i0_temp) ;
-           size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
-
-           if (is_periodic &&
-              ((haloZone[1]->operator()(dir) > domain_max)
-            || (haloZone[0]->operator()(dir) < domain_min))) {
-              index_min = min_unknown_index(dir);
-              index_max = max_unknown_index(dir);
-           }
-
-           min_unknown_index(dir) = MAC::max(min_unknown_index(dir),index_min);
-           max_unknown_index(dir) = MAC::min(max_unknown_index(dir),index_max);
+           min_unknown_index(dir) = MAC::min(temp(0),temp(1));
+           max_unknown_index(dir) = MAC::max(temp(0),temp(1));
 
         }
 
@@ -1546,13 +1519,9 @@ void DS_AllRigidBodies:: compute_fresh_nodes(FV_DiscreteField const* FF)
   size_t nb_comps = FF->nb_components() ;
   size_t field = field_num(FF) ;
 
-  boolVector const* periodic_comp = MESH->get_periodic_directions();
-
   // Get local min and max indices;
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
-
-  size_t i0_temp = 0;
 
   for (vector<size_t>::iterator it = local_RB_list.begin() ;
                                it != local_RB_list.end() ; ++it) {
@@ -1563,37 +1532,14 @@ void DS_AllRigidBodies:: compute_fresh_nodes(FV_DiscreteField const* FF)
      // Calculation on the indexes near the rigid body
      for (size_t comp = 0; comp < nb_comps; ++comp) {
         for (size_t dir = 0; dir < m_space_dimension; ++dir) {
-           // Calculations for solids on the total unknown on the proc
-           min_unknown_index(dir) =
-                   FF->get_min_index_unknown_on_proc( comp, dir );
-           max_unknown_index(dir) =
-                   FF->get_max_index_unknown_on_proc( comp, dir );
+           doubleVector box_extents(2,0.);
+           box_extents(0) = haloZone[0]->operator()(dir);
+           box_extents(1) = haloZone[1]->operator()(dir);
 
-           bool is_periodic = periodic_comp->operator()( dir );
-           double domain_min = MESH->get_main_domain_min_coordinate( dir );
-           double domain_max = MESH->get_main_domain_max_coordinate( dir );
+           intVector temp = get_local_index_of_extents(box_extents, FF, dir, comp);
 
-           bool found =FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-                                       , haloZone[0]->operator()(dir)
-                                       , i0_temp) ;
-           size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
-
-
-           found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-                                   , haloZone[1]->operator()(dir)
-                                   , i0_temp) ;
-           size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
-
-           if (is_periodic &&
-              ((haloZone[1]->operator()(dir) > domain_max)
-            || (haloZone[0]->operator()(dir) < domain_min))) {
-              index_min = min_unknown_index(dir);
-              index_max = max_unknown_index(dir);
-           }
-
-           min_unknown_index(dir) = MAC::max(min_unknown_index(dir),index_min);
-           max_unknown_index(dir) = MAC::min(max_unknown_index(dir),index_max);
-
+           min_unknown_index(dir) = MAC::min(temp(0),temp(1));
+           max_unknown_index(dir) = MAC::max(temp(0),temp(1));
         }
 
         for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
@@ -1629,16 +1575,12 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
   // void_fraction[field]->set(0);
 
-  boolVector const* periodic_comp = MESH->get_periodic_directions();
-
   double dh = MESH->get_smallest_grid_size();
   double threshold = THRES*dh;//pow(THRES,0.5)*dh;
 
   // Get local min and max indices;
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
-
-  size_t i0_temp = 0;
 
   for (vector<size_t>::iterator it = local_RB_list.begin() ;
                                it != local_RB_list.end() ; ++it) {
@@ -1651,36 +1593,14 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
      // Calculation on the indexes near the rigid body
      for (size_t comp = 0; comp < nb_comps; ++comp) {
         for (size_t dir = 0; dir < m_space_dimension; ++dir) {
-           // Calculations for solids on the total unknown on the proc
-           min_unknown_index(dir) =
-                   FF->get_min_index_unknown_on_proc( comp, dir );
-           max_unknown_index(dir) =
-                   FF->get_max_index_unknown_on_proc( comp, dir );
+           doubleVector box_extents(2,0.);
+           box_extents(0) = haloZone[0]->operator()(dir);
+           box_extents(1) = haloZone[1]->operator()(dir);
 
-           bool is_periodic = periodic_comp->operator()( dir );
-           double domain_min = MESH->get_main_domain_min_coordinate( dir );
-           double domain_max = MESH->get_main_domain_max_coordinate( dir );
+           intVector temp = get_local_index_of_extents(box_extents, FF, dir, comp);
 
-           bool found =FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-                                       , haloZone[0]->operator()(dir)
-                                       , i0_temp) ;
-           size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
-
-
-           found = FV_Mesh::between(FF->get_DOF_coordinates_vector(comp,dir)
-                                   , haloZone[1]->operator()(dir)
-                                   , i0_temp) ;
-           size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
-
-           if (is_periodic &&
-              ((haloZone[1]->operator()(dir) > domain_max)
-            || (haloZone[0]->operator()(dir) < domain_min))) {
-              index_min = min_unknown_index(dir);
-              index_max = max_unknown_index(dir);
-           }
-
-           min_unknown_index(dir) = MAC::max(min_unknown_index(dir),index_min);
-           max_unknown_index(dir) = MAC::min(max_unknown_index(dir),index_max);
+           min_unknown_index(dir) = MAC::min(temp(0),temp(1));
+           max_unknown_index(dir) = MAC::max(temp(0),temp(1));
 
         }
 
@@ -2884,7 +2804,8 @@ void DS_AllRigidBodies:: generate_list_of_local_RB( )
 
   for (size_t m = 0; m < m_nrb; m++) {
      geomVector const* pgc = m_allDSrigidbodies[m]->get_ptr_to_gravity_centre();
-     double Rp = 2.*m_allDSrigidbodies[m]->get_circumscribed_radius();
+     double Rp = 5. * MESH->get_smallest_grid_size() +
+                 m_allDSrigidbodies[m]->get_circumscribed_radius();
 
      double x0 = pgc->operator()(0);
      double y0 = pgc->operator()(1);
@@ -2981,8 +2902,10 @@ void DS_AllRigidBodies:: compute_halo_zones_for_all_rigid_body( )
 {
   MAC_LABEL( "DS_AllRigidBodies:: compute_halo_zones_for_all_rigid_body" ) ;
 
+  double dx = 5. * MESH->get_smallest_grid_size();
+
   for (size_t i = 0; i < m_nrb; ++i) {
-     m_allDSrigidbodies[i]->compute_rigid_body_halozone();
+     m_allDSrigidbodies[i]->compute_rigid_body_halozone(dx);
   }
 
 }
@@ -3005,8 +2928,6 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
   // intersect_distance[field]->set(0.);
   // intersect_fieldValue[field]->set(0.);
 
-  boolVector const* periodic_comp = MESH->get_periodic_directions();
-
   for (vector<size_t>::iterator it = local_RB_list.begin() ;
                                it != local_RB_list.end() ; ++it) {
      size_t parID = *it;
@@ -3020,7 +2941,6 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
      size_t_vector max_nearest_index(3,0);
      size_t_vector ipos(3,0);
      size_t_array2D local_extents(3,2,0);
-     size_t i0_temp = 0;
 
      double delta = MESH->get_smallest_grid_size();
 
@@ -3033,34 +2953,15 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                               FF->get_min_index_unknown_on_proc( comp, dir );
           max_unknown_index(dir) =
                               FF->get_max_index_unknown_on_proc( comp, dir );
-          local_extents(dir,0) = 0;
-          local_extents(dir,1) = max_unknown_index(dir)
-                               - min_unknown_index(dir);
 
-          bool is_periodic = periodic_comp->operator()( dir );
+          doubleVector box_extents(2,0.);
+          box_extents(0) = haloZone[0]->operator()(dir);
+          box_extents(1) = haloZone[1]->operator()(dir);
 
-          double domain_min = MESH->get_main_domain_min_coordinate(dir);
-          double domain_max = MESH->get_main_domain_max_coordinate(dir);
-          bool found =
-                  FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir)
-                                 , haloZone[0]->operator()(dir)
-                                 , i0_temp) ;
-          size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
-          found = FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir )
-                                  , haloZone[1]->operator()(dir)
-                                  , i0_temp) ;
-          size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
+          intVector temp = get_local_index_of_extents(box_extents, FF, dir, comp);
 
-          if (is_periodic &&
-              ((haloZone[1]->operator()(dir) > domain_max)
-          || (haloZone[0]->operator()(dir) < domain_min))) {
-              index_min = min_unknown_index(dir);
-              index_max = max_unknown_index(dir);
-          }
-
-          min_nearest_index(dir) = MAC::max(min_unknown_index(dir),index_min);
-          max_nearest_index(dir) = MAC::min(max_unknown_index(dir),index_max);
-
+          min_nearest_index(dir) = MAC::min(temp(0),temp(1));
+          max_nearest_index(dir) = MAC::max(temp(0),temp(1));
         }
 
         max_nearest_index(2) = (m_space_dimension == 2) ? 1
@@ -3160,8 +3061,6 @@ void DS_AllRigidBodies:: clear_GrainsRB_data_on_grid(
   size_t nb_comps = FF->nb_components() ;
   size_t field = field_num(FF) ;
 
-  boolVector const* periodic_comp = MESH->get_periodic_directions();
-
   for (vector<size_t>::iterator it = local_RB_list.begin() ;
                                it != local_RB_list.end() ; ++it) {
      size_t parID = *it;
@@ -3175,7 +3074,6 @@ void DS_AllRigidBodies:: clear_GrainsRB_data_on_grid(
      size_t_vector max_nearest_index(3,0);
      size_t_vector ipos(3,0);
      size_t_array2D local_extents(3,2,0);
-     size_t i0_temp = 0;
 
      for (size_t comp = 0; comp < nb_comps; comp++) {
 
@@ -3186,34 +3084,15 @@ void DS_AllRigidBodies:: clear_GrainsRB_data_on_grid(
                               FF->get_min_index_unknown_on_proc( comp, dir );
           max_unknown_index(dir) =
                               FF->get_max_index_unknown_on_proc( comp, dir );
-          local_extents(dir,0) = 0;
-          local_extents(dir,1) = max_unknown_index(dir)
-                               - min_unknown_index(dir);
 
-          bool is_periodic = periodic_comp->operator()( dir );
+          doubleVector box_extents(2,0.);
+          box_extents(0) = haloZone[0]->operator()(dir);
+          box_extents(1) = haloZone[1]->operator()(dir);
 
-          double domain_min = MESH->get_main_domain_min_coordinate(dir);
-          double domain_max = MESH->get_main_domain_max_coordinate(dir);
-          bool found =
-                  FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir)
-                                 , haloZone[0]->operator()(dir)
-                                 , i0_temp) ;
-          size_t index_min = (found) ? i0_temp : min_unknown_index(dir);
-          found = FV_Mesh::between(FF->get_DOF_coordinates_vector( comp, dir )
-                                  , haloZone[1]->operator()(dir)
-                                  , i0_temp) ;
-          size_t index_max = (found) ? i0_temp : max_unknown_index(dir);
+          intVector temp = get_local_index_of_extents(box_extents, FF, dir, comp);
 
-          if (is_periodic &&
-              ((haloZone[1]->operator()(dir) > domain_max)
-          || (haloZone[0]->operator()(dir) < domain_min))) {
-              index_min = min_unknown_index(dir);
-              index_max = max_unknown_index(dir);
-          }
-
-          min_nearest_index(dir) = MAC::max(min_unknown_index(dir),index_min);
-          max_nearest_index(dir) = MAC::min(max_unknown_index(dir),index_max);
-
+          min_nearest_index(dir) = MAC::min(temp(0),temp(1));
+          max_nearest_index(dir) = MAC::max(temp(0),temp(1));
         }
 
         max_nearest_index(2) = (m_space_dimension == 2) ? 1
@@ -6583,4 +6462,123 @@ void DS_AllRigidBodies:: create_neighbour_list_for_AllRB( )
          neighbour_list.push_back({0});
       }
    }
+}
+
+
+
+
+//---------------------------------------------------------------------------
+intVector
+DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
+                                          , FV_DiscreteField const* FF
+                                          , size_t const& dir
+                                          , size_t const& comp)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies::get_grid_index_of_extents" ) ;
+
+  intVector value(2,0);
+
+  bounds(0) = periodic_transformation(bounds(0),dir);
+  bounds(1) = periodic_transformation(bounds(1),dir);
+
+  double global_min = MESH->get_main_domain_min_coordinate(dir);
+  double global_max = MESH->get_main_domain_max_coordinate(dir);
+  double local_min = MESH->get_min_coordinate_on_current_processor(dir);
+  double local_max = MESH->get_max_coordinate_on_current_processor(dir);
+
+  boolVector const* is_periodic = MESH->get_periodic_directions();
+
+  // Warnings
+  if (m_macCOMM->rank() == 0) {
+     if (!(*is_periodic)(dir)) {
+        if ((bounds(0) < global_min)
+        || (bounds(1) > global_max))
+           std::cout << endl <<
+             " WARNING : Box Averaging Control Volume overlaps a " <<
+             " non-periodic BC" << endl <<
+             " Control volume will be reduced" << endl << endl;
+     }
+  }
+
+  // Getting the minimum grid index in control volume (CV)
+  if (bounds(0) < bounds(1)) {// Non-periodic CV
+     if (bounds(0) > local_min) {
+        if (bounds(0) < local_max) {
+           size_t i0_temp = 0;
+           bool found = FV_Mesh::between(
+                          FF->get_DOF_coordinates_vector(comp,dir)
+                        , bounds(0)
+                        , i0_temp) ;
+           value(0) = (found) ? (int)i0_temp : 0;
+        } else {
+           value(0) = -1;
+        }
+     } else {
+        if (bounds(1) > local_min) {
+           value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
+        } else {
+           value(0) = -1;
+        }
+     }
+  } else {// periodic control volume
+     if (bounds(0) > local_min) {
+        if (bounds(0) < local_max) {
+           size_t i0_temp = 0;
+           bool found = FV_Mesh::between(
+                          FF->get_DOF_coordinates_vector(comp,dir)
+                        , bounds(0)
+                        , i0_temp) ;
+           value(0) = (found) ? (int)i0_temp : 0;
+        } else if (bounds(1) > local_min) {
+           value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
+        } else {
+           value(0) = -1;
+        }
+     } else {
+        value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
+     }
+  }
+
+  // Getting the maximum grid index in control volume (CV)
+  if (bounds(0) < bounds(1)) {// Non-periodic CV
+     if (bounds(1) < local_max) {
+        if (bounds(1) > local_min) {
+           size_t i0_temp = 0;
+           bool found = FV_Mesh::between(
+                          FF->get_DOF_coordinates_vector(comp,dir)
+                        , bounds(1)
+                        , i0_temp) ;
+           value(1) = (found) ? (int)i0_temp : 0;
+        } else {
+           value(1) = -1;
+        }
+     } else {
+        if (bounds(0) < local_max) {
+           value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
+        } else {
+           value(1) = -1;
+        }
+     }
+  } else {// periodic control volume
+     if (bounds(1) < local_max) {
+        if (bounds(1) > local_min) {
+           size_t i0_temp = 0;
+           bool found = FV_Mesh::between(
+                          FF->get_DOF_coordinates_vector(comp,dir)
+                        , bounds(1)
+                        , i0_temp) ;
+           value(1) = (found) ? (int)i0_temp : 0;
+        } else if (bounds(0) < local_max) {
+           value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
+        } else {
+           value(1) = -1;
+        }
+     } else {
+        value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
+     }
+  }
+
+  return (value);
+
 }

@@ -114,7 +114,7 @@ void DS_STL:: display( ostream& out, size_t const& indent_width ) const
 
 
 //---------------------------------------------------------------------------
-void DS_STL:: compute_rigid_body_halozone( )
+void DS_STL:: compute_rigid_body_halozone( double const& dx )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_STL:: compute_rigid_body_halozone" ) ;
@@ -123,7 +123,7 @@ void DS_STL:: compute_rigid_body_halozone( )
 
   geomVector const* pgc = get_ptr_to_gravity_centre();
 
-  double r_equi = 3.0*radius;
+  double r_equi = radius + dx;
 
   geomVector delta(r_equi, r_equi, r_equi);
 

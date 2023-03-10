@@ -72,19 +72,15 @@ void DS_Sphere:: display( ostream& out, size_t const& indent_width ) const
 
 
 //---------------------------------------------------------------------------
-void DS_Sphere:: compute_rigid_body_halozone( )
+void DS_Sphere:: compute_rigid_body_halozone( double const& dx )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_Sphere:: compute_rigid_body_halozone" ) ;
 
-  struct FS_Sphere_Additional_Param const* pagp =
-   dynamic_cast<FS_Sphere*>(m_geometric_rigid_body)
-      ->get_ptr_FS_Sphere_Additional_Param();
-
   geomVector const* pgc = dynamic_cast<FS_RigidBody*>(m_geometric_rigid_body)
                               ->get_ptr_to_gravity_centre();
 
-  double r_equi = 3.0*pagp->radius;
+  double r_equi = get_circumscribed_radius() + dx;
 
   geomVector delta(r_equi, r_equi, r_equi);
 

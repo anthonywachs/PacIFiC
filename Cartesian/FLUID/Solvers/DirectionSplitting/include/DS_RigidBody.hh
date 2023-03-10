@@ -112,7 +112,7 @@ class DS_RigidBody
       /** @brief Compute the halozone of a rigid body
       @param out output stream
       @param indent_width indentation width */
-      virtual void compute_rigid_body_halozone( ) = 0;
+      virtual void compute_rigid_body_halozone( double const& dx ) = 0;
 
       /** @brief Returns whether a point is inside the rigid body
       @param pt the point */

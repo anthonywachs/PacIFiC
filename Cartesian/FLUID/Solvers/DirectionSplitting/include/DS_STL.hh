@@ -57,7 +57,7 @@ class DS_STL: public DS_RigidBody
       /** @brief Compute the halozone of a rigid body
       @param out output stream
       @param indent_width indentation width */
-      void compute_rigid_body_halozone( );
+      void compute_rigid_body_halozone( double const& dx );
 
       /** @brief Compute the surface points by discretizing the rigid body
       surface in approximately equal areas (if possible) */

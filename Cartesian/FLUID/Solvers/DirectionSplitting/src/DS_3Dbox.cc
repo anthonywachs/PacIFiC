@@ -72,21 +72,17 @@ void DS_3Dbox:: display( ostream& out, size_t const& indent_width ) const
 
 
 //---------------------------------------------------------------------------
-void DS_3Dbox:: compute_rigid_body_halozone( )
+void DS_3Dbox:: compute_rigid_body_halozone( double const& dx )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_3Dbox:: compute_rigid_body_halozone" ) ;
 
-  struct FS_3Dbox_Additional_Param const* pagp =
-   dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
-      ->get_ptr_FS_3Dbox_Additional_Param();
-
   geomVector const* pgc = dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
                               ->get_ptr_to_gravity_centre();
 
-  geomVector delta = pagp->corners[0] - *pgc;
+  geomVector delta(3);
 
-  double r_equi = 3.0 * delta.calcNorm();
+  double r_equi = get_circumscribed_radius() + dx;
 
   delta(0) = r_equi;
   delta(1) = r_equi;
