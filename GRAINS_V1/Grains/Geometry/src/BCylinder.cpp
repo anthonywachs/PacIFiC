@@ -3,7 +3,7 @@
 
 using namespace std;
 
-double tol = 1.e-6; // Tolerance used in this class
+double tol = 5.e-5; // Tolerance used in this class
 
 // --------------------------------------------------------------------
 // Default constructor
@@ -433,41 +433,6 @@ bool isContact( BCylinder const& a, BCylinder const& b,
         return ( true );
     }
   }
-  // Band-Edge
-  {
-    Point3 c1 = x_B2A + .5 * hB * e_B2A;
-    Point3 c2 = x_B2A - .5 * hB * e_B2A;
-    Point3 const& ptCenter = normXY( c1 ) < normXY( c2 ) ? c1 : c2;
-
-    // additional condition to avoid solving the polynomial
-    if ( ( fabs( ptCenter[Z] ) < 0.5 * hA + rB ) &&
-         ( fabs( sqrt( normXY( ptCenter ) ) - rA ) < rB ) )
-    {
-      // Misc variables
-      double const p = rB * ( normXY( v1 ) - normXY( u1 ) );
-      double const q = dotXY( u1, ptCenter ) / p;
-      double const r = dotXY( ptCenter, v1 ) / p;
-
-      double sint[4];
-      int nbRoots = 0;
-      solveQuartic( 2.*r, q*q + r*r - 1., -2.*r, -r*r, sint, nbRoots );
-
-      Point3 ptA;
-      double cost;
-      for ( int i = 0; i < nbRoots; i++ )
-      {
-        if ( fabs( sint[i] ) <= 1. )
-        {
-          cost = ( q * sint[i] ) / ( r + sint[i] );
-          if ( fabs( cost ) > 1. )
-            cost = sgn( cost ) * sqrt( 1. - sint[i]*sint[i] );
-          ptA = ptCenter + rB * cost * u1 + rB * sint[i] * v1;
-          if ( normXY( ptA ) < rA * rA && fabs( ptA[Z] ) < .5 * hA )
-            return ( true );
-        }
-      }
-    }
-  }
   // Edge-Band
   {
     Point3 c1 = x_A2B + .5 * hA * e_A2B;
@@ -476,28 +441,25 @@ bool isContact( BCylinder const& a, BCylinder const& b,
 
     // additional condition to avoid solving the polynomial
     if ( ( fabs( ptCenter[Z] ) < 0.5 * hB + rA ) &&
-         ( fabs( sqrt( normXY( ptCenter ) ) - rB ) < rA ) )
+         ( sqrt( normXY( ptCenter ) ) < rA + rB ) )
     {
       // Misc variables
-      double const p = rA * ( normXY( v2 ) - normXY( u2 ) );
+      // double const p = rA * ( normXY( v2 ) - normXY( u2 ) );
+      double const p = rA * ( normXY( v2 ) - 1. );
       double const q = dotXY( u2, ptCenter ) / p;
-      double const r = dotXY( ptCenter, v2 ) / p;
+      double const r = dotXY( v2, ptCenter ) / p;
 
       double sint[4];
       int nbRoots = 0;
       solveQuartic( 2.*r, q*q + r*r - 1., -2.*r, -r*r, sint, nbRoots );
 
-      Point3 ptA;
-      double cost;
       for ( int i = 0; i < nbRoots; i++ )
       {
-        if ( fabs( sint[i] ) <= 1. )
+        if ( sint[i] * r >= 0. ) // the min distance, not the max!
         {
-          cost = ( q * sint[i] ) / ( r + sint[i] );
-          if ( fabs( cost ) > 1. )
-            cost = sgn( cost ) * sqrt( 1. - sint[i]*sint[i] );
-          ptA = ptCenter + rA * cost * u2 + rA * sint[i] * v2;
-          if ( normXY( ptA ) < rB * rB && fabs( ptA[Z] ) < .5 * hB )
+          double cs = sgn( q ) * sqrt( 1. - sint[i] * sint[i] );
+          Point3 const& ptA = ptCenter + rA * cs * u2 + rA * sint[i] * v2;
+          if ( ( fabs( ptA[Z] ) < .5 * hB ) && ( normXY( ptA ) < rB * rB ) )
             return ( true );
         }
       }
@@ -505,36 +467,43 @@ bool isContact( BCylinder const& a, BCylinder const& b,
   }
   // Edge-Edge
   {
+    // To find the correct edge on the secondary cylinder
     Point3 c1 = x_B2A + .5 * hB * e_B2A;
     Point3 c2 = x_B2A - .5 * hB * e_B2A;
-    double d1 = pow( sqrt( normXY( c1 ) ) - rA, 2 ) +
-                pow( fabs( c1[Z] ) - .5 * hA, 2 );
-    double d2 = pow( sqrt( normXY( c2 ) ) - rA, 2 ) +
-                pow( fabs( c2[Z] ) - .5 * hA, 2 );
-    Point3 const& ptCenter = d1 < d2 ? c1 : c2; // decide on edge of B
+    double distBand1 = pow( sqrt( normXY( c1 ) ) - rA, 2 );
+    double distBand2 = pow( sqrt( normXY( c2 ) ) - rA, 2 );
+    double distEdge1 = distBand1 + pow( fabs( c1[Z] ) - .5 * hA, 2 );
+    double distEdge2 = distBand2 + pow( fabs( c2[Z] ) - .5 * hA, 2 );
+    if ( ( distBand1 - distBand2 ) * ( distEdge1 - distEdge2 ) < 0. &&
+         ( distEdge1 < distEdge2 ? distEdge1 : distEdge2 ) >= rB * rB )
+    {
+      distEdge1 = distBand1;
+      distEdge2 = distBand2;
+    }
+    Point3 const& ptCenter = distEdge1 < distEdge2 ? c1 : c2;
 
-    if ( ( d1 < d2 ? d1 : d2 ) <= rB * rB )
+    if ( ( distEdge1 < distEdge2 ? distEdge1 : distEdge2 ) < rB * rB )
     {
       // Misc variables
-      double const p = rB * rB * ( normXY( v1 ) - normXY( u1 ) ) / 2.;
-      double const q = rB * dotXY( ptCenter, u1 ) / p;
-      double const r = rB * dotXY( ptCenter, v1 ) / p;
-      double const s = ( rA*rA - normXY( ptCenter ) - rB*rB*normXY( u1 ) ) / p;
+      // double const p = rB * rB * ( normXY( v1 ) - normXY( u1 ) ) / 2.;
+      double const p = rB * rB * ( normXY( v1 ) - 1. ) / 2.;
+      double const q = rB * dotXY( u1, ptCenter ) / p;
+      double const r = rB * dotXY( v1, ptCenter ) / p;
+      // double const s = ( rA*rA - normXY( ptCenter ) - rB*rB*normXY(u1) ) / p;
+      double const s = ( rA * rA - normXY( ptCenter ) - rB * rB ) / p;
 
       double sint[4];
       int nbRoots;
       solveQuartic( 2.*r, q*q + r*r - s, -r*s, s*s/4. - q*q, sint, nbRoots );
 
-      Point3 ptA;
-      double cost;
       for ( int i = 0; i < nbRoots; i++ )
       {
         if ( fabs( sint[i] ) <= 1 )
         {
-          cost = ( s/2. - r*sint[i] - sint[i]*sint[i] ) / q;
-          ptA = ptCenter + rB * cost * u1 + rB * sint[i] * v1;
-          if ( fabs( ptA[Z] ) < .5 * hA )
-          return ( true );
+          double cost = ( s/2. - r*sint[i] - sint[i]*sint[i] ) / q;
+          double zVal = ptCenter[Z] + rB * cost * u1[Z] + rB * sint[i] * v1[Z];
+          if ( fabs( zVal ) < .5 * hA )
+            return ( true );
         }
       }
     }
@@ -770,7 +739,8 @@ void B2EContact( double rA, double hA, double rB, double hB,
   Point3 const& ptCenter = normXY( c1 ) < normXY( c2 ) ? c1 : c2;
   // additional condition to avoid solving the polynomial
   if ( ( fabs( ptCenter[Z] ) > 0.5 * hA + rB ) ||
-       ( fabs( sqrt( normXY( ptCenter ) ) - rA ) > rB ) )
+       ( sqrt( normXY( ptCenter ) ) > rA + rB ) ||
+       ( fabs( e[Z] ) < tol ) )
     return;
 
   // Vector3 const& u = ( e ^ Vector3( 0., 0., 1. ) ).normalized();
@@ -778,32 +748,71 @@ void B2EContact( double rA, double hA, double rB, double hB,
   Vector3 const& v = ( u ^ e ).normalized();
 
   // Misc variables
-  double const a = rB * ( normXY( v ) - normXY( u ) );
+  // double const a = rB * ( normXY( v ) - normXY( u ) );
+  double const a = rB * ( normXY( v ) - 1. );
   double const b = dotXY( u, ptCenter ) / a;
-  double const c = dotXY( ptCenter, v ) / a;
+  double const c = dotXY( v, ptCenter ) / a;
+
+  // double sint[4];
+  // int nbRoots = 0;
+  // solveQuartic( 2.*c, b*b + c*c - 1., -2.*c, -c*c, sint, nbRoots );
+  //
+  // Point3 ptA;
+  // double cost;
+  // for ( int i = 0; i < nbRoots; i++ )
+  // {
+  //   if ( fabs( sint[i] ) <= 1. )
+  //   {
+  //     cost = ( b * sint[i] ) / ( c + sint[i] );
+  //     if ( fabs( cost ) > 1. )
+  //       cost = sgn( cost ) * sqrt( 1. - sint[i]*sint[i] );
+  //     ptA = ptCenter + rB * cost * u + rB * sint[i] * v;
+  //     if ( normXY( ptA ) < rA * rA && fabs( ptA[Z] ) < .5 * hA )
+  //     {
+  //       contCond = ( rA - sqrt( normXY( ptA ) ) < .5 * hA - fabs( ptA[Z] ) );
+  //       break;
+  //     }
+  //   }
+  // }
 
   double sint[4];
   int nbRoots = 0;
   solveQuartic( 2.*c, b*b + c*c - 1., -2.*c, -c*c, sint, nbRoots );
 
-  Point3 ptA;
-  double cost;
+  double sn = 1., cs = 0.;
   for ( int i = 0; i < nbRoots; i++ )
   {
-    if ( fabs( sint[i] ) <= 1. )
+    sn = sint[i];
+    if ( sn * c >= 0. )
     {
-      cost = ( b * sint[i] ) / ( c + sint[i] );
-      if ( fabs( cost ) > 1. )
-        cost = sgn( cost ) * sqrt( 1. - sint[i]*sint[i] );
-      ptA = ptCenter + rB * cost * u + rB * sint[i] * v;
-      if ( normXY( ptA ) < rA * rA && fabs( ptA[Z] ) < .5 * hA )
-      {
-        contCond = ( rA - sqrt( normXY( ptA ) ) < .5 * hA - fabs( ptA[Z] ) );
-        break;
-      }
+      cs = sgn( b ) * sqrt( 1. - sn * sn );
+      break;
     }
   }
 
+  Point3 const& ptA = ptCenter + rB * cs * u + rB * sn * v;
+  contCond = ( fabs( ptA[Z] ) < .5 * hA ) &&
+             ( normXY( ptA ) < rA * rA ) &&
+             ( rA - sqrt( normXY( ptA ) ) < .5 * hA - fabs( ptA[Z] ) );
+
+  // // Gradient descent for finging the angle corresponding to minimal distance
+  // double theta = PI/4.;
+  // double delta = 1.;
+  // double sn, cs;
+  // int iter;
+  // for ( iter = 0; iter < 100 && abs( delta ) > tol; iter++ )
+  // {
+  //   sn = sin(theta);
+  //   cs = cos(theta);
+  //   delta = 2. * ( ( c + sn ) * cs - b * sn );
+  //   theta -= 0.05 * delta;
+  // }
+  // sn = sin(theta);
+  // cs = cos(theta);
+  // Point3 const& ptA = ptCenter + rB * cs * u + rB * sn * v;
+  // contCond = ( fabs( ptA[Z] ) < .5 * hA ) &&
+  //            ( normXY( ptA ) < rA * rA ) &&
+  //            ( rA - sqrt( normXY( ptA ) ) < .5 * hA - fabs( ptA[Z] ) );
 
   // Contact
   if ( contCond )
@@ -841,15 +850,15 @@ void E2EContact( double rA, double hA, double rB, double hB,
   // Contact happens if
   bool contCond = false; // TRUE if contact occurs in this scenario
   // Some variables
-  Point3 c_t = x + .5 * hB * e;
-  Point3 c_b = x - .5 * hB * e;
-  double d_t = pow( sqrt( normXY( c_t ) ) - rA, 2 ) +
-               pow( fabs( c_t[Z] ) - .5 * hA, 2 );
-  double d_b = pow( sqrt( normXY( c_b ) ) - rA, 2 ) +
-               pow( fabs( c_b[Z] ) - .5 * hA, 2 );
-  Point3 const& ptCenter1 = d_b < d_t ? c_b : c_t; // decide on edge of B
+  Point3 c1 = x + .5 * hB * e;
+  Point3 c2 = x - .5 * hB * e;
+  double d1 = pow( sqrt( normXY( c1 ) ) - rA, 2 ) +
+               pow( fabs( c1[Z] ) - .5 * hA, 2 );
+  double d2 = pow( sqrt( normXY( c2 ) ) - rA, 2 ) +
+               pow( fabs( c2[Z] ) - .5 * hA, 2 );
+  Point3 const& ptCenter1 = d1 < d2 ? c1 : c2; // decide on edge of B
   // additional condition to avoid solving the polynomial
-  if ( d_t > rB * rB && d_b > rB * rB )
+  if ( ( d1 > rB * rB && d2 > rB * rB ) || fabs( e[Z] - 1. ) < tol )
     return;
 
   // Vector3 const& u1 = ( e1 ^ Vector3( 0., 0., 1. ) ).normalized();
@@ -857,23 +866,25 @@ void E2EContact( double rA, double hA, double rB, double hB,
   Vector3 const& v1 = ( u1 ^ e ).normalized();
 
   // Misc variables
-  double const a1 = rB * rB * ( normXY( v1 ) - normXY( u1 ) ) / 2.;
-  double const b1 = rB * dotXY( ptCenter1, u1 ) / a1;
-  double const c1 = rB * dotXY( ptCenter1, v1 ) / a1;
-  double const d1 = ( rA*rA - normXY( ptCenter1 ) - rB*rB*normXY( u1 ) ) / a1;
+  // double const p1 = rB * rB * ( normXY( v1 ) - normXY( u1 ) ) / 2.;
+  double const p1 = rB * rB * ( normXY( v1 ) - 1. ) / 2.;
+  double const q1 = rB * dotXY( u1, ptCenter1 ) / p1;
+  double const r1 = rB * dotXY( v1, ptCenter1 ) / p1;
+  // double const s1 = ( rA*rA - normXY( ptCenter1 ) - rB*rB*normXY(u1) ) / p1;
+  double const s1 = ( rA * rA - normXY( ptCenter1 ) - rB * rB ) / p1;
 
   double sint1[4];
   int nbRoots1;
-  solveQuartic( 2.*c1, b1*b1 + c1*c1 - d1, -c1*d1, d1*d1/4. - b1*b1,
+  solveQuartic( 2.*r1, q1*q1 + r1*r1 - s1, -r1*s1, s1*s1/4. - q1*q1,
                 sint1, nbRoots1 );
 
   Point3 ptA, ptB;
   double cost1;
   for ( int i = 0; i < nbRoots1; i++ )
   {
-    if ( fabs( sint1[i] ) <= 1. )
-    {
-      cost1 = ( d1/2. - c1*sint1[i] - sint1[i]*sint1[i] ) / b1;
+    // if ( fabs( sint1[i] ) <= 1. )
+    // {
+      cost1 = ( s1/2. - r1*sint1[i] - sint1[i]*sint1[i] ) / q1;
       // if ( fabs( cs ) > 1. )
       //   cs = sgn( cs ) * sqrt( 1. - sol[i]*sol[i] );
       ptA = ptCenter1 + rB * cost1 * u1 + rB * sint1[i] * v1;
@@ -895,7 +906,7 @@ void E2EContact( double rA, double hA, double rB, double hB,
           break;
         }
       }
-    }
+    // }
   }
 
   // Contact
@@ -911,27 +922,29 @@ void E2EContact( double rA, double hA, double rB, double hB,
     rotateVec2VecZ( e, rotMatA2B );
     Point3 const& x2 = rotMatA2B * ( - x );
     Vector3 const& e2 = ( rotMatA2B * Vector3( 0., 0., 1. ) ).normalized();
-    c_t = x2 + .5 * hA * e2;
-    c_b = x2 - .5 * hA * e2;
-    d_t = pow( sqrt( normXY( c_t ) ) - rB, 2) +
-          pow( fabs( c_t[Z] ) - .5 * hB, 2);
-    d_b = pow( sqrt( normXY( c_b ) ) - rB, 2) +
-          pow( fabs( c_b[Z] ) - .5 * hB, 2);
-    Point3 const& ptCenter2 = d_b < d_t ? c_b : c_t;
+    c1 = x2 + .5 * hA * e2;
+    c2 = x2 - .5 * hA * e2;
+    d1 = pow( sqrt( normXY( c1 ) ) - rB, 2) +
+          pow( fabs( c1[Z] ) - .5 * hB, 2);
+    d2 = pow( sqrt( normXY( c2 ) ) - rB, 2) +
+          pow( fabs( c2[Z] ) - .5 * hB, 2);
+    Point3 const& ptCenter2 = d1 < d2 ? c1 : c2;
 
     // Vector3 const& u2 = ( e2 ^ Vector3( 0., 0., 1. ) ).normalized();
     Vector3 const& u2 = ( Vector3( e2[Y], -e2[X], 0. ) ).normalized();
     Vector3 const& v2 = ( u2 ^ e2 ).normalized();
 
     // Misc variables
-    double const a2 = rA * rA * ( normXY( v2 ) - normXY( u2 ) ) / 2.;
-    double const b2 = rA * dotXY( ptCenter2, u2 ) / a2;
-    double const c2 = rA * dotXY( ptCenter2, v2 ) / a2;
-    double const d2 = ( rB*rB - normXY( ptCenter2 ) - rA*rA*normXY( u2 ) ) / a2;
+    // double const p2 = rA * rA * ( normXY( v2 ) - normXY( u2 ) ) / 2.;
+    double const p2 = rA * rA * ( normXY( v2 ) - 1. ) / 2.;
+    double const q2 = rA * dotXY( u2, ptCenter2 ) / p2;
+    double const r2 = rA * dotXY( v2, ptCenter2 ) / p2;
+    // double const s2 = ( rB*rB - normXY(ptCenter2) - rA*rA*normXY(u2) ) / p2;
+    double const s2 = ( rB * rB - normXY( ptCenter2 ) - rA * rA ) / p2;
 
     double sint2[4];
     int nbRoots2;
-    solveQuartic( 2.*c2, b2*b2 + c2*c2 - d2, -c2*d2, d2*d2/4. - b2*b2,
+    solveQuartic( 2.*r2, q2*q2 + r2*r2 - s2, -r2*s2, s2*s2/4. - q2*q2,
                   sint2, nbRoots2 );
 
     Point3 ptC, ptD;
@@ -940,7 +953,7 @@ void E2EContact( double rA, double hA, double rB, double hB,
     {
       if ( fabs( sint2[i] ) <= 1. )
       {
-        cost2 = ( d2/2. - c2*sint2[i] - sint2[i]*sint2[i] ) / b2;
+        cost2 = ( s2/2. - r2*sint2[i] - sint2[i]*sint2[i] ) / q2;
         if ( fabs( cost2 ) > 1. )
           cost2 = sgn( cost2 ) * sqrt( 1. - sint2[i]*sint2[i] );
         ptC = ptCenter2 + rA * cost2 * u2 + rA * sint2[i] * v2;

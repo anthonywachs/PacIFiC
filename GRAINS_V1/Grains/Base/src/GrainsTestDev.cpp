@@ -104,13 +104,13 @@ void GrainsTestDev::Simulation( double time_interval )
     int nIter = 1e6;
 
     // bodies
-    // Convex* convexA = new Box( 1., 1., 16. );
-    Convex* convexA  = new Cylinder( 1., 4. );
+    Convex* convexA = new Box( 1., 1., 16. );
+    // Convex* convexA  = new Cylinder( 1., 4. );
     // RigidBodyWithCrust RBWCa( convexA, trA );
     // RBWCa.setCrustThickness( 0.1 );
 
-    // Convex* convexB = new Box( 16., 1., 1. );
-    Convex* convexB = new Cylinder( 1., 4. );
+    Convex* convexB = new Box( 16., 1., 1. );
+    // Convex* convexB = new Cylinder( 1., 4. );
     // RigidBodyWithCrust RBWCb( convexB, trB );
     // RBWCb.setCrustThickness( 0.1 );
 
@@ -137,23 +137,23 @@ void GrainsTestDev::Simulation( double time_interval )
     int ctr = 1;
     bool cntct = false;
 
-    // // Call GJK
-    // {
-    //   Point3 pointA, pointB;
-    //   int nbIterGJK = 0;
-    //   auto start = high_resolution_clock::now();
-    //   for ( ctr = 1; ctr <= nIter && cntct == false; ctr++ )
-    //   {
-    //     double distance = closest_points( *convexA, *convexB, *trA, *trB,
-    //                                       pointA, pointB, nbIterGJK );
-    //     if ( distance <= 0 )
-    //       cntct = true;
-    //   }
-    //   auto stop = high_resolution_clock::now();
-    //   auto duration = duration_cast<microseconds>( stop - start );
-    //   cout << "Contact " << cntct << ", Iter " << ctr << ", No. GJK Iter. "
-    //        << nbIterGJK  << ", Time taken by GJK: " << duration.count() << " us" << endl;
-    // }
+    // Call GJK
+    {
+      Point3 pointA, pointB;
+      int nbIterGJK = 0;
+      auto start = high_resolution_clock::now();
+      for ( ctr = 1; ctr <= nIter && cntct == false; ctr++ )
+      {
+        double distance = closest_points( *convexA, *convexB, *trA, *trB,
+                                          pointA, pointB, nbIterGJK );
+        if ( distance <= 0 )
+          cntct = true;
+      }
+      auto stop = high_resolution_clock::now();
+      auto duration = duration_cast<microseconds>( stop - start );
+      cout << "Contact " << cntct << ", Iter " << ctr << ", No. GJK Iter. "
+           << nbIterGJK  << ", Time taken by GJK: " << duration.count() << " us" << endl;
+    }
 
     // Call analCyl
     {
@@ -165,8 +165,8 @@ void GrainsTestDev::Simulation( double time_interval )
       auto start = high_resolution_clock::now();
       for ( ctr = 1; ctr <= nIter && cntct == false; ctr++ )
       {
-        pt = intersect( bCylA, bCylB, *trA, *trB );
-        // cntct = isContact( bCylA, bCylB, *trA, *trB );
+        // pt = intersect( bCylA, bCylB, *trA, *trB );
+        cntct = isContact( bCylA, bCylB, *trA, *trB );
       }
       auto stop = high_resolution_clock::now();
       auto duration = duration_cast<microseconds>( stop - start );
