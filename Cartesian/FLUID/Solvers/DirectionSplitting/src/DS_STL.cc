@@ -123,7 +123,7 @@ void DS_STL:: compute_rigid_body_halozone( double const& dx )
 
   geomVector const* pgc = get_ptr_to_gravity_centre();
 
-  double r_equi = radius + dx;
+  double r_equi = radius;
 
   geomVector delta(r_equi, r_equi, r_equi);
 
@@ -623,7 +623,7 @@ double DS_STL:: get_circumscribed_radius( ) const
 
   double value = MAC::max(Xmax - Xmin, MAC::max(Ymax - Ymin, Zmax - Zmin));
 
-  return(value);
+  return(0.5*value);
 
 }
 
