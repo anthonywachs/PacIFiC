@@ -3,7 +3,7 @@
 
 using namespace std;
 
-double tol = 5.e-5; // Tolerance used in this class
+double tol = 5.e-7; // Tolerance used in this class
 
 // --------------------------------------------------------------------
 // Default constructor
@@ -331,6 +331,9 @@ PointContact intersect( BCylinder const& a, BCylinder const& b,
         break;
     }
   }
+
+  // if ( ptCont.getOverlapDistance() <= -1.e-5 )
+  //   std::cout << "\t" << counter << " " << ptCont.getOverlapDistance() << "\t" << e_B2A << "\t" << e_A2B << '\n';
 
   switch ( counter )
   {
@@ -739,8 +742,7 @@ void B2EContact( double rA, double hA, double rB, double hB,
   Point3 const& ptCenter = normXY( c1 ) < normXY( c2 ) ? c1 : c2;
   // additional condition to avoid solving the polynomial
   if ( ( fabs( ptCenter[Z] ) > 0.5 * hA + rB ) ||
-       ( sqrt( normXY( ptCenter ) ) > rA + rB ) ||
-       ( fabs( e[Z] ) < tol ) )
+       ( sqrt( normXY( ptCenter ) ) > rA + rB ) )
     return;
 
   // Vector3 const& u = ( e ^ Vector3( 0., 0., 1. ) ).normalized();
@@ -858,7 +860,7 @@ void E2EContact( double rA, double hA, double rB, double hB,
                pow( fabs( c2[Z] ) - .5 * hA, 2 );
   Point3 const& ptCenter1 = d1 < d2 ? c1 : c2; // decide on edge of B
   // additional condition to avoid solving the polynomial
-  if ( ( d1 > rB * rB && d2 > rB * rB ) || fabs( e[Z] - 1. ) < tol )
+  if ( ( d1 > rB * rB && d2 > rB * rB ) )
     return;
 
   // Vector3 const& u1 = ( e1 ^ Vector3( 0., 0., 1. ) ).normalized();
@@ -882,8 +884,8 @@ void E2EContact( double rA, double hA, double rB, double hB,
   double cost1;
   for ( int i = 0; i < nbRoots1; i++ )
   {
-    // if ( fabs( sint1[i] ) <= 1. )
-    // {
+    if ( fabs( sint1[i] ) <= 1. )
+    {
       cost1 = ( s1/2. - r1*sint1[i] - sint1[i]*sint1[i] ) / q1;
       // if ( fabs( cs ) > 1. )
       //   cs = sgn( cs ) * sqrt( 1. - sol[i]*sol[i] );
@@ -906,7 +908,7 @@ void E2EContact( double rA, double hA, double rB, double hB,
           break;
         }
       }
-    // }
+    }
   }
 
   // Contact
