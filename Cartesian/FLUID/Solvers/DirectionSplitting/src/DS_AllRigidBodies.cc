@@ -6479,8 +6479,8 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
 
   intVector value(2,0);
 
-  bounds(0) = periodic_transformation(bounds(0),dir);
-  bounds(1) = periodic_transformation(bounds(1),dir);
+  // bounds(0) = periodic_transformation(bounds(0),dir);
+  // bounds(1) = periodic_transformation(bounds(1),dir);
 
   double global_min = MESH->get_main_domain_min_coordinate(dir);
   double global_max = MESH->get_main_domain_max_coordinate(dir);
