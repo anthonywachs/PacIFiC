@@ -2803,27 +2803,21 @@ void DS_AllRigidBodies:: generate_list_of_local_RB( )
   }
 
   for (size_t m = 0; m < m_nrb; m++) {
-     geomVector const* pgc = m_allDSrigidbodies[m]->get_ptr_to_gravity_centre();
-     double Rp = 5. * MESH->get_smallest_grid_size() +
-                 m_allDSrigidbodies[m]->get_circumscribed_radius();
-
-     double x0 = pgc->operator()(0);
-     double y0 = pgc->operator()(1);
-     double z0 = pgc->operator()(2);
-
-     doubleVector xr(2,x0);
-     xr(0) = xr(0) - Rp;
-     xr(1) = xr(1) + Rp;
+     vector<geomVector*> haloZone = m_allDSrigidbodies[m]
+                                                   ->get_rigid_body_haloZone();
+     doubleVector xr(2,0.);
+     xr(0) = haloZone[0]->operator()(0);
+     xr(1) = haloZone[1]->operator()(0);
      bool found_x = is_bounding_box_in_local_domain(xr,0);
-     doubleVector yr(2,y0);
-     yr(0) = yr(0) - Rp;
-     yr(1) = yr(1) + Rp;
+     doubleVector yr(2,0.);
+     yr(0) = haloZone[0]->operator()(1);
+     yr(1) = haloZone[1]->operator()(1);
      bool found_y = is_bounding_box_in_local_domain(yr,1);
-     doubleVector zr(2,z0);
+     doubleVector zr(2,0.);
      bool found_z = false;
      if (m_space_dimension == 3) {
-        zr(0) = zr(0) - Rp;
-        zr(1) = zr(1) + Rp;
+        zr(0) = haloZone[0]->operator()(2);
+        zr(1) = haloZone[1]->operator()(2);
         found_z = is_bounding_box_in_local_domain(zr,2);
      }
 
@@ -2847,13 +2841,20 @@ DS_AllRigidBodies::is_bounding_box_in_local_domain( class doubleVector& bounds
 
   bool value = false;
 
-  bounds(0) = periodic_transformation(bounds(0),dir);
-  bounds(1) = periodic_transformation(bounds(1),dir);
-
   double local_min = MESH->get_min_coordinate_on_current_processor(dir);
   double local_max = MESH->get_max_coordinate_on_current_processor(dir);
   double global_min = MESH->get_main_domain_min_coordinate(dir);
   double global_max = MESH->get_main_domain_max_coordinate(dir);
+
+  // Added for particle size equivalent to local domain size
+  if ((bounds(1) - bounds(0)) >= (global_max - global_min)) {
+     value = true;
+     return(value);
+  }
+
+  bounds(0) = periodic_transformation(bounds(0),dir);
+  bounds(1) = periodic_transformation(bounds(1),dir);
+
 
   // Getting the minimum grid index in control volume (CV)
   if (bounds(0) < bounds(1)) {// Non-periodic CV
@@ -2885,9 +2886,6 @@ DS_AllRigidBodies::is_bounding_box_in_local_domain( class doubleVector& bounds
 
   }
 
-  // Added for particle size equivalent to local domain size
-  if (MAC::abs(bounds(1) - bounds(0)) >= 0.3*(global_max - global_min))
-  value = true;
 
   return (value);
 
@@ -6478,14 +6476,23 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
   MAC_LABEL( "DS_AllRigidBodies::get_grid_index_of_extents" ) ;
 
   intVector value(2,0);
+  doubleVector boundsOrg(bounds);
 
-  // bounds(0) = periodic_transformation(bounds(0),dir);
-  // bounds(1) = periodic_transformation(bounds(1),dir);
+  bounds(0) = periodic_transformation(boundsOrg(0),dir);
+  bounds(1) = periodic_transformation(boundsOrg(1),dir);
 
   double global_min = MESH->get_main_domain_min_coordinate(dir);
   double global_max = MESH->get_main_domain_max_coordinate(dir);
   double local_min = MESH->get_min_coordinate_on_current_processor(dir);
   double local_max = MESH->get_max_coordinate_on_current_processor(dir);
+
+  // If particle is equivalent to domain size in PBC
+  if ((boundsOrg(1) - boundsOrg(0)) > (global_max - global_min)) {
+     value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
+     value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
+     return(value);
+  }
+
 
   boolVector const* is_periodic = MESH->get_periodic_directions();
 
