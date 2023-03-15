@@ -6518,14 +6518,10 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
                         , bounds(0)
                         , i0_temp) ;
            value(0) = (found) ? (int)i0_temp : 0;
-        } else {
-           value(0) = -1;
         }
      } else {
         if (bounds(1) > local_min) {
            value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
-        } else {
-           value(0) = -1;
         }
      }
   } else {// periodic control volume
@@ -6539,8 +6535,6 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
            value(0) = (found) ? (int)i0_temp : 0;
         } else if (bounds(1) > local_min) {
            value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
-        } else {
-           value(0) = -1;
         }
      } else {
         value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
@@ -6557,14 +6551,10 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
                         , bounds(1)
                         , i0_temp) ;
            value(1) = (found) ? (int)i0_temp : 0;
-        } else {
-           value(1) = -1;
         }
      } else {
         if (bounds(0) < local_max) {
            value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
-        } else {
-           value(1) = -1;
         }
      }
   } else {// periodic control volume
@@ -6578,8 +6568,6 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
            value(1) = (found) ? (int)i0_temp : 0;
         } else if (bounds(0) < local_max) {
            value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
-        } else {
-           value(1) = -1;
         }
      } else {
         value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
