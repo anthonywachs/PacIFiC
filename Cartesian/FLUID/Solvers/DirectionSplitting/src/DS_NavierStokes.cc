@@ -414,10 +414,10 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
    if ((is_par_motion) && (is_solids)) {
 		// Solve equation of motion for all RB and update pos,vel
 		allrigidbodies->solve_RB_equation_of_motion(t_it);
+		allrigidbodies->compute_halo_zones_for_all_rigid_body();
 		allrigidbodies->generate_list_of_local_RB();
 		allrigidbodies->initialize_surface_variables_for_all_RB();
 		allrigidbodies->compute_surface_variables_for_all_RB();
-		allrigidbodies->compute_halo_zones_for_all_rigid_body();
 		allrigidbodies->create_neighbour_list_for_AllRB();
 		// Clear void fraction and intersection data
 		allrigidbodies->clear_GrainsRB_data_on_grid(PF);
