@@ -295,8 +295,8 @@ PostProcessing::compute_fieldVolumeAverageInBox()
          intVector temp =
          get_local_index_of_extents(box_extents, EPSILON, dir, 0);
 
-         min_local_index(dir) = temp(0);
-         max_local_index(dir) = temp(1);
+         min_local_index(dir) = MAC::min(temp(0),temp(1));
+         max_local_index(dir) = MAC::max(temp(0),temp(1));
       }
 
       for (size_t comp = 0; comp < ncomps; comp++) {
@@ -404,24 +404,22 @@ PostProcessing::compute_fieldVolumeAverageAroundRB()
   size_t m_nrb = m_allrigidbodies->get_number_rigid_bodies();
   list<struct fieldVolumeAverageAroundRB>::const_iterator it;
 
-  for (size_t parID = 0; parID < m_nrb; parID++) {
-     for ( it = m_fieldVolumeAverageAroundRB_list.begin()
-         ; it != m_fieldVolumeAverageAroundRB_list.end()
-         ; it++ ) {
-
-         if (m_macCOMM->rank() == 0) {
-            MyFile << "# Average "
-                   << it->field_name
-                   << " around rigid body "
-                   << parID
-                   << " with kernel "
-                   << it->kernelType
-                   << ", the box size "
-                   << it->volumeWidth
-                   << ", and porosity "
-                   << it->withPorosity
-                   << endl;
-         }
+  for ( it = m_fieldVolumeAverageAroundRB_list.begin()
+      ; it != m_fieldVolumeAverageAroundRB_list.end()
+      ; it++ ) {
+      if (m_macCOMM->rank() == 0) {
+         MyFile << "# Average "
+         << it->field_name
+         << " around all rigid bodies"
+         << " with kernel "
+         << it->kernelType
+         << ", the box size "
+         << it->volumeWidth
+         << ", and porosity "
+         << it->withPorosity
+         << endl;
+      }
+     for (size_t parID = 0; parID < m_nrb; parID++) {
 
          FS_RigidBody const* rigidBody = m_allrigidbodies
                                              ->get_ptr_rigid_body(parID);
@@ -444,8 +442,8 @@ PostProcessing::compute_fieldVolumeAverageAroundRB()
             intVector temp =
             get_local_index_of_extents(box_extents, EPSILON, dir, 0);
 
-            min_local_index(dir) = temp(0);
-            max_local_index(dir) = temp(1);
+            min_local_index(dir) = MAC::min(temp(0),temp(1));
+            max_local_index(dir) = MAC::max(temp(0),temp(1));
          }
 
          for (size_t comp = 0; comp < ncomps; comp++) {

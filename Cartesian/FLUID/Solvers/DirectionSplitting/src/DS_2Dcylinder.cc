@@ -72,19 +72,15 @@ void DS_2Dcylinder:: display( ostream& out, size_t const& indent_width ) const
 
 
 //---------------------------------------------------------------------------
-void DS_2Dcylinder:: compute_rigid_body_halozone( )
+void DS_2Dcylinder:: compute_rigid_body_halozone( double const& dx )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_2Dcylinder:: compute_rigid_body_halozone" ) ;
 
-  struct FS_2Dcylinder_Additional_Param const* pagp =
-   dynamic_cast<FS_2Dcylinder*>(m_geometric_rigid_body)
-      ->get_ptr_FS_2Dcylinder_Additional_Param();
-
   geomVector const* pgc = dynamic_cast<FS_RigidBody*>(m_geometric_rigid_body)
                               ->get_ptr_to_gravity_centre();
 
-  double r_equi = 3.0*pagp->radius;
+  double r_equi = get_circumscribed_radius() + dx;
 
   geomVector delta(r_equi, r_equi, r_equi);
 
@@ -196,12 +192,12 @@ geomVector DS_2Dcylinder:: get_rigid_body_angular_velocity( ) const
 
 
 //---------------------------------------------------------------------------
-std::tuple<double,double> DS_2Dcylinder:: get_mass_and_density() const
+std::tuple<double,double,double> DS_2Dcylinder:: get_mass_and_density_and_moi() const
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_2Dcylinder:: get_mass_and_density()" ) ;
 
-  return ( m_geometric_rigid_body->get_mass_and_density() );
+  return ( m_geometric_rigid_body->get_mass_and_density_and_moi() );
 
 }
 
@@ -239,14 +235,27 @@ geomVector const* DS_2Dcylinder:: get_ptr_to_gravity_centre( ) const
 void DS_2Dcylinder:: update_RB_position_and_velocity(geomVector const& pos,
                                                     geomVector const& vel,
                                                     geomVector const& ang_vel,
-                                   vector<geomVector> const& periodic_directions)
+                                   vector<geomVector> const& periodic_directions,
+                                   double const& time_step)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_2Dcylinder:: update_RB_position_and_velocity" ) ;
 
   return (m_geometric_rigid_body->update_RB_position_and_velocity(pos,vel
-                                                                  ,ang_vel
-                                                         ,periodic_directions));
+                                    ,ang_vel,periodic_directions, time_step));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_2Dcylinder:: update_additional_parameters()
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_2Dcylinder:: update_additional_parameters" ) ;
+
+  m_geometric_rigid_body->update_additional_parameters();
 
 }
 
@@ -269,7 +278,7 @@ void DS_2Dcylinder:: compute_surface_points( )
 
   size_t Npoints = m_surface_area.size();
   double d_theta = 2.*MAC::pi()/((double)Npoints);
-  double theta = 0.01*d_theta;
+  double theta = 0.5*d_theta;
 
   for (size_t i = 0; i < Npoints; i++) {
      theta = theta + d_theta;

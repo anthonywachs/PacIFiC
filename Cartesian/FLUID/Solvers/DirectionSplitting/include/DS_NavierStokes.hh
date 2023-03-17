@@ -8,6 +8,7 @@
 #include <boolVector.hh>
 #include <solvercomputingtime.hh>
 #include <MAC_DoubleVector.hh>
+#include <DS_PID.hh>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -31,11 +32,15 @@ struct DS2NS
   double mu_ ;
   double kai_ ;
   string AdvectionScheme_ ;
+  string StencilCorrection_ ;
+  bool is_CConlyDivergence_ ;
+  double FluxRedistThres_ ;
   size_t AdvectionTimeAccuracy_ ;
   bool b_restart_ ;
   bool is_solids_ ;
   bool is_stressCal_;
   string ViscousStressOrder_;
+  string PressureStressOrder_;
   size_t stressCalFreq_;
   bool is_par_motion_;
   FV_DomainAndFields const* dom_ ;
@@ -173,6 +178,22 @@ class DS_NavierStokes : public MAC_Object,
                                         , size_t const& k
                                         , size_t const& component );
 
+      /** @brief Assemble advection term for Centered spacial scheme with FD corrections*/
+      double assemble_advection_Centered_FD( double const& coef
+                                                , size_t const& i
+                                                , size_t const& j
+                                                , size_t const& k
+                                                , size_t const& comp
+                                                , size_t const& level);
+
+      /** @brief Assemble advection term for Centered spacial scheme with CutCell corrections */
+      double assemble_advection_Centered_CutCell( FV_TimeIterator const* t_it
+                                                , double const& coef
+                                                , size_t const& i
+                                                , size_t const& j
+                                                , size_t const& k
+                                                , size_t const& comp
+                                                , size_t const& level);
 
       /** @brief Assemble advection term for TVD spacial scheme */
       double assemble_advection_TVD( size_t const& advecting_level
@@ -190,20 +211,45 @@ class DS_NavierStokes : public MAC_Object,
                                , FV_TimeIterator const* t_it
                                , size_t const& comp
                                , size_t const& dir );
+
+      /** @brief Compute first derivative */
+      std::tuple<double, double>
+            compute_first_derivative ( size_t const& comp
+                             , size_t const& i
+                             , size_t const& j
+                             , size_t const& k
+                             , size_t const& dir
+                             , size_t const& level);
+
       /** @brief Compute diffusive term of velocity field from previous timestep */
       double compute_un_component ( size_t const& comp
+                               , size_t const& i
+                               , size_t const& j
+                               , size_t const& k
+                               , size_t const& dir
+                               , size_t const& level);
+      /** @brief Compute diffusive term of velocity field from previous timestep */
+      double compute_un_component_FD ( size_t const& comp
                                   , size_t const& i
                                   , size_t const& j
                                   , size_t const& k
                                   , size_t const& dir
                                   , size_t const& level);
+      /** @brief Compute diffusive term of velocity field from previous timestep */
+      double compute_un_component_FV ( size_t const& comp
+                                , size_t const& i
+                                , size_t const& j
+                                , size_t const& k
+                                , size_t const& dir
+                                , size_t const& level);
       /** @brief Compute diffusive term of pressure field from previous timestep */
       double compute_p_component ( size_t const& comp
                                  , size_t const& i
                                  , size_t const& j
                                  , size_t const& k);
       /** @brief Compute advective term based on either Upwind or TVD spacial scheme */
-      double compute_adv_component ( size_t const& comp
+      double compute_adv_component ( FV_TimeIterator const* t_it
+                                   , size_t const& comp
                                    , size_t const& i
                                    , size_t const& j
                                    , size_t const& k);
@@ -213,12 +259,16 @@ class DS_NavierStokes : public MAC_Object,
 
       void assemble_velocity_diffusion_terms ( );
 
+      void assemble_velocity_advection_terms ( FV_TimeIterator const* t_it );
+
       void calculate_row_indexes ( FV_DiscreteField const* FF);
 
-      double divergence_of_U( size_t const& i
+      void compute_velocity_divergence ( FV_DiscreteField const* FF );
+
+      double divergence_of_U_noCorrection( size_t const& i
                             , size_t const& j
                             , size_t const& k
-                            , size_t const& component
+                            , size_t const& comp
                             , size_t const& level);
 
       /** @brief Call functions to assemble rhs for pressure or velocity fields in any direction */
@@ -230,12 +280,18 @@ class DS_NavierStokes : public MAC_Object,
                                , size_t const& dir
                                , size_t const& field);
 
-      /** @brief Assemble rhs for pressure in any direction */
-      double calculate_velocity_divergence ( size_t const& i
+      /** @brief Assemble divergence for penelty step */
+      double calculate_velocity_divergence_FD ( size_t const& i
                                            , size_t const& j
                                            , size_t const& k
-                                           , size_t const& level
-                                           , FV_TimeIterator const* t_it);
+                                           , size_t const& level);
+
+      /** @brief Assemble divergence for penelty step */
+      double calculate_velocity_divergence_cutCell ( size_t const& i
+                                           , size_t const& j
+                                           , size_t const& k
+                                           , size_t const& level);
+
 
       double assemble_velocity_gradients (class doubleVector& grad
                                         , size_t const& i
@@ -262,6 +318,10 @@ class DS_NavierStokes : public MAC_Object,
       void correct_pressure_2nd_layer_solid (size_t const& level );
 
       void correct_mean_pressure (size_t const& level );
+
+      void predicted_pressure_drop (FV_TimeIterator const* t_it);
+
+      double get_current_mean_flow_speed();
 
       /** @brief Solve interface unknowns for
       both fields in any particular direction */
@@ -334,6 +394,8 @@ class DS_NavierStokes : public MAC_Object,
 
       void output_L2norm_velocity( size_t const& level );
 
+      doubleVector compute_outOfDomain_Pressure(size_t const& level);
+
       /** @brief Compute velocity change from one time step to the
       next one with the direction splitting solution method */
       double compute_DS_velocity_change( void );
@@ -383,6 +445,7 @@ class DS_NavierStokes : public MAC_Object,
       FV_DiscreteField* PF;
 
       DS_NavierStokesSystem* GLOBAL_EQ ;
+      DS_PID* controller;
 
       size_t nb_procs;
       size_t my_rank;
@@ -407,6 +470,9 @@ class DS_NavierStokes : public MAC_Object,
       double mu;
       double kai;
       string AdvectionScheme;
+      string StencilCorrection;
+      bool is_CConlyDivergence;
+      double FluxRedistThres;
       size_t AdvectionTimeAccuracy;
       double rho;
       bool b_restart ;
@@ -414,6 +480,7 @@ class DS_NavierStokes : public MAC_Object,
 
       bool is_stressCal;
       string ViscousStressOrder;
+      string PressureStressOrder;
       double surface_cell_scale;
       size_t stressCalFreq;
       bool is_par_motion;
@@ -430,12 +497,16 @@ class DS_NavierStokes : public MAC_Object,
       size_t translation_direction;
       double bottom_coordinate;
       double translated_distance;
+      int outOfDomain_boundaryID;
+
+      double Qold;
 
       boolVector const* P_periodic_comp;
       boolVector const* U_periodic_comp;
       MAC_DoubleVector* gravity_vector ;
       bool is_periodic[2][3];
 
+      bool exceed, turn;
 } ;
 
 #endif

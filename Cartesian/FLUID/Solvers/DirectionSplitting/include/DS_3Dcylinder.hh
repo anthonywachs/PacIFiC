@@ -54,7 +54,7 @@ class DS_3Dcylinder: public DS_RigidBody
 
       /** @brief Computes the min and max extents of the 3D cylinder halozone
       , required for the computation of void fraction */
-      void compute_rigid_body_halozone( );
+      void compute_rigid_body_halozone( double const& dx );
 
       /** @brief Compute the surface points by discretizing the 3D cylinder
       surface in approximately equal areas (if possible) */
@@ -103,7 +103,7 @@ class DS_3Dcylinder: public DS_RigidBody
       geomVector const* get_ptr_to_gravity_centre( ) const;
 
       /** @brief Returns a tuple of mass and density of RB */
-      std::tuple<double,double> get_mass_and_density() const;
+      std::tuple<double,double,double> get_mass_and_density_and_moi() const;
 
       /** @brief Returns circumscribed radius */
       double get_circumscribed_radius( ) const;
@@ -112,9 +112,13 @@ class DS_3Dcylinder: public DS_RigidBody
       @param pos updated position
       @param vel updated translation velocity */
       void update_RB_position_and_velocity(geomVector const& pos,
-                                           geomVector const& vel,
-                                           geomVector const& ang_vel,
-                         vector<geomVector> const& periodic_directions);
+                                                   geomVector const& vel,
+                                                   geomVector const& ang_vel,
+                         vector<geomVector> const& periodic_directions,
+                         double const& time_step);
+
+      /** @brief Update additional parameters of each RB type */
+      void update_additional_parameters( );
 
       /** @brief Compute number of points on a 3D cylinder
       @param surface_cell_scale scale of surface cell compared with the grid

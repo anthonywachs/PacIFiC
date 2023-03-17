@@ -114,7 +114,7 @@ void DS_STL:: display( ostream& out, size_t const& indent_width ) const
 
 
 //---------------------------------------------------------------------------
-void DS_STL:: compute_rigid_body_halozone( )
+void DS_STL:: compute_rigid_body_halozone( double const& dx )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_STL:: compute_rigid_body_halozone" ) ;
@@ -123,7 +123,7 @@ void DS_STL:: compute_rigid_body_halozone( )
 
   geomVector const* pgc = get_ptr_to_gravity_centre();
 
-  double r_equi = 3.0*radius;
+  double r_equi = radius;
 
   geomVector delta(r_equi, r_equi, r_equi);
 
@@ -596,7 +596,7 @@ geomVector DS_STL:: get_rigid_body_angular_velocity( ) const
 
 
 //---------------------------------------------------------------------------
-std::tuple<double,double> DS_STL:: get_mass_and_density() const
+std::tuple<double,double,double> DS_STL:: get_mass_and_density_and_moi() const
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_STL:: get_mass_and_density()" ) ;
@@ -620,10 +620,10 @@ double DS_STL:: get_circumscribed_radius( ) const
   double Ymax = m_MESH->get_main_domain_max_coordinate(1);
   double Zmin = m_MESH->get_main_domain_min_coordinate(2);
   double Zmax = m_MESH->get_main_domain_max_coordinate(2);
-  
+
   double value = MAC::max(Xmax - Xmin, MAC::max(Ymax - Ymin, Zmax - Zmin));
 
-  return(value);
+  return(0.5*value);
 
 }
 
@@ -658,10 +658,23 @@ geomVector const* DS_STL:: get_ptr_to_gravity_centre( ) const
 void DS_STL:: update_RB_position_and_velocity(geomVector const& pos,
                                                     geomVector const& vel,
                                                     geomVector const& ang_vel,
-                                   vector<geomVector> const& periodic_directions)
+                                   vector<geomVector> const& periodic_directions,
+                                    double const& time_step)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_STL:: update_RB_position_and_velocity" ) ;
+
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_STL:: update_additional_parameters()
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_STL:: update_additional_parameters" ) ;
 
 
 }

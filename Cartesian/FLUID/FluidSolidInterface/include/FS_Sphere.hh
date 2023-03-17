@@ -93,6 +93,9 @@ class FS_Sphere: public FS_RigidBody
                             , double const& y
                             , double const& z ) const;
 
+      /** @brief Update additional parameters */
+      void update_additional_parameters( );
+
       //@}
 
 

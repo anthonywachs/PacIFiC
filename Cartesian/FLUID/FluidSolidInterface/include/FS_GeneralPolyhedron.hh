@@ -1,5 +1,5 @@
-#ifndef _FS_3DCYLINDER__
-#define _FS_3DCYLINDER__
+#ifndef _FS_GENERALPOLYHEDRON__
+#define _FS_GENERALPOLYHEDRON__
 
 #include <FS_RigidBody.hh>
 #include <iostream>
@@ -7,25 +7,26 @@ using std::istream ;
 
 
 /** @brief Additional geometric parameters for the sphere */
-struct FS_3Dcylinder_Additional_Param
+struct FS_GeneralPolyhedron_Additional_Param
 {
-  geomVector BottomCenter; /**< Center of the bottom disk */
-  geomVector TopCenter; /**< Center of the top disk */
-  geomVector BottomToTopVec; /**< Axial vector from the bottom to the top disk
-    	center */
-  geomVector RadialRefVec; /**< Radial reference vector */
-  double cylinder_radius; /**< Cylinder radius */
-  double cylinder_height; /**< Cylinder height */
+  vector<geomVector> corners; /**< Corner coordinates of the polyhedron */
+  vector<vector<size_t> > facesVec; /**< polygonal faces numbering */
+  vector<geomVector> faceCen; /**< Stores the face center of each face */
+  vector<geomVector> ref_corners; /**< Reference Corner coordinates
+                                       of the polyhedron */
+  // geomVector* g2; /**< slightly randomly translated gravity center */
+  // geomVector coor_min; /**< minimal coordinates of the bounding box */
+  // geomVector coor_max; /**< maximal coordinates of the bounding box */
 };
 
 
-/** @brief The class FS_3Dcylinder.
+/** @brief The class FS_GeneralPolyhedron.
 
-A moving or stationary rigid 3D cylinder of axisymmetric cross-section.
+A moving or stationary rigid GeneralPolyhedron of axisymmetric cross-section.
 
-@author A. Wachs - Pacific project 2021 */
+@author A. Goyal - Pacific project 2021 */
 
-class FS_3Dcylinder: public FS_RigidBody
+class FS_GeneralPolyhedron: public FS_RigidBody
 {
    public: //-----------------------------------------------------------------
 
@@ -34,15 +35,15 @@ class FS_3Dcylinder: public FS_RigidBody
       /**@name Constructors & Destructor */
       //@{
       /** @brief Default constructor */
-      FS_3Dcylinder();
+      FS_GeneralPolyhedron();
 
       /** @brief Constructor with arguments
       @param in input stream where features of rigid bodies are read
       @param id_ identification number */
-      FS_3Dcylinder( istream& in, size_t& id_ );
+      FS_GeneralPolyhedron( istream& in, size_t& id_ );
 
       /** @brief Destructor */
-      ~FS_3Dcylinder();
+      ~FS_GeneralPolyhedron();
       //@}
 
 
@@ -52,8 +53,8 @@ class FS_3Dcylinder: public FS_RigidBody
       //@{
       /** @brief Returns a constant pointer to the structure containing the
       additional geometric parameters for the sphere */
-      struct FS_3Dcylinder_Additional_Param const*
-      	get_ptr_FS_3Dcylinder_Additional_Param() const;
+      struct FS_GeneralPolyhedron_Additional_Param const*
+      	get_ptr_FS_GeneralPolyhedron_Additional_Param() const;
 
       //@}
 
@@ -99,9 +100,35 @@ class FS_3Dcylinder: public FS_RigidBody
                             , double const& y
                             , double const& z ) const;
 
+      /** @brief Calculate determinant 4 X 4 for checking
+      a point in tetrahedron */
+      double calcPointDeterm4by4( const geomVector &pointOne,
+              const geomVector &pointTwo, const geomVector &pointThree,
+              const geomVector &pointFour ) const;
+
+      /** @brief Check whether a point is inside a tetrahedron */
+      bool checkPointInTetrahedron( const geomVector &pointOne,
+           const geomVector &pointTwo, const geomVector &pointThree,
+           const geomVector &pointFour, const geomVector &pointToCheck ) const;
+
+      /** @brief Calculates the relative
+      distance of a point from a tetrahedron */
+      double DistOfPointFromTetrahedron( const geomVector &pointOne,
+         const geomVector &pointTwo, const geomVector &pointThree,
+         const geomVector &pointFour, const geomVector &pointToCheck ) const;
+
+      /** @brief Reverse tranform the corners of the actual GENERAL POLYHEDRON to the
+      reference GENERAL POLYHEDRON
+      @param pt point to transform */
+      void compute_reverseTransformationOfCorners( );
+
+      /** @brief Tranform the corners of the reference GENERAL POLYHEDRON to the
+      actual GENERAL POLYHEDRON
+      @param pt point to transform */
+      void compute_TransformationOfCorners( );
+
       /** @brief Update additional parameters */
       void update_additional_parameters( );
-
       //@}
 
 
@@ -111,7 +138,7 @@ class FS_3Dcylinder: public FS_RigidBody
 
       /**@name Parameters */
       //@{
-      struct FS_3Dcylinder_Additional_Param m_agp_3dcyl; /**< Additional
+      struct FS_GeneralPolyhedron_Additional_Param m_agp_poly; /**< Additional
       	geometric parameters for the 3D cylinder */
       //@}
 
@@ -123,8 +150,8 @@ class FS_3Dcylinder: public FS_RigidBody
       /**@name Constructors & Destructor */
       //@{
       /** @brief Copy constructor
-      @param copy copied FS_3Dcylinder object */
-      FS_3Dcylinder( FS_3Dcylinder const& copy );
+      @param copy copied FS_GeneralPolyhedron object */
+      FS_GeneralPolyhedron( FS_GeneralPolyhedron const& copy );
       //@}
 
 

@@ -260,10 +260,10 @@ double FS_3Dcylinder:: level_set_value( geomVector const& pt ) const
   if ( dot < m_agp_3dcyl.cylinder_height &&
        dot > -EPSILON &&
        rad_sq_dist < EPSILON) {
-     value = fabs(fabs(dot) - m_agp_3dcyl.cylinder_height)*rad_sq_dist;
+     value = -1.*fabs(fabs(dot) - m_agp_3dcyl.cylinder_height)*fabs(rad_sq_dist);
   } else {
-     value = MAC::min(fabs(fabs(dot)-m_agp_3dcyl.cylinder_height)
-                    , fabs(rad_sq_dist));
+     value = MAC::sqrt(MAC::pow((fabs(dot)-m_agp_3dcyl.cylinder_height),2.)
+                     + MAC::pow(fabs(rad_sq_dist),2.));
   }
 
   return ( value );
@@ -295,10 +295,10 @@ double FS_3Dcylinder:: level_set_value( double const& x
   if ( dot < m_agp_3dcyl.cylinder_height &&
        dot > -EPSILON &&
        rad_sq_dist < EPSILON) {
-     value = fabs(fabs(dot) - m_agp_3dcyl.cylinder_height)*rad_sq_dist;
+     value = -1.*fabs(fabs(dot) - m_agp_3dcyl.cylinder_height)*fabs(rad_sq_dist);
   } else {
-     value = MAC::min(fabs(fabs(dot)-m_agp_3dcyl.cylinder_height)
-                    , fabs(rad_sq_dist));
+     value = MAC::sqrt(MAC::pow((fabs(dot)-m_agp_3dcyl.cylinder_height),2.)
+                     + MAC::pow(fabs(rad_sq_dist),2.));
   }
 
   return ( value );
@@ -316,5 +316,18 @@ struct FS_3Dcylinder_Additional_Param const* FS_3Dcylinder::
   MAC_LABEL( "FS_3Dcylinder:: isIn(x,y,z)" ) ;
 
   return( &m_agp_3dcyl );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_3Dcylinder::update_additional_parameters( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_3Dcylinder:: update_additional_parameters( )" ) ;
+
+
 
 }

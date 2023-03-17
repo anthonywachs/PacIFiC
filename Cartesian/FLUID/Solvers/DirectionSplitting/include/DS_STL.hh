@@ -57,7 +57,7 @@ class DS_STL: public DS_RigidBody
       /** @brief Compute the halozone of a rigid body
       @param out output stream
       @param indent_width indentation width */
-      void compute_rigid_body_halozone( );
+      void compute_rigid_body_halozone( double const& dx );
 
       /** @brief Compute the surface points by discretizing the rigid body
       surface in approximately equal areas (if possible) */
@@ -109,17 +109,19 @@ class DS_STL: public DS_RigidBody
       double get_circumscribed_radius( ) const;
 
       /** @brief Returns a tuple of mass and density of RB */
-      std::tuple<double,double> get_mass_and_density() const;
+      std::tuple<double,double,double> get_mass_and_density_and_moi() const;
 
       /** @brief Update the RB position and velocity
       @param pos updated position
       @param vel updated translation velocity */
       void update_RB_position_and_velocity(geomVector const& pos,
-          geomVector const& vel,
-          geomVector const& ang_vel,
-          vector<geomVector> const& periodic_directions);
+                                                   geomVector const& vel,
+                                                   geomVector const& ang_vel,
+                         vector<geomVector> const& periodic_directions,
+                         double const& time_step);
 
-
+      /** @brief Update additional parameters of each RB type */
+      void update_additional_parameters( );
 
       /** @brief Compute number of points on a rigid body
       @param surface_cell_scale scale of surface cell compared with the grid
@@ -250,7 +252,7 @@ class DS_STL: public DS_RigidBody
 
       FV_Mesh const* m_MESH;
 
-      geomVector* ptr_gravity_centre; 
+      geomVector* ptr_gravity_centre;
 
       //@}
 };
