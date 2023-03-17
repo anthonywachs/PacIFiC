@@ -37,7 +37,6 @@
 
 # Others
 #*.dtd
-#*Makedepend
 *.so.*
 #PacIFiC-*.env.sh
 GRAINS/Env/grains-*.env.sh
@@ -46,6 +45,9 @@ Cartesian/MacWorld/Env/macworld-*.env.sh
 Cartesian/MacWorld/MAC/include/*
 *.mak
 .tags*
+Makedepend
+Maketmp
+GRAINS_V1/Env/grains-*.env.sh
 
 # Basilisk test files
 *.tst

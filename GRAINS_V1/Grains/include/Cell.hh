@@ -38,7 +38,14 @@ enum GeoPosition
     GEOPOS_WEST_BEHIND		= 23,
     GEOPOS_FRONT		= 24,
     GEOPOS_BEHIND		= 25,
-    GEOPOS_NONE			= 26                       
+    GEOPOS_NONE			= 26,
+    // Special cases for periodicity with a single cell in the periodic
+    // direction
+    // Note: all cases are not considered so far, only those with practical
+    // applications
+    GEOPOS_EASTWEST		= 27,
+    GEOPOS_NORTHSOUTH		= 28,
+    GEOPOS_EASTWESTNORTHSOUTH   = 29                              
   };
   
     
@@ -178,7 +185,19 @@ class Cell
     /** @brief Removes an obstacle from the list of obstacles in the vicinity of
     the cell
     @param obs obstacle to be removed */
-    void remove( SimpleObstacle* obs );  
+    void remove( SimpleObstacle* obs ); 
+    
+    /** @brief Returns whether a point belongs to any particle that belongs to 
+    the cell
+    @param position the point coordinates */
+    bool isInParticle( Point3 const& position ) const;
+    
+    /** @brief Returns whether a point belongs to a specific particle that 
+    belongs to the cell
+    @param position the point coordinates 
+    @param particle_ the specific particle */
+    bool isInParticle( Point3 const& position, Particle const* particle_ ) 
+    	const;                 
   
     /** @brief Output operator
     @param f output stream

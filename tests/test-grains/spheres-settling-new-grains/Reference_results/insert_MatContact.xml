@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<GRAINS>
+
+  <Materials>
+    <Material value="1">matP</Material>
+    <Material value="0">matW</Material>
+  </Materials>
+
+  <ContactForceModels>
+    <ContactForceModel type="1" value="1">
+      <Parameters>
+        <Parameter name="en">0.85</Parameter>
+        <Parameter name="eps">1e-10</Parameter>
+        <Parameter name="f">0</Parameter>
+        <Parameter name="ks">300</Parameter>
+        <Parameter name="muc">0.62</Parameter>
+        <Parameter name="mur">0.2</Parameter>
+        <Parameter name="mut">1000</Parameter>
+        <Parameter name="nr">0</Parameter>
+        <Parameter name="stiff">450000</Parameter>
+      </Parameters>
+    </ContactForceModel>
+  </ContactForceModels>
+
+</GRAINS>

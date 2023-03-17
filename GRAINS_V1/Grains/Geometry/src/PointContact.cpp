@@ -12,10 +12,10 @@ PointContact::PointContact()
 
 // ----------------------------------------------------------------------------
 // Constructor with contact point location in the world reference
-// frame, overlap vector, overlap distance and number of iterations of GJK as 
+// frame, overlap vector, overlap distance and number of iterations of GJK as
 // input parameters
-PointContact::PointContact( Point3 const& point_, Vector3 const& ov_, 
-	double distance_, int num_iter_ ) 
+PointContact::PointContact( Point3 const& point_, Vector3 const& ov_,
+	double distance_, int num_iter_ )
   : m_contact( point_ )
   , m_overlapvector( ov_ )
   , m_overlapdistance( distance_ )
@@ -28,12 +28,12 @@ PointContact::PointContact( Point3 const& point_, Vector3 const& ov_,
 // ----------------------------------------------------------------------------
 // Constructor with contact point location in the world reference
 // frame, the point in the 1st rigid body that realizes the minimal distance in
-// the rigid body reference frame, the point in the 2nd rigid body that 
-// realizes the minimal distance in the rigid body reference frame, overlap 
+// the rigid body reference frame, the point in the 2nd rigid body that
+// realizes the minimal distance in the rigid body reference frame, overlap
 // vector, overlap distance and number of iterations of GJK as input parameters
-PointContact::PointContact( Point3 const& point_, Point3 const& pointA_, 
-    	Point3 const& pointB_, Vector3 const& ov_, 
-	double distance_, int num_iter_ ) 
+PointContact::PointContact( Point3 const& point_, Point3 const& pointA_,
+    	Point3 const& pointB_, Vector3 const& ov_,
+	double distance_, int num_iter_ )
   : m_contact( point_ )
   , m_contactA( pointA_ )
   , m_contactB( pointB_ )
@@ -46,12 +46,12 @@ PointContact::PointContact( Point3 const& point_, Point3 const& pointA_,
 
 
 // ----------------------------------------------------------------------------
-// Copy constructor 
+// Copy constructor
 PointContact::PointContact( PointContact const& pc_ )
 {
   m_contact = pc_.m_contact;
-  m_contactA = pc_.m_contactA;  
-  m_contactB = pc_.m_contactB;  
+  m_contactA = pc_.m_contactA;
+  m_contactB = pc_.m_contactB;
   m_overlapvector = pc_.m_overlapvector;
   m_overlapdistance = pc_.m_overlapdistance;
   m_nbIterGJK = pc_.m_nbIterGJK;
@@ -61,7 +61,7 @@ PointContact::PointContact( PointContact const& pc_ )
 
 
 // ----------------------------------------------------------------------------
-// Destructor 
+// Destructor
 PointContact::~PointContact()
 {}
 
@@ -167,8 +167,8 @@ PointContact& PointContact::operator = ( PointContact const& rhs )
   if ( this != &rhs )
   {
     m_contact = rhs.m_contact;
-    m_contactA = rhs.m_contactA;  
-    m_contactB = rhs.m_contactB;  
+    m_contactA = rhs.m_contactA;
+    m_contactB = rhs.m_contactB;
     m_overlapvector = rhs.m_overlapvector;
     m_overlapdistance = rhs.m_overlapdistance;
     m_nbIterGJK = rhs.m_nbIterGJK;

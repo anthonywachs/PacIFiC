@@ -13,7 +13,7 @@ class Component;
 
     To manage contact errors as exceptions.
 
-    @author G.FERRER - Institut Francais du Petrole - 2000 - Creation 
+    @author G.FERRER - Institut Francais du Petrole - 2000 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class ContactError
@@ -23,9 +23,9 @@ class ContactError
     //@{
     /** @brief Default contructor */
     ContactError();
-  
+
     /** @brief Destructor */
-    ~ContactError();  
+    ~ContactError();
     //@}
 
 
@@ -35,18 +35,18 @@ class ContactError
     @param fileOut output stream */
     void Message( ostream& fileOut ) const;
 
-    /** @brief Sets the pointers to the 2 components involved in the contact 
-    error and the time of the contact error 
+    /** @brief Sets the pointers to the 2 components involved in the contact
+    error and the time of the contact error
     @param id0_ 1st component
-    @param id1_ 2nd component 
+    @param id1_ 2nd component
     @param time_ physical time */
     void setComponents( Component* id0_, Component* id1_, double time_ );
 
     /** @brief Sets header message
     @param mes header message of exception */
     void setMessage( string const& mes );
-  
-    /** @brief Returns the pointers to the 2 components involved in the contact 
+
+    /** @brief Returns the pointers to the 2 components involved in the contact
     error in a list for further post-processing */
     list<Component*> getComponents();
     //@}
@@ -58,7 +58,7 @@ class ContactError
     string m_message; /**< Header message of the exception */
     Component *m_id0; /**< 1st component involved in the contact error */
     Component *m_id1; /**< 2nd component involved in the contact error */
-    double m_time; /**< physical time */  
+    double m_time; /**< physical time */
     //@}
 };
 
@@ -79,43 +79,42 @@ class DisplacementError
     //@{
     /** @brief Constructor with input parameters
     @param id0_ component
-    @param depl component displacement 
+    @param depl component displacement
     @param deplMax maximum displacement allowed
     @param time_ physical time */
-    DisplacementError( Component* id0_, double depl, double deplMax, 
+    DisplacementError( Component* id0_, double depl, double deplMax,
   	double time_ );
-  
+
+    /** @name Contructors */
+    //@{
+    /** @brief Default constructor (forbidden) */
+    DisplacementError();
+    //@}
+
     /** @brief Destructor */
     ~DisplacementError();
     //@}
 
-  
+
     /**@name Methods */
     //@{
     /** @brief Outputs message when exception is caught
     @param fileOut output stream */
     void Message( ostream& fileOut ) const;
-  
+
     /** @brief Returns the pointer to the component involved in the displacement
     error in a list for further post-processing */
-    list<Component*> getComponent();  
+    list<Component*> getComponent();
     //@}
 
 
   private:
     /** @name Parameters */
     //@{
-    Component *m_id0; /**< Component */  
+    Component *m_id0; /**< Component */
     double m_depl; /**< Component displacement */
     double m_deplMax; /**< Maximum displacement allowed */
     double m_time; /**< physical time */
-    //@}
-
-
-    /** @name Contructors */
-    //@{
-    /** @brief Default constructor (forbidden) */
-    DisplacementError();
     //@}
 };
 
@@ -137,8 +136,8 @@ class SimulationError
     /** @brief Default constructor */
     SimulationError();
 
-    /** @brief Constructor with the name of the method involved in the error 
-    as an input parameter 
+    /** @brief Constructor with the name of the method involved in the error
+    as an input parameter
     @param str method name */
     SimulationError( string const& str );
 
@@ -156,7 +155,7 @@ class SimulationError
 
   private:
     /**@name Parameters */
-    //@{  
+    //@{
     string m_method; /**< name of the method involved in the error  */
     //@}
 };

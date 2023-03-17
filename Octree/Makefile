@@ -50,7 +50,7 @@ compile: clean
 	cd $(BASILISK)/wsServer; make clean; cd $(OCTREE_HOME)
 #	cd $(BASILISK)/bview; make clean; cd $(OCTREE_HOME) 
 	@echo "Now compiling $(BASILISK)"
-	cd $(BASILISK)/gl; CFLAGS+="-I$(BASILISK_MESA_INCDIR) -I$(BASILISK_GLU_INCDIR)" make libglutils.a libfb_osmesa.a; cd $(OCTREE_HOME) 
+	cd $(BASILISK)/gl; CFLAGS="-I${BASILISK_MESA_INCDIR} -I${BASILISK_GLU_INCDIR}" make libglutils.a libfb_osmesa.a; cd $(OCTREE_HOME) 
 	cd $(BASILISK); make -k; make; cd $(OCTREE_HOME)
 
 		

@@ -30,23 +30,23 @@ void ContactError::Message( ostream& fileOut ) const
   fileOut << "ERR Contact : " << m_message << endl; 
 
   fileOut << "Component 0 : " << endl;
-  fileOut << "  Numero = " << m_id0->getMasterComponent()->getID() << endl;
+  fileOut << "  Number = " << m_id0->getMasterComponent()->getID() << endl;
   //fileOut << "  Numero = " << id0->getID() << endl;
 //   if ( m_id0->getID() == -2 ) 
 //     fileOut << "  Numero de la particle de reference = " 
 //    	<< m_id0->getPeriodicReferenceID() << endl;
-  fileOut << "  Classe = ";
+  fileOut << "  Class = ";
   if ( m_id0->getGeometricType() != -100 ) 
     fileOut << m_id0->getGeometricType() << endl;
   else fileOut << "Obstacle" << endl;
-  fileOut << "  Rayon d'interaction = " << m_id0->getCrustThickness() << endl;  
-  fileOut << "  Position = " << *(m_id0->getPosition());
-  fileOut << "  Velocity de translation = " << 
+  fileOut << "  Crust thickness = " << m_id0->getCrustThickness() << endl;  
+  fileOut << "  Position = " << *(m_id0->getPosition()) << endl;
+  fileOut << "  Translational velocity = " << 
   	*(m_id0->getTranslationalVelocity());
-  fileOut << "    Norme = " << Norm( *(m_id0->getTranslationalVelocity()) ) 
+  fileOut << "    Norm = " << Norm( *(m_id0->getTranslationalVelocity()) ) 
   	<< endl;  
-  fileOut << "  Velocity de rotation = " << *(m_id0->getAngularVelocity());    
-  fileOut << "    Norme = " << Norm( *(m_id0->getAngularVelocity()) ) << endl;    
+  fileOut << "  Angular velocity = " << *(m_id0->getAngularVelocity());    
+  fileOut << "    Norm = " << Norm( *(m_id0->getAngularVelocity()) ) << endl;
 
   fileOut << "Component 1 : " << endl;
   fileOut << "  Numero = " << m_id1->getMasterComponent()->getID() << endl; 
@@ -55,22 +55,22 @@ void ContactError::Message( ostream& fileOut ) const
 //     fileOut << "  Numero de la particle de reference = " 
 //    	<< m_id1->getPeriodicReferenceID() << endl
 // 	<< "  Nb de periodes = " << m_id1->getNbPeriodes() << endl;   
-  fileOut << "  Classe = ";
+  fileOut << "  Class = ";
   if ( m_id1->getGeometricType() != -100 ) 
     fileOut << m_id1->getGeometricType() << endl;
   else fileOut << "Obstacle" << endl;
-  fileOut << "  Rayon d'interaction = " << m_id1->getCrustThickness() << endl;
-  fileOut << "  Position = " << *(m_id1->getPosition());
-  fileOut << "  Velocity de translation = " << 
+  fileOut << "  Crust thickness = " << m_id1->getCrustThickness() << endl;
+  fileOut << "  Position = " << *(m_id1->getPosition()) << endl;
+  fileOut << "  Translational velocity = " << 
   	*(m_id1->getTranslationalVelocity());
-  fileOut << "    Norme = " << Norm( *(m_id1->getTranslationalVelocity()) ) 
+  fileOut << "    Norm = " << Norm( *(m_id1->getTranslationalVelocity()) ) 
   	<< endl;  
-  fileOut << "  Velocity de rotation = " << *(m_id1->getAngularVelocity());    
-  fileOut << "    Norme = " << Norm( *(m_id1->getAngularVelocity()) ) << endl; 
+  fileOut << "  Angular velocity = " << *(m_id1->getAngularVelocity());    
+  fileOut << "    Norm = " << Norm( *(m_id1->getAngularVelocity()) ) << endl; 
   
-  fileOut << "Distance entre GC = " << 
+  fileOut << "Distance between GC = " << 
   	Norm( *m_id0->getPosition() - *m_id1->getPosition() ) << endl;
-  fileOut << "Penetration max autorise = " << 
+  fileOut << "Max overlap allowed = " << 
   	m_id0->getCrustThickness() + m_id1->getCrustThickness() << endl;
 }
 
@@ -152,25 +152,25 @@ DisplacementError::~DisplacementError()
 // Outputs message when exception is caught
 void DisplacementError::Message( ostream& fileOut ) const
 {
-  fileOut << "ERR Deplacement : " << m_depl 
-	<< " pour " << m_deplMax << " autorise a t=" 
+  fileOut << "ERR Displacement : " << m_depl 
+	<< " compared to " << m_deplMax << " allowed at t=" 
 	<< GrainsExec::doubleToString(m_time,TIMEFORMAT) << endl;
   fileOut << "Component : " << endl;
-  fileOut << "  Numero = " << m_id0->getID() << endl;
+  fileOut << "  Number = " << m_id0->getID() << endl;
 //   if ( m_id0->getID() == -2 ) 
 //     fileOut << "  Numero de la particle de reference = " 
 //    	<< m_id0->getPeriodicReferenceID() << endl;
-  fileOut << "  Classe = ";
+  fileOut << "  Class = ";
   if ( m_id0->getGeometricType() != -100 ) 
     fileOut << m_id0->getGeometricType() << endl;
   else fileOut << "Obstacle" << endl;
-  fileOut << "  Position = " << *m_id0->getPosition(); 
-  fileOut << "  Velocity de translation = " << 
+  fileOut << "  Position = " << *m_id0->getPosition() << endl;; 
+  fileOut << "  Translational velocity = " << 
   	*(m_id0->getTranslationalVelocity());
-  fileOut << "    Norme = " << Norm( *(m_id0->getTranslationalVelocity()) ) 
+  fileOut << "    Norm = " << Norm( *(m_id0->getTranslationalVelocity()) ) 
   	<< endl;
-  fileOut << "  Velocity de rotation = " << *(m_id0->getAngularVelocity());    
-  fileOut << "    Norme = " << Norm( *(m_id0->getAngularVelocity()) ) << endl;
+  fileOut << "  Angular velocity = " << *(m_id0->getAngularVelocity());    
+  fileOut << "    Norm = " << Norm( *(m_id0->getAngularVelocity()) ) << endl;
 }
 
 

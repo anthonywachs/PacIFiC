@@ -18,7 +18,7 @@ using namespace std;
 
 // ----------------------------------------------------------------------------
 // Constructor with name as input parameter
-SimpleObstacle::SimpleObstacle( const string &s ) 
+SimpleObstacle::SimpleObstacle( const string &s )
   : Obstacle( s )
   , m_transferToFluid( false )
 {
@@ -33,7 +33,7 @@ SimpleObstacle::SimpleObstacle( const string &s )
 
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter
-SimpleObstacle::SimpleObstacle( DOMNode *root ) 
+SimpleObstacle::SimpleObstacle( DOMNode *root )
   : Obstacle()
   , m_transferToFluid( false )
 {
@@ -42,7 +42,7 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
   Obstacle::m_totalNbSingleObstacles++;
 
   m_name = ReaderXML::getNodeAttr_String( root, "name" );
-  
+
   // Convex - Position & Orientation
   m_geoRBWC = new RigidBodyWithCrust( root );
 
@@ -50,16 +50,16 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
   DOMNode* materiau_ = ReaderXML::getNode( root, "Material" );
   m_materialName = ReaderXML::getNodeValue_String( materiau_ );
   ContactBuilderFactory::defineMaterial( m_materialName, true );
-  
-  // Obstacle à transfèrer au fluide
+
+  // Obstacle ï¿½ transfï¿½rer au fluide
   DOMNode* statut = ReaderXML::getNode( root, "Statut" );
   if ( statut )
-    m_transferToFluid = ReaderXML::getNodeAttr_Int( statut, "ToFluid" ); 
-    
-  
+    m_transferToFluid = ReaderXML::getNodeAttr_Int( statut, "ToFluid" );
+
+
   m_obstacleBox = Component::BoundingBox();
   m_LinkUpdate_frequency = 1;
-  m_LinkUpdate_counter = 0;  
+  m_LinkUpdate_counter = 0;
 }
 
 
@@ -67,16 +67,16 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
 
 // ----------------------------------------------------------------------------
 // Copy constructor from a Component
-SimpleObstacle::SimpleObstacle( Component& copy, char const* s ) 
+SimpleObstacle::SimpleObstacle( Component& copy, char const* s )
   : Obstacle( copy, s )
 {
   m_ObstacleType = "SimpleObstacle";
-  
+
   Obstacle::m_totalNbSingleObstacles++;
   m_obstacleBox = Component::BoundingBox();
   m_LinkUpdate_frequency = 1;
   m_LinkUpdate_counter = 0;
-  m_transferToFluid = false;  
+  m_transferToFluid = false;
 }
 
 
@@ -85,13 +85,13 @@ SimpleObstacle::SimpleObstacle( Component& copy, char const* s )
 // ----------------------------------------------------------------------------
 // Constructor with a rigid body, a name and a material as input parameters
 SimpleObstacle::SimpleObstacle( RigidBodyWithCrust* geoRBWC, string const& name,
-      string const& materialName, bool const& transferToFluid_ ) 
+      string const& materialName, bool const& transferToFluid_ )
   : Obstacle()
 {
   m_ObstacleType = "SimpleObstacle";
 
   Obstacle::m_totalNbSingleObstacles++;
-  
+
   m_name = name;
   m_geoRBWC = geoRBWC;
   m_materialName = materialName;
@@ -100,7 +100,7 @@ SimpleObstacle::SimpleObstacle( RigidBodyWithCrust* geoRBWC, string const& name,
 
   m_obstacleBox = Component::BoundingBox();
   m_LinkUpdate_frequency = 1;
-  m_LinkUpdate_counter = 0;  
+  m_LinkUpdate_counter = 0;
 }
 
 
@@ -133,25 +133,25 @@ void SimpleObstacle::append( Obstacle* obstacle )
 // ----------------------------------------------------------------------------
 // Moves the simple obstacle and returns a list of moved obstacles (here itself)
 list<SimpleObstacle*> SimpleObstacle::Move( double time,
-	double dt, bool const& b_deplaceCine_Comp, 
+	double dt, bool const& b_deplaceCine_Comp,
         bool const& b_deplaceF_Comp )
 {
 
   m_ismoving = m_kinematics.Deplacement( time, dt );
   m_ismoving = m_ismoving || b_deplaceCine_Comp;
 
-  if ( m_ismoving && Obstacle::m_MoveObstacle ) 
-  { 
+  if ( m_ismoving && Obstacle::m_MoveObstacle )
+  {
     Vector3 const* translation = m_kinematics.getTranslation();
     m_geoRBWC->composeLeftByTranslation( *translation );
     Quaternion const* w = m_kinematics.getQuaternionRotationOverDt();
     Rotate(*w);
   }
-  
+
   bool deplaceF = m_confinement.Deplacement( time, dt, this );
-  deplaceF = deplaceF || b_deplaceF_Comp;  
-  
-  if ( deplaceF && Obstacle::m_MoveObstacle ) 
+  deplaceF = deplaceF || b_deplaceF_Comp;
+
+  if ( deplaceF && Obstacle::m_MoveObstacle )
   {
     Vector3 translation = m_confinement.getTranslation( dt );
     m_geoRBWC->composeLeftByTranslation( translation );
@@ -159,15 +159,15 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
     //    Rotate(w);
   }
   m_ismoving = m_ismoving || deplaceF;
-  
+
   list<SimpleObstacle*> obstacleEnDeplacement;
-  if ( m_ismoving ) 
+  if ( m_ismoving )
   {
     m_obstacleBox = Component::BoundingBox();
     obstacleEnDeplacement.push_back( this );
   }
-  
-  return ( obstacleEnDeplacement );  
+
+  return ( obstacleEnDeplacement );
 }
 
 
@@ -177,7 +177,7 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
 // Returns a pointer to the obstacle if the name matches
 const Obstacle* SimpleObstacle::getObstacleFromName( string const& nom_ ) const
 {
-  if ( m_name == nom_ ) 
+  if ( m_name == nom_ )
     return ( (Obstacle*)this );
   else
     return ( NULL );
@@ -213,33 +213,33 @@ list<Obstacle*> SimpleObstacle::getObstaclesToFluid()
 
 
 // ----------------------------------------------------------------------------
-// Contact between a simple obstacle and a component. If contact 
+// Contact between a simple obstacle and a component. If contact
 // exists, computes the contact force and torque and adds to each component
-void SimpleObstacle::InterAction( Component* voisin, 
+void SimpleObstacle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
-  throw (ContactError)
 {
+  try{
   bool contactProbable = m_obstacleBox.InZone( voisin->getPosition(),
     	voisin->getCircumscribedRadius() );
-  
+
   PointContact closestPoint;
   if ( contactProbable )
   {
     try {
       closestPoint = voisin->getRigidBody()->ClosestPoint( *m_geoRBWC );
-    } 
-    catch (ContactError &erreur) 
+    }
+    catch (ContactError &erreur)
     {
       try {
 	closestPoint = voisin->getRigidBody()->ClosestPoint_ErreurHandling(
 		*m_geoRBWC, 10., m_id, voisin->getID() );
-      } 
-      catch (ContactError &erreur_level2) 
-      {  
-        cout << endl << "Processor = " << 
-    		(GrainsExec::m_MPI ? 
+      }
+      catch (ContactError &erreur_level2)
+      {
+        cout << endl << "Processor = " <<
+    		(GrainsExec::m_MPI ?
 			GrainsExec::getComm()->get_rank_active() : 0 )
-		<< " has thrown an ContactError exception" <<  endl;
+		<< " has thrown a ContactError exception" <<  endl;
         erreur_level2.setMessage(
 		"SimpleObstacle::InterAction : choc de croute ! a t="
 		+GrainsExec::doubleToString(time,TIMEFORMAT));
@@ -251,57 +251,61 @@ void SimpleObstacle::InterAction( Component* voisin,
   }
   else
     closestPoint = PointNoContact;
-    
-  LC->addToContactsFeatures( time, closestPoint );  
+
+  LC->addToContactsFeatures( time, closestPoint );
 
   if ( closestPoint.getOverlapDistance() < 0. )
   {
-    if ( ContactBuilderFactory::contactForceModel( 
+    if ( ContactBuilderFactory::contactForceModel(
     	m_materialName, voisin->getMaterial() )
     	->computeForces( voisin, this, closestPoint, LC, dt ) )
-      voisin->addToCoordinationNumber( 1 );   
+      voisin->addToCoordinationNumber( 1 );
   }
 
+  }
+  catch (const ContactError&) {
+    throw ContactError();
+  }
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Reloads the composite obstacle and links it to the higher level 
+// Reloads the composite obstacle and links it to the higher level
 // obstacle in the obstacle tree
 void SimpleObstacle::reload( Obstacle& mother, istream& file )
 {
   string buffer;
-  
+
   // Obstacle ID number
   file >> m_id;
-  
-  // Material name  
+
+  // Material name
   file >> buffer >> m_materialName;
-  
+
   // Construction of the rigid body with crust
-  // The flow is RigidBodyWithCrust( fileIn ) 
-  // => ConvexBuilderFactory::create( cle, fileIn ) 
-  // => xxx::create( fileIn ) 
-  // => constructeur de xxx  
+  // The flow is RigidBodyWithCrust( fileIn )
+  // => ConvexBuilderFactory::create( cle, fileIn )
+  // => xxx::create( fileIn )
+  // => constructeur de xxx
   m_geoRBWC = new RigidBodyWithCrust( file );
-  
-  // Whether the obstacle should be transferred to the fluid solver in 
+
+  // Whether the obstacle should be transferred to the fluid solver in
   // case of fluid-particle coupling
   file >> buffer >> m_transferToFluid;
-  
+
   // Obstacle position
   file >> buffer;
   m_geoRBWC->readPosition( file );
-  
+
   // Add the obstacle to the tree
   mother.append( this );
   file >> buffer;
-  assert( buffer == "</Simple>" ); 
-  
-  // Compute the bounding box 
-  m_obstacleBox = Component::BoundingBox();  
+  assert( buffer == "</Simple>" );
+
+  // Compute the bounding box
+  m_obstacleBox = Component::BoundingBox();
 }
 
 
@@ -312,7 +316,7 @@ void SimpleObstacle::reload( Obstacle& mother, istream& file )
 void SimpleObstacle::Rotate( Quaternion const& rotation )
 {
   m_geoRBWC->Rotate( rotation );
-  m_obstacleBox = Component::BoundingBox();  
+  m_obstacleBox = Component::BoundingBox();
 }
 
 
@@ -331,7 +335,7 @@ void SimpleObstacle::Suppression( BBox const& box )
 void SimpleObstacle::Translate( Vector3 const& translation )
 {
   m_geoRBWC->composeLeftByTranslation( translation );
-  m_obstacleBox = Component::BoundingBox();  
+  m_obstacleBox = Component::BoundingBox();
 }
 
 
@@ -344,10 +348,10 @@ void SimpleObstacle::write( ostream& fileSave ) const
   fileSave << "<Simple> " << m_name << " " << m_id << endl;
   fileSave << "*Material " << m_materialName << endl;
   m_geoRBWC->writeStatic( fileSave );
-  fileSave << endl;   
+  fileSave << endl;
   fileSave << "*ToFluid " << m_transferToFluid << endl;
   m_geoRBWC->writePosition( fileSave );
-  fileSave << endl;  
+  fileSave << endl;
   fileSave << "</Simple>";
 }
 
@@ -382,7 +386,7 @@ void SimpleObstacle::resetInCells()
 list<Cell*> const* SimpleObstacle::getInCells() const
 {
   return ( &m_inCells );
-}    
+}
 
 
 
@@ -392,7 +396,7 @@ list<Cell*> const* SimpleObstacle::getInCells() const
 const BBox* SimpleObstacle::getObstacleBox() const
 {
   return ( &m_obstacleBox );
-}  
+}
 
 
 
@@ -412,8 +416,8 @@ string SimpleObstacle::getObstacleType()
 void SimpleObstacle::DestroyObstacle( string const& name_ )
 {
   if ( m_name == name_ || name_ == "ToBeDestroyed" )
-    Obstacle::m_totalNbSingleObstacles--; 
-}  
+    Obstacle::m_totalNbSingleObstacles--;
+}
 
 
 
@@ -425,7 +429,7 @@ void SimpleObstacle::ClearObstacle( string const& name_, LinkedCell* LC )
   if ( m_name == name_ || name_ == "ToBeErased" )
     // Suppression de l'obstacle du LinkedCell
     LC->remove( this );
-}  
+}
 
 
 
@@ -437,14 +441,14 @@ void SimpleObstacle::ClearObstacle( string const& name_, LinkedCell* LC )
 bool SimpleObstacle::performLinkUpdate()
 {
   bool b_doit = false;
-  
-  if ( m_LinkUpdate_counter == m_LinkUpdate_frequency ) 
+
+  if ( m_LinkUpdate_counter == m_LinkUpdate_frequency )
   {
     m_LinkUpdate_counter = 1;
     b_doit = true;
   }
   else ++m_LinkUpdate_counter;
-  
+
   return ( b_doit );
 }
 
@@ -452,39 +456,39 @@ bool SimpleObstacle::performLinkUpdate()
 
 
 // ----------------------------------------------------------------------------
-// Returns the maximum of the absolute value of the obstacle 
+// Returns the maximum of the absolute value of the obstacle
 // velocity in each direction
 Vector3 SimpleObstacle::vitesseMaxPerDirection() const
 {
   list<Point3> surface = m_geoRBWC->get_polygonsPts_PARAVIEW();
   list<Point3>::iterator iv;
   Vector3 vmax, v;
-  
+
   for (iv=surface.begin();iv!=surface.end();iv++)
   {
     v = getVelocityAtPoint(*iv);
     vmax[X] = fabs(v[X]) > vmax[X] ? fabs(v[X]) : vmax[X];
-    vmax[Y] = fabs(v[Y]) > vmax[Y] ? fabs(v[Y]) : vmax[Y];    
-    vmax[Z] = fabs(v[Z]) > vmax[Z] ? fabs(v[Z]) : vmax[Z]; 
+    vmax[Y] = fabs(v[Y]) > vmax[Y] ? fabs(v[Y]) : vmax[Y];
+    vmax[Z] = fabs(v[Z]) > vmax[Z] ? fabs(v[Z]) : vmax[Z];
   }
 
   return ( vmax );
 
-}	
+}
 
 
 
 
 // ----------------------------------------------------------------------------
-// Sets the frequency at which the obstacle link to 
+// Sets the frequency at which the obstacle link to
 // the cells of the linked-cell grid is updated
-void SimpleObstacle::setObstacleLinkedCellUpdateFrequency( 
+void SimpleObstacle::setObstacleLinkedCellUpdateFrequency(
 	int const& updateFreq )
 {
   m_LinkUpdate_frequency = updateFreq;
   m_LinkUpdate_counter = m_LinkUpdate_frequency;
 }
-   
+
 
 
 
@@ -493,8 +497,8 @@ void SimpleObstacle::setObstacleLinkedCellUpdateFrequency(
 void SimpleObstacle::createState( list<struct ObstacleState*> &obsStates )
 {
   struct ObstacleState* obss = new ObstacleState;
-  obss->nom = m_name;  
-  obss->memento_config = new ConfigurationMemento();  
+  obss->nom = m_name;
+  obss->memento_config = new ConfigurationMemento();
   obss->memento_config->m_position = *m_geoRBWC->getTransform();
   obss->memento_cine = m_kinematics.createState();
   obsStates.push_back( obss );
@@ -512,16 +516,16 @@ void SimpleObstacle::restoreState( list<struct ObstacleState*>& obsStates )
   for (il=obsStates.begin();il!=obsStates.end() && !found; )
     if ( (*il)->nom == m_name )
     {
-      m_geoRBWC->setTransform((*il)->memento_config->m_position);      
+      m_geoRBWC->setTransform((*il)->memento_config->m_position);
       m_kinematics.restoreState((*il)->memento_cine);
       delete (*il)->memento_config;
-      delete (*il)->memento_cine;    
-      delete *il;      
+      delete (*il)->memento_cine;
+      delete *il;
       il = obsStates.erase(il) ;
-      found = true ; 
+      found = true ;
     }
     else il++;
-} 
+}
 
 
 
@@ -538,7 +542,7 @@ int SimpleObstacle::numberOfPoints_PARAVIEW() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of elementary polytopes to write the 
+// Returns the number of elementary polytopes to write the
 // simple obstacle shape in a Paraview format
 int SimpleObstacle::numberOfCells_PARAVIEW() const
 {
@@ -549,8 +553,8 @@ int SimpleObstacle::numberOfCells_PARAVIEW() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a list of points describing the simple obstacle in a Paraview format 
-list<Point3> SimpleObstacle::get_polygonsPts_PARAVIEW( 
+// Returns a list of points describing the simple obstacle in a Paraview format
+list<Point3> SimpleObstacle::get_polygonsPts_PARAVIEW(
 	Vector3 const* translation ) const
 {
   return ( m_geoRBWC->get_polygonsPts_PARAVIEW( translation ) );
@@ -561,7 +565,7 @@ list<Point3> SimpleObstacle::get_polygonsPts_PARAVIEW(
 
 // ----------------------------------------------------------------------------
 // Writes the points describing the simple obstacle in a Paraview format
-void SimpleObstacle::write_polygonsPts_PARAVIEW( ostream &f, 
+void SimpleObstacle::write_polygonsPts_PARAVIEW( ostream &f,
   	Vector3 const* translation ) const
 {
   m_geoRBWC->write_polygonsPts_PARAVIEW( f, translation );
@@ -592,9 +596,8 @@ void SimpleObstacle::writePositionInFluid( ostream &fileOut )
 
 
 
-
-// ----------------------------------------------------------------------------
-// Initializes all contact map entries to false
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Initialize all contact map entries to false
 void SimpleObstacle::setContactMapToFalse()
 {
   Component::setContactMapToFalse();
@@ -603,8 +606,8 @@ void SimpleObstacle::setContactMapToFalse()
 
 
 
-// ----------------------------------------------------------------------------
-// Updates contact map
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Update contact map
 void SimpleObstacle::updateContactMap()
 {
   Component::updateContactMap();
@@ -613,33 +616,63 @@ void SimpleObstacle::updateContactMap()
 
 
 
-// ----------------------------------------------------------------------------
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Does the contact exist in the map, if yes return the pointer to the
 // cumulative tangential displacement
-bool SimpleObstacle::ContactInMapIsActive( double*& tangentialDepl, 
-	int const& id )
+bool SimpleObstacle::getContactMemory( std::tuple<int,int,int> const& id,
+  Vector3* &tangent, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+  bool createContact)
 {
-  return ( Component::ContactInMapIsActive( tangentialDepl, id ) );
+  return ( Component::getContactMemory( id, tangent, prev_normal,
+    cumulSpringTorque, createContact) );
 }
 
 
 
 
-// ----------------------------------------------------------------------------
-// Adds new contact in the map
-void SimpleObstacle::addNewContactInMap( double const& tangentialDepl, 
-	int const& id )
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Add new contact in the map
+void SimpleObstacle::addNewContactInMap( std::tuple<int,int,int> const& id,
+  Vector3 const& tangent, Vector3 const& prev_normal,
+  Vector3 const& cumulSpringTorque )
 {
-  Component::addNewContactInMap( tangentialDepl, id );
+  Component::addNewContactInMap( id, tangent, prev_normal, cumulSpringTorque );
 }
 
 
 
 
-// ----------------------------------------------------------------------------
-// Increases cumulative tangential displacement with component id
-void SimpleObstacle::addDeplContactInMap( double const& tangentialDepl, 
-	int const& id )
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Increase cumulative tangential displacement with component id
+void SimpleObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
+  Vector3 const& tangent, Vector3 const& prev_normal,
+  Vector3 const& cumulSpringTorque )
 {
-  Component::addDeplContactInMap( tangentialDepl, id );
+  Component::addDeplContactInMap( id, tangent, prev_normal, cumulSpringTorque );
+}
+
+
+void SimpleObstacle::copyHistoryContacts( double* &destination, int start_index )
+{
+  Component::copyHistoryContacts( destination, start_index ) ;
+}
+
+// ----------------------------------------------------------------------------
+// Copy existing contact in the map
+void SimpleObstacle::copyContactInMap( std::tuple<int,int,int> const& id,
+  bool const& isActive, Vector3 const& tangent, Vector3 const& prev_normal,
+  Vector3 const& cumulSpringTorque )
+{
+  Component::copyContactInMap( id, isActive, tangent, prev_normal,
+    cumulSpringTorque ) ;
+}
+
+int SimpleObstacle::getContactMapSize()
+{
+  return ( Component::getContactMapSize() );
+}
+
+void SimpleObstacle::updateContactMapId( int prev_id, int new_id)
+{
+  Component::updateContactMapId( prev_id, new_id);
 }

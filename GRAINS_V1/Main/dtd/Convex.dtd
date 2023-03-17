@@ -12,12 +12,22 @@
   <!ATTLIST Polyhedron Name CDATA #REQUIRED>
 
 <!ELEMENT Cylinder EMPTY>
-  <!ATTLIST Cylinder Radius  CDATA #REQUIRED>
+  <!ATTLIST Cylinder Radius CDATA #REQUIRED>
   <!ATTLIST Cylinder Height CDATA #REQUIRED>
 
 <!ELEMENT Disc EMPTY>
-  <!ATTLIST Disc Radius  CDATA #REQUIRED>
+  <!ATTLIST Disc Radius CDATA #REQUIRED>
 
 <!ELEMENT Polygon EMPTY>
   <!ATTLIST Polygon Name CDATA #REQUIRED>
 
+<!ELEMENT Superquadric EMPTY>
+  <!ATTLIST Superquadric a CDATA #REQUIRED>
+  <!ATTLIST Superquadric b CDATA #REQUIRED>
+  <!ATTLIST Superquadric c CDATA #REQUIRED>
+  <!ATTLIST Superquadric n1 CDATA #REQUIRED>
+  <!ATTLIST Superquadric n2 CDATA #REQUIRED>
+  
+ <!ELEMENT Rectangle EMPTY>
+  <!ATTLIST Rectangle LX CDATA #REQUIRED>
+  <!ATTLIST Rectangle LY CDATA #REQUIRED>

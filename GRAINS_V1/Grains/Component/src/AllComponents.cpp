@@ -16,7 +16,7 @@
 
 // ----------------------------------------------------------------------------
 // Default constructor
-AllComponents::AllComponents() 
+AllComponents::AllComponents()
   : m_wait( NULL )
   , m_total_nb_particles( 0 )
   , m_obstacle( NULL )
@@ -24,7 +24,7 @@ AllComponents::AllComponents()
   , m_outputTorsorObstacles_frequency( 0 )
 {
   m_obstacle = new CompositeObstacle( "__AllObstacles___" );
-  Component::setNbCreatedComponents( 0 );  
+  Component::setNbCreatedComponents( 0 );
 }
 
 
@@ -35,14 +35,14 @@ AllComponents::AllComponents()
 AllComponents::~AllComponents()
 {
   list<Particle*>::iterator particle;
-  
-  for (particle=m_ActiveParticles.begin(); 
-  	particle!=m_ActiveParticles.end(); particle++)  
+
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
     delete *particle;
-     
-  for (particle=m_InactiveParticles.begin(); particle!=m_InactiveParticles.end(); 
+
+  for (particle=m_InactiveParticles.begin(); particle!=m_InactiveParticles.end();
        	particle++)  delete *particle;
-	      
+
   m_ActiveParticles.clear();
   m_InactiveParticles.clear();
   m_PeriodicCloneParticles.clear();
@@ -51,18 +51,18 @@ AllComponents::~AllComponents()
   m_CloneParticles.clear();
 
   vector<Particle*>::iterator ivp;
-  for (ivp=m_ReferenceParticles.begin(); 
-  	ivp!=m_ReferenceParticles.end(); ivp++)  
+  for (ivp=m_ReferenceParticles.begin();
+  	ivp!=m_ReferenceParticles.end(); ivp++)
     delete *ivp;
-  m_ReferenceParticles.clear();  
-  
+  m_ReferenceParticles.clear();
+
   delete m_obstacle;
-  
+
   list<PostProcessingWriter*>::iterator pp;
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
     delete *pp;
   m_postProcessors.clear();
-  
+
   m_AllImposedVelocitiesOnObstacles.clear();
   m_AllImposedForcesOnObstacles.clear();
 }
@@ -75,10 +75,10 @@ AllComponents::~AllComponents()
 void AllComponents::UpdateParticleActivity()
 {
   list<Particle*>::iterator particle;
-  for (particle=m_ActiveParticles.begin(); 
-  	particle!=m_ActiveParticles.end(); ) 
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); )
   {
-    switch ( (*particle)->getActivity() ) 
+    switch ( (*particle)->getActivity() )
     {
       case COMPUTE :
         particle++;
@@ -89,7 +89,7 @@ void AllComponents::UpdateParticleActivity()
         m_InactiveParticles.push_back(*particle);
         particle = m_ActiveParticles.erase( particle );
         break;
-      
+
       default:
         break;
     }
@@ -103,16 +103,16 @@ void AllComponents::UpdateParticleActivity()
 // Adds a particle
 void AllComponents::AddParticle( Particle* particle )
 {
-  switch ( particle->getActivity() ) 
+  switch ( particle->getActivity() )
   {
     case WAIT:
       m_InactiveParticles.push_back( particle );
       break;
-    
+
     case COMPUTE:
       m_ActiveParticles.push_back( particle );
       break;
-    
+
     default:
       break;
   }
@@ -159,7 +159,7 @@ void AllComponents::LinkImposedMotion( ObstacleImposedVelocity &impvel )
 void AllComponents::LinkImposedMotion( ObstacleImposedForce &load )
 {
   m_obstacle->LinkImposedMotion( load );
-  m_AllImposedForcesOnObstacles.push_back( &load );  
+  m_AllImposedForcesOnObstacles.push_back( &load );
 }
 
 
@@ -167,34 +167,34 @@ void AllComponents::LinkImposedMotion( ObstacleImposedForce &load )
 
 // ----------------------------------------------------------------------------
 // Moves all components
-list<SimpleObstacle*> AllComponents::Move( double time, double dt ) 
-  throw(DisplacementError)
+list<SimpleObstacle*> AllComponents::Move( double time, double dt )
 {
+  try{
   // Deplacement des particles
   list<Particle*>::iterator particle;
-  for (particle=m_ActiveParticles.begin(); 
+  for (particle=m_ActiveParticles.begin();
       particle!=m_ActiveParticles.end(); particle++)
     if ( (*particle)->getTag() != 2 )
       (*particle)->Move( time, dt );
 
   // Deplacement des obstacles
   list<SimpleObstacle*> displacedObstacles;
-  if ( !m_AllImposedVelocitiesOnObstacles.empty() 
+  if ( !m_AllImposedVelocitiesOnObstacles.empty()
   	|| !m_AllImposedForcesOnObstacles.empty() )
   {
     m_obstacle->resetKinematics();
     displacedObstacles = m_obstacle->Move( time, dt, false, false );
 
-    list<ObstacleImposedVelocity*>::iterator chargement;  
-    for (chargement=m_AllImposedVelocitiesOnObstacles.begin(); 
-  	chargement!=m_AllImposedVelocitiesOnObstacles.end(); ) 
+    list<ObstacleImposedVelocity*>::iterator chargement;
+    for (chargement=m_AllImposedVelocitiesOnObstacles.begin();
+  	chargement!=m_AllImposedVelocitiesOnObstacles.end(); )
       if ( (*chargement)->isCompleted( time, dt ) )
         chargement = m_AllImposedVelocitiesOnObstacles.erase( chargement );
       else chargement++;
 
-    list<ObstacleImposedForce*>::iterator chargement_F;  
-    for (chargement_F=m_AllImposedForcesOnObstacles.begin(); 
-  	chargement_F!=m_AllImposedForcesOnObstacles.end(); ) 
+    list<ObstacleImposedForce*>::iterator chargement_F;
+    for (chargement_F=m_AllImposedForcesOnObstacles.begin();
+  	chargement_F!=m_AllImposedForcesOnObstacles.end(); )
     {
       if ( (*chargement_F)->isCompleted( time, dt ) )
         chargement_F = m_AllImposedForcesOnObstacles.erase( chargement_F );
@@ -203,6 +203,10 @@ list<SimpleObstacle*> AllComponents::Move( double time, double dt )
   }
 
   return ( displacedObstacles );
+  }
+  catch (const DisplacementError&) {
+    throw DisplacementError();
+  }
 }
 
 
@@ -210,8 +214,8 @@ list<SimpleObstacle*> AllComponents::Move( double time, double dt )
 
 // ----------------------------------------------------------------------------
 // Updates obstacles' velocity without actually moving them
-void AllComponents::setKinematicsObstacleWithoutMoving( 
-	double time, double dt ) 
+void AllComponents::setKinematicsObstacleWithoutMoving(
+	double time, double dt )
 {
   bool bbb = Obstacle::getMoveObstacle() ;
 
@@ -222,14 +226,14 @@ void AllComponents::setKinematicsObstacleWithoutMoving(
     m_obstacle->resetKinematics();
     m_obstacle->Move( time, dt, false, false );
 
-    list<ObstacleImposedVelocity*>::iterator il;  
-    for (il=m_AllImposedVelocitiesOnObstacles.begin(); 
-  	il!=m_AllImposedVelocitiesOnObstacles.end(); ) 
+    list<ObstacleImposedVelocity*>::iterator il;
+    for (il=m_AllImposedVelocitiesOnObstacles.begin();
+  	il!=m_AllImposedVelocitiesOnObstacles.end(); )
       if ( (*il)->isCompleted( time, dt ) )
         il = m_AllImposedVelocitiesOnObstacles.erase( il );
       else il++;
   }
-  
+
   Obstacle::setMoveObstacle( bbb ) ;
 }
 
@@ -238,20 +242,20 @@ void AllComponents::setKinematicsObstacleWithoutMoving(
 
 
 // ----------------------------------------------------------------------------
-// Initializes forces exerted on all components and set coordination number 
+// Initializes forces exerted on all components and set coordination number
 // to 0
 void AllComponents::InitializeForces( double time, double dt,
-	bool const& withWeight ) 
+	bool const& withWeight )
 {
   list<Particle*>::iterator particle;
 
   // Particles actives
-  for (particle=m_ActiveParticles.begin(); 
-  	particle!=m_ActiveParticles.end(); particle++) 
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
     (*particle)->InitializeForce( withWeight );
-    
+
   // Obstacles
-  m_obstacle->InitializeForce( false );     
+  m_obstacle->InitializeForce( false );
 }
 
 
@@ -259,20 +263,20 @@ void AllComponents::InitializeForces( double time, double dt,
 
 // ----------------------------------------------------------------------------
 // Initializes the transformation with crust of all components to not computed
-void AllComponents::InitializeRBTransformWithCrustState( double time, 
-	double dt ) 
+void AllComponents::InitializeRBTransformWithCrustState( double time,
+	double dt )
 {
   list<Particle*>::iterator particle;
 
   // Actives particles
-  for (particle=m_ActiveParticles.begin(); 
-  	particle!=m_ActiveParticles.end(); particle++) 
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
     (*particle)->initialize_transformWithCrust_to_notComputed();
-    
+
   // Obstacles
   list<SimpleObstacle*> list_obstacles = m_obstacle->getObstacles();
   list<SimpleObstacle*>::iterator myObs;
-  for (myObs=list_obstacles.begin();myObs!=list_obstacles.end();myObs++) 
+  for (myObs=list_obstacles.begin();myObs!=list_obstacles.end();myObs++)
     (*myObs)->getRigidBody()->initialize_transformWithCrust_to_notComputed();
 }
 
@@ -280,26 +284,26 @@ void AllComponents::InitializeRBTransformWithCrustState( double time,
 
 
 // ----------------------------------------------------------------------------
-// Compute all particles weight 
-void AllComponents::computeWeight( double time, double dt ) 
+// Compute all particles weight
+void AllComponents::computeWeight( double time, double dt )
 {
   list<Particle*>::iterator particle;
   vector<Particle*>::iterator ivp;
-  
+
   // Classes de reference
-  for (ivp=m_ReferenceParticles.begin(); 
+  for (ivp=m_ReferenceParticles.begin();
   	ivp!=m_ReferenceParticles.end(); ivp++)
-    (*ivp)->computeWeight();  
+    (*ivp)->computeWeight();
 
   // Particles en attente
-  for (particle=m_InactiveParticles.begin(); 
-  	particle!=m_InactiveParticles.end(); particle++)  
-    (*particle)->computeWeight(); 
-  
+  for (particle=m_InactiveParticles.begin();
+  	particle!=m_InactiveParticles.end(); particle++)
+    (*particle)->computeWeight();
+
   // Particles actives
-  for (particle=m_ActiveParticles.begin(); 
-  	particle!=m_ActiveParticles.end(); particle++) 
-    (*particle)->computeWeight(); 
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
+    (*particle)->computeWeight();
 }
 
 
@@ -326,13 +330,13 @@ Obstacle* AllComponents::getObstacles()
 
 
 // ----------------------------------------------------------------------------
-// Returns particle with ID number id 
+// Returns particle with ID number id
 Particle* AllComponents::getParticle( int id )
 {
   Particle *particle = NULL;
   list<Particle*>::iterator iter;
   bool found = false;
-  for (iter=m_ActiveParticles.begin();iter!=m_ActiveParticles.end() 
+  for (iter=m_ActiveParticles.begin();iter!=m_ActiveParticles.end()
   	&& !found;iter++)
     if ( (*iter)->getID() == id )
     {
@@ -355,14 +359,14 @@ Component* AllComponents::getComponent( int id )
   {
     bool found = false;
     list<SimpleObstacle*> obstacles = m_obstacle->getObstacles();
-    list<SimpleObstacle*>::iterator myObs;  
-    for (myObs=obstacles.begin(); myObs!=obstacles.end() && !found; myObs++) 
+    list<SimpleObstacle*>::iterator myObs;
+    for (myObs=obstacles.begin(); myObs!=obstacles.end() && !found; myObs++)
       if ( (*myObs)->getID() == id )
       {
         composant = *myObs;
         found = true;
       }
-  }       
+  }
 
   return ( composant );
 }
@@ -374,33 +378,33 @@ Component* AllComponents::getComponent( int id )
 // Returns a particle from the list of inactive particles
 Particle* AllComponents::getParticle( PullMode mode,
 	GrainsMPIWrapper const* wrapper )
-{  
-  if ( !m_InactiveParticles.empty() ) 
+{
+  if ( !m_InactiveParticles.empty() )
   {
-    switch ( mode ) 
+    switch ( mode )
     {
       case PM_ORDERED:
         m_wait = m_InactiveParticles.front();
         break;
-      
+
       case PM_RANDOM:
-        if ( m_wait == NULL ) 
+        if ( m_wait == NULL )
 	{
 	  double v = double(random()) / double(INT_MAX);
 	  int id = int( double(m_InactiveParticles.size()) * v );
 
-	  // Parallèle: afin que le tirage aléatoire soit le même sur tous les 
-	  // procs, seul le master envoie la position tiree au hasard dans la 
+	  // Parallï¿½le: afin que le tirage alï¿½atoire soit le mï¿½me sur tous les
+	  // procs, seul le master envoie la position tiree au hasard dans la
 	  // liste aux autres procs
-	  if ( wrapper ) id = wrapper->Broadcast_INT( id );	
-	  
+	  if ( wrapper ) id = wrapper->Broadcast_INT( id );
+
 	  list<Particle*>::iterator p = m_InactiveParticles.begin();
 	  for (int i=0; i<id && p!=m_InactiveParticles.end(); i++, p++) {}
 	  m_wait = *p;
         }
         break;
     }
-  } 
+  }
   else m_wait = NULL;
 
   return ( m_wait );
@@ -517,12 +521,12 @@ double AllComponents::getCircumscribedRadiusMax()
   double radius;
 
   vector<Particle*>::iterator particle;
-  for (particle=m_ReferenceParticles.begin(); 
-  	particle!=m_ReferenceParticles.end(); particle++) 
+  for (particle=m_ReferenceParticles.begin();
+  	particle!=m_ReferenceParticles.end(); particle++)
   {
     radius = (*particle)->getCircumscribedRadius();
     radiusMax = radiusMax > radius ? radiusMax : radius;
-  }  
+  }
 
   return ( radiusMax );
 }
@@ -538,12 +542,12 @@ double AllComponents::getCircumscribedRadiusMin()
   double radius;
 
   vector<Particle*>::iterator particle;
-  for (particle=m_ReferenceParticles.begin(); 
-  	particle!=m_ReferenceParticles.end(); particle++) 
+  for (particle=m_ReferenceParticles.begin();
+  	particle!=m_ReferenceParticles.end(); particle++)
   {
     radius = (*particle)->getCircumscribedRadius();
     radiusMin = radiusMin > radius ? radius : radiusMin;
-  }  
+  }
 
   return ( radiusMin );
 }
@@ -559,13 +563,13 @@ double AllComponents::getCrustThicknessMax()
   double crustThickness;
 
   vector<Particle*>::iterator particle;
-  for (particle=m_ReferenceParticles.begin(); 
-  	particle!=m_ReferenceParticles.end(); particle++) 
+  for (particle=m_ReferenceParticles.begin();
+  	particle!=m_ReferenceParticles.end(); particle++)
   {
     crustThickness = (*particle)->getCrustThickness();
-    crustThicknessMax = crustThicknessMax > crustThickness ? 
+    crustThicknessMax = crustThicknessMax > crustThickness ?
     	crustThicknessMax : crustThickness;
-  }  
+  }
 
   return ( crustThicknessMax );
 }
@@ -581,13 +585,13 @@ double AllComponents::getCrustThicknessMin()
   double crustThickness;
 
   vector<Particle*>::iterator particle;
-  for (particle=m_ReferenceParticles.begin(); 
-  	particle!=m_ReferenceParticles.end(); particle++) 
+  for (particle=m_ReferenceParticles.begin();
+  	particle!=m_ReferenceParticles.end(); particle++)
   {
     crustThickness = (*particle)->getCrustThickness();
-    crustThicknessMin = crustThicknessMin > crustThickness ? 
+    crustThicknessMin = crustThicknessMin > crustThickness ?
     	crustThickness : crustThicknessMin;
-  }  
+  }
 
   return ( crustThicknessMin );
 }
@@ -601,15 +605,15 @@ double AllComponents::getVolume() const
 {
   double volume = 0.;
   list<Particle*>::const_iterator particle;
-  
-  for (particle=m_ActiveParticles.begin(); 
-  	particle!=m_ActiveParticles.end(); particle++) 
+
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
     volume += (*particle)->getVolume();
 
-  for (particle=m_InactiveParticles.begin(); 
+  for (particle=m_InactiveParticles.begin();
   	particle!=m_InactiveParticles.end(); particle++)
     volume += (*particle)->getVolume();
- 
+
   return ( volume );
 }
 
@@ -622,8 +626,8 @@ double AllComponents::getVolumeIn() const
 {
   double volume = 0.;
   list<Particle*>::const_iterator particle;
-  
-  for (particle=m_ActiveParticles.begin(); 
+
+  for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
     volume += (*particle)->getVolume();
 
@@ -639,8 +643,8 @@ double AllComponents::getVolumeOut() const
 {
   double volume = 0.;
   list<Particle*>::const_iterator particle;
-  
-  for (particle=m_InactiveParticles.begin(); 
+
+  for (particle=m_InactiveParticles.begin();
   	particle!=m_InactiveParticles.end(); particle++)
     volume += (*particle)->getVolume();
 
@@ -654,8 +658,8 @@ double AllComponents::getVolumeOut() const
 // Links all active particles to the application
 void AllComponents::Link( AppCollision& app )
 {
-  list<Particle*>::iterator particle; 
-  for (particle=m_ActiveParticles.begin(); 
+  list<Particle*>::iterator particle;
+  for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
     app.Link( *particle );
 }
@@ -667,10 +671,10 @@ void AllComponents::Link( AppCollision& app )
 // Set all active particles velocity to 0 if reset == "Reset"
 void AllComponents::resetKinematics( string const& reset )
 {
-  if ( reset == "Reset" ) 
+  if ( reset == "Reset" )
   {
     list<Particle*>::iterator particle;
-    for (particle=m_ActiveParticles.begin(); 
+    for (particle=m_ActiveParticles.begin();
     	particle!=m_ActiveParticles.end(); particle++)
       (*particle)->resetKinematics();
   }
@@ -703,14 +707,14 @@ bool removeParticleFromList( list<Particle*>& pointerslist, Particle* value )
   list<Particle*>::iterator particle;
   bool found =false;
   for (particle=pointerslist.begin();particle!=pointerslist.end() && !found; )
-    if ( *particle == value ) 
+    if ( *particle == value )
     {
       particle = pointerslist.erase( particle );
       found = true;
     }
-    else particle++; 
-    
-  return ( found );    
+    else particle++;
+
+  return ( found );
 }
 
 
@@ -724,14 +728,14 @@ bool removeParticleFromSet( set<Particle*> &pointersSet, Particle* value )
   set<Particle*>::iterator particle;
   bool found =false;
   for (particle=pointersSet.begin();particle!=pointersSet.end() && !found; )
-    if ( *particle == value ) 
+    if ( *particle == value )
     {
       pointersSet.erase( particle );
       found = true;
     }
-    else particle++; 
-    
-  return ( found );    
+    else particle++;
+
+  return ( found );
 }
 
 
@@ -740,20 +744,20 @@ bool removeParticleFromSet( set<Particle*> &pointersSet, Particle* value )
 // ----------------------------------------------------------------------------
 // Delete the fist instance of a pointer to a simple obstacle in a list
 // of pointers to simple obstacle
-bool removeObstacleFromList( list<SimpleObstacle*>& pointerslist, 
+bool removeObstacleFromList( list<SimpleObstacle*>& pointerslist,
 	SimpleObstacle* value )
 {
   list<SimpleObstacle*>::iterator obs;
   bool found =false;
   for (obs=pointerslist.begin();obs!=pointerslist.end() && !found; )
-    if (*obs == value) 
+    if (*obs == value)
     {
       obs = pointerslist.erase( obs );
       found = true;
     }
-    else obs++; 
-    
-  return ( found );    
+    else obs++;
+
+  return ( found );
 }
 
 
@@ -764,33 +768,33 @@ bool removeObstacleFromList( list<SimpleObstacle*>& pointerslist,
 void AllComponents::read( istream& fileSave, string const& filename )
 {
   string buffer, readingMode ;
-  int nbreParticles_, nbParticleTypes_, ParticleTag, ParticleGeomType;  
+  int nbreParticles_, nbParticleTypes_, ParticleTag, ParticleGeomType;
   Particle *particle;
 
   // Number of particle types
   fileSave >> buffer >> nbParticleTypes_;
 
-  // Reading the reference particles   
+  // Reading the reference particles
   m_ReferenceParticles.reserve( nbParticleTypes_ );
-  for (int i=0; i<nbParticleTypes_; i++) 
-  {    
+  for (int i=0; i<nbParticleTypes_; i++)
+  {
     // Read the buffer "<Particle>" or "<CompositeParticle>"
-    fileSave >> buffer; 
+    fileSave >> buffer;
 
     // Construct an empty particle
-    if ( buffer == "<Particle>" ) 
+    if ( buffer == "<Particle>" )
       particle = new Particle( false );
     else
-      particle = new CompositeParticle( false );      
+      particle = new CompositeParticle( false );
 
     // Read from stream
     particle->read( fileSave );
-    
+
     // Add to the vector of reference particles
     m_ReferenceParticles.push_back( particle );
 
     // Read the buffer "</Particle>" or "</CompositeParticle>"
-    fileSave >> buffer; 
+    fileSave >> buffer;
   }
 
   // Number of particles in to read
@@ -804,23 +808,23 @@ void AllComponents::read( istream& fileSave, string const& filename )
     string binary_filename = filename + ".bin";
     FILEbin.open( binary_filename.c_str(), ios::in | ios::binary );
   }
-    
-  for (int i=0; i<nbreParticles_; i++) 
+
+  for (int i=0; i<nbreParticles_; i++)
   {
-    // Read the geometric type of the particle 
+    // Read the geometric type of the particle
     if ( GrainsExec::m_writingModeHybrid )
       FILEbin.read( reinterpret_cast<char*>( &ParticleGeomType ), sizeof(int) );
     else
-      fileSave >> ParticleGeomType;       
+      fileSave >> ParticleGeomType;
 
     // Particle construction
-    if ( m_ReferenceParticles[ParticleGeomType]->isCompositeParticle() ) 
+    if ( m_ReferenceParticles[ParticleGeomType]->isCompositeParticle() )
       particle = new CompositeParticle( false );
-    else 
+    else
       particle = new Particle( false );
 
-    // Set the geometric type of the particle 
-    particle->setGeometricType( ParticleGeomType );  
+    // Set the geometric type of the particle
+    particle->setGeometricType( ParticleGeomType );
 
     // Read the particle features
     if ( GrainsExec::m_writingModeHybrid )
@@ -829,12 +833,12 @@ void AllComponents::read( istream& fileSave, string const& filename )
       particle->read2014( fileSave, &m_ReferenceParticles );
 
     // Add to lists
-    switch ( particle->getActivity() ) 
+    switch ( particle->getActivity() )
     {
       case COMPUTE:
         m_ActiveParticles.push_back( particle );
         ParticleTag = particle->getTag();
-        
+
 	// MPI mode
 	if ( GrainsExec::m_MPI )
 	  switch ( ParticleTag )
@@ -842,25 +846,25 @@ void AllComponents::read( istream& fileSave, string const& filename )
             case 1:
               m_ParticlesInHalozone.push_back( particle );
               break;
-	      
+
             case 2:
               m_CloneParticles.push_back( particle );
               break;
-            
+
 	    default:
               break;
           }
 	// Serial mode: periodicity
 	else
 	  if ( ParticleTag == 2 )
-	    m_PeriodicCloneParticles.insert( 
+	    m_PeriodicCloneParticles.insert(
 	    	pair<int,Particle*>( particle->getID(), particle ) );
         break;
-	
+
       default:
         m_InactiveParticles.push_back( particle );
         break;
-    } 
+    }
   }
   if ( GrainsExec::m_writingModeHybrid ) FILEbin.close();
 
@@ -870,7 +874,7 @@ void AllComponents::read( istream& fileSave, string const& filename )
   fileSave >> buffer >> name;
   m_obstacle = new CompositeObstacle( name );
   fileSave >> buffer;
-  while ( buffer != "</Composite>" ) 
+  while ( buffer != "</Composite>" )
   {
     ObstacleBuilderFactory::reload( buffer, *m_obstacle, fileSave );
     fileSave >> buffer;
@@ -880,7 +884,7 @@ void AllComponents::read( istream& fileSave, string const& filename )
   assert( buffer == "</Obstacle>" );
 }
 
-  
+
 
 
 // ---------------------------------------------------------------------------
@@ -896,33 +900,33 @@ void AllComponents::write( ostream &fileSave, string const& filename ) const
 
   size_t nbActivesNonPer = m_ActiveParticles.size();
   list<Particle*>::const_iterator particle;
-  
+
   fileSave << endl << ( GrainsExec::m_writingModeHybrid ? "Hybrid" :
-  	"Text" ) << " " << nbActivesNonPer + m_InactiveParticles.size() 
-	<< endl;  
+  	"Text" ) << " " << nbActivesNonPer + m_InactiveParticles.size()
+	<< endl;
 
   if ( GrainsExec::m_writingModeHybrid )
   {
     string binary_filename = filename + ".bin";
     ofstream FILEbin( binary_filename.c_str(), ios::out | ios::binary );
-    
-    for (particle=m_ActiveParticles.begin(); 
+
+    for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
       (*particle)->write2014_binary( FILEbin );
 
-    for (particle=m_InactiveParticles.begin(); 
+    for (particle=m_InactiveParticles.begin();
     	particle!=m_InactiveParticles.end(); particle++)
       (*particle)->write2014_binary( FILEbin );
-          
+
     FILEbin.close();
   }
   else
   {
-    for (particle=m_ActiveParticles.begin(); 
+    for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
       (*particle)->write2014( fileSave );
 
-    for (particle=m_InactiveParticles.begin(); 
+    for (particle=m_InactiveParticles.begin();
     	particle!=m_InactiveParticles.end(); particle++)
       (*particle)->write2014( fileSave );
   }
@@ -940,7 +944,7 @@ void AllComponents::write( ostream &fileSave, string const& filename ) const
 void AllComponents::debug( char* s )
 {
   cout << s << '\n'
-       << "Particles " << m_ActiveParticles.size() 
+       << "Particles " << m_ActiveParticles.size()
        		+ m_InactiveParticles.size()  << '\n'
        << "   Actives " << m_ActiveParticles.size() << '\t'
        << "   Wait    " << m_InactiveParticles.size()      << endl;
@@ -950,24 +954,24 @@ void AllComponents::debug( char* s )
 
 
 // ----------------------------------------------------------------------------
-// Output operator  
+// Output operator
 ostream& operator << ( ostream& f, AllComponents const& EC )
 {
-  f << "Number of particles on all processes = " 
+  f << "Number of particles on all processes = "
   	<< EC.m_total_nb_particles << endl;
-  f << "Number of particles = " << 
+  f << "Number of particles = " <<
   	EC.m_ActiveParticles.size() + EC.m_InactiveParticles.size() << endl;
-  f << "Number of active particles = " << EC.m_ActiveParticles.size() 
+  f << "Number of active particles = " << EC.m_ActiveParticles.size()
   	<< endl;
-  f << "Number of inactive particles = " << EC.m_InactiveParticles.size() 
+  f << "Number of inactive particles = " << EC.m_InactiveParticles.size()
   	<< endl;
-  f << "Number of particles in halozone = " << 
-  	EC.m_ParticlesInHalozone.size() << endl; 
-  f << "Number of clone particles = " << EC.m_CloneParticles.size() << endl;	 
+  f << "Number of particles in halozone = " <<
+  	EC.m_ParticlesInHalozone.size() << endl;
+  f << "Number of clone particles = " << EC.m_CloneParticles.size() << endl;
   list<Particle*>::const_iterator il;
   for (il=EC.m_ActiveParticles.begin();il!=EC.m_ActiveParticles.end();il++)
     f << *(*il) << endl;
-  
+
   return f;
 }
 
@@ -976,54 +980,54 @@ ostream& operator << ( ostream& f, AllComponents const& EC )
 
 // ----------------------------------------------------------------------------
 // Writes components for Post-Processing at the start of the simulation
-void AllComponents::PostProcessing_start( double time, double dt, 
-	LinkedCell const* LC, vector<Window> const& insert_windows, 
-	int rank, int nprocs, 
+void AllComponents::PostProcessing_start( double time, double dt,
+	LinkedCell const* LC, vector<Window> const& insert_windows,
+	int rank, int nprocs,
 	GrainsMPIWrapper const* wrapper )
 {
-  list<Particle*>* postProcessingPeriodic = NULL;  
+  list<Particle*>* postProcessingPeriodic = NULL;
   list<PostProcessingWriter*>::iterator pp;
   bool written = false;
 
   // Message on display
-  if ( rank == 0 ) 
+  if ( rank == 0 )
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
     	pp++)
     {
       cout << "Writing results in post-processing files: START" << endl;
       written = true;
     }
-    
+
   // Periodic clones
   if ( GrainsExec::m_periodic )
   {
     if ( GrainsExec::m_MPI ) {}
     else
     {
-      postProcessingPeriodic = new list<Particle*>;  
+      postProcessingPeriodic = new list<Particle*>;
       multimap<int,Particle*>::iterator imm;
       for (imm=m_PeriodicCloneParticles.begin();
   	imm!=m_PeriodicCloneParticles.end();imm++)
-        postProcessingPeriodic->push_back( imm->second );         
+        postProcessingPeriodic->push_back( imm->second );
     }
-  }  
+  }
 
   // Post processing writers
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
     (*pp)->PostProcessing_start( time, dt, &m_ActiveParticles,
 	&m_InactiveParticles, postProcessingPeriodic,
 	&m_ReferenceParticles, m_obstacle, LC, insert_windows );
-  
+
   // Destruction of local containers
   if ( GrainsExec::m_periodic )
   {
-    postProcessingPeriodic->clear(); 
+    postProcessingPeriodic->clear();
     delete postProcessingPeriodic;
   }
 
   // Message on display
-  written = false ;  
-  if ( rank == 0 ) 
+  written = false ;
+  if ( rank == 0 )
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
     	pp++)
     {
@@ -1038,15 +1042,15 @@ void AllComponents::PostProcessing_start( double time, double dt,
 // ----------------------------------------------------------------------------
 // Writes components for Post-Processing over the simulation
 void AllComponents::PostProcessing( double time, double dt,
-	LinkedCell const* LC, int rank, 
+	LinkedCell const* LC, int rank,
 	int nprocs, GrainsMPIWrapper const* wrapper )
 {
-  list<Particle*>* postProcessingPeriodic = NULL;  
+  list<Particle*>* postProcessingPeriodic = NULL;
   list<PostProcessingWriter*>::iterator pp;
   bool written = false;
 
   // Message on display
-  if ( rank == 0 ) 
+  if ( rank == 0 )
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
     	pp++)
     {
@@ -1060,11 +1064,11 @@ void AllComponents::PostProcessing( double time, double dt,
     if ( GrainsExec::m_MPI ) {}
     else
     {
-      postProcessingPeriodic = new list<Particle*>;  
+      postProcessingPeriodic = new list<Particle*>;
       multimap<int,Particle*>::iterator imm;
       for (imm=m_PeriodicCloneParticles.begin();
   	imm!=m_PeriodicCloneParticles.end();imm++)
-        postProcessingPeriodic->push_back( imm->second );        
+        postProcessingPeriodic->push_back( imm->second );
     }
   }
 
@@ -1073,17 +1077,17 @@ void AllComponents::PostProcessing( double time, double dt,
     (*pp)->PostProcessing( time, dt, &m_ActiveParticles,
 	&m_InactiveParticles, postProcessingPeriodic,
 	&m_ReferenceParticles, m_obstacle, LC );
-	
+
   // Destruction of local containers
   if ( GrainsExec::m_periodic )
   {
-    postProcessingPeriodic->clear();      
+    postProcessingPeriodic->clear();
     delete postProcessingPeriodic;
   }
 
   // Message on display
-  written = false ;  
-  if ( rank == 0 ) 
+  written = false ;
+  if ( rank == 0 )
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
     	pp++)
     {
@@ -1124,39 +1128,39 @@ void AllComponents::PostProcessingErreurComponents( string const& filename,
 
 
 // ----------------------------------------------------------------------------
-// Computes and returns the maximum and mean translational velocity 
+// Computes and returns the maximum and mean translational velocity
 // of all components i.e. particles and obstacles
-void AllComponents::ComputeMaxMeanVelocity( double& vmax, double& vmean, 
+void AllComponents::ComputeMaxMeanVelocity( double& vmax, double& vmean,
   	GrainsMPIWrapper const* wrapper ) const
 {
   double vit;
   vmax = vmean = 0. ;
   size_t ncomp = 0 ;
-  
+
   // Particles
   list<Particle*>::const_iterator particle;
-  for (particle=m_ActiveParticles.begin(); 
-  	particle!=m_ActiveParticles.end(); particle++) 
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
   {
     vit = Norm( *(*particle)->getTranslationalVelocity() );
     vmax = vit > vmax ? vit : vmax;
     vmean += vit;
-    ++ncomp;    
+    ++ncomp;
   }
 
   // Obstacles
   list<SimpleObstacle*> obstacles = m_obstacle->getObstacles();
-  list<SimpleObstacle*>::const_iterator myObs;  
-  for (myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++) 
+  list<SimpleObstacle*>::const_iterator myObs;
+  for (myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++)
   {
     if ( (*myObs)->hasMoved() )
     {
       vit = Norm( *(*myObs)->getTranslationalVelocity() );
       vmax = vit > vmax ? vit : vmax;
       vmean += vit;
-      ++ncomp;        
+      ++ncomp;
     }
-  }  
+  }
 
   if ( wrapper )
   {
@@ -1164,28 +1168,28 @@ void AllComponents::ComputeMaxMeanVelocity( double& vmax, double& vmean,
     ncomp = wrapper->sum_UNSIGNED_INT_master( ncomp );
     vmean = wrapper->sum_DOUBLE_master( vmean );
   }
-  
-  if ( ncomp ) vmean /= double(ncomp) ;  
+
+  if ( ncomp ) vmean /= double(ncomp) ;
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Computes and writes in a file the minimum, maximum and mean 
+// Computes and writes in a file the minimum, maximum and mean
 // translational velocity of all particles
-void AllComponents::monitorParticlesVelocity( double time, ofstream& fileOut, 
+void AllComponents::monitorParticlesVelocity( double time, ofstream& fileOut,
   	int rank, GrainsMPIWrapper const* wrapper ) const
 {
   Vector3 vmin( 1.20 ), vmax( -1.e20 ), vmean;
   size_t ncomp = m_ActiveParticles.size() ;
   Vector3 const* vtrans = NULL ;
   double vit = 0. ;
-  
+
   // Particles
   list<Particle*>::const_iterator particle;
-  for (particle=m_ActiveParticles.begin(); 
-  	particle!=m_ActiveParticles.end(); particle++) 
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
   {
     vtrans = (*particle)->getTranslationalVelocity();
     for (int i=0;i<3;++i)
@@ -1196,7 +1200,7 @@ void AllComponents::monitorParticlesVelocity( double time, ofstream& fileOut,
       vmean[i] += vit;
     }
   }
-  
+
   if ( wrapper )
   {
     ncomp = wrapper->sum_UNSIGNED_INT_master( ncomp );
@@ -1205,19 +1209,19 @@ void AllComponents::monitorParticlesVelocity( double time, ofstream& fileOut,
       vmin[i] = wrapper->min_DOUBLE_master( vmin[i] );
       vmax[i] = wrapper->max_DOUBLE_master( vmax[i] );
       vmean[i] = wrapper->sum_DOUBLE_master( vmean[i] );
-    }    
+    }
   }
-  
-  if ( rank == 0 ) 
+
+  if ( rank == 0 )
   {
     fileOut << time;
-    for (int i=0;i<3;++i) 
+    for (int i=0;i<3;++i)
     {
       vmean[i] /= double(ncomp) ;
       fileOut << " " << vmin[i] << " " << vmax[i] << " " << vmean[i];
     }
-    fileOut << endl;        
-  }  
+    fileOut << endl;
+  }
 }
 
 
@@ -1231,23 +1235,23 @@ void AllComponents::updateGeoPositionParticlesHalozone()
   for (particle=m_ParticlesInHalozone.begin();
   	particle!=m_ParticlesInHalozone.end();particle++)
     (*particle)->updateGeoPosition();
-} 
+}
 
 
 
 
 // ----------------------------------------------------------------------------
-// Adds a post-processing writer 
+// Adds a post-processing writer
 void AllComponents::addPostProcessingWriter( PostProcessingWriter* ppw )
 {
   m_postProcessors.push_back(ppw);
 }
-  
+
 
 
 
 // ----------------------------------------------------------------------------
-// Sets the initial post-processing cycle number 
+// Sets the initial post-processing cycle number
 void AllComponents::setInitialCycleNumber( int const& cycle0)
 {
   list<PostProcessingWriter*>::iterator pp;
@@ -1259,9 +1263,9 @@ void AllComponents::setInitialCycleNumber( int const& cycle0)
 
 
 // ----------------------------------------------------------------------------
-// Checks that the Paraview post-processing writer exists, and if not 
+// Checks that the Paraview post-processing writer exists, and if not
 // creates it
-void AllComponents::checkParaviewPostProcessing( int const& rank, 
+void AllComponents::checkParaviewPostProcessing( int const& rank,
   	int const& nprocs,
   	string const& name_,
 	string const& root_,
@@ -1274,16 +1278,16 @@ void AllComponents::checkParaviewPostProcessing( int const& rank,
       ParaviewPP = *pp;
 
   // Si aucun post processing writer n'existe, initialiser le vecteur
-  // des fenetres de post processing a true sur tous les procs 
+  // des fenetres de post processing a true sur tous les procs
   if ( m_postProcessors.empty() )
     PostProcessingWriter::allocate_PostProcessingWindow( nprocs );
-      
+
   // Si un post processing writer Paraview existe deja, on le detruit
   // et on le recreer avec les bons parametres
   if ( ParaviewPP )
   {
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
-      if ( (*pp) == ParaviewPP ) 
+      if ( (*pp) == ParaviewPP )
       {
         delete *pp;
 	pp = m_postProcessors.erase( pp );
@@ -1291,12 +1295,12 @@ void AllComponents::checkParaviewPostProcessing( int const& rank,
       else pp++;
     ParaviewPP = NULL;
   }
-      
-  // Creation du post processing writer Paraview avec les bons parametres 
+
+  // Creation du post processing writer Paraview avec les bons parametres
   ParaviewPP = new ParaviewPostProcessingWriter( rank, nprocs, name_, root_,
   	isBinary );
-  m_postProcessors.push_back( ParaviewPP );   
-} 
+  m_postProcessors.push_back( ParaviewPP );
+}
 
 
 
@@ -1308,16 +1312,16 @@ int AllComponents::getMaxParticleIDnumber() const
   int numeroMax = 0;
   list<Particle*>::const_iterator particle;
 
-  for (particle=m_ActiveParticles.begin(); 
-  	particle!=m_ActiveParticles.end(); particle++) 
-    numeroMax = numeroMax < (*particle)->getID() ? 
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
+    numeroMax = numeroMax < (*particle)->getID() ?
     	(*particle)->getID() : numeroMax;
 
-  for (particle=m_InactiveParticles.begin(); 
-  	particle!=m_InactiveParticles.end(); particle++) 
-    numeroMax = numeroMax < (*particle)->getID() ? 
-    	(*particle)->getID() : numeroMax; 
-	 
+  for (particle=m_InactiveParticles.begin();
+  	particle!=m_InactiveParticles.end(); particle++)
+    numeroMax = numeroMax < (*particle)->getID() ?
+    	(*particle)->getID() : numeroMax;
+
   return ( numeroMax );
 }
 
@@ -1327,11 +1331,11 @@ int AllComponents::getMaxParticleIDnumber() const
 // ----------------------------------------------------------------------------
 // Sets the frequency at which the relationship between obstacles
 // and linked cell grid is updated
-void AllComponents::setObstaclesLinkedCellUpdateFrequency( 
+void AllComponents::setObstaclesLinkedCellUpdateFrequency(
 	int const& updateFreq )
 {
   list<SimpleObstacle*> obstacles = m_obstacle->getObstacles();
-  list<SimpleObstacle*>::iterator myObs;   
+  list<SimpleObstacle*>::iterator myObs;
   for (myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++)
     (*myObs)->setObstacleLinkedCellUpdateFrequency( updateFreq );
 }
@@ -1347,10 +1351,10 @@ void AllComponents::setOutputObstaclesLoadParameters( string const& root_,
 {
   m_outputTorsorObstacles_dir = root_;
   m_outputTorsorObstacles_frequency = freq_;
-  
+
   for (list<string>::const_iterator il=ObsNames.begin();il!=ObsNames.end();il++)
   {
-    Obstacle* pobs = const_cast<Obstacle*>(m_obstacle->getObstacleFromName( 
+    Obstacle* pobs = const_cast<Obstacle*>(m_obstacle->getObstacleFromName(
     	*il ));
     if ( pobs )
       m_outputTorsorObstacles.push_back( pobs );
@@ -1363,7 +1367,7 @@ void AllComponents::setOutputObstaclesLoadParameters( string const& root_,
 // ----------------------------------------------------------------------------
 // Writes load on obstacles in a file
 void AllComponents::outputObstaclesLoad( double time, double dt,
-	bool enforceOutput, bool increaseCounterOnly, int rank, int nprocs, 
+	bool enforceOutput, bool increaseCounterOnly, int rank, int nprocs,
 	GrainsMPIWrapper const* wrapper )
 {
   if ( !increaseCounterOnly )
@@ -1372,44 +1376,44 @@ void AllComponents::outputObstaclesLoad( double time, double dt,
     {
       if ( nprocs > 1 )
         wrapper->sumObstaclesLoad( m_obstacle->getObstacles() );
-      
+
       if ( rank == 0 )
-      {  
+      {
         Torsor const* torseur = NULL;
-        Vector3 const* force = NULL; 
+        Vector3 const* force = NULL;
         Vector3 const* torque = NULL;
         for (list<Obstacle*>::iterator
     		obstacle=m_outputTorsorObstacles.begin();
 		obstacle!=m_outputTorsorObstacles.end();obstacle++)
         {
-          ofstream OUT( ( m_outputTorsorObstacles_dir 
+          ofstream OUT( ( m_outputTorsorObstacles_dir
       	+ "/Loading_" + (*obstacle)->getName() + ".res" ).c_str(), ios::app );
           torseur = (*obstacle)->getTorsor();
 	  force = torseur->getForce();
-          torque = torseur->getTorque();	
-	  OUT << time << " " << 
-		GrainsExec::doubleToString( ios::scientific, 6, (*force)[X] ) 
+          torque = torseur->getTorque();
+	  OUT << time << " " <<
+		GrainsExec::doubleToString( ios::scientific, 6, (*force)[X] )
 		<< " " <<
-		GrainsExec::doubleToString( ios::scientific, 6, (*force)[Y] ) 
+		GrainsExec::doubleToString( ios::scientific, 6, (*force)[Y] )
 		<< " " <<
-		GrainsExec::doubleToString( ios::scientific, 6, (*force)[Z] ) 
+		GrainsExec::doubleToString( ios::scientific, 6, (*force)[Z] )
 		<< " " <<
-		GrainsExec::doubleToString( ios::scientific, 6, (*torque)[X] ) 
+		GrainsExec::doubleToString( ios::scientific, 6, (*torque)[X] )
 		<< " " <<
-		GrainsExec::doubleToString( ios::scientific, 6, (*torque)[Y] ) 
+		GrainsExec::doubleToString( ios::scientific, 6, (*torque)[Y] )
 		<< " " <<
 		GrainsExec::doubleToString( ios::scientific, 6, (*torque)[Z] )
-		<< " " << endl;				
+		<< " " << endl;
           OUT.close();
         }
       }
     }
   }
-  
+
   if ( !enforceOutput )
   {
     ++m_outputTorsorObstacles_counter;
-    if ( m_outputTorsorObstacles_counter == 
+    if ( m_outputTorsorObstacles_counter ==
     	m_outputTorsorObstacles_frequency )
     m_outputTorsorObstacles_counter = 0 ;
   }
@@ -1423,26 +1427,26 @@ void AllComponents::outputObstaclesLoad( double time, double dt,
 void AllComponents::initialiseOutputObstaclesLoadFiles( int rank,
 	bool coupledFluid, double time )
 {
-  m_outputTorsorObstacles_counter = coupledFluid ;  
-  
+  m_outputTorsorObstacles_counter = coupledFluid ;
+
   if ( rank == 0 )
   {
     if ( GrainsExec::m_ReloadType == "new" )
     {
-      string cmd = "bash " + GrainsExec::m_GRAINS_HOME 
-     	+ "/Tools/ExecScripts/ObstaclesLoadFiles_clear.exec " 
+      string cmd = "bash " + GrainsExec::m_GRAINS_HOME
+     	+ "/Tools/ExecScripts/ObstaclesLoadFiles_clear.exec "
 	+ m_outputTorsorObstacles_dir;
-      system( cmd.c_str() );      
+      GrainsExec::m_return_syscmd = system( cmd.c_str() );
     }
-    else 
+    else
       for (list<Obstacle*>::iterator
     	obstacle=m_outputTorsorObstacles.begin();
 	obstacle!=m_outputTorsorObstacles.end();obstacle++)
-        GrainsExec::checkTime_outputFile( m_outputTorsorObstacles_dir 
-      		+ "/Loading_" + (*obstacle)->getName() + ".res", 
+        GrainsExec::checkTime_outputFile( m_outputTorsorObstacles_dir
+      		+ "/Loading_" + (*obstacle)->getName() + ".res",
     		time ) ;
   }
-    
+
 }
 
 
@@ -1450,10 +1454,10 @@ void AllComponents::initialiseOutputObstaclesLoadFiles( int rank,
 
 // ----------------------------------------------------------------------------
 // Sets the total number of particles on all processes
-void AllComponents::setNumberParticlesOnAllProc( size_t const& nb_ ) 
-{ 
-  m_total_nb_particles = int(nb_); 
-  GrainsExec::setNumberParticlesOnAllProc( m_total_nb_particles );  
+void AllComponents::setNumberParticlesOnAllProc( size_t const& nb_ )
+{
+  m_total_nb_particles = int(nb_);
+  GrainsExec::setNumberParticlesOnAllProc( m_total_nb_particles );
 }
 
 
@@ -1461,13 +1465,13 @@ void AllComponents::setNumberParticlesOnAllProc( size_t const& nb_ )
 
 // ----------------------------------------------------------------------------
 // Sets a random translational and angular velocity to all particles
-void AllComponents::setRandomMotion( double const& coefTrans, 
+void AllComponents::setRandomMotion( double const& coefTrans,
 	double const& coefRot )
 {
   for (list<Particle*>::iterator particle=m_ActiveParticles.begin();
 	particle!=m_ActiveParticles.end();particle++)
     (*particle)->setRandomMotion( coefTrans, coefRot );
-}      
+}
 
 
 
@@ -1480,12 +1484,12 @@ void AllComponents::setAllContactMapToFalse()
   for (list<Particle*>::iterator particle=m_ActiveParticles.begin();
 	particle!=m_ActiveParticles.end();particle++)
     (*particle)->setContactMapToFalse();
-    
+
   list<SimpleObstacle*> obstacles = m_obstacle->getObstacles();
   list<SimpleObstacle*>::iterator myObs;
-  for( myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++ ) 
-    (*myObs)->setContactMapToFalse();  
-}      
+  for( myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++ )
+    (*myObs)->setContactMapToFalse();
+}
 
 
 
@@ -1498,11 +1502,11 @@ void AllComponents::updateAllContactMaps()
   for (list<Particle*>::iterator particle=m_ActiveParticles.begin();
 	particle!=m_ActiveParticles.end();particle++)
     (*particle)->updateContactMap();
-    
+
   list<SimpleObstacle*> obstacles = m_obstacle->getObstacles();
   list<SimpleObstacle*>::iterator myObs;
-  for( myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++ ) 
-    (*myObs)->updateContactMap();  
+  for( myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++ )
+    (*myObs)->updateContactMap();
 }
 
 
@@ -1510,9 +1514,9 @@ void AllComponents::updateAllContactMaps()
 
 // ----------------------------------------------------------------------------
 // Returns the number of inactive particles
-size_t AllComponents::getNumberInactiveParticles() const 
-{ 
-  return ( m_InactiveParticles.size() ); 
+size_t AllComponents::getNumberInactiveParticles() const
+{
+  return ( m_InactiveParticles.size() );
 }
 
 
@@ -1520,9 +1524,9 @@ size_t AllComponents::getNumberInactiveParticles() const
 
 // ----------------------------------------------------------------------------
 // Returns the total number of particles on all processes
-size_t AllComponents::getNumberParticlesOnAllProc() const 
-{ 
-  return ( m_total_nb_particles ); 
+size_t AllComponents::getNumberParticlesOnAllProc() const
+{
+  return ( m_total_nb_particles );
 }
 
 
@@ -1536,7 +1540,7 @@ size_t AllComponents::getNumberActiveParticlesOnProc() const
   for (list<Particle*>::const_iterator il=m_ActiveParticles.begin();
   	il!=m_ActiveParticles.end();il++)
     if ( (*il)->getTag() == 2 || (*il)->getID() == -2 ) nb_part--;
-    
+
   return nb_part;
 }
 
@@ -1545,8 +1549,8 @@ size_t AllComponents::getNumberActiveParticlesOnProc() const
 
 // ----------------------------------------------------------------------------
 // Returns the number of active particles
-size_t AllComponents::getNumberActiveParticles() const 
-{ 
+size_t AllComponents::getNumberActiveParticles() const
+{
   return ( m_ActiveParticles.size() );
 }
 
@@ -1555,7 +1559,7 @@ size_t AllComponents::getNumberActiveParticles() const
 
 // ----------------------------------------------------------------------------
 // Returns the total number of particles, both active and inactive
-size_t AllComponents::getNumberParticles() const 
-{ 
+size_t AllComponents::getNumberParticles() const
+{
   return ( m_ActiveParticles.size() + m_InactiveParticles.size() );
 }

@@ -89,7 +89,7 @@ void App::set_periodicity( vector<bool> const& vper )
       	- m_domain_global_size_Y ;
     }
 
-    // BEHIND FRONT
+    // Behind Front
     if ( m_domain_global_periodicity[Z] )
     {
       m_domain_global_periodic_vectors[GEOPOS_BEHIND][Z] = 
@@ -121,7 +121,7 @@ void App::set_periodicity( vector<bool> const& vper )
       	- m_domain_global_size_Y ;
     }
     
-    // South North BEHIND FRONT
+    // South North Behind Front
     if ( m_domain_global_periodicity[Y] && m_domain_global_periodicity[Z] )
     {
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_BEHIND][Y] = 
@@ -142,7 +142,7 @@ void App::set_periodicity( vector<bool> const& vper )
       	- m_domain_global_size_Z ;
     }      
 
-    // West East BEHIND FRONT
+    // West East Behind Front
     if ( m_domain_global_periodicity[X] && m_domain_global_periodicity[Z] )
     {
       m_domain_global_periodic_vectors[GEOPOS_WEST_BEHIND][X] = 
@@ -221,9 +221,9 @@ void App::set_periodicity( vector<bool> const& vper )
   
   if ( m_periodic_vector_indices.empty() )
   {
-    m_periodic_vector_indices.reserve(27);
+    m_periodic_vector_indices.reserve(30);
     vector<int> emptyVECINT;
-    for (int i=0;i<27;++i) 
+    for (int i=0;i<30;++i) 
       m_periodic_vector_indices.push_back(emptyVECINT);
     vector<int>* work = NULL;
   
@@ -487,7 +487,40 @@ void App::set_periodicity( vector<bool> const& vper )
     (*work)[0] = GEOPOS_BEHIND;
     m_periodic_vector_indices[GEOPOS_BEHIND] = *work;
     work->clear();
-    delete work;    
+    delete work; 
+    
+    // Special cases for serial periodicity with a single cell in the main 
+    // domain in the periodic direction(s)
+    // EASTWEST => EAST, WEST
+    work = new vector<int>(2,0);
+    (*work)[0] = GEOPOS_EAST;
+    (*work)[1] = GEOPOS_WEST;    
+    m_periodic_vector_indices[GEOPOS_EASTWEST] = *work;
+    work->clear();
+    delete work;
+    
+    // NORTHSOUTH => NORTH, SOUTH
+    work = new vector<int>(2,0);
+    (*work)[0] = GEOPOS_NORTH;
+    (*work)[1] = GEOPOS_SOUTH;    
+    m_periodic_vector_indices[GEOPOS_NORTHSOUTH] = *work;
+    work->clear();
+    delete work;
+    
+    // GEOPOS_EASTWESTNORTHSOUTH => EAST, WEST, NORTH, NORTH_EAST, NORTH_WEST,
+    // SOUTH_EAST, SOUTH_WEST
+    work = new vector<int>(8,0);
+    (*work)[0] = GEOPOS_EAST;
+    (*work)[1] = GEOPOS_WEST;  
+    (*work)[2] = GEOPOS_NORTH;
+    (*work)[3] = GEOPOS_SOUTH;  
+    (*work)[4] = GEOPOS_NORTH_EAST;  
+    (*work)[5] = GEOPOS_NORTH_WEST;  
+    (*work)[6] = GEOPOS_SOUTH_EAST; 
+    (*work)[7] = GEOPOS_SOUTH_WEST;     
+    m_periodic_vector_indices[GEOPOS_EASTWESTNORTHSOUTH] = *work;
+    work->clear();
+    delete work;               
   } 
 }
 

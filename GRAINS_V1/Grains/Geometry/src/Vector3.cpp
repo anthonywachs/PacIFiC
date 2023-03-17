@@ -15,14 +15,23 @@ namespace solid
 
 
   // ---------------------------------------------------------------------------
-  // Constructor with 3 components as inputs 
+  // Constructor with 3 components as inputs
   Vector3::Vector3( double x, double y, double z )
     : Group3( x, y, z )
   {}
-  
 
 
-  
+
+
+  // ---------------------------------------------------------------------------
+  // Copy constructor
+  Vector3::Vector3( Vector3 const& point )
+    : Group3( point )
+  {}
+
+
+
+
   // ---------------------------------------------------------------------------
   // Copy constructor
   Vector3::Vector3( Group3 const& point )
@@ -45,7 +54,7 @@ namespace solid
   int Vector3::closestAxis() const
   {
     double a[2];
-    int axis = ( a[X] = fabs( m_comp[X] ) ) < ( a[Y] = fabs( m_comp[Y] ) ) 
+    int axis = ( a[X] = fabs( m_comp[X] ) ) < ( a[Y] = fabs( m_comp[Y] ) )
     	? Y : X;
     return ( a[axis] < fabs( m_comp[Z] ) ? Z : axis );
   }
@@ -74,35 +83,23 @@ namespace solid
 
 
   // ---------------------------------------------------------------------------
-  // Rounds components to +-EPSILON where EPSILON is defined in Basic.H
-  void Vector3::round() 
-  {
-    m_comp[X] = fabs( m_comp[X] ) < EPSILON ? 0. : m_comp[X];
-    m_comp[Y] = fabs( m_comp[Y] ) < EPSILON ? 0. : m_comp[Y];
-    m_comp[Z] = fabs( m_comp[Z] ) < EPSILON ? 0. : m_comp[Z];
-  }
-
-
-
-
-  // ---------------------------------------------------------------------------
   // Rotation by an unitary quaternion
   void Vector3::Rotate( Quaternion const& q )
   {
     Quaternion tmp( *this );
-    tmp = (q * tmp ) * q.Conjugate();  
+    tmp = (q * tmp ) * q.Conjugate();
     *this = *(tmp.getVector3());
   }
 
 
 
 
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // ---------------------------------------------------------------------------
   // Equal operator to another Vector3 object
   Vector3& Vector3::operator = ( Vector3 const& g2 )
   {
     if ( &g2 != this )
-    {     
+    {
       m_comp[X] = g2.m_comp[X];
       m_comp[Y] = g2.m_comp[Y];
       m_comp[Z] = g2.m_comp[Z];
@@ -112,21 +109,20 @@ namespace solid
 
 
 
-
   // ---------------------------------------------------------------------------
   // Cross product this x rhv
   Vector3 Vector3::operator ^ ( Vector3 const& rhv ) const
   {
     return ( Vector3( m_comp[1] * rhv.m_comp[2] - m_comp[2] * rhv.m_comp[1],
-	- m_comp[0] * rhv.m_comp[2] + m_comp[2] * rhv.m_comp[0], 
+	- m_comp[0] * rhv.m_comp[2] + m_comp[2] * rhv.m_comp[0],
 	m_comp[0] * rhv.m_comp[1] - m_comp[1] * rhv.m_comp[0] ) );
   }
-  
+
 
 
 
   // ---------------------------------------------------------------------------
-  // Returns whether the vector norm is less than EPSILON2 
+  // Returns whether the vector norm is less than EPSILON2
   // where EPSILON2 is defined in Basic.H
   bool approxZero( Vector3 const& v )
   {
@@ -150,7 +146,7 @@ namespace solid
   //Returns the norm of the vector
   double Norm( Vector3 const& v )
   {
-    return ( sqrt( v.m_comp[X] * v.m_comp[X] 
+    return ( sqrt( v.m_comp[X] * v.m_comp[X]
     	+ v.m_comp[Y] * v.m_comp[Y] + v.m_comp[Z] * v.m_comp[Z] ) );
   }
 
@@ -159,9 +155,9 @@ namespace solid
 
   // ---------------------------------------------------------------------------
   // Returns the norm square of the vector
-  double Norm2( Vector3 const& v)
+  double Norm2( Vector3 const& v )
   {
     return ( v.m_comp[X] * v.m_comp[X] + v.m_comp[Y] * v.m_comp[Y]
     	+ v.m_comp[Z] * v.m_comp[Z] );
-  }  
+  }
 }
