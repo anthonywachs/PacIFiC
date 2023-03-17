@@ -1874,7 +1874,8 @@ string Grains::fullResultFileName( string const& rootname ) const
 // Sets the linked cell grid
 void Grains::defineLinkedCell( double const& radius, string const& oshift )
 {
-  m_collision->set( 2. * radius, oshift );
+  size_t error = m_collision->set( 2. * radius, oshift );
+  if ( error ) grainsAbort();
 }
 
 

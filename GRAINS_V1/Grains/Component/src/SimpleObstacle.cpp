@@ -239,7 +239,7 @@ void SimpleObstacle::InterAction( Component* voisin,
         cout << endl << "Processor = " <<
     		(GrainsExec::m_MPI ?
 			GrainsExec::getComm()->get_rank_active() : 0 )
-		<< " has thrown an ContactError exception" <<  endl;
+		<< " has thrown a ContactError exception" <<  endl;
         erreur_level2.setMessage(
 		"SimpleObstacle::InterAction : choc de croute ! a t="
 		+GrainsExec::doubleToString(time,TIMEFORMAT));

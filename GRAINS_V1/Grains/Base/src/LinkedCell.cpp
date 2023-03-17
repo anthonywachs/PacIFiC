@@ -48,8 +48,9 @@ LinkedCell::~LinkedCell()
 
 // ----------------------------------------------------------------------------
 // Sets the linked cell grid in serial mode
-void LinkedCell::set( double cellsize_, string const& oshift )
+size_t LinkedCell::set( double cellsize_, string const& oshift )
 {
+  size_t error = 0;
   m_LC_global_origin = m_domain_global_origin;
   m_LC_local_origin = m_domain_local_origin;
 
@@ -58,8 +59,10 @@ void LinkedCell::set( double cellsize_, string const& oshift )
   if ( cellsize_ > 1.e-10 )
   {
     m_nbi = (int)( ( App::m_domain_local_size_X + EPSILON ) / cellsize_);
+    if ( !m_nbi ) m_nbi = 1;
     m_cellsize_X = App::m_domain_local_size_X / m_nbi ;
     m_nbj = (int)( ( App::m_domain_local_size_Y + EPSILON ) / cellsize_);
+    if ( !m_nbj ) m_nbj = 1;    
     m_cellsize_Y = App::m_domain_local_size_Y / m_nbj ;
     m_nbk = (int)( ( App::m_domain_local_size_Z + EPSILON ) / cellsize_);
     m_cellsize_Z = App::m_domain_local_size_Z / m_nbk ;
@@ -143,19 +146,33 @@ void LinkedCell::set( double cellsize_, string const& oshift )
 	m_allcells[getCellNumber( 0, j, k )]->m_tag = 2;
 	m_allcells[getCellNumber( m_nbi - 1, j, k )]->m_tag = 2;
 
-	// Set tag = 1 and geopos = GEOPOS_WEST in 2nd row
-	m_allcells[getCellNumber( 1, j, k )]->m_tag = 1;
-	m_allcells[getCellNumber( 1, j, k )]->m_GeoPosCell = GEOPOS_WEST;
+	if ( m_nbi == 3 )
+	// Special case of a single cell in the main domain
+	{
+	  // Set tag = 1 and geopos = GEOPOS_EASTWEST in 2nd row
+	  m_allcells[getCellNumber( 1, j, k )]->m_tag = 1;
+	  m_allcells[getCellNumber( 1, j, k )]->m_GeoPosCell = GEOPOS_EASTWEST;	
+	}
+	else
+	// General case
+	{
+	  // Set tag = 1 and geopos = GEOPOS_WEST in 2nd row
+	  m_allcells[getCellNumber( 1, j, k )]->m_tag = 1;
+	  m_allcells[getCellNumber( 1, j, k )]->m_GeoPosCell = GEOPOS_WEST;
 
-	// Set tag = 1 and geopos = GEOPOS_EAST in penultimate row
-	m_allcells[getCellNumber( m_nbi - 2, j, k )]->m_tag = 1;
-	m_allcells[getCellNumber( m_nbi - 2, j, k )]->m_GeoPosCell =
+	  // Set tag = 1 and geopos = GEOPOS_EAST in penultimate row
+	  m_allcells[getCellNumber( m_nbi - 2, j, k )]->m_tag = 1;
+	  m_allcells[getCellNumber( m_nbi - 2, j, k )]->m_GeoPosCell =
 		GEOPOS_EAST;
+	}
       }
   }
 
   if ( m_domain_global_periodicity[Y] )
   {
+    if ( !m_domain_global_periodicity[X] || 
+    	 ( m_domain_global_periodicity[X] && m_nbi > 3 && m_nbj > 3 ) )
+    {
     for (int i=0; i<m_nbi; i++)
       for (int k=0; k<m_nbk; k++)
       {
@@ -165,162 +182,217 @@ void LinkedCell::set( double cellsize_, string const& oshift )
 	m_allcells[getCellNumber( i, 0, k )]->m_GeoPosCell = GEOPOS_NONE ;
 	m_allcells[getCellNumber( i, m_nbj - 1, k )]->m_GeoPosCell =
 		GEOPOS_NONE;
-
-	// Set tag = 1 and geopos += GEOPOS_SOUTH in 2nd row
-	if ( m_allcells[getCellNumber( i, 1, k )]->m_tag != 2 )
+	
+	if ( m_nbj == 3 )
+	// Special case of a single cell in the main domain
 	{
+	  // Set tag = 1 and geopos = GEOPOS_NORTHSOUTH in 2nd row
 	  m_allcells[getCellNumber( i, 1, k )]->m_tag = 1;
-	  switch( int(m_allcells[getCellNumber( i, 1, k )]->m_GeoPosCell) )
-	  {
-	    case GEOPOS_NONE:
-	      m_allcells[getCellNumber( i, 1, k )]->m_GeoPosCell = GEOPOS_SOUTH;
-	      break;
-	    case GEOPOS_WEST:
-	      m_allcells[getCellNumber( i, 1, k )]->m_GeoPosCell =
-	      	GEOPOS_SOUTH_WEST;
-	      break;
-	    case GEOPOS_EAST:
-	      m_allcells[getCellNumber( i, 1, k )]->m_GeoPosCell =
-	      	GEOPOS_SOUTH_EAST;
-	      break;
-	  }
+	  m_allcells[getCellNumber( i, 1, k )]->m_GeoPosCell = 
+	  	GEOPOS_NORTHSOUTH;	
 	}
-
-	// Set tag = 1 and geopos += GEOPOS_NORTH in penultimate row
-	if ( m_allcells[getCellNumber( i, m_nbj - 2, k )]->m_tag != 2 )
-	{
-	  m_allcells[getCellNumber( i, m_nbj - 2, k )]->m_tag = 1;
-	  switch( int(m_allcells[getCellNumber( i, m_nbj - 2, k )]
-	  	->m_GeoPosCell) )
+	else
+	// General case
+	{	
+	  // Set tag = 1 and geopos += GEOPOS_SOUTH in 2nd row
+	  if ( m_allcells[getCellNumber( i, 1, k )]->m_tag != 2 )
 	  {
-	    case GEOPOS_NONE:
-	      m_allcells[getCellNumber( i, m_nbj - 2, k )]->m_GeoPosCell =
-	      	GEOPOS_NORTH;
-	      break;
-	    case GEOPOS_WEST:
-	      m_allcells[getCellNumber( i, m_nbj - 2, k )]->m_GeoPosCell =
-	      	GEOPOS_NORTH_WEST;
-	      break;
-	    case GEOPOS_EAST:
-	      m_allcells[getCellNumber( i, m_nbj - 2, k )]->m_GeoPosCell =
-	      	GEOPOS_NORTH_EAST;
-	      break;
+	    m_allcells[getCellNumber( i, 1, k )]->m_tag = 1;
+	    switch( int(m_allcells[getCellNumber( i, 1, k )]->m_GeoPosCell) )
+	    {
+	      case GEOPOS_NONE:
+	        m_allcells[getCellNumber( i, 1, k )]->m_GeoPosCell = 
+			GEOPOS_SOUTH;
+	        break;
+	      case GEOPOS_WEST:
+	        m_allcells[getCellNumber( i, 1, k )]->m_GeoPosCell =
+	      		GEOPOS_SOUTH_WEST;
+	        break;
+	      case GEOPOS_EAST:
+	        m_allcells[getCellNumber( i, 1, k )]->m_GeoPosCell =
+	      		GEOPOS_SOUTH_EAST;
+	        break;
+	    }
 	  }
+
+	  // Set tag = 1 and geopos += GEOPOS_NORTH in penultimate row
+	  if ( m_allcells[getCellNumber( i, m_nbj - 2, k )]->m_tag != 2 )
+	  {
+	    m_allcells[getCellNumber( i, m_nbj - 2, k )]->m_tag = 1;
+	    switch( int(m_allcells[getCellNumber( i, m_nbj - 2, k )]
+	  	->m_GeoPosCell) )
+	    {
+	      case GEOPOS_NONE:
+	        m_allcells[getCellNumber( i, m_nbj - 2, k )]->m_GeoPosCell =
+	      		GEOPOS_NORTH;
+	        break;
+	      case GEOPOS_WEST:
+	        m_allcells[getCellNumber( i, m_nbj - 2, k )]->m_GeoPosCell =
+	      		GEOPOS_NORTH_WEST;
+	        break;
+	      case GEOPOS_EAST:
+	        m_allcells[getCellNumber( i, m_nbj - 2, k )]->m_GeoPosCell =
+	      		GEOPOS_NORTH_EAST;
+	        break;
+	    }
+	  }  
 	}
       }
+    }
+    else if ( m_domain_global_periodicity[X] && m_nbi == 3 && m_nbj == 3 )
+    {
+      for (int i=0; i<m_nbi; i++)
+        for (int j=0; j<m_nbj; j++)
+          for (int k=0; k<m_nbk; k++)
+	  {
+	    m_allcells[getCellNumber( i, j, k )]->m_tag = 2;
+	    m_allcells[getCellNumber( i, j, k )]->m_GeoPosCell = GEOPOS_NONE ;
+	  }
+      
+      for (int k=0; k<m_nbk; k++)
+      {
+        m_allcells[getCellNumber( 1, 1, k )]->m_tag = 1;
+	m_allcells[getCellNumber( 1, 1, k )]->m_GeoPosCell = 
+		GEOPOS_EASTWESTNORTHSOUTH ;
+      }     
+    }
+    else 
+    {
+      cout << "Serial bi-periodicity in XY with a single cell in the"
+      	<< " main domain in one direction and more than one cell in the other"
+	<< " direction is not handled" << endl;
+      cout << "This configuration has not been implemented yet" << endl;
+      error = 1;
+    }
   }
 
-  if ( m_domain_global_periodicity[Z] )
+  if ( !error )
   {
-    for (int i=0; i<m_nbi; i++)
-      for (int j=0; j<m_nbj; j++)
+    if ( m_domain_global_periodicity[Z] )
+    {
+      if ( m_nbk > 3 )
       {
-        // Set tag = 2 and geopos = GEOPOS_NONE to 1st and last row
-	m_allcells[getCellNumber( i, j, 0 )]->m_tag = 2;
-	m_allcells[getCellNumber( i, j, m_nbk - 1 )]->m_tag = 2;
-	m_allcells[getCellNumber( i, j, 0 )]->m_GeoPosCell = GEOPOS_NONE ;
-	m_allcells[getCellNumber( i, j, m_nbk - 1 )]->m_GeoPosCell =
+        for (int i=0; i<m_nbi; i++)
+          for (int j=0; j<m_nbj; j++)
+          {
+            // Set tag = 2 and geopos = GEOPOS_NONE to 1st and last row
+	    m_allcells[getCellNumber( i, j, 0 )]->m_tag = 2;
+	    m_allcells[getCellNumber( i, j, m_nbk - 1 )]->m_tag = 2;
+	    m_allcells[getCellNumber( i, j, 0 )]->m_GeoPosCell = GEOPOS_NONE ;
+	    m_allcells[getCellNumber( i, j, m_nbk - 1 )]->m_GeoPosCell =
 		GEOPOS_NONE;
 
-	// Set tag = 1 and geopos += GEOPOS_BEHIND in 2nd row
-	if ( m_allcells[getCellNumber( i, j, 1 )]->m_tag != 2 )
-	{
-	  m_allcells[getCellNumber( i, j, 1 )]->m_tag = 1;
-	  switch( int(m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell) )
-	  {
-	    case GEOPOS_NONE:
-	      m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
-	      	GEOPOS_BEHIND;
-	      break;
-	    case GEOPOS_WEST:
-	      m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
-	      	GEOPOS_WEST_BEHIND;
-	      break;
-	    case GEOPOS_EAST:
-	      m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
-	      	GEOPOS_EAST_BEHIND;
-	      break;
-	    case GEOPOS_SOUTH:
-	      m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
-	      	GEOPOS_SOUTH_BEHIND;
-	      break;
-	    case GEOPOS_NORTH:
-	      m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
-	      	GEOPOS_NORTH_BEHIND;
-	      break;
-	    case GEOPOS_SOUTH_WEST:
-	      m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
-	      	GEOPOS_SOUTH_WEST_BEHIND;
-	      break;
-	    case GEOPOS_SOUTH_EAST:
-	      m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
-	      	GEOPOS_SOUTH_EAST_BEHIND;
-	      break;
-	    case GEOPOS_NORTH_WEST:
-	      m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
-	      	GEOPOS_NORTH_WEST_BEHIND;
-	      break;
-	    case GEOPOS_NORTH_EAST:
-	      m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
-	      	GEOPOS_NORTH_EAST_BEHIND;
-	      break;
-	  }
-	}
+	    // Set tag = 1 and geopos += GEOPOS_BEHIND in 2nd row
+	    if ( m_allcells[getCellNumber( i, j, 1 )]->m_tag != 2 )
+	    {
+	      m_allcells[getCellNumber( i, j, 1 )]->m_tag = 1;
+	      switch( int(m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell) )
+	      {
+	        case GEOPOS_NONE:
+	          m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
+	      		GEOPOS_BEHIND;
+	          break;
+	        case GEOPOS_WEST:
+	          m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
+	      		GEOPOS_WEST_BEHIND;
+	          break;
+	        case GEOPOS_EAST:
+	          m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
+	      		GEOPOS_EAST_BEHIND;
+	          break;
+	        case GEOPOS_SOUTH:
+	          m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
+	      		GEOPOS_SOUTH_BEHIND;
+	          break;
+	        case GEOPOS_NORTH:
+	          m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
+	      		GEOPOS_NORTH_BEHIND;
+	          break;
+	        case GEOPOS_SOUTH_WEST:
+	          m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
+	      		GEOPOS_SOUTH_WEST_BEHIND;
+	          break;
+	        case GEOPOS_SOUTH_EAST:
+	          m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
+	      		GEOPOS_SOUTH_EAST_BEHIND;
+	          break;
+	        case GEOPOS_NORTH_WEST:
+	          m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
+	      		GEOPOS_NORTH_WEST_BEHIND;
+	          break;
+	        case GEOPOS_NORTH_EAST:
+	          m_allcells[getCellNumber( i, j, 1 )]->m_GeoPosCell =
+	      		GEOPOS_NORTH_EAST_BEHIND;
+	          break;
+	      }
+	    }
 
-	// Set tag = 1 and geopos += GEOPOS_FRONT in penultimate row
-	if ( m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_tag != 2 )
-	{
-	  m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_tag = 1;
-	  switch( int(m_allcells[getCellNumber( i, j, m_nbk - 2 )]
+	    // Set tag = 1 and geopos += GEOPOS_FRONT in penultimate row
+	    if ( m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_tag != 2 )
+	    {
+	      m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_tag = 1;
+	      switch( int(m_allcells[getCellNumber( i, j, m_nbk - 2 )]
 	  	->m_GeoPosCell) )
-	  {
-	    case GEOPOS_NONE:
-	      m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
+	      {
+	        case GEOPOS_NONE:
+	          m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
 	      	GEOPOS_FRONT;
-	      break;
-	    case GEOPOS_WEST:
-	      m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
+	          break;
+	        case GEOPOS_WEST:
+	          m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
 	      	GEOPOS_WEST_FRONT;
-	      break;
-	    case GEOPOS_EAST:
-	      m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
+	          break;
+	        case GEOPOS_EAST:
+	          m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
 	      	GEOPOS_EAST_FRONT;
-	      break;
-	    case GEOPOS_SOUTH:
-	      m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
+	          break;
+	        case GEOPOS_SOUTH:
+	          m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
 	      	GEOPOS_SOUTH_FRONT;
-	      break;
-	    case GEOPOS_NORTH:
-	      m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
-	      	GEOPOS_NORTH_FRONT;
-	      break;
-	    case GEOPOS_SOUTH_WEST:
-	      m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
+	          break;
+	        case GEOPOS_NORTH:
+	          m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
+	      	    GEOPOS_NORTH_FRONT;
+	          break;
+	        case GEOPOS_SOUTH_WEST:
+	          m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
 	      	GEOPOS_SOUTH_WEST_FRONT;
-	      break;
-	    case GEOPOS_SOUTH_EAST:
-	      m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
+	          break;
+	        case GEOPOS_SOUTH_EAST:
+	          m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
 	      	GEOPOS_SOUTH_EAST_FRONT;
-	      break;
-	    case GEOPOS_NORTH_WEST:
-	      m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
+	          break;
+	        case GEOPOS_NORTH_WEST:
+	          m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
 	      	GEOPOS_NORTH_WEST_FRONT;
-	      break;
-	    case GEOPOS_NORTH_EAST:
-	      m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
+	          break;
+	        case GEOPOS_NORTH_EAST:
+	          m_allcells[getCellNumber( i, j, m_nbk - 2 )]->m_GeoPosCell =
 	      	GEOPOS_NORTH_EAST_FRONT;
-	      break;
-	  }
-	}
+	          break;
+	      }
+	    }
+          }
       }
-  }
+      else
+      {
+        cout << "Serial periodicity in Z with a single cell in the"
+      	<< " main domain in the Z direction is not handled" << endl;
+        cout << "This configuration has not been implemented yet" << endl;
+        error = 1;
+      }
+    }
+  }      
 
   // list of buffer cells (i.e. tag = 1)
-  for (int j=0; j<m_nbj; j++)
-    for (int k=0; k<m_nbk; k++)
-      for (int i=0; i<m_nbi; i++)
-        if ( m_allcells[getCellNumber( i, j, k )]->m_tag == 1 )
-	  m_buffer_cells.push_back( m_allcells[getCellNumber( i, j, k )] );
+  if ( !error )
+    for (int j=0; j<m_nbj; j++)
+      for (int k=0; k<m_nbk; k++)
+        for (int i=0; i<m_nbi; i++)
+          if ( m_allcells[getCellNumber( i, j, k )]->m_tag == 1 )
+	    m_buffer_cells.push_back( m_allcells[getCellNumber( i, j, k )] );
+	    
+  return ( error );	    
 }
 
 
@@ -1213,6 +1285,8 @@ void LinkedCell::ComputeForces( double time, double dt,
   Particle* reference;
   Cell* cell_;
   list<Particle*> neighborparticles;
+  list<SimpleObstacle*>::iterator myObs;
+//  bool tagNotTwo = false;  
 
   // Particle-particle contacts
   Point3 centre;
@@ -1225,6 +1299,7 @@ void LinkedCell::ComputeForces( double time, double dt,
        particle++)
   {
     reference = *particle;
+//    tagNotTwo = ( reference->getTag() != 2 );
 
     // Search for neighboring particle
     // In the local cell: we only detect collisions with neighboring particles
@@ -1256,10 +1331,13 @@ void LinkedCell::ComputeForces( double time, double dt,
     // the calling object is always the composite particle
     for( neighborp=neighborparticles.begin();
     	neighborp!=neighborparticles.end(); neighborp++ )
-      if( (*neighborp)->isCompositeParticle() )
-        (*neighborp)->InterAction( reference, dt, time, this );
-      else
-        reference->InterAction( *neighborp, dt, time, this );
+//      if ( tagNotTwo || (*neighborp)->getTag() != 2 )
+      {
+        if( (*neighborp)->isCompositeParticle() )
+          (*neighborp)->InterAction( reference, dt, time, this );
+        else
+          reference->InterAction( *neighborp, dt, time, this );
+      }
 
     neighborparticles.clear();
 
@@ -1267,15 +1345,15 @@ void LinkedCell::ComputeForces( double time, double dt,
     // obstacles and force computation
     // In case of a composite particle, we swap neighbor and reference such that
     // the calling object is always the composite particle
-    list<SimpleObstacle*>::iterator myObs;
-    for( myObs=cell_->m_obstacles.begin();
+//    if ( tagNotTwo )
+      for( myObs=cell_->m_obstacles.begin();
          myObs!=cell_->m_obstacles.end(); myObs++ )
-    {
-      if ( reference->isCompositeParticle() )
-        reference->InterAction( *myObs, dt, time, this );
-      else
-        (*myObs)->InterAction( reference, dt, time, this );
-    }
+      {
+        if ( reference->isCompositeParticle() )
+          reference->InterAction( *myObs, dt, time, this );
+        else
+          (*myObs)->InterAction( reference, dt, time, this );
+      }
   }
 }
 
@@ -2318,7 +2396,7 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
         // Particle moved from buffer to halozone: add particle to the periodic
         // clone multimap
         if ( tag == 2 )
-        {
+        {	  
 	  particlesPeriodicClones->insert(
 		pair<int,Particle*>( (*particle)->getID(), *particle ) );
         }
@@ -2390,7 +2468,7 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
         // periodic clone multimap
         if ( tag == 1 )
         {
-          particleID = (*particle)->getID();
+          particleID = (*particle)->getID();	  
 	  crange = particlesPeriodicClones->equal_range( particleID );
 	  found = false;
           for (imm=crange.first; imm!=crange.second && !found; )
@@ -2400,8 +2478,79 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
 	      found = true;
 	    }
 	    else imm++;
-	}
+	}	
         break;
+    }
+  }
+
+  // Special of periodicity with a single cell in the main domain in that 
+  // direction
+  // Some particles that moved from tag 2 to tag 1 may not have all their
+  // periodic clones in the system depending on the order of particles
+  // in the list of active particles
+  // Consequently, we check whether all periodic clones of each particle 
+  // tagged 1 exists and if not we create them
+  // Important: this problem does not arise as soon as there are 2 cells in 
+  // the main domain in that direction
+  if ( ( m_nbi == 3 && m_domain_global_periodicity[X] )
+  	|| ( m_nbj == 3 && m_domain_global_periodicity[Y] )
+	|| ( m_nbk == 3 && m_domain_global_periodicity[Z] ) )
+  {
+    for (list<Particle*>::iterator particle=particles->begin();
+	particle!=particles->end();particle++)
+    {
+      tag = (*particle)->getTag();
+      tag_nm1 = (*particle)->getTagNm1();
+
+      if ( tag == 1 && tag_nm1 == 2 )
+      {	
+        geoloc = (*particle)->getGeoPosition();
+        crange = particlesPeriodicClones->equal_range( particleID );
+      
+        for ( size_t i=0;i<m_periodic_vector_indices[geoloc].size();++i)
+        {
+          found = false;
+
+	  // Find the periodic clone (same assumption as in
+	  // updateDestroyPeriodicClones)
+	  for (imm=crange.first; imm!=crange.second && !found; )
+            if ( imm->second->getPosition()->DistanceTo(
+	    	*((*particle)->getPosition())
+		+ m_domain_global_periodic_vectors[
+			m_periodic_vector_indices[geoloc][i]] ) <
+		2. * (*particle)->getCrustThickness() )
+	      found = true;
+	    else imm++;
+
+	  // If the periodic clone is not found, create it
+	  if ( !found )
+	  {
+	    // Create periodic clone
+	    periodic_clone = (*particle)->createCloneCopy(
+		(*particle)->getID(),
+		(*ReferenceParticles)[(*particle)->getGeometricType()],
+		*((*particle)->getTranslationalVelocity()),
+		*((*particle)->getQuaternionRotation()),
+		*((*particle)->getAngularVelocity()),
+		*((*particle)->getRigidBody()->getTransform()),
+		COMPUTE );
+
+	    // Translate to its periodic position
+	    periodic_clone->Translate( m_domain_global_periodic_vectors[
+		m_periodic_vector_indices[geoloc][i]] );
+
+            // Link periodic clone
+            Link( periodic_clone );
+
+	    // Insert into periodic clone map
+	    particlesPeriodicClones->insert(
+		pair<int,Particle*>( (*particle)->getID(), periodic_clone ) );
+
+	    // Insert into active particle list
+	    particles->push_back( periodic_clone );
+	  }
+        }	
+      }
     }
   }
 }

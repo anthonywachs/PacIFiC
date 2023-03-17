@@ -38,7 +38,14 @@ enum GeoPosition
     GEOPOS_WEST_BEHIND		= 23,
     GEOPOS_FRONT		= 24,
     GEOPOS_BEHIND		= 25,
-    GEOPOS_NONE			= 26                       
+    GEOPOS_NONE			= 26,
+    // Special cases for periodicity with a single cell in the periodic
+    // direction
+    // Note: all cases are not considered so far, only those with practical
+    // applications
+    GEOPOS_EASTWEST		= 27,
+    GEOPOS_NORTHSOUTH		= 28,
+    GEOPOS_EASTWESTNORTHSOUTH   = 29                              
   };
   
     
