@@ -71,6 +71,9 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , mu( 1. )
    , kai( 1. )
    , AdvectionScheme( "TVD" )
+   , StencilCorrection( "FD" )
+   , is_CConlyDivergence( false )
+   , FluxRedistThres( 0.5 )
    , AdvectionTimeAccuracy( 1 )
    , b_restart( false )
    , is_solids( false )
@@ -82,6 +85,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , insertion_type ( "Grains3D" )
    , is_stressCal ( false )
    , ViscousStressOrder ( "second" )
+   , PressureStressOrder ( "first" )
    , surface_cell_scale ( 1. )
    , is_surfacestressOUT ( false )
    , stressCalFreq ( 1 )
@@ -139,14 +143,33 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
      exp->test_data( "Kai", "Kai>=0." ) ;
    }
 
+   // Divergence scheme
+   if ( exp->has_entry( "StencilCorrection" ) )
+     StencilCorrection = exp->string_data( "StencilCorrection" );
+   if ( StencilCorrection != "FD"
+     && StencilCorrection != "CutCell" )
+   {
+     string error_message="   - FD\n   - CutCell";
+     MAC_Error::object()->raise_bad_data_value( exp,
+        "StencilCorrection", error_message );
+   }
+
+   if ((StencilCorrection == "CutCell") && (exp->has_entry( "CutCell_Only_Divergence" )))
+     is_CConlyDivergence = exp->bool_data( "CutCell_Only_Divergence" ) ;
+
+   if ( exp->has_entry( "FluxRedistributionThreshold" ) )
+      FluxRedistThres = exp->double_data( "FluxRedistributionThreshold" );
+
    // Advection scheme
    if ( exp->has_entry( "AdvectionScheme" ) )
      AdvectionScheme = exp->string_data( "AdvectionScheme" );
    if ( AdvectionScheme != "Upwind"
      && AdvectionScheme != "TVD"
+     && AdvectionScheme != "CenteredFD"
      && AdvectionScheme != "Centered" )
    {
-     string error_message="   - Upwind\n   - TVD\n   - Centered";
+     string error_message=
+            "   - Upwind\n   - TVD\n   - CenteredFD\n   - Centered";
      MAC_Error::object()->raise_bad_data_value( exp,
         "AdvectionScheme", error_message );
    }
@@ -178,6 +201,15 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                  "ViscousStressOrder", error_message );
            }
          }
+         if ( exp->has_entry( "PressureStressOrder" ) ) {
+           PressureStressOrder = exp->string_data( "PressureStressOrder" );
+           if ( PressureStressOrder != "first"
+           && PressureStressOrder != "second") {
+              string error_message="- first\n   - second";
+              MAC_Error::object()->raise_bad_data_value( exp,
+                 "PressureStressOrder", error_message );
+           }
+         }
          surface_cell_scale = exp->double_data( "SurfaceCellScale" ) ;
       }
       // Read if the discretized surface force output os ON/OFF
@@ -192,6 +224,11 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       if ( exp->has_entry( "Particle_motion" ) ) {
         is_par_motion = exp->bool_data( "Particle_motion" ) ;
         b_particles_as_fixed_obstacles = !is_par_motion;
+      }
+
+      // Cases for non-moving rigib bodies but non-zero velocity
+      if (!is_par_motion && exp->has_entry( "Particles_as_fixed_obstacles" ) ) {
+         b_particles_as_fixed_obstacles = exp->bool_data( "Particles_as_fixed_obstacles" );
       }
 
       // Critical distance
@@ -302,11 +339,15 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataNS.mu_ = mu ;
       inputDataNS.kai_ = kai ;
       inputDataNS.AdvectionScheme_ = AdvectionScheme ;
+      inputDataNS.StencilCorrection_ = StencilCorrection ;
+      inputDataNS.is_CConlyDivergence_ = is_CConlyDivergence ;
+      inputDataNS.FluxRedistThres_ = FluxRedistThres ;
       inputDataNS.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
       inputDataNS.b_restart_ = b_restart ;
       inputDataNS.is_solids_ = is_solids ;
       inputDataNS.is_stressCal_ = is_stressCal;
       inputDataNS.ViscousStressOrder_ = ViscousStressOrder;
+      inputDataNS.PressureStressOrder_ = PressureStressOrder;
       inputDataNS.stressCalFreq_ = stressCalFreq;
       inputDataNS.is_par_motion_ = is_par_motion;
       inputDataNS.dom_ = dom;

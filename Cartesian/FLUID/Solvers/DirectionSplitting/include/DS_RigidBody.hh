@@ -76,7 +76,7 @@ class DS_RigidBody
       virtual double get_circumscribed_radius( ) const = 0;
 
       /** @brief Returns a tuple of mass and density of RB */
-      virtual std::tuple<double,double> get_mass_and_density() const = 0;
+      virtual std::tuple<double,double,double> get_mass_and_density_and_moi() const = 0;
 
       /** @brief Returns the distance of a point with the rigid body
       with a given ray vector and source
@@ -112,7 +112,7 @@ class DS_RigidBody
       /** @brief Compute the halozone of a rigid body
       @param out output stream
       @param indent_width indentation width */
-      virtual void compute_rigid_body_halozone( ) = 0;
+      virtual void compute_rigid_body_halozone( double const& dx ) = 0;
 
       /** @brief Returns whether a point is inside the rigid body
       @param pt the point */
@@ -187,7 +187,11 @@ class DS_RigidBody
       virtual void update_RB_position_and_velocity(geomVector const& pos,
                                                    geomVector const& vel,
                                                    geomVector const& ang_vel,
-                         vector<geomVector> const& periodic_directions) = 0;
+                         vector<geomVector> const& periodic_directions,
+                         double const& time_step) = 0;
+
+      /** @brief Update additional parameters of each RB type */
+      virtual void update_additional_parameters( ) = 0;
 
       //@}
 

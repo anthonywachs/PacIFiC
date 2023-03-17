@@ -72,7 +72,7 @@ class FS_RigidBody
       double get_circumscribed_radius() const;
 
       /** @brief Returns a tuple of mass and density of RB */
-      std::tuple<double,double> get_mass_and_density() const;
+      std::tuple<double,double,double> get_mass_and_density_and_moi() const;
       //@}
 
 
@@ -102,7 +102,11 @@ class FS_RigidBody
       void update_RB_position_and_velocity(geomVector const& pos,
                                            geomVector const& vel,
                                            geomVector const& ang_vel,
-                                           vector<geomVector> const& periodic_directions);
+                                           vector<geomVector> const& periodic_directions,
+                                           double const& time_step);
+
+      /** @brief Update additional parameters of each RB type */
+      virtual void update_additional_parameters( ) = 0;
       //@}
 
 
@@ -160,6 +164,11 @@ class FS_RigidBody
       /** @brief Rotate the pt using the rigid body rotation matrix
       @param pt the point to rotate */
       void rotate(geomVector* pt);
+
+      /** @brief Translate the pt using the rigid body gravity centers
+      @param pt the point to rotate */
+      void translate(geomVector* pt);
+
       //@}
 
 
@@ -183,6 +192,7 @@ class FS_RigidBody
       Matrix3D m_rotation_matrix; /**< Rotation matrix */
       geomVector m_translational_velocity; /**< Translational velocity */
       geomVector m_angular_velocity; /**< Angular velocity */
+      geomVector m_orientation; /**< roll, pitch, yaw */
       geomVector m_hydro_force; /**< Hydrodynamic force */
       geomVector m_hydro_torque; /**< Hydrodynamic torque */
       double m_temperature; /**< Temperature */

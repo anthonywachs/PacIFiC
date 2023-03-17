@@ -1,6 +1,7 @@
 #include <FS_3Dbox.hh>
 #include <math.h>
 using std::endl;
+#define THRESHOLD 1.e-14
 
 
 //---------------------------------------------------------------------------
@@ -174,6 +175,25 @@ void FS_3Dbox:: set( istream& in )
 
   // Set volume
   m_volume = m_mass / m_density ;
+
+  // Reset the rotation matrix
+  double roll = m_orientation(0);
+  double pitch = m_orientation(1);
+  double yaw = m_orientation(2);
+
+  m_rotation_matrix[0][0] = MAC::cos(yaw)*MAC::cos(pitch);
+  m_rotation_matrix[0][1] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+                          - MAC::sin(yaw)*MAC::cos(roll);
+  m_rotation_matrix[0][2] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+                          + MAC::sin(yaw)*MAC::sin(roll);
+  m_rotation_matrix[1][0] = MAC::sin(yaw)*MAC::cos(pitch);
+  m_rotation_matrix[1][1] = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+                          + MAC::cos(yaw)*MAC::cos(roll);
+  m_rotation_matrix[1][2] = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+                          - MAC::cos(yaw)*MAC::sin(roll);
+  m_rotation_matrix[2][0] = -MAC::sin(pitch);
+  m_rotation_matrix[2][1] = MAC::cos(pitch)*MAC::sin(roll);
+  m_rotation_matrix[2][2] = MAC::cos(pitch)*MAC::cos(roll);
 }
 
 
@@ -272,7 +292,7 @@ double FS_3Dbox:: level_set_value( geomVector const& pt ) const
 {
   MAC_LABEL( "FS_3Dbox:: level_set_value(pt)" ) ;
 
-  double value = 1.e10;
+  double value = 1.;
 
   for (vector< vector<size_t> >::const_iterator
            faceIter = m_agp_3dbox.facesVec.begin();
@@ -285,7 +305,7 @@ double FS_3Dbox:: level_set_value( geomVector const& pt ) const
                                  m_agp_3dbox.corners[ (*faceIter)[idxPts] ],
                                  m_gravity_center, pt );
 
-        if (temp > 0.) {
+        if (temp >= 0.) {
            value = std::max(temp, value);
         } else {
            value = temp;
@@ -307,7 +327,7 @@ double FS_3Dbox:: level_set_value( double const& x
 {
   MAC_LABEL( "FS_3Dbox:: level_set_value(x,y,z)" ) ;
 
-  double value = 1.e10;       // +ve outside, -ve inside
+  double value = 1.;       // +ve outside, -ve inside
 
   geomVector pt( x, y, z );
 
@@ -322,8 +342,8 @@ double FS_3Dbox:: level_set_value( double const& x
                                  m_agp_3dbox.corners[ (*faceIter)[idxPts] ],
                                  m_gravity_center, pt );
 
-        if (temp > 0.) {
-           value = std::min(temp, value);
+        if (temp >= 0.) {
+           value = std::max(temp, value);
         } else {
            value = temp;
         }
@@ -406,7 +426,7 @@ bool FS_3Dbox::checkPointInTetrahedron( const geomVector &pointOne,
 
   double sumSubElem = detOne + detTwo + detThree + detFour;
 
-  if ( fabs( detTot - sumSubElem ) > 1e-7  )
+  if ( fabs( detTot - sumSubElem ) > THRESHOLD  )
         std::cout << "ERROR: summation error in determinat 3D : "
         << detTot - sumSubElem << endl;
 
@@ -415,8 +435,8 @@ bool FS_3Dbox::checkPointInTetrahedron( const geomVector &pointOne,
         abort();
   }
 
-  if ( ( detTot*detOne >= -1.e-7 )  && ( detTot*detTwo >= -1.e-7 ) &&
-       ( detTot*detThree >= -1.e-7 ) && ( detTot*detFour >= -1.e-7 ) )
+  if ( ( detTot*detOne >= -THRESHOLD )  && ( detTot*detTwo >= -THRESHOLD ) &&
+       ( detTot*detThree >= -THRESHOLD ) && ( detTot*detFour >= -THRESHOLD ) )
       in=true;
 
   return in;
@@ -449,7 +469,7 @@ double FS_3Dbox::DistOfPointFromTetrahedron( const geomVector &pointOne,
 
   double sumSubElem = detOne + detTwo + detThree + detFour;
 
-  if ( fabs( detTot - sumSubElem ) > 1e-7  )
+  if ( fabs( detTot - sumSubElem ) > THRESHOLD  )
      std::cout << "ERROR: summation error in determinat 3D : "
                << detTot - sumSubElem << endl;
 
@@ -458,17 +478,11 @@ double FS_3Dbox::DistOfPointFromTetrahedron( const geomVector &pointOne,
      abort();
   }
 
-  if ( ( detTot*detOne >= -1.e-7 )  && ( detTot*detTwo >= -1.e-7 ) &&
-       ( detTot*detThree >= -1.e-7 ) && ( detTot*detFour >= -1.e-7 ) ) {
-     out_dist = std::max(detTot*detOne,detTot*detTwo);
-     out_dist = std::max(detTot*detThree,out_dist);
-     out_dist = std::max(detTot*detFour,out_dist);
-     out_dist *= -1.;
+  if ( ( detTot*detOne >= -THRESHOLD )  && ( detTot*detTwo >= -THRESHOLD ) &&
+       ( detTot*detThree >= -THRESHOLD ) && ( detTot*detFour >= -THRESHOLD ) ) {
+     out_dist = -1.*fabs(sumSubElem);
   } else {
-     out_dist = std::max(detTot*detOne,detTot*detTwo);
-     out_dist = std::max(detTot*detThree,out_dist);
-     out_dist = std::max(detTot*detFour,out_dist);
-     out_dist = fabs(out_dist);
+     out_dist = fabs(sumSubElem);
   }
 
   return out_dist;
@@ -487,15 +501,57 @@ void FS_3Dbox::compute_reverseTransformationOfCorners( )
   for (int i = 0; i < (int) m_agp_3dbox.ref_corners.size(); i++) {
      geomVector pt(m_agp_3dbox.corners[i]);
 
-     m_agp_3dbox.ref_corners[i](0) = pt(0)*m_rotation_matrix[0][0]
-                                   + pt(1)*m_rotation_matrix[1][0]
-                                   + pt(2)*m_rotation_matrix[2][0];
-     m_agp_3dbox.ref_corners[i](1) = pt(0)*m_rotation_matrix[0][1]
-                                   + pt(1)*m_rotation_matrix[1][1]
-                                   + pt(2)*m_rotation_matrix[2][1];
-     m_agp_3dbox.ref_corners[i](2) = pt(0)*m_rotation_matrix[0][2]
-                                   + pt(1)*m_rotation_matrix[1][2]
-                                   + pt(2)*m_rotation_matrix[2][2];
+     m_agp_3dbox.ref_corners[i](0) = (pt(0) - m_gravity_center(0))*m_rotation_matrix[0][0]
+                                   + (pt(1) - m_gravity_center(1))*m_rotation_matrix[1][0]
+                                   + (pt(2) - m_gravity_center(2))*m_rotation_matrix[2][0];
+     m_agp_3dbox.ref_corners[i](1) = (pt(0) - m_gravity_center(0))*m_rotation_matrix[0][1]
+                                   + (pt(1) - m_gravity_center(1))*m_rotation_matrix[1][1]
+                                   + (pt(2) - m_gravity_center(2))*m_rotation_matrix[2][1];
+     m_agp_3dbox.ref_corners[i](2) = (pt(0) - m_gravity_center(0))*m_rotation_matrix[0][2]
+                                   + (pt(1) - m_gravity_center(1))*m_rotation_matrix[1][2]
+                                   + (pt(2) - m_gravity_center(2))*m_rotation_matrix[2][2];
   }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_3Dbox::compute_TransformationOfCorners( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_3Dbox:: compute_TransformationOfCorners()" ) ;
+
+  for (int i = 0; i < (int) m_agp_3dbox.corners.size(); i++) {
+     geomVector pt(m_agp_3dbox.ref_corners[i]);
+
+     m_agp_3dbox.corners[i](0) = pt(0)*m_rotation_matrix[0][0]
+                               + pt(1)*m_rotation_matrix[0][1]
+                               + pt(2)*m_rotation_matrix[0][2]
+                               + m_gravity_center(0);
+     m_agp_3dbox.corners[i](1) = pt(0)*m_rotation_matrix[1][0]
+                               + pt(1)*m_rotation_matrix[1][1]
+                               + pt(2)*m_rotation_matrix[1][2]
+                               + m_gravity_center(1);
+     m_agp_3dbox.corners[i](2) = pt(0)*m_rotation_matrix[2][0]
+                               + pt(1)*m_rotation_matrix[2][1]
+                               + pt(2)*m_rotation_matrix[2][2]
+                               + m_gravity_center(2);
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_3Dbox::update_additional_parameters( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_3Dbox:: update_additional_parameters( )" ) ;
+
+  compute_TransformationOfCorners();
+  // display (std::cout, '\t');
 
 }

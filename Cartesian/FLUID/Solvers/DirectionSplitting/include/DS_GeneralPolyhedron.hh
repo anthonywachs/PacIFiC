@@ -1,18 +1,19 @@
-#ifndef _DS_2DCYLINDER__
-#define _DS_2DCYLINDER__
+#ifndef _DS_GENERALPOLYHEDRON__
+#define _DS_GENERALPOLYHEDRON__
 
 #include <DS_RigidBody.hh>
 #include <string>
 using std::string;
 
 
-/** @brief The class DS_2Dcylinder.
+/** @brief The class DS_GeneralPolyhedron.
 
-A moving or stationary rigid 2Dcylinder in the Direction Splitting solver.
+A moving or stationary rigid 3D box of axisymmetric cross-section in the
+Direction Splitting solver.
 
 @author A. Wachs - Pacific project 2021 */
 
-class DS_2Dcylinder: public DS_RigidBody
+class DS_GeneralPolyhedron: public DS_RigidBody
 {
    public: //-----------------------------------------------------------------
 
@@ -21,14 +22,14 @@ class DS_2Dcylinder: public DS_RigidBody
       /**@name Constructors & Destructor */
       //@{
       /** @brief Default constructor */
-      DS_2Dcylinder();
+      DS_GeneralPolyhedron();
 
       /** @brief Constructor with arguments
       @param pgrb pointer to the corresponding geometric rigid body */
-      DS_2Dcylinder( FS_RigidBody* pgrb );
+      DS_GeneralPolyhedron( FS_RigidBody* pgrb );
 
       /** @brief Destructor */
-      ~DS_2Dcylinder();
+      ~DS_GeneralPolyhedron();
       //@}
 
 
@@ -36,7 +37,7 @@ class DS_2Dcylinder: public DS_RigidBody
 
       /**@name Set methods */
       //@{
-      /** @brief Updates the 2Dcylinder features from its corresponding
+      /** @brief Updates the sphere features from its corresponding
       geometric rigid body */
       void update();
       //@}
@@ -51,11 +52,11 @@ class DS_2Dcylinder: public DS_RigidBody
       @param indent_width indentation width */
       void display( ostream& out, size_t const& indent_width ) const;
 
-      /** @brief Computes the min and max extents of the 2Dcylinder halozone
+      /** @brief Computes the min and max extents of the 3D cylinder halozone
       , required for the computation of void fraction */
       void compute_rigid_body_halozone( double const& dx );
 
-      /** @brief Compute the surface points by discretizing the 2Dcylinder
+      /** @brief Compute the surface points by discretizing the 3D cylinder
       surface in approximately equal areas (if possible) */
       void compute_surface_points( );
 
@@ -119,12 +120,11 @@ class DS_2Dcylinder: public DS_RigidBody
       /** @brief Update additional parameters of each RB type */
       void update_additional_parameters( );
 
-      /** @brief Compute number of points on a 2Dcylinder
+      /** @brief Compute number of points on a 3D cylinder
       @param surface_cell_scale scale of surface cell compared with the grid
       @param dx grid size */
       void compute_number_of_surface_variables( double const& surface_cell_scale
                                               , double const& dx );
-
 
       //@}
 
@@ -135,6 +135,10 @@ class DS_2Dcylinder: public DS_RigidBody
 
       /**@name Parameters */
       //@{
+      double dis_level;          /** Level of surface discretization
+                                    (higher value finer discretization).*/
+      vector<size_t> Npoints;    /** Surface points on each direction
+                                     of 3D box.*/
       //@}
 
 
@@ -145,8 +149,8 @@ class DS_2Dcylinder: public DS_RigidBody
       /**@name Constructors & Destructor */
       //@{
       /** @brief Copy constructor
-      @param copy copied DS_2Dcylinder object */
-      DS_2Dcylinder( DS_2Dcylinder const& copy );
+      @param copy copied DS_GeneralPolyhedron object */
+      DS_GeneralPolyhedron( DS_GeneralPolyhedron const& copy );
       //@}
 };
 

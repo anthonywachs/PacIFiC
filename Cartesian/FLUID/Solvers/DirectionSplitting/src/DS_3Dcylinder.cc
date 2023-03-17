@@ -72,21 +72,15 @@ void DS_3Dcylinder:: display( ostream& out, size_t const& indent_width ) const
 
 
 //---------------------------------------------------------------------------
-void DS_3Dcylinder:: compute_rigid_body_halozone( )
+void DS_3Dcylinder:: compute_rigid_body_halozone( double const& dx )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_3Dcylinder:: compute_rigid_body_halozone" ) ;
 
-  struct FS_3Dcylinder_Additional_Param const* pagp =
-   dynamic_cast<FS_3Dcylinder*>(m_geometric_rigid_body)
-      ->get_ptr_FS_3Dcylinder_Additional_Param();
-
   geomVector const* pgc = dynamic_cast<FS_3Dcylinder*>(m_geometric_rigid_body)
                               ->get_ptr_to_gravity_centre();
 
-  double r_equi = 3.0 *
-                  MAC::sqrt(pagp->cylinder_radius * pagp->cylinder_radius
-                          + pagp->cylinder_height * pagp->cylinder_height);
+  double r_equi = get_circumscribed_radius() + dx;
 
   geomVector delta(r_equi, r_equi, r_equi);
 
@@ -198,12 +192,12 @@ geomVector DS_3Dcylinder:: get_rigid_body_angular_velocity( ) const
 
 
 //---------------------------------------------------------------------------
-std::tuple<double,double> DS_3Dcylinder:: get_mass_and_density() const
+std::tuple<double,double,double> DS_3Dcylinder:: get_mass_and_density_and_moi() const
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_3Dcylinder:: get_mass_and_density()" ) ;
 
-  return ( m_geometric_rigid_body->get_mass_and_density() );
+  return ( m_geometric_rigid_body->get_mass_and_density_and_moi() );
 
 }
 
@@ -241,14 +235,29 @@ geomVector const* DS_3Dcylinder:: get_ptr_to_gravity_centre( ) const
 void DS_3Dcylinder:: update_RB_position_and_velocity(geomVector const& pos,
                                                     geomVector const& vel,
                                                     geomVector const& ang_vel,
-                                   vector<geomVector> const& periodic_directions)
+                                   vector<geomVector> const& periodic_directions
+                                   , double const& time_step)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_3Dcylinder:: update_RB_position_and_velocity" ) ;
 
   return (m_geometric_rigid_body->update_RB_position_and_velocity(pos,vel
                                                                   ,ang_vel
-                                                         ,periodic_directions));
+                                                         ,periodic_directions
+                                                         ,time_step));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_3Dcylinder:: update_additional_parameters()
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dcylinder:: update_additional_parameters" ) ;
+
+  m_geometric_rigid_body->update_additional_parameters();
 
 }
 

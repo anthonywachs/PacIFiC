@@ -320,7 +320,7 @@ DS_HeatTransfer::write_output_field()
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
 
-  size_t_vector* void_frac = (is_solids) ?
+  size_t_array2D* void_frac = (is_solids) ?
                     allrigidbodies->get_void_fraction_on_grid(TF) : 0;
   size_t_array2D* intersect_vector = (is_solids) ?
                     allrigidbodies->get_intersect_vector_on_grid(TF) : 0;
@@ -352,7 +352,7 @@ DS_HeatTransfer::write_output_field()
 				  size_t p = TF->DOF_local_number(i,j,k,comp);
 
               outputFile << xC << "," << yC << "," << zC
-              << "," << void_frac->operator()(p)
+              << "," << void_frac->operator()(p,0)
               << "," << intersect_vector->operator()(p,0)
               << "," << intersect_distance->operator()(p,0)
               << "," << intersect_vector->operator()(p,1)
@@ -407,7 +407,7 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
 
-  size_t_vector* void_frac = (is_solids) ?
+  size_t_array2D* void_frac = (is_solids) ?
 						  allrigidbodies->get_void_fraction_on_grid(TF) : 0;
 
   vector<doubleVector*> T_diffusion = GLOBAL_EQ->get_temperature_diffusion();
@@ -445,7 +445,7 @@ DS_HeatTransfer:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it
 				  									 		  : 0.;
 
               if (is_solids) {
-                 if (void_frac->operator()(p) != 0) {
+                 if (void_frac->operator()(p,0) != 0) {
                     adv_value = 0.;
                  }
               }
@@ -607,9 +607,9 @@ DS_HeatTransfer:: compute_un_component ( size_t const& comp
 				- TF->DOF_value( i-1, j, k, comp, level ) ;
 
       if (is_solids) {
-			size_t_vector* void_frac = allrigidbodies
+			size_t_array2D* void_frac = allrigidbodies
 												->get_void_fraction_on_grid(TF);
-         if (void_frac->operator()(p) == 0) {
+         if (void_frac->operator()(p,0) == 0) {
             if (intersect_vector->operator()(p,2*dir+0) == 1) {
                xleft = TF->DOF_value( i, j, k, comp, level )
 					      - intersect_fieldVal->operator()(p,2*dir+0);
@@ -644,8 +644,8 @@ DS_HeatTransfer:: compute_un_component ( size_t const& comp
 				- TF->DOF_value( i, j-1, k, comp, level ) ;
 
       if (is_solids) {
-			size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(TF);
-         if (void_frac->operator()(p) == 0) {
+			size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(TF);
+         if (void_frac->operator()(p,0) == 0) {
             if (intersect_vector->operator()(p,2*dir+0) == 1) {
                yleft = TF->DOF_value( i, j, k, comp, level )
 					      - intersect_fieldVal->operator()(p,2*dir+0);
@@ -680,8 +680,8 @@ DS_HeatTransfer:: compute_un_component ( size_t const& comp
 			   - TF->DOF_value( i, j, k-1, comp, level ) ;
 
       if (is_solids) {
-         size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(TF);
-         if (void_frac->operator()(p) == 0) {
+         size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(TF);
+         if (void_frac->operator()(p,0) == 0) {
             if (intersect_vector->operator()(p,2*dir+0) == 1) {
                zleft = TF->DOF_value( i, j, k, comp, level )
 					 		- intersect_fieldVal->operator()(p,2*dir+0);
@@ -928,7 +928,7 @@ DS_HeatTransfer:: assemble_temperature_matrix (FV_DiscreteField const* FF
 				                   allrigidbodies->get_intersect_vector_on_grid(FF);
 				         doubleArray2D* intersect_distance =
 				                 allrigidbodies->get_intersect_distance_on_grid(FF);
-				         size_t_vector* void_frac =
+				         size_t_array2D* void_frac =
 				                      allrigidbodies->get_void_fraction_on_grid(FF);
 
 				         // if left node is inside the solid particle
@@ -940,7 +940,7 @@ DS_HeatTransfer:: assemble_temperature_matrix (FV_DiscreteField const* FF
 				            right = -gamma/intersect_distance->operator()(p,2*dir+1);
 				         }
 				         // if center node is inside the solid particle
-				         if (void_frac->operator()(p) != 0) {
+				         if (void_frac->operator()(p,0) != 0) {
 				            left = 0.;
 				            right = 0.;
 				         }
@@ -1848,7 +1848,7 @@ DS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
   size_t_vector max_unknown_index(dim,0);
 
   // Vector for solid presence
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(TF);
+  size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(TF);
 
   for (size_t comp=0;comp<nb_comps;comp++) {
      // Get local min and max indices
@@ -1882,8 +1882,8 @@ DS_HeatTransfer:: nodes_temperature_initialization ( size_t const& level )
 				  double zC = (dim == 2) ? 0 : TF->get_DOF_coordinate( k, comp, 2 );
 				  geomVector pt(xC,yC,zC);
               size_t p = TF->DOF_local_number(i,j,k,comp);
-              if (void_frac->operator()(p) != 0) {
-                 size_t par_id = void_frac->operator()(p) - 1;
+              if (void_frac->operator()(p,0) != 0) {
+                 size_t par_id = void_frac->operator()(p,0) - 1;
 					  geomVector Tpart = allrigidbodies->rigid_body_temperature(par_id,pt);
                  TF->set_DOF_value( i, j, k, comp, level,Tpart(comp));
               }

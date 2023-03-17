@@ -72,21 +72,17 @@ void DS_3Dbox:: display( ostream& out, size_t const& indent_width ) const
 
 
 //---------------------------------------------------------------------------
-void DS_3Dbox:: compute_rigid_body_halozone( )
+void DS_3Dbox:: compute_rigid_body_halozone( double const& dx )
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_3Dbox:: compute_rigid_body_halozone" ) ;
 
-  struct FS_3Dbox_Additional_Param const* pagp =
-   dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
-      ->get_ptr_FS_3Dbox_Additional_Param();
-
   geomVector const* pgc = dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
                               ->get_ptr_to_gravity_centre();
 
-  geomVector delta = pagp->corners[0] - *pgc;
+  geomVector delta(3);
 
-  double r_equi = 3.0 * delta.calcNorm();
+  double r_equi = get_circumscribed_radius() + dx;
 
   delta(0) = r_equi;
   delta(1) = r_equi;
@@ -200,12 +196,12 @@ geomVector DS_3Dbox:: get_rigid_body_angular_velocity( ) const
 
 
 //---------------------------------------------------------------------------
-std::tuple<double,double> DS_3Dbox:: get_mass_and_density() const
+std::tuple<double,double,double> DS_3Dbox:: get_mass_and_density_and_moi() const
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_3Dbox:: get_mass_and_density()" ) ;
 
-  return ( m_geometric_rigid_body->get_mass_and_density() );
+  return ( m_geometric_rigid_body->get_mass_and_density_and_moi() );
 
 }
 
@@ -243,14 +239,29 @@ geomVector const* DS_3Dbox:: get_ptr_to_gravity_centre( ) const
 void DS_3Dbox:: update_RB_position_and_velocity(geomVector const& pos,
                                                     geomVector const& vel,
                                                     geomVector const& ang_vel,
-                                   vector<geomVector> const& periodic_directions)
+                                vector<geomVector> const& periodic_directions,
+                                   double const& time_step)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "DS_3Dbox:: update_RB_position_and_velocity" ) ;
 
   return (m_geometric_rigid_body->update_RB_position_and_velocity(pos,vel
                                                                   ,ang_vel
-                                                         ,periodic_directions));
+                                                         ,periodic_directions
+                                                         , time_step));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void DS_3Dbox:: update_additional_parameters()
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_3Dbox:: update_additional_parameters" ) ;
+
+  m_geometric_rigid_body->update_additional_parameters();
 
 }
 
@@ -348,6 +359,7 @@ void DS_3Dbox:: compute_surface_points(  )
   for (size_t i = 0; i < m_surface_area.size(); i++) {
      m_geometric_rigid_body->rotate(m_surface_points[i]);
      m_geometric_rigid_body->rotate(m_surface_normal[i]);
+     m_geometric_rigid_body->translate(m_surface_points[i]);
   }
 
 }
@@ -367,8 +379,11 @@ void DS_3Dbox:: compute_number_of_surface_variables(
                         dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
                            ->get_ptr_FS_3Dbox_Additional_Param();
 
-  if (box_min.empty()) box_min.assign(3,1.e14);
-  if (box_max.empty()) box_max.assign(3,-1.e14);
+  geomVector const* pgc = dynamic_cast<FS_3Dbox*>(m_geometric_rigid_body)
+                            ->get_ptr_to_gravity_centre();
+
+  box_min.assign(3,1.e14);
+  box_max.assign(3,-1.e14);
 
   for (int i = 0; i < (int) pagp->ref_corners.size(); i++) {
      for (int dir = 0; dir < 3; dir++) {
@@ -377,7 +392,6 @@ void DS_3Dbox:: compute_number_of_surface_variables(
 
         if (pagp->ref_corners[i](dir) > box_max[dir])
            box_max[dir] = pagp->ref_corners[i](dir);
-
      }
   }
 

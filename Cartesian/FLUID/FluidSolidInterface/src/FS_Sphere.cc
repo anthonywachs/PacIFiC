@@ -274,3 +274,16 @@ struct FS_Sphere_Additional_Param const* FS_Sphere::
   return ( &m_agp_sphere );
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_Sphere::update_additional_parameters( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Sphere:: update_additional_parameters( )" ) ;
+
+
+
+}

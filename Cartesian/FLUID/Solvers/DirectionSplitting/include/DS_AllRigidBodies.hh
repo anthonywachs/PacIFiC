@@ -5,6 +5,7 @@
 #include <size_t_vector.hh>
 #include <size_t_array2D.hh>
 #include <doubleArray2D.hh>
+#include <doubleArray3D.hh>
 #include <boolArray2D.hh>
 #include <MAC_Communicator.hh>
 #include <MAC_DoubleVector.hh>
@@ -146,7 +147,10 @@ class DS_AllRigidBodies
       DS_RigidBody* get_ptr_rigid_body( size_t i );
 
       /** @brief Returns the void_fraction on field FF */
-      size_t_vector* get_void_fraction_on_grid( FV_DiscreteField const* FF );
+      size_t_array2D* get_void_fraction_on_grid( FV_DiscreteField const* FF );
+
+      /** @brief Returns the void_fraction on field FF */
+      boolVector* get_fresh_nodes( FV_DiscreteField const* FF );
 
       /** @brief Returns the ID of rigid body present on the field FF */
       size_t_vector* get_rigidbodyIDs_on_grid( FV_DiscreteField const* FF );
@@ -159,6 +163,24 @@ class DS_AllRigidBodies
 
       /** @brief Returns the Dirichlet BC on the near rigid body on FF */
       doubleArray2D* get_intersect_fieldValue_on_grid( FV_DiscreteField const* FF );
+
+      /** @brief Returns the RB normal in the Cut Cell */
+      doubleArray2D* get_CC_RB_normal(FV_DiscreteField const* FF);
+
+      /** @brief Returns the RB area in the Cut Cell */
+      doubleVector* get_CC_RB_area(FV_DiscreteField const* FF);
+
+      /** @brief Returns the cell volume */
+      doubleArray2D* get_CC_cell_volume(FV_DiscreteField const* FF);
+
+      /** @brief Returns the RB ID in the Cut Cell */
+      intVector* get_CC_ownerID(FV_DiscreteField const* FF);
+
+      /** @brief Returns the face centroid in the Cut Cell */
+      doubleArray3D* get_CC_face_centroid(FV_DiscreteField const* FF);
+
+      /** @brief Returns the face fraction for the Cut Cell */
+      doubleArray2D* get_CC_face_fraction(FV_DiscreteField const* FF);
 
       //@}
 
@@ -207,6 +229,30 @@ class DS_AllRigidBodies
                         double const& y,
                         double const& z ) const;
 
+      /** @brief Check if any neighbour field node is in solid or not
+      @param FF field
+      @param comp component
+      @param i index i
+      @param j index j
+      @param k index k */
+      bool is_neighbor_inSolids(FV_DiscreteField const* FF
+                              , size_t const& i
+                              , size_t const& j
+                              , size_t const& k
+                              , size_t const& comp);
+
+      /** @brief Returns the parID if the point is inside parID, based on levelset
+      @param pt the point */
+      int levelset_any_RB( geomVector const& pt ) const;
+
+      /** @brief Returns the parID if the point is inside parID, based on levelset
+      @param x x-coordinate of the point
+      @param y x-coordinate of the point
+      @param z x-coordinate of the point */
+      int levelset_any_RB( double const& x,
+                           double const& y,
+                           double const& z ) const;
+
 
       /** @brief Returns the parID if the point is inside parID, based on levelset
       @param ownID ID of RB owning the pt
@@ -248,6 +294,51 @@ class DS_AllRigidBodies
                               double const& y,
                               double const& z ) const;
 
+      /** @brief Returns the length of side in fluid
+      @param pt1 Point 1
+      @param pt2 Point 2 */
+      std::tuple<double, geomVector, int, int>
+            return_side_fraction(geomVector const& pt1
+                               , geomVector const& pt2 );
+
+      /** @brief Returns the flux from RB given the FF cell center
+      @param FF field
+      @param pCen cell center */
+      double calculate_velocity_flux_fromRB ( FV_DiscreteField const* FF,
+                                              size_t const& pCen);
+
+      double calculate_diffusive_flux_fromRB ( FV_DiscreteField const* FF,
+                                               size_t const& pCen,
+                                               size_t const& comp,
+                                               size_t const& dir,
+                                               size_t const& level);
+
+      double calculate_diffusive_flux( size_t const& p,                                               														  size_t const& comp,
+                                       size_t const& dir,
+ 											      geomVector const& pt,
+												   size_t const& ownID,
+                                       size_t const& level);
+
+      /** @brief Calculate the divergenceredistribution factor for each PF node
+      using the normal of RB intersect
+      @param FF field
+      @param i index i
+      @param j index j
+      @param k index k
+      @param comp component */
+      vector<double> flux_redistribution_factor ( FV_DiscreteField const* FF,
+                                                   size_t const& i,
+                                                   size_t const& j,
+                                                   size_t const& k,
+                                                   size_t const& comp,
+                                                   double const& factor);
+
+      /** @brief Calculates the area of RB section with given vector
+      of polygon corners
+      @param points vector of points */
+      double calculate_area_of_RBplane( vector<geomVector> const& points);
+                                      // , geomVector const& normal);
+
       /** @brief Computes the halo zone for all rigid bodies, required for
       void fraction and intersection calculation on the grid nodes */
       void compute_halo_zones_for_all_rigid_body( );
@@ -259,10 +350,43 @@ class DS_AllRigidBodies
       void compute_void_fraction_on_grid( FV_DiscreteField const* FF
                                         , bool const& is_in_time_iter );
 
+      /** @brief Extrapolate the adv field value on fresh nodes */
+      void extrapolate_scalar_on_fresh_nodes(FV_DiscreteField * FF
+                                          , size_t const& level);
+
+      /** @brief Interpolate velocity on the fresh nodes */
+      void interpolate_vector_on_fresh_nodes(FV_DiscreteField * FF
+                                          , vector<size_t> const& list);
+
+      /** @brief Extrapolate the PF value on 1st layer of node in solid */
+      void extrapolate_pressure_inside_RB(FV_DiscreteField * FF
+                                          , size_t const& level);
+
+      /** @brief Compute fresh nodes in the computational domain
+      @param FF the fluid field (PF, UF) */
+      void compute_fresh_nodes(FV_DiscreteField const* FF);
+
       /** @brief Computes the void fraction on the epsilon grid for PP
       of a given fluid field
       @param FF the fluid field (PP_EPSILON) */
       void compute_void_fraction_on_epsilon_grid( FV_DiscreteField * FF );
+
+      /** @brief Computes the face fraction belonging the each node
+      of a given fluid field */
+      void compute_cutCell_geometric_parameters( FV_DiscreteField const* FF );
+
+      /** @brief Outputs the cutcell parameters in a csv for debugging */
+      void write_CutCell_parameters(FV_DiscreteField const* FF);
+
+      void write_volume_conservation(FV_TimeIterator const* t_it);
+
+      /** @brief Compute the velocity face flux from the UF face */
+      double velocity_flux ( FV_DiscreteField const* FF
+                           , size_t const& pCen
+                           , size_t const& comp
+                           , size_t const& dir
+                           , size_t const& side
+                           , size_t const& level);
 
       /** @brief Computes the intersection of grid nodes of a given fluid field
       with the nearest rigid body of a given fluid field
@@ -281,6 +405,15 @@ class DS_AllRigidBodies
       @param pt a point in space*/
       geomVector rigid_body_velocity( size_t const& parID,
                                           geomVector const& pt );
+
+      /** @brief Computes the rigid body velocity translation velocity
+      without the rotation speed
+      @param parID rigid body ID */
+      geomVector rigid_body_GC_velocity( size_t const& parID);
+
+      /** @brief Returns pointer to gravity center of parID
+      @param parID ID of rigid body*/
+      geomVector const* get_gravity_centre( size_t const& parID);
 
       /** @brief Returns the rigid body angular velocity */
       geomVector rigid_body_angular_velocity( size_t const& parID) const;
@@ -362,6 +495,24 @@ class DS_AllRigidBodies
                                         , vector<int> const& sign
                                         , vector<size_t> const& list);
 
+      // Only for quantities except UF (i.e. PF and Adv)
+      double Biquadratic_interpolation_for_scalars ( FV_DiscreteField const* FF
+                                      , size_t const& comp
+                                      , geomVector const* pt
+                                      , size_t_vector const& i0
+                                      , size_t const& interpol_dir
+                                      , int const& sign
+                                      , vector<size_t> const& list);
+
+      double Triquadratic_interpolation_for_scalars ( FV_DiscreteField const* FF
+                                       , size_t const& comp
+                                       , geomVector const* pt
+                                       , size_t_vector const& i0
+                                       , size_t const& parID
+                                       , size_t const& ghost_points_dir
+                                       , vector<int> const& sign
+                                       , vector<size_t> const& list);
+
       /** @brief Return the sum of interpolated field for all
       given list of levels on a point in 3D box including
       the corrections near the solid interface
@@ -376,9 +527,20 @@ class DS_AllRigidBodies
                                      , size_t const& parID
                                      , vector<size_t> const& list);
 
+      double Trilinear_interpolation ( FV_DiscreteField const* FF
+                                     , size_t const& comp
+                                     , geomVector const* pt
+                                     , size_t_vector const& i0
+                                     , vector<size_t> const& list);
+
       /** @brief Calculate the first order pressure force and torque on parID
       @param parID rigid body ID */
       void first_order_pressure_stress( size_t const& parID );
+
+      /** @brief Calculate the second order pressure force and torque on parID
+      using extrapolations on fluid cells
+      @param parID rigid body ID */
+      void second_order_pressure_stress( size_t const& parID );
 
       /** @brief Calculate the first order viscous force and torque on parID
       @param parID rigid body ID */
@@ -397,7 +559,7 @@ class DS_AllRigidBodies
       void second_order_temperature_flux( size_t const& parID );
 
       /** @brief Calculate the pressure force and torque on all rigid bodies */
-      void compute_pressure_force_and_torque_for_allRB ();
+      void compute_pressure_force_and_torque_for_allRB (string const& StressOrder);
 
       /** @brief Calculate the viscous force and torque on all rigid bodies */
       void compute_viscous_force_and_torque_for_allRB (string const& StressOrder);
@@ -426,6 +588,12 @@ class DS_AllRigidBodies
       @param b_restart if simulation is restart or not */
       void write_force_and_flux_summary( FV_TimeIterator const* t_it
                                        , bool const& b_restart);
+
+      /** @brief Return the local index of a bounding box on a given field FF */
+      intVector get_local_index_of_extents( class doubleVector& bounds
+                                          , FV_DiscreteField const* FF
+                                          , size_t const& dir
+                                          , size_t const& comp);
 
       /** @brief Returns true if a box is within the local domain
       extents
@@ -471,13 +639,32 @@ class DS_AllRigidBodies
       double surface_cell_scale; /**< a variable to store the scale of surface
       cell on the RB as compared with computational grid cell size */
 
-      vector<size_t_vector*> void_fraction; /**< vector of void fraction the
+      vector<size_t_array2D*> void_fraction; /**< vector of void fraction the
       field grid nodes, 0 in fluid and (parID+1) in the rigid bodies*/
-      vector<size_t_vector*> rb_ID; /**< vector of rigid body ID on the
-      field grid node, if any */
 
-      vector<struct BoundaryBisec*> rb_intersect; /**< 2DArray of intersection
-      of field grid node near the rigid body with the rigid */
+      vector<boolVector*> fresh_node; /**< vector on field grid to to store
+      if the node is fresh(1) or not(0)*/
+
+      vector<doubleArray3D*> CC_face_centroid; /**< centroid of the cut faces
+      for all fields, if any. [field]->[index][face][x,y,z]*/
+
+      vector<doubleArray2D*> CC_face_fraction; /**< Face fraction of the cell faces
+      for all fields. [field]->[index][face]*/
+
+      vector<doubleArray2D*> CC_cell_volume; /**< Stores cell volume
+      . [field]->[index][level]*/
+
+      vector<doubleVector*> CC_RB_area; /**< Intersection points
+      of rigid body with the grid cell. [field][index][points]*/
+
+      vector<intVector*> CC_ownerID; /**< Stores the RB's ID
+      intersecting the grid cell*/
+
+      vector<doubleArray2D*> CC_RB_normal; /**< Normal vector of RB surface
+      in the grid cell, if any*/
+
+      vector<doubleArray2D*> CC_RB_centroid; /**< RB centroid
+      in the grid cell, if any*/
 
       // Columns in each variable are (left,right,bottom,top,behind,front)
       vector<size_t_array2D*> intersect_vector;  /**<Direction of intersection*/

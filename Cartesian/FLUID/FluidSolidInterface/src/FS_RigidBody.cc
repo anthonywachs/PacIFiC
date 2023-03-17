@@ -20,6 +20,8 @@ FS_RigidBody:: FS_RigidBody()
   	= m_rotation_matrix[1][2] = m_rotation_matrix[2][0]
 	= m_rotation_matrix[2][1] = m_rotation_matrix[2][2] = 0.;
 
+	m_orientation.resize(3);
+
 }
 
 
@@ -319,12 +321,12 @@ double FS_RigidBody:: get_circumscribed_radius() const
 
 
 //---------------------------------------------------------------------------
-std::tuple<double,double> FS_RigidBody:: get_mass_and_density() const
+std::tuple<double,double,double> FS_RigidBody:: get_mass_and_density_and_moi() const
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "FS_RigidBody:: get_mass_and_density()" ) ;
 
-  return ( std::make_tuple(m_mass,m_density) );
+  return ( std::make_tuple(m_mass,m_density,m_inertia[0][0]) );
 
 }
 
@@ -335,7 +337,8 @@ std::tuple<double,double> FS_RigidBody:: get_mass_and_density() const
 void FS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
 												 					 geomVector const& vel,
 																	 geomVector const& ang_vel,
-											vector<geomVector> const& periodic_directions)
+											vector<geomVector> const& periodic_directions,
+											double const& time_step)
 //---------------------------------------------------------------------------
 {
   MAC_LABEL( "FS_RigidBody:: update_RB_position_and_velocity()" ) ;
@@ -349,6 +352,31 @@ void FS_RigidBody:: update_RB_position_and_velocity(geomVector const& pos,
   m_angular_velocity(0) = ang_vel(0);
   m_angular_velocity(1) = ang_vel(1);
   m_angular_velocity(2) = ang_vel(2);
+
+  m_orientation(0) += ang_vel(0)*time_step;
+  m_orientation(1) += ang_vel(1)*time_step;
+  m_orientation(2) += ang_vel(2)*time_step;
+
+  // Reset the rotation matrix
+  double roll = m_orientation(0);
+  double pitch = m_orientation(1);
+  double yaw = m_orientation(2);
+
+  m_rotation_matrix[0][0] = MAC::cos(yaw)*MAC::cos(pitch);
+  m_rotation_matrix[0][1] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+  								  - MAC::sin(yaw)*MAC::cos(roll);
+  m_rotation_matrix[0][2] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+  								  + MAC::sin(yaw)*MAC::sin(roll);
+  m_rotation_matrix[1][0] = MAC::sin(yaw)*MAC::cos(pitch);
+  m_rotation_matrix[1][1] = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+  								  + MAC::cos(yaw)*MAC::cos(roll);
+  m_rotation_matrix[1][2] = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+  								  - MAC::cos(yaw)*MAC::sin(roll);
+  m_rotation_matrix[2][0] = -MAC::sin(pitch);
+  m_rotation_matrix[2][1] = MAC::cos(pitch)*MAC::sin(roll);
+  m_rotation_matrix[2][2] = MAC::cos(pitch)*MAC::cos(roll);
+
+
 
   if ( m_periodic_directions )
   {
@@ -428,5 +456,20 @@ void FS_RigidBody:: rotate(geomVector* pt)
   pt->operator()(0) = delta_x;
   pt->operator()(1) = delta_y;
   pt->operator()(2) = delta_z;
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_RigidBody:: translate(geomVector* pt)
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_RigidBody:: translate" ) ;
+
+  pt->operator()(0) += m_gravity_center(0);
+  pt->operator()(1) += m_gravity_center(1);
+  pt->operator()(2) += m_gravity_center(2);
 
 }

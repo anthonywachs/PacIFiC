@@ -125,6 +125,9 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       double mu;
       double kai;
       string AdvectionScheme;
+      string StencilCorrection;
+      bool is_CConlyDivergence;
+      double FluxRedistThres;
       size_t AdvectionTimeAccuracy;
       size_t space_dimensions;
       bool b_restart;
@@ -138,6 +141,7 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       string insertion_type;
       bool is_stressCal;
       string ViscousStressOrder;
+      string PressureStressOrder;
       double surface_cell_scale;
       bool is_surfacestressOUT;
       size_t stressCalFreq;
