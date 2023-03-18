@@ -3,7 +3,7 @@
 
 using namespace std;
 
-double tol = 5.e-7; // Tolerance used in this class
+double tol = 1.e-10; // Tolerance used in this class
 
 // --------------------------------------------------------------------
 // Default constructor
@@ -246,10 +246,14 @@ inline void solveQuartic( double const b, double const c, double const d,
 inline void rotateVec2VecZ( Vector3 const& v, Matrix& rotMat )
 {
   double const c = 1. + v[Z];
-  if ( fabs( c ) < tol )
+  if ( fabs( c ) < EPSILON2 )
     rotMat.setValue( -1.,  0.,  0.,
                       0., -1.,  0.,
                       0.,  0., -1. );
+  else if ( fabs( c - 2. ) < EPSILON2 )
+    rotMat.setValue( 1.,  0.,  0.,
+                     0., 1.,  0.,
+                     0.,  0., 1. );
   else
   {
     double const vx2 = v[X]*v[X]/c;
@@ -260,7 +264,7 @@ inline void rotateVec2VecZ( Vector3 const& v, Matrix& rotMat )
                      v[X], v[Y], 1. - vx2 - vy2 );
   }
 
-  rotMat.round( EPSILON2 );
+  // rotMat.round( EPSILON2 );
 }
 
 
@@ -331,9 +335,6 @@ PointContact intersect( BCylinder const& a, BCylinder const& b,
         break;
     }
   }
-
-  // if ( ptCont.getOverlapDistance() <= -1.e-5 )
-  //   std::cout << "\t" << counter << " " << ptCont.getOverlapDistance() << "\t" << e_B2A << "\t" << e_A2B << '\n';
 
   switch ( counter )
   {
@@ -669,7 +670,7 @@ void F2EContact( double rA, double hA, double rB, double hB,
     // amount of overlap
     overlap = hA - fabs( ptE[Z] );
     // contact vector
-    contVec = Vector3( 0., 0., - sgn( x[Z] ));
+    contVec = Vector3( 0., 0., - sgn( x[Z] ) );
     // contact point
     contPt = ptE - .5 * overlap * contVec;
     // output
@@ -855,13 +856,11 @@ void E2EContact( double rA, double hA, double rB, double hB,
   // Some variables
   Point3 c1 = x + hB * e;
   Point3 c2 = x - hB * e;
-  double d1 = pow( sqrt( normXY( c1 ) ) - rA, 2 ) +
-               pow( fabs( c1[Z] ) - hA, 2 );
-  double d2 = pow( sqrt( normXY( c2 ) ) - rA, 2 ) +
-               pow( fabs( c2[Z] ) - hA, 2 );
+  double d1 = pow( sqrt( normXY(c1) ) - rA, 2 ) + pow( fabs( c1[Z] ) - hA, 2 );
+  double d2 = pow( sqrt( normXY(c2) ) - rA, 2 ) + pow( fabs( c2[Z] ) - hA, 2 );
   Point3 const& ptCenter1 = d1 < d2 ? c1 : c2; // decide on edge of B
   // additional condition to avoid solving the polynomial
-  if ( ( d1 > rB * rB && d2 > rB * rB ) )
+  if ( ( d1 < d2 ? d1 : d2 ) > rB * rB )
     return;
 
   // Vector3 const& u1 = ( e1 ^ Vector3( 0., 0., 1. ) ).normalized();
@@ -876,39 +875,20 @@ void E2EContact( double rA, double hA, double rB, double hB,
   // double const s1 = ( rA*rA - normXY( ptCenter1 ) - rB*rB*normXY(u1) ) / p1;
   double const s1 = ( rA * rA - normXY( ptCenter1 ) - rB * rB ) / p1;
 
-  double sint1[4];
-  int nbRoots1;
+  double sol1[4];
+  int nbRoots;
   solveQuartic( 2.*r1, q1*q1 + r1*r1 - s1, -r1*s1, s1*s1/4. - q1*q1,
-                sint1, nbRoots1 );
+                sol1, nbRoots );
 
-  Point3 ptA, ptB;
-  double cost1;
-  for ( int i = 0; i < nbRoots1; i++ )
+  double sint1 = 1., cost1 = 0.;
+  for ( int i = 0; i < nbRoots; i++ )
   {
-    if ( fabs( sint1[i] ) <= 1. )
+    sint1 = sol1[i];
+    cost1 = ( s1 / 2. - ( r1 + sint1 ) * sint1 ) / q1;
+    if ( fabs( ptCenter1[Z] + rB * cost1 * u1[Z] + rB * sint1 * v1[Z] ) < hA )
     {
-      cost1 = ( s1/2. - r1*sint1[i] - sint1[i]*sint1[i] ) / q1;
-      // if ( fabs( cs ) > 1. )
-      //   cs = sgn( cs ) * sqrt( 1. - sol[i]*sol[i] );
-      ptA = ptCenter1 + rB * cost1 * u1 + rB * sint1[i] * v1;
-      if ( fabs( ptA[Z] ) < hA )
-      {
-        // Finding the face point
-        double sina1 = ( sgn( ptA[Z] ) * hA - ptCenter1[Z] ) / ( rB * v1[Z] );
-        double cosa1 = sqrt( 1. - sina1 * sina1 );
-        ptB = ptCenter1 + rB * cosa1 * u1 + rB * sina1 * v1;
-        if ( normXY( ptB ) < rA * rA )
-        {
-          contCond = true;
-          break;
-        }
-        ptB = ptCenter1 + rB * (-cosa1) * u1 + rB * sina1 * v1;
-        if ( normXY( ptB ) < rA * rA )
-        {
-          contCond = true;
-          break;
-        }
-      }
+      contCond = true;
+      break;
     }
   }
 
@@ -920,6 +900,22 @@ void E2EContact( double rA, double hA, double rB, double hB,
     Vector3 contVec; // Contact vector directed from b to a
     Point3 contPt;
 
+    // The band point
+    Point3 const& ptA = ptCenter1 + rB * cost1 * u1 + rB * sint1 * v1;
+
+    // The face point
+    sint1 = ( sgn( ptA[Z] ) * hA - ptCenter1[Z] ) / ( rB * v1[Z] );
+    if ( fabs( sint1 ) > 1. )
+      return;
+    cost1 = sqrt( 1. - sint1 * sint1 );
+    Point3 ptB = ptCenter1 + rB * cost1 * u1 + rB * sint1 * v1;
+    if ( normXY( ptB ) > rA * rA )
+      ptB = ptCenter1 + rB * (-cost1) * u1 + rB * sint1 * v1;
+    // Theoretically, we don't need to check the following. Numerically,
+    // it should be checked.
+    if ( normXY( ptB ) > rA * rA )
+      return;
+
     // Finding contacting edge points of cylinder A
     Matrix rotMatA2B;
     rotateVec2VecZ( e, rotMatA2B );
@@ -927,10 +923,8 @@ void E2EContact( double rA, double hA, double rB, double hB,
     Vector3 const& e2 = ( rotMatA2B * Vector3( 0., 0., 1. ) ).normalized();
     c1 = x2 + hA * e2;
     c2 = x2 - hA * e2;
-    d1 = pow( sqrt( normXY( c1 ) ) - rB, 2) +
-          pow( fabs( c1[Z] ) - hB, 2);
-    d2 = pow( sqrt( normXY( c2 ) ) - rB, 2) +
-          pow( fabs( c2[Z] ) - hB, 2);
+    d1 = pow( sqrt( normXY( c1 ) ) - rB, 2) + pow( fabs( c1[Z] ) - hB, 2);
+    d2 = pow( sqrt( normXY( c2 ) ) - rB, 2) + pow( fabs( c2[Z] ) - hB, 2);
     Point3 const& ptCenter2 = d1 < d2 ? c1 : c2;
 
     // Vector3 const& u2 = ( e2 ^ Vector3( 0., 0., 1. ) ).normalized();
@@ -945,35 +939,46 @@ void E2EContact( double rA, double hA, double rB, double hB,
     // double const s2 = ( rB*rB - normXY(ptCenter2) - rA*rA*normXY(u2) ) / p2;
     double const s2 = ( rB * rB - normXY( ptCenter2 ) - rA * rA ) / p2;
 
-    double sint2[4];
-    int nbRoots2;
+    double sol2[4];
     solveQuartic( 2.*r2, q2*q2 + r2*r2 - s2, -r2*s2, s2*s2/4. - q2*q2,
-                  sint2, nbRoots2 );
+                  sol2, nbRoots );
 
-    Point3 ptC, ptD;
-    double cost2;
-    for ( int i = 0; i < nbRoots2; i++ )
+    double sint2 = 1., cost2 = 0.;
+    for ( int i = 0; i < nbRoots; i++ )
     {
-      if ( fabs( sint2[i] ) <= 1. )
-      {
-        cost2 = ( s2/2. - r2*sint2[i] - sint2[i]*sint2[i] ) / q2;
-        if ( fabs( cost2 ) > 1. )
-          cost2 = sgn( cost2 ) * sqrt( 1. - sint2[i]*sint2[i] );
-        ptC = ptCenter2 + rA * cost2 * u2 + rA * sint2[i] * v2;
-        if ( fabs( ptC[Z] ) < hB )
-          break;
-      }
+      sint2 = sol2[i];
+      cost2 = ( s2 / 2. - ( r2 + sint2 ) * sint2 ) / q2;
+      if ( fabs( ptCenter2[Z] + rA * cost2 * u2[Z] + rA * sint2 * v2[Z] ) < hB )
+        break;
     }
+    Point3 ptC = ptCenter2 + rA * cost2 * u2 + rA * sint2 * v2;
+    // Theoretically, we don't need to check the following. Numerically,
+    //  it should be checked.
+    if ( fabs( ptC[Z] ) > hB )
+      return;
+
     // Finding the face point
-    double sina2 = ( sgn( ptC[Z] ) * hB - ptCenter2[Z] ) / ( rA * v2[Z] );
-    double cosa2 = sqrt( 1. - sina2 * sina2 );
-    ptD = ptCenter2 + rA * cosa2 * u2 + rA * sina2 * v2;
+    sint2 = ( sgn( ptC[Z] ) * hB - ptCenter2[Z] ) / ( rA * v2[Z] );
+    if ( fabs( sint2 ) > 1. )
+      return;
+    cost2 = sqrt( 1. - sint2 * sint2 );
+    Point3 ptD = ptCenter2 + rA * cost2 * u2 + rA * sint2 * v2;
     if ( normXY( ptD ) > rB * rB )
-      ptD = ptCenter2 + rA * (-cosa2) * u2 + rA * sina2 * v2;
+      ptD = ptCenter2 + rA * (-cost2) * u2 + rA * sint2 * v2;
+    // Theoretically, we don't need to check the following. Numerically,
+    //  it should be checked.
+    if ( normXY( ptD ) > rB * rB )
+      return;
 
     // Contact points in the coordinate system of cylinder A
     ptC = x + Point3( transpose( rotMatA2B ) * ( ptC ) );
     ptD = x + Point3( transpose( rotMatA2B ) * ( ptD ) );
+
+    // Theoretically, we don't need to check the following. Numerically,
+    //  it should be checked.
+    if ( fabs( ptC[Z] ) > hA || normXY( ptC ) > rA * rA ||
+         fabs( ptD[Z] ) > hA || normXY( ptD ) > rA * rA )
+      return;
 
     // Distance between two lines
     Vector3 vec_rA = .5 * ( ptC + ptD );
@@ -1000,5 +1005,3 @@ void E2EContact( double rA, double hA, double rB, double hB,
     ptCont.setOverlapDistance( - overlap );
   }
 }
-// #undef normXY
-// #undef dotXY
