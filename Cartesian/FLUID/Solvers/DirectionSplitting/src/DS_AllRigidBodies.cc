@@ -6222,7 +6222,8 @@ void DS_AllRigidBodies:: write_surface_discretization_for_all_RB( )
 
 //---------------------------------------------------------------------------
 void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
-                                                FV_DiscreteField const* FF )
+                                                FV_DiscreteField const* FF,
+                                                string const& StencilCorrection)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_AllRigidBodies:: build_solid_variables_on_fluid_grid" ) ;
@@ -6244,13 +6245,15 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    intersect_fieldValue[field]->re_initialize(FF_LOC_UNK,6);
 
    // Cut Cell parameters initialization
-   CC_face_centroid[field]->re_initialize(FF_LOC_UNK,6,3);
-   CC_face_fraction[field]->re_initialize(FF_LOC_UNK,6);
-   CC_ownerID[field]->re_initialize(FF_LOC_UNK,-1.);
-   CC_RB_area[field]->re_initialize(FF_LOC_UNK);
-   CC_cell_volume[field]->re_initialize(FF_LOC_UNK,2);
-   CC_RB_normal[field]->re_initialize(FF_LOC_UNK,3);
-   CC_RB_centroid[field]->re_initialize(FF_LOC_UNK,3);
+   if (StencilCorrection == "CutCell") {
+      CC_face_centroid[field]->re_initialize(FF_LOC_UNK,6,3);
+      CC_face_fraction[field]->re_initialize(FF_LOC_UNK,6);
+      CC_ownerID[field]->re_initialize(FF_LOC_UNK,-1.);
+      CC_RB_area[field]->re_initialize(FF_LOC_UNK);
+      CC_cell_volume[field]->re_initialize(FF_LOC_UNK,2);
+      CC_RB_normal[field]->re_initialize(FF_LOC_UNK,3);
+      CC_RB_centroid[field]->re_initialize(FF_LOC_UNK,3);
+   }
 
 }
 
@@ -6500,7 +6503,7 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
   }
 
 
-  boolVector const* is_periodic = MESH->get_periodic_directions();
+  // boolVector const* is_periodic = MESH->get_periodic_directions();
 
   // Warnings
   // if (m_macCOMM->rank() == 0) {

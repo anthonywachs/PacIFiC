@@ -290,8 +290,8 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    if (is_solids) {
 		// Build void frac and intersection variable
-		allrigidbodies->build_solid_variables_on_fluid_grid(PF);
-		allrigidbodies->build_solid_variables_on_fluid_grid(UF);
+		allrigidbodies->build_solid_variables_on_fluid_grid(PF,StencilCorrection);
+		allrigidbodies->build_solid_variables_on_fluid_grid(UF,StencilCorrection);
 		// Compute void fraction for pressure and velocity field
 		allrigidbodies->compute_void_fraction_on_grid(PF, false);
 		allrigidbodies->compute_void_fraction_on_grid(UF, false);
@@ -3349,12 +3349,14 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 					double dz = (dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1.;
 					size_t p = FF->DOF_local_number(i,j,k,comp);
 					if (is_solids) {
-						if (ownerID->operator()(p) == -1) {
+						int ownID = (StencilCorrection == "FD") ? -1
+									 : ownerID->operator()(p);
+						if (ownID == -1) {
 							double vel_div = (FF == UF) ?
 												divergence_of_U_noCorrection(i,j,k,comp,0)
 											 : calculate_velocity_divergence_FD(i,j,k,0);
 				         divergence->operator()(p,0) = vel_div * dx * dy * dz;
-						} else if (ownerID->operator()(p) != -1) {
+						} else if (ownID != -1) {
 						   double rht_flux = allrigidbodies->velocity_flux(FF,p,0,0,1,0);
 						   double lft_flux = allrigidbodies->velocity_flux(FF,p,0,0,0,0);
 						   double top_flux = allrigidbodies->velocity_flux(FF,p,1,1,1,0);
@@ -3841,7 +3843,8 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    for (size_t i = 0; i < PF->nb_local_unknowns() ; i++) {
       divergencePF->operator()(i,1) = divergencePF->operator()(i,0);
 		if (is_solids) {
-			CC_volPF->operator()(i,1) = CC_volPF->operator()(i,0);
+			if (StencilCorrection == "CutCell")
+				CC_volPF->operator()(i,1) = CC_volPF->operator()(i,0);
 			void_fracPF->operator()(i,1) = void_fracPF->operator()(i,0);
 		}
 	}
@@ -3850,7 +3853,8 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 	for (size_t i = 0; i < UF->nb_local_unknowns() ; i++) {
 		divergenceUF->operator()(i,1) = divergenceUF->operator()(i,0);
 		if (is_solids) {
-			CC_volUF->operator()(i,1) = CC_volUF->operator()(i,0);
+			if (StencilCorrection == "CutCell")
+				CC_volUF->operator()(i,1) = CC_volUF->operator()(i,0);
 			void_fracUF->operator()(i,1) = void_fracUF->operator()(i,0);
 		}
 	}

@@ -178,7 +178,8 @@ DS_HeatTransfer:: do_before_time_stepping( FV_TimeIterator const* t_it,
    // Generate solid particles if required
 	if (is_solids) {
 		// Build void frac and intersection variable
-		allrigidbodies->build_solid_variables_on_fluid_grid(TF);
+		string StencilCorrection = "FD";
+		allrigidbodies->build_solid_variables_on_fluid_grid(TF, StencilCorrection);
 		// Compute void fraction for temperature field
 		allrigidbodies->compute_void_fraction_on_grid(TF, false);
 		// Compute intersection with RB for temperature field
