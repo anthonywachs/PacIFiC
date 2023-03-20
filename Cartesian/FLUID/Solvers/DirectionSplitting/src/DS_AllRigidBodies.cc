@@ -2952,6 +2952,9 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
           max_unknown_index(dir) =
                               FF->get_max_index_unknown_on_proc( comp, dir );
 
+          local_extents(dir,0) = 0;
+          local_extents(dir,1) = max_unknown_index(dir) - min_unknown_index(dir);
+
           doubleVector box_extents(2,0.);
           box_extents(0) = haloZone[0]->operator()(dir);
           box_extents(1) = haloZone[1]->operator()(dir);
@@ -3082,6 +3085,9 @@ void DS_AllRigidBodies:: clear_GrainsRB_data_on_grid(
                               FF->get_min_index_unknown_on_proc( comp, dir );
           max_unknown_index(dir) =
                               FF->get_max_index_unknown_on_proc( comp, dir );
+
+          local_extents(dir,0) = 0;
+          local_extents(dir,1) = max_unknown_index(dir) - min_unknown_index(dir);
 
           doubleVector box_extents(2,0.);
           box_extents(0) = haloZone[0]->operator()(dir);
@@ -6497,16 +6503,16 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
   boolVector const* is_periodic = MESH->get_periodic_directions();
 
   // Warnings
-  if (m_macCOMM->rank() == 0) {
-     if (!(*is_periodic)(dir)) {
-        if ((bounds(0) < global_min)
-        || (bounds(1) > global_max))
-           std::cout << endl <<
-             " WARNING : Box Averaging Control Volume overlaps a " <<
-             " non-periodic BC" << endl <<
-             " Control volume will be reduced" << endl << endl;
-     }
-  }
+  // if (m_macCOMM->rank() == 0) {
+  //    if (!(*is_periodic)(dir)) {
+  //       if ((bounds(0) < global_min)
+  //       || (bounds(1) > global_max))
+  //          std::cout << endl <<
+  //            " WARNING : Box Averaging Control Volume overlaps a " <<
+  //            " non-periodic BC" << endl <<
+  //            " Control volume will be reduced" << endl << endl;
+  //    }
+  // }
 
   // Getting the minimum grid index in control volume (CV)
   if (bounds(0) < bounds(1)) {// Non-periodic CV
