@@ -6526,7 +6526,11 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(0)
                         , i0_temp) ;
-           value(0) = (found) ? (int)i0_temp : 0;
+           value(0) = (found) ? (int)i0_temp
+                              : (int)FF->get_min_index_unknown_on_proc(comp,dir);
+           // Fail safe when RB is near wall (return 1 instead of 0)
+           value(0) = MAC::max(value(0)
+                            , (int)FF->get_min_index_unknown_on_proc(comp,dir));
         }
      } else {
         if (bounds(1) > local_min) {
@@ -6541,7 +6545,10 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(0)
                         , i0_temp) ;
-           value(0) = (found) ? (int)i0_temp : 0;
+           value(0) = (found) ? (int)i0_temp
+                              : (int)FF->get_min_index_unknown_on_proc(comp,dir);
+           value(0) = MAC::max(value(0)
+                            , (int)FF->get_min_index_unknown_on_proc(comp,dir));
         } else if (bounds(1) > local_min) {
            value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
         }
@@ -6559,7 +6566,10 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(1)
                         , i0_temp) ;
-           value(1) = (found) ? (int)i0_temp : 0;
+           value(1) = (found) ? (int)i0_temp
+                              : (int)FF->get_max_index_unknown_on_proc(comp,dir);
+           value(1) = MAC::min(value(1)
+                              , (int)FF->get_max_index_unknown_on_proc(comp,dir));
         }
      } else {
         if (bounds(0) < local_max) {
@@ -6574,7 +6584,10 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(1)
                         , i0_temp) ;
-           value(1) = (found) ? (int)i0_temp : 0;
+           value(1) = (found) ? (int)i0_temp
+                              : (int)FF->get_max_index_unknown_on_proc(comp,dir);
+           value(1) = MAC::min(value(1)
+                              , (int)FF->get_max_index_unknown_on_proc(comp,dir));
         } else if (bounds(0) < local_max) {
            value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
         }
