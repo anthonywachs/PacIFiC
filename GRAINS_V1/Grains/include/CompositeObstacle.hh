@@ -96,7 +96,7 @@ class CompositeObstacle : public Obstacle
         bool const& b_deplaceF_Comp ) ;
 
     /** @brief Returns whether the component is a composite obstacle ? */
-    virtual bool isCompositeObstacle() const {return ( true ); }
+    virtual bool isCompositeObstacle() const;
 
     /** @brief Returns whether there is geometric contact with another
     component 

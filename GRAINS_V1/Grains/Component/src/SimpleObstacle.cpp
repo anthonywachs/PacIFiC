@@ -11,9 +11,8 @@
 #include "ContactForceModel.hh"
 #include <sstream>
 #include <limits>
-using namespace std;
-
 #include <assert.h>
+using namespace std;
 
 
 // ----------------------------------------------------------------------------
@@ -51,7 +50,7 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
   m_materialName = ReaderXML::getNodeValue_String( materiau_ );
   ContactBuilderFactory::defineMaterial( m_materialName, true );
 
-  // Obstacle � transf�rer au fluide
+  // Obstacle to transfer to the fluid
   DOMNode* statut = ReaderXML::getNode( root, "Statut" );
   if ( statut )
     m_transferToFluid = ReaderXML::getNodeAttr_Int( statut, "ToFluid" );
@@ -596,8 +595,8 @@ void SimpleObstacle::writePositionInFluid( ostream &fileOut )
 
 
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Initialize all contact map entries to false
+// ----------------------------------------------------------------------------
+// Initializes all contact map entries to false
 void SimpleObstacle::setContactMapToFalse()
 {
   Component::setContactMapToFalse();
@@ -606,8 +605,8 @@ void SimpleObstacle::setContactMapToFalse()
 
 
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Update contact map
+// ----------------------------------------------------------------------------
+// Updates contact map
 void SimpleObstacle::updateContactMap()
 {
   Component::updateContactMap();
@@ -616,7 +615,7 @@ void SimpleObstacle::updateContactMap()
 
 
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// ----------------------------------------------------------------------------
 // Does the contact exist in the map, if yes return the pointer to the
 // cumulative tangential displacement
 bool SimpleObstacle::getContactMemory( std::tuple<int,int,int> const& id,
@@ -630,8 +629,8 @@ bool SimpleObstacle::getContactMemory( std::tuple<int,int,int> const& id,
 
 
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Add new contact in the map
+// ----------------------------------------------------------------------------
+// Adds new contact in the map
 void SimpleObstacle::addNewContactInMap( std::tuple<int,int,int> const& id,
   Vector3 const& tangent, Vector3 const& prev_normal,
   Vector3 const& cumulSpringTorque )
@@ -642,8 +641,8 @@ void SimpleObstacle::addNewContactInMap( std::tuple<int,int,int> const& id,
 
 
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Increase cumulative tangential displacement with component id
+// ----------------------------------------------------------------------------
+// Increases cumulative tangential displacement with component id
 void SimpleObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
   Vector3 const& tangent, Vector3 const& prev_normal,
   Vector3 const& cumulSpringTorque )
@@ -652,13 +651,20 @@ void SimpleObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
 }
 
 
-void SimpleObstacle::copyHistoryContacts( double* &destination, int start_index )
+
+// ----------------------------------------------------------------------------
+// Writes the contact map information in an array of doubles
+void SimpleObstacle::copyHistoryContacts( double* &destination, 
+	int start_index )
 {
   Component::copyHistoryContacts( destination, start_index ) ;
 }
 
+
+
+
 // ----------------------------------------------------------------------------
-// Copy existing contact in the map
+// Adds a single contact info to the contact map
 void SimpleObstacle::copyContactInMap( std::tuple<int,int,int> const& id,
   bool const& isActive, Vector3 const& tangent, Vector3 const& prev_normal,
   Vector3 const& cumulSpringTorque )
@@ -667,11 +673,22 @@ void SimpleObstacle::copyContactInMap( std::tuple<int,int,int> const& id,
     cumulSpringTorque ) ;
 }
 
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of contacts in the contact map
 int SimpleObstacle::getContactMapSize()
 {
   return ( Component::getContactMapSize() );
 }
 
+
+
+
+// ----------------------------------------------------------------------------
+// Updates the ids of the contact map: in the case of a reload with 
+// insertion, the obstacle's ids are reset. This function keeps track of that 
+// change.
 void SimpleObstacle::updateContactMapId( int prev_id, int new_id)
 {
   Component::updateContactMapId( prev_id, new_id);

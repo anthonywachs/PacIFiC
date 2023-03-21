@@ -30,7 +30,8 @@ struct ContactInfos
     Physical component of a granular simulation (can be particle or obstacle).
 
     @author G.FERRER - Institut Francais du Petrole - 2000 - Creation
-    @author A.WACHS - 2019 - Major cleaning & refactoring */
+    @author A.WACHS - 2019 - Major cleaning & refactoring 
+    @author D. HUET - 2022 - Contact force model with memory */
 // ============================================================================
 class Component
 {
@@ -98,65 +99,77 @@ class Component
     virtual void updateContactMap();
 
     /** @brief Does the contact exist in the map? If so, return true and make
-    kdelta, prev_normal and cumulSpringTorque point to the memorized info. Otherwise, return false and set those pointers to NULL.
+    kdelta, prev_normal and cumulSpringTorque point to the memorized info. 
+    Otherwise, return false and set those pointers to NULL.
     @param id key in the map
     @param kdelta pointer to the memory of the vector kt * delta_t
-    @param prev_normal pointer to the previous vector normal to the contact plane
-    @param cumulSpringTorque pointer to the memory of the spring-like component of the friction torque */
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
     virtual bool getContactMemory( std::tuple<int,int,int> const& id,
-  Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
-  bool createContact );
+  	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+  	bool createContact );
 
-    /** @brief Add new contact in the map
+    /** @brief Adds new contact in the map
     @param id key in the map
     @param kdelta pointer to the memory of the vector kt * delta_t
-    @param prev_normal pointer to the previous vector normal to the contact plane
-    @param cumulSpringTorque pointer to the memory of the spring-like component of the friction torque */
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
     virtual void addNewContactInMap( std::tuple<int,int,int> const& id,
-  Vector3 const& kdelta, Vector3 const& prev_normal,
-  Vector3 const& cumulSpringTorque );
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
 
-    /** @brief Store memory of the contact with component id: increase cumulative tangential displacement and cumulative spring torque, remember contact normal.
+    /** @brief Stores memory of the contact with component id: increase 
+    cumulative tangential displacement and cumulative spring torque, remember 
+    contact normal.
     @param id key in the map
     @param kdelta pointer to the memory of the vector kt * delta_t
-    @param prev_normal pointer to the previous vector normal to the contact plane
-    @param cumulSpringTorque pointer to the memory of the spring-like component of the friction torque */
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
     virtual void addDeplContactInMap( std::tuple<int,int,int> const& id,
-  Vector3 const& kdelta, Vector3 const& prev_normal,
-  Vector3 const& cumulSpringTorque );
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
 
-    /** @brief copyHistoryContacts write the contact map information in an array of doubles
-    @param destination the array of double where the contact map should be stored
+    /** @brief Writes the contact map information in an array of doubles
+    @param destination the array of double where the contact map should be 
+    stored
     @param start index the index of destination where the copy should start */
     virtual void copyHistoryContacts( double* &destination, int start_index );
 
-    /** @brief copyContactInMap add a single contact info to the contact map
+    /** @brief Adds a single contact info to the contact map
     @param id key in the map
     @param isActive boolean: true if the contact is active, false otherwise
     @param kdelta pointer to the memory of the vector kt * delta_t
-    @param prev_normal pointer to the previous vector normal to the contact plane
-    @param cumulSpringTorque pointer to the memory of the spring-like component of the friction torque */
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
     virtual void copyContactInMap( std::tuple<int,int,int> const& id,
-  bool const& isActive, Vector3 const& kdelta, Vector3 const& prev_normal,
-  Vector3 const& cumulSpringTorque );
+  	bool const& isActive, Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
 
-    /** @brief getContactMapSize Return the number of contacts in the contact map
-    */
+    /** @brief Returns the number of contacts in the contact map */
     virtual int getContactMapSize();
 
-    /** @brief printActiveNeighbors displays the active neighbours in the format "my_elementary_id/neighbour_id/neightbout_elementary_id ; ...". Useful for debugging only.
-    @param id id of this component
-    */
-    virtual void printActiveNeighbors(int const& id );
-    //@}
+    /** @brief Displays the active neighbours in the 
+    format "my_elementary_id/neighbour_id/neightbout_elementary_id ; ...". 
+    Useful for debugging only.
+    @param id id of this component */
+    virtual void printActiveNeighbors( int const& id );
 
-    /** @brief Update the ids of the contact map: in the case of a reload with insersion, the obstacle's ids are reset. This function keeps track of that change.
+    /** @brief Updates the ids of the contact map: in the case of a reload with 
+    insertion, the obstacle's ids are reset. This function keeps track of that 
+    change.
     @param prev_id previous id that should be updated
-    @param new_id updated id
-    */
-    void updateContactMapId( int prev_id, int new_id);
+    @param new_id updated id */
+    void updateContactMapId( int prev_id, int new_id );
 
-    /** @ brief Returns whether a point lies inside the component
+    /** @brief Returns whether a point lies inside the component
     @param pt point */
     virtual bool isIn( Point3 const& pt ) const;
     //@}
@@ -181,7 +194,7 @@ class Component
     @param mat material type */
     void setMaterial( string const& mat );
 
-    /** @brief Initialize all contact map entries to false */
+    /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
     //@}
 
@@ -324,6 +337,9 @@ class Component
 
     /** @brief Returns whether the component is an elementary particle */
     virtual bool isElementaryParticle() const;
+    
+    /** @brief Returns whether the component is an STL obstacle */
+    virtual bool isSTLObstacle() const;    
     //@}
 
 
@@ -372,19 +388,19 @@ class Component
 	int& last_offset ) const = 0;
     //@}
 
-    /** @brief Write the contact map to file in plain 2014 format
+    /** @brief Writes the contact map to file in plain 2014 format
     @param fileSave output file stream */
     void writeContactMemory_2014(ostream &fileSave ) const;
 
-    /** @brief Write the contact map to file in binary format
+    /** @brief Writes the contact map to file in binary format
     @param fileSave output file stream */
     void writeContactMemory_binary( ostream &fileOut );
 
-    /** @brief Read the contact map to file in plain 2014 format
+    /** @brief Reads the contact map to file in plain 2014 format
     @param fileSave input file stream */
     void readContactMap_2014( istream &fileSave);
 
-    /** @brief Read the contact map to file in binary format
+    /** @brief Reads the contact map to file in binary format
     @param fileSave input file stream */
     void readContactMap_binary( istream &fileSave );
     //@}
@@ -444,16 +460,16 @@ class Component
     string m_materialName; /**< Material name */
     double m_mass; /**< Mass */
     RigidBodyWithCrust *m_geoRBWC; /**< geometric shape with crust */
-    Torsor m_torsor; /**< Torsor of forces exerted on the component at its center
-    	of mass */
+    Torsor m_torsor; /**< Torsor of forces exerted on the component at its 
+    	center of mass */
     ConfigurationMemento *m_memento; /**< To store the component features */
     map < std::tuple<int,int,int>,
-     std::tuple<bool, Vector3, Vector3, Vector3> > m_contactMap;
-    /** List of active contacts with other components. It reads as follows:
-    map<tuple<own elementary particle id, neighbour id, neighbour elementary
-    particle id>, tuple<isContactActive, kt * cumulative tangential dispacement,
-    previous normal vector, kr * cumulative rotational displacement> > */
-    //@}
+     	std::tuple<bool, Vector3, Vector3, Vector3> > m_contactMap; /** List of 
+     	active contacts with other components. It reads as follows:
+    	map<tuple<own elementary particle id, neighbour id, neighbour elementary
+    	particle id>, tuple<isContactActive, kt * cumulative tangential 
+	dispacement, previous normal vector, kr * cumulative rotational 
+	displacement> > */
     static int m_nb; /**< Number of created components */
     //@}
 };

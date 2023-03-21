@@ -24,7 +24,7 @@ CompositeObstacle::CompositeObstacle( DOMNode* root ) :
   Obstacle( "obstacle", false )
 {
   m_id = -4;
-  assert(root != NULL);
+  assert( root != NULL );
 
   m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
 
@@ -772,4 +772,14 @@ bool CompositeObstacle::isIn( Point3 const& pt ) const
     bisIn = (*obstacle)->isIn( pt );
 
   return ( bisIn );  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether the component is a composite obstacle ? */
+bool CompositeObstacle::isCompositeObstacle() const
+{
+  return ( true ); 
 }
