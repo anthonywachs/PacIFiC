@@ -1602,29 +1602,36 @@ void LinkedCell::Link( Obstacle* obstacle )
   Transform CelPosition;
   double alpha=2.;
   Point3 const* cg = NULL;
+  bool add = false;
 
   for (myObs=list_obstacles.begin();myObs!=list_obstacles.end();myObs++)
   {
     RigidBody const* obstacleRigidBody = (*myObs)->getRigidBody();
-    BBox obsBox = obstacleRigidBody->BoxRigidBody();
+    BBox const* obsBox = (*myObs)->getObstacleBox();
     if ( (*myObs)->getMaterial() == "periode" ) alpha = 3.1;
     else alpha = 2.;
     Convex* convexCell = new Box( alpha * m_cellsize_X, alpha * m_cellsize_Y,
     	alpha * m_cellsize_Z);
     RigidBody CelRigidBody( convexCell, CelPosition );
 
-    // Intersection g�om�trique de la cellule avec l'obstacle
     // Intersection of the cell with the obstacle
     for (int i=0; i<m_nb; i++)
     {
       cell_ = m_allcells[i];
       cg = cell_->getCentre();
-      if ( obsBox.InZone( cg, 0.5 * alpha * m_cellsize_X,
+      add = false;
+      if ( obsBox->InZone( cg, 0.5 * alpha * m_cellsize_X,
       		0.5 * alpha * m_cellsize_Y,
       		0.5 * alpha * m_cellsize_Z ) )
       {
-        CelRigidBody.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
-	if ( CelRigidBody.isContact( *obstacleRigidBody ) )
+        if ( (*myObs)->isSTLObstacle() ) add = true;
+	else 
+	{
+	  CelRigidBody.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
+	  add = CelRigidBody.isContact( *obstacleRigidBody );	
+	}
+	
+	if ( add )
         {
           cell_->addObstacle( *myObs );
           (*myObs)->add( cell_ );
@@ -1752,8 +1759,7 @@ void LinkedCell::LinkUpdate( double time, double dt, SimpleObstacle *myObs )
 {
   if ( myObs->performLinkUpdate() )
   {
-    const RigidBody* obstacleRigidBody = myObs->getRigidBody();
-    BBox obsBox = obstacleRigidBody->BoxRigidBody();
+    BBox const* obsBox = myObs->getObstacleBox();
     Cell* cell_ = NULL;
     Vector3 deplMax;
     Point3 const* cg = NULL;
@@ -1761,7 +1767,7 @@ void LinkedCell::LinkUpdate( double time, double dt, SimpleObstacle *myObs )
     // le coefficient 1.2 donne une marge d'erreur de 20%, ce qui signifie
     // qu'on suppose que le vecteur vitesse de l'obstacle sur les n pas de time
     // suivants ne varie pas de plus de 20%
-    // Attention: rien dans le code verifie cette hypoth�se !!
+    // Attention: rien dans le code verifie cette hypothese !!
     int updateFreq = myObs->getObstacleLinkedCellUpdateFrequency();
     double coefApprox = updateFreq == 1 ? 1. : 1.2;
     deplMax = myObs->vitesseMaxPerDirection() * coefApprox
@@ -1775,7 +1781,7 @@ void LinkedCell::LinkUpdate( double time, double dt, SimpleObstacle *myObs )
     {
       cell_ = m_allcells[i];
       cg = cell_->getCentre();
-      if ( obsBox.InZone( cg, CelExtent[X], CelExtent[Y], CelExtent[Z] ) )
+      if ( obsBox->InZone( cg, CelExtent[X], CelExtent[Y], CelExtent[Z] ) )
       {
         cell_->addObstacle( myObs );
         myObs->add( cell_ );

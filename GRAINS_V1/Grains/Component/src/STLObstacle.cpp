@@ -43,6 +43,20 @@ STLObstacle::STLObstacle( const string &s, string const& filename )
     
   // Read STL file and construct the triangulation
   readSTL( filename );
+
+  // Set the bounding box
+  list<STLVertex*>::iterator il;
+  Point3 pmin( 1.e20, 1.e20, 1.e20 ), pmax( -1.e20, -1.e20, -1.e20 );
+  for (il = m_allSTLVertices.begin(); il != m_allSTLVertices.end(); ++il)  
+  {
+    pmin[X] = min( (*il)->m_p[X], pmin[X] );
+    pmin[Y] = min( (*il)->m_p[Y], pmin[Y] );    
+    pmin[Z] = min( (*il)->m_p[Y], pmin[Y] );    
+    pmax[X] = max( (*il)->m_p[X], pmax[X] );
+    pmax[Y] = max( (*il)->m_p[Y], pmax[Y] );    
+    pmax[Z] = max( (*il)->m_p[Y], pmax[Y] );        
+  }
+  m_obstacleBox.setValue( pmin, pmax );
 }
 
 
@@ -83,7 +97,38 @@ STLObstacle::STLObstacle( DOMNode *root )
   string filename = ReaderXML::getNodeAttr_String( file_, "Name" ); 
   
   // Read STL file and construct the triangulation
-  readSTL( filename );     
+  readSTL( filename );
+  
+  // Translation of the STL obstacle to adjust its position
+  DOMNode* translat = ReaderXML::getNode( root, "Translation" );  
+  if ( translat )
+  {
+    Vector3 STLTranslation;
+    STLTranslation[X] = ReaderXML::getNodeAttr_Double( translat, "X" );
+    STLTranslation[Y] = ReaderXML::getNodeAttr_Double( translat, "Y" );
+    STLTranslation[Z] = ReaderXML::getNodeAttr_Double( translat, "Z" );
+    list<STLVertex*>::iterator il;
+    for (il = m_allSTLVertices.begin(); il != m_allSTLVertices.end(); ++il)  
+    {
+      (*il)->m_p[X] += STLTranslation[X];
+      (*il)->m_p[Y] += STLTranslation[Y];
+      (*il)->m_p[Z] += STLTranslation[Z];     
+    }     
+  } 
+  
+  // Set the bounding box
+  list<STLVertex*>::const_iterator il;
+  Point3 pmin( 1.e20, 1.e20, 1.e20 ), pmax( -1.e20, -1.e20, -1.e20 );
+  for (il = m_allSTLVertices.begin(); il != m_allSTLVertices.end(); ++il)  
+  {
+    pmin[X] = min( (*il)->m_p[X], pmin[X] );
+    pmin[Y] = min( (*il)->m_p[Y], pmin[Y] );    
+    pmin[Z] = min( (*il)->m_p[Y], pmin[Y] );    
+    pmax[X] = max( (*il)->m_p[X], pmax[X] );
+    pmax[Y] = max( (*il)->m_p[Y], pmax[Y] );    
+    pmax[Z] = max( (*il)->m_p[Y], pmax[Y] );        
+  }
+  m_obstacleBox.setValue( pmin, pmax );       
 }
 
 
@@ -138,9 +183,133 @@ list<SimpleObstacle*> STLObstacle::Move( double time,
 void STLObstacle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
 {
-  // TO DO
+  cout << "STLObstacle::InterAction" << endl;
+  
+  try {
+  list<ContactInfos*>  listContactInfos;
+
+  // Search all contact points between the STL triangulation and the component
+  // and store them in the list listContactInfos
+  SearchContact( voisin, dt, time, LC, listContactInfos );
+
+  // Loop over all contact points and compute the contact force & torque
+  int nbContact = int(listContactInfos.size());
+  for ( list<ContactInfos*>::iterator il=listContactInfos.begin();
+      il!=listContactInfos.end(); il++ )
+  {
+    LC->addToContactsFeatures( time, (*il)->ContactPoint );
+
+    if ( ContactBuilderFactory::contactForceModel(
+		(*il)->p0->getMaterial(), (*il)->p1->getMaterial() )
+      		->computeForces( (*il)->p0, (*il)->p1, (*il)->ContactPoint,
+		LC, dt, nbContact ) )
+    {
+      (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
+      (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+    }
+    delete *il;
+  }
+
+  // Free the list
+  listContactInfos.clear();
+  }
+  catch (const ContactError&) {
+    throw ContactError();
+  }
 }
 
+
+
+
+// ----------------------------------------------------------------------------
+// Searches and stores all contact points between two components
+void STLObstacle::SearchContact( Component* voisin, double dt,
+      double const& time, LinkedCell *LC,
+      list<ContactInfos*>& listContact )
+{
+  cout << "STLObstacle::SearchContact" << endl;
+  bool found = false; 
+
+  // Search for contact points between the component and the triangles
+  if ( found )
+  {
+    ContactInfos* result = NULL ;
+    PointContact closestPoint;
+    result = new struct ContactInfos;
+    result->ContactPoint = closestPoint;
+    result->p0 = this;
+    result->p1 = voisin;
+    listContact.push_back( result );
+  } 
+  
+  // Search for contact points between the component and the vertices
+  if ( found )
+  {
+    ContactInfos* result = NULL ;
+    PointContact closestPoint;
+    result = new struct ContactInfos;
+    result->ContactPoint = closestPoint;
+    result->p0 = this;
+    result->p1 = voisin;
+    listContact.push_back( result );
+  }   
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether there is geometric contact with another component. 
+bool STLObstacle::isContact( Component const* voisin ) const
+{
+  bool contact = false;
+    
+  // TO DO
+
+  return ( contact );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether there is geometric contact with another
+// component accounting for crust thickness
+bool STLObstacle::isContactWithCrust( Component const* voisin ) const
+{
+  return ( STLObstacle::isContact( voisin ) );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether there is geometric proximity with another
+// component in the sense of whether their respective bounding boxes overlap 
+bool STLObstacle::isClose( Component const* voisin ) const
+{
+  bool contact = false;
+    
+  // TO DO
+
+  return ( contact );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether there is geometric proximity with another
+// component in the sense of whether their respective bounding boxes minus 
+// their crust thickness overlap
+bool STLObstacle::isCloseWithCrust( Component const* voisin ) const
+{
+  bool contact = false;
+    
+  // TO DO
+
+  return ( contact );
+}
 
 
 
@@ -206,8 +375,7 @@ Vector3 STLObstacle::vitesseMaxPerDirection() const
 // Paraview format
 int STLObstacle::numberOfPoints_PARAVIEW() const
 {
-  // TO DO
-  return ( 0 );
+  return ( int( m_allSTLVertices.size() ) );
 }
 
 
@@ -218,8 +386,7 @@ int STLObstacle::numberOfPoints_PARAVIEW() const
 // STL obstacle shape in a Paraview format
 int STLObstacle::numberOfCells_PARAVIEW() const
 {
-  // TO DO
-  return ( 0 );
+  return ( int( m_allSTLTriangles.size() ) );
 }
 
 
@@ -230,11 +397,20 @@ int STLObstacle::numberOfCells_PARAVIEW() const
 list<Point3> STLObstacle::get_polygonsPts_PARAVIEW(
 	Vector3 const* translation ) const
 {
-  list<Point3> lp;
+  list<Point3> ParaviewPoints;
+  list<STLVertex*>::const_iterator il;
+  Point3 p, pp;
+  Transform const* transform = m_geoRBWC->getTransform();
+  
+  for (il=m_allSTLVertices.begin();il!=m_allSTLVertices.end();il++)
+  {
+    p = (*il)->m_p;    
+    pp = (*transform)( p );
+    if ( translation ) pp += *translation;
+    ParaviewPoints.push_back( pp );        
+  }
 
-  // TO DO
-
-  return ( lp );
+  return ( ParaviewPoints );
 }
 
 
@@ -245,7 +421,17 @@ list<Point3> STLObstacle::get_polygonsPts_PARAVIEW(
 void STLObstacle::write_polygonsPts_PARAVIEW( ostream &f,
   	Vector3 const* translation ) const
 {
-  // TO DO
+  list<STLVertex*>::const_iterator il;
+  Point3 p, pp;
+  Transform const* transform = m_geoRBWC->getTransform();
+  
+  for (il=m_allSTLVertices.begin();il!=m_allSTLVertices.end();il++)
+  {
+    p = (*il)->m_p;    
+    pp = (*transform)( p );
+    if ( translation ) pp += *translation;
+    f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;      
+  }
 }
 
 
@@ -253,11 +439,26 @@ void STLObstacle::write_polygonsPts_PARAVIEW( ostream &f,
 
 // ----------------------------------------------------------------------------
 // Writes the STL obstacle in a Paraview format
-void STLObstacle::write_polygonsStr_PARAVIEW(list<int> &connectivity,
+void STLObstacle::write_polygonsStr_PARAVIEW( list<int> &connectivity,
     	list<int> &offsets, list<int> &cellstype, int& firstpoint_globalnumber,
-	int& last_offset) const
+	int& last_offset ) const
 {
-  // TO DO
+  vector<STLTriangle>::const_iterator itt;
+  
+  for (itt=m_allSTLTriangles.begin();itt!=m_allSTLTriangles.end();itt++)
+  {  
+    connectivity.push_back( firstpoint_globalnumber + 
+    	int(get<0>(itt->m_v)->m_id) );
+    connectivity.push_back( firstpoint_globalnumber + 
+    	int(get<1>(itt->m_v)->m_id) );
+    connectivity.push_back( firstpoint_globalnumber + 
+    	int(get<2>(itt->m_v)->m_id) );
+    last_offset += 3;
+    offsets.push_back( last_offset );
+    cellstype.push_back( 5 );  
+  }
+  
+  firstpoint_globalnumber += int( m_allSTLVertices.size() );  
 }
 
 
@@ -380,7 +581,6 @@ void STLObstacle::readSTL( string const& filename )
 
   double xn, yn, zn;
   double x1, y1, z1, x2, y2, z2, x3, y3, z3;
-  double duration;
   int kk = 0;
   size_t vid = 0, tid = 0;
   string notsodummy,dummy;
@@ -595,7 +795,7 @@ void STLObstacle::readSTL( string const& filename )
 void STLObstacle::STLnormalsAtVertices()
 {
   vector<STLTriangle>::iterator itt;
-  double total_area[m_allSTLVertices.size()];
+  double* total_area = new double[m_allSTLVertices.size()];
 
   for (itt = m_allSTLTriangles.begin(); itt != m_allSTLTriangles.end(); ++itt)
   {
@@ -616,7 +816,7 @@ void STLObstacle::STLnormalsAtVertices()
     v3->m_n[2] = 0.0;
   }
 
-  for (int i = 0; i < m_allSTLVertices.size(); i++) total_area[i] = 0.0;
+  for (size_t i = 0; i < m_allSTLVertices.size(); i++) total_area[i] = 0.0;
 
   for (itt = m_allSTLTriangles.begin(); itt != m_allSTLTriangles.end(); ++itt)
   {
@@ -653,6 +853,8 @@ void STLObstacle::STLnormalsAtVertices()
     (**itv).m_n[1] = (**itv).m_n[1] / total_area[(**itv).m_id];
     (**itv).m_n[2] = (**itv).m_n[2] / total_area[(**itv).m_id];
   }
+  
+  delete [] total_area;
 }
 
 

@@ -266,7 +266,7 @@ bool CompositeObstacle::isContact( Component const* voisin ) const
   for (obstacle=m_obstacles.begin(); 
        obstacle!=m_obstacles.end() && !contact; obstacle++)
   {
-    if ( voisin->isCompositeObstacle() )
+    if ( voisin->isCompositeParticle() )
       contact = voisin->isContact( *obstacle );
     else
       contact = (*obstacle)->isContact( voisin );
@@ -289,7 +289,7 @@ bool CompositeObstacle::isContactWithCrust( Component const* voisin ) const
   for (obstacle=m_obstacles.begin(); 
        obstacle!=m_obstacles.end() && !contact; obstacle++)
   {
-    if ( voisin->isCompositeObstacle() )
+    if ( voisin->isCompositeParticle() )
       contact = voisin->isContactWithCrust( *obstacle );
     else
       contact = (*obstacle)->isContactWithCrust( voisin );
@@ -311,7 +311,7 @@ bool CompositeObstacle::isClose( Component const* voisin ) const
   list<Obstacle*>::const_iterator obstacle;
   for (obstacle=m_obstacles.begin(); 
        obstacle!=m_obstacles.end() && !contact; obstacle++)
-    if ( voisin->isCompositeObstacle() )
+    if ( voisin->isCompositeParticle() )
       contact = voisin->isClose( *obstacle );
     else
       contact = (*obstacle)->isClose( voisin );
@@ -333,7 +333,7 @@ bool CompositeObstacle::isCloseWithCrust( Component const* voisin ) const
   list<Obstacle*>::const_iterator obstacle;
   for (obstacle=m_obstacles.begin(); 
        obstacle!=m_obstacles.end() && !contact; obstacle++)
-    if ( voisin->isCompositeObstacle() )
+    if ( voisin->isCompositeParticle() )
       contact = voisin->isCloseWithCrust( *obstacle );
     else
       contact = (*obstacle)->isCloseWithCrust( voisin );

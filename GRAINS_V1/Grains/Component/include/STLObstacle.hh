@@ -88,6 +88,39 @@ class STLObstacle : public SimpleObstacle
     virtual void InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC );
 
+    /** @brief Searches and stores all contact points between two components
+    @exception ContactError if overlapping distance is larger than the sum of
+    the crust thicknesses of the components
+    @param voisin the other component
+    @param dt time step magnitude
+    @param time physical time
+    @param LC linked-cell grid
+    @param listContact list of information about contacts */
+    void SearchContact( Component* voisin, double dt,
+      double const& time, LinkedCell *LC,
+      list<ContactInfos*>& listContact );
+
+    /** @brief Returns whether there is geometric contact with another
+    component 
+    @param voisin the other component */
+    virtual bool isContact( Component const* voisin ) const;
+
+    /** @brief Returns whether there is geometric contact with another
+    component accounting for crust thickness 
+    @param voisin the other component */
+    virtual bool isContactWithCrust( Component const* voisin ) const;
+
+    /** @brief Returns whether there is geometric proximity with another
+    component in the sense of whether their respective bounding boxes overlap 
+    @param voisin the other component */
+    virtual bool isClose( Component const* voisin ) const;
+
+    /** @brief Returns whether there is geometric proximity with another
+    component in the sense of whether their respective bounding boxes minus 
+    their crust thickness overlap 
+    @param voisin the other component */
+    virtual bool isCloseWithCrust( Component const* voisin ) const; 
+
     /** @brief Rotates the obstacle with a quaternion
     @param rotation the quaternion defining the rotation */
     virtual void Rotate( Quaternion const& rotation );

@@ -772,7 +772,7 @@ void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
     start_output_binary( sizeof_Float32, 3*nbpts ) ;
     for (il=allObstacles.begin();il!=allObstacles.end();il++)
     {
-      ppp = (*il)->getRigidBody()->get_polygonsPts_PARAVIEW();
+      ppp = (*il)->get_polygonsPts_PARAVIEW();
       for (ilpp=ppp.begin();ilpp!=ppp.end();ilpp++)
         for (int comp=0;comp<3;++comp)
 	  write_double_binary( (*ilpp)[comp] ) ;
@@ -781,10 +781,7 @@ void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
   }
   else
     for (il=allObstacles.begin();il!=allObstacles.end();il++)
-    {
-      //(*il)->getRigidBody()->write_polygonsPts_PARAVIEW( f );
-      (*il)->write_polygonsPts_PARAVIEW( f );
-    }
+       (*il)->write_polygonsPts_PARAVIEW( f );
   f << "</DataArray>" << endl;
   f << "</Points>" << endl;
 

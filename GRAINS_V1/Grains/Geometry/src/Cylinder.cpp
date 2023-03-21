@@ -216,10 +216,10 @@ int Cylinder::numberOfCells_PARAVIEW() const
 void Cylinder::write_polygonsPts_PARAVIEW( ostream& f,
   	Transform const& transform, Vector3 const* translation ) const
 {
-  Point3 pp,p;
+  Point3 pp, p;
   double dtheta = 2.* PI / m_visuNodeNbOnPer;
 
-  // Couronne inferieure
+  // Lower disk rim
   p[Y] = - m_halfHeight;
   for (int i=0;i<m_visuNodeNbOnPer;++i)
   {
@@ -230,7 +230,7 @@ void Cylinder::write_polygonsPts_PARAVIEW( ostream& f,
     f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
   }
 
-  // Couronne superieure
+  // Upper disk rim
   p[Y] = m_halfHeight;
   for (int i=0;i<m_visuNodeNbOnPer;++i)
   {
@@ -241,7 +241,7 @@ void Cylinder::write_polygonsPts_PARAVIEW( ostream& f,
     f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
   }
 
-  // Centre inferieur
+  // Lower disk center
   p[X] = 0.;
   p[Y] = - m_halfHeight;
   p[Z] = 0.;
@@ -250,7 +250,7 @@ void Cylinder::write_polygonsPts_PARAVIEW( ostream& f,
   if ( translation ) pp += *translation;
   f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
 
-  // Centre superieur
+  // Upper disk center
   p[Y] = m_halfHeight;
   pp = transform( p );
   if ( translation ) pp += *translation;
@@ -269,7 +269,7 @@ list<Point3> Cylinder::get_polygonsPts_PARAVIEW( Transform const& transform,
   Point3 pp,p;
   double dtheta = 2.* PI / m_visuNodeNbOnPer;
 
-  // Couronne inferieure
+  // Lower disk rim
   p[Y] = - m_halfHeight;
   for (int i=0;i<m_visuNodeNbOnPer;++i)
   {
@@ -280,7 +280,7 @@ list<Point3> Cylinder::get_polygonsPts_PARAVIEW( Transform const& transform,
     ParaviewPoints.push_back( pp );
   }
 
-  // Couronne superieure
+  // Upper disk rim
   p[Y] = m_halfHeight;
   for (int i=0;i<m_visuNodeNbOnPer;++i)
   {
@@ -291,7 +291,7 @@ list<Point3> Cylinder::get_polygonsPts_PARAVIEW( Transform const& transform,
     ParaviewPoints.push_back( pp );
   }
 
-  // Centre inferieur
+  // Lower disk center
   p[X] = 0.;
   p[Y] = - m_halfHeight;
   p[Z] = 0.;
@@ -299,7 +299,7 @@ list<Point3> Cylinder::get_polygonsPts_PARAVIEW( Transform const& transform,
   if ( translation ) pp += *translation;
   ParaviewPoints.push_back( pp );
 
-  // Centre superieur
+  // Upper disk center
   p[Y] = m_halfHeight;
   pp = transform( p );
   if ( translation ) pp += *translation;

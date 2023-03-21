@@ -157,8 +157,7 @@ class CompositeParticle : public Particle
     void InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC );
 
-    /** @brief Searches and stores all contact points between a composite
-    particle and a component.
+    /** @brief Searches and stores all contact points between two components
     @exception ContactError if overlapping distance is larger than the sum of
     the crust thicknesses of the components
     @param voisin the other component

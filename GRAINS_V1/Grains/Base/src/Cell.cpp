@@ -232,7 +232,10 @@ bool Cell::isContact( Particle const* particle_ ) const
   // Contact detection with obstacles
   list<SimpleObstacle*>::const_iterator obs = m_obstacles.begin();
   for ( ; obs!=m_obstacles.end() && !contact; obs++)
-    contact = particle_->isContact( *obs ); 
+    if ( particle_->isCompositeParticle() )
+      contact = particle_->isContact( *obs );
+    else
+      contact = (*obs)->isContact( particle_ ); 
   
   return ( contact );
 }
@@ -262,7 +265,10 @@ bool Cell::isContactWithCrust( Particle const* particle_ ) const
   // Contact detection with obstacles
   list<SimpleObstacle*>::const_iterator obs = m_obstacles.begin();
   for ( ; obs!=m_obstacles.end() && !contact; obs++)
-    contact = particle_->isContactWithCrust( *obs ); 
+    if ( particle_->isCompositeParticle() )
+      contact = particle_->isContactWithCrust( *obs );
+    else
+      contact = (*obs)->isContactWithCrust( particle_ ); 
 
   return ( contact );
 }
@@ -291,7 +297,10 @@ bool Cell::isClose( Particle const* particle_ ) const
   // Closeness detection with obstacles
   list<SimpleObstacle*>::const_iterator obs = m_obstacles.begin();
   for ( ; obs!=m_obstacles.end() && !contact; obs++)
-    contact = particle_->isClose( *obs );   
+    if ( particle_->isCompositeParticle() )
+      contact = particle_->isClose( *obs );
+    else
+      contact = (*obs)->isClose( particle_ );
   
   return ( contact );
 }
@@ -320,8 +329,10 @@ bool Cell::isCloseWithCrust( Particle const* particle_ ) const
   // Closeness detection with obstacles
   list<SimpleObstacle*>::const_iterator obs = m_obstacles.begin();
   for ( ; obs!=m_obstacles.end() && !contact; obs++)
-    if ( (*obs)->getMaterial() != "periode" ) 
-      contact = particle_->isCloseWithCrust( *obs );   
+    if ( particle_->isCompositeParticle() )
+      contact = particle_->isCloseWithCrust( *obs );
+    else
+      contact = (*obs)->isCloseWithCrust( particle_ );  
   
   return ( contact );
 }
