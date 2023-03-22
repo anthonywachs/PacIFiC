@@ -29,7 +29,7 @@ REG_HeatEquation const* REG_HeatEquation::PROTOTYPE
 REG_HeatEquation:: REG_HeatEquation( void )
 //--------------------------------------------------------------------------
    : FV_OneStepIteration( "REG_HeatEquation" )
-   , ComputingTime("Solver")      
+   , PAC_ComputingTime("Solver")      
 {
    MAC_LABEL( "REG_HeatEquation:: REG_HeatEquation" ) ;
 
@@ -65,7 +65,7 @@ REG_HeatEquation:: REG_HeatEquation( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
    : FV_OneStepIteration( a_owner, dom, exp )
-   , ComputingTime("Solver") 
+   , PAC_ComputingTime("Solver") 
    , TF ( dom->discrete_field( "temperature" ) ) 
    , TF_STAG ( dom->discrete_field( "temperature_staggered" ) ) 
    , TF_VERTEX ( dom->discrete_field( "temperature_vertex" ) )    

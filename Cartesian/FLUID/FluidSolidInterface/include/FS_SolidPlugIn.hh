@@ -3,7 +3,7 @@
 
 #include <geomVector.hh>
 #include <MAC_assertions.hh>
-#include <solvercomputingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <string>
 #include <sstream>
 using std::string;
@@ -17,7 +17,7 @@ of solid bodies with potential collisions.
 
 @author A. Wachs - Pacific project 2021 */
 
-class FS_SolidPlugIn : public SolverComputingTime
+class FS_SolidPlugIn : public PAC_SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 
@@ -41,12 +41,14 @@ class FS_SolidPlugIn : public SolverComputingTime
       /** @name Virtual methods */
       //@{
       /** @brief Simulation
+      @param time_interval fluid time step
       @param predictor if yes, predictor phase, otherwise corrector phase
       @param isPredictorCorrector is the coupling scheme predictor-corrector
       @param contact_force_coef contact forces coefficient
       @param explicit_added_mass whether to treat added mass (and torque) term
         explicitly */
-      virtual void Simulation( bool const& predictor = true,
+      virtual void Simulation( double const& time_interval,
+      	bool const& predictor = true,
         bool const& isPredictorCorrector = false,
         double const& contact_force_coef = 1.,
         bool const& explicit_added_mass = false ) = 0;

@@ -49,12 +49,14 @@ class FS_Grains3DPlugIn : public FS_SolidPlugIn
       /** @name Methods */
       //@{
       /** @brief Simulation
+      @param time_interval fluid time step
       @param predictor if yes, predictor phase, otherwise corrector phase
       @param isPredictorCorrector is the coupling scheme predictor-corrector
       @param contact_force_coef contact forces coefficient
       @param explicit_added_mass whether to treat added mass (and torque) term
         explicitly */
-      void Simulation( bool const& predictor = true,
+      void Simulation( double const& time_interval,
+      	bool const& predictor = true,
         bool const& isPredictorCorrector = false,
         double const& contact_force_coef = 1.,
         bool const& explicit_added_mass = false );

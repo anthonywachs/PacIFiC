@@ -4,8 +4,8 @@
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
 #include <geomVector.hh>
-#include <computingtime.hh>
-#include <solvercomputingtime.hh>
+#include <PAC_computingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <vector>
 #include <string>
 #include <boolVector.hh>
@@ -39,8 +39,8 @@ struct MPIVar {
    double ***receive;
 };
 
-class DDS_HeatEquation : public FV_OneStepIteration, public ComputingTime,
-public SolverComputingTime
+class DDS_HeatEquation : public FV_OneStepIteration, public PAC_ComputingTime,
+	public PAC_SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 

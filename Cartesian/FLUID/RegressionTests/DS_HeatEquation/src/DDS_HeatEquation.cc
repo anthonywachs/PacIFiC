@@ -31,7 +31,7 @@ DDS_HeatEquation const* DDS_HeatEquation::PROTOTYPE
 DDS_HeatEquation:: DDS_HeatEquation( void )
 //--------------------------------------------------------------------------
    : FV_OneStepIteration( "DDS_HeatEquation" )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
 {
    MAC_LABEL( "DDS_HeatEquation:: DDS_HeatEquation" ) ;
 
@@ -64,7 +64,7 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
    : FV_OneStepIteration( a_owner, dom, exp )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , TF ( dom->discrete_field( "temperature" ) )
    , TF_ERROR( 0 )
    , TF_DS_ERROR( 0 )

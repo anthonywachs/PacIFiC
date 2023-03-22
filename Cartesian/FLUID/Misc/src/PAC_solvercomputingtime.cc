@@ -1,10 +1,10 @@
-#include <solvercomputingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <cstdlib>
 
   
 // ----------------------------------------------------------------------------
 // Default constructor
-SolverComputingTime::SolverComputingTime()
+PAC_SolverComputingTime::PAC_SolverComputingTime()
 {}
 
 
@@ -12,12 +12,12 @@ SolverComputingTime::SolverComputingTime()
 
 // ----------------------------------------------------------------------------
 // Constructor with a list of the application names as input parameter 
-SolverComputingTime::SolverComputingTime( list<string>& all_apps_ )
+PAC_SolverComputingTime::PAC_SolverComputingTime( list<string>& all_apps_ )
 {
   list<string>::iterator il;
   for (il=all_apps_.begin();il!=all_apps_.end();il++)
   {
-    ComputingTime cpt(*il);
+    PAC_ComputingTime cpt(*il);
     m_all_apps.push_back(cpt);
   }  
 }    
@@ -27,7 +27,8 @@ SolverComputingTime::SolverComputingTime( list<string>& all_apps_ )
 
 // ----------------------------------------------------------------------------
 // Copy constructor
-SolverComputingTime::SolverComputingTime( SolverComputingTime const& SCT ) 
+PAC_SolverComputingTime::PAC_SolverComputingTime( 
+	PAC_SolverComputingTime const& SCT ) 
 {}
 
 
@@ -35,7 +36,7 @@ SolverComputingTime::SolverComputingTime( SolverComputingTime const& SCT )
 
 // ----------------------------------------------------------------------------
 // Destructor 
-SolverComputingTime::~SolverComputingTime()
+PAC_SolverComputingTime::~PAC_SolverComputingTime()
 {
   m_all_apps.clear();
 } 
@@ -45,9 +46,9 @@ SolverComputingTime::~SolverComputingTime()
 
 // ----------------------------------------------------------------------------
 // Set start
-void SolverComputingTime::SCT_set_start( string const& app_name_ )       
+void PAC_SolverComputingTime::SCT_set_start( string const& app_name_ )       
 {
-  list<ComputingTime>::iterator il=m_all_apps.begin();
+  list<PAC_ComputingTime>::iterator il=m_all_apps.begin();
   bool found=false;
   
   while( ( il != m_all_apps.end() ) && ( !found ) )
@@ -63,7 +64,7 @@ void SolverComputingTime::SCT_set_start( string const& app_name_ )
   if ( !found )
   { 
     cout << "Wrong application name \"" << app_name_ 
-    	<< "\" in SolverComputingTime::set_start" << endl;
+    	<< "\" in PAC_SolverComputingTime::set_start" << endl;
     cout << "Available applications are :" << endl;
     for (il=m_all_apps.begin();il!=m_all_apps.end();il++)
       cout << "  - " << il->CT_get_app_name() << endl;
@@ -76,9 +77,9 @@ void SolverComputingTime::SCT_set_start( string const& app_name_ )
  
 // ----------------------------------------------------------------------------
 // Get the elapsed time 
-double SolverComputingTime::SCT_get_elapsed_time( string const& app_name_ )
+double PAC_SolverComputingTime::SCT_get_elapsed_time( string const& app_name_ )
 {
-  list<ComputingTime>::iterator il=m_all_apps.begin();
+  list<PAC_ComputingTime>::iterator il=m_all_apps.begin();
   bool found=false;
   double elapsed_time=0.;
   
@@ -94,7 +95,7 @@ double SolverComputingTime::SCT_get_elapsed_time( string const& app_name_ )
   
   if ( !found )
   { 
-    cout << "Wrong application name in SolverComputingTime::"
+    cout << "Wrong application name in PAC_SolverComputingTime::"
     	<< "get_elapsed_time" << endl;
     exit(0);
   }
@@ -107,9 +108,9 @@ double SolverComputingTime::SCT_get_elapsed_time( string const& app_name_ )
 
 // ----------------------------------------------------------------------------
 // Add the elapsed time without incrementing the counter
-void SolverComputingTime::SCT_add_elapsed_time( string const& app_name_ )
+void PAC_SolverComputingTime::SCT_add_elapsed_time( string const& app_name_ )
 {
-  list<ComputingTime>::iterator il=m_all_apps.begin();
+  list<PAC_ComputingTime>::iterator il=m_all_apps.begin();
   bool found=false;
   
   while( ( il != m_all_apps.end() ) && ( !found ) )
@@ -124,7 +125,7 @@ void SolverComputingTime::SCT_add_elapsed_time( string const& app_name_ )
   
   if ( !found )
   { 
-    cout << "Wrong application name in SolverComputingTime::"
+    cout << "Wrong application name in PAC_SolverComputingTime::"
     	<< "get_elapsed_time" << endl;
     exit(0);
   }
@@ -135,10 +136,10 @@ void SolverComputingTime::SCT_add_elapsed_time( string const& app_name_ )
 
 // ----------------------------------------------------------------------------
 // Get the total elapsed time 
-double SolverComputingTime::SCT_get_total_elapsed_time( string const& app_name_ )
+double PAC_SolverComputingTime::SCT_get_total_elapsed_time( string const& app_name_ )
 	const
 {
-  list<ComputingTime>::const_iterator il=m_all_apps.begin();
+  list<PAC_ComputingTime>::const_iterator il=m_all_apps.begin();
   bool found=false;
   double total_elapsed_time=0.;
   
@@ -154,7 +155,7 @@ double SolverComputingTime::SCT_get_total_elapsed_time( string const& app_name_ 
   
   if ( !found )
   { 
-    cout << "Wrong application name in SolverComputingTime::"
+    cout << "Wrong application name in PAC_SolverComputingTime::"
     	<< "get_elapsed_time" << endl;
     exit(0);
   }
@@ -167,10 +168,10 @@ double SolverComputingTime::SCT_get_total_elapsed_time( string const& app_name_ 
     
 // ----------------------------------------------------------------------------
 // Get summary 
-void SolverComputingTime::SCT_get_summary( ostream& f,
+void PAC_SolverComputingTime::SCT_get_summary( ostream& f,
 	double const& solver_total_time ) const
 {
-  list<ComputingTime>::const_iterator il;
+  list<PAC_ComputingTime>::const_iterator il;
   double total_time_apps=0,time_other;
   
   if ( !m_all_apps.empty() )
@@ -212,9 +213,9 @@ void SolverComputingTime::SCT_get_summary( ostream& f,
 
 // ----------------------------------------------------------------------------
 // Insert a new application 
-void SolverComputingTime::SCT_insert_app( string const& app_name_ )
+void PAC_SolverComputingTime::SCT_insert_app( string const& app_name_ )
 {
-  list<ComputingTime>::iterator il=m_all_apps.begin();
+  list<PAC_ComputingTime>::iterator il=m_all_apps.begin();
   bool found=false;
   
   while( ( il != m_all_apps.end() ) && ( !found ) )
@@ -225,7 +226,7 @@ void SolverComputingTime::SCT_insert_app( string const& app_name_ )
   
   if ( !found )
   { 
-    ComputingTime cpt(app_name_);
+    PAC_ComputingTime cpt(app_name_);
     m_all_apps.push_back(cpt);
   }
 }

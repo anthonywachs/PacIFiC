@@ -3,8 +3,8 @@
 
 #include <FV_OneStepIteration.hh>
 #include <geomVector.hh>
-#include <computingtime.hh>
-#include <solvercomputingtime.hh>
+#include <PAC_computingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <REG_ProjNSWithHeatTransferSystem.hh>
 #include <REG_HeatTransfer.hh>
 #include <FV_DiscreteField.hh>
@@ -28,7 +28,7 @@ Solver for the incompressible Newtonian NavierStokes problem with heat transfer.
 @author A. Wachs - Pacific project 2018-2019 */
 
 class REG_ProjNSWithHeatTransfer : public FV_OneStepIteration, 
-public ComputingTime, public SolverComputingTime
+	public PAC_ComputingTime, public PAC_SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 

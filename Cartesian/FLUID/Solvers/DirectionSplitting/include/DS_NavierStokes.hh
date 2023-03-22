@@ -4,9 +4,9 @@
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
 #include <geomVector.hh>
-#include <computingtime.hh>
+#include <PAC_computingtime.hh>
 #include <boolVector.hh>
-#include <solvercomputingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <MAC_DoubleVector.hh>
 #include <DS_PID.hh>
 #include <vector>
@@ -62,9 +62,8 @@ struct MPIVarNS {
    double ***receive;
 };
 
-class DS_NavierStokes : public MAC_Object,
-                        public ComputingTime,
-                        public SolverComputingTime
+class DS_NavierStokes : public MAC_Object, public PAC_ComputingTime,
+	public PAC_SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 

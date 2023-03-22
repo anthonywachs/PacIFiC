@@ -56,7 +56,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
                                    struct DS2NS const& fromDS )
 //---------------------------------------------------------------------------
    : MAC_Object( a_owner )
-	, ComputingTime("Solver")
+	, PAC_ComputingTime("Solver")
    , UF ( fromDS.dom_->discrete_field( "velocity" ) )
    , PF ( fromDS.dom_->discrete_field( "pressure" ) )
    , GLOBAL_EQ( 0 )

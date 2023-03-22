@@ -3,8 +3,8 @@
 
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
-#include <computingtime.hh>
-#include <solvercomputingtime.hh>
+#include <PAC_computingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <DS_NavierStokes.hh>
 #include <DS_HeatTransfer.hh>
 #include <MAC_DoubleVector.hh>
@@ -28,8 +28,7 @@ Server for the intiating the NavierStokes and/or HeatTransfer classes.
 @author A. Goyal - Pacific project 2022 */
 
 class DS_DirectionSplitting : public FV_OneStepIteration,
-                           public ComputingTime,
-                           public SolverComputingTime
+	public PAC_ComputingTime, public PAC_SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 

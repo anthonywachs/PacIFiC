@@ -1,5 +1,5 @@
-#ifndef _SOLVERCOMPUTINGTIME_HH_
-#define _SOLVERCOMPUTINGTIME_HH_
+#ifndef PAC_SOLVERCOMPUTINGTIME_HH_
+#define PAC_SOLVERCOMPUTINGTIME_HH_
 
 #include <string>
 #include <list>
@@ -10,32 +10,32 @@
 #include <sstream>
 #include <utility>
 #include <iomanip>
-#include <computingtime.hh>
+#include <PAC_computingtime.hh>
 using namespace std;
 
 
-/** @brief The class SolverComputingTime.
+/** @brief The class PAC_SolverComputingTime.
 
     Use for the definition of solver computing time (CT) measurements.
 
     @author A.Wachs - Particulate flow project 2003-2005
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================    
-class SolverComputingTime
+class PAC_SolverComputingTime
 {
   public :
     /** @name Constructors */
     //@{  
     /** @brief Default constructor */
-    SolverComputingTime();
+    PAC_SolverComputingTime();
 
     /** @brief Constructor with a list of the application names as input 
     parameter  
     @param all_apps_ list of application names */
-    SolverComputingTime( list<string>& all_apps_ );    
+    PAC_SolverComputingTime( list<string>& all_apps_ );    
 
     /** @brief Destructor */
-    ~SolverComputingTime();        
+    ~PAC_SolverComputingTime();        
     //@}    
 
 
@@ -79,15 +79,15 @@ class SolverComputingTime
   private :
     /** @name Parameters */
     //@{
-    list<ComputingTime> m_all_apps; /**< list of all applications timed in this
-    	solver */
+    list<PAC_ComputingTime> m_all_apps; /**< list of all applications timed in 
+    	this solver */
     //@} 
     	
 
     /** @name Constructors */
     //@{
     /** @brief Copy constructor */
-    SolverComputingTime( SolverComputingTime const& SCT );
+    PAC_SolverComputingTime( PAC_SolverComputingTime const& SCT );
     //@}              
 };
 

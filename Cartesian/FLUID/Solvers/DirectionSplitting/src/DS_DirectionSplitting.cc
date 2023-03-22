@@ -33,7 +33,7 @@ DS_DirectionSplitting const* DS_DirectionSplitting::PROTOTYPE
 DS_DirectionSplitting:: DS_DirectionSplitting( void )
 //--------------------------------------------------------------------------
    : FV_OneStepIteration( "DS_DirectionSplitting" )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
 {
    MAC_LABEL( "DS_DirectionSplitting:: DS_DirectionSplitting" ) ;
 
@@ -66,7 +66,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                                          MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
    : FV_OneStepIteration( a_owner, dom, exp )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , rho( 1. )
    , mu( 1. )
    , kai( 1. )
