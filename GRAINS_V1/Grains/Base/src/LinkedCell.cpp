@@ -1,5 +1,6 @@
 #include "GrainsMPIWrapper.hh"
 #include "AllComponents.hh"
+#include "GrainsBuilderFactory.hh"
 #include "MPINeighbors.hh"
 #include "LinkedCell.hh"
 #include "Cell.hh"
@@ -51,12 +52,24 @@ LinkedCell::~LinkedCell()
 size_t LinkedCell::set( double cellsize_, string const& oshift )
 {
   size_t error = 0;
+  
+  // In 2D, we set the domain size in Z to 2*EPSILON and the origin in Z 
+  // to -EPSILON such that the Z position of the cells is always 0
+  if ( GrainsBuilderFactory::getContext() == DIM_2 )
+  {
+    m_domain_global_origin[Z] = - EPSILON;
+    m_domain_local_origin[Z] = - EPSILON; 
+    m_domain_global_size_Z = 2. * EPSILON;
+    m_domain_local_size_Z = 2. * EPSILON;
+    m_domain_global_periodicity[Z] = false;
+  }
+  
   m_LC_global_origin = m_domain_global_origin;
   m_LC_local_origin = m_domain_local_origin;
 
   // Number of cells and cell edge length in each direction and
   // Default in 1 unique cell if cellsize_ is zero
-  if ( cellsize_ > 1.e-10 )
+  if ( cellsize_ > EPSILON )
   {
     m_nbi = (int)( ( App::m_domain_local_size_X + EPSILON ) / cellsize_);
     if ( !m_nbi ) m_nbi = 1;
@@ -64,35 +77,45 @@ size_t LinkedCell::set( double cellsize_, string const& oshift )
     m_nbj = (int)( ( App::m_domain_local_size_Y + EPSILON ) / cellsize_);
     if ( !m_nbj ) m_nbj = 1;    
     m_cellsize_Y = App::m_domain_local_size_Y / m_nbj ;
-    m_nbk = (int)( ( App::m_domain_local_size_Z + EPSILON ) / cellsize_);
-    m_cellsize_Z = App::m_domain_local_size_Z / m_nbk ;
-    if ( !m_nbk )
+    if ( GrainsBuilderFactory::getContext() == DIM_2 )
     {
       m_nbk = 1;
-      m_cellsize_Z = m_cellsize_Y;
+      m_cellsize_Z = App::m_domain_local_size_Z;
     }
-
-    // Periodicity
-    if ( m_domain_global_periodicity[X] )
+    else
     {
-      m_LC_global_origin.Move( - m_cellsize_X, 0., 0. );
-      m_LC_local_origin.Move( - m_cellsize_X, 0., 0. );
-      m_nbi += 2;
-    }
-    if ( m_domain_global_periodicity[Y] )
-    {
-      m_LC_global_origin.Move( 0., - m_cellsize_Y, 0. );
-      m_LC_local_origin.Move( 0., - m_cellsize_Y, 0. );
-      m_nbj += 2;
-    }
-    if ( m_domain_global_periodicity[Z] )
-    {
-      m_LC_global_origin.Move( 0., 0., - m_cellsize_Z );
-      m_LC_local_origin.Move( 0., 0., - m_cellsize_Z );
-      m_nbk += 2;
+      m_nbk = (int)( ( App::m_domain_local_size_Z + EPSILON ) / cellsize_);
+      if ( !m_nbk ) m_nbk = 1;
+      m_cellsize_Z = App::m_domain_local_size_Z / m_nbk ;
     }
   }
-  else  m_nbi = m_nbj = m_nbk = 1;
+  else  
+  {
+    m_nbi = m_nbj = m_nbk = 1;
+    m_cellsize_X = App::m_domain_local_size_X;
+    m_cellsize_Y = App::m_domain_local_size_Y;    
+    m_cellsize_Z = App::m_domain_local_size_Z;
+  }
+  
+  // Periodicity
+  if ( m_domain_global_periodicity[X] )
+  {
+    m_LC_global_origin.Move( - m_cellsize_X, 0., 0. );
+    m_LC_local_origin.Move( - m_cellsize_X, 0., 0. );
+    m_nbi += 2;
+  }
+  if ( m_domain_global_periodicity[Y] )
+  {
+    m_LC_global_origin.Move( 0., - m_cellsize_Y, 0. );
+    m_LC_local_origin.Move( 0., - m_cellsize_Y, 0. );
+    m_nbj += 2;
+  }
+  if ( m_domain_global_periodicity[Z] )
+  {
+    m_LC_global_origin.Move( 0., 0., - m_cellsize_Z );
+    m_LC_local_origin.Move( 0., 0., - m_cellsize_Z );
+    m_nbk += 2;
+  }      
 
   m_nb = m_nbi * m_nbj * m_nbk;
 
@@ -1611,7 +1634,7 @@ void LinkedCell::Link( Obstacle* obstacle )
     if ( (*myObs)->getMaterial() == "periode" ) alpha = 3.1;
     else alpha = 2.;
     Convex* convexCell = new Box( alpha * m_cellsize_X, alpha * m_cellsize_Y,
-    	alpha * m_cellsize_Z);
+    	alpha * m_cellsize_Z );
     RigidBody CelRigidBody( convexCell, CelPosition );
 
     // Intersection of the cell with the obstacle

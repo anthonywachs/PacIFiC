@@ -222,6 +222,9 @@ class AllComponents
 
     /** @brief Returns a pointer to the map of serial clone particles */
     multimap<int,Particle*>* getPeriodicCloneParticles();
+    
+    /** @brief Returns a pointer to the map of serial clone particles */
+    multimap<int,Particle*> const* getPeriodicCloneParticles() const;    
 
     /** @brief Returns a pointer to the vector of reference particles */
     vector<Particle*>* getReferenceParticles();

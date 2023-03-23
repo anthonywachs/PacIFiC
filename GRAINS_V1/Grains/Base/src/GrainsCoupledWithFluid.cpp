@@ -841,16 +841,22 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
     list<Obstacle*> obstaclesToFluid = m_allcomponents.getObstaclesToFluid();
     ostringstream particles_features;
     list<Particle*>::const_iterator particle, clone;
-    int id = 0, ncorners = 0;
+    int particleIDinFluid = 0, particleID = 0, ncorners = 0;
     size_t nclonesper = 0;
     Vector3 const* vtrans = NULL;
     Vector3 const* vrot = NULL;
     Point3 const* centre = NULL;
     vector<double> inertia( 6, 0. );
-    //double const* inertia = NULL;
     string particleType = "P";
     double density = 0., mass = 0., radius = 0.;
     Matrix mr;
+    multimap<int,Particle*> const* particlesPeriodicClones = 
+    	m_allcomponents.getPeriodicCloneParticles();
+    multimap<int,Particle*>::const_iterator imm;
+    pair < multimap<int,Particle*>::const_iterator,
+  	multimap<int,Particle*>::const_iterator > crange;	
+    Particle* periodic_clone = NULL ;
+    Vector3 periodicVector;
     
     // TO DO: the particle number used to communicate with the fluid is 
     // different from its actual number in Grains. 
@@ -862,8 +868,8 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
       particles_features << particles->size() + obstaclesToFluid.size() << endl;
 
       // Particle features
-      for (particle=particles->begin(), id=0; particle!=particles->end();
-       		particle++, id++)
+      for (particle=particles->begin(), particleIDinFluid=0; 
+      	particle!=particles->end();particle++, particleIDinFluid++)
       {
         if ( (*particle)->getActivity() == COMPUTE
     		&& (*particle)->getTag() < 2 )
@@ -874,15 +880,15 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
           density = (*particle)->getDensity();
           mass = (*particle)->getMass();
           (*particle)->computeInertiaTensorSpaceFixed( inertia );
-	  //inertia = (*particle)->getInertiaTensorBodyFixed();
           radius = (*particle)->getCircumscribedRadius();
           ncorners = (*particle)->getNbCorners();
-          nclonesper = 0; // TO DO
+          particleID = (*particle)->getID();
+	  nclonesper = particlesPeriodicClones->count( particleID ); 
           particleType = "P";
           if ( nclonesper ) particleType = "PP";
           mr = (*particle)->getRigidBody()->getTransform()->getBasis();
 
-          particles_features << id << " " << ncorners << endl;
+          particles_features << particleIDinFluid << " " << ncorners << endl;
           particles_features << particleType << " " <<
 		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
 			(*vtrans)[X] ) << " " << 
@@ -939,7 +945,19 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
 
           if ( particleType == "PP" )
           {
-            // TO DO
+            crange = particlesPeriodicClones->equal_range( particleID );
+	    for (imm=crange.first; imm!=crange.second;imm++)
+	    {
+	      periodic_clone = imm->second;
+              periodicVector = *(periodic_clone->getPosition()) - *centre;
+              particles_features << 
+	      	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			periodicVector[X] ) << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			periodicVector[Y] ) << " " <<				
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			periodicVector[Z] ) << endl;	      
+	    }
           }
 
           particles_features << radius ;
@@ -947,7 +965,7 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
         }
         else
         {
-          particles_features << id << " " << "1" << endl;
+          particles_features << particleIDinFluid << " " << "1" << endl;
           particles_features << "P " <<
 		"0. 0. 0. 0. 0. 0. 1e8 1. " <<
 		"1.  1.  1.  1.  1.  1. " <<

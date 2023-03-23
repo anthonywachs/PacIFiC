@@ -55,7 +55,7 @@ ConvexType Disc::getConvexType() const
 bool Disc::BuildInertia( double* inertia, double* inertia_1 ) const
 {
   // Active 2D plane is XY -> rotation around Z
-  inertia[1] = inertia[2] = inertia[4]= 0.0;
+  inertia[1] = inertia[2] = inertia[4]= 0.;
   inertia[0] = inertia[3] = PI * pow( m_radius, 4. ) / 4.;
   inertia[5] = PI * pow( m_radius, 4. ) / 2.;
   

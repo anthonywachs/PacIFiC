@@ -1067,27 +1067,28 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  {
 	    // Random particle positions from a collection of insertion windows
 	    DOMNode* nWindows = ReaderXML::getNode( nPosition, "Windows" );
-      if ( nWindows )
+            if ( nWindows )
 	    {
 	      cout << GrainsExec::m_shift9 << "Insertion windows" << endl;
 	      DOMNodeList* allWindows = ReaderXML::getNodes( nWindows );
-        for (XMLSize_t i=0; i<allWindows->getLength(); i++)
+              for (XMLSize_t i=0; i<allWindows->getLength(); i++)
 	      {
 	        DOMNode* nWindow = allWindows->item( i );
-          Window iwindow;
+                Window iwindow;
 		      readWindow( nWindow, iwindow, GrainsExec::m_shift12 );
-	        m_insertion_windows.insert( m_insertion_windows.begin(), iwindow );
-        }
+	        m_insertion_windows.insert( m_insertion_windows.begin(), 
+			iwindow );
+              }
 	    }
-      else
+            else
 	    {
-        if ( m_insertion_mode != IM_NOINSERT )
-        {
-          if ( m_rank == 0 )
-            cout << GrainsExec::m_shift6 <<
+              if ( m_insertion_mode != IM_NOINSERT )
+              {
+                if ( m_rank == 0 )
+                  cout << GrainsExec::m_shift6 <<
             "Insertion positions or windows are mandatory !!" << endl;
-          grainsAbort();
-        }
+                grainsAbort();
+              }
 	    }
 	  }
   }

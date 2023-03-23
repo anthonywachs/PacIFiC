@@ -484,6 +484,16 @@ multimap<int,Particle*>* AllComponents::getPeriodicCloneParticles()
 
 
 // ----------------------------------------------------------------------------
+// Returns a pointer to the map of serial clone particles */
+multimap<int,Particle*> const* AllComponents::getPeriodicCloneParticles() const
+{
+  return ( &m_PeriodicCloneParticles );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns a pointer to the vector of reference particles
 vector<Particle*>* AllComponents::getReferenceParticles()
 {
