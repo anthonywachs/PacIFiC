@@ -148,8 +148,7 @@ double Disc::getVolume()const
 // Output operator
 void Disc::writeShape( ostream& fileOut ) const 
 {
-  fileOut << "*Disc\n";
-  fileOut << m_radius << endl;  
+  fileOut << "*Disc " << m_radius << " *END";   
 }
 
 

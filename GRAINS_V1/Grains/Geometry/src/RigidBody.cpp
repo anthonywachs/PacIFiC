@@ -451,7 +451,9 @@ void RigidBody::writePositionInFluid( ostream& fluid )
       fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
 		pointEnvelop[X] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Y] ) << endl;
+		pointEnvelop[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelop[Z] ) << endl;		
     }
   }
 
