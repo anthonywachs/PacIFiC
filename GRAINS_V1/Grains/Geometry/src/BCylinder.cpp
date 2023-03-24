@@ -121,7 +121,7 @@ ostream& operator << ( ostream& f, BCylinder const& B )
 // ----------------------------------------------------------------------------
 // Sign function
 template < typename T >
-inline int sgn( T val )
+inline int sgn( T const val )
 {
     return ( ( T(0) < val ) - ( val < T(0) ) );
 }
@@ -131,7 +131,7 @@ inline int sgn( T val )
 
 // ----------------------------------------------------------------------------
 // Returns the norm of a Point3 object in the xy-plane
-inline double normXY( Point3 x )
+inline double normXY( Point3 const& x )
 {
   return ( x[X]*x[X] + x[Y]*x[Y] );
 }
@@ -141,7 +141,7 @@ inline double normXY( Point3 x )
 
 // ----------------------------------------------------------------------------
 // Returns the dot product of two Vector3 objects in the xy-plane
-inline double dotXY( Vector3 x, Vector3 y )
+inline double dotXY( Vector3 const& x, Vector3 const& y )
 {
   return ( x[X]*y[X] + x[Y]*y[Y] );
 }
@@ -408,7 +408,7 @@ bool isContact( BCylinder const& a, BCylinder const& b,
     // Vector3 r = ( e_B2A ^ ( e_B2A ^ zAxis ) ).normalized();
     // r = sgn( x_B2A[Z] ) * ( rB * r - hB * sgn( e_B2A[Z] ) * e_B2A );
     Vector3 r = sgn( -x_B2A[Z] ) * ( rB * v1 + hB * sgn( e_B2A[Z] ) * e_B2A );
-    Point3 ptE = x_B2A + r;
+    Point3 const& ptE = x_B2A + r;
     if ( ( fabs( ptE[Z] ) < hA ) && ( normXY( ptE ) < rA * rA ) )
       return ( true );
   }
@@ -429,7 +429,7 @@ bool isContact( BCylinder const& a, BCylinder const& b,
   if ( d < rA + rB )
   {
     double lBStar = ( e_B2A[Z] * x_B2A[Z] - e_B2A * x_B2A )
-                    / ( 1 - e_B2A[Z]*e_B2A[Z] );
+                    / ( 1. - e_B2A[Z]*e_B2A[Z] );
     if ( fabs( lBStar ) < hB )
     {
       double lAStar = x_B2A[Z] + lBStar * e_B2A[Z];
@@ -503,7 +503,7 @@ bool isContact( BCylinder const& a, BCylinder const& b,
 
       for ( int i = 0; i < nbRoots; i++ )
       {
-        if ( fabs( sint[i] ) <= 1 )
+        if ( fabs( sint[i] ) <= 1. )
         {
           double cost = ( s/2. - r*sint[i] - sint[i]*sint[i] ) / q;
           double zVal = ptCenter[Z] + rB * cost * u1[Z] + rB * sint[i] * v1[Z];
