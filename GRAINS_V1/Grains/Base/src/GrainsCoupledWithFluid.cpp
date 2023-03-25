@@ -347,7 +347,7 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
     
     // Maximum circumscribed radius of particles
     double maxR = m_allcomponents.getCircumscribedRadiusMax();
-    if ( maxR < 1.e-12 ) grainsAbort();
+    if ( maxR < 1.e-12 ) maxR = 1.e16;
     else if ( m_rank == 0 ) 
       cout << GrainsExec::m_shift9 << "Maximum circumscribed particle radius = "
       	<< maxR << endl; 
@@ -575,14 +575,14 @@ void GrainsCoupledWithFluid::AdditionalFeatures( DOMElement* rootElement )
 	  ObstacleImposedForce* load = new ObstacleImposedForce(
 	      nOL, m_dt, m_rank, error );
 	  if ( error != 0 ) grainsAbort();    
-	  else m_allcomponents.LinkImposedMotion( *load );
+	  else m_allcomponents.LinkImposedMotion( load );
 	}
 	else if ( type == "Velocity" )
 	{
 	  ObstacleImposedVelocity* load = new ObstacleImposedVelocity( 
 	  	nOL, m_dt, m_rank, error );
 	  if ( error != 0 ) grainsAbort();    
-	  else m_allcomponents.LinkImposedMotion( *load );	  
+	  else m_allcomponents.LinkImposedMotion( load );	  
 	}
 	else
         {
@@ -841,7 +841,7 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
     list<Obstacle*> obstaclesToFluid = m_allcomponents.getObstaclesToFluid();
     ostringstream particles_features;
     list<Particle*>::const_iterator particle, clone;
-    int particleIDinFluid = 0, particleID = 0, ncorners = 0;
+    int componentIDinFluid = 0, particleID = 0, ncorners = 0;
     size_t nclonesper = 0;
     Vector3 const* vtrans = NULL;
     Vector3 const* vrot = NULL;
@@ -866,8 +866,8 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
     particles_features << particles->size() + obstaclesToFluid.size() << endl;
 
     // Particle features
-    for (particle=particles->begin(), particleIDinFluid=0; 
-      	particle!=particles->end();particle++, particleIDinFluid++)
+    for (particle=particles->begin(), componentIDinFluid=0; 
+      	particle!=particles->end();particle++, componentIDinFluid++)
     {
       if ( (*particle)->getActivity() == COMPUTE
     		&& (*particle)->getTag() < 2 )
@@ -886,7 +886,7 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
         if ( nclonesper ) particleType = "PP";
         mr = (*particle)->getRigidBody()->getTransform()->getBasis();
 
-        particles_features << particleIDinFluid << " " << ncorners << endl;
+        particles_features << componentIDinFluid << " " << ncorners << endl;
         particles_features << particleType << " " <<
 		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
 			(*vtrans)[X] ) << " " << 
@@ -963,7 +963,7 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
       }
       else
       {
-        particles_features << particleIDinFluid << " " << "1" << endl;
+        particles_features << componentIDinFluid << " " << "1" << endl;
         particles_features << "P " <<
 		"0. 0. 0. 0. 0. 0. 1e8 1. " <<
 		"1.  1.  1.  1.  1.  1. " <<
@@ -976,7 +976,61 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
     }
 
     // Obstacles to be sent to the fluid
-    // TO DO
+    list<Obstacle*>::const_iterator obst;
+    string obstacleType = "O";
+    for (obst=obstaclesToFluid.begin();obst!=obstaclesToFluid.end();obst++,
+    	componentIDinFluid++)
+    {
+      vtrans = (*obst)->getTranslationalVelocity();
+      vrot = (*obst)->getAngularVelocity();
+      centre = (*obst)->getPosition();
+      radius = (*obst)->getCircumscribedRadius();
+      ncorners = (*obst)->getRigidBody()->getConvex()->getNbCorners();
+      mr = (*obst)->getRigidBody()->getTransform()->getBasis();
+
+      particles_features << componentIDinFluid << " " << ncorners << endl;
+      particles_features << obstacleType << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vtrans)[X] ) << " " << 
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vtrans)[Y] ) << " " << 			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vtrans)[Z] ) << " " << 			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vrot)[X] ) << " " << 
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vrot)[Y] ) << " " << 			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vrot)[Z] ) << " " << 
+		"1000. 0. 0. 0. 0. 0. 0. 0. " <<		
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[X][X] ) << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[X][Y] ) << " " <<			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[X][Z] ) << " " <<	
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Y][X] ) << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Y][Y] ) << " " <<			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Y][Z] ) << " " <<			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Z][X] ) << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Z][Y] ) << " " <<			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Z][Z] ) << " " <<			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*centre)[X] ) << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*centre)[Y] ) << " " <<				
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*centre)[Z] ) << endl;			
+
+      particles_features << radius ;
+      (*obst)->writePositionInFluid( particles_features );    
+    }
 
     // Transfer from oss to iss
     is.str( particles_features.rdbuf()->str() );     

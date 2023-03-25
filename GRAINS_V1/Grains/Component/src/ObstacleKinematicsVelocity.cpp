@@ -27,17 +27,17 @@ ObstacleKinematicsVelocity::~ObstacleKinematicsVelocity()
 
 // ----------------------------------------------------------------------------
 // Adds an imposed velocity motion to the obstacle kinematics
-void ObstacleKinematicsVelocity::append( ObstacleImposedVelocity& chargement )
+void ObstacleKinematicsVelocity::append( ObstacleImposedVelocity* chargement )
 {
   if ( m_imposedVelocities.empty( ))
-    m_imposedVelocities.push_back(&chargement);
+    m_imposedVelocities.push_back( chargement );
   else 
   {
     list<ObstacleImposedVelocity*>::iterator c;
     for (c=m_imposedVelocities.begin(); 
-    	c!=m_imposedVelocities.end() && **c<chargement; c++)
+    	c!=m_imposedVelocities.end() && **c<*chargement; c++)
       {}
-    m_imposedVelocities.insert(c, &chargement);
+    m_imposedVelocities.insert( c, chargement );
   }
 }
 

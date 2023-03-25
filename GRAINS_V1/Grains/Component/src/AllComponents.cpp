@@ -62,7 +62,10 @@ AllComponents::~AllComponents()
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
     delete *pp;
   m_postProcessors.clear();
-
+ 
+  // Note: the loadings are destroyed by the destructors of the classes
+  // ObstacleKinematicsVelocity and ObstacleKinematicsForce
+  // Hence we are free the lists here but do not destroy the pointed objects
   m_AllImposedVelocitiesOnObstacles.clear();
   m_AllImposedForcesOnObstacles.clear();
 }
@@ -123,7 +126,7 @@ void AllComponents::AddParticle( Particle* particle )
 
 // ----------------------------------------------------------------------------
 // Adds a reference particle
-void AllComponents::AddReferenceParticle( Particle *particle )
+void AllComponents::AddReferenceParticle( Particle* particle )
 {
   m_ReferenceParticles.reserve( m_ReferenceParticles.size() + 1 );
   m_ReferenceParticles.push_back( particle );
@@ -145,10 +148,10 @@ void AllComponents::AddObstacle( Obstacle* obstacle_ )
 
 // ----------------------------------------------------------------------------
 // Associates the imposed velocity to the obstacle
-void AllComponents::LinkImposedMotion( ObstacleImposedVelocity &impvel )
+void AllComponents::LinkImposedMotion( ObstacleImposedVelocity* impvel )
 {
   m_obstacle->LinkImposedMotion( impvel );
-  m_AllImposedVelocitiesOnObstacles.push_back( &impvel );
+  m_AllImposedVelocitiesOnObstacles.push_back( impvel );
 }
 
 
@@ -156,10 +159,10 @@ void AllComponents::LinkImposedMotion( ObstacleImposedVelocity &impvel )
 
 // ----------------------------------------------------------------------------
 // Associates the imposed velocity to the obstacle
-void AllComponents::LinkImposedMotion( ObstacleImposedForce &load )
+void AllComponents::LinkImposedMotion( ObstacleImposedForce* load )
 {
   m_obstacle->LinkImposedMotion( load );
-  m_AllImposedForcesOnObstacles.push_back( &load );
+  m_AllImposedForcesOnObstacles.push_back( load );
 }
 
 
@@ -535,7 +538,7 @@ double AllComponents::getCircumscribedRadiusMax()
   	particle!=m_ReferenceParticles.end(); particle++)
   {
     radius = (*particle)->getCircumscribedRadius();
-    radiusMax = radiusMax > radius ? radiusMax : radius;
+    radiusMax = max( radiusMax, radius );
   }
 
   return ( radiusMax );

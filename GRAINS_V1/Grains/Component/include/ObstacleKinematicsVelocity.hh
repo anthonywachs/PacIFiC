@@ -40,7 +40,7 @@ class ObstacleKinematicsVelocity : public Kinematics
     //@{
     /** @brief Adds an imposed velocity motion to the obstacle kinematics
     @param chargement the imposed velocity motion */
-    void append( ObstacleImposedVelocity& chargement );
+    void append( ObstacleImposedVelocity* chargement );
 
     /** @brief Composes the obstacle kinematics with another "higher level"
     velocity kinematics

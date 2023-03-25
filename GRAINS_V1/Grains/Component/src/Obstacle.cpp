@@ -51,10 +51,10 @@ Obstacle::~Obstacle()
 // ----------------------------------------------------------------------------
 // Links imposed kinematics to the obstacle and returns true if the
 // linking process is successful
-bool Obstacle::LinkImposedMotion( ObstacleImposedVelocity& imposed )
+bool Obstacle::LinkImposedMotion( ObstacleImposedVelocity* imposed )
 {
   bool status = false;
-  if ( m_name == imposed.getNom() )
+  if ( m_name == imposed->getNom() )
   {
     m_kinematics.append( imposed );
     status = true;
@@ -79,10 +79,10 @@ Torsor const* Obstacle::getTorsor()
 // ----------------------------------------------------------------------------
 // Links imposed kinematics to the obstacle and returns true if the
 // linking process is successful
-bool Obstacle::LinkImposedMotion( ObstacleImposedForce& imposed )
+bool Obstacle::LinkImposedMotion( ObstacleImposedForce* imposed )
 {
   bool status = false;
-  if ( m_name == imposed.getNom() )
+  if ( m_name == imposed->getNom() )
   {
     m_confinement.append( imposed );
     Obstacle::m_isConfinement = status = true;

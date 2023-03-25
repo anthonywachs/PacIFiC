@@ -51,10 +51,9 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
   ContactBuilderFactory::defineMaterial( m_materialName, true );
 
   // Obstacle to transfer to the fluid
-  DOMNode* statut = ReaderXML::getNode( root, "Statut" );
-  if ( statut )
-    m_transferToFluid = ReaderXML::getNodeAttr_Int( statut, "ToFluid" );
-
+  DOMNode* status = ReaderXML::getNode( root, "Status" );
+  if ( status )
+    m_transferToFluid = ReaderXML::getNodeAttr_Int( status, "ToFluid" );
 
   m_obstacleBox = Component::BoundingBox();
   m_LinkUpdate_frequency = 1;

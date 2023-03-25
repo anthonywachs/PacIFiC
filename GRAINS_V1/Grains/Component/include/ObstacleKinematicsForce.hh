@@ -35,7 +35,7 @@ class ObstacleKinematicsForce : public Kinematics
     //@{
     /** @brief Adds an imposed force load to the obstacle kinematics
     @param chargement the imposed force load */
-    void append( ObstacleImposedForce& chargement );
+    void append( ObstacleImposedForce* chargement );
 
     /** @brief Composes the obstacle kinematics with another "higher level"
     force kinematics

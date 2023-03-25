@@ -72,10 +72,10 @@ void CompositeObstacle::append( Obstacle* obstacle )
 // ----------------------------------------------------------------------------
 // Links imposed kinematics to the obstacle and returns true if the
 // linking process is successful
-bool CompositeObstacle::LinkImposedMotion( ObstacleImposedVelocity& imposed )
+bool CompositeObstacle::LinkImposedMotion( ObstacleImposedVelocity* imposed )
 {
   bool status = false;
-  if ( m_name == imposed.getNom() ) 
+  if ( m_name == imposed->getNom() ) 
   {
     m_kinematics.append( imposed );
     status = true;
@@ -96,10 +96,10 @@ bool CompositeObstacle::LinkImposedMotion( ObstacleImposedVelocity& imposed )
 // ----------------------------------------------------------------------------
 // Links imposed force kinematics to the obstacle and returns true 
 // if the linking process is successful
-bool CompositeObstacle::LinkImposedMotion( ObstacleImposedForce& imposed )
+bool CompositeObstacle::LinkImposedMotion( ObstacleImposedForce* imposed )
 {
   bool status = false;
-  if ( m_name == imposed.getNom() ) 
+  if ( m_name == imposed->getNom() ) 
   {
     m_confinement.append( imposed );
     status = true;

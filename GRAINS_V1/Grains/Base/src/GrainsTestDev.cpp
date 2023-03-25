@@ -993,14 +993,14 @@ void GrainsTestDev::AdditionalFeatures( DOMElement* rootElement )
 	  ObstacleImposedForce* load = new ObstacleImposedForce(
 	      nOL, m_dt, m_rank, error );
 	  if ( error != 0 ) grainsAbort();
-	  else m_allcomponents.LinkImposedMotion( *load );
+	  else m_allcomponents.LinkImposedMotion( load );
 	}
 	else if ( type == "Velocity" )
 	{
 	  ObstacleImposedVelocity* load = new ObstacleImposedVelocity(
 	  	nOL, m_dt, m_rank, error );
 	  if ( error != 0 ) grainsAbort();
-	  else m_allcomponents.LinkImposedMotion( *load );
+	  else m_allcomponents.LinkImposedMotion( load );
 	}
 	else
         {

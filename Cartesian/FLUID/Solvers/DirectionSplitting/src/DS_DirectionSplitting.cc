@@ -428,7 +428,17 @@ DS_DirectionSplitting:: do_one_inner_iteration( FV_TimeIterator const* t_it )
       stop_solving_timer() ;
       stop_total_timer() ;
    }
+   
+   // Rigid body motion
+   if ( is_GRAINS ) 
+   {
+     // Compute the trajectory of particles with collisions in Grains3D
+     solidSolver->Simulation( t_it->time_step(), true, false, 1., false );   
 
+     // Update the rigid components positions in the fluid
+     solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+     allrigidbodies->update( *solidFluid_transferStream );
+   }
 }
 
 

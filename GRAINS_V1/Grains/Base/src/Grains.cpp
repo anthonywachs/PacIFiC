@@ -642,7 +642,7 @@ void Grains::Construction( DOMElement* rootElement )
 
     // Maximum circumscribed radius of particles
     double maxR = m_allcomponents.getCircumscribedRadiusMax();
-    if ( maxR < 1.e-12 ) grainsAbort();
+    if ( maxR < 1.e-12 ) maxR = 1.e16;
     else if ( m_rank == 0 )
       cout << GrainsExec::m_shift9 << "Maximum circumscribed particle radius = "
       	<< maxR << endl;
@@ -1218,14 +1218,14 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  ObstacleImposedForce* load = new ObstacleImposedForce(
 	      nOL, m_dt, m_rank, error );
 	  if ( error != 0 ) grainsAbort();
-	  else m_allcomponents.LinkImposedMotion( *load );
+	  else m_allcomponents.LinkImposedMotion( load );
 	}
 	else if ( type == "Velocity" )
 	{
 	  ObstacleImposedVelocity* load = new ObstacleImposedVelocity(
 	  	nOL, m_dt, m_rank, error );
 	  if ( error != 0 ) grainsAbort();
-	  else m_allcomponents.LinkImposedMotion( *load );
+	  else m_allcomponents.LinkImposedMotion( load );
 	}
 	else
         {

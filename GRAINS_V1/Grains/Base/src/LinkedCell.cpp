@@ -71,10 +71,10 @@ size_t LinkedCell::set( double cellsize_, string const& oshift )
   // Default in 1 unique cell if cellsize_ is zero
   if ( cellsize_ > EPSILON )
   {
-    m_nbi = (int)( ( App::m_domain_local_size_X + EPSILON ) / cellsize_);
+    m_nbi = (int)( ( App::m_domain_local_size_X + EPSILON ) / cellsize_ );
     if ( !m_nbi ) m_nbi = 1;
     m_cellsize_X = App::m_domain_local_size_X / m_nbi ;
-    m_nbj = (int)( ( App::m_domain_local_size_Y + EPSILON ) / cellsize_);
+    m_nbj = (int)( ( App::m_domain_local_size_Y + EPSILON ) / cellsize_ );
     if ( !m_nbj ) m_nbj = 1;    
     m_cellsize_Y = App::m_domain_local_size_Y / m_nbj ;
     if ( GrainsBuilderFactory::getContext() == DIM_2 )

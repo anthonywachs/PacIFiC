@@ -132,6 +132,8 @@ void FS_Grains3DPlugIn:: getSolidBodyFeatures( istringstream* & is )
   if ( m_Grains3D_active_on_this_rank )
     m_Grains3D->GrainsToFluid( *is ); 
     
+//  cout << is->str() << endl;  
+    
   // If Grains3D runs in serial and the fluid runs in parallel, we need
   // to broadcast the solid body features stream to all processes
   if ( !m_Grains3D_parallel_mode )
