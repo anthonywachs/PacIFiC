@@ -615,10 +615,10 @@ void ParaviewPostProcessingWriter::one_output(
         list<string> ptVec;
         ptVec.push_back("Orientation");
         writePVTU_Paraview( partFilename, &ptVec, &Scalars, 
-	 	&empty_string_list );
+	 	&empty_string_list );	
       }       	
-      writePVTU_Paraview( partFilename, &empty_string_list, &empty_string_list,
-       	&Scalars );
+      else writePVTU_Paraview( partFilename, &empty_string_list, 
+      	&empty_string_list, &Scalars );
     }
 
     // Does this processor write data ?

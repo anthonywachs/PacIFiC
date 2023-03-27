@@ -842,7 +842,7 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
     ostringstream particles_features;
     list<Particle*>::const_iterator particle, clone;
     int componentIDinFluid = 0, particleID = 0, ncorners = 0;
-    size_t nclonesper = 0;
+    size_t nclonesper = 0, nparticles = 0;
     Vector3 const* vtrans = NULL;
     Vector3 const* vrot = NULL;
     Point3 const* centre = NULL;
@@ -861,33 +861,36 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
     // TO DO: the particle number used to communicate with the fluid is 
     // different from its actual number in Grains. 
     // This needs to be fixed in the future 
+    for (particle=particles->begin();particle!=particles->end();particle++)
+      if ( (*particle)->getTag() < 2 ) nparticles++;	          
     
     // Total number of rigid bodies to send to the fluid flow solver
-    particles_features << particles->size() + obstaclesToFluid.size() << endl;
+    particles_features << nparticles + obstaclesToFluid.size() << endl;
 
     // Particle features
     for (particle=particles->begin(), componentIDinFluid=0; 
-      	particle!=particles->end();particle++, componentIDinFluid++)
+      	particle!=particles->end();particle++)
     {
-      if ( (*particle)->getActivity() == COMPUTE
-    		&& (*particle)->getTag() < 2 )
-      {
-        vtrans = (*particle)->getTranslationalVelocity();
-        vrot = (*particle)->getAngularVelocity();
-        centre = (*particle)->getPosition();
-        density = (*particle)->getDensity();
-        mass = (*particle)->getMass();
-        (*particle)->computeInertiaTensorSpaceFixed( inertia );
-        radius = (*particle)->getCircumscribedRadius();
-        ncorners = (*particle)->getNbCorners();
-        particleID = (*particle)->getID();
-	nclonesper = particlesPeriodicClones->count( particleID ); 
-        particleType = "P";
-        if ( nclonesper ) particleType = "PP";
-        mr = (*particle)->getRigidBody()->getTransform()->getBasis();
+      if ( (*particle)->getTag() < 2 ) 
+      {     
+        if ( (*particle)->getActivity() == COMPUTE )      
+        {        
+	  vtrans = (*particle)->getTranslationalVelocity();
+          vrot = (*particle)->getAngularVelocity();
+          centre = (*particle)->getPosition();
+          density = (*particle)->getDensity();
+          mass = (*particle)->getMass();
+          (*particle)->computeInertiaTensorSpaceFixed( inertia );
+          radius = (*particle)->getCircumscribedRadius();
+          ncorners = (*particle)->getNbCorners();
+          particleID = (*particle)->getID();
+	  nclonesper = particlesPeriodicClones->count( particleID ); 
+          particleType = "P";
+          if ( nclonesper ) particleType = "PP";
+          mr = (*particle)->getRigidBody()->getTransform()->getBasis();
 
-        particles_features << componentIDinFluid << " " << ncorners << endl;
-        particles_features << particleType << " " <<
+          particles_features << componentIDinFluid << " " << ncorners << endl;
+          particles_features << particleType << " " <<
 		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
 			(*vtrans)[X] ) << " " << 
 		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
@@ -941,37 +944,41 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
 		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
 			(*centre)[Z] ) << endl;			
 
-        if ( particleType == "PP" )
-        {
-          crange = particlesPeriodicClones->equal_range( particleID );
-	  for (imm=crange.first; imm!=crange.second;imm++)
-	  {
-	    periodic_clone = imm->second;
-            periodicVector = *(periodic_clone->getPosition()) - *centre;
-            particles_features << 
+          if ( particleType == "PP" )
+          {
+            particles_features << nclonesper << endl;
+	    crange = particlesPeriodicClones->equal_range( particleID );
+	    for (imm=crange.first; imm!=crange.second;imm++)
+	    {
+	      periodic_clone = imm->second;
+              periodicVector = *(periodic_clone->getPosition()) - *centre;
+              particles_features << 
 	      	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
 			periodicVector[X] ) << " " <<
 		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
 			periodicVector[Y] ) << " " <<				
 		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
 			periodicVector[Z] ) << endl;	      
-	  }
-        }
+	    }
+          }
 
-        particles_features << radius ;
-        (*particle)->writePositionInFluid( particles_features );
-      }
-      else
-      {
-        particles_features << componentIDinFluid << " " << "1" << endl;
-        particles_features << "P " <<
+          particles_features << radius ;
+          (*particle)->writePositionInFluid( particles_features );
+        }
+        else
+        {
+          particles_features << componentIDinFluid << " " << "1" << endl;
+          particles_features << "P " <<
 		"0. 0. 0. 0. 0. 0. 1e8 1. " <<
 		"1.  1.  1.  1.  1.  1. " <<
 		"1. 0. 0. 0. 1. 0. 0. 0. 1." 
 		"0. 0. 0. " << endl;
-        particles_features << "0.  1"     << endl;
-        particles_features << "0. 0. 0." << endl;
-	particles_features << "0" << endl;
+          particles_features << "0.  1"     << endl;
+          particles_features << "0. 0. 0." << endl;
+	  particles_features << "0" << endl;
+        }
+      
+        componentIDinFluid++;
       }
     }
 

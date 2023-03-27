@@ -974,7 +974,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
       	( m_force_insertion  ? "True" : "False" ) << endl;
 
 
-      // Particle positions via a external file OR a structured array OR a
+      // Particle positions via an external file OR a structured array OR a
       // collection of insertion windows, in this order of priority
       // Remark: these 3 modes cannot be combined
       DOMNode* nPosition = ReaderXML::getNode( nInsertion, "ParticlePosition" );
