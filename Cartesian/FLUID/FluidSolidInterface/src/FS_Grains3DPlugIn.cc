@@ -172,3 +172,18 @@ void FS_Grains3DPlugIn:: saveResults( string const& filename,
   ++counter;
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_Grains3DPlugIn:: transferHydroFTtoSolid( 
+      	vector< vector<double> > const* hydroFT ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Grains3DPlugIn:: transferHydroFTtoSolid" ) ;
+  
+  if ( m_Grains3D_active_on_this_rank )
+    m_Grains3D->updateParticlesHydroFT( hydroFT );
+  
+}  

@@ -6577,3 +6577,32 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
   return (value);
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+void
+DS_AllRigidBodies::copyHydroFT( vector< vector<double> >* hydroFT )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies::copyHydroFT" ) ;
+
+  for (size_t i = 0; i < m_npart; ++i) 
+  {
+     (*hydroFT)[i][0] = pressure_force->operator()(i,0) 
+     	+ viscous_force->operator()(i,0);
+     (*hydroFT)[i][1] = pressure_force->operator()(i,1) 
+     	+ viscous_force->operator()(i,1);
+     (*hydroFT)[i][2] = pressure_force->operator()(i,2) 
+     	+ viscous_force->operator()(i,2);
+
+     (*hydroFT)[i][3] = pressure_torque->operator()(i,0) 
+     	+ viscous_torque->operator()(i,0);
+     (*hydroFT)[i][4] = pressure_torque->operator()(i,1) 
+     	+ viscous_torque->operator()(i,1);
+     (*hydroFT)[i][5] = pressure_torque->operator()(i,2) 
+     	+ viscous_torque->operator()(i,2);
+  }
+
+}

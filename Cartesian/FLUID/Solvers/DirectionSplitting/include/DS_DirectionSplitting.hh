@@ -159,6 +159,7 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       istringstream* solidFluid_transferStream;
       DS_AllRigidBodies* allrigidbodies;
       bool b_particles_as_fixed_obstacles;
+      vector< vector<double> >* hydroFT;
 
       double critical_distance_translation;
 

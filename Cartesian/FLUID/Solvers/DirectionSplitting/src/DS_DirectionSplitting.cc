@@ -94,6 +94,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , HeatSolver ( 0 )
    , allrigidbodies ( 0 )
    , b_particles_as_fixed_obstacles( true )
+   , hydroFT( NULL )
 {
    MAC_LABEL( "DS_DirectionSplitting:: DS_DirectionSplitting" ) ;
 
@@ -228,19 +229,20 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 
       // Cases for non-moving rigib bodies but non-zero velocity
       if (!is_par_motion && exp->has_entry( "Particles_as_fixed_obstacles" ) ) {
-         b_particles_as_fixed_obstacles = exp->bool_data( "Particles_as_fixed_obstacles" );
+         b_particles_as_fixed_obstacles = exp->bool_data( 
+	 	"Particles_as_fixed_obstacles" );
       }
 
       // Critical distance
       if ( dom->primary_grid()->is_translation_active() ) {
         if ( exp->has_entry( "Critical_Distance_Translation" ) )
            critical_distance_translation= exp->double_data(
-             										"Critical_Distance_Translation" );
+		"Critical_Distance_Translation" );
         else {
            string error_message=" Projection-Translation is active but ";
            error_message+="Critical_Distance_Translation is NOT defined.";
            MAC_Error::object()->raise_bad_data_value( exp,
-              							 "Projection_Translation", error_message );
+		"Projection_Translation", error_message );
         }
       }
 
@@ -396,6 +398,7 @@ DS_DirectionSplitting:: ~DS_DirectionSplitting( void )
       if ( solidSolver ) delete solidSolver;
       if ( solidFluid_transferStream ) delete solidFluid_transferStream;
       if ( allrigidbodies ) delete allrigidbodies;
+      if ( hydroFT ) delete hydroFT; 
    }
 
 }
@@ -429,16 +432,16 @@ DS_DirectionSplitting:: do_one_inner_iteration( FV_TimeIterator const* t_it )
       stop_total_timer() ;
    }
    
-   // Rigid body motion
-   if ( is_GRAINS ) 
-   {
-     // Compute the trajectory of particles with collisions in Grains3D
-     solidSolver->Simulation( t_it->time_step(), true, false, 1., false );   
-
-     // Update the rigid components positions in the fluid
-     solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
-     allrigidbodies->update( *solidFluid_transferStream );
-   }
+//    // Rigid body motion
+//    if ( is_GRAINS ) 
+//    {
+//      // Compute the trajectory of particles with collisions in Grains3D
+//      solidSolver->Simulation( t_it->time_step(), true, false, 1., false );   
+// 
+//      // Update the rigid components positions in the fluid
+//      solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+//      allrigidbodies->update( *solidFluid_transferStream );
+//    }
 }
 
 
@@ -574,7 +577,36 @@ DS_DirectionSplitting:: do_after_inner_iterations_stage(
    if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0))
       allrigidbodies->write_force_and_flux_summary(t_it, b_restart);
 
+   // Rigid body motion
+   if ( is_GRAINS ) 
+   {
+     // Send hydro force and torque to Grains3D
+     if ( is_par_motion )
+     {  
+       // Allocate array if empty
+       if ( !hydroFT )
+       {
+         size_t npart = allrigidbodies->get_number_particles();
+	 vector<double> work( 6, 0. );
+	 hydroFT = new vector< vector<double> >;
+	 hydroFT->reserve( npart );
+	 for (size_t k=0;k<npart;++k) hydroFT->push_back( work );	 
+       }
+       
+       // Fill the hydro force and torque array
+       allrigidbodies->copyHydroFT( hydroFT );
+       
+       // Transfer to Grains3D
+       solidSolver->transferHydroFTtoSolid( hydroFT );
+     }
+     
+     // Compute the trajectory of particles with collisions in Grains3D
+     solidSolver->Simulation( t_it->time_step(), true, false, 1., false );   
 
+     // Update the rigid components positions in the fluid
+     solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+     allrigidbodies->update( *solidFluid_transferStream );
+   }
 }
 
 

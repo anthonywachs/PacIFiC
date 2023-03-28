@@ -16,6 +16,7 @@ GrainsCoupledWithFluid::GrainsCoupledWithFluid( double fluid_density_ )
   , m_fluid_density( fluid_density_ )
   , m_fluidflow_dt( 0. )
   , m_forceReloadSame( false )
+  , m_PRSHydroFT( NULL )
 {
   Disc::SetvisuNodeNb( 40 );
   Sphere::SetvisuNodeNbPerQar( 5 );
@@ -74,6 +75,10 @@ void GrainsCoupledWithFluid::do_before_time_stepping( DOMElement* rootElement )
   m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );  
   m_allcomponents.outputObstaclesLoad( m_time, m_dt, false, 
       GrainsExec::m_ReloadType == "same" ); 
+      
+  // Allocate hydro force and torque arrays in the AppPRSHydroFT app
+  if ( m_PRSHydroFT ) m_PRSHydroFT->allocateHydroFT( 
+  	m_allcomponents.getNumberActiveParticlesOnProc() );
 
   cout << "Initialization completed" << endl << endl;                           
 }
@@ -390,7 +395,7 @@ void GrainsCoupledWithFluid::Forces( DOMElement* rootElement )
     {
       // Gravity
       DOMNode* nGravity = ReaderXML::getNode( root, "Gravity" );
-      if( nGravity )
+      if ( nGravity )
       {
         GrainsExec::m_vgravity[X] = ReaderXML::getNodeAttr_Double( 
       		nGravity, "GX" );
@@ -406,7 +411,16 @@ void GrainsCoupledWithFluid::Forces( DOMElement* rootElement )
         if ( m_rank == 0 ) cout << GrainsExec::m_shift6 << 
 		"Gravity is mandatory !!" << endl;
         grainsAbort();
-      }          
+      }
+      
+      // PRS hydro forces and torques
+      DOMNode* nPRSHydroFT = ReaderXML::getNode( root, "PRSHydro" ); 
+      if ( nPRSHydroFT )
+      {
+        m_PRSHydroFT = new AppPRSHydroFT();
+	m_PRSHydroFT->setName( "PRSHydroFT" );
+        m_allApp.push_back( m_PRSHydroFT );	
+      }               
     }
     else
     {
@@ -1103,3 +1117,14 @@ void GrainsCoupledWithFluid::updateParticlesVelocity(
     }     
   }
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Updates particles hydro force and torque with data from the fluid solver
+void GrainsCoupledWithFluid::updateParticlesHydroFT( 
+  	vector< vector<double> > const* hydroft_data_array )
+{
+  m_PRSHydroFT->setHydroFT( hydroft_data_array );
+} 

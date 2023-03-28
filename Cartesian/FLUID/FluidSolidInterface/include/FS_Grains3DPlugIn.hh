@@ -77,6 +77,11 @@ class FS_Grains3DPlugIn : public FS_SolidPlugIn
       @param cycleNumber cycle number */
       void saveResults( string const& filename, double const& time,
         int const& cycleNumber );
+	
+      /** @brief Transfer hydro force and torque array to solid solver
+      @param hydroFT hydro force and torque array */
+      void transferHydroFTtoSolid( 
+      	vector< vector<double> > const* hydroFT ) const;
       //@}
     	  
   

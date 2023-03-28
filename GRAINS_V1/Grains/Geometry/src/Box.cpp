@@ -91,7 +91,7 @@ ConvexType Box::getConvexType() const
 // Sets the corner/vertex coordinates and the face/vertices numbering
 void Box::setCornersFaces()
 {
-  m_corners.reserve(8);
+  m_corners.reserve( 8 );
   Point3 sommet;
   sommet.setValue( - m_extent[X], - m_extent[Y], - m_extent[Z] );
   m_corners.push_back(sommet);
@@ -113,7 +113,7 @@ void Box::setCornersFaces()
   if ( m_allFaces.empty() )
   {
     vector<int> oneFace( 4, 0 );
-    m_allFaces.reserve(6);
+    m_allFaces.reserve( 6 );
     for (int i=0;i<6;++i) m_allFaces.push_back( oneFace );
 
     m_allFaces[0][0]=4;

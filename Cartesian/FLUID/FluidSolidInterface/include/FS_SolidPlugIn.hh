@@ -70,6 +70,11 @@ class FS_SolidPlugIn : public PAC_SolverComputingTime
       @param cycleNumber cycle number */
       virtual void saveResults( string const& filename, double const& time,
         int const& cycleNumber ) = 0;
+	
+      /** @brief Transfer hydro force and torque array to solid solver
+      @param hydroFT hydro force and torque array */
+      virtual void transferHydroFTtoSolid( 
+      	vector< vector<double> > const* hydroFT ) const = 0;
       //@}
     
 

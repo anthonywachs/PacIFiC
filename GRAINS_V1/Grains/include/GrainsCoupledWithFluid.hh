@@ -3,6 +3,7 @@
 
 #include "Grains.hh"
 #include "ReaderXML.hh"
+#include "AppPRSHydroFT.hh"
 #include <list>
 #include <string>
 using namespace std;
@@ -74,8 +75,14 @@ class GrainsCoupledWithFluid : virtual public Grains
     @param b_set_velocity_nm1_and_diff updates the velocity at the previous time
     and the explicit velocity difference */
     virtual void updateParticlesVelocity( 
-  	vector<vector<double> > const& velocity_data_array,
-  	bool const& b_set_velocity_nm1_and_diff );   
+  	vector< vector<double> > const& velocity_data_array,
+  	bool const& b_set_velocity_nm1_and_diff );
+	
+    /** @brief Updates particles hydro force and torque with data from the 
+    fluid solver
+    @param hydroft_data_array hydro force and torque data array */
+    virtual void updateParticlesHydroFT( 
+  	vector< vector<double> > const* hydroft_data_array );	   
     //@}
     
     
@@ -115,7 +122,9 @@ class GrainsCoupledWithFluid : virtual public Grains
     double m_min_dt; /**< minimum granular simulation time step */
     double m_max_dt; /**< minimum granular simulation time step */
     size_t m_ndt; /**< number of granular simulation time steps over 
-    	a fluid flow simulation time step */        	       
+    	a fluid flow simulation time step */ 
+    AppPRSHydroFT* m_PRSHydroFT; /**< explicit pointer to the PRS hydro force
+    	and torque application */	       	       
     //@}
 
 

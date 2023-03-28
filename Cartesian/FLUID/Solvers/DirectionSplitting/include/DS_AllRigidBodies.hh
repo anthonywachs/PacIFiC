@@ -601,6 +601,10 @@ class DS_AllRigidBodies
       @param dir direction to check */
       bool is_bounding_box_in_local_domain( class doubleVector& bounds
                                            , size_t const& dir);
+					   
+      /** @brief Copies hydro force and torque in an array
+      @param hydroFT hydro force and torque array */
+      void copyHydroFT( vector< vector<double> >* hydroFT );
       //@}
 
 
