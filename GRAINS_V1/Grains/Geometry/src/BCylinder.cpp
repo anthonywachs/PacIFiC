@@ -1,5 +1,4 @@
 #include "BCylinder.hh"
-#include <iostream>
 
 using namespace std;
 
@@ -377,32 +376,14 @@ bool isContact( BCylinder const& a, BCylinder const& b,
   rotateVec2VecZ( e_A, rotMatA );
   Point3 const& x_B2A = rotMatA * ( *(b2w.getOrigin()) - *(a2w.getOrigin()) );
   Vector3 const& e_B2A = ( rotMatA * e_B ).normalized();
-  // e_B2A.round( EPSILON );
-  // Relative positions - A w.r.t. B
-  Matrix rotMatB;
-  rotateVec2VecZ( e_B, rotMatB );
-  Point3 const& x_A2B = rotMatB * ( *(a2w.getOrigin()) - *(b2w.getOrigin()) );
-  Vector3 const& e_A2B = ( rotMatB * e_A ).normalized();
-  // e_A2B.round( EPSILON );
-
 
   // General variables to use later
-  // Vector3 const& u1 = ( e_B2A ^ Vector3( 0., 0., 1. ) ).normalized();
   Vector3 const& u1 = ( Vector3( e_B2A[Y], -e_B2A[X], 0. ) ).normalized();
   Vector3 const& v1 = ( u1 ^ e_B2A ).normalized();
 
-  // Vector3 const& u2 = ( e_A2B ^ Vector3( 0., 0., 1. ) ).normalized();
-  Vector3 const& u2 = ( Vector3( e_A2B[Y], -e_A2B[X], 0. ) ).normalized();
-  Vector3 const& v2 = ( u2 ^ e_A2B ).normalized();
+  //* Contact Scenarios: A primary, B secondary *//
 
-
-  // Contact scenarios
-  // Face-Face / Band-Band (Parallel)
-  if ( ( fabs( fabs( e_B2A[Z] ) - 1. ) < tol ) &&
-       ( fabs( x_B2A[Z] ) < hA + hB ) &&
-       ( normXY( x_B2A ) < ( rA + rB ) * ( rA + rB ) ) )
-    return ( true );
-  // Face-Edge
+  // Face A - Edge B
   if ( fabs( x_B2A[Z] ) > hA )
   {
     // Vector3 r = ( e_B2A ^ ( e_B2A ^ zAxis ) ).normalized();
@@ -410,66 +391,10 @@ bool isContact( BCylinder const& a, BCylinder const& b,
     Vector3 r = sgn( -x_B2A[Z] ) * ( rB * v1 + hB * sgn( e_B2A[Z] ) * e_B2A );
     Point3 const& ptE = x_B2A + r;
     if ( ( fabs( ptE[Z] ) < hA ) && ( normXY( ptE ) < rA * rA ) )
-      return ( true );
+    return ( true );
   }
-  // Edge-Face
-  if ( fabs( x_A2B[Z] ) > hB )
-  {
-    // Vector3 r = ( e_A2B ^ ( e_A2B ^ zAxis ) ).normalized();
-    // r = sgn( x_A2B[Z] ) * ( rA * r - hA * sgn( e_A2B[Z] ) * e_A2B );
-    Vector3 r = sgn( -x_A2B[Z] ) * ( rA * v2 + hA * sgn( e_A2B[Z] ) * e_A2B );
-    Point3 ptE = x_A2B + r;
-    if ( ( fabs( ptE[Z] ) < hB ) && ( normXY( ptE ) < rB * rB ) )
-      return ( true );
-  }
-  // Band-Band (Skewed)
-  // Vector3 r = ( zAxis ^ e_B2A ).normalized();
-  // double d = fabs( x_B2A * r );
-  double d = fabs( x_B2A * ( -u1 ) );
-  if ( d < rA + rB )
-  {
-    double lBStar = ( e_B2A[Z] * x_B2A[Z] - e_B2A * x_B2A )
-                    / ( 1. - e_B2A[Z]*e_B2A[Z] );
-    if ( fabs( lBStar ) < hB )
-    {
-      double lAStar = x_B2A[Z] + lBStar * e_B2A[Z];
-      if ( fabs( lAStar ) < hA )
-        return ( true );
-    }
-  }
-  // Edge-Band
-  {
-    Point3 c1 = x_A2B + hA * e_A2B;
-    Point3 c2 = x_A2B - hA * e_A2B;
-    Point3 const& ptCenter = normXY( c1 ) < normXY( c2 ) ? c1 : c2;
 
-    // additional condition to avoid solving the polynomial
-    if ( ( fabs( ptCenter[Z] ) < hB + rA ) &&
-         ( sqrt( normXY( ptCenter ) ) < rA + rB ) )
-    {
-      // Misc variables
-      // double const p = rA * ( normXY( v2 ) - normXY( u2 ) );
-      double const p = rA * ( normXY( v2 ) - 1. );
-      double const q = dotXY( u2, ptCenter ) / p;
-      double const r = dotXY( v2, ptCenter ) / p;
-
-      double sint[4];
-      int nbRoots = 0;
-      solveQuartic( 2.*r, q*q + r*r - 1., -2.*r, -r*r, sint, nbRoots );
-
-      for ( int i = 0; i < nbRoots; i++ )
-      {
-        if ( sint[i] * r >= 0. ) // the min distance, not the max!
-        {
-          double cs = sgn( q ) * sqrt( 1. - sint[i] * sint[i] );
-          Point3 const& ptA = ptCenter + rA * cs * u2 + rA * sint[i] * v2;
-          if ( ( fabs( ptA[Z] ) < hB ) && ( normXY( ptA ) < rB * rB ) )
-            return ( true );
-        }
-      }
-    }
-  }
-  // Edge-Edge
+  // Edge A - Edge B
   {
     // To find the correct edge on the secondary cylinder
     Point3 c1 = x_B2A + hB * e_B2A;
@@ -514,8 +439,85 @@ bool isContact( BCylinder const& a, BCylinder const& b,
     }
   }
 
+  // Special Case: Face A - Face B
+  if ( ( fabs( fabs( e_B2A[Z] ) - 1. ) < tol ) &&
+       ( fabs( x_B2A[Z] ) < hA + hB ) &&
+       ( normXY( x_B2A ) < ( rA + rB ) * ( rA + rB ) ) )
+    return ( true );
+
+  // Special Case: Band A - Band B
+  if ( fabs( x_B2A * ( - u1 ) ) < rA + rB )
+  {
+    double lBStar = ( e_B2A[Z] * x_B2A[Z] - e_B2A * x_B2A )
+    / ( 1. - e_B2A[Z]*e_B2A[Z] );
+    if ( fabs( lBStar ) < hB )
+    {
+      double lAStar = x_B2A[Z] + lBStar * e_B2A[Z];
+      if ( fabs( lAStar ) < hA )
+      return ( true );
+    }
+  }
+
+
+  // Relative positions - A w.r.t. B
+  Matrix rotMatB;
+  rotateVec2VecZ( e_B, rotMatB );
+  Point3 const& x_A2B = rotMatB * ( *(a2w.getOrigin()) - *(b2w.getOrigin()) );
+  Vector3 const& e_A2B = ( rotMatB * e_A ).normalized();
+
+  // Vector3 const& u2 = ( e_A2B ^ Vector3( 0., 0., 1. ) ).normalized();
+  Vector3 const& u2 = ( Vector3( e_A2B[Y], -e_A2B[X], 0. ) ).normalized();
+  Vector3 const& v2 = ( u2 ^ e_A2B ).normalized();
+
+  //* Contact Scenarios: B secondary, A pirmary *//
+
+  // Edge B - Face A
+  if ( fabs( x_A2B[Z] ) > hB )
+  {
+    // Vector3 r = ( e_A2B ^ ( e_A2B ^ zAxis ) ).normalized();
+    // r = sgn( x_A2B[Z] ) * ( rA * r - hA * sgn( e_A2B[Z] ) * e_A2B );
+    Vector3 r = sgn( -x_A2B[Z] ) * ( rA * v2 + hA * sgn( e_A2B[Z] ) * e_A2B );
+    Point3 ptE = x_A2B + r;
+    if ( ( fabs( ptE[Z] ) < hB ) && ( normXY( ptE ) < rB * rB ) )
+      return ( true );
+  }
+
+  // Edge B - Band A
+  {
+    Point3 c1 = x_A2B + hA * e_A2B;
+    Point3 c2 = x_A2B - hA * e_A2B;
+    Point3 const& ptCenter = normXY( c1 ) < normXY( c2 ) ? c1 : c2;
+
+    // additional condition to avoid solving the polynomial
+    if ( ( fabs( ptCenter[Z] ) < hB + rA ) &&
+         ( sqrt( normXY( ptCenter ) ) < rA + rB ) )
+    {
+      // Misc variables
+      // double const p = rA * ( normXY( v2 ) - normXY( u2 ) );
+      double const p = rA * ( normXY( v2 ) - 1. );
+      double const q = dotXY( u2, ptCenter ) / p;
+      double const r = dotXY( v2, ptCenter ) / p;
+
+      double sint[4];
+      int nbRoots = 0;
+      solveQuartic( 2.*r, q*q + r*r - 1., -2.*r, -r*r, sint, nbRoots );
+
+      for ( int i = 0; i < nbRoots; i++ )
+      {
+        if ( sint[i] * r >= 0. ) // the min distance, not the max!
+        {
+          double cs = sgn( q ) * sqrt( 1. - sint[i] * sint[i] );
+          Point3 const& ptA = ptCenter + rA * cs * u2 + rA * sint[i] * v2;
+          if ( ( fabs( ptA[Z] ) < hB ) && ( normXY( ptA ) < rB * rB ) )
+            return ( true );
+        }
+      }
+    }
+  }
+
   return ( false );
 }
+
 
 
 

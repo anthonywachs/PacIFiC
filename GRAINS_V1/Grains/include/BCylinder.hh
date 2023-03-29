@@ -4,6 +4,7 @@
 #include "Matrix.hh"
 #include "Transform.hh"
 #include "PointContact.hh"
+
 using namespace solid;
 
 class BCylinder;
