@@ -6496,7 +6496,7 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
   double local_max = MESH->get_max_coordinate_on_current_processor(dir);
 
   // If particle is equivalent to domain size in PBC
-  if ((boundsOrg(1) - boundsOrg(0)) > (global_max - global_min)) {
+  if ((boundsOrg(1) - boundsOrg(0)) > 0.5 * (global_max - global_min)) {
      value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
      value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
      return(value);
