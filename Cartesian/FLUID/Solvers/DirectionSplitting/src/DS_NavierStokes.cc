@@ -177,15 +177,16 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
 		// controller = DS_PID::create(0.5,1.,0);
 		// Set the initial pressure drop, required in case of given flow rate
 		if (!b_restart) {
-			const_cast<FV_Mesh*>(UF->primary_grid())
-							->set_periodic_pressure_drop( -100. ) ;
-			string fileName = "./DS_results/flow_pressure_history.csv" ;
-			std::ofstream MyFile;
+			if (UF->primary_grid()->get_periodic_pressure_drop() < 1.e-12)
+				const_cast<FV_Mesh*>(UF->primary_grid())
+								->set_periodic_pressure_drop( -100. ) ;
 			if (macCOMM->rank() == 0) {
+				string fileName = "./DS_results/flow_pressure_history.csv" ;
+				std::ofstream MyFile;
 				MyFile.open( fileName.c_str()) ;
 				MyFile << "t Qc dP exceed turn" << endl;
+				MyFile.close();
 			}
-			MyFile.close();
 		} else if (b_restart) {
 			double temp_press;
 			string fileName = "./DS_results/flow_pressure_history.csv" ;
@@ -2606,75 +2607,78 @@ DS_NavierStokes:: predicted_pressure_drop (FV_TimeIterator const* t_it)
 {
    MAC_LABEL("DS_NavierStokes:: predicted_pressure_drop" ) ;
 
-	size_t p_flow_dir = UF->primary_grid()->get_periodic_flow_direction();
-	double Lx = UF->primary_grid()->get_main_domain_max_coordinate( 0 )
-				 - UF->primary_grid()->get_main_domain_min_coordinate( 0 );
-	double Ly = UF->primary_grid()->get_main_domain_max_coordinate( 1 )
-				 - UF->primary_grid()->get_main_domain_min_coordinate( 1 );
-   double Lz = (dim == 3) ? UF->primary_grid()->get_main_domain_max_coordinate( 2 )
-				 				  - UF->primary_grid()->get_main_domain_min_coordinate( 2 )
-								  : 1.;
-
-   double cross_sec_area = Lx * Ly * Lz;
-
-	if (p_flow_dir == 0) {
-		cross_sec_area = Ly * Lz;
-	} else if (p_flow_dir == 1) {
-		cross_sec_area = Lx * Lz;
-	} else if (p_flow_dir == 2) {
-		cross_sec_area = Lx * Ly;
-	}
-
 	double Um = get_current_mean_flow_speed();
-	double Qc = cross_sec_area * Um;
-	double Qset = UF->primary_grid()->get_periodic_flow_rate();
 	double pressure_drop = UF->primary_grid()->get_periodic_pressure_drop();
 
-	if ((fabs(Qc - Qset) / Qset > 1e-5) && (t_it->iteration_number() % 1 == 0)) {
-      if ((Qc / Qset) > 1.) {
-         exceed = true;
-			// pressure_drop -= controller->calculate(Qset,Qc,t_it->time_step());
-	      if (turn == false) {
-	         pressure_drop *= 0.5;
-	         if ((Qc - Qold) < 0.) turn = true;
-         } else {
-            if ((Qc / Qold) > 1.) {
-               pressure_drop *= (Qset / Qc);
-            } else {
-					// Threshold controls the oscillation
-               if (fabs(Qc - Qold) / Qc < 1e-6)
-                  pressure_drop *= (Qset / Qc);
-            }
-         }
-      } else {
-         if (exceed == true) {
+	if (macCOMM->rank() == 0) {
+		size_t p_flow_dir = UF->primary_grid()->get_periodic_flow_direction();
+		double Lx = UF->primary_grid()->get_main_domain_max_coordinate( 0 )
+					 - UF->primary_grid()->get_main_domain_min_coordinate( 0 );
+		double Ly = UF->primary_grid()->get_main_domain_max_coordinate( 1 )
+					 - UF->primary_grid()->get_main_domain_min_coordinate( 1 );
+	   double Lz = (dim == 3)
+					 ? UF->primary_grid()->get_main_domain_max_coordinate( 2 )
+					 - UF->primary_grid()->get_main_domain_min_coordinate( 2 )
+					 : 1.;
+
+	   double cross_sec_area = Lx * Ly * Lz;
+
+		if (p_flow_dir == 0) {
+			cross_sec_area = Ly * Lz;
+		} else if (p_flow_dir == 1) {
+			cross_sec_area = Lx * Lz;
+		} else if (p_flow_dir == 2) {
+			cross_sec_area = Lx * Ly;
+		}
+
+		double Qc = cross_sec_area * Um;
+		double Qset = UF->primary_grid()->get_periodic_flow_rate();
+
+		if ((fabs(Qc - Qset) / Qset > 1e-5) && (t_it->iteration_number() % 1 == 0)) {
+	      if ((Qc / Qset) > 1.) {
+	         exceed = true;
 				// pressure_drop -= controller->calculate(Qset,Qc,t_it->time_step());
-            if ((Qc / Qold) < 1.) {
-               pressure_drop *= (Qset / Qc);
-            } else {
-					// Threshold controls the oscillation
-               if (fabs(Qc - Qold) / Qc < 1e-6)
-                  pressure_drop *= (Qset / Qc);
-            }
-         }
-      }
+		      if (turn == false) {
+		         pressure_drop *= 0.5;
+		         if ((Qc - Qold) < 0.) turn = true;
+	         } else {
+	            if ((Qc / Qold) > 1.) {
+	               pressure_drop *= (Qset / Qc);
+	            } else {
+						// Threshold controls the oscillation
+	               if (fabs(Qc - Qold) / Qc < 1e-6)
+	                  pressure_drop *= (Qset / Qc);
+	            }
+	         }
+	      } else {
+	         if (exceed == true) {
+					// pressure_drop -= controller->calculate(Qset,Qc,t_it->time_step());
+	            if ((Qc / Qold) < 1.) {
+	               pressure_drop *= (Qset / Qc);
+	            } else {
+						// Threshold controls the oscillation
+	               if (fabs(Qc - Qold) / Qc < 1e-6)
+	                  pressure_drop *= (Qset / Qc);
+	            }
+	         }
+	      }
+		}
+	   Qold = Qc;
+
+		string fileName = "./DS_results/flow_pressure_history.csv" ;
+		std::ofstream MyFile;
+		MyFile.open( fileName.c_str(), std::ios::app ) ;
+		MyFile << t_it->time() << " " << MAC::doubleToString( ios::scientific, 6, Qc)
+				<< " " << MAC::doubleToString( ios::scientific, 6, pressure_drop)
+				<< " " << exceed
+				<< " " << turn << endl;
 	}
-   Qold = Qc;
+
+	// Broadcast the new pressure to all procs from master proc
+	macCOMM->broadcast(pressure_drop);
 
    const_cast<FV_Mesh*>(UF->primary_grid())
 											->set_periodic_pressure_drop( pressure_drop ) ;
-
-	string fileName = "./DS_results/flow_pressure_history.csv" ;
-	std::ofstream MyFile;
-
-	if (macCOMM->rank() == 0) {
-		MyFile.open( fileName.c_str(), std::ios::app ) ;
-      MyFile << t_it->time() << " " << MAC::doubleToString( ios::scientific, 6, Qc)
-									  << " " << MAC::doubleToString( ios::scientific, 6, pressure_drop)
-									  << " " << exceed
-									  << " " << turn << endl;
-   }
-
 }
 
 
