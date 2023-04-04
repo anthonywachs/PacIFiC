@@ -6602,7 +6602,7 @@ DS_AllRigidBodies::copyHydroFT( vector< vector<double> >* hydroFT )
      (*hydroFT)[i][4] = pressure_torque->operator()(i,1) 
      	+ viscous_torque->operator()(i,1);
      (*hydroFT)[i][5] = pressure_torque->operator()(i,2) 
-     	+ viscous_torque->operator()(i,2);
+     	+ viscous_torque->operator()(i,2);	
   }
 
 }

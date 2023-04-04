@@ -24,7 +24,7 @@ class GrainsCoupledWithFluid : virtual public Grains
     //@{
     /** @brief Default constructor 
     @param fluid_density_ fluid density */
-    GrainsCoupledWithFluid( double fluid_density_ = 1000. );
+    GrainsCoupledWithFluid( double fluid_density_ );
 
     /** @brief Destructor */
     virtual ~GrainsCoupledWithFluid();
@@ -60,6 +60,12 @@ class GrainsCoupledWithFluid : virtual public Grains
     /** @brief Sets the boolean m_forceReloadSame to true. This forces the code 
     to restart a simulation as a continuation of a previous simulation */
     void setReloadSame();
+    
+    /** @brief Sets the boolean Particle::setFluidCorrectedAcceleration. Default
+    value is True, i.e., the particle acceleration is corrected by
+    the factor ( 1 - fluid_density / particle_density )
+    @param correct particle acceleration correction factor */
+    void setFluidCorrectedAcceleration( bool correct );
     //@}  
 
 

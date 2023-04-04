@@ -10,8 +10,8 @@
 FS_Grains3DPlugIn::FS_Grains3DPlugIn( string const& insertion_file_,
         string const& simulation_file_,
         double const& fluid_density,
+	bool const& correct_particle_acceleration,
         bool const& b_restart,
-        bool const& b_initializeClonePer,
         double const& grid_size,
         bool const& is_solidsolver_parallel,	
         int& error )
@@ -49,6 +49,7 @@ FS_Grains3DPlugIn::FS_Grains3DPlugIn( string const& insertion_file_,
     DOMElement* rootNode = ReaderXML::getRoot( simulation_file_exe );
     m_Grains3D = GrainsBuilderFactory::createCoupledWithFluid( rootNode,
         fluid_density );
+    m_Grains3D->setFluidCorrectedAcceleration( correct_particle_acceleration );
     if ( b_restart ) m_Grains3D->setReloadSame() ;
     m_Grains3D->do_before_time_stepping( rootNode );
 

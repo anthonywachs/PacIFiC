@@ -103,7 +103,8 @@ void HODCContactForceModel::performForcesCalculus( Component* p0_,
     delM = - k_m_s * normFN * 0.001 * wn ;
     
     // Classical rolling resistance moment
-    if ( normwt > EPSILON )  delM -= k_m_s * normFN * wt / normwt;
+//    if ( normwt > EPSILON )  delM -= k_m_s * normFN * wt / normwt;
+    if ( normwt > EPSILON )  delM -= k_m_s * normFN * wt;    
   }
   else delM = 0.0;  
 }

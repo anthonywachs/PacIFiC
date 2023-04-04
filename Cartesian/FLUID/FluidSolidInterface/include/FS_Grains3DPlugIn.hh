@@ -25,16 +25,17 @@ class FS_Grains3DPlugIn : public FS_SolidPlugIn
       @param insertion_file_ insertion file name
       @param simulation_file_ simulation file name
       @param fluid_density fluid density
+      @param correct_particle_acceleration particle acceleration is corrected by
+      the factor ( 1 - fluid_density / particle_density ) if value is true
       @param b_restart is the run a restart or a new run
-      @param b_initializeClonePer initialize periodic clones
       @param grid_size size of the smallest grid cell
       @param is_solidsolver_parallel is Grains3D running in parallel ?
       @param error =0 if the construction is successful */
       FS_Grains3DPlugIn( string const& insertion_file_,
         string const& simulation_file_,
         double const& fluid_density,
+	bool const& correct_particle_acceleration,
         bool const& b_restart,
-        bool const& b_initializeClonePer,
         double const& grid_size,
         bool const& is_solidsolver_parallel,
 	int& error );

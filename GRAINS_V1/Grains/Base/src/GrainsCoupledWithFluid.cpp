@@ -20,6 +20,7 @@ GrainsCoupledWithFluid::GrainsCoupledWithFluid( double fluid_density_ )
 {
   Disc::SetvisuNodeNb( 40 );
   Sphere::SetvisuNodeNbPerQar( 5 );
+  Particle::setFluidDensity( m_fluid_density ); 
 }
 
 
@@ -1128,3 +1129,15 @@ void GrainsCoupledWithFluid::updateParticlesHydroFT(
 {
   m_PRSHydroFT->setHydroFT( hydroft_data_array );
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the boolean Particle::setFluidCorrectedAcceleration. Default
+// value is True, i.e., the particle acceleration is corrected by
+// the factor ( 1 - fluid_density / particle_density )
+void GrainsCoupledWithFluid::setFluidCorrectedAcceleration( bool correct )
+{
+  Particle::setFluidCorrectedAcceleration( correct );
+}

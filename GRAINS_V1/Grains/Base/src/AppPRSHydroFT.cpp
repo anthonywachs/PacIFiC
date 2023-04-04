@@ -68,7 +68,8 @@ void AppPRSHydroFT::setHydroFT( vector< vector<double> > const* hydrovec )
   for (i=0;i<nbPart;++i)
     for (j=0;j<3;++j) 
     {
-      m_PRSHydroForce[i][j] = (*hydrovec)[i][j];
-      m_PRSHydroTorque[i][j] = (*hydrovec)[i][j+3];    
+      m_PRSHydroForce[i][j] = (*hydrovec)[i][j];      
+      m_PRSHydroTorque[i][j] = (*hydrovec)[i][j+3]; 
+      cout << m_PRSHydroForce[i][j] << " " << m_PRSHydroTorque[i][j] << endl;   
     }
 }

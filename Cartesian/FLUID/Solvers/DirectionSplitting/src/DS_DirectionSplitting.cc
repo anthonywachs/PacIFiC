@@ -60,10 +60,13 @@ DS_DirectionSplitting:: create_replica( MAC_Object* a_owner,
 
 }
 
+
+
+
 //---------------------------------------------------------------------------
 DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
-		                                   FV_DomainAndFields const* dom,
-                                         MAC_ModuleExplorer const* exp )
+	FV_DomainAndFields const* dom,
+	MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
    : FV_OneStepIteration( a_owner, dom, exp )
    , PAC_ComputingTime("Solver")
@@ -275,12 +278,10 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    if (is_GRAINS) {
       int error = 0;
       solidSolver = FS_SolidPlugIn_BuilderFactory:: create( solidSolverType,
-         solidSolver_insertionFile,
-         solidSolver_simulationFile,
-         1., false,
-         b_particles_as_fixed_obstacles,
-         1., b_solidSolver_parallel,
-         error );
+         solidSolver_insertionFile, solidSolver_simulationFile,
+         rho, false, b_restart,
+         dom->primary_grid()->get_smallest_constant_grid_size(),
+	 b_solidSolver_parallel, error );
 
       solidFluid_transferStream = NULL;
       solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
