@@ -19,13 +19,6 @@ method introduced by [Charrier et al.](#charrier1989free).
   #define DWDL2(L1, L2) (E_S/(3.*L2)*(sq(L2) - 1./(sq(L1*L2))))
 #endif
 
-/** For validation purposes, the option is given to the user to print the
-principal stresses on each triangle. They are printed to the standard output
-stream */
-#ifndef OUTPUT_PRINCIPAL_STRESS
-  #define OUTPUT_PRINCIPAL_STRESS 0
-#endif
-
 /**
 ## Finite Element helper functions
 
@@ -227,16 +220,14 @@ void comp_elastic_stress(lagMesh* mesh) {
     lambda[1] = sqrt(.5*(C[0][0] + C[1][1] + sqrt(sq(C[0][0] - C[1][1]) +
       4*sq(C[0][1]))));
 
-    /** If the user wants to output the two principal stresses (for validation
-  purposes), print them to the standard output */
-    #if OUTPUT_PRINCIPAL_STRESS
-    double e1, e2, t1, t2;
-    e1 = .5*(sq(lambda[0]) - 1.);
-    e2 = .5*(sq(lambda[1]) - 1.);
+    /** Below we add the stretch and stress  */
+    double t1, t2;
     t1 = DWDL1(lambda[0], lambda[1])/lambda[1];
     t2 = DWDL2(lambda[0], lambda[1])/lambda[0];
-    fprintf(stdout, "%d, %g, %g, %g, %g\n", i, e1, e2, t1, t2);
-    #endif
+    mesh->triangles[i].tension[0] = t1;
+    mesh->triangles[i].tension[1] = t2;
+    mesh->triangles[i].stretch[0] = lambda[0];
+    mesh->triangles[i].stretch[1] = lambda[1];
 
     /** #### Step 5. For each node of the triangle, compute the force in the common plane,
     then rotate it and add it to the Lagrangian force of the node */

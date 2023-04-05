@@ -92,6 +92,8 @@ typedef struct Edge {
     coord centroid;
     coord refShape[2];
     double sfc[3][2]; // sfc for "shape function coefficients"
+    double stretch[2];
+    double tension[2];
   } Triangle;
 #endif
 

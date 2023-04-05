@@ -719,6 +719,43 @@ void pv_output_ascii() {
           MB(j).triangles[k].node_ids[1],
           MB(j).triangles[k].node_ids[2]);
       }
+      fprintf(file, "CELL_DATA %d\n", nbtri_tot);
+      fprintf(file, "SCALARS T1 double 1 \n");
+      fprintf(file, "LOOKUP_TABLE default\n");
+      for(int k=0; k<MB(j).nlt; k++)
+        if (!(is_triangle_across_periodic(&MB(j), k)))
+          fprintf(file, "%g ", MB(j).triangles[k].tension[0]);
+      fprintf(file, "\n");
+      fprintf(file, "SCALARS T2 double 1 \n");
+      fprintf(file, "LOOKUP_TABLE default\n");
+      for(int k=0; k<MB(j).nlt; k++)
+        if (!(is_triangle_across_periodic(&MB(j), k)))
+          fprintf(file, "%g ", MB(j).triangles[k].tension[1]);
+      fprintf(file, "\n");
+      fprintf(file, "SCALARS Tmax double 1 \n");
+      fprintf(file, "LOOKUP_TABLE default\n");
+      for(int k=0; k<MB(j).nlt; k++)
+        if (!(is_triangle_across_periodic(&MB(j), k)))
+          fprintf(file, "%g ", max(MB(j).triangles[k].tension[0], MB(j).triangles[k].tension[1]));
+      fprintf(file, "\n");
+      fprintf(file, "SCALARS Tavg double 1 \n");
+      fprintf(file, "LOOKUP_TABLE default\n");
+      for(int k=0; k<MB(j).nlt; k++)
+        if (!(is_triangle_across_periodic(&MB(j), k)))
+          fprintf(file, "%g ", .5*(MB(j).triangles[k].tension[0] + MB(j).triangles[k].tension[1]));
+      fprintf(file, "\n");
+      fprintf(file, "SCALARS Lambda_1 double 1 \n");
+      fprintf(file, "LOOKUP_TABLE default\n");
+      for(int k=0; k<MB(j).nlt; k++)
+        if (!(is_triangle_across_periodic(&MB(j), k)))
+          fprintf(file, "%g ", MB(j).triangles[k].stretch[0]);
+      fprintf(file, "\n");
+      fprintf(file, "SCALARS Lambda_2 double 1 \n");
+      fprintf(file, "LOOKUP_TABLE default\n");
+      for(int k=0; k<MB(j).nlt; k++)
+        if (!(is_triangle_across_periodic(&MB(j), k)))
+          fprintf(file, "%g ", MB(j).triangles[k].stretch[1]);
+      fprintf(file, "\n");
     }
     else {
       int nbtri = 0;
@@ -733,6 +770,43 @@ void pv_output_ascii() {
             MB(j).triangles[k].node_ids[1],
             MB(j).triangles[k].node_ids[2]);
       }
+      fprintf(file, "CELL_DATA %d\n", nbtri);
+      fprintf(file, "SCALARS T1 double 1 \n");
+      fprintf(file, "LOOKUP_TABLE default\n");
+      for(int k=0; k<MB(j).nlt; k++)
+        if (!(is_triangle_across_periodic(&MB(j), k)))
+          fprintf(file, "%g ", MB(j).triangles[k].tension[0]);
+      fprintf(file, "\n");
+      fprintf(file, "SCALARS T2 double 1 \n");
+      fprintf(file, "LOOKUP_TABLE default\n");
+      for(int k=0; k<MB(j).nlt; k++)
+        if (!(is_triangle_across_periodic(&MB(j), k)))
+          fprintf(file, "%g ", MB(j).triangles[k].tension[1]);
+      fprintf(file, "\n");
+      fprintf(file, "SCALARS Tmax double 1 \n");
+      fprintf(file, "LOOKUP_TABLE default\n");
+      for(int k=0; k<MB(j).nlt; k++)
+        if (!(is_triangle_across_periodic(&MB(j), k)))
+          fprintf(file, "%g ", max(MB(j).triangles[k].tension[0], MB(j).triangles[k].tension[1]));
+      fprintf(file, "\n");
+      fprintf(file, "SCALARS Tavg double 1 \n");
+      fprintf(file, "LOOKUP_TABLE default\n");
+      for(int k=0; k<MB(j).nlt; k++)
+        if (!(is_triangle_across_periodic(&MB(j), k)))
+          fprintf(file, "%g ", .5*(MB(j).triangles[k].tension[0] + MB(j).triangles[k].tension[1]));
+      fprintf(file, "\n");
+      // fprintf(file, "SCALARS Lambda_max double 1 \n");
+      // fprintf(file, "LOOKUP_TABLE default\n");
+      // for(int k=0; k<MB(j).nlt; k++)
+      //   if (!(is_triangle_across_periodic(&MB(j), k)))
+      //     fprintf(file, "%g ", max(MB(j).triangles[k].stretch[0], MB(j).triangles[k].stretch[1]));
+      // fprintf(file, "\n");
+      // fprintf(file, "SCALARS Lambda_avg double 1 \n");
+      // fprintf(file, "LOOKUP_TABLE default\n");
+      // for(int k=0; k<MB(j).nlt; k++)
+      //   if (!(is_triangle_across_periodic(&MB(j), k)))
+      //     fprintf(file, "%g ", .5*(MB(j).triangles[k].stretch[0] + MB(j).triangles[k].stretch[1]));
+      // fprintf(file, "\n");
     }
 
     fclose(file);
