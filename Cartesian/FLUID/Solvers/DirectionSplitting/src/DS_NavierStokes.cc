@@ -2745,10 +2745,10 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
 					size_t p = UF->DOF_local_number(i,j,k,comp);
 					// Cell volume
 					double cellV = dxC * dyC * dzC;
-					if ((StencilCorrection == "CutCell")
-					 && (CC_vol->operator()(p,0) >= FluxRedistThres*cellV)) {
-					 	cellV = CC_vol->operator()(p,0);
-					}
+					// if ((StencilCorrection == "CutCell")
+					//  && (CC_vol->operator()(p,0) >= FluxRedistThres*cellV)) {
+					//  	cellV = CC_vol->operator()(p,0);
+					// }
 
                // Dxx for un
                double xvalue = vel_diffusion[0]->operator()(p);
@@ -3456,14 +3456,10 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 					double dz = (dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1.;
 					size_t p = FF->DOF_local_number(i, j, k, comp);
 					double volume = dx * dy * dz;
-					// if (is_solids && (FF == UF) && (StencilCorrection == "CutCell")
-					//  && (CC_vol->operator()(p,0) >= FluxRedistThres*volume)) {
-					if (is_solids && (StencilCorrection == "CutCell")
- 					 && (CC_vol->operator()(p,0) >= FluxRedistThres*volume)) {
-					 	volume = CC_vol->operator()(p,0);
-					}
-					// if (is_solids && (void_frac->operator()(p) == 0) && (StencilCorrection == "CutCell"))
-					// 	volume = CC_vol->operator()(p,0);
+					// if (is_solids && (StencilCorrection == "CutCell")
+ 					//  && (CC_vol->operator()(p,0) >= FluxRedistThres*volume)) {
+					//  	volume = CC_vol->operator()(p,0);
+					// }
 					divergence->operator()(p,0) = divergence->operator()(p,0)/volume;
 				}
 			}
