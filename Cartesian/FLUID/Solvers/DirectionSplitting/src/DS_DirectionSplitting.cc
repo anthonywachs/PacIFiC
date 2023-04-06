@@ -285,6 +285,8 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 
       solidFluid_transferStream = NULL;
       solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+      solidSolver->checkParaviewPostProcessing( 
+      	MAC::extract_root_directory( solidSolver_simulationFile ) );      
    }
 
    space_dimensions = dom->primary_grid()->nb_space_dimensions();
@@ -634,7 +636,9 @@ DS_DirectionSplitting:: do_additional_savings( FV_TimeIterator const* t_it,
       HeatSolver->do_additional_savings( t_it, cycleNumber ) ;
       stop_total_timer() ;
    }
-
+   // Solid solver
+   if ( solidSolver )
+     solidSolver->saveResults( "", t_it->time(), cycleNumber );  
 
 }
 

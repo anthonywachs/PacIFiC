@@ -75,6 +75,11 @@ class FS_SolidPlugIn : public PAC_SolverComputingTime
       @param hydroFT hydro force and torque array */
       virtual void transferHydroFTtoSolid( 
       	vector< vector<double> > const* hydroFT ) const = 0;
+	
+      /** @brief Check that Paraview writer is activated
+      @param solid_resDir particles results directory */
+      virtual void checkParaviewPostProcessing( string const& solid_resDir ) 
+      	= 0;
       //@}
     
 

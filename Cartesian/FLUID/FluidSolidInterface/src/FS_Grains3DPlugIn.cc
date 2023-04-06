@@ -188,3 +188,19 @@ void FS_Grains3DPlugIn:: transferHydroFTtoSolid(
     m_Grains3D->updateParticlesHydroFT( hydroFT );
   
 }  
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_Grains3DPlugIn:: checkParaviewPostProcessing( 
+	string const& solid_resDir ) 
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Grains3DPlugIn:: checkParaviewPostProcessing" ) ;
+  
+  if ( m_Grains3D_active_on_this_rank )
+    m_Grains3D->checkParaviewPostProcessing( 
+             "grains", solid_resDir, true ) ;
+  
+} 

@@ -56,28 +56,28 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
                                    struct DS2NS const& fromDS )
 //---------------------------------------------------------------------------
    : MAC_Object( a_owner )
-	, PAC_ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , UF ( fromDS.dom_->discrete_field( "velocity" ) )
    , PF ( fromDS.dom_->discrete_field( "pressure" ) )
    , GLOBAL_EQ( 0 )
    , mu( fromDS.mu_ )
    , kai( fromDS.kai_ )
    , AdvectionScheme( fromDS.AdvectionScheme_ )
-	, StencilCorrection( fromDS.StencilCorrection_ )
-	, is_CConlyDivergence ( fromDS.is_CConlyDivergence_ )
-	, FluxRedistThres( fromDS.FluxRedistThres_ )
+   , StencilCorrection( fromDS.StencilCorrection_ )
+   , is_CConlyDivergence ( fromDS.is_CConlyDivergence_ )
+   , FluxRedistThres( fromDS.FluxRedistThres_ )
    , AdvectionTimeAccuracy( fromDS.AdvectionTimeAccuracy_ )
    , rho( fromDS.rho_ )
-	, b_restart ( fromDS.b_restart_ )
+   , b_restart ( fromDS.b_restart_ )
    , is_solids( fromDS.is_solids_ )
-	, is_stressCal ( fromDS.is_stressCal_ )
-	, ViscousStressOrder ( fromDS.ViscousStressOrder_ )
-	, PressureStressOrder ( fromDS.PressureStressOrder_ )
-	, stressCalFreq ( fromDS.stressCalFreq_ )
-	, is_par_motion ( fromDS.is_par_motion_ )
-	, allrigidbodies ( fromDS.allrigidbodies_ )
+   , is_stressCal ( fromDS.is_stressCal_ )
+   , ViscousStressOrder ( fromDS.ViscousStressOrder_ )
+   , PressureStressOrder ( fromDS.PressureStressOrder_ )
+   , stressCalFreq ( fromDS.stressCalFreq_ )
+   , is_par_motion ( fromDS.is_par_motion_ )
+   , allrigidbodies ( fromDS.allrigidbodies_ )
    , b_projection_translation( fromDS.dom_->primary_grid()
-														->is_translation_active() )
+   		->is_translation_active() )
    , b_grid_has_been_translated_since_last_output( false )
    , b_grid_has_been_translated_at_previous_time( false )
    , critical_distance_translation( fromDS.critical_distance_translation_ )
@@ -85,8 +85,8 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , bottom_coordinate( 0. )
    , translated_distance( 0. )
    , gravity_vector( 0 )
-	, exceed (false)
-	, turn (false)
+   , exceed (false)
+   , turn (false)
 {
    MAC_LABEL( "DS_NavierStokes:: DS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -372,44 +372,46 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 {
    MAC_LABEL( "DS_NavierStokes:: do_before_inner_iterations_stage" ) ;
 
-	if ( my_rank == is_master )
-		SCT_set_start( "Matrix_RE_Assembly&Initialization" );
+   if ( my_rank == is_master )
+   SCT_set_start( "Matrix_RE_Assembly&Initialization" );
 
-	// Projection translation
-	if ( b_projection_translation ) {
+   // Projection translation
+   if ( b_projection_translation ) {
 
-		double min_coord = allrigidbodies->get_min_RB_coord(translation_direction);
+     double min_coord = allrigidbodies->get_min_RB_coord(translation_direction);
+     double distance_to_bottom = MAC::abs(min_coord-bottom_coordinate);
 
-		double distance_to_bottom = MAC::abs(min_coord-bottom_coordinate);
+     if ( distance_to_bottom < critical_distance_translation ) {
 
-		if ( distance_to_bottom < critical_distance_translation ) {
+       if ( my_rank == is_master )
+         MAC::out() << "         -> -> -> -> -> -> -> -> -> -> -> ->"
+		<< endl << "         !!!     Domain Translation      !!!"
+		<< endl << "         -> -> -> -> -> -> -> -> -> -> -> ->"
+		<< endl;
 
-			if ( my_rank == is_master )
-				MAC::out() << "         -> -> -> -> -> -> -> -> -> -> -> ->"
-					<< endl << "         !!!     Domain Translation      !!!"
-					<< endl << "         -> -> -> -> -> -> -> -> -> -> -> ->"
-					<< endl;
+         b_grid_has_been_translated_at_previous_time = true;
 
-			b_grid_has_been_translated_at_previous_time = true;
+         translated_distance += MVQ_translation_vector( translation_direction );
+         if ( my_rank == is_master )
+           MAC::out() << "         Translated distance = " <<
+		translated_distance << endl;
 
-			translated_distance += MVQ_translation_vector( translation_direction );
-			if ( my_rank == is_master )
-				MAC::out() << "         Translated distance = " <<
-					 translated_distance << endl;
+         fields_projection();
 
-			fields_projection();
+         if ( MVQ_translation_vector(translation_direction) < 0. )
+           bottom_coordinate = 
+	   	(*UF->primary_grid()->get_global_main_coordinates())
+			[translation_direction](0) ;
+         else
+           bottom_coordinate = 
+	   	(*UF->primary_grid()->get_global_main_coordinates())
+		[translation_direction](
+			(*UF->primary_grid()->get_global_max_index())
+				(translation_direction)) ;
 
-			if ( MVQ_translation_vector(translation_direction) < 0. )
-				bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-										  [translation_direction](0) ;
-			else
-				bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-					[translation_direction]((*UF->primary_grid()->get_global_max_index())
-										  (translation_direction)) ;
-
-			b_grid_has_been_translated_since_last_output = true;
-		}
-	}
+         b_grid_has_been_translated_since_last_output = true;
+     }
+   }
 
    if ((is_par_motion) && (is_solids)) {
 		// Solve equation of motion for all RB and update pos,vel

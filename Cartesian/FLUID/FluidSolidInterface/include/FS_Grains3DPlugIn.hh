@@ -83,6 +83,10 @@ class FS_Grains3DPlugIn : public FS_SolidPlugIn
       @param hydroFT hydro force and torque array */
       void transferHydroFTtoSolid( 
       	vector< vector<double> > const* hydroFT ) const;
+	
+      /** @brief Check that Paraview writer is activated
+      @param solid_resDir particles results directory */
+      void checkParaviewPostProcessing( string const& solid_resDir );	
       //@}
     	  
   
