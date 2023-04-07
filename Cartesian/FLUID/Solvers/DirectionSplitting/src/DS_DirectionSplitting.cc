@@ -603,6 +603,34 @@ DS_DirectionSplitting:: do_before_inner_iterations_stage(
      }
    }
 
+   // Rigid body motion
+   if ( is_GRAINS ) {
+     // Send hydro force and torque to Grains3D
+     if ( is_par_motion ) {
+       // Allocate array if empty
+       if ( !hydroFT ) {
+          size_t npart = allrigidbodies->get_number_particles();
+          vector<double> work( 6, 0. );
+          hydroFT = new vector< vector<double> >;
+          hydroFT->reserve( npart );
+          for (size_t k=0;k<npart;++k) hydroFT->push_back( work );
+       }
+
+       // Fill the hydro force and torque array
+       allrigidbodies->copyHydroFT( hydroFT );
+
+       // Transfer to Grains3D
+       solidSolver->transferHydroFTtoSolid( hydroFT );
+     }
+
+     // Compute the trajectory of particles with collisions in Grains3D
+     solidSolver->Simulation( t_it->time_step(), true, false, 1., false );
+
+     // Update the rigid components positions in the fluid
+     solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+     allrigidbodies->update( *solidFluid_transferStream );
+   }
+
    // Flow solver
    if (is_NS || is_NSwithHE) {
       start_total_timer( "DS_NavierStokes:: do_before_inner_iterations_stage" ) ;
@@ -647,36 +675,6 @@ DS_DirectionSplitting:: do_after_inner_iterations_stage(
    if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0))
       allrigidbodies->write_force_and_flux_summary(t_it, b_restart);
 
-   // Rigid body motion
-   if ( is_GRAINS )
-   {
-     // Send hydro force and torque to Grains3D
-     if ( is_par_motion )
-     {
-       // Allocate array if empty
-       if ( !hydroFT )
-       {
-         size_t npart = allrigidbodies->get_number_particles();
-	 vector<double> work( 6, 0. );
-	 hydroFT = new vector< vector<double> >;
-	 hydroFT->reserve( npart );
-	 for (size_t k=0;k<npart;++k) hydroFT->push_back( work );
-       }
-
-       // Fill the hydro force and torque array
-       allrigidbodies->copyHydroFT( hydroFT );
-
-       // Transfer to Grains3D
-       solidSolver->transferHydroFTtoSolid( hydroFT );
-     }
-
-     // Compute the trajectory of particles with collisions in Grains3D
-     solidSolver->Simulation( t_it->time_step(), true, false, 1., false );
-
-     // Update the rigid components positions in the fluid
-     solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
-     allrigidbodies->update( *solidFluid_transferStream );
-   }
 }
 
 
