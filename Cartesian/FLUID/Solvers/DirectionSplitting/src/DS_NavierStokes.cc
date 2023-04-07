@@ -56,37 +56,32 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
                                    struct DS2NS const& fromDS )
 //---------------------------------------------------------------------------
    : MAC_Object( a_owner )
-	, ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , UF ( fromDS.dom_->discrete_field( "velocity" ) )
    , PF ( fromDS.dom_->discrete_field( "pressure" ) )
    , GLOBAL_EQ( 0 )
    , mu( fromDS.mu_ )
    , kai( fromDS.kai_ )
    , AdvectionScheme( fromDS.AdvectionScheme_ )
-	, StencilCorrection( fromDS.StencilCorrection_ )
-	, is_CConlyDivergence ( fromDS.is_CConlyDivergence_ )
-	, FluxRedistThres( fromDS.FluxRedistThres_ )
+   , StencilCorrection( fromDS.StencilCorrection_ )
+   , is_CConlyDivergence ( fromDS.is_CConlyDivergence_ )
+   , FluxRedistThres( fromDS.FluxRedistThres_ )
    , AdvectionTimeAccuracy( fromDS.AdvectionTimeAccuracy_ )
    , rho( fromDS.rho_ )
-	, b_restart ( fromDS.b_restart_ )
+   , b_restart ( fromDS.b_restart_ )
    , is_solids( fromDS.is_solids_ )
-	, is_stressCal ( fromDS.is_stressCal_ )
-	, ViscousStressOrder ( fromDS.ViscousStressOrder_ )
-	, PressureStressOrder ( fromDS.PressureStressOrder_ )
-	, stressCalFreq ( fromDS.stressCalFreq_ )
-	, is_par_motion ( fromDS.is_par_motion_ )
-	, allrigidbodies ( fromDS.allrigidbodies_ )
+   , is_stressCal ( fromDS.is_stressCal_ )
+   , ViscousStressOrder ( fromDS.ViscousStressOrder_ )
+   , PressureStressOrder ( fromDS.PressureStressOrder_ )
+   , stressCalFreq ( fromDS.stressCalFreq_ )
+   , is_par_motion ( fromDS.is_par_motion_ )
+   , allrigidbodies ( fromDS.allrigidbodies_ )
    , b_projection_translation( fromDS.dom_->primary_grid()
-														->is_translation_active() )
-   , b_grid_has_been_translated_since_last_output( false )
-   , b_grid_has_been_translated_at_previous_time( false )
-   , critical_distance_translation( fromDS.critical_distance_translation_ )
-   , translation_direction( 0 )
-   , bottom_coordinate( 0. )
-   , translated_distance( 0. )
+   		->is_translation_active() )
+   , outOfDomain_boundaryID( 0 )
    , gravity_vector( 0 )
-	, exceed (false)
-	, turn (false)
+   , exceed (false)
+   , turn (false)
 {
    MAC_LABEL( "DS_NavierStokes:: DS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -274,20 +269,7 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    calculate_row_indexes ( UF );
 
    // Projection-Translation
-   if ( b_projection_translation )
-   {
-     set_translation_vector() ;
-
-     if ( MVQ_translation_vector(translation_direction) < 0. )
-       bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-                [translation_direction](0) ;
-     else
-       bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-           [translation_direction]((*UF->primary_grid()->get_global_max_index())
-                                (translation_direction)) ;
-
-     build_links_translation() ;
-   }
+   if ( b_projection_translation ) build_links_translation();
 
    if (is_solids) {
 		// Build void frac and intersection variable
@@ -373,8 +355,8 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 {
    MAC_LABEL( "DS_NavierStokes:: do_before_inner_iterations_stage" ) ;
 
-	if ( my_rank == is_master )
-		SCT_set_start( "Matrix_RE_Assembly&Initialization" );
+   if ( my_rank == is_master )
+   SCT_set_start( "Matrix_RE_Assembly&Initialization" );
 
 	// Projection translation
 	if ( b_projection_translation ) {
@@ -414,7 +396,7 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 
    if ((is_par_motion) && (is_solids)) {
 		// Solve equation of motion for all RB and update pos,vel
-		allrigidbodies->solve_RB_equation_of_motion(t_it);
+		//allrigidbodies->solve_RB_equation_of_motion(t_it);
 		allrigidbodies->compute_halo_zones_for_all_rigid_body();
 		allrigidbodies->generate_list_of_local_RB();
 		allrigidbodies->initialize_surface_variables_for_all_RB();
@@ -456,12 +438,8 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
       assemble_1D_matrices(UF,t_it);
    }
 
-	//  Projection_Translation
-	if ( b_projection_translation )
-		b_grid_has_been_translated_at_previous_time = false;
-
-	if ( my_rank == is_master )
-		SCT_get_elapsed_time( "Matrix_RE_Assembly&Initialization" );
+   if ( my_rank == is_master )
+     SCT_get_elapsed_time( "Matrix_RE_Assembly&Initialization" );
 
 }
 
@@ -4401,22 +4379,6 @@ DS_NavierStokes:: free_DS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DS_NavierStokes:: set_translation_vector()
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokes:: set_translation_vector" ) ;
-
-   MVQ_translation_vector.resize( dim );
-   translation_direction = UF->primary_grid()->get_translation_direction() ;
-   MVQ_translation_vector( translation_direction ) =
-        UF->primary_grid()->get_translation_magnitude() ;
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
 DS_NavierStokes::build_links_translation()
 //---------------------------------------------------------------------------
 {
@@ -4425,9 +4387,12 @@ DS_NavierStokes::build_links_translation()
    UF->create_transproj_interpolation() ;
    PF->create_transproj_interpolation() ;
 
-	double translation_magnitude = UF->primary_grid()->get_translation_magnitude();
+   double translation_magnitude =
+   	UF->primary_grid()->get_translation_magnitude();
+   size_t translation_direction =
+   	UF->primary_grid()->get_translation_direction();
 
-	string outOfDomain_boundaryName;
+   string outOfDomain_boundaryName;
    switch( translation_direction )
    {
      case 0:
@@ -4444,9 +4409,8 @@ DS_NavierStokes::build_links_translation()
        break;
    }
 
-
-	outOfDomain_boundaryID = int( FV_DomainBuilder::get_color_number(
-        outOfDomain_boundaryName ) );
+   outOfDomain_boundaryID = int( FV_DomainBuilder::get_color_number(
+   	outOfDomain_boundaryName ) );
 
 }
 

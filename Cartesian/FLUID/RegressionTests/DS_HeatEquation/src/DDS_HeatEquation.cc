@@ -31,7 +31,7 @@ DDS_HeatEquation const* DDS_HeatEquation::PROTOTYPE
 DDS_HeatEquation:: DDS_HeatEquation( void )
 //--------------------------------------------------------------------------
    : FV_OneStepIteration( "DDS_HeatEquation" )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
 {
    MAC_LABEL( "DDS_HeatEquation:: DDS_HeatEquation" ) ;
 
@@ -64,7 +64,7 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
    : FV_OneStepIteration( a_owner, dom, exp )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , TF ( dom->discrete_field( "temperature" ) )
    , TF_ERROR( 0 )
    , TF_DS_ERROR( 0 )
@@ -150,13 +150,13 @@ DDS_HeatEquation:: DDS_HeatEquation( MAC_Object* a_owner,
       insertion_type = exp->string_data( "InsertionType" ) ;
       MAC_ASSERT( insertion_type == "file" ) ;
       solid_filename = exp->string_data( "Particle_FileName" ) ;
-      loc_thres = exp->double_data( "Local_threshold" ) ; 
+      loc_thres = exp->double_data( "Local_threshold" ) ;
       if ( exp->has_entry( "LevelSetType" ) )
          level_set_type = exp->string_data( "LevelSetType" );
       if ( level_set_type != "Square" && level_set_type != "Rectangle" && level_set_type != "Wall_X" && level_set_type != "Wall_Y" && level_set_type != "Sphere" && level_set_type != "Wedge2D" && level_set_type != "PipeX") {
          string error_message="- Square\n   - Wall_X\n    - Wall_Y\n   - Sphere\n   - Wedge2D\n   - Rectangle\n   - PipeX";
          MAC_Error::object()->raise_bad_data_value( exp,"LevelSetType", error_message );
-      }      
+      }
    }
 
    // Build the matrix system
@@ -286,7 +286,7 @@ DDS_HeatEquation:: do_one_inner_iteration( FV_TimeIterator const* t_it )
 
    if ( my_rank == is_master ) SCT_set_start("DS_Solution");
 
-   // Solve heat equation using direction splitting 
+   // Solve heat equation using direction splitting
    HeatEquation_DirectionSplittingSolver(t_it);
 
    if ( my_rank == is_master ) SCT_get_elapsed_time( "DS_Solution" );
@@ -420,11 +420,11 @@ DDS_HeatEquation::write_output_field()
               outputFile << xC << "," << yC << "," << zC << "," << id << "," << voidf;
               for (size_t dir = 0; dir < dim; dir++) {
                   for (size_t off = 0; off < 2; off++) {
-                      outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off); 
+                      outputFile << "," << b_intersect[dir].offset[comp]->item(p,off) << "," << b_intersect[dir].value[comp]->item(p,off);
                   }
               }
               outputFile << endl;
-           } 
+           }
         }
      }
   }
@@ -433,7 +433,7 @@ DDS_HeatEquation::write_output_field()
 
 //---------------------------------------------------------------------------
 double
-DDS_HeatEquation:: bodyterm_value ( double const& xC, double const& yC, double const& zC) 
+DDS_HeatEquation:: bodyterm_value ( double const& xC, double const& yC, double const& zC)
 //---------------------------------------------------------------------------
 {
    double bodyterm = 0.;
@@ -443,7 +443,7 @@ DDS_HeatEquation:: bodyterm_value ( double const& xC, double const& yC, double c
                                                * MAC::sin( MAC::pi() * yC );
       } else if (dim == 3) {
          bodyterm = 3. * MAC::pi() * MAC::pi() * MAC::sin( MAC::pi() * xC )
-                                               * MAC::sin( MAC::pi() * yC ) 
+                                               * MAC::sin( MAC::pi() * yC )
                                                * MAC::sin( MAC::pi() * zC );
       }
    }
@@ -533,12 +533,12 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
       xleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i-1, j, k, comp, level ) ;
 
       if (is_solids) {
-         size_t p = return_node_index(TF,comp,i,j,k); 
+         size_t p = return_node_index(TF,comp,i,j,k);
          if (node.void_frac[comp]->item(p) == 0) {
             if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
                xleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
                xhl = b_intersect[dir].value[comp]->item(p,0);
-            } 
+            }
             if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
                xright = b_intersect[dir].field[comp]->item(p,1) - TF->DOF_value( i, j, k, comp, level );
                xhr = b_intersect[dir].value[comp]->item(p,1);
@@ -562,12 +562,12 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
       yleft = TF->DOF_value( i, j, k, comp, level ) - TF->DOF_value( i, j-1, k, comp, level ) ;
 
       if (is_solids) {
-         size_t p = return_node_index(TF,comp,i,j,k);           
+         size_t p = return_node_index(TF,comp,i,j,k);
          if (node.void_frac[comp]->item(p) == 0) {
             if ((b_intersect[dir].offset[comp]->item(p,0) == 1)) {
                yleft = TF->DOF_value( i, j, k, comp, level ) - b_intersect[dir].field[comp]->item(p,0);
                yhl = b_intersect[dir].value[comp]->item(p,0);
-            } 
+            }
             if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
                yright = b_intersect[dir].field[comp]->item(p,1) - TF->DOF_value( i, j, k, comp, level );
                yhr = b_intersect[dir].value[comp]->item(p,1);
@@ -605,7 +605,7 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
             zleft = 0.; zright = 0.;
          }
       }
-      
+
       //zvalue = zright/zhr - zleft/zhl;
       if (TF->DOF_in_domain(i, j, k-1, comp) && TF->DOF_in_domain(i, j, k+1, comp))
          value = zright/zhr - zleft/zhl;
@@ -616,7 +616,7 @@ DDS_HeatEquation:: compute_un_component ( size_t const& comp, size_t const& i, s
    }
 
    return(value);
-	   
+
 }
 
 //---------------------------------------------------------------------------
@@ -688,7 +688,7 @@ DDS_HeatEquation:: return_row_index (
       }
    }
 
-   return(p); 
+   return(p);
 }
 
 //---------------------------------------------------------------------------
@@ -782,23 +782,23 @@ DDS_HeatEquation:: assemble_temperature_matrix (
        // All the proc will have open left bound, except first proc for non periodic systems
        if ((is_iperiodic[dir] != 1) && (rank_in_i[dir] == 0)) l_bound = true;
 
-       // Set Aie, Aei and Aee 
+       // Set Aie, Aei and Aee
        if ((!l_bound) && (i == min_unknown_index(dir))) {
           // Periodic boundary condition at minimum unknown index
           // First proc has non zero value in Aie,Aei for first & last index
 	  if (rank_in_i[dir] == 0) {
              A[dir].ie[comp][r_index]->set_item(m,nb_ranks_comm_i[dir]-1,left);
-      	     A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,left);			
+      	     A[dir].ei[comp][r_index]->set_item(nb_ranks_comm_i[dir]-1,m,left);
 	  } else {
              A[dir].ie[comp][r_index]->set_item(m,rank_in_i[dir]-1,left);
-	     A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,left);			
+	     A[dir].ei[comp][r_index]->set_item(rank_in_i[dir]-1,m,left);
 	  }
        }
 
        if ((!r_bound) && (i == max_unknown_index(dir))) {
           // Periodic boundary condition at maximum unknown index
           // For last index, Aee comes from this proc as it is interface unknown wrt this proc
-          A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],left);			
+          A[dir].ie[comp][r_index]->set_item(m-1,rank_in_i[dir],left);
           Aee_diagcoef = value;
           A[dir].ei[comp][r_index]->set_item(rank_in_i[dir],m-1,left);
        }
@@ -941,8 +941,8 @@ DDS_HeatEquation:: assemble_schur_matrix (size_t const& comp, size_t const& dir,
             if (p > 0) Schur[dir].ii_sub[comp][r_index]->set_item(p-1,-receive_matrix->item(p,p-1));
 	    // In case of periodic and multi-processor, there will be a variant of Tridiagonal matrix instead of normal format
             if (is_iperiodic[dir] == 1) {
-               Schur[dir].ie[comp][r_index]->set_item(p,0,-receive_matrix->item(p,nb_row)); 
-               Schur[dir].ei[comp][r_index]->set_item(0,p,-receive_matrix->item(nb_row,p)); 
+               Schur[dir].ie[comp][r_index]->set_item(p,0,-receive_matrix->item(p,nb_row));
+               Schur[dir].ei[comp][r_index]->set_item(0,p,-receive_matrix->item(nb_row,p));
 	    }
 	 }
 
@@ -1136,7 +1136,7 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
               if ((b_intersect[dir].offset[comp]->item(p,1) == 1)) {
                  value = value - b_intersect[dir].field[comp]->item(p,1)/b_intersect[dir].value[comp]->item(p,1);
               }
-           }       
+           }
         }
      } else {
 	if ((b_bodyterm) && (dir==0)) {
@@ -1175,7 +1175,7 @@ DDS_HeatEquation:: assemble_local_rhs ( size_t const& j, size_t const& k, double
 
    }
 
-   // Since, this function is used in all directions; 
+   // Since, this function is used in all directions;
    // ii, jj, and kk are used to convert the passed arguments corresponding to correct direction
    size_t ii=0,jj=0,kk=0;
 
@@ -1247,7 +1247,7 @@ DDS_HeatEquation:: data_packing ( double const& fe, size_t const& comp, size_t c
 {
    LocalVector* VEC = GLOBAL_EQ->get_VEC() ;
 
-   double *packed_data = first_pass[dir].send[comp][rank_in_i[dir]]; 
+   double *packed_data = first_pass[dir].send[comp][rank_in_i[dir]];
 
    if (rank_in_i[dir] == 0) {
       // Check if bc is periodic in x
@@ -1275,7 +1275,7 @@ DDS_HeatEquation:: data_packing ( double const& fe, size_t const& comp, size_t c
    }
 
    packed_data[3*vec_pos+2] = fe; // Send the fe values and 0 for last proc
-   
+
 }
 
 //---------------------------------------------------------------------------
@@ -1335,7 +1335,7 @@ DDS_HeatEquation:: unpack_compute_ue_pack(size_t const& comp, size_t const& dir,
             second_pass[dir].send[comp][i][2*p+1] = 0;
       }
    }
-   
+
 }
 
 //---------------------------------------------------------------------------
@@ -1420,7 +1420,7 @@ DDS_HeatEquation:: solve_interface_unknowns ( double const& gamma,  FV_TimeItera
 
      	    size_t p = j-local_min_j;
 
-	    unpack_compute_ue_pack(comp,dir,p); 
+	    unpack_compute_ue_pack(comp,dir,p);
 
             // Need to have the original rhs function assembled for corrosponding j,k pair
             double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
@@ -1437,7 +1437,7 @@ DDS_HeatEquation:: solve_interface_unknowns ( double const& gamma,  FV_TimeItera
 
    	       size_t p = (j-local_min_j)+local_length_j*(k-local_min_k);
 
-	       unpack_compute_ue_pack(comp,dir,p); 
+	       unpack_compute_ue_pack(comp,dir,p);
 
                // Need to have the original rhs function assembled for corrosponding j,k pair
                double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir);
@@ -1538,7 +1538,7 @@ DDS_HeatEquation:: Solve_i_in_jk ( FV_TimeIterator const* t_it, double const& ga
         for (size_t j=min_unknown_index(dir_j);j<=max_unknown_index(dir_j);++j) {
 	   for (size_t k=local_min_k; k <= local_max_k; ++k) {
               size_t r_index = return_row_index (TF,comp,dir_i,j,k);
-              // Assemble fi and return fe for each proc locally        
+              // Assemble fi and return fe for each proc locally
               double fe = assemble_local_rhs(j,k,gamma,t_it,comp,dir_i);
               // Calculate Aei*ui in each proc locally
               compute_Aei_ui(A,VEC,comp,dir_i,r_index);
@@ -1569,11 +1569,11 @@ DDS_HeatEquation::DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_
 
    TDMatrix* Schur = GLOBAL_EQ-> get_Schur();
 
-   // Condition for variant of Tridiagonal Schur complement in Perioidic direction with multi-processor 
+   // Condition for variant of Tridiagonal Schur complement in Perioidic direction with multi-processor
    if ((is_iperiodic[dir] == 1) && (nb_ranks_comm_i[dir] != 1)) {
       LocalVector* Schur_VEC = GLOBAL_EQ->get_Schur_VEC();
       TDMatrix* DoubleSchur = GLOBAL_EQ-> get_DoubleSchur();
-      
+
       // Transfer interface_rhs to Schur VEC (i.e. S_fi and S_fe)
       size_t nrows = Schur_VEC[dir].local_T[comp]->nb_rows();
       for (size_t i = 0; i < nrows; i++) {
@@ -1639,8 +1639,8 @@ DDS_HeatEquation:: Solids_generation ()
      }
      inFile.close();
   }
-} 
-  
+}
+
 //---------------------------------------------------------------------------
 void
 DDS_HeatEquation:: nodes_temperature_initialization ( size_t const& level )
@@ -1727,10 +1727,10 @@ DDS_HeatEquation:: level_set_function (size_t const& m, size_t const& comp, doub
      level_set = delta(1);
   } else if (type == "Square") {
      double theta = 0.0;//MAC::pi()/6.;
-     if ((pow(MAC::abs(delta(0)*MAC::cos(theta) + delta(1)*MAC::sin(theta)),1) - pow(Rp,1) < 0.) 
+     if ((pow(MAC::abs(delta(0)*MAC::cos(theta) + delta(1)*MAC::sin(theta)),1) - pow(Rp,1) < 0.)
       && (pow(MAC::abs(-delta(0)*MAC::sin(theta) + delta(1)*MAC::cos(theta)),1) - pow(Rp,1) < 0.)) {
         level_set = -1.;
-     } else if ((pow(MAC::abs(delta(0)*MAC::cos(theta) + delta(1)*MAC::sin(theta)),1) - pow(Rp,1) == 0.) 
+     } else if ((pow(MAC::abs(delta(0)*MAC::cos(theta) + delta(1)*MAC::sin(theta)),1) - pow(Rp,1) == 0.)
              && (pow(MAC::abs(-delta(0)*MAC::sin(theta) + delta(1)*MAC::cos(theta)),1) - pow(Rp,1) == 0.)) {
         level_set = 0.;
      } else {
@@ -1799,9 +1799,9 @@ DDS_HeatEquation:: node_property_calculation ( )
               size_t p = return_node_index(TF,comp,i,j,k);
               for (size_t m=0;m<Npart;m++) {
                  double level_set = level_set_function(m,comp,xC,yC,zC,level_set_type);
-                 level_set *= solid.inside[comp]->item(m);  
+                 level_set *= solid.inside[comp]->item(m);
 
-                 // level_set is xb, if local critical time scale is 0.01 of the global time scale 
+                 // level_set is xb, if local critical time scale is 0.01 of the global time scale
                  // then the node is considered inside the solid object
                  // (xb/dC)^2 = 0.01 --> (xb/xC) = 0.1
                  if (level_set <= pow(loc_thres,0.5)*dC) {
@@ -1906,7 +1906,7 @@ DDS_HeatEquation:: assemble_intersection_matrix ( size_t const& comp, size_t con
                        size_t par_id = node.parID[comp]->item(node_neigh(dir,off));
                        double field_value = solid.temp[comp]->item(par_id);
                        b_intersect[dir].field[comp]->set_item(p,off,field_value);
-                    } 
+                    }
                  }
               }
            }
@@ -1976,13 +1976,13 @@ DDS_HeatEquation:: find_intersection ( size_t const& left, size_t const& right, 
 
   // In case both the points are on the same side of solid interface
   // This will occur when the point just outside the solid interface will be considered inside the solid
-  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid 
+  // This condition enables the intersection with the interface using the point in fluid and the ACTUAL node in the solid
   if (funl*funr > 0.) {
      double dx = TF->get_cell_size(side(off),comp,dir) ;
      if (off == 0) {
         xleft = xleft - dx;
      } else {
-        xright = xright + dx; 
+        xright = xright + dx;
      }
   }
 
@@ -2339,7 +2339,7 @@ DDS_HeatEquation:: allocate_mpi_variables ( void )
 //---------------------------------------------------------------------------
 {
 
-   for (size_t dir = 0; dir < dim; dir++) {  
+   for (size_t dir = 0; dir < dim; dir++) {
       first_pass[dir].size = new int [nb_comps];
       second_pass[dir].size = new int [nb_comps];
       for (size_t comp = 0; comp < nb_comps; comp++) {
@@ -2389,7 +2389,7 @@ DDS_HeatEquation:: allocate_mpi_variables ( void )
    }
 
    // Array declarations
-   for (size_t dir = 0; dir < dim; dir++) {  
+   for (size_t dir = 0; dir < dim; dir++) {
       first_pass[dir].send = new double** [nb_comps];
       first_pass[dir].receive = new double** [nb_comps];
       second_pass[dir].send = new double** [nb_comps];

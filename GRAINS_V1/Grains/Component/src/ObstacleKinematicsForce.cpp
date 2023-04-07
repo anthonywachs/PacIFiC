@@ -25,9 +25,9 @@ ObstacleKinematicsForce::~ObstacleKinematicsForce()
 
 // ----------------------------------------------------------------------------
 // Adds an imposed force load to the obstacle kinematics
-void ObstacleKinematicsForce::append( ObstacleImposedForce& chargement_ )
+void ObstacleKinematicsForce::append( ObstacleImposedForce* chargement_ )
 {
-  m_imposedForces.push_back( &chargement_ );
+  m_imposedForces.push_back( chargement_ );
 }
 
 

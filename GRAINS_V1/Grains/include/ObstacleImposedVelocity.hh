@@ -135,6 +135,7 @@ class ObstacleImposedVelocity
     Vector3 m_angularVelocity; /**< angular velocity */
     double m_Sin_amplitude; /**< sinusoidal velocity amplitude */
     double m_Sin_period; /**< sinusoidal velocity period */
+    double m_Sin_phase; /**< sinusoidal velocity phase shift */    
     Vector3 m_Sin_vitRef; /**< sinusoidal velocity reference vector */  
     double m_freqX; /**< cyclic motion frequency in x */
     double m_freqY; /**< cyclic motion frequency in y */ 

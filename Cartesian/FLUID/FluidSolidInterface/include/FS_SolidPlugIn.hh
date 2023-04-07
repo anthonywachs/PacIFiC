@@ -3,7 +3,7 @@
 
 #include <geomVector.hh>
 #include <MAC_assertions.hh>
-#include <solvercomputingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <string>
 #include <sstream>
 using std::string;
@@ -17,7 +17,7 @@ of solid bodies with potential collisions.
 
 @author A. Wachs - Pacific project 2021 */
 
-class FS_SolidPlugIn : public SolverComputingTime
+class FS_SolidPlugIn : public PAC_SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 
@@ -41,12 +41,14 @@ class FS_SolidPlugIn : public SolverComputingTime
       /** @name Virtual methods */
       //@{
       /** @brief Simulation
+      @param time_interval fluid time step
       @param predictor if yes, predictor phase, otherwise corrector phase
       @param isPredictorCorrector is the coupling scheme predictor-corrector
       @param contact_force_coef contact forces coefficient
       @param explicit_added_mass whether to treat added mass (and torque) term
         explicitly */
-      virtual void Simulation( bool const& predictor = true,
+      virtual void Simulation( double const& time_interval,
+      	bool const& predictor = true,
         bool const& isPredictorCorrector = false,
         double const& contact_force_coef = 1.,
         bool const& explicit_added_mass = false ) = 0;
@@ -68,6 +70,24 @@ class FS_SolidPlugIn : public SolverComputingTime
       @param cycleNumber cycle number */
       virtual void saveResults( string const& filename, double const& time,
         int const& cycleNumber ) = 0;
+	
+      /** @brief Transfer hydro force and torque array to solid solver
+      @param hydroFT hydro force and torque array */
+      virtual void transferHydroFTtoSolid( 
+      	vector< vector<double> > const* hydroFT ) const = 0;
+	
+      /** @brief Check that Paraview writer is activated
+      @param solid_resDir particles results directory */
+      virtual void checkParaviewPostProcessing( string const& solid_resDir ) 
+      	= 0;
+	
+      /** @brief Set the post-processing translation vector in case of
+      projection-translation
+      @param tvx x coordinate
+      @param tvy y coordinate
+      @param tvz z coordinate */
+      virtual void setParaviewPostProcessingTranslationVector( 
+      	double const& tvx, double const& tvy, double const& tvz ) = 0;	
       //@}
     
 

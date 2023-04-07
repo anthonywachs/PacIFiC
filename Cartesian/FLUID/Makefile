@@ -88,7 +88,7 @@ $(libdir)/%/Makefile:
 	-I $(XERCESCROOT)/include \
 	-I $(MACWORLD_MPI_INCDIR) \
 	-I $(BASILISK_DLMFD) \
-	-I $(GRAINS_HOME)/Grains/inc \
+	-I $(GRAINS_HOME)/Grains/include \
 	-path $(GRAINS_HOME)/Grains/lib$(GRAINS_FULL_EXT) -l grains \
 	-path $(XERCESCROOT)/lib$(GRAINS_BITS_EXT)-$(GRAINS_SERCOMPIL_ENV)-$(GRAINS_SERCOMPIL_VERSION) -l xerces-c -l xerces-depdom \
 	-path $(MACWORLD_GFORTRAN_LIBDIR) -l $(MACWORLD_GFORTRAN_LIBS) \

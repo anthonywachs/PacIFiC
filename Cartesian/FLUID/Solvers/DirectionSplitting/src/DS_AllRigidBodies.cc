@@ -1570,8 +1570,7 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 {
   MAC_LABEL( "DS_AllRigidBodies:: compute_void_fraction_on_grid" ) ;
 
-  size_t nb_comps = FF->nb_components() ;
-  size_t field = field_num(FF) ;
+  return(std::make_tuple(fraction, intersection_pt, point_in_fluid, ownerID));
 
   // void_fraction[field]->set(0);
 
@@ -1602,7 +1601,9 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
            min_unknown_index(dir) = MAC::min(temp(0),temp(1));
            max_unknown_index(dir) = MAC::max(temp(0),temp(1));
 
-        }
+  // Estimate the face fractions and centroids of the faces.
+  // corresponding to the FF cell. The parameters are stored in the
+  // following face order: left,right,bottom,top,behind,front
 
         for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
            double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
@@ -1626,6 +1627,11 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
              }
            }
         }
+     }
+     solid_volume = m_macCOMM->sum(solid_volume);
+     if (m_macCOMM->rank() == 0) {
+        std::cout << "," << solid_volume;
+        MyFile << "," << solid_volume;
      }
   }
 }
@@ -1681,6 +1687,9 @@ std::tuple<double, geomVector, int, int> DS_AllRigidBodies::
   return(std::make_tuple(fraction, intersection_pt, point_in_fluid, ownerID));
 
 }
+
+
+
 
 
 
@@ -2964,6 +2973,13 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
           min_nearest_index(dir) = MAC::min(temp(0),temp(1));
           max_nearest_index(dir) = MAC::max(temp(0),temp(1));
         }
+        // Calculation of field variable on ghost point
+        size_t_vector face_vector(3,0);
+        face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
+        double press = (m_space_dimension == 2) ?
+         Bilinear_interpolation(PF,comp,surface_point[i],i0,face_vector,{0,1}) :
+         Trilinear_interpolation(PF,comp,surface_point[i],i0,parID,{0,1}) ;
+        stress = - press/2.;
 
         max_nearest_index(2) = (m_space_dimension == 2) ? 1
                                                         : max_nearest_index(2);
@@ -3043,6 +3059,32 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
                  }
               }
            }
+        }
+
+        size_t interpol_dir = (major_dir == 0) ? 1 : 0;
+
+        double fpt1 = (m_space_dimension == 2) ?
+            Biquadratic_interpolation_for_scalars(PF, comp, &pt1, i1, interpol_dir
+                                   , sign[interpol_dir], {0,1})
+          : Triquadratic_interpolation_for_scalars(PF, comp, &pt1, i1, parID
+                                   , major_dir, sign, {0,1}) ;
+
+        double fpt2 = (m_space_dimension == 2) ?
+           Biquadratic_interpolation_for_scalars(PF, comp, &pt2, i2, interpol_dir
+                                   , sign[interpol_dir], {0,1})
+         : Triquadratic_interpolation_for_scalars(PF, comp, &pt2, i2, parID
+                                   , major_dir, sign, {0,1}) ;
+
+        double press = (fpt1 * di(1) - fpt2 * di(0)) / (di(1) - di(0));
+
+        stress = - press;
+
+        if (MESH->is_periodic_flow() &&
+            (external_gradP != 0.)) {
+           double delta = surface_point[i]->operator()(pfd)
+                        - pgc->operator()(pfd);
+           delta = delta - round(delta/isize) * isize;
+           stress += - (external_gradP * (delta + pgc->operator()(pfd)));
         }
      }
   }
@@ -3145,8 +3187,31 @@ void DS_AllRigidBodies:: clear_GrainsRB_data_on_grid(
 
 }
 
+        if ((i0_temp(0) >= 0) &&
+            (i0_temp(0) < (int)TF->get_local_nb_dof(comp,major_dir))) {
+           ghost_pt[1](major_dir) =
+                  TF->get_DOF_coordinate(i0_temp(0), comp, major_dir);
+           i0_new[1](major_dir) = i0_temp(0);
+           in_domain_comp(1,major_dir) = 1;
+        } else {
+           in_domain_comp(1,major_dir) = 0;
+        }
 
+        if ((i0_temp(1) >= 0) &&
+            (i0_temp(1) < (int)TF->get_local_nb_dof(comp,major_dir))) {
+           ghost_pt[2](major_dir) =
+                  TF->get_DOF_coordinate(i0_temp(1), comp, major_dir);
+           i0_new[2](major_dir) = i0_temp(1);
+           in_domain_comp(2,major_dir) = 1;
+        } else {
+           in_domain_comp(2,major_dir) = 0;
+        }
 
+        doubleVector di(2,0.);
+        di(1) = (ghost_pt[1](major_dir) - ghost_pt[0](major_dir))
+              / surface_normal[i]->operator()(major_dir);
+        di(2) = (ghost_pt[2](major_dir) - ghost_pt[0](major_dir))
+              / surface_normal[i]->operator()(major_dir);
 
 //---------------------------------------------------------------------------
 void DS_AllRigidBodies:: initialize_surface_variables_on_grid( )
@@ -6597,5 +6662,34 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
   }
 
   return (value);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void
+DS_AllRigidBodies::copyHydroFT( vector< vector<double> >* hydroFT )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "DS_AllRigidBodies::copyHydroFT" ) ;
+
+  for (size_t i = 0; i < m_npart; ++i)
+  {
+     (*hydroFT)[i][0] = pressure_force->operator()(i,0)
+     	+ viscous_force->operator()(i,0);
+     (*hydroFT)[i][1] = pressure_force->operator()(i,1)
+     	+ viscous_force->operator()(i,1);
+     (*hydroFT)[i][2] = pressure_force->operator()(i,2)
+     	+ viscous_force->operator()(i,2);
+
+     (*hydroFT)[i][3] = pressure_torque->operator()(i,0)
+     	+ viscous_torque->operator()(i,0);
+     (*hydroFT)[i][4] = pressure_torque->operator()(i,1)
+     	+ viscous_torque->operator()(i,1);
+     (*hydroFT)[i][5] = pressure_torque->operator()(i,2)
+     	+ viscous_torque->operator()(i,2);
+  }
 
 }

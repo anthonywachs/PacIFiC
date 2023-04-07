@@ -3,8 +3,8 @@
 
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
-#include <computingtime.hh>
-#include <solvercomputingtime.hh>
+#include <PAC_computingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <DS_NavierStokes.hh>
 #include <DS_HeatTransfer.hh>
 #include <MAC_DoubleVector.hh>
@@ -18,6 +18,7 @@ using namespace std;
 
 class MAC_Communicator ;
 class FV_DiscreteField ;
+class FV_Mesh ;
 class FS_SolidPlugIn ;
 class DS_AllRigidBodies ;
 
@@ -28,8 +29,7 @@ Server for the intiating the NavierStokes and/or HeatTransfer classes.
 @author A. Goyal - Pacific project 2022 */
 
 class DS_DirectionSplitting : public FV_OneStepIteration,
-                           public ComputingTime,
-                           public SolverComputingTime
+	public PAC_ComputingTime, public PAC_SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 
@@ -113,6 +113,15 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       //@}
 
 
+      //-- Projection-Translation methods
+
+      /** @name Projection-Translation methods */
+      //@{
+      /** @brief Set translation vector and direction */
+      void set_translation_vector();
+      //@}
+      
+
    private: //----------------------------------------------------------------
 
    //-- Class attributes
@@ -160,10 +169,21 @@ class DS_DirectionSplitting : public FV_OneStepIteration,
       istringstream* solidFluid_transferStream;
       DS_AllRigidBodies* allrigidbodies;
       bool b_particles_as_fixed_obstacles;
+      vector< vector<double> >* hydroFT;
 
+      // Grid motion
+      bool b_projection_translation;
+      FV_Mesh const* primary_grid;
       double critical_distance_translation;
+      geomVector MVQ_translation_vector;
+      size_t translation_direction;
+      double bottom_coordinate;
+      double translated_distance;      
 
       MAC_Communicator const* macCOMM;
+      size_t nb_procs;
+      size_t my_rank;
+      size_t is_master;      
 
 } ;
 

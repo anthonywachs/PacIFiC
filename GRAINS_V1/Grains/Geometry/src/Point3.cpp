@@ -25,6 +25,15 @@ namespace solid
   
   // ---------------------------------------------------------------------------
   // Copy constructor
+  Point3::Point3( Point3 const& point )
+    : Group3( point )
+  {}
+  
+  
+  
+  
+  // ---------------------------------------------------------------------------
+  // Copy constructor  
   Point3::Point3( Group3 const& point )
     : Group3( point )
   {}
@@ -110,4 +119,20 @@ namespace solid
     double c = m_comp[2] - z;
     return ( sqrt( a*a + b*b + c*c ) );
   }
+
+
+
+
+  // --------------------------------------------------------------------------
+  // Equal operator to another Group3 object
+  Point3& Point3::operator = ( Point3 const& g2 )
+  {
+    if ( &g2 != this )
+    {      
+      m_comp[X] = g2.m_comp[X];
+      m_comp[Y] = g2.m_comp[Y];
+      m_comp[Z] = g2.m_comp[Z];
+    }
+    return ( *this );
+  }  
 }

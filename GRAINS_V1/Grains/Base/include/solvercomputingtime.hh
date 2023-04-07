@@ -87,7 +87,7 @@ class SolverComputingTime
     /** @name Constructors */
     //@{
     /** @brief Copy constructor */
-    SolverComputingTime( ComputingTime const& CT );
+    SolverComputingTime( SolverComputingTime const& SCT );
     //@}              
 };
 

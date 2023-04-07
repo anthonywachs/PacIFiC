@@ -11,8 +11,8 @@ FS_SolidPlugIn* FS_SolidPlugIn_BuilderFactory:: create( string const& type,
 	string const& insertion_file_,
         string const& simulation_file_,
         double const& fluid_density,
+	bool const& correct_particle_acceleration,
         bool const& b_restart,
-        bool const& b_initializeClonePer,
         double const& grid_size,
         bool const& is_solidsolver_parallel,
 	int& error )
@@ -24,8 +24,8 @@ FS_SolidPlugIn* FS_SolidPlugIn_BuilderFactory:: create( string const& type,
   
   if ( type == "Grains3D" )
     	psolid = new FS_Grains3DPlugIn( insertion_file_, simulation_file_, 
-		fluid_density, b_restart, b_initializeClonePer, grid_size, 
-		is_solidsolver_parallel, error );
+		fluid_density, correct_particle_acceleration, b_restart, 
+		grid_size, is_solidsolver_parallel, error );
   else 
   {
     MAC::out() << "Warning: unknown solid solver type" << endl;

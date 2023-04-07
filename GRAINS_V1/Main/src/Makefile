@@ -15,7 +15,7 @@ GRAINSFLAGS := -L$(GRAINSLIB) -lgrains
 
 
 # Compiler
-# Comment: the general CC flags and MPI flags are defined in the 
+# Comment: the general CC flags and MPI flags are defined in the
 # environment file and should not be altered unless you are a hard core
 # Grains developer
 COMP  := $(GRAINS_MPI_BINDIR)/$(GRAINS_MPICCC) $(GRAINS_GENCCFLAGS) $(GRAINS_MPICCFLAGS)
@@ -23,7 +23,7 @@ LINK  := $(GRAINS_MPI_BINDIR)/$(GRAINS_MPICCC) $(GRAINS_GENCCFLAGS) $(GRAINS_MPI
 DEBUG  := -g
 
 
-# XML 
+# XML
 MACRO       = -D_XML
 XERCESINC   := $(XERCESC_ROOT)/include
 XERCESLIB   := $(XERCESC_ROOT)/lib$(GRAINS_BITS_EXT)-$(GRAINS_SERCOMPIL_ENV)-$(GRAINS_SERCOMPIL_VERSION)
@@ -72,7 +72,7 @@ START  :
 	@echo 'Compilation flags = $(GRAINS_GENCCFLAGS)$(GRAINS_MPICCFLAGS)$(COMPFLAGS)'
 	@echo 'Macros = $(MACRO)'
 	@echo
-	
+
 app    :  Grains $(MAINOBJ)
 
 Grains :
@@ -97,8 +97,8 @@ depend :
 include ./Makedepend      # DO NOT DELETE
 
 # CLEAN
-clean : 
+clean :
 	( cd ../../Grains; make clean; cd ../Main/src )
 	@echo 'Main   : deleting binary and object files'
 	rm -f $(MAINOBJ)
-	rm -f $(EXEDIR)/*	
+	rm -f $(EXEDIR)/*

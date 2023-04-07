@@ -2,6 +2,7 @@
 #include "ObstacleBuilderFactory.hh"
 #include "CompositeObstacle.hh"
 #include "SimpleObstacle.hh"
+#include "STLObstacle.hh"
 #include <string>
 using namespace std;
 
@@ -21,6 +22,7 @@ Obstacle* ObstacleBuilderFactory::create( DOMNode* root )
     type = ReaderXML::getNodeAttr_String( root, "Type" );
 
     if ( type == "Standard" ) obstacle = new SimpleObstacle( root ); 
+    else if ( type == "STL" ) obstacle = new STLObstacle( root );
   }
   else if ( type == "Composite" )
     obstacle = new CompositeObstacle( root );

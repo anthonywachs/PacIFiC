@@ -4,9 +4,9 @@
 #include <mpi.h>
 #include <FV_OneStepIteration.hh>
 #include <geomVector.hh>
-#include <computingtime.hh>
+#include <PAC_computingtime.hh>
 #include <boolVector.hh>
-#include <solvercomputingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <MAC_DoubleVector.hh>
 #include <DS_PID.hh>
 #include <vector>
@@ -62,9 +62,8 @@ struct MPIVarNS {
    double ***receive;
 };
 
-class DS_NavierStokes : public MAC_Object,
-                        public ComputingTime,
-                        public SolverComputingTime
+class DS_NavierStokes : public MAC_Object, public PAC_ComputingTime,
+	public PAC_SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 
@@ -110,6 +109,17 @@ class DS_NavierStokes : public MAC_Object,
       virtual void do_additional_savings( FV_TimeIterator const* t_it,
       	int const& cycleNumber  );
       //@}
+
+
+   //-- Projection-Translation methods
+
+      /** @name Projection-Translation methods */
+      //@{
+      /** @brief Projection of the field on the translated position of the grid
+      */
+      void fields_projection();
+      //@}
+
 
    protected: //--------------------------------------------------------------
 
@@ -402,7 +412,7 @@ class DS_NavierStokes : public MAC_Object,
       //@}
 
 
-   // Direction splitting communicators
+   //-- Direction splitting communicators
 
       /** @name Direction splitting communicators */
       /** @brief Create the sub-communicators */
@@ -420,19 +430,14 @@ class DS_NavierStokes : public MAC_Object,
 
       //@}
 
-      //-- Projection-Translation methods
+
+   //-- Projection-Translation methods
 
       /** @name Projection-Translation methods */
       //@{
-      /** @brief Set translation vector and direction */
-      void set_translation_vector();
-
       /** @brief Build the field projection-translation interpolations */
       void build_links_translation();
-
-      /** @brief Projection of the field on the translated position of the grid
-      */
-      void fields_projection();
+      //@}
 
 
    private: //----------------------------------------------------------------
@@ -490,13 +495,6 @@ class DS_NavierStokes : public MAC_Object,
 
       // Grid motion
       bool b_projection_translation;
-      bool b_grid_has_been_translated_since_last_output;
-      bool b_grid_has_been_translated_at_previous_time;
-      double critical_distance_translation;
-      geomVector MVQ_translation_vector;
-      size_t translation_direction;
-      double bottom_coordinate;
-      double translated_distance;
       int outOfDomain_boundaryID;
 
       double Qold;

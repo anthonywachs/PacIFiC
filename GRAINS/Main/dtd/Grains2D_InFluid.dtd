@@ -1,9 +1,9 @@
 <!-- Grains2D_InFluid DTD -->
 
-<!ENTITY % Convex.dtd SYSTEM "/home/goyal001/Documents/GIT/pacific/GRAINS/Main/dtd/Convex.dtd">
+<!ENTITY % Convex.dtd SYSTEM "/home/damien/phd/pacific/GRAINS/Main/dtd/Convex.dtd">
 %Convex.dtd;
 
-<!ENTITY % Contact.dtd SYSTEM "/home/goyal001/Documents/GIT/pacific/GRAINS/Main/dtd/Contact.dtd">
+<!ENTITY % Contact.dtd SYSTEM "/home/damien/phd/pacific/GRAINS/Main/dtd/Contact.dtd">
 %Contact.dtd;
 
 <!ELEMENT Point EMPTY>

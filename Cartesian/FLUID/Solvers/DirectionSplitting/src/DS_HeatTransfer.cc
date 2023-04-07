@@ -51,7 +51,7 @@ DS_HeatTransfer:: DS_HeatTransfer( MAC_Object* a_owner,
 				    			  			  struct DS2HE const& fromDS )
 //---------------------------------------------------------------------------
    : MAC_Object( a_owner )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , TF ( fromDS.dom_->discrete_field( "temperature" ) )
    , UF ( 0 )
    , TF_DS_ERROR( 0 )

@@ -3,8 +3,8 @@
 
 #include <FV_OneStepIteration.hh>
 #include <geomVector.hh>
-#include <computingtime.hh>
-#include <solvercomputingtime.hh>
+#include <PAC_computingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <REG_ViscoplasticFISTASystem.hh>
 #include <FV_DiscreteField.hh>
 #include <vector>
@@ -25,8 +25,8 @@ Solver for the incompressible viscoplastic NavierStokes problem.
 
 @author A. Wachs - Pacific project 2018-2019 */
 
-class REG_ViscoplasticFISTA : public FV_OneStepIteration, public ComputingTime,
-public SolverComputingTime
+class REG_ViscoplasticFISTA : public FV_OneStepIteration, 
+	public PAC_ComputingTime, public PAC_SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 

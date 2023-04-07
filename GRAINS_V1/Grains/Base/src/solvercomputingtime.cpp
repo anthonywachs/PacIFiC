@@ -27,7 +27,7 @@ SolverComputingTime::SolverComputingTime( list<string>& all_apps_ )
 
 // ----------------------------------------------------------------------------
 // Copy constructor
-SolverComputingTime::SolverComputingTime( ComputingTime const& CT ) 
+SolverComputingTime::SolverComputingTime( SolverComputingTime const& SCT ) 
 {}
 
 

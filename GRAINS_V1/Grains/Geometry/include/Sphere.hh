@@ -9,13 +9,13 @@ using namespace solid;
 
 /** @brief The class Sphere.
 
-    Convex with a spherical shape. From GJK Engine - A Fast and 
+    Convex with a spherical shape. From GJK Engine - A Fast and
     Robust GJK Implementation, Copyright (C) 1998  Gino van den Bergen.
-    
-    @author D.PETIT - Institut Francais du Petrole - 2000 - Creation 
+
+    @author D.PETIT - Institut Francais du Petrole - 2000 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
-class Sphere : public Convex 
+class Sphere : public Convex
 {
   public:
     /**@name Constructors */
@@ -31,11 +31,11 @@ class Sphere : public Convex
     /** @brief Constructor with an XML node as an input parameter
     @param root XML node */
     Sphere( DOMNode* root );
-  
+
     /** @brief Destructor */
     ~Sphere();
     //@}
-  
+
 
     /** @name Methods */
     //@{
@@ -61,7 +61,7 @@ class Sphere : public Convex
 
     /** @brief Returns the number of vertices/corners or a code corresponding to
     a specific convex shape. Here 1 as a convention */
-    int getNbCorners() const;  
+    int getNbCorners() const;
 
     /** @brief Returns the sphere volume */
     double getVolume() const;
@@ -78,36 +78,36 @@ class Sphere : public Convex
     point on the surface of the sphere that satisfies max(P.v)
     @param v direction vector */
     Point3 support( Vector3 const& v ) const;
-  
+
     /** @brief Returns the number of points to write the sphere in a
     Paraview format */
     int numberOfPoints_PARAVIEW() const;
-  
-    /** @brief Returns the number of elementary polytopes to write the sphere 
+
+    /** @brief Returns the number of elementary polytopes to write the sphere
     in a Paraview format */
     int numberOfCells_PARAVIEW() const;
 
     /** @brief Writes a list of points describing the sphere in a
-    Paraview format 
+    Paraview format
     @param f output stream
-    @param transform geometric transformation 
+    @param transform geometric transformation
     @param translation additional center of mass translation */
-    void write_polygonsPts_PARAVIEW( ostream& f, 
-  	Transform const& transform, 
+    void write_polygonsPts_PARAVIEW( ostream& f,
+  	Transform const& transform,
   	Vector3 const* translation = NULL ) const;
-	
+
     /** @brief Returns a list of points describing the sphere in a
-    Paraview format 
-    @param transform geometric transformation 
+    Paraview format
+    @param transform geometric transformation
     @param translation additional center of mass translation */
     list<Point3> get_polygonsPts_PARAVIEW( Transform const& transform,
-  	Vector3 const* translation = NULL ) const; 
-	
+  	Vector3 const* translation = NULL ) const;
+
     /** @brief Writes the sphere in a STL format
     @param f output stream
     @param transform geometric transformation */
     void write_convex_STL( ostream& f, Transform const& transform ) const;
-  
+
     /** @brief Writes the sphere in a Paraview format
     @param connectivity connectivity of Paraview polytopes
     @param offsets connectivity offsets
@@ -116,33 +116,33 @@ class Sphere : public Convex
     @param last_offset last offset used for the previous convex shape */
     void write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
-	int& last_offset ) const; 
-	
-    /** @brief Sets the number of point per quarter of the equator line for 
+	int& last_offset ) const;
+
+    /** @brief Sets the number of point per quarter of the equator line for
     Paraview post-processing, i.e., controls the number of facets in the sphere
-    reconstruction in Paraview 
+    reconstruction in Paraview
     @param nbpts number of point per quarter of the equator line */
     static void SetvisuNodeNbPerQar( int nbpts );
-  
+
     /** @brief Returns whether the convex shape is a sphere */
-    bool isSphere() const;  
-  
+    bool isSphere() const;
+
     /** @brief Returns an orientation vector describing the convex shape angular
     position
     @param transform geometric transformation */
-    Vector3 computeOrientationVector( Transform const* transform ) const; 
-    
+    Vector3 computeOrientationVector( Transform const* transform ) const;
+
     /** @ brief Returns whether a point lies inside the sphere
     @param pt point */
-    bool isIn( Point3 const& pt ) const;        
+    bool isIn( Point3 const& pt ) const;
     //@}
-  
+
 
   protected:
     /**@name Parameters */
     //@{
     double m_radius; /**< sphere radius */
-    static int m_visuNodeNbPerQar; /**< number of points per quarter of the 
+    static int m_visuNodeNbPerQar; /**< number of points per quarter of the
     	equator line for Paraview post-processing */
     //@}
 
@@ -152,9 +152,9 @@ class Sphere : public Convex
     /** @brief Returns the circumscribed radius of the reference sphere,
     i.e., without applying any transformation */
     double computeCircumscribedRadius() const;
-    //@} 
+    //@}
 
-  
+
   private:
     /**@name Methods */
     //@{
@@ -163,13 +163,13 @@ class Sphere : public Convex
     @param f output stream
     @param GC center of mass coordinates
     @param pp1 point 1
-    @param pp2 point 2  
+    @param pp2 point 2
     @param pp3 point 3 */
     void write_STLfacet_sphere( ostream& f, Point3 const& GC,
   	Point3 const& pp1,
-  	Point3 const& pp2,	
+  	Point3 const& pp2,
   	Point3 const& pp3 ) const;
-    //@}     
+    //@}
 };
 
 #endif

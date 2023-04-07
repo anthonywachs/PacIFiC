@@ -1,27 +1,41 @@
 /**
 # Lagrangian mesh
 
-In this file, we implement a Lagrangian mesh meant to track the position and
-compute the stresses of an elasitc membrane.
+In this file, we implement a Lagrangian mesh for the front-tracking method,
+meant to track the position and compute the stresses of an elasitc membrane.
 
 
 ## Structure of the mesh
 
-In the Lagrangian mesh, each node is assigned coordinates, the IDs of its
-two connecting edges (in 2D), an elastic force, a velocity, a normal vector,
-a current and a reference curvature (i.e. the curvature of the unstressed
-resting shape) and a stencil used for averaging the neighboring velocities and
-spreading the Lagrangian force as a body force on the neighboring Eulerian
-nodes. In the case of MPI, we also store the rank of the processor which owns
-the Eulerian cell containing the Node.
+In the Lagrangian mesh, each node is assigned several attributes:
+
+* ```pos```, the node coordinates
+* ```lagVel```, the node velocity vector
+* ```normal```, the vector normal to the membrane at the node coordinates
+* ```curv```, the (mean) curvature of the membrane at the node coordinates
+* ```ref_curv```, the reference (mean) curvature of the membrane at the node coordinates (default is zero)
+* ```lagForce```, an elastic and/or bending force exerted by the membrane on its surrounding fluid
+* ```stencil```, a [Cache](http://basilisk.fr/src/grid/tree.h#82) structure used for averaging the neighboring velocities and spreading the Lagrangian force as a body force on the neighboring Eulerian nodes
+* in case of MPI simulations, ```pid```, the rank of the processor owning the Eulerian cell which contains the lagNode
+* ```edge_ids```, the IDs of its connecting edges: 2 in 2D, up to 6 in 3D (because every considered shape is derived by subdividing in icosahedron, leading to 5 or 6 neighbors only).
+
+In case of 3D simulations, other attributes are introduced:
+
+* ```nb_neighbors```, the number of neighbors of the node, which should only be 5 or 6
+* ```neighbor_ids```, the IDs of the node neighbors
+* ```nb_triangles```, the number of triangles having the node as a vertex
+* ```triangle_ids```, the ids of the above triangles
+* ```gcurv```, the Gaussian curvature of the membrane at the node coordinates
+* ```nb_fit_iterations```, the number of iterations needed to compute the membrane curvature and normal vector to the desired convergence threshold.
+
 */
 typedef struct lagNode {
   coord pos;
-  coord lagForce;
   coord lagVel;
   coord normal;
   double curv;
   double ref_curv;
+  coord lagForce;
   Cache stencil;
   #if _MPI
     int pid;
@@ -29,33 +43,51 @@ typedef struct lagNode {
   #if dimension < 3
     int edge_ids[2];
   #else
+    int edge_ids[6];
     int nb_neighbors;
     int neighbor_ids[6];
-    int nb_edges;
-    int edge_ids[6];
     int nb_triangles;
     int triangle_ids[6];
+    double gcurv;
+    int nb_fit_iterations;
   #endif
 } lagNode;
 
-/** Similarly, the edges of the mesh are assigned the IDs of the two nodes they
-connect, an undeformed and a deformed lengths $l_0$ and $l$, and a normal
-vector.  */
+/** Similarly, the edges of the mesh are assigned:
+
+* ```node_ids```, the IDs of the two nodes they connect
+* In case of 3D simulations, ```triangle_ids```, the IDs of the two triangles they separate
+* ```l0```, the length of the edge in the initial stress-free configuration
+* ```length```, the current length of the edge
+* ```normal```, a vector normal to the membrane at the edge midpoint.
+
+*/
 typedef struct Edge {
   int node_ids[2];
   #if dimension > 2
     int triangle_ids[2];
   #endif
-  double l0, length; // Initial edge length, current stretch
+  double l0;
+  double length;
   coord normal;
 } Edge;
 
-/** In 3 dimensions, we define triangle faces */
+/** In case of 3D simulations, we define triangle faces. Each ```Triangle``` structure has the following attributes:
+
+* ```node_ids```, the IDs of the triangle vertices
+* ```edge_ids```, the IDs of the triangle edges
+* ```area```, the current area of the triangle
+* ```normal```, the normal vector to the triangle pointing outside the membrane
+* ```centroid```, the coordinates of the triangle centroid
+* ```refShape```, the coordinates of the vertices in the Common Plane in the stress-free configuration. By convention the first vertex is always placed at $(0, 0, 0)$, so only the coordinates of the second and third vertex are stored in ```refShape```
+* ```sfc```, the shape function coefficients used in the finite elements method and computed in [store_initial_configuration](elasticity-ft.h#store_initial_configuration). There are two coefficients per vertex, hence the $3 \times 2$ array structure of ```sfc```.
+
+ */
 #if dimension > 2
   typedef struct Triangle {
     int node_ids[3];
     int edge_ids[3];
-    double area, refArea;
+    double area;
     coord normal;
     coord centroid;
     coord refShape[2];
@@ -63,17 +95,27 @@ typedef struct Edge {
   } Triangle;
 #endif
 
-/** The lagMesh struct stores an array of nodes, edges as well as their
-respective sizes. The three booleans are used to check if the stretches, normal
-vectors and curvatures have been re-computed since the position of the mesh was
-advected. */
+/** The ```lagMesh``` structure contains arrays of the previously introduced nodes, edges and triangles. It defines an unstructured mesh, the membrane of our capsule. Its attributes are:
+
+*  ```nlp``` the number of Lagrangian nodes (or Lagrangian points, hence the "p")
+* ```nodes```, the array of Lagrangian nodes
+* ```nle```, the number of Lagrangian edges
+* ```edges```, the array of Lagrangian edges
+* In case of 3D simulations:
+    * ```nlt```, the number of Lagrangian triangles
+    * ```triangles```, the array of Lagrangian triangles
+* ```updated_stretches```, a boolean used to check if the current length of the edges has been updated since the last advection of the Lagrangian nodes
+* ```updated_normals```, a similar boolean telling if the nodal normal vectors should be recomputed
+* ```updated_curvatures```, a last boolean telling if the nodal curvatures should be recomputed.
+*/
+
 typedef struct lagMesh {
-  int nlp;  // Number of Lagrangian points
-  int nle;  // Number of Lagrangian Edges
-  lagNode* nodes;  // Array of nodes
-  Edge* edges;  // Array of edges
+  int nlp;
+  lagNode* nodes;
+  int nle;
+  Edge* edges;
   #if dimension > 2
-    int nlt; // Number of Lagrangian triangles
+    int nlt;
     Triangle* triangles;
   #endif
   bool updated_stretches;
@@ -81,8 +123,8 @@ typedef struct lagMesh {
   bool updated_curvatures;
 } lagMesh;
 
-/** We denote by $NCAPS$ the number of Lagrangian meshes, or capsules, in the
-simulation. It is one by default. */
+/** We denote by ```NCAPS``` the number of Lagrangian meshes, or capsules, in
+the simulation. It is one by default. */
 #ifndef NCAPS
   #define NCAPS 1
 #endif
@@ -130,7 +172,7 @@ void free_caps(Capsules* caps) {
 }
 
 /** By default, the mesh is advected using a second-order two-step Runge Kutta
-scheme. If the following macro is set to $0$, a first-order forward Euler schme
+scheme. If the following macro is set to 0, a first-order forward Euler schme
 is used instead. */
 #ifndef ADVECT_LAG_RK2
   #define ADVECT_LAG_RK2 1
@@ -153,6 +195,15 @@ be the case. */
 #define PERIODIC_1DAVG(a,b) (fabs(a - L0 - b) > L0/2. ? a + L0 + b : a - L0 + b)
 #define GENERAL_1DAVG(a,b) (ACROSS_PERIODIC(a,b) ? PERIODIC_1DAVG(a,b) : a + b)
 
+#if dimension < 3
+  #define cnorm(a) (sqrt(sq(a.x) + sq(a.y)))
+  #define cdot(a,b) (a.x*b.x + a.y*b.y)
+#else
+  #define cnorm(a) (sqrt(sq(a.x) + sq(a.y) + sq(a.z)))
+  #define cdot(a,b) (a.x*b.x + a.y*b.y + a.z*b.z)
+#endif
+
+
 
 /**
 ## Geometric computations
@@ -172,9 +223,9 @@ double edge_length(lagMesh* mesh, int i) {
 }
 
 /**
-The function below computes the membrane stretch $\lambda = \frac{l}{l_0}$,
-with $l$ the current length of an edge and $l_0$ its reference length
-(in the untressed resting shape).
+The function ```compute_lengths``` below computes the lengths of all edges. It
+takes as an argument a pointer to the mesh. If the optional argument
+```force``` is set to ```true```, the edges' lengths are computed no matter the value of ```updated_stretches```.
 */
 struct _compute_lengths{
   lagMesh* mesh;
@@ -194,7 +245,7 @@ void compute_lengths(struct _compute_lengths p) {
 #if dimension < 3
 /**
 The two functions below compute the outward normal vector to all the edges of
-a Lagrangian mesh.
+a Lagrangian mesh, for 2D simulations.
 */
 void comp_edge_normal(lagMesh* mesh, int i) {
     int node_id[2];
@@ -212,7 +263,7 @@ void comp_edge_normals(lagMesh* mesh) {
   for(int i=0; i<mesh->nle; i++) comp_edge_normal(mesh, i);
 }
 #else // dimension > 2
-/** The function below assumes that the Lagrangian mesh contains the origin and
+/** In 3D simulations, the function below assumes that the Lagrangian mesh contains the origin and
 is convex, and swaps the order of the nodes in order to compute an outward
 normal vector. This only need to be performed at the creation of the mesh since
 the outward property of the normal vectors won't change through the simulation.
@@ -220,7 +271,9 @@ the outward property of the normal vectors won't change through the simulation.
 void comp_initial_area_normals(lagMesh* mesh) {
   for(int i=0; i<mesh->nlt; i++) {
     int nid[3]; // node ids
-    coord centroid;
+    coord centroid; /** Note: the centroid is only valid if the triangle is not
+    across periodic boundaries, which is fine for this function since it is
+    assumed the center of the membrane is at the origin. */
     foreach_dimension() centroid.x = 0.;
     for(int j=0; j<3; j++) {
       nid[j] = mesh->triangles[i].node_ids[j];
@@ -250,21 +303,34 @@ void comp_initial_area_normals(lagMesh* mesh) {
   }
 }
 
-/** The two function below compute the outward normal vector to all the
-triangles of the mesh. */
+/** The two functions below compute the outward normal vector to all the
+triangles of the mesh, for 3D simulations. */
 void comp_triangle_area_normal(lagMesh* mesh, int i) {
   int nid[3]; // node ids
   for(int j=0; j<3; j++) nid[j] = mesh->triangles[i].node_ids[j];
+  /** The next 15 lines compute the centroid of the triangle, making sure it is
+  valid when the triangle lies across periodic boundaries. */
   foreach_dimension() mesh->triangles[i].centroid.x = 0.;
   for(int j=0; j<3; j++) {
-    nid[j] = mesh->triangles[i].node_ids[j];
-    foreach_dimension()
-      mesh->triangles[i].centroid.x += mesh->nodes[nid[j]].pos.x/3;
+    foreach_dimension() {
+      mesh->triangles[i].centroid.x +=
+        ACROSS_PERIODIC(mesh->nodes[nid[j]].pos.x/3,
+        mesh->nodes[nid[0]].pos.x/3) ? mesh->nodes[nid[j]].pos.x/3 - L0 :
+        mesh->nodes[nid[j]].pos.x/3;
+    }
+  }
+  foreach_dimension() {
+    if (fabs(mesh->triangles[i].centroid.x) > L0/2.) {
+      if (mesh->triangles[i].centroid.x > 0)
+        mesh->triangles[i].centroid.x -= L0;
+      else mesh->triangles[i].centroid.x += L0;
+    }
   }
   coord normal, e[2];
   for(int j=0; j<2; j++)
     foreach_dimension()
-      e[j].x = mesh->nodes[nid[0]].pos.x - mesh->nodes[nid[j+1]].pos.x;
+      e[j].x = GENERAL_1DIST(mesh->nodes[nid[0]].pos.x,
+        mesh->nodes[nid[j+1]].pos.x);
   foreach_dimension() normal.x = e[0].y*e[1].z - e[0].z*e[1].y;
   double norm = sqrt(sq(normal.x) + sq(normal.y) + sq(normal.z));
   foreach_dimension() mesh->triangles[i].normal.x = normal.x/norm;
@@ -306,7 +372,7 @@ void comp_normals(lagMesh* mesh) {
       normn = sqrt(normn);
       foreach_dimension() mesh->nodes[i].normal.x /= normn;
     }
-    #else // dimension = 3
+    #else // dimension == 3
     comp_triangle_area_normals(mesh);
     for(int i=0; i<mesh->nlp; i++) {
       foreach_dimension() mesh->nodes[i].normal.x = 0.;
@@ -323,108 +389,11 @@ void comp_normals(lagMesh* mesh) {
       }
       foreach_dimension()
         mesh->nodes[i].normal.x /= sw;
+      double normn = cnorm(mesh->nodes[i].normal);
+      foreach_dimension() mesh->nodes[i].normal.x /= normn;
     }
     #endif
     mesh->updated_normals = true;
-  }
-}
-
-
-/**
-The function below computes the signed curvature of the Lagrangian mesh at each
-node. It scales in a second-order fashion with the number of Lagrangian points.
-It only works in two dimensions.
-*/
-void comp_curvature(lagMesh* mesh) {
-  if (!mesh->updated_curvatures) {
-    comp_normals(mesh);
-    #if dimension < 3
-    bool up; // decide if we switch the x and y axes
-    lagNode* cn; // current node
-    for(int i=0; i<mesh->nlp; i++) {
-      cn = &(mesh->nodes[i]);
-      up = (fabs(cn->normal.y) > fabs(cn->normal.x)) ? true : false;
-      coord p[5]; // store the coordinates of the current node and of its
-                  // neighbors'
-      for(int j=0; j<5; j++) {
-        int index = (mesh->nlp + i - 2 + j)%mesh->nlp;
-        foreach_dimension() p[j].x = up ? mesh->nodes[index].pos.x :
-          mesh->nodes[index].pos.y;
-      }
-      /** If one of the neighboring nodes is across a periodic boundary, we
-correct its position */
-      for(int j=0; j<5; j++) {
-        if (j!=2) {
-          foreach_dimension() {
-            if (ACROSS_PERIODIC(p[j].x,p[2].x)) {
-              p[j].x += (ACROSS_PERIODIC(p[j].x + L0, p[2].x)) ? -L0 : L0;
-            }
-          }
-        }
-      }
-
-/** Since the bending force will involve taking the laplacian of the curvature,
-we seek a cuvrature to fourth order accuracy, so we need to interpolate the
-membrane with a fourth-degree polynomial, which we need to differentiate twice
-to get the curvature:
-$$P_4(x) = \sum_{j=i-2}^{i+2} y_j \prod_{k \neq j} \frac{x - x_j}{x_k - x_j} $$
-
-$$P'_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
-\right) \sum_{l \neq j}\prod_{m \neq j, m \neq l} x - x_m $$
-
-$$P''_4(x) = \sum_{j=i-2}^{i+2} y_j \left( \prod_{k \neq j} \frac{1}{x_k - x_j}
-\right) \sum_{l \neq j}\sum_{m \neq j, m \neq l}\sum_{n \neq j, n \neq l, n
-\neq m}x - x_n $$
-*/
-      double dy = 0.;
-      double ddy = 0.;
-      for(int j=0; j<5; j++) {
-        double b1 = 0.; double b2 = 0.;
-        for(int l=0; l<5; l++) {
-          if (l!=j) {
-            double c1 = 1.; double c2 = 0.;
-            for(int m=0; m<5; m++) {
-              if (m!=j && m!=l) {
-                double d2 = 1.;
-                for(int n=0; n<5; n++) {
-                  if (n!=j && n!=l && n!= m) {
-                    d2 *= p[2].x - p[n].x;
-                  }
-                }
-                c1 *= p[2].x - p[m].x;
-                c2 += d2;
-              }
-            }
-            b1 += c1;
-            b2 += c2;
-          }
-        }
-        for(int k=0; k<5; k++) {
-          if (k!=j) {
-            b1 /= (p[k].x - p[j].x);
-            b2 /= (p[k].x - p[j].x);
-          }
-        }
-        dy += b1*p[j].y;
-        ddy += b2*p[j].y;
-      }
-
-      /** The formula for the signed curvature of a function y(x) is
-  $$ \kappa = \frac{y''}{(1 + y'^2)^{\frac{3}{2}}}. $$
-  The sign is dertemined from a parametrization of the curve: walking
-  anticlockwise along the curve, if we turn left the curvature is positive. This
-  statement can be easily written as a dot product between edge i's normal
-  vector and edge (i+1)'s direction vector.*/
-      coord a, b;
-      foreach_dimension() {
-        a.x = mesh->edges[mesh->nodes[i].edge_ids[0]].normal.x;
-        b.x = mesh->edges[mesh->nodes[i].edge_ids[1]].normal.x;
-      }
-      int s = (a.x*b.x + a.y*b.y > 0) ? 1 : -1;
-      cn->curv = s*fabs(ddy)/cube(sqrt(1 + sq(dy)));
-    }
-    #endif
-    mesh->updated_curvatures = true;
   }
 }
 
@@ -441,11 +410,14 @@ bool on_face(double p, int n, double l0) {
 
 void correct_lag_pos(lagMesh* mesh) {
   for(int i=0; i < mesh->nlp; i++) {
+    coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
     foreach_dimension() {
       if (on_face(mesh->nodes[i].pos.x, N, L0))
         mesh->nodes[i].pos.x += 1.e-10;
-      if(fabs(mesh->nodes[i].pos.x) > L0/2)
-        mesh->nodes[i].pos.x -= L0*sign(mesh->nodes[i].pos.x);
+      if (mesh->nodes[i].pos.x > origin.x + L0/2)
+        mesh->nodes[i].pos.x -= L0;
+      else if (mesh->nodes[i].pos.x < origin.x - L0/2)
+        mesh->nodes[i].pos.x += L0;
     }
   }
   mesh->updated_stretches = false;
@@ -471,9 +443,10 @@ nodes.
 /**
 The function below advects each Lagrangian node by
 interpolating the velocities around the node of interest. By default, a
-second-order Runge Kutta scheme is used. By setting the macro $ADVECT\_LAG\_RK2$
-to zero, a simple forward Euler scheme is used as a scheme.
+second-order Runge Kutta scheme is used. By setting the macro
+```ADVECT_LAG_RK2``` to 0, a simple forward Euler scheme is used.
 */
+trace
 void advect_lagMesh(lagMesh* mesh) {
   eul2lag(mesh);
   #if !(ADVECT_LAG_RK2)
@@ -495,10 +468,10 @@ void advect_lagMesh(lagMesh* mesh) {
     correct_lag_pos(&buffer_mesh);
     for(int j=0; j<buffer_mesh.nlp; j++) {
       buffer_mesh.nodes[j].stencil.n = STENCIL_SIZE;
-      buffer_mesh.nodes[j].stencil.nm = STENCIL_SIZE*128;
+      buffer_mesh.nodes[j].stencil.nm = STENCIL_SIZE;
       buffer_mesh.nodes[j].stencil.p = malloc(STENCIL_SIZE*sizeof(Index));
     }
-    generate_lag_stencils(&buffer_mesh);
+    generate_lag_stencils_one_caps(&buffer_mesh);
     eul2lag(&buffer_mesh);
     for(int i=0; i<mesh->nlp; i++) {
       // Step 2 of RK2
@@ -509,18 +482,18 @@ void advect_lagMesh(lagMesh* mesh) {
     free(buffer_mesh.nodes);
   #endif
   correct_lag_pos(mesh);
-  generate_lag_stencils(mesh);
+  generate_lag_stencils_one_caps(mesh);
 }
 
 
 /**
 ## Putting the pieces together
 
-Below with call the above functions at the appropriate time using the Basilisk
+Below, we call the above functions at the appropriate time using the Basilisk
 event syntax.
 
 We start by creating empty Lagrangian meshes, and allocating an acceleration
-field in case it isn't done yet by another Basilisk module.
+field in case it isn't done yet by another Basilisk solver.
 */
 event defaults (i = 0) {
   mbs.nbmb = NCAPS;
@@ -531,7 +504,9 @@ event defaults (i = 0) {
     a = new face vector;
     foreach_face()
       a.x[] = 0.;
+    #if OLD_QCC
     boundary ((scalar *){a});
+    #endif
   }
 }
 
@@ -542,10 +517,10 @@ event init (i = 0) {
   for(int i=0; i<mbs.nbmb; i++) {
     for(int j=0; j<MB(i).nlp; j++) {
       MB(i).nodes[j].stencil.n = STENCIL_SIZE;
-      MB(i).nodes[j].stencil.nm = STENCIL_SIZE*128;
+      MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
       MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
     }
-    generate_lag_stencils(&MB(i));
+    generate_lag_stencils_one_caps(&MB(i));
   }
 }
 
@@ -566,9 +541,11 @@ faces, and will be fed as a source term to the Navier-Stokes solver. */
 vector forcing[];
 event acceleration (i++) {
   face vector ae = a;
-  foreach() foreach_dimension() forcing.x[] = 0.;
+  foreach()
+    if (cm[] > 1.e-20) foreach_dimension() forcing.x[] = 0.;
   for(int i=0; i<mbs.nbmb; i++) lag2eul(forcing, &mbs.mb[i]);
-  foreach_face() ae.x[] += .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
+  foreach_face()
+    if (fm.x[] > 1.e-20) ae.x[] += .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
 }
 
 /** At the end of the simulation, we free the allocated memory.*/
