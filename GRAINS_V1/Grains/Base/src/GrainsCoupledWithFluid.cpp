@@ -10,7 +10,7 @@
 
 
 // ----------------------------------------------------------------------------
-// Constructeur par defaut
+// Default constructor
 GrainsCoupledWithFluid::GrainsCoupledWithFluid( double fluid_density_ ) 
   : Grains()
   , m_fluid_density( fluid_density_ )
@@ -1140,4 +1140,20 @@ void GrainsCoupledWithFluid::updateParticlesHydroFT(
 void GrainsCoupledWithFluid::setFluidCorrectedAcceleration( bool correct )
 {
   Particle::setFluidCorrectedAcceleration( correct );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the Paraview post-processing translation vector in case of
+// projection-translation
+void GrainsCoupledWithFluid::setParaviewPostProcessingTranslationVector( 
+      	double const& tvx, double const& tvy, double const& tvz )
+{
+  if ( !GrainsExec::m_translationParaviewPostProcessing )
+    GrainsExec::m_translationParaviewPostProcessing = new Vector3();
+  (*GrainsExec::m_translationParaviewPostProcessing)[X] = tvx;
+  (*GrainsExec::m_translationParaviewPostProcessing)[Y] = tvy;
+  (*GrainsExec::m_translationParaviewPostProcessing)[Z] = tvz;
 }

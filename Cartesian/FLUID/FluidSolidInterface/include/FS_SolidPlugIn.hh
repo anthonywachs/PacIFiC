@@ -80,6 +80,14 @@ class FS_SolidPlugIn : public PAC_SolverComputingTime
       @param solid_resDir particles results directory */
       virtual void checkParaviewPostProcessing( string const& solid_resDir ) 
       	= 0;
+	
+      /** @brief Set the post-processing translation vector in case of
+      projection-translation
+      @param tvx x coordinate
+      @param tvy y coordinate
+      @param tvz z coordinate */
+      virtual void setParaviewPostProcessingTranslationVector( 
+      	double const& tvx, double const& tvy, double const& tvz ) = 0;	
       //@}
     
 

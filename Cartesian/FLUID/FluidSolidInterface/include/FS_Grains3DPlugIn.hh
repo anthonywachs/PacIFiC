@@ -87,6 +87,14 @@ class FS_Grains3DPlugIn : public FS_SolidPlugIn
       /** @brief Check that Paraview writer is activated
       @param solid_resDir particles results directory */
       void checkParaviewPostProcessing( string const& solid_resDir );	
+	
+      /** @brief Set the post-processing translation vector in case of
+      projection-translation
+      @param tvx x coordinate
+      @param tvy y coordinate
+      @param tvz z coordinate */
+      void setParaviewPostProcessingTranslationVector( 
+      	double const& tvx, double const& tvy, double const& tvz );
       //@}
     	  
   

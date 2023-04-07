@@ -204,3 +204,19 @@ void FS_Grains3DPlugIn:: checkParaviewPostProcessing(
              "grains", solid_resDir, true ) ;
   
 } 
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_Grains3DPlugIn:: setParaviewPostProcessingTranslationVector( 
+      	double const& tvx, double const& tvy, double const& tvz )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Grains3DPlugIn:: setParaviewPostProcessingTranslationVector" );
+  
+  if ( m_Grains3D_active_on_this_rank )
+    m_Grains3D->setParaviewPostProcessingTranslationVector( 
+      	tvx, tvy, tvz );
+  
+} 

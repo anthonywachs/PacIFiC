@@ -78,12 +78,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    , allrigidbodies ( fromDS.allrigidbodies_ )
    , b_projection_translation( fromDS.dom_->primary_grid()
    		->is_translation_active() )
-   , b_grid_has_been_translated_since_last_output( false )
-   , b_grid_has_been_translated_at_previous_time( false )
-   , critical_distance_translation( fromDS.critical_distance_translation_ )
-   , translation_direction( 0 )
-   , bottom_coordinate( 0. )
-   , translated_distance( 0. )
+   , outOfDomain_boundaryID( 0 )
    , gravity_vector( 0 )
    , exceed (false)
    , turn (false)
@@ -273,20 +268,7 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    calculate_row_indexes ( UF );
 
    // Projection-Translation
-   if ( b_projection_translation )
-   {
-     set_translation_vector() ;
-
-     if ( MVQ_translation_vector(translation_direction) < 0. )
-       bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-                [translation_direction](0) ;
-     else
-       bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-           [translation_direction]((*UF->primary_grid()->get_global_max_index())
-                                (translation_direction)) ;
-
-     build_links_translation() ;
-   }
+   if ( b_projection_translation ) build_links_translation();
 
    if (is_solids) {
 		// Build void frac and intersection variable
@@ -375,44 +357,6 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
    if ( my_rank == is_master )
    SCT_set_start( "Matrix_RE_Assembly&Initialization" );
 
-   // Projection translation
-   if ( b_projection_translation ) {
-
-     double min_coord = allrigidbodies->get_min_RB_coord(translation_direction);
-     double distance_to_bottom = MAC::abs(min_coord-bottom_coordinate);
-
-     if ( distance_to_bottom < critical_distance_translation ) {
-
-       if ( my_rank == is_master )
-         MAC::out() << "         -> -> -> -> -> -> -> -> -> -> -> ->"
-		<< endl << "         !!!     Domain Translation      !!!"
-		<< endl << "         -> -> -> -> -> -> -> -> -> -> -> ->"
-		<< endl;
-
-         b_grid_has_been_translated_at_previous_time = true;
-
-         translated_distance += MVQ_translation_vector( translation_direction );
-         if ( my_rank == is_master )
-           MAC::out() << "         Translated distance = " <<
-		translated_distance << endl;
-
-         fields_projection();
-
-         if ( MVQ_translation_vector(translation_direction) < 0. )
-           bottom_coordinate = 
-	   	(*UF->primary_grid()->get_global_main_coordinates())
-			[translation_direction](0) ;
-         else
-           bottom_coordinate = 
-	   	(*UF->primary_grid()->get_global_main_coordinates())
-		[translation_direction](
-			(*UF->primary_grid()->get_global_max_index())
-				(translation_direction)) ;
-
-         b_grid_has_been_translated_since_last_output = true;
-     }
-   }
-
    if ((is_par_motion) && (is_solids)) {
 		// Solve equation of motion for all RB and update pos,vel
 		//allrigidbodies->solve_RB_equation_of_motion(t_it);
@@ -457,12 +401,8 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
       assemble_1D_matrices(UF,t_it);
    }
 
-	//  Projection_Translation
-	if ( b_projection_translation )
-		b_grid_has_been_translated_at_previous_time = false;
-
-	if ( my_rank == is_master )
-		SCT_get_elapsed_time( "Matrix_RE_Assembly&Initialization" );
+   if ( my_rank == is_master )
+     SCT_get_elapsed_time( "Matrix_RE_Assembly&Initialization" );
 
 }
 
@@ -4399,22 +4339,6 @@ DS_NavierStokes:: free_DS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DS_NavierStokes:: set_translation_vector()
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokes:: set_translation_vector" ) ;
-
-   MVQ_translation_vector.resize( dim );
-   translation_direction = UF->primary_grid()->get_translation_direction() ;
-   MVQ_translation_vector( translation_direction ) =
-        UF->primary_grid()->get_translation_magnitude() ;
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
 DS_NavierStokes::build_links_translation()
 //---------------------------------------------------------------------------
 {
@@ -4423,9 +4347,12 @@ DS_NavierStokes::build_links_translation()
    UF->create_transproj_interpolation() ;
    PF->create_transproj_interpolation() ;
 
-	double translation_magnitude = UF->primary_grid()->get_translation_magnitude();
+   double translation_magnitude = 
+   	UF->primary_grid()->get_translation_magnitude();
+   size_t translation_direction = 
+   	UF->primary_grid()->get_translation_direction();   	
 
-	string outOfDomain_boundaryName;
+   string outOfDomain_boundaryName;
    switch( translation_direction )
    {
      case 0:
@@ -4442,9 +4369,8 @@ DS_NavierStokes::build_links_translation()
        break;
    }
 
-
-	outOfDomain_boundaryID = int( FV_DomainBuilder::get_color_number(
-        outOfDomain_boundaryName ) );
+   outOfDomain_boundaryID = int( FV_DomainBuilder::get_color_number(
+   	outOfDomain_boundaryName ) );
 
 }
 

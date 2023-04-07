@@ -114,7 +114,15 @@ class GrainsCoupledWithFluid : virtual public Grains
 
     /** @brief Writes postprocessing files    
     @param indent_width output message indentation width */
-    void doPostProcessing( size_t indent_width = 0 );	          
+    void doPostProcessing( size_t indent_width = 0 );
+    
+    /** @brief Sets the Paraview post-processing translation vector in case of
+    projection-translation
+    @param tvx x coordinate
+    @param tvy y coordinate
+    @param tvz z coordinate */
+    void setParaviewPostProcessingTranslationVector( 
+      	double const& tvx, double const& tvy, double const& tvz );
     //@}
     
 

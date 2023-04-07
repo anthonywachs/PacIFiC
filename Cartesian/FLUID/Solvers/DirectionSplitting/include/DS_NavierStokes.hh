@@ -110,6 +110,17 @@ class DS_NavierStokes : public MAC_Object, public PAC_ComputingTime,
       	int const& cycleNumber  );
       //@}
 
+      
+   //-- Projection-Translation methods
+
+      /** @name Projection-Translation methods */
+      //@{
+      /** @brief Projection of the field on the translated position of the grid
+      */
+      void fields_projection();
+      //@}      
+
+
    protected: //--------------------------------------------------------------
 
    private: //----------------------------------------------------------------
@@ -401,7 +412,7 @@ class DS_NavierStokes : public MAC_Object, public PAC_ComputingTime,
       //@}
 
 
-   // Direction splitting communicators
+   //-- Direction splitting communicators
 
       /** @name Direction splitting communicators */
       /** @brief Create the sub-communicators */
@@ -419,20 +430,15 @@ class DS_NavierStokes : public MAC_Object, public PAC_ComputingTime,
 
       //@}
 
-      //-- Projection-Translation methods
+
+   //-- Projection-Translation methods
 
       /** @name Projection-Translation methods */
       //@{
-      /** @brief Set translation vector and direction */
-      void set_translation_vector();
-
       /** @brief Build the field projection-translation interpolations */
       void build_links_translation();
-
-      /** @brief Projection of the field on the translated position of the grid
-      */
-      void fields_projection();
-
+      //@}
+      
 
    private: //----------------------------------------------------------------
 
@@ -489,13 +495,6 @@ class DS_NavierStokes : public MAC_Object, public PAC_ComputingTime,
 
       // Grid motion
       bool b_projection_translation;
-      bool b_grid_has_been_translated_since_last_output;
-      bool b_grid_has_been_translated_at_previous_time;
-      double critical_distance_translation;
-      geomVector MVQ_translation_vector;
-      size_t translation_direction;
-      double bottom_coordinate;
-      double translated_distance;
       int outOfDomain_boundaryID;
 
       double Qold;

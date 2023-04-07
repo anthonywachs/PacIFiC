@@ -98,12 +98,22 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , allrigidbodies ( 0 )
    , b_particles_as_fixed_obstacles( true )
    , hydroFT( NULL )
+   , b_projection_translation( dom->primary_grid()
+   		->is_translation_active() )
+   , primary_grid( dom->primary_grid() )
+   , critical_distance_translation( 0. )
+   , translation_direction( 0 )
+   , bottom_coordinate( 0. )
+   , translated_distance( 0. )   
 {
    MAC_LABEL( "DS_DirectionSplitting:: DS_DirectionSplitting" ) ;
 
    // Is the run a follow up of a previous job
    b_restart = MAC_Application::is_follow();
    macCOMM = MAC_Exec::communicator();
+   my_rank = macCOMM->rank();
+   nb_procs = macCOMM->nb_ranks();
+   is_master = 0;   
 
    // Read Density
    if ( exp->has_entry( "Density" ) ) {
@@ -461,6 +471,25 @@ DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
 
+   // Projection-Translation
+   if ( b_projection_translation )
+   {
+     set_translation_vector() ;
+
+     if ( MVQ_translation_vector(translation_direction) < 0. )
+       bottom_coordinate = (*primary_grid->get_global_main_coordinates())
+                [translation_direction](0) ;
+     else
+       bottom_coordinate = (*primary_grid->get_global_main_coordinates())
+           [translation_direction]((*primary_grid->get_global_max_index())
+                                (translation_direction)) ;
+     
+     geomVector vt(space_dimensions); 
+     vt(translation_direction) = primary_grid->get_translation_distance() ;
+     solidSolver->setParaviewPostProcessingTranslationVector( -vt(0), -vt(1), 
+          -vt(2) ) ;
+   }
+
    // Flow solver
    if (is_NS || is_NSwithHE) {
       start_total_timer( "DS_NavierStokes:: do_before_time_stepping" ) ;
@@ -535,6 +564,45 @@ DS_DirectionSplitting:: do_before_inner_iterations_stage(
    MAC_LABEL( "DS_DirectionSplitting:: do_before_inner_iterations_stage" ) ;
 
    FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
+
+   // Projection translation
+   if ( b_projection_translation ) 
+   {
+     double min_coord = allrigidbodies->get_min_RB_coord(translation_direction);
+     double distance_to_bottom = MAC::abs(min_coord-bottom_coordinate);
+
+     if ( distance_to_bottom < critical_distance_translation ) {
+
+       if ( my_rank == is_master )
+         MAC::out() << "         -> -> -> -> -> -> -> -> -> -> -> ->"
+		<< endl << "         !!!     Domain Translation      !!!"
+		<< endl << "         -> -> -> -> -> -> -> -> -> -> -> ->"
+		<< endl;
+
+       translated_distance += MVQ_translation_vector( translation_direction );
+       if ( my_rank == is_master )
+         MAC::out() << "         Translated distance = " <<
+		translated_distance << endl;
+
+       FlowSolver->fields_projection();
+       
+       geomVector vt(space_dimensions); 
+       vt(translation_direction) = primary_grid->get_translation_distance() ;
+       solidSolver->setParaviewPostProcessingTranslationVector( -vt(0), -vt(1), 
+          -vt(2) ) ;       
+
+       if ( MVQ_translation_vector(translation_direction) < 0. )
+         bottom_coordinate = 
+	   	(*primary_grid->get_global_main_coordinates())
+			[translation_direction](0) ;
+       else
+         bottom_coordinate = 
+	   	(*primary_grid->get_global_main_coordinates())
+		[translation_direction](
+			(*primary_grid->get_global_max_index())
+				(translation_direction)) ;
+     }
+   }
 
    // Flow solver
    if (is_NS || is_NSwithHE) {
@@ -701,4 +769,20 @@ DS_DirectionSplitting:: do_more_post_processing( FV_DomainAndFields * dom,
    }
 
 
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void
+DS_DirectionSplitting:: set_translation_vector()
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_DirectionSplitting:: set_translation_vector" ) ;
+
+   MVQ_translation_vector.resize( primary_grid->nb_space_dimensions() );
+   translation_direction = primary_grid->get_translation_direction() ;
+   MVQ_translation_vector( translation_direction ) =
+        primary_grid->get_translation_magnitude() ;
 }
