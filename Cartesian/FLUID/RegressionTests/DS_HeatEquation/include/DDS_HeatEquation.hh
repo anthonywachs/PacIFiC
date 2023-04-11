@@ -146,7 +146,7 @@ class DDS_HeatEquation : public FV_OneStepIteration, public PAC_ComputingTime,
         FV_DiscreteField const* FF,
         FV_TimeIterator const* t_it,
         double const& gamma,
-        size_t const& comp, 
+        size_t const& comp,
         size_t const& dir,
         size_t const& j,
         size_t const& k,
@@ -170,57 +170,57 @@ class DDS_HeatEquation : public FV_OneStepIteration, public PAC_ComputingTime,
       /** @brief Compute Aei*(Aii)-1*fi required to compute interface unknown */
       void compute_Aei_ui (struct TDMatrix* arr, struct LocalVector* VEC, size_t const& comp, size_t const& dir, size_t const& r_index);
 
-      /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */ 
+      /** @brief Pack Aei*(Aii)-1*fi and fe for sending to master processor */
       void data_packing ( double const& fe, size_t const& comp, size_t const& dir, size_t const& vec_pos);
 
-      /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */ 
+      /** @brief Unpack the data sent by "data_packing" and compute the interface unknown; and pack ue for sending to slave processor */
       void unpack_compute_ue_pack(size_t const& comp, size_t const& dir, size_t const& p);
 
-      /** @brief Unpack the interface variable sent by master processor to slave processor */ 
+      /** @brief Unpack the interface variable sent by master processor to slave processor */
       void unpack_ue(size_t const& comp, double * received_data, size_t const& dir, int const& p);
 
-      /** @brief Call the appropriate functions to solve local variable and interface unknown */ 
+      /** @brief Call the appropriate functions to solve local variable and interface unknown */
       void solve_interface_unknowns(double const& gamma,FV_TimeIterator const* t_it, size_t const& comp, size_t const& dir);
-      
-      /** @brief Call the appropriate functions to solve any particular direction in the other directions */ 
+
+      /** @brief Call the appropriate functions to solve any particular direction in the other directions */
       void HeatEquation_DirectionSplittingSolver( FV_TimeIterator const* t_it ) ;
 
-      /** @brief Calculate the required field parrameters such as void_fractions, intersection pointes with the solid objects */ 
+      /** @brief Calculate the required field parrameters such as void_fractions, intersection pointes with the solid objects */
       void node_property_calculation( ) ;
 
-      /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
+      /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */
       void nodes_temperature_initialization ( size_t const& level );
 
       /** @brief Returns negative value of the point lies inside the solid, otherwise returns a positive number*/
       double level_set_function (size_t const& m, size_t const& comp, double const& xC, double const& yC, double const& zC, string const& type);
 
-      /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */ 
+      /** @brief Correct the fluxes and variables on the nodes due to presence of solid objects */
       void assemble_intersection_matrix ( size_t const& comp, size_t const& level);                 // Here level:0 -> fluid; 1-> solid
-      
 
-      /** @brief Find the intersection using bisection method with the solid interface */ 
+
+      /** @brief Find the intersection using bisection method with the solid interface */
       double find_intersection ( size_t const& left, size_t const& right, size_t const& yconst, size_t const& zconst, size_t const& comp, size_t const& dir, size_t const& off);
 
 
-      /** @brief Generate the solid particles present in the domain */ 
+      /** @brief Generate the solid particles present in the domain */
       void Solids_generation( ) ;
 
-      /** @brief Solve i in j and k; e.g. solve x in y ank z */ 
+      /** @brief Solve i in j and k; e.g. solve x in y ank z */
       void Solve_i_in_jk (FV_TimeIterator const* t_it, double const& gamma, size_t const& dir_i, size_t const& dir_j, size_t const& dir_k );
 
-      /** @brief Solve interface unknown for all cases */ 
+      /** @brief Solve interface unknown for all cases */
       void DS_interface_unknown_solver(LA_SeqVector* interface_rhs, size_t const& comp, size_t const& dir, size_t const& r_index);
 
       /** @brief Error compared to analytical solution */
       void DS_error_with_analytical_solution ( FV_DiscreteField const* FF,FV_DiscreteField* FF_ERROR ) ;
-      
+
       /** @brief Calculate L2 norm without any analytical solution */
       void output_l2norm ( void ) ;
       //@}
 
 
    // Direction splitting communicators
-     
+
       /** @name Direction splitting communicators */
       /** @brief Create the sub-communicators */
       void create_DDS_subcommunicators ( void ) ;
@@ -265,7 +265,7 @@ class DDS_HeatEquation : public FV_OneStepIteration, public PAC_ComputingTime,
 
       struct MPIVar first_pass[3];
       struct MPIVar second_pass[3];
-      
+
       double peclet ;
       double loc_thres; // Local threshold for the node near the solid interface to be considered inside the solid, i.e. local_CFL = loc_thres*global_CFL
       bool b_bodyterm ;

@@ -427,7 +427,8 @@ class DS_AllRigidBodies
       /** @brief Build the variable associated with the rigid bodies
       on the Cartesian computational grid
       @param FF target fluid grid */
-      void build_solid_variables_on_fluid_grid( FV_DiscreteField const* FF );
+      void build_solid_variables_on_fluid_grid( FV_DiscreteField const* FF
+                                             , string const& StencilCorrection);
 
       /** @brief Periodic transformation of a distance in a given direction
       @param delta distance

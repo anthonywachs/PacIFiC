@@ -1601,7 +1601,6 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
 
            min_unknown_index(dir) = MAC::min(temp(0),temp(1));
            max_unknown_index(dir) = MAC::max(temp(0),temp(1));
-
         }
 
         for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
@@ -1625,8 +1624,8 @@ void DS_AllRigidBodies:: compute_void_fraction_on_grid(
                     void_fraction[field]->operator()(p,0) = 1 + parID;
              }
            }
-        }
-     }
+       }
+    }
   }
 }
 
@@ -1681,6 +1680,9 @@ std::tuple<double, geomVector, int, int> DS_AllRigidBodies::
   return(std::make_tuple(fraction, intersection_pt, point_in_fluid, ownerID));
 
 }
+
+
+
 
 
 
@@ -2607,8 +2609,8 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor (
    double dy = FF->get_cell_size(j,comp,1);
    double dz = (m_space_dimension == 3) ? FF->get_cell_size(k,comp,2) : 1.;
 
-	// if (void_fraction[field]->operator()(p) != 0) {
-   if (CC_cell_volume[field]->operator()(p,0) < factor * dx * dy * dz) {
+	if (void_fraction[field]->operator()(p,0) != 0) {
+   // if (CC_cell_volume[field]->operator()(p,0) < factor * dx * dy * dz) {
       double norm_mag = MAC::sqrt(pow(CC_RB_normal[field]->operator()(p,0),2)
                                 + pow(CC_RB_normal[field]->operator()(p,1),2)
                                 + pow(CC_RB_normal[field]->operator()(p,2),2));
@@ -2629,8 +2631,8 @@ vector<double> DS_AllRigidBodies:: flux_redistribution_factor (
       for (size_t dir = 0; dir < m_space_dimension; dir++) {
          for (size_t side = 0; side < 2; side++) {
             if ((p_face[2*dir+side] <= FF_UNK_MAX)
-             && (void_fraction[field]->operator()(p_face[2*dir+side],0) == 0)
-             && (CC_cell_volume[field]->operator()(p_face[2*dir+side],0) >= factor * dx * dy * dz)) {
+             && (void_fraction[field]->operator()(p_face[2*dir+side],0) == 0)) {
+             // && (CC_cell_volume[field]->operator()(p_face[2*dir+side],0) >= factor * dx * dy * dz)) {
                // wht[2*dir+side] = (void_fraction[field]->operator()(p_face[2*dir+side]) == 0) ?
                wht[2*dir+side] = CC_RB_normal[field]->operator()(p,dir)
                                * CC_RB_normal[field]->operator()(p,dir)
@@ -2952,6 +2954,9 @@ void DS_AllRigidBodies:: compute_grid_intersection_with_rigidbody(
           max_unknown_index(dir) =
                               FF->get_max_index_unknown_on_proc( comp, dir );
 
+          local_extents(dir,0) = 0;
+          local_extents(dir,1) = max_unknown_index(dir) - min_unknown_index(dir);
+
           doubleVector box_extents(2,0.);
           box_extents(0) = haloZone[0]->operator()(dir);
           box_extents(1) = haloZone[1]->operator()(dir);
@@ -3082,6 +3087,9 @@ void DS_AllRigidBodies:: clear_GrainsRB_data_on_grid(
                               FF->get_min_index_unknown_on_proc( comp, dir );
           max_unknown_index(dir) =
                               FF->get_max_index_unknown_on_proc( comp, dir );
+
+          local_extents(dir,0) = 0;
+          local_extents(dir,1) = max_unknown_index(dir) - min_unknown_index(dir);
 
           doubleVector box_extents(2,0.);
           box_extents(0) = haloZone[0]->operator()(dir);
@@ -6216,7 +6224,8 @@ void DS_AllRigidBodies:: write_surface_discretization_for_all_RB( )
 
 //---------------------------------------------------------------------------
 void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
-                                                FV_DiscreteField const* FF )
+                                                FV_DiscreteField const* FF,
+                                                string const& StencilCorrection)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL( "DS_AllRigidBodies:: build_solid_variables_on_fluid_grid" ) ;
@@ -6238,13 +6247,15 @@ void DS_AllRigidBodies:: build_solid_variables_on_fluid_grid(
    intersect_fieldValue[field]->re_initialize(FF_LOC_UNK,6);
 
    // Cut Cell parameters initialization
-   CC_face_centroid[field]->re_initialize(FF_LOC_UNK,6,3);
-   CC_face_fraction[field]->re_initialize(FF_LOC_UNK,6);
-   CC_ownerID[field]->re_initialize(FF_LOC_UNK,-1.);
-   CC_RB_area[field]->re_initialize(FF_LOC_UNK);
-   CC_cell_volume[field]->re_initialize(FF_LOC_UNK,2);
-   CC_RB_normal[field]->re_initialize(FF_LOC_UNK,3);
-   CC_RB_centroid[field]->re_initialize(FF_LOC_UNK,3);
+   if (StencilCorrection == "CutCell") {
+      CC_face_centroid[field]->re_initialize(FF_LOC_UNK,6,3);
+      CC_face_fraction[field]->re_initialize(FF_LOC_UNK,6);
+      CC_ownerID[field]->re_initialize(FF_LOC_UNK,-1.);
+      CC_RB_area[field]->re_initialize(FF_LOC_UNK);
+      CC_cell_volume[field]->re_initialize(FF_LOC_UNK,2);
+      CC_RB_normal[field]->re_initialize(FF_LOC_UNK,3);
+      CC_RB_centroid[field]->re_initialize(FF_LOC_UNK,3);
+   }
 
 }
 
@@ -6487,26 +6498,26 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
   double local_max = MESH->get_max_coordinate_on_current_processor(dir);
 
   // If particle is equivalent to domain size in PBC
-  if ((boundsOrg(1) - boundsOrg(0)) > (global_max - global_min)) {
+  if ((boundsOrg(1) - boundsOrg(0)) > 0.5 * (global_max - global_min)) {
      value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
      value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
      return(value);
   }
 
 
-  boolVector const* is_periodic = MESH->get_periodic_directions();
+  // boolVector const* is_periodic = MESH->get_periodic_directions();
 
   // Warnings
-  if (m_macCOMM->rank() == 0) {
-     if (!(*is_periodic)(dir)) {
-        if ((bounds(0) < global_min)
-        || (bounds(1) > global_max))
-           std::cout << endl <<
-             " WARNING : Box Averaging Control Volume overlaps a " <<
-             " non-periodic BC" << endl <<
-             " Control volume will be reduced" << endl << endl;
-     }
-  }
+  // if (m_macCOMM->rank() == 0) {
+  //    if (!(*is_periodic)(dir)) {
+  //       if ((bounds(0) < global_min)
+  //       || (bounds(1) > global_max))
+  //          std::cout << endl <<
+  //            " WARNING : Box Averaging Control Volume overlaps a " <<
+  //            " non-periodic BC" << endl <<
+  //            " Control volume will be reduced" << endl << endl;
+  //    }
+  // }
 
   // Getting the minimum grid index in control volume (CV)
   if (bounds(0) < bounds(1)) {// Non-periodic CV
@@ -6517,7 +6528,11 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(0)
                         , i0_temp) ;
-           value(0) = (found) ? (int)i0_temp : 0;
+           value(0) = (found) ? (int)i0_temp
+                              : (int)FF->get_min_index_unknown_on_proc(comp,dir);
+           // Fail safe when RB is near wall (return 1 instead of 0)
+           value(0) = MAC::max(value(0)
+                            , (int)FF->get_min_index_unknown_on_proc(comp,dir));
         }
      } else {
         if (bounds(1) > local_min) {
@@ -6532,7 +6547,10 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(0)
                         , i0_temp) ;
-           value(0) = (found) ? (int)i0_temp : 0;
+           value(0) = (found) ? (int)i0_temp
+                              : (int)FF->get_min_index_unknown_on_proc(comp,dir);
+           value(0) = MAC::max(value(0)
+                            , (int)FF->get_min_index_unknown_on_proc(comp,dir));
         } else if (bounds(1) > local_min) {
            value(0) = (int)FF->get_min_index_unknown_on_proc(comp,dir);
         }
@@ -6550,7 +6568,10 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(1)
                         , i0_temp) ;
-           value(1) = (found) ? (int)i0_temp : 0;
+           value(1) = (found) ? (int)i0_temp
+                              : (int)FF->get_max_index_unknown_on_proc(comp,dir);
+           value(1) = MAC::min(value(1)
+                              , (int)FF->get_max_index_unknown_on_proc(comp,dir));
         }
      } else {
         if (bounds(0) < local_max) {
@@ -6565,7 +6586,10 @@ DS_AllRigidBodies::get_local_index_of_extents( class doubleVector& bounds
                           FF->get_DOF_coordinates_vector(comp,dir)
                         , bounds(1)
                         , i0_temp) ;
-           value(1) = (found) ? (int)i0_temp : 0;
+           value(1) = (found) ? (int)i0_temp
+                              : (int)FF->get_max_index_unknown_on_proc(comp,dir);
+           value(1) = MAC::min(value(1)
+                              , (int)FF->get_max_index_unknown_on_proc(comp,dir));
         } else if (bounds(0) < local_max) {
            value(1) = (int)FF->get_max_index_unknown_on_proc(comp,dir);
         }
@@ -6588,21 +6612,21 @@ DS_AllRigidBodies::copyHydroFT( vector< vector<double> >* hydroFT )
 {
   MAC_LABEL( "DS_AllRigidBodies::copyHydroFT" ) ;
 
-  for (size_t i = 0; i < m_npart; ++i) 
+  for (size_t i = 0; i < m_npart; ++i)
   {
-     (*hydroFT)[i][0] = pressure_force->operator()(i,0) 
+     (*hydroFT)[i][0] = pressure_force->operator()(i,0)
      	+ viscous_force->operator()(i,0);
-     (*hydroFT)[i][1] = pressure_force->operator()(i,1) 
+     (*hydroFT)[i][1] = pressure_force->operator()(i,1)
      	+ viscous_force->operator()(i,1);
-     (*hydroFT)[i][2] = pressure_force->operator()(i,2) 
+     (*hydroFT)[i][2] = pressure_force->operator()(i,2)
      	+ viscous_force->operator()(i,2);
 
-     (*hydroFT)[i][3] = pressure_torque->operator()(i,0) 
+     (*hydroFT)[i][3] = pressure_torque->operator()(i,0)
      	+ viscous_torque->operator()(i,0);
-     (*hydroFT)[i][4] = pressure_torque->operator()(i,1) 
+     (*hydroFT)[i][4] = pressure_torque->operator()(i,1)
      	+ viscous_torque->operator()(i,1);
-     (*hydroFT)[i][5] = pressure_torque->operator()(i,2) 
-     	+ viscous_torque->operator()(i,2);	
+     (*hydroFT)[i][5] = pressure_torque->operator()(i,2)
+     	+ viscous_torque->operator()(i,2);
   }
 
 }
