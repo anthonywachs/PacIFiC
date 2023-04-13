@@ -1045,7 +1045,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
               grainsAbort();
 	    }
 
-            m_position == "STRUCTURED";
+            m_position = "STRUCTURED";
 	    if ( m_rank == 0 )
 	    {
 	      cout << GrainsExec::m_shift9 << "Structured array" << endl;
