@@ -175,3 +175,19 @@ PointContact& PointContact::operator = ( PointContact const& rhs )
   }
   return ( *this );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Output operator
+ostream& operator << ( ostream& Out, PointContact const& pc )
+{
+  Out << "Contact point = " << pc.m_contact << endl;
+  Out << "Min dist ptA = " << pc.m_contactA << endl; 
+  Out << "Min dist ptB = " << pc.m_contactB << endl; 
+  Out << "Overlap vector = " << pc.m_overlapvector << endl; 
+  Out << "Overlap distance = " << pc.m_overlapdistance << endl;
+  Out << "GJK iterations = " << pc.m_nbIterGJK << endl; 
+  return ( Out );          
+}

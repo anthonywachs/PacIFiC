@@ -6,7 +6,8 @@
 using namespace solid;
 
 class Component;
-
+class PointContact;
+ostream& operator << ( ostream& Out, PointContact const& pc );
 
 /** @brief The class PointContact.
 
@@ -104,6 +105,11 @@ class PointContact
     /** @brief Equal operator to another PointContact object
     @param rhs the other PointContact object */
     PointContact& operator = ( PointContact const& rhs );
+    
+    /** @brief Output operator
+    @param fileOut output stream
+    @param pc PointContact object */
+    friend ostream& operator << ( ostream& Out, PointContact const& pc );
     //@}
 
 
