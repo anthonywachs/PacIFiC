@@ -172,15 +172,16 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
 		// controller = DS_PID::create(0.5,1.,0);
 		// Set the initial pressure drop, required in case of given flow rate
 		if (!b_restart) {
-			const_cast<FV_Mesh*>(UF->primary_grid())
-							->set_periodic_pressure_drop( -100. ) ;
-			string fileName = "./DS_results/flow_pressure_history.csv" ;
-			std::ofstream MyFile;
+			if (UF->primary_grid()->get_periodic_pressure_drop() < 1.e-12)
+				const_cast<FV_Mesh*>(UF->primary_grid())
+								->set_periodic_pressure_drop( -100. ) ;
 			if (macCOMM->rank() == 0) {
+				string fileName = "./DS_results/flow_pressure_history.csv" ;
+				std::ofstream MyFile;
 				MyFile.open( fileName.c_str()) ;
 				MyFile << "t Qc dP exceed turn" << endl;
+				MyFile.close();
 			}
-			MyFile.close();
 		} else if (b_restart) {
 			double temp_press;
 			string fileName = "./DS_results/flow_pressure_history.csv" ;
@@ -272,8 +273,8 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    if (is_solids) {
 		// Build void frac and intersection variable
-		allrigidbodies->build_solid_variables_on_fluid_grid(PF);
-		allrigidbodies->build_solid_variables_on_fluid_grid(UF);
+		allrigidbodies->build_solid_variables_on_fluid_grid(PF,StencilCorrection);
+		allrigidbodies->build_solid_variables_on_fluid_grid(UF,StencilCorrection);
 		// Compute void fraction for pressure and velocity field
 		allrigidbodies->compute_void_fraction_on_grid(PF, false);
 		allrigidbodies->compute_void_fraction_on_grid(UF, false);
@@ -2548,75 +2549,78 @@ DS_NavierStokes:: predicted_pressure_drop (FV_TimeIterator const* t_it)
 {
    MAC_LABEL("DS_NavierStokes:: predicted_pressure_drop" ) ;
 
-	size_t p_flow_dir = UF->primary_grid()->get_periodic_flow_direction();
-	double Lx = UF->primary_grid()->get_main_domain_max_coordinate( 0 )
-				 - UF->primary_grid()->get_main_domain_min_coordinate( 0 );
-	double Ly = UF->primary_grid()->get_main_domain_max_coordinate( 1 )
-				 - UF->primary_grid()->get_main_domain_min_coordinate( 1 );
-   double Lz = (dim == 3) ? UF->primary_grid()->get_main_domain_max_coordinate( 2 )
-				 				  - UF->primary_grid()->get_main_domain_min_coordinate( 2 )
-								  : 1.;
-
-   double cross_sec_area = Lx * Ly * Lz;
-
-	if (p_flow_dir == 0) {
-		cross_sec_area = Ly * Lz;
-	} else if (p_flow_dir == 1) {
-		cross_sec_area = Lx * Lz;
-	} else if (p_flow_dir == 2) {
-		cross_sec_area = Lx * Ly;
-	}
-
 	double Um = get_current_mean_flow_speed();
-	double Qc = cross_sec_area * Um;
-	double Qset = UF->primary_grid()->get_periodic_flow_rate();
 	double pressure_drop = UF->primary_grid()->get_periodic_pressure_drop();
 
-	if ((fabs(Qc - Qset) / Qset > 1e-5) && (t_it->iteration_number() % 1 == 0)) {
-      if ((Qc / Qset) > 1.) {
-         exceed = true;
-			// pressure_drop -= controller->calculate(Qset,Qc,t_it->time_step());
-	      if (turn == false) {
-	         pressure_drop *= 0.5;
-	         if ((Qc - Qold) < 0.) turn = true;
-         } else {
-            if ((Qc / Qold) > 1.) {
-               pressure_drop *= (Qset / Qc);
-            } else {
-					// Threshold controls the oscillation
-               if (fabs(Qc - Qold) / Qc < 1e-6)
-                  pressure_drop *= (Qset / Qc);
-            }
-         }
-      } else {
-         if (exceed == true) {
+	if (macCOMM->rank() == 0) {
+		size_t p_flow_dir = UF->primary_grid()->get_periodic_flow_direction();
+		double Lx = UF->primary_grid()->get_main_domain_max_coordinate( 0 )
+					 - UF->primary_grid()->get_main_domain_min_coordinate( 0 );
+		double Ly = UF->primary_grid()->get_main_domain_max_coordinate( 1 )
+					 - UF->primary_grid()->get_main_domain_min_coordinate( 1 );
+	   double Lz = (dim == 3)
+					 ? UF->primary_grid()->get_main_domain_max_coordinate( 2 )
+					 - UF->primary_grid()->get_main_domain_min_coordinate( 2 )
+					 : 1.;
+
+	   double cross_sec_area = Lx * Ly * Lz;
+
+		if (p_flow_dir == 0) {
+			cross_sec_area = Ly * Lz;
+		} else if (p_flow_dir == 1) {
+			cross_sec_area = Lx * Lz;
+		} else if (p_flow_dir == 2) {
+			cross_sec_area = Lx * Ly;
+		}
+
+		double Qc = cross_sec_area * Um;
+		double Qset = UF->primary_grid()->get_periodic_flow_rate();
+
+		if ((fabs(Qc - Qset) / Qset > 1e-5) && (t_it->iteration_number() % 1 == 0)) {
+	      if ((Qc / Qset) > 1.) {
+	         exceed = true;
 				// pressure_drop -= controller->calculate(Qset,Qc,t_it->time_step());
-            if ((Qc / Qold) < 1.) {
-               pressure_drop *= (Qset / Qc);
-            } else {
-					// Threshold controls the oscillation
-               if (fabs(Qc - Qold) / Qc < 1e-6)
-                  pressure_drop *= (Qset / Qc);
-            }
-         }
-      }
+		      if (turn == false) {
+		         pressure_drop *= 0.5;
+		         if ((Qc - Qold) < 0.) turn = true;
+	         } else {
+	            if ((Qc / Qold) > 1.) {
+	               pressure_drop *= (Qset / Qc);
+	            } else {
+						// Threshold controls the oscillation
+	               if (fabs(Qc - Qold) / Qc < 1e-6)
+	                  pressure_drop *= (Qset / Qc);
+	            }
+	         }
+	      } else {
+	         if (exceed == true) {
+					// pressure_drop -= controller->calculate(Qset,Qc,t_it->time_step());
+	            if ((Qc / Qold) < 1.) {
+	               pressure_drop *= (Qset / Qc);
+	            } else {
+						// Threshold controls the oscillation
+	               if (fabs(Qc - Qold) / Qc < 1e-6)
+	                  pressure_drop *= (Qset / Qc);
+	            }
+	         }
+	      }
+		}
+	   Qold = Qc;
+
+		string fileName = "./DS_results/flow_pressure_history.csv" ;
+		std::ofstream MyFile;
+		MyFile.open( fileName.c_str(), std::ios::app ) ;
+		MyFile << t_it->time() << " " << MAC::doubleToString( ios::scientific, 6, Qc)
+				<< " " << MAC::doubleToString( ios::scientific, 6, pressure_drop)
+				<< " " << exceed
+				<< " " << turn << endl;
 	}
-   Qold = Qc;
+
+	// Broadcast the new pressure to all procs from master proc
+	macCOMM->broadcast(pressure_drop);
 
    const_cast<FV_Mesh*>(UF->primary_grid())
 											->set_periodic_pressure_drop( pressure_drop ) ;
-
-	string fileName = "./DS_results/flow_pressure_history.csv" ;
-	std::ofstream MyFile;
-
-	if (macCOMM->rank() == 0) {
-		MyFile.open( fileName.c_str(), std::ios::app ) ;
-      MyFile << t_it->time() << " " << MAC::doubleToString( ios::scientific, 6, Qc)
-									  << " " << MAC::doubleToString( ios::scientific, 6, pressure_drop)
-									  << " " << exceed
-									  << " " << turn << endl;
-   }
-
 }
 
 
@@ -2683,10 +2687,10 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
 					size_t p = UF->DOF_local_number(i,j,k,comp);
 					// Cell volume
 					double cellV = dxC * dyC * dzC;
-					if ((StencilCorrection == "CutCell")
-					 && (CC_vol->operator()(p,0) >= FluxRedistThres*cellV)) {
-					 	cellV = CC_vol->operator()(p,0);
-					}
+					// if ((StencilCorrection == "CutCell")
+					//  && (CC_vol->operator()(p,0) >= FluxRedistThres*cellV)) {
+					//  	cellV = CC_vol->operator()(p,0);
+					// }
 
                // Dxx for un
                double xvalue = vel_diffusion[0]->operator()(p);
@@ -3291,12 +3295,14 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 					double dz = (dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1.;
 					size_t p = FF->DOF_local_number(i,j,k,comp);
 					if (is_solids) {
-						if (ownerID->operator()(p) == -1) {
+						int ownID = (StencilCorrection == "FD") ? -1
+									 : ownerID->operator()(p);
+						if (ownID == -1) {
 							double vel_div = (FF == UF) ?
 												divergence_of_U_noCorrection(i,j,k,comp,0)
 											 : calculate_velocity_divergence_FD(i,j,k,0);
 				         divergence->operator()(p,0) = vel_div * dx * dy * dz;
-						} else if (ownerID->operator()(p) != -1) {
+						} else if (ownID != -1) {
 						   double rht_flux = allrigidbodies->velocity_flux(FF,p,0,0,1,0);
 						   double lft_flux = allrigidbodies->velocity_flux(FF,p,0,0,0,0);
 						   double top_flux = allrigidbodies->velocity_flux(FF,p,1,1,1,0);
@@ -3392,14 +3398,10 @@ DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
 					double dz = (dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1.;
 					size_t p = FF->DOF_local_number(i, j, k, comp);
 					double volume = dx * dy * dz;
-					// if (is_solids && (FF == UF) && (StencilCorrection == "CutCell")
-					//  && (CC_vol->operator()(p,0) >= FluxRedistThres*volume)) {
-					if (is_solids && (StencilCorrection == "CutCell")
- 					 && (CC_vol->operator()(p,0) >= FluxRedistThres*volume)) {
-					 	volume = CC_vol->operator()(p,0);
-					}
-					// if (is_solids && (void_frac->operator()(p) == 0) && (StencilCorrection == "CutCell"))
-					// 	volume = CC_vol->operator()(p,0);
+					// if (is_solids && (StencilCorrection == "CutCell")
+ 					//  && (CC_vol->operator()(p,0) >= FluxRedistThres*volume)) {
+					//  	volume = CC_vol->operator()(p,0);
+					// }
 					divergence->operator()(p,0) = divergence->operator()(p,0)/volume;
 				}
 			}
@@ -3783,7 +3785,8 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    for (size_t i = 0; i < PF->nb_local_unknowns() ; i++) {
       divergencePF->operator()(i,1) = divergencePF->operator()(i,0);
 		if (is_solids) {
-			CC_volPF->operator()(i,1) = CC_volPF->operator()(i,0);
+			if (StencilCorrection == "CutCell")
+				CC_volPF->operator()(i,1) = CC_volPF->operator()(i,0);
 			void_fracPF->operator()(i,1) = void_fracPF->operator()(i,0);
 		}
 	}
@@ -3792,7 +3795,8 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
 	for (size_t i = 0; i < UF->nb_local_unknowns() ; i++) {
 		divergenceUF->operator()(i,1) = divergenceUF->operator()(i,0);
 		if (is_solids) {
-			CC_volUF->operator()(i,1) = CC_volUF->operator()(i,0);
+			if (StencilCorrection == "CutCell")
+				CC_volUF->operator()(i,1) = CC_volUF->operator()(i,0);
 			void_fracUF->operator()(i,1) = void_fracUF->operator()(i,0);
 		}
 	}
@@ -4347,10 +4351,10 @@ DS_NavierStokes::build_links_translation()
    UF->create_transproj_interpolation() ;
    PF->create_transproj_interpolation() ;
 
-   double translation_magnitude = 
+   double translation_magnitude =
    	UF->primary_grid()->get_translation_magnitude();
-   size_t translation_direction = 
-   	UF->primary_grid()->get_translation_direction();   	
+   size_t translation_direction =
+   	UF->primary_grid()->get_translation_direction();
 
    string outOfDomain_boundaryName;
    switch( translation_direction )

@@ -110,7 +110,7 @@ class DS_NavierStokes : public MAC_Object, public PAC_ComputingTime,
       	int const& cycleNumber  );
       //@}
 
-      
+
    //-- Projection-Translation methods
 
       /** @name Projection-Translation methods */
@@ -118,7 +118,7 @@ class DS_NavierStokes : public MAC_Object, public PAC_ComputingTime,
       /** @brief Projection of the field on the translated position of the grid
       */
       void fields_projection();
-      //@}      
+      //@}
 
 
    protected: //--------------------------------------------------------------
@@ -438,7 +438,7 @@ class DS_NavierStokes : public MAC_Object, public PAC_ComputingTime,
       /** @brief Build the field projection-translation interpolations */
       void build_links_translation();
       //@}
-      
+
 
    private: //----------------------------------------------------------------
 

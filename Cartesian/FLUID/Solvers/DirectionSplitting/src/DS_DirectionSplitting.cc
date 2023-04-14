@@ -104,7 +104,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , critical_distance_translation( 0. )
    , translation_direction( 0 )
    , bottom_coordinate( 0. )
-   , translated_distance( 0. )   
+   , translated_distance( 0. )
 {
    MAC_LABEL( "DS_DirectionSplitting:: DS_DirectionSplitting" ) ;
 
@@ -113,7 +113,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    macCOMM = MAC_Exec::communicator();
    my_rank = macCOMM->rank();
    nb_procs = macCOMM->nb_ranks();
-   is_master = 0;   
+   is_master = 0;
 
    // Read Density
    if ( exp->has_entry( "Density" ) ) {
@@ -242,8 +242,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 
       // Cases for non-moving rigib bodies but non-zero velocity
       if (!is_par_motion && exp->has_entry( "Particles_as_fixed_obstacles" ) ) {
-         b_particles_as_fixed_obstacles = exp->bool_data( 
-	 	"Particles_as_fixed_obstacles" );
+         b_particles_as_fixed_obstacles = exp->bool_data( "Particles_as_fixed_obstacles" );
       }
 
       // Critical distance
@@ -295,8 +294,8 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 
       solidFluid_transferStream = NULL;
       solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
-      solidSolver->checkParaviewPostProcessing( 
-      	MAC::extract_root_directory( solidSolver_simulationFile ) );      
+      solidSolver->checkParaviewPostProcessing(
+      	MAC::extract_root_directory( solidSolver_simulationFile ) );
    }
 
    space_dimensions = dom->primary_grid()->nb_space_dimensions();
@@ -411,7 +410,7 @@ DS_DirectionSplitting:: ~DS_DirectionSplitting( void )
       if ( solidSolver ) delete solidSolver;
       if ( solidFluid_transferStream ) delete solidFluid_transferStream;
       if ( allrigidbodies ) delete allrigidbodies;
-      if ( hydroFT ) delete hydroFT; 
+      if ( hydroFT ) delete hydroFT;
    }
 
 }
@@ -444,13 +443,13 @@ DS_DirectionSplitting:: do_one_inner_iteration( FV_TimeIterator const* t_it )
       stop_solving_timer() ;
       stop_total_timer() ;
    }
-   
+
 //    // Rigid body motion
-//    if ( is_GRAINS ) 
+//    if ( is_GRAINS )
 //    {
 //      // Compute the trajectory of particles with collisions in Grains3D
-//      solidSolver->Simulation( t_it->time_step(), true, false, 1., false );   
-// 
+//      solidSolver->Simulation( t_it->time_step(), true, false, 1., false );
+//
 //      // Update the rigid components positions in the fluid
 //      solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
 //      allrigidbodies->update( *solidFluid_transferStream );
@@ -483,10 +482,10 @@ DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
        bottom_coordinate = (*primary_grid->get_global_main_coordinates())
            [translation_direction]((*primary_grid->get_global_max_index())
                                 (translation_direction)) ;
-     
-     geomVector vt(space_dimensions); 
+
+     geomVector vt(space_dimensions);
      vt(translation_direction) = primary_grid->get_translation_distance() ;
-     solidSolver->setParaviewPostProcessingTranslationVector( -vt(0), -vt(1), 
+     solidSolver->setParaviewPostProcessingTranslationVector( -vt(0), -vt(1),
           -vt(2) ) ;
    }
 
@@ -566,7 +565,7 @@ DS_DirectionSplitting:: do_before_inner_iterations_stage(
    FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
 
    // Projection translation
-   if ( b_projection_translation ) 
+   if ( b_projection_translation )
    {
      double min_coord = allrigidbodies->get_min_RB_coord(translation_direction);
      double distance_to_bottom = MAC::abs(min_coord-bottom_coordinate);
@@ -585,23 +584,51 @@ DS_DirectionSplitting:: do_before_inner_iterations_stage(
 		translated_distance << endl;
 
        FlowSolver->fields_projection();
-       
-       geomVector vt(space_dimensions); 
+
+       geomVector vt(space_dimensions);
        vt(translation_direction) = primary_grid->get_translation_distance() ;
-       solidSolver->setParaviewPostProcessingTranslationVector( -vt(0), -vt(1), 
-          -vt(2) ) ;       
+       solidSolver->setParaviewPostProcessingTranslationVector( -vt(0), -vt(1),
+          -vt(2) ) ;
 
        if ( MVQ_translation_vector(translation_direction) < 0. )
-         bottom_coordinate = 
+         bottom_coordinate =
 	   	(*primary_grid->get_global_main_coordinates())
 			[translation_direction](0) ;
        else
-         bottom_coordinate = 
+         bottom_coordinate =
 	   	(*primary_grid->get_global_main_coordinates())
 		[translation_direction](
 			(*primary_grid->get_global_max_index())
 				(translation_direction)) ;
      }
+   }
+
+   // Rigid body motion
+   if ( is_GRAINS ) {
+     // Send hydro force and torque to Grains3D
+     if ( is_par_motion ) {
+       // Allocate array if empty
+       if ( !hydroFT ) {
+          size_t npart = allrigidbodies->get_number_particles();
+          vector<double> work( 6, 0. );
+          hydroFT = new vector< vector<double> >;
+          hydroFT->reserve( npart );
+          for (size_t k=0;k<npart;++k) hydroFT->push_back( work );
+       }
+
+       // Fill the hydro force and torque array
+       allrigidbodies->copyHydroFT( hydroFT );
+
+       // Transfer to Grains3D
+       solidSolver->transferHydroFTtoSolid( hydroFT );
+     }
+
+     // Compute the trajectory of particles with collisions in Grains3D
+     solidSolver->Simulation( t_it->time_step(), true, false, 1., false );
+
+     // Update the rigid components positions in the fluid
+     solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+     allrigidbodies->update( *solidFluid_transferStream );
    }
 
    // Flow solver
@@ -648,36 +675,6 @@ DS_DirectionSplitting:: do_after_inner_iterations_stage(
    if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0))
       allrigidbodies->write_force_and_flux_summary(t_it, b_restart);
 
-   // Rigid body motion
-   if ( is_GRAINS ) 
-   {
-     // Send hydro force and torque to Grains3D
-     if ( is_par_motion )
-     {  
-       // Allocate array if empty
-       if ( !hydroFT )
-       {
-         size_t npart = allrigidbodies->get_number_particles();
-	 vector<double> work( 6, 0. );
-	 hydroFT = new vector< vector<double> >;
-	 hydroFT->reserve( npart );
-	 for (size_t k=0;k<npart;++k) hydroFT->push_back( work );	 
-       }
-       
-       // Fill the hydro force and torque array
-       allrigidbodies->copyHydroFT( hydroFT );
-       
-       // Transfer to Grains3D
-       solidSolver->transferHydroFTtoSolid( hydroFT );
-     }
-     
-     // Compute the trajectory of particles with collisions in Grains3D
-     solidSolver->Simulation( t_it->time_step(), true, false, 1., false );   
-
-     // Update the rigid components positions in the fluid
-     solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
-     allrigidbodies->update( *solidFluid_transferStream );
-   }
 }
 
 
@@ -706,7 +703,7 @@ DS_DirectionSplitting:: do_additional_savings( FV_TimeIterator const* t_it,
    }
    // Solid solver
    if ( solidSolver )
-     solidSolver->saveResults( "", t_it->time(), cycleNumber );  
+     solidSolver->saveResults( "", t_it->time(), cycleNumber );
 
 }
 
