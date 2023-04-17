@@ -572,10 +572,7 @@ bool common_point( Convex const& a, Convex const& b, Transform const& b2a,
 double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
 	Transform const& b2w, Point3& pa, Point3& pb, int& nbIter )
 {
-   static Vector3 zero(-EPSILON, EPSILON, EPSILON);
-  // static Vector3 zero(0., 0., 0.);
-
-  Vector3 v = a2w(a.support(zero)) - b2w(b.support(zero));
+  Vector3 v = a2w(a.support(Vector3Nul)) - b2w(b.support(Vector3Nul));
 
   double dist = Norm(v);
   Vector3 w;

@@ -279,7 +279,7 @@ void BBox::debug( char const* s ) const
 // Output operator
 ostream& operator << ( ostream& f, BBox const& B )
 {
-  f << "BBox: Center = " << B.m_center;
+  f << "BBox: Center = " << B.m_center << endl;
   f << "      Extent = " << B.m_extent;
   return ( f );  
 }
