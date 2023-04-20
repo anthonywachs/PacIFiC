@@ -49,7 +49,8 @@ class GrainsCoupledWithFluid : virtual public Grains
 
     /** @name Set methods */
     //@{
-    /** @brief Sets the initial physical time
+    /** @brief Sets the initial physical time and initializes what depends
+    on the initial time
     @param time0 initial physical time */
     void setInitialTime( double const& time0 ) ;
 

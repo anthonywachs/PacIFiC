@@ -114,7 +114,10 @@ class BBox
     void setValue( Point3 const& min, Point3 const& max );
 
     /** @brief Returns the largest half length of the bounding box */
-    double size() const ;
+    double largestHalfLength() const ;
+    
+    /** @brief Returns the lowest half length of the bounding box */
+    double lowestHalfLength() const ;    
 
     /** @brief Debugging method
     @param s debugging message to be printed on the default error output cerr */

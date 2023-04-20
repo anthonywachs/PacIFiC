@@ -67,15 +67,7 @@ void GrainsCoupledWithFluid::do_before_time_stepping( DOMElement* rootElement )
   // Number of particles: inserted and in the system
   m_allcomponents.setNumberParticlesOnAllProc( 
   	m_allcomponents.getNumberParticles() );
-  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
-
-  // Initialisation obstacle kinematics
-  m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt ); 
-
-  // Postprocessing of force & torque on obstacles 
-  m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );  
-  m_allcomponents.outputObstaclesLoad( m_time, m_dt, false, 
-      GrainsExec::m_ReloadType == "same" ); 
+  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles(); 
       
   // Allocate hydro force and torque arrays in the AppPRSHydroFT app
   if ( m_PRSHydroFT ) m_PRSHydroFT->allocateHydroFT( 
@@ -484,7 +476,8 @@ void GrainsCoupledWithFluid::AdditionalFeatures( DOMElement* rootElement )
         cout << GrainsExec::m_shift6 << 
       		"Number of time steps over a fluid time step = " << m_ndt 
 		<< endl;
-      }		
+      }
+      m_dt = m_min_dt;		
     }
     else
     {
@@ -757,11 +750,21 @@ void GrainsCoupledWithFluid::AdditionalFeatures( DOMElement* rootElement )
 
 
 // ----------------------------------------------------------------------------
-// Sets the initial physical time
+// Sets the initial physical time and initializes what depends 
+// on the initial time
 void GrainsCoupledWithFluid::setInitialTime( double const& time0 )
 {
+  // Initial time
   m_tstart = time0;
   m_time = time0;
+  
+  // Initialisation obstacle kinematics
+  m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt ); 
+
+  // Postprocessing of force & torque on obstacles 
+  m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );  
+  m_allcomponents.outputObstaclesLoad( m_time, m_dt, false, 
+      GrainsExec::m_ReloadType == "same" );
 }
 
 

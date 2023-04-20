@@ -220,3 +220,17 @@ void FS_Grains3DPlugIn:: setParaviewPostProcessingTranslationVector(
       	tvx, tvy, tvz );
   
 } 
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_Grains3DPlugIn:: setInitialTime( double const& time0 )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Grains3DPlugIn:: setInitialTime" );
+  
+  if ( m_Grains3D_active_on_this_rank )
+    m_Grains3D->setInitialTime( time0 );
+  
+} 

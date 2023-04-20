@@ -95,6 +95,10 @@ class FS_Grains3DPlugIn : public FS_SolidPlugIn
       @param tvz z coordinate */
       void setParaviewPostProcessingTranslationVector( 
       	double const& tvx, double const& tvy, double const& tvz );
+	
+      /** @brief Set the initial physical time
+      @param time0 initial physical time */
+      void setInitialTime( double const& time0 );	
       //@}
     	  
   

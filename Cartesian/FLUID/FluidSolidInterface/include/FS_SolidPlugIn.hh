@@ -87,7 +87,11 @@ class FS_SolidPlugIn : public PAC_SolverComputingTime
       @param tvy y coordinate
       @param tvz z coordinate */
       virtual void setParaviewPostProcessingTranslationVector( 
-      	double const& tvx, double const& tvy, double const& tvz ) = 0;	
+      	double const& tvx, double const& tvy, double const& tvz ) = 0;
+	
+      /** @brief Set the initial physical time
+      @param time0 initial physical time */
+      virtual void setInitialTime( double const& time0 ) = 0;      	
       //@}
     
 
