@@ -38,6 +38,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
                                   , MAC_Communicator const* arb_macCOMM
                                   , double const& arb_mu
                                   , bool const& is_GRAINS
+                                  , bool const& is_stressCal
                                   , bool const& is_STL
                                   , istream& STL_input)
 //---------------------------------------------------------------------------
@@ -53,6 +54,7 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
   , m_rho ( arb_rho )
   , gravity_vector ( arb_gv )
   , b_GRAINS ( is_GRAINS )
+  , b_stressCal ( is_stressCal )
   , b_STL ( is_STL )
 {
   MAC_LABEL( "DS_AllRigidBodies:: DS_AllRigidBodies(size_t&,istream&)" ) ;
@@ -85,11 +87,11 @@ DS_AllRigidBodies:: DS_AllRigidBodies( size_t& dimens
 
   generate_list_of_local_RB();
 
-  initialize_surface_variables_for_all_RB();
+  if (b_stressCal) initialize_surface_variables_for_all_RB();
 
   initialize_surface_variables_on_grid();
 
-  compute_surface_variables_for_all_RB();
+  if (b_stressCal) compute_surface_variables_for_all_RB();
 
   compute_halo_zones_for_all_rigid_body();
 

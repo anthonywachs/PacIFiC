@@ -321,6 +321,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                           , macCOMM
                           , mu
                           , is_GRAINS
+                          , is_stressCal
                           , is_STL
                           , STL_input);
       } else if (is_HE) {
@@ -470,14 +471,14 @@ DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
    FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
 
    // Solid solver
-   if ( is_GRAINS ) 
+   if ( is_GRAINS )
    {
      // Set the initial time
      solidSolver->setInitialTime( t_it->time() );
-     
+
      // Update the rigid components positions in the fluid
      solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
-     allrigidbodies->update( *solidFluid_transferStream );     
+     allrigidbodies->update( *solidFluid_transferStream );
    }
 
    // Projection-Translation
@@ -527,7 +528,7 @@ DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
              << ", Tgrad"
              << endl;
       MyFile.close();
-   }  
+   }
 
 }
 
@@ -613,9 +614,8 @@ DS_DirectionSplitting:: do_before_inner_iterations_stage(
    }
 
    // Rigid body motion
-   if ( is_GRAINS ) {
-     // Send hydro force and torque to Grains3D
-     if ( is_par_motion ) {
+   // Send hydro force and torque to Grains3D
+   if ( is_GRAINS && is_par_motion ) {
        // Allocate array if empty
        if ( !hydroFT ) {
           size_t npart = allrigidbodies->get_number_particles();
@@ -630,15 +630,14 @@ DS_DirectionSplitting:: do_before_inner_iterations_stage(
 
        // Transfer to Grains3D
        solidSolver->transferHydroFTtoSolid( hydroFT );
-     }
 
-     // Compute the trajectory of particles with collisions in Grains3D
-     solidSolver->Simulation( t_it->time_step(), true, false, 1., false );
+       // Compute the trajectory of particles with collisions in Grains3D
+       solidSolver->Simulation( t_it->time_step(), true, false, 1., false );
 
-     // Update the rigid components positions in the fluid
-     solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
-     cout << solidFluid_transferStream->str() << endl;
-     allrigidbodies->update( *solidFluid_transferStream );
+       // Update the rigid components positions in the fluid
+       solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+       // cout << solidFluid_transferStream->str() << endl;
+       allrigidbodies->update( *solidFluid_transferStream );
    }
 
    // Flow solver
@@ -712,7 +711,7 @@ DS_DirectionSplitting:: do_additional_savings( FV_TimeIterator const* t_it,
       stop_total_timer() ;
    }
    // Solid solver
-   if ( solidSolver )
+   if ( is_GRAINS )
      solidSolver->saveResults( "", t_it->time(), cycleNumber );
 
 }

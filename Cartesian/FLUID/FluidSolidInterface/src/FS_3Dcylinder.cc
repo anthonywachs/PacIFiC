@@ -202,8 +202,11 @@ bool FS_3Dcylinder:: isIn( geomVector const& pt ) const
   geomVector BottomToPoint( pt - m_agp_3dcyl.BottomCenter );
   double dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
 	                        /  m_agp_3dcyl.cylinder_height ;
-  if ( dot <= m_agp_3dcyl.cylinder_height && dot >= - EPSILON )
-    if ( BottomToPoint.calcNormSquare() - dot * dot  - EPSILON <=
+
+  double eps_local = EPSILON*m_agp_3dcyl.cylinder_height;
+
+  if ( dot <= m_agp_3dcyl.cylinder_height && dot >= - eps_local )
+    if ( BottomToPoint.calcNormSquare() - dot * dot  - eps_local <=
          m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
       b_isIn = true ;
 
@@ -212,8 +215,8 @@ bool FS_3Dcylinder:: isIn( geomVector const& pt ) const
         BottomToPoint = pt - (m_agp_3dcyl.BottomCenter + (*m_periodic_directions)[i]);
         dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec  )
             /  m_agp_3dcyl.cylinder_height ;
-        if ( dot <= m_agp_3dcyl.cylinder_height && dot >= - EPSILON )
-          if ( BottomToPoint.calcNormSquare() - dot * dot  - EPSILON <=
+        if ( dot <= m_agp_3dcyl.cylinder_height && dot >= - eps_local )
+          if ( BottomToPoint.calcNormSquare() - dot * dot  - eps_local <=
                m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
             b_isIn = true ;
       }
@@ -257,9 +260,11 @@ double FS_3Dcylinder:: level_set_value( geomVector const& pt ) const
 
   double value = 0.;
 
+  double eps_local = EPSILON*m_agp_3dcyl.cylinder_height;
+
   if ( dot < m_agp_3dcyl.cylinder_height &&
-       dot > -EPSILON &&
-       rad_sq_dist < EPSILON) {
+       dot > -eps_local &&
+       rad_sq_dist < eps_local) {
      value = -1.*fabs(fabs(dot) - m_agp_3dcyl.cylinder_height)*fabs(rad_sq_dist);
   } else {
      value = MAC::sqrt(MAC::pow((fabs(dot)-m_agp_3dcyl.cylinder_height),2.)
@@ -278,8 +283,8 @@ double FS_3Dcylinder:: level_set_value( geomVector const& pt ) const
         double temp = 0.;
 
         if ( dot < m_agp_3dcyl.cylinder_height &&
-             dot > -EPSILON &&
-             rad_sq_dist < EPSILON) {
+             dot > -eps_local &&
+             rad_sq_dist < eps_local) {
            temp = -1.*fabs(fabs(dot) - m_agp_3dcyl.cylinder_height)*fabs(rad_sq_dist);
         } else {
            temp = MAC::sqrt(MAC::pow((fabs(dot)-m_agp_3dcyl.cylinder_height),2.)

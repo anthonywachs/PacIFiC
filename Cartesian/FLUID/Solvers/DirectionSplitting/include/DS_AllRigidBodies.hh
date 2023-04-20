@@ -75,6 +75,7 @@ class DS_AllRigidBodies
                        , MAC_Communicator const* arb_macCOMM
                        , double const& arb_mu
                        , bool const& is_GRAINS
+                       , bool const& is_stressCal
                        , bool const& is_STL
                        , istream& STL_input );
 
@@ -708,6 +709,7 @@ class DS_AllRigidBodies
       vector<size_t> local_RB_list; /**< Stores a list of local RB */
 
       bool b_GRAINS;
+      bool b_stressCal;
       bool b_STL;
 
       //@}

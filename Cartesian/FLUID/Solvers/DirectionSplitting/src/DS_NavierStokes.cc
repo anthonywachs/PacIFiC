@@ -300,6 +300,19 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
 
    }
 
+	// Calculate the divergence at last time step data in case of restart
+	// Not required for the fresh start as imposed field (if any)
+	// is always divergence-free
+	if (b_restart) {
+		compute_velocity_divergence(PF);
+		doubleArray2D* divergencePF = GLOBAL_EQ->get_node_divergence(0);
+		for (size_t i = 0; i < PF->nb_local_unknowns() ; i++) {
+			divergencePF->operator()(i,1) = divergencePF->operator()(i,0);
+			// divergencePF->operator()(i,0) = 0.;
+			// divergencePF->operator()(i,1) = 0.;
+		}
+	}
+
    // Direction splitting
    // Assemble 1D tridiagonal matrices
    assemble_1D_matrices(PF,t_it);
