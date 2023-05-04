@@ -214,14 +214,15 @@ are cylinders
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
 PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
-  RigidBodyWithCrust const& rbB );
+  RigidBodyWithCrust const& rbB ); 
 
-/** @brief Returns whether there is a contact between the circumscribed
-cylinders of two rigid bodies
+/** @brief Returns whether there is a contact between the bounding volumes of 
+two rigid bodies
 @param rbA 1st rigid body
 @param rbB 2nd rigid body */
-bool isContactCYLINDERS( RigidBodyWithCrust const& rbA,
-  RigidBodyWithCrust const& rbB );
+bool isContactBVolume( RigidBodyWithCrust const& rbA,
+                       RigidBodyWithCrust const& rbB );  
+
 
 /** @brief Returns the features of the contact when the 1 rigid body is
 a rectangle

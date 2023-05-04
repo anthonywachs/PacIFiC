@@ -1,4 +1,5 @@
 #include "GrainsBuilderFactory.hh"
+#include "GrainsExec.hh"
 #include "RigidBody.hh"
 #include "ConvexBuilderFactory.hh"
 #include "Torsor.hh"
@@ -11,8 +12,8 @@
 // Default constructor
 RigidBody::RigidBody()
   : m_convex( NULL )
+  , m_boundingVolume( NULL )
   , m_circumscribedRadius( 0.0 )
-  , m_cylinder( BCylinder() )
 {}
 
 
@@ -24,6 +25,7 @@ RigidBody::RigidBody( Convex* convex_, Transform const& position_ )
   : m_transform( position_ )
   , m_convex( convex_ )
 {
+  m_boundingVolume = m_convex->computeBVolume( GrainsExec::m_boundingVolume );
   m_circumscribedRadius = m_convex->computeCircumscribedRadius();
 }
 
@@ -35,10 +37,11 @@ RigidBody::RigidBody( Convex* convex_, Transform const& position_ )
 RigidBody::RigidBody( RigidBody const& form )
   : m_transform( form.m_transform )
   , m_convex( NULL )
+  , m_boundingVolume( NULL )
   , m_circumscribedRadius( form.m_circumscribedRadius )
-  , m_cylinder( form.m_cylinder )
 {
   if ( form.m_convex ) m_convex = form.m_convex->clone();
+  if ( form.m_boundingVolume) m_boundingVolume = form.m_boundingVolume->clone();
 }
 
 
@@ -49,6 +52,7 @@ RigidBody::RigidBody( RigidBody const& form )
 RigidBody::~RigidBody()
 {
   delete m_convex;
+  delete m_boundingVolume;
 }
 
 
@@ -192,7 +196,7 @@ double RigidBody::getCircumscribedRadius() const
 // Returns the rigid body volume
 double RigidBody::getVolume() const
 {
-  return ( m_convex->getVolume() );
+  return ( m_volume );
 }
 
 
@@ -200,9 +204,9 @@ double RigidBody::getVolume() const
 
 // ----------------------------------------------------------------------------
 // Returns the rigid body bounding cylinder
-BCylinder RigidBody::getBCylinder() const
+BVolume const* RigidBody::getBVolume() const
 {
-  return ( m_convex->bcylinder() );
+  return ( m_boundingVolume );
 }
 
 

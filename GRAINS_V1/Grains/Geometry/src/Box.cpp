@@ -1,7 +1,10 @@
 #include "GrainsExec.hh"
 #include "GrainsBuilderFactory.hh"
 #include "Box.hh"
-#include "BCylinder.hh"
+#include "BBox.hh"
+#include "BVolume.hh"
+#include "OBB.hh"
+#include "OBC.hh"
 #include <sstream>
 
 // Static attribute
@@ -961,17 +964,25 @@ bool Box::isIn( Point3 const& pt ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns the bounding cylinder to box
-BCylinder Box::bcylinder() const
+// Returns the bounding volume to box
+BVolume* Box::computeBVolume( unsigned int type ) const
 {
-  double a[2];
-  int axis = ( a[X] = fabs( m_extent[X] ) ) < ( a[Y] = fabs( m_extent[Y] ) )
-    ? Y : X;
-  int i = a[axis] < fabs( m_extent[Z] ) ? Z : axis;
-  Vector3 e( 0., 0., 0. );
-  e[i] = 1.;
-  double h = 2. * m_extent[i];
-  double r = sqrt( Norm2(m_extent) - m_extent[i]*m_extent[i]);
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( m_extent, m_extent );
+  else if ( type == 2 ) // OBC
+  {
+    double a[2];
+    int axis = ( a[X] = fabs( m_extent[X] ) ) < ( a[Y] = fabs( m_extent[Y] ) )
+      ? Y : X;
+    int i = a[axis] < fabs( m_extent[Z] ) ? Z : axis;
+    Vector3 e( 0., 0., 0. );
+    e[i] = 1.;
+    double h = 2. * m_extent[i];
+    double r = sqrt( Norm2(m_extent) - m_extent[i]*m_extent[i]);
 
-  return( BCylinder( r, h, e ) );
+    bvol = new OBC( r, h, e );
+  }
+
+  return( bvol );
 }

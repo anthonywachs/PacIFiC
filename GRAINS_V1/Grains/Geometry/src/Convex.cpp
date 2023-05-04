@@ -3,6 +3,8 @@
 #include "BBox.hh"
 #include "Sphere.hh"
 #include "Transform.hh"
+#include "BVolume.hh"
+
 
 double rel_error = EPSILON;   // relative error in the computed distance
 double abs_error = EPSILON2;  // absolute error if the distance is almost zero
@@ -56,15 +58,15 @@ BBox Convex::bbox( Transform const& t ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns the convex shape bounding cylinder
-BCylinder Convex::bcylinder() const
+// Returns the convex shape bounding volume
+BVolume* Convex::computeBVolume( unsigned int type ) const
 {
-  cout << "Warning for this Convex the method Convex::bcylinder() "
+  cout << "Warning for this Convex the method Convex::computeBVolume() "
        << "is not yet implemented !\n"
        << "Need for an assistance ! Stop running !\n";
   // exit(10);
 
-  return( BCylinder() );
+  return( nullptr );
 }
 
 
@@ -575,7 +577,7 @@ double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
    static Vector3 zero(-EPSILON, EPSILON, EPSILON);
   // static Vector3 zero(0., 0., 0.);
 
-  Vector3 v = a2w(a.support(zero)) - b2w(b.support(zero));
+  Vector3 v = a2w(a.support(Vector3Nul)) - b2w(b.support(Vector3Nul));
 
   double dist = Norm(v);
   Vector3 w;

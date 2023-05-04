@@ -520,6 +520,28 @@ void Grains::Construction( DOMElement* rootElement )
       m_allcomponents.resetKinematics( reset );
     }
 
+    // Bounding volume precollision test
+    DOMNode* nBoundingVolume = ReaderXML::getNode( root, "BoundingVolume" );
+    if ( nBoundingVolume )
+    {
+      string nBVtype = ReaderXML::getNodeAttr_String( nBoundingVolume, "Type" );
+      if ( nBVtype == "OBB" )
+        GrainsExec::m_boundingVolume = 1;
+      else if ( nBVtype == "OBC" )
+        GrainsExec::m_boundingVolume = 2;
+      else
+        GrainsExec::m_boundingVolume = 0;
+    }
+    if ( m_rank == 0 && GrainsExec::m_boundingVolume == 1 )
+      cout << GrainsExec::m_shift6 <<
+      "Pre-collision Test with oriented bounding boxes is on." << endl;
+    else if ( m_rank == 0 && GrainsExec::m_boundingVolume == 2 )
+      cout << GrainsExec::m_shift6 <<
+      "Pre-collision Test with oriented bounding cylinders is on." << endl;
+    else if ( m_rank == 0 )
+      cout << GrainsExec::m_shift6 <<
+      "Pre-collision Test with bounding volumes is off." << endl;
+
 
     // Particles
     DOMNode* particles = ReaderXML::getNode( root, "Particles" );
@@ -537,7 +559,7 @@ void Grains::Construction( DOMElement* rootElement )
       {
         DOMNode* nParticle = allParticles->item( i );
         int nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
-
+        
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
         Particle* particleRef = new Particle( nParticle, false,
@@ -787,20 +809,6 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
     		"Type" );
     if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Time integration scheme = " << GrainsExec::m_TIScheme << endl;
-
-    // Bounding cylinders precollision test
-    DOMNode* nPreCollision = ReaderXML::getNode( root, "PreCollision" );
-    if ( nPreCollision )
-      GrainsExec::m_preCollision_cyl =
-        ( ReaderXML::getNodeAttr_String( nPreCollision, "Type" )
-                                                      == "BoundingCylinders" );
-    if ( m_rank == 0 && GrainsExec::m_preCollision_cyl )
-      cout << GrainsExec::m_shift6 <<
-      "Pre-collision Test with bounding cylinders is on." << endl;
-    else if ( m_rank == 0 && !GrainsExec::m_preCollision_cyl )
-      cout << GrainsExec::m_shift6 <<
-      "Pre-collision Test with bounding cylinders is off." << endl;
-
 
     // Restart file and writing mode
     DOMNode* nRestartFile = ReaderXML::getNode( root, "RestartFile" );

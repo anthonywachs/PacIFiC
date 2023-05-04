@@ -7,6 +7,7 @@
 #include "Convex.hh"
 #include "Vector3.hh"
 #include "Point3.hh"
+#include "BVolume.hh"
 using namespace solid;
 
 class Cell;
@@ -173,7 +174,7 @@ class RigidBody
     double getVolume() const;
 
     /** @brief Returns the rigid body bounding cylinder */
-    BCylinder getBCylinder() const;
+    BVolume const* getBVolume() const;
     //@}
 
 
@@ -243,9 +244,9 @@ class RigidBody
     Transform m_transform; /**< rigid body's transformation: center of mass
   	position and body orientation */
     Convex *m_convex; /**< convex shape */
+    BVolume* m_boundingVolume; /** The bounding volume of the convex body **/
     double m_circumscribedRadius; /**< circumscribed radius */
     double m_volume; /**< rigid body volume */
-    BCylinder m_cylinder; /** The bounding cylinder of the convex body **/
     //@}
 };
 

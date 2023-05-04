@@ -40,7 +40,7 @@
 <!ELEMENT Grains3D (Construction, Forces, Simulation)>
 <!ATTLIST Grains3D Type (Standard|MPI) "Standard">
 
-  <!ELEMENT Construction (LinkedCell, Origin?, Periodicity?, DomainDecomposition?, MPI?, ContactForceModels, Particles?, Obstacles?, Reload?)>
+  <!ELEMENT Construction (LinkedCell, Origin?, Periodicity?, DomainDecomposition?, MPI?, ContactForceModels, BoundingVolume?, Particles?, Obstacles?, Reload?)>
     <!ELEMENT LinkedCell EMPTY>
     <!ATTLIST LinkedCell MX CDATA #REQUIRED>
     <!ATTLIST LinkedCell MY CDATA #REQUIRED>
@@ -56,7 +56,10 @@
     <!ATTLIST MPI VerbosityLevel (0|1|2) "2">	 
 
     <!ELEMENT ContactForceModels (Default?, ContactForceModel*)>
-
+    
+    <!ELEMENT BoundingVolume EMPTY>
+    <!ATTLIST BoundingVolume Type (OFF|OBB|OBC) "OFF">
+      
     <!ELEMENT Particles (Particle+)>    
       <!ELEMENT Particle (Convex, AngularPosition, Material)>
       <!ATTLIST Particle Number  CDATA #REQUIRED>
@@ -83,7 +86,7 @@
     <!ATTLIST Gravity GZ CDATA #REQUIRED>
 
 
-  <!ELEMENT Simulation (TimeInterval, TimeStep, TimeIntegration, RestartFile, TimeSave, PreCollision?, CollisionalRelativeVelocity?, MovingObstacles?, ParticleInsertion?, ObstacleLoadings?, PostProcessingWriters?)>
+  <!ELEMENT Simulation (TimeInterval, TimeStep, TimeIntegration, RestartFile, TimeSave, CollisionalRelativeVelocity?, MovingObstacles?, ParticleInsertion?, ObstacleLoadings?, PostProcessingWriters?)>
     <!ELEMENT TimeInterval EMPTY>
     <!ATTLIST TimeInterval Start CDATA #REQUIRED>
     <!ATTLIST TimeInterval End   CDATA #REQUIRED>
@@ -102,9 +105,6 @@
     <!ATTLIST TimeSave Start CDATA #REQUIRED>
     <!ATTLIST TimeSave End   CDATA #REQUIRED>
     <!ATTLIST TimeSave Every CDATA #REQUIRED>
-    
-    <!ELEMENT PreCollision EMPTY>
-    <!ATTLIST PreCollision Type (BoundingCylinders) "Off">   
 
     <!ELEMENT CollisionalRelativeVelocity EMPTY>
     <!ATTLIST CollisionalRelativeVelocity value CDATA #REQUIRED>    

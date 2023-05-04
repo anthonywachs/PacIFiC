@@ -1,12 +1,13 @@
 #include "GrainsMPIWrapper.hh"
 #include "RigidBodyWithCrust.hh"
 #include "Box.hh"
+#include "Cylinder.hh"
 #include "ConvexBuilderFactory.hh"
 #include "PointContact.hh"
 #include "PointC.hh"
 #include "GrainsExec.hh"
 #include "Particle.hh"
-#include "BCylinder.hh"
+#include "BBox.hh"
 
 #include <fstream>
 #include <sstream>
@@ -70,6 +71,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( istream& fileIn, string type )
 
   // Read the rigid body shape
   m_convex = ConvexBuilderFactory::create( cle, fileIn );
+  m_boundingVolume = m_convex->computeBVolume( GrainsExec::m_boundingVolume );
   fileIn >> cle;
   assert( cle == "*END" );
 
@@ -105,13 +107,13 @@ RigidBodyWithCrust::RigidBodyWithCrust( DOMNode* root )
   // Convex
   DOMNode* forme = ReaderXML::getNode( root, "Convex" );
   m_convex = ConvexBuilderFactory::create( forme );
-
   m_crustThickness = ReaderXML::getNodeAttr_Double( forme, "CrustThickness" );
+  m_boundingVolume = m_convex->computeBVolume( GrainsExec::m_boundingVolume );
 
   // Transformation
   m_transform.load( root );
 
-  // Circumscribed radius, bounding box, bounding cylinder
+  // Circumscribed radius, bounding box
   m_circumscribedRadius = m_convex->computeCircumscribedRadius();
   m_scaling = new Vector3;
   BBox box = m_convex->bbox( TransformIdentity );
@@ -216,7 +218,7 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
       return ( ClosestPointRECTANGLE( *this, neighbor ) );
 
     // Pre-collision Test
-    if(GrainsExec::m_preCollision_cyl && !isContactCYLINDERS( *this, neighbor ))
+    if( GrainsExec::m_boundingVolume && !isContactBVolume( *this, neighbor ) )
          return ( PointNoContact );
 
     // Distance between the 2 rigid bodies shrunk by their crust thickness
@@ -261,6 +263,17 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
     // If actual overlap distance < 0 => contact
     // otherwise no contact
     distance -= m_crustThickness + neighbor.m_crustThickness;
+
+    // if ( distance < 0. && isContactOBB( *this, neighbor ) == true )
+    // {
+    //   std::cout << "T" << endl;
+    //   // bool cnt = isContactOBB2( *this, neighbor );
+    // }
+    // if ( distance < 0. && isContactOBB( *this, neighbor ) == false )
+    // {
+    //   std::cout << "F" << endl;
+    //   bool cnt = isContactOBB2( *this, neighbor );
+    // }
 
     return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
   }
@@ -751,16 +764,17 @@ void RigidBodyWithCrust::initialize_transformWithCrust_to_notComputed()
 // ----------------------------------------------------------------------------
 // Returns the features of the contact when the 2 rigid bodies are cylinders
 PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
-  RigidBodyWithCrust const& rbB )
+                                    RigidBodyWithCrust const& rbB )
 {
   try {
-  Transform const* a2wNoCrust = rbA.getTransform();
-  Transform const* b2wNoCrust = rbB.getTransform();
-  Vector3 gcagcb = *( a2wNoCrust->getOrigin() ) - *( b2wNoCrust->getOrigin() );
+  Cylinder const* cylA = (Cylinder const*)( rbA.getConvex() );
+  Cylinder const* cylB = (Cylinder const*)( rbB.getConvex() );
+  Transform const* a2w = rbA.getTransform();
+  Transform const* b2w = rbB.getTransform();
+  Vector3 gcagcb = *( a2w->getOrigin() ) - *( b2w->getOrigin() );
   if ( Norm(gcagcb) < rbA.getCircumscribedRadius() +
                       rbB.getCircumscribedRadius() )
-    return( intersect( rbA.getBCylinder(), rbB.getBCylinder(),
-                       *a2wNoCrust, *b2wNoCrust ) );
+    return( intersect( *cylA, *cylB, *a2w, *b2w ) );
   else
     return ( PointNoContact );
   }
@@ -773,15 +787,17 @@ PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
 
 
 // ----------------------------------------------------------------------------
-// Returns whether there is a contact between the circumscribed cylinders of
-// two rigid bodies
-bool isContactCYLINDERS( RigidBodyWithCrust const& rbA,
-                         RigidBodyWithCrust const& rbB )
+// Returns whether there is a contact between the bounding volumes of two rigid
+// bodies
+bool isContactBVolume( RigidBodyWithCrust const& rbA, 
+                       RigidBodyWithCrust const& rbB )
 {
-  Transform const* a2wNoCrust = rbA.getTransform();
-  Transform const* b2wNoCrust = rbB.getTransform();
-  return ( isContact( rbA.getBCylinder(), rbB.getBCylinder(),
-                      *a2wNoCrust, *b2wNoCrust ) );
+  // Transform const* a2w = rbA.getTransform();
+  // Transform const* b2w = rbB.getTransform();
+  return ( isContact( *rbA.getBVolume(), 
+                      *rbB.getBVolume(),
+                      *rbA.getTransform(),
+                      *rbB.getTransform() ) );
 }
 
 

@@ -41,7 +41,7 @@ list<IndexArray*> GrainsExec::m_allPolytopeNodesIndex;
 list<vector< vector<int> >*> GrainsExec::m_allPolyhedronFacesConnectivity;
 string GrainsExec::m_inputFile;
 int GrainsExec::m_return_syscmd = 0;
-bool GrainsExec::m_preCollision_cyl = false;
+unsigned int GrainsExec::m_boundingVolume = 0;
 
 
 

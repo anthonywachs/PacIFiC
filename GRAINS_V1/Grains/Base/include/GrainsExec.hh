@@ -271,7 +271,7 @@ class GrainsExec
     	result files at this time */
     static string m_inputFile; /**< Grains3D major input file */
     static int m_return_syscmd; /**< Returned value of system command */
-    static bool m_preCollision_cyl; /** precollision test w/ bounding cyls **/
+    static unsigned int m_boundingVolume; /** bounding volume type **/
     //@}
 
 
