@@ -969,7 +969,7 @@ BVolume* Box::computeBVolume( unsigned int type ) const
 {
   BVolume* bvol = NULL;
   if ( type == 1 ) // OBB
-    bvol = new OBB( m_extent, m_extent );
+    bvol = new OBB( m_extent, Matrix() );
   else if ( type == 2 ) // OBC
   {
     double a[2];

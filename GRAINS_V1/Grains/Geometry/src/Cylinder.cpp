@@ -3,6 +3,7 @@
 #include "BVolume.hh"
 #include "OBB.hh"
 #include "OBC.hh"
+#include "Matrix.hh"
 
 int Cylinder::m_visuNodeNbOnPer = 36;
 static double tol = EPSILON; // Tolerance used in this class
@@ -369,7 +370,7 @@ BVolume* Cylinder::computeBVolume( unsigned int type ) const
   if ( type == 1 ) // OBB
   {
     Vector3 const& extent = Vector3( m_radius, m_radius, m_halfHeight );
-    bvol = new OBB( extent, Vector3( 0., 1., 0. ) );
+    bvol = new OBB( extent, Matrix() );
   }
 
   else if ( type == 2 ) // OBC

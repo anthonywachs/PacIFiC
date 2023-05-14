@@ -80,6 +80,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( istream& fileIn, string type )
 
   // Circumscribed radius and bounding box
   m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+  m_volume = m_convex->getVolume();
   m_scaling = new Vector3;
   BBox box = m_convex->bbox( TransformIdentity );
   Vector3 const& extent = box.getExtent();
@@ -115,6 +116,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( DOMNode* root )
 
   // Circumscribed radius, bounding box
   m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+  m_volume = m_convex->getVolume();
   m_scaling = new Vector3;
   BBox box = m_convex->bbox( TransformIdentity );
   const Vector3& extent = box.getExtent();
@@ -792,10 +794,8 @@ PointContact ClosestPointCYLINDERS( RigidBodyWithCrust const& rbA,
 bool isContactBVolume( RigidBodyWithCrust const& rbA, 
                        RigidBodyWithCrust const& rbB )
 {
-  // Transform const* a2w = rbA.getTransform();
-  // Transform const* b2w = rbB.getTransform();
-  return ( isContact( *rbA.getBVolume(), 
-                      *rbB.getBVolume(),
+  return ( isContact( rbA.getBVolume(), 
+                      rbB.getBVolume(),
                       *rbA.getTransform(),
                       *rbB.getTransform() ) );
 }

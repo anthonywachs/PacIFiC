@@ -203,10 +203,10 @@ double RigidBody::getVolume() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the rigid body bounding cylinder
-BVolume const* RigidBody::getBVolume() const
+// Returns the rigid body bounding volume
+BVolume const& RigidBody::getBVolume() const
 {
-  return ( m_boundingVolume );
+  return ( *m_boundingVolume );
 }
 
 

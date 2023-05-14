@@ -122,6 +122,9 @@ public:
   /** @ brief Returns whether a point lies inside the superquadric
   @param pt point */
   bool isIn( Point3 const& pt ) const;
+
+  /** @ Returns the bounding volume to superquadric */
+  BVolume* computeBVolume( unsigned int type ) const;
   //@}
 
 protected:

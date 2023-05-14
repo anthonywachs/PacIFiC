@@ -24,7 +24,7 @@ class OBB : public BVolume
     /** @brief Constructor with half-lengths extent and initial orientation ori
     @param extent half-lengths
     @param ori initial orientation */
-    OBB( Vector3 const& extent, Vector3 const& ori );
+    OBB( Vector3 const& extent, Matrix const& ori );
 
     /** @brief Copy constructor
     @param obc_ reference OBB */
@@ -46,7 +46,7 @@ class OBB : public BVolume
     Vector3 const& getExtent() const;
 
     /** @brief Returns the OBB initial orientation */
-    Vector3 const& getInitOrientation() const;
+    Matrix const& getInitOrientation() const;
 
     /** @brief Sets the OBB half-lenghts
     @param extent new half-lengths */
@@ -54,7 +54,7 @@ class OBB : public BVolume
 
     /** @brief Sets the OBB initial orientation
     @param ori new initial orientation */
-    void setInitOrientation( Vector3 const& ori );
+    void setInitOrientation( Matrix const& ori );
 
     /** @brief Output operator (is called by <<)
     @param fileOut output stream */
@@ -66,7 +66,7 @@ class OBB : public BVolume
     /** @name Parameters */
     //@{
     Vector3 m_extent; /**< OBB half-lenghts */
-    Vector3 m_initOrientation; /**< OBB initial orientation */
+    Matrix m_initOrientation; /**< OBB initial orientation */
     //@}
 };
 

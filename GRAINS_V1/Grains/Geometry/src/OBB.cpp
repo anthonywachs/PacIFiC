@@ -11,7 +11,7 @@ OBB::OBB()
 
 // --------------------------------------------------------------------
 // Constructor with half-lengths extent and initial orientation ori
-OBB::OBB( Vector3 const& extent, Vector3 const& ori )
+OBB::OBB( Vector3 const& extent, Matrix const& ori )
 {
   m_extent = extent;
   m_initOrientation = ori;
@@ -71,7 +71,7 @@ Vector3 const& OBB::getExtent() const
 
 // --------------------------------------------------------------------
 // Returns the OBB initial orientation
-Vector3 const& OBB::getInitOrientation() const
+Matrix const& OBB::getInitOrientation() const
 {
   return ( m_initOrientation );
 }
@@ -91,7 +91,7 @@ void OBB::setExtent( Vector3 const& extent )
 
 // --------------------------------------------------------------------
 // Sets the OBB initial orientation
-void OBB::setInitOrientation( Vector3 const& ori )
+void OBB::setInitOrientation( Matrix const& ori )
 {
   m_initOrientation = ori;
 }
@@ -118,10 +118,15 @@ void OBB::writeShape ( ostream& fileOut ) const
   ( fabs( cen[0]*ori[i][0] + cen[1]*ori[i][1] + cen[2]*ori[i][2] ) > \
   ( b[i] + a[0]*fabs(ori[i][0]) + a[1]*fabs(ori[i][1]) + a[2]*fabs(ori[i][2]) ) )
 
+// #define TESTCASE3(i, j) \
+//   ( fabs( cen[(j+2)%3]*ori[i][(j+1)%3] - cen[(j+1)%3]*ori[i][(j+2)%3] ) > \
+//   ( a[(i+1)%3]*fabs(ori[(i+2)%3][j]) + a[(i+2)%3]*fabs(ori[(i+1)%3][j]) + \
+//     b[(j+1)%3]*fabs(ori[i][(j+2)%3]) + b[(j+2)%3]*fabs(ori[i][(j+1)%3]) ) )
+
 #define TESTCASE3(i, j) \
   ( fabs( cen[(j+2)%3]*ori[i][(j+1)%3] - cen[(j+1)%3]*ori[i][(j+2)%3] ) > \
-  ( a[(i+1)%3]*fabs(ori[(i+2)%3][j]) + a[(i+2)%3]*fabs(ori[(i+1)%3][j]) + \
-    b[(j+1)%3]*fabs(ori[i][(j+2)%3]) + b[(j+2)%3]*fabs(ori[i][(j+1)%3]) ) )
+  ( a[(i+1)%3]*oriAbs[(i+2)%3][j] + a[(i+2)%3]*oriAbs[(i+1)%3][j] + \
+    b[(j+1)%3]*oriAbs[i][(j+2)%3] + b[(j+2)%3]*oriAbs[i][(j+1)%3] ) )
 
 // Returns whether two OBBs are in contact
 bool isContactBVolume( OBB const& obbA,
@@ -134,6 +139,9 @@ bool isContactBVolume( OBB const& obbA,
   Point3 const& cen = transpose( a2w.getBasis() ) * 
                       ( *( b2w.getOrigin() ) - *( a2w.getOrigin() ) );
   Matrix const& ori = transpose( b2w.getBasis() ) * a2w.getBasis();
+  Matrix const oriAbs( fabs(ori[0][0]), fabs(ori[0][1]), fabs(ori[0][2]),
+                       fabs(ori[1][0]), fabs(ori[1][1]), fabs(ori[1][2]),
+                       fabs(ori[2][0]), fabs(ori[2][1]), fabs(ori[2][2]) );
 
   // CASE 1: ( three of them )
   if TESTCASE1( 0 ) return ( false );

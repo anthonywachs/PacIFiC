@@ -174,7 +174,7 @@ class RigidBody
     double getVolume() const;
 
     /** @brief Returns the rigid body bounding cylinder */
-    BVolume const* getBVolume() const;
+    BVolume const& getBVolume() const;
     //@}
 
 
