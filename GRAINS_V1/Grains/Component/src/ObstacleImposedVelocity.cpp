@@ -62,6 +62,7 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
       	m_translationalVelocity << endl;
     }   
   }
+  // Sinusoidal translation  
   else if ( ReaderXML::getNode( root, "SinTranslation" ) )
   {
     m_type = "SinTranslation";
@@ -96,7 +97,26 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
       	m_Sin_amplitude * 2. * PI / m_Sin_period << endl; 
     }             
   }
-  else
+  else if ( ReaderXML::getNode( root, "ConstantRotation" ) )
+  {
+    m_type = "ConstantRotation";
+    DOMNode* nVRotation = ReaderXML::getNode( root, "ConstantRotation" );
+    DOMNode* nRV = ReaderXML::getNode( nVRotation, "AngularVelocity" );
+    m_angularVelocity[X] = ReaderXML::getNodeAttr_Double( nRV, "WX" );
+    m_angularVelocity[Y] = ReaderXML::getNodeAttr_Double( nRV, "WY" );    
+    m_angularVelocity[Z] = ReaderXML::getNodeAttr_Double( nRV, "WZ" ); 
+    if ( rank == 0 )
+    {
+      cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
+      	<< endl;      
+      cout << GrainsExec::m_shift12 << "Time interval = [" 
+      	<< m_tstart << "," << m_tend << "]" << endl;
+      cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
+      cout << GrainsExec::m_shift12 << "Angular velocity = " << 
+      	m_angularVelocity << endl;
+    }   
+  }
+  else 
   {
     error = 1;
     if ( rank == 0 ) cout << GrainsExec::m_shift6 << 
