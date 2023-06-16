@@ -1,7 +1,7 @@
 /**
 # Matrix inversion using LU-decomposition
 
-Let's not reinvent the wheel: the code below is copy-pasted from [wikipedia](https://en.wikipedia.org/wiki/LU_decomposition#C_code_example).
+Let's not reinvent the wheel: the code below is copy-pasted from [wikipedia](https://en.wikipedia.org/wiki/LU_decomposition#C_code_example). I could not find the name of the author of this code.
 
 
 */

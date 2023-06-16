@@ -1,5 +1,8 @@
 /**
 # Wrapper for output functions with Paraview
+
+File copy-pasted (with minor modifications by Can Celçuk and Guodong Gai) from [Oystein Lande's sandbox](http://basilisk.fr/sandbox/oystelan/output_vtu_foreach.h). All credit goes to Oystein Lande, Can Selçuk and Guodong Gai.
+
 */
 /*Here we defined the directory of the results*/
 # define result_dir "Res" 

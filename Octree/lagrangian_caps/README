@@ -3,10 +3,7 @@
 ## Overview
 <img style = float:right src="images/rbc_lvl9.png" alt="RBC" width="240px"/>
 
-Welcome to my sandbox. Here, I provide documentation, test cases and references related to the implementation of liquid-enclosed capsules - such as biological vesicles - at low Reynolds number.
-
-I implement a Lagrangian description of the capsules, after an attempted
-Eulerian description did not lead to satisfactory results.
+Welcome to my sandbox. Here, I provide documentation, test cases and references related to the implementation of immersed elastic capsules - such as red blood cells - in a wide range of Reynolds numbers.
 
 ## Lagrangian framework
 In the Lagrangian description, also referred to as _front-tracking method_, we
@@ -14,10 +11,7 @@ follow the membrane using an unstructured mesh, which we use to compute the
 internal strains and stresses of the membrane. These stresses are transferred to
 the fluid with the Immersed Boundary Method (IBM), i.e. by means of a
 regularized Dirac function as introduced by Peskin. The present Lagrangian
-implementation is implemented in two and three dimensions. The internal fluid
-of the capsule is allowed to have a different viscosity than the outer fluid,
-but this feature is not available in 3D yet. A bending force in addition to the
-elastic membrane stresses is also under development.
+implementation is implemented in two and three dimensions. More information about the development of this approach can be found in this [preprint](https://arxiv.org/abs/2211.15814).
 
 #### Source files
 * [lag-mesh.h](src/lagrangian_caps/lag-mesh.h): definition of the mesh,
@@ -77,6 +71,7 @@ result to various authors.
 * [bending_shear.c](tests/lagrangian_caps/bending_shear.c): same test as
 [nh_shear.c](tests/lagrangian_caps/nh_shear.c) with the addition of a bending
 stress. Results are compared to various authors.
+* [rbc_shear.c](tests/lagrangian_caps/rbc_shear.c): Red blood cell (RBC) in a shear flow. Qualitative comparison with a Yazdani \& Bagchi.
 * [constricted_channel.c](tests/lagrangian_caps/constricted_channel.c): tests
 the Skalak elasticty law, the interaction with embedded boundaries and compares
 quantitatively the deformation of the capsule to that of Park \&
@@ -89,12 +84,13 @@ tests the interaction of two elastic capsules in the presence of inerta
 ($Re = 3, 10, 50$), and compares to the work of Doddi \& Bagchi (2008).
 
 #### Original results
-* [narrow_constricted_channel.c](tests/lagrangian_caps/narrow_constricted_channel.c):
+<!---* [narrow_constricted_channel.c](tests/lagrangian_caps/narrow_constricted_channel.c):
 same case as [constricted_channel.c](tests/lagrangian_caps/constricted_channel.c) but with a narrower constriction size, a finer grid
-resolution, and the addition of bending effects.
+resolution, and the addition of bending effects.-->
 * [helix.c](cases/lagrangian_caps/helix.c): a demonstration case in a large 3D
 domain featuring a helicoidal channel. Inertial migration of a capsule is
 observed for $Re = 10, 50$.
+* [caps_corner.c](cases/lagrangian_caps/caps_corner.c): an extensive parametric  study of the deformation of interacting capsules in a sharp corner in the presence of inertia.
 
 #### Limitations and known bugs
 * The 2D bending force currently leads to numerical instabilities, probably due
@@ -106,6 +102,18 @@ multigrid.
 * Visualization tools: visualizing the edges of the mesh in 3D is necessary to
 get some visual perspective because the textures on triangular faces (i.e. the
 shades) have not been implemented.
+
+#### To do list
+* **Better MPI parallelism**: right now there is only one MPI communication per time step during the interpolation of the velocity from the octree grid to the membrane nodes (two if the RK2 scheme is used), but it comes at the price of having every processor compute the motion of every node of every capsule. This is highly inefficient and could be made better by (i) using "bounding boxes" for our capsules, such that only processors that deal with fuid cells close to a capsule see it; or (ii) implement our surface triangulation locally on grid cells one the `scalar` quantity allows to consider `struct` rather than `double` (in this case we would have a scalar that is an array of arrays of nodes, edges and triangles).
+* **Shading effect in bview**: right now the triangles are outputted in bview in plain white color, so it is necessary to draw the edges in order to get the impression of 3D.
+* **Compatibility with multigrid**: because our Lagrangian stencils are stored in `Cache` structures, the code is only compatible with tree grids. If we want to study non adaptive cases, i.e. a constant level of refinement everywhere, using multigrids is more efficient and the code could be made compatible with it by not relying on Caches and using a more efficient way to access the cells in the stencil thant the `locate()` function.
+* **Elegant volume conservation correction**: we could use the approach of Mendez et al., JCP, 2014 to impose a constant volume of the capsules by solving a (simple) optimization problem. It performs better than simply pulling on the nodes in the normal direction, and can be seen as a correction for the non-conservativity of the velocity interpolation of the IBM.
+* **Stencils spanning cells of variable levels**: it can be useful in some selected configurations, and could be performed by requiring the stencils to remain isotropic and simply averaging of the velocity/force. If this approach is too naive, I don't see why yet.
+* **More efficient computation of indicator function**: this is useful only if we consider a viscosity ratio inside/outside of the capsules. In this case, we can tweak the Poisson solver to only iterate through the cells located close to the membrane, because we know that the indicator function away from the membrane will remain constant.
+* **Output capsules in Paraview in binary files**: requires to find a good documentation of the Paraview file format.
+* **Wall-aware IBM stencils**: renormalize the convolution operations in the IBM when some cells of the stencil are located outside of the fluid domain.
+* **Predefined output functions**: provide the code user with functions to output typical quantities such as capsule centroids, average and maximum stress, etc.
+
 
 
 ## Eulerian framework
