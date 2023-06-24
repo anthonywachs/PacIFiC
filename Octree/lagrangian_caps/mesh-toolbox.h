@@ -58,6 +58,15 @@ bool is_edge_across_periodic(lagMesh* mesh, int i) {
   return false;
 }
 
+// foreach_dimension()
+// bool is_edge_across_periodic_x(lagMesh* mesh, int i) {
+//   int n[2];
+//   for(int k=0; k<2; k++) n[k] = mesh->edges[i].node_ids[k];
+//     if (ACROSS_PERIODIC(mesh->nodes[n[0]].pos.x, mesh->nodes[n[1]].pos.x))
+//       return true;
+//   return false;
+// }
+
 
 struct _write_edge {
   lagMesh* mesh;
@@ -455,6 +464,53 @@ void refine_mesh(lagMesh* mesh) {
     /** Shrink the original (big) triangle into the center smaller one */
     overwrite_triangle(mesh, i, mid_ids[0], mid_ids[1], mid_ids[2]);
   }
+}
+
+// /** The function below is not compatible with periodic boundaries yet */
+// double compute_volume(lagMesh* mesh) {
+//   double volume = 0.;
+//   for(int i=0; i<mesh->nlt; i++) {
+//     coord triangle_relative_centroid;
+//     foreach_dimension() {
+//       double tc = mesh->triangles[i].centroid.x; // `tc` for "triangle centroid"
+//       double cc = mesh->centroid.x; // `cc` for "capsule centroid"
+//       double offset = fabs(tc - cc) < L0/2 ? 0 : ((tc < cc) ? -1 : 1);  
+//       triangle_relative_centroid.x = tc - (cc + offset*L0);
+//       // triangle_relative_centroid.x = GENERAL_1DIST(mesh->triangles[i].centroid.x,
+//       //   mesh->centroid.x);
+//     }
+//     double signed_height = cdot(mesh->triangles[i].normal,
+//       triangle_relative_centroid);
+//     volume += mesh->triangles[i].area*signed_height/3;
+//   }
+//   return volume;
+// }
+
+double compute_volume(lagMesh* mesh) {
+  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+  comp_centroid(mesh);
+  double volume = 0;
+  for(int i=0; i<mesh->nlt; i++) {
+    coord nodes[3];
+    for(int j=0; j<3; j++)
+      foreach_dimension() {
+        double tentative_pos = mesh->nodes[mesh->triangles[i].node_ids[j]].pos.x
+          - mesh->centroid.x;
+        nodes[j].x = (tentative_pos < origin.x - L0/2) ?
+          tentative_pos + L0 : 
+          ((tentative_pos > origin.x + L0/2) ? tentative_pos - L0 :
+          tentative_pos);
+      }
+    for(int j=0; j<3; j++) {
+      coord cross_product;
+      foreach_dimension() 
+        cross_product.x = nodes[(j+1)%3].y*nodes[(j+2)%3].z - 
+          nodes[(j+1)%3].z*nodes[(j+2)%3].y;
+      volume += cdot(nodes[j],cross_product);
+    }
+  }
+  volume /= 18;
+  return volume;
 }
 
 /**

@@ -358,15 +358,91 @@ void comp_triangle_area_normals(lagMesh* mesh) {
 #endif
 
 /**
+If a Lagrangian node falls exactly on an edge or a vertex of the Eulerian
+mesh, some issues arise when checking for periodic boundary conditions. As a
+quick fix, if this is the case we shift the point position by $10^{-10}$, as
+is done in the two functions below.
+*/
+bool on_face(double p, int n, double l0) {
+  if ((fabs(p/(l0/n)) - ((int)fabs(p/(l0/n)))) < 1.e-10) return true;
+  else return false;
+}
+
+void correct_node_pos(coord* node) {
+  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+  foreach_dimension() {
+    if (on_face(node->x, N, L0))
+      node->x += 1.e-10;
+    //FIXME: the nodes should not be sent to the other side of the domain if the boundary is not periodic...
+    if (node->x > origin.x + L0/2)
+      node->x -= L0;
+    else if (node->x < origin.x - L0/2)
+      node->x += L0;
+  }
+}
+
+void correct_lag_pos(lagMesh* mesh) {
+  for(int i=0; i < mesh->nlp; i++) {
+    correct_node_pos(&mesh->nodes[i].pos);
+  }
+  mesh->updated_stretches = false;
+  mesh->updated_normals = false;
+  mesh->updated_curvatures = false;
+}
+
+/**
 The function below computes the centroid of the capsule as the average of the
 coordinates of all its nodes. The centroid is stored as an attribute of the
 caps structure.
 */
+// void comp_centroid(lagMesh* mesh) {
+//   foreach_dimension() mesh->centroid.x = 0;
+//   coord is_caps_periodic = {0., 0., 0.};
+//   for(int i=0; i<mesh->nle; i++) {
+//     foreach_dimension() 
+//       if (is_edge_across_periodic_x(mesh, i)) is_caps_periodic.x = 1;
+//   }
+
+//   foreach_dimension() mesh->centroid.x = 0.;
+//   coord max_pos = {-HUGE, -HUGE, -HUGE};
+//   coord min_pos = {HUGE, HUGE, HUGE};
+//   for(int i=0; i<mesh->nlp; i++) {
+//     foreach_dimension() {
+//       if (mesh->nodes[i].pos.x > max_pos.x) max_pos.x = mesh->nodes[i].pos.x;
+//       if (mesh->nodes[i].pos.x < min_pos.x) min_pos.x = mesh->nodes[i].pos.x;
+//     }
+//   }
+//   coord separating_plane;
+//   foreach_dimension() separating_plane.x = .5*(max_pos.x - min_pos.x);
+//   // coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+
+//   for(int i=0; i<mesh->nlp; i++) {
+//     foreach_dimension() {
+//       if (is_caps_periodic.x < .5) mesh->centroid.x += mesh->nodes[i].pos.x;
+//       else {
+//         if (mesh->nodes[i].pos.x > separating_plane.x)
+//           mesh->centroid.x += mesh->nodes[i].pos.x - L0;
+//       }
+//     }
+//   }
+//   foreach_dimension() mesh->centroid.x /= mesh->nlp;
+//   correct_node_pos(&mesh->centroid);
+// }
+
 void comp_centroid(lagMesh* mesh) {
+  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
   foreach_dimension() mesh->centroid.x = 0.;
   for(int i=0; i<mesh->nlp; i++)
-    foreach_dimension() mesh->centroid.x += mesh->nodes[i].pos.x;
-  foreach_dimension() mesh->centroid.x /= mesh->nlp;
+    foreach_dimension() {
+      double tentative_pos = mesh->nodes[i].pos.x - mesh->nodes[0].pos.x;
+      mesh->centroid.x += (tentative_pos < origin.x - L0/2) ?
+        tentative_pos + L0 : 
+          ((tentative_pos > origin.x + L0/2) ? tentative_pos - L0 :
+          tentative_pos);
+    }
+  foreach_dimension() 
+    mesh->centroid.x = mesh->centroid.x/mesh->nlp + mesh->nodes[0].pos.x;
+  correct_node_pos(&mesh->centroid);
 }
 
 /** The function below updates the normal vectors on all the nodes as well as
@@ -422,35 +498,6 @@ void comp_normals(lagMesh* mesh) {
     #endif
     mesh->updated_normals = true;
   }
-}
-
-/**
-If a Lagrangian node falls exactly on an edge or a vertex of the Eulerian
-mesh, some issues arise when checking for periodic boundary conditions. As a
-quick fix, if this is the case we shift the point position by $10^{-10}$, as
-is done in the two functions below.
-*/
-bool on_face(double p, int n, double l0) {
-  if ((fabs(p/(l0/n)) - ((int)fabs(p/(l0/n)))) < 1.e-10) return true;
-  else return false;
-}
-
-void correct_lag_pos(lagMesh* mesh) {
-  for(int i=0; i < mesh->nlp; i++) {
-    coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
-    foreach_dimension() {
-      if (on_face(mesh->nodes[i].pos.x, N, L0))
-        mesh->nodes[i].pos.x += 1.e-10;
-      //FIXME: the nodes should not be sent to the other side of the domain if the boundary is not periodic...
-      if (mesh->nodes[i].pos.x > origin.x + L0/2)
-        mesh->nodes[i].pos.x -= L0;
-      else if (mesh->nodes[i].pos.x < origin.x - L0/2)
-        mesh->nodes[i].pos.x += L0;
-    }
-  }
-  mesh->updated_stretches = false;
-  mesh->updated_normals = false;
-  mesh->updated_curvatures = false;
 }
 
 
