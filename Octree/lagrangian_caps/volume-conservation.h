@@ -5,39 +5,12 @@ In this file, we follow the method of Sigüenza et al. to enforce exact volume
 conservation of the capsule. The details can be found in appendix A of [1](#siguenza2016validation).
 */
 
-double third_order_polynomial(double[4] c, double x) {
-    return (c[0]*cube(x) + c[1]*sq(x) + c[2]*x + c[3]);
-}
-
-double derivative_third_order_polynomial(double[4] c, double x) {
-    return (3*c[0]*sq(x) + 2*c[1]*x + c[2]);
-}
-
-double find_smallest_real_root(double[4] c) {
-    /** Solve 3rd-order polynomial:
-    We use Newton's method with initial guess 0 */
-    double tolerance = 1e-5;
-    int i = 0;
-    int max_iterations 25;
-    double xn = 0;
-    double fxn = third_order_polynomial(c, xn);
-    while ((fabs(fxn) > tolerance) && (i < max_iterations)) {
-        double dfxn = derivative_third_order_polynomial(c, xn);
-        if (dfxn < 1.e-10) {
-            fprintf(stderr, "Error: zero derivative in Newton's method.");
-            return xn;
-        }
-        xn = xn - fxn/dfxn; 
-        fxn = third_order_polynomial(xn);
-        i++;
-    }
-    return xn;
-}
+#include "smallest_root_cubic.h"
 
 void compute_alpha_m(lagMesh* mesh, int m) {
     double alpha = 0;
 
-    
+    /** To complte... */
 
     return -alpha/12;
 }
