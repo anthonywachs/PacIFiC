@@ -466,53 +466,6 @@ void refine_mesh(lagMesh* mesh) {
   }
 }
 
-// /** The function below is not compatible with periodic boundaries yet */
-// double compute_volume(lagMesh* mesh) {
-//   double volume = 0.;
-//   for(int i=0; i<mesh->nlt; i++) {
-//     coord triangle_relative_centroid;
-//     foreach_dimension() {
-//       double tc = mesh->triangles[i].centroid.x; // `tc` for "triangle centroid"
-//       double cc = mesh->centroid.x; // `cc` for "capsule centroid"
-//       double offset = fabs(tc - cc) < L0/2 ? 0 : ((tc < cc) ? -1 : 1);  
-//       triangle_relative_centroid.x = tc - (cc + offset*L0);
-//       // triangle_relative_centroid.x = GENERAL_1DIST(mesh->triangles[i].centroid.x,
-//       //   mesh->centroid.x);
-//     }
-//     double signed_height = cdot(mesh->triangles[i].normal,
-//       triangle_relative_centroid);
-//     volume += mesh->triangles[i].area*signed_height/3;
-//   }
-//   return volume;
-// }
-
-double compute_volume(lagMesh* mesh) {
-  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
-  comp_centroid(mesh);
-  double volume = 0;
-  for(int i=0; i<mesh->nlt; i++) {
-    coord nodes[3];
-    for(int j=0; j<3; j++)
-      foreach_dimension() {
-        double tentative_pos = mesh->nodes[mesh->triangles[i].node_ids[j]].pos.x
-          - mesh->centroid.x;
-        nodes[j].x = (tentative_pos < origin.x - L0/2) ?
-          tentative_pos + L0 : 
-          ((tentative_pos > origin.x + L0/2) ? tentative_pos - L0 :
-          tentative_pos);
-      }
-    for(int j=0; j<3; j++) {
-      coord cross_product;
-      foreach_dimension() 
-        cross_product.x = nodes[(j+1)%3].y*nodes[(j+2)%3].z - 
-          nodes[(j+1)%3].z*nodes[(j+2)%3].y;
-      volume += cdot(nodes[j],cross_product);
-    }
-  }
-  volume /= 18;
-  return volume;
-}
-
 /**
 ## Adding capsules after restart
 

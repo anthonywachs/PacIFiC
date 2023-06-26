@@ -3,8 +3,13 @@
 
 In this file, we implement a Lagrangian mesh for the front-tracking method,
 meant to track the position and compute the stresses of an elasitc membrane.
+*/
 
+#ifndef dimension
+  #define dimension 3
+#endif
 
+/**
 ## Structure of the mesh
 
 In the Lagrangian mesh, each node is assigned several attributes:
@@ -395,40 +400,6 @@ The function below computes the centroid of the capsule as the average of the
 coordinates of all its nodes. The centroid is stored as an attribute of the
 caps structure.
 */
-// void comp_centroid(lagMesh* mesh) {
-//   foreach_dimension() mesh->centroid.x = 0;
-//   coord is_caps_periodic = {0., 0., 0.};
-//   for(int i=0; i<mesh->nle; i++) {
-//     foreach_dimension() 
-//       if (is_edge_across_periodic_x(mesh, i)) is_caps_periodic.x = 1;
-//   }
-
-//   foreach_dimension() mesh->centroid.x = 0.;
-//   coord max_pos = {-HUGE, -HUGE, -HUGE};
-//   coord min_pos = {HUGE, HUGE, HUGE};
-//   for(int i=0; i<mesh->nlp; i++) {
-//     foreach_dimension() {
-//       if (mesh->nodes[i].pos.x > max_pos.x) max_pos.x = mesh->nodes[i].pos.x;
-//       if (mesh->nodes[i].pos.x < min_pos.x) min_pos.x = mesh->nodes[i].pos.x;
-//     }
-//   }
-//   coord separating_plane;
-//   foreach_dimension() separating_plane.x = .5*(max_pos.x - min_pos.x);
-//   // coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
-
-//   for(int i=0; i<mesh->nlp; i++) {
-//     foreach_dimension() {
-//       if (is_caps_periodic.x < .5) mesh->centroid.x += mesh->nodes[i].pos.x;
-//       else {
-//         if (mesh->nodes[i].pos.x > separating_plane.x)
-//           mesh->centroid.x += mesh->nodes[i].pos.x - L0;
-//       }
-//     }
-//   }
-//   foreach_dimension() mesh->centroid.x /= mesh->nlp;
-//   correct_node_pos(&mesh->centroid);
-// }
-
 void comp_centroid(lagMesh* mesh) {
   coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
   foreach_dimension() mesh->centroid.x = 0.;
@@ -444,6 +415,34 @@ void comp_centroid(lagMesh* mesh) {
     mesh->centroid.x = mesh->centroid.x/mesh->nlp + mesh->nodes[0].pos.x;
   correct_node_pos(&mesh->centroid);
 }
+
+double comp_volume(lagMesh* mesh) {
+  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+  comp_centroid(mesh);
+  double volume = 0;
+  for(int i=0; i<mesh->nlt; i++) {
+    coord nodes[3];
+    for(int j=0; j<3; j++)
+      foreach_dimension() {
+        double tentative_pos = mesh->nodes[mesh->triangles[i].node_ids[j]].pos.x
+          - mesh->centroid.x;
+        nodes[j].x = (tentative_pos < origin.x - L0/2) ?
+          tentative_pos + L0 : 
+          ((tentative_pos > origin.x + L0/2) ? tentative_pos - L0 :
+          tentative_pos);
+      }
+    for(int j=0; j<3; j++) {
+      coord cross_product;
+      foreach_dimension() 
+        cross_product.x = nodes[(j+1)%3].y*nodes[(j+2)%3].z - 
+          nodes[(j+1)%3].z*nodes[(j+2)%3].y;
+      volume += cdot(nodes[j],cross_product);
+    }
+  }
+  volume /= 18;
+  return volume;
+}
+
 
 /** The function below updates the normal vectors on all the nodes as well as
 the lengths and midpoints of all the edges (in 2D) or the area and centroids of
@@ -515,6 +514,13 @@ nodes.
 #endif
 #include "reg-dirac.h"
 
+#ifndef CONSERVE_VOLUME
+  #define CONSERVE_VOLUME 1
+#endif
+#if CONSERVE_VOLUME
+  #include "volume-conservation.h "
+#endif
+
 /**
 The function below advects each Lagrangian node by
 interpolating the velocities around the node of interest. By default, a
@@ -558,8 +564,11 @@ void advect_lagMesh(lagMesh* mesh) {
     free(buffer_mesh.nodes);
   #endif
   correct_lag_pos(mesh);
-  generate_lag_stencils_one_caps(mesh);
+  #if CONSERVE_VOLUME
+    enforce_optimal_volume_conservation(mesh);
+  #endif
   comp_centroid(mesh);
+  generate_lag_stencils_one_caps(mesh);
 }
 
 
