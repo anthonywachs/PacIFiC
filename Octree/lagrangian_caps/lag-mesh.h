@@ -127,7 +127,12 @@ typedef struct lagMesh {
     int nlt;
     Triangle* triangles;
   #endif
+  #if CONSERVE_VOLUME
+    coord* alpha;
+  #endif
   coord centroid;
+  double initial_volume;
+  double volume;
   bool updated_stretches;
   bool updated_normals;
   bool updated_curvatures;
@@ -167,6 +172,9 @@ void initialize_empty_mb(lagMesh* mesh) {
     mesh->nlt = 0;
     mesh->triangles = NULL;
   #endif
+  #if CONSERVE_VOLUME
+    mesh->alpha = NULL;
+  #endif
   mesh->updated_stretches = false;
   mesh->updated_normals = false;
   mesh->updated_curvatures = false;
@@ -179,6 +187,9 @@ void free_mesh(lagMesh* mesh) {
   free(mesh->edges);
   #if dimension > 2
     free(mesh->triangles);
+  #endif
+  #if CONSERVE_VOLUME
+    free(mesh->alpha);
   #endif
 }
 
@@ -416,7 +427,8 @@ void comp_centroid(lagMesh* mesh) {
   correct_node_pos(&mesh->centroid);
 }
 
-double comp_volume(lagMesh* mesh) {
+trace
+void comp_volume(lagMesh* mesh) {
   coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
   comp_centroid(mesh);
   double volume = 0;
@@ -439,8 +451,7 @@ double comp_volume(lagMesh* mesh) {
       volume += cdot(nodes[j],cross_product);
     }
   }
-  volume /= 18;
-  return volume;
+  mesh->volume = volume/18;
 }
 
 
@@ -499,7 +510,6 @@ void comp_normals(lagMesh* mesh) {
   }
 }
 
-
 /**
 ## Advection of the mesh
 
@@ -513,12 +523,11 @@ nodes.
   #include "lag-mesh-mpi.h"
 #endif
 #include "reg-dirac.h"
-
 #ifndef CONSERVE_VOLUME
   #define CONSERVE_VOLUME 1
 #endif
 #if CONSERVE_VOLUME
-  #include "volume-conservation.h "
+  #include "volume-conservation.h"
 #endif
 
 /**
@@ -568,6 +577,7 @@ void advect_lagMesh(lagMesh* mesh) {
     enforce_optimal_volume_conservation(mesh);
   #endif
   comp_centroid(mesh);
+  comp_volume(mesh);
   generate_lag_stencils_one_caps(mesh);
 }
 

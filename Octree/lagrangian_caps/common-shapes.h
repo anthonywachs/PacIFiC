@@ -76,6 +76,8 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   #endif
 
   comp_centroid(p.mesh);
+  comp_volume(p.mesh);
+  p.mesh->initial_volume = p.mesh->volume;
 }
 
 /**
@@ -137,6 +139,8 @@ void initialize_biconcave_mb(struct _initialize_circular_mb p) {
     p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
   comp_centroid(p.mesh);
+  comp_volume(p.mesh);
+  p.mesh->initial_volume = p.mesh->volume;
 }
 
 
@@ -203,6 +207,8 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
   #endif
 
   comp_centroid(p.mesh);
+  comp_volume(p.mesh);
+  p.mesh->initial_volume = p.mesh->volume;
 }
 
 #if dimension > 2
@@ -284,6 +290,8 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
   }
 
   comp_centroid(p.mesh);
+  comp_volume(p.mesh);
+  p.mesh->initial_volume = p.mesh->volume;
 }
 
 /**
@@ -371,6 +379,8 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   correct_lag_pos(p.mesh);
   comp_normals(p.mesh);
   comp_centroid(p.mesh);
+  comp_volume(p.mesh);
+  p.mesh->initial_volume = p.mesh->volume;
 }
 
 void initialize_rbc_mb(struct _initialize_circular_mb p) {
@@ -403,6 +413,8 @@ void initialize_rbc_mb(struct _initialize_circular_mb p) {
   }
   correct_lag_pos(p.mesh);
   comp_centroid(p.mesh);
+  comp_volume(p.mesh);
+  p.mesh->initial_volume = p.mesh->volume;
 
   #ifdef CAPS_VISCOSITY
     double a, c;
@@ -427,6 +439,9 @@ void activate_spherical_capsule(struct _initialize_circular_mb p) {
   #endif
   #if _BENDING_FT
     initialize_refcurv_onecaps(p.mesh);
+  #endif
+  #if CONSERVE_VOLUME
+    p.mesh->alpha = malloc(p.mesh->nlp*sizeof(coord));
   #endif
 }
 

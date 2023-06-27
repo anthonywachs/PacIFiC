@@ -61,9 +61,10 @@ double compute_d(double* a, double u, double v) {
     return (-v*b0); // for us a_0 = 0
 }
 
+trace
 double find_smallest_real_root(double* a) {
     double tolerance = 1e-10;
-    double epsilon = 1.e-10;
+    double epsilon = 1.e-6;
         
     if (fabs(a[3]) > epsilon) {
         /** Solve 3rd-order polynomial:
@@ -91,9 +92,6 @@ double find_smallest_real_root(double* a) {
             h = b[0] - vi*b[2];
             g = b[1] - ui*b[2];
             double det = vi*sq(g) + h*(h - ui*g);
-            printf("hi! c = %g, d = %g, det=%g, u=%g, v=%g\n", 
-                fabs(c), fabs(d), det, ui, vi);
-
             if (fabs(det) < epsilon) {
                 fprintf(stderr, "Error: zero determinant in Berstow's method.");
                 return HUGE;
@@ -106,29 +104,27 @@ double find_smallest_real_root(double* a) {
             d = compute_d(a, ui, vi);
             i++;
         }
+        fprintf(stderr, "Number of iterations in Bairstow's method: %d\n", i);
         b[0] = compute_b0(a, ui, vi);
         b[1] = compute_b1(a, ui, vi);
         b[2] = a[3];
-        printf("%d iterations, c=%g, d=%g, u=%g, v=%g, b0=%g, b1=%g, b2=%g\n", 
-            i, c, d, ui, vi, b[0], b[1], b[2]);
 
         double quadratic_coeff[3];
         quadratic_coeff[0] = vi;
         quadratic_coeff[1] = ui;
         quadratic_coeff[2] = 1.;
         realQuadraticRoots my_roots = real_quadratic_roots(quadratic_coeff);
+        // printf("vi=%g\n",fabs(vi));
         double root1 = fabs(vi) > epsilon ? my_roots.roots[0] : 
             my_roots.roots[1];
+        // printf("root1=%g, root2=%g, ", my_roots.roots[0], my_roots.roots[1]);
         quadratic_coeff[0] = b[0];
         quadratic_coeff[1] = b[1];
         quadratic_coeff[2] = b[2];
-        // printf("b0=%g, b1=%g, b2=%g\n", b[0], b[1], b[2]);
-        printf("r1=%g, r2=%g, ", my_roots.roots[0], my_roots.roots[1]);
         my_roots = real_quadratic_roots(quadratic_coeff);
+        // printf("root3=%g, root4=%g\n", my_roots.roots[0], my_roots.roots[1]);
         double root2 = fabs(vi) > epsilon ? my_roots.roots[1] : 
             my_roots.roots[0];
-        printf("r3=%g, r4=%g\n", my_roots.roots[0], my_roots.roots[1]);
-        printf("root1=%g, root2=%g\n", root1, root2);
         double smallest_real_root = (fabs(root1) > fabs(root2)) ? root2 : root1;
         return smallest_real_root;
     }
