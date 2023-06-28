@@ -127,9 +127,6 @@ typedef struct lagMesh {
     int nlt;
     Triangle* triangles;
   #endif
-  #if CONSERVE_VOLUME
-    coord* alpha;
-  #endif
   coord centroid;
   double initial_volume;
   double volume;
@@ -172,9 +169,6 @@ void initialize_empty_mb(lagMesh* mesh) {
     mesh->nlt = 0;
     mesh->triangles = NULL;
   #endif
-  #if CONSERVE_VOLUME
-    mesh->alpha = NULL;
-  #endif
   mesh->updated_stretches = false;
   mesh->updated_normals = false;
   mesh->updated_curvatures = false;
@@ -187,9 +181,6 @@ void free_mesh(lagMesh* mesh) {
   free(mesh->edges);
   #if dimension > 2
     free(mesh->triangles);
-  #endif
-  #if CONSERVE_VOLUME
-    free(mesh->alpha);
   #endif
 }
 

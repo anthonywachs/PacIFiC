@@ -440,9 +440,6 @@ void activate_spherical_capsule(struct _initialize_circular_mb p) {
   #if _BENDING_FT
     initialize_refcurv_onecaps(p.mesh);
   #endif
-  #if CONSERVE_VOLUME
-    p.mesh->alpha = malloc(p.mesh->nlp*sizeof(coord));
-  #endif
 }
 
 #endif

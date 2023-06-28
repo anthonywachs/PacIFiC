@@ -49,14 +49,12 @@ double compute_b2(double* a, double u, double v) {
 }
 
 double compute_c(double* a, double u, double v) {
-    // return (a[0] - v*(a[2] - u*a[3]) - u*(a[1] - v*a[3] - u*a[2] + sq(u)*a[3]));
     double b1 = compute_b1(a, u, v);
     double b0 = compute_b0(a, u, v);
     return (a[0] - v*b1 - u*b0);
 }
 
 double compute_d(double* a, double u, double v) {
-    // return (-v*(a[1] - v*a[3] - u*a[2] + sq(u)*a[3]));
     double b0 = compute_b0(a, u, v);
     return (-v*b0); // for us a_0 = 0
 }
@@ -104,7 +102,6 @@ double find_smallest_real_root(double* a) {
             d = compute_d(a, ui, vi);
             i++;
         }
-        fprintf(stderr, "Number of iterations in Bairstow's method: %d\n", i);
         b[0] = compute_b0(a, ui, vi);
         b[1] = compute_b1(a, ui, vi);
         b[2] = a[3];
@@ -114,15 +111,12 @@ double find_smallest_real_root(double* a) {
         quadratic_coeff[1] = ui;
         quadratic_coeff[2] = 1.;
         realQuadraticRoots my_roots = real_quadratic_roots(quadratic_coeff);
-        // printf("vi=%g\n",fabs(vi));
         double root1 = fabs(vi) > epsilon ? my_roots.roots[0] : 
             my_roots.roots[1];
-        // printf("root1=%g, root2=%g, ", my_roots.roots[0], my_roots.roots[1]);
         quadratic_coeff[0] = b[0];
         quadratic_coeff[1] = b[1];
         quadratic_coeff[2] = b[2];
         my_roots = real_quadratic_roots(quadratic_coeff);
-        // printf("root3=%g, root4=%g\n", my_roots.roots[0], my_roots.roots[1]);
         double root2 = fabs(vi) > epsilon ? my_roots.roots[1] : 
             my_roots.roots[0];
         double smallest_real_root = (fabs(root1) > fabs(root2)) ? root2 : root1;
