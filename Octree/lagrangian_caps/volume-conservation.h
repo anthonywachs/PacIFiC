@@ -7,7 +7,7 @@ conservation of the capsule. The details can be found in appendix A of [1](#sigu
 
 #include "smallest_root_cubic.h"
 
-coord* correct_periodic_nodes_pos(coord* result, coord a, coord b, coord ref) {
+void correct_periodic_nodes_pos(coord* result, coord a, coord b, coord ref) {
     foreach_dimension() {
         result[0].x = (fabs(a.x - ref.x) < L0/2) ? a.x : 
             (a.x > ref.x) ? a.x - L0 : a.x + L0;
