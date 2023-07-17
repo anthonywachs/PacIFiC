@@ -3,7 +3,7 @@
 #
 
 # PacIFiC home
-export PACIFIC_HOME=/home/gitlab-runner/builds/GEm5KEz3/0/pacific-devel-team/pacific
+export PACIFIC_HOME=TO_BE_OVERWRITTEN
 export PACIFIC_BITS_DEFAULT="64"
 export PACIFIC_BITS_EXT="64"
 echo -e '\033[94m*** PacIFiC shell variables\033[0m'
