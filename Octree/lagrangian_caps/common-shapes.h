@@ -415,10 +415,6 @@ void initialize_rbc_mb(struct _initialize_circular_mb p) {
       foreach_dimension()
         p.mesh->nodes[i].pos.x += shift.x;
   }
-  correct_lag_pos(p.mesh);
-  comp_centroid(p.mesh);
-  comp_volume(p.mesh);
-  p.mesh->initial_volume = p.mesh->volume;
 
   #ifdef CAPS_VISCOSITY
     double a, c;
@@ -431,6 +427,10 @@ void initialize_rbc_mb(struct _initialize_circular_mb p) {
       sq(2*(y - shift.y)/(RHS*a*c)) - sq((z - shift.z)/(a*c)));
     foreach() if (I[] > 1.e-6) prevI[] = I[];
   #endif
+  correct_lag_pos(p.mesh);
+  comp_centroid(p.mesh);
+  comp_volume(p.mesh);
+  p.mesh->initial_volume = p.mesh->volume;
 }
 
 void activate_spherical_capsule(struct _initialize_circular_mb p) {
