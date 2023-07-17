@@ -20,6 +20,7 @@ struct _initialize_circular_mb {
   double inclination;
   coord shift;
   bool disregard_shift;
+  bool verbose;
 };
 
 void initialize_circular_mb(struct _initialize_circular_mb p) {
@@ -311,6 +312,7 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   if (p.shift.x || p.shift.y || p.shift.z)
     {shift.x = p.shift.x; shift.y = p.shift.y; shift.z = p.shift.z;}
   else {shift.x = 0.; shift.y = 0.; shift.z = 0.;}
+  bool verbose = p.verbose ? true : false;
 
   /** For each subdivision:
     * the number of additional nodes equals the number of edges
@@ -356,11 +358,13 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
     cr = sqrt(cr);
     foreach_dimension() p.mesh->nodes[i].pos.x *= radius/cr;
   }
-
-  fprintf(stderr, "Number of triangle refinements: %d\n", ns);
-  fprintf(stderr, "Number of Lagrangian nodes: %d\n", p.mesh->nlp);
-  fprintf(stderr, "Number of Lagrangian edges: %d\n", p.mesh->nle);
-  fprintf(stderr, "Number of Lagrangian triangles: %d\n", p.mesh->nlt);
+  
+  if (verbose) {
+    fprintf(stderr, "Number of triangle refinements: %d\n", ns);
+    fprintf(stderr, "Number of Lagrangian nodes: %d\n", p.mesh->nlp);
+    fprintf(stderr, "Number of Lagrangian edges: %d\n", p.mesh->nle);
+    fprintf(stderr, "Number of Lagrangian triangles: %d\n", p.mesh->nlt);
+  }
 
   comp_initial_area_normals(p.mesh);
   if (!p.disregard_shift) {
