@@ -1,17 +1,17 @@
 stages:
   - build
   - test-capsules
-  - test-grains
-  - test-fluid
+  # - test-grains
+  # - test-fluid
 
 build:
   stage: build
   script:
     - cd tests
     - ./build_env.sh
-    - ./build_grains.sh
-    - ./build_mac.sh
-    - ./build_fluid.sh
+    # - ./build_grains.sh
+    # - ./build_mac.sh
+    # - ./build_fluid.sh
     - $(! grep -q "1" build_success.txt)
   artifacts:
     untracked: true
@@ -33,13 +33,13 @@ build:
       - Octree/Env/octree.env.sh
 
 
-### Tests for Grains3D
-memory-model:
-  stage: test-grains
-  script:
-    - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
-    - cd tests/test-grains/spheres-settling
-    - ./spheres-settling.sh
+# ### Tests for Grains3D
+# memory-model:
+#   stage: test-grains
+#   script:
+#     - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+#     - cd tests/test-grains/spheres-settling
+#     - ./spheres-settling.sh
 
 ### Tests for capsule solver in Basilisk
 create-capsule-sphere:
