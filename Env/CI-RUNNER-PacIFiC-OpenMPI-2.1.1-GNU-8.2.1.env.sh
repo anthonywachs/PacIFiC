@@ -97,33 +97,33 @@ echo -e '\033[32mPACIFIC_INTEL_LIBS\033[0m =' $PACIFIC_INTEL_LIBS
 echo -e '  '
 
 
-# Grains
-source ${PACIFIC_HOME}/GRAINS/Env/grains-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
-echo -e '  '
+# # Grains
+# source ${PACIFIC_HOME}/GRAINS/Env/grains-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+# echo -e '  '
 
 
-# MacWorld
-source ${PACIFIC_HOME}/Cartesian/MacWorld/Env/macworld-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
-echo -e '  '
+# # MacWorld
+# source ${PACIFIC_HOME}/Cartesian/MacWorld/Env/macworld-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+# echo -e '  '
 
 
-# Fluid MAC
-source ${PACIFIC_HOME}/Cartesian/FLUID/Env/fluid-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
-echo -e '  '
+# # Fluid MAC
+# source ${PACIFIC_HOME}/Cartesian/FLUID/Env/fluid-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
+# echo -e '  '
 
 
 # Basilisk
 source ${PACIFIC_HOME}/Octree/Env/octree.env.sh
 
 
-# Post processing
-echo -e '  '
-export PP_HOME=$PACIFIC_HOME/postProcessingTools
-echo -e '\033[94m*** Post processing shell variables\033[0m'
-echo -e '\033[94mPP_HOME\033[0m =' $PP_HOME
+# # Post processing
+# echo -e '  '
+# export PP_HOME=$PACIFIC_HOME/postProcessingTools
+# echo -e '\033[94m*** Post processing shell variables\033[0m'
+# echo -e '\033[94mPP_HOME\033[0m =' $PP_HOME
 
-# Print current branch name:
-echo -e '  '
-cd $PACIFIC_HOME
-echo -e '\033[32m*** You are currently on branch\033[32m' $(git rev-parse --abbrev-ref HEAD) '\033[32m***\033[0m'
-cd -
+# # Print current branch name:
+# echo -e '  '
+# cd $PACIFIC_HOME
+# echo -e '\033[32m*** You are currently on branch\033[32m' $(git rev-parse --abbrev-ref HEAD) '\033[32m***\033[0m'
+# cd -
