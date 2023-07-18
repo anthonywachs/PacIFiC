@@ -45,7 +45,8 @@ build:
 create-capsule-sphere:
   stage: test-capsules
   script:
-  - cat <> /tmp/logpipe 1>&2 &
+  - mkfifo -m 600 /home/gitlab-runner/logpipe
+  - cat <> /home/gitlab-runner/logpipe 1>&2 &
   - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
   - cd tests/test-capsules
   - make create-capsule-sphere.tst
