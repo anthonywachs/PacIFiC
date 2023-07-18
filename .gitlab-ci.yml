@@ -49,3 +49,35 @@ create-capsule-sphere:
   - cd tests/test-capsules
   - make create-capsule-sphere.tst
   - diff create-capsule-sphere/log create-capsule-sphere.ref
+
+create-capsule-biconcave:
+  stage: test-capsules
+  script:
+  - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+  - cd tests/test-capsules
+  - make create-capsule-biconcave.tst
+  - diff create-capsule-biconcave/log create-capsule-biconcave.ref
+
+stress-strain-neo-hookean:
+  stage: test-capsules
+  script:
+  - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+  - cd tests/test-capsules
+  - make stress-strain-neo-hookean.tst
+  - diff stress-strain-neo-hookean/log stress-strain-neo-hookean.ref
+
+stress-strain-skalak:
+  stage: test-capsules
+  script:
+  - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+  - cd tests/test-capsules
+  - make stress-strain-skalak.tst
+  - diff stress-strain-skalak/log stress-strain-skalak.ref
+
+curvature-biconcave:
+  stage: test-capsules
+  script:
+  - source Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+  - cd tests/test-capsules
+  - make curvature-biconcave.tst
+  - diff curvature-biconcave/log curvature-biconcave.ref
