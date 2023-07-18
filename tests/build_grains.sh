@@ -2,6 +2,7 @@ source ../Env/PacIFiC-CI-RUNNER-OpenMPI-2.1.1-GNU-8.2.1.env.sh
 
 # Compilation of Grains3D
 cd $GRAINS_HOME
+tar zxvf xerces-2-8-0.tar.gz
 ./makeARCH create ; make update ; make dtd
 
 # Check if the compilation was successful
