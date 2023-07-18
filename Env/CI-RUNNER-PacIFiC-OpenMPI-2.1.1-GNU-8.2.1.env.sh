@@ -14,7 +14,7 @@ echo -e '  '
 
 
 # MPI
-export PACIFIC_MPI_ROOT=/home/gitlab-runner/dependencies/openmpi-2.1.1-r8k1/build
+export PACIFIC_MPI_ROOT=/home/gitlab-runner/dependencies/openmpi-2.1.1/build
 export PACIFIC_MPI_DISTRIB=OpenMPI
 export PACIFIC_MPI_VERSION=2.1.1
 export PACIFIC_MPI_INCDIR="${PACIFIC_MPI_ROOT}/include"
