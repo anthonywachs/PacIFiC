@@ -1,4 +1,15 @@
-#define RADIUS 1.
+/**
+# Capsule creation test: biconcave shape
+
+In this case we simply create a biconcave capsule of radius 1 and ensure that
+all the membrane nodes are at the right location. We don't test the connectivity
+as it should be a necessary condition for the nodes position to be correct.
+
+This file essentially tests most functions in mesh-toolbox.h and 
+common-shapes.h.
+*/
+
+#define RADIUS 1.4
 #define NCAPS 1
 #define LAG_LEVEL 4
 

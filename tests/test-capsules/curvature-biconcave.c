@@ -1,3 +1,12 @@
+/**
+# Membrane curvature test
+
+In this test, we compute the membrane mean and Gaussian curvatures, the 
+Laplace-Beltrami operator of the curvature, as well as the bending force
+density in the case of a biconcave capsule.
+
+This file tests the functions in bending-ft.h and curvature-ft.h.
+*/
 #define L0 4.
 #define RADIUS 1
 #define LEVEL 1
@@ -22,7 +31,6 @@ int main(int argc, char* argv[]) {
 event init (i = 0) {
   activate_biconcave_capsule(&MB(0), radius = RADIUS, level = LAG_LEVEL);
   generate_lag_stencils();
-//   comp_curvature(&MB(0));
 }
 
 event output (i = 1) {
@@ -32,8 +40,6 @@ event output (i = 1) {
   double total_triangle_area = 0.;
   for(int i=0; i<MB(0).nlt; i++)
     total_triangle_area += MB(0).triangles[i].area;
-//   fprintf(stderr, "total triangle area = %g\n", total_triangle_area);
-//   fprintf(stderr, "total node area = %g\n", total_node_area);
 
   lagMesh* mesh = &(MB(0));
   for(int i=0; i<mesh->nlp; i++) {
@@ -48,11 +54,11 @@ event output (i = 1) {
       mesh->nodes[i].gcurv, lbcurv, bending_force/node_area, node_area, i);
   }
 
-//   view(fov = 18, bg = {1,1,1}, theta = pi/6, psi = 0., phi = pi/8, width=1200, height=1200);
-//   // view(fov = 18, bg = {1,1,1});
-//   clear();
-//   draw_lag(mesh = &(MB(0)), lw = .5, facets = true);
-//   save("rbc.png");
+  view(fov = 18, bg = {1,1,1}, theta = pi/6, psi = 0., phi = pi/8, width=1200, height=1200);
+  // view(fov = 18, bg = {1,1,1});
+  clear();
+  draw_lag(mesh = &(MB(0)), lw = .5, facets = true);
+  save("rbc.png");
 }
 
 /**
