@@ -1,5 +1,5 @@
 cd ../Env
-sed -i "s|TO_BE_OVERWRITTEN|$(echo $PWD)|" ./CI-RUNNER-PacIFiC-OpenMPI-2.1.1-GNU-8.2.1.env.sh
+sed -i "s|TO_BE_OVERWRITTEN|$(dirname $(echo $PWD))|" ./CI-RUNNER-PacIFiC-OpenMPI-2.1.1-GNU-8.2.1.env.sh
 source CI-RUNNER-PacIFiC-OpenMPI-2.1.1-GNU-8.2.1.env.sh
 # cp ${PACIFIC_HOME}/GRAINS/Env/grains_env_template.env.sh ${PACIFIC_HOME}/GRAINS/Env/grains-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
 # cp ${PACIFIC_HOME}/Cartesian/MacWorld/Env/macworld_env_template.env.sh ${PACIFIC_HOME}/Cartesian/MacWorld/Env/macworld-${PACIFIC_MPI_DISTRIB}-${PACIFIC_MPI_VERSION}-${PACIFIC_SERCOMPIL_ENV}-${PACIFIC_SERCOMPIL_VERSION}.env.sh
