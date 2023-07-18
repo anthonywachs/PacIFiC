@@ -1,4 +1,4 @@
 CFLAGS += -DDISPLAY=1
 # CFLAGS += -I${BASILISK_MESA_GLU_INSTALL} -L${BASILISK_MESA_GLU_INSTALL}/lib
 CFLAGS += -I${OCTREE_HOME}
-include $(BASILISK)/Makefile.defs
+include ${BASILISK}/Makefile.defs
