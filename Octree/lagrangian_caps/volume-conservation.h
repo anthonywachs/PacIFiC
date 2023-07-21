@@ -5,8 +5,27 @@ In this file, we follow the method of Sigüenza et al. to enforce exact volume
 conservation of the capsule. The details can be found in appendix A of [1](#siguenza2016validation).
 */
 
+/**
+We will need to find the smallest real root of a cubic equation, which we
+implement in a separate file.
+*/
 #include "smallest_root_cubic.h"
 
+/**
+In order to compute the volume, we need to take the dot and cross products of
+neighboring nodes that can be across periodic boundaries. The next three 
+functions implement ``periodic-friendly" versions of the dot and cross products
+that do not take into account the coordinates jump across the periodic
+boundaries. The implementation relies on the assumption that a capsule is
+*always* smaller in the x, y and z directions that half the domain size L0/2.
+*/
+
+/**
+The function below corrects the coordinates of two nodes $a$ and $b$ in order to
+ensure they are placed on the same side of a reference coordinate (in practice,
+the centroid of the capsule). The result is stored in an array of `coord` of
+length 2.
+*/
 void correct_periodic_nodes_pos(coord* result, coord a, coord b, coord ref) {
     foreach_dimension() {
         result[0].x = (fabs(a.x - ref.x) < L0/2) ? a.x : 
@@ -16,6 +35,12 @@ void correct_periodic_nodes_pos(coord* result, coord a, coord b, coord ref) {
     }
 }
 
+/**
+The function below computes the cross product of two coordinates $a$ and $b$
+that potentially lie across periodic boundaries. The coordinates are 
+temporarilly moved on the same side of the periodic boundary as a reference 
+coordinate `ref`, in practice the centroid of the capsule.
+*/
 foreach_dimension()
 double periodic_friendly_cross_product_x(coord a, coord b, coord ref) {
     coord nodes[2];
@@ -23,12 +48,21 @@ double periodic_friendly_cross_product_x(coord a, coord b, coord ref) {
     return nodes[0].y*nodes[1].z - nodes[0].z*nodes[1].y;
 }
 
+/**
+The function below computes the dot product of two coordinates $a$ and $b$
+that potentially lie across periodic boundaries. The coordinates are 
+temporarilly moved on the same side of the periodic boundary as a reference 
+coordinate `ref`, in practice the centroid of the capsule.
+*/
 double periodic_friendly_dot_product(coord a, coord b, coord ref) {
     coord nodes[2];
     correct_periodic_nodes_pos(nodes, a, b, ref);
     return cdot(nodes[0], nodes[1]);
 }
 
+/**
+The function below computes the quantity $\bm{\alpha_m}$ as specified in Eq.\,(41) of [1](#siguenza2016validation).
+*/
 trace
 coord compute_alpha_m(lagMesh* mesh, int m) {
     coord alpha = {0., 0., 0.};
@@ -51,12 +85,66 @@ coord compute_alpha_m(lagMesh* mesh, int m) {
     return alpha;
 }
 
+/**
+The function below solves an optimization problem to enforce the
+conservation of volume of a capsule. The cost function to minimize is the following:
+\begin{equation}
+    J_\Lambda(\bm{\delta X}) = \sum_{i = 1}^{n} \|\bm{\delta X}_i\|^2 - \Lambda \left( V(\bm{X} + \bm{\delta X}) - V_0 \right),
+\end{equation}
+where $\bm{X} = \left[\bm{X}_1 \cdots \bm{X}_n \right]$ is a tensor 
+storing the coordinates $\left\{ \bm{X}_i \right\}_{i \in [\![1,n ]\!]}
+$ of the $n$ capsule nodes, 
+$\bm{\delta X} = \left[\bm{\delta X}_1 \cdots \bm{\delta X}_n \right]$ 
+is a tensor storing their displacements, $V(\bm{X})$ is the capsule 
+volume in configuration $\bm{X}$, $V_0$ is the initial volume and 
+$\Lambda$ is a Lagrange multiplier. Sigüenza et al. show that $\Lambda$
+is a (real) root of a third order polynomial which coefficients are
+given by Eqs.\,(43-46) in [1](#siguenza2016validation). An assumption 
+for their derivation is $\| \bm{\delta X} \| \ll \| \bm{X} \|$, so the
+solution to the optimization will not quite be exact, but this 
+approximation is asymptotically true as $\Delta t$ tends to zero.
+*/
 trace
 void enforce_optimal_volume_conservation(lagMesh* mesh) {
+    /** First, the $\bm{\alpha_m}$ are computed and stored in an array 
+    of size the number of Lagrangian nodes.*/
     coord* alpha = malloc(mesh->nlp*sizeof(coord));
     for(int m=0; m<mesh->nlp; m++)
         alpha[m] = compute_alpha_m(mesh, m);
 
+    /** Once all the $\bm{\alpha_m}$ are known, the coefficients of the
+    polynomial in $\Lambda$ can be computed:
+    \begin{equation}
+        A \Lambda^3 + B \Lambda^2 + C \Lambda + D = 0
+    \end{equation}
+    with
+    \begin{equation}
+        A = \frac{1}{18} \sum_{i=1}^{N_t} \[ 
+            \bm{\alpha_{i,1}} \cdot (\bm{\alpha_{i,2}} \cross \bm{\alpha_{i,3}}) + 
+            \bm{\alpha_{i,2}} \cdot (\bm{\alpha_{i,3}} \cross \bm{\alpha_{i,1}}) +
+            \bm{\alpha_{i,3}} \cdot (\bm{\alpha_{i,1}} \cross \bm{\alpha_{i,2}}) \],
+    \end{equation}
+    \begin{equation}
+        B = \frac{1}{6} \sum_{i=1}^{N_t} \[ 
+            \bm{x_{i,1}} \cdot (\bm{\alpha_{i,2}} \cross \bm{\alpha_{i,3}}) + 
+            \bm{x_{i,2}} \cdot (\bm{\alpha_{i,3}} \cross \bm{\alpha_{i,1}}) +
+            \bm{x_{i,3}} \cdot (\bm{\alpha_{i,1}} \cross \bm{\alpha_{i,2}}) \],
+    \end{equation}
+    \begin{equation}
+        C = \frac{1}{6} \sum_{i=1}^{N_t} \[ 
+            \bm{\alpha_{i,1}} \cdot (\bm{x_{i,2}} \cross \bm{x_{i,3}}) +
+            \bm{\alpha_{i,2}} \cdot (\bm{x_{i,3}} \cross \bm{x_{i,1}}) +
+            \bm{\alpha_{i,3}} \cdot (\bm{x_{i,1}} \cross \bm{x_{i,2}})
+            \],
+    \end{equation}
+    and 
+    \begin{equation}
+        D = V - V_0
+    \end{equation}
+    where $\star_{i,1}$ is the quantity $\star$ at vertex 1 of triangle $i$, $V$ is the capsule volume and $V_0$ is the initial (conserved)
+    volume.
+    In practice, we normalize the polynomial so that its largest coefficient is 1.
+    */
     double coeff_polynomial[4];
     for(int j=0; j<mesh->nlt; j++) {
         int tn[3]; // `tn` for "triangle nodes"
@@ -88,8 +176,18 @@ void enforce_optimal_volume_conservation(lagMesh* mesh) {
     coeff_polynomial[2] /= normalize_factor;
     coeff_polynomial[1] /= normalize_factor;
     coeff_polynomial[0] /= normalize_factor;
+    /**
+    Once the coefficients are found, we find its smallest real root (in
+    absolute value) thanks to a separate routine.
+    */
     double lambda = find_smallest_real_root(coeff_polynomial);
 
+    /**
+    Finally, the correction applied to each node $i$ is
+    \begin{equation}
+        \bm{x_i} \leftarrow \bm{x_i} + \Lambda \bm{\alpha_m} 
+    \end{equation}
+    */
     for(int i=0; i<mesh->nlp; i++) {
         foreach_dimension() 
             mesh->nodes[i].pos.x += lambda*alpha[i].x;

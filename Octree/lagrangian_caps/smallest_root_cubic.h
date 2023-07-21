@@ -1,3 +1,8 @@
+/**
+In this file, we implement a routine to find the smallest real root of a
+third-order polynomial, in absolute value.
+*/
+
 typedef struct realQuadraticRoots {
     bool real;
     double roots[2];
