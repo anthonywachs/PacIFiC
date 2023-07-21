@@ -19,12 +19,13 @@ common-shapes.h.
 #include "lagrangian_caps/common-shapes.h"
 
 int main() {
+    foreach_dimension() periodic(left);
     run();
 }
 
 event init (i = 0) {
     activate_spherical_capsule(&MB(0), radius=RADIUS, level=LAG_LEVEL, 
-        shift={1., 2. -4.});
+        shift={L0/2., 3*L0/7. -2*L0/5});
     for(int i=0; i<MB(0).nlp; i++) {
         foreach_dimension() fprintf(stderr, "%g ", MB(0).nodes[i].pos.x);
         fprintf(stderr, "\n");

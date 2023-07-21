@@ -44,10 +44,8 @@ realQuadraticRoots real_quadratic_roots(double* p) {
 
 trace
 double find_smallest_real_root(double* a) {
-    double tolerance = 1e-10;
     double epsilon = 1.e-10;
         
-    // fprintf(stderr, "Polynomial: %gx^3 + %gx^2 + %gx + %g = 0\n", a[3], a[2], a[1], a[0]);
     if (fabs(a[3]) > epsilon) {
         /** Solve 3rd-order polynomial: */
         double alpha = a[2]/a[3];
