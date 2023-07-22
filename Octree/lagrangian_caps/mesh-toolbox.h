@@ -581,8 +581,8 @@ void dump_triangle(FILE* fp, Triangle* triangle) {
   for(int k=0; k<3; k++)
     for(int l=0; l<2; l++)
       fwrite(&(triangle->sfc[k][l]), sizeof(double), 1, fp);
-  fwrite(&(triangle->stretch[0]), sizeof(double), 2);
-  fwrite(&(triangle->tension[0]), sizeof(double), 2);
+  fwrite(&(triangle->stretch[0]), sizeof(double), 2, fp);
+  fwrite(&(triangle->tension[0]), sizeof(double), 2, fp);
 }
 
 void restore_triangle(FILE* fp, Triangle* triangle) {
@@ -600,8 +600,8 @@ void restore_triangle(FILE* fp, Triangle* triangle) {
   for(int k=0; k<3; k++)
     for(int l=0; l<2; l++)
       fread(&(triangle->sfc[k][l]), sizeof(double), 1, fp);
-  fread(&(triangle->stretch[0]), sizeof(double), 2);
-  fread(&(triangle->tension[0]), sizeof(double), 2);
+  fread(&(triangle->stretch[0]), sizeof(double), 2, fp);
+  fread(&(triangle->tension[0]), sizeof(double), 2, fp);
 }
 
 void dump_lagmesh(FILE* fp, lagMesh* mesh) {
@@ -699,138 +699,114 @@ void dump_plain_triangles(lagMesh* mesh, char* filename) {
   #define PARAVIEW_CAPSULE 0
 #endif
 
+#define PARAVIEW_CAPSULE 1
 #if PARAVIEW_CAPSULE
 int pv_timestep = 0;
 
+coord correct_periodic_node_pos(coord a, coord ref) {
+    coord result;
+    foreach_dimension() {
+        result.x = (fabs(a.x - ref.x) < L0/2) ? a.x : 
+            (a.x > ref.x) ? a.x - L0 : a.x + L0;
+    }
+    return result;
+}
+
 void pv_output_ascii() {
-  if (pid() == 0) {
-    for(int j=0; j<NCAPS; j++) {
+    if (pid() == 0) {
+        char filename[128];
+        FILE* file;
+        sprintf(filename, "caps_T%d.vtk", pv_timestep);
+        file = fopen(filename, "w");
 
-    char filename[128];
-    FILE* file;
-    sprintf(filename, "caps_%d_T%d.vtk", j, pv_timestep);
-    file = fopen(filename, "w");
+        /* Populate the header and other non-data fields */
+        fprintf(file, "# vtk DataFile Version 4.2\n");
+        fprintf(file, "Capsules at time %g\n", t);
+        fprintf(file, "ASCII\n");
+        fprintf(file, "DATASET POLYDATA\n");
+        
+        /**
+        First, we find the number of nodes and triangles to display
+        */
+        int nbpts_tot = 0;
+        int nbtri_tot = 0;
+        for(int j=0; j<NCAPS; j++) {
+            if (MB(j).isactive) {
+                nbpts_tot += MB(j).nlp;
+                nbtri_tot += MB(j).nlt;
+            }
+        }
 
-    /* Populate the header and other non-data fields */
-    fprintf(file, "# vtk DataFile Version 4.2\n");
-    fprintf(file, "Capsules at time %g\n", t);
-    fprintf(file, "ASCII\n");
-    fprintf(file, "DATASET POLYDATA\n");
+        /* Populate the coordinates of all the Lagrangian nodes */
+        fprintf(file, "POINTS %d double\n", nbpts_tot);
+        for(int j=0; j<NCAPS; j++) {
+            for(int k=0; k<MB(j).nlp; k++) {
+                coord node_pos = correct_periodic_node_pos(
+                    MB(j).nodes[k].pos, MB(j).centroid);
+                fprintf(file, "%g %g %g\n", node_pos.x, node_pos.y, node_pos.z);
+            }
+        }
 
-    /* Populate the coordinates of all the Lagrangian nodes */
-    int nbpts_tot = MB(j).nlp;
-    fprintf(file, "POINTS %d double\n", nbpts_tot);
-    for(int k=0; k<nbpts_tot; k++) {
-      fprintf(file, "%g %g %g\n", MB(j).nodes[k].pos.x, MB(j).nodes[k].pos.y,
-        MB(j).nodes[k].pos.z);
+        /* Populate the connectivity of the triangles */
+        fprintf(file, "TRIANGLE_STRIPS %d %d\n", nbtri_tot, 
+        4*nbtri_tot);
+        int node_offset = 0;
+        for(int j=0; j<NCAPS; j++) {
+            for(int k=0; k<MB(j).nlt; k++) {
+            fprintf(file, "%d %d %d %d\n", 3,
+                MB(j).triangles[k].node_ids[0] + node_offset,
+                MB(j).triangles[k].node_ids[1] + node_offset,
+                MB(j).triangles[k].node_ids[2] + node_offset);
+            }
+            node_offset += MB(j).nlp;
+        }
+        // fprintf(file, "CELL_DATA %d\n", nbtri_tot);
+        // fprintf(file, "SCALARS T1 double 1 \n");
+        // fprintf(file, "LOOKUP_TABLE default\n");
+        // for(int j=0; j<NCAPS; j++) {    
+        //     for(int k=0; k<MB(j).nlt; k++)
+        //         fprintf(file, "%g ", MB(j).triangles[k].tension[0]);
+        // }
+        // fprintf(file, "\n");
+        // fprintf(file, "SCALARS T2 double 1 \n");
+        // fprintf(file, "LOOKUP_TABLE default\n");
+        // for(int j=0; j<NCAPS; j++) {
+        //     for(int k=0; k<MB(j).nlt; k++)
+        //         fprintf(file, "%g ", MB(j).triangles[k].tension[1]);
+        // }
+        // fprintf(file, "\n");
+        // fprintf(file, "SCALARS Tmax double 1 \n");
+        // fprintf(file, "LOOKUP_TABLE default\n");
+        // for(int j=0; j<NCAPS; j++) {
+        //     for(int k=0; k<MB(j).nlt; k++)
+        //         fprintf(file, "%g ", max(MB(j).triangles[k].tension[0], 
+        //             MB(j).triangles[k].tension[1]));
+        // }
+        // fprintf(file, "\n");
+        // fprintf(file, "SCALARS Tavg double 1 \n");
+        // fprintf(file, "LOOKUP_TABLE default\n");
+        // for(int j=0; j<NCAPS; j++) {
+        //     for(int k=0; k<MB(j).nlt; k++)
+        //         fprintf(file, "%g ", .5*(MB(j).triangles[k].tension[0] + 
+        //             MB(j).triangles[k].tension[1]));
+        // }
+        // fprintf(file, "\n");
+        // fprintf(file, "SCALARS Lambda_1 double 1 \n");
+        // fprintf(file, "LOOKUP_TABLE default\n");
+        // for(int j=0; j<NCAPS; j++) {
+        //     for(int k=0; k<MB(j).nlt; k++)
+        //         fprintf(file, "%g ", MB(j).triangles[k].stretch[0]);
+        // }
+        // fprintf(file, "\n");
+        // fprintf(file, "SCALARS Lambda_2 double 1 \n");
+        // fprintf(file, "LOOKUP_TABLE default\n");
+        // for(int j=0; j<NCAPS; j++) {
+        //     for(int k=0; k<MB(j).nlt; k++)
+        //         fprintf(file, "%g ", MB(j).triangles[k].stretch[1]);
+        // }
+        // fprintf(file, "\n");
+        fclose(file);
     }
-
-    /* Populate the connectivity of the triangles */
-    if ((u.x.boundary[left] != periodic_bc) &&
-      (u.x.boundary[bottom] != periodic_bc) &&
-      (u.x.boundary[front] != periodic_bc)) {
-      int nbtri_tot = MB(j).nlt;
-      fprintf(file, "TRIANGLE_STRIPS %d %d\n", nbtri_tot, 4*nbtri_tot);
-      for(int k=0; k<nbtri_tot; k++) {
-        fprintf(file, "%d %d %d %d\n", 3,
-          MB(j).triangles[k].node_ids[0],
-          MB(j).triangles[k].node_ids[1],
-          MB(j).triangles[k].node_ids[2]);
-      }
-      fprintf(file, "CELL_DATA %d\n", nbtri_tot);
-      fprintf(file, "SCALARS T1 double 1 \n");
-      fprintf(file, "LOOKUP_TABLE default\n");
-      for(int k=0; k<MB(j).nlt; k++)
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%g ", MB(j).triangles[k].tension[0]);
-      fprintf(file, "\n");
-      fprintf(file, "SCALARS T2 double 1 \n");
-      fprintf(file, "LOOKUP_TABLE default\n");
-      for(int k=0; k<MB(j).nlt; k++)
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%g ", MB(j).triangles[k].tension[1]);
-      fprintf(file, "\n");
-      fprintf(file, "SCALARS Tmax double 1 \n");
-      fprintf(file, "LOOKUP_TABLE default\n");
-      for(int k=0; k<MB(j).nlt; k++)
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%g ", max(MB(j).triangles[k].tension[0], MB(j).triangles[k].tension[1]));
-      fprintf(file, "\n");
-      fprintf(file, "SCALARS Tavg double 1 \n");
-      fprintf(file, "LOOKUP_TABLE default\n");
-      for(int k=0; k<MB(j).nlt; k++)
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%g ", .5*(MB(j).triangles[k].tension[0] + MB(j).triangles[k].tension[1]));
-      fprintf(file, "\n");
-      fprintf(file, "SCALARS Lambda_1 double 1 \n");
-      fprintf(file, "LOOKUP_TABLE default\n");
-      for(int k=0; k<MB(j).nlt; k++)
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%g ", MB(j).triangles[k].stretch[0]);
-      fprintf(file, "\n");
-      fprintf(file, "SCALARS Lambda_2 double 1 \n");
-      fprintf(file, "LOOKUP_TABLE default\n");
-      for(int k=0; k<MB(j).nlt; k++)
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%g ", MB(j).triangles[k].stretch[1]);
-      fprintf(file, "\n");
-    }
-    else {
-      int nbtri = 0;
-      for(int k=0; k<MB(j).nlt; k++) {
-        if (!(is_triangle_across_periodic(&MB(j), k))) nbtri++;
-      }
-      fprintf(file, "TRIANGLE_STRIPS %d %d\n", nbtri, 4*nbtri);
-      for(int k=0; k<MB(j).nlt; k++) {
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%d %d %d %d\n", 3,
-            MB(j).triangles[k].node_ids[0],
-            MB(j).triangles[k].node_ids[1],
-            MB(j).triangles[k].node_ids[2]);
-      }
-      fprintf(file, "CELL_DATA %d\n", nbtri);
-      fprintf(file, "SCALARS T1 double 1 \n");
-      fprintf(file, "LOOKUP_TABLE default\n");
-      for(int k=0; k<MB(j).nlt; k++)
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%g ", MB(j).triangles[k].tension[0]);
-      fprintf(file, "\n");
-      fprintf(file, "SCALARS T2 double 1 \n");
-      fprintf(file, "LOOKUP_TABLE default\n");
-      for(int k=0; k<MB(j).nlt; k++)
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%g ", MB(j).triangles[k].tension[1]);
-      fprintf(file, "\n");
-      fprintf(file, "SCALARS Tmax double 1 \n");
-      fprintf(file, "LOOKUP_TABLE default\n");
-      for(int k=0; k<MB(j).nlt; k++)
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%g ", max(MB(j).triangles[k].tension[0], MB(j).triangles[k].tension[1]));
-      fprintf(file, "\n");
-      fprintf(file, "SCALARS Tavg double 1 \n");
-      fprintf(file, "LOOKUP_TABLE default\n");
-      for(int k=0; k<MB(j).nlt; k++)
-        if (!(is_triangle_across_periodic(&MB(j), k)))
-          fprintf(file, "%g ", .5*(MB(j).triangles[k].tension[0] + MB(j).triangles[k].tension[1]));
-      fprintf(file, "\n");
-      // fprintf(file, "SCALARS Lambda_max double 1 \n");
-      // fprintf(file, "LOOKUP_TABLE default\n");
-      // for(int k=0; k<MB(j).nlt; k++)
-      //   if (!(is_triangle_across_periodic(&MB(j), k)))
-      //     fprintf(file, "%g ", max(MB(j).triangles[k].stretch[0], MB(j).triangles[k].stretch[1]));
-      // fprintf(file, "\n");
-      // fprintf(file, "SCALARS Lambda_avg double 1 \n");
-      // fprintf(file, "LOOKUP_TABLE default\n");
-      // for(int k=0; k<MB(j).nlt; k++)
-      //   if (!(is_triangle_across_periodic(&MB(j), k)))
-      //     fprintf(file, "%g ", .5*(MB(j).triangles[k].stretch[0] + MB(j).triangles[k].stretch[1]));
-      // fprintf(file, "\n");
-    }
-
-    fclose(file);
-
-    }
-  }
-  pv_timestep++;
+    pv_timestep++;
 }
 #endif
