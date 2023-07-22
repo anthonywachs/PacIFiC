@@ -4,6 +4,7 @@
 This file provides functions to display the Lagrangian mesh.
 */
 
+#define dimension 3
 #include "view.h"
 
 static void begin_draw_vertices (bview * view, float color[3], float ps)
@@ -48,17 +49,18 @@ void draw_lag(struct _draw_lag p) {
       else {my_color[0] = 0.; my_color[1] = 0.; my_color[2] = 0.;}
       draw_lines(view, my_color, p.lw) {
         for (int i=0; i<p.mesh->nle; i++) {
-          bool across_periodic_bc = false;
           int v1, v2;
           v1 = p.mesh->edges[i].node_ids[0];
           v2 = p.mesh->edges[i].node_ids[1];
-          foreach_dimension() {
-            if (fabs(p.mesh->nodes[v1].pos.x
-              - p.mesh->nodes[v2].pos.x) > L0/2.) across_periodic_bc = true;
-          }
-          /** If the edge crosses a perdiodic boundary (i.e. the edge length
-          is larger than L0/2), we simply don't draw it */
-          if (!across_periodic_bc) {
+        //   foreach_dimension() {
+        //     if (fabs(p.mesh->nodes[v1].pos.x
+        //       - p.mesh->nodes[v2].pos.x) > L0/2.) across_periodic_bc = true;
+        //   }
+        coord node1 = correct_periodic_node_pos(p.mesh->nodes[v1].pos,
+            p.mesh->centroid);
+        coord node2 = correct_periodic_node_pos(p.mesh->nodes[v2].pos,
+            p.mesh->centroid);
+        //   if (!across_periodic_bc) {
             glBegin(GL_LINES);
               #if dimension < 3
                 glvertex2d(view, p.mesh->nodes[v1].pos.x,
@@ -66,14 +68,11 @@ void draw_lag(struct _draw_lag p) {
                 glvertex2d(view, p.mesh->nodes[v2].pos.x,
                   p.mesh->nodes[v2].pos.y);
               #else
-                glvertex3d(view, p.mesh->nodes[v1].pos.x,
-                  p.mesh->nodes[v1].pos.y, p.mesh->nodes[v1].pos.z);
-                glvertex3d(view, p.mesh->nodes[v2].pos.x,
-                  p.mesh->nodes[v2].pos.y, p.mesh->nodes[v2].pos.z);
+                glvertex3d(view, node1.x, node1.y, node1.z);
+                glvertex3d(view, node2.x, node2.y, node2.z);
               #endif
             glEnd();
             view->ni++;
-          }
         }
       }
     }
@@ -101,22 +100,20 @@ void draw_lag(struct _draw_lag p) {
         if (p.fc[0]) {my_color[0] = p.fc[0]; my_color[1] = p.fc[1]; my_color[2] = p.fc[2];}
         else {my_color[0] = 1.; my_color[1] = 1.; my_color[2] = 1.;}
         for (int i=0; i<p.mesh->nlt; i++) {
-          int nodes[3];
-          for(int j=0; j<3; j++) nodes[j] = p.mesh->triangles[i].node_ids[j];
-          if (!(is_triangle_across_periodic(p.mesh, i))) {
+          coord nodes[3];
+          for(int j=0; j<3; j++) nodes[j] = correct_periodic_node_pos(p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos, p.mesh->centroid);
             glBegin (GL_POLYGON);
             glColor3f (my_color[0], my_color[1], my_color[2]);
               for(int j=0; j<3; j++) {
                 glVertex3d(
-                  p.mesh->nodes[nodes[j]].pos.x,
-                  p.mesh->nodes[nodes[j]].pos.y,
-                  p.mesh->nodes[nodes[j]].pos.z);
+                  nodes[j].x,
+                  nodes[j].y,
+                  nodes[j].z);
                 }
             glEnd ();
             view->ni++;
-          }
         }
-      }
+    }
     #endif
   }
 }
