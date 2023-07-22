@@ -581,6 +581,8 @@ void dump_triangle(FILE* fp, Triangle* triangle) {
   for(int k=0; k<3; k++)
     for(int l=0; l<2; l++)
       fwrite(&(triangle->sfc[k][l]), sizeof(double), 1, fp);
+  fwrite(&(triangle->stretch[0]), sizeof(double), 2);
+  fwrite(&(triangle->tension[0]), sizeof(double), 2);
 }
 
 void restore_triangle(FILE* fp, Triangle* triangle) {
@@ -598,6 +600,8 @@ void restore_triangle(FILE* fp, Triangle* triangle) {
   for(int k=0; k<3; k++)
     for(int l=0; l<2; l++)
       fread(&(triangle->sfc[k][l]), sizeof(double), 1, fp);
+  fread(&(triangle->stretch[0]), sizeof(double), 2);
+  fread(&(triangle->tension[0]), sizeof(double), 2);
 }
 
 void dump_lagmesh(FILE* fp, lagMesh* mesh) {
@@ -606,8 +610,11 @@ void dump_lagmesh(FILE* fp, lagMesh* mesh) {
   fwrite(&(mesh->nle), sizeof(int), 1, fp);
   for(int i=0; i<mesh->nle; i++) dump_edge(fp, &(mesh->edges[i]));
   fwrite(&(mesh->nlt), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nlt; i++) dump_triangle(fp, &(mesh->triangles[i]));
+  for(int i=0; i<mesh->nlt; i++) 
+    dump_triangle(fp, &(mesh->triangles[i]));
   foreach_dimension() fwrite(&(mesh->centroid.x), sizeof(double), 1, fp);
+  fwrite(&(mesh->volume), sizeof(double), 1, fp);
+  fwrite(&(mesh->initial_volume), sizeof(double), 1, fp);
   int tmp;
   tmp = mesh->updated_stretches ? 1 : 0; fwrite(&(tmp), sizeof(int), 1, fp);
   tmp = mesh->updated_normals ? 1 : 0; fwrite(&(tmp), sizeof(int), 1, fp);
@@ -626,6 +633,8 @@ void restore_lagmesh(FILE* fp, lagMesh* mesh) {
   mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
   for(int i=0; i<mesh->nlt; i++) restore_triangle(fp, &mesh->triangles[i]);
   foreach_dimension() fread(&(mesh->centroid.x), sizeof(double), 1, fp);
+  fread(&(mesh->volume), sizeof(double), 1, fp);
+  fread(&(mesh->initial_volume), sizeof(double), 1, fp);
   int tmp;
   fread(&(tmp), sizeof(int), 1, fp);
   mesh->updated_stretches = (tmp == 0) ? false : true;
