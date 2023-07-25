@@ -2,7 +2,8 @@
 # Enforcing volume conservation
 
 In this file, we follow the method of Sigüenza et al. to enforce exact volume 
-conservation of the capsule. The details can be found in appendix A of [1](#siguenza2016validation).
+conservation of the capsule. The details can be found in appendix A of 
+[\[1\]](#siguenza2016validation).
 */
 
 /**
@@ -92,8 +93,7 @@ conservation of volume of a capsule. The cost function to minimize is the follow
     J_\Lambda(\bm{\delta X}) = \sum_{i = 1}^{n} \|\bm{\delta X}_i\|^2 - \Lambda \left( V(\bm{X} + \bm{\delta X}) - V_0 \right),
 \end{equation}
 where $\bm{X} = \left[\bm{X}_1 \cdots \bm{X}_n \right]$ is a tensor 
-storing the coordinates $\left\{ \bm{X}_i \right\}_{i \in [\![1,n ]\!]}
-$ of the $n$ capsule nodes, 
+storing the coordinates $\bm{X}_i$ of the $n$ capsule nodes, 
 $\bm{\delta X} = \left[\bm{\delta X}_1 \cdots \bm{\delta X}_n \right]$ 
 is a tensor storing their displacements, $V(\bm{X})$ is the capsule 
 volume in configuration $\bm{X}$, $V_0$ is the initial volume and 

@@ -52,15 +52,10 @@ void draw_lag(struct _draw_lag p) {
           int v1, v2;
           v1 = p.mesh->edges[i].node_ids[0];
           v2 = p.mesh->edges[i].node_ids[1];
-        //   foreach_dimension() {
-        //     if (fabs(p.mesh->nodes[v1].pos.x
-        //       - p.mesh->nodes[v2].pos.x) > L0/2.) across_periodic_bc = true;
-        //   }
         coord node1 = correct_periodic_node_pos(p.mesh->nodes[v1].pos,
             p.mesh->centroid);
         coord node2 = correct_periodic_node_pos(p.mesh->nodes[v2].pos,
             p.mesh->centroid);
-        //   if (!across_periodic_bc) {
             glBegin(GL_LINES);
               #if dimension < 3
                 glvertex2d(view, p.mesh->nodes[v1].pos.x,

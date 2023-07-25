@@ -1,0 +1,106 @@
+/**
+# Advection of a front-tracking mesh, and volume conservation of a capsule
+
+In this file we test the advection of a capsule described by a Lagrangian mesh
+across a periodic boundary.
+*/
+
+#define LEVEL 6
+#define LAG_LEVEL 4
+#define RADIUS .125
+#define L0 1.
+#define T_END 1.
+
+#include "grid/octree.h"
+#include "navier-stokes/centered.h"
+#include "lagrangian_caps/lag-mesh.h"
+#include "lagrangian_caps/common-shapes.h"
+#include "lagrangian_caps/view-ft.h"
+
+int main(int argc, char* argv[]) {
+  origin(-.5*L0, -.5*L0, -.5*L0);
+  N = 1 << LEVEL;
+  init_grid(N);
+  periodic(left);
+  TOLERANCE = HUGE;
+  DT = 5.e-3;
+  run();
+}
+
+coord* ref_data = NULL;
+event init (i = 0) {
+  activate_spherical_capsule(&MB(0), level = LAG_LEVEL, radius = RADIUS);
+  generate_lag_stencils(no_warning = true);
+  correct_lag_pos(&MB(0));
+  ref_data = malloc(MB(0).nlp*sizeof(coord));
+  for(int i=0; i<MB(0).nlp; i++)
+    foreach_dimension() ref_data[i].x = MB(0).nodes[i].pos.x;
+}
+
+event impose_u (i++) {
+  foreach() {
+    double x0 = x + L0 -t*L0*T_END;
+    double y0 = y + L0;
+    double a = -2*sq(sin(pi*x0))*sin(pi*y0)*cos(pi*y0)*cos(pi*t/T_END);
+    double b = -2*sin(pi*x0)*cos(pi*x0)*sq(cos(pi*y0))*cos(pi*t/T_END);
+    double theta = pi/4.;
+    u.x[] = a*cos(theta)/2 + L0*T_END;
+    u.y[] = b/2;
+    u.z[] = a*sin(theta)/2;
+  }
+}
+
+event adapt (i++) {
+  tag_ibm_stencils(&MB(0));
+  adapt_wavelet({stencils}, (double []){1.e-2}, maxlevel = LEVEL);
+  generate_lag_stencils(&MB(0));
+}
+
+/** We compute the time evolutions of the normalized area and volume 
+of the capsule */
+event volume_output (i++) {
+  comp_triangle_area_normals(&MB(0));
+  double narea = 0;
+  for(int j=0; j<MB(0).nlt; j++) narea += MB(0).triangles[j].area;
+  narea /= 4*pi*sq(RADIUS);
+  comp_volume(&MB(0));
+  double nvolume = MB(0).volume/MB(0).initial_volume;
+  fprintf(stderr, "%d, %g, %g, %g %g\n", i, narea, nvolume,
+    MB(0).centroid.x, MB(0).initial_volume);
+  fflush(stderr);
+}
+
+/** At the end of the simulation, we also compare the position of the
+membrane to its initial position. With an asymptotically fine space
+and time resolutions, they should coincide. */
+event output (t = T_END) {
+    double avg_err, max_err;
+    avg_err = 0.; max_err = -HUGE;
+    for(int i=0; i < MB(0).nlp; i++){
+      double err = 0.;
+      foreach_dimension() err += sq(GENERAL_1DIST(ref_data[i].x,
+        MB(0).nodes[i].pos.x));
+      err = sqrt(err);
+      avg_err += err;
+      if (err > max_err) max_err = err;
+    }
+    avg_err /= MB(0).nlp;
+    fprintf(stderr, "%g, %g\n", avg_err, max_err);
+    fflush(stderr);
+}
+
+event end (t = T_END) {
+  return 0;
+}
+
+/**
+##Results
+
+~~~gnuplot
+set xlabel "time"
+set ylabel "normalized volume"
+plot 'volume.csv' using ($1/10):3 w l lc -1 dt 1 title "capsule volume", \
+1 w l lc -1 dt 2 title "ideal volume"
+~~~
+
+*/
