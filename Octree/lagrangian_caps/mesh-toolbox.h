@@ -709,18 +709,27 @@ void dump_plain_triangles(lagMesh* mesh, char* filename) {
 
 /** ### Visualization in paraview */
 #ifndef PARAVIEW_CAPSULE
-  #define PARAVIEW_CAPSULE 0
+  #define PARAVIEW_CAPSULE 1
 #endif
 
 #if PARAVIEW_CAPSULE
 int pv_timestep = 0;
 
-void pv_output_ascii() {
+struct _pv_output_ascii {
+    char* name;
+    FILE* fp;
+};
+
+void pv_output_ascii(struct _pv_output_ascii p) {
     if (pid() == 0) {
-        char filename[128];
-        FILE* file;
-        sprintf(filename, "caps_T%d.vtk", pv_timestep);
-        file = fopen(filename, "w");
+        char name[128];
+        char default_name[5] = "caps\0";
+        char* prefix = p.name ? p.name : default_name;
+        char suffix[64];
+        sprintf(suffix, "_T%d.vtk", pv_timestep);
+        sprintf(name, "%s%s", prefix, suffix);
+        FILE* file = p.fp ? p.fp : fopen(name, "w");
+        assert(file);
 
         /* Populate the header and other non-data fields */
         fprintf(file, "# vtk DataFile Version 4.2\n");

@@ -30,7 +30,6 @@ int main(int argc, char* argv[]) {
 
 event init (i = 0) {
   activate_biconcave_capsule(&MB(0), radius = RADIUS, level = LAG_LEVEL);
-  generate_lag_stencils();
 }
 
 event output (i = 1) {

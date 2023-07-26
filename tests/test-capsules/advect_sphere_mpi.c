@@ -30,8 +30,6 @@ int main(int argc, char* argv[]) {
 coord* ref_data = NULL;
 event init (i = 0) {
   activate_spherical_capsule(&MB(0), level = LAG_LEVEL, radius = RADIUS);
-  generate_lag_stencils(no_warning = true);
-  correct_lag_pos(&MB(0));
   ref_data = malloc(MB(0).nlp*sizeof(coord));
   for(int i=0; i<MB(0).nlp; i++)
     foreach_dimension() ref_data[i].x = MB(0).nodes[i].pos.x;
