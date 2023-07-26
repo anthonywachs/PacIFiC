@@ -712,7 +712,6 @@ void dump_plain_triangles(lagMesh* mesh, char* filename) {
   #define PARAVIEW_CAPSULE 0
 #endif
 
-#define PARAVIEW_CAPSULE 1
 #if PARAVIEW_CAPSULE
 int pv_timestep = 0;
 

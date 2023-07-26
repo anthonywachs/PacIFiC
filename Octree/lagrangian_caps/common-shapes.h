@@ -23,6 +23,7 @@ struct _initialize_circular_mb {
   bool verbose;
 };
 
+#if dimension < 3
 void initialize_circular_mb(struct _initialize_circular_mb p) {
   double radius = (p.radius) ? p.radius : RADIUS;
   int nlp = (p.nlp) ? p.nlp : NLP;
@@ -212,7 +213,7 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
   p.mesh->initial_volume = p.mesh->volume;
 }
 
-#if dimension > 2
+#else // dimension > 2
 /**
 ## 3D icosahedron
 */
@@ -239,7 +240,6 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
   for(int i=0; i<3; i++) {
     for(int j=0; j<4; j++) {
       p.mesh->nodes[i*4+j].nb_neighbors = 0;
-      // p.mesh->nodes[i*4+j].nb_edges = 0;
       p.mesh->nodes[i*4+j].nb_triangles = i;
       foreach_dimension()
         p.mesh->nodes[i*4+j].pos.x = c[i].x*
@@ -438,6 +438,7 @@ void activate_spherical_capsule(struct _initialize_circular_mb p) {
   p.mesh->isactive = true;
   initialize_spherical_mb(p);
   initialize_membrane_stencils(p.mesh);
+  generate_lag_stencils(no_warning = true);
   #if _ELASTICITY_FT
     store_initial_configuration(p.mesh);
   #endif
@@ -451,6 +452,7 @@ void activate_biconcave_capsule(struct _initialize_circular_mb p) {
   p.mesh->isactive = true;
   initialize_rbc_mb(p);
   initialize_membrane_stencils(p.mesh);
+  generate_lag_stencils(no_warning = true);
   #if _ELASTICITY_FT
     store_initial_configuration(p.mesh);
   #endif

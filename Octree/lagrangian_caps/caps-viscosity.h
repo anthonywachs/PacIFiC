@@ -71,15 +71,9 @@ void construct_divG(scalar divG, lagMesh* mesh) {
     }
   }
   #endif
-  #if OLD_QCC
-  boundary((scalar*){G});
-  #endif
   foreach()
     if (cm[] > 1.e-20)
       foreach_dimension() divG[] += (G.x[1] - G.x[-1])/(2.*Delta);
-  #if OLD_QCC
-  boundary({divG});
-  #endif
 }
 
 double muc, mup;
