@@ -1,10 +1,27 @@
 /**
 # View front-tracking
 
-This file provides functions to display the Lagrangian mesh.
+This file provides functions to display the Lagrangian mesh. For this to work
+with the new version of Basilisk (featuring tinyGL and tinyMESA), replace
+```
+case GL_POLYGON:
+```
+by
+```
+case GL_POLYGON:
+if (nvertex == 3) {
+    assert (nnormal == 0); // only constant shading is implemented
+    assert (ntexture == 0); // textures are not implemented on polygons
+    tiny_triangle ((vec4[3]){vertex[0], vertex[1], vertex[2]},
+            &FgColor, constant_normal_shader, Face, // fixme: swap NULL and constant_normal_shader
+            TinyFramebuffer);
+    reset_vertices();
+}
+break;
+```
+in the function `glVertex3d` of the file `gl/fb_tiny.c`.
 */
 
-#define dimension 3
 #include "view.h"
 
 static void begin_draw_vertices (bview * view, float color[3], float ps)
@@ -13,7 +30,7 @@ static void begin_draw_vertices (bview * view, float color[3], float ps)
   glPushMatrix();
   glTranslatef (0., 0., view->lc*view->fov/24.);
   glColor3f (color[0], color[1], color[2]);
-  glEnable(GL_POINT_SMOOTH);
+  glEnable(GL_POINTS);
   glPointSize (view->samples*(ps > 0. ? ps : 8.));
   _reversed = view->reversed;
   view->reversed = false;
@@ -90,7 +107,7 @@ void draw_lag(struct _draw_lag p) {
       }
     }
     #if dimension > 2
-      bool facets = p.facets;
+    bool facets = p.facets;
       if (facets) {
         if (p.fc[0]) {my_color[0] = p.fc[0]; my_color[1] = p.fc[1]; my_color[2] = p.fc[2];}
         else {my_color[0] = 1.; my_color[1] = 1.; my_color[2] = 1.;}
