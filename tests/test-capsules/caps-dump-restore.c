@@ -1,0 +1,58 @@
+/**
+# Test case for the dump and restore of a capsule
+
+*/
+#define L0 1.
+#define RADIUS .2
+#define LEVEL 5
+#define LAG_LEVEL 4
+#define NCAPS 2
+
+#include "grid/octree.h"
+#include "navier-stokes/centered.h"
+#include "lagrangian_caps/lag-mesh.h"
+#include "lagrangian_caps/neo-hookean.h"
+#include "lagrangian_caps/bending-ft.h"
+#include "lagrangian_caps/common-shapes.h"
+
+int main(int argc, char* argv[]) {
+  origin(-.5*L0, -.5*L0, -.5*L0);
+  N = 1 << LEVEL;
+  run();
+}
+
+event init (i = 0) {
+    activate_spherical_capsule(&MB(0), radius = RADIUS, 
+        level = LAG_LEVEL);
+
+    comp_volume(&MB(0));
+    MB(0).initial_volume = MB(0).volume;
+
+    double c0, c1, c2;
+    c0 = 0.2072; c1 = 2.0026; c2 = -1.1228;
+    double radius = RADIUS;
+    for(int i=0; i<MB(0).nlp; i++) {
+        double rho = sqrt(sq(MB(0).nodes[i].pos.x) +
+        sq(MB(0).nodes[i].pos.z))/radius;
+        rho = (rho > 1) ? 1 : rho;
+        int sign = (MB(0).nodes[i].pos.y > 0.) ? 1 : -1;
+        MB(0).nodes[i].pos.y = sign*.5*radius*sqrt(1 - sq(rho))*
+        (c0 + c1*sq(rho) + c2*sq(sq(rho)));
+    }
+    correct_lag_pos(&MB(0));
+    comp_normals(&MB(0));
+    comp_centroid(&MB(0));
+    comp_volume(&MB(0));
+
+    FILE* file = fopen("caps0.dump", "w");
+    dump_lagmesh(file, &MB(0));
+    fclose(file);
+    file = fopen("caps0.dump", "r");
+    restore_lagmesh(file, &MB(1));
+    fclose(file);
+    file = fopen("caps1.dump", "w");
+    dump_lagmesh(file, &MB(1));
+    fclose(file);
+    dump_membranes(fp=stderr);
+}
+

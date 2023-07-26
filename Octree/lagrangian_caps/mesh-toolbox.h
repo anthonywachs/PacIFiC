@@ -661,11 +661,18 @@ void restore_lagmesh(FILE* fp, lagMesh* mesh) {
 
 /** If the simulation contains several membranes, we dump and read one mesh at
 a time, but all meshes are stored in the same file. */
-void dump_membranes(char* filename) {
-  FILE* file = fopen(filename, "w");
-  assert(file);
-  for(int i=0; i<mbs.nbmb; i++) dump_lagmesh(file, &MB(i));
-  fclose(file);
+struct _dump_membranes {
+    char* name;
+    FILE* fp;
+};
+
+void dump_membranes(struct _dump_membranes p) {
+    char default_name[10] = "caps.dump\0";
+    char* name = p.name ? p.name : default_name;
+    FILE* file = p.fp ? p.fp : fopen(name, "w");
+    assert(file);
+    for(int i=0; i<mbs.nbmb; i++) dump_lagmesh(file, &MB(i));
+    fclose(file);
 }
 
 void restore_membranes(char* filename) {
@@ -709,7 +716,7 @@ void dump_plain_triangles(lagMesh* mesh, char* filename) {
 
 /** ### Visualization in paraview */
 #ifndef PARAVIEW_CAPSULE
-  #define PARAVIEW_CAPSULE 1
+  #define PARAVIEW_CAPSULE 0
 #endif
 
 #if PARAVIEW_CAPSULE
