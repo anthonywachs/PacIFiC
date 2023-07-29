@@ -13,55 +13,6 @@ implement in a separate file.
 #include "smallest_root_cubic.h"
 
 /**
-In order to compute the volume, we need to take the dot and cross products of
-neighboring nodes that can be across periodic boundaries. The next three 
-functions implement ``periodic-friendly" versions of the dot and cross products
-that do not take into account the coordinates jump across the periodic
-boundaries. The implementation relies on the assumption that a capsule is
-*always* smaller in the x, y and z directions that half the domain size L0/2.
-*/
-
-/**
-The function below corrects the coordinates of two nodes $a$ and $b$ in order to
-ensure they are placed on the same side of a reference coordinate (in practice,
-the centroid of the capsule). The result is stored in an array of `coord` of
-length 2.
-*/
-void correct_periodic_nodes_pos(coord* result, coord a, coord b, coord ref) {
-    foreach_dimension() {
-        result[0].x = (fabs(a.x - ref.x) < L0/2) ? a.x : 
-            (a.x > ref.x) ? a.x - L0 : a.x + L0;
-        result[1].x = (fabs(b.x - ref.x) < L0/2) ? b.x : 
-            (b.x > ref.x) ? b.x - L0 : b.x + L0;
-    }
-}
-
-/**
-The function below computes the cross product of two coordinates $a$ and $b$
-that potentially lie across periodic boundaries. The coordinates are 
-temporarilly moved on the same side of the periodic boundary as a reference 
-coordinate `ref`, in practice the centroid of the capsule.
-*/
-foreach_dimension()
-double periodic_friendly_cross_product_x(coord a, coord b, coord ref) {
-    coord nodes[2];
-    correct_periodic_nodes_pos(nodes, a, b, ref);
-    return nodes[0].y*nodes[1].z - nodes[0].z*nodes[1].y;
-}
-
-/**
-The function below computes the dot product of two coordinates $a$ and $b$
-that potentially lie across periodic boundaries. The coordinates are 
-temporarilly moved on the same side of the periodic boundary as a reference 
-coordinate `ref`, in practice the centroid of the capsule.
-*/
-double periodic_friendly_dot_product(coord a, coord b, coord ref) {
-    coord nodes[2];
-    correct_periodic_nodes_pos(nodes, a, b, ref);
-    return cdot(nodes[0], nodes[1]);
-}
-
-/**
 The function below computes the quantity $\bm{\alpha_m}$ as specified in Eq.\,(41) of [1](#siguenza2016validation).
 */
 trace
@@ -108,8 +59,8 @@ trace
 void enforce_optimal_volume_conservation(lagMesh* mesh) {
     /** First, the $\bm{\alpha_m}$ are computed and stored in an array 
     of size the number of Lagrangian nodes.*/
-    coord* alpha = malloc(mesh->nlp*sizeof(coord));
-    for(int m=0; m<mesh->nlp; m++)
+    coord* alpha = malloc(mesh->nln*sizeof(coord));
+    for(int m=0; m<mesh->nln; m++)
         alpha[m] = compute_alpha_m(mesh, m);
 
     /** Once all the $\bm{\alpha_m}$ are known, the coefficients of the
@@ -188,7 +139,7 @@ void enforce_optimal_volume_conservation(lagMesh* mesh) {
         \bm{x_i} \leftarrow \bm{x_i} + \Lambda \bm{\alpha_m} 
     \end{equation}
     */
-    for(int i=0; i<mesh->nlp; i++) {
+    for(int i=0; i<mesh->nln; i++) {
         foreach_dimension() 
             mesh->nodes[i].pos.x += lambda*alpha[i].x;
     }

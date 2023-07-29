@@ -13,8 +13,8 @@ across a periodic boundary.
 
 #include "grid/octree.h"
 #include "navier-stokes/centered.h"
-#include "lagrangian_caps/lag-mesh.h"
-#include "lagrangian_caps/common-shapes.h"
+#include "lagrangian_caps/capsule-ft.h"
+#include "lagrangian_caps/common-shapes-ft.h"
 #include "lagrangian_caps/view-ft.h"
 
 int main(int argc, char* argv[]) {
@@ -30,8 +30,8 @@ int main(int argc, char* argv[]) {
 coord* ref_data = NULL;
 event init (i = 0) {
   activate_spherical_capsule(&MB(0), level = LAG_LEVEL, radius = RADIUS);
-  ref_data = malloc(MB(0).nlp*sizeof(coord));
-  for(int i=0; i<MB(0).nlp; i++)
+  ref_data = malloc(MB(0).nln*sizeof(coord));
+  for(int i=0; i<MB(0).nln; i++)
     foreach_dimension() ref_data[i].x = MB(0).nodes[i].pos.x;
 }
 
@@ -77,7 +77,7 @@ event output (t = T_END) {
     if (pid() == 0) {
         double avg_err, max_err;
         avg_err = 0.; max_err = -HUGE;
-        for(int i=0; i < MB(0).nlp; i++){
+        for(int i=0; i < MB(0).nln; i++){
         double err = 0.;
         foreach_dimension() err += sq(GENERAL_1DIST(ref_data[i].x,
             MB(0).nodes[i].pos.x));
@@ -85,7 +85,7 @@ event output (t = T_END) {
         avg_err += err;
         if (err > max_err) max_err = err;
         }
-        avg_err /= MB(0).nlp;
+        avg_err /= MB(0).nln;
         fprintf(stderr, "%g, %g\n", avg_err, max_err);
         fflush(stderr);
     }

@@ -37,11 +37,11 @@ And this case is super fast so we don't really care :)
 */
 #include "grid/octree.h"
 #include "navier-stokes/centered.h"
-#include "lagrangian_caps/lag-mesh.h"
+#include "lagrangian_caps/capsule-ft.h"
 #if SKALAK
-  #include "lagrangian_caps/skalak.h"
+  #include "lagrangian_caps/skalak-ft.h"
 #else
-  #include "lagrangian_caps/neo-hookean.h"
+  #include "lagrangian_caps/neo-hookean-ft.h"
 #endif
 #include "lagrangian_caps/view-ft.h"
 
@@ -57,10 +57,10 @@ diagonal) and two triangles. */
 event init (i = 0) {
   /** Initialize two triangles */
   lagMesh* mesh = &MB(0);
-  mesh->nlp = 4;
+  mesh->nln = 4;
   mesh->nle = 5;
   mesh->nlt = 2;
-  mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
+  mesh->nodes = malloc(mesh->nln*sizeof(lagNode));
   mesh->edges = malloc(mesh->nle*sizeof(Edge));
   mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
   /** Create nodes, edges and triangles */

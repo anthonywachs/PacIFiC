@@ -16,9 +16,9 @@ This file tests the functions in bending-ft.h and curvature-ft.h.
 
 #include "grid/octree.h"
 #include "navier-stokes/centered.h"
-#include "lagrangian_caps/lag-mesh.h"
+#include "lagrangian_caps/capsule-ft.h"
 #include "lagrangian_caps/bending-ft.h"
-#include "lagrangian_caps/common-shapes.h"
+#include "lagrangian_caps/common-shapes-ft.h"
 #include "lagrangian_caps/view-ft.h"
 
 int main(int argc, char* argv[]) {
@@ -34,14 +34,14 @@ event init (i = 0) {
 
 event output (i = 1) {
   double total_node_area = 0.;
-  for(int i=0; i<MB(0).nlp; i++)
+  for(int i=0; i<MB(0).nln; i++)
     total_node_area += compute_node_area(&MB(0), i);
   double total_triangle_area = 0.;
   for(int i=0; i<MB(0).nlt; i++)
     total_triangle_area += MB(0).triangles[i].area;
 
   lagMesh* mesh = &(MB(0));
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     double bending_force = cnorm(mesh->nodes[i].lagForce);
     double lbcurv = laplace_beltrami(mesh, i, true);
     double norm = cnorm(mesh->nodes[i].pos);

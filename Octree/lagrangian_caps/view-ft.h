@@ -94,7 +94,7 @@ void draw_lag(struct _draw_lag p) {
       else {my_color[0] = 0.; my_color[1] = 0.; my_color[2] = 0.;}
       draw_vertices(view, my_color, p.ns) {
         glBegin(GL_POINTS);
-          for (int i=0; i<p.mesh->nlp; i++)
+          for (int i=0; i<p.mesh->nln; i++)
             #if dimension < 3
               glvertex2d(view, p.mesh->nodes[i].pos.x,
                 p.mesh->nodes[i].pos.y);

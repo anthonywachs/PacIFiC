@@ -13,13 +13,13 @@ In 2D, we compute the curvature by fitting a 4th-degree polynomial to the mesh u
 void compute_2d_curvature(lagMesh*) {
   bool up; // decide if we switch the x and y axes
   lagNode* cn; // current node
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     cn = &(mesh->nodes[i]);
     up = (fabs(cn->normal.y) > fabs(cn->normal.x)) ? true : false;
     coord p[5]; // store the coordinates of the current node and of its
                 // neighbors'
     for(int j=0; j<5; j++) {
-      int index = (mesh->nlp + i - 2 + j)%mesh->nlp;
+      int index = (mesh->nln + i - 2 + j)%mesh->nln;
       foreach_dimension() p[j].x = up ? mesh->nodes[index].pos.x :
         mesh->nodes[index].pos.y;
     }
@@ -313,7 +313,7 @@ void comp_curvature(lagMesh* mesh) {
     #if dimension < 3
       compute_2d_curvature(mesh);
     #else
-      for(int i=0; i<mesh->nlp; i++) {
+      for(int i=0; i<mesh->nln; i++) {
         laplace_beltrami(mesh, i, false);
       }
     #endif
@@ -325,7 +325,7 @@ void initialize_refcurv_onecaps(lagMesh* mesh) {
   #if REF_CURV
     comp_curvature(mesh);
   #endif
-  for(int j=0; j<mesh->nlp; j++) {
+  for(int j=0; j<mesh->nln; j++) {
     #if (REF_CURV)
       #if GLOBAL_REF_CURV
         mesh->nodes[j].ref_curv = C0;

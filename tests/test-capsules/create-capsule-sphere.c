@@ -15,8 +15,8 @@ common-shapes.h.
 
 #include "grid/octree.h"
 #include "navier-stokes/centered.h"
-#include "lagrangian_caps/lag-mesh.h"
-#include "lagrangian_caps/common-shapes.h"
+#include "lagrangian_caps/capsule-ft.h"
+#include "lagrangian_caps/common-shapes-ft.h"
 
 int main() {
     origin(-.5*L0, -.5*L0, -.5*L0);
@@ -27,7 +27,7 @@ int main() {
 event init (i = 0) {
     activate_spherical_capsule(&MB(0), radius=RADIUS, level=LAG_LEVEL, 
         shift={L0/2., 3*L0/7. -2*L0/5});
-    for(int i=0; i<MB(0).nlp; i++) {
+    for(int i=0; i<MB(0).nln; i++) {
         foreach_dimension() fprintf(stderr, "%g ", MB(0).nodes[i].pos.x);
         fprintf(stderr, "\n");
     }

@@ -130,7 +130,7 @@ void comp_elastic_stress(lagMesh* mesh) {
   don't need the finite element framework. For the moment, the Neo-Hookean law
   is hard-coded below, but other 2D elastic laws will be available soon.*/
   compute_lengths(mesh);
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     coord T[2];
     for(int j=0; j<2; j++) {
       int edge_id, edge_node1, edge_node2;

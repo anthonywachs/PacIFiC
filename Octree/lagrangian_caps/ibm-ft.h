@@ -35,7 +35,7 @@ trace
 void generate_lag_stencils_one_caps(struct _generate_lag_stencils_one_caps p) {
   lagMesh* mesh = p.mesh;
   bool no_warning = p.no_warning;
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     mesh->nodes[i].stencil.n = 0;
     /**
     The current implementation assumes that the Eulerian cells around Lagrangian
@@ -95,7 +95,7 @@ the intention is to include them in the forcing).
 */
 trace
 void lag2eul(vector forcing, lagMesh* mesh) {
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
         #if EMBED
@@ -135,7 +135,7 @@ the Lagrangian mesh.
 */
 trace
 void eul2lag(lagMesh* mesh) {
-  for(int ii=0; ii<mesh->nlp; ii++) {
+  for(int ii=0; ii<mesh->nln; ii++) {
     foreach_dimension() mesh->nodes[ii].lagVel.x = 0.;
     foreach_cache(mesh->nodes[ii].stencil) {
       if (point.level >= 0) {
@@ -178,7 +178,7 @@ the 5x5(x5) stencils around the Lagrangian nodes are at the same level.
 scalar stencils[];
 trace
 void tag_ibm_stencils_one_caps(lagMesh* mesh) {
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
         coord dist;

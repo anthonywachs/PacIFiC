@@ -12,8 +12,8 @@ boundaries
 
 #include "grid/octree.h"
 #include "navier-stokes/centered.h"
-#include "lagrangian_caps/lag-mesh.h"
-#include "lagrangian_caps/common-shapes.h"
+#include "lagrangian_caps/capsule-ft.h"
+#include "lagrangian_caps/common-shapes-ft.h"
 
 int main(int argc, char* argv[]) {
   origin(-.5*L0, -.5*L0, -.5*L0);

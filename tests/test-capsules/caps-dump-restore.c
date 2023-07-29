@@ -10,10 +10,10 @@
 
 #include "grid/octree.h"
 #include "navier-stokes/centered.h"
-#include "lagrangian_caps/lag-mesh.h"
-#include "lagrangian_caps/neo-hookean.h"
+#include "lagrangian_caps/capsule-ft.h"
+#include "lagrangian_caps/neo-hookean-ft.h"
 #include "lagrangian_caps/bending-ft.h"
-#include "lagrangian_caps/common-shapes.h"
+#include "lagrangian_caps/common-shapes-ft.h"
 
 int main(int argc, char* argv[]) {
   origin(-.5*L0, -.5*L0, -.5*L0);
@@ -31,7 +31,7 @@ event init (i = 0) {
     double c0, c1, c2;
     c0 = 0.2072; c1 = 2.0026; c2 = -1.1228;
     double radius = RADIUS;
-    for(int i=0; i<MB(0).nlp; i++) {
+    for(int i=0; i<MB(0).nln; i++) {
         double rho = sqrt(sq(MB(0).nodes[i].pos.x) +
         sq(MB(0).nodes[i].pos.z))/radius;
         rho = (rho > 1) ? 1 : rho;
@@ -53,6 +53,6 @@ event init (i = 0) {
     file = fopen("caps1.dump", "w");
     dump_lagmesh(file, &MB(1));
     fclose(file);
-    dump_membranes(fp=stderr);
+    dump_capsules(fp=stderr);
 }
 

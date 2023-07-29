@@ -90,7 +90,7 @@ event acceleration (i++) {
     if (mbs.mb[i].isactive) {
       lagMesh* mesh = &(MB(i));
       comp_curvature(mesh);
-      for(int j=0; j<mesh->nlp; j++) {
+      for(int j=0; j<mesh->nln; j++) {
         #if (!LINEAR_BENDING)
           double curv = mesh->nodes[j].curv;
           double rcurv = mesh->nodes[i].ref_curv;

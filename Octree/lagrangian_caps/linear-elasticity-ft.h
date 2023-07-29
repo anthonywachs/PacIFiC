@@ -9,7 +9,7 @@ the membrane(s). We choose this force from Breyiannis & Pozrikidis, 2000.
 
 void linear_elasticity(lagMesh* mesh) {
   compute_lengths(mesh);
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     coord T[2];
     for(int j=0; j<2; j++) {
       int edge_id, edge_node1, edge_node2;

@@ -16,8 +16,8 @@ common-shapes.h.
 
 #include "grid/octree.h"
 #include "navier-stokes/centered.h"
-#include "lagrangian_caps/lag-mesh.h"
-#include "lagrangian_caps/common-shapes.h"
+#include "lagrangian_caps/capsule-ft.h"
+#include "lagrangian_caps/common-shapes-ft.h"
 #include "lagrangian_caps/view-ft.h"
 
 int main() {
