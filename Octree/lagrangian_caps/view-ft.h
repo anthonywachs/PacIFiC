@@ -4,25 +4,34 @@
 This file provides functions to display the Lagrangian mesh. For this to work
 with the new version of Basilisk (featuring tinyGL and tinyMESA), replace
 ```
-case GL_POLYGON:
+ case GL_POLYGON:
+
+ case GL_TRIANGLE_FAN:
+  break
 ```
 by
 ```
-case GL_POLYGON:
-if (nvertex == 3) {
-    assert (nnormal == 0); // only constant shading is implemented
-    assert (ntexture == 0); // textures are not implemented on polygons
-    tiny_triangle ((vec4[3]){vertex[0], vertex[1], vertex[2]},
-            &FgColor, constant_normal_shader, Face, // fixme: swap NULL and constant_normal_shader
-            TinyFramebuffer);
-    reset_vertices();
-}
-break;
+ case GL_TRIANGLE_FAN:
+  if (nvertex == 3) {
+   assert (nnormal == 0); // only constant shading is implemented
+   assert (ntexture == 0); // textures are not implemented on polygons
+   tiny_triangle ((vec4[3]){vertex[0], vertex[1], vertex[2]},
+	&FgColor, constant_normal_shader, Face, // fixme: swap NULL and constant_normal_shader
+	 TinyFramebuffer);
+     reset_vertices();
+   }
+  break;
+
+  case GL_POLYGON:
+   break;
 ```
 in the function `glVertex3d` of the file `gl/fb_tiny.c`.
 */
 
 #include "view.h"
+#ifndef dimension
+    #define dimension 3
+#endif
 
 static void begin_draw_vertices (bview * view, float color[3], float ps)
 {
@@ -114,7 +123,7 @@ void draw_lag(struct _draw_lag p) {
         for (int i=0; i<p.mesh->nlt; i++) {
           coord nodes[3];
           for(int j=0; j<3; j++) nodes[j] = correct_periodic_node_pos(p.mesh->nodes[p.mesh->triangles[i].node_ids[j]].pos, p.mesh->centroid);
-            glBegin (GL_POLYGON);
+            glBegin (GL_TRIANGLE_FAN);
             glColor3f (my_color[0], my_color[1], my_color[2]);
               for(int j=0; j<3; j++) {
                 glVertex3d(

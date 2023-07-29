@@ -27,10 +27,14 @@ int main() {
 
 event init (i = 0) {
     activate_spherical_capsule(&MB(0), radius=RADIUS, level=LAG_LEVEL);
+    foreach()
+        u.x[] = sin(2*pi*x*y/L0);
 
     view(fov = 18.9, bg = {1,1,1});
     clear();
-    draw_lag(&MB(0), lw = .5, ns = 3, facets = true);
+    draw_lags(lw = .5, ns = 3, facets = true);
+    squares("u.x", n = {0,0,1});
+    cells(n = {0,0,1});
     save(fp=stderr);
 
     exit(0);
