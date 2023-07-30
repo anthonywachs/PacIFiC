@@ -86,9 +86,9 @@ double compute_node_area(lagMesh* mesh, int i) {
 }
 
 event acceleration (i++) {
-  for(int i=0; i<mbs.nbmb; i++) {
-    if (mbs.mb[i].isactive) {
-      lagMesh* mesh = &(MB(i));
+  for(int i=0; i<NCAPS; i++) {
+    if (CAPS(i).isactive) {
+      lagMesh* mesh = &(CAPS(i));
       comp_curvature(mesh);
       for(int j=0; j<mesh->nln; j++) {
         #if (!LINEAR_BENDING)

@@ -154,14 +154,14 @@ void dump_capsules(struct _dump_capsules p) {
     char* name = p.name ? p.name : default_name;
     FILE* file = p.fp ? p.fp : fopen(name, "w");
     assert(file);
-    for(int i=0; i<mbs.nbmb; i++) dump_lagmesh(file, &MB(i));
+    for(int i=0; i<NCAPS; i++) dump_lagmesh(file, &CAPS(i));
     fclose(file);
 }
 
 void restore_capsules(char* filename) {
   FILE* file = fopen(filename, "r");
   assert(file);
-  for(int i=0; i<mbs.nbmb; i++) restore_lagmesh(file, &MB(i));
+  for(int i=0; i<NCAPS; i++) restore_lagmesh(file, &CAPS(i));
   fclose(file);
   initialize_all_capsules_stencils();
   generate_lag_stencils(no_warning = true);

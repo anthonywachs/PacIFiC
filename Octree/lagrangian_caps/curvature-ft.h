@@ -339,9 +339,9 @@ void initialize_refcurv_onecaps(lagMesh* mesh) {
 }
 
 void initialize_refcurv() {
-  for(int i=0; i<mbs.nbmb; i++) {
-    if (mbs.mb[i].isactive)
-      initialize_refcurv_onecaps(&MB(i));
+  for(int i=0; i<NCAPS; i++) {
+    if (CAPS(i).isactive)
+      initialize_refcurv_onecaps(&CAPS(i));
   }
 }
 

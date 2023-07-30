@@ -24,8 +24,8 @@ int main(int argc, char* argv[]) {
 }
 
 event init (i = 0) {
-  activate_biconcave_capsule(&MB(0), radius = RADIUS, level = LAG_LEVEL, shift={L0/2., 3*L0/7., 3*L0/4.});
-  activate_biconcave_capsule(&MB(1), radius = RADIUS, level = LAG_LEVEL);
+  activate_biconcave_capsule(&CAPS(0), radius = RADIUS, level = LAG_LEVEL, shift={L0/2., 3*L0/7., 3*L0/4.});
+  activate_biconcave_capsule(&CAPS(1), radius = RADIUS, level = LAG_LEVEL);
 
   pv_output_ascii(fp=stderr);
 }

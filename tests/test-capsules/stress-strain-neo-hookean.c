@@ -56,7 +56,7 @@ four nodes (the vertices of the rectangles), five edges (its sides plus one
 diagonal) and two triangles. */
 event init (i = 0) {
   /** Initialize two triangles */
-  lagMesh* mesh = &MB(0);
+  lagMesh* mesh = &CAPS(0);
   mesh->nln = 4;
   mesh->nle = 5;
   mesh->nlt = 2;
@@ -147,7 +147,7 @@ $$\lambda_2^{SK} = \sqrt{\frac{1 + C \lambda_1^2}{1 + C \lambda_1^4}}$$
 for the Skalak law.
 */
 event acceleration (i++) {
-  lagMesh* mesh = &MB(0);
+  lagMesh* mesh = &CAPS(0);
   double strain_comp = 0.01*i;
   double stretch1 = sqrt(2*strain_comp +1);
   #if SKALAK
@@ -172,13 +172,13 @@ event acceleration (i++) {
 }
 
 event logfile (i++) {
-  comp_elastic_stress(&MB(0));
-  for(int i=0; i<MB(0).nlt; i++) {
+  comp_elastic_stress(&CAPS(0));
+  for(int i=0; i<CAPS(0).nlt; i++) {
     fprintf(stderr, "%d, %g, %g, %g, %g\n", i,
-    .5*(sq(MB(0).triangles[i].stretch[0]) - 1.),
-    MB(0).triangles[i].tension[0],
-    .5*(sq(MB(0).triangles[i].stretch[1]) - 1.),
-    MB(0).triangles[i].tension[1]);
+    .5*(sq(CAPS(0).triangles[i].stretch[0]) - 1.),
+    CAPS(0).triangles[i].tension[0],
+    .5*(sq(CAPS(0).triangles[i].stretch[1]) - 1.),
+    CAPS(0).triangles[i].tension[1]);
   }
 }
 

@@ -29,10 +29,10 @@ int main(int argc, char* argv[]) {
 
 coord* ref_data = NULL;
 event init (i = 0) {
-  activate_spherical_capsule(&MB(0), level = LAG_LEVEL, radius = RADIUS);
-  ref_data = malloc(MB(0).nln*sizeof(coord));
-  for(int i=0; i<MB(0).nln; i++)
-    foreach_dimension() ref_data[i].x = MB(0).nodes[i].pos.x;
+  activate_spherical_capsule(&CAPS(0), level = LAG_LEVEL, radius = RADIUS);
+  ref_data = malloc(CAPS(0).nln*sizeof(coord));
+  for(int i=0; i<CAPS(0).nln; i++)
+    foreach_dimension() ref_data[i].x = CAPS(0).nodes[i].pos.x;
 }
 
 event impose_u (i++) {
@@ -49,23 +49,23 @@ event impose_u (i++) {
 }
 
 event adapt (i++) {
-  tag_ibm_stencils(&MB(0));
+  tag_ibm_stencils(&CAPS(0));
   adapt_wavelet({stencils}, (double []){1.e-2}, maxlevel = LEVEL);
-  generate_lag_stencils(&MB(0));
+  generate_lag_stencils(&CAPS(0));
 }
 
 /** We compute the time evolutions of the normalized area and volume 
 of the capsule */
 event volume_output (i++) {
     if (pid() == 0) {
-        comp_triangle_area_normals(&MB(0));
+        comp_triangle_area_normals(&CAPS(0));
         double narea = 0;
-        for(int j=0; j<MB(0).nlt; j++) narea += MB(0).triangles[j].area;
+        for(int j=0; j<CAPS(0).nlt; j++) narea += CAPS(0).triangles[j].area;
         narea /= 4*pi*sq(RADIUS);
-        comp_volume(&MB(0));
-        double nvolume = MB(0).volume/MB(0).initial_volume;
+        comp_volume(&CAPS(0));
+        double nvolume = CAPS(0).volume/CAPS(0).initial_volume;
         fprintf(stderr, "%d, %g, %g, %g %g\n", i, narea, nvolume,
-        MB(0).centroid.x, MB(0).initial_volume);
+        CAPS(0).centroid.x, CAPS(0).initial_volume);
         fflush(stderr);
     }
 }
@@ -77,15 +77,15 @@ event output (t = T_END) {
     if (pid() == 0) {
         double avg_err, max_err;
         avg_err = 0.; max_err = -HUGE;
-        for(int i=0; i < MB(0).nln; i++){
+        for(int i=0; i < CAPS(0).nln; i++){
         double err = 0.;
         foreach_dimension() err += sq(GENERAL_1DIST(ref_data[i].x,
-            MB(0).nodes[i].pos.x));
+            CAPS(0).nodes[i].pos.x));
         err = sqrt(err);
         avg_err += err;
         if (err > max_err) max_err = err;
         }
-        avg_err /= MB(0).nln;
+        avg_err /= CAPS(0).nln;
         fprintf(stderr, "%g, %g\n", avg_err, max_err);
         fflush(stderr);
     }

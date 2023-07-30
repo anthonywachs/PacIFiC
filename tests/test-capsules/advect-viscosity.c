@@ -4,7 +4,7 @@ periodic boundary.
 
 In this file we test the advection of a capsule featuring a non-unity
 viscosity ratio, across a perodic boundary. This file tests the 
-functions in caps-viscosity.h as well as the lag2eul function in 
+functions in viscosity-ft.h as well as the lag2eul function in 
 reg-dirac.h. The test may fail if the dumping of scalars in Basilisk
 is modified. The mesh resolution is very coarse to keep the execution 
 of this test under 3 minutes.
@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
 }
 
 event init (i = 0) {
-  activate_biconcave_capsule(&MB(0), level = LAG_LEVEL, radius = RADIUS);
+  activate_biconcave_capsule(&CAPS(0), level = LAG_LEVEL, radius = RADIUS);
 }
 
 event impose_u (i++) {
@@ -51,9 +51,9 @@ event impose_u (i++) {
 }
 
 event adapt (i++) {
-  tag_ibm_stencils(&MB(0));
+  tag_ibm_stencils(&CAPS(0));
   adapt_wavelet({stencils}, (double []){1.e-2}, maxlevel = LEVEL);
-  generate_lag_stencils(&MB(0));
+  generate_lag_stencils(&CAPS(0));
 }
 
 event progress (i++) {
@@ -66,7 +66,7 @@ of the capsule */
 event movie (i++) {
     view(fov = 18.9, bg = {1,1,1}, theta = 5*pi/6, psi = 0., phi = pi/8);
     clear();
-    draw_lag(&MB(0), lw = .5, edges = true, facets = false);
+    draw_lag(&CAPS(0), lw = .5, edges = true, facets = false);
     cells(n = {0,0,1});
     squares("I", n = {0,0,1});
     save("viscosity.mp4");

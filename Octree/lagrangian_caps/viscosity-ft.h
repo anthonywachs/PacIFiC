@@ -119,9 +119,9 @@ event properties (i++) {
     }
   }
 
-  for (int k=0; k<mbs.nbmb; k++)
-    if (mbs.mb[k].isactive) 
-      construct_divG(divG, &MB(k));
+  for (int k=0; k<NCAPS; k++)
+    if (CAPS(k).isactive) 
+      construct_divG(divG, &CAPS(k));
   poisson(I, divG, tolerance = 1.e-6, minlevel = 4);
 
   // Simple clamping of I:

@@ -22,36 +22,36 @@ int main(int argc, char* argv[]) {
 }
 
 event init (i = 0) {
-    activate_spherical_capsule(&MB(0), radius = RADIUS, 
+    activate_spherical_capsule(&CAPS(0), radius = RADIUS, 
         level = LAG_LEVEL);
 
-    comp_volume(&MB(0));
-    MB(0).initial_volume = MB(0).volume;
+    comp_volume(&CAPS(0));
+    CAPS(0).initial_volume = CAPS(0).volume;
 
     double c0, c1, c2;
     c0 = 0.2072; c1 = 2.0026; c2 = -1.1228;
     double radius = RADIUS;
-    for(int i=0; i<MB(0).nln; i++) {
-        double rho = sqrt(sq(MB(0).nodes[i].pos.x) +
-        sq(MB(0).nodes[i].pos.z))/radius;
+    for(int i=0; i<CAPS(0).nln; i++) {
+        double rho = sqrt(sq(CAPS(0).nodes[i].pos.x) +
+        sq(CAPS(0).nodes[i].pos.z))/radius;
         rho = (rho > 1) ? 1 : rho;
-        int sign = (MB(0).nodes[i].pos.y > 0.) ? 1 : -1;
-        MB(0).nodes[i].pos.y = sign*.5*radius*sqrt(1 - sq(rho))*
+        int sign = (CAPS(0).nodes[i].pos.y > 0.) ? 1 : -1;
+        CAPS(0).nodes[i].pos.y = sign*.5*radius*sqrt(1 - sq(rho))*
         (c0 + c1*sq(rho) + c2*sq(sq(rho)));
     }
-    correct_lag_pos(&MB(0));
-    comp_normals(&MB(0));
-    comp_centroid(&MB(0));
-    comp_volume(&MB(0));
+    correct_lag_pos(&CAPS(0));
+    comp_normals(&CAPS(0));
+    comp_centroid(&CAPS(0));
+    comp_volume(&CAPS(0));
 
     FILE* file = fopen("caps0.dump", "w");
-    dump_lagmesh(file, &MB(0));
+    dump_lagmesh(file, &CAPS(0));
     fclose(file);
     file = fopen("caps0.dump", "r");
-    restore_lagmesh(file, &MB(1));
+    restore_lagmesh(file, &CAPS(1));
     fclose(file);
     file = fopen("caps1.dump", "w");
-    dump_lagmesh(file, &MB(1));
+    dump_lagmesh(file, &CAPS(1));
     fclose(file);
     dump_capsules(fp=stderr);
 }

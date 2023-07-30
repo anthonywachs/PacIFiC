@@ -82,8 +82,8 @@ struct _generate_lag_stencils {
 trace
 void generate_lag_stencils(struct _generate_lag_stencils p) {
   for(int k=0; k<NCAPS; k++)
-    if (mbs.mb[k].isactive)
-      generate_lag_stencils_one_caps(mesh = &MB(k), no_warning = p.no_warning);
+    if (CAPS(k).isactive)
+      generate_lag_stencils_one_caps(mesh = &CAPS(k), no_warning = p.no_warning);
 }
 
 
@@ -205,7 +205,7 @@ trace
 void tag_ibm_stencils() {
   foreach() stencils[] = 0.;
   for(int k=0; k<NCAPS; k++)
-    if (mbs.mb[k].isactive) tag_ibm_stencils_one_caps(&MB(k));
+    if (CAPS(k).isactive) tag_ibm_stencils_one_caps(&CAPS(k));
 }
 
 /**

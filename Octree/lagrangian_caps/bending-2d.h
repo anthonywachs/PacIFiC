@@ -15,14 +15,14 @@ unstressed configuration, and $l$ is a line element along the membrane.
 #endif
 
   event init (i=0) {
-    for(int k=0; k<mbs.nbmb; k++) {
-      if (mbs.mb[k].isactive) {
-        comp_curvature(&mbs.mb[k]);
-        for(int i=0; i<mbs.mb[k].nln; i++) {
+    for(int k=0; k<NCAPS; k++) {
+      if (CAPS(k).isactive) {
+        comp_curvature(&CAPS(k));
+        for(int i=0; i<CAPS(k).nln; i++) {
           #if REF_CURV
-            mbs.mb[k].nodes[i].ref_curv = mbs.mb[k].nodes[i].curv;
+            CAPS(k).nodes[i].ref_curv = CAPS(k).nodes[i].curv;
           #else
-            mbs.mb[k].nodes[i].ref_curv = 0.;
+            CAPS(k).nodes[i].ref_curv = 0.;
           #endif
         }
       }
@@ -62,5 +62,5 @@ void bending(lagMesh* mesh) {
 }
 
 event acceleration (i++) {
-  for(int i=0; i<mbs.nbmb; i++) if (mbs.mb[i].isactive) bending(&mbs.mb[i]);
+  for(int i=0; i<NCAPS; i++) if (CAPS(i).isactive) bending(&CAPS(i));
 }

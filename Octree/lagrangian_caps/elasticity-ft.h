@@ -292,15 +292,15 @@ an example of a isotropically pre-stressed membrane.*/
 event init (i = 0) {
   #if (RESTART_CASE == 0)
     for(int j=0; j<NCAPS; j++)
-      if (mbs.mb[j].isactive) store_initial_configuration(&(MB(j)));
+      if (CAPS(j).isactive) store_initial_configuration(&(CAPS(j)));
   #endif
 }
 #endif
 
 event acceleration (i++) {
-  for(int i=0; i<mbs.nbmb; i++)
-    if (mbs.mb[i].isactive)
-      comp_elastic_stress(&mbs.mb[i]);
+  for(int i=0; i<allCaps.nbcaps; i++)
+    if (CAPS(i).isactive)
+      comp_elastic_stress(&CAPS(i));
 }
 
 /**

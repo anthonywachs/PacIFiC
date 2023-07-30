@@ -29,18 +29,18 @@ int main(int argc, char* argv[]) {
 }
 
 event init (i = 0) {
-  activate_biconcave_capsule(&MB(0), radius = RADIUS, level = LAG_LEVEL);
+  activate_biconcave_capsule(&CAPS(0), radius = RADIUS, level = LAG_LEVEL);
 }
 
 event output (i = 1) {
   double total_node_area = 0.;
-  for(int i=0; i<MB(0).nln; i++)
-    total_node_area += compute_node_area(&MB(0), i);
+  for(int i=0; i<CAPS(0).nln; i++)
+    total_node_area += compute_node_area(&CAPS(0), i);
   double total_triangle_area = 0.;
-  for(int i=0; i<MB(0).nlt; i++)
-    total_triangle_area += MB(0).triangles[i].area;
+  for(int i=0; i<CAPS(0).nlt; i++)
+    total_triangle_area += CAPS(0).triangles[i].area;
 
-  lagMesh* mesh = &(MB(0));
+  lagMesh* mesh = &(CAPS(0));
   for(int i=0; i<mesh->nln; i++) {
     double bending_force = cnorm(mesh->nodes[i].lagForce);
     double lbcurv = laplace_beltrami(mesh, i, true);
@@ -48,7 +48,7 @@ event output (i = 1) {
     double acosarg = (fabs(mesh->nodes[i].pos.y/norm) > 1) ?
       sign(mesh->nodes[i].pos.y)*1. : mesh->nodes[i].pos.y/norm;
     double theta = acos(acosarg);
-    double node_area = compute_node_area(&MB(0),i);
+    double node_area = compute_node_area(&CAPS(0),i);
     fprintf(stderr, "%g %g %g %g %g %g %d\n", theta, mesh->nodes[i].curv,
       mesh->nodes[i].gcurv, lbcurv, bending_force/node_area, node_area, i);
   }
@@ -56,7 +56,7 @@ event output (i = 1) {
   view(fov = 18, bg = {1,1,1}, theta = pi/6, psi = 0., phi = pi/8, width=1200, height=1200);
   // view(fov = 18, bg = {1,1,1});
   clear();
-  draw_lag(mesh = &(MB(0)), lw = .5, facets = true);
+  draw_lag(mesh = &(CAPS(0)), lw = .5, facets = true);
   save("rbc.png");
 }
 

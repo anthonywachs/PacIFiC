@@ -154,14 +154,14 @@ the simulation. It is one by default. */
 
 /** The Lagrangian mesh is accessible in the code thanks to the structure
 below, which is simply an array of Lagrangian meshes (useful when several of
-them are considered). The macro $MB(k)$ can be used as a shortcut to access the
+them are considered). The macro $CAPS(k)$ can be used as a shortcut to access the
 $k^{th}$ membrane. */
 typedef struct Capsules {
-  lagMesh mb[NCAPS];
-  int nbmb;
+  lagMesh caps[NCAPS];
+  int nbcaps;
 } Capsules;
-Capsules mbs;
-#define MB(i) (mbs.mb[i])
+Capsules allCaps;
+#define CAPS(i) (allCaps.caps[i])
 
 
 /**
@@ -192,9 +192,9 @@ void free_one_caps(lagMesh* mesh) {
 }
 
 void free_all_caps(Capsules* caps) {
-  for(int i=0; i<caps->nbmb; i++)
-    if (mbs.mb[i].isactive)
-      free_one_caps(&(caps->mb[i]));
+  for(int i=0; i<caps->nbcaps; i++)
+    if (CAPS(i).isactive)
+      free_one_caps(&(caps->caps[i]));
 }
 
 /**
@@ -203,9 +203,9 @@ void free_all_caps(Capsules* caps) {
 In case we add membranes to a simulation after restart, we need to call
 the function below. */
 void initialize_capsules() {
-  mbs.nbmb = NCAPS;
-  for(int i=0; i<mbs.nbmb; i++) {
-    if (mbs.mb[i].isactive) initialize_empty_capsule(&mbs.mb[i]);
+  allCaps.nbcaps = NCAPS;
+  for(int i=0; i<NCAPS; i++) {
+    if (CAPS(i).isactive) initialize_empty_capsule(&CAPS(i));
   }
   if (is_constant(a.x)) {
     a = new face vector;
@@ -222,9 +222,9 @@ void initialize_capsule_stencils(lagMesh* mesh) {
 }
 
 void initialize_all_capsules_stencils() {
-  for(int i=0; i<mbs.nbmb; i++)
-    if (mbs.mb[i].isactive)
-      initialize_capsule_stencils(&MB(i));
+  for(int i=0; i<NCAPS; i++)
+    if (CAPS(i).isactive)
+      initialize_capsule_stencils(&CAPS(i));
 }
 
 void initialize_active_capsule(lagMesh* mesh) {
@@ -349,10 +349,10 @@ We start by creating empty Lagrangian meshes, and allocating an acceleration
 field in case it isn't done yet by another Basilisk solver.
 */
 event defaults (i = 0) {
-  mbs.nbmb = NCAPS;
+  allCaps.nbcaps = NCAPS;
   // #if (RESTART_CASE == 0)
-    for(int i=0; i<mbs.nbmb; i++) {
-      initialize_empty_capsule(&mbs.mb[i]);
+    for(int i=0; i<NCAPS; i++) {
+      initialize_empty_capsule(&CAPS(i));
     }
   // #endif
   if (is_constant(a.x)) {
@@ -365,11 +365,11 @@ event defaults (i = 0) {
 velocities. We also use this loop as an opportunity to
 re-initialize the Lagrangian forces to zero. */
 event tracer_advection(i++) {
-  for(int i=0; i<mbs.nbmb; i++) {
-    if (mbs.mb[i].isactive) {
-      advect_lagMesh(&mbs.mb[i]);
-      for(int j=0; j<mbs.mb[i].nln; j++)
-        foreach_dimension() mbs.mb[i].nodes[j].lagForce.x = 0.;
+  for(int i=0; i<NCAPS; i++) {
+    if (CAPS(i).isactive) {
+      advect_lagMesh(&CAPS(i));
+      for(int j=0; j<CAPS(i).nln; j++)
+        foreach_dimension() CAPS(i).nodes[j].lagForce.x = 0.;
     }
   }
 }
@@ -382,8 +382,8 @@ event acceleration (i++) {
   face vector ae = a;
   foreach()
     if (cm[] > 1.e-20) foreach_dimension() forcing.x[] = 0.;
-  for(int i=0; i<mbs.nbmb; i++) {
-    if (mbs.mb[i].isactive) lag2eul(forcing, &mbs.mb[i]);
+  for(int i=0; i<NCAPS; i++) {
+    if (CAPS(i).isactive) lag2eul(forcing, &CAPS(i));
   }
   foreach_face()
     if (fm.x[] > 1.e-20) ae.x[] += .5*alpha.x[]*(forcing.x[] + forcing.x[-1]);
@@ -391,7 +391,7 @@ event acceleration (i++) {
 
 /** At the end of the simulation, we free the allocated memory.*/
 event cleanup (t = end) {
-  free_all_caps(&mbs);
+  free_all_caps(&allCaps);
 }
 
 /**
