@@ -166,7 +166,6 @@ solver, meaning they should lead to compilation errors. They need to be updated.
 * The solver has never been tested with OpenMP.
 
 ### To do list
-* **Correct the .c files in this sandbox that were written prior to a solver update and would lead to compilation errors**
 * **Compatibility with the javascript visualization**
 * **Better MPI parallelism**: right now there is only one MPI communication per time step during the interpolation of the velocity from the octree grid to the membrane nodes (two if the RK2 scheme is used), but it comes at the price of having every processor compute the motion of every node of every capsule. This is highly inefficient and could be made better by (i) using "bounding boxes" for our capsules, such that only processors that deal with fuid cells close to a capsule see it; or (ii) implement our surface triangulation locally on grid cells one the `scalar` quantity allows to consider `struct` rather than `double` (in this case we would have a scalar that is an array of arrays of nodes, edges and triangles).
 * **Shading effect in bview**: right now the triangles are outputted in bview in plain white color, so it is necessary to draw the edges in order to get the impression of 3D.
@@ -181,13 +180,8 @@ solver, meaning they should lead to compilation errors. They need to be updated.
 * ~~**Compatibility with the new bview**~~
 * ~~**Add a test suite with reference files**~~
 * ~~**Reorganize the source files**: currently, some mesh-related functions are in capsule-ft.h and post-processing-ft.h and it could be organized in a more intuitive way.~~
-* ~~**Stick to a naming convention**: right now the terms `caps` or `capsules`, and `mb` or `membranes` are used interchangeably in the source files, but one single term should be used.~~
-
-### Deprecated 2D validation cases
-* [advect_caps.c](tests/lagrangian_caps/advect_caps.c): tests the simple advection
-of a capsule devoid of elasticity.
-* [curvature.c](tests/lagrangian_caps/curvature.c): tests the computations of
-the normal vectors and curvature of a capsule in 2 dimensions.
+* ~~**Stick to a naming convention**: right now the terms `caps` or `capsules`, and `mb` or `membranes` are used interchangeably in the source files, but one single term should be used.`~~  The script `update-source-file.sh` automatically updates a `.c` file to comply to the new naming convention.
+* ~~**Correct the .c files in this sandbox that were written prior to a solver update and would lead to compilation errors**~~
 
 ## Eulerian framework
 In the Eulerian framework, we do not mesh the capsules. The source files
