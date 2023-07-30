@@ -25,25 +25,23 @@ about the development of this approach can be found in this
 [preprint](https://arxiv.org/abs/2211.15814).
 
 ### Source files
-* [lag-mesh.h](src/lagrangian_caps/lag-mesh.h): definition of the Lagrangian 
+* [capsule-ft.h](src/lagrangian_caps/capsule-ft.h): definition of the Lagrangian 
 mesh, computation of geometrical quantities, advection of the mesh.
-* [lag-mesh-mpi.h](src/lagrangian_caps/lag-mesh-mpi.h): a helper function
+* [capsule-ft-mpi.h](src/lagrangian_caps/capsule-ft-mpi.h): a helper function
 for compatibility with MPI.
-* [mesh-toolbox.h](src/lagrangian_caps/mesh-toolbox.h): helper functions for
-Lagrangian meshes: mainly for creating 3D meshed surfaces, but also to create
-restart files, Paraview visualization of the membranes, dump and restart files,
-etc.
-* [reg-dirac.h](src/lagrangian_caps/reg-dirac.h): Implementation of the immersed
+* [geometry-ft.h](src/lagrangian_caps/geometry-ft.h): helper functions for
+triangulated meshes.
+* [ibm-ft.h](src/lagrangian_caps/ibm-ft.h): Implementation of the immersed
 boundary method. Because we use the Cache structures, the code in this sandbox
 is only compatible with quadtree and octree grids.
 * [elasticity-ft.h](src/lagrangian_caps/elasticity-ft.h): Implementation of the
 membrane elasticity in the front-tracking framework. In 3D, this is an explicit
 finite element method.
-* [neo-hookean.h](src/lagrangian_caps/neo-hookean.h): Implementation of the
+* [neo-hookean-ft.h](src/lagrangian_caps/neo-hookean-ft.h): Implementation of the
 neo-Hookean elatic law.
-* [skalak.h](src/lagrangian_caps/skalak.h): Implementation of the
+* [skalak-ft.h](src/lagrangian_caps/skalak-ft.h): Implementation of the
 Skalak elatic law, describing lipid-bilayer biological membranes.
-* [higer-order-neo-hookean.h](src/lagrangian_caps/ho-neo-hookean.h):
+* [ho-neo-hookean-ft.h](src/lagrangian_caps/ho-neo-hookean-ft.h):
 Implementation of the higher-order neo-Hookean elastic force, for extreme
 deformation of red blood cells.
 * [bending-ft.h](src/lagrangian_caps/bending-ft.h): Implementation of a bending
@@ -54,14 +52,18 @@ the nearest neighbors (and using the ordinary least-squares method in 3D).
 * [smallest_root_cubic.h](src/lagrangian_caps/smallest_root_cubic.h):
 a function that computes the smallest real root of a third-order polynomial,
 useful for the volume conservation routine.
-* [volume-conservation.h](src/lagrangian_caps/volume-conservation.h): 
+* [volume-conservation-ft.h](src/lagrangian_caps/volume-conservation-ft.h): 
 Implementation of a volume correction routine based on an optimization problem.
-* [caps-viscosity.h](src/lagrangian_caps/caps-viscosity.h): Allows non-unity
+* [viscosity-ft.h](src/lagrangian_caps/viscosity-ft.h): Allows non-unity
 viscosity ratios between the fluids inner and outer to the capsule. Based on the
 method of Tryggvason et al.
 * [view-ft.h](src/lagrangian_caps/view-ft.h): Allows visualization of the
 Lagrangian mesh using bview.
-* [common-shapes.h](src/lagrangian_caps/common-shapes.h): Some pre-defined
+* [dump-ft.h](src/lagrangian_caps/dump-ft.h): Save and restore capsules in order
+to restart simulations.
+* [post-processing-ft.h](src/lagrangian_caps/post-processing-ft.h): Paraview
+output function and plain output of nodes and triangles.
+* [common-shapes-ft.h](src/lagrangian_caps/common-shapes-ft.h): Some pre-defined
 initial shapes for the capsules.
 * [matrix-toolbox.h](src/lagrangian_caps/matrix-toolbox.h): An implementation in
 C of the inversion of matrices using LU-decomposition, copy-pasted entirely
@@ -117,35 +119,35 @@ from $5\%$ to $30\%$ and the increased bulk viscosity is measured.
 
 ### Test suite
 * [create-capsule-sphere.c](tests/regression-tests/create-capsule-sphere.c):
-tests most functions in [mesh-toolbox.h](src/lagrangian_caps/mesh-toolbox.h) and
-some functions in [lag-mesh.h](src/lagrangian_caps/lag-mesh.h).
+tests most functions in [geometry-ft.h](src/lagrangian_caps/geometry-ft.h) and
+some functions in [capsule-ft.h](src/lagrangian_caps/capsule-ft.h).
 * [create-capsule-biconcave.c](tests/regression-tests/create-capsule-biconcave.c):
-tests most functions in [mesh-toolbox.h](src/lagrangian_caps/mesh-toolbox.h) and
-some functions in [lag-mesh.h](src/lagrangian_caps/lag-mesh.h).
+tests most functions in [geometry-ft.h](src/lagrangian_caps/geometry-ft.h) and
+some functions in [capsule-ft.h](src/lagrangian_caps/capsule-ft.h).
 * [draw-sphere.c](tests/regression-tests/draw-sphere.c): tests 
 [view-ft.h](src/lagrangian_caps/view-ft.h).
 * [stress-strain-neo-hookean.c](tests/regression-tests/stress-strain-neo-hookean.c):
 tests [elasticity-ft.h](src/lagrangian_caps/elasticity-ft.h) and 
-[neo-hookean.h](src/lagrangian_caps/neo-hookean.h).
+[neo-hookean-ft.h](src/lagrangian_caps/neo-hookean-ft.h).
 * [stress-strain-skalak.c](tests/regression-tests/stress-strain-skalak.c)
 tests [elasticity-ft.h](src/lagrangian_caps/elasticity-ft.h) and 
-[skalak.h](src/lagrangian_caps/skalak.h).
+[skalak-ft.h](src/lagrangian_caps/skalak-ft.h).
 * [curvature-biconcave.c](tests/regression-tests/curvature-biconcave.c): tests
 [bending-ft.h](src/lagrangian_caps/bending-ft.h), 
 [curvature-ft.h](src/lagrangian_caps/curvature-ft.h) and
 [matrix-toolbox.h](src/lagrangian_caps/matrix-toolbox.h).
 * [advect-sphere.c](tests/regression-tests/advect-sphere.c): tests
-[reg-dirac.h](src/lagrangian_caps/reg-dirac.h),
-[lag-mesh.h](src/lagrangian_caps/lag-mesh.h).
+[ibm-ft.h](src/lagrangian_caps/ibm-ft.h),
+[capsule-ft.h](src/lagrangian_caps/capsule-ft.h).
 * [advect-sphere-mpi.c](tests/regression-tests/advect-sphere_mpi.c): tests
-[lag-mesh-mpi.h](src/lagrangian_caps/lag-mesh-mpi.h).
+[capsule-ft-mpi.h](src/lagrangian_caps/capsule-ft-mpi.h).
 * [advect-viscosity.c](tests/regression-tests/advect-viscosity.c): tests 
 [caps-viscosity.h](src/lagrangian_caps/caps-viscosity.h).
 * [caps-dump-restore.c](tests/regression-tests/caps-dump-restore.c): tests
 dump and restore functions in 
-[mesh-toolbox.h](src/lagrangian_caps/mesh-toolbox.h).
+[dump-ft.h](src/lagrangian_caps/dump-ft.h).
 * [caps-paraview.c](tests/regression-tests/caps-paraview.c): tests
-paraview functions in [mesh-toolbox.h](src/lagrangian_caps/mesh-toolbox.h).
+paraview functions in [post-processing-ft.h](src/lagrangian_caps/post-processing-ft.h).
 
 ### Limitations and known bugs
 * The development of the 2D version of this solver has stopped: the latest 
@@ -165,8 +167,6 @@ solver, meaning they should lead to compilation errors. They need to be updated.
 
 ### To do list
 * **Correct the .c files in this sandbox that were written prior to a solver update and would lead to compilation errors**
-* **Reorganize the source files**: currently, some mesh-related functions are in lag-mesh.h and mesh-toolbox.h and it could be organized in a more intuitive way.
-* **Stick to a naming convention**: right now the terms `caps` or `capsules`, and `mb` or `membranes` are used interchangeably in the source files, but one single term should be used.
 * **Compatibility with the javascript visualization**
 * **Better MPI parallelism**: right now there is only one MPI communication per time step during the interpolation of the velocity from the octree grid to the membrane nodes (two if the RK2 scheme is used), but it comes at the price of having every processor compute the motion of every node of every capsule. This is highly inefficient and could be made better by (i) using "bounding boxes" for our capsules, such that only processors that deal with fuid cells close to a capsule see it; or (ii) implement our surface triangulation locally on grid cells one the `scalar` quantity allows to consider `struct` rather than `double` (in this case we would have a scalar that is an array of arrays of nodes, edges and triangles).
 * **Shading effect in bview**: right now the triangles are outputted in bview in plain white color, so it is necessary to draw the edges in order to get the impression of 3D.
@@ -180,6 +180,8 @@ solver, meaning they should lead to compilation errors. They need to be updated.
 * ~~**Elegant volume conservation correction**: we could use the approach of Mendez et al., JCP, 2014 to impose a constant volume of the capsules by solving a (simple) optimization problem. It performs better than simply pulling on the nodes in the normal direction, and can be seen as a correction for the non-conservativity of the velocity interpolation of the IBM.~~
 * ~~**Compatibility with the new bview**~~
 * ~~**Add a test suite with reference files**~~
+* ~~**Reorganize the source files**: currently, some mesh-related functions are in capsule-ft.h and post-processing-ft.h and it could be organized in a more intuitive way.~~
+* ~~**Stick to a naming convention**: right now the terms `caps` or `capsules`, and `mb` or `membranes` are used interchangeably in the source files, but one single term should be used.~~
 
 ### Deprecated 2D validation cases
 * [advect_caps.c](tests/lagrangian_caps/advect_caps.c): tests the simple advection

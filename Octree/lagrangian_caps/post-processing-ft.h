@@ -1,5 +1,8 @@
+/**
+# Post-processing functions for triangulated surfaces
+*/
 
-/** ### Output membrane position for external post-processing */
+/** ## Output membrane position in plain text for external post-processing */
 void dump_plain_nodes_pos(lagMesh* mesh, char* filename) {
   if (pid() == 0) {
     FILE* file = fopen(filename, "a");
@@ -29,7 +32,7 @@ void dump_plain_triangles(lagMesh* mesh, char* filename) {
   }
 }
 
-/** ### Visualization in paraview */
+/** ## Visualization in paraview */
 struct _pv_output_ascii {
     char* name;
     FILE* fp;
