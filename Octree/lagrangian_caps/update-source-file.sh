@@ -3,7 +3,7 @@
 file=$1
 source_path="lagrangian_caps/"
 
-sed -i "s|lag-mesh.h\"|capsule-ft.h\"\n#include \"${source_path}dump-ft.h\"\n#include \"${source_path}post-processing-ft.h\"|g" $file
+sed -i "s|lag-mesh.h|capsule-ft.h|g" $file
 sed -i "s|neo-hookean.h|neo-hookean-ft.h|g" $file
 sed -i "s|skalak.h|skalak-ft.h|g" $file
 sed -i "s|caps-viscosity.h|viscosity-ft.h|g" $file
