@@ -5,7 +5,7 @@
 
 # Sets here the directories where the mac scripts will recursively
 # find the source files of the application
-SRC = RegressionTests Misc Solvers
+SRC = RegressionTests Misc Solvers FluidSolidInterface PostProcessing
 
 # default compilation system (used to find the architecture)
 CCC := gcc
@@ -66,17 +66,17 @@ exeg    : MACLIB=mac1
 exegg   : MACLIB=macg
 exepgpg : MACLIB=$(MAC_HOME)/$(libdir)/optpg
 
-$(libdir)/optg/Makefile: 
+$(libdir)/optg/Makefile:
 	$(BEGIN_TARGET) $@
 	$(MKDIR) $(@D)
 	mac depend -l mac1 -compiler $(CCC) dbg $(@D) $(SRC)
 
-$(libdir)/optg%/Makefile: 
+$(libdir)/optg%/Makefile:
 	$(BEGIN_TARGET) $@
 	$(MKDIR) $(@D)
 	mac depend -l mac$* -compiler $(CCC) dbg $(@D) $(SRC)
 
-$(libdir)/optpg%/Makefile: 
+$(libdir)/optpg%/Makefile:
 	$(BEGIN_TARGET) $@
 	$(MKDIR) $(@D)
 	mac depend -l $(MACLIB) -compiler $(CCC) optpg $(@D) $(SRC)
@@ -88,13 +88,13 @@ $(libdir)/%/Makefile:
 	-I $(XERCESCROOT)/include \
 	-I $(MACWORLD_MPI_INCDIR) \
 	-I $(BASILISK_DLMFD) \
-	-I $(GRAINS_HOME)/Grains/inc \
+	-I $(GRAINS_HOME)/Grains/include \
 	-path $(GRAINS_HOME)/Grains/lib$(GRAINS_FULL_EXT) -l grains \
 	-path $(XERCESCROOT)/lib$(GRAINS_BITS_EXT)-$(GRAINS_SERCOMPIL_ENV)-$(GRAINS_SERCOMPIL_VERSION) -l xerces-c -l xerces-depdom \
 	-path $(MACWORLD_GFORTRAN_LIBDIR) -l $(MACWORLD_GFORTRAN_LIBS) \
 	-compiler $(CCC) $* $(@D) $(SRC)
 	$(END_TARGET) $@
-	
+
 exe% : $(libdir)/exe%
 	$(END_TARGET) $@
 
@@ -144,7 +144,6 @@ FORCE:
 RM    := rm -fr
 MKDIR := mkdir -p
 BEGIN_TARGET := @printf "****************************************\n* \
-Begin target : %s \n****\n" 
+Begin target : %s \n****\n"
 END_TARGET := @printf "****\n* \
 target %s completed\n****************************************\n"
-

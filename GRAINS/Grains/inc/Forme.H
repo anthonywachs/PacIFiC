@@ -239,10 +239,6 @@ public:
   /** @brief Ecriture de l'information de position pour le Fluide */
   void writePositionInFluid( ostream &fluid );
 
-  /** @brief Ecriture de l'information de position pour Basilisk (fluide) */
-  void writePositionInFluid (struct BasiliskDataStructure * b);
-
-
   /** @brief Ecriture de l'information statique.
   @param statique Flux recepteur
   @param composant solid object */

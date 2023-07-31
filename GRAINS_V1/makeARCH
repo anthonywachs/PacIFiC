@@ -1,0 +1,63 @@
+#!/bin/bash
+# Create architecture-dependent sub-directories
+# $1 : create = mkdir and delete = "rm -rf"
+# $2 : force a specific architecture other than the one from the shell variables
+
+tabdir=(Main Tools/PrePost/Position Tools/PrePost/ShapeFile Tools/PrePost/RotationMatrix)
+
+
+# Check $1 parameter as the right value
+OK=0
+if [ "$1" == "create" ] || [ "$1" == "delete" ]
+  then 
+    OK=1
+  else 
+    echo "unknown argument, 1st argument should be \"create\" or \"delete\""
+fi
+      
+# Set architecture
+# If $2, then force $2
+# Else use shell variables
+archi="null"
+if [ $2 ] && [ $OK -ne 0 ]
+  then
+    archi=$2
+    echo "Architecture is forced to \""$2"\""
+  else
+    archi=${GRAINS_FULL_EXT}
+fi
+
+
+# Create or delete architecture
+if [ $OK -ne 0 ]
+  then
+    i=0
+    if [ "$1" == "create" ]
+      then
+        if  [ ! -d ${GRAINS_HOME}/Grains/obj${archi} ]
+	  then
+	    mkdir ${GRAINS_HOME}/Grains/obj${archi} ${GRAINS_HOME}/Grains/lib${archi}
+	    while [ $i -lt ${#tabdir[@]} ]
+            do
+              mkdir ${GRAINS_HOME}/${tabdir[$i]}/obj${archi} $GRAINS_HOME/${tabdir[$i]}/bin${archi}
+           i=`expr $i + 1`
+            done	    
+	    echo "Architecture" ${archi} $1"d"
+	  else
+	    echo "!!! Warning: Architecture" ${archi} "already exists !!!"
+	fi  
+      else
+        if [ ! -d ${GRAINS_HOME}/Grains/obj${archi} ]
+	  then
+	    echo "!!! Warning: Architecture" ${archi} "does not exist !!!"
+	  else
+            rm -rf ${GRAINS_HOME}/Grains/obj${archi} ${GRAINS_HOME}/Grains/lib${archi}
+	    while [ $i -lt ${#tabdir[@]} ]
+            do
+              rm -rf ${GRAINS_HOME}/${tabdir[$i]}/obj${archi} $GRAINS_HOME/${tabdir[$i]}/bin${archi}
+           i=`expr $i + 1`
+            done	    
+	    echo "Architecture" ${archi} $1"d"
+        fi
+    fi
+fi

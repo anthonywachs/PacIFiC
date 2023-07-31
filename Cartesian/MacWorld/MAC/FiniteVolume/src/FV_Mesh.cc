@@ -225,6 +225,9 @@ FV_Mesh:: FV_Mesh( MAC_Object* a_owner,
      {
        periodic_pressure_drop = new double ;
        *periodic_pressure_drop = 0. ;
+       // Added by Aashish Goyal on 29Mar2023 for DS solver
+       if (eee->has_entry( "initial_pressure_drop" ))
+          *periodic_pressure_drop = eee->double_data( "initial_pressure_drop" );
      }
                    
      eee->destroy() ; eee=0 ;          

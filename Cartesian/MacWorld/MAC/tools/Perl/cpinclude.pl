@@ -73,8 +73,13 @@ pod2usage( -verbose => 1 ) if $H  ;
 
 
 # Clean include directory
-$cmd = "rm -rf $root/include/*";
-if ( $verbosity ) { print "$cmd\n";}
+if ( -d "$root/include" ) { 
+  $cmd = "rm -rf $root/include";  
+  if ( $verbosity ) { print "Deleting $root/include\n";}
+  system( $cmd );  
+}
+$cmd = "mkdir $root/include";
+if ( $verbosity ) { print "Creating $root/include\n";}
 system( $cmd ); 
 
 

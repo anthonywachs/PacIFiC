@@ -1,0 +1,128 @@
+<!-- Grains3D_InFluid DTD -->
+
+<!ENTITY % Convex.dtd SYSTEM "___WHERESISCONVEX__">
+%Convex.dtd;
+
+<!ENTITY % Contact.dtd SYSTEM "___WHERESISCONTACT__">
+%Contact.dtd;
+
+<!ELEMENT Point EMPTY>
+<!ATTLIST Point X CDATA #REQUIRED>
+<!ATTLIST Point Y CDATA #REQUIRED>
+<!ATTLIST Point Z CDATA #REQUIRED>
+
+<!ELEMENT Centre EMPTY>
+<!ATTLIST Centre X CDATA #REQUIRED>
+<!ATTLIST Centre Y CDATA #REQUIRED>
+<!ATTLIST Centre Z CDATA #REQUIRED>
+
+<!ELEMENT BottomCentre EMPTY>
+<!ATTLIST BottomCentre X CDATA #REQUIRED>
+<!ATTLIST BottomCentre Y CDATA #REQUIRED>
+<!ATTLIST BottomCentre Z CDATA #REQUIRED>
+
+<!ELEMENT Origin EMPTY>
+<!ATTLIST Origin OX CDATA #REQUIRED>
+<!ATTLIST Origin OY CDATA #REQUIRED>
+<!ATTLIST Origin OZ CDATA #REQUIRED>
+
+<!ELEMENT Periodicity EMPTY>
+<!ATTLIST Periodicity PX CDATA #REQUIRED>
+<!ATTLIST Periodicity PY CDATA #REQUIRED>
+<!ATTLIST Periodicity PZ CDATA #REQUIRED>
+
+<!ELEMENT Vector EMPTY>
+<!ATTLIST Vector X CDATA #REQUIRED>
+<!ATTLIST Vector Y CDATA #REQUIRED>
+<!ATTLIST Vector Z CDATA #REQUIRED>
+
+
+<!ELEMENT Grains3D (Construction, Forces, Simulation)>
+<!ATTLIST Grains3D Type (CoupledFluid|CoupledFluidMPI) "CoupledFluid">
+
+  <!ELEMENT Construction (LinkedCell, Origin?, Periodicity?, DomainDecomposition?, MPI?, ContactForceModels, Reload)>
+    <!ELEMENT LinkedCell EMPTY>
+    <!ATTLIST LinkedCell MX CDATA #REQUIRED>
+    <!ATTLIST LinkedCell MY CDATA #REQUIRED>
+    <!ATTLIST LinkedCell MZ CDATA #REQUIRED>
+    <!ATTLIST LinkedCell CellSizeFactor CDATA "1">    
+    
+    <!ELEMENT DomainDecomposition EMPTY>
+    <!ATTLIST DomainDecomposition NX CDATA #REQUIRED>
+    <!ATTLIST DomainDecomposition NY CDATA #REQUIRED>
+    <!ATTLIST DomainDecomposition NZ CDATA #REQUIRED> 
+    
+    <!ELEMENT MPI EMPTY>
+    <!ATTLIST MPI VerbosityLevel (0|1|2) "2">	 
+
+    <!ELEMENT ContactForceModels (Default?, ContactForceModel*)>
+
+    <!ELEMENT Reload EMPTY>
+    <!ATTLIST Reload File CDATA #REQUIRED>
+    <!ATTLIST Reload Velocity (Reset|NoReset) "NoReset">
+    <!ATTLIST Reload Type (new|same) "new"> 
+
+
+  <!ELEMENT Forces (Gravity?)>
+    <!ELEMENT Gravity EMPTY>
+    <!ATTLIST Gravity GX CDATA #REQUIRED>
+    <!ATTLIST Gravity GY CDATA #REQUIRED>
+    <!ATTLIST Gravity GZ CDATA #REQUIRED>
+
+
+  <!ELEMENT Simulation (TimeStep, TimeIntegration, RestartFile,  MovingObstacles?, ObstacleLoadings?, PostProcessingWriters?)>
+    <!ELEMENT TimeStep EMPTY>
+    <!ATTLIST TimeStep dt CDATA #REQUIRED>
+
+    <!ELEMENT TimeIntegration EMPTY>
+    <!ATTLIST TimeIntegration Type (FirstOrderExplicit|SecondOrderExplicit|SecondOrderLeapFrog|SecondOrderAdamsBashforth) "SecondOrderLeapFrog">   
+
+    <!ELEMENT RestartFile EMPTY>
+    <!ATTLIST RestartFile Name CDATA #REQUIRED>
+    <!ATTLIST RestartFile WritingMode (Text|Hybrid) "Text">   
+
+    <!ELEMENT MovingObstacles EMPTY>
+    <!ATTLIST MovingObstacles LinkUpdateEvery CDATA #REQUIRED>
+    <!ATTLIST MovingObstacles GeometricallyDisplace (True|False) "True">    
+
+    <!ELEMENT ObstacleLoadings (ObstacleLoading+)>
+      <!ELEMENT ObstacleLoading (ObstacleName, Type, TimeInterval, ConstantTranslation?, SinTranslation?)>
+        <!ATTLIST ObstacleLoading ObstacleName CDATA #REQUIRED>
+        <!ATTLIST ObstacleLoading Type (Force|Velocity) "Velocity">
+	<!ELEMENT TimeInterval EMPTY>
+        <!ATTLIST TimeInterval Start CDATA #REQUIRED>
+        <!ATTLIST TimeInterval End   CDATA #REQUIRED>      
+	<!ELEMENT ConstantTranslation (TranslationalVelocity)>
+          <!ELEMENT TranslationalVelocity EMPTY>
+          <!ATTLIST TranslationalVelocity VX CDATA #REQUIRED>
+          <!ATTLIST TranslationalVelocity VY CDATA #REQUIRED>
+          <!ATTLIST TranslationalVelocity VZ CDATA #REQUIRED>
+	<!ELEMENT SinTranslation (Direction, Parameters)>
+          <!ELEMENT Direction EMPTY>
+          <!ATTLIST Direction VX CDATA #REQUIRED>
+          <!ATTLIST Direction VY CDATA #REQUIRED>
+          <!ATTLIST Direction VZ CDATA #REQUIRED>
+	  <!ELEMENT Parameters (Amplitude, Period, PhaseShift) >
+	  <!ATTLIST Parameters Amplitude CDATA #REQUIRED>
+	  <!ATTLIST Parameters Period CDATA #REQUIRED>	  		
+	  <!ATTLIST Parameters PhaseShift CDATA #REQUIRED>	
+      
+    <!ELEMENT PostProcessingWriters (Domain?, Writers?, ForceTorqueObstacles?)>
+      <!ELEMENT Domain (Point, Point)>
+      <!ELEMENT Writers (Paraview?, RawData?)> 
+        <!ELEMENT Paraview EMPTY>
+        <!ATTLIST Paraview RootName CDATA #REQUIRED>
+        <!ATTLIST Paraview Directory CDATA #REQUIRED>
+        <!ATTLIST Paraview InitialCycleNumber CDATA "0">
+        <!ATTLIST Paraview WritingMode (Text|Binary) "Text">
+	<!ATTLIST Paraview ForceNetwork (True|False) "False">
+	<!ATTLIST Paraview Obstacle (True|False) "True">	    
+    
+        <!ELEMENT RawData EMPTY>
+        <!ATTLIST RawData Name CDATA #REQUIRED> 
+      
+      <!ELEMENT ForceTorqueObstacles (Every, Directory, Obstacle+)> 
+        <!ATTLIST ForceTorqueObstacles Every CDATA #REQUIRED>  
+	<!ATTLIST ForceTorqueObstacles Directory CDATA #REQUIRED>
+	<!ELEMENT Obstacle EMPTY> 
+	<!ATTLIST Obstacle ObstacleName CDATA #REQUIRED> 

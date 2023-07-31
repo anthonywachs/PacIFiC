@@ -1,0 +1,12 @@
+# Origin
+0.01	0.01	0.01
+# Box dimension
+0.2	0.2	0.8	
+# Circular cylinder or sphere radius
+0.01
+# Number of particles
+1145
+# Random: true or false
+true
+# Output file
+initial_position.result

@@ -50,6 +50,8 @@ export MACWORLD_X11_DIR=${PACIFIC_X11_DIR}
 export MACWORLD_X11_INCDIR=${PACIFIC_X11_INCDIR}
 export MACWORLD_X11_LIBDIR=${PACIFIC_X11_LIBDIR}
 
+# Other
+export MACWORLD_PETSC_WITH_MUMPS=${PACIFIC_PETSC_WITH_MUMPS}
 
 echo -e '\033[93m*** MacWorld shell variables\033[0m'
 echo -e '\033[93mMACWORLD_ROOT\033[0m =' $MACWORLD_ROOT
@@ -90,10 +92,11 @@ echo -e '\033[93mMACWORLD_X11_LIBDIR\033[0m =' $MACWORLD_X11_LIBDIR
 echo -e '\033[93mMACWORLD_SERCOMPIL_ENV\033[0m =' $MACWORLD_SERCOMPIL_ENV
 echo -e '\033[93mMACWORLD_SERCOMPIL_VERSION\033[0m =' $MACWORLD_SERCOMPIL_VERSION
 echo -e '\033[93mMACWORLD_OPT_FLAGS\033[0m =' $MACWORLD_OPT_FLAGS
+echo -e '\033[93mMACWORLD_PETSC_WITH_MUMPS\033[0m =' $MACWORLD_PETSC_WITH_MUMPS
 echo -e '  '
 
 
-# HYPRE / Petsc 
+# HYPRE / Petsc
 echo -e '\033[96m*** Petsc/Hypre shell variables\033[0m'
 source ${MACWORLD_ROOT}/hypre-2.10.1/hypre.env.sh
 source ${MACWORLD_ROOT}/petsc-3.2.0-p7/petsc.env.sh
@@ -106,5 +109,5 @@ if [[ ${PACIFIC_AUTO_CONFIG} -eq 1 ]]
 then
   echo -e '\033[33mUsing MAC template Linux and extra-Linux makefiles\033[0m'
   cp ${MACWORLD_ROOT}/MAC/etc/Linux_template.mak ${MACWORLD_ROOT}/MAC/etc/${MAC_ARCH}.mak
-  cp ${MACWORLD_ROOT}/MAC/etc/extra-Linux_template.mak ${MACWORLD_ROOT}/MAC/etc/extra-${MAC_ARCH}.mak  
+  cp ${MACWORLD_ROOT}/MAC/etc/extra-Linux_template.mak ${MACWORLD_ROOT}/MAC/etc/extra-${MAC_ARCH}.mak
 fi

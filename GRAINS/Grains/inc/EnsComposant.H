@@ -192,7 +192,8 @@ public:
 	LinkedCell const* LC, vector<Fenetre> const& insert_windows,
 	int rang = 0,
 	int nprocs = 1,
-  	MPIWrapperGrains const* wrapper = NULL );
+  	MPIWrapperGrains const* wrapper = NULL,
+	size_t indent_width = 0 );
 
   /** @brief Ecriture des composants pour Post-Processing (Ecriture
   d'evolution)
@@ -206,7 +207,8 @@ public:
 	LinkedCell const* LC,
 	int rang = 0,
   	int nprocs = 1,
-	MPIWrapperGrains const* wrapper = NULL );
+	MPIWrapperGrains const* wrapper = NULL,
+	size_t indent_width = 0 );
 
   /** @brief Ecriture des composants pour Post-Processing GrainsCompFeatures */
   void PostProcessing();
@@ -237,8 +239,6 @@ public:
   /** @brief Mise � jour des particules clones periodiques
   @param LC grille de cellules */
   void updateClonesPeriodiques( LinkedCell* LC );
-
-  void updateContactMapId( int prev_id, int new_id);
 
   /** @brief Mise � jour du statut des particules clones paralleles qui sont
   egalement des references periodiques
@@ -490,7 +490,7 @@ public:
   void setVelocityAndVelocityDifferencePreviousTimeRestart(
   	string const& PelDirRes );
   double setVelocityAndVelocityDifferencePreviousTimeRestart_Basilisk(
-  	string const& dirRes );
+  	string const& rootfilename );
 
   /** @brief Mouvement aleatoire sur les particules actives
   @param coefTrans amplitude max du mouvement translationnel
@@ -530,8 +530,7 @@ public:
   @param filename nom du fichier correspondant au flux de lecture
   @param new_reload_format reload avec le format de reload 2014 */
   void read( istream &fileSave, string const& filename,
-  	bool const& new_reload_format = false,
-    bool const& contact_history_storage = false );
+  	bool const& new_reload_format = false );
 
   /** @brief Sauvegarde des composants pour Reload.
   @param fileSave Flux de sauvegarde

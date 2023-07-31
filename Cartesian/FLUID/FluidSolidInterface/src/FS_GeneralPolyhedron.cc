@@ -1,0 +1,633 @@
+#include <FS_GeneralPolyhedron.hh>
+#include <math.h>
+using std::endl;
+#define THRESHOLD 1.e-10
+
+
+//---------------------------------------------------------------------------
+FS_GeneralPolyhedron:: FS_GeneralPolyhedron()
+//---------------------------------------------------------------------------
+  : FS_RigidBody()
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: FS_GeneralPolyhedron" ) ;
+
+  m_space_dimension = 3;
+  m_shape_type = GEOM_GENERAL_POLYHEDRON;
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+FS_GeneralPolyhedron:: FS_GeneralPolyhedron( istream& in, size_t& id_ )
+//---------------------------------------------------------------------------
+  : FS_RigidBody()
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: FS_GeneralPolyhedron" ) ;
+
+  // Default parameter
+  m_space_dimension = 3;
+  m_Id = id_;
+  m_shape_type = GEOM_GENERAL_POLYHEDRON;
+
+  // Resize parameters
+  m_gravity_center.resize(3);
+  m_translational_velocity.resize(3);
+  m_angular_velocity.resize(3);
+  m_hydro_force.resize(3);
+  m_hydro_torque.resize(3);
+  m_heat_flux.resize(3);
+
+  // Set the rigid body features from the input stream
+  set( in );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+FS_GeneralPolyhedron:: ~FS_GeneralPolyhedron()
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: ~FS_GeneralPolyhedron" ) ;
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_GeneralPolyhedron:: update( istream& in )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: update" ) ;
+
+  // Set the rigid body features from the input stream
+  set( in );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_GeneralPolyhedron:: set( istream& in )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: set" ) ;
+
+  size_t ncorners, i, nfaces, nper ;
+  geomVector node(3);
+
+  // Read the input stream
+  in >> m_type >> m_translational_velocity >>
+  	m_angular_velocity >> m_density >> m_mass;
+  in >> m_inertia[0][0];
+  in >> m_inertia[0][1];
+  in >> m_inertia[0][2];
+  in >> m_inertia[1][1];
+  in >> m_inertia[1][2];
+  in >> m_inertia[2][2];
+  m_inertia[1][0] = m_inertia[0][1];
+  m_inertia[2][0] = m_inertia[0][2];
+  m_inertia[2][1] = m_inertia[1][2];
+
+  in >> m_rotation_matrix[0][0];
+  in >> m_rotation_matrix[0][1];
+  in >> m_rotation_matrix[0][2];
+  in >> m_rotation_matrix[1][0];
+  in >> m_rotation_matrix[1][1];
+  in >> m_rotation_matrix[1][2];
+  in >> m_rotation_matrix[2][0];
+  in >> m_rotation_matrix[2][1];
+  in >> m_rotation_matrix[2][2];
+
+  in >> m_gravity_center;
+
+  if ( m_periodic_directions )
+  {
+    delete m_periodic_directions;
+    m_periodic_directions = NULL;
+  }
+
+  if ( m_type == "PP" )
+  {
+    geomVector pv( 3 );
+    in >> nper;
+    m_periodic_directions = new vector<geomVector>( nper, pv ) ;
+    for (i=0;i<nper;++i)
+      in >> (*m_periodic_directions)[i](0) >> (*m_periodic_directions)[i](1)
+      	>> (*m_periodic_directions)[i](2);
+  }
+  in >> m_circumscribed_radius >> ncorners;
+
+  // Read the corners and faces numbering of the 3D box
+
+  // Build the polyhedron corners
+  if ( m_agp_poly.corners.empty() ) {
+    m_agp_poly.corners.reserve( ncorners );
+    for (i = 0; i < ncorners; i++) {
+      in >> node;
+      m_agp_poly.corners.push_back(node);
+    }
+  } else {
+    for (i = 0; i < ncorners; i++) in >> m_agp_poly.corners[i];
+  }
+
+  // Build the reference polyhedron corners
+  if ( m_agp_poly.ref_corners.empty() ) {
+    m_agp_poly.ref_corners.reserve( ncorners );
+    for (i = 0; i < ncorners; i++) {
+      m_agp_poly.ref_corners.push_back(node);
+    }
+  }
+
+  compute_reverseTransformationOfCorners( );
+
+  // build the polyhedron faces
+  size_t nbFaceCorners, localCornerIdx;
+
+  in >> nfaces;
+
+  if ( m_agp_poly.facesVec.empty() ) {
+    m_agp_poly.facesVec.reserve( nfaces );
+    m_agp_poly.faceCen.reserve( nfaces );
+    for ( i = 0; i <= nfaces-1; i++ ) {
+      in >> nbFaceCorners;
+
+      vector<size_t> localVect;
+      localVect.reserve(nbFaceCorners);
+      geomVector cen(3);
+
+      for ( size_t idx = 0; idx < nbFaceCorners; idx++ ) {
+        in >> localCornerIdx;
+        localVect.push_back( localCornerIdx );
+        cen(0) += m_agp_poly.corners[localCornerIdx](0);
+        cen(1) += m_agp_poly.corners[localCornerIdx](1);
+        cen(2) += m_agp_poly.corners[localCornerIdx](2);
+      }
+      cen /= nbFaceCorners;
+      m_agp_poly.facesVec.push_back( localVect );
+      m_agp_poly.faceCen.push_back( cen );
+    }
+  } else {
+    for ( i = 0; i <= nfaces-1; i++ ) {
+      in >> nbFaceCorners;
+      geomVector cen(3);
+      for ( size_t idx = 0; idx < nbFaceCorners; idx++ ) {
+        in >> localCornerIdx;
+        m_agp_poly.facesVec[i][idx] = localCornerIdx;
+        cen(0) += m_agp_poly.corners[localCornerIdx](0);
+        cen(1) += m_agp_poly.corners[localCornerIdx](1);
+        cen(2) += m_agp_poly.corners[localCornerIdx](2);
+      }
+      cen /= nbFaceCorners;
+      m_agp_poly.faceCen[i] = cen;
+    }
+  }
+
+  // Set volume
+  m_volume = m_mass / m_density ;
+
+  // display(std::cout, 3);
+
+  // // Reset the rotation matrix
+  // double roll = m_orientation(0);
+  // double pitch = m_orientation(1);
+  // double yaw = m_orientation(2);
+  //
+  // m_rotation_matrix[0][0] = MAC::cos(yaw)*MAC::cos(pitch);
+  // m_rotation_matrix[0][1] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+  //                         - MAC::sin(yaw)*MAC::cos(roll);
+  // m_rotation_matrix[0][2] = MAC::cos(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+  //                         + MAC::sin(yaw)*MAC::sin(roll);
+  // m_rotation_matrix[1][0] = MAC::sin(yaw)*MAC::cos(pitch);
+  // m_rotation_matrix[1][1] = MAC::sin(yaw)*MAC::sin(pitch)*MAC::sin(roll)
+  //                         + MAC::cos(yaw)*MAC::cos(roll);
+  // m_rotation_matrix[1][2] = MAC::sin(yaw)*MAC::sin(pitch)*MAC::cos(roll)
+  //                         - MAC::cos(yaw)*MAC::sin(roll);
+  // m_rotation_matrix[2][0] = -MAC::sin(pitch);
+  // m_rotation_matrix[2][1] = MAC::cos(pitch)*MAC::sin(roll);
+  // m_rotation_matrix[2][2] = MAC::cos(pitch)*MAC::cos(roll);
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_GeneralPolyhedron:: display( ostream& out, size_t const& indent_width ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: display" ) ;
+
+  string space( indent_width, ' ' ) ;
+  string three( 3, ' ' ) ;
+  out << space << "Shape type = " <<
+  	FS_RigidBody::GEOMETRICSHAPE_name[m_shape_type] << endl;
+  out << space << "Specific attributes" << endl;
+  for (int i = 0; i < (int) m_agp_poly.corners.size(); i++)
+     out << space << three << i+1 << "st Corner = " << m_agp_poly.corners[i](0)
+                                           << three << m_agp_poly.corners[i](1)
+                                           << three << m_agp_poly.corners[i](2)
+                                           << endl;
+
+  for (int i = 0; i < (int) m_agp_poly.facesVec.size(); i++) {
+     out << space << three << i+1 << "st faceVec = ";
+     for (int j = 0; j < (int) m_agp_poly.facesVec[i].size(); j++)
+        out << three << m_agp_poly.facesVec[i][j];
+     out << endl;
+  }
+
+  for (int i = 0; i < (int) m_agp_poly.facesVec.size(); i++) {
+     out << space << three << i+1 << "st faceCen = ";
+     for (int j = 0; j < 3; j++)
+        out << three << m_agp_poly.faceCen[i](j);
+     out << endl;
+  }
+
+
+  out << space << "General attributes" << endl;
+  display_general( out, indent_width + 3 );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+bool FS_GeneralPolyhedron:: isIn( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: isIn(pt)" ) ;
+
+  bool b_isIn = false;
+
+  size_t nfaces = m_agp_poly.faceCen.size();
+
+  for (size_t iface = 0; iface < nfaces; iface++) {
+     size_t n_vertex = m_agp_poly.facesVec[iface].size();
+     for (size_t idxPts = 0; idxPts < n_vertex && !b_isIn; ++idxPts ) {
+        // Vertex index
+        size_t i0 = idxPts;
+        size_t i1 = (idxPts + 1 == n_vertex) ? 0 : idxPts + 1;
+        // Vertex ID
+        size_t v1 = m_agp_poly.facesVec[iface][i0];
+        size_t v2 = m_agp_poly.facesVec[iface][i1];
+        if ( checkPointInTetrahedron( m_agp_poly.faceCen[iface],
+                                      m_agp_poly.corners[v1],
+                                      m_agp_poly.corners[v2],
+                                      m_gravity_center, pt ) )
+           b_isIn = true;
+     }
+  }
+
+  if (m_periodic_directions) {
+     for (size_t i = 0; i < m_periodic_directions->size() && !b_isIn; ++i) {
+
+        for (size_t iface = 0; iface < nfaces; iface++) {
+           size_t n_vertex = m_agp_poly.facesVec[iface].size();
+           for (size_t idxPts = 0; idxPts < n_vertex && !b_isIn; ++idxPts ) {
+              // Vertex index
+              size_t i0 = idxPts;
+              size_t i1 = (idxPts + 1 == n_vertex) ? 0 : idxPts + 1;
+              // Vertex ID
+              size_t v1 = m_agp_poly.facesVec[iface][i0];
+              size_t v2 = m_agp_poly.facesVec[iface][i1];
+              if ( checkPointInTetrahedron(
+                        m_agp_poly.faceCen[iface] + (*m_periodic_directions)[i],
+                        m_agp_poly.corners[v1] + (*m_periodic_directions)[i],
+                        m_agp_poly.corners[v2] + (*m_periodic_directions)[i],
+                        m_gravity_center + (*m_periodic_directions)[i], pt ) )
+                 b_isIn = true;
+           }
+        }
+
+     }
+  }
+
+  return ( b_isIn );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double FS_GeneralPolyhedron:: level_set_value( geomVector const& pt ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: level_set_value(pt)" ) ;
+
+  double value = 1.;
+
+  size_t nfaces = m_agp_poly.faceCen.size();
+
+  for (size_t iface = 0; iface < nfaces; iface++) {
+     size_t n_vertex = m_agp_poly.facesVec[iface].size();
+     for (size_t idxPts = 0; idxPts < n_vertex && (value > 0.); ++idxPts ) {
+        // Vertex index
+        size_t i0 = idxPts;
+        size_t i1 = (idxPts + 1 == n_vertex) ? 0 : idxPts + 1;
+        // Vertex ID
+        size_t v1 = m_agp_poly.facesVec[iface][i0];
+        size_t v2 = m_agp_poly.facesVec[iface][i1];
+        double temp = DistOfPointFromTetrahedron( m_agp_poly.faceCen[iface],
+                                      m_agp_poly.corners[v1],
+                                      m_agp_poly.corners[v2],
+                                      m_gravity_center, pt );
+        if (temp >= 0.) {
+           value = std::min(temp, value);
+        } else {
+           value = temp;
+        }
+     }
+  }
+
+  if (m_periodic_directions) {
+     for (size_t i = 0; i < m_periodic_directions->size() && (value > 0.); ++i) {
+
+        for (size_t iface = 0; iface < nfaces; iface++) {
+           size_t n_vertex = m_agp_poly.facesVec[iface].size();
+           for (size_t idxPts = 0; idxPts < n_vertex && (value > 0.); ++idxPts ) {
+              // Vertex index
+              size_t i0 = idxPts;
+              size_t i1 = (idxPts + 1 == n_vertex) ? 0 : idxPts + 1;
+              // Vertex ID
+              size_t v1 = m_agp_poly.facesVec[iface][i0];
+              size_t v2 = m_agp_poly.facesVec[iface][i1];
+              double temp = DistOfPointFromTetrahedron(
+                        m_agp_poly.faceCen[iface] + (*m_periodic_directions)[i],
+                        m_agp_poly.corners[v1] + (*m_periodic_directions)[i],
+                        m_agp_poly.corners[v2] + (*m_periodic_directions)[i],
+                        m_gravity_center + (*m_periodic_directions)[i], pt );
+              if (temp >= 0.) {
+                 value = std::min(temp, value);
+              } else {
+                 value = temp;
+              }
+           }
+        }
+
+     }
+  }
+
+  return(value);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+bool FS_GeneralPolyhedron:: isIn( double const& x, double const& y, double const& z )
+const
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "FS_GeneralPolyhedron:: isIn(x,y,z)" ) ;
+
+   geomVector pt( x, y, z );
+
+   bool b_isIn = isIn(pt);
+
+   return ( b_isIn );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double FS_GeneralPolyhedron:: level_set_value( double const& x
+                                 , double const& y
+                                 , double const& z ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: level_set_value(x,y,z)" ) ;
+
+  geomVector pt( x, y, z );
+
+  double value = level_set_value(pt);
+
+  return(value);
+}
+
+
+
+
+//---------------------------------------------------------------------------
+struct FS_GeneralPolyhedron_Additional_Param const* FS_GeneralPolyhedron::
+	get_ptr_FS_GeneralPolyhedron_Additional_Param() const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: get_ptr_FS_GeneralPolyhedron_Additional_Param()" ) ;
+
+  return( &m_agp_poly );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double FS_GeneralPolyhedron::calcPointDeterm4by4( const geomVector &pointOne,
+        const geomVector &pointTwo, const geomVector &pointThree,
+        const geomVector &pointFour ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: calcPointDeterm4by4" ) ;
+
+  double x2 = pointTwo(0);
+  double y2 = pointTwo(1);
+  double z2 = pointTwo(2);
+  double x3 = pointThree(0);
+  double y3 = pointThree(1);
+  double z3 = pointThree(2);
+  double x4 = pointFour(0);
+  double y4 = pointFour(1);
+  double z4 = pointFour(2);
+
+  double retVal =
+  pointOne(0) * ( y2*z3 + y3*z4 + y4*z2 - y4*z3 - y3*z2 - y2*z4 ) -
+  pointOne(1) * ( x2*z3 + x3*z4 + x4*z2 - x4*z3 - x3*z2 - x2*z4 ) +
+  pointOne(2) * ( x2*y3 + x3*y4 + x4*y2 - x4*y3 - x3*y2 - x2*y4 ) -
+        ( x2*y3*z4 + x3*y4*z2 + x4*y2*z3 - x4*y3*z2 - x3*y2*z4 - x2*y4*z3 ) ;
+
+  return retVal;
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+bool FS_GeneralPolyhedron::checkPointInTetrahedron( const geomVector &pointOne,
+        const geomVector &pointTwo, const geomVector &pointThree,
+        const geomVector &pointFour, const geomVector &pointToCheck ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: checkPointInTetrahedron" ) ;
+
+// Link: http://steve.hollasch.net/cgindex/geometry/ptintet.html
+
+  double detTot   = calcPointDeterm4by4( pointOne, pointTwo,
+        pointThree, pointFour );
+  double detOne   = calcPointDeterm4by4( pointToCheck, pointTwo,
+        pointThree, pointFour );
+  double detTwo   = calcPointDeterm4by4( pointOne, pointToCheck,
+        pointThree, pointFour );
+  double detThree = calcPointDeterm4by4( pointOne, pointTwo,
+        pointToCheck, pointFour );
+  double detFour  = calcPointDeterm4by4( pointOne, pointTwo,
+        pointThree, pointToCheck );
+
+  bool in=false;
+
+  double sumSubElem = detOne + detTwo + detThree + detFour;
+
+  if ( fabs( detTot - sumSubElem ) > THRESHOLD  )
+        std::cout << "ERROR: summation error in determinat 3D : "
+        << detTot - sumSubElem << endl;
+
+  if ( detTot == 0 ) {
+        std::cout << "degenerated tetrahedron: det == 0 " << endl;
+        abort();
+  }
+
+  double r1 = detOne/detTot;
+  double r2 = detTwo/detTot;
+  double r3 = detThree/detTot;
+  double r4 = detFour/detTot;
+
+  // Allowed threshold for ratio of determinant to handle points on surface
+  double thres = 1.E-4;
+
+  if ( ( r1 >= -thres )  && ( r2 >= -thres ) &&
+       ( r3 >= -thres ) && ( r4 >= -thres ) )
+      in=true;
+
+  return in;
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double FS_GeneralPolyhedron::DistOfPointFromTetrahedron( const geomVector &pointOne,
+        const geomVector &pointTwo, const geomVector &pointThree,
+        const geomVector &pointFour, const geomVector &pointToCheck ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: DistOfPointFromTetrahedron" ) ;
+
+  double detTot   = calcPointDeterm4by4( pointOne, pointTwo,
+        pointThree, pointFour );
+  double detOne   = calcPointDeterm4by4( pointToCheck, pointTwo,
+        pointThree, pointFour );
+  double detTwo   = calcPointDeterm4by4( pointOne, pointToCheck,
+        pointThree, pointFour );
+  double detThree = calcPointDeterm4by4( pointOne, pointTwo,
+        pointToCheck, pointFour );
+  double detFour  = calcPointDeterm4by4( pointOne, pointTwo,
+        pointThree, pointToCheck );
+
+  double out_dist = 0.;
+
+  double sumSubElem = detOne + detTwo + detThree + detFour;
+
+  if ( fabs( detTot - sumSubElem ) > THRESHOLD  )
+     std::cout << "ERROR: summation error in determinat 3D : "
+               << detTot - sumSubElem << endl;
+
+  if ( detTot == 0 ) {
+     std::cout << "degenerated tetrahedron: det == 0 " << endl;
+     abort();
+  }
+
+  double r1 = detOne/detTot;
+  double r2 = detTwo/detTot;
+  double r3 = detThree/detTot;
+  double r4 = detFour/detTot;
+
+  // Allowed threshold for ratio of determinant to handle points on surface
+  double thres = 1.E-4;
+
+  if ( ( r1 >= -thres )  && ( r2 >= -thres ) &&
+       ( r3 >= -thres ) && ( r4 >= -thres ) ) {
+     out_dist = -1.*fabs(sumSubElem);
+  } else {
+     out_dist = fabs(sumSubElem);
+  }
+
+  return out_dist;
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_GeneralPolyhedron::compute_reverseTransformationOfCorners( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: compute_reverseTransformationOfCorners()" ) ;
+
+  for (int i = 0; i < (int) m_agp_poly.ref_corners.size(); i++) {
+     geomVector pt(m_agp_poly.corners[i]);
+
+     m_agp_poly.ref_corners[i](0) = (pt(0) - m_gravity_center(0))*m_rotation_matrix[0][0]
+                                   + (pt(1) - m_gravity_center(1))*m_rotation_matrix[1][0]
+                                   + (pt(2) - m_gravity_center(2))*m_rotation_matrix[2][0];
+     m_agp_poly.ref_corners[i](1) = (pt(0) - m_gravity_center(0))*m_rotation_matrix[0][1]
+                                   + (pt(1) - m_gravity_center(1))*m_rotation_matrix[1][1]
+                                   + (pt(2) - m_gravity_center(2))*m_rotation_matrix[2][1];
+     m_agp_poly.ref_corners[i](2) = (pt(0) - m_gravity_center(0))*m_rotation_matrix[0][2]
+                                   + (pt(1) - m_gravity_center(1))*m_rotation_matrix[1][2]
+                                   + (pt(2) - m_gravity_center(2))*m_rotation_matrix[2][2];
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_GeneralPolyhedron::compute_TransformationOfCorners( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: compute_TransformationOfCorners()" ) ;
+
+  for (int i = 0; i < (int) m_agp_poly.corners.size(); i++) {
+     geomVector pt(m_agp_poly.ref_corners[i]);
+
+     m_agp_poly.corners[i](0) = pt(0)*m_rotation_matrix[0][0]
+                               + pt(1)*m_rotation_matrix[0][1]
+                               + pt(2)*m_rotation_matrix[0][2]
+                               + m_gravity_center(0);
+     m_agp_poly.corners[i](1) = pt(0)*m_rotation_matrix[1][0]
+                               + pt(1)*m_rotation_matrix[1][1]
+                               + pt(2)*m_rotation_matrix[1][2]
+                               + m_gravity_center(1);
+     m_agp_poly.corners[i](2) = pt(0)*m_rotation_matrix[2][0]
+                               + pt(1)*m_rotation_matrix[2][1]
+                               + pt(2)*m_rotation_matrix[2][2]
+                               + m_gravity_center(2);
+  }
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_GeneralPolyhedron::update_additional_parameters( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_GeneralPolyhedron:: update_additional_parameters( )" ) ;
+
+  compute_TransformationOfCorners();
+  // display (std::cout, '\t');
+
+}

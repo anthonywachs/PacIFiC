@@ -1269,14 +1269,6 @@ void EnsComposant::updateClonesPeriodiques( LinkedCell* LC )
 }
 
 
-void EnsComposant::updateContactMapId( int prev_id, int new_id)
-{
-  list<Particule*>::iterator part;
-  for(part=m_particulesActives.begin(); part!=m_particulesActives.end(); ++part)
-  {
-    (*part)->updateContactMapId( prev_id, new_id);
-  }
-}
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1285,7 +1277,7 @@ void EnsComposant::updateContactMapId( int prev_id, int new_id)
 // A. WACHS - Aout 2014 - Modification
 // D. RAKOTONIRINA - Sept 2014 - Modification
 void EnsComposant::read( istream &fileSave, string const& filename,
-	bool const& new_reload_format, bool const& contact_history_storage )
+	bool const& new_reload_format )
 {
   string buffer, particuleCle, adresse, particuleRefID, materiauCle,
       matType, particuleType, readingMode ;
@@ -1345,8 +1337,7 @@ void EnsComposant::read( istream &fileSave, string const& filename,
     if ( new_reload_format )
     {
       if ( Grains_Exec::m_writingModeHybrid )
-          particule->read2014_binary( FILEbin, &m_ParticuleClassesReference,
-                                    contact_history_storage );
+        particule->read2014_binary( FILEbin, &m_ParticuleClassesReference );
       else
         particule->read2014( fileSave, &m_ParticuleClassesReference );
     }
@@ -1526,7 +1517,8 @@ ostream& operator << ( ostream &f, const EnsComposant &EC )
 void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
 	LinkedCell const* LC, vector<Fenetre> const& insert_windows,
 	int rang, int nprocs,
-	MPIWrapperGrains const* wrapper )
+	MPIWrapperGrains const* wrapper,
+	size_t indent_width )
 {
   list<Particule*>* postProcessingParticules = NULL;
   list<Particule*>* postProcessingWait = NULL;
@@ -1534,12 +1526,13 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
   vector<Particule*>* particulespost = NULL;
   list<PostProcessingWriter*>::iterator pp;
   bool written = false ;
+  string const siw( indent_width, ' ' ) ;
 
   if ( rang == 0 )
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
       if ( !(*pp)->isCompFeaturesWriter() && !written )
       {
-	cout << "Sortie resultats: START" << endl;
+	cout << siw << "Sortie resultats: START" << endl;
 	written = true;
       }
 
@@ -1564,7 +1557,8 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
   if ( nprocs > 1 && m_hasSerialPostProcessors )
   {
     if ( rang == 0 )
-      cout << "Copie des particules sur le master pour Post-processing" << endl;
+      cout << siw << "Copie des particules sur le master pour Post-processing"
+      	<< endl;
 
     // Collecte les particules de tous les processeurs dans un vecteur
     // sur le master
@@ -1590,6 +1584,7 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
     else
       postProcessingPeriodiques = new list<Particule*>;
   }
+
   // Initialise force at the contact point for the post-processing
   // of the stress tensor
   if ( Grains_Exec::m_stressTensor || Grains_Exec::m_particleStressTensor )
@@ -1645,6 +1640,7 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
       delete postProcessingPeriodiques;
     }
   }
+
   // Dans le cas d'une simulation periodique ou la periodicite est geree
   // par le pattern MPI, on vide la liste
   if ( Grains_Exec::m_MPIperiodique ) m_particulesClonesPeriodiques.clear();
@@ -1654,7 +1650,7 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
       if ( !(*pp)->isCompFeaturesWriter() && !written )
       {
-	cout << "Sortie resultats: COMPLETED" << endl;
+	cout << siw << "Sortie resultats: COMPLETED" << endl;
 	written = true;
       }
   if ( rang == 0 && Grains_Exec::m_ContactforceOutput )
@@ -1671,15 +1667,17 @@ void EnsComposant::PostProcessing_start( Scalar temps, Scalar dt,
 // A.WACHS - Fev.2010 - Modification
 void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
 	LinkedCell const* LC, int rang,
-	int nprocs, MPIWrapperGrains const* wrapper )
+	int nprocs, MPIWrapperGrains const* wrapper,
+	size_t indent_width )
 {
   list<Particule*>* postProcessingParticules = NULL;
   list<Particule*>* postProcessingWait = NULL;
   list<Particule*>* postProcessingPeriodiques = NULL;
   vector<Particule*>* particulespost = NULL;
+  string const siw( indent_width, ' ' ) ;
 
   if ( rang == 0 )
-    cout << "Sortie resultats: START" << endl;
+    cout << siw << "Sortie resultats: START" << endl;
 
   // Dans le cas d'une simulation periodique ou la periodicite est geree
   // par le pattern MPI, il faut determiner les clones periodiques
@@ -1695,7 +1693,8 @@ void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
   if ( nprocs > 1 && m_hasSerialPostProcessors )
   {
     if ( rang == 0 )
-      cout << "Copie des particules sur le master pour Post-processing" << endl;
+      cout << siw << "Copie des particules sur le master pour Post-processing"
+      	<< endl;
 
     // Collecte les particules de tous les processeurs dans un vecteur
     // sur le master
@@ -1794,7 +1793,7 @@ void EnsComposant::PostProcessing( Scalar temps, Scalar dt,
   if ( Grains_Exec::m_MPIperiodique ) m_particulesClonesPeriodiques.clear();
 
   if ( rang == 0 )
-    cout << "Sortie resultats: COMPLETED" << endl;
+    cout << siw << "Sortie resultats: COMPLETED" << endl;
 }
 
 
@@ -2056,15 +2055,13 @@ void EnsComposant::checkMatlabPostProcessing(
 // A.WACHS - Mars.2010 - Creation
 int EnsComposant::numeroMaxParticules() const
 {
-  int numeroMax = -1;
+  int numeroMax = 0;
   list<Particule*>::const_iterator particule;
 
   for (particule=m_particulesActives.begin();
   	particule!=m_particulesActives.end(); particule++)
-    {
-      numeroMax = numeroMax < (*particule)->getID() ?
+    numeroMax = numeroMax < (*particule)->getID() ?
     	(*particule)->getID() : numeroMax;
-    }
 
   for (particule=m_pwait.begin(); particule!=m_pwait.end(); particule++)
     numeroMax = numeroMax < (*particule)->getID() ?
@@ -2636,7 +2633,7 @@ void EnsComposant::setVelocityAndVelocityDifferencePreviousTimeRestart(
 
 double EnsComposant::
 	setVelocityAndVelocityDifferencePreviousTimeRestart_Basilisk(
-	string const& dirRes )
+	string const& rootfilename )
 {
   string linet, linetnm1, sbuffer ;
   istringstream iss;
@@ -2651,8 +2648,8 @@ double EnsComposant::
     if ( (*particule)->getActivity() == COMPUTE
     	&& (*particule)->getID() >= 0 )
     {
-      ifstream pdata( ( dirRes + "/particle-data-" + Grains_Exec::intToString(i)
-      	+ "" ).c_str(), ios::in );
+      ifstream pdata( ( rootfilename + "_" + Grains_Exec::intToString(i)
+      	+ ".dat" ).c_str(), ios::in );
 
       while ( !pdata.eof() )
       {
@@ -2774,7 +2771,7 @@ void EnsComposant::compute_ParticleClassesConcentration( void )
   vector<Particule*>::iterator iv;
   int i=0;
   MPIWrapperGrains const* wrapper = Grains_Exec::getComm() ;
-  // cout << "hi 3.0" << endl;
+
   for (iv=m_ParticuleClassesReference.begin();
   	iv!=m_ParticuleClassesReference.end(); iv++, i++)
   {
@@ -2846,22 +2843,6 @@ void EnsComposant::setAllContactMapToFalse()
 	particule!=m_particulesActives.end();particule++)
     (*particule)->setContactMapToFalse();
 
-  for (list<Particule*>::iterator particuleH=m_particulesHalozone.begin();
-	particuleH!=m_particulesHalozone.end();particuleH++){
-        (*particuleH)->setContactMapToFalse();
-    }
-
-  for (list<Particule*>::iterator particuleClone=m_particulesClones.begin();
-	particuleClone!=m_particulesClones.end();particuleClone++){
-        (*particuleClone)->setContactMapToFalse();
-    }
-
-  for (list<Particule*>::iterator particuleCloneP=
-    m_particulesClonesPeriodiques.begin();
-	particuleCloneP!=m_particulesClonesPeriodiques.end();particuleCloneP++){
-        (*particuleCloneP)->setContactMapToFalse();
-    }
-
   list<MonObstacle*> obstacles = m_obstacle->getObstacles();
   list<MonObstacle*>::iterator myObs;
   for( myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++ )
@@ -2881,21 +2862,6 @@ void EnsComposant::updateAllContactMaps()
         (*particule)->updateContactMap();
     }
 
-  for (list<Particule*>::iterator particuleH=m_particulesHalozone.begin();
-	particuleH!=m_particulesHalozone.end();particuleH++){
-        (*particuleH)->updateContactMap();
-    }
-
-  for (list<Particule*>::iterator particuleClone=m_particulesClones.begin();
-	particuleClone!=m_particulesClones.end();particuleClone++){
-        (*particuleClone)->updateContactMap();
-    }
-
-  for (list<Particule*>::iterator particuleCloneP=
-    m_particulesClonesPeriodiques.begin();
-	particuleCloneP!=m_particulesClonesPeriodiques.end();particuleCloneP++){
-        (*particuleCloneP)->updateContactMap();
-    }
 
   list<MonObstacle*> obstacles = m_obstacle->getObstacles();
   list<MonObstacle*>::iterator myObs;

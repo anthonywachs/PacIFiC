@@ -19,14 +19,14 @@ Obstacle* Obstacle_BuilderFactory::create( DOMNode *root )
 
   string type = ReaderXML::getNodeName( root );
 
-  if ( type == "Obstacle" )
+  if ( type == "Obstacle" ) 
   {
     type = ReaderXML::getNodeAttr_String( root, "Type" );
 
-    if ( type == "Standard" ) obstacle = new MonObstacle( root );
+    if ( type == "Standard" ) obstacle = new MonObstacle( root ); 
     else if ( type == "Absorbant" ) obstacle = new ObstacleAbsorbant( root );
   }
-  else if ( type == "Periode" )
+  else if ( type == "Periode" ) 
   {
     obstacle = Obstacle_BuilderFactory::createPeriode( root );
     Grains_Exec::m_periodique = true;
@@ -35,7 +35,7 @@ Obstacle* Obstacle_BuilderFactory::create( DOMNode *root )
     obstacle = new CompObstacle( root );
 
   else if ( type == "CylindricalBox" )
-    obstacle = new CylindricalBoxObstacle( root );
+    obstacle = new CylindricalBoxObstacle( root ); 
 
   return obstacle;
 }
@@ -48,7 +48,7 @@ Obstacle* Obstacle_BuilderFactory::create( DOMNode *root )
 Obstacle* Obstacle_BuilderFactory::createPeriode( DOMNode *root )
 {
   Obstacle *obstacle = NULL;
-
+  
   Vecteur direction(0.);
   DOMNode* vecteur = ReaderXML::getNode( root, "Vecteur" );
   direction[X] = ReaderXML::getNodeAttr_Double( vecteur, "X" );
@@ -58,9 +58,9 @@ Obstacle* Obstacle_BuilderFactory::createPeriode( DOMNode *root )
   string name  = ReaderXML::getNodeAttr_String( root, "name" );
 
   obstacle = new CompObstacle(name.c_str());
-  ObstaclePeriodique* obstacleA = new ObstaclePeriodique( root, name+"_A",
+  ObstaclePeriodique* obstacleA = new ObstaclePeriodique( root, name+"_A", 
 	direction );
-
+	
   ObstaclePeriodique* obstacleB = new ObstaclePeriodique( root, name+"_B",
 	-direction );
   Point position = *obstacleB->getPosition();
@@ -83,15 +83,15 @@ Obstacle* Obstacle_BuilderFactory::createPeriode( DOMNode *root )
 // Reload de l'Obstacle sous l'Obstacle referent
 void Obstacle_BuilderFactory::reload( const string &tag,
 	Obstacle& obstacle, istream &file )
-{
-  if ( tag == "<Composite>" )
+{ 
+  if ( tag == "<Composite>" ) 
   {
     string nom;
     file >> nom;
     Obstacle *composite = new CompObstacle( nom );
     composite->reload( obstacle, file );
-  }
-  else if ( tag == "<CylindricalBox>" )
+  } 
+  else if ( tag == "<CylindricalBox>" ) 
   {
     string nom;
     double radius=0., length=0.;
@@ -100,22 +100,22 @@ void Obstacle_BuilderFactory::reload( const string &tag,
     file >> length;
     Obstacle *CylindricalBox = new CylindricalBoxObstacle( nom,radius,length );
     CylindricalBox->reload( obstacle, file );
-  }
-  else if ( tag == "<Simple>" )
+  } 
+  else if ( tag == "<Simple>" ) 
   {
     string nom;
     file >> nom;
     Obstacle *simple = new MonObstacle( nom );
     simple->reload( obstacle, file );
-  }
-  else if ( tag == "<Absorbant>" )
+  } 
+  else if ( tag == "<Absorbant>" ) 
   {
     string nom;
     file >> nom;
     Obstacle *absorbant = new ObstacleAbsorbant( nom );
     absorbant->reload( obstacle, file );
-  }
-  else if ( tag == "<Periodique>" )
+  } 
+  else if ( tag == "<Periodique>" ) 
   {
     string nom;
     file >> nom;
