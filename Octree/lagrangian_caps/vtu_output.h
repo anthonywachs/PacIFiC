@@ -18,29 +18,29 @@ using MPI.
 */
 void output_pvtu_bin (scalar * list, vector * vlist,  FILE * fp, char * subname)
 {
-    fputs ("<?xml version=\"1.0\"?>\n"
-    "<VTKFile type=\"PUnstructuredGrid\" version=\"1.0\" byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fp);
-    fputs ("\t <PUnstructuredGrid GhostLevel=\"0\">\n", fp);
-    fputs ("\t\t\t <PCellData Scalars=\"scalars\">\n", fp);
-    for (scalar s in list) {
-      fprintf (fp,"\t\t\t\t <PDataArray type=\"Float64\" Name=\"%s\" format=\"appended\">\n", s.name);
-      fputs ("\t\t\t\t </PDataArray>\n", fp);
-    }
-    for (vector v in vlist) {
-      fprintf (fp,"\t\t\t\t <PDataArray type=\"Float64\" NumberOfComponents=\"3\" Name=\"%s\" format=\"appended\">\n", v.x.name);
-      fputs ("\t\t\t\t </PDataArray>\n", fp);
-    }
-    fputs ("\t\t\t </PCellData>\n", fp);
-    fputs ("\t\t\t <PPoints>\n", fp);
-    fputs ("\t\t\t\t <PDataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">\n", fp);
+  fputs ("<?xml version=\"1.0\"?>\n"
+  "<VTKFile type=\"PUnstructuredGrid\" version=\"1.0\" byte_order=\"LittleEndian\" header_type=\"UInt64\">\n", fp);
+  fputs ("\t <PUnstructuredGrid GhostLevel=\"0\">\n", fp);
+  fputs ("\t\t\t <PCellData Scalars=\"scalars\">\n", fp);
+  for (scalar s in list) {
+    fprintf (fp,"\t\t\t\t <PDataArray type=\"Float64\" Name=\"%s\" format=\"appended\">\n", s.name);
     fputs ("\t\t\t\t </PDataArray>\n", fp);
-    fputs ("\t\t\t </PPoints>\n", fp);
+  }
+  for (vector v in vlist) {
+    fprintf (fp,"\t\t\t\t <PDataArray type=\"Float64\" NumberOfComponents=\"3\" Name=\"%s\" format=\"appended\">\n", v.x.name);
+    fputs ("\t\t\t\t </PDataArray>\n", fp);
+  }
+  fputs ("\t\t\t </PCellData>\n", fp);
+  fputs ("\t\t\t <PPoints>\n", fp);
+  fputs ("\t\t\t\t <PDataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">\n", fp);
+  fputs ("\t\t\t\t </PDataArray>\n", fp);
+  fputs ("\t\t\t </PPoints>\n", fp);
 
-    for (int i = 0; i < npe(); i++)
-      fprintf (fp, "<Piece Source=\"%s_%d.vtu\"/> \n", subname, i);
+  for (int i = 0; i < npe(); i++)
+    fprintf (fp, "<Piece Source=\"%s_%d.vtu\"/> \n", subname, i);
 
-    fputs ("\t </PUnstructuredGrid>\n", fp);
-    fputs ("</VTKFile>\n", fp);
+  fputs ("\t </PUnstructuredGrid>\n", fp);
+  fputs ("</VTKFile>\n", fp);
 }
 
 /**

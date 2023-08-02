@@ -49,15 +49,15 @@ The two functions below compute the outward normal vector to all the edges of
 a Lagrangian mesh, for 2D simulations.
 */
 void comp_edge_normal(lagMesh* mesh, int i) {
-    int node_id[2];
-    for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].node_ids[j];
-    mesh->edges[i].normal.y = GENERAL_1DIST(mesh->nodes[node_id[0]].pos.x,
-      mesh->nodes[node_id[1]].pos.x);
-    mesh->edges[i].normal.x = GENERAL_1DIST(mesh->nodes[node_id[1]].pos.y,
-      mesh->nodes[node_id[0]].pos.y);
-    double normn = sqrt(sq(mesh->edges[i].normal.x)
-      + sq(mesh->edges[i].normal.y));
-    foreach_dimension() mesh->edges[i].normal.x /= normn;
+  int node_id[2];
+  for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].node_ids[j];
+  mesh->edges[i].normal.y = GENERAL_1DIST(mesh->nodes[node_id[0]].pos.x,
+    mesh->nodes[node_id[1]].pos.x);
+  mesh->edges[i].normal.x = GENERAL_1DIST(mesh->nodes[node_id[1]].pos.y,
+    mesh->nodes[node_id[0]].pos.y);
+  double normn = sqrt(sq(mesh->edges[i].normal.x)
+    + sq(mesh->edges[i].normal.y));
+  foreach_dimension() mesh->edges[i].normal.x /= normn;
 }
 
 void comp_edge_normals(lagMesh* mesh) {
@@ -777,12 +777,12 @@ the centroid of the capsule). The result is stored in an array of `coord` of
 length 2.
 */
 void correct_periodic_nodes_pos(coord* result, coord a, coord b, coord ref) {
-    foreach_dimension() {
-        result[0].x = (fabs(a.x - ref.x) < L0/2) ? a.x : 
-            (a.x > ref.x) ? a.x - L0 : a.x + L0;
-        result[1].x = (fabs(b.x - ref.x) < L0/2) ? b.x : 
-            (b.x > ref.x) ? b.x - L0 : b.x + L0;
-    }
+  foreach_dimension() {
+    result[0].x = (fabs(a.x - ref.x) < L0/2) ? a.x : 
+      (a.x > ref.x) ? a.x - L0 : a.x + L0;
+    result[1].x = (fabs(b.x - ref.x) < L0/2) ? b.x : 
+      (b.x > ref.x) ? b.x - L0 : b.x + L0;
+  }
 }
 
 /**
@@ -793,9 +793,9 @@ coordinate `ref`, in practice the centroid of the capsule.
 */
 foreach_dimension()
 double periodic_friendly_cross_product_x(coord a, coord b, coord ref) {
-    coord nodes[2];
-    correct_periodic_nodes_pos(nodes, a, b, ref);
-    return nodes[0].y*nodes[1].z - nodes[0].z*nodes[1].y;
+  coord nodes[2];
+  correct_periodic_nodes_pos(nodes, a, b, ref);
+  return nodes[0].y*nodes[1].z - nodes[0].z*nodes[1].y;
 }
 
 /**
@@ -805,9 +805,9 @@ temporarilly moved on the same side of the periodic boundary as a reference
 coordinate `ref`, in practice the centroid of the capsule.
 */
 double periodic_friendly_dot_product(coord a, coord b, coord ref) {
-    coord nodes[2];
-    correct_periodic_nodes_pos(nodes, a, b, ref);
-    return cdot(nodes[0], nodes[1]);
+  coord nodes[2];
+  correct_periodic_nodes_pos(nodes, a, b, ref);
+  return cdot(nodes[0], nodes[1]);
 }
 
 
