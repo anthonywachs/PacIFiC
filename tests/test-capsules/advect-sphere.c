@@ -57,38 +57,38 @@ event adapt (i++) {
 /** We compute the time evolutions of the normalized area and volume 
 of the capsule */
 event volume_output (i++) {
-    if (pid() == 0) {
-        comp_triangle_area_normals(&CAPS(0));
-        double narea = 0;
-        for(int j=0; j<CAPS(0).nlt; j++) narea += CAPS(0).triangles[j].area;
-        narea /= 4*pi*sq(RADIUS);
-        comp_volume(&CAPS(0));
-        double nvolume = CAPS(0).volume/CAPS(0).initial_volume;
-        fprintf(stderr, "%d, %g, %g, %g %g\n", i, narea, nvolume,
-        CAPS(0).centroid.x, CAPS(0).initial_volume);
-        fflush(stderr);
-    }
+  if (pid() == 0) {
+    comp_triangle_area_normals(&CAPS(0));
+    double narea = 0;
+    for(int j=0; j<CAPS(0).nlt; j++) narea += CAPS(0).triangles[j].area;
+    narea /= 4*pi*sq(RADIUS);
+    comp_volume(&CAPS(0));
+    double nvolume = CAPS(0).volume/CAPS(0).initial_volume;
+    fprintf(stderr, "%d, %g, %g, %g %g\n", i, narea, nvolume,
+    CAPS(0).centroid.x, CAPS(0).initial_volume);
+    fflush(stderr);
+  }
 }
 
 /** At the end of the simulation, we also compare the position of the
 membrane to its initial position. With an asymptotically fine space
 and time resolutions, they would coincide. */
 event output (t = T_END) {
-    if (pid() == 0) {
-        double avg_err, max_err;
-        avg_err = 0.; max_err = -HUGE;
-        for(int i=0; i < CAPS(0).nln; i++){
-        double err = 0.;
-        foreach_dimension() err += sq(GENERAL_1DIST(ref_data[i].x,
-            CAPS(0).nodes[i].pos.x));
-        err = sqrt(err);
-        avg_err += err;
-        if (err > max_err) max_err = err;
-        }
-        avg_err /= CAPS(0).nln;
-        fprintf(stderr, "%g, %g\n", avg_err, max_err);
-        fflush(stderr);
+  if (pid() == 0) {
+    double avg_err, max_err;
+    avg_err = 0.; max_err = -HUGE;
+    for(int i=0; i < CAPS(0).nln; i++){
+    double err = 0.;
+    foreach_dimension() err += sq(GENERAL_1DIST(ref_data[i].x,
+        CAPS(0).nodes[i].pos.x));
+    err = sqrt(err);
+    avg_err += err;
+    if (err > max_err) max_err = err;
     }
+    avg_err /= CAPS(0).nln;
+    fprintf(stderr, "%g, %g\n", avg_err, max_err);
+    fflush(stderr);
+  }
 }
 
 event end (t = T_END) {

@@ -97,6 +97,7 @@ void enforce_optimal_volume_conservation(lagMesh* mesh) {
   In practice, we normalize the polynomial so that its largest coefficient is 1.
   */
   double coeff_polynomial[4];
+  for(int k=0; k<4; k++) coeff_polynomial[k] = 0;
   for(int j=0; j<mesh->nlt; j++) {
     int tn[3]; // `tn` for "triangle nodes"
     for(int k=0; k<3; k++) 
@@ -112,7 +113,7 @@ void enforce_optimal_volume_conservation(lagMesh* mesh) {
       }
       coeff_polynomial[3] += cdot(alpha[tn[k]], cp0);
       coeff_polynomial[2] += periodic_friendly_dot_product(
-        mesh->nodes[tn[k]].pos, cp0, mesh->centroid);
+      mesh->nodes[tn[k]].pos, cp0, mesh->centroid);
       coeff_polynomial[1] += cdot(alpha[tn[k]], cp2);
     }
   }

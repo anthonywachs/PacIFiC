@@ -30,7 +30,7 @@ in the function `glVertex3d` of the file `gl/fb_tiny.c`.
 
 #include "view.h"
 #ifndef dimension
-    #define dimension 3
+  #define dimension 3
 #endif
 
 static void begin_draw_vertices (bview * view, float color[3], float ps)

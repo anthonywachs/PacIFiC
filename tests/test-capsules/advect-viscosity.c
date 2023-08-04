@@ -57,26 +57,26 @@ event adapt (i++) {
 }
 
 event progress (i++) {
-    fprintf(stdout, "i=%d, t=%g\n", i, t);
-    fflush(stdout);
+  fprintf(stdout, "i=%d, t=%g\n", i, t);
+  fflush(stdout);
 }
 
 /** We compute the time evolutions of the normalized area and volume 
 of the capsule */
 event movie (i++) {
-    view(fov = 18.9, bg = {1,1,1}, theta = 5*pi/6, psi = 0., phi = pi/8);
-    clear();
-    draw_lag(&CAPS(0), lw = .5, edges = true, facets = false);
-    cells(n = {0,0,1});
-    squares("I", n = {0,0,1});
-    save("viscosity.mp4");
+  view(fov = 18.9, bg = {1,1,1}, theta = 5*pi/6, psi = 0., phi = pi/8);
+  clear();
+  draw_lag(&CAPS(0), lw = .5, edges = true, facets = false);
+  cells(n = {0,0,1});
+  squares("I", n = {0,0,1});
+  save("viscosity.mp4");
 }
 
 /** At the end of the simulation, we also compare the position of the
 membrane to its initial position. With an asymptotically fine space
 and time resolutions, they would coincide. */
 event output (t = T_END/2) {
-    dump(list={I, prevI, G, divG}, fp=stderr);
+  dump(list={I, prevI, G, divG}, fp=stderr);
 }
 
 event end (t = T_END/2) {

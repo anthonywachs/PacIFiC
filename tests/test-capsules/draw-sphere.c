@@ -21,21 +21,20 @@ common-shapes.h.
 #include "lagrangian_caps/view-ft.h"
 
 int main() {
-    origin(-.5*L0, -.5*L0, -.5*L0);
-    run();
+  origin(-.5*L0, -.5*L0, -.5*L0);
+  run();
 }
 
 event init (i = 0) {
-    activate_spherical_capsule(&MB(0), radius=RADIUS, level=LAG_LEVEL);
-    foreach()
-        u.x[] = sin(2*pi*x*y/L0);
+  activate_spherical_capsule(&CAPS(0), radius=RADIUS, level=LAG_LEVEL);
+  foreach() u.x[] = sin(2*pi*x*y/L0);
 
-    view(fov = 18.9, bg = {1,1,1});
-    clear();
-    draw_lags(lw = .5, ns = 3, facets = true);
-    squares("u.x", n = {0,0,1});
-    cells(n = {0,0,1});
-    save(fp=stderr);
+  view(fov = 18.9, bg = {1,1,1});
+  clear();
+  draw_lags(lw = .5, ns = 3, facets = true);
+  squares("u.x", n = {0,0,1});
+  cells(n = {0,0,1});
+  save(fp=stderr);
 
-    exit(0);
+  exit(0);
 }
