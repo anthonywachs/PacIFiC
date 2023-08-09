@@ -11,6 +11,7 @@ void dump_lagnode(FILE* fp, lagNode* node) {
   foreach_dimension() fwrite(&(node->lagVel.x), sizeof(double), 1, fp);
   foreach_dimension() fwrite(&(node->normal.x), sizeof(double), 1, fp);
   fwrite(&(node->curv), sizeof(double), 1, fp);
+  fwrite(&(node->gcurv), sizeof(double), 1, fp);
   fwrite(&(node->ref_curv), sizeof(double), 1, fp);
   foreach_dimension() fwrite(&(node->lagForce.x), sizeof(double), 1, fp);
   fwrite(&(node->nb_neighbors), sizeof(int), 1, fp);
@@ -29,6 +30,7 @@ void restore_lagnode(FILE* fp, lagNode* node) {
   foreach_dimension() fread(&(node->lagVel.x), sizeof(double), 1, fp);
   foreach_dimension() fread(&(node->normal.x), sizeof(double), 1, fp);
   fread(&(node->curv), sizeof(double), 1, fp);
+  fread(&(node->gcurv), sizeof(double), 1, fp);
   fread(&(node->ref_curv), sizeof(double), 1, fp);
   foreach_dimension() fread(&(node->lagForce.x), sizeof(double), 1, fp);
   fread(&(node->nb_neighbors), sizeof(int), 1, fp);

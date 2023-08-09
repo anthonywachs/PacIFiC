@@ -1,16 +1,12 @@
 /**
-# Advection of a red blood cell including a viscosity jump across a
-periodic boundary.
+# Advection of a spherical capsule featuring a viscosity jump
 
 In this file we test the advection of a capsule featuring a non-unity
 viscosity ratio, across a perodic boundary. This file tests the 
-functions in viscosity-ft.h as well as the lag2eul function in 
-reg-dirac.h. The test may fail if the dumping of scalars in Basilisk
-is modified. The mesh resolution is very coarse to keep the execution 
-of this test under 3 minutes.
-*/
+functions in [viscosity-ft.h](../../src/lagrangian_caps/viscosity-ft.h) as well
+as the lag2eul function in [ibm-ft/h](../../src/lagrangian_caps/ibm-ft.h). */
 
-#define LEVEL 5
+#define LEVEL 6
 #define LAG_LEVEL 4
 #define RADIUS .2
 #define L0 1.
@@ -29,12 +25,13 @@ int main(int argc, char* argv[]) {
   init_grid(N);
   periodic(left);
   TOLERANCE = HUGE;
+  stokes = true;
   DT = 1.e-2;
   run();
 }
 
 event init (i = 0) {
-  activate_biconcave_capsule(&CAPS(0), level = LAG_LEVEL, radius = RADIUS);
+  activate_spherical_capsule(&CAPS(0), level = LAG_LEVEL, radius = RADIUS);
 }
 
 event impose_u (i++) {
@@ -68,7 +65,7 @@ event movie (i++) {
   clear();
   draw_lag(&CAPS(0), lw = .5, edges = true, facets = false);
   cells(n = {0,0,1});
-  squares("I", n = {0,0,1});
+  squares("I", n = {0,0,1}, min=-.5, max=1.5);
   save("viscosity.mp4");
 }
 
@@ -76,9 +73,17 @@ event movie (i++) {
 membrane to its initial position. With an asymptotically fine space
 and time resolutions, they would coincide. */
 event output (t = T_END/2) {
-  dump(list={I, prevI, G, divG}, fp=stderr);
+  foreach() 
+    if (I[] > 1.e-10) 
+      fprintf(stderr, "%.4g, %.4g, %.4g, %.4g\n", x, y, z, I[]);
 }
 
 event end (t = T_END/2) {
   return 0;
 }
+
+/**
+## Results
+
+![Viscosity field advected through a periodic boundary](advect-viscosity/viscosity.mp4)
+*/

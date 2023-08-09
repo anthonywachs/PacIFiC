@@ -23,7 +23,6 @@ rectangular membrane, etc.
 */
 #define L0 1.
 #define NCAPS 1
-#define NLP 4
 #define LEVEL 1
 #define H0 (L0/8.)
 /** Change the SKALAK macro to 0 to consider a neo-Hookean membrane. */
@@ -183,6 +182,10 @@ event logfile (i++) {
 }
 
 event end (i = 100) {
+  lagMesh* mesh = &CAPS(0);
+  free(mesh->nodes);
+  free(mesh->edges);
+  free(mesh->triangles);
   return 0;
 }
 
@@ -195,7 +198,6 @@ set xlabel "Principal strain"
 set ylabel "Principal stress"
 set key top left reverse Left
 
-set label at 0.63,4.5 "Skalak law"
 set label at 0.68,1.2 "Neo-Hookean law"
 
 l(x) = sqrt(2*x + 1)
@@ -206,9 +208,7 @@ set samples 20
 set pointsize 1.5
 
 plot 'log' using 4:(3*$5) every 10 w p pt 1 lc rgb "red" title "This study", \
-'../stress-strain-skalak.ref' using 4:5 every 10 w p pt 1 lc rgb "red" title "", \
-nh(x) w l lc -1 title "", \
-sk(x) w l lc -1 title "Exact"
+nh(x) w l lc -1 title "Exact"
 
 
 ~~~

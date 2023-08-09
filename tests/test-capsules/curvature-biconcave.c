@@ -5,7 +5,9 @@ In this test, we compute the membrane mean and Gaussian curvatures, the
 Laplace-Beltrami operator of the curvature, as well as the bending force
 density in the case of a biconcave capsule.
 
-This file tests the functions in bending-ft.h and curvature-ft.h.
+This file tests the functions in [bending-ft.h](../../src/lagrangian_caps/bending-ft.h) and [curvature-ft.h](../../src/lagrangian_caps/curvature-ft.h).
+
+![Shape of a biconcave capsule](curvature-biconcave/rbc.png){ width=30% }
 */
 #define L0 4.
 #define RADIUS 1
@@ -49,7 +51,7 @@ event output (i = 1) {
       sign(mesh->nodes[i].pos.y)*1. : mesh->nodes[i].pos.y/norm;
     double theta = acos(acosarg);
     double node_area = compute_node_area(&CAPS(0),i);
-    fprintf(stderr, "%g %g %g %g %g %g %d\n", theta, mesh->nodes[i].curv,
+    fprintf(stderr, "%.4g %.4g %.4g %.4g %.4g %.4g %d\n", theta, mesh->nodes[i].curv,
       mesh->nodes[i].gcurv, lbcurv, bending_force/node_area, node_area, i);
   }
 

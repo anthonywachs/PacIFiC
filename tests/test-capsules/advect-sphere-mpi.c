@@ -1,9 +1,10 @@
 /**
-# Advection of a front-tracking mesh, and volume conservation of a capsule
+# Advection of a front-tracking mesh in MPI
 
 In this file we test the advection of a capsule described by a Lagrangian mesh
-across a periodic boundary.
-*/
+across a periodic boundary using 4 processors.
+
+This is a test for [capsule-ft-mpi.h](../../src/lagrangian_caps/capsule-ft-mpi.h). */
 
 #define LEVEL 6
 #define LAG_LEVEL 4
@@ -23,6 +24,7 @@ int main(int argc, char* argv[]) {
   init_grid(N);
   periodic(left);
   TOLERANCE = HUGE;
+  stokes = true;
   DT = 5.e-3;
   run();
 }
@@ -56,7 +58,7 @@ event adapt (i++) {
 
 /** We compute the time evolutions of the normalized area and volume 
 of the capsule */
-event volume_output (i++) {
+event progress_output (i++) {
   if (pid() == 0) {
     comp_triangle_area_normals(&CAPS(0));
     double narea = 0;
@@ -64,10 +66,18 @@ event volume_output (i++) {
     narea /= 4*pi*sq(RADIUS);
     comp_volume(&CAPS(0));
     double nvolume = CAPS(0).volume/CAPS(0).initial_volume;
-    fprintf(stderr, "%d, %g, %g, %g %g\n", i, narea, nvolume,
+    fprintf(stderr, "%d, %.5g, %.5g, %.5g, %.5g %.5g\n", i, t, narea, nvolume,
     CAPS(0).centroid.x, CAPS(0).initial_volume);
     fflush(stderr);
   }
+}
+
+event movie (i+=5) {
+  view(fov = 25, bg = {1,1,1}, theta = 5*pi/6, psi = 0., phi = pi/8);
+  clear();
+  draw_lag(&CAPS(0), lw = .5, edges = true, facets = true);
+  cells(n = {0,0,1});
+  save("advected_sphere_mpi.mp4");
 }
 
 /** At the end of the simulation, we also compare the position of the
@@ -80,29 +90,24 @@ event output (t = T_END) {
     for(int i=0; i < CAPS(0).nln; i++){
     double err = 0.;
     foreach_dimension() err += sq(GENERAL_1DIST(ref_data[i].x,
-      CAPS(0).nodes[i].pos.x));
+        CAPS(0).nodes[i].pos.x));
     err = sqrt(err);
     avg_err += err;
     if (err > max_err) max_err = err;
     }
     avg_err /= CAPS(0).nln;
-    fprintf(stderr, "%g, %g\n", avg_err, max_err);
+    fprintf(stderr, "%.3g, %.3g\n", avg_err, max_err);
     fflush(stderr);
   }
 }
 
 event end (t = T_END) {
+  free(ref_data);
   return 0;
 }
 
 /**
 ##Results
 
-~~~gnuplot
-set xlabel "time"
-set ylabel "normalized volume"
-plot 'volume.csv' using ($1/10):3 w l lc -1 dt 1 title "capsule volume", \
-1 w l lc -1 dt 2 title "ideal volume"
-~~~
-
+![Movie of an advected sphere](advect-sphere-mpi/advected_sphere_mpi.mp4)
 */

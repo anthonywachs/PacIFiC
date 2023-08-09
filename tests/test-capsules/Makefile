@@ -1,5 +1,5 @@
-CFLAGS += -DDISPLAY=1
-CFLAGS += -I${OCTREE_HOME}
+CFLAGS += -DDISPLAY=1 -O2 -I../../src
 include ${BASILISK}/Makefile.defs
 
-advect_sphere_mpi.tst: CC=mpicc -D_MPI=4
+advect-sphere-mpi.tst: CC=mpicc -D_MPI=4
+
