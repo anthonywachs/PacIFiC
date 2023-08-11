@@ -23,18 +23,31 @@ LIBLAPACK_FOR_MAC___=$(echo ${MACWORLD_LAPACK_LIBS} | sed 's%[^ ][^ ]*%-l&%g')
 echo 'Lapack libs link for MAC =' ${LIBLAPACK_FOR_MAC___}
 export LIBLAPACK_FOR_MAC___
 
-# Create libscalapack links for MAC
-LIBSCALAPACK_FOR_MAC___=$(echo ${MACWORLD_SCALAPACK_LIBS} | sed 's%[^ ][^ ]*%-l&%g')
-echo 'ScaLapack libs link for MAC =' ${LIBSCALAPACK_FOR_MAC___}
-export LIBSCALAPACK_FOR_MAC___
-
 # Create libintel links for MAC
-LIBINTEL_FOR_MAC___=$(echo ${MACWORLD_INTEL_LIBS} | sed 's%[^ ][^ ]*%-l&%g')
-echo 'Intel links for MAC =' ${LIBINTEL_FOR_MAC___}
-export LIBINTEL_FOR_MAC___
+if [[ "${MACWORLD_SERCOMPIL_ENV}" == "Intel" ]]
+then
+  LIBINTEL_FOR_MAC___=$(echo ${MACWORLD_INTEL_LIBS} | sed 's%[^ ][^ ]*%-l&%g')
+  echo 'Intel links for MAC =' ${LIBINTEL_FOR_MAC___}
+else
+  LIBINTEL_FOR_MAC___=""
+  echo 'No Intel links for MAC'
+fi  
+export LIBINTEL_FOR_MAC___  
+
+# Create libgfortran links for MAC
+if [[ "${MACWORLD_SERCOMPIL_ENV}" == "GNU" ]]
+then
+  LIBGNU_FOR_MAC___=$(echo ${MACWORLD_GFORTRAN_LIBS} | sed 's%[^ ][^ ]*%-l&%g')
+  echo 'GNU links for MAC =' ${LIBGNU_FOR_MAC___}
+else
+   LIBGNU_FOR_MAC___=""
+  echo 'No GNU links for MAC' 
+fi
+export LIBGNU_FOR_MAC___
+
 echo ' '
 
 
-# Compile in mac0 and mac2 modes
-make CCC=${MAC_FULL_EXT} lib0
-make CCC=${MAC_FULL_EXT} lib2
+# Compile in mac0 and mac2 modes using 4 cores
+make -j4 CCC=${MAC_FULL_EXT} lib0
+make -j4 CCC=${MAC_FULL_EXT} lib2

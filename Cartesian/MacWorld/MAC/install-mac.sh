@@ -73,9 +73,9 @@ echo ' '
 make CCC=${MAC_FULL_EXT} cpinclude
 
 
-# Compile in mac0 and mac2 modes
-make CCC=${MAC_FULL_EXT} lib0
-make CCC=${MAC_FULL_EXT} lib2
+# Compile in mac0 and mac2 modes using 4 cores
+make -j4 CCC=${MAC_FULL_EXT} lib0
+make -j4 CCC=${MAC_FULL_EXT} lib2
 
 
 # Copy back the saved architecture-based installations
