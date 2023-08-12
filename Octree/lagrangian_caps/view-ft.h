@@ -4,9 +4,6 @@
 This file provides functions to display the Lagrangian mesh. */
 
 #include "view.h"
-#ifndef dimension // hmm, why?
-# define dimension 3
-#endif
 
 static void begin_draw_vertices (bview * view, float color[3], float ps)
 {
@@ -27,6 +24,30 @@ static void end_draw_vertices()
   bview * view = draw();
   view->reversed = _reversed;
 }
+
+
+/**
+The function `draw_lag` displays a triangulation in the current view. It does
+not include shading effects, so displaying the edges of the triangles is
+necessary to get a three-dimensional perspective.
+
+The arguments are:
+
+* `mesh`: the Lagrangian mesh, aka the triangulation to display
+* `nodes`: a boolean which sets whether to display Lagrangian nodes or not. It
+is false by default.
+* `edges`: a boolean which sets whether to display Lagrangian edges or not. It
+is false by default.
+* `facets`: a boolean which sets whether to display triangles or not. It
+is false by default.
+* `nc`: the nodes color, an array of three doubles (RGB color convention).
+* `ec`: the edges color, an array of three doubles (RGB color convention).
+* `fc`: the facets color, an array of three doubles (RGB color convention).
+* `ns`: a double setting the nodes size. If different than 0, it sets `nodes` to
+true.
+* `lw`: a double setting the line width of the edges. If different than 0, it 
+sets `nodes` to true.
+*/
 
 struct _draw_lag {
   lagMesh * mesh; // Compulsory
@@ -119,6 +140,11 @@ void draw_lag (struct _draw_lag p)
 #endif
   }
 }
+
+/**
+The function below display all active capsules. Its optional arguments are the
+same as the `draw_lag` function.
+*/
 
 void draw_lags (struct _draw_lag p)
 {
