@@ -668,7 +668,7 @@ double comp_angle(lagNode* n1, lagNode* n2, lagNode* n3) {
     norm2 += sq(n1->pos.x - n3->pos.x);
   }
   theta /= sqrt(norm1)*sqrt(norm2);
-  theta = acos(fabs(theta));
+  theta = acos(theta);
   return theta;
 }
 
@@ -680,7 +680,7 @@ bool is_obtuse_node(lagMesh* mesh, int tid, int i) {
   lagNode* n[3];
   for(int j=0; j<3; j++)
     n[j] = &(mesh->nodes[mesh->triangles[tid].node_ids[j]]);
-  if (comp_angle(n[i], n[(i+1)%3], n[(i+2)%3]) > pi) return true;
+  if (comp_angle(n[i], n[(i+1)%3], n[(i+2)%3]) > pi/2.) return true;
   else return false;
 }
 
