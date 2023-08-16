@@ -1,7 +1,7 @@
 #include "Cylinder.hh"
 #include "BCylinder.hh"
 
-int Cylinder::m_visuNodeNbOnPer = 36;
+int Cylinder::m_visuNodeNbOnPer = 32;
 
 
 // ----------------------------------------------------------------------------
@@ -246,7 +246,6 @@ void Cylinder::write_polygonsPts_PARAVIEW( ostream& f,
   p[Y] = - m_halfHeight;
   p[Z] = 0.;
   pp = transform( p );
-
   if ( translation ) pp += *translation;
   f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
 
@@ -351,8 +350,8 @@ void Cylinder::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 // Returns whether a point lies inside the cylinder
 bool Cylinder::isIn( Point3 const& pt ) const
 {
-  return ( pt[Y] > - m_halfHeight && pt[Y] < m_halfHeight
-  	&& sqrt( pt[X] * pt[X] + pt[Z] * pt[Z] ) < m_radius );
+  return ( pt[Y] >= - m_halfHeight && pt[Y] <= m_halfHeight
+  	&& sqrt( pt[X] * pt[X] + pt[Z] * pt[Z] ) <= m_radius );
 }
 
 
