@@ -963,7 +963,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 
       // Force insertion
       DOMNode* nForceInsertion = ReaderXML::getNode( nInsertion,
-      	"ForcedInsertion" );
+      	"ForceInsertion" );
       if ( nForceInsertion )
       {
         string value = ReaderXML::getNodeAttr_String( nForceInsertion,
