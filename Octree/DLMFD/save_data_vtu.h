@@ -116,7 +116,7 @@ void save_data( scalar * list, vector * vlist, double const time )
 void reinitialize_vtk_restart( void )
 //----------------------------------------------------------------------------
 {
-  // Get the last cycle cumber from previous simulation
+  // Get the last cycle number from previous simulation
   char filename_lcn[80] = "";
   sprintf( filename_lcn, "%s", result_dir );
   strcat( filename_lcn, "/" );  
@@ -135,7 +135,7 @@ void reinitialize_vtk_restart( void )
   {    
     char filename_pvd[80] = "";
     char time_line[256] = "";
-    char start[20] = ""; 
+    char start[9] = ""; 
     char start_ref[20] = "<DataSet";    
     sprintf( filename_pvd, "%s", result_dir );
     strcat( filename_pvd, "/" );  
@@ -148,6 +148,7 @@ void reinitialize_vtk_restart( void )
     {      
       // Extract 8 first characters
       strncpy( start, time_line, 8 );
+      start[8] = '\0';
 
       // If 8 first characters equal "<DataSet", it is an output time line
       // We add to the vtk time series string

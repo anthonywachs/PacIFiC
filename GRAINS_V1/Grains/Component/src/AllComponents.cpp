@@ -1309,6 +1309,12 @@ void AllComponents::checkParaviewPostProcessing( int const& rank,
   }
 
   // Creation of the Paraview post-processing writer with the proper parameters
+  if ( rank == 0 )
+  {
+    cout << GrainsExec::m_shift3 << "Creation of the Paraview"
+    	" post-processing writer with the proper parameters" << endl;
+    cout << GrainsExec::m_shift6 << "Postprocessing" << endl;	
+  }  
   ParaviewPP = new ParaviewPostProcessingWriter( rank, nprocs, name_, root_,
   	isBinary );
   m_postProcessors.push_back( ParaviewPP );
