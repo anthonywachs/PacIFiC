@@ -422,7 +422,8 @@ event end_timestep (i++)
   /* Fluid velocity change over the time step */
   deltau = change( u.x, u_previoustime );
   if ( pid() == 0 )
-    printf( "   Velocity change = %8.5e\n", deltau );  
+    printf( "   Velocity change = %8.5e\n", deltau );
+  boundary((scalar*){u_previoustime});  
 }
 
 
