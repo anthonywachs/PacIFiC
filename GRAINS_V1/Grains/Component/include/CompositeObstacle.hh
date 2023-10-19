@@ -71,12 +71,12 @@ class CompositeObstacle : public Obstacle
     /** @brief Links imposed kinematics to the obstacle and returns true if the
     linking process is successful
     @param imposed the imposed kinematics */
-    virtual bool LinkImposedMotion( ObstacleImposedVelocity& imposed );
+    virtual bool LinkImposedMotion( ObstacleImposedVelocity* imposed );
  
     /** @brief Links imposed force kinematics to the obstacle and returns true 
     if the linking process is successful
     @param imposed the imposed force */
-    virtual bool LinkImposedMotion( ObstacleImposedForce& imposed );
+    virtual bool LinkImposedMotion( ObstacleImposedForce* imposed );
 
     /** @brief Adds an obstacle (single or composite) to the composite obstacle
     tree
@@ -96,7 +96,7 @@ class CompositeObstacle : public Obstacle
         bool const& b_deplaceF_Comp ) ;
 
     /** @brief Returns whether the component is a composite obstacle ? */
-    virtual bool isCompositeObstacle() const {return ( true ); }
+    virtual bool isCompositeObstacle() const;
 
     /** @brief Returns whether there is geometric contact with another
     component 

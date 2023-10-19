@@ -24,7 +24,7 @@ CompositeObstacle::CompositeObstacle( DOMNode* root ) :
   Obstacle( "obstacle", false )
 {
   m_id = -4;
-  assert(root != NULL);
+  assert( root != NULL );
 
   m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
 
@@ -72,10 +72,10 @@ void CompositeObstacle::append( Obstacle* obstacle )
 // ----------------------------------------------------------------------------
 // Links imposed kinematics to the obstacle and returns true if the
 // linking process is successful
-bool CompositeObstacle::LinkImposedMotion( ObstacleImposedVelocity& imposed )
+bool CompositeObstacle::LinkImposedMotion( ObstacleImposedVelocity* imposed )
 {
   bool status = false;
-  if ( m_name == imposed.getNom() ) 
+  if ( m_name == imposed->getNom() ) 
   {
     m_kinematics.append( imposed );
     status = true;
@@ -96,10 +96,10 @@ bool CompositeObstacle::LinkImposedMotion( ObstacleImposedVelocity& imposed )
 // ----------------------------------------------------------------------------
 // Links imposed force kinematics to the obstacle and returns true 
 // if the linking process is successful
-bool CompositeObstacle::LinkImposedMotion( ObstacleImposedForce& imposed )
+bool CompositeObstacle::LinkImposedMotion( ObstacleImposedForce* imposed )
 {
   bool status = false;
-  if ( m_name == imposed.getNom() ) 
+  if ( m_name == imposed->getNom() ) 
   {
     m_confinement.append( imposed );
     status = true;
@@ -266,7 +266,7 @@ bool CompositeObstacle::isContact( Component const* voisin ) const
   for (obstacle=m_obstacles.begin(); 
        obstacle!=m_obstacles.end() && !contact; obstacle++)
   {
-    if ( voisin->isCompositeObstacle() )
+    if ( voisin->isCompositeParticle() )
       contact = voisin->isContact( *obstacle );
     else
       contact = (*obstacle)->isContact( voisin );
@@ -289,7 +289,7 @@ bool CompositeObstacle::isContactWithCrust( Component const* voisin ) const
   for (obstacle=m_obstacles.begin(); 
        obstacle!=m_obstacles.end() && !contact; obstacle++)
   {
-    if ( voisin->isCompositeObstacle() )
+    if ( voisin->isCompositeParticle() )
       contact = voisin->isContactWithCrust( *obstacle );
     else
       contact = (*obstacle)->isContactWithCrust( voisin );
@@ -311,7 +311,7 @@ bool CompositeObstacle::isClose( Component const* voisin ) const
   list<Obstacle*>::const_iterator obstacle;
   for (obstacle=m_obstacles.begin(); 
        obstacle!=m_obstacles.end() && !contact; obstacle++)
-    if ( voisin->isCompositeObstacle() )
+    if ( voisin->isCompositeParticle() )
       contact = voisin->isClose( *obstacle );
     else
       contact = (*obstacle)->isClose( voisin );
@@ -333,7 +333,7 @@ bool CompositeObstacle::isCloseWithCrust( Component const* voisin ) const
   list<Obstacle*>::const_iterator obstacle;
   for (obstacle=m_obstacles.begin(); 
        obstacle!=m_obstacles.end() && !contact; obstacle++)
-    if ( voisin->isCompositeObstacle() )
+    if ( voisin->isCompositeParticle() )
       contact = voisin->isCloseWithCrust( *obstacle );
     else
       contact = (*obstacle)->isCloseWithCrust( voisin );
@@ -772,4 +772,14 @@ bool CompositeObstacle::isIn( Point3 const& pt ) const
     bisIn = (*obstacle)->isIn( pt );
 
   return ( bisIn );  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether the component is a composite obstacle ? */
+bool CompositeObstacle::isCompositeObstacle() const
+{
+  return ( true ); 
 }

@@ -202,11 +202,22 @@ bool FS_3Dcylinder:: isIn( geomVector const& pt ) const
   geomVector BottomToPoint( pt - m_agp_3dcyl.BottomCenter );
   double dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
 	                        /  m_agp_3dcyl.cylinder_height ;
-
   if ( dot <= m_agp_3dcyl.cylinder_height && dot >= - EPSILON )
     if ( BottomToPoint.calcNormSquare() - dot * dot  - EPSILON <=
          m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
       b_isIn = true ;
+
+  if (m_periodic_directions) {
+     for (size_t i = 0; (i < m_periodic_directions->size()) && !b_isIn; ++i) {
+        BottomToPoint = pt - (m_agp_3dcyl.BottomCenter + (*m_periodic_directions)[i]);
+        dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec  )
+            /  m_agp_3dcyl.cylinder_height ;
+        if ( dot <= m_agp_3dcyl.cylinder_height && dot >= - EPSILON )
+          if ( BottomToPoint.calcNormSquare() - dot * dot  - EPSILON <=
+               m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
+            b_isIn = true ;
+      }
+   }
 
   return ( b_isIn );
 
@@ -222,20 +233,9 @@ bool FS_3Dcylinder:: isIn( double const& x, double const& y, double const& z )
 {
   MAC_LABEL( "FS_3Dcylinder:: isIn(x,y,z)" ) ;
 
-  bool b_isIn = false;
-
   geomVector pt(x,y,z);
 
-  geomVector BottomToPoint( pt - m_agp_3dcyl.BottomCenter );
-  double dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
-                           /  m_agp_3dcyl.cylinder_height ;
-
-  if ( dot <= m_agp_3dcyl.cylinder_height && dot >= - EPSILON )
-    if ( BottomToPoint.calcNormSquare() - dot * dot - EPSILON <=
-         m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius )
-      b_isIn = true ;
-
-  return ( b_isIn );
+  return ( isIn(pt) );
 
 }
 
@@ -260,10 +260,33 @@ double FS_3Dcylinder:: level_set_value( geomVector const& pt ) const
   if ( dot < m_agp_3dcyl.cylinder_height &&
        dot > -EPSILON &&
        rad_sq_dist < EPSILON) {
-     value = fabs(fabs(dot) - m_agp_3dcyl.cylinder_height)*rad_sq_dist;
+     value = -1.*fabs(fabs(dot) - m_agp_3dcyl.cylinder_height)*fabs(rad_sq_dist);
   } else {
-     value = MAC::min(fabs(fabs(dot)-m_agp_3dcyl.cylinder_height)
-                    , fabs(rad_sq_dist));
+     value = MAC::sqrt(MAC::pow((fabs(dot)-m_agp_3dcyl.cylinder_height),2.)
+                     + MAC::pow(fabs(rad_sq_dist),2.));
+  }
+
+  if (m_periodic_directions) {
+     for (size_t i = 0; i < m_periodic_directions->size(); ++i) {
+        BottomToPoint = pt - (m_agp_3dcyl.BottomCenter + (*m_periodic_directions)[i]);
+        dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
+      	   /  m_agp_3dcyl.cylinder_height ;
+
+        rad_sq_dist = BottomToPoint.calcNormSquare() - dot * dot -
+               m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius;
+
+        double temp = 0.;
+
+        if ( dot < m_agp_3dcyl.cylinder_height &&
+             dot > -EPSILON &&
+             rad_sq_dist < EPSILON) {
+           temp = -1.*fabs(fabs(dot) - m_agp_3dcyl.cylinder_height)*fabs(rad_sq_dist);
+        } else {
+           temp = MAC::sqrt(MAC::pow((fabs(dot)-m_agp_3dcyl.cylinder_height),2.)
+                           + MAC::pow(fabs(rad_sq_dist),2.));
+        }
+        value = MAC::min(temp, value);
+     }
   }
 
   return ( value );
@@ -283,25 +306,7 @@ double FS_3Dcylinder:: level_set_value( double const& x
 
   geomVector pt(x,y,z);
 
-  geomVector BottomToPoint( pt - m_agp_3dcyl.BottomCenter );
-  double dot = ( BottomToPoint , m_agp_3dcyl.BottomToTopVec )
-	                        /  m_agp_3dcyl.cylinder_height ;
-
-  double rad_sq_dist = BottomToPoint.calcNormSquare() - dot * dot -
-         m_agp_3dcyl.cylinder_radius * m_agp_3dcyl.cylinder_radius;
-
-  double value = 0.;
-
-  if ( dot < m_agp_3dcyl.cylinder_height &&
-       dot > -EPSILON &&
-       rad_sq_dist < EPSILON) {
-     value = fabs(fabs(dot) - m_agp_3dcyl.cylinder_height)*rad_sq_dist;
-  } else {
-     value = MAC::min(fabs(fabs(dot)-m_agp_3dcyl.cylinder_height)
-                    , fabs(rad_sq_dist));
-  }
-
-  return ( value );
+  return ( level_set_value(pt) );
 
 }
 
@@ -316,5 +321,18 @@ struct FS_3Dcylinder_Additional_Param const* FS_3Dcylinder::
   MAC_LABEL( "FS_3Dcylinder:: isIn(x,y,z)" ) ;
 
   return( &m_agp_3dcyl );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_3Dcylinder::update_additional_parameters( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_3Dcylinder:: update_additional_parameters( )" ) ;
+
+
 
 }

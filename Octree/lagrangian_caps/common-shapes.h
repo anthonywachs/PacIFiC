@@ -1,5 +1,5 @@
 /**
-Some common initial shapes for vesicles
+# Common initial shapes for immersed membranes
 */
 
 #ifndef NLP
@@ -9,12 +9,17 @@ Some common initial shapes for vesicles
   #define RADIUS 1.
 #endif
 
+/**
+## 2D circular membrane
+*/
 struct _initialize_circular_mb {
   lagMesh* mesh;
   double radius;
-  double nlp;
+  int nlp;
+  int level;
   double inclination;
   coord shift;
+  bool disregard_shift;
 };
 
 void initialize_circular_mb(struct _initialize_circular_mb p) {
@@ -71,6 +76,9 @@ void initialize_circular_mb(struct _initialize_circular_mb p) {
   #endif
 }
 
+/**
+## 2D biconcave membrane
+*/
 void initialize_biconcave_mb(struct _initialize_circular_mb p) {
   double radius = (p.radius) ? p.radius : RADIUS;
   int nlp = (p.nlp) ? p.nlp : NLP;
@@ -126,25 +134,12 @@ void initialize_biconcave_mb(struct _initialize_circular_mb p) {
     p.mesh->edges[i].l0 = edge_length(p.mesh, i);
     p.mesh->edges[i].length = p.mesh->edges[i].l0;
   }
-
-  #ifdef CAPS_VISCOSITY
-    /**
-    We define below the local coordinates of the RBC and the parametric angle
-    */
-    #define MY_X ((x - shift.x)*cos(inclination) + \
-      (y - shift.y)*sin(inclination))
-    #define MY_Y (-(x - shift.x)*sin(inclination) + \
-      (y - shift.y)*cos(inclination))
-    #define MY_Z z
-    #define COSPHI2 ((sq(MY_X)+sq(MY_Z))/sq(radius*c))
-    #define LAMBDA (0.207 + 2.003*COSPHI2 - 1.123*sq(COSPHI2))
-    fraction(prevI, 1. - sq(MY_X/(radius*c)) -
-      sq(2*MY_Y/(LAMBDA*radius*c)) -
-      sq(MY_Z/(radius*c)));
-  #endif
 }
 
 
+/**
+## 2D elliptic membrane
+*/
 struct _initialize_elliptic_mb {
   lagMesh* mesh;
   double a;
@@ -206,6 +201,9 @@ void initialize_elliptic_mb(struct _initialize_elliptic_mb p) {
 }
 
 #if dimension > 2
+/**
+## 3D icosahedron
+*/
 void initialize_icosahedron(struct _initialize_circular_mb p) {
   double radius = (p.radius) ? p.radius : RADIUS;
   p.mesh->nlp = 12;
@@ -229,7 +227,7 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
   for(int i=0; i<3; i++) {
     for(int j=0; j<4; j++) {
       p.mesh->nodes[i*4+j].nb_neighbors = 0;
-      p.mesh->nodes[i*4+j].nb_edges = 0;
+      // p.mesh->nodes[i*4+j].nb_edges = 0;
       p.mesh->nodes[i*4+j].nb_triangles = i;
       foreach_dimension()
         p.mesh->nodes[i*4+j].pos.x = c[i].x*
@@ -281,6 +279,9 @@ void initialize_icosahedron(struct _initialize_circular_mb p) {
   }
 }
 
+/**
+## 3D spherical membrane
+*/
 /** The function below triangulates a sphere: it starts from an icosahedron,
 subdivides each of its triangles into four smaller ones until the desired number
 of Lagrangian nodes is reached or exceeded, and projects the resulting mesh
@@ -289,26 +290,40 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   initialize_icosahedron(p);
 
   double radius = (p.radius) ? p.radius : RADIUS;
-  int nlp = (p.nlp) ? p.nlp : NLP;
+  int nlp = (p.nlp) ? p.nlp : -1;
+  int ns = (p.level) ? p.level : -1;
   coord shift;
   if (p.shift.x || p.shift.y || p.shift.z)
     {shift.x = p.shift.x; shift.y = p.shift.y; shift.z = p.shift.z;}
   else {shift.x = 0.; shift.y = 0.; shift.z = 0.;}
 
-  /** 1. Determine the number of triangles subdivisions required */
-  int ns = 0; // ns for "number of subdivisions"
+  /** For each subdivision:
+    * the number of additional nodes equals the number of edges
+    * the number of edges is multiplied by 4: each edge is split in two, and
+    each new nodes results in two new edges (one per neighboring triangles)
+    * the number of triangles is multiplied by 4
+  */
   int nn, ne, nt; // the numbers of nodes, edges and triangles.
   nn = 12; // at first, an icosahedron has 12 nodes
-  /** For each subdivision:
-  * the number of additional nodes equals the number of edges
-  * the number of edges is multiplied by 4: each edge is split in two, and
-  each new nodes results in two new edges (one per neighboring triangles)
-  * the number of triangles is multiplied by 4
-  */
-  while (nn < nlp) {
-    ne = 30*pow(4,ns);
-    nn += ne;
-    ns++;
+  if (nlp > 0) {
+    ns = 0;
+    while (nn < nlp) {
+      ne = 30*pow(4,ns);
+      nn += ne;
+      ns++;
+    }
+  }
+  if (ns > 0) {
+    int cns = 0;
+    while (cns < ns) {
+      ne = 30*pow(4,cns);
+      nn += ne;
+      cns++;
+    }
+  }
+  else {
+    fprintf(stderr, "Error: number of Lagrangian nodes or Lagrangian mesh "
+      "levels need to be specified.\n");
   }
   ne = 30*pow(4,ns);
   nt = 20*pow(4,ns);
@@ -333,13 +348,64 @@ void initialize_spherical_mb(struct _initialize_circular_mb p) {
   fprintf(stderr, "Number of Lagrangian triangles: %d\n", p.mesh->nlt);
 
   comp_initial_area_normals(p.mesh);
-  if (shift.x > 1.e-10 || shift.y > 1.e-10 || shift.z > 1.e-10) {
+  if (!p.disregard_shift) {
+    if (shift.x > 1.e-10 || shift.y > 1.e-10 || shift.z > 1.e-10) {
+      for(int i=0; i<p.mesh->nlp; i++)
+        foreach_dimension()
+          p.mesh->nodes[i].pos.x += shift.x;
+    }
+
+    #ifdef CAPS_VISCOSITY
+      fraction(I, sq(RADIUS) - sq(x - shift.x) - sq(y - shift.y)
+        - sq(z - shift.z));
+      foreach() if (I[] > 1.e-6) prevI[] = I[];
+    #endif
+  }
+  correct_lag_pos(p.mesh);
+  comp_normals(p.mesh);
+}
+
+void initialize_rbc_mb(struct _initialize_circular_mb p) {
+  initialize_spherical_mb(mesh = p.mesh, radius = p.radius, nlp = p.nlp,
+    level = p.level, disregard_shift = true);
+
+  double c0, c1, c2;
+  c0 = 0.2072; c1 = 2.0026; c2 = -1.1228;
+  double radius = (p.radius) ? p.radius : RADIUS;
+  for(int i=0; i<p.mesh->nlp; i++) {
+    double rho = sqrt(sq(p.mesh->nodes[i].pos.x) +
+      sq(p.mesh->nodes[i].pos.z))/radius;
+    rho = (rho > 1) ? 1 : rho;
+    int sign = (p.mesh->nodes[i].pos.y > 0.) ? 1 : -1;
+    p.mesh->nodes[i].pos.y = sign*.5*radius*sqrt(1 - sq(rho))*
+      (c0 + c1*sq(rho) + c2*sq(sq(rho)));
+  }
+  correct_lag_pos(p.mesh);
+  comp_normals(p.mesh);
+
+  coord shift;
+  if (p.shift.x || p.shift.y || p.shift.z)
+    {shift.x = p.shift.x; shift.y = p.shift.y; shift.z = p.shift.z;}
+  else {shift.x = 0.; shift.y = 0.; shift.z = 0.;}
+  if (fabs(shift.x) > 1.e-10 || fabs(shift.y) > 1.e-10 ||
+    fabs(shift.z) > 1.e-10) {
     for(int i=0; i<p.mesh->nlp; i++)
       foreach_dimension()
         p.mesh->nodes[i].pos.x += shift.x;
   }
   correct_lag_pos(p.mesh);
-  comp_normals(p.mesh);
+
+  #ifdef CAPS_VISCOSITY
+    double a, c;
+    c = 1.3858189;
+    a = RADIUS/c;
+    // We define below the local coordinates of the RBC and the parametric angle
+    #define COSPHI2 ((sq(x - shift.x) + sq(z - shift.z))/sq(a*c))
+    #define RHS (0.207 + 2.003*COSPHI2 - 1.123*sq(COSPHI2))
+    fraction(I, 1. - sq((x - shift.x)/(a*c)) -
+      sq(2*(y - shift.y)/(RHS*a*c)) - sq((z - shift.z)/(a*c)));
+    foreach() if (I[] > 1.e-6) prevI[] = I[];
+  #endif
 }
 
 #endif

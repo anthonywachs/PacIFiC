@@ -25,7 +25,7 @@ class PeriodicObstacle;
 class SimpleObstacle : public Obstacle
 {
   public:
-    /** @name Constructeurs */
+    /** @name Contructors & Destructor */
     //@{
     /** @brief Constructor with name as input parameter
     @param s obstacle name */
@@ -100,7 +100,7 @@ class SimpleObstacle : public Obstacle
     obstacle belongs to (imposed velocity)
     @param b_deplaceF_Comp whether to move the composite that the composite
     obstacle belongs to (imposed force) */
-    list<SimpleObstacle*> Move( double time,
+    virtual list<SimpleObstacle*> Move( double time,
 	double dt, bool const& b_deplaceCine_Comp,
         bool const& b_deplaceF_Comp ) ;
 
@@ -117,7 +117,7 @@ class SimpleObstacle : public Obstacle
 
     /** @brief Rotates the obstacle with a quaternion
     @param rotation the quaternion defining the rotation */
-    void Rotate( Quaternion const& rotation );
+    virtual void Rotate( Quaternion const& rotation );
 
     /** @brief Deletes the obstacle if it belongs to a prescribed box
     @param box the box */
@@ -125,7 +125,7 @@ class SimpleObstacle : public Obstacle
 
     /** @brief Translates the obstacle
     @param translation translation vector */
-    void Translate( Vector3 const& translation );
+    virtual void Translate( Vector3 const& translation );
 
     /** @brief Deletes an obstacle in the obstacle tree
     @param name_ name of obstacle to be deleted */
@@ -145,52 +145,70 @@ class SimpleObstacle : public Obstacle
     the pointer to the obstacle is these cells */
     void resetInCells();
 
-    /** @brief Returns whether an update of the link between the obstacle and the
-    linked-cell grid is required. If yes, returns true and sets the counter to
-    0, if no, returns false and increments the counter */
+    /** @brief Returns whether an update of the link between the obstacle and 
+    the linked-cell grid is required. If yes, returns true and sets the counter 
+    to 0, if no, returns false and increments the counter */
     bool performLinkUpdate();
 
     /** @brief Returns the maximum of the absolute value of the obstacle
     velocity in each direction */
-    Vector3 vitesseMaxPerDirection() const;
+    virtual Vector3 vitesseMaxPerDirection() const;
 
     /** @brief Update contact map */
     virtual void updateContactMap();
 
-    /** @brief Does the contact exist in the map, if yes return the pointer to the
-    cumulative tangential displacement
+    /** @brief Does the contact exist in the map, if yes return the pointer to 
+    the cumulative tangential displacement
     @param tangentialDepl pointer to the cumulative tangential displacement
     @param id id number of the other component */
     virtual bool getContactMemory( std::tuple<int,int,int> const& id,
-  Vector3* &tangent, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
-  bool createContact);
+  	Vector3* &tangent, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+  	bool createContact );
 
-    /** @brief Add new contact in the map
+    /** @brief Adds new contact in the map
     @param tangentialDepl initial tangential displacement
     @param id id number of the other component */
     virtual void addNewContactInMap( std::tuple<int,int,int> const& id,
-  Vector3 const& tangent, Vector3 const& prev_normal,
-  Vector3 const& cumulSpringTorque );
+  	Vector3 const& tangent, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
 
-    /** @brief Increase cumulative tangential displacement with component id
+    /** @brief Increases cumulative tangential displacement with component id
     @param tangentialDepl additional tangential displacement
     @param id id number of the other component */
     virtual void addDeplContactInMap( std::tuple<int,int,int> const& id,
-  Vector3 const& tangent, Vector3 const& prev_normal,
-  Vector3 const& cumulSpringTorque );
-    //@}
+  	Vector3 const& tangent, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
 
-    void updateContactMapId( int prev_id, int new_id);
+    /** @brief Updates the ids of the contact map: in the case of a reload with 
+    insertion, the obstacle's ids are reset. This function keeps track of that 
+    change.
+    @param prev_id previous id that should be updated
+    @param new_id updated id */
+    void updateContactMapId( int prev_id, int new_id );
 
+    /** @brief Writes the contact map information in an array of doubles
+    @param destination the array of double where the contact map should be 
+    stored
+    @param start index the index of destination where the copy should start */
     virtual void copyHistoryContacts( double* &destination, int start_index );
 
-    // Copy existing contact in the map
+    /** @brief Adds a single contact info to the contact map
+    @param id key in the map
+    @param isActive boolean: true if the contact is active, false otherwise
+    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
     virtual void copyContactInMap( std::tuple<int,int,int> const& id,
-  bool const& isActive, Vector3 const& tangent, Vector3 const& prev_normal,
-  Vector3 const& cumulSpringTorque );
+  	bool const& isActive, Vector3 const& tangent, 
+	Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
 
+    /** @brief Returns the number of contacts in the contact map */
     virtual int getContactMapSize();
-
+    //@}
+    
 
     /** @name Set methods */
     //@{

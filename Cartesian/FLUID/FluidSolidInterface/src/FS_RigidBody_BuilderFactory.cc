@@ -5,6 +5,7 @@
 #include <FS_3Dcylinder.hh>
 #include <FS_2Dcylinder.hh>
 #include <FS_3Dbox.hh>
+#include <FS_GeneralPolyhedron.hh>
 using std::endl;
 
 
@@ -45,6 +46,26 @@ FS_RigidBody* FS_RigidBody_BuilderFactory:: create( size_t& dimens,
 	   case 666:
 		  prb = new FS_3Dbox( in, id_ );
 		  break;
+
+	   case 4:
+		  prb = new FS_GeneralPolyhedron( in, id_ );
+		  break;
+
+	   case 6:
+  		  prb = new FS_GeneralPolyhedron( in, id_ );
+  		  break;
+
+	  	case 8:
+	     prb = new FS_GeneralPolyhedron( in, id_ );
+	     break;
+
+	   case 12:
+	     prb = new FS_GeneralPolyhedron( in, id_ );
+	     break;
+
+		case 20:
+ 	     prb = new FS_GeneralPolyhedron( in, id_ );
+ 	     break;
 
       default:
         MAC::out() << "Unknown rigid body shape" << endl;

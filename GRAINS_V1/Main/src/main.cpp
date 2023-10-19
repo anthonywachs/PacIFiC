@@ -51,7 +51,7 @@ int main( int argc, char *argv[] )
     if ( rankproc == 0 )
     {
       string cmd = "/bin/rm " + filename_exe;
-      system( cmd.c_str() );
+      GrainsExec::m_return_syscmd = system( cmd.c_str() );
     }
 
     // Run the simulation

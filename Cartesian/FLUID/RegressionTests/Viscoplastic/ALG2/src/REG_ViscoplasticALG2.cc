@@ -35,7 +35,7 @@ REG_ViscoplasticALG2 const* REG_ViscoplasticALG2::PROTOTYPE
 REG_ViscoplasticALG2:: REG_ViscoplasticALG2( void )
 //--------------------------------------------------------------------------
    : FV_OneStepIteration( "REG_ViscoplasticALG2" )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
 {
    MAC_LABEL( "REG_ViscoplasticALG2:: REG_ViscoplasticALG2" ) ;
 }
@@ -70,7 +70,7 @@ REG_ViscoplasticALG2:: REG_ViscoplasticALG2( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
    : FV_OneStepIteration( a_owner, dom, exp )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , UU( dom->discrete_field( "velocity" ) )
    , PP( dom->discrete_field( "pressure" ) )
    , DD( dom->discrete_field( "dDLtensors" ) )

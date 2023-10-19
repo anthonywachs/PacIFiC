@@ -1,4 +1,5 @@
 #include "BBox.hh"
+#include "GrainsBuilderFactory.hh"
 #include <iostream>
 using namespace std;
 
@@ -231,10 +232,10 @@ void BBox::setExtent( Vector3 const& v )
 // --------------------------------------------------------------------
 // Sets the box dimensions using the point with the
 // lowest coordinates and the point with the largest coordinates
-void BBox::setValue( Point3 const& min, Point3 const& max )
-{
-  m_extent = (max - min) / 2.;
-  m_center = min + m_extent;
+void BBox::setValue( Point3 const& min, Point3 const& max ) 
+{ 
+  m_extent = ( max - min ) / 2.;
+  m_center = min + m_extent; 
 }
 
 
@@ -242,9 +243,20 @@ void BBox::setValue( Point3 const& min, Point3 const& max )
 
 // ----------------------------------------------------------------------------
 // Returns the largest half length of the bounding box
-double BBox::size() const
+double BBox::largestHalfLength() const 
 {
   return ( max( max( m_extent[X], m_extent[Y] ), m_extent[Z] ) );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the largest half length of the bounding box
+double BBox::lowestHalfLength() const 
+{
+  return ( min( min( m_extent[X], m_extent[Y] ), 
+  	GrainsBuilderFactory::getContext() == DIM_2 ? 1.e20 : m_extent[Z] ) ); 
 }
 
 
@@ -279,7 +291,7 @@ void BBox::debug( char const* s ) const
 // Output operator
 ostream& operator << ( ostream& f, BBox const& B )
 {
-  f << "BBox: Center = " << B.m_center;
+  f << "BBox: Center = " << B.m_center << endl;
   f << "      Extent = " << B.m_extent;
   return ( f );
 }

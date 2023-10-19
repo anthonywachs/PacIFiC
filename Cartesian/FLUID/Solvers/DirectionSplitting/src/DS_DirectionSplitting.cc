@@ -33,7 +33,7 @@ DS_DirectionSplitting const* DS_DirectionSplitting::PROTOTYPE
 DS_DirectionSplitting:: DS_DirectionSplitting( void )
 //--------------------------------------------------------------------------
    : FV_OneStepIteration( "DS_DirectionSplitting" )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
 {
    MAC_LABEL( "DS_DirectionSplitting:: DS_DirectionSplitting" ) ;
 
@@ -60,26 +60,35 @@ DS_DirectionSplitting:: create_replica( MAC_Object* a_owner,
 
 }
 
+
+
+
 //---------------------------------------------------------------------------
 DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
-		                                   FV_DomainAndFields const* dom,
-                                         MAC_ModuleExplorer const* exp )
+	FV_DomainAndFields const* dom,
+	MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
    : FV_OneStepIteration( a_owner, dom, exp )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , rho( 1. )
    , mu( 1. )
    , kai( 1. )
    , AdvectionScheme( "TVD" )
+   , StencilCorrection( "FD" )
+   , is_CConlyDivergence( false )
+   , FluxRedistThres( 0.5 )
    , AdvectionTimeAccuracy( 1 )
    , b_restart( false )
    , is_solids( false )
+   , is_GRAINS( false )
+   , is_STL( false )
    , is_HE( false )
    , is_NS( false )
    , is_NSwithHE( false )
    , insertion_type ( "Grains3D" )
    , is_stressCal ( false )
    , ViscousStressOrder ( "second" )
+   , PressureStressOrder ( "first" )
    , surface_cell_scale ( 1. )
    , is_surfacestressOUT ( false )
    , stressCalFreq ( 1 )
@@ -88,12 +97,23 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    , HeatSolver ( 0 )
    , allrigidbodies ( 0 )
    , b_particles_as_fixed_obstacles( true )
+   , hydroFT( NULL )
+   , b_projection_translation( dom->primary_grid()
+   		->is_translation_active() )
+   , primary_grid( dom->primary_grid() )
+   , critical_distance_translation( 0. )
+   , translation_direction( 0 )
+   , bottom_coordinate( 0. )
+   , translated_distance( 0. )
 {
    MAC_LABEL( "DS_DirectionSplitting:: DS_DirectionSplitting" ) ;
 
    // Is the run a follow up of a previous job
    b_restart = MAC_Application::is_follow();
    macCOMM = MAC_Exec::communicator();
+   my_rank = macCOMM->rank();
+   nb_procs = macCOMM->nb_ranks();
+   is_master = 0;
 
    // Read Density
    if ( exp->has_entry( "Density" ) ) {
@@ -108,8 +128,28 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    }
 
    // Read the presence of particles
-   if ( exp->has_entry( "Particles" ) )
-     is_solids = exp->bool_data( "Particles" ) ;
+   if ( exp->has_entry( "Particles_from_GRAINS" ) )
+     is_GRAINS = exp->bool_data( "Particles_from_GRAINS" ) ;
+
+   // Read the presence of STL
+   if ( exp->has_entry( "STL_as_RB" ) )
+     is_STL = exp->bool_data( "STL_as_RB" ) ;
+
+   // Read STL file name
+   istringstream STL_input;
+   ostringstream STL_features;
+   if ( is_STL ) {
+     STL_file = exp->string_data( "STL_file" ) ;
+     STL_features << STL_file << endl;
+     intVector Halo( 3, 0 );
+     Halo = exp->intVector_data( "HaloZones" );
+     STL_features << Halo(0) << "\t" << Halo(1) << "\t" << Halo(2) << endl;
+     double HaloEnh = exp->double_data( "HaloEnhancement" ) ;
+     STL_features << HaloEnh << endl;
+     bool invertSTL = exp->bool_data ( "InvertSTL" ) ;
+     STL_features << invertSTL << endl;
+   }
+   STL_input.str( STL_features.rdbuf()->str() );
 
    // Read Kai
    if ( exp->has_entry( "Kai" ) ) {
@@ -117,14 +157,33 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
      exp->test_data( "Kai", "Kai>=0." ) ;
    }
 
+   // Divergence scheme
+   if ( exp->has_entry( "StencilCorrection" ) )
+     StencilCorrection = exp->string_data( "StencilCorrection" );
+   if ( StencilCorrection != "FD"
+     && StencilCorrection != "CutCell" )
+   {
+     string error_message="   - FD\n   - CutCell";
+     MAC_Error::object()->raise_bad_data_value( exp,
+        "StencilCorrection", error_message );
+   }
+
+   if ((StencilCorrection == "CutCell") && (exp->has_entry( "CutCell_Only_Divergence" )))
+     is_CConlyDivergence = exp->bool_data( "CutCell_Only_Divergence" ) ;
+
+   if ( exp->has_entry( "FluxRedistributionThreshold" ) )
+      FluxRedistThres = exp->double_data( "FluxRedistributionThreshold" );
+
    // Advection scheme
    if ( exp->has_entry( "AdvectionScheme" ) )
      AdvectionScheme = exp->string_data( "AdvectionScheme" );
    if ( AdvectionScheme != "Upwind"
      && AdvectionScheme != "TVD"
+     && AdvectionScheme != "CenteredFD"
      && AdvectionScheme != "Centered" )
    {
-     string error_message="   - Upwind\n   - TVD\n   - Centered";
+     string error_message=
+            "   - Upwind\n   - TVD\n   - CenteredFD\n   - Centered";
      MAC_Error::object()->raise_bad_data_value( exp,
         "AdvectionScheme", error_message );
    }
@@ -138,7 +197,7 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
 	                          "AdvectionTimeAccuracy", error_message );
    }
 
-   if (is_solids) {
+   if (is_GRAINS) {
       insertion_type = exp->string_data( "InsertionType" ) ;
       MAC_ASSERT( insertion_type == "Grains3D" ) ;
 
@@ -154,6 +213,15 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
               string error_message="- first\n   - second";
               MAC_Error::object()->raise_bad_data_value( exp,
                  "ViscousStressOrder", error_message );
+           }
+         }
+         if ( exp->has_entry( "PressureStressOrder" ) ) {
+           PressureStressOrder = exp->string_data( "PressureStressOrder" );
+           if ( PressureStressOrder != "first"
+           && PressureStressOrder != "second") {
+              string error_message="- first\n   - second";
+              MAC_Error::object()->raise_bad_data_value( exp,
+                 "PressureStressOrder", error_message );
            }
          }
          surface_cell_scale = exp->double_data( "SurfaceCellScale" ) ;
@@ -172,23 +240,28 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
         b_particles_as_fixed_obstacles = !is_par_motion;
       }
 
+      // Cases for non-moving rigib bodies but non-zero velocity
+      if (!is_par_motion && exp->has_entry( "Particles_as_fixed_obstacles" ) ) {
+         b_particles_as_fixed_obstacles = exp->bool_data( "Particles_as_fixed_obstacles" );
+      }
+
       // Critical distance
       if ( dom->primary_grid()->is_translation_active() ) {
         if ( exp->has_entry( "Critical_Distance_Translation" ) )
            critical_distance_translation= exp->double_data(
-             										"Critical_Distance_Translation" );
+		"Critical_Distance_Translation" );
         else {
            string error_message=" Projection-Translation is active but ";
            error_message+="Critical_Distance_Translation is NOT defined.";
            MAC_Error::object()->raise_bad_data_value( exp,
-              							 "Projection_Translation", error_message );
+		"Projection_Translation", error_message );
         }
       }
 
    }
 
    // Read the solids filename
-   if (is_solids && (insertion_type == "Grains3D")) {
+   if (is_GRAINS && (insertion_type == "Grains3D")) {
       solidSolverType = "Grains3D";
       b_solidSolver_parallel = false;
       solidSolver_insertionFile = "Grains/Init/insert.xml";
@@ -211,18 +284,18 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    }
 
    // Create Grains3D if solidSolverType is Grains3D;
-   if (is_solids) {
+   if (is_GRAINS) {
       int error = 0;
       solidSolver = FS_SolidPlugIn_BuilderFactory:: create( solidSolverType,
-         solidSolver_insertionFile,
-         solidSolver_simulationFile,
-         1., false,
-         b_particles_as_fixed_obstacles,
-         1., b_solidSolver_parallel,
-         error );
+         solidSolver_insertionFile, solidSolver_simulationFile,
+         rho, false, b_restart,
+         dom->primary_grid()->get_smallest_constant_grid_size(),
+	 b_solidSolver_parallel, error );
 
       solidFluid_transferStream = NULL;
       solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+      solidSolver->checkParaviewPostProcessing(
+      	MAC::extract_root_directory( solidSolver_simulationFile ) );
    }
 
    space_dimensions = dom->primary_grid()->nb_space_dimensions();
@@ -234,7 +307,8 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
    gravity_vector = MAC_DoubleVector::create( this, gg );
 
    // Create rigid bodies objects depending on which PDE to solve
-   if (is_solids) {
+   if (is_GRAINS || is_STL) {
+      is_solids = true;
       if (is_NS) {
          allrigidbodies = new DS_AllRigidBodies( space_dimensions
                           , *solidFluid_transferStream
@@ -245,7 +319,10 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
                           , gravity_vector
                           , surface_cell_scale
                           , macCOMM
-                          , mu );
+                          , mu
+                          , is_GRAINS
+                          , is_STL
+                          , STL_input);
       } else if (is_HE) {
          allrigidbodies = new DS_AllRigidBodies( space_dimensions
                           , *solidFluid_transferStream
@@ -269,7 +346,6 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       }
    }
 
-
    // Create structure to input in the NS solver
    if (is_NS || is_NSwithHE) {
       struct DS2NS inputDataNS;
@@ -277,11 +353,15 @@ DS_DirectionSplitting:: DS_DirectionSplitting( MAC_Object* a_owner,
       inputDataNS.mu_ = mu ;
       inputDataNS.kai_ = kai ;
       inputDataNS.AdvectionScheme_ = AdvectionScheme ;
+      inputDataNS.StencilCorrection_ = StencilCorrection ;
+      inputDataNS.is_CConlyDivergence_ = is_CConlyDivergence ;
+      inputDataNS.FluxRedistThres_ = FluxRedistThres ;
       inputDataNS.AdvectionTimeAccuracy_ = AdvectionTimeAccuracy ;
       inputDataNS.b_restart_ = b_restart ;
       inputDataNS.is_solids_ = is_solids ;
       inputDataNS.is_stressCal_ = is_stressCal;
       inputDataNS.ViscousStressOrder_ = ViscousStressOrder;
+      inputDataNS.PressureStressOrder_ = PressureStressOrder;
       inputDataNS.stressCalFreq_ = stressCalFreq;
       inputDataNS.is_par_motion_ = is_par_motion;
       inputDataNS.dom_ = dom;
@@ -330,6 +410,7 @@ DS_DirectionSplitting:: ~DS_DirectionSplitting( void )
       if ( solidSolver ) delete solidSolver;
       if ( solidFluid_transferStream ) delete solidFluid_transferStream;
       if ( allrigidbodies ) delete allrigidbodies;
+      if ( hydroFT ) delete hydroFT;
    }
 
 }
@@ -363,6 +444,16 @@ DS_DirectionSplitting:: do_one_inner_iteration( FV_TimeIterator const* t_it )
       stop_total_timer() ;
    }
 
+//    // Rigid body motion
+//    if ( is_GRAINS )
+//    {
+//      // Compute the trajectory of particles with collisions in Grains3D
+//      solidSolver->Simulation( t_it->time_step(), true, false, 1., false );
+//
+//      // Update the rigid components positions in the fluid
+//      solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+//      allrigidbodies->update( *solidFluid_transferStream );
+//    }
 }
 
 
@@ -376,8 +467,37 @@ DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
 {
    MAC_LABEL( "DS_DirectionSplitting:: do_before_time_stepping" ) ;
 
-
    FV_OneStepIteration::do_before_time_stepping( t_it, basename ) ;
+
+   // Solid solver
+   if ( is_GRAINS ) 
+   {
+     // Set the initial time
+     solidSolver->setInitialTime( t_it->time() );
+     
+     // Update the rigid components positions in the fluid
+     solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+     allrigidbodies->update( *solidFluid_transferStream );     
+   }
+
+   // Projection-Translation
+   if ( b_projection_translation )
+   {
+     set_translation_vector() ;
+
+     if ( MVQ_translation_vector(translation_direction) < 0. )
+       bottom_coordinate = (*primary_grid->get_global_main_coordinates())
+                [translation_direction](0) ;
+     else
+       bottom_coordinate = (*primary_grid->get_global_main_coordinates())
+           [translation_direction]((*primary_grid->get_global_max_index())
+                                (translation_direction)) ;
+
+     geomVector vt(space_dimensions);
+     vt(translation_direction) = primary_grid->get_translation_distance() ;
+     solidSolver->setParaviewPostProcessingTranslationVector( -vt(0), -vt(1),
+          -vt(2) ) ;
+   }
 
    // Flow solver
    if (is_NS || is_NSwithHE) {
@@ -407,8 +527,7 @@ DS_DirectionSplitting:: do_before_time_stepping( FV_TimeIterator const* t_it,
              << ", Tgrad"
              << endl;
       MyFile.close();
-   }
-
+   }  
 
 }
 
@@ -423,20 +542,20 @@ DS_DirectionSplitting:: do_after_time_stepping( void )
    MAC_LABEL( "DS_DirectionSplitting:: do_after_time_stepping" ) ;
 
    // Flow solver
-   if (is_NS || is_NSwithHE) {
+   if ( is_NS || is_NSwithHE ) {
       start_total_timer( "DS_NavierStokes:: do_after_time_stepping" ) ;
       FlowSolver->do_after_time_stepping() ;
       stop_total_timer() ;
    }
 
    // Temperature solver
-   if (is_HE || is_NSwithHE) {
+   if ( is_HE || is_NSwithHE ) {
       start_total_timer( "DS_HeatTransfer:: do_after_time_stepping" ) ;
       HeatSolver->do_after_time_stepping() ;
       stop_total_timer() ;
    }
 
-   if (is_surfacestressOUT)
+   if ( is_surfacestressOUT )
       allrigidbodies->write_surface_discretization_for_all_RB();
 
 }
@@ -453,6 +572,74 @@ DS_DirectionSplitting:: do_before_inner_iterations_stage(
    MAC_LABEL( "DS_DirectionSplitting:: do_before_inner_iterations_stage" ) ;
 
    FV_OneStepIteration::do_before_inner_iterations_stage( t_it ) ;
+
+   // Projection translation
+   if ( b_projection_translation )
+   {
+     double min_coord = allrigidbodies->get_min_RB_coord(translation_direction);
+     double distance_to_bottom = MAC::abs(min_coord-bottom_coordinate);
+
+     if ( distance_to_bottom < critical_distance_translation ) {
+
+       if ( my_rank == is_master )
+         MAC::out() << "         -> -> -> -> -> -> -> -> -> -> -> ->"
+		<< endl << "         !!!     Domain Translation      !!!"
+		<< endl << "         -> -> -> -> -> -> -> -> -> -> -> ->"
+		<< endl;
+
+       translated_distance += MVQ_translation_vector( translation_direction );
+       if ( my_rank == is_master )
+         MAC::out() << "         Translated distance = " <<
+		translated_distance << endl;
+
+       FlowSolver->fields_projection();
+
+       geomVector vt(space_dimensions);
+       vt(translation_direction) = primary_grid->get_translation_distance() ;
+       solidSolver->setParaviewPostProcessingTranslationVector( -vt(0), -vt(1),
+          -vt(2) ) ;
+
+       if ( MVQ_translation_vector(translation_direction) < 0. )
+         bottom_coordinate =
+	   	(*primary_grid->get_global_main_coordinates())
+			[translation_direction](0) ;
+       else
+         bottom_coordinate =
+	   	(*primary_grid->get_global_main_coordinates())
+		[translation_direction](
+			(*primary_grid->get_global_max_index())
+				(translation_direction)) ;
+     }
+   }
+
+   // Rigid body motion
+   if ( is_GRAINS ) {
+     // Send hydro force and torque to Grains3D
+     if ( is_par_motion ) {
+       // Allocate array if empty
+       if ( !hydroFT ) {
+          size_t npart = allrigidbodies->get_number_particles();
+          vector<double> work( 6, 0. );
+          hydroFT = new vector< vector<double> >;
+          hydroFT->reserve( npart );
+          for (size_t k=0;k<npart;++k) hydroFT->push_back( work );
+       }
+
+       // Fill the hydro force and torque array
+       allrigidbodies->copyHydroFT( hydroFT );
+
+       // Transfer to Grains3D
+       solidSolver->transferHydroFTtoSolid( hydroFT );
+     }
+
+     // Compute the trajectory of particles with collisions in Grains3D
+     solidSolver->Simulation( t_it->time_step(), true, false, 1., false );
+
+     // Update the rigid components positions in the fluid
+     solidSolver->getSolidBodyFeatures( solidFluid_transferStream );
+     cout << solidFluid_transferStream->str() << endl;
+     allrigidbodies->update( *solidFluid_transferStream );
+   }
 
    // Flow solver
    if (is_NS || is_NSwithHE) {
@@ -498,7 +685,6 @@ DS_DirectionSplitting:: do_after_inner_iterations_stage(
    if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0))
       allrigidbodies->write_force_and_flux_summary(t_it, b_restart);
 
-
 }
 
 
@@ -525,7 +711,9 @@ DS_DirectionSplitting:: do_additional_savings( FV_TimeIterator const* t_it,
       HeatSolver->do_additional_savings( t_it, cycleNumber ) ;
       stop_total_timer() ;
    }
-
+   // Solid solver
+   if ( solidSolver )
+     solidSolver->saveResults( "", t_it->time(), cycleNumber );
 
 }
 
@@ -588,4 +776,20 @@ DS_DirectionSplitting:: do_more_post_processing( FV_DomainAndFields * dom,
    }
 
 
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void
+DS_DirectionSplitting:: set_translation_vector()
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_DirectionSplitting:: set_translation_vector" ) ;
+
+   MVQ_translation_vector.resize( primary_grid->nb_space_dimensions() );
+   translation_direction = primary_grid->get_translation_direction() ;
+   MVQ_translation_vector( translation_direction ) =
+        primary_grid->get_translation_magnitude() ;
 }

@@ -3,6 +3,7 @@
 
 #include "Grains.hh"
 #include "ReaderXML.hh"
+#include "AppPRSHydroFT.hh"
 #include <list>
 #include <string>
 using namespace std;
@@ -23,7 +24,7 @@ class GrainsCoupledWithFluid : virtual public Grains
     //@{
     /** @brief Default constructor 
     @param fluid_density_ fluid density */
-    GrainsCoupledWithFluid( double fluid_density_ = 1000. );
+    GrainsCoupledWithFluid( double fluid_density_ );
 
     /** @brief Destructor */
     virtual ~GrainsCoupledWithFluid();
@@ -48,7 +49,8 @@ class GrainsCoupledWithFluid : virtual public Grains
 
     /** @name Set methods */
     //@{
-    /** @brief Sets the initial physical time
+    /** @brief Sets the initial physical time and initializes what depends
+    on the initial time
     @param time0 initial physical time */
     void setInitialTime( double const& time0 ) ;
 
@@ -59,6 +61,12 @@ class GrainsCoupledWithFluid : virtual public Grains
     /** @brief Sets the boolean m_forceReloadSame to true. This forces the code 
     to restart a simulation as a continuation of a previous simulation */
     void setReloadSame();
+    
+    /** @brief Sets the boolean Particle::setFluidCorrectedAcceleration. Default
+    value is True, i.e., the particle acceleration is corrected by
+    the factor ( 1 - fluid_density / particle_density )
+    @param correct particle acceleration correction factor */
+    void setFluidCorrectedAcceleration( bool correct );
     //@}  
 
 
@@ -74,8 +82,14 @@ class GrainsCoupledWithFluid : virtual public Grains
     @param b_set_velocity_nm1_and_diff updates the velocity at the previous time
     and the explicit velocity difference */
     virtual void updateParticlesVelocity( 
-  	vector<vector<double> > const& velocity_data_array,
-  	bool const& b_set_velocity_nm1_and_diff );   
+  	vector< vector<double> > const& velocity_data_array,
+  	bool const& b_set_velocity_nm1_and_diff );
+	
+    /** @brief Updates particles hydro force and torque with data from the 
+    fluid solver
+    @param hydroft_data_array hydro force and torque data array */
+    virtual void updateParticlesHydroFT( 
+  	vector< vector<double> > const* hydroft_data_array );	   
     //@}
     
     
@@ -101,7 +115,15 @@ class GrainsCoupledWithFluid : virtual public Grains
 
     /** @brief Writes postprocessing files    
     @param indent_width output message indentation width */
-    void doPostProcessing( size_t indent_width = 0 );	          
+    void doPostProcessing( size_t indent_width = 0 );
+    
+    /** @brief Sets the Paraview post-processing translation vector in case of
+    projection-translation
+    @param tvx x coordinate
+    @param tvy y coordinate
+    @param tvz z coordinate */
+    void setParaviewPostProcessingTranslationVector( 
+      	double const& tvx, double const& tvy, double const& tvz );
     //@}
     
 
@@ -115,7 +137,9 @@ class GrainsCoupledWithFluid : virtual public Grains
     double m_min_dt; /**< minimum granular simulation time step */
     double m_max_dt; /**< minimum granular simulation time step */
     size_t m_ndt; /**< number of granular simulation time steps over 
-    	a fluid flow simulation time step */        	       
+    	a fluid flow simulation time step */ 
+    AppPRSHydroFT* m_PRSHydroFT; /**< explicit pointer to the PRS hydro force
+    	and torque application */	       	       
     //@}
 
 

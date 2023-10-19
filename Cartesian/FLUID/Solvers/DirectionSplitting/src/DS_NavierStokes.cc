@@ -23,6 +23,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <math.h>
+#include <algorithm>
 #include <DS_AllRigidBodies.hh>
 
 
@@ -55,31 +56,32 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
                                    struct DS2NS const& fromDS )
 //---------------------------------------------------------------------------
    : MAC_Object( a_owner )
-	, ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , UF ( fromDS.dom_->discrete_field( "velocity" ) )
    , PF ( fromDS.dom_->discrete_field( "pressure" ) )
    , GLOBAL_EQ( 0 )
    , mu( fromDS.mu_ )
    , kai( fromDS.kai_ )
    , AdvectionScheme( fromDS.AdvectionScheme_ )
+   , StencilCorrection( fromDS.StencilCorrection_ )
+   , is_CConlyDivergence ( fromDS.is_CConlyDivergence_ )
+   , FluxRedistThres( fromDS.FluxRedistThres_ )
    , AdvectionTimeAccuracy( fromDS.AdvectionTimeAccuracy_ )
    , rho( fromDS.rho_ )
-	, b_restart ( fromDS.b_restart_ )
+   , b_restart ( fromDS.b_restart_ )
    , is_solids( fromDS.is_solids_ )
-	, is_stressCal ( fromDS.is_stressCal_ )
-	, ViscousStressOrder ( fromDS.ViscousStressOrder_ )
-	, stressCalFreq ( fromDS.stressCalFreq_ )
-	, is_par_motion ( fromDS.is_par_motion_ )
-	, allrigidbodies ( fromDS.allrigidbodies_ )
+   , is_stressCal ( fromDS.is_stressCal_ )
+   , ViscousStressOrder ( fromDS.ViscousStressOrder_ )
+   , PressureStressOrder ( fromDS.PressureStressOrder_ )
+   , stressCalFreq ( fromDS.stressCalFreq_ )
+   , is_par_motion ( fromDS.is_par_motion_ )
+   , allrigidbodies ( fromDS.allrigidbodies_ )
    , b_projection_translation( fromDS.dom_->primary_grid()
-														->is_translation_active() )
-   , b_grid_has_been_translated_since_last_output( false )
-   , b_grid_has_been_translated_at_previous_time( false )
-   , critical_distance_translation( fromDS.critical_distance_translation_ )
-   , translation_direction( 0 )
-   , bottom_coordinate( 0. )
-   , translated_distance( 0. )
+   		->is_translation_active() )
+   , outOfDomain_boundaryID( 0 )
    , gravity_vector( 0 )
+   , exceed (false)
+   , turn (false)
 {
    MAC_LABEL( "DS_NavierStokes:: DS_NavierStokes" ) ;
    MAC_ASSERT( UF->discretization_type() == "staggered" ) ;
@@ -166,6 +168,33 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
    GLOBAL_EQ = DS_NavierStokesSystem::create( this, se, UF, PF, inputData ) ;
    se->destroy() ;
 
+	if (UF->primary_grid()->is_periodic_flow_rate()) {
+		// controller = DS_PID::create(0.5,1.,0);
+		// Set the initial pressure drop, required in case of given flow rate
+		if (!b_restart) {
+			if (UF->primary_grid()->get_periodic_pressure_drop() < 1.e-12)
+				const_cast<FV_Mesh*>(UF->primary_grid())
+								->set_periodic_pressure_drop( -100. ) ;
+			if (macCOMM->rank() == 0) {
+				string fileName = "./DS_results/flow_pressure_history.csv" ;
+				std::ofstream MyFile;
+				MyFile.open( fileName.c_str()) ;
+				MyFile << "t Qc dP exceed turn" << endl;
+				MyFile.close();
+			}
+		} else if (b_restart) {
+			double temp_press;
+			string fileName = "./DS_results/flow_pressure_history.csv" ;
+			std::ifstream MyFile;
+			MyFile.open( fileName.c_str() ) ;
+			MyFile.seekg(-31,ios_base::end);
+	      MyFile >> Qold >> temp_press >> exceed >> turn;
+			MyFile.close();
+			const_cast<FV_Mesh*>(UF->primary_grid())
+							->set_periodic_pressure_drop( temp_press ) ;
+		}
+	}
+
    // Timing routines
    if ( my_rank == is_master ) {
      SCT_insert_app("Matrix_Assembly&Initialization");
@@ -240,31 +269,23 @@ DS_NavierStokes:: do_before_time_stepping( FV_TimeIterator const* t_it,
    calculate_row_indexes ( UF );
 
    // Projection-Translation
-   if ( b_projection_translation )
-   {
-     set_translation_vector() ;
-
-     if ( MVQ_translation_vector(translation_direction) < 0. )
-       bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-                [translation_direction](0) ;
-     else
-       bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-           [translation_direction]((*UF->primary_grid()->get_global_max_index())
-                                (translation_direction)) ;
-
-     build_links_translation() ;
-   }
+   if ( b_projection_translation ) build_links_translation();
 
    if (is_solids) {
 		// Build void frac and intersection variable
-		allrigidbodies->build_solid_variables_on_fluid_grid(PF);
-		allrigidbodies->build_solid_variables_on_fluid_grid(UF);
+		allrigidbodies->build_solid_variables_on_fluid_grid(PF,StencilCorrection);
+		allrigidbodies->build_solid_variables_on_fluid_grid(UF,StencilCorrection);
 		// Compute void fraction for pressure and velocity field
-		allrigidbodies->compute_void_fraction_on_grid(PF);
-		allrigidbodies->compute_void_fraction_on_grid(UF);
+		allrigidbodies->compute_void_fraction_on_grid(PF, false);
+		allrigidbodies->compute_void_fraction_on_grid(UF, false);
 		// Compute intersection with RB for pressure and velocity field
-		allrigidbodies->compute_grid_intersection_with_rigidbody(PF);
-		allrigidbodies->compute_grid_intersection_with_rigidbody(UF);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(PF, false);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, false);
+		// Compute the face fractions of CutCell is active
+		if (StencilCorrection == "CutCell") {
+			allrigidbodies->compute_cutCell_geometric_parameters(PF);
+			allrigidbodies->compute_cutCell_geometric_parameters(UF);
+		}
 
 		if (my_rank == 0)
          cout << "Finished void fraction and grid intersection... \n" << endl;
@@ -306,7 +327,7 @@ DS_NavierStokes:: do_after_time_stepping( void )
 
    // SCT_set_start( "Writing CSV" );
    // write_output_field(PF);
-   // write_output_field(UF,1);
+   // write_output_field(UF);
    // SCT_get_elapsed_time( "Writing CSV" );
 
    output_L2norm_velocity(0);
@@ -334,28 +355,46 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
 {
    MAC_LABEL( "DS_NavierStokes:: do_before_inner_iterations_stage" ) ;
 
-	if ( my_rank == is_master )
-		SCT_set_start( "Matrix_RE_Assembly&Initialization" );
+   if ( my_rank == is_master )
+   SCT_set_start( "Matrix_RE_Assembly&Initialization" );
 
    if ((is_par_motion) && (is_solids)) {
 		// Solve equation of motion for all RB and update pos,vel
-		allrigidbodies->solve_RB_equation_of_motion(t_it);
+		//allrigidbodies->solve_RB_equation_of_motion(t_it);
+		allrigidbodies->compute_halo_zones_for_all_rigid_body();
 		allrigidbodies->generate_list_of_local_RB();
 		allrigidbodies->initialize_surface_variables_for_all_RB();
 		allrigidbodies->compute_surface_variables_for_all_RB();
-		allrigidbodies->compute_halo_zones_for_all_rigid_body();
 		allrigidbodies->create_neighbour_list_for_AllRB();
+		// Clear void fraction and intersection data
+		allrigidbodies->clear_GrainsRB_data_on_grid(PF);
+		allrigidbodies->clear_GrainsRB_data_on_grid(UF);
 		// Compute void fraction for pressure and velocity field
-		allrigidbodies->compute_void_fraction_on_grid(PF);
-		allrigidbodies->compute_void_fraction_on_grid(UF);
+		allrigidbodies->compute_void_fraction_on_grid(PF, true);
+		allrigidbodies->compute_void_fraction_on_grid(UF, true);
 		// Compute intersection with RB for pressure and velocity field
-		allrigidbodies->compute_grid_intersection_with_rigidbody(PF);
-		allrigidbodies->compute_grid_intersection_with_rigidbody(UF);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(PF, true);
+		allrigidbodies->compute_grid_intersection_with_rigidbody(UF, true);
+		// Compute the face fractions of CutCell is active
+		if (StencilCorrection == "CutCell") {
+			allrigidbodies->compute_cutCell_geometric_parameters(PF);
+			allrigidbodies->compute_cutCell_geometric_parameters(UF);
+		}
+		// Compute the fresh node coming in fluid in this step
+		allrigidbodies->compute_fresh_nodes(PF);
+		allrigidbodies->compute_fresh_nodes(UF);
 
 		// Field initialization
 		vector<size_t> vec{ 0, 1, 3};
 		if (dim == 3) vec.push_back(4);
 		initialize_grid_nodes_on_rigidbody(vec);
+
+		// // Extrapolate advecvtion term on fresh nodes
+		// allrigidbodies->extrapolate_scalar_on_fresh_nodes(UF,2);
+		// // Interpolate velocity on the fresh nodes in fluid domain
+		// allrigidbodies->interpolate_vector_on_fresh_nodes(UF,vec);
+		// // allrigidbodies->extrapolate_scalar_on_fresh_nodes(PF,0);
+		// // allrigidbodies->extrapolate_scalar_on_fresh_nodes(PF,1);
 
 	   // Direction splitting
       // Assemble 1D tridiagonal matrices
@@ -363,12 +402,8 @@ DS_NavierStokes:: do_before_inner_iterations_stage(
       assemble_1D_matrices(UF,t_it);
    }
 
-	//  Projection_Translation
-	if ( b_projection_translation )
-		b_grid_has_been_translated_at_previous_time = false;
-
-	if ( my_rank == is_master )
-		SCT_get_elapsed_time( "Matrix_RE_Assembly&Initialization" );
+   if ( my_rank == is_master )
+     SCT_get_elapsed_time( "Matrix_RE_Assembly&Initialization" );
 
 }
 
@@ -404,41 +439,7 @@ DS_NavierStokes:: do_after_inner_iterations_stage(
    if ( my_rank == is_master )
       MAC::out() << "CFL: "<< cfl <<endl;
 
-   // Projection translation
-   if ( b_projection_translation ) {
-
-      double min_coord = allrigidbodies->get_min_RB_coord(translation_direction);
-
-      double distance_to_bottom = MAC::abs(min_coord-bottom_coordinate);
-
-      if ( distance_to_bottom < critical_distance_translation ) {
-
-         if ( my_rank == is_master )
-            MAC::out() << "         -> -> -> -> -> -> -> -> -> -> -> ->"
-               << endl << "         !!!     Domain Translation      !!!"
-               << endl << "         -> -> -> -> -> -> -> -> -> -> -> ->"
-               << endl;
-
-         b_grid_has_been_translated_at_previous_time = true;
-
-         translated_distance += MVQ_translation_vector( translation_direction );
-         if ( my_rank == is_master )
-            MAC::out() << "         Translated distance = " <<
-                translated_distance << endl;
-
-         fields_projection();
-
-         if ( MVQ_translation_vector(translation_direction) < 0. )
-            bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-                                [translation_direction](0) ;
-         else
-            bottom_coordinate = (*UF->primary_grid()->get_global_main_coordinates())
-               [translation_direction]((*UF->primary_grid()->get_global_max_index())
-                                (translation_direction)) ;
-
-         b_grid_has_been_translated_since_last_output = true;
-      }
-   }
+	// allrigidbodies->write_volume_conservation(t_it);
 
 }
 
@@ -554,6 +555,9 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 	size_t_vector min_unknown_index(3,0);
 	size_t_vector max_unknown_index(3,0);
 
+	// doubleArray2D* CC_face_frac = allrigidbodies->get_CC_face_fraction(FF);
+	// doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(FF);
+
 	for (size_t comp=0;comp<nb_comps[field];comp++) {
 		// Get local min and max indices
 		for (size_t l=0;l<dim;++l) {
@@ -618,43 +622,47 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
 				         xL = 0.;
 				      }
 
-      				double dx = FF->get_cell_size( i,comp, dir);
-
       				double dxr = xR - xC;
       				double dxl = xC - xL;
+						double dx = FF->get_cell_size( i, comp, dir);
+						// double pre_factor = (2. * dx) / (dxr + dxl);
 
 						double right = (FF == PF) ? -1.0/dxr : -gamma/dxr ;
 						double left = (FF == PF) ? -1.0/dxl : -gamma/dxl ;
 						double unsteady_term = (FF == PF) ? 1.0*dx
-								: rho*FF->get_cell_size(i,comp,dir)/t_it->time_step();
+																	 : rho*dx/t_it->time_step();
 
 						double center = - (right+left);
 
 				      if ((is_solids) && (FF == UF)) {
-				         size_t p = 0;
-				         if (dir == 0) {
-				            p = FF->DOF_local_number(i,j,k,comp);
-				         } else if (dir == 1) {
-				            p = FF->DOF_local_number(j,i,k,comp);
-				         } else if (dir == 2) {
-				            p = FF->DOF_local_number(j,k,i,comp);
-				         }
-
 				         size_t_array2D* intersect_vector = allrigidbodies
 														->get_intersect_vector_on_grid(FF);
 				         doubleArray2D* intersect_distance = allrigidbodies
 														->get_intersect_distance_on_grid(FF);
-				         size_t_vector* void_frac = allrigidbodies
+				         size_t_array2D* void_frac = allrigidbodies
 														->get_void_fraction_on_grid(FF);
 
-				         if (void_frac->operator()(p) == 0) {
+							size_t p = 0;
+							if (dir == 0) {
+								p = FF->DOF_local_number(i,j,k,comp);
+							} else if (dir == 1) {
+								p = FF->DOF_local_number(j,i,k,comp);
+							} else if (dir == 2) {
+								p = FF->DOF_local_number(j,k,i,comp);
+							}
+
+				         if (void_frac->operator()(p,0) == 0) {
 				            // if left node is inside the solid particle
-				            if (intersect_vector->operator()(p,2*dir+0) == 1)
+				            if (intersect_vector->operator()(p,2*dir+0) == 1) {
 				               left = -gamma/intersect_distance->operator()(p,2*dir+0);
+									// pre_factor = (2. * dx) / (dxr + intersect_distance->operator()(p,2*dir+0));
+								}
 				            // if right node is inside the solid particle
-				            if (intersect_vector->operator()(p,2*dir+1) == 1)
+				            if (intersect_vector->operator()(p,2*dir+1) == 1) {
 				               right = -gamma/intersect_distance->operator()(p,2*dir+1);
-				         } else if (void_frac->operator()(p) != 0) {
+									// pre_factor = (2. * dx) / (dxl + intersect_distance->operator()(p,2*dir+1));
+								}
+				         } else if (void_frac->operator()(p,0) != 0) {
 				            // if center node is inside the solid particle
 				            left = 0.;
 				            right = 0.;
@@ -667,6 +675,10 @@ DS_NavierStokes:: assemble_field_matrix ( FV_DiscreteField const* FF
          				if (intersect_vector->operator()(p,2*dir+1) == 1)
 								right = 0.;
       				}
+
+						// left *= pre_factor;
+						// right *= pre_factor;
+						// center *= pre_factor;
 
 						double value = center;
 
@@ -1046,12 +1058,18 @@ DS_NavierStokes:: NS_first_step ( FV_TimeIterator const* t_it )
   // Synchronize pressure field
   PF->synchronize(1);
 
+  if (is_solids) {
+	  // allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
+  	correct_pressure_1st_layer_solid(1);
+  	correct_pressure_2nd_layer_solid(1);
+  }
+
   PF->set_neumann_DOF_values();
 
   // Calculate pressure forces on the solid particles
   if ( my_rank == is_master ) SCT_set_start( "Pressure stress" );
   if (is_stressCal && (t_it->iteration_number() % stressCalFreq == 0)) {
-     allrigidbodies->compute_pressure_force_and_torque_for_allRB();
+     allrigidbodies->compute_pressure_force_and_torque_for_allRB(PressureStressOrder);
   }
   if ( my_rank == is_master ) SCT_get_elapsed_time( "Pressure stress" );
 
@@ -1104,6 +1122,39 @@ DS_NavierStokes:: assemble_velocity_diffusion_terms ( )
             }
          }
       }
+
+		// Flux redistribution
+		if (is_solids && (StencilCorrection == "CutCell") && !is_CConlyDivergence) {
+			size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+			intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
+			for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+				for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+					for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+						size_t p = UF->DOF_local_number(i,j,k,comp);
+						if ((ownerID->operator()(p) != -1) && (void_frac->operator()(p,0) != 0)) {
+							for (size_t dir = 0; dir < dim; dir++) {
+								size_t_vector i0_r(3), i0_l(3);
+								i0_l(0) = i; i0_l(1) = j; i0_l(2) = k;
+								i0_r = i0_l;
+								i0_l(dir) = i0_l(dir) - 1;
+								i0_r(dir) = i0_r(dir) + 1;
+								size_t p_lft = UF->DOF_local_number(i0_l(0),i0_l(1),i0_l(2),comp);
+								size_t p_rht = UF->DOF_local_number(i0_r(0),i0_r(1),i0_r(2),comp);
+								if (vel_diffusion[dir]->operator()(p) != 0.) {
+									if (void_frac->operator()(p_lft,0) == 0) {
+										vel_diffusion[dir]->operator()(p_lft) += vel_diffusion[dir]->operator()(p);
+										vel_diffusion[dir]->operator()(p) = 0.;
+									} else if (vel_diffusion[dir]->operator()(p_rht) == 0) {
+										vel_diffusion[dir]->operator()(p_rht) += vel_diffusion[dir]->operator()(p);
+										vel_diffusion[dir]->operator()(p) = 0.;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
    }
 }
 
@@ -1122,6 +1173,293 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
 {
    MAC_LABEL("DS_NavierStokes:: compute_un_component" ) ;
 
+	double value = 0.;
+
+	if ((StencilCorrection == "CutCell") && !is_CConlyDivergence) {
+		value = compute_un_component_FV(comp,i,j,k,dir,level);
+	} else {
+		value = compute_un_component_FD(comp,i,j,k,dir,level);
+	}
+
+	return(value);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+std::tuple<double,double>
+DS_NavierStokes:: compute_first_derivative ( size_t const& comp,
+	                                          size_t const& i,
+	                                          size_t const& j,
+	                                          size_t const& k,
+	                                          size_t const& dir,
+	                                          size_t const& level)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: compute_first_derivative" ) ;
+
+   size_t_array2D* intersect_vector = (is_solids) ?
+                           allrigidbodies->get_intersect_vector_on_grid(UF)
+									: 0;
+   doubleArray2D* intersect_distance = (is_solids) ?
+                           allrigidbodies->get_intersect_distance_on_grid(UF)
+									: 0;
+   doubleArray2D* intersect_fieldVal = (is_solids) ?
+                           allrigidbodies->get_intersect_fieldValue_on_grid(UF)
+									: 0;
+
+   size_t p = UF->DOF_local_number(i,j,k,comp);
+	double value = 0., dC = 1.;
+	double fc = UF->DOF_value( i, j, k, comp, level );
+	double dxl_act = 1., dxr_act = 1.;
+	double dxl = 1., dxr = 1.;
+
+   if (dir == 0) {
+		dC = UF->get_cell_size(i, comp, 0);
+		double xc = UF->get_DOF_coordinate( i,comp, 0 );
+		double xl = xc, xr = xc;
+		double fr = fc, fl = fc;
+
+      if (UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
+         fr = UF->DOF_value( i+1, j, k, comp, level );
+         xr = UF->get_DOF_coordinate( i+1,comp, 0 );
+      }
+
+      if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)) {
+         fl = UF->DOF_value( i-1, j, k, comp, level ) ;
+         xl = UF->get_DOF_coordinate( i-1, comp, 0 ) ;
+      }
+
+		dxl_act = xc - xl;
+		dxr_act = xr - xc;
+		dxl = dxl_act;
+		dxr = dxr_act;
+
+      if (is_solids) {
+         size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+         if (void_frac->operator()(p,0) == 0) {
+            if (intersect_vector->operator()(p,2*dir+0) == 1) {
+               fl = intersect_fieldVal->operator()(p,2*dir+0);
+               xl = xc - intersect_distance->operator()(p,2*dir+0);
+					dC = ((xc - xl) < 0.5*dC ) ? 0.5 * dC + (xc - xl) : dC;
+					dxl = xc - xl;
+            }
+            if (intersect_vector->operator()(p,2*dir+1) == 1) {
+               fr = intersect_fieldVal->operator()(p,2*dir+1);
+               xr = xc + intersect_distance->operator()(p,2*dir+1);
+					dC = ((xr - xc) < 0.5*dC ) ? 0.5 * dC + (xr - xc) : dC;
+					dxr = xr - xc;
+            }
+         }
+      }
+
+		// Derivative
+      if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)
+         && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
+			if (dxl != dxl_act) {
+				if (dxl < 0.5 * dxl_act) {
+					value = (fr - fl) / (dxr + dxl);
+				} else {
+					value = 1./(dxl_act + dxr_act)
+							* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+				}
+			} else if (dxr != dxr_act) {
+				if (dxr < 0.5 * dxr_act) {
+					value = (fr - fl) / (dxr + dxl);
+				} else {
+					value = 1./(dxl_act + dxr_act)
+							* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+				}
+			} else {
+				value = 1./(dxl_act + dxr_act)
+						* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+			}
+      } else if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)) {
+         value = - (fl - fc)/dxl;
+      } else if (UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
+         value = (fr - fc)/dxr;
+		} else {
+			value = 0.;
+		}
+
+	} else if (dir == 1) {
+		dC = UF->get_cell_size(j, comp, 1);
+		double xc = UF->get_DOF_coordinate( j,comp, 1 );
+		double xl = xc, xr = xc;
+		double fr = fc, fl = fc;
+
+      if (UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
+         fr = UF->DOF_value( i, j+1, k, comp, level );
+         xr = UF->get_DOF_coordinate( j+1,comp, 1 );
+      }
+
+      if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)) {
+         fl = UF->DOF_value( i, j-1, k, comp, level ) ;
+         xl = UF->get_DOF_coordinate( j-1, comp, 1 ) ;
+      }
+
+		dxl_act = xc - xl;
+		dxr_act = xr - xc;
+		dxl = dxl_act;
+		dxr = dxr_act;
+
+      if (is_solids) {
+         size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+         if (void_frac->operator()(p,0) == 0) {
+            if (intersect_vector->operator()(p,2*dir+0) == 1) {
+               fl = intersect_fieldVal->operator()(p,2*dir+0);
+               xl = xc - intersect_distance->operator()(p,2*dir+0);
+					dC = ((xc - xl) < 0.5*dC ) ? 0.5 * dC + (xc - xl) : dC;
+					dxl = xc - xl;
+            }
+            if (intersect_vector->operator()(p,2*dir+1) == 1) {
+               fr = intersect_fieldVal->operator()(p,2*dir+1);
+               xr = xc + intersect_distance->operator()(p,2*dir+1);
+					dC = ((xr - xc) < 0.5*dC ) ? 0.5 * dC + (xr - xc) : dC;
+					dxr = xr - xc;
+            }
+         }
+      }
+
+		// Derivative
+      if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)
+         && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
+				if (dxl != dxl_act) {
+					if (dxl < 0.5 * dxl_act) {
+						value = (fr - fl) / (dxr + dxl);
+					} else {
+						value = 1./(dxl_act + dxr_act)
+								* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+					}
+				} else if (dxr != dxr_act) {
+					if (dxr < 0.5 * dxr_act) {
+						value = (fr - fl) / (dxr + dxl);
+					} else {
+						value = 1./(dxl_act + dxr_act)
+								* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+					}
+				} else {
+					value = 1./(dxl_act + dxr_act)
+							* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+				}
+      } else if(UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)) {
+         value = - (fl - fc)/dxl;
+      } else if(UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
+         value = (fr - fc)/dxr;
+		} else {
+			value = 0.;
+		}
+
+	} else if (dir == 2) {
+		dC = UF->get_cell_size(k, comp, 2);
+		double xc = UF->get_DOF_coordinate( k,comp, 2 );
+		double xl = xc, xr = xc;
+		double fr = fc, fl = fc;
+
+      if (UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
+         fr = UF->DOF_value( i, j, k+1, comp, level );
+         xr = UF->get_DOF_coordinate( k+1,comp, 2 );
+      }
+
+      if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
+         fl = UF->DOF_value( i, j, k-1, comp, level ) ;
+         xl = UF->get_DOF_coordinate( k-1, comp, 2 ) ;
+      }
+
+		dxl_act = xc - xl;
+		dxr_act = xr - xc;
+		dxl = dxl_act;
+		dxr = dxr_act;
+
+      if (is_solids) {
+         size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+         if (void_frac->operator()(p,0) == 0) {
+            if (intersect_vector->operator()(p,2*dir+0) == 1) {
+               fl = intersect_fieldVal->operator()(p,2*dir+0);
+               xl = xc - intersect_distance->operator()(p,2*dir+0);
+					dC = ((xc - xl) < 0.5*dC ) ? 0.5 * dC + (xc - xl) : dC;
+					dxl = xc - xl;
+            }
+            if (intersect_vector->operator()(p,2*dir+1) == 1) {
+               fr = intersect_fieldVal->operator()(p,2*dir+1);
+               xr = xc + intersect_distance->operator()(p,2*dir+1);
+					dC = ((xr - xc) < 0.5*dC ) ? 0.5 * dC + (xr - xc) : dC;
+					dxr = xr - xc;
+            }
+         }
+      }
+
+		// Derivative
+      if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)
+         && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
+				if (dxl != dxl_act) {
+					if (dxl < 0.5 * dxl_act) {
+						value = (fr - fl) / (dxr + dxl);
+					} else {
+						value = 1./(dxl_act + dxr_act)
+								* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl)*(fl-fc));
+					}
+				} else if (dxr != dxr_act) {
+					if (dxr < 0.5 * dxr_act) {
+						value = (fr - fl) / (dxr + dxl);
+					} else {
+						value = 1./(dxl_act + dxr_act)
+								* ((dxl_act/dxr)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+					}
+				} else {
+					value = 1./(dxl_act + dxr_act)
+							* ((dxl_act/dxr_act)*(fr-fc) - (dxr_act/dxl_act)*(fl-fc));
+				}
+      } else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
+         value = - (fl - fc)/dxl;
+      } else if(UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
+         value = (fr - fc)/dxr;
+		} else {
+			value = 0.;
+		}
+	}
+
+	if (comp == 0) {
+		// Check of Neumann BC
+		if (((UF->DOF_color(i,j,k,comp) == FV_BC_LEFT) ||
+			 (UF->DOF_color(i,j,k,comp) == FV_BC_RIGHT))
+		 && (!is_periodic[1][0]))
+			value = 0.;
+	} else if (comp == 1) {
+		// Check of Neumann BC
+		if (((UF->DOF_color(i,j,k,comp) == FV_BC_TOP) ||
+			 (UF->DOF_color(i,j,k,comp) == FV_BC_BOTTOM))
+		 && (!is_periodic[1][1]))
+			value = 0.;
+	} else if (comp == 2) {
+		// Check of Neumann BC
+		if (((UF->DOF_color(i,j,k,comp) == FV_BC_FRONT) ||
+			 (UF->DOF_color(i,j,k,comp) == FV_BC_BEHIND))
+		 && (!is_periodic[1][2]))
+			value = 0.;
+	}
+
+   return(std::make_tuple(value,dC));
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double
+DS_NavierStokes:: compute_un_component_FD ( size_t const& comp,
+                                          size_t const& i,
+                                          size_t const& j,
+                                          size_t const& k,
+                                          size_t const& dir,
+                                          size_t const& level)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: compute_un_component_FD" ) ;
+
    double xhr=1.,xhl=1.,xright=0.,xleft=0.,yhr=1.,yhl=1.,yright=0.,yleft=0.;
    double zhr=1.,zhl=1.,zright=0.,zleft=0., value=0.;
 
@@ -1136,6 +1474,10 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
 									: 0;
 
    size_t p = UF->DOF_local_number(i,j,k,comp);
+	double dxC = UF->get_cell_size(i, comp, 0);
+	double dyC = UF->get_cell_size(j, comp, 1);
+	double dzC = (dim == 3) ? UF->get_cell_size(k, comp, 2) : 1.;
+	// double pre_factor = 1.;
 
    switch (dir) {
       case 0:
@@ -1154,8 +1496,8 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
          }
 
          if (is_solids) {
-            size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-            if (void_frac->operator()(p) == 0) {
+            size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+            if (void_frac->operator()(p,0) == 0) {
                if (intersect_vector->operator()(p,2*dir+0) == 1) {
                   xleft = UF->DOF_value( i, j, k, comp, level )
                         - intersect_fieldVal->operator()(p,2*dir+0);
@@ -1173,12 +1515,39 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
 
          //xvalue = xright/xhr - xleft/xhl;
          if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)
-            && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp))
+            && UF->DOF_in_domain( (int)i+1, (int)j, (int)k, comp)) {
             value = xright/xhr - xleft/xhl;
-         else if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp))
+				// pre_factor = (2.* dxC) / (xhl + xhr);
+         } else if (UF->DOF_in_domain( (int)i-1, (int)j, (int)k, comp)) {
             value = - xleft/xhl;
-         else
+				// pre_factor = dxC / xhl;
+         } else {
             value = xright/xhr;
+				// pre_factor = dxC/ xhr;
+			}
+			// value *= pre_factor * dyC * dzC;
+
+			if (comp == 0) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_LEFT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_RIGHT))
+				 && (!is_periodic[1][0]))
+					value = 0.;
+			} else if (comp == 1) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_TOP) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BOTTOM))
+				 && (!is_periodic[1][1]))
+					value = 0.;
+			} else if (comp == 2) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_FRONT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BEHIND))
+				 && (!is_periodic[1][2]))
+					value = 0.;
+			}
+
+			value *= dyC * dzC;
          break;
       case 1:
          if (UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
@@ -1196,8 +1565,8 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
          }
 
          if (is_solids) {
-            size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-            if (void_frac->operator()(p) == 0) {
+            size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+            if (void_frac->operator()(p,0) == 0) {
                if (intersect_vector->operator()(p,2*dir+0) == 1) {
                   yleft = UF->DOF_value( i, j, k, comp, level )
                         - intersect_fieldVal->operator()(p,2*dir+0);
@@ -1215,12 +1584,39 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
 
          //yvalue = yright/yhr - yleft/yhl;
          if (UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)
-            && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp))
+            && UF->DOF_in_domain((int)i, (int)j+1, (int)k, comp)) {
             value = yright/yhr - yleft/yhl;
-         else if(UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp))
+				// pre_factor = (2. * dyC) / (yhr + yhl);
+         } else if(UF->DOF_in_domain((int)i, (int)j-1, (int)k, comp)) {
             value = - yleft/yhl;
-         else
+				// pre_factor = dyC / yhl;
+         } else {
             value = yright/yhr;
+				// pre_factor = dyC / yhr;
+			}
+			// value *= pre_factor * dxC * dzC;
+
+			if (comp == 0) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_LEFT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_RIGHT))
+				 && (!is_periodic[1][0]))
+					value = 0.;
+			} else if (comp == 1) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_TOP) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BOTTOM))
+				 && (!is_periodic[1][1]))
+					value = 0.;
+			} else if (comp == 2) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_FRONT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BEHIND))
+				 && (!is_periodic[1][2]))
+					value = 0.;
+			}
+
+			value *= dxC * dzC;
          break;
       case 2:
          if (UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
@@ -1238,8 +1634,8 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
          }
 
          if (is_solids) {
-            size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
-            if (void_frac->operator()(p) == 0) {
+            size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+            if (void_frac->operator()(p,0) == 0) {
                if (intersect_vector->operator()(p,2*dir+0) == 1) {
                   zleft = UF->DOF_value( i, j, k, comp, level )
                         - intersect_fieldVal->operator()(p,2*dir+0);
@@ -1257,14 +1653,98 @@ DS_NavierStokes:: compute_un_component ( size_t const& comp,
 
          //zvalue = zright/zhr - zleft/zhl;
          if (UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)
-            && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp))
+            && UF->DOF_in_domain((int)i, (int)j, (int)k+1, comp)) {
             value = zright/zhr - zleft/zhl;
-         else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp))
+				// pre_factor = (2. * dzC) / (zhl + zhr);
+         } else if(UF->DOF_in_domain((int)i, (int)j, (int)k-1, comp)) {
             value = - zleft/zhl;
-         else
+				// pre_factor = dzC / zhl;
+         } else {
             value = zright/zhr;
+				// pre_factor = dzC / zhr;
+			}
+			// value *= pre_factor * dxC * dyC;
+
+			if (comp == 0) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_LEFT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_RIGHT))
+				 && (!is_periodic[1][0]))
+					value = 0.;
+			} else if (comp == 1) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_TOP) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BOTTOM))
+				 && (!is_periodic[1][1]))
+					value = 0.;
+			} else if (comp == 2) {
+				// Check of Neumann BC
+				if (((UF->DOF_color(i,j,k,comp) == FV_BC_FRONT) ||
+					 (UF->DOF_color(i,j,k,comp) == FV_BC_BEHIND))
+				 && (!is_periodic[1][2]))
+					value = 0.;
+			}
+
+			value *= dxC * dyC;
          break;
    }
+
+   return(value);
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+double
+DS_NavierStokes:: compute_un_component_FV ( size_t const& comp,
+                                       	  size_t const& i,
+                                            size_t const& j,
+                                            size_t const& k,
+                                            size_t const& dir,
+                                            size_t const& level)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: compute_un_component_FV" ) ;
+
+	intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
+	doubleArray3D* CC_face_cen = allrigidbodies->get_CC_face_centroid(UF);
+	doubleArray2D* CC_face_frac = allrigidbodies->get_CC_face_fraction(UF);
+	// size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+
+	size_t p = UF->DOF_local_number(i,j,k,comp);
+
+	geomVector xL(3), xR(3);
+	xL(0) = CC_face_cen->operator()(p,2*dir+0,0);
+	xL(1) = CC_face_cen->operator()(p,2*dir+0,1);
+	xL(2) = CC_face_cen->operator()(p,2*dir+0,2);
+
+	xR(0) = CC_face_cen->operator()(p,2*dir+1,0);
+	xR(1) = CC_face_cen->operator()(p,2*dir+1,1);
+	xR(2) = CC_face_cen->operator()(p,2*dir+1,2);
+
+	double value = 0.;
+
+	// if ((ownerID->operator()(p) != -1) && (void_frac->operator()(p) == 0)) {
+	if (ownerID->operator()(p) != -1) {
+		double fleft = 0.;
+		if (CC_face_frac->operator()(p,2*dir+0) != 0.) {
+			fleft = allrigidbodies->calculate_diffusive_flux(p, comp,dir, xL,ownerID->operator()(p),level)
+					* CC_face_frac->operator()(p,2*dir+0);
+		}
+		double fright = 0.;
+		if (CC_face_frac->operator()(p,2*dir+1) != 0.) {
+		   fright = allrigidbodies->calculate_diffusive_flux(p, comp,dir, xR,ownerID->operator()(p),level)
+					 * CC_face_frac->operator()(p,2*dir+1);
+		}
+
+		double RBflux = allrigidbodies->calculate_diffusive_flux_fromRB(UF,p,comp,dir,level);
+
+		value = (fright - fleft + RBflux);
+	} else {
+		value = compute_un_component_FD(comp, i, j, k, dir, level);
+	}
 
    return(value);
 
@@ -1326,23 +1806,45 @@ DS_NavierStokes:: velocity_local_rhs ( size_t const& j
          ii = j; jj = k; kk = i; level = 4;
       }
 
+		double dxC = UF->get_cell_size(ii, comp, 0);
+		double dyC = UF->get_cell_size(jj, comp, 1);
+		double dzC = (dim == 3) ? UF->get_cell_size(kk, comp, 2) : 1.;
+		double area = 0.;
+
+		if (dir == 0) {
+			area = dyC * dzC;
+      } else if (dir == 1) {
+			area = dxC * dzC;
+      } else if (dir == 2) {
+			area = dxC * dyC;
+      }
+
       size_t pos = i - min_unknown_index(dir);
       size_t p = UF->DOF_local_number(ii,jj,kk,comp);
+		double dC = UF->get_cell_size(i,comp,dir);
 
-      double value= vel_diffusion[dir]->operator()(p);
+      double value = vel_diffusion[dir]->operator()(p)/area;
 
       if (is_solids) {
-         if (intersect_vector->operator()(p,2*dir+0) == 1) {
+			if ((intersect_vector->operator()(p,2*dir+0) == 1)
+			 && (intersect_vector->operator()(p,2*dir+1) == 1)) {
+				 // double pre_factor = 2 * dC / (intersect_distance->operator()(p,2*dir+0)
+			 		// 								  + intersect_distance->operator()(p,2*dir+1));
+				 value = value - (intersect_fieldVal->operator()(p,2*dir+0)
+                            /intersect_distance->operator()(p,2*dir+0)
+								   + intersect_fieldVal->operator()(p,2*dir+1)
+                            /intersect_distance->operator()(p,2*dir+1));// * pre_factor;
+			} else if (intersect_vector->operator()(p,2*dir+0) == 1) {
+				// double pre_factor = 2 * dC / (dC + intersect_distance->operator()(p,2*dir+0));
             value = value - intersect_fieldVal->operator()(p,2*dir+0)
-                           /intersect_distance->operator()(p,2*dir+0);
-         }
-         if (intersect_vector->operator()(p,2*dir+1) == 1) {
+                           /intersect_distance->operator()(p,2*dir+0);// * pre_factor;
+         } else if (intersect_vector->operator()(p,2*dir+1) == 1) {
+				// double pre_factor = 2 * dC / (dC + intersect_distance->operator()(p,2*dir+1));
             value = value - intersect_fieldVal->operator()(p,2*dir+1)
-                           /intersect_distance->operator()(p,2*dir+1);
+                           /intersect_distance->operator()(p,2*dir+1);// * pre_factor;
          }
       }
 
-      double dC = UF->get_cell_size(i,comp,dir);
 
       double temp_val = UF->DOF_value(ii,jj,kk,comp,level)
                         *dC*rho/t_it->time_step() - gamma*value;
@@ -1756,9 +2258,13 @@ DS_NavierStokes:: compute_p_component ( size_t const& comp
    return(value);
 }
 
+
+
+
 //---------------------------------------------------------------------------
 double
-DS_NavierStokes:: compute_adv_component ( size_t const& comp,
+DS_NavierStokes:: compute_adv_component ( FV_TimeIterator const* t_it,
+														 size_t const& comp,
                                            size_t const& i,
                                            size_t const& j,
                                            size_t const& k)
@@ -1767,18 +2273,44 @@ DS_NavierStokes:: compute_adv_component ( size_t const& comp,
    MAC_LABEL("DS_NavierStokes:: compute_adv_component" ) ;
    double ugradu = 0., value = 0.;
 
+	double dxC = UF->get_cell_size(i,comp,0) ;
+	double dyC = UF->get_cell_size(j,comp,1) ;
+	double dzC = (dim == 3) ? UF->get_cell_size(k,comp,2) : 1.;
+	doubleArray2D* divergence = GLOBAL_EQ->get_node_divergence(1);
+	size_t p = UF->DOF_local_number(i, j, k, comp);
+
    if ( AdvectionScheme == "TVD" ) {
       ugradu = assemble_advection_TVD(1,rho,1,i,j,k,comp)
-             - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
+             - rho * UF->DOF_value(i,j,k,comp,1)
+				  		 * divergence->operator()(p,0)
+						 * dxC * dyC * dzC;
    } else if ( AdvectionScheme == "Upwind" ) {
       ugradu = assemble_advection_Upwind(1,rho,1,i,j,k,comp)
-             - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
-   } else if ( AdvectionScheme == "Centered" ) {
-      ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp)
-             - rho*UF->DOF_value(i,j,k,comp,1)*divergence_of_U(i,j,k,comp,1);
+				 - rho * UF->DOF_value(i,j,k,comp,1)
+				       * divergence->operator()(p,0)
+					    * dxC * dyC * dzC;
+	} else if ( AdvectionScheme == "CenteredFD" ) {
+		// No divergence correction requried as we calculate the u div(u) instead of div(uu)
+		ugradu = assemble_advection_Centered_FD(rho,i,j,k,comp,1);
+	} else if ( AdvectionScheme == "Centered" && StencilCorrection == "FD" ) {
+ 		ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp)
+				 - rho * UF->DOF_value(i,j,k,comp,1)
+				       * divergence->operator()(p,0)
+					    * dxC * dyC * dzC;
+	} else if ( AdvectionScheme == "Centered" && StencilCorrection == "CutCell" ) {
+		intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
+		doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
+		if (ownerID->operator()(p) != -1) {
+			ugradu = assemble_advection_Centered_CutCell(t_it,rho,i,j,k,comp,1);
+		} else {
+			ugradu = assemble_advection_Centered(1,rho,1,i,j,k,comp);
+		}
+		ugradu -= rho * UF->DOF_value(i,j,k,comp,1)
+						  * divergence->operator()(p,0)
+						  * CC_vol->operator()(p,0);
    }
 
-   if ( AdvectionTimeAccuracy == 1 ) {
+   if (( AdvectionTimeAccuracy == 1 )) {
       value = ugradu;
    } else {
       value = 1.5*ugradu - 0.5*UF->DOF_value(i,j,k,comp,2);
@@ -1790,14 +2322,14 @@ DS_NavierStokes:: compute_adv_component ( size_t const& comp,
 
 //----------------------------------------------------------------------
 double
-DS_NavierStokes:: divergence_of_U( size_t const& i
-                                  , size_t const& j
-                                  , size_t const& k
-                                  , size_t const& component
-                                  , size_t const& level)
+DS_NavierStokes:: divergence_of_U_noCorrection( size_t const& i
+				                                  , size_t const& j
+				                                  , size_t const& k
+				                                  , size_t const& component
+				                                  , size_t const& level)
 //----------------------------------------------------------------------
 {
-   MAC_LABEL( "DS_NavierStokes:: divergence_of_U" );
+   MAC_LABEL( "DS_NavierStokes:: divergence_of_U_noCorrection" );
 
    // Parameters
    double flux = 0.;
@@ -1830,6 +2362,12 @@ DS_NavierStokes:: divergence_of_U( size_t const& i
    double dzC = (dim == 3) ? UF->get_cell_size(k,component,2) : 0;
 
    AdvectorValueC = UF->DOF_value( i, j, k, component, level );
+
+	if (is_solids) {
+		size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+		size_t p = UF->DOF_local_number(i, j, k, component);
+		if (void_frac->operator()(p,0) != 0) return(flux);
+	}
 
    // The First Component (u)
    if ( component == 0 ) {
@@ -1949,12 +2487,144 @@ DS_NavierStokes:: divergence_of_U( size_t const& i
    }
 
    if (dim == 2) {
-      flux = ((vt - vb) * dxC + (ur - ul) * dyC);
+      flux = ((vt - vb) * dxC + (ur - ul) * dyC) / dxC / dyC;
    } else if (dim == 3) {
-      flux = (vt - vb) * dxC * dzC + (ur - ul) * dyC * dzC + (wf - wb) * dxC * dyC;
-   }
+      flux = ((vt - vb) * dxC * dzC
+			  + (ur - ul) * dyC * dzC
+			  + (wf - wb) * dxC * dyC) / dxC / dyC / dzC;
+	}
+
    return ( flux );
 }
+
+
+
+
+//---------------------------------------------------------------------------
+double
+DS_NavierStokes:: get_current_mean_flow_speed()
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokesSystem:: get_current_mean_flow_speed" ) ;
+
+   size_t comp = UF->primary_grid()->get_periodic_flow_direction();
+
+   size_t_vector min_unknown_index(dim,0);
+   size_t_vector max_unknown_index(dim,0);
+
+   // Get local min and max indices
+   for (size_t l = 0; l < dim; ++l) {
+     min_unknown_index(l) = UF->get_min_index_unknown_handled_by_proc( comp,l );
+     max_unknown_index(l) = UF->get_max_index_unknown_handled_by_proc( comp,l );
+   }
+
+   double value = 0.;
+   double volume = 0.;
+
+   for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+      double dx = UF->get_cell_size( i, comp, 0 );
+      for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+         double dy = UF->get_cell_size( j, comp, 1 );
+         for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+            double dz = (dim == 3) ? UF->get_cell_size( k, comp, 2 ) : 1.;
+            value += UF->DOF_value(i, j, k, comp, 0) * dx * dy * dz;
+            volume += dx * dy * dz;
+         }
+      }
+   }
+
+   value = macCOMM->sum( value ) ;
+   volume = macCOMM->sum( volume ) ;
+
+   return(value/volume);
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void
+DS_NavierStokes:: predicted_pressure_drop (FV_TimeIterator const* t_it)
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: predicted_pressure_drop" ) ;
+
+	double Um = get_current_mean_flow_speed();
+	double pressure_drop = UF->primary_grid()->get_periodic_pressure_drop();
+
+	if (macCOMM->rank() == 0) {
+		size_t p_flow_dir = UF->primary_grid()->get_periodic_flow_direction();
+		double Lx = UF->primary_grid()->get_main_domain_max_coordinate( 0 )
+					 - UF->primary_grid()->get_main_domain_min_coordinate( 0 );
+		double Ly = UF->primary_grid()->get_main_domain_max_coordinate( 1 )
+					 - UF->primary_grid()->get_main_domain_min_coordinate( 1 );
+	   double Lz = (dim == 3)
+					 ? UF->primary_grid()->get_main_domain_max_coordinate( 2 )
+					 - UF->primary_grid()->get_main_domain_min_coordinate( 2 )
+					 : 1.;
+
+	   double cross_sec_area = Lx * Ly * Lz;
+
+		if (p_flow_dir == 0) {
+			cross_sec_area = Ly * Lz;
+		} else if (p_flow_dir == 1) {
+			cross_sec_area = Lx * Lz;
+		} else if (p_flow_dir == 2) {
+			cross_sec_area = Lx * Ly;
+		}
+
+		double Qc = cross_sec_area * Um;
+		double Qset = UF->primary_grid()->get_periodic_flow_rate();
+
+		if ((fabs(Qc - Qset) / Qset > 1e-5) && (t_it->iteration_number() % 1 == 0)) {
+	      if ((Qc / Qset) > 1.) {
+	         exceed = true;
+				// pressure_drop -= controller->calculate(Qset,Qc,t_it->time_step());
+		      if (turn == false) {
+		         pressure_drop *= 0.5;
+		         if ((Qc - Qold) < 0.) turn = true;
+	         } else {
+	            if ((Qc / Qold) > 1.) {
+	               pressure_drop *= (Qset / Qc);
+	            } else {
+						// Threshold controls the oscillation
+	               if (fabs(Qc - Qold) / Qc < 1e-6)
+	                  pressure_drop *= (Qset / Qc);
+	            }
+	         }
+	      } else {
+	         if (exceed == true) {
+					// pressure_drop -= controller->calculate(Qset,Qc,t_it->time_step());
+	            if ((Qc / Qold) < 1.) {
+	               pressure_drop *= (Qset / Qc);
+	            } else {
+						// Threshold controls the oscillation
+	               if (fabs(Qc - Qold) / Qc < 1e-6)
+	                  pressure_drop *= (Qset / Qc);
+	            }
+	         }
+	      }
+		}
+	   Qold = Qc;
+
+		string fileName = "./DS_results/flow_pressure_history.csv" ;
+		std::ofstream MyFile;
+		MyFile.open( fileName.c_str(), std::ios::app ) ;
+		MyFile << t_it->time() << " " << MAC::doubleToString( ios::scientific, 6, Qc)
+				<< " " << MAC::doubleToString( ios::scientific, 6, pressure_drop)
+				<< " " << exceed
+				<< " " << turn << endl;
+	}
+
+	// Broadcast the new pressure to all procs from master proc
+	macCOMM->broadcast(pressure_drop);
+
+   const_cast<FV_Mesh*>(UF->primary_grid())
+											->set_periodic_pressure_drop( pressure_drop ) ;
+}
+
+
+
 
 //---------------------------------------------------------------------------
 void
@@ -1966,6 +2636,8 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
 
    // Assemble the diffusive components of velocity once in each iteration
    assemble_velocity_diffusion_terms ( );
+	compute_velocity_divergence(UF);
+	assemble_velocity_advection_terms ( t_it );
 
    double bodyterm=0.;
    size_t cpp = 10;
@@ -1973,19 +2645,27 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
    // Periodic pressure gradient
    if ( UF->primary_grid()->is_periodic_flow() ) {
       cpp = UF->primary_grid()->get_periodic_flow_direction() ;
-      bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
-               ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
-               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
+		if (UF->primary_grid()->is_periodic_pressure_drop() &&
+	      !UF->primary_grid()->is_periodic_flow_rate()) {
+	      bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
+	               ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
+	               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
+		} else if (UF->primary_grid()->is_periodic_flow_rate()) {
+			predicted_pressure_drop(t_it);
+			bodyterm = UF->primary_grid()->get_periodic_pressure_drop() /
+	               ( UF->primary_grid()->get_main_domain_max_coordinate( cpp )
+	               - UF->primary_grid()->get_main_domain_min_coordinate( cpp ) ) ;
+		}
    }
 
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
 
-   // min_unknown_index(2) = (dim == 3) ? 0 : 0;
-   // max_unknown_index(2) = (dim == 3) ? 0 : 1;
-
+	doubleArray2D* CC_vol = (is_solids) ?
+							allrigidbodies->get_CC_cell_volume(UF) : 0;
+	vector<doubleVector*> advection = GLOBAL_EQ->get_velocity_advection();
    vector<doubleVector*> vel_diffusion = GLOBAL_EQ->get_velocity_diffusion();
-   size_t_vector* void_frac = (is_solids) ?
+   size_t_array2D* void_frac = (is_solids) ?
 							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
    for (size_t comp=0;comp<nb_comps[1];comp++) {
@@ -2004,7 +2684,14 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
             for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
                double dzC = (dim == 3) ? UF->get_cell_size( k, comp, 2 ) : 1 ;
 
-               size_t p = UF->DOF_local_number(i,j,k,comp);
+					size_t p = UF->DOF_local_number(i,j,k,comp);
+					// Cell volume
+					double cellV = dxC * dyC * dzC;
+					// if ((StencilCorrection == "CutCell")
+					//  && (CC_vol->operator()(p,0) >= FluxRedistThres*cellV)) {
+					//  	cellV = CC_vol->operator()(p,0);
+					// }
+
                // Dxx for un
                double xvalue = vel_diffusion[0]->operator()(p);
                // Dyy for un
@@ -2014,32 +2701,30 @@ DS_NavierStokes:: assemble_DS_un_at_rhs ( FV_TimeIterator const* t_it,
                // Pressure contribution
                double pvalue = compute_p_component(comp,i,j,k);
                // Advection contribution
-               double adv_value = compute_adv_component(comp,i,j,k);
+               double adv_value = advection[0]->operator()(p);
                //
                if (is_solids) {
-                  if (void_frac->operator()(p) != 0) {
-                     pvalue = 0.; adv_value = 0.;
+                  if (void_frac->operator()(p,0) != 0) {
+                     pvalue = 0.;
                   }
                }
 
-               double rhs = gamma*(xvalue*dyC*dzC
-                                 + yvalue*dxC*dzC
-                                 + zvalue*dxC*dyC)
+               double rhs = gamma*(xvalue + yvalue + zvalue)
                           - pvalue - adv_value
-                          + (UF->DOF_value( i, j, k, comp, 1 )*dxC*dyC*dzC*rho)
+                          + (UF->DOF_value( i, j, k, comp, 1 )*cellV*rho)
                                                          /(t_it -> time_step());
 
 
-               if ( cpp==comp ) rhs += - bodyterm*dxC*dyC*dzC;
+               if ( cpp==comp ) rhs += - bodyterm*cellV;
 
                if (is_solids) {
-                  if (void_frac->operator()(p) != 0) {
-                     if ( cpp==comp ) rhs += bodyterm*dxC*dyC*dzC;
+                  if (void_frac->operator()(p,0) != 0) {
+                     if ( cpp==comp ) rhs += bodyterm*cellV;
                   }
                }
 
                UF->set_DOF_value( i, j, k, comp, 0,
-                                  rhs*(t_it -> time_step())/(dxC*dyC*dzC*rho));
+                                  rhs*(t_it -> time_step())/(cellV*rho));
             }
          }
       }
@@ -2225,29 +2910,35 @@ DS_NavierStokes:: NS_velocity_update ( FV_TimeIterator const* t_it )
    assemble_DS_un_at_rhs(t_it,gamma);
    // Update gamma based for invidual direction
    gamma = mu/2.0;
+	UF->set_neumann_DOF_values();
 
    Solve_i_in_jk(UF,t_it,0,1,2,gamma,3);
    // Synchronize the velocity field
 	UF->synchronize( 3 );
    if (is_solids) initialize_grid_nodes_on_rigidbody({3});
+	UF->set_neumann_DOF_values();
 
 	size_t level = (dim == 2) ? 0 : 4 ;
    Solve_i_in_jk(UF,t_it,1,0,2,gamma,level);
 	// Synchronize the velocity field
 	UF->synchronize( level );
    if (is_solids) initialize_grid_nodes_on_rigidbody({level});
+	UF->set_neumann_DOF_values();
 
    if (dim == 3) {
       Solve_i_in_jk(UF,t_it,2,0,1,gamma,0);
 		// Synchronize the velocity field
 		UF->synchronize( 0 );
       if (is_solids) initialize_grid_nodes_on_rigidbody({0});
+		UF->set_neumann_DOF_values();
    }
 
 	// Compute velocity change over the time step
 	double velocity_time_change = compute_DS_velocity_change()/t_it->time_step();
 	if ( my_rank == is_master ) cout << "velocity change = " <<
 		MAC::doubleToString( ios::scientific, 5, velocity_time_change ) << endl;
+
+	compute_velocity_divergence(PF);
 
 }
 
@@ -2265,7 +2956,7 @@ DS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list 
   size_t_vector max_unknown_index(3,0);
 
   // Vector for solid presence
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+  size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
 
   for (size_t comp = 0; comp < nb_comps[1]; comp++) {
      // Get local min and max indices
@@ -2291,9 +2982,10 @@ DS_NavierStokes::initialize_grid_nodes_on_rigidbody( vector<size_t> const& list 
               double zC = (dim == 2) ? 0 : UF->get_DOF_coordinate( k, comp, 2 );
               geomVector pt(xC,yC,zC);
               size_t p = UF->DOF_local_number(i,j,k,comp);
-              if (void_frac->operator()(p) != 0) {
-                 size_t par_id = void_frac->operator()(p) - 1;
+              if (void_frac->operator()(p,0) != 0) {
+                 size_t par_id = void_frac->operator()(p,0) - 1;
                  geomVector rb_vel = allrigidbodies->rigid_body_velocity(par_id,pt);
+					  // geomVector rb_vel = allrigidbodies->rigid_body_GC_velocity(par_id);
                  for (size_t level : list)
                   UF->set_DOF_value( i, j, k, comp, level,rb_vel(comp));
               }
@@ -2327,7 +3019,7 @@ DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
                      allrigidbodies->get_intersect_distance_on_grid(PF) : 0;
    doubleArray2D* intersect_fieldVal = (is_solids) ?
                      allrigidbodies->get_intersect_fieldValue_on_grid(PF) : 0;
-   size_t_vector* void_frac = (is_solids) ?
+   size_t_array2D* void_frac = (is_solids) ?
 							allrigidbodies->get_void_fraction_on_grid(PF) : 0;
 
    size_t p = PF->DOF_local_number(i,j,k,comp);
@@ -2346,8 +3038,8 @@ DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
    double bx = xh;
    double by = yh;
 
-   if (is_solids) {
-      if (void_frac->operator()(p) == 0) {
+   if (is_solids && StencilCorrection == "FD") {
+      if (void_frac->operator()(p,0) == 0) {
          if (intersect_vector->operator()(p,2*0+0) == 1) {
             xvalue = UF->DOF_value( shift.i+i, j, k, 0, level)
                    - intersect_fieldVal->operator()(p,2*0+0);
@@ -2372,8 +3064,8 @@ DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
       }
    }
 
-   if (is_solids) {
-      if (void_frac->operator()(p) == 0) {
+   if (is_solids && StencilCorrection == "FD") {
+      if (void_frac->operator()(p,0) == 0) {
          if (intersect_vector->operator()(p,2*1+0) == 1) {
             yvalue = UF->DOF_value( i, shift.j+j, k, 1, level)
                    - intersect_fieldVal->operator()(p,2*1+0);
@@ -2412,8 +3104,8 @@ DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
 
       double bz = zh;
 
-      if (is_solids) {
-         if (void_frac->operator()(p) == 0) {
+      if (is_solids && StencilCorrection == "FD") {
+         if (void_frac->operator()(p,0) == 0) {
             if (intersect_vector->operator()(p,2*2+0) == 1) {
                zvalue = UF->DOF_value( i, j, shift.k+k, 2, level)
                       - intersect_fieldVal->operator()(p,2*2+0);
@@ -2457,11 +3149,10 @@ DS_NavierStokes:: assemble_velocity_gradients (class doubleVector& grad
 
 //---------------------------------------------------------------------------
 double
-DS_NavierStokes:: calculate_velocity_divergence ( size_t const& i,
+DS_NavierStokes:: calculate_velocity_divergence_FD ( size_t const& i,
                                                    size_t const& j,
                                                    size_t const& k,
-                                                   size_t const& level,
-                                                   FV_TimeIterator const* t_it)
+                                                   size_t const& level)
 //---------------------------------------------------------------------------
 {
    MAC_LABEL("DS_NavierStokes:: calculate_velocity_divergence" ) ;
@@ -2473,6 +3164,249 @@ DS_NavierStokes:: calculate_velocity_divergence ( size_t const& i,
    double value = beta*(grad(0) + grad(1) + grad(2));
 
    return(value);
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void
+DS_NavierStokes:: assemble_velocity_advection_terms ( FV_TimeIterator const* t_it )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: assemble_velocity_advection_terms" ) ;
+
+	vector<doubleVector*> advection = GLOBAL_EQ->get_velocity_advection();
+	size_t_array2D* void_frac = (is_solids) ?
+							allrigidbodies->get_void_fraction_on_grid(UF) : 0;
+
+	size_t_vector min_unknown_index(3,0);
+	size_t_vector max_unknown_index(3,0);
+
+	for (size_t comp=0;comp<nb_comps[1];comp++) {
+		// Get local min and max indices
+		for (size_t l=0;l<dim;++l) {
+			min_unknown_index(l) =
+								UF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+			max_unknown_index(l) =
+								UF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+		}
+
+		// Compute the advection value and store
+		for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+			for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+				for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+					size_t p = UF->DOF_local_number(i,j,k,comp);
+					// Advection contribution
+					advection[0]->operator()(p) = compute_adv_component(t_it,comp,i,j,k);
+				}
+			}
+		}
+
+		if (is_solids && StencilCorrection == "CutCell" && !is_CConlyDivergence) {
+			size_t UF_UNK_MAX = UF->nb_local_unknowns();
+			intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
+			// Flux redistribution
+			for (size_t i=min_unknown_index(0);i<=max_unknown_index(0);++i) {
+				for (size_t j=min_unknown_index(1);j<=max_unknown_index(1);++j) {
+					for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
+						size_t p = UF->DOF_local_number(i,j,k,comp);
+						if (ownerID->operator()(p) != -1) {
+							size_t p_lft = UF->DOF_local_number(i-1,j,k,comp);
+							size_t p_rht = UF->DOF_local_number(i+1,j,k,comp);
+							size_t p_bot = UF->DOF_local_number(i,j-1,k,comp);
+							size_t p_top = UF->DOF_local_number(i,j+1,k,comp);
+							size_t p_bhd = (dim == 2) ? 0 : UF->DOF_local_number(i,j,k-1,comp);
+							size_t p_frt = (dim == 2) ? 0 : UF->DOF_local_number(i,j,k+1,comp);
+
+							vector<double> wht = allrigidbodies->
+							flux_redistribution_factor(UF,i,j,k,comp,FluxRedistThres);
+
+						   // Flux redistribution
+						   double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];
+
+							if (sum > 0.) {
+								if (p_lft <= UF_UNK_MAX)
+									advection[0]->operator()(p_lft) +=
+													wht[0]/sum * advection[0]->operator()(p);
+								if (p_rht <= UF_UNK_MAX)
+									advection[0]->operator()(p_rht) +=
+													wht[1]/sum * advection[0]->operator()(p);
+								if (p_bot <= UF_UNK_MAX)
+									advection[0]->operator()(p_bot) +=
+													wht[2]/sum * advection[0]->operator()(p);
+								if (p_top <= UF_UNK_MAX)
+									advection[0]->operator()(p_top) +=
+													wht[3]/sum * advection[0]->operator()(p);
+								if (dim == 3) {
+									if (p_bhd <= UF_UNK_MAX)
+										advection[0]->operator()(p_bhd) +=
+													wht[4]/sum * advection[0]->operator()(p);
+									if (p_frt <= UF_UNK_MAX)
+										advection[0]->operator()(p_frt) +=
+													wht[5]/sum * advection[0]->operator()(p);
+								}
+								advection[0]->operator()(p) = 0.;
+							} else if ((sum == 0.) && (void_frac->operator()(p,0) != 0)) {
+								advection[0]->operator()(p) = 0.;
+							}
+						}
+					}
+				}
+			}
+		}
+
+	}
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void
+DS_NavierStokes:: compute_velocity_divergence ( FV_DiscreteField const* FF )
+//---------------------------------------------------------------------------
+{
+   MAC_LABEL("DS_NavierStokes:: compute_velocity_divergence" ) ;
+
+	size_t field = (FF == PF) ? 0 : 1;
+	size_t UNK_MAX = FF->nb_local_unknowns();
+	doubleArray2D* divergence = GLOBAL_EQ->get_node_divergence(field);
+	doubleArray2D* CC_vol = (is_solids) ? allrigidbodies->get_CC_cell_volume(FF) : 0;
+	intVector* ownerID = (is_solids) ? allrigidbodies->get_CC_ownerID(FF) : 0;
+
+	for (size_t comp = 0; comp < nb_comps[field]; comp++) {
+		// Get local min and max indices
+		size_t_vector min_unknown_index(3,0);
+		size_t_vector max_unknown_index(3,0);
+		for (size_t l = 0; l < dim; ++l) {
+			min_unknown_index(l) =
+					FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+			max_unknown_index(l) =
+					FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
+		}
+
+		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+			double dx = FF->get_cell_size( i, comp, 0 );
+			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+				double dy = FF->get_cell_size( j, comp, 1 );
+				for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+					double dz = (dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1.;
+					size_t p = FF->DOF_local_number(i,j,k,comp);
+					if (is_solids) {
+						int ownID = (StencilCorrection == "FD") ? -1
+									 : ownerID->operator()(p);
+						if (ownID == -1) {
+							double vel_div = (FF == UF) ?
+												divergence_of_U_noCorrection(i,j,k,comp,0)
+											 : calculate_velocity_divergence_FD(i,j,k,0);
+				         divergence->operator()(p,0) = vel_div * dx * dy * dz;
+						} else if (ownID != -1) {
+						   double rht_flux = allrigidbodies->velocity_flux(FF,p,0,0,1,0);
+						   double lft_flux = allrigidbodies->velocity_flux(FF,p,0,0,0,0);
+						   double top_flux = allrigidbodies->velocity_flux(FF,p,1,1,1,0);
+						   double bot_flux = allrigidbodies->velocity_flux(FF,p,1,1,0,0);
+						   double fnt_flux = (dim == 2) ? 0.
+						 	       			 : allrigidbodies->velocity_flux(FF,p,2,2,1,0);
+						   double bhd_flux = (dim == 2) ? 0.
+						 	    				 : allrigidbodies->velocity_flux(FF,p,2,2,0,0);
+
+							double xvalue = (rht_flux - lft_flux);
+							double yvalue = (top_flux - bot_flux);
+							double zvalue = (fnt_flux - bhd_flux);
+							double RB_flux = allrigidbodies->calculate_velocity_flux_fromRB(FF,p);
+							double dFV = 0.;//(CC_vol->operator()(p,0) - CC_vol->operator()(p,1))/0.001;
+
+							double value = xvalue + yvalue + zvalue + RB_flux + dFV;
+
+							// In case of nodes at the boundary of proc, especially
+							// nodes not handled by the proc
+							value = std::isnan(value) ? 0. : value;
+
+				         divergence->operator()(p,0) = value;
+						}
+					} else {
+						double vel_div = (FF == UF) ?
+											divergence_of_U_noCorrection(i,j,k,comp,0)
+										 : calculate_velocity_divergence_FD(i,j,k,0);
+						divergence->operator()(p,0) = vel_div * dx * dy * dz;
+					}
+				}
+			}
+		}
+
+		size_t_array2D* void_frac = (is_solids) ? allrigidbodies->get_void_fraction_on_grid(FF) : 0;
+
+		// Flux redistribution
+		if ((StencilCorrection == "CutCell")) {// && (FF == UF)) {
+			for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+				for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+					for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+						size_t p = FF->DOF_local_number(i,j,k,comp);
+						if (ownerID->operator()(p) != -1) {
+							size_t p_lft = FF->DOF_local_number(i-1,j,k,comp);
+							size_t p_rht = FF->DOF_local_number(i+1,j,k,comp);
+							size_t p_bot = FF->DOF_local_number(i,j-1,k,comp);
+							size_t p_top = FF->DOF_local_number(i,j+1,k,comp);
+							size_t p_bhd = (dim == 2) ? 0 : FF->DOF_local_number(i,j,k-1,comp);
+							size_t p_frt = (dim == 2) ? 0 : FF->DOF_local_number(i,j,k+1,comp);
+
+							vector<double> wht = allrigidbodies
+							->flux_redistribution_factor(FF,i,j,k,comp,FluxRedistThres);
+
+							// Flux redistribution
+							double sum = wht[0] + wht[1] + wht[2] + wht[3] + wht[4] + wht[5];
+
+							if (sum > 0.) {
+								if (p_lft <= UNK_MAX)
+									divergence->operator()(p_lft,0) +=
+													wht[0]/sum * divergence->operator()(p,0);
+								if (p_rht <= UNK_MAX)
+									divergence->operator()(p_rht,0) +=
+													wht[1]/sum * divergence->operator()(p,0);
+								if (p_bot <= UNK_MAX)
+									divergence->operator()(p_bot,0) +=
+													wht[2]/sum * divergence->operator()(p,0);
+								if (p_top <= UNK_MAX)
+									divergence->operator()(p_top,0) +=
+													wht[3]/sum * divergence->operator()(p,0);
+								if (dim == 3) {
+									if (p_bhd <= UNK_MAX)
+										divergence->operator()(p_bhd,0) +=
+													wht[4]/sum * divergence->operator()(p,0);
+									if (p_frt <= UNK_MAX)
+										divergence->operator()(p_frt,0) +=
+													wht[5]/sum * divergence->operator()(p,0);
+								}
+								divergence->operator()(p,0) = 0.;
+							} else if ((sum == 0.) && (void_frac->operator()(p,0) != 0)) {
+								divergence->operator()(p,0) = 0.;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Converting flux to divergence
+		for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
+			double dx = FF->get_cell_size( i, comp, 0 );
+			for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
+				double dy = FF->get_cell_size( j, comp, 1 );
+				for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
+					double dz = (dim == 3) ? FF->get_cell_size( k, comp, 2 ) : 1.;
+					size_t p = FF->DOF_local_number(i, j, k, comp);
+					double volume = dx * dy * dz;
+					// if (is_solids && (StencilCorrection == "CutCell")
+ 					//  && (CC_vol->operator()(p,0) >= FluxRedistThres*volume)) {
+					//  	volume = CC_vol->operator()(p,0);
+					// }
+					divergence->operator()(p,0) = divergence->operator()(p,0)/volume;
+				}
+			}
+		}
+	}
 }
 
 
@@ -2504,15 +3438,14 @@ DS_NavierStokes:: pressure_local_rhs ( size_t const& j
 
    // Vector for fi
    LocalVector* VEC = GLOBAL_EQ->get_VEC(0);
-   doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
+   doubleArray2D* divergence = GLOBAL_EQ->get_node_divergence(0);
 
    for (size_t i=min_unknown_index(dir);i<=max_unknown_index(dir);++i) {
       double dx = PF->get_cell_size( i, 0, dir );
       if (dir == 0) {
-         double vel_div = calculate_velocity_divergence(i,j,k,0,t_it);
+			size_t p = PF->DOF_local_number(i,j,k,0);
+         double vel_div = divergence->operator()(p,0);
          value = -(rho*vel_div*dx)/(t_it -> time_step());
-         size_t p = PF->DOF_local_number(i,j,k,0);
-         divergence->operator()(p) = vel_div;
       } else if (dir == 1) {
          value = PF->DOF_value( j, i, k, 0, 1 )*dx;
       } else if (dir == 2) {
@@ -2560,7 +3493,7 @@ DS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
   }
 
   NodeProp node = GLOBAL_EQ->get_node_property(0,0);
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
+  size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
 
   size_t comp = 0;
 
@@ -2569,28 +3502,28 @@ DS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
         for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
            size_t p = PF->DOF_local_number(i,j,k,comp);
            node.bound_cell->set_item(p,0.);
-           if (void_frac->operator()(p) != 0) {
+           if (void_frac->operator()(p,0) != 0) {
               double value = 0., count = 0.;
               size_t p1 = PF->DOF_local_number(i+1,j,k,comp);
               size_t p2 = PF->DOF_local_number(i-1,j,k,comp);
               size_t p3 = PF->DOF_local_number(i,j+1,k,comp);
               size_t p4 = PF->DOF_local_number(i,j-1,k,comp);
-              if (void_frac->operator()(p1) == 0) {
+              if (void_frac->operator()(p1,0) == 0) {
                  node.bound_cell->set_item(p,1.);
                  value += PF->DOF_value( i+1, j, k, comp, level );
                  count += 1.;
               }
-              if (void_frac->operator()(p2) == 0) {
+              if (void_frac->operator()(p2,0) == 0) {
                  node.bound_cell->set_item(p,1.);
                  value += PF->DOF_value( i-1, j, k, comp, level );
                  count += 1.;
               }
-              if (void_frac->operator()(p3) == 0) {
+              if (void_frac->operator()(p3,0) == 0) {
                  node.bound_cell->set_item(p,1.);
                  value += PF->DOF_value( i, j+1, k, comp, level );
                  count += 1.;
               }
-              if (void_frac->operator()(p4) == 0) {
+              if (void_frac->operator()(p4,0) == 0) {
                  node.bound_cell->set_item(p,1.);
                  value += PF->DOF_value( i, j-1, k, comp, level );
                  count += 1.;
@@ -2600,12 +3533,12 @@ DS_NavierStokes:: correct_pressure_1st_layer_solid (size_t const& level )
                  size_t p5 = PF->DOF_local_number(i,j,k+1,comp);
                  size_t p6 = PF->DOF_local_number(i,j,k-1,comp);
 
-                 if (void_frac->operator()(p5) == 0) {
+                 if (void_frac->operator()(p5,0) == 0) {
                     node.bound_cell->set_item(p,1.);
                     value += PF->DOF_value( i, j, k+1, comp, level );
                     count += 1.;
                  }
-                 if (void_frac->operator()(p6) == 0) {
+                 if (void_frac->operator()(p6,0) == 0) {
                     node.bound_cell->set_item(p,1.);
                     value += PF->DOF_value( i, j, k-1, comp, level );
                     count += 1.;
@@ -2639,7 +3572,7 @@ DS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
   }
 
   NodeProp node = GLOBAL_EQ->get_node_property(0,0);
-  size_t_vector* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
+  size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(PF);
 
   size_t comp = 0;
 
@@ -2647,7 +3580,7 @@ DS_NavierStokes:: correct_pressure_2nd_layer_solid (size_t const& level )
      for (size_t j = min_unknown_index(1);j <= max_unknown_index(1); ++j) {
         for (size_t k = min_unknown_index(2);k <= max_unknown_index(2); ++k) {
            size_t p = PF->DOF_local_number(i,j,k,comp);
-           if ((void_frac->operator()(p) != 0)
+           if ((void_frac->operator()(p,0) != 0)
             && (node.bound_cell->item(p) == 0)) {
               double value = 0., count = 0.;
               size_t p1 = PF->DOF_local_number(i+1,j,k,comp);
@@ -2719,7 +3652,7 @@ DS_NavierStokes:: correct_mean_pressure (size_t const& level )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
-  size_t_vector* void_frac = (is_solids) ?
+  size_t_array2D* void_frac = (is_solids) ?
   						allrigidbodies->get_void_fraction_on_grid(PF) : 0;
   size_t comp = 0;
 
@@ -2730,7 +3663,7 @@ DS_NavierStokes:: correct_mean_pressure (size_t const& level )
         for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
            if (is_solids) {
               size_t p = PF->DOF_local_number(i,j,k,comp);
-              if (void_frac->operator()(p) == 0) {
+              if (void_frac->operator()(p,0) == 0) {
                  mean += PF->DOF_value( i, j, k, comp, level );
                  nb_global_unknown += 1.;
               }
@@ -2749,7 +3682,7 @@ DS_NavierStokes:: correct_mean_pressure (size_t const& level )
         for (size_t k = min_unknown_index(2); k <= max_unknown_index(2); ++k) {
            if (is_solids) {
               size_t p = PF->DOF_local_number(i,j,k,comp);
-              if (void_frac->operator()(p) == 0) {
+              if (void_frac->operator()(p,0) == 0) {
                  double value = PF->DOF_value( i, j, k, comp, level );
 					  PF->set_DOF_value( i, j, k, comp, level, value-mean);
               }
@@ -2794,8 +3727,9 @@ DS_NavierStokes:: NS_pressure_update ( FV_TimeIterator const* t_it )
   }
 
   if (is_solids) {
-     correct_pressure_1st_layer_solid(1);
-     correct_pressure_2nd_layer_solid(1);
+	  // allrigidbodies->extrapolate_pressure_inside_RB(PF,1);
+	  correct_pressure_1st_layer_solid(1);
+	  correct_pressure_2nd_layer_solid(1);
   }
 }
 
@@ -2812,8 +3746,12 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    size_t_vector min_unknown_index(3,0);
    size_t_vector max_unknown_index(3,0);
 
-   doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
-   doubleVector* divergence_old = GLOBAL_EQ->get_node_divergence(1);
+   doubleArray2D* divergencePF = GLOBAL_EQ->get_node_divergence(0);
+	doubleArray2D* divergenceUF = GLOBAL_EQ->get_node_divergence(1);
+	doubleArray2D* CC_volPF = (is_solids) ? allrigidbodies->get_CC_cell_volume(PF) : 0;
+	doubleArray2D* CC_volUF = (is_solids) ? allrigidbodies->get_CC_cell_volume(UF) : 0;
+	size_t_array2D* void_fracPF = (is_solids) ? allrigidbodies->get_void_fraction_on_grid(PF) : 0;
+	size_t_array2D* void_fracUF = (is_solids) ? allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
    for (size_t l=0;l<dim;++l) {
       min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
@@ -2824,8 +3762,8 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
       for (size_t j = min_unknown_index(1); j <= max_unknown_index(1); ++j) {
          for (size_t k = min_unknown_index(2);k <= max_unknown_index(2); ++k) {
             size_t p = PF->DOF_local_number(i,j,k,0);
-            double vel_div0 = divergence->operator()(p);
-            double vel_div1 = divergence_old->operator()(p);
+            double vel_div0 = divergencePF->operator()(p,0);
+            double vel_div1 = divergencePF->operator()(p,1);
 
             // Assemble the bodyterm
             double value = PF->DOF_value( i, j, k, 0, 0 )
@@ -2844,12 +3782,29 @@ DS_NavierStokes:: NS_final_step ( FV_TimeIterator const* t_it )
    }
 
    // Store the divergence to be used in the next time iteration
-   for (size_t i = 0; i < divergence->size(); i++)
-      divergence_old->operator()(i) = divergence->operator()(i);
+   for (size_t i = 0; i < PF->nb_local_unknowns() ; i++) {
+      divergencePF->operator()(i,1) = divergencePF->operator()(i,0);
+		if (is_solids) {
+			if (StencilCorrection == "CutCell")
+				CC_volPF->operator()(i,1) = CC_volPF->operator()(i,0);
+			void_fracPF->operator()(i,1) = void_fracPF->operator()(i,0);
+		}
+	}
+
+	// Store the divergence to be used in the next time iteration
+	for (size_t i = 0; i < UF->nb_local_unknowns() ; i++) {
+		divergenceUF->operator()(i,1) = divergenceUF->operator()(i,0);
+		if (is_solids) {
+			if (StencilCorrection == "CutCell")
+				CC_volUF->operator()(i,1) = CC_volUF->operator()(i,0);
+			void_fracUF->operator()(i,1) = void_fracUF->operator()(i,0);
+		}
+	}
 
    if (is_solids) {
-      correct_pressure_1st_layer_solid(0);
-      correct_pressure_2nd_layer_solid(0);
+		// allrigidbodies->extrapolate_pressure_inside_RB(PF,0);
+		correct_pressure_1st_layer_solid(0);
+		correct_pressure_2nd_layer_solid(0);
    }
    // Propagate values to the boundaries depending on BC conditions
    PF->set_neumann_DOF_values();
@@ -2866,56 +3821,65 @@ DS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
   ofstream outputFile ;
 
   std::ostringstream os2;
-  os2 << "./DS_results/intersection_data.csv";
+  os2 << "./DS_results/intersection_data_" << my_rank << ".csv";
   std::string filename = os2.str();
   outputFile.open(filename.c_str());
 
   size_t field = (FF == UF) ? 1 : 0 ;
 
   size_t i,j,k;
-  outputFile << "x,y,z,void_frac,left,lv"
+  outputFile << "x,y,z,id,void_frac,div,left,lv"
              << ",right,rv"
              << ",bottom,bov"
              << ",top,tv"
              << ",behind,bev"
-             << ",front,fv" << endl;
+             << ",front,fv"
+				 << ",fresh"
+				 << ",field"
+				 << endl;
 
   size_t_vector min_index(dim,0);
   size_t_vector max_index(dim,0);
 
-  size_t_vector* void_frac = (is_solids) ?
+  boolVector* fresh_node = (is_solids) ?
+                    allrigidbodies->get_fresh_nodes(FF) : 0;
+  size_t_array2D* void_frac = (is_solids) ?
                     allrigidbodies->get_void_fraction_on_grid(FF) : 0;
   size_t_array2D* intersect_vector = (is_solids) ?
                     allrigidbodies->get_intersect_vector_on_grid(FF) : 0;
   doubleArray2D* intersect_distance = (is_solids) ?
                     allrigidbodies->get_intersect_distance_on_grid(FF) : 0;
 
+  doubleArray2D* divergence = GLOBAL_EQ->get_node_divergence(field);
+
   for (size_t comp=0;comp<nb_comps[field];comp++) {
      // Get local min and max indices
      for (size_t l=0;l<dim;++l) {
-        min_index(l) = 0;
-        max_index(l) = FF->get_local_nb_dof( comp, l );
+        min_index(l) = FF->get_min_index_unknown_handled_by_proc( comp, l ) ;
+        max_index(l) = FF->get_max_index_unknown_handled_by_proc( comp, l ) ;
      }
 
      size_t local_min_k = 0;
-     size_t local_max_k = 1;
+     size_t local_max_k = 0;
 
      if (dim == 3) {
         local_min_k = min_index(2);
         local_max_k = max_index(2);
      }
 
-     for (i=min_index(0);i<max_index(0);++i) {
+     for (i=min_index(0);i<=max_index(0);++i) {
         double xC = FF->get_DOF_coordinate( i, comp, 0 ) ;
-        for (j=min_index(1);j<max_index(1);++j) {
+        for (j=min_index(1);j<=max_index(1);++j) {
            double yC = FF->get_DOF_coordinate( j, comp, 1 ) ;
-           for (k=local_min_k;k<local_max_k;++k) {
+           for (k=local_min_k;k<=local_max_k;++k) {
               double zC = 0.;
               if (dim == 3) zC = FF->get_DOF_coordinate( k, comp, 2 ) ;
               size_t p = FF->DOF_local_number(i,j,k,comp);
 
               outputFile << xC << "," << yC << "," << zC
-              << "," << void_frac->operator()(p)
+				  << "," << p
+              << "," << void_frac->operator()(p,0)
+				  << "," << divergence->operator()(p,0)
               << "," << intersect_vector->operator()(p,0)
               << "," << intersect_distance->operator()(p,0)
               << "," << intersect_vector->operator()(p,1)
@@ -2928,6 +3892,8 @@ DS_NavierStokes::write_output_field(FV_DiscreteField const* FF)
               << "," << intersect_distance->operator()(p,4)
               << "," << intersect_vector->operator()(p,5)
               << "," << intersect_distance->operator()(p,5)
+				  << "," << fresh_node->operator()(p)
+				  << "," << FF->DOF_value(i,j,k,comp,0)
               << endl;
            }
         }
@@ -2949,7 +3915,7 @@ DS_NavierStokes::output_L2norm_divergence( )
   double div_velocity = 0.;
   double max_divu = 0.;
 
-  doubleVector* divergence = GLOBAL_EQ->get_node_divergence(0);
+  doubleArray2D* divergence = GLOBAL_EQ->get_node_divergence(0);
 
   for (size_t l=0;l<dim;++l) {
     min_unknown_index(l) = PF->get_min_index_unknown_handled_by_proc( 0, l ) ;
@@ -2962,22 +3928,23 @@ DS_NavierStokes::output_L2norm_divergence( )
         double dy = PF->get_cell_size( j, 0, 1 );
         if (dim == 2) {
            size_t p = PF->DOF_local_number(i,j,0,0);
-           double vel_div = divergence->operator()(p);
+           double vel_div = divergence->operator()(p,0);
            max_divu = MAC::max( MAC::abs(vel_div), max_divu );
-           div_velocity += vel_div * ( dx * dy );
+           div_velocity += vel_div * vel_div * ( dx * dy );
         } else {
            for (size_t k=min_unknown_index(2);k<=max_unknown_index(2);++k) {
               double dz = PF->get_cell_size( k, 0, 2 );
               size_t p = PF->DOF_local_number(i,j,k,0);
-              double vel_div = divergence->operator()(p);
+              double vel_div = divergence->operator()(p,0);
               max_divu = MAC::max( MAC::abs(vel_div), max_divu );
-              div_velocity += vel_div * ( dx * dy * dz );
+              div_velocity += vel_div * vel_div * ( dx * dy * dz );
            }
         }
      }
   }
 
   div_velocity = macCOMM->sum( div_velocity ) ;
+  div_velocity = MAC::sqrt( div_velocity );
   max_divu = macCOMM->max( max_divu ) ;
   if ( my_rank == is_master )
     MAC::out() << "Norm L2 div(u) = "
@@ -2985,6 +3952,13 @@ DS_NavierStokes::output_L2norm_divergence( )
                << " Max div(u) = "
                << MAC::doubleToString( ios::scientific, 12, max_divu )
                << endl;
+
+  if ( my_rank == is_master ) {
+     string fileName = "./DS_results/max_divergence.csv" ;
+     ofstream MyFile( fileName.c_str(), ios::app ) ;
+     MyFile << div_velocity << "," << max_divu << endl;
+     MyFile.close( ) ;
+  }
 }
 
 
@@ -3006,7 +3980,7 @@ DS_NavierStokes::output_L2norm_pressure( size_t const& level )
      max_unknown_index(l) = PF->get_max_index_unknown_handled_by_proc( 0, l ) ;
   }
 
-  size_t_vector* void_frac = (is_solids) ?
+  size_t_array2D* void_frac = (is_solids) ?
   									  allrigidbodies->get_void_fraction_on_grid(PF) : 0;
 
   for (size_t i = min_unknown_index(0); i <= max_unknown_index(0); ++i) {
@@ -3019,7 +3993,7 @@ DS_NavierStokes::output_L2norm_pressure( size_t const& level )
            max_P = MAC::max( MAC::abs(cell_P), max_P );
            if (is_solids) {
               size_t p = PF->DOF_local_number(i,j,k,0);
-              if (void_frac->operator()(p) == 0) {
+              if (void_frac->operator()(p,0) == 0) {
                  L2normP += cell_P * cell_P * dx * dy * dz;
               }
            } else {
@@ -3093,7 +4067,7 @@ DS_NavierStokes::output_L2norm_velocity( size_t const& level )
   size_t_vector min_unknown_index(3,0);
   size_t_vector max_unknown_index(3,0);
 
-  size_t_vector* void_frac = (is_solids) ?
+  size_t_array2D* void_frac = (is_solids) ?
   									allrigidbodies->get_void_fraction_on_grid(UF) : 0;
 
   for (size_t comp = 0; comp < nb_comps[1]; comp++) {
@@ -3117,7 +4091,7 @@ DS_NavierStokes::output_L2norm_velocity( size_t const& level )
               max_U = MAC::max( MAC::abs(cell_U), max_U );
               if (is_solids) {
                  size_t p = UF->DOF_local_number(i,j,k,comp);
-                 if (void_frac->operator()(p) == 0) {
+                 if (void_frac->operator()(p,0) == 0) {
                     L2normU += cell_U * cell_U * dx * dy * dz;
                  }
               } else {
@@ -3369,22 +4343,6 @@ DS_NavierStokes:: free_DS_subcommunicators ( void )
 
 //---------------------------------------------------------------------------
 void
-DS_NavierStokes:: set_translation_vector()
-//---------------------------------------------------------------------------
-{
-   MAC_LABEL( "DS_NavierStokes:: set_translation_vector" ) ;
-
-   MVQ_translation_vector.resize( dim );
-   translation_direction = UF->primary_grid()->get_translation_direction() ;
-   MVQ_translation_vector( translation_direction ) =
-        UF->primary_grid()->get_translation_magnitude() ;
-}
-
-
-
-
-//---------------------------------------------------------------------------
-void
 DS_NavierStokes::build_links_translation()
 //---------------------------------------------------------------------------
 {
@@ -3393,6 +4351,64 @@ DS_NavierStokes::build_links_translation()
    UF->create_transproj_interpolation() ;
    PF->create_transproj_interpolation() ;
 
+   double translation_magnitude =
+   	UF->primary_grid()->get_translation_magnitude();
+   size_t translation_direction =
+   	UF->primary_grid()->get_translation_direction();
+
+   string outOfDomain_boundaryName;
+   switch( translation_direction )
+   {
+     case 0:
+       if ( translation_magnitude > 0. ) outOfDomain_boundaryName = "right" ;
+       else outOfDomain_boundaryName = "left" ;
+       break;
+     case 1:
+       if ( translation_magnitude > 0. ) outOfDomain_boundaryName = "top" ;
+       else outOfDomain_boundaryName = "bottom" ;
+       break;
+     case 2:
+       if ( translation_magnitude > 0. ) outOfDomain_boundaryName = "front" ;
+       else outOfDomain_boundaryName = "behind" ;
+       break;
+   }
+
+   outOfDomain_boundaryID = int( FV_DomainBuilder::get_color_number(
+   	outOfDomain_boundaryName ) );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+doubleVector
+DS_NavierStokes::compute_outOfDomain_Pressure(size_t const& level)
+//---------------------------------------------------------------------------
+{
+	MAC_LABEL( "DS_NavierStokes:: compute_outOfDomain_Pressure" ) ;
+
+	size_t_vector nb_local_dof( dim, 0 );
+	doubleVector Pref(1,0.);
+	for (size_t l= 0; l < dim; l++)
+		nb_local_dof(l) = PF->get_local_nb_dof( 0, l ) ;
+
+	bool b_gotIt = false;
+
+	for (size_t i = 0; (i <= nb_local_dof(0)) && (!b_gotIt); i++) {
+		for (size_t j = 0; (j <= nb_local_dof(1)) && (!b_gotIt); j++) {
+			for (size_t k = 0; (k <= nb_local_dof(2)) && (!b_gotIt); k++) {
+				if ( PF->DOF_color( i, j, k, 0 ) == outOfDomain_boundaryID ) {
+					Pref(0) = PF->DOF_value( i, j, k, 0, level ) ;
+					b_gotIt = true;
+				}
+			}
+		}
+	}
+
+	Pref(0) = macCOMM->sum(Pref(0));
+
+	return(Pref);
 }
 
 
@@ -3421,13 +4437,15 @@ DS_NavierStokes::fields_projection()
    UF->translation_projection( 3, 5, 0 ) ;
 	UF->synchronize( 3 ) ;
 
-   UF->translation_projection( 4, 5 ) ;
+   UF->translation_projection( 4, 5, 1 ) ;
 	UF->synchronize( 4 ) ;
 
-   PF->translation_projection( 0, 2, 0 ) ;
+	// doubleVector POut = compute_outOfDomain_Pressure(0);
+   PF->translation_projection( 0, 2, 0);//, &POut ) ;
 	PF->synchronize( 0 );
 
-   PF->translation_projection( 1, 2 ) ;
+	// POut = compute_outOfDomain_Pressure(1);
+   PF->translation_projection( 1, 2, 1);//, &POut ) ;
 	PF->synchronize( 1 );
 
 }
@@ -3643,6 +4661,319 @@ DS_NavierStokes:: assemble_advection_Centered( size_t const& advecting_level,
       flux = (fto - fbo) * dxC * dzC + (fri - fle) * dyC * dzC + (ffr - fbe) * dxC * dyC;
    }
    return ( coef * flux );
+}
+
+
+
+
+//----------------------------------------------------------------------
+double
+DS_NavierStokes:: assemble_advection_Centered_FD(double const& coef,
+													          size_t const& i,
+                                                 size_t const& j,
+                                                 size_t const& k,
+                                                 size_t const& comp,
+																 size_t const& level)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_NavierStokes:: assemble_advection_Centered_FD" );
+
+	double dh = UF->primary_grid()->get_smallest_grid_size();
+   double threshold = 0.0001*dh;
+	FV_SHIFT_TRIPLET shift = UF->shift_staggeredToStaggered( comp );
+
+	double dxC = UF->get_cell_size(i,comp,0) ;
+	double dyC = UF->get_cell_size(j,comp,1) ;
+	double dzC = (dim == 3) ? UF->get_cell_size(k,comp,2) : 1.;
+
+	geomVector pt(3,0.);
+	pt(0) = UF->get_DOF_coordinate( i, comp, 0 );
+	pt(1) = UF->get_DOF_coordinate( j, comp, 1 );
+	pt(2) = (dim == 3) ? UF->get_DOF_coordinate( k, comp, 2 ) : 0. ;
+
+	size_t_vector face_vector(3,0);
+	face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
+
+	doubleVector ui(3,0.);
+	doubleVector dui(3,0.);
+	doubleVector dC(3,1.);
+
+	dC(0) = dxC; dC(1) = dyC; dC(2) = dzC;
+
+	size_t p = UF->DOF_local_number(i,j,k,comp);
+
+	size_t_array2D* intersect_vector = (is_solids) ?
+						allrigidbodies->get_intersect_vector_on_grid(UF) : 0;
+
+	bool nearRB = false;
+	if (is_solids) {
+		for (size_t dir = 0; dir < dim && !nearRB ; dir++) {
+			nearRB = (intersect_vector->operator()(p,2*dir+0) == 1)
+					|| (intersect_vector->operator()(p,2*dir+1) == 1);
+		}
+		size_t_array2D* void_frac = allrigidbodies->get_void_fraction_on_grid(UF);
+		if (void_frac->operator()(p,0) != 0) return(0.);
+	}
+
+	for (size_t cpt = 0; cpt < dim; cpt++) {
+		auto value = compute_first_derivative(comp,i,j,k,cpt,level);
+		dui(cpt) = std::get<0>(value);
+		dC(cpt) = std::get<1>(value);
+
+		if (is_solids && nearRB) {
+			if (cpt != comp) {
+				size_t_vector i0(3);
+				for (size_t l = 0; l < dim; l++) {
+					size_t i0_temp;
+					bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(cpt,l),
+					pt(l) + threshold, i0_temp);
+					if (found) i0(l) = i0_temp;
+				}
+				ui(cpt) = (dim == 2) ? allrigidbodies->
+						Bilinear_interpolation(UF, cpt, &pt, i0, face_vector, {level})
+												: allrigidbodies->
+						Trilinear_interpolation(UF, cpt, &pt, i0, {level});
+			} else {
+				ui(cpt) = UF->DOF_value( i, j, k, comp, level );
+			}
+			// if (p == 10584) {
+			// 	cout << cpt << "," << dui(cpt) << "," << dC(cpt) << "," << ui(cpt) << endl;
+			// }
+		} else {
+			if (comp == 0) {
+				if (cpt == 0) {
+					ui(cpt) = UF->DOF_value( i, j, k, comp, level );
+				} else if (cpt == 1) {
+					double uToLe = UF->DOF_value(i+shift.i-1, j+shift.j, k, cpt, level );
+			      double uToRi = UF->DOF_value(i+shift.i, j+shift.j, k, cpt, level );
+					double uBoLe = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, cpt, level );
+			      double uBoRi = UF->DOF_value(i+shift.i, j+shift.j-1, k, cpt, level );
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_RIGHT) {
+						ui(cpt) = 0.5 * (uToLe + uBoLe);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_LEFT) {
+						ui(cpt) = 0.5 * (uToRi + uBoRi);
+					} else {
+						ui(cpt) = 0.25 * (uToLe + uToRi + uBoLe + uBoRi);
+					}
+				} else if (cpt == 2) {
+					double uFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, cpt, level );
+					double uFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, cpt, level );
+					double uBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, cpt, level );
+					double uBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, cpt, level );
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_RIGHT) {
+						ui(cpt) = 0.5 * (uFrLe + uBeLe);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_LEFT) {
+						ui(cpt) = 0.5 * (uFrRi + uBeRi);
+					} else {
+						ui(cpt) = 0.25 * (uFrLe + uFrRi + uBeLe + uBeRi);
+					}
+				}
+			} else if (comp == 1) {
+				if (cpt == 0) {
+					double uToLe = UF->DOF_value(i+shift.i-1, j+shift.j, k, cpt, level );
+			      double uToRi = UF->DOF_value(i+shift.i, j+shift.j, k, cpt, level );
+					double uBoLe = UF->DOF_value(i+shift.i-1, j+shift.j-1, k, cpt, level );
+			      double uBoRi = UF->DOF_value(i+shift.i, j+shift.j-1, k, cpt, level );
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_TOP) {
+						ui(cpt) = 0.5 * (uBoLe + uBoRi);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_BOTTOM) {
+						ui(cpt) = 0.5 * (uToLe + uToRi);
+					} else {
+						ui(cpt) = 0.25 * (uToLe + uToRi + uBoLe + uBoRi);
+					}
+				} else if (cpt == 1) {
+					ui(cpt) = UF->DOF_value( i, j, k, comp, level );
+				} else if (cpt == 2) {
+					double uFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, cpt, level );
+					double uFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, cpt, level );
+					double uBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, cpt, level );
+					double uBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, cpt, level );
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_TOP) {
+						ui(cpt) = 0.5 * (uFrBo + uBeBo);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_BOTTOM) {
+						ui(cpt) = 0.5 * (uFrTo + uBeTo);
+					} else {
+						ui(cpt) = 0.25 * (uFrBo + uFrTo + uBeBo + uBeTo);
+					}
+				}
+			} else if (comp == 2) {
+				if (cpt == 0) {
+					double uFrLe = UF->DOF_value(i+shift.i-1, j, k+shift.k, cpt, level );
+					double uFrRi = UF->DOF_value(i+shift.i, j, k+shift.k, cpt, level );
+					double uBeLe = UF->DOF_value(i+shift.i-1, j, k+shift.k-1, cpt, level );
+					double uBeRi = UF->DOF_value(i+shift.i, j, k+shift.k-1, cpt, level );
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_FRONT) {
+						ui(cpt) = 0.5 * (uBeLe + uBeRi);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_BEHIND) {
+						ui(cpt) = 0.5 * (uFrLe + uFrRi);
+					} else {
+						ui(cpt) = 0.25 * (uFrLe + uFrRi + uBeLe + uBeRi);
+					}
+				} else if (cpt == 1) {
+					double uFrBo = UF->DOF_value(i, j+shift.j-1, k+shift.k, cpt, level );
+					double uFrTo = UF->DOF_value(i, j+shift.j, k+shift.k, cpt, level );
+					double uBeBo = UF->DOF_value(i, j+shift.j-1, k+shift.k-1, cpt, level );
+					double uBeTo = UF->DOF_value(i, j+shift.j, k+shift.k-1, cpt, level );
+					if (UF->DOF_color( i, j, k, comp) == FV_BC_FRONT) {
+						ui(cpt) = 0.5 * (uBeBo + uBeTo);
+					} else if (UF->DOF_color( i, j, k, comp) == FV_BC_BEHIND) {
+						ui(cpt) = 0.5 * (uFrBo + uFrTo);
+					} else {
+						ui(cpt) = 0.25 * (uFrBo + uFrTo + uBeBo + uBeTo);
+					}
+				} else if (cpt == 2) {
+					ui(cpt) = UF->DOF_value( i, j, k, comp, level );
+				}
+			}
+		}
+	}
+
+	double beta = 1.;
+
+	beta = MAC::min(dC(0)/dxC,dC(1)/dyC);
+	if (dim == 3) beta = MAC::min(beta, dC(2)/dzC);
+	beta *= dxC * dyC * dzC;
+
+	return ( coef*(ui(0)*dui(0)+ui(1)*dui(1)+ui(2)*dui(2))*beta);
+}
+
+
+
+
+//----------------------------------------------------------------------
+double
+DS_NavierStokes:: assemble_advection_Centered_CutCell(FV_TimeIterator const* t_it,
+																		double const& coef,
+																		size_t const& i,
+                                                	   size_t const& j,
+                                                		size_t const& k,
+                                                		size_t const& comp,
+																	 	size_t const& level)
+//----------------------------------------------------------------------
+{
+   MAC_LABEL( "DS_NavierStokes:: assemble_advection_Centered_CutCell" );
+
+	double dh = UF->primary_grid()->get_smallest_grid_size();
+   double threshold = 0.0001*dh;
+
+	intVector color(6);
+	color(0) = FV_BC_LEFT; color(1) = FV_BC_RIGHT;
+	color(2) = FV_BC_BOTTOM; color(3) = FV_BC_TOP;
+	if (dim == 3) {color(4) = FV_BC_BEHIND; color(5) = FV_BC_FRONT;}
+
+	doubleArray2D* face_fraction = allrigidbodies->get_CC_face_fraction(UF);
+	doubleArray3D* face_centroid = allrigidbodies->get_CC_face_centroid(UF);
+
+	doubleVector flux(6,0.);
+
+	// Area of the faces without even considering the RB
+	doubleVector GridfaceArea(3,0.);
+   double dxC = UF->get_cell_size(i,comp,0) ;
+   double dyC = UF->get_cell_size(j,comp,1) ;
+   double dzC = (dim == 3) ? UF->get_cell_size(k,comp,2) : 1.;
+	GridfaceArea(0) = dyC * dzC ;
+	GridfaceArea(1) = dxC * dzC ;
+	GridfaceArea(2) = dxC * dyC ;
+
+   double ValueC = UF->DOF_value( i, j, k, comp, level );
+
+	size_t_vector face_vector(3,0);
+	face_vector(0) = 1; face_vector(1) = 1; face_vector(2) = 0;
+
+	size_t p = UF->DOF_local_number(i, j, k, comp);
+
+	for (size_t dir = 0; dir < dim; dir++) {
+		for (size_t side = 0; side < 2; side++) {
+			if (comp == dir) {
+				if ( UF->DOF_color( i, j, k, comp ) == color(2*dir+side) ) {
+		         flux(2*dir+side) = ValueC * ValueC * GridfaceArea(dir);
+				} else {
+					if ((face_fraction->operator()(p,2*dir+side) <= GridfaceArea(dir) + threshold)
+					 && (face_fraction->operator()(p,2*dir+side) != 0.) ) {
+						geomVector pt(3);
+						pt(0) = face_centroid->operator()(p,2*dir+side,0);
+						pt(1) = face_centroid->operator()(p,2*dir+side,1);
+						pt(2) = face_centroid->operator()(p,2*dir+side,2);
+
+						size_t_vector i0(3);
+						for (size_t l = 0; l < dim; l++) {
+				         size_t i0_temp;
+				         bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
+				                                        pt(l) + threshold, i0_temp);
+				         if (found) i0(l) = i0_temp;
+						}
+						double uface = (dim == 2) ? allrigidbodies->
+							Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level})
+														  : allrigidbodies->
+						   Trilinear_interpolation(UF, comp, &pt, i0, {level});
+						flux(2*dir+side) = uface * uface * face_fraction->operator()(p,2*dir+side);
+					}
+				}
+			} else {
+				if ((face_fraction->operator()(p,2*dir+side) <= GridfaceArea(dir) + threshold)
+				 && (face_fraction->operator()(p,2*dir+side) != 0.) ) {
+					geomVector pt(3);
+					pt(0) = face_centroid->operator()(p,2*dir+side,0);
+					pt(1) = face_centroid->operator()(p,2*dir+side,1);
+					pt(2) = face_centroid->operator()(p,2*dir+side,2);
+
+					size_t_vector i0(3);
+					// Advector value
+					for (size_t l = 0; l < dim; l++) {
+						size_t i0_temp;
+						bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(dir,l),
+																 pt(l) + threshold, i0_temp);
+						if (found) i0(l) = i0_temp;
+					}
+					double uAdvector = (dim == 2) ? allrigidbodies->
+						Bilinear_interpolation(UF, dir, &pt, i0, face_vector, {level})
+															: allrigidbodies->
+						Trilinear_interpolation(UF, dir, &pt, i0, {level});
+					// Advected value
+					for (size_t l = 0; l < dim; l++) {
+						size_t i0_temp;
+						bool found = FV_Mesh::between( UF->get_DOF_coordinates_vector(comp,l),
+																 pt(l) + threshold, i0_temp);
+						if (found) i0(l) = i0_temp;
+					}
+					double uAdvected = (dim == 2) ? allrigidbodies->
+						Bilinear_interpolation(UF, comp, &pt, i0, face_vector, {level})
+										  					: allrigidbodies->
+					  	Trilinear_interpolation(UF, comp, &pt, i0, {level});
+					flux(2*dir+side) = uAdvected * uAdvector * face_fraction->operator()(p,2*dir+side);
+				}
+			}
+		}
+	}
+
+	// RB contribution
+	intVector* ownerID = allrigidbodies->get_CC_ownerID(UF);
+	doubleArray2D* normalRB = allrigidbodies->get_CC_RB_normal(UF);
+	doubleVector* RBarea = allrigidbodies->get_CC_RB_area(UF);
+	double fsurf = 0.;
+	// // Effect of volume change, based on Seo and Mittal 2011; and Arthur Ghigo CutCell
+	doubleArray2D* CC_vol = allrigidbodies->get_CC_cell_volume(UF);
+	double dFV = 0.;
+
+	if ((ownerID->operator()(p) != -1) && (RBarea->operator()(p) != 0.)) {
+		size_t local_parID = (size_t) ownerID->operator()(p);
+		geomVector const* pgc = allrigidbodies->get_gravity_centre(local_parID);
+      geomVector pt(pgc->operator()(0),
+                    pgc->operator()(1),
+                    pgc->operator()(2));
+      geomVector rbVel = allrigidbodies->rigid_body_velocity(local_parID,pt);
+		geomVector normVec(normalRB->operator()(p,0),
+								 normalRB->operator()(p,1),
+							    normalRB->operator()(p,2));
+	   normVec *= 1./normVec.calcNorm();
+
+		fsurf = rbVel(comp) * rbVel.operator,(normVec) * RBarea->operator()(p);
+
+		dFV = 0.;//(CC_vol->operator()(p,0) - CC_vol->operator()(p,1))
+			 // * (ValueC - rbVel(comp)) / t_it->time_step();
+	}
+
+   return ( coef * ((flux(3) - flux(2)) + (flux(1) - flux(0)) + (flux(5) - flux(4)) - fsurf + dFV) );
 }
 
 

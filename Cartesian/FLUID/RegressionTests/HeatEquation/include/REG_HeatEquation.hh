@@ -3,8 +3,8 @@
 
 #include <FV_OneStepIteration.hh>
 #include <geomVector.hh>
-#include <computingtime.hh>
-#include <solvercomputingtime.hh>
+#include <PAC_computingtime.hh>
+#include <PAC_solvercomputingtime.hh>
 #include <vector>
 #include <string>
 #include <iostream>
@@ -27,8 +27,8 @@ Equation: dT/dt = ( 1 / Pe ) * lap(T) + bodyterm, where Pe is the Peclet number.
 
 @author A. Wachs - Pacific project 2017 */
 
-class REG_HeatEquation : public FV_OneStepIteration, public ComputingTime,
-public SolverComputingTime
+class REG_HeatEquation : public FV_OneStepIteration, public PAC_ComputingTime,
+	public PAC_SolverComputingTime
 {
    public: //-----------------------------------------------------------------
 

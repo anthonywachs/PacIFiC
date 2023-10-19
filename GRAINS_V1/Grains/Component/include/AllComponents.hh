@@ -73,11 +73,11 @@ class AllComponents
 
     /** @brief Associates the imposed velocity to the obstacle
     @param impvel imposed velocity */
-    void LinkImposedMotion( ObstacleImposedVelocity &impvel );
+    void LinkImposedMotion( ObstacleImposedVelocity* impvel );
 
     /** @brief Associates the imposed velocity to the obstacle
     @param load imposed force */
-    void LinkImposedMotion( ObstacleImposedForce &load );
+    void LinkImposedMotion( ObstacleImposedForce* load );
 
     /** @brief Initializes forces exerted on all components and set coordination
     number to 0
@@ -222,6 +222,9 @@ class AllComponents
 
     /** @brief Returns a pointer to the map of serial clone particles */
     multimap<int,Particle*>* getPeriodicCloneParticles();
+    
+    /** @brief Returns a pointer to the map of serial clone particles */
+    multimap<int,Particle*> const* getPeriodicCloneParticles() const;    
 
     /** @brief Returns a pointer to the vector of reference particles */
     vector<Particle*>* getReferenceParticles();

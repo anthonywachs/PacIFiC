@@ -665,7 +665,7 @@ bool CompositeParticle::isContact( Component const* voisin ) const
   bool contact = false;
 
   for ( size_t i=0; i<m_nbElemPart && !contact; ++i )
-    if ( voisin->isCompositeParticle() )
+    if ( voisin->isCompositeParticle() || voisin->isSTLObstacle() )
       contact = voisin->isContact( m_elementaryParticles[i] );
     else
       contact = m_elementaryParticles[i]->isContact( voisin );
@@ -685,7 +685,7 @@ bool CompositeParticle::isContactWithCrust( Component const* voisin ) const
   bool contact = false;
 
   for ( size_t i=0; i<m_nbElemPart && !contact; ++i )
-    if ( voisin->isCompositeParticle() )
+    if ( voisin->isCompositeParticle() || voisin->isSTLObstacle() )
       contact = voisin->isContactWithCrust( m_elementaryParticles[i] );
     else
       contact = m_elementaryParticles[i]->isContactWithCrust( voisin );
@@ -705,7 +705,7 @@ bool CompositeParticle::isClose( Component const* voisin ) const
   bool contact = false;
 
   for ( size_t i=0; i<m_nbElemPart && !contact; ++i )
-    if ( voisin->isCompositeParticle() )
+    if ( voisin->isCompositeParticle() || voisin->isSTLObstacle() )
       contact = voisin->isClose( m_elementaryParticles[i] );
     else
       contact = m_elementaryParticles[i]->isClose( voisin );
@@ -726,7 +726,7 @@ bool CompositeParticle::isCloseWithCrust( Component const* voisin ) const
   bool contact = false;
 
   for ( size_t i=0; i<m_nbElemPart && !contact; ++i )
-    if ( voisin->isCompositeParticle() )
+    if ( voisin->isCompositeParticle() || voisin->isSTLObstacle() )
       contact = voisin->isCloseWithCrust( m_elementaryParticles[i] );
     else
       contact = m_elementaryParticles[i]->isCloseWithCrust( voisin );
@@ -743,14 +743,14 @@ bool CompositeParticle::isCloseWithCrust( Component const* voisin ) const
 void CompositeParticle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
 {
-  try{
+  try {
   list<ContactInfos*>  listContactInfos;
 
-  // Search all contact between the composite particle and the component
+  // Search all contact points between the composite particle and the component
   // and store them in the list listContactInfos
   for ( size_t i=0; i<m_nbElemPart; ++i )
   {
-    if ( voisin->isCompositeParticle() )
+    if ( voisin->isCompositeParticle() || voisin->isSTLObstacle() )
       voisin->SearchContact( m_elementaryParticles[i], dt,
 	  time, LC, listContactInfos );
     else m_elementaryParticles[i]->SearchContact( voisin, dt,
@@ -793,7 +793,7 @@ void CompositeParticle::SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC,
       list<ContactInfos*>& listContact )
 {
-  try{
+  try {
   for ( size_t i=0; i<m_nbElemPart; ++i )
       m_elementaryParticles[i]->SearchContact( voisin, dt, time, LC,
 	listContact );

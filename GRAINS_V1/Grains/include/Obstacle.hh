@@ -175,12 +175,12 @@ class Obstacle : public Component
     /** @brief Links imposed kinematics to the obstacle and returns true if the
     linking process is successful
     @param imposed the imposed kinematics */
-    virtual bool LinkImposedMotion( ObstacleImposedVelocity& imposed );
+    virtual bool LinkImposedMotion( ObstacleImposedVelocity* imposed );
 
     /** @brief Links imposed force kinematics to the obstacle and returns true
     if the linking process is successful
     @param imposed the imposed force */
-    virtual bool LinkImposedMotion( ObstacleImposedForce& imposed );
+    virtual bool LinkImposedMotion( ObstacleImposedForce* imposed );
 
     /** @brief Resets kinematics to 0 */
     virtual void resetKinematics();

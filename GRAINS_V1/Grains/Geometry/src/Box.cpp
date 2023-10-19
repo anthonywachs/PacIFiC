@@ -18,6 +18,7 @@ Box::Box( Vector3 const& extent_ )
   : m_extent( extent_ )
   , m_corners2D_XY( NULL )
 {
+  if ( GrainsBuilderFactory::getContext() == DIM_2 ) m_extent[Z] = 0.;
   setCornersFaces();
 }
 
@@ -26,10 +27,11 @@ Box::Box( Vector3 const& extent_ )
 
 // ----------------------------------------------------------------------------
 // Constructor with edge length as input parameters
-Box::Box(double x, double y, double z)
+Box::Box( double x, double y, double z )
   : m_extent( fabs(x)/2., fabs(y)/2., fabs(z)/2. )
   , m_corners2D_XY( NULL )
 {
+  if ( GrainsBuilderFactory::getContext() == DIM_2 ) m_extent[Z] = 0.;
   setCornersFaces();
 }
 
@@ -56,7 +58,8 @@ Box::Box( DOMNode* root )
   m_extent[X] = ReaderXML::getNodeAttr_Double( root, "LX" ) / 2.;
   m_extent[Y] = ReaderXML::getNodeAttr_Double( root, "LY" ) / 2.;
   m_extent[Z] = ReaderXML::getNodeAttr_Double( root, "LZ" ) / 2.;
-  setCornersFaces();
+  if ( GrainsBuilderFactory::getContext() == DIM_2 ) m_extent[Z] = 0.;
+  setCornersFaces(); 
 }
 
 
@@ -88,10 +91,10 @@ ConvexType Box::getConvexType() const
 
 
 // ----------------------------------------------------------------------------
-// Construit les sommets du pav� et les faces
+// Sets the corner/vertex coordinates and the face/vertices numbering
 void Box::setCornersFaces()
 {
-  m_corners.reserve(8);
+  m_corners.reserve( 8 );
   Point3 sommet;
   sommet.setValue( - m_extent[X], - m_extent[Y], - m_extent[Z] );
   m_corners.push_back(sommet);
@@ -113,7 +116,7 @@ void Box::setCornersFaces()
   if ( m_allFaces.empty() )
   {
     vector<int> oneFace( 4, 0 );
-    m_allFaces.reserve(6);
+    m_allFaces.reserve( 6 );
     for (int i=0;i<6;++i) m_allFaces.push_back( oneFace );
 
     m_allFaces[0][0]=4;
@@ -147,7 +150,7 @@ void Box::setCornersFaces()
     m_allFaces[5][3]=2;
   }
 
-  // Dans le cas o� la box est utlis�e dans une simu 2D
+  // In case of a 2D simulation
   if ( GrainsBuilderFactory::getContext() == DIM_2 )
   {
     m_corners2D_XY = new vector<Point3>( 4, sommet );
@@ -180,12 +183,23 @@ Convex* Box::clone() const
 bool Box::BuildInertia( double* inertia, double* inertia_1 ) const
 {
   inertia[1] = inertia[2] = inertia[4] = 0.0;
-  inertia[0] = 8.0 * m_extent[X] * m_extent[Y] * m_extent[Z]
+  if ( GrainsBuilderFactory::getContext() == DIM_2 )
+  {
+    inertia[0] = 4.0 * m_extent[X] * m_extent[Y] * m_extent[Y] 
+    	* m_extent[Y]  / 3.0;
+    inertia[3] = 4.0 * m_extent[Y] * m_extent[X] * m_extent[X] 
+    	* m_extent[X]  / 3.0;
+    inertia[5] = inertia[0] + inertia[3];
+  }
+  else
+  {
+    inertia[0] = 8.0 * m_extent[X] * m_extent[Y] * m_extent[Z]
     * ( m_extent[Y] * m_extent[Y] + m_extent[Z] * m_extent[Z] ) / 3.0;
-  inertia[3] = 8.0 * m_extent[X] * m_extent[Y] * m_extent[Z]
+    inertia[3] = 8.0 * m_extent[X] * m_extent[Y] * m_extent[Z]
     * ( m_extent[X] * m_extent[X] + m_extent[Z] * m_extent[Z] ) / 3.0;
-  inertia[5] = 8.0 * m_extent[X] * m_extent[Y] * m_extent[Z]
+    inertia[5] = 8.0 * m_extent[X] * m_extent[Y] * m_extent[Z]
     * ( m_extent[Y] * m_extent[Y] + m_extent[X] * m_extent[X] ) / 3.0;
+  }  
 
   inertia_1[1] = inertia_1[2] = inertia_1[4] = 0.0;
   inertia_1[0] = 1.0 / inertia[0];

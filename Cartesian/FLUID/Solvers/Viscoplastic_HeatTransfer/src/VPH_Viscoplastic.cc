@@ -36,7 +36,7 @@ VPH_Viscoplastic const* VPH_Viscoplastic::PROTOTYPE
 VPH_Viscoplastic:: VPH_Viscoplastic( void )
 //--------------------------------------------------------------------------
    : FV_OneStepIteration( "VPH_Viscoplastic" )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
 {
    MAC_LABEL( "VPH_Viscoplastic:: VPH_Viscoplastic" ) ;
 }
@@ -71,7 +71,7 @@ VPH_Viscoplastic:: VPH_Viscoplastic( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
    : FV_OneStepIteration( a_owner, dom, exp )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , UU( dom->discrete_field( "velocity" ) )
    , PP( dom->discrete_field( "pressure" ) )
    , DD( dom->discrete_field( "dDStensors" ) )

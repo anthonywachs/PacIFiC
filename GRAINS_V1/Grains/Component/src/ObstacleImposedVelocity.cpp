@@ -43,14 +43,14 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
   m_tend = ReaderXML::getNodeAttr_Double( nTimeInterval, "End" );
 
   // Constant translation
-  if ( ReaderXML::getNode( root, "VTranslation" ) )
+  if ( ReaderXML::getNode( root, "ConstantTranslation" ) )
   {
-    DOMNode* nVTranslation = ReaderXML::getNode( root, "VTranslation" );
+    m_type = "ConstantTranslation";
+    DOMNode* nVTranslation = ReaderXML::getNode( root, "ConstantTranslation" );
     DOMNode* nTV = ReaderXML::getNode( nVTranslation, "TranslationalVelocity" );
     m_translationalVelocity[X] = ReaderXML::getNodeAttr_Double( nTV, "VX" );
     m_translationalVelocity[Y] = ReaderXML::getNodeAttr_Double( nTV, "VY" );    
     m_translationalVelocity[Z] = ReaderXML::getNodeAttr_Double( nTV, "VZ" ); 
-    m_type = "ConstantTranslation";
     if ( rank == 0 )
     {
       cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
@@ -61,6 +61,40 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
       cout << GrainsExec::m_shift12 << "Translational velocity = " << 
       	m_translationalVelocity << endl;
     }   
+  }
+  else if ( ReaderXML::getNode( root, "SinTranslation" ) )
+  {
+    m_type = "SinTranslation";
+    DOMNode* nVTranslation = ReaderXML::getNode( root, "SinTranslation" ); 
+    DOMNode* nTV = ReaderXML::getNode( nVTranslation, "Direction" );
+    m_Sin_vitRef[X] = ReaderXML::getNodeAttr_Double( nTV, "VX" );
+    m_Sin_vitRef[Y] = ReaderXML::getNodeAttr_Double( nTV, "VY" );    
+    m_Sin_vitRef[Z] = ReaderXML::getNodeAttr_Double( nTV, "VZ" ); 
+    m_Sin_vitRef.normalize();
+    DOMNode* nPar = ReaderXML::getNode( nVTranslation, "Parameters" );        
+    m_Sin_amplitude = ReaderXML::getNodeAttr_Double( nPar, "Amplitude" ); 
+    m_Sin_period = ReaderXML::getNodeAttr_Double( nPar, "Period" ); 
+    m_Sin_phase = ReaderXML::getNodeAttr_Double( nPar, "PhaseShift" );
+    if ( rank == 0 )
+    {
+      cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
+      	<< endl;      
+      cout << GrainsExec::m_shift12 << "Time interval = [" 
+      	<< m_tstart << "," << m_tend << "]" << endl;
+      cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
+      cout << GrainsExec::m_shift12 << "Unit direction vector = " << 
+      	m_Sin_vitRef << endl;
+      cout << GrainsExec::m_shift12 << "Amplitude = " << 
+      	m_Sin_amplitude << endl;
+      cout << GrainsExec::m_shift12 << "Period = " << 
+      	m_Sin_period << endl;
+      cout << GrainsExec::m_shift12 << "Phase shift = " << 
+      	m_Sin_phase << endl;	
+      cout << GrainsExec::m_shift12 << "Maximum displacement = " << 
+      	m_Sin_amplitude * m_Sin_period / ( 2. * PI ) << endl;
+      cout << GrainsExec::m_shift12 << "Maximum acceleration = " << 
+      	m_Sin_amplitude * 2. * PI / m_Sin_period << endl; 
+    }             
   }
   else
   {
@@ -139,28 +173,7 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
 //     	m_Sin_period / ( 2. * PI ) << endl;
 //     cout << "   Acceleration angulaire max du mouvement = " << m_Sin_amplitude *
 //     	2. * PI / m_Sin_period << endl;       
-//   } 
-//   else if ( mode == "TranslationSinusoidale" ) 
-//   {
-//     m_Sin_vitRef = vecteur / Norm(vecteur);
-//     m_translationalVelocity.reset();
-//     m_type = mode;
-//     m_Sin_amplitude = ReaderXML::getNodeAttr_Double( root, "A" );
-//     m_Sin_period = ReaderXML::getNodeAttr_Double( root, "P" );
-//     cout << endl << "Chargement translationnel sinusoidal sur " 
-//     	<< m_ObstacleName << endl;
-//     cout << "   Periode du mouvement = " << m_Sin_period << endl;
-//     cout << "   Amplitude max du mouvement = " << m_Sin_amplitude * 
-//     	m_Sin_period / ( 2. * PI ) << endl;
-//     cout << "   Acceleration max du mouvement = " << m_Sin_amplitude *
-//     	2. * PI / m_Sin_period << endl; 
-//   }
-// 
-//   if ( rank == 0 )
-//   {
-//     cout << "   Temps de depart = " << m_tstart << endl;
-//     cout << "   Temps de fin = " << m_tend << endl << endl;
-//   }     
+//   }  
 }
 
 
@@ -224,23 +237,23 @@ bool ObstacleImposedVelocity::isCompleted( double t, double dt ) const
 Vector3 const* ObstacleImposedVelocity::translationalVelocity( double time, 
 	double dt )
 {
-  if ( m_type == "TranslationSinusoidale" )
+  if ( m_type == "SinTranslation" )
     m_translationalVelocity = m_Sin_amplitude * 
-    	sin( 2. * PI * ( time - m_tstart ) / m_Sin_period )
+    	sin( 2. * PI * ( time - m_tstart ) / m_Sin_period + m_Sin_phase )
 	* m_Sin_vitRef ;
-  else if ( m_type == "Cyclic" )
-  {
-    Vector3 trans, dx;
-    trans[X] = m_ampX * sin( 2. * PI * m_freqX 
-	* ( time - m_tstart ) ); 
-    trans[Y] = m_ampY * sin( 2. * PI * m_freqY 
-	* ( time - m_tstart ) + m_phase ); 
-    trans[Z] = m_ampZ * sin( 2. * PI * m_freqZ 
-	* ( time - m_tstart ) + m_phase ); 
-    dx = trans - m_prev; 
-    m_prev = trans;
-    m_translationalVelocity = dx / dt;
-  }
+//   else if ( m_type == "Cyclic" )
+//   {
+//     Vector3 trans, dx;
+//     trans[X] = m_ampX * sin( 2. * PI * m_freqX 
+// 	* ( time - m_tstart ) ); 
+//     trans[Y] = m_ampY * sin( 2. * PI * m_freqY 
+// 	* ( time - m_tstart ) + m_phase ); 
+//     trans[Z] = m_ampZ * sin( 2. * PI * m_freqZ 
+// 	* ( time - m_tstart ) + m_phase ); 
+//     dx = trans - m_prev; 
+//     m_prev = trans;
+//     m_translationalVelocity = dx / dt;
+//   }
 
   return ( &m_translationalVelocity );
 }
@@ -253,10 +266,10 @@ Vector3 const* ObstacleImposedVelocity::translationalVelocity( double time,
 Vector3 const* ObstacleImposedVelocity::angularVelocity( double time, 
 	double dt )
 {
-  if ( m_type == "RotationSinusoidale" )
-    m_angularVelocity = m_Sin_amplitude * 
-    	sin( 2. * PI * ( time - m_tstart ) / m_Sin_period )
-	* m_Sin_vitRef ;
+//   if ( m_type == "RotationSinusoidale" )
+//     m_angularVelocity = m_Sin_amplitude * 
+//     	sin( 2. * PI * ( time - m_tstart ) / m_Sin_period )
+// 	* m_Sin_vitRef ;
      
   return ( &m_angularVelocity );
 }

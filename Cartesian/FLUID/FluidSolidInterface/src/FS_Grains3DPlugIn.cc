@@ -1,7 +1,7 @@
 #include <FS_Grains3DPlugIn.hh>
 #include <MAC_Communicator.hh>
 #include <MAC_Exec.hh>
-#include "Grains_BuilderFactory.H"
+#include "GrainsBuilderFactory.hh"
 #include "GrainsCoupledWithFluid.hh"
 #include "ReaderXML.hh"
 
@@ -10,8 +10,8 @@
 FS_Grains3DPlugIn::FS_Grains3DPlugIn( string const& insertion_file_,
         string const& simulation_file_,
         double const& fluid_density,
+	bool const& correct_particle_acceleration,
         bool const& b_restart,
-        bool const& b_initializeClonePer,
         double const& grid_size,
         bool const& is_solidsolver_parallel,	
         int& error )
@@ -42,18 +42,16 @@ FS_Grains3DPlugIn::FS_Grains3DPlugIn( string const& insertion_file_,
     // Create an input file with the XML requirements from simulation_file
     // Only done by the master process 0
     string simulation_file_exe = 
-      Grains_BuilderFactory::init( m_simulation_file, m_my_rank, 
+      GrainsBuilderFactory::init( m_simulation_file, m_my_rank, 
         m_Grains3D_parallel_mode ? m_nb_ranks : 1 );
 
     // Create the Grains3D coupled to the fluid application
     DOMElement* rootNode = ReaderXML::getRoot( simulation_file_exe );
-    m_Grains3D = Grains_BuilderFactory::createCoupledWithFluid( rootNode,
-        fluid_density, grid_size );
+    m_Grains3D = GrainsBuilderFactory::createCoupledWithFluid( rootNode,
+        fluid_density );
+    m_Grains3D->setFluidCorrectedAcceleration( correct_particle_acceleration );
     if ( b_restart ) m_Grains3D->setReloadSame() ;
-    m_Grains3D->Construction( rootNode );
-    m_Grains3D->Forces( rootNode );
-    m_Grains3D->Chargement( rootNode );
-    if ( b_initializeClonePer ) m_Grains3D->initializeClonesPeriodiques();
+    m_Grains3D->do_before_time_stepping( rootNode );
 
     // Finalize XML reader
     ReaderXML::terminate(); 
@@ -89,7 +87,8 @@ FS_Grains3DPlugIn:: ~FS_Grains3DPlugIn()
 
 
 //---------------------------------------------------------------------------
-void FS_Grains3DPlugIn:: Simulation( bool const& predictor,
+void FS_Grains3DPlugIn:: Simulation( double const& time_interval,
+	bool const& predictor,
         bool const& isPredictorCorrector,
         double const& contact_force_coef,
         bool const& explicit_added_mass )
@@ -98,8 +97,7 @@ void FS_Grains3DPlugIn:: Simulation( bool const& predictor,
   MAC_LABEL( "FS_Grains3DPlugIn:: Simulation" ) ;
 
   if ( m_Grains3D_active_on_this_rank )
-    m_Grains3D->Simulation( predictor, isPredictorCorrector, 
-  	explicit_added_mass ); 
+    m_Grains3D->Simulation( time_interval ); 
 
 }
 
@@ -133,7 +131,9 @@ void FS_Grains3DPlugIn:: getSolidBodyFeatures( istringstream* & is )
   
   // Get solid body features from Grains3D
   if ( m_Grains3D_active_on_this_rank )
-    m_Grains3D->WriteParticulesInFluid( *is ); 
+    m_Grains3D->GrainsToFluid( *is ); 
+    
+//  cout << is->str() << endl;  
     
   // If Grains3D runs in serial and the fluid runs in parallel, we need
   // to broadcast the solid body features stream to all processes
@@ -173,3 +173,64 @@ void FS_Grains3DPlugIn:: saveResults( string const& filename,
   ++counter;
 
 }
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_Grains3DPlugIn:: transferHydroFTtoSolid( 
+      	vector< vector<double> > const* hydroFT ) const
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Grains3DPlugIn:: transferHydroFTtoSolid" ) ;
+  
+  if ( m_Grains3D_active_on_this_rank )
+    m_Grains3D->updateParticlesHydroFT( hydroFT );
+  
+}  
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_Grains3DPlugIn:: checkParaviewPostProcessing( 
+	string const& solid_resDir ) 
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Grains3DPlugIn:: checkParaviewPostProcessing" ) ;
+  
+  if ( m_Grains3D_active_on_this_rank )
+    m_Grains3D->checkParaviewPostProcessing( 
+             "grains", solid_resDir, true ) ;
+  
+} 
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_Grains3DPlugIn:: setParaviewPostProcessingTranslationVector( 
+      	double const& tvx, double const& tvy, double const& tvz )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Grains3DPlugIn:: setParaviewPostProcessingTranslationVector" );
+  
+  if ( m_Grains3D_active_on_this_rank )
+    m_Grains3D->setParaviewPostProcessingTranslationVector( 
+      	tvx, tvy, tvz );
+  
+} 
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_Grains3DPlugIn:: setInitialTime( double const& time0 )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_Grains3DPlugIn:: setInitialTime" );
+  
+  if ( m_Grains3D_active_on_this_rank )
+    m_Grains3D->setInitialTime( time0 );
+  
+} 

@@ -35,7 +35,7 @@ REG_UzawaNavierStokes const* REG_UzawaNavierStokes::PROTOTYPE
 REG_UzawaNavierStokes:: REG_UzawaNavierStokes( void )
 //--------------------------------------------------------------------------
    : FV_OneStepIteration( "REG_UzawaNavierStokes" )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
 {
    MAC_LABEL( "REG_UzawaNavierStokes:: REG_UzawaNavierStokes" ) ;
 }
@@ -70,7 +70,7 @@ REG_UzawaNavierStokes:: REG_UzawaNavierStokes( MAC_Object* a_owner,
 		MAC_ModuleExplorer const* exp )
 //---------------------------------------------------------------------------
    : FV_OneStepIteration( a_owner, dom, exp )
-   , ComputingTime("Solver")
+   , PAC_ComputingTime("Solver")
    , UU ( dom->discrete_field( "velocity" ) )
    , PP ( dom->discrete_field( "pressure" ) )
    , GLOBAL_EQ( 0 )

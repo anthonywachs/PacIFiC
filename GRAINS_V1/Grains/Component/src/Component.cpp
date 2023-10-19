@@ -528,22 +528,20 @@ void Component::addToCoordinationNumber( int const& nc )
 
 
 // ----------------------------------------------------------------------------
-// Initialize all contact map entries to false
+// Initializes all contact map entries to false
 void Component::setContactMapToFalse()
 {
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3,
     Vector3>,bool >::iterator it;
   for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
-    {
-      get<0>(it->second) = false;
-    }
+    get<0>(it->second) = false;
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Update contact map
+// Updates contact map
 void Component::updateContactMap()
 {
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3,
@@ -555,17 +553,17 @@ void Component::updateContactMap()
     if ( !(get<0>(it->second)) ) keywithfalse.push_back(it->first);
 
   for (il=keywithfalse.begin();il!=keywithfalse.end();il++)
-  {
     m_contactMap.erase(*il);
-  }
 }
 
 
+
+
 // ----------------------------------------------------------------------------
-// Add new contact in the map
+// Adds new contact in the map
 void Component::addNewContactInMap( std::tuple<int,int,int> const& id,
-  Vector3 const& kdelta, Vector3 const& prev_normal,
-  Vector3 const& cumulSpringTorque )
+	Vector3 const& kdelta, Vector3 const& prev_normal,
+	Vector3 const& cumulSpringTorque )
 {
   m_contactMap.insert(std::make_pair( std::make_tuple(get<0>(id),get<1>(id),
     get<2>(id)), std::make_tuple(
@@ -573,11 +571,13 @@ void Component::addNewContactInMap( std::tuple<int,int,int> const& id,
 }
 
 
+
+
 // ----------------------------------------------------------------------------
-// Copy existing contact in the map
+// Copies existing contact in the map
 void Component::copyContactInMap( std::tuple<int,int,int> const& id,
-  bool const& isActive, Vector3 const& kdelta, Vector3 const& prev_normal,
-  Vector3 const& cumulSpringTorque )
+	bool const& isActive, Vector3 const& kdelta, Vector3 const& prev_normal,
+	Vector3 const& cumulSpringTorque )
 {
   m_contactMap.insert(std::make_pair( id, std::make_tuple(
     isActive, kdelta, prev_normal, cumulSpringTorque) ));
@@ -590,8 +590,8 @@ void Component::copyContactInMap( std::tuple<int,int,int> const& id,
 // prev_normal and cumulSpringTorque point to the memorized info. Otherwise,
 // return false and set those pointers to NULL
 bool Component::getContactMemory( std::tuple<int,int,int> const& id,
-  Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
-  bool createContact)
+	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+	bool createContact)
 {
   bool active = false;
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
@@ -605,8 +605,10 @@ bool Component::getContactMemory( std::tuple<int,int,int> const& id,
     prev_normal = &(get<2>(it->second));
     cumulSpringTorque = &(get<3>(it->second));
   }
-  else {
-    if (createContact) {
+  else 
+  {
+    if (createContact) 
+    {
       Vector3 zeroV(0.);
       std::pair< map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3,
         Vector3> > ::iterator, bool > ret;
@@ -617,21 +619,25 @@ bool Component::getContactMemory( std::tuple<int,int,int> const& id,
       prev_normal = &(get<2>(it->second));
       cumulSpringTorque = &(get<3>(it->second));
     }
-    else {
+    else 
+    {
       kdelta = NULL;
       prev_normal = NULL;
       cumulSpringTorque = NULL;
     }
   }
-  return active;
+  
+  return ( active );
 }
 
 
+
+
 // ----------------------------------------------------------------------------
-// Increase cumulative tangential displacement with component id
+// Increases cumulative tangential displacement with component id
 void Component::addDeplContactInMap( std::tuple<int,int,int> const& id,
-  Vector3 const& kdelta, Vector3 const& prev_normal,
-  Vector3 const& cumulSpringTorque )
+	Vector3 const& kdelta, Vector3 const& prev_normal,
+	Vector3 const& cumulSpringTorque )
 {
   get<0>(m_contactMap[id]) = true;
   get<1>(m_contactMap[id]) = kdelta;
@@ -639,27 +645,36 @@ void Component::addDeplContactInMap( std::tuple<int,int,int> const& id,
   get<3>(m_contactMap[id]) = cumulSpringTorque;
 }
 
+
+
+
 // ---------------------------------------------------------------------------
-// Print active neighbors of the particle
+// Prints active neighbors of the particle
 void Component::printActiveNeighbors(int const& id )
 {
-    map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
-      ::iterator it;
-    if (m_contactMap.begin() != m_contactMap.end())
+  map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
+	::iterator it;
+
+  if (m_contactMap.begin() != m_contactMap.end())
+  {
+    cout << "Neighbors of #" << id << ": ";
+    for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
     {
-        cout << "Neighbors of #" << id << ": ";
-        for (it=m_contactMap.begin();it!=m_contactMap.end();++it){
-            if (get<0>(it->second)){
-                cout << get<0>(it->first)  << "/"
-                << get<1>(it->first)  << "/"
-                << get<2>(it->first)  << " ; ";
-            }
-        }
-        cout << endl;
+      if ( get<0>(it->second) )
+      {
+        cout << get<0>(it->first)  << "/"
+		<< get<1>(it->first)  << "/"
+		<< get<2>(it->first)  << " ; ";
+      }
     }
+    cout << endl;
+  }
 }
 
 
+
+// ---------------------------------------------------------------------------
+// Writes the contact map information in an array of doubles
 void Component::copyHistoryContacts( double* &destination, int start_index )
 {
   int nb_contacts = (int) m_contactMap.size();
@@ -667,6 +682,7 @@ void Component::copyHistoryContacts( double* &destination, int start_index )
   start_index++;
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
     ::iterator it;
+
   if (m_contactMap.begin() != m_contactMap.end())
   {
     for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
@@ -689,11 +705,19 @@ void Component::copyHistoryContacts( double* &destination, int start_index )
   }
 }
 
+
+
+// ---------------------------------------------------------------------------
+// Returns the number of contacts in the contact map
 int Component::getContactMapSize()
 {
   return ( (int) m_contactMap.size() );
 }
 
+
+
+// ---------------------------------------------------------------------------
+// Writes the contact map to file in plain 2014 format
 void Component::writeContactMemory_2014(ostream &fileOut ) const
 {
   int mapSize;
@@ -727,6 +751,11 @@ void Component::writeContactMemory_2014(ostream &fileOut ) const
   }
 }
 
+
+
+
+// ---------------------------------------------------------------------------
+// Writes the contact map to file in binary format
 void Component::writeContactMemory_binary( ostream &fileOut )
 {
   int mapSize;
@@ -759,6 +788,12 @@ void Component::writeContactMemory_binary( ostream &fileOut )
 }
 
 
+
+
+// ---------------------------------------------------------------------------
+// Updates the ids of the contact map: in the case of a reload with 
+// insertion, the obstacle's ids are reset. This function keeps track of that 
+// change.
 void Component::updateContactMapId( int prev_id, int new_id)
 {
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
@@ -768,7 +803,8 @@ void Component::updateContactMapId( int prev_id, int new_id)
     if (get<1>((it->first)) == prev_id)
     {
       copyContactInMap( std::make_tuple(get<0>(it->first),new_id,
-            get<2>(it->first)), get<0>(it->second), get<1>(it->second), get<2>(it->second), get<3>(it->second));
+            get<2>(it->first)), get<0>(it->second), get<1>(it->second), 
+	    get<2>(it->second), get<3>(it->second));
       m_contactMap.erase(std::make_tuple(get<0>(it->first),get<1>(it->first),
             get<2>(it->first)));
       break;
@@ -776,6 +812,11 @@ void Component::updateContactMapId( int prev_id, int new_id)
   }
 }
 
+
+
+
+// ---------------------------------------------------------------------------
+// Reads the contact map to file in plain 2014 format
 void Component::readContactMap_2014( istream &fileSave)
 {
   // Read the contact memories of the particle (if any)
@@ -807,6 +848,11 @@ void Component::readContactMap_2014( istream &fileSave)
   }
 }
 
+
+
+
+// ---------------------------------------------------------------------------
+// Reads the contact map to file in binary format
 void Component::readContactMap_binary( istream &fileSave)
 {
   int mapSize;
@@ -827,6 +873,7 @@ void Component::readContactMap_binary( istream &fileSave)
       tangent, prev_normal, cumulSpringTorque) ;
   }
 }
+
 
 
 
@@ -894,6 +941,16 @@ bool Component::isObstacle() const
 // ----------------------------------------------------------------------------
 // Returns whether the component is an elementary particle
 bool Component::isElementaryParticle() const
+{
+  return ( false );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether the component is an STL obstacle
+bool Component::isSTLObstacle() const
 {
   return ( false );
 }

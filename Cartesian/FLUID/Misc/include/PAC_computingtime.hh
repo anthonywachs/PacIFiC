@@ -1,5 +1,5 @@
-#ifndef _computingtime
-#define _computingtime
+#ifndef PAC_COMPUTINGTIME_HH_
+#define PAC_COMPUTINGTIME_HH_
 
 #include <time.h>
 #include <sys/time.h>
@@ -10,57 +10,49 @@
 using namespace std;
 
 
-/** @brief The Class ComputingTime.
+/** @brief The class PAC_ComputingTime.
 
-Use for the definition of computation time (CT) measurements the precision of
-which is the microsecond.
+    Use for the definition of computing time (CT) measurements the precision of
+    which is the microsecond.
 
-@author A.Wachs - Particulate flow project 2003-2005 */
-class ComputingTime
+    @author A.Wachs - Particulate flow project 2003-2005
+    @author A.WACHS - 2019 - Major cleaning & refactoring */
+// ============================================================================
+class PAC_ComputingTime
 {
-  private :
-//    struct timeval start; /* start time */
-//    struct timeval end; /* end time */
-//    struct timezone tz; /* time zone (obsolete, see sys/time.h) */
-    double start;
-    double end;
-    string app_name; /**< application name */
-    double total_elapsed_time; /**< total elapsed time */
-    int counter; /**< number of calls to this application */ 
-	
-  private :
-    /** @name Constructors & Destructor */
-    //@{
-    /** @brief Constructor without argument */
-    ComputingTime() {}
-    //@}  
-
   public :
-    /** @name Constructors & Destructor */
+    /** @name Constructors */
     //@{  
-    /** @brief Constructor with argument the application name  
+    /** @brief Constructor the application name as the input parameter 
     @param app_name_ application name */
-    ComputingTime(const string &app_name_);    
+    PAC_ComputingTime( string const& app_name_ );    
 
     /** @brief Copy constructor */
-    ComputingTime(const ComputingTime &CT);
+    PAC_ComputingTime( PAC_ComputingTime  const& CT );
 
     /** @brief Destructor */
-    ~ComputingTime();        
+    ~PAC_ComputingTime();        
     //@}    
 
+
+    /** @name Friend methods */
+    //@
     /** @brief Write elapsed time in seconds, minutes, hours and days
     @param f output stream
     @param elapsed_time elapsed time 
     @param name defines the elapsed time (ex : "Computation time") */
-    friend void write_elapsed_time_smhd(ostream &f,const double &elapsed_time,
-    	const string &name);
+    friend void write_elapsed_time_smhd( ostream& f, 
+    	double const& elapsed_time,
+    	string const& name );
+    //@} 
+
     
-    /** @name SET methods */
+    /** @name Set methods */
     //@{
     /** @brief Set start */
     void CT_set_start();        
     //@}
+
     
     /** @name GET methods */
     //@{ 
@@ -82,6 +74,24 @@ class ComputingTime
     /** @brief Get the number of calls to this application */    
     int CT_get_counter() const;            
     //@} 
+    
+    
+  private :
+    /** @name Parameters */
+    //@{     
+    double m_start; /**< start of timing */
+    double m_end; /**< end of timing */
+    string m_app_name; /**< application name */
+    double m_total_elapsed_time; /**< total elapsed time */
+    int m_counter; /**< number of calls to this application */
+    //@}     
+
+
+    /** @name Constructors */
+    //@{
+    /** @brief Default constructor */
+    PAC_ComputingTime();
+    //@}     
            
 };
 
@@ -89,7 +99,7 @@ class ComputingTime
 @param f output stream
 @param elapsed_time elapsed time 
 @param name defines the elapsed time (ex : "Computation time") */
-void write_elapsed_time_smhd(ostream &f,const double &elapsed_time,
-    	const string &name);
+void write_elapsed_time_smhd( ostream& f, double const& elapsed_time,
+    	string const& name );
 	
 #endif

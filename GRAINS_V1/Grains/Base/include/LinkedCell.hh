@@ -200,7 +200,7 @@ class LinkedCell : public AppCollision
     /** @brief Sets the linked cell grid in serial mode
     @param cellsize_ minimum cell edge length in each direction
     @param oshift empty string to shift the output */
-    void set( double cellsize_, string const& oshift );
+    size_t set( double cellsize_, string const& oshift );
 
     /** @brief Sets the linked cell grid in parallel mode
     @param cellsize_ minimum cell edge length in each direction

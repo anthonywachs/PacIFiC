@@ -664,7 +664,7 @@ void Grains::Construction( DOMElement* rootElement )
 
     // Maximum circumscribed radius of particles
     double maxR = m_allcomponents.getCircumscribedRadiusMax();
-    if ( maxR < 1.e-12 ) grainsAbort();
+    if ( maxR < 1.e-12 ) maxR = 1.e16;
     else if ( m_rank == 0 )
       cout << GrainsExec::m_shift9 << "Maximum circumscribed particle radius = "
       	<< maxR << endl;
@@ -982,7 +982,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
       	( m_force_insertion  ? "True" : "False" ) << endl;
 
 
-      // Particle positions via a external file OR a structured array OR a
+      // Particle positions via an external file OR a structured array OR a
       // collection of insertion windows, in this order of priority
       // Remark: these 3 modes cannot be combined
       DOMNode* nPosition = ReaderXML::getNode( nInsertion, "ParticlePosition" );
@@ -1053,7 +1053,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
               grainsAbort();
 	    }
 
-            m_position == "STRUCTURED";
+            m_position = "STRUCTURED";
 	    if ( m_rank == 0 )
 	    {
 	      cout << GrainsExec::m_shift9 << "Structured array" << endl;
@@ -1075,27 +1075,28 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  {
 	    // Random particle positions from a collection of insertion windows
 	    DOMNode* nWindows = ReaderXML::getNode( nPosition, "Windows" );
-      if ( nWindows )
+            if ( nWindows )
 	    {
 	      cout << GrainsExec::m_shift9 << "Insertion windows" << endl;
 	      DOMNodeList* allWindows = ReaderXML::getNodes( nWindows );
-        for (XMLSize_t i=0; i<allWindows->getLength(); i++)
+              for (XMLSize_t i=0; i<allWindows->getLength(); i++)
 	      {
 	        DOMNode* nWindow = allWindows->item( i );
-          Window iwindow;
+                Window iwindow;
 		      readWindow( nWindow, iwindow, GrainsExec::m_shift12 );
-	        m_insertion_windows.insert( m_insertion_windows.begin(), iwindow );
-        }
+	        m_insertion_windows.insert( m_insertion_windows.begin(), 
+			iwindow );
+              }
 	    }
-      else
+            else
 	    {
-        if ( m_insertion_mode != IM_NOINSERT )
-        {
-          if ( m_rank == 0 )
-            cout << GrainsExec::m_shift6 <<
+              if ( m_insertion_mode != IM_NOINSERT )
+              {
+                if ( m_rank == 0 )
+                  cout << GrainsExec::m_shift6 <<
             "Insertion positions or windows are mandatory !!" << endl;
-          grainsAbort();
-        }
+                grainsAbort();
+              }
 	    }
 	  }
   }
@@ -1225,14 +1226,14 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  ObstacleImposedForce* load = new ObstacleImposedForce(
 	      nOL, m_dt, m_rank, error );
 	  if ( error != 0 ) grainsAbort();
-	  else m_allcomponents.LinkImposedMotion( *load );
+	  else m_allcomponents.LinkImposedMotion( load );
 	}
 	else if ( type == "Velocity" )
 	{
 	  ObstacleImposedVelocity* load = new ObstacleImposedVelocity(
 	  	nOL, m_dt, m_rank, error );
 	  if ( error != 0 ) grainsAbort();
-	  else m_allcomponents.LinkImposedMotion( *load );
+	  else m_allcomponents.LinkImposedMotion( load );
 	}
 	else
         {
@@ -1882,7 +1883,8 @@ string Grains::fullResultFileName( string const& rootname ) const
 // Sets the linked cell grid
 void Grains::defineLinkedCell( double const& radius, string const& oshift )
 {
-  m_collision->set( 2. * radius, oshift );
+  size_t error = m_collision->set( 2. * radius, oshift );
+  if ( error ) grainsAbort();
 }
 
 

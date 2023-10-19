@@ -205,10 +205,10 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
   if ( convexA->getConvexType() == BOX && convexB->getConvexType() == DISC2D )
     return ( ClosestPointSPHEREBOX( *this, neighbor ) );
 
-  // In case the rigid bodies are cylinders
-  if ( convexA->getConvexType() == CYLINDER &&
-       convexB->getConvexType() == CYLINDER )
-    return( ClosestPointCYLINDERS( *this, neighbor ) );
+//   // In case the rigid bodies are cylinders
+//   if ( convexA->getConvexType() == CYLINDER &&
+//        convexB->getConvexType() == CYLINDER )
+//     return( ClosestPointCYLINDERS( *this, neighbor ) );
 
   // General case for any pair of convex rigid bodies
   Vector3 gcagcb = *m_transform.getOrigin() - *neighbor.m_transform.getOrigin();
@@ -637,13 +637,24 @@ bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
   if ( convexA->getConvexType() == BOX && convexB->getConvexType() == DISC2D )
     return ( isContactSPHEREBOX( *this, neighbor ) );
 
-  // Cas general
+//   // General case
+//   // Comment: GJK has consistantly shown accuracy issues when 2 particles
+//   // overlap a lot. Instead returning a distance of zero to machine precision,
+//   // it returns a small number that sclaes with the size of the particle
+//   // Consequently, some particles are mistakenly inserted in the simulation
+//   // To avoid this, we now take the conservative rule of the max of 1/5 of the 
+//   // characteristic length and the crust thickness
+//   // IMPORTANT: this is a temporary fix
   Point3 pointA, pointB;
   int nbIterGJK = 0;
   Transform const* a2w = this->getTransformWithCrust();
-  Transform const* b2w = neighbor.getTransformWithCrust();
+  Transform const* b2w = neighbor.getTransformWithCrust();  
+//  BBox bba = RigidBody::BoxRigidBody();
+//  BBox bbb = neighbor.RigidBody::BoxRigidBody();    
   double distanceMin = (*this).m_crustThickness + neighbor.m_crustThickness
   	- EPSILON;
+//  double distanceMin = max((*this).m_crustThickness + neighbor.m_crustThickness,
+//  	( bba.lowestHalfLength() + bbb.lowestHalfLength() ) / 5. );
   double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w, *b2w,
 	pointA, pointB, nbIterGJK );
 

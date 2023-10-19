@@ -25,16 +25,17 @@ class FS_Grains3DPlugIn : public FS_SolidPlugIn
       @param insertion_file_ insertion file name
       @param simulation_file_ simulation file name
       @param fluid_density fluid density
+      @param correct_particle_acceleration particle acceleration is corrected by
+      the factor ( 1 - fluid_density / particle_density ) if value is true
       @param b_restart is the run a restart or a new run
-      @param b_initializeClonePer initialize periodic clones
       @param grid_size size of the smallest grid cell
       @param is_solidsolver_parallel is Grains3D running in parallel ?
       @param error =0 if the construction is successful */
       FS_Grains3DPlugIn( string const& insertion_file_,
         string const& simulation_file_,
         double const& fluid_density,
+	bool const& correct_particle_acceleration,
         bool const& b_restart,
-        bool const& b_initializeClonePer,
         double const& grid_size,
         bool const& is_solidsolver_parallel,
 	int& error );
@@ -49,12 +50,14 @@ class FS_Grains3DPlugIn : public FS_SolidPlugIn
       /** @name Methods */
       //@{
       /** @brief Simulation
+      @param time_interval fluid time step
       @param predictor if yes, predictor phase, otherwise corrector phase
       @param isPredictorCorrector is the coupling scheme predictor-corrector
       @param contact_force_coef contact forces coefficient
       @param explicit_added_mass whether to treat added mass (and torque) term
         explicitly */
-      void Simulation( bool const& predictor = true,
+      void Simulation( double const& time_interval,
+      	bool const& predictor = true,
         bool const& isPredictorCorrector = false,
         double const& contact_force_coef = 1.,
         bool const& explicit_added_mass = false );
@@ -75,6 +78,27 @@ class FS_Grains3DPlugIn : public FS_SolidPlugIn
       @param cycleNumber cycle number */
       void saveResults( string const& filename, double const& time,
         int const& cycleNumber );
+	
+      /** @brief Transfer hydro force and torque array to solid solver
+      @param hydroFT hydro force and torque array */
+      void transferHydroFTtoSolid( 
+      	vector< vector<double> > const* hydroFT ) const;
+	
+      /** @brief Check that Paraview writer is activated
+      @param solid_resDir particles results directory */
+      void checkParaviewPostProcessing( string const& solid_resDir );	
+	
+      /** @brief Set the post-processing translation vector in case of
+      projection-translation
+      @param tvx x coordinate
+      @param tvy y coordinate
+      @param tvz z coordinate */
+      void setParaviewPostProcessingTranslationVector( 
+      	double const& tvx, double const& tvy, double const& tvz );
+	
+      /** @brief Set the initial physical time
+      @param time0 initial physical time */
+      void setInitialTime( double const& time0 );	
       //@}
     	  
   

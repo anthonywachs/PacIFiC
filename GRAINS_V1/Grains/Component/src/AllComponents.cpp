@@ -62,7 +62,10 @@ AllComponents::~AllComponents()
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
     delete *pp;
   m_postProcessors.clear();
-
+ 
+  // Note: the loadings are destroyed by the destructors of the classes
+  // ObstacleKinematicsVelocity and ObstacleKinematicsForce
+  // Hence we are free the lists here but do not destroy the pointed objects
   m_AllImposedVelocitiesOnObstacles.clear();
   m_AllImposedForcesOnObstacles.clear();
 }
@@ -123,7 +126,7 @@ void AllComponents::AddParticle( Particle* particle )
 
 // ----------------------------------------------------------------------------
 // Adds a reference particle
-void AllComponents::AddReferenceParticle( Particle *particle )
+void AllComponents::AddReferenceParticle( Particle* particle )
 {
   m_ReferenceParticles.reserve( m_ReferenceParticles.size() + 1 );
   m_ReferenceParticles.push_back( particle );
@@ -145,10 +148,10 @@ void AllComponents::AddObstacle( Obstacle* obstacle_ )
 
 // ----------------------------------------------------------------------------
 // Associates the imposed velocity to the obstacle
-void AllComponents::LinkImposedMotion( ObstacleImposedVelocity &impvel )
+void AllComponents::LinkImposedMotion( ObstacleImposedVelocity* impvel )
 {
   m_obstacle->LinkImposedMotion( impvel );
-  m_AllImposedVelocitiesOnObstacles.push_back( &impvel );
+  m_AllImposedVelocitiesOnObstacles.push_back( impvel );
 }
 
 
@@ -156,10 +159,10 @@ void AllComponents::LinkImposedMotion( ObstacleImposedVelocity &impvel )
 
 // ----------------------------------------------------------------------------
 // Associates the imposed velocity to the obstacle
-void AllComponents::LinkImposedMotion( ObstacleImposedForce &load )
+void AllComponents::LinkImposedMotion( ObstacleImposedForce* load )
 {
   m_obstacle->LinkImposedMotion( load );
-  m_AllImposedForcesOnObstacles.push_back( &load );
+  m_AllImposedForcesOnObstacles.push_back( load );
 }
 
 
@@ -484,6 +487,16 @@ multimap<int,Particle*>* AllComponents::getPeriodicCloneParticles()
 
 
 // ----------------------------------------------------------------------------
+// Returns a pointer to the map of serial clone particles */
+multimap<int,Particle*> const* AllComponents::getPeriodicCloneParticles() const
+{
+  return ( &m_PeriodicCloneParticles );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns a pointer to the vector of reference particles
 vector<Particle*>* AllComponents::getReferenceParticles()
 {
@@ -525,7 +538,7 @@ double AllComponents::getCircumscribedRadiusMax()
   	particle!=m_ReferenceParticles.end(); particle++)
   {
     radius = (*particle)->getCircumscribedRadius();
-    radiusMax = radiusMax > radius ? radiusMax : radius;
+    radiusMax = max( radiusMax, radius );
   }
 
   return ( radiusMax );
@@ -1277,13 +1290,12 @@ void AllComponents::checkParaviewPostProcessing( int const& rank,
     if ( (*pp)->getPostProcessingWriterType() == "Paraview" )
       ParaviewPP = *pp;
 
-  // Si aucun post processing writer n'existe, initialiser le vecteur
-  // des fenetres de post processing a true sur tous les procs
+  // If no post-processing writer, all processors write data  
   if ( m_postProcessors.empty() )
     PostProcessingWriter::allocate_PostProcessingWindow( nprocs );
 
-  // Si un post processing writer Paraview existe deja, on le detruit
-  // et on le recreer avec les bons parametres
+  // If a Paraview post-processing writer already exists, it is destroyed and
+  // recreated with the proper parameters
   if ( ParaviewPP )
   {
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
@@ -1296,7 +1308,7 @@ void AllComponents::checkParaviewPostProcessing( int const& rank,
     ParaviewPP = NULL;
   }
 
-  // Creation du post processing writer Paraview avec les bons parametres
+  // Creation of the Paraview post-processing writer with the proper parameters
   ParaviewPP = new ParaviewPostProcessingWriter( rank, nprocs, name_, root_,
   	isBinary );
   m_postProcessors.push_back( ParaviewPP );

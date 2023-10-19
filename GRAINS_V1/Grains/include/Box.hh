@@ -9,6 +9,8 @@
 using namespace solid;
 
 class Transform;
+
+
 /** @brief The class Box.
 
     Convex with a box shape. From GJK Engine - A Fast and

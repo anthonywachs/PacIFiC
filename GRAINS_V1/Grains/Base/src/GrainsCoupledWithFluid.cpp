@@ -10,15 +10,17 @@
 
 
 // ----------------------------------------------------------------------------
-// Constructeur par defaut
+// Default constructor
 GrainsCoupledWithFluid::GrainsCoupledWithFluid( double fluid_density_ ) 
   : Grains()
   , m_fluid_density( fluid_density_ )
   , m_fluidflow_dt( 0. )
   , m_forceReloadSame( false )
+  , m_PRSHydroFT( NULL )
 {
   Disc::SetvisuNodeNb( 40 );
   Sphere::SetvisuNodeNbPerQar( 5 );
+  Particle::setFluidDensity( m_fluid_density ); 
 }
 
 
@@ -65,15 +67,11 @@ void GrainsCoupledWithFluid::do_before_time_stepping( DOMElement* rootElement )
   // Number of particles: inserted and in the system
   m_allcomponents.setNumberParticlesOnAllProc( 
   	m_allcomponents.getNumberParticles() );
-  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
-
-  // Initialisation obstacle kinematics
-  m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt ); 
-
-  // Postprocessing of force & torque on obstacles 
-  m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );  
-  m_allcomponents.outputObstaclesLoad( m_time, m_dt, false, 
-      GrainsExec::m_ReloadType == "same" ); 
+  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles(); 
+      
+  // Allocate hydro force and torque arrays in the AppPRSHydroFT app
+  if ( m_PRSHydroFT ) m_PRSHydroFT->allocateHydroFT( 
+  	m_allcomponents.getNumberActiveParticlesOnProc() );
 
   cout << "Initialization completed" << endl << endl;                           
 }
@@ -347,7 +345,7 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
     
     // Maximum circumscribed radius of particles
     double maxR = m_allcomponents.getCircumscribedRadiusMax();
-    if ( maxR < 1.e-12 ) grainsAbort();
+    if ( maxR < 1.e-12 ) maxR = 1.e16;
     else if ( m_rank == 0 ) 
       cout << GrainsExec::m_shift9 << "Maximum circumscribed particle radius = "
       	<< maxR << endl; 
@@ -390,7 +388,7 @@ void GrainsCoupledWithFluid::Forces( DOMElement* rootElement )
     {
       // Gravity
       DOMNode* nGravity = ReaderXML::getNode( root, "Gravity" );
-      if( nGravity )
+      if ( nGravity )
       {
         GrainsExec::m_vgravity[X] = ReaderXML::getNodeAttr_Double( 
       		nGravity, "GX" );
@@ -406,7 +404,16 @@ void GrainsCoupledWithFluid::Forces( DOMElement* rootElement )
         if ( m_rank == 0 ) cout << GrainsExec::m_shift6 << 
 		"Gravity is mandatory !!" << endl;
         grainsAbort();
-      }          
+      }
+      
+      // PRS hydro forces and torques
+      DOMNode* nPRSHydroFT = ReaderXML::getNode( root, "PRSHydro" ); 
+      if ( nPRSHydroFT )
+      {
+        m_PRSHydroFT = new AppPRSHydroFT();
+	m_PRSHydroFT->setName( "PRSHydroFT" );
+        m_allApp.push_back( m_PRSHydroFT );	
+      }               
     }
     else
     {
@@ -469,7 +476,8 @@ void GrainsCoupledWithFluid::AdditionalFeatures( DOMElement* rootElement )
         cout << GrainsExec::m_shift6 << 
       		"Number of time steps over a fluid time step = " << m_ndt 
 		<< endl;
-      }		
+      }
+      m_dt = m_min_dt;		
     }
     else
     {
@@ -575,14 +583,14 @@ void GrainsCoupledWithFluid::AdditionalFeatures( DOMElement* rootElement )
 	  ObstacleImposedForce* load = new ObstacleImposedForce(
 	      nOL, m_dt, m_rank, error );
 	  if ( error != 0 ) grainsAbort();    
-	  else m_allcomponents.LinkImposedMotion( *load );
+	  else m_allcomponents.LinkImposedMotion( load );
 	}
 	else if ( type == "Velocity" )
 	{
 	  ObstacleImposedVelocity* load = new ObstacleImposedVelocity( 
 	  	nOL, m_dt, m_rank, error );
 	  if ( error != 0 ) grainsAbort();    
-	  else m_allcomponents.LinkImposedMotion( *load );	  
+	  else m_allcomponents.LinkImposedMotion( load );	  
 	}
 	else
         {
@@ -742,11 +750,21 @@ void GrainsCoupledWithFluid::AdditionalFeatures( DOMElement* rootElement )
 
 
 // ----------------------------------------------------------------------------
-// Sets the initial physical time
+// Sets the initial physical time and initializes what depends 
+// on the initial time
 void GrainsCoupledWithFluid::setInitialTime( double const& time0 )
 {
+  // Initial time
   m_tstart = time0;
   m_time = time0;
+  
+  // Initialisation obstacle kinematics
+  m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt ); 
+
+  // Postprocessing of force & torque on obstacles 
+  m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );  
+  m_allcomponents.outputObstaclesLoad( m_time, m_dt, false, 
+      GrainsExec::m_ReloadType == "same" );
 }
 
 
@@ -841,48 +859,55 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
     list<Obstacle*> obstaclesToFluid = m_allcomponents.getObstaclesToFluid();
     ostringstream particles_features;
     list<Particle*>::const_iterator particle, clone;
-    int id = 0, ncorners = 0;
-    size_t nclonesper = 0;
+    int componentIDinFluid = 0, particleID = 0, ncorners = 0;
+    size_t nclonesper = 0, nparticles = 0;
     Vector3 const* vtrans = NULL;
     Vector3 const* vrot = NULL;
     Point3 const* centre = NULL;
     vector<double> inertia( 6, 0. );
-    //double const* inertia = NULL;
     string particleType = "P";
     double density = 0., mass = 0., radius = 0.;
     Matrix mr;
+    multimap<int,Particle*> const* particlesPeriodicClones = 
+    	m_allcomponents.getPeriodicCloneParticles();
+    multimap<int,Particle*>::const_iterator imm;
+    pair < multimap<int,Particle*>::const_iterator,
+  	multimap<int,Particle*>::const_iterator > crange;	
+    Particle* periodic_clone = NULL ;
+    Vector3 periodicVector;
     
     // TO DO: the particle number used to communicate with the fluid is 
     // different from its actual number in Grains. 
     // This needs to be fixed in the future 
+    for (particle=particles->begin();particle!=particles->end();particle++)
+      if ( (*particle)->getTag() < 2 ) nparticles++;	          
     
-    if ( m_dimension == 3 )
-    {
-      // Total number of rigid bodies to send to the fluid flow solver
-      particles_features << particles->size() + obstaclesToFluid.size() << endl;
+    // Total number of rigid bodies to send to the fluid flow solver
+    particles_features << nparticles + obstaclesToFluid.size() << endl;
 
-      // Particle features
-      for (particle=particles->begin(), id=0; particle!=particles->end();
-       		particle++, id++)
-      {
-        if ( (*particle)->getActivity() == COMPUTE
-    		&& (*particle)->getTag() < 2 )
-        {
-          vtrans = (*particle)->getTranslationalVelocity();
+    // Particle features
+    for (particle=particles->begin(), componentIDinFluid=0; 
+      	particle!=particles->end();particle++)
+    {
+      if ( (*particle)->getTag() < 2 ) 
+      {     
+        if ( (*particle)->getActivity() == COMPUTE )      
+        {        
+	  vtrans = (*particle)->getTranslationalVelocity();
           vrot = (*particle)->getAngularVelocity();
           centre = (*particle)->getPosition();
           density = (*particle)->getDensity();
           mass = (*particle)->getMass();
           (*particle)->computeInertiaTensorSpaceFixed( inertia );
-	  //inertia = (*particle)->getInertiaTensorBodyFixed();
           radius = (*particle)->getCircumscribedRadius();
           ncorners = (*particle)->getNbCorners();
-          nclonesper = 0; // TO DO
+          particleID = (*particle)->getID();
+	  nclonesper = particlesPeriodicClones->count( particleID ); 
           particleType = "P";
           if ( nclonesper ) particleType = "PP";
           mr = (*particle)->getRigidBody()->getTransform()->getBasis();
 
-          particles_features << id << " " << ncorners << endl;
+          particles_features << componentIDinFluid << " " << ncorners << endl;
           particles_features << particleType << " " <<
 		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
 			(*vtrans)[X] ) << " " << 
@@ -939,7 +964,20 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
 
           if ( particleType == "PP" )
           {
-            // TO DO
+            particles_features << nclonesper << endl;
+	    crange = particlesPeriodicClones->equal_range( particleID );
+	    for (imm=crange.first; imm!=crange.second;imm++)
+	    {
+	      periodic_clone = imm->second;
+              periodicVector = *(periodic_clone->getPosition()) - *centre;
+              particles_features << 
+	      	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			periodicVector[X] ) << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			periodicVector[Y] ) << " " <<				
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			periodicVector[Z] ) << endl;	      
+	    }
           }
 
           particles_features << radius ;
@@ -947,7 +985,7 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
         }
         else
         {
-          particles_features << id << " " << "1" << endl;
+          particles_features << componentIDinFluid << " " << "1" << endl;
           particles_features << "P " <<
 		"0. 0. 0. 0. 0. 0. 1e8 1. " <<
 		"1.  1.  1.  1.  1.  1. " <<
@@ -957,18 +995,70 @@ void GrainsCoupledWithFluid::GrainsToFluid( istringstream &is ) const
           particles_features << "0. 0. 0." << endl;
 	  particles_features << "0" << endl;
         }
+      
+        componentIDinFluid++;
       }
-
-      // Obstacles to be sent to the fluid
-      // TO DO
-
-      // Transfer from oss to iss
-      is.str( particles_features.rdbuf()->str() );    
     }
-    else
+
+    // Obstacles to be sent to the fluid
+    list<Obstacle*>::const_iterator obst;
+    string obstacleType = "O";
+    for (obst=obstaclesToFluid.begin();obst!=obstaclesToFluid.end();obst++,
+    	componentIDinFluid++)
     {
-      // TO DO
-    }  
+      vtrans = (*obst)->getTranslationalVelocity();
+      vrot = (*obst)->getAngularVelocity();
+      centre = (*obst)->getPosition();
+      radius = (*obst)->getCircumscribedRadius();
+      ncorners = (*obst)->getRigidBody()->getConvex()->getNbCorners();
+      mr = (*obst)->getRigidBody()->getTransform()->getBasis();
+
+      particles_features << componentIDinFluid << " " << ncorners << endl;
+      particles_features << obstacleType << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vtrans)[X] ) << " " << 
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vtrans)[Y] ) << " " << 			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vtrans)[Z] ) << " " << 			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vrot)[X] ) << " " << 
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vrot)[Y] ) << " " << 			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*vrot)[Z] ) << " " << 
+		"1000. 0. 0. 0. 0. 0. 0. 0. " <<		
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[X][X] ) << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[X][Y] ) << " " <<			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[X][Z] ) << " " <<	
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Y][X] ) << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Y][Y] ) << " " <<			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Y][Z] ) << " " <<			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Z][X] ) << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Z][Y] ) << " " <<			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			mr[Z][Z] ) << " " <<			
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*centre)[X] ) << " " <<
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*centre)[Y] ) << " " <<				
+		GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+			(*centre)[Z] ) << endl;			
+
+      particles_features << radius ;
+      (*obst)->writePositionInFluid( particles_features );    
+    }
+
+    // Transfer from oss to iss
+    is.str( particles_features.rdbuf()->str() );     
   }  
 }
 
@@ -1030,4 +1120,43 @@ void GrainsCoupledWithFluid::updateParticlesVelocity(
       // TO DO
     }     
   }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Updates particles hydro force and torque with data from the fluid solver
+void GrainsCoupledWithFluid::updateParticlesHydroFT( 
+  	vector< vector<double> > const* hydroft_data_array )
+{
+  m_PRSHydroFT->setHydroFT( hydroft_data_array );
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the boolean Particle::setFluidCorrectedAcceleration. Default
+// value is True, i.e., the particle acceleration is corrected by
+// the factor ( 1 - fluid_density / particle_density )
+void GrainsCoupledWithFluid::setFluidCorrectedAcceleration( bool correct )
+{
+  Particle::setFluidCorrectedAcceleration( correct );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the Paraview post-processing translation vector in case of
+// projection-translation
+void GrainsCoupledWithFluid::setParaviewPostProcessingTranslationVector( 
+      	double const& tvx, double const& tvy, double const& tvz )
+{
+  if ( !GrainsExec::m_translationParaviewPostProcessing )
+    GrainsExec::m_translationParaviewPostProcessing = new Vector3();
+  (*GrainsExec::m_translationParaviewPostProcessing)[X] = tvx;
+  (*GrainsExec::m_translationParaviewPostProcessing)[Y] = tvy;
+  (*GrainsExec::m_translationParaviewPostProcessing)[Z] = tvz;
 }

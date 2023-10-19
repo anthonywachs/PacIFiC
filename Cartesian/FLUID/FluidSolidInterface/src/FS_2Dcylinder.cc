@@ -122,7 +122,6 @@ void FS_2Dcylinder:: set( istream& in )
   }
   in >> m_circumscribed_radius >> ncorners;
   in >> m_gravity_center;
-  in >> nfaces;
 
   // Force the mass equivalent to a disk
   m_mass = MAC::pi() * m_circumscribed_radius
@@ -134,6 +133,12 @@ void FS_2Dcylinder:: set( istream& in )
 
   // Set radius
   m_agp_2Dcylinder.radius = m_circumscribed_radius;
+
+  // Force moi of a 2D disk
+  m_inertia[0][0] = (1./2.) * m_mass
+                            * m_circumscribed_radius * m_circumscribed_radius;
+  m_inertia[1][1] = m_inertia[0][0];
+  m_inertia[2][2] = m_inertia[0][0];
 
 }
 
@@ -278,5 +283,18 @@ struct FS_2Dcylinder_Additional_Param const* FS_2Dcylinder::
   MAC_LABEL( "FS_2Dcylinder:: get_ptr_FS_2Dcylinder_Additional_Param" ) ;
 
   return ( &m_agp_2Dcylinder );
+
+}
+
+
+
+
+//---------------------------------------------------------------------------
+void FS_2Dcylinder::update_additional_parameters( )
+//---------------------------------------------------------------------------
+{
+  MAC_LABEL( "FS_2Dcylinder:: update_additional_parameters( )" ) ;
+
+
 
 }
