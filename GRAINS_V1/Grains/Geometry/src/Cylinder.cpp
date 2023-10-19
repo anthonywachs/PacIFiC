@@ -369,7 +369,7 @@ BVolume* Cylinder::computeBVolume( unsigned int type ) const
   BVolume* bvol = NULL;
   if ( type == 1 ) // OBB
   {
-    Vector3 const& extent = Vector3( m_radius, m_radius, m_halfHeight );
+    Vector3 const& extent = Vector3( m_radius, m_halfHeight, m_radius );
     bvol = new OBB( extent, Matrix() );
   }
 

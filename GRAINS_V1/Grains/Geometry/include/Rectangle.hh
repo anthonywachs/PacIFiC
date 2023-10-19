@@ -9,7 +9,7 @@ class Transform;
 
     Convex with a rectangular shape.
 
-    @author A.YAZDANI - 2019 - Creation */
+    @author A.YAZDANI - 2022 - Creation */
 // ============================================================================
 class Rectangle : public Convex
 {
