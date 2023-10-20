@@ -389,7 +389,7 @@ class Component
 
     /** @brief Writes the contact map to file in plain 2014 format
     @param fileSave output file stream */
-    void writeContactMemory_2014(ostream &fileSave ) const;
+    void writeContactMemory_2014( ostream &fileSave ) const;
 
     /** @brief Writes the contact map to file in binary format
     @param fileSave output file stream */
@@ -397,7 +397,7 @@ class Component
 
     /** @brief Reads the contact map to file in plain 2014 format
     @param fileSave input file stream */
-    void readContactMap_2014( istream &fileSave);
+    void readContactMap_2014( istream &fileSave );
 
     /** @brief Reads the contact map to file in binary format
     @param fileSave input file stream */

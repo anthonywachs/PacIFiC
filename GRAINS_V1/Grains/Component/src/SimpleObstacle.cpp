@@ -286,7 +286,7 @@ void SimpleObstacle::reload( Obstacle& mother, istream& file )
   // The flow is RigidBodyWithCrust( fileIn )
   // => ConvexBuilderFactory::create( cle, fileIn )
   // => xxx::create( fileIn )
-  // => constructeur de xxx
+  // => constructor of xxx
   m_geoRBWC = new RigidBodyWithCrust( file );
 
   // Whether the obstacle should be transferred to the fluid solver in
@@ -688,7 +688,7 @@ int SimpleObstacle::getContactMapSize()
 // Updates the ids of the contact map: in the case of a reload with 
 // insertion, the obstacle's ids are reset. This function keeps track of that 
 // change.
-void SimpleObstacle::updateContactMapId( int prev_id, int new_id)
+void SimpleObstacle::updateContactMapId( int prev_id, int new_id )
 {
   Component::updateContactMapId( prev_id, new_id);
 }

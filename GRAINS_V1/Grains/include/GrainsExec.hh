@@ -185,6 +185,25 @@ class GrainsExec
 	double const& CylHeight,
 	size_t const& CylAxisDir,
 	double const& tol = EPSILON );
+	
+    /** @brief Computes and returns the 4 x 4 determinant of 4 points
+    @param p1 point 1    
+    @param p2 point 2    
+    @param p3 point 3 
+    @param p4 point 4 */
+    static double PointDeterm4by4( Point3 const& p1, Point3 const& p2,
+    	Point3 const& p3, Point3 const& p4 );
+	
+    /** @brief Returns whether a point lies inside a tetrahedron
+    @param p1 point 1    
+    @param p2 point 2    
+    @param p3 point 3 
+    @param p4 point 4 
+    @param p point to check 
+    @param check additional geometric checks if true, default value is false */
+    static bool isPointInTetrahedron( Point3 const& p1, Point3 const& p2,
+    	Point3 const& p3, Point3 const& p4, Point3 const& p, 
+	bool check = false );
     //@}
 
 

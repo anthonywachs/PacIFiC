@@ -840,7 +840,33 @@ void Polyhedron::write_convex_STL( ostream& f, Transform const& transform )
 // Returns whether a point lies inside the polyhedron
 bool Polyhedron::isIn( Point3 const& pt ) const
 {
-  // TO DO
+  bool isIn = false;
+
+  // Recall that by definition, center of mass is at the origin in the reference
+  // configuration
+  Point3 G_, centerOfMass ;
+  size_t i, j, k, nbface = m_allFaces->size();
+  for (i=0; i<nbface && !isIn; i++)
+  {       
+    if ( (*m_allFaces)[i].size() == 3 )
+    {
+      isIn = GrainsExec::isPointInTetrahedron( (*this)[(*m_allFaces)[i][0]], 
+      	(*this)[(*m_allFaces)[i][1]], (*this)[(*m_allFaces)[i][2]], 
+	centerOfMass, pt );
+    }
+    else
+    {
+      size_t nptsface = (*m_allFaces)[i].size();
+      G_.reset();
+      for (j=0; j<nptsface; ++j) 
+        G_ += (*this)[(*m_allFaces)[i][j]];
+      G_ /= double(nptsface);
+      for (j=0, k=nptsface - 1; j<nptsface && !isIn; k=j++) 
+        isIn = GrainsExec::isPointInTetrahedron( G_, 
+		(*this)[(*m_allFaces)[i][k]], (*this)[(*m_allFaces)[i][j]], 
+		centerOfMass, pt );
+    }
+  }
   
-  return ( false );
+  return ( isIn );
 }

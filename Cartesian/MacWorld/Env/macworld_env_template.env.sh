@@ -98,8 +98,8 @@ echo -e '  '
 
 # HYPRE / Petsc
 echo -e '\033[96m*** Petsc/Hypre shell variables\033[0m'
-source ${MACWORLD_ROOT}/hypre-2.10.1/hypre.env.sh
-source ${MACWORLD_ROOT}/petsc-3.2.0-p7/petsc.env.sh
+source ${MACWORLD_ROOT}/hypre-2.24.0/hypre.env.sh
+source ${MACWORLD_ROOT}/petsc-3.17.5/petsc.env.sh
 echo -e '  '
 
 
