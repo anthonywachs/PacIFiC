@@ -338,9 +338,6 @@ void create_FD_Interior_Octahedron( particle * p, vector Index_lambda,
   /** Extract geometric information from particle pointer p */
   GeomParameter gp = p->g;
 
-  /** Declare the checkpoint parameter */
-  coord checkpt;
-
   /* Min/Max coordinates for the AABB (Axed-Aligned-Bounding-Box) */
   coord mincoord = {HUGE, HUGE, HUGE};
   coord maxcoord = {-HUGE, -HUGE, -HUGE};
@@ -369,6 +366,7 @@ void create_FD_Interior_Octahedron( particle * p, vector Index_lambda,
 
   foreach() 
   {
+    coord checkpt;    
     checkpt.x = x;
     checkpt.y = y;
     checkpt.z = z;

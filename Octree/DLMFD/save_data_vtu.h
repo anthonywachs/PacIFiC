@@ -116,7 +116,7 @@ void save_data( scalar * list, vector * vlist, double const time )
 void reinitialize_vtk_restart( void )
 //----------------------------------------------------------------------------
 {
-  // Get the last cycle number from previous simulation
+  // Get the last cycle cumber from previous simulation
   char filename_lcn[80] = "";
   sprintf( filename_lcn, "%s", result_dir );
   strcat( filename_lcn, "/" );  
@@ -260,7 +260,7 @@ void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
     int total_interior_points = 0;
     
     for (int k = 0; k < np; k++) 
-      foreach()
+      foreach(serial)
         if ( flagfield[] < 1 && (int)index_lambda.y[] == k )
        	  number_interior_points += 1;
      
@@ -281,7 +281,7 @@ void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
 
     int counter = 0;
     for (int k = 0; k < np; k++) 
-      foreach()
+      foreach(serial)
      	if ( flagfield[] < 1 && (int)index_lambda.y[] == k ) 
        	{
           interior_coordx[counter] = x;
