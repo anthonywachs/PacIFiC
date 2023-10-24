@@ -7,6 +7,7 @@
 #include <MAC.hh>
 #include <MAC_Communicator.hh>
 #include <MAC_Data.hh>
+#include <MAC_DoubleArray2D.hh>
 #include <MAC_DoubleArray3D.hh>
 #include <MAC_Error.hh>
 #include <MAC_Exec.hh>
@@ -24,6 +25,7 @@
 #include <MAC_DoubleVector.hh>
 #include <MAC_Variable.hh>
 #include <stringVector.hh>
+#include <doubleArray2D.hh>
 #include <LA_SeqVector.hh>
 #include <LA_Vector.hh>
 #include <LA_Matrix.hh>
@@ -2914,62 +2916,6 @@ FV_DiscreteField:: set_synchronization_features( void )
      (*ild) = new double[nijk];
      bufferzone_sent_data_size.push_back(nijk);
    }
-
-
-//    // Debug
-//    size_t nb_ranks = macCOMM->nb_ranks() ;
-//    size_t RANK = macCOMM->rank() ;
-//    for (size_t i=0;i<nb_ranks;++i)
-//    {
-//      if ( i == RANK )
-//      {
-//        cout << "Rank " << RANK << endl ;
-//        cout << "   Buffer data" << endl;
-//        for ( r=synchronization_MPI_rank_neighbors.begin(),
-//   	ibs=bufferzone_sent.begin(),
-// 	ils=bufferzone_sent_data_size.begin();
-//   	r!=synchronization_MPI_rank_neighbors.end();
-// 	r++,ibs++,ils++ )
-//        {
-//          cout << "   To rank " << *r << endl;
-// 	 cout << "   Buffer data size = " << *ils << endl;
-// 	 cout << "   Number of triplets per comp = " << *ils << endl;
-// 	 for (comp=0;comp<NB_COMPS;comp++)
-// 	 {
-// 	   cout << "      Comp = " << comp << " n = " << (*ibs)[comp].size()
-// 	   	<< endl;
-// 	   nijk = (*ibs)[comp].size();
-// 	   for (m=0;m<nijk;++m)
-// 	     cout << "      " << (*ibs)[comp][m].i << " " << (*ibs)[comp][m].j
-// 	     	<< " " << (*ibs)[comp][m].k << endl;
-// 	 }
-//        }
-//        cout << endl;
-//        cout << "   Halozone data" << endl;
-//        for ( r=synchronization_MPI_rank_neighbors.begin(),
-//   	ihr=halozone_received.begin(),
-// 	ils=halozone_received_data_size.begin();
-//   	r!=synchronization_MPI_rank_neighbors.end();
-// 	r++,ihr++,ils++ )
-//        {
-//          cout << "   From rank " << *r << endl;
-// 	 cout << "   Received data size = " << *ils << endl;
-// 	 cout << "   Number of triplets per comp = " << *ils << endl;
-// 	 for (comp=0;comp<NB_COMPS;comp++)
-// 	 {
-// 	   cout << "      Comp = " << comp << " n = " << (*ihr)[comp].size()
-// 	   	<< endl;
-// 	   nijk = (*ihr)[comp].size();
-// 	   for (m=0;m<nijk;++m)
-// 	     cout << "      " << (*ihr)[comp][m].i << " " << (*ihr)[comp][m].j
-// 	     	<< " " << (*ihr)[comp][m].k << endl;
-// 	 }
-//        }
-//        cout << endl;
-//      }
-//      macCOMM->barrier();
-//    }
-//    if ( RANK == 0 ) cout << endl;
 }
 
 
@@ -3817,70 +3763,6 @@ FV_DiscreteField:: synchronize( size_t level )
   // Check that all non-blocking messages are complete
   for (ireq=0;ireq<idreq.size();++ireq)
     macCOMM->wait( idreq[ireq] );
-
-
-//    // Debug
-//    size_t nb_ranks = macCOMM->nb_ranks() ;
-//    size_t RANK = macCOMM->rank() ;
-//    size_t nijk = 0;
-//    for (size_t i=0;i<nb_ranks;++i)
-//    {
-//      if ( i == RANK )
-//      {
-//        cout << "Rank " << RANK << endl ;
-//        cout << "   Buffer data" << endl;
-//        for ( r=synchronization_MPI_rank_neighbors.begin(),
-//   	ibs=bufferzone_sent.begin(),
-// 	ils=bufferzone_sent_data_size.begin();
-//   	r!=synchronization_MPI_rank_neighbors.end();
-// 	r++,ibs++,ils++ )
-//        {
-//          cout << "   To rank " << *r << endl;
-// 	 cout << "   Buffer data size = " << *ils << endl;
-// 	 cout << "   Number of triplets per comp = " << *ils << endl;
-// 	 for (comp=0;comp<NB_COMPS;comp++)
-// 	 {
-// 	   cout << "      Comp = " << comp << " n = " << (*ibs)[comp].size()
-// 	   	<< endl;
-// 	   nijk = (*ibs)[comp].size();
-// 	   for (m=0;m<nijk;++m)
-// 	     cout << "      " << (*ibs)[comp][m].i << " " << (*ibs)[comp][m].j
-// 	     	<< " " << (*ibs)[comp][m].k << " " <<
-// 		MAC::doubleToString( std::ios::scientific, 8,
-// 		(*VALUES)[level][comp](
-// 		(*ibs)[comp][m].i, (*ibs)[comp][m].j, (*ibs)[comp][m].k ) )
-// 		<< endl;
-// 	 }
-//        }
-//        cout << endl;
-//        cout << "   Halozone data" << endl;
-//        for ( r=synchronization_MPI_rank_neighbors.begin(),
-//   	ihr=halozone_received.begin(),
-// 	ils=halozone_received_data_size.begin();
-//   	r!=synchronization_MPI_rank_neighbors.end();
-// 	r++,ihr++,ils++ )
-//        {
-//          cout << "   From rank " << *r << endl;
-// 	 cout << "   Received data size = " << *ils << endl;
-// 	 cout << "   Number of triplets per comp = " << *ils << endl;
-// 	 for (comp=0;comp<NB_COMPS;comp++)
-// 	 {
-// 	   cout << "      Comp = " << comp << " n = " << (*ihr)[comp].size()
-// 	   	<< endl;
-// 	   nijk = (*ihr)[comp].size();
-// 	   for (m=0;m<nijk;++m)
-// 	     cout << "      " << (*ihr)[comp][m].i << " " << (*ihr)[comp][m].j
-// 	     	<< " " << (*ihr)[comp][m].k << " " <<
-// 		MAC::doubleToString( std::ios::scientific, 8,
-// 		(*VALUES)[level][comp]( (*ihr)[comp][m].i, (*ihr)[comp][m].j,
-// 		(*ihr)[comp][m].k ) ) << endl;
-// 	 }
-//        }
-//        cout << endl;
-//      }
-//      macCOMM->barrier();
-//    }
-//    if ( RANK == 0 ) cout << endl;
 }
 
 
@@ -4736,39 +4618,80 @@ FV_DiscreteField:: save_state( MAC_ObjectWriter* writer ) const
 
    writer->start_new_object( "FV_DiscreteField" ) ;
 
+   bool use_format_2023 = true;
    writer->add_entry( "name", MAC_String::create( 0, FNAME ) ) ;
    writer->add_entry( "nb_DOF", MAC_Int::create( 0, NB_LOCAL_DOF ) ) ;
    writer->add_entry( "nb_components", MAC_Int::create( 0, NB_COMPS ) ) ;
    writer->add_entry( "nb_levels", MAC_Int::create( 0, STO_DEPTH ) ) ;
+   if ( use_format_2023 )
+     writer->add_entry( "format", MAC_String::create( 0, "2023" ) ) ;   
 
    // Saving values
-   doubleArray3D OutputValues( NB_COMPS, STO_DEPTH, NB_LOCAL_DOF, 0. ) ;
-   for (size_t comp=0;comp<NB_COMPS;++comp)
-   {
-     size_t nelem0 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(0) ;
-     size_t nelem1 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(1) ;
-     size_t nelem2 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(2) ;
+   // We keep the old data format for clarity, but from now on we set
+   // use_format_2023 to true
+   if ( !use_format_2023 )
+   {   
+     doubleArray3D OutputValues( NB_COMPS, STO_DEPTH, NB_LOCAL_DOF, 0. ) ;
+     for (size_t comp=0;comp<NB_COMPS;++comp)
+     {
+       size_t nelem0 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(0) ;
+       size_t nelem1 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(1) ;
+       size_t nelem2 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(2) ;
 
+       for (size_t lev=0;lev<STO_DEPTH;++lev)
+       {
+         size_t idx = 0 ;
+         if ( DIM == 2 )
+         {
+           for (size_t i=0;i<nelem0;++i)
+             for (size_t j=0;j<nelem1;++j)
+               OutputValues( comp, lev, idx++ ) = (*VALUES)[lev][comp](i,j,0) ;
+         }
+         else
+         {
+           for (size_t i=0;i<nelem0;++i)
+             for (size_t j=0;j<nelem1;++j)
+	       for (size_t k=0;k<nelem2;++k)
+                 OutputValues( comp, lev, idx++ ) = 
+		 	(*VALUES)[lev][comp](i,j,k) ;
+         }
+       }
+     }
+
+     writer->add_entry( "values", MAC_DoubleArray3D::create( 0, 
+     	OutputValues ) ) ;
+   }
+   else
+   {
+     doubleArray2D OutputValues( STO_DEPTH, NB_LOCAL_DOF, 0. ) ;
      for (size_t lev=0;lev<STO_DEPTH;++lev)
      {
        size_t idx = 0 ;
-       if ( DIM == 2 )
-       {
-         for (size_t i=0;i<nelem0;++i)
-           for (size_t j=0;j<nelem1;++j)
-             OutputValues( comp, lev, idx++ ) = (*VALUES)[lev][comp](i,j,0) ;
-       }
-       else
-       {
-         for (size_t i=0;i<nelem0;++i)
-           for (size_t j=0;j<nelem1;++j)
-	     for (size_t k=0;k<nelem2;++k)
-               OutputValues( comp, lev, idx++ ) = (*VALUES)[lev][comp](i,j,k) ;
-       }
-     }
-   }
+       for (size_t comp=0;comp<NB_COMPS;++comp)
+       { 
+         size_t nelem0 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(0) ;
+         size_t nelem1 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(1) ;
+         size_t nelem2 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(2) ;
 
-   writer->add_entry( "values", MAC_DoubleArray3D::create( 0, OutputValues ) ) ;
+         if ( DIM == 2 )
+         {
+           for (size_t i=0;i<nelem0;++i)
+             for (size_t j=0;j<nelem1;++j)
+               OutputValues( lev, idx++ ) = (*VALUES)[lev][comp](i,j,0) ;
+         }
+         else
+         {
+           for (size_t i=0;i<nelem0;++i)
+             for (size_t j=0;j<nelem1;++j)
+	       for (size_t k=0;k<nelem2;++k)
+                 OutputValues( lev, idx++ ) = (*VALUES)[lev][comp](i,j,k) ;
+         }
+       }
+     }   
+
+     writer->add_entry( "values", MAC_DoubleArray2D::create( 0, 
+     	OutputValues ) ) ;
+   }
 
    writer->finalize_object() ;
 
@@ -4793,6 +4716,9 @@ FV_DiscreteField:: restore_state( MAC_ObjectReader* reader )
    int const read_nb_DOF = reader->data_of_entry( "nb_DOF" )->to_int() ;
    int const read_nb_comps = reader->data_of_entry( "nb_components" )->to_int();
    int const read_nb_levels = reader->data_of_entry( "nb_levels" )->to_int() ;
+   string read_format = "old";   
+   if ( reader->has_entry( "format" ) )
+     read_format = reader->data_of_entry( "format" )->to_string() ;
 
    // Does some checks
    MAC_ASSERT( read_name==FNAME ) ;
@@ -4801,35 +4727,71 @@ FV_DiscreteField:: restore_state( MAC_ObjectReader* reader )
    MAC_ASSERT( read_nb_levels==(int) STO_DEPTH ) ;
 
    // Retrieving values
-   doubleArray3D OutputValues
-   		= reader->data_of_entry( "values" )->to_double_array3D() ;
-   MAC_ASSERT( OutputValues.index_bound(0) == NB_COMPS ) ;
-   MAC_ASSERT( OutputValues.index_bound(1) == STO_DEPTH ) ;
-   MAC_ASSERT( OutputValues.index_bound(2) == NB_LOCAL_DOF ) ;
-
-   for (size_t comp=0;comp<NB_COMPS;++comp)
+   // We keep the old data format for back compatibility 
+   if ( read_format != "2023" )
    {
-     size_t nelem0 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(0) ;
-     size_t nelem1 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(1) ;
-     size_t nelem2 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(2) ;
+     doubleArray3D OutputValues
+   		= reader->data_of_entry( "values" )->to_double_array3D() ;
+     MAC_ASSERT( OutputValues.index_bound(0) == NB_COMPS ) ;
+     MAC_ASSERT( OutputValues.index_bound(1) == STO_DEPTH ) ;
+     MAC_ASSERT( OutputValues.index_bound(2) == NB_LOCAL_DOF ) ;
 
+     for (size_t comp=0;comp<NB_COMPS;++comp)
+     {
+       size_t nelem0 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(0) ;
+       size_t nelem1 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(1) ;
+       size_t nelem2 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(2) ;
+
+       for (size_t lev=0;lev<STO_DEPTH;++lev)
+       {
+         size_t idx = 0 ;
+         if ( DIM == 2 )
+         { 
+           for (size_t i=0;i<nelem0;++i)
+             for (size_t j=0;j<nelem1;++j)
+               (*VALUES)[lev][comp](i,j,0) = OutputValues( comp, lev, idx++ ) ;
+         }
+         else
+         {
+           for (size_t i=0;i<nelem0;++i)
+             for (size_t j=0;j<nelem1;++j)
+	       for (size_t k=0;k<nelem2;++k)
+                 (*VALUES)[lev][comp](i,j,k) = 
+		 	OutputValues( comp, lev, idx++ ) ;
+         }
+       }
+     }
+   }
+   else
+   {
+     doubleArray2D OutputValues
+   		= reader->data_of_entry( "values" )->to_double_array2D() ;
+     MAC_ASSERT( OutputValues.index_bound(0) == STO_DEPTH ) ;
+     MAC_ASSERT( OutputValues.index_bound(1) == NB_LOCAL_DOF ) ;
      for (size_t lev=0;lev<STO_DEPTH;++lev)
      {
        size_t idx = 0 ;
-       if ( DIM == 2 )
+       for (size_t comp=0;comp<NB_COMPS;++comp)
        {
-         for (size_t i=0;i<nelem0;++i)
-           for (size_t j=0;j<nelem1;++j)
-             (*VALUES)[lev][comp](i,j,0) = OutputValues( comp, lev, idx++ ) ;
+         size_t nelem0 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(0) ;
+         size_t nelem1 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(1) ;
+         size_t nelem2 = (*UNK_LOCAL_NUMBERING)[comp].index_bound(2) ;
+
+         if ( DIM == 2 )
+         {
+           for (size_t i=0;i<nelem0;++i)
+             for (size_t j=0;j<nelem1;++j)
+               (*VALUES)[lev][comp](i,j,0) = OutputValues( lev, idx++ );
+         }
+         else
+         {
+           for (size_t i=0;i<nelem0;++i)
+             for (size_t j=0;j<nelem1;++j)
+	       for (size_t k=0;k<nelem2;++k)
+                 (*VALUES)[lev][comp](i,j,k) = OutputValues( lev, idx++ );
+         }
        }
-       else
-       {
-         for (size_t i=0;i<nelem0;++i)
-           for (size_t j=0;j<nelem1;++j)
-	     for (size_t k=0;k<nelem2;++k)
-               (*VALUES)[lev][comp](i,j,k) = OutputValues( comp, lev, idx++ ) ;
-       }
-     }
+     }  
    }
 
    reader->end_object_retrieval() ;

@@ -64,8 +64,6 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
     	<< m_ParaviewFilename << endl;
     cout << GrainsExec::m_shift12 << "Output file directory name = " 
     	<< m_ParaviewFilename_dir << endl;
-    cout << GrainsExec::m_shift12 << "Initial cycle number = " 
-    	<< m_ParaviewCycleNumber << endl;
     cout << GrainsExec::m_shift12 << "Writing mode = " 
     	<< ( m_binary ? "Binary" : "Text" ) << endl;
     cout << GrainsExec::m_shift12 << "Write force network = " 
@@ -92,11 +90,27 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
   , m_ParaviewCycleNumber( 0 )
   , m_binary( isBinary )
   , m_postProcessObstacle( true ) 
-  , m_initialCycleNumber_forced( false )   
+  , m_initialCycleNumber_forced( false )
+  , m_network( false )     
   , BUFFER( NULL )
   , ALLOCATED( 0 )
   , OFFSET( 0 )
-{}	
+{
+  if ( m_rank == 0 )
+  {
+    cout << GrainsExec::m_shift9 << "Type = Paraview" << endl;
+    cout << GrainsExec::m_shift12 << "Output file root name = " 
+    	<< m_ParaviewFilename << endl;
+    cout << GrainsExec::m_shift12 << "Output file directory name = " 
+    	<< m_ParaviewFilename_dir << endl;
+    cout << GrainsExec::m_shift12 << "Writing mode = " 
+    	<< ( m_binary ? "Binary" : "Text" ) << endl;
+    cout << GrainsExec::m_shift12 << "Write force network = " 
+    	<< ( m_network ? "True" : "False" ) << endl;
+    cout << GrainsExec::m_shift12 << "Write obstacles = " 
+    	<< ( m_postProcessObstacle ? "True" : "False" ) << endl;	
+  }
+}	
 
 
 
@@ -259,9 +273,10 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
   }
   else
   {
-    // In reload mode "same", the obstacle post-processign file is required
+    // In reload mode "same", the obstacle post-processing file is required
     // therefore we force m_postProcessObstacle = true
     m_postProcessObstacle = true ;
+
     if ( m_rank == 0 )
     {     
       // Obstacles
@@ -287,8 +302,9 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
           readPVDFile( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
 		+ "_Particles_Type"+ossPC->str() + ".pvd",
 		*m_Paraview_saveParticles_pvd[i] );
+	  delete ossPC;	
 	}     
-    
+ 
       if ( GrainsExec::m_periodic )
         readPVDFile( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_PeriodicCloneParticles.pvd", 
@@ -300,7 +316,7 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
 	readPVDFile( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_ParticleVelocityVectors.pvd", 
 	m_Paraview_saveParticleVelocityVectors_pvd );  
-    
+
         // Contact force vectors
 	readPVDFile( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_ContactForceVectors.pvd", m_Paraview_saveContactForceVectors_pvd );
@@ -314,7 +330,7 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
         }
       }
     }  
-    
+
     // Cycle number
     if ( !m_initialCycleNumber_forced )
       m_ParaviewCycleNumber = getPreviousCycleNumber();

@@ -272,7 +272,7 @@ event init (i = 0)
 
 	
   // Initialize the field u_previoustime to compute x-velocity change
-  foreach() u_previoustime[] = u.x[];  
+  foreach() u_previoustime[] = u.x[];
   
   
   // By default:
@@ -376,7 +376,7 @@ event viscous_term (i++)
       foreach_dimension()
         u.x[] += -dt*DLM_explicit.x[]/(rhoval*dlmfd_dv());
 
-    boundary((scalar*){u});
+    synchronize((scalar*){u});
 # endif
 }
 

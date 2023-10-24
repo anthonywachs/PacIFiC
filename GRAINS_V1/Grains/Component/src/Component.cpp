@@ -486,6 +486,8 @@ Vector3 const* Component::getTranslationalVelocity_fluide() const
 }
 
 
+
+
 // ----------------------------------------------------------------------------
 // Searches and stores all contact points between a composite particle and a
 // component.
@@ -500,6 +502,9 @@ void Component::InterAction( Component* voisin, double dt,
     throw ContactError();
   }
 }
+
+
+
 
 // ----------------------------------------------------------------------------
 // Searches and stores all contact points between a composite particle and a
@@ -582,6 +587,7 @@ void Component::copyContactInMap( std::tuple<int,int,int> const& id,
   m_contactMap.insert(std::make_pair( id, std::make_tuple(
     isActive, kdelta, prev_normal, cumulSpringTorque) ));
 }
+
 
 
 
@@ -673,6 +679,7 @@ void Component::printActiveNeighbors(int const& id )
 
 
 
+
 // ---------------------------------------------------------------------------
 // Writes the contact map information in an array of doubles
 void Component::copyHistoryContacts( double* &destination, int start_index )
@@ -707,6 +714,7 @@ void Component::copyHistoryContacts( double* &destination, int start_index )
 
 
 
+
 // ---------------------------------------------------------------------------
 // Returns the number of contacts in the contact map
 int Component::getContactMapSize()
@@ -716,9 +724,10 @@ int Component::getContactMapSize()
 
 
 
+
 // ---------------------------------------------------------------------------
 // Writes the contact map to file in plain 2014 format
-void Component::writeContactMemory_2014(ostream &fileOut ) const
+void Component::writeContactMemory_2014( ostream &fileOut ) const
 {
   int mapSize;
   mapSize = (int) m_contactMap.size();
@@ -728,8 +737,8 @@ void Component::writeContactMemory_2014(ostream &fileOut ) const
     ::const_iterator it;
   if (m_contactMap.begin() != m_contactMap.end())
   {
-  int c=0;
-  for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
+    int c=0;
+    for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
     {
       c++;
       fileOut << get<0>(it->first) ;
@@ -794,7 +803,7 @@ void Component::writeContactMemory_binary( ostream &fileOut )
 // Updates the ids of the contact map: in the case of a reload with 
 // insertion, the obstacle's ids are reset. This function keeps track of that 
 // change.
-void Component::updateContactMapId( int prev_id, int new_id)
+void Component::updateContactMapId( int prev_id, int new_id )
 {
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
     ::iterator it;
@@ -817,7 +826,7 @@ void Component::updateContactMapId( int prev_id, int new_id)
 
 // ---------------------------------------------------------------------------
 // Reads the contact map to file in plain 2014 format
-void Component::readContactMap_2014( istream &fileSave)
+void Component::readContactMap_2014( istream &fileSave )
 {
   // Read the contact memories of the particle (if any)
   char next_char;
@@ -853,7 +862,7 @@ void Component::readContactMap_2014( istream &fileSave)
 
 // ---------------------------------------------------------------------------
 // Reads the contact map to file in binary format
-void Component::readContactMap_binary( istream &fileSave)
+void Component::readContactMap_binary( istream &fileSave )
 {
   int mapSize;
   fileSave.read( reinterpret_cast<char*>( &mapSize ), sizeof(int) );

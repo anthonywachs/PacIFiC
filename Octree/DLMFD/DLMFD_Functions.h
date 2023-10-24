@@ -130,6 +130,20 @@ typedef struct {
 
 
 
+/** Force synchronization of a field in parallel by setting the dirty flag
+of the fields to true */
+//----------------------------------------------------------------------------
+trace void synchronize (scalar * list)
+//----------------------------------------------------------------------------
+{
+  for (scalar s in list)
+    s.dirty = true;
+  boundary(list);
+}
+
+
+
+
 # include "CircularCylinder2D.h"
 # include "Sphere.h"
 # include "Cube.h"
@@ -458,7 +472,7 @@ void create_index_lambda_scalar (const SolidBodyBoundary dlm_bd,
   
   free (fdlocal);
   
-  boundary ((scalar*) {Index_lambda});
+  synchronize((scalar*) {Index_lambda});
 }
 
 
@@ -750,7 +764,7 @@ void remove_too_close_multipliers(particle * p, vector index_lambda)
     free_SolidBodyBoundary(&dlm_lambda_to_desactivate);
   } /* End loop NPARTICLES */
 
-  boundary((scalar*) {index_lambda});
+  synchronize((scalar*) {index_lambda});
 }
 
 
@@ -798,6 +812,7 @@ void reverse_fill_flagfield (particle * p, scalar f, vector index_lambda,
 	  lambdacellpos.z = z;
 	  lambdapos.z = dlm_lambda.z[(int)index_lambda.x[]];
 #endif
+
 	  /* compute relative vector X_boundary - X_local = rel from the 
 	  cell (containning the boundary) position to the boundary's 
 	  (analytical) position */
@@ -816,7 +831,7 @@ void reverse_fill_flagfield (particle * p, scalar f, vector index_lambda,
 	    gcbdum.center.x += pshift.x[];
 	  
 	  /* assign fictitious-boundary's normal (use boundary's position) */
-	  assign_dial_fd_boundary (&p[k], lambdapos, gcbdum, Delta, &NCX);	  
+	  assign_dial_fd_boundary (&p[k], lambdapos, gcbdum, Delta, &NCX);
 	
 	  /* compute relative vector neighbor to the local cell */
 	  compute_relative_vector (localcellpos, lambdacellpos , &relnl);
@@ -836,7 +851,8 @@ void reverse_fill_flagfield (particle * p, scalar f, vector index_lambda,
       }
     }
   
-    boundary ({f, index_lambda.x, index_lambda.y});
+//    synchronize({f, index_lambda.x, index_lambda.y});
+    synchronize({f});    
   }// loop on particles id 
 }
 
@@ -864,8 +880,8 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
       }
   }
   
-  boundary ({g, h});
-  boundary ((scalar *){e, pshift});
+  synchronize({g, h});
+  synchronize((scalar *){e, pshift});
 
 
   for (int k = 0; k < n; k++) {
@@ -939,6 +955,8 @@ void allocate_and_init_particles (particle * p, const int n, vector e,
     initialize_and_allocate_Cache(c);
 #endif
   }
+  
+  synchronize((scalar*) {e});
 }
 
 
@@ -1426,7 +1444,7 @@ void vorticity_3D( const vector u, vector omega )
       omega.x[] = ( (u.z[0,1,0] - u.z[0,-1,0]) 
       	- (u.y[0,0,1] - u.y[0,0,-1]) )/2.*Delta;
   
-  boundary((scalar *){omega});
+  synchronize((scalar *){omega});
 }
 
 
@@ -1652,12 +1670,7 @@ int totalcells()
 //----------------------------------------------------------------------------
 {
   int t = 0;
-  
-  foreach() t++;
-  
-# if _MPI
-    mpi_all_reduce( t, MPI_INT, MPI_SUM );
-# endif
+  foreach(reduction(+:t)) t++;  
   
   return t;
 }
@@ -1682,7 +1695,7 @@ int total_dlmfd_cells( particle* allpart, const int np )
       apts += allpart[k].reduced_domain.n;
 #   endif
   }
-  
+
 # if _MPI
     mpi_all_reduce( apts, MPI_INT, MPI_SUM );
 # endif

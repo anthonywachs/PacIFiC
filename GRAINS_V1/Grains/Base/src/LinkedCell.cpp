@@ -2152,42 +2152,45 @@ bool LinkedCell::insertParticleSerial( Particle* particle,
 	vector<Particle*> const* ReferenceParticles,
 	bool const& periodic, bool const& force_insertion )
 {
-  bool insert = false, contact = true;
+  bool insert = false, contact = false;
   GeoPosition geoloc = GEOPOS_NONE;
 
   // If insertion is not forced, check contacts with other particles and
   // obstacles
-  if ( !force_insertion )
+
+  // Check with master particle
+  if ( !force_insertion ) contact = isContactWithCrust( particle );
+
+  // In case of a periodic domain, we need the geoloc of the cell the particle
+  // belongs to
+  if ( periodic && !contact )
   {
-    // Check with master particle
-    contact = isContactWithCrust( particle );
+    // Get the cell where the master particle is located
+    Point3 centre = *(particle->getPosition());
+    int id[3];
+    Cell::GetCell( centre, id );
+    Cell* cell_ = getCell( id[X], id[Y], id[Z] );
+    geoloc = cell_->m_GeoPosCell;
+  }
 
-    // In case of a periodic domain, check if periodic clones have contacts
-    if ( periodic && !contact )
+  // In case of a periodic domain, check if periodic clones have contacts
+  if ( periodic && !force_insertion && !contact )
+  {  
+    // Loop over the domain periodic vectors for this geographic position
+    for ( size_t i=0;i<m_periodic_vector_indices[geoloc].size() &&
+	!contact;++i)
     {
-      // Get the cell where the master particle is located
-      Point3 centre = *(particle->getPosition());
-      int id[3];
-      Cell::GetCell( centre, id );
-      Cell* cell_ = getCell( id[X], id[Y], id[Z] );
-      geoloc = cell_->m_GeoPosCell;
+      // Translate particle by periodic vector i
+      particle->Translate( m_domain_global_periodic_vectors[
+	m_periodic_vector_indices[geoloc][i]] );
 
-      // Loop over the domain periodic vectors for this geographic position
-      for ( size_t i=0;i<m_periodic_vector_indices[geoloc].size() &&
-      	!contact;++i)
-      {
-        // Translate particle by periodic vector i
-	particle->Translate( m_domain_global_periodic_vectors[
+      // Check contact of the periodic clone
+      contact = isContactWithCrust( particle );
+
+      // If no contact, translate back to original position
+      if ( !contact )
+	particle->Translate( - m_domain_global_periodic_vectors[
 		m_periodic_vector_indices[geoloc][i]] );
-
-	// Check contact of the periodic clone
-	contact = isContactWithCrust( particle );
-
-	// If no contact, translate back to original position
-        if ( !contact )
-	  particle->Translate( - m_domain_global_periodic_vectors[
-		m_periodic_vector_indices[geoloc][i]] );
-      }
     }
   }
 

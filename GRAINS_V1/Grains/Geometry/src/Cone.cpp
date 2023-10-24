@@ -1,5 +1,7 @@
 #include "Cone.hh"
 
+int Cone::m_visuNodeNbOnPer = 32;
+
 // ----------------------------------------------------------------------
 // Constructor with flat base radius and height as input parameters
 Cone::Cone( double r, double h ) 
@@ -16,6 +18,19 @@ Cone::Cone( double r, double h )
 Cone::Cone( istream& fileIn )
 {
   readShape( fileIn );
+}
+
+
+
+
+// -----------------------------------------------------------------------------
+// Constructor with an XML node as an input parameter
+Cone::Cone( DOMNode* root )
+{
+  m_bottomRadius = ReaderXML::getNodeAttr_Double( root, "Radius" );
+  m_quarterHeight = ReaderXML::getNodeAttr_Double( root, "Height") / 4.;
+  m_sinAngle = m_bottomRadius / sqrt( m_bottomRadius * m_bottomRadius 
+  	+ 16. * m_quarterHeight * m_quarterHeight ); 
 }
 
 
@@ -63,6 +78,45 @@ Point3 Cone::support( Vector3 const& v ) const
   } 
   else
     return ( Point3() );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a vector of points describing the envelope of the
+// cone. TO DO
+vector<Point3> Cone::getEnvelope() const
+{
+  Point3 point(0.,0.,0.);
+  vector<Point3> enveloppe(1,point);
+
+  // TO DO
+
+  return ( enveloppe );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of vertices/corners or a code corresponding to
+// a specific convex shape. Here returns the code 777
+int Cone::getNbCorners() const
+{
+  return ( 888 );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a pointer to a 2D array describing the relationship between the face
+// indices and the point indices. Returns a null pointer as a convention
+vector< vector<int> > const* Cone::getFaces() const
+{
+  vector< vector<int> >* allFaces = NULL;
+  return ( allFaces );
 }
 
 
@@ -146,10 +200,143 @@ void Cone::readShape( istream& fileIn )
 
 
 // ----------------------------------------------------------------------------
+// Returns the number of points to write the cone in a Paraview format
+int Cone::numberOfPoints_PARAVIEW() const
+{
+  return ( m_visuNodeNbOnPer + 2 );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of elementary polytopes to write the cone in a
+// Paraview format
+int Cone::numberOfCells_PARAVIEW() const
+{
+  return ( m_visuNodeNbOnPer );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes a list of points describing the cone in a Paraview format
+void Cone::write_polygonsPts_PARAVIEW( ostream& f,
+  	Transform const& transform, Vector3 const* translation ) const
+{
+  Point3 pp, p;
+  double dtheta = 2.* PI / m_visuNodeNbOnPer;
+
+  // Disk rim
+  p[Y] = - m_quarterHeight;
+  for (int i=0;i<m_visuNodeNbOnPer;++i)
+  {
+    p[X] = m_bottomRadius * cos ( i * dtheta );
+    p[Z] = m_bottomRadius * sin ( i * dtheta );
+    pp = transform( p );
+    if ( translation ) pp += *translation;
+    f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+  }
+
+  // Disk center
+  p[X] = 0.;
+  p[Y] = - m_quarterHeight;
+  p[Z] = 0.;
+  pp = transform( p );
+  if ( translation ) pp += *translation;
+  f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+
+  // Upper tip
+  p[X] = 0.;
+  p[Y] = 3. * m_quarterHeight;
+  p[Z] = 0.;
+  pp = transform( p );
+  if ( translation ) pp += *translation;
+  f << pp[X] << " " << pp[Y] << " " << pp[Z] << endl;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a list of points describing the cylinder in a Paraview format
+list<Point3> Cone::get_polygonsPts_PARAVIEW( Transform const& transform,
+  	Vector3 const* translation ) const
+{
+  list<Point3> ParaviewPoints;
+  Point3 pp,p;
+  double dtheta = 2.* PI / m_visuNodeNbOnPer;
+
+  // Disk rim
+  p[Y] = - m_quarterHeight;
+  for (int i=0;i<m_visuNodeNbOnPer;++i)
+  {
+    p[X] = m_bottomRadius * cos ( i * dtheta );
+    p[Z] = m_bottomRadius * sin ( i * dtheta );
+    pp = transform( p );
+    if ( translation ) pp += *translation;
+    ParaviewPoints.push_back( pp );
+  }
+
+  // Disk center
+  p[X] = 0.;
+  p[Y] = - m_quarterHeight;
+  p[Z] = 0.;
+  pp = transform( p );
+  if ( translation ) pp += *translation;
+  ParaviewPoints.push_back( pp );  
+
+  // Upper tip
+  p[X] = 0.;
+  p[Y] = 3. * m_quarterHeight;
+  p[Z] = 0.;
+  pp = transform( p );
+  if ( translation ) pp += *translation;
+  ParaviewPoints.push_back( pp );
+
+  return ( ParaviewPoints );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the cylinder in a Paraview format
+void Cone::write_polygonsStr_PARAVIEW( list<int>& connectivity,
+    	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
+	int& last_offset ) const
+{
+  for (int i=0;i<m_visuNodeNbOnPer-1;++i)
+  {
+    connectivity.push_back( firstpoint_globalnumber + i );
+    connectivity.push_back( firstpoint_globalnumber + i + 1 );
+    connectivity.push_back( firstpoint_globalnumber + m_visuNodeNbOnPer );
+    connectivity.push_back( firstpoint_globalnumber + m_visuNodeNbOnPer + 1 );
+    last_offset += 4;
+    offsets.push_back( last_offset );
+    cellstype.push_back( 10 );
+  }
+  connectivity.push_back( firstpoint_globalnumber + m_visuNodeNbOnPer - 1 );
+  connectivity.push_back( firstpoint_globalnumber );
+  connectivity.push_back( firstpoint_globalnumber + m_visuNodeNbOnPer );
+  connectivity.push_back( firstpoint_globalnumber + m_visuNodeNbOnPer + 1 );
+  last_offset += 4;
+  offsets.push_back( last_offset );
+  cellstype.push_back( 10 );
+
+  firstpoint_globalnumber += m_visuNodeNbOnPer + 2;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns whether a point lies inside the cone
 bool Cone::isIn( Point3 const& pt ) const
 {
-  // TO DO
-  
-  return ( false );
+  return ( pt[Y] >= - m_quarterHeight && pt[Y] <= 3. * m_quarterHeight
+  	&& sqrt( pt[X] * pt[X] + pt[Z] * pt[Z] ) <= 
+		( 3. * m_quarterHeight - pt[Y] ) * m_sinAngle 
+			/ sqrt( 1. - m_sinAngle * m_sinAngle ) );
 }  

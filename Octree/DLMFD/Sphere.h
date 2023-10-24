@@ -197,7 +197,7 @@ void create_FD_Boundary_Sphere( GeomParameter gcp,
     dlm_bd->z[k] = pos.z;
   }
 
-  boundary((scalar*){pshift});
+//  boundary((scalar*){pshift});
 }
 
 

@@ -612,3 +612,70 @@ bool GrainsExec::isPointInAACylinder( Point3 const& pt,
 
   return ( isIn ) ;
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes and returns the 4 x 4 determinant of 4 points
+double GrainsExec::PointDeterm4by4( Point3 const& p1, Point3 const& p2,
+    	Point3 const& p3, Point3 const& p4 )
+{
+  double x2 = p2[X];
+  double y2 = p2[Y];
+  double z2 = p2[Z];
+  double x3 = p3[X];
+  double y3 = p3[Y];
+  double z3 = p3[Z];
+  double x4 = p4[X];
+  double y4 = p4[Y];
+  double z4 = p4[Z];
+
+  double det =
+  	p1[X] * ( y2*z3 + y3*z4 + y4*z2 - y4*z3 - y3*z2 - y2*z4 ) -
+  	p1[Y] * ( x2*z3 + x3*z4 + x4*z2 - x4*z3 - x3*z2 - x2*z4 ) +
+  	p1[Z] * ( x2*y3 + x3*y4 + x4*y2 - x4*y3 - x3*y2 - x2*y4 ) -
+        ( x2*y3*z4 + x3*y4*z2 + x4*y2*z3 - x4*y3*z2 - x3*y2*z4 - x2*y4*z3 ) ;
+
+  return ( det );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether a point lies inside a tetrahedron
+bool GrainsExec::isPointInTetrahedron( Point3 const& p1, Point3 const& p2,
+    	Point3 const& p3, Point3 const& p4, Point3 const& p, bool check )
+{
+  double detTot = PointDeterm4by4( p1, p2, p3, p4 ),
+	detOne = PointDeterm4by4( p, p2, p3, p4 ),
+	detTwo = PointDeterm4by4( p1, p, p3, p4 ),
+	detThree = PointDeterm4by4( p1, p2, p, p4 ),
+	detFour = PointDeterm4by4( p1, p2, p3, p );
+  bool isIn = false;
+  double sumSubElem = detOne + detTwo + detThree + detFour;
+
+  if ( check ) 
+  {
+    if ( fabs( detTot - sumSubElem ) > EPSILON  )
+      cout << "ERROR: summation error in determinant 3D : " << 
+      	detTot - sumSubElem << endl;
+
+    if ( detTot == 0. ) 
+    {
+      cout << "Degenerated tetrahedron: det == 0 " << endl;
+      abort();
+    }
+  }
+
+  double r1 = detOne/detTot, r2 = detTwo/detTot, r3 = detThree/detTot,
+	r4 = detFour/detTot ;
+
+  // Allowed threshold for ratio of determinant to handle points on surface
+  if ( ( r1 > - EPSILON )  && ( r2 > - EPSILON ) &&
+       ( r3 > - EPSILON ) && ( r4 > - EPSILON ) )
+      isIn = true;
+
+  return ( isIn );
+}

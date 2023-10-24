@@ -135,7 +135,7 @@ void reinitialize_vtk_restart( void )
   {    
     char filename_pvd[80] = "";
     char time_line[256] = "";
-    char start[20] = ""; 
+    char start[9] = ""; 
     char start_ref[20] = "<DataSet";    
     sprintf( filename_pvd, "%s", result_dir );
     strcat( filename_pvd, "/" );  
@@ -148,6 +148,7 @@ void reinitialize_vtk_restart( void )
     {      
       // Extract 8 first characters
       strncpy( start, time_line, 8 );
+      start[8] = '\0';
 
       // If 8 first characters equal "<DataSet", it is an output time line
       // We add to the vtk time series string
@@ -259,7 +260,7 @@ void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
     int total_interior_points = 0;
     
     for (int k = 0; k < np; k++) 
-      foreach()
+      foreach(serial)
         if ( flagfield[] < 1 && (int)index_lambda.y[] == k )
        	  number_interior_points += 1;
      
@@ -280,7 +281,7 @@ void output_vtu_dlmfd_intpts( particle const* allpart, const int np,
 
     int counter = 0;
     for (int k = 0; k < np; k++) 
-      foreach()
+      foreach(serial)
      	if ( flagfield[] < 1 && (int)index_lambda.y[] == k ) 
        	{
           interior_coordx[counter] = x;

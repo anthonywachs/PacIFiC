@@ -144,7 +144,7 @@ void create_FD_Boundary_CircularCylinder2D( GeomParameter gcp,
     }
   }
   
-  boundary((scalar*){pshift});
+//  boundary((scalar*){pshift});
 }
 
 

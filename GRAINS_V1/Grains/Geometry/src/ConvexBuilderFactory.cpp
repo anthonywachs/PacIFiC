@@ -5,6 +5,7 @@
 #include "Polygon.hh"
 #include "Polyhedron.hh"
 #include "Sphere.hh"
+#include "Cone.hh"
 #include "PointC.hh"
 #include "Superquadric.hh"
 #include "Rectangle.hh"
@@ -27,6 +28,7 @@ Convex* ConvexBuilderFactory::create( DOMNode* root )
   else if ( type == "Polygon" ) convex = Polygon::create( element );
   else if ( type == "Polyhedron" ) convex = Polyhedron::create( element );
   else if ( type == "Sphere" ) convex = new Sphere( element );
+  else if ( type == "Cone" ) convex = new Cone( element );
   else if ( type == "Superquadric" ) convex = new Superquadric( element );
   else if ( type == "Rectangle" ) convex = new Rectangle( element );
 
@@ -50,6 +52,7 @@ Convex* ConvexBuilderFactory::create( string& type, istream& fileIn )
   else if ( type == "*Polygon" ) convex = Polygon::create( fileIn );
   else if ( type == "*Polyhedron" ) convex = Polyhedron::create( fileIn );
   else if ( type == "*Sphere" ) convex = new Sphere( fileIn );
+  else if ( type == "*Cone" ) convex = new Cone( fileIn );
   else if ( type == "*PointC" ) convex = new PointC();
   else if ( type == "*Superquadric" ) convex = new Superquadric( fileIn );
   else if ( type == "*Rectangle" ) convex = new Rectangle( fileIn );
