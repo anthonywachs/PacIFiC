@@ -1390,16 +1390,18 @@ void Particle::setRandomMotion( double const& coefTrans,
       setTranslationalVelocity( rvel );
     }
 
-  if ( coefTrans )
+  if ( coefRot )
     if ( m_tag != 2 )
     {
       Vector3 rvel;
-      rvel[X] = coefTrans * (
-	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
-      rvel[Y] = coefTrans * (
-	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
       if ( GrainsBuilderFactory::getContext() == DIM_3 )
-        rvel[Z] = coefTrans * (
+      {      
+        rvel[X] = coefTrans * (
+	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
+        rvel[Y] = coefTrans * (
+	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
+      }
+      rvel[Z] = coefTrans * (
 	      	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
       setAngularVelocity( rvel );
     }

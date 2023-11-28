@@ -1671,14 +1671,16 @@ void Grains::computeInitVit( Vector3& vtrans, Vector3& vrot ) const
 
       if ( m_RandomMotionCoefRot )
       {
-	vrot[X] = m_RandomMotionCoefRot * (
-	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
-	vrot[Y] = m_RandomMotionCoefRot * (
-	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
+	vrot[Z] = m_RandomMotionCoefRot * (
+	      	2. * (double(random()) / double(INT_MAX)) - 1. ) ;	
 	if ( m_dimension == 3 )
-	  vrot[Z] = m_RandomMotionCoefRot * (
-	      	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
-	else vrot[Z] = 0.;
+	{
+	  vrot[X] = m_RandomMotionCoefRot * (
+	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
+	  vrot[Y] = m_RandomMotionCoefRot * (
+	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
+	}
+	else vrot[X] = vrot[Y] = 0.;
       }
       else vrot.reset();
       break;
