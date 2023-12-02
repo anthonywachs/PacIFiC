@@ -295,55 +295,54 @@ void RawDataPostProcessingWriter::one_output_Standard(double const& time,
   m_angular_velocity_z << time;
   m_coordination_number << time;
 
-  // Dans le cas d'une insertion, tant que la particle n'est pas insérée
-  // la vitesse & la position sont nulles
   list<Particle*>::const_iterator particle;
   for (particle=particles->begin(); particle!=particles->end();particle++)
-  {
-    // Position du centre de gravité
-    centre = (*particle)->getPosition();
-    m_gc_coordinates_x << " " << (*centre)[X];
-    m_gc_coordinates_y << " " << (*centre)[Y];
-    m_gc_coordinates_z << " " << (*centre)[Z];
-
-    // Velocity translationnelle du centre de gravité
-    velT = (*particle)->getTranslationalVelocity();
-    m_translational_velocity_x << " " << (*velT)[X];
-    m_translational_velocity_y << " " << (*velT)[Y];
-    m_translational_velocity_z << " " << (*velT)[Z]; 
-    
-    // Velocity de rotation du centre de gravité
-    velR = (*particle)->getAngularVelocity();
-    m_angular_velocity_x << " " << (*velR)[X];
-    m_angular_velocity_y << " " << (*velR)[Y];
-    m_angular_velocity_z << " " << (*velR)[Z];
-    
-    // Nombre de contacts
-    m_coordination_number << " " << (*particle)->getCoordinationNumber();
-  }
-
-  if( pwait )
-    for (particle=pwait->begin(); particle!=pwait->end();particle++)
+    if ( (*particle)->getTag() != 2 )
     {
-      // Position du centre de gravité
+      // Center of mass position
       centre = (*particle)->getPosition();
       m_gc_coordinates_x << " " << (*centre)[X];
       m_gc_coordinates_y << " " << (*centre)[Y];
       m_gc_coordinates_z << " " << (*centre)[Z];
 
-      // Velocity translationnelle du centre de gravité
+      // Translational velocity
+      velT = (*particle)->getTranslationalVelocity();
+      m_translational_velocity_x << " " << (*velT)[X];
+      m_translational_velocity_y << " " << (*velT)[Y];
+      m_translational_velocity_z << " " << (*velT)[Z]; 
+    
+      // Angular velocity
+      velR = (*particle)->getAngularVelocity();
+      m_angular_velocity_x << " " << (*velR)[X];
+      m_angular_velocity_y << " " << (*velR)[Y];
+      m_angular_velocity_z << " " << (*velR)[Z];
+    
+      // Number of contacts
+      m_coordination_number << " " << (*particle)->getCoordinationNumber();
+    }
+
+  if( pwait )
+    for (particle=pwait->begin(); particle!=pwait->end();particle++)
+    {
+      // Center of mass position
+      centre = (*particle)->getPosition();
+      m_gc_coordinates_x << " " << (*centre)[X];
+      m_gc_coordinates_y << " " << (*centre)[Y];
+      m_gc_coordinates_z << " " << (*centre)[Z];
+
+      // Translational velocity
       velT = (*particle)->getTranslationalVelocity();
       m_translational_velocity_x << " " << (*velT)[X];
       m_translational_velocity_y << " " << (*velT)[Y];
       m_translational_velocity_z << " " << (*velT)[Z];
 
-      // Velocity de rotation du centre de gravité
+      // Angular velocity
       velR = (*particle)->getAngularVelocity();
       m_angular_velocity_x << " " << (*velR)[X];
       m_angular_velocity_y << " " << (*velR)[Y];
       m_angular_velocity_z << " " << (*velR)[Z];
       
-      // Nombre de contacts
+      // Number of contacts
       m_coordination_number << " 0";
     }
   
