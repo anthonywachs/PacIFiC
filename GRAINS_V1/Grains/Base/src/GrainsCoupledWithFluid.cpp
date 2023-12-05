@@ -1076,21 +1076,23 @@ void GrainsCoupledWithFluid::updateParticlesVelocity(
     list<Particle*>* particles = m_allcomponents.getActiveParticles(); 
     list<Particle*>::iterator particle;
     int id = 0;
-    size_t vecSize = 0;
+    size_t vecSize = 0, nparticles = 0;
     Vector3 vtrans, vrot;
     
     // TO DO: the particle number used to communicate with the fluid is 
     // different from its actual number in Grains. 
     // This needs to be fixed in the future
+    for (particle=particles->begin();particle!=particles->end();particle++)
+      if ( (*particle)->getTag() < 2 ) nparticles++;
 
     if ( m_dimension == 3 )
     {
-      if ( velocity_data_array.size() != particles->size() )
+      if ( velocity_data_array.size() != nparticles )
         cout << "WARNING: numbers of particles in Grains and in the fluid "
 		<< "solver are different" << endl;
 
       for (particle=particles->begin(), id=0; particle!=particles->end();
-       		particle++, id++)
+       		particle++)
       {
         if ( (*particle)->getActivity() == COMPUTE
     		&& (*particle)->getTag() < 2 )
@@ -1112,6 +1114,8 @@ void GrainsCoupledWithFluid::updateParticlesVelocity(
 
           if ( b_set_velocity_nm1_and_diff )
             (*particle)->setVelocityAndVelocityDifferencePreviousTime();
+	    
+	  id++;
         }
       }    
     }
