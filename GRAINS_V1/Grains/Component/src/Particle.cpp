@@ -30,7 +30,7 @@ Particle::Particle( bool const& autonumbering )
   : Component( autonumbering )
   , m_masterParticle( this )
   , m_kinematics( NULL )
-  , m_density( 0.0 )
+  , m_density( 2500. )
   , m_activity( WAIT )
   , m_VelocityInfosNm1( NULL )
   , m_tag( 0 )
@@ -41,6 +41,7 @@ Particle::Particle( bool const& autonumbering )
   , m_cellule_nm1( NULL )
   , m_GeomType( 0 )
   , m_coordination_number( 0 )
+  , m_specific_composite_shape( "none" )
 {
   // Initialize inertia
   for (int i=0; i<6; i++)
@@ -70,6 +71,7 @@ Particle::Particle( Particle const& other )
   , m_GeomType( other.m_GeomType )
   , m_coordination_number( other.m_coordination_number )
   , m_weight( other.m_weight )
+  , m_specific_composite_shape( other.m_specific_composite_shape )  
 {
   m_kinematics = other.m_kinematics->clone();
   copy( &other.m_inertia[0], &other.m_inertia[6], &m_inertia[0] );
@@ -111,6 +113,7 @@ Particle::Particle( DOMNode* root, bool const& autonumbering,
   , m_cellule_nm1( NULL )
   , m_GeomType( pc )
   , m_coordination_number( 0 )
+  , m_specific_composite_shape( "none" )
 {
   for (int i=0; i<6; i++)
   {
@@ -154,6 +157,64 @@ Particle::Particle( DOMNode* root, bool const& autonumbering,
 
 
 // ----------------------------------------------------------------------------
+// Constructor with input parameters. This constructor is
+// expected to be used for reference particles
+Particle::Particle( RigidBodyWithCrust* georbwc, double const& density,
+    	string const& mat, bool const& autonumbering,
+  	int const& pc )
+  : Component( autonumbering )
+  , m_masterParticle( this )
+  , m_kinematics( NULL )
+  , m_density( 2500. )
+  , m_activity( WAIT )
+  , m_VelocityInfosNm1( NULL )
+  , m_tag( 0 )
+  , m_GeoLoc( GEOPOS_NONE )
+  , m_cellule( NULL )
+  , m_tag_nm1( 0 )
+  , m_GeoLoc_nm1( GEOPOS_NONE )
+  , m_cellule_nm1( NULL )
+  , m_GeomType( pc )
+  , m_coordination_number( 0 )
+  , m_specific_composite_shape( "none" )
+{
+  for (int i=0; i<6; i++)
+  {
+    m_inertia[i] = 0.0;
+    m_inertia_1[i] = 0.0;
+  }
+
+  m_geoRBWC = georbwc;
+  m_kinematics = KinematicsBuilderFactory::create(
+  	m_geoRBWC->getConvex() );
+
+  // Particle density
+  m_density = density;
+
+  // Material
+  m_materialName = mat;
+  ContactBuilderFactory::defineMaterial( m_materialName, false );
+
+  // Mass and inertia
+  m_mass = m_density * m_geoRBWC->getVolume();
+  m_geoRBWC->BuildInertia( m_inertia, m_inertia_1 );
+  for (int i=0; i<6; i++)
+  {
+    m_inertia[i] *= m_density;
+    m_inertia_1[i] /= m_density;
+  }
+
+  // Weight
+  computeWeight();
+
+  // In case part of the particle acceleration is computed explicity
+  if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Constructor with input parameters
 Particle::Particle( int const& id_, Particle const* ParticleRef,
 	double const& vx, double const& vy, double const& vz,
@@ -173,6 +234,7 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
   , m_GeoLoc( GEOPOS_NONE )
   , m_cellule_nm1( NULL )
   , m_coordination_number( coordination_number_ )
+  , m_specific_composite_shape( "none" )
 {
   // Initialize inertia
   for (int i=0; i<6; i++)
@@ -242,6 +304,7 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
   , m_GeoLoc_nm1( GEOPOS_NONE )
   , m_cellule_nm1( NULL )
   , m_coordination_number( 0 )
+  , m_specific_composite_shape( "none" )  
 {
   // ID number
   m_id = id_;
@@ -984,6 +1047,8 @@ void Particle::write( ostream& fileSave ) const
 {
   fileSave << endl << ( isCompositeParticle() ? "<CompositeParticle>" :
   	"<Particle>" ) << endl;
+  if ( isCompositeParticle() ) fileSave << "*SpecificShape " 
+  	<< m_specific_composite_shape << endl;
   writeStatic( fileSave );
   fileSave << "*Type " << m_GeomType << endl;
   fileSave << "*Tag " << m_tag << endl;

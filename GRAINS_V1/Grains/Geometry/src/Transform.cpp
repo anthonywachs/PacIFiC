@@ -360,7 +360,7 @@ ostream& operator << ( ostream& fileOut, Transform const& t )
 {  
   fileOut << "Type = " << t.m_type << endl;
   fileOut << "*Position\n";
-  fileOut << t.m_origin;
+  fileOut << t.m_origin << endl;
   fileOut << t.m_basis;
 
   return ( fileOut );

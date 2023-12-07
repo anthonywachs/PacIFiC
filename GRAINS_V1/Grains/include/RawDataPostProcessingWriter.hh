@@ -23,9 +23,10 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     as input parameters
     @param dn XML node
     @param rank_ process rank 
-    @param nbranks_ number of processes */
+    @param nbranks_ number of processes 
+    @param verbose outputs writer features if true */
     RawDataPostProcessingWriter( DOMNode* dn, int const& rank_, 
-    	int const& nbranks_ );
+    	int const& nbranks_, bool const& verbose = true );
 
     /** @brief Destructor */
     virtual ~RawDataPostProcessingWriter();

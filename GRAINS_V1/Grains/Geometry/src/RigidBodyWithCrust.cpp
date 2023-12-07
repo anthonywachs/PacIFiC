@@ -43,16 +43,38 @@ RigidBodyWithCrust::RigidBodyWithCrust( RigidBodyWithCrust const& rbwc )
 
 
 // ----------------------------------------------------------------------------
-// Constructor with a convex and a transformation as input
-// parameters, used exclusively by compObstacle whose own shape is not defined
+// Constructor with input parameters, used by composite component 
+// whose own shape is not defined (composite = true) or to create component 
+// from scratch in the code ( composite = false )
 RigidBodyWithCrust::RigidBodyWithCrust( Convex* convex_,
-	Transform const& position_ )
+	Transform const& position_,
+	bool composite, double const& crust_thickness )
   : RigidBody( convex_, position_ )
-  , m_crustThickness( 0.0 )
+  , m_crustThickness( crust_thickness )
   , m_scaling( NULL )
   , m_transformWithCrust( NULL )
   , m_transformWithCrust_computed( false )
-{}
+{
+  if ( !composite )
+  {
+    m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+    m_scaling = new Vector3;
+    BBox box = m_convex->bbox( TransformIdentity );
+    Vector3 const& extent = box.getExtent();
+
+    // Scaling factor from bounding box
+    (*m_scaling)[X] = extent[X] < EPSILON ?
+  	1. : ( extent[X] - m_crustThickness ) / extent[X];
+    (*m_scaling)[Y] = extent[Y] < EPSILON ?
+  	1. : ( extent[Y] - m_crustThickness ) / extent[Y];
+    (*m_scaling)[Z] = extent[Z] < EPSILON ?
+  	1. : ( extent[Z] - m_crustThickness ) / extent[Z];
+
+    // Transformation with crust
+    m_transformWithCrust = new Transform();
+    m_transformWithCrust_computed = false ;  
+  }
+}
 
 
 

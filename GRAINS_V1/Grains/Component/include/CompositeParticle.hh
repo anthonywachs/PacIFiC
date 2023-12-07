@@ -199,23 +199,23 @@ class CompositeParticle : public Particle
     //@{
     /** @brief Returns the number of points to write the composite particle in a
     Paraview format */
-    int numberOfPoints_PARAVIEW() const;
+    virtual int numberOfPoints_PARAVIEW() const;
 
     /** @brief Returns the number of elementary polytopes to write the
     composite particle shape in a Paraview format */
-    int numberOfCells_PARAVIEW() const;
+    virtual int numberOfCells_PARAVIEW() const;
 
     /** @brief Writes the points describing the composite particle in a
     Paraview format
     @param f output stream
     @param translation additional center of mass translation */
-    void write_polygonsPts_PARAVIEW( ostream& f,
+    virtual void write_polygonsPts_PARAVIEW( ostream& f,
   	Vector3 const* translation = NULL ) const;
 
     /** @brief Returns a list of points describing the component in a
     Paraview format
     @param translation additional center of mass translation */
-    list<Point3> get_polygonsPts_PARAVIEW(
+    virtual list<Point3> get_polygonsPts_PARAVIEW(
   	Vector3 const* translation = NULL ) const;
 
     /** @brief Writes the points describing the composite particle in a
@@ -224,7 +224,7 @@ class CompositeParticle : public Particle
     @param f output stream
     @param transform transformation
     @param translation additional center of mass translation */
-    void write_polygonsPts_PARAVIEW( ostream& f,
+    virtual void write_polygonsPts_PARAVIEW( ostream& f,
   	Transform const& transform,
   	Vector3 const* translation = NULL ) const;
 
@@ -234,13 +234,13 @@ class CompositeParticle : public Particle
     @param cellstype Paraview polytopes type
     @param firstpoint_globalnumber global number of the 1st point
     @param last_offset last offset used for the previous convex shape */
-    void write_polygonsStr_PARAVIEW( list<int>& connectivity,
+    virtual void write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const ;
 
     /**  @brief Outputs information to be transferred to the fluid
     @param fluid output stream */
-    void writePositionInFluid( ostream& fluid );
+    virtual void writePositionInFluid( ostream& fluid );
     //@}
 
 
@@ -254,7 +254,7 @@ class CompositeParticle : public Particle
 
     /** @brief Returns the number of corners of the rigib body shape and a code
     describing the rigid body shape */
-    int getNbCorners() const;
+    virtual int getNbCorners() const;
 
     /** @brief Returns the volume of the composite particle */
     double getVolume() const;
@@ -311,21 +311,6 @@ class CompositeParticle : public Particle
 
 
   protected:
-    /**@name I/O methods */
-    //@{
-    /** @brief Saves additional features of a (in practice reference) composite
-    particle for reload
-    @param fileSave output stream */
-    void writeAdditionalFeatures( ostream& fileSave ) const;
-
-    /** @brief Reads additional features of a (in practice reference) particle
-    data from a stream
-    @param fileIn input stream */
-    void readAdditionalFeatures( istream& fileIn );
-    //@}
-
-
-  private:
     /** @name Parameters */
     //@{
     size_t m_nbElemPart; /**< Number of elementary (glued) particles */
@@ -337,6 +322,20 @@ class CompositeParticle : public Particle
 	reference position */
     vector<Matrix> m_InitialRotationMatrices; /**< vector of initial rotation
     	matrices of elementary particles in their initial reference position */
+    //@}
+
+
+    /**@name I/O methods */
+    //@{
+    /** @brief Saves additional features of a (in practice reference) composite
+    particle for reload
+    @param fileSave output stream */
+    void writeAdditionalFeatures( ostream& fileSave ) const;
+
+    /** @brief Reads additional features of a (in practice reference) particle
+    data from a stream
+    @param fileIn input stream */
+    void readAdditionalFeatures( istream& fileIn );
     //@}
 
 
@@ -359,6 +358,7 @@ class CompositeParticle : public Particle
     //@}
 
 
+  private:
     /**@name Constructors */
     //@{
     /** @brief Default constructor */

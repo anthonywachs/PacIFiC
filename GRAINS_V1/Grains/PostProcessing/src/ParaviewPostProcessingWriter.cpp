@@ -28,8 +28,8 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter()
 // ----------------------------------------------------------------------------
 // Constructor with XML node, rank and number of processes as input parameters
 ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
-    int const& rank_, int const& nbranks_ )
-  : PostProcessingWriter( dn, rank_,nbranks_ )
+    int const& rank_, int const& nbranks_, bool const& verbose )
+  : PostProcessingWriter( dn, rank_, nbranks_ )
   , m_ParaviewCycleNumber( 0 )
   , m_binary( false )
   , m_postProcessObstacle( true )
@@ -57,7 +57,7 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
     if ( sm_obstacle == "False" ) m_postProcessObstacle = false; 
   }
   
-  if ( m_rank == 0 )
+  if ( m_rank == 0 && verbose )
   {
     cout << GrainsExec::m_shift9 << "Type = Paraview" << endl;
     cout << GrainsExec::m_shift12 << "Output file root name = " 
@@ -83,7 +83,8 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
     int const& nbranks_,
     const string &name_,
     const string &root_,
-    const bool &isBinary )
+    const bool &isBinary,
+    bool const& verbose )
   : PostProcessingWriter( rank_, nbranks_ )
   , m_ParaviewFilename_dir( root_ )
   , m_ParaviewFilename( name_ )
@@ -96,7 +97,7 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
   , ALLOCATED( 0 )
   , OFFSET( 0 )
 {
-  if ( m_rank == 0 )
+  if ( m_rank == 0 && verbose )
   {
     cout << GrainsExec::m_shift9 << "Type = Paraview" << endl;
     cout << GrainsExec::m_shift12 << "Output file root name = " 

@@ -27,21 +27,24 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     as input parameters
     @param dn XML node
     @param rank_ process rank 
-    @param nbranks_ number of processes */
+    @param nbranks_ number of processes 
+    @param verbose outputs writer features if true */
     ParaviewPostProcessingWriter( DOMNode* dn, int const& rank_, 
-    	int const& nbranks_ );
+    	int const& nbranks_, bool const& verbose = true );
   
     /** @brief Constructor with input parameters 
     @param rank_ process rank 
     @param nbranks_ number of processes 
     @param name_ files name
     @param root_ file root name
-    @param isBinary whether to write in binary */
+    @param isBinary whether to write in binary
+    @param verbose outputs writer features if true */
     ParaviewPostProcessingWriter( int const& rank_,
   	int const& nbranks_,
   	const string &name_,
 	const string &root_,
-  	const bool &isBinary );  
+  	const bool &isBinary, 
+	bool const& verbose = true );  
 
     /** @brief Destructor */
     virtual ~ParaviewPostProcessingWriter();

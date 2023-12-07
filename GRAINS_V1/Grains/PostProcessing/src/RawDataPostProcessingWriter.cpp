@@ -16,12 +16,12 @@ RawDataPostProcessingWriter::RawDataPostProcessingWriter()
 // ----------------------------------------------------------------------------
 // Constructor with XML node, rank and number of processes as input parameters
 RawDataPostProcessingWriter::RawDataPostProcessingWriter( DOMNode* dn,
-    int const& rank_, int const& nbranks_ )
+    int const& rank_, int const& nbranks_, bool const& verbose )
   : PostProcessingWriter( dn, rank_, nbranks_ )
 { 
   m_filerootname = ReaderXML::getNodeAttr_String( dn, "Name" );
  
-  if ( m_rank == 0 )
+  if ( m_rank == 0 && verbose )
   {
     cout << GrainsExec::m_shift9 << "Type = Text" << endl;
     cout << GrainsExec::m_shift12 << "Output file name = " 

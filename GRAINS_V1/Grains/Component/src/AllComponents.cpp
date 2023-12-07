@@ -798,7 +798,13 @@ void AllComponents::read( istream& fileSave, string const& filename )
     if ( buffer == "<Particle>" )
       particle = new Particle( false );
     else
-      particle = new CompositeParticle( false );
+    {
+      fileSave >> buffer >> buffer;
+      if ( buffer == "SpheroCylinder" )
+        particle = new SpheroCylinder( false );
+      else        
+        particle = new CompositeParticle( false );
+    }
 
     // Read from stream
     particle->read( fileSave );

@@ -10,6 +10,7 @@
 using namespace std;
 #include "Particle.hh"
 #include "CompositeParticle.hh"
+#include "SpheroCylinder.hh"
 #include "Obstacle.hh"
 #include "SimpleObstacle.hh"
 #include "WriterXML.hh"

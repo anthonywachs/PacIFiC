@@ -72,6 +72,18 @@ class Particle : public Component
     @param pc particle class */
     Particle( DOMNode* root, bool const& autonumbering = true,
   	int const& pc = 0 );
+	
+    /** @brief Constructor with input parameters. This
+    constructor is expected to be used for reference particles
+    @param georbwc pointer to a rigid body with crust object
+    @param density particle density
+    @param mat particle material
+    @param autonumbering whether to increment the component indexing
+    @param pc particle class */
+    Particle( RigidBodyWithCrust* georbwc, double const& density,
+    	string const& mat,
+    	bool const& autonumbering = true,
+  	int const& pc = 0 );	
 
     /** @brief Constructor with input parameters
     @param id_ ID number
@@ -646,6 +658,8 @@ class Particle : public Component
     int m_GeomType; /**< particle geometric type */
     int m_coordination_number; /**< coordination number */
     Vector3 m_weight; /**< particle weight */
+    string m_specific_composite_shape; /**< specific composite particle 
+    	shape, e.g., SpheroCylinder */  
     //@}
 
 

@@ -159,14 +159,6 @@ CompositeParticle::CompositeParticle( DOMNode* root,
 
   // In case part of the particle acceleration computed explicity
   if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();
-
-  // Reset the total number of created components by subtracting the number
-  // of elementary particles as the construction of each elementary particle
-  // increments the total number of created components by 1 when autonumbering
-  // is true
-  if ( autonumbering )
-    Component::setNbCreatedComponents( Component::getNbCreatedComponents()
-    	- int( m_nbElemPart ) );
 }
 
 
@@ -308,7 +300,6 @@ CompositeParticle::CompositeParticle( CompositeParticle const& other )
   // elementary particle increments the total number of created components by 1
   Component::setNbCreatedComponents( Component::getNbCreatedComponents()
     	- int( m_nbElemPart ) );
-
 }
 
 
