@@ -43,11 +43,11 @@ void FirstOrderExplicit::Move( Vector3& vtrans, Vector3 const& dUdt,
 	Vector3& transDisplacement, Vector3 const& dOmegadt,
 	Vector3& vrot, Vector3& meanVRot, double dt )
 {
-  // Velocity et deplacement translationnels
+  // Translational velocity and displacement
   transDisplacement = vtrans * dt;
   vtrans += dUdt * dt;
 
-  // Velocity et deplacement rotationnels
+  // Angular velocity and displacement
   meanVRot = vrot;  
   vrot += dOmegadt * dt;  
 }

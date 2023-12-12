@@ -49,14 +49,15 @@ ParticleKinematics::~ParticleKinematics()
 // Integrates Newton's law and moves the particle
 double ParticleKinematics::Move( Particle* particle, double dt )
 {
-  // Integration en time 
+  // Time integration
   m_timeIntegrationScheme->Move( m_translationalVelocity,
   	m_dUdt, m_translationalDisplacementOverDt,
 	m_dOmegadt, m_angularVelocity, m_averageAngularVelocityOverDt, dt );
   
+  // Translational displacement
   particle->Translate( m_translationalDisplacementOverDt );
   
-  // Deplacement rotationnel  
+  // Angular displacement 
   double nOmega = Norm( m_averageAngularVelocityOverDt );
   if ( nOmega > EPSILON ) 
   {

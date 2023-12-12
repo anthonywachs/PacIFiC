@@ -43,11 +43,11 @@ void SecondOrderLeapFrog::Move( Vector3& vtrans, Vector3 const& dUdt,
 	Vector3& transDisplacement, Vector3 const& dOmegadt,
 	Vector3& vrot, Vector3& meanVRot, double dt )
 {
-  // Velocity et deplacement translationnels
+  // Translational velocity and displacement
   vtrans += dUdt * dt;
   transDisplacement = vtrans * dt;
 
-  // Velocity et deplacement rotationnels
+  // Angular velocity and displacement
   vrot += dOmegadt * dt;
   meanVRot = vrot;    
 }

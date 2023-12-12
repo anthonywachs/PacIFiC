@@ -49,17 +49,17 @@ void SecondOrderAdamsBashforth::Move( Vector3& vtrans, Vector3 const& dUdt,
 	Vector3& transDisplacement, Vector3 const& dOmegadt,
 	Vector3& vrot, Vector3& meanVRot, double dt )
 {      
-  // Velocity et deplacement translationnels
-  transDisplacement = 0.5 * ( 3.*vtrans 
+  // Translational velocity and displacement
+  transDisplacement = 0.5 * ( 3. * vtrans 
   	- m_translationalVelocity_nm2 ) * dt;
   m_translationalVelocity_nm2 = vtrans;
-  vtrans += 0.5 * ( 3.*dUdt - m_dUdt_nm2 ) * dt;
+  vtrans += 0.5 * ( 3. * dUdt - m_dUdt_nm2 ) * dt;
   m_dUdt_nm2 = dUdt;  
 
-  // Velocity et deplacement rotationnels
-  meanVRot = 0.5 * ( 3.*vrot  - m_angularVelocity_nm2 );
+  // Angular velocity and displacement
+  meanVRot = 0.5 * ( 3. * vrot  - m_angularVelocity_nm2 );
   m_angularVelocity_nm2 = vrot;  
-  vrot += 0.5 * ( 3.*dOmegadt - m_dOmegadt_nm2 ) * dt;
+  vrot += 0.5 * ( 3. * dOmegadt - m_dOmegadt_nm2 ) * dt;
   m_dOmegadt_nm2 = dOmegadt;  
 }
 

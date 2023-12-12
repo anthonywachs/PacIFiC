@@ -129,11 +129,11 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
       m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
 
 
-      // Compute volume and contact forces
+      // Compute forces from all applications
       // Initialisation torsors with weight only
       m_allcomponents.InitializeForces( m_time, m_dt, true );
       
-      // Compute forces from all applications     
+      // Compute forces    
       for (app=m_allApp.begin(); app!=m_allApp.end(); app++)
         (*app)->ComputeForces( m_time, m_dt, 
       		m_allcomponents.getActiveParticles() );
@@ -172,23 +172,23 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
       // Write force & torque exerted on obstacles
       m_allcomponents.outputObstaclesLoad( m_time, m_dt );
     } 
-    catch (ContactError &chocCroute) 
+    catch (ContactError &errContact) 
     {
       // Max overlap exceeded
       cout << endl;
       m_allcomponents.PostProcessingErreurComponents( "ContactError",
-            chocCroute.getComponents() );
-      chocCroute.Message( cout );
+            errContact.getComponents() );
+      errContact.Message( cout );
       m_error_occured = true;
       break;
     } 
-    catch (DisplacementError &errDeplacement) 
+    catch (DisplacementError &errDisplacement) 
     {
       // Particle displacement over dt is too large
       cout << endl;
       m_allcomponents.PostProcessingErreurComponents( "DisplacementError",
-            errDeplacement.getComponent() );
-      errDeplacement.Message(cout);
+            errDisplacement.getComponent() );
+      errDisplacement.Message(cout);
       m_error_occured = true;	
       break;
     } 

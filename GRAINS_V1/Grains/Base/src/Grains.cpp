@@ -255,12 +255,6 @@ void Grains::Simulation( double time_interval )
 	}
 
 
-      // Initiliaze all component transforms with crust to non computed
-      SCT_set_start( "ComputeForces" );
-      m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
-      SCT_get_elapsed_time( "ComputeForces" );
-
-
       // Insertion of particles
       SCT_set_start( "ParticlesInsertion" );
       if ( m_npwait_nm1 != m_allcomponents.getNumberInactiveParticles() )
@@ -277,27 +271,31 @@ void Grains::Simulation( double time_interval )
         insertParticle( m_insertion_order );
       SCT_get_elapsed_time( "ParticlesInsertion" );
 
+
+      // Initiliaze all component transforms with crust to non computed
+      SCT_set_start( "ComputeForces" );
+      m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
+
       // Initialize contact maps (for contact model with memory)
       // TODO: add if-statement that bypasses this step when contact model has
       // no memory.
       m_allcomponents.setAllContactMapToFalse();
 
-      // Compute volume and contact forces
-      SCT_set_start( "ComputeForces" );
+      // Compute forces from all applications
       // Initialisation torsors with weight only
       m_allcomponents.InitializeForces( m_time, m_dt, true );
 
-      // Compute forces from all applications
+      // Compute forces
       for (app=m_allApp.begin(); app!=m_allApp.end(); app++)
         (*app)->ComputeForces( m_time, m_dt,
       		m_allcomponents.getActiveParticles() );
-      SCT_add_elapsed_time( "ComputeForces" );
-
 
       // Update contact maps (for contact model with memory)
       // TODO: add if-statement that bypasses this step when contact model has
       // no memory.
       m_allcomponents.updateAllContactMaps();
+      SCT_get_elapsed_time( "ComputeForces" );      
+      
 
       // Solve Newton's law and move particles
       SCT_set_start( "Move" );
@@ -365,23 +363,23 @@ void Grains::Simulation( double time_interval )
 	SCT_get_elapsed_time( "OutputResults" );
       }
     }
-    catch (ContactError &chocCroute)
+    catch (ContactError &errContact)
     {
       // Max overlap exceeded
       cout << endl;
       m_allcomponents.PostProcessingErreurComponents( "ContactError",
-            chocCroute.getComponents() );
-      chocCroute.Message( cout );
+            errContact.getComponents() );
+      errContact.Message( cout );
       m_error_occured = true;
       break;
     }
-    catch (DisplacementError &errDeplacement)
+    catch (DisplacementError &errDisplacement)
     {
       // Particle displacement over dt is too large
       cout << endl;
       m_allcomponents.PostProcessingErreurComponents( "DisplacementError",
-            errDeplacement.getComponent() );
-      errDeplacement.Message(cout);
+            errDisplacement.getComponent() );
+      errDisplacement.Message(cout);
       m_error_occured = true;
       break;
     }
