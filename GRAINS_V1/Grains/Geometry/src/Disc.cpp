@@ -114,10 +114,10 @@ Point3 Disc::support( Vector3 const& v ) const
 // Here simply returns the point (0,0,0) as a convention
 vector<Point3> Disc::getEnvelope() const
 {
-  vector<Point3> enveloppe;
+  vector<Point3> envelope;
   Point3 point( 0.,0.,0. );
-  enveloppe.push_back( point );
-  return ( enveloppe );
+  envelope.push_back( point );
+  return ( envelope );
 }
 
 

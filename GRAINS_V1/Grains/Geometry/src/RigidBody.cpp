@@ -435,7 +435,7 @@ void RigidBody::writeStatic( ostream& fileOut ) const
 // spheres and 3D cylinders
 void RigidBody::writePositionInFluid( ostream& fluid )
 {
-  Point3 pointEnvelop;
+  Point3 pointEnvelope;
   vector<Point3> allPoints = m_convex->getEnvelope();
   vector<Point3>::iterator point;
 
@@ -447,13 +447,13 @@ void RigidBody::writePositionInFluid( ostream& fluid )
     // Points describing the shape
     for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
-      pointEnvelop = m_transform(*point);
+      pointEnvelope = m_transform(*point);
       fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[X] ) << " " <<
+		pointEnvelope[X] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Y] ) << " " <<
+		pointEnvelope[Y] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Z] ) << endl;		
+		pointEnvelope[Z] ) << endl;		
     }
   }
 
@@ -463,17 +463,17 @@ void RigidBody::writePositionInFluid( ostream& fluid )
     // Points describing the shape
     for (point=allPoints.begin(); point!=allPoints.end(); point++)
     {
-      pointEnvelop = m_transform(*point);
+      pointEnvelope = m_transform(*point);
       fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[X] ) << " " <<
+		pointEnvelope[X] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Y] ) << " " <<
+		pointEnvelope[Y] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelop[Z] ) << endl;
+		pointEnvelope[Z] ) << endl;
     }
 
     // Faces describing the shape
-    vector< vector<int> > const* allFaces  = m_convex->getFaces();
+    vector< vector<int> > const* allFaces = m_convex->getFaces();
     vector< vector<int> >::const_iterator face;
     if ( allFaces )
     {

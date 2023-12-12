@@ -221,12 +221,12 @@ Point3 Superquadric::support( Vector3 const& v ) const
 vector<Point3> Superquadric::getEnvelope() const
 {
   Point3 point( 0., 0., 0. );
-  vector<Point3> enveloppe( 3, point );
-  /**  enveloppe[0][Y] = - halfHeight;
-  enveloppe[1][Y] = - halfHeight;
-  enveloppe[1][X] = radius;
-  enveloppe[2][Y] = halfHeight; */
-  return ( enveloppe );
+  vector<Point3> envelope( 3, point );
+  /**  envelope[0][Y] = - halfHeight;
+  envelope[1][Y] = - halfHeight;
+  envelope[1][X] = radius;
+  envelope[2][Y] = halfHeight; */
+  return ( envelope );
 }
 
 

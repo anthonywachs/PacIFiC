@@ -79,8 +79,8 @@ vector<Point3> Convex::getEnvelope() const
        << "Need for an assistance ! Stop running !\n";
   exit(10);
 
-  vector<Point3> enveloppe;
-  return ( enveloppe );
+  vector<Point3> envelope;
+  return ( envelope );
 }
 
 

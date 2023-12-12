@@ -121,11 +121,11 @@ Point3 Sphere::support( Vector3 const& v ) const
 // Returns a vector of points describing the envelope of the sphere
 vector<Point3> Sphere::getEnvelope() const
 {
-  vector<Point3> enveloppe;
+  vector<Point3> envelope;
   Point3 point( 0., 0., 0. );
-  enveloppe.push_back( point );
+  envelope.push_back( point );
 
-  return ( enveloppe );
+  return ( envelope );
 }
 
 

@@ -75,13 +75,13 @@ int Polytope::numVerts() const
 // Returns a vector of points describing the envelope of the polytope
 vector<Point3> Polytope::getEnvelope() const
 {
-  vector<Point3> enveloppe;
+  vector<Point3> envelope;
   for (int i=0; i<numVerts(); i++) 
   {
     Point3 const& p = (*this)[i];
-    enveloppe.push_back( p );
+    envelope.push_back( p );
   }
-  return ( enveloppe );
+  return ( envelope );
 }
 
 

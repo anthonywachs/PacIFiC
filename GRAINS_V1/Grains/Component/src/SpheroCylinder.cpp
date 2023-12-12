@@ -617,7 +617,7 @@ void SpheroCylinder::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 // describing the rigid body shape
 int SpheroCylinder::getNbCorners() const
 {
-  return ( 101 );
+  return ( 1001 );
 }
 
 
@@ -626,7 +626,32 @@ int SpheroCylinder::getNbCorners() const
 
 // ----------------------------------------------------------------------------
 // Outputs information to be transferred to the fluid
+// Same format data as a regular cylinder: center of bottom circular
+// face of the elementary cylinder, an arbitrary point on the lateral surface 
+// of the elementary cylinder and center of top circular face of the elementary
+// cylinder    
 void SpheroCylinder::writePositionInFluid( ostream& fluid )
 {
-  // TO DO
+  Point3 pointEnvelope;
+  vector<Point3> allPoints( 3, pointEnvelope );
+  vector<Point3>::iterator point;
+  Transform const* transform = m_geoRBWC->getTransform();
+
+  fluid << " 3" << endl;
+
+  allPoints[0][Y] = - m_height / 2.;
+  allPoints[1][Y] = - m_height / 2.;
+  allPoints[1][X] = m_radius;
+  allPoints[2][Y] = m_height / 2.;
+
+  for (point=allPoints.begin(); point!=allPoints.end(); point++)
+  {
+    pointEnvelope = (*transform)(*point);
+    fluid << GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelope[X] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelope[Y] ) << " " <<
+	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
+		pointEnvelope[Z] ) << endl;
+  }
 }

@@ -89,11 +89,11 @@ Point3 Cone::support( Vector3 const& v ) const
 vector<Point3> Cone::getEnvelope() const
 {
   Point3 point(0.,0.,0.);
-  vector<Point3> enveloppe(1,point);
+  vector<Point3> envelope(1,point);
 
   // TO DO
 
-  return ( enveloppe );
+  return ( envelope );
 }
 
 
@@ -101,7 +101,7 @@ vector<Point3> Cone::getEnvelope() const
 
 // ----------------------------------------------------------------------------
 // Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here returns the code 777
+// a specific convex shape. Here returns the code 888
 int Cone::getNbCorners() const
 {
   return ( 888 );
