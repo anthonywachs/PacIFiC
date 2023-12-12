@@ -13,6 +13,8 @@
 #include <iterator>
 #include <algorithm>
 
+int SpheroCylinder::m_visuNodeNbPerQar = 8;
+
 
 // ----------------------------------------------------------------------------
 // Constructor with autonumbering as input parameter
@@ -81,11 +83,10 @@ SpheroCylinder::SpheroCylinder( DOMNode* root,
   	( 1. / 12. ) * PI * m_height * m_radius * m_radius
   	 	* ( 3. * m_radius * m_radius + m_height * m_height 
 			+ 4. * m_radius * m_height ) 
-	+ ( 8. / 15. ) * PI * pow( m_radius, 5. );
+	+ ( 8. / 15. ) * PI * pow( m_radius, 5. )
+	+ ( 1. / 2. ) * PI * m_height * pow( m_radius, 4. );
   m_inertia[3] = ( 1. / 30. ) * PI * pow( m_radius, 4. )
   	* ( 16. * m_radius + 15. * m_height );  
-  cout << m_mass / m_density << " " << m_inertia[0] << " " << m_inertia[3]
-  	<< endl;
   BuildInertia();
 
 
@@ -273,12 +274,7 @@ Particle* SpheroCylinder::createCloneCopy( int const& id_,
 // Paraview format
 int SpheroCylinder::numberOfPoints_PARAVIEW() const
 {
-  int nbpts = 0 ;
-  for ( size_t i=0; i<m_nbElemPart; ++i )
-    nbpts += m_elementaryParticles[i]->getRigidBody()->getConvex()
-	->numberOfPoints_PARAVIEW();
-
-  return ( nbpts );
+ return ( 2 * ( 4 * m_visuNodeNbPerQar * m_visuNodeNbPerQar + 2 ) );  
 }
 
 
@@ -288,13 +284,9 @@ int SpheroCylinder::numberOfPoints_PARAVIEW() const
 // Returns the number of elementary polytopes to write the
 // composite particle shape in a Paraview format
 int SpheroCylinder::numberOfCells_PARAVIEW() const
-{
-  int nbcells = 0 ;
-  for ( size_t i=0; i<m_nbElemPart; ++i )
-    nbcells += m_elementaryParticles[i]->getRigidBody()->getConvex()
-	->numberOfCells_PARAVIEW();
-
-  return ( nbcells );
+{  
+  return ( 2 * ( 4 * m_visuNodeNbPerQar * m_visuNodeNbPerQar ) 
+  	+ 4 * m_visuNodeNbPerQar );   
 }
 
 
@@ -304,9 +296,82 @@ int SpheroCylinder::numberOfCells_PARAVIEW() const
 // Writes the points describing the composite particle in a Paraview format
 void SpheroCylinder::write_polygonsPts_PARAVIEW( ostream& f,
 	Vector3 const* translation )const
-{
-  for ( size_t i=0; i<m_nbElemPart; ++i )
-    m_elementaryParticles[i]->write_polygonsPts_PARAVIEW( f, translation ) ;
+{ 
+  // Top sphere
+  Transform const* transform = m_elementaryParticles[1]->getRigidBody()
+  	->getTransform();  	 	
+  double angle = PI / ( 2. * m_visuNodeNbPerQar ) ;
+  double angleY = 0., local_radius = 0.;
+  int k, i, ptsPerlevel = 4 * m_visuNodeNbPerQar;
+  Point3 pp, pptrans;
+  
+  // Regular points on the surface
+  for ( k = m_visuNodeNbPerQar - 1; k < 2*m_visuNodeNbPerQar-1 ; ++k ) 
+  {  
+    angleY = - PI / 2. + ( k + 1 ) * angle;
+    local_radius = m_radius * cos( angleY );
+    pp[Y] = m_radius * sin( angleY );
+    for ( i = 0; i < ptsPerlevel ; ++i )
+    {
+      pp[X] = local_radius * cos( i * angle );
+      pp[Z] = local_radius * sin( i * angle );
+      pptrans = (*transform)( pp );
+      if ( translation ) pptrans += *translation;
+      f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
+    }
+  }
+   
+  pp[X] = 0.;
+  pp[Z] = 0.;	
+  // Top point
+  pp[Y] = m_radius;
+  pptrans = (*transform)( pp );
+  if ( translation ) pptrans += *translation;
+  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
+	
+  // Gravity center
+  pp[Y] = 0.;
+  pptrans = (*transform)( pp );
+  if ( translation ) pptrans += *translation;
+  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl; 
+  
+  
+  // Bottom sphere
+  transform = m_elementaryParticles[2]->getRigidBody()
+  	->getTransform();  	 	
+  
+  // Regular points on the surface
+  for ( k = m_visuNodeNbPerQar - 1; k >=0 ; --k ) 
+  {  
+    angleY = - PI / 2. + ( k + 1 ) * angle;
+    local_radius = m_radius * cos( angleY );
+    pp[Y] = m_radius * sin( angleY );
+    for ( i = 0; i < ptsPerlevel ; ++i )
+    {
+      pp[X] = local_radius * cos( i * angle );
+      pp[Z] = local_radius * sin( i * angle );
+      pptrans = (*transform)( pp );
+      if ( translation ) pptrans += *translation;
+      f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
+    }
+  }
+   
+  pp[X] = 0.;
+  pp[Z] = 0.;
+  // Bottom point
+  pp[Y] = - m_radius;
+  pptrans = (*transform)( pp );
+  if ( translation ) pptrans += *translation;
+  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;	
+	
+  // Gravity center
+  pp[Y] = 0.;
+  pptrans = (*transform)( pp );
+  if ( translation ) pptrans += *translation;
+  f << pptrans[X] << " " << pptrans[Y] << " " << pptrans[Z] << endl;
+  
+  
+  // Cylinder: no additional point needed      
 }
 
 
@@ -317,32 +382,84 @@ void SpheroCylinder::write_polygonsPts_PARAVIEW( ostream& f,
 list<Point3> SpheroCylinder::get_polygonsPts_PARAVIEW(
 	Vector3 const* translation ) const
 {
-  list<Point3> ppp, ParaviewPoints;
-  list<Point3>::const_iterator itpp;
-
-  for ( size_t i=0; i<m_nbElemPart; ++i )
-  {
-    ppp = m_elementaryParticles[i]->get_polygonsPts_PARAVIEW( translation );
-    for ( itpp=ppp.begin(); itpp!=ppp.end(); ++itpp )
-      ParaviewPoints.push_back( *itpp );
+  // Top sphere
+  Transform const* transform = m_elementaryParticles[1]->getRigidBody()
+  	->getTransform();
+  list<Point3> ParaviewPoints;
+  double angle = PI / ( 2. * m_visuNodeNbPerQar ) ;
+  double angleY = 0., local_radius = 0.;
+  int k, i, ptsPerlevel =  4 * m_visuNodeNbPerQar;
+  Point3 pp, pptrans;
+  
+  // Regular points on the surface
+  for ( k = m_visuNodeNbPerQar - 1; k < 2*m_visuNodeNbPerQar-1 ; ++k ) 
+  {  
+    angleY = -PI / 2. + ( k + 1 ) * angle;
+    local_radius = m_radius * cos( angleY );
+    pp[Y] = m_radius * sin( angleY );
+    for ( i = 0; i < ptsPerlevel ; ++i )
+    {
+      pp[X] = local_radius * cos( i * angle );
+      pp[Z] = local_radius * sin( i * angle );
+      pptrans = (*transform)( pp );
+      if ( translation ) pptrans += *translation;
+      ParaviewPoints.push_back( pptrans );
+    }
   }
-
+   
+  pp[X] = 0.;
+  pp[Z] = 0.;	
+  // Top point
+  pp[Y] = m_radius;
+  pptrans = (*transform)( pp );
+  if ( translation ) pptrans += *translation;
+  ParaviewPoints.push_back( pptrans );
+	
+  // Gravity center
+  pp[Y] = 0.;
+  pptrans = (*transform)( pp );  
+  if ( translation ) pptrans += *translation;
+  ParaviewPoints.push_back( pptrans );
+  
+  
+  // Bottom sphere
+  transform = m_elementaryParticles[2]->getRigidBody()
+  	->getTransform();
+  
+  // Regular points on the surface
+  for ( k = m_visuNodeNbPerQar - 1; k >=0 ; --k ) 
+  {  
+    angleY = -PI / 2. + ( k + 1 ) * angle;
+    local_radius = m_radius * cos( angleY );
+    pp[Y] = m_radius * sin( angleY );
+    for ( i = 0; i < ptsPerlevel ; ++i )
+    {
+      pp[X] = local_radius * cos( i * angle );
+      pp[Z] = local_radius * sin( i * angle );
+      pptrans = (*transform)( pp );
+      if ( translation ) pptrans += *translation;
+      ParaviewPoints.push_back( pptrans );
+    }
+  }
+   
+  pp[X] = 0.;
+  pp[Z] = 0.;
+  // Bottom point
+  pp[Y] = - m_radius;
+  pptrans = (*transform)( pp );
+  if ( translation ) pptrans += *translation;
+  ParaviewPoints.push_back( pptrans );
+	
+  // Gravity center
+  pp[Y] = 0.;
+  pptrans = (*transform)( pp );  
+  if ( translation ) pptrans += *translation;
+  ParaviewPoints.push_back( pptrans );
+  
+  
+  // Cylinder: no additional point needed     
+      
   return ( ParaviewPoints );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Writes the points describing the composite particle in a
-// Paraview format with a transformation that may be different than the current
-// transformation of the particle
-void SpheroCylinder::write_polygonsPts_PARAVIEW( ostream& f,
-	Transform const& transform, Vector3 const* translation ) const
-{
-  for ( size_t i=0; i<m_nbElemPart; ++i )
-    m_elementaryParticles[i]->write_polygonsPts_PARAVIEW( f,
-	transform, translation );
 }
 
 
@@ -354,9 +471,140 @@ void SpheroCylinder::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const
 {
-  for ( size_t i=0; i<m_nbElemPart; ++i )
-    m_elementaryParticles[i]->write_polygonsStr_PARAVIEW( connectivity,
-	    offsets, cellstype, firstpoint_globalnumber, last_offset );
+  int i, k, ptsPerlevel = 4 * m_visuNodeNbPerQar;
+  
+  // Top sphere
+  int Top_number = firstpoint_globalnumber + ptsPerlevel * m_visuNodeNbPerQar,  
+  	Top_GC_number = firstpoint_globalnumber 
+		+ ptsPerlevel * m_visuNodeNbPerQar + 1;
+  // Regular cells: Pyramid
+  for ( k = 0; k < m_visuNodeNbPerQar-1 ; ++k ) 
+  {  
+    for ( i = 0; i < ptsPerlevel-1 ; ++i )
+    {
+      connectivity.push_back( firstpoint_globalnumber + k * ptsPerlevel + i ); 
+      connectivity.push_back( firstpoint_globalnumber + k * ptsPerlevel + i 
+      	+ 1);
+      connectivity.push_back( firstpoint_globalnumber + ( k + 1) * ptsPerlevel
+      	+ i + 1 );	
+      connectivity.push_back( firstpoint_globalnumber + ( k + 1 ) * ptsPerlevel
+	+ i );
+      connectivity.push_back( Top_GC_number );
+      last_offset += 5;
+      offsets.push_back( last_offset );
+      cellstype.push_back( 14 );		
+    }
+    connectivity.push_back( firstpoint_globalnumber + k * ptsPerlevel + 
+    	ptsPerlevel - 1 );
+    connectivity.push_back( firstpoint_globalnumber + k * ptsPerlevel );
+    connectivity.push_back( firstpoint_globalnumber + ( k + 1 ) * ptsPerlevel );
+    connectivity.push_back( firstpoint_globalnumber + ( k + 1 ) * ptsPerlevel 
+    	+ ptsPerlevel - 1 );
+    connectivity.push_back( Top_GC_number );
+    last_offset += 5;
+    offsets.push_back( last_offset );
+    cellstype.push_back( 14 );    
+  }   
+  
+  // Top cells: tetraedron  
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    connectivity.push_back( firstpoint_globalnumber
+    	+ ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel + i );
+    connectivity.push_back( firstpoint_globalnumber
+    	+ ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel + i + 1 );
+    connectivity.push_back( Top_number );	
+    connectivity.push_back( Top_GC_number );
+    last_offset += 4;
+    offsets.push_back( last_offset );
+    cellstype.push_back( 10 ); 
+  }
+  connectivity.push_back( firstpoint_globalnumber
+  	+  m_visuNodeNbPerQar * ptsPerlevel - 1 );
+  connectivity.push_back( firstpoint_globalnumber
+  	+ ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel );
+  connectivity.push_back( Top_number );	
+  connectivity.push_back( Top_GC_number );
+  last_offset += 4;
+  offsets.push_back( last_offset );
+  cellstype.push_back( 10 ); 
+	
+
+  // Bottom sphere
+  int shift = firstpoint_globalnumber + ptsPerlevel * m_visuNodeNbPerQar + 2 ;  
+  int Bottom_number = shift + ptsPerlevel * m_visuNodeNbPerQar,  
+  	Bottom_GC_number = shift + ptsPerlevel * m_visuNodeNbPerQar + 1; 
+  // Regular cells: Pyramid
+  for ( k = 0; k < m_visuNodeNbPerQar-1 ; ++k ) 
+  {  
+    for ( i = 0; i < ptsPerlevel-1 ; ++i )
+    {
+      connectivity.push_back( shift + k * ptsPerlevel + i ); 
+      connectivity.push_back( shift + k * ptsPerlevel + i + 1);
+      connectivity.push_back( shift + ( k + 1) * ptsPerlevel + i + 1 );	
+      connectivity.push_back( shift + ( k + 1 ) * ptsPerlevel + i );
+      connectivity.push_back( Bottom_GC_number );
+      last_offset += 5;
+      offsets.push_back( last_offset );
+      cellstype.push_back( 14 );		
+    }
+    connectivity.push_back( shift + k * ptsPerlevel + ptsPerlevel - 1 );
+    connectivity.push_back( shift + k * ptsPerlevel );
+    connectivity.push_back( shift + ( k + 1 ) * ptsPerlevel );
+    connectivity.push_back( shift + ( k + 1 ) * ptsPerlevel + ptsPerlevel - 1 );
+    connectivity.push_back( Bottom_GC_number );
+    last_offset += 5;
+    offsets.push_back( last_offset );
+    cellstype.push_back( 14 );    
+  }
+
+  // Bottom cells: tetraedron
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    connectivity.push_back( shift + ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel 
+    	+ i );
+    connectivity.push_back( shift + ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel 
+    	+ i + 1 );
+    connectivity.push_back( Bottom_number );	
+    connectivity.push_back( Bottom_GC_number );
+    last_offset += 4;
+    offsets.push_back( last_offset );
+    cellstype.push_back( 10 ); 
+  }
+  connectivity.push_back( shift +  m_visuNodeNbPerQar * ptsPerlevel - 1 );
+  connectivity.push_back( shift + ( m_visuNodeNbPerQar - 1 ) * ptsPerlevel );
+  connectivity.push_back( Bottom_number );	
+  connectivity.push_back( Bottom_GC_number );
+  last_offset += 4;
+  offsets.push_back( last_offset );
+  cellstype.push_back( 10 ); 
+  
+  
+  // Cylinder	
+  for ( i = 0; i < ptsPerlevel-1 ; ++i )
+  {
+    connectivity.push_back( firstpoint_globalnumber + i );
+    connectivity.push_back( firstpoint_globalnumber + i + 1 );
+    connectivity.push_back( Top_GC_number );
+    connectivity.push_back( shift + i );
+    connectivity.push_back( shift + i + 1 );
+    connectivity.push_back( Bottom_GC_number );
+    last_offset += 6;
+    offsets.push_back( last_offset );
+    cellstype.push_back( 13 );
+  }
+  connectivity.push_back( firstpoint_globalnumber + ptsPerlevel - 1 );
+  connectivity.push_back( firstpoint_globalnumber );
+  connectivity.push_back( Top_GC_number );
+  connectivity.push_back( shift + ptsPerlevel - 1 );
+  connectivity.push_back( shift );
+  connectivity.push_back( Bottom_GC_number );
+  last_offset += 6;
+  offsets.push_back( last_offset );
+  cellstype.push_back( 13 );
+
+
+  firstpoint_globalnumber += 2 * ( ptsPerlevel * m_visuNodeNbPerQar + 2 ) ;
 }
 
 

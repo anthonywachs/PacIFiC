@@ -587,16 +587,6 @@ class Particle : public Component
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset) const ;
 
-    /** @brief Writes the points describing the particle in a
-    Paraview format with a transformation that may be different than the current
-    transformation of the particle
-    @param f output stream
-    @param transform transformation
-    @param translation additional center of mass translation */
-    virtual void write_polygonsPts_PARAVIEW( ostream& f,
-  	Transform const& transform,
-  	Vector3 const* translation = NULL ) const;
-
     /** @brief Returns the number of points to write the particle in a
     Paraview format */
     virtual int numberOfPoints_PARAVIEW() const ;

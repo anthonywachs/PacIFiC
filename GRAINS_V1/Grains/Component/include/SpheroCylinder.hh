@@ -134,16 +134,6 @@ class SpheroCylinder : public CompositeParticle
     list<Point3> get_polygonsPts_PARAVIEW(
   	Vector3 const* translation = NULL ) const;
 
-    /** @brief Writes the points describing the composite particle in a
-    Paraview format with a transformation that may be different than the current
-    transformation of the particle
-    @param f output stream
-    @param transform transformation
-    @param translation additional center of mass translation */
-    void write_polygonsPts_PARAVIEW( ostream& f,
-  	Transform const& transform,
-  	Vector3 const* translation = NULL ) const;
-
     /** @brief Writes the composite particle in a Paraview format
     @param connectivity connectivity of Paraview polytopes
     @param offsets connectivity offsets
@@ -177,6 +167,9 @@ class SpheroCylinder : public CompositeParticle
     double m_height; /**< Height of the elementary cylinder */
     double m_radius; /**< Radius of the elementary cylinder and the two
     	spherical caps */
+    static int m_visuNodeNbPerQar; /**< number of points over a quarter of 
+    	the circular perimeter of the sphero-cylinder for Paraview 
+	post-processing */	
     //@}
 
     /**@name Constructors */

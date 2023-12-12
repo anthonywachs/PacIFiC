@@ -218,16 +218,6 @@ class CompositeParticle : public Particle
     virtual list<Point3> get_polygonsPts_PARAVIEW(
   	Vector3 const* translation = NULL ) const;
 
-    /** @brief Writes the points describing the composite particle in a
-    Paraview format with a transformation that may be different than the current
-    transformation of the particle
-    @param f output stream
-    @param transform transformation
-    @param translation additional center of mass translation */
-    virtual void write_polygonsPts_PARAVIEW( ostream& f,
-  	Transform const& transform,
-  	Vector3 const* translation = NULL ) const;
-
     /** @brief Writes the composite particle in a Paraview format
     @param connectivity connectivity of Paraview polytopes
     @param offsets connectivity offsets

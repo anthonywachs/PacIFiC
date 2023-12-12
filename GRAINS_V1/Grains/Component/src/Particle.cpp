@@ -1368,20 +1368,6 @@ void Particle::write_polygonsStr_PARAVIEW( list<int> &connectivity,
 
 
 // ----------------------------------------------------------------------------
-// Writes the points describing the particle in a
-// Paraview format with a transformation that may be different than the current
-// transformation of the particle
-void Particle::write_polygonsPts_PARAVIEW( ostream& f,
-	Transform const& transform, Vector3 const* translation ) const
-{
-  m_geoRBWC->getConvex()->write_polygonsPts_PARAVIEW( f,
-	transform, translation );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns the number of points to write the particle in a Paraview format
 int Particle::numberOfPoints_PARAVIEW() const
 {

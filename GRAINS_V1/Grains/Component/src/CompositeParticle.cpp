@@ -464,21 +464,6 @@ list<Point3> CompositeParticle::get_polygonsPts_PARAVIEW(
 
 
 // ----------------------------------------------------------------------------
-// Writes the points describing the composite particle in a
-// Paraview format with a transformation that may be different than the current
-// transformation of the particle
-void CompositeParticle::write_polygonsPts_PARAVIEW( ostream& f,
-	Transform const& transform, Vector3 const* translation ) const
-{
-  for ( size_t i=0; i<m_nbElemPart; ++i )
-    m_elementaryParticles[i]->write_polygonsPts_PARAVIEW( f,
-	transform, translation );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Writes the composite particle in a Paraview format
 void CompositeParticle::write_polygonsStr_PARAVIEW( list<int>& connectivity,
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
