@@ -871,7 +871,13 @@ void AllComponents::read( istream& fileSave, string const& filename )
 
     // Particle construction
     if ( m_ReferenceParticles[ParticleGeomType]->isCompositeParticle() )
-      particle = new CompositeParticle( false );
+    {    
+      if ( m_ReferenceParticles[ParticleGeomType]
+      		->getSpecificCompositeShapeName() == "SpheroCylinder" )
+        particle = new SpheroCylinder( false );
+      else   
+        particle = new CompositeParticle( false );
+    }
     else
       particle = new Particle( false );
 

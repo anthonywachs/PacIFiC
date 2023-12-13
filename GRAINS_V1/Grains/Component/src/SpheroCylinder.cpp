@@ -655,3 +655,47 @@ void SpheroCylinder::writePositionInFluid( ostream& fluid )
 		pointEnvelope[Z] ) << endl;
   }
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads composite particle data from a stream. Usage: for standard composite
+// particles in the 2014 reload format
+void SpheroCylinder::read2014( istream& fileIn, vector<Particle*> const*
+  	referenceParticles )
+{
+  CompositeParticle::read2014( fileIn, referenceParticles );
+
+  // We know that (*referenceParticles)[m_GeomType] points to a
+  // CompositeParticle, such that we can dynamic cast it to actual type and
+  // use -> instead of using get methods through virtual typing
+  SpheroCylinder const* CompParticleRef =
+  	dynamic_cast<SpheroCylinder const*>(
+		(*referenceParticles)[m_GeomType]);
+
+  m_height = CompParticleRef->m_height;
+  m_radius = CompParticleRef->m_radius;  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads composite particle data from a stream in a binary form.
+// Usage: for standard composite particles in the 2014 reload format
+void SpheroCylinder::read2014_binary( istream& fileIn,
+	vector<Particle*> const* referenceParticles )
+{
+  CompositeParticle::read2014_binary( fileIn, referenceParticles );
+
+  // We know that (*referenceParticles)[m_GeomType] points to a
+  // CompositeParticle, such that we can dynamic cast it to actual type and
+  // use -> instead of using get methods through virtual typing
+  SpheroCylinder const* CompParticleRef =
+  	dynamic_cast<SpheroCylinder const*>(
+		(*referenceParticles)[m_GeomType]);
+
+  m_height = CompParticleRef->m_height;
+  m_radius = CompParticleRef->m_radius;
+}

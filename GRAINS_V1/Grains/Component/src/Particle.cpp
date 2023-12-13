@@ -1777,3 +1777,15 @@ void Particle::computeInertiaTensorSpaceFixed( vector<double>& inertia ) const
   inertia[4] = inertiaSpaceFixed[Y][Z];
   inertia[5] = inertiaSpaceFixed[Z][Z];
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the specific composite shape name: "none" for standard particles
+// and non-specific composite particle and class name for specific composite
+// particles 
+string Particle::getSpecificCompositeShapeName() const
+{
+  return ( m_specific_composite_shape );
+}

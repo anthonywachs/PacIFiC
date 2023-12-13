@@ -521,6 +521,11 @@ class Particle : public Component
     /** @brief Returns a pointer to the reference component of the component:
     this in general and the CompositeParticle for an elementary particle */
     virtual Component* getMasterComponent();
+    
+    /** @brief Returns the specific composite shape name: "none" for standard 
+    particles and non-specific composite particle and class name for specific 
+    composite particles */
+    string getSpecificCompositeShapeName() const;
     //@}
 
 

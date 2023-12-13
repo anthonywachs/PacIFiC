@@ -289,7 +289,7 @@ class CompositeParticle : public Particle
     @param fileIn input stream
     @param referenceParticles reference particles for each class of
     particles */
-    void read2014( istream& fileIn, vector<Particle*> const*
+    virtual void read2014( istream& fileIn, vector<Particle*> const*
   	referenceParticles );
 
     /** @brief Reads composite particle data from a stream in a binary form.
@@ -297,7 +297,7 @@ class CompositeParticle : public Particle
     @param fileIn input stream
     @param referenceParticles reference particles for each class of
     particles */
-    void read2014_binary( istream& fileIn, vector<Particle*> const*
+    virtual void read2014_binary( istream& fileIn, vector<Particle*> const*
   	referenceParticles );
     //@}
 

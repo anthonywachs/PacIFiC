@@ -154,8 +154,28 @@ class SpheroCylinder : public CompositeParticle
     //@{
     /** @brief Returns the number of corners of the rigib body shape and a code
     describing the rigid body shape */
-    int getNbCorners() const;
+    int getNbCorners() const;   
     //@}
+    
+    
+    /**@name I/O methods */
+    //@{
+    /** @brief Reads composite particle data from a stream. Usage: for standard
+    composite particles in the 2014 reload format
+    @param fileIn input stream
+    @param referenceParticles reference particles for each class of
+    particles */
+    void read2014( istream& fileIn, vector<Particle*> const*
+  	referenceParticles );
+
+    /** @brief Reads composite particle data from a stream in a binary form.
+    Usage: for standard composite particles in the 2014 reload format
+    @param fileIn input stream
+    @param referenceParticles reference particles for each class of
+    particles */
+    void read2014_binary( istream& fileIn, vector<Particle*> const*
+  	referenceParticles );
+    //@}    
 
 
   protected:
