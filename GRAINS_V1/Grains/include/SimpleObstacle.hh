@@ -157,26 +157,42 @@ class SimpleObstacle : public Obstacle
     /** @brief Update contact map */
     virtual void updateContactMap();
 
-    /** @brief Does the contact exist in the map, if yes return the pointer to 
-    the cumulative tangential displacement
-    @param tangentialDepl pointer to the cumulative tangential displacement
-    @param id id number of the other component */
+    /** @brief Does the contact exist in the map? If so, return true and make
+    kdelta, prev_normal and cumulSpringTorque point to the memorized info. 
+    Otherwise, return false and set those pointers to NULL.
+    @param id key in the map
+    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque 
+    @param createContact when true, create contact if it does not exist */
     virtual bool getContactMemory( std::tuple<int,int,int> const& id,
-  	Vector3* &tangent, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+  	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
   	bool createContact );
 
     /** @brief Adds new contact in the map
-    @param tangentialDepl initial tangential displacement
-    @param id id number of the other component */
+    @param id key in the map
+    @param kdelta kt * delta_t vector
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
     virtual void addNewContactInMap( std::tuple<int,int,int> const& id,
-  	Vector3 const& tangent, Vector3 const& prev_normal,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
 
-    /** @brief Increases cumulative tangential displacement with component id
-    @param tangentialDepl additional tangential displacement
-    @param id id number of the other component */
+    /** @brief Stores memory of the contact with component id: increase 
+    cumulative tangential displacement and cumulative spring torque, remember 
+    contact normal.
+    @param id key in the map
+    @param kdelta kt * delta_t vector
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
     virtual void addDeplContactInMap( std::tuple<int,int,int> const& id,
-  	Vector3 const& tangent, Vector3 const& prev_normal,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
 
     /** @brief Updates the ids of the contact map: in the case of a reload with 
@@ -189,19 +205,19 @@ class SimpleObstacle : public Obstacle
     /** @brief Writes the contact map information in an array of doubles
     @param destination the array of double where the contact map should be 
     stored
-    @param start index the index of destination where the copy should start */
+    @param start_index the index of destination where the copy should start */
     virtual void copyHistoryContacts( double* &destination, int start_index );
 
     /** @brief Adds a single contact info to the contact map
     @param id key in the map
     @param isActive boolean: true if the contact is active, false otherwise
-    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param kdelta kt * delta_t vector
     @param prev_normal pointer to the previous vector normal to the contact 
     plane
     @param cumulSpringTorque pointer to the memory of the spring-like component 
     of the friction torque */
     virtual void copyContactInMap( std::tuple<int,int,int> const& id,
-  	bool const& isActive, Vector3 const& tangent, 
+  	bool const& isActive, Vector3 const& kdelta, 
 	Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
 

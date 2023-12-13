@@ -100,9 +100,23 @@ class AllComponents
 
     /** @brief Moves all components
     @param time physical time
-    @param dt time step magnitude */
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp displacement time step magnitude
+    @param dt_obstacle obstacle velocity and displacement time step magnitude */
     list<SimpleObstacle*> Move( double time,
-		double dt );
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp,
+	double const& dt_obstacle );
+	
+    /** @brief Computes particles acceleration
+    @param time physical time */
+    void computeParticlesAcceleration( double time );
+    
+    /** @brief Advances particles velocity over dt_particle_vel
+    @param time physical time 
+    @param dt_particle_vel velocity time step magnitude */
+    void advanceParticlesVelocity( double time, 
+    	double const& dt_particle_vel );        
 
     /** @brief Links all active particles to the application
     @param app application */

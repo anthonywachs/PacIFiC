@@ -31,11 +31,11 @@ class RigidBodyWithCrust : public RigidBody
     RigidBodyWithCrust( RigidBodyWithCrust const& rbwc );
 
     /** @brief Constructor with input parameters, used by composite component 
-    whose own shape is not defined (composite = true) or to create component 
+    whose own shape is not defined ( composite = true ) or to create component 
     from scratch in the code ( composite = false )         
     @param convex_ convex
     @param position_ transformation 
-    @param noncomposite for standard 
+    @param composite true for composite, false for standard 
     @param crust_thickness crust thickness */
     RigidBodyWithCrust( Convex* convex_, Transform const& position_,
     	bool composite = true, double const& crust_thickness = 0. );

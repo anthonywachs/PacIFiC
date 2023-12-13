@@ -170,28 +170,31 @@ void AllComponents::LinkImposedMotion( ObstacleImposedForce* load )
 
 // ----------------------------------------------------------------------------
 // Moves all components
-list<SimpleObstacle*> AllComponents::Move( double time, double dt )
+list<SimpleObstacle*> AllComponents::Move( double time,
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp,
+	double const& dt_obstacle )
 {
   try{
-  // Deplacement des particles
+  // Particles displacement
   list<Particle*>::iterator particle;
   for (particle=m_ActiveParticles.begin();
       particle!=m_ActiveParticles.end(); particle++)
     if ( (*particle)->getTag() != 2 )
-      (*particle)->Move( time, dt );
+      (*particle)->Move( time, dt_particle_vel, dt_particle_disp );
 
-  // Deplacement des obstacles
+  // Obstacles displacement
   list<SimpleObstacle*> displacedObstacles;
   if ( !m_AllImposedVelocitiesOnObstacles.empty()
   	|| !m_AllImposedForcesOnObstacles.empty() )
   {
     m_obstacle->resetKinematics();
-    displacedObstacles = m_obstacle->Move( time, dt, false, false );
+    displacedObstacles = m_obstacle->Move( time, dt_obstacle, false, false );
 
     list<ObstacleImposedVelocity*>::iterator chargement;
     for (chargement=m_AllImposedVelocitiesOnObstacles.begin();
   	chargement!=m_AllImposedVelocitiesOnObstacles.end(); )
-      if ( (*chargement)->isCompleted( time, dt ) )
+      if ( (*chargement)->isCompleted( time, dt_obstacle ) )
         chargement = m_AllImposedVelocitiesOnObstacles.erase( chargement );
       else chargement++;
 
@@ -199,7 +202,7 @@ list<SimpleObstacle*> AllComponents::Move( double time, double dt )
     for (chargement_F=m_AllImposedForcesOnObstacles.begin();
   	chargement_F!=m_AllImposedForcesOnObstacles.end(); )
     {
-      if ( (*chargement_F)->isCompleted( time, dt ) )
+      if ( (*chargement_F)->isCompleted( time, dt_obstacle ) )
         chargement_F = m_AllImposedForcesOnObstacles.erase( chargement_F );
       else chargement_F++;
     }
@@ -210,6 +213,36 @@ list<SimpleObstacle*> AllComponents::Move( double time, double dt )
   catch (const DisplacementError&) {
     throw DisplacementError();
   }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes particles acceleration
+void AllComponents::computeParticlesAcceleration( double time )
+{
+  list<Particle*>::iterator particle;
+  for (particle=m_ActiveParticles.begin();
+      particle!=m_ActiveParticles.end(); particle++)
+    if ( (*particle)->getTag() != 2 )
+      (*particle)->computeAcceleration( time );
+}
+
+
+
+
+
+// ----------------------------------------------------------------------------
+// Advances particles velocity over dt_particle_vel
+void AllComponents::advanceParticlesVelocity( double time, 
+    	double const& dt_particle_vel )
+{
+  list<Particle*>::iterator particle;
+  for (particle=m_ActiveParticles.begin();
+      particle!=m_ActiveParticles.end(); particle++)
+    if ( (*particle)->getTag() != 2 )
+      (*particle)->advanceVelocity( time, dt_particle_vel );
 }
 
 

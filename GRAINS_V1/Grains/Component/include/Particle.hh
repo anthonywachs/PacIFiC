@@ -287,8 +287,21 @@ class Particle : public Component
     /** @brief Solves the Newton's law and move particle to their new position
     @exception DisplacementError displacement is larger than crust thickness
     @param time physical time
-    @param dt time step magnitude */
-    virtual void Move( double time, double dt );
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp displacement time step magnitude */
+    virtual void Move( double time, 
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp );
+	
+    /** @brief Computes acceleration
+    @param time physical time */
+    void computeAcceleration( double time );
+    
+    /** @brief Advances velocity over dt_particle_vel
+    @param time physical time 
+    @param dt_particle_vel velocity time step magnitude */
+    void advanceVelocity( double time, 
+    	double const& dt_particle_vel );      
 
     /** @brief Contact between a particle and a component. If contact exists,
     computes the contact force and torque and adds to each component

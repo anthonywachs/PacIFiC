@@ -408,22 +408,24 @@ Particle::~Particle()
 
 // ----------------------------------------------------------------------------
 // Solves the Newton's law and move particle to their new position
-void Particle::Move( double time, double dt )
+void Particle::Move( double time, 
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp )
 {
   try {
-  // Time integration of Newton's law followed and kinematic equations
-  m_kinematics->computeMomentumChangeOverDt( m_torsor, dt, this );
-  double depl = m_kinematics->Move( this, dt );
+  // Time integration of Newton's law and kinematic equations
+  double depl = m_kinematics->Move( this, dt_particle_vel, 
+    	dt_particle_disp );
 
   // Check that translational displacement is smaller than crust thickness
-  double rayon = m_geoRBWC->getCrustThickness();
-  if ( depl > rayon )
+  double crust = m_geoRBWC->getCrustThickness();
+  if ( depl > crust )
   {
     cout << endl << "Processor = " <<
     	(GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
 	<< " has thrown an DisplacementError exception" <<  endl;
     GrainsExec::m_exception_Displacement = true;
-    DisplacementError erreur( this, depl, rayon, time );
+    DisplacementError erreur( this, depl, crust, time );
     throw erreur;
   }
 
@@ -431,6 +433,26 @@ void Particle::Move( double time, double dt )
   catch (const DisplacementError&) {
     throw DisplacementError();
   }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes acceleration
+void Particle::computeAcceleration( double time )
+{
+  m_kinematics->computeAcceleration( m_torsor, this );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Advances velocity over dt_particle_vel
+void Particle::advanceVelocity( double time, double const& dt_particle_vel )
+{
+  m_kinematics->advanceVelocity( dt_particle_vel );
 }
 
 

@@ -38,11 +38,10 @@ class ParticleKinematicsSphere : public ParticleKinematics3D
     ParticleKinematics* clone() const;
 
     /** @brief Computes the momentum change over dt 
-    @param torseur particle torsor 
-    @param dt time step magnitude 
+    @param torseur particle torsor  
     @param particle particle related to the kinematics */
-    void computeMomentumChangeOverDt( Torsor const& torseur,
-	double dt, Particle const* particle ) ;
+    void computeAcceleration( Torsor const& torseur,
+	Particle const* particle ) ;
     //@}
 
 };

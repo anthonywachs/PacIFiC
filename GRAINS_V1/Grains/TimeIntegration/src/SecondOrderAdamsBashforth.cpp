@@ -45,21 +45,22 @@ TimeIntegrator* SecondOrderAdamsBashforth::clone() const
 
 // ----------------------------------------------------------------------------
 // Computes the new velocity and position at time t+dt
-void SecondOrderAdamsBashforth::Move( Vector3& vtrans, Vector3 const& dUdt,
+void SecondOrderAdamsBashforth::Move( Vector3 const& dUdt, Vector3& vtrans, 
 	Vector3& transDisplacement, Vector3 const& dOmegadt,
-	Vector3& vrot, Vector3& meanVRot, double dt )
+	Vector3& vrot, Vector3& meanVRot, double const& dt_particle_vel, 
+    	double const& dt_particle_disp )
 {      
   // Translational velocity and displacement
   transDisplacement = 0.5 * ( 3. * vtrans 
-  	- m_translationalVelocity_nm2 ) * dt;
+  	- m_translationalVelocity_nm2 ) * dt_particle_disp;
   m_translationalVelocity_nm2 = vtrans;
-  vtrans += 0.5 * ( 3. * dUdt - m_dUdt_nm2 ) * dt;
+  vtrans += 0.5 * ( 3. * dUdt - m_dUdt_nm2 ) * dt_particle_vel;
   m_dUdt_nm2 = dUdt;  
 
   // Angular velocity and displacement
   meanVRot = 0.5 * ( 3. * vrot  - m_angularVelocity_nm2 );
   m_angularVelocity_nm2 = vrot;  
-  vrot += 0.5 * ( 3. * dOmegadt - m_dOmegadt_nm2 ) * dt;
+  vrot += 0.5 * ( 3. * dOmegadt - m_dOmegadt_nm2 ) * dt_particle_vel;
   m_dOmegadt_nm2 = dOmegadt;  
 }
 

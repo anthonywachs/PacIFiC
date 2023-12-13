@@ -68,7 +68,7 @@ class MemoryContactForceModel : public ContactForceModel
     /** @brief Computation of vector tangent to contact
     @param tij The vector where the result is stored
     @param n_t Eta_t, the tangential damping coefficient
-    @param u_t The tangential velocity
+    @param ut The tangential velocity
     @param kdelta The cumulative displacement */
     void computeTangentialVector(Vector3& tij, double n_t, const Vector3 ut,
   const Vector3 kdelta);
@@ -123,6 +123,7 @@ class MemoryContactForceModel : public ContactForceModel
     /** @brief Performs forces & torques computation
     @param p0_ first Component (Particle)
     @param p1_ second Component (Particle ou Obstacle)
+    @param dt time step magnitude
     @param contactInfos geometric contact features
     @param delFN normal force
     @param delFT tangential force

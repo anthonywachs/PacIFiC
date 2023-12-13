@@ -46,10 +46,9 @@ class ParticleKinematics : public Kinematics
 
     /** @brief Computes the momentum change over dt 
     @param torseur particle torsor 
-    @param dt time step magnitude 
     @param particle particle related to the kinematics */
-    virtual void computeMomentumChangeOverDt( Torsor const& torseur,
-	double dt, Particle const* particle ) = 0;
+    virtual void computeAcceleration( Torsor const& torseur,
+	Particle const* particle ) = 0;
 			   
     /** @brief Computes explicitly Idw/dt
     @param dw explicit change of angular velocity
@@ -63,8 +62,14 @@ class ParticleKinematics : public Kinematics
     //@{
     /** @brief Integrates Newton's law and moves the particle 
     @param particle the particle
-    @param dt time step magnitude */
-    double Move( Particle* particle, double dt );
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp displacement time step magnitude */
+    double Move( Particle* particle, double const& dt_particle_vel, 
+    	double const& dt_particle_disp );
+	
+    /** @brief Advances velocity over dt_particle_vel
+    @param dt_particle_vel velocity time step magnitude */
+    void advanceVelocity( double const& dt_particle_vel ); 	
 
     /** @brief Returns the total velocity U + om x R given R 
     @param lev lever arm vector */

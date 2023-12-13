@@ -19,9 +19,9 @@ public:
   /**@name Constructors */
   //@{
   /** @brief Constructeur avec initialisation
-  @param a scale parameter along the x-axis
-  @param b scale parameter along the y-axis
-  @param c scale parameter along the z-axis
+  @param a0 scale parameter along the x-axis
+  @param b0 scale parameter along the y-axis
+  @param c0 scale parameter along the z-axis
   @param n1 first exponent
   @param n2 second exponent */
   Superquadric( double a0 = 0., double b0 = 0., double c0 = 0.,

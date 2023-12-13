@@ -182,8 +182,10 @@ class CompositeParticle : public Particle
     /** @brief Solves the Newton's law and move particle to their new position
     @exception DisplacementError displacement is larger than crust thickness
     @param time physical time
-    @param dt time step magnitude */
-    void Move( double time, double dt );
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp displacement time step magnitude */
+    void Move( double time, double const& dt_particle_vel, 
+    	double const& dt_particle_disp );
 
     /** @brief Translates the composite particle
     @param translation translation vector */

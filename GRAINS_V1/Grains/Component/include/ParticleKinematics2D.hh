@@ -42,10 +42,9 @@ class ParticleKinematics2D : public ParticleKinematics
 
     /** @brief Computes the momentum change over dt 
     @param torseur particle torsor 
-    @param dt time step magnitude 
     @param particle particle related to the kinematics */
-    void computeMomentumChangeOverDt( Torsor const& torseur,
-	double dt, Particle const* particle ) ;
+    void computeAcceleration( Torsor const& torseur,
+	Particle const* particle ) ;
 			   
     /** @brief Computes explicitly Idw/dt
     @param dw explicit change of angular velocity

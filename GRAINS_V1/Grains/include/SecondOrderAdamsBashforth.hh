@@ -31,16 +31,18 @@ class SecondOrderAdamsBashforth : public TimeIntegrator
     TimeIntegrator* clone() const ;
 
     /** @brief Computes the new velocity and position at time t+dt
-    @param vtrans translational velocity at time t
-    @param dUdt Translational velocity variation dU/dt
+    @param dUdt Translational acceleration dU/dt
+    @param vtrans translational velocity 
     @param transDisplacement translation displacement
-    @param dOmegadt Angular velocity variation dom/dt
-    @param vrot angular velocity at time t 
+    @param dOmegadt Angular ecceleration dom/dt
+    @param vrot angular velocity 
     @param meanVRot average angular velocity in interval [t,t+dt]
-    @param dt time step magnitude */        
-    void Move( Vector3& vtrans, Vector3 const& dUdt,
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp displacement time step magnitude */        
+    void Move( Vector3 const& dUdt, Vector3& vtrans, 
 	Vector3& transDisplacement, Vector3 const& dOmegadt,
-	Vector3& vrot, Vector3& meanVRot, double dt ) ;
+	Vector3& vrot, Vector3& meanVRot, double const& dt_particle_vel, 
+    	double const& dt_particle_disp );
 
     /** @brief Copies kinematics at time t-2dt (translational velocity, angular 
     velocity, variation of translational velocity, variation of angular 

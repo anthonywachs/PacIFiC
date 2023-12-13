@@ -107,7 +107,7 @@ class PointContact
     PointContact& operator = ( PointContact const& rhs );
     
     /** @brief Output operator
-    @param fileOut output stream
+    @param Out output stream
     @param pc PointContact object */
     friend ostream& operator << ( ostream& Out, PointContact const& pc );
     //@}

@@ -140,7 +140,7 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
 
 
       // Solve Newton's law and move particles
-      m_allcomponents.Move( m_time, m_dt );
+      m_allcomponents.Move( m_time, m_dt, m_dt, m_dt );
       
       
       // In case of periodicity, update periodic clones and destroy periodic

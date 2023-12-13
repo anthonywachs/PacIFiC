@@ -47,12 +47,15 @@ ParticleKinematics::~ParticleKinematics()
 
 // ----------------------------------------------------------------------------
 // Integrates Newton's law and moves the particle
-double ParticleKinematics::Move( Particle* particle, double dt )
+double ParticleKinematics::Move( Particle* particle, 
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp )
 {
   // Time integration
-  m_timeIntegrationScheme->Move( m_translationalVelocity,
-  	m_dUdt, m_translationalDisplacementOverDt,
-	m_dOmegadt, m_angularVelocity, m_averageAngularVelocityOverDt, dt );
+  m_timeIntegrationScheme->Move( m_dUdt, m_translationalVelocity,
+  	m_translationalDisplacementOverDt,
+	m_dOmegadt, m_angularVelocity, m_averageAngularVelocityOverDt, 
+	dt_particle_vel, dt_particle_disp );
   
   // Translational displacement
   particle->Translate( m_translationalDisplacementOverDt );
@@ -61,8 +64,8 @@ double ParticleKinematics::Move( Particle* particle, double dt )
   double nOmega = Norm( m_averageAngularVelocityOverDt );
   if ( nOmega > EPSILON ) 
   {
-    double c = cos( nOmega * dt / 2. );
-    double s = sin( nOmega * dt / 2. );
+    double c = cos( nOmega * dt_particle_disp / 2. );
+    double s = sin( nOmega * dt_particle_disp / 2. );
     Vector3 t;
     t = ( s * 1. / nOmega ) * m_averageAngularVelocityOverDt;
     m_QuaternionRotationOverDt.setQuaternion( t, c );
@@ -75,6 +78,18 @@ double ParticleKinematics::Move( Particle* particle, double dt )
   particle->Rotate( m_QuaternionRotationOverDt );
 
   return Norm( m_translationalDisplacementOverDt );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Advances velocity over dt_particle_vel
+void ParticleKinematics::advanceVelocity( double const& dt_particle_vel )
+{
+  // Time integration
+  m_timeIntegrationScheme->advanceVelocity( m_dUdt, m_translationalVelocity,
+  	m_dOmegadt, m_angularVelocity, dt_particle_vel );
 }
 
 

@@ -141,6 +141,10 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
   m_timeSave = m_save.begin();
   while ( *m_timeSave - m_time < 0.01 * m_dt && m_timeSave != m_save.end() )
       m_timeSave++;
+      
+  // In case of SecondOrderLeapFrog, initialize acceleration
+  if ( GrainsExec::m_TIScheme == "SecondOrderLeapFrog" )
+    computeParticlesForceAndAcceleration();
 
   cout << "Initialization completed" << endl << endl;
   SCT_get_elapsed_time( "Initialization" );
@@ -216,7 +220,6 @@ void Grains::do_after_time_stepping()
 // Runs the simulation over the prescribed time interval
 void Grains::Simulation( double time_interval )
 {
-  list<App*>::iterator app;
   double vmax = 0., vmean = 0. ;
 
   // Timers
@@ -272,65 +275,40 @@ void Grains::Simulation( double time_interval )
       SCT_get_elapsed_time( "ParticlesInsertion" );
 
 
-      // Initiliaze all component transforms with crust to non computed
-      SCT_set_start( "ComputeForces" );
-      m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
+      if ( GrainsExec::m_TIScheme == "SecondOrderLeapFrog" )
+      {
+        // We implement the kick-drift-kick version of the LeapFrog scheme
 
-      // Initialize contact maps (for contact model with memory)
-      // TODO: add if-statement that bypasses this step when contact model has
-      // no memory.
-      m_allcomponents.setAllContactMapToFalse();
-
-      // Compute forces from all applications
-      // Initialisation torsors with weight only
-      m_allcomponents.InitializeForces( m_time, m_dt, true );
-
-      // Compute forces
-      for (app=m_allApp.begin(); app!=m_allApp.end(); app++)
-        (*app)->ComputeForces( m_time, m_dt,
-      		m_allcomponents.getActiveParticles() );
-
-      // Update contact maps (for contact model with memory)
-      // TODO: add if-statement that bypasses this step when contact model has
-      // no memory.
-      m_allcomponents.updateAllContactMaps();
-      SCT_get_elapsed_time( "ComputeForces" );      
+	// Move particles and obstacles
+	// Update particle velocity over dt/2 and particle position over dt,
+	// obstacle velocity and position over dt
+	// v_i+1/2 = v_i + a_i * dt / 2
+	// x_i+1 = x_i + v_i+1/2 * dt
+        moveParticlesAndObstacles( 0.5 * m_dt, m_dt, m_dt );
+	
+        // Compute particle forces and acceleration
+	// Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)
+	SCT_set_start( "ComputeForces" );
+        computeParticlesForceAndAcceleration();
+        SCT_get_elapsed_time( "ComputeForces" );	
+	
+	// Update particle velocity over dt/2
+	// v_i+1 = v_i+1/2 + a_i+1 * dt / 2 
+	m_allcomponents.advanceParticlesVelocity( m_time, 0.5 * m_dt );
+      }
+      else
+      {
+        // Compute particle forces and acceleration
+	// Compute f_i and a_i as a function of (x_i,v_i) 
+	SCT_set_start( "ComputeForces" );
+        computeParticlesForceAndAcceleration();
+        SCT_get_elapsed_time( "ComputeForces" );
       
-
-      // Solve Newton's law and move particles
-      SCT_set_start( "Move" );
-      m_allcomponents.Move( m_time, m_dt );
-
-
-      // In case of periodicity, update periodic clones and destroy periodic
-      // clones that are out of the linked cell grid
-      if ( m_periodic )
-        m_collision->updateDestroyPeriodicClones(
-		m_allcomponents.getActiveParticles(),
-		m_allcomponents.getPeriodicCloneParticles() );
-      SCT_get_elapsed_time( "Move" );
-
-
-      // Update particle activity
-      SCT_set_start( "UpdateParticleActivity" );
-      m_allcomponents.UpdateParticleActivity();
-      SCT_get_elapsed_time( "UpdateParticleActivity" );
-
-
-      // Update the particle & obstacles links with the grid
-      SCT_set_start( "LinkUpdate" );
-      m_collision->LinkUpdate( m_time, m_dt,
-        	m_allcomponents.getActiveParticles() );
-
-
-      // In case of periodicity, create new periodic clones and destroy periodic
-      // clones because the master particle has changed tag/geoposition
-      if ( m_periodic )
-        m_collision->createDestroyPeriodicClones(
-		m_allcomponents.getActiveParticles(),
-		m_allcomponents.getPeriodicCloneParticles(),
-		m_allcomponents.getReferenceParticles() );
-      SCT_get_elapsed_time( "LinkUpdate" );
+        // Move particles and obstacles
+	// x_i+1 = x_i + g(v_i,v_i-1,a_i,dt)
+	// v_i+1 = v_i + g(a_i,a_i-1,dt)
+        moveParticlesAndObstacles( m_dt, m_dt, m_dt );
+      }
 
 
       // Write force & torque exerted on obstacles
@@ -392,6 +370,84 @@ void Grains::Simulation( double time_interval )
       break;
     }
   }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes particle forces and acceleration
+void Grains::computeParticlesForceAndAcceleration()
+{
+  // Initiliaze all component transforms with crust to non computed
+  m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
+
+  // Initialize contact maps (for contact model with memory)
+  // TODO: add if-statement that bypasses this step when contact model has
+  // no memory.
+  m_allcomponents.setAllContactMapToFalse();
+
+  // Compute forces from all applications
+  // Initialisation torsors with weight only
+  m_allcomponents.InitializeForces( m_time, m_dt, true );
+
+  // Compute forces
+  for (list<App*>::iterator app=m_allApp.begin(); app!=m_allApp.end(); app++)
+    (*app)->ComputeForces( m_time, m_dt,
+	m_allcomponents.getActiveParticles() );
+
+  // Update contact maps (for contact model with memory)
+  // TODO: add if-statement that bypasses this step when contact model has
+  // no memory.
+  m_allcomponents.updateAllContactMaps();
+      
+  // Compute particle acceleration
+  m_allcomponents.computeParticlesAcceleration( m_time );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Moves particles and obstacles	
+void Grains::moveParticlesAndObstacles( double const& dt_particle_vel, 
+    	double const& dt_particle_disp,
+	double const& dt_obstacle )
+{
+  // Solve Newton's law and move particles
+  SCT_set_start( "Move" );
+  m_allcomponents.Move( m_time, dt_particle_vel, dt_particle_disp, 
+      	dt_obstacle );
+
+
+  // In case of periodicity, update periodic clones and destroy periodic
+  // clones that are out of the linked cell grid
+  if ( m_periodic )
+    m_collision->updateDestroyPeriodicClones(
+		m_allcomponents.getActiveParticles(),
+		m_allcomponents.getPeriodicCloneParticles() );
+  SCT_get_elapsed_time( "Move" );
+
+
+  // Update particle activity
+  SCT_set_start( "UpdateParticleActivity" );
+  m_allcomponents.UpdateParticleActivity();
+  SCT_get_elapsed_time( "UpdateParticleActivity" );
+
+
+  // Update the particle & obstacles links with the grid
+  SCT_set_start( "LinkUpdate" );
+  m_collision->LinkUpdate( m_time, m_dt, m_allcomponents.getActiveParticles() );
+
+
+  // In case of periodicity, create new periodic clones and destroy periodic
+  // clones because the master particle has changed tag/geoposition
+  if ( m_periodic )
+    m_collision->createDestroyPeriodicClones(
+	m_allcomponents.getActiveParticles(),
+	m_allcomponents.getPeriodicCloneParticles(),
+	m_allcomponents.getReferenceParticles() );
+  SCT_get_elapsed_time( "LinkUpdate" );
 }
 
 

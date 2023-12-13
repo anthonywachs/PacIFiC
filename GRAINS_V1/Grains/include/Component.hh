@@ -106,14 +106,15 @@ class Component
     @param prev_normal pointer to the previous vector normal to the contact 
     plane
     @param cumulSpringTorque pointer to the memory of the spring-like component 
-    of the friction torque */
+    of the friction torque 
+    @param createContact when true, create contact if it does not exist */
     virtual bool getContactMemory( std::tuple<int,int,int> const& id,
   	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
   	bool createContact );
 
     /** @brief Adds new contact in the map
     @param id key in the map
-    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param kdelta kt * delta_t vector
     @param prev_normal pointer to the previous vector normal to the contact 
     plane
     @param cumulSpringTorque pointer to the memory of the spring-like component 
@@ -126,7 +127,7 @@ class Component
     cumulative tangential displacement and cumulative spring torque, remember 
     contact normal.
     @param id key in the map
-    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param kdelta kt * delta_t vector
     @param prev_normal pointer to the previous vector normal to the contact 
     plane
     @param cumulSpringTorque pointer to the memory of the spring-like component 
@@ -138,13 +139,13 @@ class Component
     /** @brief Writes the contact map information in an array of doubles
     @param destination the array of double where the contact map should be 
     stored
-    @param start index the index of destination where the copy should start */
+    @param start_index the index of destination where the copy should start */
     virtual void copyHistoryContacts( double* &destination, int start_index );
 
     /** @brief Adds a single contact info to the contact map
     @param id key in the map
     @param isActive boolean: true if the contact is active, false otherwise
-    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param kdelta kt * delta_t vector
     @param prev_normal pointer to the previous vector normal to the contact 
     plane
     @param cumulSpringTorque pointer to the memory of the spring-like component 
@@ -392,7 +393,7 @@ class Component
     void writeContactMemory_2014( ostream &fileSave ) const;
 
     /** @brief Writes the contact map to file in binary format
-    @param fileSave output file stream */
+    @param fileOut output file stream */
     void writeContactMemory_binary( ostream &fileOut );
 
     /** @brief Reads the contact map to file in plain 2014 format

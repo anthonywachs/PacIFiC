@@ -29,16 +29,27 @@ class TimeIntegrator
     virtual TimeIntegrator* clone() const = 0;
 
     /** @brief Computes the new velocity and position at time t+dt
-    @param vtrans translational velocity at time t
-    @param dUdt Translational velocity variation dU/dt
+    @param dUdt Translational acceleration dU/dt
+    @param vtrans translational velocity 
     @param transDisplacement translation displacement
-    @param dOmegadt Angular velocity variation dom/dt
-    @param vrot angular velocity at time t 
+    @param dOmegadt Angular ecceleration dom/dt
+    @param vrot angular velocity 
     @param meanVRot average angular velocity in interval [t,t+dt]
-    @param dt time step magnitude */        
-    virtual void Move( Vector3& vtrans, Vector3 const& dUdt,
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp displacement time step magnitude */        
+    virtual void Move( Vector3 const& dUdt, Vector3& vtrans, 
 	Vector3& transDisplacement, Vector3 const& dOmegadt,
-	Vector3& vrot, Vector3& meanVRot, double dt ) = 0;
+	Vector3& vrot, Vector3& meanVRot, double const& dt_particle_vel, 
+    	double const& dt_particle_disp ) = 0;
+
+    /** @brief Advances velocity over dt_particle_vel
+    @param dUdt Translational acceleration dU/dt
+    @param vtrans translational velocity 
+    @param dOmegadt Angular ecceleration dom/dt
+    @param vrot angular velocity 
+    @param dt_particle_vel velocity time step magnitude */
+    virtual void advanceVelocity( Vector3 const& dUdt, Vector3& vtrans, 
+	Vector3 const& dOmegadt, Vector3& vrot, double const& dt_particle_vel );
 
     /** @brief Copies kinematics at time t-2dt (translational velocity, angular 
     velocity, variation of translational velocity, variation of angular 

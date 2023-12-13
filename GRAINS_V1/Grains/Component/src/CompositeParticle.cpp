@@ -808,11 +808,13 @@ void CompositeParticle::composePositionRightByTransform( Transform const& t )
 
 // ----------------------------------------------------------------------------
 // Solves the Newton's law and move particle to their new position
-void CompositeParticle::Move( double time, double dt )
+void CompositeParticle::Move( double time, 
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp )
 {
   try{
   // Move the composite particle
-  Particle::Move( time, dt );
+  Particle::Move( time, dt_particle_vel, dt_particle_disp );
 
   // Update elementary particles' position
   setElementaryParticlesPosition();

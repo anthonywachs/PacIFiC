@@ -17,8 +17,8 @@ class Rectangle : public Convex
     /** @name Constructors */
     //@{
     /** @brief Constructor with edge length as input parameters
-    @param x edge length in x
-    @param y edge length in y */
+    @param LX edge length in x
+    @param LY edge length in y */
     Rectangle( double LX = 0., double LY = 0. );
 
     /** @brief Constructor with an input stream

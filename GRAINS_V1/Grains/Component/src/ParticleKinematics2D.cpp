@@ -52,8 +52,8 @@ ParticleKinematics* ParticleKinematics2D::clone() const
 
 // ----------------------------------------------------------------------------
 // Computes the momentum change over dt
-void ParticleKinematics2D::computeMomentumChangeOverDt( Torsor const& torseur,
-	double dt, Particle const* particle )
+void ParticleKinematics2D::computeAcceleration( Torsor const& torseur,
+	Particle const* particle )
 {
   // Values of the coupling factor:
   // 1) purely granular
