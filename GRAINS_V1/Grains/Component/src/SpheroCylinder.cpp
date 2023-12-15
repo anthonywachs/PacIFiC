@@ -156,7 +156,7 @@ SpheroCylinder::SpheroCylinder( DOMNode* root,
   m_elementaryParticles[2]->getRigidBody()
  	->composeLeftByTransform( *(m_geoRBWC->getTransform()) );
 
-  // Compute and set the the circumscribed radius
+  // Set the the circumscribed radius
   setCircumscribedRadius();
 
   // In case part of the particle acceleration computed explicity
@@ -652,8 +652,11 @@ void SpheroCylinder::writePositionInFluid( ostream& fluid )
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
 		pointEnvelope[Y] ) << " " <<
 	GrainsExec::doubleToString( ios::scientific, POSITIONFORMAT,
-		pointEnvelope[Z] ) << endl;
+		pointEnvelope[Z] ) << endl;	
   }
+  
+  // No faces
+  fluid << "0" << endl;
 }
 
 
@@ -698,4 +701,39 @@ void SpheroCylinder::read2014_binary( istream& fileIn,
 
   m_height = CompParticleRef->m_height;
   m_radius = CompParticleRef->m_radius;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes and sets the circumscribed radius
+void SpheroCylinder::setCircumscribedRadius()
+{
+  m_geoRBWC->setCircumscribedRadius( m_height / 2. + m_radius );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Saves additional features of a (in practice reference) composite particle
+// for reload
+void SpheroCylinder::writeAdditionalFeatures( ostream& fileSave ) const
+{
+  fileSave << endl << "*HeightAndRadius " << m_height << " " << m_radius;  
+  CompositeParticle::writeAdditionalFeatures( fileSave );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads additional features of a (in practice reference) composite particle
+// data from a stream
+void SpheroCylinder::readAdditionalFeatures( istream& fileIn )
+{
+  string buffer;
+  fileIn >> buffer >> m_height >> m_radius;
+  CompositeParticle::readAdditionalFeatures( fileIn );
 }

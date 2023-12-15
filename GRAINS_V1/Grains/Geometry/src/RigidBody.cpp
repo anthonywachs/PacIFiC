@@ -11,7 +11,7 @@
 // Default constructor
 RigidBody::RigidBody()
   : m_convex( NULL )
-  , m_circumscribedRadius( 0.0 )
+  , m_circumscribedRadius( 0. )
   , m_cylinder( BCylinder() )
 {}
 
@@ -377,7 +377,7 @@ void RigidBody::composeLeftByTranslation( Vector3 const& v )
 void RigidBody::readPosition( istream& fileIn )
 {
   fileIn >> m_transform;
-  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+//  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
 }
 
 
@@ -389,7 +389,7 @@ void RigidBody::readPosition( istream& fileIn )
 void RigidBody::readPosition2014( istream& fileIn )
 {
   m_transform.readTransform2014( fileIn );
-  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+//  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
 }
 
 
@@ -401,7 +401,7 @@ void RigidBody::readPosition2014( istream& fileIn )
 void RigidBody::readPosition2014_binary( istream& fileIn )
 {
   m_transform.readTransform2014_binary( fileIn );
-  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+//  m_circumscribedRadius = m_convex->computeCircumscribedRadius();
 }
 
 

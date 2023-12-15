@@ -177,7 +177,6 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
       m_allcomponents.computeParticlesAcceleration( m_time );
 
 
-
       // Update particle velocity over dt/2
       // v_i+1 = v_i+1/2 + a_i+1 * dt / 2 
       m_allcomponents.advanceParticlesVelocity( m_time, 0.5 * m_dt );

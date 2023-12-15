@@ -179,7 +179,26 @@ class SpheroCylinder : public CompositeParticle
 
 
   protected:
+    /**@name I/O methods */
+    //@{
+    /** @brief Saves additional features of a (in practice reference) composite
+    particle for reload
+    @param fileSave output stream */
+    void writeAdditionalFeatures( ostream& fileSave ) const;
 
+    /** @brief Reads additional features of a (in practice reference) particle
+    data from a stream
+    @param fileIn input stream */
+    void readAdditionalFeatures( istream& fileIn );
+    //@}
+    
+    
+    /** @name Methods */
+    //@{
+    /** @brief Computes and sets the circumscribed radius */
+    void setCircumscribedRadius();
+    //@}    
+    
 
   private:
     /** @name Parameters */

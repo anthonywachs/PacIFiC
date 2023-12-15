@@ -322,12 +322,12 @@ class CompositeParticle : public Particle
     /** @brief Saves additional features of a (in practice reference) composite
     particle for reload
     @param fileSave output stream */
-    void writeAdditionalFeatures( ostream& fileSave ) const;
+    virtual void writeAdditionalFeatures( ostream& fileSave ) const;
 
     /** @brief Reads additional features of a (in practice reference) particle
     data from a stream
     @param fileIn input stream */
-    void readAdditionalFeatures( istream& fileIn );
+    virtual void readAdditionalFeatures( istream& fileIn );
     //@}
 
 
@@ -337,7 +337,7 @@ class CompositeParticle : public Particle
     void BuildInertia();
 
     /** @brief Computes and sets the circumscribed radius */
-    void setCircumscribedRadius();
+    virtual void setCircumscribedRadius();
 
     /** @brief Sets the elementary particle position given the position of the
     composite particle */
