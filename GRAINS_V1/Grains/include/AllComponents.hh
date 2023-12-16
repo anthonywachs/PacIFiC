@@ -324,6 +324,10 @@ class AllComponents
     /** @brief Update all contact map entries in all particles
     and all elementary obstacles */
     void updateAllContactMaps();
+    
+    /** @brief Set all contact map entry features to zero in all particles
+    and all elementary obstacles */
+    void setAllContactMapFeaturesToZero();    
     //@}
 
 
@@ -449,7 +453,7 @@ bool removeParticleFromSet( set<Particle*>& pointersSet, Particle* value );
 of pointers to simple obstacle
 @param pointerslist simple obstaclr pointer list
 @param value pointer to delete */
-bool removeObstacleFromList( list<SimpleObstacle*> &pointerslist,
+bool removeObstacleFromList( list<SimpleObstacle*>& pointerslist,
 	SimpleObstacle* value );
 //@}
 

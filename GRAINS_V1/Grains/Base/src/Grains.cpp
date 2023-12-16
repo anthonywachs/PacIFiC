@@ -143,8 +143,12 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
       m_timeSave++;
       
   // In case of SecondOrderLeapFrog, initialize acceleration
-  if ( GrainsExec::m_TIScheme == "SecondOrderLeapFrog" )
+  if ( GrainsExec::m_TIScheme == "SecondOrderLeapFrog" && 
+  	!GrainsExec::m_isReloaded )
+  {
     computeParticlesForceAndAcceleration();
+    m_allcomponents.setAllContactMapFeaturesToZero();
+  }
 
   cout << "Initialization completed" << endl << endl;
   SCT_get_elapsed_time( "Initialization" );
@@ -532,6 +536,7 @@ void Grains::Construction( DOMElement* rootElement )
     if ( reload )
     {
       brestart = true;
+      GrainsExec::m_isReloaded = brestart;
 
       // Restart mode
       string reload_type = ReaderXML::getNodeAttr_String( reload, "Type" );

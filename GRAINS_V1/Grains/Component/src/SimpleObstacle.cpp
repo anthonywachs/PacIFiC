@@ -605,6 +605,16 @@ void SimpleObstacle::setContactMapToFalse()
 
 
 // ----------------------------------------------------------------------------
+// Set contact map entry features to zero
+void SimpleObstacle::setContactMapFeaturesToZero()
+{
+  Component::setContactMapFeaturesToZero();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Updates contact map
 void SimpleObstacle::updateContactMap()
 {
@@ -690,5 +700,16 @@ int SimpleObstacle::getContactMapSize()
 // change.
 void SimpleObstacle::updateContactMapId( int prev_id, int new_id )
 {
-  Component::updateContactMapId( prev_id, new_id);
+  Component::updateContactMapId( prev_id, new_id );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Displays the active neighbours in the format "my_elementary_id/neighbour_id/
+// neightbout_elementary_id ; ...". Useful for debugging only.
+void SimpleObstacle::printActiveNeighbors( int const& id )
+{
+  Component::printActiveNeighbors( id );
 }

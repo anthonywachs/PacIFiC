@@ -68,3 +68,52 @@ void SecondOrderLeapFrog::advanceVelocity( Vector3 const& dUdt, Vector3& vtrans,
   vrot += dOmegadt * dt_particle_vel;
 }
 
+
+
+
+// ----------------------------------------------------------------------------
+// Writes time integrator data in an output stream with a high
+// precision and 2014 format
+void SecondOrderLeapFrog::writeParticleKinematics2014( ostream& fileOut,
+    	Vector3 const& dUdt, Vector3 const& dOmegadt ) const
+{
+  fileOut << " "; 
+  dUdt.writeGroup3( fileOut ); 
+  fileOut << " "; 
+  dOmegadt.writeGroup3( fileOut );   
+} 
+
+
+
+  
+// ----------------------------------------------------------------------------
+// Writes time integrator data in an output stream with a binary and 2014 format
+void SecondOrderLeapFrog::writeParticleKinematics2014_binary( 
+	ostream& fileOut, Vector3& dUdt, Vector3& dOmegadt )
+{
+  dUdt.writeGroup3_binary( fileOut ); 
+  dOmegadt.writeGroup3_binary( fileOut );   
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads time integrator data from a stream in the 2014 format 
+void SecondOrderLeapFrog::readParticleKinematics2014( istream& StreamIN,
+    	Vector3& dUdt, Vector3& dOmegadt )
+{
+  StreamIN >> dUdt >> dOmegadt;
+} 
+
+
+
+  
+// ----------------------------------------------------------------------------
+// Reads time integrator data from a stream in a binary form in the 2014 format 
+void SecondOrderLeapFrog::readParticleKinematics2014_binary( 
+	istream& StreamIN, Vector3& dUdt, Vector3& dOmegadt )
+{
+  dUdt.readGroup3_binary( StreamIN ); 
+  dOmegadt.readGroup3_binary( StreamIN );   
+}

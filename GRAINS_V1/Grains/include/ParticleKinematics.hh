@@ -89,6 +89,10 @@ class ParticleKinematics : public Kinematics
     and 2014 format
     @param fileOut output stream */
     void writeParticleKinematics2014_binary( ostream& fileOut );
+
+    /** @brief Reads particle kinematics from a stream in the 2014 format 
+    @param StreamIN input stream */
+    void readParticleKinematics2014( istream& StreamIN ); 
   
     /** @brief Reads particle kinematics from a stream in a binary form in the
     2014 format 

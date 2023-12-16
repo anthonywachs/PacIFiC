@@ -31,7 +31,7 @@ struct ContactInfos
 
     @author G.FERRER - Institut Francais du Petrole - 2000 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring 
-    @author D. HUET - 2022 - Contact force model with memory */
+    @author D.HUET - 2022 - Contact force model with memory */
 // ============================================================================
 class Component
 {
@@ -136,6 +136,13 @@ class Component
   	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
 
+    /** @brief Updates the ids of the contact map: in the case of a reload with 
+    insertion, the obstacle's ids are reset. This function keeps track of that 
+    change.
+    @param prev_id previous id that should be updated
+    @param new_id updated id */
+    virtual void updateContactMapId( int prev_id, int new_id );
+
     /** @brief Writes the contact map information in an array of doubles
     @param destination the array of double where the contact map should be 
     stored
@@ -162,13 +169,6 @@ class Component
     Useful for debugging only.
     @param id id of this component */
     virtual void printActiveNeighbors( int const& id );
-
-    /** @brief Updates the ids of the contact map: in the case of a reload with 
-    insertion, the obstacle's ids are reset. This function keeps track of that 
-    change.
-    @param prev_id previous id that should be updated
-    @param new_id updated id */
-    void updateContactMapId( int prev_id, int new_id );
 
     /** @brief Returns whether a point lies inside the component
     @param pt point */
@@ -197,6 +197,9 @@ class Component
 
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
+    
+    /** @brief Set contact map entry features to zero */
+    virtual void setContactMapFeaturesToZero();     
     //@}
 
 

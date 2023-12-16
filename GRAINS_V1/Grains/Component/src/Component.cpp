@@ -825,6 +825,24 @@ void Component::updateContactMapId( int prev_id, int new_id )
 
 
 // ---------------------------------------------------------------------------
+// Set all contact map entry features to zero in all particles
+// and all elementary obstacles
+void Component::setContactMapFeaturesToZero()
+{
+  map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
+    ::iterator it;
+  for(it=m_contactMap.begin();it!=m_contactMap.end();++it)
+  {
+    get<1>(it->second).reset();
+    get<2>(it->second).reset();   
+    get<3>(it->second).reset();        
+  }
+}
+
+
+
+
+// ---------------------------------------------------------------------------
 // Reads the contact map to file in plain 2014 format
 void Component::readContactMap_2014( istream &fileSave )
 {

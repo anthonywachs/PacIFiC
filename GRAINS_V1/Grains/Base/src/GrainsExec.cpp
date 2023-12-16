@@ -8,6 +8,7 @@ bool GrainsExec::m_MPI = false;
 string GrainsExec::m_TIScheme = "SecondOrderLeapFrog";
 bool GrainsExec::m_SphereAsPolyParaview = false;
 int GrainsExec::m_MPI_verbose = 2;
+bool GrainsExec::m_isReloaded = false;
 string GrainsExec::m_ReloadType = "new" ;
 Vector3 GrainsExec::m_vgravity = Vector3Nul;
 Vector3* GrainsExec::m_translationParaviewPostProcessing = NULL ;

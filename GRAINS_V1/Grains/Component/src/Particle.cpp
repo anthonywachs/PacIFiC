@@ -992,7 +992,7 @@ void Particle::read2014( istream& fileIn, vector<Particle*> const*
   if ( m_kinematics ) delete m_kinematics;
   m_kinematics = KinematicsBuilderFactory::create(
   	m_geoRBWC->getConvex() );
-  fileIn >> *m_kinematics;
+  m_kinematics->readParticleKinematics2014( fileIn );;
 
   // In case part of the particle acceleration is computed explicity
   if ( Particle::m_splitExplicitAcceleration ) createVelocityInfosNm1();

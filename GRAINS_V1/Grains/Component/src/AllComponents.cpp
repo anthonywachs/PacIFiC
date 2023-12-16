@@ -1576,6 +1576,24 @@ void AllComponents::updateAllContactMaps()
 
 
 // ----------------------------------------------------------------------------
+// Set all contact map entry features to zero in all particles
+// and all elementary obstacles */
+void AllComponents::setAllContactMapFeaturesToZero()
+{
+  for (list<Particle*>::iterator particle=m_ActiveParticles.begin();
+	particle!=m_ActiveParticles.end();particle++)
+    (*particle)->setContactMapFeaturesToZero();
+
+  list<SimpleObstacle*> obstacles = m_obstacle->getObstacles();
+  list<SimpleObstacle*>::iterator myObs;
+  for( myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++ )
+    (*myObs)->setContactMapFeaturesToZero();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns the number of inactive particles
 size_t AllComponents::getNumberInactiveParticles() const
 {

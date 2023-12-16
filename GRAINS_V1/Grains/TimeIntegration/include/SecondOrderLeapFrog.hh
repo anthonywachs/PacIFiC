@@ -52,6 +52,37 @@ class SecondOrderLeapFrog : public TimeIntegrator
     @param dt_particle_vel velocity time step magnitude */
     void advanceVelocity( Vector3 const& dUdt, Vector3& vtrans, 
 	Vector3 const& dOmegadt, Vector3& vrot, double const& dt_particle_vel );
+
+    /** @brief Writes time integrator data in an output stream with a high
+    precision and 2014 format
+    @param fileOut output stream 
+    @param dUdt particle translational acceleration 
+    @param dOmegadt particle angular acceleration */
+    void writeParticleKinematics2014( ostream& fileOut,
+    	Vector3 const& dUdt, Vector3 const& dOmegadt ) const; 
+  
+    /** @brief Writes time integrator data in an output stream with a binary 
+    and 2014 format
+    @param fileOut output stream 
+    @param dUdt particle translational acceleration 
+    @param dOmegadt particle angular acceleration */
+    virtual void writeParticleKinematics2014_binary( ostream& fileOut,
+    	Vector3& dUdt, Vector3& dOmegadt );
+
+    /** @brief Reads time integrator data from a stream in the 2014 format 
+    @param StreamIN input stream 
+    @param dUdt particle translational acceleration 
+    @param dOmegadt particle angular acceleration */
+    void readParticleKinematics2014( istream& StreamIN,
+    	Vector3& dUdt, Vector3& dOmegadt ); 
+  
+    /** @brief Reads time integrator data from a stream in a binary form in the
+    2014 format 
+    @param StreamIN input stream 
+    @param dUdt particle translational acceleration 
+    @param dOmegadt particle angular acceleration */
+    void readParticleKinematics2014_binary( istream& StreamIN,
+    	Vector3& dUdt, Vector3& dOmegadt );
     //@}
 
 

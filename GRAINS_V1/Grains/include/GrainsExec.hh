@@ -253,6 +253,8 @@ class GrainsExec
     	faceted as polyhedrons, false if post-processed as a vectorial field */
     static int m_MPI_verbose; /**< MPI verbosity level, 3 levels: 0=none,
     	1=particles, 2=particles+contact */
+    static bool m_isReloaded; /**< whether the simulation starts from a reload 
+    	state */ 
     static string m_ReloadType; /**< Reload type: "new" for a new simulation and
     	 "same" for an on-going simulation */
     static Vector3 m_vgravity; /**< gravity vector */

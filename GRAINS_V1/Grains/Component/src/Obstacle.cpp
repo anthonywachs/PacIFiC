@@ -431,6 +431,19 @@ void Obstacle::setContactMapToFalse()
 
 
 // ----------------------------------------------------------------------------
+// Set contact map entry features to zero */
+void Obstacle::setContactMapFeaturesToZero()
+{
+  cout << "Warning when calling Obstacle::setContactMapFeaturesToZero() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Updates contact map
 void Obstacle::updateContactMap()
 {
@@ -444,22 +457,27 @@ void Obstacle::updateContactMap()
 
 
 // ----------------------------------------------------------------------------
-// Does the contact exist in the map, if yes return the pointer to the
-// cumulative tangential displacement
-bool Obstacle::ContactInMapIsActive( double*& tangentialDepl, int const& id )
+// Does the contact exist in the map? If so, return true and make
+// kdelta, prev_normal and cumulSpringTorque point to the memorized info. 
+// Otherwise, return false and set those pointers to NULL.
+bool Obstacle::getContactMemory( std::tuple<int,int,int> const& id,
+  	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+  	bool createContact )
 {
-  cout << "Warning when calling Obstacle::ContactInMapIsActive() "
+  cout << "Warning when calling Obstacle::getContactMemory() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);
-}
+}	
 
 
 
 
 // ----------------------------------------------------------------------------
 // Adds new contact in the map
-void Obstacle::addNewContactInMap( double const& tangentialDepl, int const& id )
+void Obstacle::addNewContactInMap( std::tuple<int,int,int> const& id,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque )
 {
   cout << "Warning when calling Obstacle::addNewContactInMap() "
        << "\nShould not go into this class !\n"
@@ -472,10 +490,81 @@ void Obstacle::addNewContactInMap( double const& tangentialDepl, int const& id )
 
 // ----------------------------------------------------------------------------
 // Increases cumulative tangential displacement with component id
-void Obstacle::addDeplContactInMap( double const& tangentialDepl,
-	int const& id )
+void Obstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque )
 {
   cout << "Warning when calling Obstacle::addDeplContactInMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Updates the ids of the contact map: in the case of a reload with 
+// insertion, the obstacle's ids are reset. This function keeps track of that 
+// change.
+void Obstacle::updateContactMapId( int prev_id, int new_id )
+{
+  cout << "Warning when calling Obstacle::updateContactMapId() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes the contact map information in an array of doubles
+void Obstacle::copyHistoryContacts( double* &destination, int start_index )
+{
+  cout << "Warning when calling Obstacle::copyHistoryContacts() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Adds a single contact info to the contact map
+void Obstacle::copyContactInMap( std::tuple<int,int,int> const& id,
+  	bool const& isActive, Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque )
+{
+  cout << "Warning when calling Obstacle::copyContactInMap() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}	
+	
+	
+	
+
+// ----------------------------------------------------------------------------
+// Returns the number of contacts in the contact map */
+int Obstacle::getContactMapSize()
+{
+  cout << "Warning when calling Obstacle::getContactMapSize() "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Displays the active neighbours in the format "my_elementary_id/neighbour_id/
+// neightbout_elementary_id ; ...". Useful for debugging only.
+void Obstacle::printActiveNeighbors( int const& id )
+{
+  cout << "Warning when calling Obstacle::printActiveNeighbors() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);

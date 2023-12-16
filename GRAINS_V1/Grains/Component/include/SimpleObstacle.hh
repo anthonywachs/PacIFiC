@@ -223,6 +223,12 @@ class SimpleObstacle : public Obstacle
 
     /** @brief Returns the number of contacts in the contact map */
     virtual int getContactMapSize();
+    
+    /** @brief Displays the active neighbours in the 
+    format "my_elementary_id/neighbour_id/neightbout_elementary_id ; ...". 
+    Useful for debugging only.
+    @param id id of this component */
+    virtual void printActiveNeighbors( int const& id );    
     //@}
     
 
@@ -230,6 +236,9 @@ class SimpleObstacle : public Obstacle
     //@{
     /** @brief Initializes all contact map entries to false */
     void setContactMapToFalse();
+    
+    /** @brief Set contact map entry features to zero */
+    void setContactMapFeaturesToZero();     
 
     /** @brief Sets the frequency at which the obstacle link to
     the cells of the linked-cell grid is updated

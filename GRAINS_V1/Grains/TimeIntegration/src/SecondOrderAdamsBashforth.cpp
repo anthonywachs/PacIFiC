@@ -93,3 +93,62 @@ void SecondOrderAdamsBashforth::setKinematicsNm2(double const* tab)
   for (int j=0 ;j<3; j++) m_dUdt_nm2[j] = tab[j+6];  
   for (int j=0 ;j<3; j++) m_dOmegadt_nm2[j] = tab[j+9];   
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes time integrator data in an output stream with a high
+// precision and 2014 format
+void SecondOrderAdamsBashforth::writeParticleKinematics2014( ostream& fileOut,
+    	Vector3 const& dUdt, Vector3 const& dOmegadt ) const
+{
+  fileOut << " "; 
+  m_translationalVelocity_nm2.writeGroup3( fileOut ); 
+  fileOut << " "; 
+  m_angularVelocity_nm2.writeGroup3( fileOut ); 
+  fileOut << " ";  
+  m_dUdt_nm2.writeGroup3( fileOut ); 
+  fileOut << " ";  
+  m_dOmegadt_nm2.writeGroup3( fileOut );    
+} 
+
+
+
+  
+// ----------------------------------------------------------------------------
+// Writes time integrator data in an output stream with a binary and 2014 format
+void SecondOrderAdamsBashforth::writeParticleKinematics2014_binary( 
+	ostream& fileOut, Vector3& dUdt, Vector3& dOmegadt )
+{
+  m_translationalVelocity_nm2.writeGroup3_binary( fileOut ); 
+  m_angularVelocity_nm2.writeGroup3_binary( fileOut );   
+  m_dUdt_nm2.writeGroup3_binary( fileOut );  
+  m_dOmegadt_nm2.writeGroup3_binary( fileOut );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads time integrator data from a stream in the 2014 format 
+void SecondOrderAdamsBashforth::readParticleKinematics2014( istream& StreamIN,
+    	Vector3& dUdt, Vector3& dOmegadt )
+{
+  StreamIN >> m_translationalVelocity_nm2 >> m_angularVelocity_nm2
+  	>> m_dUdt_nm2 >> m_dOmegadt_nm2;
+} 
+
+
+
+  
+// ----------------------------------------------------------------------------
+// Reads time integrator data from a stream in a binary form in the 2014 format 
+void SecondOrderAdamsBashforth::readParticleKinematics2014_binary( 
+	istream& StreamIN, Vector3& dUdt, Vector3& dOmegadt )
+{
+  m_translationalVelocity_nm2.readGroup3_binary( StreamIN ); 
+  m_angularVelocity_nm2.readGroup3_binary( StreamIN );   
+  m_dUdt_nm2.readGroup3_binary( StreamIN );  
+  m_dOmegadt_nm2.readGroup3_binary( StreamIN );
+}

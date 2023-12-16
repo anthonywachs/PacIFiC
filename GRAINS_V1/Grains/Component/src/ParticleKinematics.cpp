@@ -267,7 +267,9 @@ void ParticleKinematics::writeParticleKinematics2014( ostream& fileOut ) const
   fileOut << " ";  
   m_QuaternionRotation.writeQuaternion( fileOut ); 
   fileOut << " "; 
-  m_dQuaternionRotationdt.writeQuaternion( fileOut ); 
+  m_dQuaternionRotationdt.writeQuaternion( fileOut );
+  m_timeIntegrationScheme->writeParticleKinematics2014( fileOut,
+    	m_dUdt, m_dOmegadt ); 
 }
 
 
@@ -279,7 +281,9 @@ void ParticleKinematics::writeParticleKinematics2014_binary( ostream &fileOut )
 {
   m_translationalVelocity.writeGroup3_binary( fileOut ); 
   m_QuaternionRotation.writeQuaternion_binary( fileOut ); 
-  m_dQuaternionRotationdt.writeQuaternion_binary( fileOut );   
+  m_dQuaternionRotationdt.writeQuaternion_binary( fileOut );
+  m_timeIntegrationScheme->writeParticleKinematics2014_binary( fileOut,
+    	m_dUdt, m_dOmegadt );      
 }
 
 
@@ -304,6 +308,24 @@ istream& operator >> ( istream& fileIn, ParticleKinematics& cinematique )
 
 // ----------------------------------------------------------------------------
 // Reads particle kinematics from a stream in a binary form in the 2014 format
+void ParticleKinematics::readParticleKinematics2014( istream &StreamIN )
+{
+  StreamIN >> m_translationalVelocity
+	 >> m_QuaternionRotation
+	 >> m_dQuaternionRotationdt;
+
+  m_angularVelocity = 2.0 * m_dQuaternionRotationdt.multConjugateToVector3( 
+  	m_QuaternionRotation );
+	
+  m_timeIntegrationScheme->readParticleKinematics2014( StreamIN,
+    	m_dUdt, m_dOmegadt );     
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads particle kinematics from a stream in a binary form in the 2014 format
 void ParticleKinematics::readParticleKinematics2014_binary( istream &StreamIN )
 {
   m_translationalVelocity.readGroup3_binary( StreamIN );
@@ -311,7 +333,10 @@ void ParticleKinematics::readParticleKinematics2014_binary( istream &StreamIN )
   m_dQuaternionRotationdt.readQuaternion_binary( StreamIN );
 
   m_angularVelocity = 2.0 * m_dQuaternionRotationdt.multConjugateToVector3( 
-  	m_QuaternionRotation );  
+  	m_QuaternionRotation );
+	
+  m_timeIntegrationScheme->readParticleKinematics2014_binary( StreamIN,
+    	m_dUdt, m_dOmegadt );   
 } 
 
 
