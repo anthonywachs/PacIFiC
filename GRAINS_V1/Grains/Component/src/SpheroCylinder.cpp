@@ -150,7 +150,7 @@ SpheroCylinder::SpheroCylinder( DOMNode* root, int const& pc )
   m_InitialRelativePositions[2][Z] = 0.;  
   m_elementaryParticles[2]->setPosition( m_InitialRelativePositions[2] );  
   m_elementaryParticles[2]->setMasterParticle( this );
-  m_InitialRotationMatrices[2] = m_elementaryParticles[1]->getRigidBody()
+  m_InitialRotationMatrices[2] = m_elementaryParticles[2]->getRigidBody()
 	->getTransform()->getBasis();
   m_elementaryParticles[2]->getRigidBody()
  	->composeLeftByTransform( *(m_geoRBWC->getTransform()) );
@@ -201,8 +201,11 @@ SpheroCylinder::SpheroCylinder( int const& id_,
 	Quaternion const& qrot,
 	Vector3 const& vrot,
 	Transform const& config,
-	ParticleActivity const& activ )
-  : CompositeParticle( id_, ParticleRef, vtrans, qrot, vrot, config, activ )
+	ParticleActivity const& activ,
+     	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap )
+  : CompositeParticle( id_, ParticleRef, vtrans, qrot, vrot, config, activ,
+  	contactMap )
 {
   m_specific_composite_shape = "SpheroCylinder";
   SpheroCylinder const* SpheroCylRef =
@@ -261,10 +264,12 @@ Particle* SpheroCylinder::createCloneCopy( bool const& autonumbering ) const
 Particle* SpheroCylinder::createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,
-	Transform const& config, ParticleActivity const& activ ) const
+	Transform const& config, ParticleActivity const& activ,
+	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap ) const
 {
   Particle* particle = new SpheroCylinder( id_, ParticleRef, vtrans,
-	qrot, vrot, config, activ );
+	qrot, vrot, config, activ, contactMap );
 
   return ( particle );
 }

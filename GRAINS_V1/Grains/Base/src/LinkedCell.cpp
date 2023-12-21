@@ -1309,7 +1309,6 @@ void LinkedCell::ComputeForces( double time, double dt,
   Cell* cell_;
   list<Particle*> neighborparticles;
   list<SimpleObstacle*>::iterator myObs;
-//  bool tagNotTwo = false;  
 
   // Particle-particle contacts
   Point3 centre;
@@ -1322,7 +1321,6 @@ void LinkedCell::ComputeForces( double time, double dt,
        particle++)
   {
     reference = *particle;
-//    tagNotTwo = ( reference->getTag() != 2 );
 
     // Search for neighboring particle
     // In the local cell: we only detect collisions with neighboring particles
@@ -1354,13 +1352,12 @@ void LinkedCell::ComputeForces( double time, double dt,
     // the calling object is always the composite particle
     for( neighborp=neighborparticles.begin();
     	neighborp!=neighborparticles.end(); neighborp++ )
-//      if ( tagNotTwo || (*neighborp)->getTag() != 2 )
-      {
-        if( (*neighborp)->isCompositeParticle() )
-          (*neighborp)->InterAction( reference, dt, time, this );
-        else
-          reference->InterAction( *neighborp, dt, time, this );
-      }
+    {
+      if( (*neighborp)->isCompositeParticle() )
+        (*neighborp)->InterAction( reference, dt, time, this );
+      else
+        reference->InterAction( *neighborp, dt, time, this );
+    }
 
     neighborparticles.clear();
 
@@ -1368,15 +1365,14 @@ void LinkedCell::ComputeForces( double time, double dt,
     // obstacles and force computation
     // In case of a composite particle, we swap neighbor and reference such that
     // the calling object is always the composite particle
-//    if ( tagNotTwo )
-      for( myObs=cell_->m_obstacles.begin();
+    for( myObs=cell_->m_obstacles.begin();
          myObs!=cell_->m_obstacles.end(); myObs++ )
-      {
-        if ( reference->isCompositeParticle() )
-          reference->InterAction( *myObs, dt, time, this );
-        else
-          (*myObs)->InterAction( reference, dt, time, this );
-      }
+    {
+      if ( reference->isCompositeParticle() )
+        reference->InterAction( *myObs, dt, time, this );
+      else
+        (*myObs)->InterAction( reference, dt, time, this );
+    }
   }
 }
 
@@ -2218,7 +2214,7 @@ bool LinkedCell::insertParticleSerial( Particle* particle,
 		*(particle->getQuaternionRotation()),
 		*(particle->getAngularVelocity()),
 		*(particle->getRigidBody()->getTransform()),
-		COMPUTE );
+		COMPUTE, particle->getContactMap() );
 
 	// Translate to its periodic position
 	clone->Translate( m_domain_global_periodic_vectors[
@@ -2401,7 +2397,7 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
 		*((*particle)->getQuaternionRotation()),
 		*((*particle)->getAngularVelocity()),
 		*((*particle)->getRigidBody()->getTransform()),
-		COMPUTE );
+		COMPUTE, (*particle)->getContactMap() );
 
 	    // Translate to its periodic position
 	    periodic_clone->Translate( m_domain_global_periodic_vectors[
@@ -2473,7 +2469,7 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
 			*((*particle)->getQuaternionRotation()),
 			*((*particle)->getAngularVelocity()),
 			*((*particle)->getRigidBody()->getTransform()),
-			COMPUTE );
+			COMPUTE, (*particle)->getContactMap() );
 
 	        // Translate to its periodic position
 	        periodic_clone->Translate( m_domain_global_periodic_vectors[
@@ -2565,7 +2561,7 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
 		*((*particle)->getQuaternionRotation()),
 		*((*particle)->getAngularVelocity()),
 		*((*particle)->getRigidBody()->getTransform()),
-		COMPUTE );
+		COMPUTE, (*particle)->getContactMap() );
 
 	    // Translate to its periodic position
 	    periodic_clone->Translate( m_domain_global_periodic_vectors[

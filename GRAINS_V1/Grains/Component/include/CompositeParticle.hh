@@ -68,13 +68,16 @@ class CompositeParticle : public Particle
     @param vrot angular velocity
     @param qrot rotation quaternion
     @param config particle transformation
-    @param activ particle activity */
+    @param activ particle activity 
+    @param contactMap contact map */
     CompositeParticle( int const& id_, Particle const* ParticleRef,
 	Vector3 const& vtrans,
 	Quaternion const& qrot,
 	Vector3 const& vrot,
 	Transform const& config,
-	ParticleActivity const& activ );
+	ParticleActivity const& activ,
+     	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap );
 
     /** @brief Copy constructor (the torsor is initialized to 0)
     @param other copied CompositeParticle object
@@ -116,7 +119,10 @@ class CompositeParticle : public Particle
     Particle* createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,
-	Transform const& config, ParticleActivity const& activ ) const ;
+	Transform const& config, ParticleActivity const& activ,
+	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap ) 
+	const ;
 
     /** @brief Sets the boolean that tells that the rigid body's transformation
     with the scaling by the crust thickness to shrink the rigid bodies has

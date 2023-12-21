@@ -226,8 +226,10 @@ CompositeParticle::CompositeParticle( int const& id_,
 	Quaternion const& qrot,
 	Vector3 const& vrot,
 	Transform const& config,
-	ParticleActivity const& activ )
-  : Particle( id_, ParticleRef, vtrans, qrot, vrot, config, activ )
+	ParticleActivity const& activ,
+     	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap )
+  : Particle( id_, ParticleRef, vtrans, qrot, vrot, config, activ, contactMap )
 {
   // We know that ParticleRef points to a CompositeParticle, such that
   // we can dynamic cast it to actual type and use -> instead of using
@@ -316,10 +318,12 @@ Particle* CompositeParticle::createCloneCopy( bool const& autonumbering ) const
 Particle* CompositeParticle::createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,
-	Transform const& config, ParticleActivity const& activ ) const
+	Transform const& config, ParticleActivity const& activ,
+	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap ) const
 {
   Particle* particle = new CompositeParticle( id_, ParticleRef, vtrans,
-	qrot, vrot, config, activ );
+	qrot, vrot, config, activ, contactMap );
 
   return ( particle );
 }

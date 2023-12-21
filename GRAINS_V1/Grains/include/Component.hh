@@ -261,6 +261,11 @@ class Component
 
     /** @brief Returns the particle class */
     virtual int getGeometricType() const;
+    
+    /** @brief Returns a pointer to the contact map */
+    map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* getContactMap()
+	const;    
     //@}
 
 
@@ -471,7 +476,7 @@ class Component
     Torsor m_torsor; /**< Torsor of forces exerted on the component at its 
     	center of mass */
     ConfigurationMemento *m_memento; /**< To store the component features */
-    map < std::tuple<int,int,int>,
+    map< std::tuple<int,int,int>,
      	std::tuple<bool, Vector3, Vector3, Vector3> > m_contactMap; /** List of 
      	active contacts with other components. It reads as follows:
     	map<tuple<own elementary particle id, neighbour id, neighbour elementary

@@ -50,6 +50,8 @@ Component::Component( Component const& copy, bool const& autonumbering )
   else m_id = -1;
 
   m_geoRBWC = new RigidBodyWithCrust( *copy.m_geoRBWC );
+  
+  if ( copy.m_contactMap.size() ) m_contactMap = copy.m_contactMap;    
 }
 
 
@@ -1008,3 +1010,15 @@ bool Component::isIn( Point3 const& pt ) const
 {
   return ( m_geoRBWC->isIn( pt ) );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a pointer to the contact map */
+map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* 
+	Component::getContactMap() const
+{
+  return ( &m_contactMap );
+}	  

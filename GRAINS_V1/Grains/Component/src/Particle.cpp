@@ -285,11 +285,11 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
 // ----------------------------------------------------------------------------
 // Constructor with input parameters
 Particle::Particle( int const& id_, Particle const* ParticleRef,
-	Vector3 const& vtrans,
-	Quaternion const& qrot,
-	Vector3 const& vrot,
-	Transform const& config,
-	ParticleActivity const& activ )
+	Vector3 const& vtrans, Quaternion const& qrot,
+	Vector3 const& vrot, Transform const& config,
+	ParticleActivity const& activ,
+     	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap )
   : Component( false )
   , m_masterParticle( this )
   , m_kinematics( NULL )
@@ -333,6 +333,9 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
     m_inertia[i] = ParticleRef->m_inertia[i];
     m_inertia_1[i] = ParticleRef->m_inertia_1[i];
   }
+  
+  // Contact map
+  if ( contactMap->size() ) m_contactMap = *contactMap;   
 
   // Weight
   computeWeight();
@@ -364,15 +367,17 @@ Particle* Particle::createCloneCopy( bool const& autonumbering ) const
 // constructor Particle( int const& id_, Particle const* ParticleRef, Vector3
 // const& vtrans, Quaternion const& qrot, Vector3 const& vrot,	Transform
 // const& config, ParticleActivity const& activ ) and is used for periodic
-// clone particles to be inserted in the simulation. Numbering is set with the
-// parameter id_ and total number of components left unchanged.
+// clone particles to be inserted in the simulation. Autonumbering
+// is set to false and numbering is set with the parameter id_
 Particle* Particle::createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,
-	Transform const& config, ParticleActivity const& activ ) const
+	Transform const& config, ParticleActivity const& activ,
+     	map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap ) const
 {
   Particle* particle = new Particle( id_, ParticleRef, vtrans,
-	qrot, vrot, config, activ );
+	qrot, vrot, config, activ, contactMap );
 
   return ( particle );
 }
