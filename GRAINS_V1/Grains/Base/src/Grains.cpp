@@ -509,7 +509,7 @@ void Grains::Construction( DOMElement* rootElement )
   // Domain decomposition
   readDomainDecomposition( root, mx - ox, my - oy, mz - oz );
 
-  cout << "XXX = " << Component::getNbCreatedComponents() << endl;
+
   // Display domain size
   if ( m_rank == 0 )
   {
