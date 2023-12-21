@@ -234,8 +234,6 @@ void Grains::Simulation( double time_interval )
   SCT_insert_app( "LinkUpdate" );
   SCT_insert_app( "OutputResults" );
 
-  cout << "XXX = " << Component::getNbCreatedComponents() << endl;
-
   // Simulation: time marching algorithm
   cout << "Time \t TO \tend \tParticles \tIn \tOut" << endl;
   while ( m_tend - m_time > 0.01 * m_dt )
