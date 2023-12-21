@@ -120,40 +120,36 @@ bool HODCContactForceModel::computeForces( Component* p0_,
 	LinkedCell* LC,
 	double dt, int nbContact )
 {
-  bool compute = true ;
-
-  // Pour les particles composite, on calcule la moyenne des forces appliquees
-  // a chaque point de contact. Par defaut nbContact = 1 (particles convexes)
+  // In the case of composite particles, we compute the average of the 
+  // contact force over all contact points between two rigid bodies
+  // By default, nbContact = 1
   double coef = 1. / double( nbContact );
   
-  // Pour les particles composites, on renvoie la reference du composite
-  // et non celle des particles elementaires
+  // In the case of composite particles, we use the composite particle not the
+  // elemetary particles
   Component* ref_p0_ = p0_->getMasterComponent() ;
   Component* ref_p1_ = p1_->getMasterComponent() ; 
 
-  if ( compute  )
-  {
-    Vector3 delFN, delFT, delM; 
-    Point3 geometricPointOfContact = contactInfos.getContact();
+  Vector3 delFN, delFT, delM; 
+  Point3 geometricPointOfContact = contactInfos.getContact();
 
-    // Calcul des forces & moments de contact
-    performForcesCalculus( ref_p0_, ref_p1_, contactInfos, delFN, delFT, delM );
+  // Compute contact force and torque
+  performForcesCalculus( ref_p0_, ref_p1_, contactInfos, delFN, delFT, delM );
 
-    // Component p0_
-    ref_p0_->addForce( geometricPointOfContact, coef * (delFN + delFT) );
-    if ( k_m_s ) ref_p0_->addTorque( delM * coef );     
+  // Component p0_
+  ref_p0_->addForce( geometricPointOfContact, coef * (delFN + delFT) );
+  if ( k_m_s ) ref_p0_->addTorque( delM * coef );     
     
-    // Component p1_
-    ref_p1_->addForce( geometricPointOfContact, coef * ( - delFN - delFT ) );
-    if ( k_m_s ) ref_p1_->addTorque( - delM * coef );
+  // Component p1_
+  ref_p1_->addForce( geometricPointOfContact, coef * ( - delFN - delFT ) );
+  if ( k_m_s ) ref_p1_->addTorque( - delM * coef );
     
-    // Force postprocessing
-    if ( GrainsExec::m_output_data_at_this_time )
-      LC->addPPForce( geometricPointOfContact, coef * (delFN + delFT),
+  // Force postprocessing
+  if ( GrainsExec::m_output_data_at_this_time )
+    LC->addPPForce( geometricPointOfContact, coef * (delFN + delFT),
 	ref_p0_, ref_p1_ );            
-  }
   
-  return ( compute ) ;  
+  return ( true ) ;  
 }
 
 

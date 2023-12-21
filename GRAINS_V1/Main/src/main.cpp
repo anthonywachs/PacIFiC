@@ -62,6 +62,11 @@ int main( int argc, char *argv[] )
 
     // Delete the Grains application
     delete grains;
+    
+    if ( Component::getNbCreatedComponents() )
+      cout << "Warning: " << Component::getNbCreatedComponents()
+      	<< " component(s) was/were not properly destroyed on proc " << rankproc 
+	<< endl;
   }
 
   // Close all MPI apps

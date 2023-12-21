@@ -44,11 +44,6 @@ class Obstacle : public Component
     @param autonumbering obstacle autonumbering */
     Obstacle( string const& s = "obstacle", bool const& autonumbering = true );
 
-    /** @brief Copy constructor from a Component
-    @param copy copied Component
-    @param s obstacle name */
-    Obstacle( Component& copy, char const* s = "obstacle" );
-
     /** @brief Destructor */
     virtual ~Obstacle();
     //@}
@@ -396,6 +391,16 @@ class Obstacle : public Component
 	cases */
     static bool m_isConfinement; /**< true if imposed force */
   //@}
+  
+  
+  private:
+    /** @name Constructors */
+    //@{
+    /** @brief Copy constructor
+    @param copy copied Obstacle
+    @param s obstacle name */
+    Obstacle( Obstacle const& copy );
+    //@}      
 
 };
 

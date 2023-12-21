@@ -393,27 +393,30 @@ class Component
 
     /** @brief Writes the contact map to file in plain 2014 format
     @param fileSave output file stream */
-    void writeContactMemory_2014( ostream &fileSave ) const;
+    void writeContactMemory2014( ostream &fileSave ) const;
 
     /** @brief Writes the contact map to file in binary format
     @param fileOut output file stream */
-    void writeContactMemory_binary( ostream &fileOut );
+    void writeContactMemory2014_binary( ostream &fileOut );
 
     /** @brief Reads the contact map to file in plain 2014 format
     @param fileSave input file stream */
-    void readContactMap_2014( istream &fileSave );
+    void readContactMap2014( istream &fileSave );
 
     /** @brief Reads the contact map to file in binary format
     @param fileSave input file stream */
-    void readContactMap_binary( istream &fileSave );
+    void readContactMap2014_binary( istream &fileSave );
     //@}
 
 
     /** @name Static methods */
     //@{
-    /** @brief Resets the number of created components to nb_
-    @param nb_ number of created components */
-    static void setNbCreatedComponents( const int &nb_ );
+    /** @brief Resets the maximum ID number of a component for autonumbering
+    @param maxID_ maximum ID number */
+    static void setMaxIDnumber( int const& maxID_ );
+    
+    /** @brief Returns the maximum ID number of a component */
+    static int getMaxIDnumber();    
 
     /** @brief Returns the number of created components  */
     static int getNbCreatedComponents();
@@ -437,11 +440,13 @@ class Component
     /** @brief Default constructor
     @param autonumbering whether to increase the number of created components or
     not */
-    Component( bool const& autonumbering = true );
+    Component( bool const& autonumbering );
 
-    /** @brief Copy constructor
-    @param copy copied Component object */
-    Component( Component const& copy );
+    /** @brief Copy constructor 
+    @param copy copied Component object 
+    @param autonumbering whether to increase the number of created components or
+    not */
+    Component( Component const& copy, bool const& autonumbering );
     //@}
 
 
@@ -453,7 +458,7 @@ class Component
 
     /** @brief Writes the component's "static" data
     @param fileOut output stream */
-    virtual void writeStatic( ostream& fileOut ) const;
+    virtual void writeStatic( ostream& fileOut ) const;    
     //@}
 
 
@@ -474,6 +479,7 @@ class Component
 	dispacement, previous normal vector, kr * cumulative rotational 
 	displacement> > */
     static int m_nb; /**< Number of created components */
+    static int m_maxID; /**< Maximum ID number */
     //@}
 };
 

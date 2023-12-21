@@ -35,20 +35,6 @@ class SimpleObstacle : public Obstacle
     @param root XML node */
     SimpleObstacle( DOMNode* root );
 
-    /** @brief Copy constructor from a Component
-    @param copy copied Component
-    @param s obstacle name */
-    SimpleObstacle( Component& copy, char const* s = "obstacle" );
-
-    /** @brief Constructor with a rigid body, a name and a material as input
-    parameters
-    @param geoRBWC rigid body
-    @param name obstacle name
-    @param materialName material name
-    @param transferToFluid_ whether the obstacle is transferred to the fluid */
-    SimpleObstacle( RigidBodyWithCrust* geoRBWC, string const& name = "",
-      string const& materialName = "", bool const& transferToFluid_ = false );
-
     /** @brief Destructor */
     ~SimpleObstacle();
     //@}
@@ -322,6 +308,15 @@ class SimpleObstacle : public Obstacle
   	solver or not in case of coupling to a fluid solver */
     //@}
 
+
+  private:
+    /** @name Constructors */
+    //@{
+    /** @brief Copy constructor
+    @param copy copied SimpleObstacle
+    @param s obstacle name */
+    SimpleObstacle( SimpleObstacle const& copy );
+    //@}   
 };
 
 #endif

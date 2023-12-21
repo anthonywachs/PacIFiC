@@ -20,17 +20,17 @@ class CompositeParticle : public Particle
     //@{
     /** @brief Constructor with autonumbering as input parameter
     @param autonumbering whether to increment the component indexing */
-    CompositeParticle( bool const& autonumbering = true );
+    CompositeParticle( bool const& autonumbering );
 
     /** @brief Constructor with an XML node as an input parameter. This
-    constructor is expected to be used for reference composite particles
+    constructor is expected to be used for reference composite particles.
+    Autonumbering is set to false
     @param root XML node
-    @param autonumbering whether to increment the component indexing
     @param pc particle class */
-    CompositeParticle( DOMNode* root, bool const& autonumbering = true,
-  	int const& pc = 0 );
+    CompositeParticle( DOMNode* root, int const& pc );
 
-    /** @brief Constructor with input parameters
+    /** @brief Constructor with input parameters. Autonumbering
+    is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vx x translational velocity component
@@ -60,7 +60,8 @@ class CompositeParticle : public Particle
  	bool const& updatePosition = false );
 
     /** @brief Constructor with input parameters. This constructor is expected
-    to be used for periodic clone particle
+    to be used for periodic clone particle. Autonumbering
+    is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vtrans translational velocity
@@ -76,8 +77,10 @@ class CompositeParticle : public Particle
 	ParticleActivity const& activ );
 
     /** @brief Copy constructor (the torsor is initialized to 0)
-    @param other copied CompositeParticle object */
-    CompositeParticle( CompositeParticle const& other );
+    @param other copied CompositeParticle object
+    @param autonumbering whether to increment the component indexing */
+    CompositeParticle( CompositeParticle const& other, 
+    	bool const& autonumbering );
 
     /** @brief Destructor */
     virtual ~CompositeParticle();
@@ -92,18 +95,17 @@ class CompositeParticle : public Particle
 
     /** @brief Creates a clone of the composite particle. This method calls
     the standard copy constructor and is used for new composite particles to be
-    inserted in the simulation. Numbering is automatic, total number of
-    components is incremented by 1 and activity is set to WAIT. The calling
-    object is expected to be a reference composite particle */
-    Particle* createCloneCopy() const ;
+    inserted in the simulation. Activity is set to WAIT. The calling
+    object is expected to be a reference composite particle 
+    @param autonumbering whether to increment the component indexing */
+    Particle* createCloneCopy( bool const& autonumbering ) const ;
 
     /** @brief Creates a clone of the composite particle. This method calls the
     constructor CompositeParticle( int const& id_, Particle const* ParticleRef,
     Vector3 const& vtrans, Quaternion const& qrot, Vector3 const& vrot,
     Transform const& config, ParticleActivity const& activ ) and is used for
     periodic clone composite particles to be inserted in the simulation.
-    Numbering is set with the parameter id_ and total number of components left
-    unchanged.
+    Autonumbering is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vtrans translational velocity

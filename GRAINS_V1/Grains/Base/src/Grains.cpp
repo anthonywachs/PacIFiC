@@ -234,6 +234,7 @@ void Grains::Simulation( double time_interval )
   SCT_insert_app( "LinkUpdate" );
   SCT_insert_app( "OutputResults" );
 
+  cout << "XXX = " << Component::getNbCreatedComponents() << endl;
 
   // Simulation: time marching algorithm
   cout << "Time \t TO \tend \tParticles \tIn \tOut" << endl;
@@ -242,6 +243,7 @@ void Grains::Simulation( double time_interval )
     try
     {
       m_time += m_dt;
+
 
       // Check whether data are output at this time
       m_lastTime_save = false;
@@ -509,7 +511,7 @@ void Grains::Construction( DOMElement* rootElement )
   // Domain decomposition
   readDomainDecomposition( root, mx - ox, my - oy, mz - oz );
 
-
+  cout << "XXX = " << Component::getNbCreatedComponents() << endl;
   // Display domain size
   if ( m_rank == 0 )
   {
@@ -599,8 +601,7 @@ void Grains::Construction( DOMElement* rootElement )
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
-        Particle* particleRef = new Particle( nParticle, false,
-            nbPC+int(i) );
+        Particle* particleRef = new Particle( nParticle, nbPC+int(i) );
         m_allcomponents.AddReferenceParticle( particleRef );
         pair<Particle*,int> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
@@ -636,11 +637,9 @@ void Grains::Construction( DOMElement* rootElement )
 	  sshape = ReaderXML::getNodeAttr_String( nCompParticle, 
 	  	"SpecificShape" );
 	if ( sshape == "SpheroCylinder" )
-	  particleRef = new SpheroCylinder( nCompParticle,
-              false, nbPC+int(i) );
+	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
 	else 	
-	  particleRef = new CompositeParticle( nCompParticle,
-              false, nbPC+int(i) );
+	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
         m_allcomponents.AddReferenceParticle( particleRef );
         pair<Particle*,int> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
@@ -1462,17 +1461,16 @@ void Grains::InsertCreateNewParticles()
   // are re-numbered
 
   int numPartMax = getMaxParticleIDnumber();
-  if ( numPartMax ) ++numPartMax;
   list< pair<Particle*,int> >::iterator ipart;
 
   // New particles construction
-  Component::setNbCreatedComponents( numPartMax );
+  Component::setMaxIDnumber( numPartMax );
   for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
   {
     int nbre = ipart->second;
     for (int ii=0; ii<nbre; ii++)
     {
-      Particle* particle = ipart->first->createCloneCopy();
+      Particle* particle = ipart->first->createCloneCopy( true );
       m_allcomponents.AddParticle( particle );
     }
   }

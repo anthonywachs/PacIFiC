@@ -17,17 +17,17 @@ class SpheroCylinder : public CompositeParticle
     //@{
     /** @brief Constructor with autonumbering as input parameter
     @param autonumbering whether to increment the component indexing */
-    SpheroCylinder( bool const& autonumbering = true );
+    SpheroCylinder( bool const& autonumbering );
 
     /** @brief Constructor with an XML node as an input parameter. This
-    constructor is expected to be used for reference composite particles
+    constructor is expected to be used for reference composite particles.
+    Autonumbering is set to false
     @param root XML node
-    @param autonumbering whether to increment the component indexing
     @param pc particle class */
-    SpheroCylinder( DOMNode* root, bool const& autonumbering = true,
-  	int const& pc = 0 );
+    SpheroCylinder( DOMNode* root, int const& pc );
 
-    /** @brief Constructor with input parameters
+    /** @brief Constructor with input parameters. Autonumbering
+    is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vx x translational velocity component
@@ -57,7 +57,8 @@ class SpheroCylinder : public CompositeParticle
  	bool const& updatePosition = false );
 
     /** @brief Constructor with input parameters. This constructor is expected
-    to be used for periodic clone particle
+    to be used for periodic clone particle. Autonumbering
+    is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vtrans translational velocity
@@ -73,8 +74,10 @@ class SpheroCylinder : public CompositeParticle
 	ParticleActivity const& activ );
 
     /** @brief Copy constructor (the torsor is initialized to 0)
-    @param other copied SpheroCylinder object */
-    SpheroCylinder( SpheroCylinder const& other );
+    @param other copied SpheroCylinder object 
+    @param autonumbering whether to increment the component indexing */
+    SpheroCylinder( SpheroCylinder const& other, 
+    	bool const& autonumbering );
 
     /** @brief Destructor */
     virtual ~SpheroCylinder();
@@ -85,18 +88,16 @@ class SpheroCylinder : public CompositeParticle
     //@{
     /** @brief Creates a clone of the composite particle. This method calls
     the standard copy constructor and is used for new composite particles to be
-    inserted in the simulation. Numbering is automatic, total number of
-    components is incremented by 1 and activity is set to WAIT. The calling
+    inserted in the simulation. Activity is set to WAIT. The calling
     object is expected to be a reference composite particle */
-    Particle* createCloneCopy() const ;
+    Particle* createCloneCopy( bool const& autonumbering ) const ;
 
     /** @brief Creates a clone of the composite particle. This method calls the
     constructor SpheroCylinder( int const& id_, Particle const* ParticleRef,
     Vector3 const& vtrans, Quaternion const& qrot, Vector3 const& vrot,
     Transform const& config, ParticleActivity const& activ ) and is used for
     periodic clone composite particles to be inserted in the simulation.
-    Numbering is set with the parameter id_ and total number of components left
-    unchanged.
+    Autonumbering is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vtrans translational velocity

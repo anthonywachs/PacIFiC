@@ -25,9 +25,8 @@ CompositeParticle::CompositeParticle( bool const& autonumbering ):
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter. This constructor is
 // expected to be used for reference composite particles
-CompositeParticle::CompositeParticle( DOMNode* root,
-	bool const& autonumbering, int const& pc )
-  : Particle( autonumbering )
+CompositeParticle::CompositeParticle( DOMNode* root, int const& pc )
+  : Particle( false )
 {
   // Geometric type
   m_GeomType = pc;
@@ -112,8 +111,7 @@ CompositeParticle::CompositeParticle( DOMNode* root,
     DOMNode* nElemParticle = allElemParticles->item( i );
 
     // Construction of the elementary particle
-    m_elementaryParticles[i] = new Particle( nElemParticle,
-     	false, pc );
+    m_elementaryParticles[i] = new Particle( nElemParticle, pc );
 
     // Set its material as the composite material
     m_elementaryParticles[i]->setMaterial( m_materialName );
@@ -239,14 +237,6 @@ CompositeParticle::CompositeParticle( int const& id_,
 
   // Creates and sets the elementary particles
   createSetElementaryParticles( CompParticleRef );
-
-  // The constructor of Particle called here sets autonumbering to false,
-  // hence there is no need to reset the total number of created components
-  // However, we need to subtracting the number of elementary particles as the
-  // construction of each elementary particle increments the total number of
-  // created components by 1 (from the copy constructor of Particle)
-  Component::setNbCreatedComponents( Component::getNbCreatedComponents()
-	- int( m_nbElemPart ) );
 }
 
 
@@ -266,8 +256,9 @@ CompositeParticle::~CompositeParticle()
 
 // ----------------------------------------------------------------------------
 // Copy constructor (the torsor is initialized to 0)
-CompositeParticle::CompositeParticle( CompositeParticle const& other )
-  : Particle( other )
+CompositeParticle::CompositeParticle( CompositeParticle const& other, 
+    	bool const& autonumbering )
+  : Particle( other, autonumbering )
 {
   // Elementary particles
   m_nbElemPart = other.m_nbElemPart;
@@ -278,8 +269,9 @@ CompositeParticle::CompositeParticle( CompositeParticle const& other )
   for ( size_t i=0; i<m_nbElemPart; ++i )
   {
     m_elementaryParticles[i] = new Particle(
-      *((other.m_elementaryParticles)[i]) );
+      *((other.m_elementaryParticles)[i]), false );    
     m_elementaryParticles[i]->setMasterParticle( this );
+    m_elementaryParticles[i]->setID( int(i) );
   }
 
   // Initial relative positions
@@ -293,13 +285,6 @@ CompositeParticle::CompositeParticle( CompositeParticle const& other )
   for ( size_t i=0; i<m_nbElemPart; ++i )
     m_InitialRotationMatrices.push_back(
     	(other.m_InitialRotationMatrices)[i] );
-
-  // The copy constructor of Particle called here sets autonumbering to true,
-  // hence we need to reset the total number of created components by
-  // subtracting the number of elementary particles as the construction of each
-  // elementary particle increments the total number of created components by 1
-  Component::setNbCreatedComponents( Component::getNbCreatedComponents()
-    	- int( m_nbElemPart ) );
 }
 
 
@@ -311,9 +296,9 @@ CompositeParticle::CompositeParticle( CompositeParticle const& other )
 // simulation. Numbering is automatic, total number of components is
 // incremented by 1 and activity is set to WAIT. The calling object is
 // expected to be a reference particle
-Particle* CompositeParticle::createCloneCopy() const
+Particle* CompositeParticle::createCloneCopy( bool const& autonumbering ) const
 {
-  Particle* particle = new CompositeParticle( *this );
+  Particle* particle = new CompositeParticle( *this, autonumbering );
 
   return ( particle );
 }
@@ -327,8 +312,7 @@ Particle* CompositeParticle::createCloneCopy() const
 // Vector3 const& vtrans, Quaternion const& qrot, Vector3 const& vrot,
 // Transform const& config, ParticleActivity const& activ ) and is used for
 // periodic clone composite particles to be inserted in the simulation.
-// Numbering is set with the parameter id_ and total number of components left
-// unchanged.
+// Autonumbering is set to false and numbering is set with the parameter id_
 Particle* CompositeParticle::createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,
@@ -1031,8 +1015,9 @@ void CompositeParticle::createSetElementaryParticles(
   for ( size_t i=0; i<m_nbElemPart; ++i )
   {
     m_elementaryParticles[i] = new Particle(
-      *((CompParticleRef->m_elementaryParticles)[i]) );
+      *((CompParticleRef->m_elementaryParticles)[i]), false );
     m_elementaryParticles[i]->setMasterParticle( this );
+    m_elementaryParticles[i]->setID( int(i) );
   }
 
   // Initial relative positions

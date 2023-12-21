@@ -33,9 +33,8 @@ SpheroCylinder::SpheroCylinder( bool const& autonumbering )
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter. This constructor is
 // expected to be used for reference composite particles
-SpheroCylinder::SpheroCylinder( DOMNode* root,
-	bool const& autonumbering, int const& pc )
-  : CompositeParticle( autonumbering )
+SpheroCylinder::SpheroCylinder( DOMNode* root, int const& pc )
+  : CompositeParticle( false )
 {
   m_specific_composite_shape = "SpheroCylinder";
 
@@ -111,7 +110,7 @@ SpheroCylinder::SpheroCylinder( DOMNode* root,
   RigidBodyWithCrust* geoRBWC_cyl = new RigidBodyWithCrust( cyl, Transform(),
   	false, crust_thickness ); 
   m_elementaryParticles[0] = new Particle( geoRBWC_cyl, m_density,
-      	m_materialName, false, pc );
+      	m_materialName, pc );
   m_InitialRelativePositions[0][X] = 0.;
   m_InitialRelativePositions[0][Y] = 0.;  
   m_InitialRelativePositions[0][Z] = 0.;  
@@ -128,7 +127,7 @@ SpheroCylinder::SpheroCylinder( DOMNode* root,
   	new RigidBodyWithCrust( spht, Transform(),
   	false, crust_thickness );
   m_elementaryParticles[1] = new Particle( geoRBWC_spht, m_density,
-      	m_materialName, false, pc );
+      	m_materialName, pc );
   m_InitialRelativePositions[1][X] = 0.;
   m_InitialRelativePositions[1][Y] = m_height / 2.;  
   m_InitialRelativePositions[1][Z] = 0.;  
@@ -145,7 +144,7 @@ SpheroCylinder::SpheroCylinder( DOMNode* root,
   	new RigidBodyWithCrust( sphb, Transform(),
   	false, crust_thickness );
   m_elementaryParticles[2] = new Particle( geoRBWC_sphb, m_density,
-      	m_materialName, false, pc );
+      	m_materialName, pc );
   m_InitialRelativePositions[2][X] = 0.;
   m_InitialRelativePositions[2][Y] = - m_height / 2.;  
   m_InitialRelativePositions[2][Z] = 0.;  
@@ -185,6 +184,10 @@ SpheroCylinder::SpheroCylinder( int const& id_,
 	rx, ry, rz, m, activ, tag_, coordination_number_ , updatePosition )	
 {
   m_specific_composite_shape = "SpheroCylinder";
+  SpheroCylinder const* SpheroCylRef =
+  	dynamic_cast<SpheroCylinder const*>(ParticleRef);
+  m_height = SpheroCylRef->m_height;
+  m_radius = SpheroCylRef->m_radius;  
 }
 
 
@@ -221,8 +224,9 @@ SpheroCylinder::~SpheroCylinder()
 
 // ----------------------------------------------------------------------------
 // Copy constructor (the torsor is initialized to 0)
-SpheroCylinder::SpheroCylinder( SpheroCylinder const& other )
-  : CompositeParticle( other )
+SpheroCylinder::SpheroCylinder( SpheroCylinder const& other, 
+    	bool const& autonumbering )
+  : CompositeParticle( other, autonumbering )
 {
   m_height = other.m_height;
   m_radius = other.m_radius;
@@ -237,9 +241,9 @@ SpheroCylinder::SpheroCylinder( SpheroCylinder const& other )
 // simulation. Numbering is automatic, total number of components is
 // incremented by 1 and activity is set to WAIT. The calling object is
 // expected to be a reference particle
-Particle* SpheroCylinder::createCloneCopy() const
+Particle* SpheroCylinder::createCloneCopy( bool const& autonumbering ) const
 {
-  Particle* particle = new SpheroCylinder( *this );
+  Particle* particle = new SpheroCylinder( *this, autonumbering );
 
   return ( particle );
 }
@@ -253,8 +257,7 @@ Particle* SpheroCylinder::createCloneCopy() const
 // Vector3 const& vtrans, Quaternion const& qrot, Vector3 const& vrot,
 // Transform const& config, ParticleActivity const& activ ) and is used for
 // periodic clone composite particles to be inserted in the simulation.
-// Numbering is set with the parameter id_ and total number of components left
-// unchanged.
+// Autonumbering is set to false and numbering is set with the parameter id_
 Particle* SpheroCylinder::createCloneCopy( int const& id_,
     	Particle const* ParticleRef, Vector3 const& vtrans,
 	Quaternion const& qrot,	Vector3 const& vrot,

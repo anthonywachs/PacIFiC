@@ -27,19 +27,6 @@ Obstacle::Obstacle( string const& s, bool const& autonumbering ) :
 
 
 
-// ----------------------------------------------------------------------------
-// Copy constructor from a Component
-Obstacle::Obstacle( Component& copy, char const* s ) :
-  Component( copy ),
-  m_name( s ),
-  m_ismoving( false ),
-  m_indicator( 0. ),
-  m_ObstacleType ( "0" )
-{}
-
-
-
-
 //-----------------------------------------------------------------------------
 // Destructor
 Obstacle::~Obstacle()

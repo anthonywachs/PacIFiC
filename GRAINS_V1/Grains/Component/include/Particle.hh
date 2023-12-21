@@ -63,29 +63,27 @@ class Particle : public Component
     //@{
     /** @brief Constructor with autonumbering as input parameter
     @param autonumbering whether to increment the component indexing */
-    Particle( bool const& autonumbering = true );
+    Particle( bool const& autonumbering );
 
     /** @brief Constructor with an XML node as an input parameter. This
-    constructor is expected to be used for reference particles
+    constructor is expected to be used for reference particles. Autonumbering
+    is set to false
     @param root XML node
-    @param autonumbering whether to increment the component indexing
     @param pc particle class */
-    Particle( DOMNode* root, bool const& autonumbering = true,
-  	int const& pc = 0 );
+    Particle( DOMNode* root, int const& pc );
 	
     /** @brief Constructor with input parameters. This
-    constructor is expected to be used for reference particles
+    constructor is expected to be used for reference particles. Autonumbering
+    is set to false
     @param georbwc pointer to a rigid body with crust object
     @param density particle density
     @param mat particle material
-    @param autonumbering whether to increment the component indexing
     @param pc particle class */
     Particle( RigidBodyWithCrust* georbwc, double const& density,
-    	string const& mat,
-    	bool const& autonumbering = true,
-  	int const& pc = 0 );	
+    	string const& mat, int const& pc );	
 
-    /** @brief Constructor with input parameters
+    /** @brief Constructor with input parameters. Autonumbering
+    is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vx x translational velocity component
@@ -110,10 +108,11 @@ class Particle : public Component
 	const double m[12],
 	ParticleActivity const& activ,
 	int const& tag_,
-	int const& coordination_number_ = 0 );
+	int const& coordination_number_ );
 
     /** @brief Constructor with input parameters. This constructor is expected
-    to be used for periodic clone particle
+    to be used for periodic clone particle. Autonumbering
+    is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vtrans translational velocity
@@ -128,9 +127,11 @@ class Particle : public Component
 	Transform const& config,
 	ParticleActivity const& activ );
 
-    /** @brief Copy constructor (the torsor is initialized to 0)
-    @param other copied Particle object */
-    Particle( Particle const& other );
+    /** @brief Copy constructor (the torsor is initialized to 0). Autonumbering
+    is set to true
+    @param other copied Particle object
+    @param autonumbering whether to increment the component indexing */
+    Particle( Particle const& other, bool const& autonumbering );
 
     /** @brief Destructor */
     virtual ~Particle();
@@ -381,17 +382,17 @@ class Particle : public Component
 
     /** @brief Creates a clone of the particle. This method calls the standard
     copy constructor and is used for new particles to be inserted in the
-    simulation. Numbering is automatic, total number of components is
-    incremented by 1 and activity is set to WAIT. The calling object is
-    expected to be a reference particle */
-    virtual Particle* createCloneCopy() const ;
+    simulation. Activity is set to WAIT. The calling object is
+    expected to be a reference particle
+    @param autonumbering whether to increment the component indexing */
+    virtual Particle* createCloneCopy( bool const& autonumbering ) const ;
 
     /** @brief Creates a clone of the particle. This method calls the
     constructor Particle( int const& id_, Particle const* ParticleRef, Vector3
     const& vtrans, Quaternion const& qrot, Vector3 const& vrot,	Transform
     const& config, ParticleActivity const& activ ) and is used for periodic
-    clone particles to be inserted in the simulation. Numbering is set with the
-    parameter id_ and total number of components left unchanged.
+    clone particles to be inserted in the simulation. Autonumbering
+    is set to false and numbering is set with the parameter id_
     @param id_ ID number
     @param ParticleRef reference particle
     @param vtrans translational velocity

@@ -24,7 +24,6 @@ AllComponents::AllComponents()
   , m_outputTorsorObstacles_frequency( 0 )
 {
   m_obstacle = new CompositeObstacle( "__AllObstacles___" );
-  Component::setNbCreatedComponents( 0 );
 }
 
 
@@ -929,8 +928,7 @@ void AllComponents::read( istream& fileSave, string const& filename )
   // Reload the obstacle tree
   string name;
   fileSave >> buffer;
-  fileSave >> buffer >> name;
-  m_obstacle = new CompositeObstacle( name );
+  fileSave >> buffer >> buffer;
   fileSave >> buffer;
   while ( buffer != "</Composite>" )
   {

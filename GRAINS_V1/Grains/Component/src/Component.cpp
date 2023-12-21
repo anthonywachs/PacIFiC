@@ -9,6 +9,7 @@ using namespace std;
 
 
 int Component::m_nb = 0;
+int Component::m_maxID = -1;
 
 
 // ----------------------------------------------------------------------------
@@ -19,10 +20,12 @@ Component::Component( bool const& autonumbering )
   , m_geoRBWC( NULL )
   , m_memento( NULL )
 {
+  Component::m_nb++;  
+  
   if ( autonumbering )
   {
-    m_id = Component::m_nb;
-    Component::m_nb++;
+    Component::m_maxID++;
+    m_id = Component::m_maxID;
   }
   else m_id = -1;
 }
@@ -32,13 +35,19 @@ Component::Component( bool const& autonumbering )
 
 // ----------------------------------------------------------------------------
 // Copy constructor
-Component::Component( Component const& copy )
-  : m_id( Component::m_nb )
-  , m_materialName( copy.m_materialName )
+Component::Component( Component const& copy, bool const& autonumbering )
+  : m_materialName( copy.m_materialName )
   , m_mass( copy.m_mass )
   , m_memento( NULL )
 {
   Component::m_nb++;
+
+  if ( autonumbering )
+  {
+    Component::m_maxID++;
+    m_id = Component::m_maxID;
+  }
+  else m_id = -1;
 
   m_geoRBWC = new RigidBodyWithCrust( *copy.m_geoRBWC );
 }
@@ -570,9 +579,9 @@ void Component::addNewContactInMap( std::tuple<int,int,int> const& id,
 	Vector3 const& kdelta, Vector3 const& prev_normal,
 	Vector3 const& cumulSpringTorque )
 {
-  m_contactMap.insert(std::make_pair( std::make_tuple(get<0>(id),get<1>(id),
+  m_contactMap.insert( std::make_pair( std::make_tuple(get<0>(id),get<1>(id),
     get<2>(id)), std::make_tuple(
-    true, kdelta, prev_normal, cumulSpringTorque) ));
+    true, kdelta, prev_normal, cumulSpringTorque) ) );
 }
 
 
@@ -584,8 +593,8 @@ void Component::copyContactInMap( std::tuple<int,int,int> const& id,
 	bool const& isActive, Vector3 const& kdelta, Vector3 const& prev_normal,
 	Vector3 const& cumulSpringTorque )
 {
-  m_contactMap.insert(std::make_pair( id, std::make_tuple(
-    isActive, kdelta, prev_normal, cumulSpringTorque) ));
+  m_contactMap.insert( std::make_pair( id, std::make_tuple(
+    isActive, kdelta, prev_normal, cumulSpringTorque) ) );
 }
 
 
@@ -597,7 +606,7 @@ void Component::copyContactInMap( std::tuple<int,int,int> const& id,
 // return false and set those pointers to NULL
 bool Component::getContactMemory( std::tuple<int,int,int> const& id,
 	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
-	bool createContact)
+	bool createContact )
 {
   bool active = false;
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
@@ -613,13 +622,13 @@ bool Component::getContactMemory( std::tuple<int,int,int> const& id,
   }
   else 
   {
-    if (createContact) 
+    if ( createContact ) 
     {
       Vector3 zeroV(0.);
       std::pair< map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3,
-        Vector3> > ::iterator, bool > ret;
-      ret = m_contactMap.insert(std::make_pair( id, std::make_tuple(
-        true, zeroV, zeroV, zeroV)));
+        Vector3> >::iterator, bool > ret;
+      ret = m_contactMap.insert( std::make_pair( id, std::make_tuple(
+        true, zeroV, zeroV, zeroV ) ) );
       it = ret.first;
       kdelta = &(get<1>(it->second));
       prev_normal = &(get<2>(it->second));
@@ -645,6 +654,7 @@ void Component::addDeplContactInMap( std::tuple<int,int,int> const& id,
 	Vector3 const& kdelta, Vector3 const& prev_normal,
 	Vector3 const& cumulSpringTorque )
 {
+  // If id does not exist in m_contactMap, operator [] inserts it
   get<0>(m_contactMap[id]) = true;
   get<1>(m_contactMap[id]) = kdelta;
   get<2>(m_contactMap[id]) = prev_normal;
@@ -727,20 +737,17 @@ int Component::getContactMapSize()
 
 // ---------------------------------------------------------------------------
 // Writes the contact map to file in plain 2014 format
-void Component::writeContactMemory_2014( ostream &fileOut ) const
+void Component::writeContactMemory2014( ostream &fileOut ) const
 {
   int mapSize;
   mapSize = (int) m_contactMap.size();
-  fileOut << mapSize ;
-  fileOut << " ";
+  fileOut << " " << mapSize ;
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
     ::const_iterator it;
-  if (m_contactMap.begin() != m_contactMap.end())
-  {
-    int c=0;
+  if ( mapSize )
     for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
     {
-      c++;
+      fileOut << " ";
       fileOut << get<0>(it->first) ;
       fileOut << " ";
       fileOut << get<1>(it->first) ;
@@ -755,9 +762,7 @@ void Component::writeContactMemory_2014( ostream &fileOut ) const
       get<2>(it->second).writeGroup3(fileOut);
       fileOut << " ";
       get<3>(it->second).writeGroup3(fileOut);
-      if (c<mapSize) fileOut << " ";
     }
-  }
 }
 
 
@@ -765,16 +770,15 @@ void Component::writeContactMemory_2014( ostream &fileOut ) const
 
 // ---------------------------------------------------------------------------
 // Writes the contact map to file in binary format
-void Component::writeContactMemory_binary( ostream &fileOut )
+void Component::writeContactMemory2014_binary( ostream &fileOut )
 {
   int mapSize;
   mapSize = (int) m_contactMap.size();
   fileOut.write( reinterpret_cast<char*>( &mapSize ), sizeof(int) );
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
     ::const_iterator it;
-  if (m_contactMap.begin() != m_contactMap.end())
-  {
-  for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
+  if ( mapSize )
+    for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
     {
       int buffer_int;
       Vector3 buffer_vect;
@@ -793,7 +797,6 @@ void Component::writeContactMemory_binary( ostream &fileOut )
       buffer_vect = Vector3(get<3>(it->second));
       buffer_vect.writeGroup3_binary(fileOut);
     }
-  }
 }
 
 
@@ -844,35 +847,28 @@ void Component::setContactMapFeaturesToZero()
 
 // ---------------------------------------------------------------------------
 // Reads the contact map to file in plain 2014 format
-void Component::readContactMap_2014( istream &fileSave )
+void Component::readContactMap2014( istream &fileSave )
 {
   // Read the contact memories of the particle (if any)
-  char next_char;
-  int contact_map_size=-1;
-  fileSave.get(next_char);
-  if ( next_char != '\n' )
-  {
-    fileSave >> contact_map_size;
-    if (contact_map_size)
+  int contact_map_size = 0;
+  fileSave >> contact_map_size;
+  if ( contact_map_size )
+    for(int j=0; j<contact_map_size; j++)
     {
-      for(int j=0; j<contact_map_size; j++)
-      {
-        // Read contact memory map here
-        int id0, id1, id2;
-        bool isActive ;
-        double x, y, z ;
-        Vector3 tangent, prev_normal, cumulSpringTorque ;
-        fileSave >> id0 >> id1 >> id2 >> isActive >> x >> y >> z;
-        tangent = Vector3(x,y,z);
-        fileSave >> x >> y >> z ;
-        prev_normal = Vector3(x,y,z);
-        fileSave >> x >> y >> z ;
-        cumulSpringTorque = Vector3(x,y,z);
-        this->copyContactInMap(std::make_tuple(id0,id1,id2), isActive,
-          tangent, prev_normal, cumulSpringTorque) ;
-      }
+      // Read contact memory map here
+      int id0, id1, id2;
+      bool isActive ;
+      double x, y, z ;
+      Vector3 tangent, prev_normal, cumulSpringTorque ;
+      fileSave >> id0 >> id1 >> id2 >> isActive >> x >> y >> z;
+      tangent = Vector3(x,y,z);
+      fileSave >> x >> y >> z ;
+      prev_normal = Vector3(x,y,z);
+      fileSave >> x >> y >> z ;
+      cumulSpringTorque = Vector3(x,y,z);
+      copyContactInMap( std::make_tuple(id0,id1,id2), isActive,
+          tangent, prev_normal, cumulSpringTorque ) ;
     }
-  }
 }
 
 
@@ -880,25 +876,26 @@ void Component::readContactMap_2014( istream &fileSave )
 
 // ---------------------------------------------------------------------------
 // Reads the contact map to file in binary format
-void Component::readContactMap_binary( istream &fileSave )
+void Component::readContactMap2014_binary( istream &fileSave )
 {
-  int mapSize;
-  fileSave.read( reinterpret_cast<char*>( &mapSize ), sizeof(int) );
-  for(int k=0; k<mapSize; k++)
-  {
-    // Read contact memory map here
-    int id0, id1, id2, isActive ;
-    Vector3 tangent, prev_normal, cumulSpringTorque ;
-    fileSave.read( reinterpret_cast<char*>( &id0 ), sizeof(int) );
-    fileSave.read( reinterpret_cast<char*>( &id1 ), sizeof(int) );
-    fileSave.read( reinterpret_cast<char*>( &id2 ), sizeof(int) );
-    fileSave.read( reinterpret_cast<char*>( &isActive ), sizeof(int) );
-    tangent.readGroup3_binary( fileSave );
-    prev_normal.readGroup3_binary( fileSave );
-    cumulSpringTorque.readGroup3_binary( fileSave );
-    this->copyContactInMap(std::make_tuple(id0,id1,id2), (bool)isActive,
-      tangent, prev_normal, cumulSpringTorque) ;
-  }
+  int contact_map_size;
+  fileSave.read( reinterpret_cast<char*>( &contact_map_size ), sizeof(int) );
+  if ( contact_map_size )
+    for(int k=0; k<contact_map_size; k++)
+    {
+      // Read contact memory map here
+      int id0, id1, id2, isActive ;
+      Vector3 tangent, prev_normal, cumulSpringTorque ;
+      fileSave.read( reinterpret_cast<char*>( &id0 ), sizeof(int) );
+      fileSave.read( reinterpret_cast<char*>( &id1 ), sizeof(int) );
+      fileSave.read( reinterpret_cast<char*>( &id2 ), sizeof(int) );
+      fileSave.read( reinterpret_cast<char*>( &isActive ), sizeof(int) );
+      tangent.readGroup3_binary( fileSave );
+      prev_normal.readGroup3_binary( fileSave );
+      cumulSpringTorque.readGroup3_binary( fileSave );
+      copyContactInMap( std::make_tuple(id0,id1,id2), (bool)isActive,
+      	tangent, prev_normal, cumulSpringTorque ) ;
+    }
 }
 
 
@@ -915,10 +912,20 @@ void Component::setID( int const& id_ )
 
 
 // ----------------------------------------------------------------------------
-// Resets the number of created components to nb_
-void Component::setNbCreatedComponents( const int &nb_ )
+// Resets the maximum ID number of a component for autonumbering
+void Component::setMaxIDnumber( int const& maxID_ )
 {
-  m_nb = nb_;
+  m_maxID = maxID_;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the maximum ID number of a component
+int Component::getMaxIDnumber()
+{
+  return ( m_maxID );
 }
 
 

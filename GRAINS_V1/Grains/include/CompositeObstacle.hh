@@ -327,10 +327,13 @@ class CompositeObstacle : public Obstacle
 
 
   private:
-    /** @name Methods */
-    //@{  
-
-    //@}
+    /** @name Constructors */
+    //@{
+    /** @brief Copy constructor
+    @param copy copied CompositeObstacle
+    @param s obstacle name */
+    CompositeObstacle( CompositeObstacle const& copy );
+    //@}   
 };
 
 #endif

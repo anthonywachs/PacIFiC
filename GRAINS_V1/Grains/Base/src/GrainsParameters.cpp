@@ -115,8 +115,7 @@ void GrainsParameters::Construction( DOMElement* rootElement )
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
-        Particle* particleRef = new Particle( nParticle, false, 
-            nbPC+int(i) );
+        Particle* particleRef = new Particle( nParticle, nbPC+int(i) );
         m_allcomponents.AddReferenceParticle( particleRef );
         pair<Particle*,int> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
@@ -147,8 +146,15 @@ void GrainsParameters::Construction( DOMElement* rootElement )
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
-        Particle* particleRef = new CompositeParticle( nCompParticle, 
-              false, nbPC+int(i) );
+        Particle* particleRef = NULL;
+	string sshape = "none";
+	if ( ReaderXML::hasNodeAttr( nCompParticle, "SpecificShape" )  )
+	  sshape = ReaderXML::getNodeAttr_String( nCompParticle, 
+	  	"SpecificShape" );
+	if ( sshape == "SpheroCylinder" )
+	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
+	else 	
+	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
         m_allcomponents.AddReferenceParticle( particleRef );
         pair<Particle*,int> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );

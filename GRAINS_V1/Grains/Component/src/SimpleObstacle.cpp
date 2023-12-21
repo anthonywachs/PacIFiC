@@ -64,47 +64,6 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
 
 
 // ----------------------------------------------------------------------------
-// Copy constructor from a Component
-SimpleObstacle::SimpleObstacle( Component& copy, char const* s )
-  : Obstacle( copy, s )
-{
-  m_ObstacleType = "SimpleObstacle";
-
-  Obstacle::m_totalNbSingleObstacles++;
-  m_obstacleBox = Component::BoundingBox();
-  m_LinkUpdate_frequency = 1;
-  m_LinkUpdate_counter = 0;
-  m_transferToFluid = false;
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Constructor with a rigid body, a name and a material as input parameters
-SimpleObstacle::SimpleObstacle( RigidBodyWithCrust* geoRBWC, string const& name,
-      string const& materialName, bool const& transferToFluid_ )
-  : Obstacle()
-{
-  m_ObstacleType = "SimpleObstacle";
-
-  Obstacle::m_totalNbSingleObstacles++;
-
-  m_name = name;
-  m_geoRBWC = geoRBWC;
-  m_materialName = materialName;
-  m_transferToFluid = transferToFluid_;
-  ContactBuilderFactory::defineMaterial( materialName, true );
-
-  m_obstacleBox = Component::BoundingBox();
-  m_LinkUpdate_frequency = 1;
-  m_LinkUpdate_counter = 0;
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Destructor
 SimpleObstacle::~SimpleObstacle()
 {
@@ -270,7 +229,7 @@ void SimpleObstacle::InterAction( Component* voisin,
 
 
 // ----------------------------------------------------------------------------
-// Reloads the composite obstacle and links it to the higher level
+// Reloads the simple obstacle and links it to the higher level
 // obstacle in the obstacle tree
 void SimpleObstacle::reload( Obstacle& mother, istream& file )
 {
@@ -296,6 +255,9 @@ void SimpleObstacle::reload( Obstacle& mother, istream& file )
   // Obstacle position
   file >> buffer;
   m_geoRBWC->readPosition( file );
+
+  // Read contact map
+  readContactMap2014( file );
 
   // Add the obstacle to the tree
   mother.append( this );
@@ -350,6 +312,8 @@ void SimpleObstacle::write( ostream& fileSave ) const
   fileSave << "*ToFluid " << m_transferToFluid << endl;
   m_geoRBWC->writePosition( fileSave );
   fileSave << endl;
+  writeContactMemory2014( fileSave );
+  fileSave << endl;  
   fileSave << "</Simple>";
 }
 

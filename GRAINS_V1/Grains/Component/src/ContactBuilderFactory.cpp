@@ -134,9 +134,9 @@ pair<ContactBuilderFactory::ContactFeatures,ContactForceModel*>
     }
     else if ( type == "Memory" )
     {
-			forceLaw.first.name   = Memory;
-      forceLaw.first.values =
-				MemoryContactForceModel::defineParameters(contact);
+      forceLaw.first.name   = Memory;
+      forceLaw.first.values = MemoryContactForceModel::defineParameters(
+      	contact);
       forceLaw.second = new MemoryContactForceModel(forceLaw.first.values);
     }
   }
@@ -226,7 +226,8 @@ void ContactBuilderFactory::reload( istream& file )
         m_contactForceModels[value] = new HODCContactForceModel(
 				parameters.values );
       else if( parameters.name == Memory )
-        m_contactForceModels[value] = new MemoryContactForceModel( parameters.values );
+        m_contactForceModels[value] = new MemoryContactForceModel( 
+		parameters.values );
     }
   }
 }
