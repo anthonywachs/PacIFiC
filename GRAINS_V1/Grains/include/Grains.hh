@@ -1,6 +1,8 @@
 #ifndef _GRAINS_HH_
 #define _GRAINS_HH_
 
+#include <mpi.h>
+#include "GrainsMPIWrapper.hh"
 #include "GrainsExec.hh"
 #include "AllComponents.hh"
 #include "App.hh"
@@ -183,7 +185,8 @@ class Grains : public ComputingTime, public SolverComputingTime
     int m_nprocs; /**< Total number of processes in the MPI_COMM_activProc 
     	communicator (=1 in serial) */	 
     bool m_processorIsActive; /**< true if the process is active
-  	(=true in serial) */	
+  	(=true in serial) */
+    GrainsMPIWrapper* m_wrapper; /**< manages MPI communications */		
     //@}  
 
 
@@ -280,7 +283,10 @@ class Grains : public ComputingTime, public SolverComputingTime
     @param dt_obstacle time step to advance obstacle velocity and position */    
     void moveParticlesAndObstacles( double const& dt_particle_vel, 
     	double const& dt_particle_disp,
-	double const& dt_obstacle );	
+	double const& dt_obstacle );
+	
+    /** @brief Outputs timer summary */
+    virtual void display_timer_summary(); 	
     //@}
   
 };

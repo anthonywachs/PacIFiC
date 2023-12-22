@@ -18,7 +18,7 @@ vector<int> GrainsMPIWrapper::m_GeoLocReciprocity;
 // ----------------------------------------------------------------------------
 // Constructor with domain decomposition and periodicity as input parameters
 GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
-  	int PERX, int PERY, int PERZ ) : 
+  	int PERX, int PERY, int PERZ, string const& oshift ) : 
    m_coords( NULL ),
    m_dim( NULL ),
    m_period( NULL ),
@@ -52,10 +52,11 @@ GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
     m_nprocs = NX * NY * NZ;
     if ( m_rank_world == 0 )
     {
-      cout << "Total number of processus = " << m_nprocs_world << endl;
-      cout << "Number of active processus = " << m_nprocs << endl;
-      cout << "Number of sleeping processus = " << m_nprocs_world - m_nprocs 
+      cout << oshift << "Total number of processes = " << m_nprocs_world 
       	<< endl;
+      cout << oshift << "Number of active processes = " << m_nprocs << endl;
+      cout << oshift << "Number of sleeping processes = " << 
+      	m_nprocs_world - m_nprocs << endl;
     }
   }  
 
@@ -126,7 +127,7 @@ GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
     	m_period ); 
  
     // Timer
-    SCT_insert_app( "Copie_Buffers" );
+    SCT_insert_app( "BuffersCopy" );
     SCT_insert_app( "MPIComm" );
     SCT_insert_app( "UpdateCreateClones" );          
   }
@@ -1295,54 +1296,55 @@ int const* GrainsMPIWrapper::get_MPI_periodicity() const
 
 // ----------------------------------------------------------------------------
 // Writes the MPI wrapper features in a stream
-void GrainsMPIWrapper::display( ostream& f ) const
+void GrainsMPIWrapper::display( ostream& f, string const& oshift ) const
 {
   if ( m_rank == 0 )
   {
-    f << endl << "Domain decomposition = ";
-    for (int j=0;j<3;++j) cout << "N[" << j << "]=" << m_dim[j] << " ";
+    f << oshift << "Domain decomposition = ";
+    for (int j=0;j<3;++j) f << "N[" << j << "]=" << m_dim[j] << " ";
     f << endl;
-    f << "MPI periods = ";
-    for (int j=0;j<3;++j) cout << "P[" << j << "]=" << m_period[j] << " ";
+    f << oshift << "MPI periods = ";
+    for (int j=0;j<3;++j) f << "P[" << j << "]=" << m_period[j] << " ";
     f << endl;    
-    //App::output_domain_features(f);
-    f << endl;
   }
-
+  MPI_Barrier( m_MPI_COMM_activProc );
+  
   for (int m=0;m<m_nprocs;++m)
   {
     if ( m == m_rank && m_is_activ )
     {      
-      f << "Process = " << m_rank << " PID = " << getpid() << endl;
-      f << "Position in the MPI cartesian topology = ";
-      for (int j=0;j<3;++j) cout << m_coords[j] << " ";
+      f << oshift << GrainsExec::m_shift3 << "Process = " << m_rank << 
+      	" PID = " << getpid() << endl;
+      f << oshift << GrainsExec::m_shift3 << "Position in the MPI cartesian"
+      	" topology = ";
+      for (int j=0;j<3;++j) f << m_coords[j] << " ";
       f << endl;
-      f << "Neighboring processes in the MPI cartesian topology" << endl;
-      f << "---------------------------------------------------" << endl;
+      f << oshift << GrainsExec::m_shift3 << "Neighboring processes in the MPI "
+      	"cartesian topology" << endl;
+      f << oshift << GrainsExec::m_shift3 
+      	<< "---------------------------------------------------" << endl;
       for (int i=-1;i<2;i++)
         for (int j=-1;j<2;j++)
           for (int k=-1;k<2;k++)
 	    if ( m_voisins->rank( i, j, k ) != -1 )
             {  
-              f << "Neighbor (" << i << "," << j << "," << k << ") GEOLOC = " 
-	      	<< Cell::getGeoPositionName( 
+              f << oshift << GrainsExec::m_shift3 << "Neighbor (" << i << "," 
+	      	<< j << "," << k << ") GEOLOC = " << Cell::getGeoPositionName( 
 			getGeoPosition( i, j, k ) ) << endl;
 	      int const* coords_ = m_voisins->coordinates( i, j, k );
-	      f << "Position in MPI topology = " << coords_[0] << " " <<
-		coords_[1] << " " << coords_[2] << endl;
-	      f << "Rank in MPI topology = " << m_voisins->rank( i, j, k ) 
-	      	<< endl;
-	      f << "MPI periodic vector = " << 
-	      	m_MPIperiodes[ getGeoPosition( i, j, k ) ][X] << " " << 
+	      f << oshift << GrainsExec::m_shift3 
+	      	<< "Position in MPI topology = " << coords_[0] << " "
+		<< coords_[1] << " " << coords_[2] << endl;
+	      f << oshift << GrainsExec::m_shift3 << "Rank in MPI topology = " 
+	      	<< m_voisins->rank( i, j, k ) << endl;
+	      f << oshift << GrainsExec::m_shift3 << "MPI periodic vector = " 
+	      	<< m_MPIperiodes[ getGeoPosition( i, j, k ) ][X] << " " << 
 	      	m_MPIperiodes[ getGeoPosition( i, j, k ) ][Y] << " " << 
 	      	m_MPIperiodes[ getGeoPosition( i, j, k ) ][Z] << endl;	
             }
-      f << endl;
     }
     MPI_Barrier( m_MPI_COMM_activProc );
   }
-
-  if ( m_rank == 0 ) f << endl;  
 }
 
 
@@ -1979,7 +1981,7 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
 //   bool b_stochNu = GrainsExec::m_withStochasticNusselt ;
 //   double intTodouble = 0.1 ;
 //   
-//   SCT_set_start( "Copie_Buffers" );
+//   SCT_set_start( "BuffersCopy" );
 // 
 //   // Remplissage de la multimap pour acces aux clones par numero 
 //   // -----------------------------------------------------------
@@ -2075,7 +2077,7 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
 //       index[*iv] += NB_DOUBLE_PART;
 //     }
 //   }           
-//   SCT_get_elapsed_time("Copie_Buffers");
+//   SCT_get_elapsed_time("BuffersCopy");
 //   
 //   // Communication
 //   // -------------
@@ -2724,9 +2726,9 @@ void GrainsMPIWrapper::testCommLocal_SendRecv_DOUBLE( int const& n ) const
 
 // ----------------------------------------------------------------------------
 // Outputs timer summary
-void GrainsMPIWrapper::bilanTimer() const
+void GrainsMPIWrapper::timerSummary() const
 {
-  double cputime=SCT_get_total_elapsed_time("Copie_Buffers")
+  double cputime=SCT_get_total_elapsed_time("BuffersCopy")
      	+SCT_get_total_elapsed_time("MPIComm")
      	+SCT_get_total_elapsed_time("UpdateCreateClones");
   cout << "Bilan de la partie MPIComm" << endl;

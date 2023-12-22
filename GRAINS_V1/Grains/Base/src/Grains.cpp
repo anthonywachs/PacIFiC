@@ -42,6 +42,7 @@ Grains::Grains()
   , m_rank( 0 )
   , m_nprocs( 1 )
   , m_processorIsActive( true )
+  , m_wrapper( NULL )
 {
   if ( GrainsBuilderFactory::getContext() == DIM_2 ) m_dimension = 2;
 }
@@ -93,7 +94,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
   CT_set_start();
   SCT_insert_app( "Initialization" );
   SCT_set_start( "Initialization" );
-  cout << endl << "Initialization" << endl;
+  if ( m_rank == 0 ) cout << endl << "Initialization" << endl;
 
   // Set time to initial time
   m_time = m_tstart;
@@ -106,7 +107,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
   	m_allcomponents.getNumberParticles() );
   m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
 
-  // Initialisation obstacle kinematics
+  // Initialisation of obstacle kinematics
   m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt );
 
   // In case of initial random motion
@@ -116,18 +117,21 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
 
   // Writing results for postprocessing
   m_allcomponents.PostProcessing_start( m_time, m_dt, m_collision,
-  	m_insertion_windows );
+  	m_insertion_windows, m_rank, m_nprocs, m_wrapper );
 
   // Track component max and mean velocity
-  fVitMax.open( (m_fileSave + "_VelocityMaxMean.dat").c_str(), ios::out );
   m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean );
-  cout << "Component velocity : max = " << vmax << " average = " <<
+  if ( m_rank == 0 ) 
+  {
+    fVitMax.open( (m_fileSave + "_VelocityMaxMean.dat").c_str(), ios::out );
+    cout << "Component velocity : max = " << vmax << " average = " <<
     	vmean << endl;
-  fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
+    fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
     	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmax )
 	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmean )
 	<< endl;
-  fVitMax.close();
+    fVitMax.close();
+  }
 
   // Display memory used by Grains
   display_used_memory();
@@ -135,7 +139,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
   // Postprocessing of force & torque on obstacles
   m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );
   m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
-      GrainsExec::m_ReloadType == "same" );
+      GrainsExec::m_ReloadType == "same", m_rank, m_nprocs, m_wrapper );
 
   // Next time of writing results
   m_timeSave = m_save.begin();
@@ -150,7 +154,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
     m_allcomponents.setAllContactMapFeaturesToZero();
   }
 
-  cout << "Initialization completed" << endl << endl;
+  if ( m_rank == 0 ) cout << "Initialization completed" << endl << endl;
   SCT_get_elapsed_time( "Initialization" );
 }
 
@@ -164,14 +168,15 @@ void Grains::do_after_time_stepping()
   double vmax = 0., vmean = 0. ;
 
   // Particles in & out at the end of the simulation
-  ostringstream oss;
-  oss.width(10);
-  oss << left << m_time;
-  cout << "\r                                              "
-         << "                 " << flush;
-  cout << '\r' << oss.str() << "  \t" << m_tend << "\t\t\t"
-         << m_allcomponents.getNumberActiveParticlesOnProc() << '\t'
-         << m_allcomponents.getNumberInactiveParticles() << endl;
+  size_t nact = m_allcomponents.getNumberActiveParticlesOnProc();
+  if ( m_wrapper ) m_wrapper->sum_UNSIGNED_INT( nact );  
+  if ( m_rank == 0 )
+  {  
+    cout << endl << "Number of active particles in the simulation = " 
+    	<< nact << endl;
+    cout << "Number of inactive particles in the simulation = " 
+    	<< m_allcomponents.getNumberInactiveParticles() << endl;
+  }	
 
   // Write reload files
   if ( !m_lastTime_save )
@@ -179,16 +184,19 @@ void Grains::do_after_time_stepping()
     SCT_set_start( "OutputResults" );
 
     // Track component max and mean velocity at the end of the simulation
-    m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean );
-    cout << endl << "Component velocity : max = " << vmax
+    m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );
+    if ( m_rank == 0 )
+    {
+      cout << endl << "Component velocity : max = " << vmax
 	<< " average = " << vmean << endl;
-    fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
+      fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
 	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6,
 	vmax ) << "\t" << GrainsExec::doubleToString( ios::scientific,
 	6, vmean ) << endl;
-    fVitMax.close();
+      fVitMax.close();
+    }
 
-    // Reload files are alsways written at the end of the simulation
+    // Reload files are always written at the end of the simulation
     if ( !m_error_occured ) saveReload( m_time );
 
     SCT_get_elapsed_time( "OutputResults" );
@@ -198,23 +206,27 @@ void Grains::do_after_time_stepping()
   m_allcomponents.PostProcessing_end();
 
   // Contact features over the simulation
-  cout << endl << "Contact features over the simulation" << endl;
-  cout << GrainsExec::m_shift3 << "Minimal crust thickness = " <<
+  double omax = m_collision->getOverlapMax(),
+  	omean = m_collision->getOverlapMean(),
+	timemax = m_collision->getTimeOverlapMax(),
+	ngjk = m_collision->getNbIterGJKMean();
+  if ( m_wrapper ) m_wrapper->ContactsFeatures( omax, omean, timemax, ngjk );	
+
+  if ( m_rank == 0 )
+  {   
+    cout << endl << "Contact features over the simulation" << endl;
+    cout << GrainsExec::m_shift3 << "Minimal crust thickness = " <<
     	m_allcomponents.getCrustThicknessMin() << endl;
-  cout << GrainsExec::m_shift3 << "Average overlap = " <<
-  	m_collision->getOverlapMean() << endl;
-  cout << GrainsExec::m_shift3 << "Maximum overlap = " <<
-  	m_collision->getOverlapMax() << endl;
-  cout << GrainsExec::m_shift3 << "Time of maximum overlap = " <<
-	m_collision->getTimeOverlapMax() << endl;
-  cout << GrainsExec::m_shift3 << "Average number of iterations of GJK = " <<
-    	m_collision->getNbIterGJKMean() << endl;
+    cout << GrainsExec::m_shift3 << "Maximum overlap = " << omax << endl;
+    cout << GrainsExec::m_shift3 << "Average overlap = " << omean << endl;
+    cout << GrainsExec::m_shift3 << "Time of maximum overlap = " <<
+	timemax << endl;
+    cout << GrainsExec::m_shift3 << "Average number of iterations of GJK = " <<
+    	ngjk << endl;
+  }
 
   // Timer outcome
-  double cputime = CT_get_elapsed_time();
-  cout << endl << "Full problem" << endl;
-  write_elapsed_time_smhd(cout,cputime,"Computation time");
-  SCT_get_summary( cout, cputime );
+  display_timer_summary();
 }
 
 
@@ -2208,4 +2220,17 @@ void Grains::readWindow( DOMNode* nWindow, Window& iwindow,
       grainsAbort();
       break;
   }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Outputs timer summary */
+void Grains::display_timer_summary()
+{
+  double cputime = CT_get_elapsed_time();
+  cout << endl << "Full problem" << endl;
+  write_elapsed_time_smhd( cout, cputime, "Computing time" );
+  SCT_get_summary( cout, cputime );
 }

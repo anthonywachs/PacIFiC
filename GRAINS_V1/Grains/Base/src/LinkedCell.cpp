@@ -68,7 +68,7 @@ size_t LinkedCell::set( double cellsize_, string const& oshift )
   m_LC_local_origin = m_domain_local_origin;
 
   // Number of cells and cell edge length in each direction and
-  // Default in 1 unique cell if cellsize_ is zero
+  // Default is 1 unique cell if cellsize_ is zero
   if ( cellsize_ > EPSILON )
   {
     m_nbi = (int)( ( App::m_domain_local_size_X + EPSILON ) / cellsize_ );
@@ -423,57 +423,99 @@ size_t LinkedCell::set( double cellsize_, string const& oshift )
 
 // ----------------------------------------------------------------------------
 // Sets the linked cell grid in parallel mode
-void LinkedCell::set( double cellsize_, int const* nprocsdir,
+size_t LinkedCell::set( double cellsize_, int const* nprocsdir,
 	int const* MPIcoords, MPINeighbors const* voisins,
-	int const* MPIperiod, string const& oshift )
+	string const& oshift )
 {
+  size_t error = 0;
+
+  // In 2D, we set the domain size in Z to 2*EPSILON and the origin in Z 
+  // to -EPSILON such that the Z position of the cells is always 0
+  if ( GrainsBuilderFactory::getContext() == DIM_2 )
+  {
+    m_domain_global_origin[Z] = - EPSILON;
+    m_domain_local_origin[Z] = - EPSILON; 
+    m_domain_global_size_Z = 2. * EPSILON;
+    m_domain_local_size_Z = 2. * EPSILON;
+    m_domain_global_periodicity[Z] = false;
+  }
+
   m_LC_global_origin = m_domain_global_origin;
   m_LC_local_origin = m_domain_local_origin;
 
   // Number of cells and cell edge length in each direction and
-  // Default in 1 unique cell if cellsize_ is zero
-  if ( cellsize_ > 1.e-10 )
+  // Default is 1 unique cell if cellsize_ is zero
+  if ( cellsize_ > EPSILON )
   {
     m_nbi = (int)( ( App::m_domain_local_size_X + EPSILON ) / cellsize_);
+    if ( !m_nbi ) m_nbi = 1;
     m_cellsize_X = App::m_domain_local_size_X / m_nbi ;
     m_nbj = (int)( ( App::m_domain_local_size_Y + EPSILON ) / cellsize_);
+    if ( !m_nbj ) m_nbj = 1;
     m_cellsize_Y = App::m_domain_local_size_Y / m_nbj ;
-    m_nbk = (int)( ( App::m_domain_local_size_Z + EPSILON ) / cellsize_);
-    m_cellsize_Z = App::m_domain_local_size_Z / m_nbk ;
-    if ( !m_nbk )
+    if ( GrainsBuilderFactory::getContext() == DIM_2 )
     {
       m_nbk = 1;
-      m_cellsize_Z = m_cellsize_Y;
-    }
+      m_cellsize_Z = App::m_domain_local_size_Z;
+    } 
+    else
+    {
+      m_nbk = (int)( ( App::m_domain_local_size_Z + EPSILON ) / cellsize_);
+      if ( !m_nbk ) m_nbk = 1;
+      m_cellsize_Z = App::m_domain_local_size_Z / m_nbk ;    
+    }   
+  }
+  else  
+  {
+    m_nbi = m_nbj = m_nbk = 1;
+    m_cellsize_X = App::m_domain_local_size_X;
+    m_cellsize_Y = App::m_domain_local_size_Y;    
+    m_cellsize_Z = App::m_domain_local_size_Z;
+  }
 
-    // Add cells in halo zones
-    int suppX = 0, suppY = 0, suppZ = 0;
-    if ( MPIcoords[0] != 0 || MPIperiod[0] ) suppX++;
-    if ( MPIcoords[0] != nprocsdir[0] - 1 ||  MPIperiod[0] ) suppX++;
-    m_nbi += suppX;
-    if ( MPIcoords[1] != 0 ||  MPIperiod[1] ) suppY++;
-    if ( MPIcoords[1] != nprocsdir[1] - 1 ||  MPIperiod[1] ) suppY++;
-    m_nbj += suppY;
-    if ( MPIcoords[2] != 0 ||  MPIperiod[2] ) suppZ++;
-    if ( MPIcoords[2] != nprocsdir[2] - 1 ||  MPIperiod[2] ) suppZ++;
-    m_nbk += suppZ;
+  // Add cells in halo zones
+  int suppX = 0, suppY = 0, suppZ = 0;
+  if ( MPIcoords[0] != 0 || m_domain_global_periodicity[0] ) suppX++;
+  if ( MPIcoords[0] != nprocsdir[0] - 1 ||  m_domain_global_periodicity[0] ) 
+    suppX++;
+  m_nbi += suppX;
+  if ( MPIcoords[1] != 0 ||  m_domain_global_periodicity[1] ) suppY++;
+  if ( MPIcoords[1] != nprocsdir[1] - 1 ||  m_domain_global_periodicity[1] ) 
+    suppY++;
+  m_nbj += suppY;
+  if ( MPIcoords[2] != 0 ||  m_domain_global_periodicity[2] ) suppZ++;
+  if ( MPIcoords[2] != nprocsdir[2] - 1 ||  m_domain_global_periodicity[2] ) 
+    suppZ++;
+  m_nbk += suppZ;
 
-    // Local origin of the linked cell grid
-    if ( voisins->rank( -1, 0, 0 ) != -1 ) m_LC_local_origin.Move(
+  // Local origin of the linked cell grid
+  if ( voisins->rank( -1, 0, 0 ) != -1 ) m_LC_local_origin.Move(
     	- m_cellsize_X, 0., 0. );
-    if ( voisins->rank( 0, -1, 0 ) != -1 ) m_LC_local_origin.Move(
+  if ( voisins->rank( 0, -1, 0 ) != -1 ) m_LC_local_origin.Move(
     	0., - m_cellsize_Y, 0. );
-    if ( voisins->rank( 0, 0, -1 ) != -1 ) m_LC_local_origin.Move(
+  if ( voisins->rank( 0, 0, -1 ) != -1 ) m_LC_local_origin.Move(
     	0., 0., - m_cellsize_Z );
 
-    // Periodicity
-    if ( MPIperiod[0] ) m_LC_global_origin.Move( - m_cellsize_X, 0., 0. );
-    if ( MPIperiod[1] )	m_LC_global_origin.Move( 0., - m_cellsize_Y, 0. );
-    if ( MPIperiod[2] )	m_LC_global_origin.Move( 0., 0., - m_cellsize_Z );
-  }
-  else  m_nbi = m_nbj = m_nbk = 1;
+  // Periodicity
+  if ( m_domain_global_periodicity[0] ) 
+    m_LC_global_origin.Move( - m_cellsize_X, 0., 0. );
+  if ( m_domain_global_periodicity[1] )	
+    m_LC_global_origin.Move( 0., - m_cellsize_Y, 0. );
+  if ( m_domain_global_periodicity[2] )	
+    m_LC_global_origin.Move( 0., 0., - m_cellsize_Z );
 
   m_nb = m_nbi * m_nbj * m_nbk;
+
+  if ( voisins->rank( 0, 0, 0 ) == 0 )
+  {
+    cout << oshift << "Linked-cell grid on proc 0" << endl;
+    cout << oshift << "Number of cells = " << m_nbi << " " << m_nbj << " "
+    	<< m_nbk << " = " << m_nbi * m_nbj * m_nbk << endl;
+    cout << oshift << "Cell size = " << m_cellsize_X << " x " << m_cellsize_Y <<
+  	" x " << m_cellsize_Z << endl;
+    cout << oshift << "Global origin = " << m_LC_global_origin << endl;
+    cout << oshift << "Local origin = " << m_LC_global_origin << endl;
+  }
 
   m_LC_local_xmin = m_LC_local_origin[0];
   m_LC_local_ymin = m_LC_local_origin[1];
@@ -491,19 +533,9 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 
   if ( voisins->rank( 0, 0, 0 ) == 0 )
   {
-    cout << "Linked-cell grid on proc 0" << endl;
-    cout << "   Number of cells = " << m_nbi << " " << m_nbj << " "
-    	<< m_nbk << " = " << m_nbi * m_nbj * m_nbk << endl;
-    cout << "   Cell size = " << m_cellsize_X << " x " << m_cellsize_Y <<
-  	" x " << m_cellsize_Z << endl;
-    cout << "   Global origin = " << m_LC_global_origin[X] << " " <<
-    	m_LC_global_origin[Y] << " " <<
-	m_LC_global_origin[Z] << endl;
-    cout << "   Local origin = " << m_LC_local_origin[X] << " " <<
-    	m_LC_local_origin[Y] << " " <<
-	m_LC_local_origin[Z] << endl;
-    cout << "   Max coordinates of local grid = " << m_LC_local_xmax << " " <<
-    	 m_LC_local_ymax << " " << m_LC_local_zmax << endl << endl;
+    cout << oshift << "Local size  = " << m_LC_local_xmax - m_LC_local_xmin
+  	<< " x " << m_LC_local_ymax - m_LC_local_ymin
+	<< " x " << m_LC_local_zmax - m_LC_local_zmin << endl;
   }
 
   // Cells construction
@@ -527,7 +559,7 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	else if ( i == 1 )
 	{
 	  if ( j == 0 ) tag = 2;
-	  else if ( j == 1 || j == 2 )
+	  else if ( j == 1 )
 	  {
 	    // 2D geometry
 	    if ( m_nbk == 1 )
@@ -539,12 +571,12 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	    else
 	    {
 	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
+	      else if ( k == 1 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_SOUTH_WEST_BEHIND;
 	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
+	      else if ( k == m_nbk - 2 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_SOUTH_WEST_FRONT;
@@ -557,7 +589,7 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	      }
 	    }
 	  }
-	  else if ( j == m_nbj - 2 || j == m_nbj - 3 )
+	  else if ( j == m_nbj - 2 )
 	  {
 	    // 2D geometry
 	    if ( m_nbk == 1 )
@@ -569,12 +601,12 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	    else
 	    {
 	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
+	      else if ( k == 1 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_NORTH_WEST_BEHIND;
 	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
+	      else if ( k == m_nbk - 2 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_NORTH_WEST_FRONT;
@@ -600,12 +632,12 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	    else
 	    {
 	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
+	      else if ( k == 1 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_WEST_BEHIND;
 	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
+	      else if ( k == m_nbk - 2 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_WEST_FRONT;
@@ -623,7 +655,7 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	else if ( i == m_nbi - 2 )
 	{
 	  if ( j == 0 ) tag = 2;
-	  else if ( j == 1 || j == 2 )
+	  else if ( j == 1 )
 	  {
 	    // 2D geometry
 	    if ( m_nbk == 1 )
@@ -635,12 +667,12 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	    else
 	    {
 	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
+	      else if ( k == 1 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_SOUTH_EAST_BEHIND;
 	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
+	      else if ( k == m_nbk - 2 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_SOUTH_EAST_FRONT;
@@ -653,7 +685,7 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	      }
 	    }
 	  }
-	  else if ( j == m_nbj - 2 || j == m_nbj - 3 )
+	  else if ( j == m_nbj - 2 )
 	  {
 	    // 2D geometry
 	    if ( m_nbk == 1 )
@@ -665,12 +697,12 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	    else
 	    {
 	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
+	      else if ( k == 1 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_NORTH_EAST_BEHIND;
 	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
+	      else if ( k == m_nbk - 2 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_NORTH_EAST_FRONT;
@@ -716,288 +748,6 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	  }
 	}
 
-	else if ( i == 2 )
-	{
-	  if ( j == 0 ) tag = 2;
-	  else if ( j == 1 )
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 1;
-	      geoLoc = GEOPOS_SOUTH_WEST;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_WEST_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_WEST_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_WEST;
-	      }
-	    }
-	  }
-	  else if ( j == 2 )
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 0;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_WEST_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_WEST_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else tag = 0;
-	    }
-	  }
-	  else if ( j == m_nbj - 3 )
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 0;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_WEST_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_WEST_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else tag = 0;
-	    }
-	  }
-	  else if ( j == m_nbj - 2 )
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 1;
-	      geoLoc = GEOPOS_NORTH_WEST;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_WEST_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_WEST_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_WEST;
-	      }
-	    }
-	  }
-	  else if ( j == m_nbj - 1 ) tag = 2;
-	  else
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 0;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_WEST_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_WEST_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else tag = 0;
-	    }
-	  }
-	}
-
-	else if ( i == m_nbi - 3 )
-	{
-	  if ( j == 0 ) tag = 2;
-	  else if ( j == 1 )
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 1;
-	      geoLoc = GEOPOS_SOUTH_EAST;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_EAST_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_EAST_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_EAST;
-	      }
-	    }
-	  }
-	  else if ( j == 2 )
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 0;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_EAST_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_EAST_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else tag = 0;
-	    }
-	  }
-	  else if ( j == m_nbj - 3 )
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 0;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_EAST_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_EAST_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else tag = 0;
-	    }
-	  }
-	  else if ( j == m_nbj - 2 )
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 1;
-	      geoLoc = GEOPOS_NORTH_EAST;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_EAST_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_EAST_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_EAST;
-	      }
-	    }
-	  }
-	  else if ( j == m_nbj - 1 ) tag = 2;
-	  else
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 0;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_EAST_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_EAST_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else tag = 0;
-	    }
-	  }
-	}
-
 	else
 	{
 	  if ( j == 0 ) tag = 2;
@@ -1014,12 +764,12 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	    else
 	    {
 	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
+	      else if ( k == 1 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_SOUTH_BEHIND;
 	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
+	      else if ( k == m_nbk - 2 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_SOUTH_FRONT;
@@ -1030,56 +780,6 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
 	        tag = 1;
 	        geoLoc = GEOPOS_SOUTH;
 	      }
-	    }
-	  }
-	  else if ( j == 2 )
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 0;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_SOUTH_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else tag = 0;
-	    }
-	  }
-	  else if ( j == m_nbj - 3 )
-	  {
-	    // 2D geometry
-	    if ( m_nbk == 1 )
-	    {
-	      tag = 0;
-	    }
-	    // 3D geometry
-	    else
-	    {
-	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_BEHIND;
-	      }
-	      else if ( k == m_nbk - 2 )
-	      {
-	        tag = 1;
-	        geoLoc = GEOPOS_NORTH_FRONT;
-	      }
-	      else if ( k == m_nbk - 1 ) tag = 2;
-	      else tag = 0;
 	    }
 	  }
 	  else if ( j == m_nbj - 2 )
@@ -1151,52 +851,52 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
   // No neighbor to the left
   if ( voisins->rank( -1, 0, 0 ) == -1 )
   {
-    for (int i=0; i<3; i++)
+    for (int i=0; i<2; i++)
       for (int j=0; j<m_nbj; j++)
         for (int k=0; k<m_nbk; k++)
 	{
-	  getCell( i, j, k )->m_tag = getCell( 3, j, k )->m_tag;
+	  getCell( i, j, k )->m_tag = getCell( 2, j, k )->m_tag;
 	  getCell( i, j, k )->m_GeoPosCell =
-	  	getCell( 3, j, k )->m_GeoPosCell;
+	  	getCell( 2, j, k )->m_GeoPosCell;
 	}
   }
 
   // No neighbor to the right
   if ( voisins->rank( 1, 0, 0 ) == -1 )
   {
-    for (int i=m_nbi-3; i<m_nbi; i++)
+    for (int i=m_nbi-2; i<m_nbi; i++)
       for (int j=0; j<m_nbj; j++)
         for (int k=0; k<m_nbk; k++)
 	{
-	  getCell( i, j, k )->m_tag = getCell( m_nbi-4, j, k )->m_tag;
+	  getCell( i, j, k )->m_tag = getCell( m_nbi-3, j, k )->m_tag;
 	  getCell( i, j, k )->m_GeoPosCell =
-	  	getCell( m_nbi-4, j, k )->m_GeoPosCell;
+	  	getCell( m_nbi-3, j, k )->m_GeoPosCell;
 	}
   }
 
   // No neighbor at the bottom
   if ( voisins->rank( 0, -1, 0 ) == -1 )
   {
-    for (int j=0; j<3; j++)
+    for (int j=0; j<2; j++)
       for (int i=0; i<m_nbi; i++)
         for (int k=0; k<m_nbk; k++)
 	{
-	  getCell( i, j, k )->m_tag = getCell( i, 3, k )->m_tag;
+	  getCell( i, j, k )->m_tag = getCell( i, 2, k )->m_tag;
 	  getCell( i, j, k )->m_GeoPosCell =
-	  	getCell( i, 3, k )->m_GeoPosCell;
+	  	getCell( i, 2, k )->m_GeoPosCell;
 	}
   }
 
   // No neighbor at the top
   if ( voisins->rank( 0, 1, 0 ) == -1 )
   {
-    for (int j=m_nbj-3; j<m_nbj; j++)
+    for (int j=m_nbj-2; j<m_nbj; j++)
       for (int i=0; i<m_nbi; i++)
         for (int k=0; k<m_nbk; k++)
 	{
-	  getCell( i, j, k )->m_tag = getCell( i, m_nbj-4, k )->m_tag;
+	  getCell( i, j, k )->m_tag = getCell( i, m_nbj-3, k )->m_tag;
 	  getCell( i, j, k )->m_GeoPosCell =
-	  	getCell( i, m_nbj-4, k )->m_GeoPosCell;
+	  	getCell( i, m_nbj-3, k )->m_GeoPosCell;
 	}
   }
 
@@ -1206,26 +906,26 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
     // No neighbor behind
     if ( voisins->rank( 0, 0, -1 ) == -1 )
     {
-      for (int k=0; k<3; k++)
+      for (int k=0; k<2; k++)
         for (int i=0; i<m_nbi; i++)
           for (int j=0; j<m_nbj; j++)
 	  {
-	    getCell( i, j, k )->m_tag = getCell( i, j, 3 )->m_tag;
+	    getCell( i, j, k )->m_tag = getCell( i, j, 2 )->m_tag;
 	    getCell( i, j, k )->m_GeoPosCell =
-	    	getCell( i, j, 3 )->m_GeoPosCell;
+	    	getCell( i, j, 2 )->m_GeoPosCell;
 	  }
     }
 
     // No neighbor at the front
     if ( voisins->rank( 0, 0, 1 ) == -1 )
     {
-      for (int k=m_nbk-3; k<m_nbk; k++)
+      for (int k=m_nbk-2; k<m_nbk; k++)
         for (int i=0; i<m_nbi; i++)
           for (int j=0; j<m_nbj; j++)
 	  {
-	    getCell( i, j, k )->m_tag = getCell( i, j, m_nbk-4 )->m_tag;
+	    getCell( i, j, k )->m_tag = getCell( i, j, m_nbk-3 )->m_tag;
 	    getCell( i, j, k )->m_GeoPosCell =
-	    	getCell( i, j, m_nbk-4 )->m_GeoPosCell;
+	    	getCell( i, j, m_nbk-3 )->m_GeoPosCell;
 	  }
     }
   }
@@ -1233,6 +933,8 @@ void LinkedCell::set( double cellsize_, int const* nprocsdir,
   // Sets the the list of neighboring cells over which broad phase
   // contact detection is performed
   setCellContactNeighborhood();
+  
+  return ( error );  
 }
 
 

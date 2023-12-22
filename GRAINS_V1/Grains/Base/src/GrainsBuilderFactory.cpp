@@ -4,6 +4,7 @@
 #include "GrainsTestDev.hh"
 #include "GrainsCoupledWithFluid.hh"
 #include "GrainsPostProcessing.hh"
+#include "GrainsMPI.hh"
 #include <string>
 using namespace std;
 
@@ -26,6 +27,7 @@ Grains* GrainsBuilderFactory::create( DOMElement* root )
   if ( type == "Grains3D" ) m_context = DIM_3;  
   
   if ( option == "Standard" ) grains = new Grains();
+  else if ( option == "MPI" ) grains = new GrainsMPI();  
   else if ( option == "Parameters" ) grains = new GrainsParameters();
   else if ( option == "CompositeRigidBody" ) grains = new GrainsCRBFeatures();
   else if ( option == "TestDev" ) grains = new GrainsTestDev(); 

@@ -207,11 +207,9 @@ class LinkedCell : public AppCollision
     @param nprocsdir number of subdomains in each direction
     @param MPIcoords subdomain coordinates in the MPI Cartesian topology
     @param voisins neighboring subdomain in the MPI Cartesian topology
-    @param MPIperiod periodicity of the MPI Cartesian topology
     @param oshift empty string to shift the output */
-    void set( double cellsize_, int const* nprocsdir, int const* MPIcoords,
-  	MPINeighbors const* voisins, int const* MPIperiod,
-	string const& oshift );
+    size_t set( double cellsize_, int const* nprocsdir, int const* MPIcoords,
+  	MPINeighbors const* voisins, string const& oshift );
     //@}
 
 

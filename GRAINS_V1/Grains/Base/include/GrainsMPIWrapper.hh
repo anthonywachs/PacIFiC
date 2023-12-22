@@ -35,9 +35,10 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param NZ number of processes (=subdomains) in the Z direction
     @param PERX periodicity in the X direction (1 if periodic, 0 otherwise) 
     @param PERY periodicity in the Y direction (1 if periodic, 0 otherwise) 
-    @param PERZ periodicity in the Z direction (1 if periodic, 0 otherwise) */
+    @param PERZ periodicity in the Z direction (1 if periodic, 0 otherwise) 
+    @param oshift empty string to shift the output */
     GrainsMPIWrapper( int NX, int NY, int NZ,
-  	int PERX, int PERY, int PERZ );
+  	int PERX, int PERY, int PERZ, string const& oshift );
   
     /** @brief Destructor */
     ~GrainsMPIWrapper();
@@ -250,7 +251,7 @@ class GrainsMPIWrapper : public SolverComputingTime
     void setCommLocal(); 
   
     /** @brief Outputs timer summary */
-    void bilanTimer() const;
+    void timerSummary() const;
   
     /** @brief Outputs the MPI log string per process and reinitialize it to
     empty
@@ -346,8 +347,9 @@ class GrainsMPIWrapper : public SolverComputingTime
     /** @name I/O methods */
     //@{  
     /** @brief Writes the MPI wrapper features in a stream
-    @param f output stream */
-    void display( ostream& f ) const;
+    @param f output stream 
+    @param oshift empty string to shift the output */
+    void display( ostream& f, string const& oshift ) const;
 
     /** @brief Writes the memory consumption per process in a stream
     @param f output flux */
