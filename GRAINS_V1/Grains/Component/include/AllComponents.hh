@@ -165,9 +165,14 @@ class AllComponents
     void resetKinematics( string const& reset );
 
     /** @brief Transfer the inactive particle waiting to be inserted to the list
-    of active particles */
-    void ShiftParticleOutIn();
+    of active particles 
+    @param parallel true if Grains runs in parallel mode */
+    void ShiftParticleOutIn( bool const& parallel = false );
 
+    /** @brief Removes the inactive particle waiting to be inserted from the
+    list of inactive particles and destroys it */
+    void DeleteAndDestroyWait();
+  
     /** @brief Computes and returns the maximum and mean translational velocity
     of all components i.e. particles and obstacles
     @param vmax maximum translational velocity
@@ -269,21 +274,35 @@ class AllComponents
     /** @brief Returns the cumulative volume of all inactives particles */
     double getVolumeOut() const;
 
-    /** @brief Returns the total number of particles, both active and
-    inactive */
+    /** @brief Returns the number of particles in this process */
     size_t getNumberParticles() const;
+    
+    /** @brief Returns the total number of particles in the
+    system (i.e. on all subdomains/processes) */
+    size_t getTotalNumberParticles() const;    
 
-    /** @brief Returns the number of active particles */
+    /** @brief Returns the number of active particles in this process */
     size_t getNumberActiveParticles() const;
+    
+    /** @brief Returns the total number of active particles in the system (i.e. 
+    on all subdomains/processes) */
+    size_t getTotalNumberActiveParticles() const;    
 
-    /** @brief Returns the number of active particles with tag 0 ou 1 */
+    /** @brief Returns the number of active particles in this process with tag 
+    0 ou 1 */
     size_t getNumberActiveParticlesOnProc() const;
 
-    /** @brief Returns the total number of particles on all processes */
-    size_t getNumberParticlesOnAllProc() const;
+    /** @brief Returns the total number of active particles with tag 
+    0 ou 1 in the system (i.e. on all subdomains/processes) */
+    size_t getNumberActiveParticlesOnAllProc() const;
 
     /** @brief Returns the number of inactive particles */
     size_t getNumberInactiveParticles() const;
+    
+    /** @brief Returns the total number of particles in the physical system 
+    (i.e. on all subdomains/processes), i.e. sum of total number of active 
+    particles with tag 0 or 1 and inactive particles */
+    size_t getTotalNumberPhysicalParticles() const;    
 
     /** @brief Returns the highest particle ID number */
     int getMaxParticleIDnumber() const;
@@ -295,9 +314,9 @@ class AllComponents
 
     /**@name Methods Set */
     //@{
-    /** @brief Sets the total number of particles on all processes
-    @param nb_ total number of particles on all processes */
-    void setNumberParticlesOnAllProc( size_t const& nb_ );
+    /** @brief Computes and sets the numbers of particles in the system 
+    @param wrapper MPI wrapper */
+    void computeNumberParticles( GrainsMPIWrapper const* wrapper );    
 
     /** @brief Sets the frequency at which the relationship between obstacles
     and linked cell grid is updated
@@ -413,8 +432,24 @@ class AllComponents
     multimap<int,Particle*> m_PeriodicCloneParticles; /**< Periodic clone
     	particles and their relation to their master particle through its ID
 	number */
+    size_t m_nb_particles; /**< number of particles in this process */
     size_t m_total_nb_particles; /**< total number of particles in the system
   	(i.e. on all subdomains/processes) */
+    size_t m_nb_active_particles; /**< number of active particles in this 
+    	process */
+    size_t m_total_nb_active_particles; /**< total number of active particles 
+    	in the system (i.e. on all subdomains/processes) */
+    size_t m_nb_active_particles_on_proc; /**< number of active particles in 
+    	this process with tag 0 or 1 */
+    size_t m_total_nb_active_particles_on_all_procs; /**< total number of 
+    	active particles with tag 0 or 1 in the system 
+	(i.e. on all subdomains/processes) */
+    size_t m_nb_inactive_particles; /**< number of inactive particles in the
+    	system (i.e. on all subdomains/processes) */
+    size_t m_total_nb_physical_particles; /**< total number of particles 
+    	in the physical system (i.e. on all subdomains/processes), i.e. sum of 
+	total number of active particles with tag 0 or 1 and inactive 
+	particles */		
     Obstacle *m_obstacle; /**< Root obstacle */
     list<PostProcessingWriter*> m_postProcessors; /**< list of
   	post-processors */

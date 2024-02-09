@@ -59,8 +59,7 @@ void GrainsPostProcessing::do_before_time_stepping( DOMElement* rootElement )
   m_allcomponents.Link( *m_collision );
 
   // Number of particles: inserted and in the system
-  m_allcomponents.setNumberParticlesOnAllProc( 
-  	m_allcomponents.getNumberParticles() );
+  m_allcomponents.computeNumberParticles( m_wrapper );
   m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
 
   // Initialisation obstacle kinematics

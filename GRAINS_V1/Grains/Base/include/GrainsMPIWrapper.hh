@@ -374,7 +374,7 @@ class GrainsMPIWrapper : public SolverComputingTime
     int m_nprocs; /**< number of active processes */
     int m_nprocs_world; /**< total number of processes */
     bool m_is_activ; /**< is this process active ? */  
-    MPINeighbors *m_voisins; /**< neighbors of the process in the MPI cartesian 
+    MPINeighbors *m_neighbors; /**< neighbors of the process in the MPI cartesian 
     	topology */
     MPI_Comm *m_commgrainsMPI_3D; /**< MPI cartesian communicator */
     vector<MPI_Group*> m_groupMPINeighbors; /**< local groups involving 
@@ -398,7 +398,7 @@ class GrainsMPIWrapper : public SolverComputingTime
     static vector<int> m_GeoLocReciprocity; /**< reciprocal correspondence of
   	GeoPosition (ex: GEOPOS_BEHIND -> GEOPOS_FRONT ) */
     vector<Vector3> m_MPIperiodes; /**< periodic vectors */
-    multimap<int,Particle*> AccessToClones; /**< facilitates access to clone
+    multimap<int,Particle*> m_AccessToClones; /**< facilitates access to clone
     	particles via their ID number */
     //@}
 

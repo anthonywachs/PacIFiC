@@ -1942,6 +1942,35 @@ bool LinkedCell::insertParticleSerial( Particle* particle,
 
 
 // ----------------------------------------------------------------------------
+// Attempts to insert a particle in parallel mode
+pair<bool,bool> LinkedCell::insertParticleParallel( Particle* particle, 
+	list<Particle*>* particles,
+    	bool const& force_insertion,
+	GrainsMPIWrapper const* wrapper )
+{
+  // First is "Is in LinkedCell?" and second is "Is contact?"
+  pair<bool,bool> insert(false,false);
+
+  // Check whether the particle belongs to the local Linked Cell
+  insert.first = isInLinkedCell( *(particle->getPosition()) );
+  
+  // Check contacts
+  if ( !force_insertion )
+  {
+    if ( insert.first ) insert.second = isContactWithCrust( particle );  
+    insert.second = wrapper->max_INT( insert.second );     
+  }
+  
+  // If contact is false and inLinkCell is true, link particle 
+  if ( !insert.second && insert.first ) Link( particle ); 
+  
+  return ( insert );  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Updates periodic clones and destroy those out of the linked cell grid in
 // serial mode
 void LinkedCell::updateDestroyPeriodicClones( list<Particle*>* particles,

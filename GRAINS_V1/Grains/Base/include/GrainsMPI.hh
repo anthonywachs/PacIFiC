@@ -47,6 +47,19 @@ class GrainsMPI : virtual public Grains
   protected:
     /**@name Methods */
     //@{
+    /** @brief Attempts to insert a particle in the simulation
+    @param mode insertion order */
+    virtual bool insertParticle( PullMode const& mode );
+
+    /** @brief Sets particle initial positions from a file 
+    @param mode insertion order */
+    virtual void setPositionParticlesFromFile( 
+    	PullMode const& mode = PM_ORDERED );
+  
+    /** @brief Sets particle initial position with a structured array
+    @param mode insertion order */
+    virtual void setPositionParticlesArray( const PullMode& mode = PM_ORDERED );
+
     /** @brief Reads data for MPI simulations and creates and sets the MPI
     wrapper
     @param lx global domain size in the X direction
@@ -70,6 +83,9 @@ class GrainsMPI : virtual public Grains
     
     /** @brief Returns the maximum particle ID number */
     virtual int getMaxParticleIDnumber() const;
+
+    /** @brief Creates, inserts and links new particles in the simulation */
+    virtual void InsertCreateNewParticles(); 
     
     /** @brief Displays the memory used by the simulation */
     virtual void display_used_memory() const; 
@@ -78,7 +94,17 @@ class GrainsMPI : virtual public Grains
     virtual void synchronize_PPWindow();
     
     /** @brief Outputs timer summary */
-    virtual void display_timer_summary();                  
+    virtual void display_timer_summary();
+    
+    /** @brief Returns a particle class among the classes of new particles to
+    insert
+    @param mode particle insertion order
+    @param ParticleClassesForCreation classes of new particles to insert
+    @param random_local true if random is on the process, otherwise random over
+    all processes */
+    Particle* getParticleClassForCreation( PullMode const& mode,
+  	list< pair<Particle*,int> >& ParticleClassesForCreation,
+	bool const& random_local );                      
     //@}
   
 };

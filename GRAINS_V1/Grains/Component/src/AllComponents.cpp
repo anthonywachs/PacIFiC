@@ -18,7 +18,14 @@
 // Default constructor
 AllComponents::AllComponents()
   : m_wait( NULL )
+  , m_nb_particles( 0 )
   , m_total_nb_particles( 0 )
+  , m_nb_active_particles( 0 )
+  , m_total_nb_active_particles( 0 )
+  , m_nb_active_particles_on_proc( 0 )
+  , m_total_nb_active_particles_on_all_procs( 0 )
+  , m_nb_inactive_particles( 0 )
+  , m_total_nb_physical_particles( 0 )
   , m_obstacle( NULL )
   , m_outputTorsorObstacles_counter( 1 )
   , m_outputTorsorObstacles_frequency( 0 )
@@ -39,8 +46,8 @@ AllComponents::~AllComponents()
   	particle!=m_ActiveParticles.end(); particle++)
     delete *particle;
 
-  for (particle=m_InactiveParticles.begin(); particle!=m_InactiveParticles.end();
-       	particle++)  delete *particle;
+  for (particle=m_InactiveParticles.begin(); 
+  	particle!=m_InactiveParticles.end();particle++)  delete *particle;
 
   m_ActiveParticles.clear();
   m_InactiveParticles.clear();
@@ -731,14 +738,30 @@ void AllComponents::resetKinematics( string const& reset )
 // ----------------------------------------------------------------------------
 // Transfer the inactive particle waiting to be inserted to the list
 // of active particles
-void AllComponents::ShiftParticleOutIn()
+void AllComponents::ShiftParticleOutIn( bool const& parallel )
 {
   m_wait->setActivity( COMPUTE );
   removeParticleFromList( m_InactiveParticles, m_wait );
   m_ActiveParticles.push_back( m_wait );
-//   if ( m_wait->getTag() == 1 ) m_ParticlesInHalozone.push_back(m_wait);
-//   else if ( m_wait->getTag() == 2 ) m_CloneParticles.push_back(m_wait);
+  if ( parallel )
+  {
+    if ( m_wait->getTag() == 1 ) m_ParticlesInHalozone.push_back(m_wait);
+    else if ( m_wait->getTag() == 2 ) m_CloneParticles.push_back(m_wait);
+  }
   m_wait = NULL;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Removes the inactive particle waiting to be inserted from the
+// list of inactive particles and destroys it
+void AllComponents::DeleteAndDestroyWait()
+{
+  removeParticleFromList( m_InactiveParticles, m_wait );
+  delete m_wait;
+  m_wait = NULL;  
 }
 
 
@@ -1514,17 +1537,6 @@ void AllComponents::initialiseOutputObstaclesLoadFiles( int rank,
 
 
 // ----------------------------------------------------------------------------
-// Sets the total number of particles on all processes
-void AllComponents::setNumberParticlesOnAllProc( size_t const& nb_ )
-{
-  m_total_nb_particles = int(nb_);
-  GrainsExec::setNumberParticlesOnAllProc( m_total_nb_particles );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Sets a random translational and angular velocity to all particles
 void AllComponents::setRandomMotion( double const& coefTrans,
 	double const& coefRot )
@@ -1592,35 +1604,21 @@ void AllComponents::setAllContactMapFeaturesToZero()
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of inactive particles
-size_t AllComponents::getNumberInactiveParticles() const
+// Returns the number of particles in this process
+size_t AllComponents::getNumberParticles() const
 {
-  return ( m_InactiveParticles.size() );
+  return ( m_nb_particles );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns the total number of particles on all processes
-size_t AllComponents::getNumberParticlesOnAllProc() const
+// Returns the number of particles total number of particles in the
+// system (i.e. on all subdomains/processes)
+size_t AllComponents::getTotalNumberParticles() const
 {
   return ( m_total_nb_particles );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns the number of active particles with tag 0 ou 1
-size_t AllComponents::getNumberActiveParticlesOnProc() const
-{
-  size_t nb_part = m_ActiveParticles.size();
-  for (list<Particle*>::const_iterator il=m_ActiveParticles.begin();
-  	il!=m_ActiveParticles.end();il++)
-    if ( (*il)->getTag() == 2 || (*il)->getID() == -2 ) nb_part--;
-
-  return nb_part;
 }
 
 
@@ -1630,15 +1628,92 @@ size_t AllComponents::getNumberActiveParticlesOnProc() const
 // Returns the number of active particles
 size_t AllComponents::getNumberActiveParticles() const
 {
-  return ( m_ActiveParticles.size() );
+  return ( m_nb_active_particles );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns the total number of particles, both active and inactive
-size_t AllComponents::getNumberParticles() const
+// Returns the total number of active particles in the system (i.e. 
+// on all subdomains/processes)
+size_t AllComponents::getTotalNumberActiveParticles() const
 {
-  return ( m_ActiveParticles.size() + m_InactiveParticles.size() );
+  return ( m_total_nb_active_particles );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of active particles in this process with tag 0 ou 1
+size_t AllComponents::getNumberActiveParticlesOnProc() const
+{
+  return ( m_nb_active_particles_on_proc );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the total number of active particles with tag 0 ou 1 in the system 
+// (i.e. on all subdomains/processes)
+size_t AllComponents::getNumberActiveParticlesOnAllProc() const
+{
+  return ( m_total_nb_active_particles_on_all_procs );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of inactive particles
+size_t AllComponents::getNumberInactiveParticles() const
+{
+  return ( m_nb_inactive_particles );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the total number of particles in the physical system 
+// (i.e. on all subdomains/processes), i.e. sum of total number of active 
+// particles with tag 0 or 1 and inactive particles
+size_t AllComponents::getTotalNumberPhysicalParticles() const
+{
+  return ( m_total_nb_physical_particles );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes and sets the numbers of particles in the system */
+void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
+{
+  m_nb_inactive_particles = m_InactiveParticles.size();  
+
+  m_nb_active_particles = m_ActiveParticles.size();
+
+  if ( wrapper ) m_total_nb_active_particles = wrapper->sum_UNSIGNED_INT( 
+  	 m_nb_active_particles );
+  else m_total_nb_active_particles = m_nb_active_particles;  
+
+  m_nb_particles = m_nb_active_particles + m_nb_inactive_particles;
+
+  m_total_nb_particles = m_total_nb_active_particles + m_nb_inactive_particles;
+
+  m_nb_active_particles_on_proc = m_ActiveParticles.size();
+  for (list<Particle*>::const_iterator il=m_ActiveParticles.begin();
+  	il!=m_ActiveParticles.end();il++)
+    if ( (*il)->getTag() == 2 || (*il)->getID() == -2 ) 
+      m_nb_active_particles_on_proc--; 
+
+  if ( wrapper ) m_total_nb_active_particles_on_all_procs = 
+  	wrapper->sum_UNSIGNED_INT( m_nb_active_particles_on_proc );
+  else m_total_nb_active_particles_on_all_procs = m_nb_active_particles_on_proc;
+  
+  m_total_nb_physical_particles = m_total_nb_active_particles_on_all_procs
+  	+ m_nb_inactive_particles;
 }

@@ -103,8 +103,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
   InsertCreateNewParticles();
 
   // Number of particles: inserted and in the system
-  m_allcomponents.setNumberParticlesOnAllProc(
-  	m_allcomponents.getNumberParticles() );
+  m_allcomponents.computeNumberParticles( m_wrapper );
   m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
 
   // Initialisation of obstacle kinematics
@@ -120,7 +119,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
   	m_insertion_windows, m_rank, m_nprocs, m_wrapper );
 
   // Track component max and mean velocity
-  m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean );
+  m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );
   if ( m_rank == 0 ) 
   {
     fVitMax.open( (m_fileSave + "_VelocityMaxMean.dat").c_str(), ios::out );
@@ -130,7 +129,6 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
     	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmax )
 	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmean )
 	<< endl;
-    fVitMax.close();
   }
 
   // Display memory used by Grains
@@ -275,6 +273,7 @@ void Grains::Simulation( double time_interval )
 
 
       // Insertion of particles
+      m_allcomponents.computeNumberParticles( m_wrapper );
       SCT_set_start( "ParticlesInsertion" );
       if ( m_npwait_nm1 != m_allcomponents.getNumberInactiveParticles() )
           cout << "\r                                              "
@@ -1168,7 +1167,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
               }
 	    }
 	  }
-  }
+        }
       }
       else
       {
@@ -1529,12 +1528,10 @@ void Grains::InsertCreateNewParticles()
   }
 
   if ( m_rank == 0 )
-  {
     cout << "Particle volume IN  : " <<
     	m_allcomponents.getVolumeIn()  << endl
 	<< "                OUT : " <<
 	m_allcomponents.getVolumeOut() << endl;
-  }
 }
 
 
@@ -1651,7 +1648,7 @@ Point3 Grains::getInsertionPoint() const
 
 
 // ----------------------------------------------------------------------------
-// Insertion d'une particle dans les algorithmes
+// Attempts to insert a particle in the simulation
 bool Grains::insertParticle( PullMode const& mode )
 {
   static size_t insert_counter = 0;

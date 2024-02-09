@@ -171,6 +171,17 @@ class LinkedCell : public AppCollision
     void createDestroyPeriodicClones( list<Particle*>* particles,
     	multimap<int,Particle*>* particlesPeriodicClones,
 	vector<Particle*> const* ReferenceParticles );
+	
+    /** @brief Attempts to insert a particle in parallel mode
+    @param particle particle
+    @param particles list of active particles
+    @param force_insertion force insertion regardless of potential contacts with
+    other particles or obstacles 
+    @param wrapper MPI wrapper */
+    pair<bool,bool> insertParticleParallel( Particle* particle, 
+    	list<Particle*>* particles,
+    	bool const& force_insertion,
+	GrainsMPIWrapper const* wrapper = NULL );	
     //@}
 
 
