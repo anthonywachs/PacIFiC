@@ -165,13 +165,11 @@ void Grains::do_after_time_stepping()
 {
   double vmax = 0., vmean = 0. ;
 
-  // Particles in & out at the end of the simulation
-  size_t nact = m_allcomponents.getNumberActiveParticlesOnProc();
-  if ( m_wrapper ) m_wrapper->sum_UNSIGNED_INT( nact );  
+  // Particles in & out at the end of the simulation 
   if ( m_rank == 0 )
   {  
     cout << endl << "Number of active particles in the simulation = " 
-    	<< nact << endl;
+    	<< m_allcomponents.getNumberActiveParticlesOnAllProc() << endl;
     cout << "Number of inactive particles in the simulation = " 
     	<< m_allcomponents.getNumberInactiveParticles() << endl;
   }	
@@ -1699,6 +1697,8 @@ bool Grains::insertParticle( PullMode const& mode )
 	qrot.setQuaternion( particle->getRigidBody()->getTransform()
 		->getBasis() );
 	particle->setQuaternionRotation( qrot );
+	particle->InitializeForce( true );
+	particle->computeAcceleration( m_time );
       }
     }
   }

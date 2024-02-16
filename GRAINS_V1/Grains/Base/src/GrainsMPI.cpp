@@ -47,6 +47,7 @@ void GrainsMPI::initialOutputMessage()
 void GrainsMPI::Simulation( double time_interval )
 {
   double vmax = 0., vmean = 0. ;
+  list<Particle*>* newHaloPart = new list<Particle*>;
 
   // Timers
   SCT_insert_app( "ParticlesInsertion" );
@@ -72,7 +73,8 @@ void GrainsMPI::Simulation( double time_interval )
 	{
 	  // Set the global data output boolean to true
 	  GrainsExec::m_output_data_at_this_time = true;
-	  if ( m_rank == 0 ) cout << endl << "Time = " << m_time << endl;
+	  if ( m_rank == 0 ) cout << endl << "Time = " << m_time << endl
+	  	<< std::flush;
 
 	  // Reset counter for force postprocessing
 	  m_collision->resetPPForceIndex();
@@ -85,7 +87,7 @@ void GrainsMPI::Simulation( double time_interval )
 	}
 
 
-      // Insertion of particles
+      // Insertion of particles     
       SCT_set_start( "ParticlesInsertion" );
       m_allcomponents.computeNumberParticles( m_wrapper );
       if ( GrainsExec::m_output_data_at_this_time )
@@ -116,9 +118,57 @@ void GrainsMPI::Simulation( double time_interval )
 
    
       // Update particle position and velocity
-      
-      
+      m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
+	m_allcomponents.getActiveParticles(),
+  	m_allcomponents.getParticlesInHalozone(),
+  	m_allcomponents.getCloneParticles(),
+	m_allcomponents.getReferenceParticles(),
+	m_collision, true );
+
+
+      // Destroy out of domain clones
+      m_collision->DestroyOutOfDomainClones( m_time,
+	m_allcomponents.getActiveParticles(),
+	m_allcomponents.getCloneParticles(),
+	m_wrapper );      
       SCT_get_elapsed_time( "Move" );
+      
+      
+      // Update particle activity
+      SCT_set_start( "UpdateParticleActivity" );
+      m_allcomponents.UpdateParticleActivity();
+      SCT_get_elapsed_time( "UpdateParticleActivity" );
+
+
+      // Update the particle & obstacles links with the grid
+      SCT_set_start( "LinkUpdate" );
+      m_collision->LinkUpdate( m_time, m_dt, 
+      	m_allcomponents.getActiveParticles() );  
+      m_allcomponents.updateParticleLists( m_time, newHaloPart ); 
+
+
+      // Create new clones
+      m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
+	m_allcomponents.getActiveParticles(),
+  	newHaloPart,
+  	m_allcomponents.getCloneParticles(),
+	m_allcomponents.getReferenceParticles(),
+	m_collision, false );
+      SCT_get_elapsed_time( "LinkUpdate" );
+      
+      
+      // Compute particle forces and acceleration
+      // Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)
+      SCT_set_start( "ComputeForces" );
+      computeParticlesForceAndAcceleration();
+      SCT_get_elapsed_time( "ComputeForces" );
+
+
+      // Update particle velocity over dt/2
+      // v_i+1 = v_i+1/2 + a_i+1 * dt / 2 
+      SCT_set_start( "Move" );      
+      m_allcomponents.advanceParticlesVelocity( m_time, 0.5 * m_dt );            
+      SCT_add_elapsed_time( "Move" );
 
       // Write force & torque exerted on obstacles
       m_allcomponents.outputObstaclesLoad( m_time, m_dt );
@@ -143,13 +193,17 @@ void GrainsMPI::Simulation( double time_interval )
 
 	// Display memory used by Grains
 	display_used_memory();
-
-	// Write reload files
-	saveReload( m_time );
+		
+        // Summary of MPI particle comms
+        if ( GrainsExec::m_MPI_verbose ) 
+          m_wrapper->writeAndFlushMPIString( cout );		
 
 	// Write postprocessing files
         m_allcomponents.PostProcessing( m_time, m_dt, m_collision,
 		m_rank, m_nprocs, m_wrapper );
+
+	// Write reload files
+	saveReload( m_time );
 
 	SCT_get_elapsed_time( "OutputResults" );
       }
@@ -208,6 +262,9 @@ void GrainsMPI::readDomainDecomposition( DOMNode* root,
   m_processorIsActive = m_wrapper->isActive();
   m_rank = m_wrapper->get_rank_active();
   m_nprocs = m_wrapper->get_total_number_of_active_processes();
+  DOMNode* mpiNode = ReaderXML::getNode( root, "Verbosity" );
+  GrainsExec::m_MPI_verbose = 
+  	ReaderXML::getNodeAttr_Int( mpiNode, "Level" );
   if ( m_processorIsActive )
   {      
     // Local domain geometric features
@@ -234,7 +291,7 @@ void GrainsMPI::readDomainDecomposition( DOMNode* root,
 bool GrainsMPI::insertParticle( PullMode const& mode )
 {
   static size_t insert_counter = 0;
-  pair<bool,bool> insert(false,false);
+  pair<bool,bool> insert( false, false );
   Vector3 vtrans, vrot ;
   Point3 position;
   Matrix mrot;
@@ -254,8 +311,8 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
     //  m_allcomponents.getParticle( mode ) when mode == PM_RANDOM
     Particle *particle = NULL;
     if ( m_position != "" ) 
-      particle = m_allcomponents.getParticle( PM_ORDERED );
-    else particle = m_allcomponents.getParticle( mode );
+      particle = m_allcomponents.getParticle( PM_ORDERED, m_wrapper );
+    else particle = m_allcomponents.getParticle( mode, m_wrapper );
     
     if ( particle )
     {
@@ -320,11 +377,13 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
         // If particle is in LinkedCell
 	if ( insert.first )
 	{
-	  m_allcomponents.ShiftParticleOutIn();
+	  m_allcomponents.ShiftParticleOutIn( true );
 	  Quaternion qrot;
 	  qrot.setQuaternion( particle->getRigidBody()->getTransform()
 		->getBasis() );
 	  particle->setQuaternionRotation( qrot );
+	  particle->InitializeForce( true );
+	  particle->computeAcceleration( m_time );
         }
 	// If not in LinkedCell
         else

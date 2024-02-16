@@ -46,8 +46,7 @@ class CompositeParticle : public Particle
     @param m particle position & configuration as a 1D array
     @param activ particle activity
     @param tag_ tag of the cell the particle belongs to
-    @param coordination_number_ particle coordination number
-    @param updatePosition whether we update position or not */
+    @param coordination_number_ particle coordination number */
     CompositeParticle( int const& id_, Particle const* ParticleRef,
 	double const& vx, double const& vy, double const& vz,
 	double const& qrotationx, double const& qrotationy,
@@ -56,8 +55,7 @@ class CompositeParticle : public Particle
 	const double m[12],
 	ParticleActivity const& activ,
 	int const& tag_,
-	int const& coordination_number_ = 0,
- 	bool const& updatePosition = false );
+	int const& coordination_number_ = 0 );
 
     /** @brief Constructor with input parameters. This constructor is expected
     to be used for periodic clone particle. Autonumbering
@@ -287,6 +285,20 @@ class CompositeParticle : public Particle
     transformation
     @param transform_ transformation */
     void setTransform( Transform const& transform_ );
+    
+    /** @brief Sets the rotation quaternion
+    @param vecteur0 x component of the quaternion
+    @param vecteur1 y component of the quaternion
+    @param vecteur2 z component of the quaternion
+    @param scalaire scalar component of the quaternion */
+    void setQuaternionRotation( double const& vecteur0,
+	double const& vecteur1,
+	double const& vecteur2,
+	double const& scalaire );
+
+    /** @brief Sets the rotation quaternion
+    @param qrot rotation quaternion */
+    void setQuaternionRotation( Quaternion const& qrot );    
     //@}
 
 

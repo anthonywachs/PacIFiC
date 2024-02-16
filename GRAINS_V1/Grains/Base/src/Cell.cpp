@@ -596,7 +596,16 @@ string Cell::getGeoPositionName_generic( int geoloc_ )
       break;      
     case GEOPOS_NONE:
       name = "NONE";
-      break;  
+      break; 
+    case GEOPOS_EASTWEST:
+      name = "EAST_WEST";
+      break;      
+    case GEOPOS_NORTHSOUTH:
+      name = "NORTH_SOUTH";
+      break;      
+    case GEOPOS_EASTWESTNORTHSOUTH:
+      name = "EAST_WEST_NORTH_SOUTH";
+      break;              
   }      
       
   return ( name );

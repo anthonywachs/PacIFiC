@@ -1307,44 +1307,38 @@ void GrainsMPIWrapper::display( ostream& f, string const& oshift ) const
     for (int j=0;j<3;++j) f << "P[" << j << "]=" << m_period[j] << " ";
     f << endl;    
   }
-  MPI_Barrier( m_MPI_COMM_activProc );
-  
-  for (int m=0;m<m_nprocs;++m)
-  {
-    if ( m == m_rank && m_is_activ )
-    {      
-      f << oshift << GrainsExec::m_shift3 << "Process = " << m_rank << 
-      	" PID = " << getpid() << endl;
-      f << oshift << GrainsExec::m_shift3 << "Position in the MPI cartesian"
+
+  ostringstream out;
+  out << oshift << GrainsExec::m_shift3 << "Process PID = " << getpid() << endl;
+  out << oshift << GrainsExec::m_shift3 << "Position in the MPI cartesian"
       	" topology = ";
-      for (int j=0;j<3;++j) f << m_coords[j] << " ";
-      f << endl;
-      f << oshift << GrainsExec::m_shift3 << "Neighboring processes in the MPI "
+  for (int j=0;j<3;++j) out << m_coords[j] << " ";
+  out << endl;
+  out << oshift << GrainsExec::m_shift3 << "Neighboring processes in the MPI "
       	"cartesian topology" << endl;
-      f << oshift << GrainsExec::m_shift3 
-      	<< "---------------------------------------------------" << endl;
-      for (int i=-1;i<2;i++)
-        for (int j=-1;j<2;j++)
-          for (int k=-1;k<2;k++)
-	    if ( m_neighbors->rank( i, j, k ) != -1 )
-            {  
-              f << oshift << GrainsExec::m_shift3 << "Neighbor (" << i << "," 
-	      	<< j << "," << k << ") GEOLOC = " << Cell::getGeoPositionName( 
-			getGeoPosition( i, j, k ) ) << endl;
-	      int const* coords_ = m_neighbors->coordinates( i, j, k );
-	      f << oshift << GrainsExec::m_shift3 
+  out << oshift << GrainsExec::m_shift3 
+      	<< "---------------------------------------------------";
+  for (int i=-1;i<2;i++)
+    for (int j=-1;j<2;j++)
+      for (int k=-1;k<2;k++)
+        if ( m_neighbors->rank( i, j, k ) != -1 )
+        {  
+          out << endl << oshift << GrainsExec::m_shift3 << "Neighbor (" << i 
+	  	<< "," << j << "," << k << ") GEOLOC = " << 
+		Cell::getGeoPositionName( getGeoPosition( i, j, k ) ) << endl;
+	  int const* coords_ = m_neighbors->coordinates( i, j, k );
+	  out << oshift << GrainsExec::m_shift3 
 	      	<< "Position in MPI topology = " << coords_[0] << " "
 		<< coords_[1] << " " << coords_[2] << endl;
-	      f << oshift << GrainsExec::m_shift3 << "Rank in MPI topology = " 
+	  out << oshift << GrainsExec::m_shift3 << "Rank in MPI topology = " 
 	      	<< m_neighbors->rank( i, j, k ) << endl;
-	      f << oshift << GrainsExec::m_shift3 << "MPI periodic vector = " 
+	  out << oshift << GrainsExec::m_shift3 << "MPI periodic vector = " 
 	      	<< m_MPIperiodes[ getGeoPosition( i, j, k ) ][X] << " " << 
 	      	m_MPIperiodes[ getGeoPosition( i, j, k ) ][Y] << " " << 
-	      	m_MPIperiodes[ getGeoPosition( i, j, k ) ][Z] << endl;	
-            }
-    }
-    MPI_Barrier( m_MPI_COMM_activProc );
-  }
+	      	m_MPIperiodes[ getGeoPosition( i, j, k ) ][Z];	
+        }
+
+  writeStringPerProcess( f, out.str(), true, oshift + GrainsExec::m_shift3 );
 }
 
 
@@ -1393,69 +1387,69 @@ vector< vector<double> >* GrainsMPIWrapper::
     const list<Particle*> &particles,
     const size_t& nb_total_particles ) const
 {
-//   double intTodouble = 0.1 ;
-//   int i=0, tag_DOUBLE = 1, recvsize = 0, ID_part=0;
-//   MPI_Status status;
-//   MPI_Request idreq;
+  double intTodouble = 0.1 ;
+  int i=0, tag_DOUBLE = 1, recvsize = 0, ID_part=0;
+  MPI_Status status;
+  MPI_Request idreq;
 
   vector< vector<double> >* class_Global = NULL;
     
-//   list<Particle*>::const_iterator il;
-//   int nb_part_loc = int(particles.size());
-//   
-//   // We do not care about particles in  halozone
-//   for (il=particles.begin();il!=particles.end();il++)
-//     if ((*il)->getTag()==2) nb_part_loc--;
-// 
-//   // Buffer size depend on the number of particles per core
-//   double *buffer = new double[2*nb_part_loc];
-//   
-//   for (il=particles.begin(), i=0; il!=particles.end(); il++, i+=2)
-//   {
-//     if( (*il)->getTag()==2 ) i-=2;
-//     else
-//     {
-//       buffer[i] = (*il)->getID() + intTodouble ;
-//       buffer[i+1] = (*il)->getGeometricType();
-//     }
-//   }
-// 
-//   MPI_Isend( buffer, 2*nb_part_loc, MPI_DOUBLE, m_rank_masterWorld,
-//       tag_DOUBLE, m_MPI_COMM_activProc, &idreq );	
-// 
-//   // RECEPTION par le Master 
-//   // -----------------------
-//   if( m_rank == m_rank_masterWorld )
-//   {
-//     vector<double> work( nb_total_particles, 0. ) ; 
-//     class_Global = new vector< vector<double> >( 1, work ) ;
-// 
-//     for (int irank=0; irank<m_nprocs; ++irank)
-//     {
-//       // Evaluation de la taille du message
-//       MPI_Probe( irank, tag_DOUBLE, m_MPI_COMM_activProc, &status );  
-//       MPI_Get_count( &status, MPI_DOUBLE, &recvsize );
-// 
-//       // Reception du message de doubles
-//       double *recvbuf_DOUBLE = new double[recvsize];
-//       MPI_Recv( recvbuf_DOUBLE, recvsize, MPI_DOUBLE, 
-//           irank, tag_DOUBLE, m_MPI_COMM_activProc, &status );	    
-//       
-//       // Copie dans class_Global
-//       for(int j=0; j<recvsize; j+=2)
-//       {
-//         ID_part = int(recvbuf_DOUBLE[j]) ;
-//         (*class_Global)[0][ID_part] = recvbuf_DOUBLE[j+1];
-//       }
-//       
-//       delete [] recvbuf_DOUBLE; 
-//     }
-//   }
-// 
-//   // Verifie que les envois non bloquants sont terminés
-//   MPI_Wait( &idreq, &status );    
-// 
-//   delete [] buffer ;
+  list<Particle*>::const_iterator il;
+  int nb_part_loc = int(particles.size());
+  
+  // We do not care about particles in  halozone
+  for (il=particles.begin();il!=particles.end();il++)
+    if ((*il)->getTag()==2) nb_part_loc--;
+
+  // Buffer size depend on the number of particles per core
+  double *buffer = new double[2*nb_part_loc];
+  
+  for (il=particles.begin(), i=0; il!=particles.end(); il++, i+=2)
+  {
+    if( (*il)->getTag()==2 ) i-=2;
+    else
+    {
+      buffer[i] = (*il)->getID() + intTodouble ;
+      buffer[i+1] = (*il)->getGeometricType();
+    }
+  }
+
+  MPI_Isend( buffer, 2*nb_part_loc, MPI_DOUBLE, m_rank_masterWorld,
+      tag_DOUBLE, m_MPI_COMM_activProc, &idreq );	
+
+  // Reception by the master process
+  // -------------------------------
+  if( m_rank == m_rank_masterWorld )
+  {
+    vector<double> work( nb_total_particles, 0. ) ; 
+    class_Global = new vector< vector<double> >( 1, work ) ;
+
+    for (int irank=0; irank<m_nprocs; ++irank)
+    {
+      // Size of the message
+      MPI_Probe( irank, tag_DOUBLE, m_MPI_COMM_activProc, &status );  
+      MPI_Get_count( &status, MPI_DOUBLE, &recvsize );
+
+      // Reception of the actual message	
+      double *recvbuf_DOUBLE = new double[recvsize];
+      MPI_Recv( recvbuf_DOUBLE, recvsize, MPI_DOUBLE, 
+          irank, tag_DOUBLE, m_MPI_COMM_activProc, &status );	    
+      
+      // Copy in class_Global
+      for(int j=0; j<recvsize; j+=2)
+      {
+        ID_part = int(recvbuf_DOUBLE[j]) ;
+        (*class_Global)[0][ID_part] = recvbuf_DOUBLE[j+1];
+      }
+      
+      delete [] recvbuf_DOUBLE; 
+    }
+  }
+
+  // Verify that all non-blocking sends completed
+  MPI_Wait( &idreq, &status );    
+
+  delete [] buffer ;
 
   return ( class_Global );
   
@@ -1472,7 +1466,7 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   	list<Particle*> const* particlesHalozone,
   	list<Particle*>* particlesClones,
 	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC )
+	LinkedCell* LC, bool update )
 {
   list<Particle*>::const_iterator il;
   int i, j, tag_DOUBLE = 1, recvsize = 0, geoLoc, ireq = 0;
@@ -1489,14 +1483,14 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   SCT_set_start( "BuffersCopy" );
 
   // Fill the multimap to access clones by their ID number
-  // -----------------------------------------------------------
+  // -----------------------------------------------------
   m_AccessToClones.clear();
   for (il=particlesClones->begin();il!=particlesClones->end();il++)
     m_AccessToClones.insert( pair<int,Particle*>( (*il)->getID(), *il ) );     
   
         
   // Copy particles in halozone data into local buffers
-  // -------------------------------------------------------------
+  // --------------------------------------------------
   vector<int> nbHzGeoLoc(26,0);
   vector<int>::iterator iv;
   for (il=particlesHalozone->begin();il!=particlesHalozone->end();il++)
@@ -1510,7 +1504,7 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   // Buffer of doubles: kinematics and configuration as follows 
   // [ID number, class, rank of sending process, translational
   //  velocity, rotation quaternion, angular velocity, transform]
-  // -------------------------------------------------------------------------
+  // ------------------------------------------------------------
   int NB_DOUBLE_PART = 25;
 
   vector<int> index( 26, 0 );
@@ -1575,11 +1569,16 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
     SCT_add_elapsed_time( "MPIComm" );
     SCT_set_start( "UpdateCreateClones" );
  
-    // Creation or update of clones
-    // --------------------------
-    UpdateOrCreateClones( time, recvsize, recvbuf_DOUBLE,
+    // Creation or update of clone particles
+    // -------------------------------------
+    if ( update )    
+      UpdateClones( time, recvsize, recvbuf_DOUBLE,
 		NB_DOUBLE_PART, particlesClones,
 		particles, particlesHalozone, referenceParticles, LC );
+    else
+      CreateClones( time, recvsize, recvbuf_DOUBLE,
+		NB_DOUBLE_PART, particlesClones,
+		particles, particlesHalozone, referenceParticles, LC );      
 
     delete [] recvbuf_DOUBLE;
 
@@ -2192,7 +2191,7 @@ void GrainsMPIWrapper::timerSummary() const
   double cputime=SCT_get_total_elapsed_time("BuffersCopy")
      	+SCT_get_total_elapsed_time("MPIComm")
      	+SCT_get_total_elapsed_time("UpdateCreateClones");
-  cout << "Bilan de la partie MPIComm" << endl;
+  cout << "MPI wrapper timer" << endl;
   SCT_get_summary(cout,cputime);
 }
 
@@ -2213,13 +2212,18 @@ void GrainsMPIWrapper::addToMPIString( string const& add )
 // Outputs the MPI log string per process and reinitialize it to empty
 void GrainsMPIWrapper::writeAndFlushMPIString( ostream &f )
 {
-  for (int i=0;i<get_total_number_of_active_processes();++i)
-  {
-    if ( i == m_rank )
-      if ( !m_MPILogString->empty() )
-        f << "Processor = " << i << endl << *m_MPILogString;
-    MPI_Barrier( m_MPI_COMM_activProc );    
-  }
+//   for (int i=0;i<get_total_number_of_active_processes();++i)
+//   {
+//     if ( i == m_rank )
+//       if ( !m_MPILogString->empty() )
+//       {
+//         f << "Processor = " << i << endl << std::flush;
+// 	f << *m_MPILogString << std::flush;
+//       }
+//     MPI_Barrier( m_MPI_COMM_activProc );    
+//   }
+  
+  writeStringPerProcess( f, *m_MPILogString, true );
 
   delete m_MPILogString;
   m_MPILogString = new string;
@@ -2389,24 +2393,21 @@ void GrainsMPIWrapper::UpdateOrCreateClones(double time,
 
         // Creation du clone
         Particle *new_clone = NULL ;
-        if( (*referenceParticles)[classe]->isCompositeParticle() )
-	{
-//           new_clone = new CompositeParticle( id,
-//               (*referenceParticles)[classe],
-//               recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
-//               recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
-//               recvbuf_DOUBLE[NB_DOUBLE_PART*j+5],
-//               recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
-//               recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
-//               recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],	
-//               recvbuf_DOUBLE[NB_DOUBLE_PART*j+9],
-//               recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
-//               recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
-//               recvbuf_DOUBLE[NB_DOUBLE_PART*j+12],
-//               &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13],
-//               COMPUTE,
-//               2, 0 );
-	}      
+        if ( (*referenceParticles)[classe]->isCompositeParticle() )
+          new_clone = new CompositeParticle( id,
+              (*referenceParticles)[classe],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+5],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],	
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+9],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+12],
+              &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13],
+              COMPUTE, 2, 0 );  
         else
           new_clone = new Particle( id,
               (*referenceParticles)[classe],
@@ -2421,8 +2422,7 @@ void GrainsMPIWrapper::UpdateOrCreateClones(double time,
               recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
               recvbuf_DOUBLE[NB_DOUBLE_PART*j+12],
               &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13],
-              COMPUTE,
-              2, 0 );
+              COMPUTE, 2, 0 );
 
         // Add to the LinkedCell
         LC->Link( new_clone );
@@ -2436,13 +2436,241 @@ void GrainsMPIWrapper::UpdateOrCreateClones(double time,
       }    
     }    
   } 
-
-//   /* Mise a jour des donnees des particles elementaires */
-//   for(list<Particle*>::iterator il=particlesClones->begin();
-//   	il!=particlesClones->end();il++)
-//     if ( (*il)->isCompositeParticle() )
-//       (*il)->setElementPosition();
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Updates clones with the data sent by the neighboring processes 
+void GrainsMPIWrapper::UpdateClones(double time,
+ 	int const &recvsize, double const* recvbuf_DOUBLE,
+	const int& NB_DOUBLE_PART,  
+  	list<Particle*>* particlesClones,
+	list<Particle*>* particles,
+  	list<Particle*> const* particlesHalozone,
+	vector<Particle*> const* referenceParticles,
+	LinkedCell* LC )
+{
+  int j, id;
+  bool found = false;
+  double distGC = 0. ; 
+  Point3 const* GC = NULL ; 
+  multimap<int,Particle*>::iterator imm;
+  size_t ncid = 0;
+  Particle* pClone = NULL ;
+  pair < multimap<int,Particle*>::iterator, 
+  	multimap<int,Particle*>::iterator > crange;
+  
+  for( j=0; j<recvsize; ++j )
+  {
+    found = false;
+    id = int( recvbuf_DOUBLE[NB_DOUBLE_PART*j] );  
+      
+    // Searh whether the clone already exists in this local domain
+    ncid = m_AccessToClones.count( id );
+    switch( ncid )
+    {
+      case 0: // no clone with this ID number in this local domain
+        break;
+      case 1: // 1 clone with this ID number in this local domain
+        imm = m_AccessToClones.find( id );
+        if ( m_isMPIperiodic )
+        {
+          GC = imm->second->getPosition();
+          distGC = sqrt( 
+          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] - (*GC)[X], 2. ) +
+            	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] - (*GC)[Y], 2. ) +
+            	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+24] - (*GC)[Z], 2. ) ) ;
+          if ( distGC < 1.1 * imm->second->getCrustThickness() )  
+              found = true;	
+        }
+        else found = true;
+        break;
+      default: // more than 1 clone with this ID number in this local domain
+        // Periodic case with 1 multi-proc clone and 1 periodic clone in the
+	// same local domain
+        crange = m_AccessToClones.equal_range( id );
+        for (imm=crange.first; imm!=crange.second && !found; )
+        {
+          GC = imm->second->getPosition();
+          distGC = sqrt( 
+          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] - (*GC)[X], 2. ) +
+          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] - (*GC)[Y], 2. ) +
+          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+24] - (*GC)[Z], 2. ) ) ;
+          if ( distGC < 1.1 * imm->second->getCrustThickness() )  
+            found = true;
+          else imm++;
+        }
+        break;    
+    }   
+       
+    // If found, update the clone features
+    if ( found )
+    {
+      // We get the pointer to the clone and erase it from the map, because
+      // each clone has a single master only and can therefore be updated 
+      // only once
+      pClone = imm->second;
+      m_AccessToClones.erase( imm );
+      
+      pClone->setPosition( &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13] );
+      Vector3 trans( recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
+	  	recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
+		recvbuf_DOUBLE[NB_DOUBLE_PART*j+5] );
+      pClone->setTranslationalVelocity( trans );
+      pClone->setQuaternionRotation( recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
+		recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
+		recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],
+		recvbuf_DOUBLE[NB_DOUBLE_PART*j+9] );
+      Vector3 rot(recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
+	  	recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
+		recvbuf_DOUBLE[NB_DOUBLE_PART*j+12] );
+      pClone->setAngularVelocity( rot );
+    }
+    else
+    {
+      cout << "!!! Warning !!! Clone " << id << " not found in proc " 
+      	<< m_rank << endl;
+    }  
+  } 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Creates and updates clones with the data sent by the neighboring processes 
+void GrainsMPIWrapper::CreateClones(double time,
+ 	int const &recvsize, double const* recvbuf_DOUBLE,
+	const int& NB_DOUBLE_PART,  
+  	list<Particle*>* particlesClones,
+	list<Particle*>* particles,
+  	list<Particle*> const* particlesHalozone,
+	vector<Particle*> const* referenceParticles,
+	LinkedCell* LC )
+{
+  int j, id, classe;
+  bool found = false;
+  double distGC = 0. ; 
+  Point3 const* GC = NULL ; 
+  multimap<int,Particle*>::iterator imm;
+  size_t ncid = 0;
+  pair < multimap<int,Particle*>::iterator, 
+  	multimap<int,Particle*>::iterator > crange;
+	  
+  // Note: although we create new clones here, we need to check if they
+  // do not already exist. This scenario happens if a master particle moves from
+  // a halozone cell to another halozone cell and the two halozone cells have
+  // a different GeoPosition, then such a master particle is added to the list 
+  // of new halozone particle but might already exist on the local process
+
+  for( j=0; j<recvsize; ++j )
+  {
+    found = false;
+    id = int( recvbuf_DOUBLE[NB_DOUBLE_PART*j] );  
+      
+    // Search whether the clone already exists in this local domain
+    ncid = m_AccessToClones.count( id );
+    switch( ncid )
+    {
+      case 0: // no clone with this ID number in this local domain
+        break;
+      case 1: // 1 clone with this ID number in this local domain
+        imm = m_AccessToClones.find( id );
+        if ( m_isMPIperiodic )
+        {
+          GC = imm->second->getPosition();
+          distGC = sqrt( 
+          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] - (*GC)[X], 2. ) +
+            pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] - (*GC)[Y], 2. ) +
+            pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+24] - (*GC)[Z], 2. ) ) ;
+            if ( distGC < 1.1 * imm->second->getCrustThickness() )  
+              found = true;	
+        }
+        else found = true;
+        break;
+      default: // more than 1 clone with this ID number in this local domain
+        // Periodic case with 1 multi-proc clone and 1 periodic clone in the
+	// same local domain
+        crange = m_AccessToClones.equal_range( id );
+        for (imm=crange.first; imm!=crange.second && !found; )
+        {
+          GC = imm->second->getPosition();
+          distGC = sqrt( 
+          pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] - (*GC)[X], 2. ) +
+          pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] - (*GC)[Y], 2. ) +
+          pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+24] - (*GC)[Z], 2. ) ) ;
+          if ( distGC < 1.1 * imm->second->getCrustThickness() )  
+            found = true;
+          else imm++;
+        }
+        break;    
+    }   
+       
+    // If not found, create the clone particle
+    if ( !found )
+    {
+      classe = int( recvbuf_DOUBLE[NB_DOUBLE_PART*j+1] );
+	
+      if ( GrainsExec::m_MPI_verbose )
+      {
+        ostringstream oss;
+        oss << "   t=" << GrainsExec::doubleToString(time,TIMEFORMAT)
+		<< " Create Clone                                Id = " 
+		<< id
+		<< " Classe = " << classe << " " 
+		<< recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] << " " 
+		<< recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] << " " 
+		<< recvbuf_DOUBLE[NB_DOUBLE_PART*j+24]
+		<< endl;
+        GrainsMPIWrapper::addToMPIString(oss.str());
+      }
+
+      // Creation of the clone particle
+      Particle *new_clone = NULL ;
+      if ( (*referenceParticles)[classe]->isCompositeParticle() )
+        new_clone = new CompositeParticle( id,
+              (*referenceParticles)[classe],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+5],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],	
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+9],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+12],
+              &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13],
+              COMPUTE, 2, 0 );   
+      else
+        new_clone = new Particle( id,
+              (*referenceParticles)[classe],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+5],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],	
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+9],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
+              recvbuf_DOUBLE[NB_DOUBLE_PART*j+12],
+              &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13],
+              COMPUTE, 2, 0 );
+
+      // Add to the LinkedCell
+      LC->Link( new_clone );
+	
+      // Add to active particle and clone particle lists
+      particlesClones->push_back( new_clone );
+      particles->push_back( new_clone ); 
+    }
+    else m_AccessToClones.erase( imm ); 
+  } 
+}
+
 
 
 
@@ -2508,19 +2736,11 @@ void GrainsMPIWrapper::sumObstaclesLoad(
 // Writes the memory consumption per process in a stream
 void GrainsMPIWrapper::display_used_memory( ostream& f ) const
 {
-  if ( m_rank == 0 )
-    f << "Memory used by Grains3D" << endl;
-
-  for (int m=0;m<m_nprocs;++m)
-  {
-    if ( m == m_rank && m_is_activ ) 
-    {
-      f << "   Process = " << m_rank << " = ";
-      GrainsExec::display_memory( f, GrainsExec::used_memory() ); 
-      f << endl;
-    }
-    MPI_Barrier( m_MPI_COMM_activProc );
-  }
+  if ( m_rank == 0 ) f << "Memory used by Grains3D" << endl;
+  
+  ostringstream out;
+  GrainsExec::display_memory( out, GrainsExec::used_memory() ); 
+  writeStringPerProcess( f, out.str(), false, GrainsExec::m_shift3 );   
 }
 
 
@@ -2812,3 +3032,55 @@ list<Particle*>* GrainsMPIWrapper::GatherPeriodicClones_PostProcessing(
 
   return ( allClonesPeriodiques );
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes a string per process in a process-id ordered manner
+void GrainsMPIWrapper::writeStringPerProcess( ostream& f, string const& out, 
+    	bool creturn, string const& shift ) const
+{
+  string allout = shift + "Process 0";
+  int dim = 0, recvsize = 0 ;
+  int tag_CHAR = 111;
+  MPI_Status status;
+  
+  if ( m_rank == 0 ) 
+  {
+    if ( creturn ) allout += "\n";
+    else allout += ": ";
+    allout += out + "\n"; 
+    for ( int irank=1;irank<m_nprocs;irank++)
+    {
+      // Size of the message
+      MPI_Probe( irank, tag_CHAR, m_MPI_COMM_activProc, &status );  
+      MPI_Get_count( &status, MPI_CHAR, &recvsize );
+
+      // Reception of the actual message	
+      char *recvbuf_char = new char[recvsize];
+      MPI_Recv( recvbuf_char, recvsize, MPI_CHAR, 
+          irank, tag_CHAR, m_MPI_COMM_activProc, &status );
+
+      if ( recvsize != 1 )
+      { 
+        string recstring = string( recvbuf_char );
+        allout += shift + "Process " + GrainsExec::intToString( irank );
+        if ( creturn ) allout += "\n";
+        else allout += ": ";
+        allout += recstring;
+        if ( irank != m_nprocs - 1 ) allout += "\n";
+      }
+      delete recvbuf_char;       	
+    }
+  }
+  else
+  {
+    // Send the string to the master proc
+    dim = int(out.size()+1);
+    MPI_Send( out.c_str(), dim, MPI_CHAR, 0, tag_CHAR, m_MPI_COMM_activProc );
+  }
+
+  // The master proc writes to the stream
+  if ( m_rank == 0 ) f << allout << endl; 
+}

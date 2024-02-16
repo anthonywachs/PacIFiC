@@ -174,45 +174,19 @@ CompositeParticle::CompositeParticle( int const& id_,
 	const double m[12],
 	ParticleActivity const& activ,
 	int const& tag_,
-	int const& coordination_number_ ,
- 	bool const& updatePosition )
+	int const& coordination_number_ )
   : Particle( id_, ParticleRef, vx, vy, vz,
 	qrotationx, qrotationy, qrotationz, qrotations,
 	rx, ry, rz, m, activ, tag_, coordination_number_ )
 {
-//   /* Particules elementaires */
-//   m_elementaryParticles.reserve( ParticuleRef->getNbreElemPart() );
-//   ElementParticule* ppp = NULL;
-//   for ( size_t i=0; i<ParticuleRef->getNbreElemPart(); ++i )
-//     m_elementaryParticles.push_back( ppp );
-//
-//   for ( size_t i=0; i<m_elementaryParticles.size(); ++i )
-//     m_elementaryParticles[i] = new ElementParticule(
-//       *(ParticuleRef->getElementParticules()[i]), this );
-//
-//   /* Positions initiales des particules elementaires dans insert.xml */
-//   m_InitialRelativePositions = ParticuleRef->getInitialRelativePositions();
-//
-//   /* Positions des particules elementaires par rapport a (0.,0.,0.) */
-//   /* m_InitialRelativePositions sont les bras de levier                    */
-//   m_InitialRelativePositions = ParticuleRef->getRelativePositions();
-//
-//   m_InitialMatrix = ParticuleRef->getInitialMatrix();
-//
-//   /* Affectation de la cinematique*/
-//   for ( size_t i=0; i<m_elementaryParticles.size(); ++i )
-//   {
-//     m_elementaryParticles[i]->setVitesseTranslation( Vector3( vx, vy, vz )
-//       + ( Vector3( rx, ry, rz ) ^ ( (m_geoRBWC->getTransform()->getBasis())
-//       * m_InitialRelativePositions[i] ) ) );
-//     m_elementaryParticles[i]->setVitesseRotation( Vector3( rx, ry, rz ) );
-//
-//     m_elementaryParticles[i]->setQuaternionRotation( qrotationx, qrotationy,
-//       qrotationz, qrotations );
-//   }
-//
-//   if ( updatePosition )
-//     setElementPosition();
+  // We know that ParticleRef points to a CompositeParticle, such that
+  // we can dynamic cast it to actual type and use -> instead of using
+  // get methods through virtual typing
+  CompositeParticle const* CompParticleRef =
+  	dynamic_cast<CompositeParticle const*>(ParticleRef);
+
+  // Creates and sets the elementary particles
+  createSetElementaryParticles( CompParticleRef );
 }
 
 
@@ -1100,4 +1074,30 @@ BBox CompositeParticle::BoundingBox() const
 vector<Vector3> const* CompositeParticle::getInitialRelativePositions() const
 {
   return ( &m_InitialRelativePositions );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the rotation quaternion
+void CompositeParticle::setQuaternionRotation( double const& vecteur0,
+	double const& vecteur1,
+	double const& vecteur2,
+	double const& scalaire )
+{
+  Particle::setQuaternionRotation( vecteur0, vecteur1, vecteur2, scalaire );
+  for ( size_t i=0; i<m_nbElemPart; ++i )
+    m_elementaryParticles[i]->setQuaternionRotation( vecteur0, vecteur1, 
+    	vecteur2, scalaire );  
+}	
+	
+	
+// ----------------------------------------------------------------------------
+// Sets the rotation quaternion
+void CompositeParticle::setQuaternionRotation( Quaternion const& qrot )
+{
+  Particle::setQuaternionRotation( qrot );
+  for ( size_t i=0; i<m_nbElemPart; ++i )
+    m_elementaryParticles[i]->setQuaternionRotation( qrot );  
 }

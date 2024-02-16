@@ -728,12 +728,12 @@ size_t LinkedCell::set( double cellsize_, int const* nprocsdir,
 	    else
 	    {
 	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
+	      else if ( k == 1  )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_EAST_BEHIND;
 	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
+	      else if ( k == m_nbk - 2 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_EAST_FRONT;
@@ -794,12 +794,12 @@ size_t LinkedCell::set( double cellsize_, int const* nprocsdir,
 	    else
 	    {
 	      if ( k == 0 ) tag = 2;
-	      else if ( k == 1 || k == 2 )
+	      else if ( k == 1 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_NORTH_BEHIND;
 	      }
-	      else if ( k == m_nbk - 2 || k == m_nbk - 3 )
+	      else if ( k == m_nbk - 2 )
 	      {
 	        tag = 1;
 	        geoLoc = GEOPOS_NORTH_FRONT;
@@ -1785,7 +1785,8 @@ void LinkedCell::DestroyOutOfDomainClones( double time,
         ostringstream oss;
         oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
       		" Destroy clone                               Id = " <<
-      		(*particle)->getID() << " " << *(*particle)->getPosition();
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
         GrainsMPIWrapper::addToMPIString( oss.str() );
       }
       pdestroy = *particle;

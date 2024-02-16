@@ -241,14 +241,14 @@ class Particle : public Component
     @param vecteur1 y component of the quaternion
     @param vecteur2 z component of the quaternion
     @param scalaire scalar component of the quaternion */
-    void setQuaternionRotation( double const& vecteur0,
+    virtual void setQuaternionRotation( double const& vecteur0,
 	double const& vecteur1,
 	double const& vecteur2,
 	double const& scalaire );
 
     /** @brief Sets the rotation quaternion
     @param qrot rotation quaternion */
-    void setQuaternionRotation( Quaternion const& qrot );
+    virtual void setQuaternionRotation( Quaternion const& qrot );
 
     /** @brief Sets the particle geometric type
     @param pc particle class */

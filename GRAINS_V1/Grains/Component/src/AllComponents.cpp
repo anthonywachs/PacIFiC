@@ -435,9 +435,8 @@ Particle* AllComponents::getParticle( PullMode mode,
 	  double v = double(random()) / double(INT_MAX);
 	  int id = int( double(m_InactiveParticles.size()) * v );
 
-	  // Parall�le: afin que le tirage al�atoire soit le m�me sur tous les
-	  // procs, seul le master envoie la position tiree au hasard dans la
-	  // liste aux autres procs
+	  // Only the master proc randomly selects and then the random
+	  // number is broadcasted to all other processes
 	  if ( wrapper ) id = wrapper->Broadcast_INT( id );
 
 	  list<Particle*>::iterator p = m_InactiveParticles.begin();
@@ -498,6 +497,16 @@ list<Particle*> const* AllComponents::getInactiveParticles() const
 // ----------------------------------------------------------------------------
 // Returns a pointer to the list of particles in the halozone
 list<Particle*>* AllComponents::getParticlesInHalozone()
+{
+  return ( &m_ParticlesInHalozone );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a pointer to the list of particles in the halozone
+list<Particle*> const* AllComponents::getParticlesInHalozone() const
 {
   return ( &m_ParticlesInHalozone );
 }
@@ -1073,7 +1082,8 @@ void AllComponents::PostProcessing_start( double time, double dt,
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
     	pp++)
     {
-      cout << "Writing results in post-processing files: START" << endl;
+      cout << "Writing results in post-processing files: START" << endl 
+      	<< std::flush;
       written = true;
     }
 
@@ -1110,7 +1120,8 @@ void AllComponents::PostProcessing_start( double time, double dt,
     for (pp=m_postProcessors.begin();pp!=m_postProcessors.end() && !written;
     	pp++)
     {
-      cout << "Writing results in post-processing files: COMPLETED" << endl;
+      cout << "Writing results in post-processing files: COMPLETED" << endl
+      	<< std::flush;
       written = true;
     }
 }
@@ -1393,7 +1404,7 @@ void AllComponents::checkParaviewPostProcessing( int const& rank,
 // Returns the highest particle ID number
 int AllComponents::getMaxParticleIDnumber() const
 {
-  int numeroMax = 0;
+  int numeroMax = - 1;
   list<Particle*>::const_iterator particle;
 
   for (particle=m_ActiveParticles.begin();
@@ -1704,11 +1715,10 @@ void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
 
   m_total_nb_particles = m_total_nb_active_particles + m_nb_inactive_particles;
 
-  m_nb_active_particles_on_proc = m_ActiveParticles.size();
+  m_nb_active_particles_on_proc = m_nb_active_particles;
   for (list<Particle*>::const_iterator il=m_ActiveParticles.begin();
   	il!=m_ActiveParticles.end();il++)
-    if ( (*il)->getTag() == 2 || (*il)->getID() == -2 ) 
-      m_nb_active_particles_on_proc--; 
+    if ( (*il)->getTag() == 2 ) m_nb_active_particles_on_proc--; 
 
   if ( wrapper ) m_total_nb_active_particles_on_all_procs = 
   	wrapper->sum_UNSIGNED_INT( m_nb_active_particles_on_proc );
@@ -1716,4 +1726,119 @@ void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
   
   m_total_nb_physical_particles = m_total_nb_active_particles_on_all_procs
   	+ m_nb_inactive_particles;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Updates list of particles in parallel
+void AllComponents::updateParticleLists( double time, 
+	list<Particle*>* newHaloPart )
+{
+  newHaloPart->clear();
+  
+  list<Particle*>::iterator particle;
+  int tag = 0, tagnm1 = 0;
+  for (particle=m_ActiveParticles.begin();particle!=m_ActiveParticles.end(); 
+  	particle++)
+  { 
+    tag = (*particle)->getTag();
+    tagnm1 = (*particle)->getTagNm1();
+    
+    switch ( tagnm1 )
+    {
+      case 0:
+        // Interior to halozone (0 -> 1)
+	if ( tag == 1 ) 
+	{
+	  m_ParticlesInHalozone.push_back( *particle);
+	  newHaloPart->push_back( *particle);
+          if ( GrainsExec::m_MPI_verbose )
+	  {
+	    ostringstream oss;
+	    oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
+		" Interior to Halozone (0 -> 1)               Id = " <<
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
+	    GrainsMPIWrapper::addToMPIString( oss.str() );
+	  } 
+	}
+	break;
+	
+      case 1:
+        switch ( tag )
+	{
+	  // Halozone to interior (1 -> 0)
+	  case 0:
+	    removeParticleFromList( m_ParticlesInHalozone, *particle );
+            if ( GrainsExec::m_MPI_verbose )
+	    {
+              ostringstream oss;
+              oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT )
+      		<< " Halozone to Interior (1 -> 0)               Id = " <<
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
+              GrainsMPIWrapper::addToMPIString( oss.str() );
+	    } 
+            break;
+	    
+	  // Halozone to halozone ( 1 -> 1)
+	  case 1:
+	    if ( (*particle)->getGeoPosition() 
+	    	!= (*particle)->getGeoPositionNm1() )
+	    {
+	      newHaloPart->push_back( *particle);
+              if ( GrainsExec::m_MPI_verbose )
+	      {
+                ostringstream oss;
+                oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT )
+      		<< " Halozone to Halozone (1 -> 1)               Id = " <<
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
+		oss << "                From " <<
+		Cell::getGeoPositionName((*particle)->getGeoPositionNm1())
+		<< " to " << Cell::getGeoPositionName(
+			(*particle)->getGeoPosition()) << endl;
+                GrainsMPIWrapper::addToMPIString( oss.str() );
+	      } 
+	    }	      	  
+	    break;
+	    
+	  // Halozone to Clone (1 -> 2)
+	  case 2:
+            removeParticleFromList( m_ParticlesInHalozone, *particle );
+	    m_CloneParticles.push_back( *particle);
+	    if ( GrainsExec::m_MPI_verbose )
+            {
+              ostringstream oss;
+              oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT )
+      		<< " Halozone to Clone (1 -> 2)                  Id = " <<
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
+              GrainsMPIWrapper::addToMPIString( oss.str() );
+            }
+	    break;
+	}
+	break;      
+    
+      case 2:
+        // Clone to halozone (2 -> 1)
+	if ( tag == 1 ) 
+	{
+          removeParticleFromList( m_CloneParticles, *particle );
+	  m_ParticlesInHalozone.push_back( *particle);          
+          if ( GrainsExec::m_MPI_verbose )
+	  {
+            ostringstream oss;
+            oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
+      		" Clone to Halozone (2 -> 1)                  Id = " <<
+      		(*particle)->getID() << " " << *(*particle)->getPosition()
+		<< endl;
+            GrainsMPIWrapper::addToMPIString( oss.str() );
+	  } 
+	}	
+	break;
+    }
+  }   
 }

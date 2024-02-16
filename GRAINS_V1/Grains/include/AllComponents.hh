@@ -197,6 +197,10 @@ class AllComponents
     @param time physical time
     @param dt time step magnitude */
     void setKinematicsObstacleWithoutMoving( double time, double dt );
+    
+    /** @brief Updates list of particles in parallel
+    @param time physical time */
+    void updateParticleLists( double time, list<Particle*>* newHaloPart );    
     //@}
 
 
@@ -236,6 +240,9 @@ class AllComponents
 
     /** @brief Returns a pointer to the list of particles in the halozone */
     list<Particle*>* getParticlesInHalozone();
+    
+    /** @brief Returns a pointer to the list of particles in the halozone */
+    list<Particle*> const* getParticlesInHalozone() const;    
 
     /** @brief Returns a pointer to the list of clone particles */
     list<Particle*>* getCloneParticles();

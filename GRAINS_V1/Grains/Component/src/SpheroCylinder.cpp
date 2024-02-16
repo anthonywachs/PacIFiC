@@ -177,11 +177,10 @@ SpheroCylinder::SpheroCylinder( int const& id_,
 	const double m[12],
 	ParticleActivity const& activ,
 	int const& tag_,
-	int const& coordination_number_ ,
- 	bool const& updatePosition )
+	int const& coordination_number_ )
   : CompositeParticle( id_, ParticleRef,
 	vx, vy, vz, qrotationx, qrotationy, qrotationz, qrotations,
-	rx, ry, rz, m, activ, tag_, coordination_number_ , updatePosition )	
+	rx, ry, rz, m, activ, tag_, coordination_number_ )	
 {
   m_specific_composite_shape = "SpheroCylinder";
   SpheroCylinder const* SpheroCylRef =

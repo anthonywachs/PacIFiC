@@ -294,7 +294,7 @@ void GrainsParameters::Simulation( double time_interval )
     // Between particles of same class
     for (i=0;i<nClasses;++i)
     {
-      Particle* particle = new Particle( *((*particleClasses)[i]) );    
+      Particle* particle = new Particle( *((*particleClasses)[i]), true );    
       cout << "Contact Class " << i << " / Class " << i << endl;
       ContactBuilderFactory::contactForceModel( 
        	(*particleClasses)[i]->getMaterial(),
@@ -332,7 +332,6 @@ void GrainsParameters::Simulation( double time_interval )
       } 
 	
     cout << "PARTICLE DISPLACEMENT" << endl;    
-    // Entre particles de la meme classe
     for (i=0;i<nClasses;++i)
     {
       cout << "  Class " << i << " : v0*dt/crust = " << 

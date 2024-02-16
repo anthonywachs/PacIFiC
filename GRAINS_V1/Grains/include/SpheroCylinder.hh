@@ -43,8 +43,7 @@ class SpheroCylinder : public CompositeParticle
     @param m particle position & configuration as a 1D array
     @param activ particle activity
     @param tag_ tag of the cell the particle belongs to
-    @param coordination_number_ particle coordination number
-    @param updatePosition whether we update position or not */
+    @param coordination_number_ particle coordination number */
     SpheroCylinder( int const& id_, Particle const* ParticleRef,
 	double const& vx, double const& vy, double const& vz,
 	double const& qrotationx, double const& qrotationy,
@@ -53,8 +52,7 @@ class SpheroCylinder : public CompositeParticle
 	const double m[12],
 	ParticleActivity const& activ,
 	int const& tag_,
-	int const& coordination_number_ = 0,
- 	bool const& updatePosition = false );
+	int const& coordination_number_ = 0 );
 
     /** @brief Constructor with input parameters. This constructor is expected
     to be used for periodic clone particle. Autonumbering

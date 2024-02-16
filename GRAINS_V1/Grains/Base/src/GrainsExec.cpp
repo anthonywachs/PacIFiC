@@ -7,7 +7,7 @@
 bool GrainsExec::m_MPI = false;
 string GrainsExec::m_TIScheme = "SecondOrderLeapFrog";
 bool GrainsExec::m_SphereAsPolyParaview = false;
-int GrainsExec::m_MPI_verbose = 2;
+int GrainsExec::m_MPI_verbose = 0;
 bool GrainsExec::m_isReloaded = false;
 string GrainsExec::m_ReloadType = "new" ;
 Vector3 GrainsExec::m_vgravity = Vector3Nul;
@@ -265,10 +265,10 @@ void GrainsExec::display_memory( ostream& os, size_t memory )
   static size_t const go = 1024*1024*1024 ;
 
   if( memory > go )
-    os << ( (double) memory )/go << " Go" ;
+    os << ( (double) memory )/go << " Go" << std::flush;
   else if( memory > mo )
-    os << ( (double) memory )/mo << " Mo" ;
-  else os << memory << " octets" ;
+    os << ( (double) memory )/mo << " Mo" << std::flush ;
+  else os << memory << " octets" << std::flush ;
 }
 
 

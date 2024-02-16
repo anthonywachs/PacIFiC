@@ -21,7 +21,8 @@ using namespace std;
 
     Manages MPI communications in the parallel version of Grains3D.
 
-    @author A.WACHS - 2021 - Major cleaning & refactoring */
+    @author A.WACHS - 2021 - Major cleaning & refactoring 
+    @author A.WACHS - 2024 - Major cleaning & refactoring - step 2 */
 // ============================================================================
 class GrainsMPIWrapper : public SolverComputingTime
 {
@@ -93,13 +94,14 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param particlesHalozone list of active particles in the halo (buffer) zone 
     @param particlesClones list of active clone particles
     @param referenceParticles reference particles
-    @param LC linked cell grid */
+    @param LC linked cell grid 
+    @param update update clones if true, otherwise create */
     void UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,  	
 	list<Particle*>* particles,
   	list<Particle*> const* particlesHalozone,
   	list<Particle*>* particlesClones,
 	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC );
+	LinkedCell* LC, bool update );
 	
     /** @brief Gathers all particles on the master process for post-processing
     purposes
@@ -292,7 +294,13 @@ class GrainsMPIWrapper : public SolverComputingTime
   	list< pair<Particle*,int> > const& newPart,
 	list< pair<Particle*,int> >& newPartProc,
 	size_t const& npartproc,
-	size_t const& ntotalinsert ) const; 	
+	size_t const& ntotalinsert ) const; 
+	
+    /** @brief Writes a string per process in a process-id ordered manner
+    @param f output flux
+    @param out string */
+    void writeStringPerProcess( ostream& f, string const& out, 
+    	bool creturn = true, string const& shift="" ) const;	
     //@}  
 
 
@@ -374,8 +382,8 @@ class GrainsMPIWrapper : public SolverComputingTime
     int m_nprocs; /**< number of active processes */
     int m_nprocs_world; /**< total number of processes */
     bool m_is_activ; /**< is this process active ? */  
-    MPINeighbors *m_neighbors; /**< neighbors of the process in the MPI cartesian 
-    	topology */
+    MPINeighbors *m_neighbors; /**< neighbors of the process in the MPI 
+    	cartesian topology */
     MPI_Comm *m_commgrainsMPI_3D; /**< MPI cartesian communicator */
     vector<MPI_Group*> m_groupMPINeighbors; /**< local groups involving 
     	neighbors in the MPI cartesian topology */	
@@ -439,7 +447,45 @@ class GrainsMPIWrapper : public SolverComputingTime
 	list<Particle*>* particles,
   	list<Particle*> const* particlesHalozone,
 	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC );               
+	LinkedCell* LC ); 
+	
+    /** @brief Updates clones with the data sent by the neighboring processes 
+    @param time physical time
+    @param recvsize number of particles received
+    @param recvbuf_DOUBLE array of double containing the data received
+    @param NB_DOUBLE_PART number of doubles per particle       
+    @param particlesClones list of active clone particles
+    @param particles list of active particles
+    @param particlesHalozone list of active particles in the halo (buffer) zone
+    @param referenceParticles vector of reference particles
+    @param LC linked cell grid */
+    void UpdateClones( double time,
+ 	int const& recvsize, double const* recvbuf_DOUBLE,
+	int const& NB_DOUBLE_PART, 
+  	list<Particle*>* particlesClones,
+	list<Particle*>* particles,
+  	list<Particle*> const* particlesHalozone,
+	vector<Particle*> const* referenceParticles,
+	LinkedCell* LC ); 
+	
+    /** @brief Creates clones with the data sent by the neighboring processes 
+    @param time physical time
+    @param recvsize number of particles received
+    @param recvbuf_DOUBLE array of double containing the data received
+    @param NB_DOUBLE_PART number of doubles per particle       
+    @param particlesClones list of active clone particles
+    @param particles list of active particles
+    @param particlesHalozone list of active particles in the halo (buffer) zone
+    @param referenceParticles vector of reference particles
+    @param LC linked cell grid */
+    void CreateClones( double time,
+ 	int const& recvsize, double const* recvbuf_DOUBLE,
+	int const& NB_DOUBLE_PART, 
+  	list<Particle*>* particlesClones,
+	list<Particle*>* particles,
+  	list<Particle*> const* particlesHalozone,
+	vector<Particle*> const* referenceParticles,
+	LinkedCell* LC );		              
     //@}  
 };
 
