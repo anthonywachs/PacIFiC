@@ -1944,11 +1944,19 @@ bool LinkedCell::insertParticleSerial( Particle* particle,
 
 // ----------------------------------------------------------------------------
 // Attempts to insert a particle in parallel mode
-pair<bool,bool> LinkedCell::insertParticleParallel( Particle* particle, 
+pair<bool,bool> LinkedCell::insertParticleParallel( double time,
+	Particle* particle, 
 	list<Particle*>* particles,
+	list<Particle*>* particlesClones,
+	vector<Particle*> const* ReferenceParticles,
+	bool const& periodic,
     	bool const& force_insertion,
 	GrainsMPIWrapper const* wrapper )
 {
+  GeoPosition geoloc = GEOPOS_NONE;
+  int source = 0;
+  bool contact = false;
+
   // First is "Is in LinkedCell?" and second is "Is contact?"
   pair<bool,bool> insert(false,false);
 
@@ -1962,6 +1970,98 @@ pair<bool,bool> LinkedCell::insertParticleParallel( Particle* particle,
     insert.second = wrapper->max_INT( insert.second );     
   }
   
+  // Periodic clones
+  if ( !insert.second && periodic ) 
+  {
+    // The particle is only in the local domain of a single proc
+    if ( insert.first && isInLocalDomain( particle->getPosition() ) )
+    {
+      // Get the cell where the master particle is located
+      Point3 centre = *(particle->getPosition());
+      int id[3];
+      Cell::GetCell( centre, id );
+      Cell* cell_ = getCell( id[X], id[Y], id[Z] );
+      geoloc = cell_->m_GeoPosCell;
+      source = wrapper->get_rank_active();    
+    }
+    
+    // Broadcast the geoloc
+    source = wrapper->max_INT( source ); 
+    geoloc = GeoPosition( wrapper->Broadcast_INT( int(geoloc), source ) );
+    
+    // Loop over the domain periodic vectors for this geographic position
+    for ( size_t i=0;i<m_periodic_vector_indices[geoloc].size() &&
+	!contact;++i)
+    {
+      // Translate particle by periodic vector i
+      particle->Translate( m_domain_global_periodic_vectors[
+	m_periodic_vector_indices[geoloc][i]] );
+
+      // Check contact of the periodic clone
+      if ( isInLinkedCell( *(particle->getPosition()) ) )
+        contact = isContactWithCrust( particle );
+
+      // If no contact, translate back to original position
+      if ( !contact )
+	particle->Translate( - m_domain_global_periodic_vectors[
+		m_periodic_vector_indices[geoloc][i]] );
+    }    
+    contact = wrapper->max_INT( contact ); 
+    if ( contact ) insert.second = true;
+    
+    // If no contact for periodic clones, create them in local domains
+    // where they exist
+    if ( !contact )
+    {
+      Particle* clone = NULL;
+
+      // Loop over the domain periodic vectors for this geographic position
+      for ( size_t i=0;i<m_periodic_vector_indices[geoloc].size();++i)
+      {
+        // Translate particle by periodic vector i
+        particle->Translate( m_domain_global_periodic_vectors[
+		m_periodic_vector_indices[geoloc][i]] );
+		
+        if ( isInLinkedCell( *(particle->getPosition()) ) )
+	{
+          if ( GrainsExec::m_MPI_verbose )
+          {
+            ostringstream oss;
+            oss << "   t=" << GrainsExec::doubleToString(time,TIMEFORMAT)
+		<< " Create Clone                                Id = " 
+		<< particle->getID()
+		<< " Classe = " << particle->getGeometricType() << " " 
+		<< (*(particle->getPosition()))[X] << " " 
+		<< (*(particle->getPosition()))[Y] << " " 
+		<< (*(particle->getPosition()))[Z]
+		<< endl;
+            GrainsMPIWrapper::addToMPIString(oss.str());
+          }
+
+          // Create periodic clone
+	  clone = particle->createCloneCopy( particle->getID(),
+		(*ReferenceParticles)[particle->getGeometricType()],
+		*(particle->getTranslationalVelocity()),
+		*(particle->getQuaternionRotation()),
+		*(particle->getAngularVelocity()),
+		*(particle->getRigidBody()->getTransform()),
+		COMPUTE, particle->getContactMap() );
+
+          // Link periodic clone
+          Link( clone );
+
+	  // Insert into active particle list and clone particle list
+	  particles->push_back( clone );
+	  particlesClones->push_back( clone );
+	}
+	
+        // Translate back to original position
+        particle->Translate( - m_domain_global_periodic_vectors[
+		m_periodic_vector_indices[geoloc][i]] );	
+      }
+    }    
+  } 
+      
   // If contact is false and inLinkCell is true, link particle 
   if ( !insert.second && insert.first ) Link( particle ); 
   

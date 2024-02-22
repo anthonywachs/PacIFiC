@@ -295,7 +295,8 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
   Vector3 vtrans, vrot ;
   Point3 position;
   Matrix mrot;
-  Transform trot;    
+  Transform trot;
+  Quaternion qrot;    
 
   if ( insert_counter == 0 )
   {
@@ -313,7 +314,7 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
     if ( m_position != "" ) 
       particle = m_allcomponents.getParticle( PM_ORDERED, m_wrapper );
     else particle = m_allcomponents.getParticle( mode, m_wrapper );
-    
+ 
     if ( particle )
     {
       if ( m_position == "" ) 
@@ -362,14 +363,18 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
       }
 
       particle->initialize_transformWithCrust_to_notComputed();
+      qrot.setQuaternion( particle->getRigidBody()->getTransform()
+		->getBasis() );
+      particle->setQuaternionRotation( qrot );      
 
       // If insertion if successful, shift particle from wait to inserted
       // and initialize particle rotation quaternion from rotation matrix
-      insert = m_collision->insertParticleParallel( particle,
-      	m_allcomponents.getActiveParticles(), m_force_insertion,
+      insert = m_collision->insertParticleParallel( m_time, particle,
+      	m_allcomponents.getActiveParticles(),
+	m_allcomponents.getCloneParticles(),
+	m_allcomponents.getReferenceParticles(), 
+	m_periodic, m_force_insertion,
 	m_wrapper );
-	
-      // TO DO: periodic insertion !!
 	
       // If no contact
       if ( !insert.second )
@@ -378,10 +383,6 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
 	if ( insert.first )
 	{
 	  m_allcomponents.ShiftParticleOutIn( true );
-	  Quaternion qrot;
-	  qrot.setQuaternion( particle->getRigidBody()->getTransform()
-		->getBasis() );
-	  particle->setQuaternionRotation( qrot );
 	  particle->InitializeForce( true );
 	  particle->computeAcceleration( m_time );
         }

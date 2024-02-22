@@ -173,14 +173,21 @@ class LinkedCell : public AppCollision
 	vector<Particle*> const* ReferenceParticles );
 	
     /** @brief Attempts to insert a particle in parallel mode
+    @param time physical time    
     @param particle particle
     @param particles list of active particles
+    @param particlesClones list of active clone particles 
+    @param ReferenceParticles vector of reference particles       
+    @param periodic true if the domain is at least mono-periodic
     @param force_insertion force insertion regardless of potential contacts with
     other particles or obstacles 
     @param wrapper MPI wrapper */
-    pair<bool,bool> insertParticleParallel( Particle* particle, 
+    pair<bool,bool> insertParticleParallel( double time,
+    	Particle* particle, 
     	list<Particle*>* particles,
-    	bool const& force_insertion,
+	list<Particle*>* particlesClones,
+	vector<Particle*> const* ReferenceParticles,
+    	bool const& periodic, bool const& force_insertion,
 	GrainsMPIWrapper const* wrapper = NULL );	
     //@}
 

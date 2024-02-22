@@ -754,8 +754,8 @@ void AllComponents::ShiftParticleOutIn( bool const& parallel )
   m_ActiveParticles.push_back( m_wait );
   if ( parallel )
   {
-    if ( m_wait->getTag() == 1 ) m_ParticlesInHalozone.push_back(m_wait);
-    else if ( m_wait->getTag() == 2 ) m_CloneParticles.push_back(m_wait);
+    if ( m_wait->getTag() == 1 ) m_ParticlesInHalozone.push_back( m_wait );
+    else if ( m_wait->getTag() == 2 ) m_CloneParticles.push_back( m_wait );
   }
   m_wait = NULL;
 }
@@ -1090,10 +1090,17 @@ void AllComponents::PostProcessing_start( double time, double dt,
   // Periodic clones
   if ( GrainsExec::m_periodic )
   {
-    if ( GrainsExec::m_MPI ) {}
+    postProcessingPeriodic = new list<Particle*>;
+    if ( GrainsExec::m_MPI ) 
+    {
+      list<Particle*>::const_iterator particle;
+      for (particle=m_CloneParticles.begin();
+  	particle!=m_CloneParticles.end(); particle++)
+        if ( !LC->isInDomain( (*particle)->getPosition() ) )
+	  postProcessingPeriodic->push_back( *particle );
+    }
     else
     {
-      postProcessingPeriodic = new list<Particle*>;
       multimap<int,Particle*>::iterator imm;
       for (imm=m_PeriodicCloneParticles.begin();
   	imm!=m_PeriodicCloneParticles.end();imm++)
@@ -1151,10 +1158,17 @@ void AllComponents::PostProcessing( double time, double dt,
   // Periodic clones
   if ( GrainsExec::m_periodic )
   {
-    if ( GrainsExec::m_MPI ) {}
+    postProcessingPeriodic = new list<Particle*>;
+    if ( GrainsExec::m_MPI )
+    {
+      list<Particle*>::const_iterator particle;
+      for (particle=m_CloneParticles.begin();
+  	particle!=m_CloneParticles.end(); particle++)
+        if ( !LC->isInDomain( (*particle)->getPosition() ) )
+	  postProcessingPeriodic->push_back( *particle );
+    }    
     else
     {
-      postProcessingPeriodic = new list<Particle*>;
       multimap<int,Particle*>::iterator imm;
       for (imm=m_PeriodicCloneParticles.begin();
   	imm!=m_PeriodicCloneParticles.end();imm++)

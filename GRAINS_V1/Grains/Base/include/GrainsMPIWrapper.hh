@@ -140,8 +140,9 @@ class GrainsMPIWrapper : public SolverComputingTime
 		
     /** @brief Broadcasts an integer from the master to all processes within the
     MPI_COMM_activProc communicator
-    @param i integer */
-    int Broadcast_INT( int const& i ) const;
+    @param i integer 
+    @param source rank of sending process (default is master = 0 ) */
+    int Broadcast_INT( int const& i, int source = 0 ) const;
 
     /** @brief Broadcasts a double from the master to all processes within the 
     MPI_COMM_activProc communicator
@@ -428,26 +429,6 @@ class GrainsMPIWrapper : public SolverComputingTime
     /** @brief Sets the GeoPosition of the master process in the local
     communicators involving neighbors only to which this process belongs to */
     void setMasterGeoLocInLocalComm(); 
-  
-    /** @brief Creates and updates clones with the data sent by the neighboring
-    processes 
-    @param time physical time
-    @param recvsize number of particles received
-    @param recvbuf_DOUBLE array of double containing the data received
-    @param NB_DOUBLE_PART number of doubles per particle       
-    @param particlesClones list of active clone particles
-    @param particles list of active particles
-    @param particlesHalozone list of active particles in the halo (buffer) zone
-    @param referenceParticles vector of reference particles
-    @param LC linked cell grid */
-    void UpdateOrCreateClones( double time,
- 	int const& recvsize, double const* recvbuf_DOUBLE,
-	int const& NB_DOUBLE_PART, 
-  	list<Particle*>* particlesClones,
-	list<Particle*>* particles,
-  	list<Particle*> const* particlesHalozone,
-	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC ); 
 	
     /** @brief Updates clones with the data sent by the neighboring processes 
     @param time physical time

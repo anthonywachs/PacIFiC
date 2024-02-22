@@ -1652,6 +1652,7 @@ bool Grains::insertParticle( PullMode const& mode )
   static size_t insert_counter = 0;
   bool insert = true;
   Vector3 vtrans, vrot ;
+  Quaternion qrot;  
 
   if ( insert_counter == 0 )
   {
@@ -1682,6 +1683,9 @@ bool Grains::insertParticle( PullMode const& mode )
       }
 
       particle->initialize_transformWithCrust_to_notComputed();
+      qrot.setQuaternion( particle->getRigidBody()->getTransform()
+		->getBasis() );
+      particle->setQuaternionRotation( qrot );      
 
       // If insertion if successful, shift particle from wait to inserted
       // and initialize particle rotation quaternion from rotation matrix
@@ -1693,10 +1697,6 @@ bool Grains::insertParticle( PullMode const& mode )
       if ( insert )
       {
         m_allcomponents.ShiftParticleOutIn();
-	Quaternion qrot;
-	qrot.setQuaternion( particle->getRigidBody()->getTransform()
-		->getBasis() );
-	particle->setQuaternionRotation( qrot );
 	particle->InitializeForce( true );
 	particle->computeAcceleration( m_time );
       }

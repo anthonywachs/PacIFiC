@@ -492,8 +492,8 @@ void ParaviewPostProcessingWriter::one_output(
 	              
       ofstream f( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_Obstacles.pvd" ).c_str(), ios::out );	 
-//       f << m_Paraview_saveObstacles_pvd.str();
-      writeBigOSS( f, m_Paraview_saveObstacles_pvd );
+      f << m_Paraview_saveObstacles_pvd.str();
+//      writeBigOSS( f, m_Paraview_saveObstacles_pvd );
       f << "</Collection>" << endl;
       f << "</VTKFile>" << endl;
       f.close();      
@@ -515,8 +515,8 @@ void ParaviewPostProcessingWriter::one_output(
        
       ofstream g( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_Particles.pvd" ).c_str(), ios::out );
-//       g << m_Paraview_saveParticles_pvd[0]->str();
-      writeBigOSS( g, *m_Paraview_saveParticles_pvd[0] );
+      g << m_Paraview_saveParticles_pvd[0]->str();
+//      writeBigOSS( g, *m_Paraview_saveParticles_pvd[0] );
       g << "</Collection>" << endl;
       g << "</VTKFile>" << endl;
       g.close();
@@ -572,8 +572,8 @@ void ParaviewPostProcessingWriter::one_output(
         ofstream g( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        		+ "_Particles_Type" + ossPC->str() + ".pvd" ).c_str(), 
 		ios::out );
-//         g << m_Paraview_saveParticles_pvd[i]->str();
-	writeBigOSS( g, *m_Paraview_saveParticles_pvd[i] );
+        g << m_Paraview_saveParticles_pvd[i]->str();
+//	writeBigOSS( g, *m_Paraview_saveParticles_pvd[i] );
         g << "</Collection>" << endl;
         g << "</VTKFile>" << endl;
         g.close(); 
@@ -619,8 +619,8 @@ void ParaviewPostProcessingWriter::one_output(
        
       ofstream g( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_PeriodicCloneParticles.pvd" ).c_str(), ios::out );
-//       g << m_Paraview_savePeriodicCloneParticles_pvd.str();
-      writeBigOSS( g, m_Paraview_savePeriodicCloneParticles_pvd );
+      g << m_Paraview_savePeriodicCloneParticles_pvd.str();
+//      writeBigOSS( g, m_Paraview_savePeriodicCloneParticles_pvd );
       g << "</Collection>" << endl;
       g << "</VTKFile>" << endl;
       g.close(); 
@@ -668,8 +668,8 @@ void ParaviewPostProcessingWriter::one_output(
        
       ofstream h( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_ParticleVelocityVectors.pvd" ).c_str(), ios::out );
-//       h << m_Paraview_saveParticleVelocityVectors_pvd.str();
-      writeBigOSS( h, m_Paraview_saveParticleVelocityVectors_pvd );
+      h << m_Paraview_saveParticleVelocityVectors_pvd.str();
+//      writeBigOSS( h, m_Paraview_saveParticleVelocityVectors_pvd );
       h << "</Collection>" << endl;
       h << "</VTKFile>" << endl;
       h.close();      
@@ -699,8 +699,8 @@ void ParaviewPostProcessingWriter::one_output(
         
       ofstream h( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
         	+ "_ContactForceVectors.pvd" ).c_str(), ios::out );
-//        h << m_Paraview_saveContactForceVectors_pvd.str();
-      writeBigOSS( h, m_Paraview_saveContactForceVectors_pvd );        
+       h << m_Paraview_saveContactForceVectors_pvd.str();
+//      writeBigOSS( h, m_Paraview_saveContactForceVectors_pvd );        
       h << "</Collection>" << endl;
       h << "</VTKFile>" << endl;
       h.close();      
@@ -731,7 +731,8 @@ void ParaviewPostProcessingWriter::one_output(
           
         ofstream h( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
           	+ "_ContactForceChains.pvd" ).c_str(), ios::out );
-        writeBigOSS( h, m_Paraview_saveContactForceChains_pvd );        
+        h << m_Paraview_saveContactForceChains_pvd.str();
+//	writeBigOSS( h, m_Paraview_saveContactForceChains_pvd );        
         h << "</Collection>" << endl;
         h << "</VTKFile>" << endl;
         h.close();      
