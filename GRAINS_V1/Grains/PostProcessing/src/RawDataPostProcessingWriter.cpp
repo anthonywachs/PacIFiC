@@ -13,19 +13,29 @@ RawDataPostProcessingWriter::RawDataPostProcessingWriter()
 
 
 
+
 // ----------------------------------------------------------------------------
 // Constructor with XML node, rank and number of processes as input parameters
 RawDataPostProcessingWriter::RawDataPostProcessingWriter( DOMNode* dn,
     int const& rank_, int const& nbranks_, bool const& verbose )
   : PostProcessingWriter( dn, rank_, nbranks_ )
+  , m_binary( false )
+  , m_ndigits( 6 )  
 { 
   m_filerootname = ReaderXML::getNodeAttr_String( dn, "Name" );
+  if ( ReaderXML::hasNodeAttr( dn, "WritingMode" ) )
+  { 
+    string sm_binary = ReaderXML::getNodeAttr_String( dn, "WritingMode" );
+    if ( sm_binary == "Binary" ) m_binary = true;
+  }  
  
   if ( m_rank == 0 && verbose )
   {
-    cout << GrainsExec::m_shift9 << "Type = Text" << endl;
+    cout << GrainsExec::m_shift9 << "Type = RawData" << endl;
     cout << GrainsExec::m_shift12 << "Output file name = " 
     	<< m_filerootname << endl;
+    cout << GrainsExec::m_shift12 << "Writing mode = " 
+    	<< ( m_binary ? "Binary" : "Text" ) << endl;	
   }
 }
 
@@ -54,7 +64,8 @@ void RawDataPostProcessingWriter::PostProcessing_start(
     vector<Window> const& insert_windows )
 {
   GrainsMPIWrapper const* wrapper = GrainsExec::getComm() ;
-  size_t nb_total_part = GrainsExec::getNumberParticlesOnAllProc() ;
+  size_t nb_total_part = GrainsExec::getTotalNumberPhysicalParticles() ;
+  int type = 0;
 
   if ( m_rank == 0 )
   {
@@ -67,41 +78,85 @@ void RawDataPostProcessingWriter::PostProcessing_start(
     prepareResultFiles( mode );
   }     
 
-  // IF PARALLEL
-  if( wrapper )
+  // In parallel mode
+  if ( wrapper )
   {
-    vector< vector<double> >* cinematique_Global;
-
-    // Réunir la cinematique des particles de tous les procs sur le master
-    cinematique_Global = wrapper->GatherPositionVelocity_PostProcessing( 
-    	  *particles, nb_total_part );
-
-    // Ecrire les resultats contenus dans cinematique_Global
-    if ( m_rank == 0 )
-      if ( GrainsExec::m_ReloadType == "new" )
-        one_output_MPI( time, nb_total_part, cinematique_Global ) ;
-
+    vector<int>* types_Global = NULL;
+    vector< vector<double> >* data_Global = NULL;    
+    
     // Gather particles class from every proc on master proc
-    vector< vector<double> >* types_Global = 
+    types_Global = 
         wrapper->GatherParticlesClass_PostProcessing( *particles,
             nb_total_part );
 
     // Write down particles class only once at the begining
     if ( m_rank == 0 )
     {
-      for (size_t i=0; i<nb_total_part; i++)
-        m_particle_class << (*types_Global)[0][i] << " " ;
+      if ( m_binary )
+      { 
+        for (size_t i=0; i<nb_total_part; i++)
+	{
+	  type = (*types_Global)[i];
+	  m_particle_class.write( reinterpret_cast<char*>( &type ), 
+	  	sizeof(int) );
+	}      
+      }
+      else
+      {     
+        for (size_t i=0; i<nb_total_part; i++)
+          m_particle_class << (*types_Global)[i] << " " ;
+        m_particle_class << endl ;
+      }
+    }
+    if ( types_Global ) delete types_Global ;
+
+    
+    // Gather particle data ordered by particle ID on the master proc
+    data_Global = wrapper->GatherParticleData_PostProcessing( 
+    	  *particles, nb_total_part );
+
+    // Write particle data
+    if ( m_rank == 0 )
+      if ( GrainsExec::m_ReloadType == "new" )
+        one_output_MPI( time, nb_total_part, data_Global ) ;
+    if ( data_Global ) delete data_Global ;
+  }
+  // In serial mode
+  else
+  {  
+    // Extract the active particles that are not periodic clones
+    // and create a map part ID - particle pointer such that we can write data
+    // in increasing order of particle ID from 0 to nb_total_part-1
+    map<size_t,Particle*> IDtoPart;
+    list<Particle*>::const_iterator il;
+    for (il=particles->begin(); il!=particles->end();il++)
+      if ( (*il)->getTag() != 2 )
+        IDtoPart.insert( pair<int,Particle*>( size_t((*il)->getID()), *il ) );
+       
+    // Add the inactive particles
+    for (il=pwait->begin(); il!=pwait->end();il++)
+      IDtoPart.insert( pair<int,Particle*>( size_t((*il)->getID()), *il ) );
+      
+    map<size_t,Particle*>::const_iterator im; 
+    if ( m_binary )
+    {
+      for (im=IDtoPart.begin();im!=IDtoPart.end();im++)
+      {
+	type = im->second->getGeometricType();
+	m_particle_class.write( reinterpret_cast<char*>( &type ), sizeof(int) );
+      }              
+    }
+    else
+    { 
+      for (im=IDtoPart.begin();im!=IDtoPart.end();im++)
+        m_particle_class << im->second->getGeometricType() << " " ;
       m_particle_class << endl ;
     }
 
-    if ( cinematique_Global )
-      delete cinematique_Global ;
-
-    if ( types_Global )
-      delete types_Global ;
+       
+    // Write particle data
+    one_output_Standard( time, nb_total_part, particles );    
   }
-  else
-    one_output_Standard( time, particles, pwait );
 }
 
 
@@ -120,23 +175,22 @@ void RawDataPostProcessingWriter::PostProcessing( double const& time,
 {
 
   GrainsMPIWrapper const* wrapper = GrainsExec::getComm() ;
-  size_t nb_total_part = GrainsExec::getNumberParticlesOnAllProc() ;
+  size_t nb_total_part = GrainsExec::getTotalNumberPhysicalParticles() ;
 
-  if( wrapper )
+  if ( wrapper )
   {
-    vector< vector<double> >* cinematique_Global = 
-        wrapper->GatherPositionVelocity_PostProcessing( *particles,
+    vector< vector<double> >* data_Global = 
+        wrapper->GatherParticleData_PostProcessing( *particles,
         nb_total_part );
 
     // Ecrire les résultats contenus dans cinematique_Global
     if ( m_rank == 0 )
-      one_output_MPI( time, nb_total_part, cinematique_Global ) ;
+      one_output_MPI( time, nb_total_part, data_Global ) ;
 
-    if ( cinematique_Global )
-      delete cinematique_Global ;
+    if ( data_Global ) delete data_Global ;
   }
   else
-    one_output_Standard( time, particles, pwait );
+    one_output_Standard( time, nb_total_part, particles );
 }
 
 
@@ -167,56 +221,143 @@ void RawDataPostProcessingWriter::PostProcessing_end()
 
 // ----------------------------------------------------------------------------
 // Writes data in parallel mode at one physical time
-void RawDataPostProcessingWriter::one_output_MPI(double const& time, 
+void RawDataPostProcessingWriter::one_output_MPI( double const& time, 
     size_t& nb_total_part, 
-    vector< vector<double> > const* cinematique_Global)
+    vector< vector<double> > const* data_Global )
 {
-  vector<double> InternalFeatures(9,0.);
-
-  m_gc_coordinates_x << time;
-  m_gc_coordinates_y << time;
-  m_gc_coordinates_z << time;
-  m_translational_velocity_x << time;
-  m_translational_velocity_y << time;
-  m_translational_velocity_z << time;
-  m_angular_velocity_x << time;
-  m_angular_velocity_y << time;
-  m_angular_velocity_z << time;
-  m_coordination_number << time;
-
-  // Dans le cas d'une insertion, tant que la particle n'est pas insérée
-  // la vitesse & la position sont nulles
-  for (size_t i=0; i<nb_total_part; i++)
+  if ( m_binary )
   {
-    // Position du centre de gravité
-    m_gc_coordinates_x << " " << (*cinematique_Global)[0][i] ;
-    m_gc_coordinates_y << " " << (*cinematique_Global)[1][i] ;
-    m_gc_coordinates_z << " " << (*cinematique_Global)[2][i] ;
+    double tt = time;
+    m_gc_coordinates_x.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_gc_coordinates_y.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_gc_coordinates_z.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_translational_velocity_x.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_translational_velocity_y.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_translational_velocity_z.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_angular_velocity_x.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_angular_velocity_y.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_angular_velocity_z.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_angular_velocity_z.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );					  
+  }
+  else
+  {
+    string stime = GrainsExec::doubleToString( ios::scientific, 6, time );
+    m_gc_coordinates_x << stime;
+    m_gc_coordinates_y << stime;
+    m_gc_coordinates_z << stime;
+    m_translational_velocity_x << stime;
+    m_translational_velocity_y << stime;
+    m_translational_velocity_z << stime;
+    m_angular_velocity_x << stime;
+    m_angular_velocity_y << stime;
+    m_angular_velocity_z << stime;
+    m_angular_velocity_z << stime;
+  }
 
-    // Velocity translationnelle du centre de gravité
-    m_translational_velocity_x << " " << (*cinematique_Global)[3][i] ;
-    m_translational_velocity_y << " " << (*cinematique_Global)[4][i] ;
-    m_translational_velocity_z << " " << (*cinematique_Global)[5][i] ;
+  // Write in files: inactive particles are assigned 0 values and values are
+  // written in increasing order of particle ID from 0 to nb_total_part-1
+  if ( m_binary )
+  {
+    int coord = 0;
+    double val = 0.;
     
-    // Velocity de rotation du centre de gravité
-    m_angular_velocity_x << " " << (*cinematique_Global)[6][i] ;
-    m_angular_velocity_y << " " << (*cinematique_Global)[7][i] ;
-    m_angular_velocity_z << " " << (*cinematique_Global)[8][i] ;
+    for (size_t i=0; i<nb_total_part; i++)
+    {
+      // Center of mass position
+      val = (*data_Global)[i][0];
+      m_gc_coordinates_x.write( reinterpret_cast<char*>( &val ), 
+      	sizeof(double) ); 
+      val = (*data_Global)[i][1];	
+      m_gc_coordinates_y.write( reinterpret_cast<char*>( &val ), 
+      	sizeof(double) );
+      val = (*data_Global)[i][2];       
+      m_gc_coordinates_z.write( reinterpret_cast<char*>( &val ), 
+      	sizeof(double) ); 
 
-    // Coordination number
-    m_coordination_number << " " << (*cinematique_Global)[9][i] ;
+      // Translational velocity
+      val = (*data_Global)[i][3];      
+      m_translational_velocity_x.write( reinterpret_cast<char*>( &val ), 
+      	sizeof(double) );
+      val = (*data_Global)[i][4];      
+      m_translational_velocity_y.write( reinterpret_cast<char*>( &val ), 
+      	sizeof(double) );	
+      val = (*data_Global)[i][5];      
+      m_translational_velocity_z.write( reinterpret_cast<char*>( &val ), 
+      	sizeof(double) );	 
+    
+      // Angular velocity
+      val = (*data_Global)[i][6];       
+      m_angular_velocity_x.write( reinterpret_cast<char*>( &val ), 
+      	sizeof(double) );
+      val = (*data_Global)[i][7];       
+      m_angular_velocity_y.write( reinterpret_cast<char*>( &val ), 
+      	sizeof(double) );	
+      val = (*data_Global)[i][8];       
+      m_angular_velocity_z.write( reinterpret_cast<char*>( &val ), 
+      	sizeof(double) );	
+
+      // Number of contacts
+      coord = int((*data_Global)[i][9]) ;
+      m_coordination_number.write( reinterpret_cast<char*>( 
+      	&coord ), sizeof(int) );
+    }  
+  }
+  else
+  { 
+    for (size_t i=0; i<nb_total_part; i++)
+    {
+      // Center of mass position
+      m_gc_coordinates_x << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*data_Global)[i][0] ) ;
+      m_gc_coordinates_y << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*data_Global)[i][1] ) ;
+      m_gc_coordinates_z << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*data_Global)[i][2] ) ;
+
+      // Translational velocity
+      m_translational_velocity_x << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*data_Global)[i][3] ) ;
+      m_translational_velocity_y << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*data_Global)[i][4] ) ;
+      m_translational_velocity_z << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*data_Global)[i][5] ) ;
+    
+      // Angular velocity
+      m_angular_velocity_x << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*data_Global)[i][6] ) ;
+      m_angular_velocity_y << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*data_Global)[i][7] ) ;
+      m_angular_velocity_z << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*data_Global)[i][8] ) ;
+
+      // Number of contacts
+      m_coordination_number << " " << int((*data_Global)[i][9] ) ;
+    }
   }
   
-  m_gc_coordinates_x << endl ;
-  m_gc_coordinates_y << endl ;
-  m_gc_coordinates_z << endl ;
-  m_translational_velocity_x << endl ;
-  m_translational_velocity_y << endl ;
-  m_translational_velocity_z << endl ;
-  m_angular_velocity_x << endl ;
-  m_angular_velocity_y << endl ;
-  m_angular_velocity_z << endl ;
-  m_coordination_number << endl ;
+  if ( !m_binary )
+  {
+    m_gc_coordinates_x << endl ;
+    m_gc_coordinates_y << endl ;
+    m_gc_coordinates_z << endl ;
+    m_translational_velocity_x << endl ;
+    m_translational_velocity_y << endl ;
+    m_translational_velocity_z << endl ;
+    m_angular_velocity_x << endl ;
+    m_angular_velocity_y << endl ;
+    m_angular_velocity_z << endl ;
+    m_coordination_number << endl ;
+  }
 }
 
 
@@ -243,31 +384,42 @@ void RawDataPostProcessingWriter::prepareResultFiles( ios_base::openmode mode )
 {
   string file;
   file = m_filerootname+"_position_x.dat";
-  m_gc_coordinates_x.open(file.c_str(),mode);
+  m_gc_coordinates_x.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) );
   file = m_filerootname+"_position_y.dat";
-  m_gc_coordinates_y.open(file.c_str(),mode);
+  m_gc_coordinates_y.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) );
   file = m_filerootname+"_position_z.dat";
-  m_gc_coordinates_z.open(file.c_str(),mode);
+  m_gc_coordinates_z.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) );
 
   file = m_filerootname+"_translational_velocity_x.dat";
-  m_translational_velocity_x.open(file.c_str(),mode);
+  m_translational_velocity_x.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) );
   file = m_filerootname+"_translational_velocity_y.dat";
-  m_translational_velocity_y.open(file.c_str(),mode);
+  m_translational_velocity_y.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) );
   file = m_filerootname+"_translational_velocity_z.dat";
-  m_translational_velocity_z.open(file.c_str(),mode); 
+  m_translational_velocity_z.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) ); 
 
   file = m_filerootname+"_angular_velocity_x.dat";
-  m_angular_velocity_x.open(file.c_str(),mode);
+  m_angular_velocity_x.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) );
   file = m_filerootname+"_angular_velocity_y.dat";
-  m_angular_velocity_y.open(file.c_str(),mode);
+  m_angular_velocity_y.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) );
   file = m_filerootname+"_angular_velocity_z.dat";
-  m_angular_velocity_z.open(file.c_str(),mode);
+  m_angular_velocity_z.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) );
   
   file = m_filerootname+"_coordinationNumber.dat";
-  m_coordination_number.open( file.c_str(), mode );
+  m_coordination_number.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) );
 
   file = m_filerootname+"_particleType.dat";
-  m_particle_class.open( file.c_str(), mode );
+  m_particle_class.open( file.c_str(), mode | ( m_binary ? 
+  	ios::binary : mode ) );
 
 }
 
@@ -276,75 +428,190 @@ void RawDataPostProcessingWriter::prepareResultFiles( ios_base::openmode mode )
 
 // ----------------------------------------------------------------------------
 // Writes data in serial mode at one physical time
-void RawDataPostProcessingWriter::one_output_Standard(double const& time,
-    list<Particle*> const* particles,
-    list<Particle*> const* pwait)
+void RawDataPostProcessingWriter::one_output_Standard( double const& time,
+    size_t& nb_total_part, list<Particle*> const* particles )
 { 
-  Point3 const* centre = NULL;
-  Vector3 const* velT = NULL; 
-  Vector3 const* velR = NULL;    
+  Point3* centre = NULL;
+  Vector3* velT = NULL; 
+  Vector3* velR = NULL; 
+  double zero = 0., tt = time; 
+  int coord = 0, izero = 0; 
 
-  m_gc_coordinates_x << time;
-  m_gc_coordinates_y << time;  
-  m_gc_coordinates_z << time; 
-  m_translational_velocity_x << time;
-  m_translational_velocity_y << time;   
-  m_translational_velocity_z << time;
-  m_angular_velocity_x << time;
-  m_angular_velocity_y << time;   
-  m_angular_velocity_z << time;
-  m_coordination_number << time;
-
-  list<Particle*>::const_iterator particle;
-  for (particle=particles->begin(); particle!=particles->end();particle++)
-    if ( (*particle)->getTag() != 2 )
+  if ( m_binary )
+  {
+    m_gc_coordinates_x.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_gc_coordinates_y.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_gc_coordinates_z.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_translational_velocity_x.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_translational_velocity_y.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_translational_velocity_z.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_angular_velocity_x.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_angular_velocity_y.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_angular_velocity_z.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );
+    m_angular_velocity_z.write( reinterpret_cast<char*>( &tt ), 
+    	sizeof(double) );					  
+  }
+  else
+  {
+    string stime = GrainsExec::doubleToString( ios::scientific, 6, time );
+    m_gc_coordinates_x << stime;
+    m_gc_coordinates_y << stime;
+    m_gc_coordinates_z << stime;
+    m_translational_velocity_x << stime;
+    m_translational_velocity_y << stime;
+    m_translational_velocity_z << stime;
+    m_angular_velocity_x << stime;
+    m_angular_velocity_y << stime;
+    m_angular_velocity_z << stime;
+    m_angular_velocity_z << stime;
+  }
+  
+  // Extract the active particles that are not periodic clones
+  // and create a map part ID - particle pointer such that we can write data
+  // in increasing order of particle ID from 0 to nb_total_part-1
+  map<size_t,Particle*> IDtoPart;
+  list<Particle*>::const_iterator il;
+  Particle* pp = NULL;
+  for (il=particles->begin(); il!=particles->end();il++)
+    if ( (*il)->getTag() != 2 )
+       IDtoPart.insert( pair<int,Particle*>( size_t((*il)->getID()), *il ) ); 
+       
+  // Write in files: inactive particles are assigned 0 values and values are
+  // written in increasing order of particle ID from 0 to nb_total_part-1
+  for (size_t i=0;i<nb_total_part;i++)
+    if ( IDtoPart.count( i ) )
     {
-      // Center of mass position
-      centre = (*particle)->getPosition();
-      m_gc_coordinates_x << " " << (*centre)[X];
-      m_gc_coordinates_y << " " << (*centre)[Y];
-      m_gc_coordinates_z << " " << (*centre)[Z];
-
-      // Translational velocity
-      velT = (*particle)->getTranslationalVelocity();
-      m_translational_velocity_x << " " << (*velT)[X];
-      m_translational_velocity_y << " " << (*velT)[Y];
-      m_translational_velocity_z << " " << (*velT)[Z]; 
-    
-      // Angular velocity
-      velR = (*particle)->getAngularVelocity();
-      m_angular_velocity_x << " " << (*velR)[X];
-      m_angular_velocity_y << " " << (*velR)[Y];
-      m_angular_velocity_z << " " << (*velR)[Z];
-    
-      // Number of contacts
-      m_coordination_number << " " << (*particle)->getCoordinationNumber();
-    }
-
-  if( pwait )
-    for (particle=pwait->begin(); particle!=pwait->end();particle++)
-    {
-      // Center of mass position
-      centre = (*particle)->getPosition();
-      m_gc_coordinates_x << " " << (*centre)[X];
-      m_gc_coordinates_y << " " << (*centre)[Y];
-      m_gc_coordinates_z << " " << (*centre)[Z];
-
-      // Translational velocity
-      velT = (*particle)->getTranslationalVelocity();
-      m_translational_velocity_x << " " << (*velT)[X];
-      m_translational_velocity_y << " " << (*velT)[Y];
-      m_translational_velocity_z << " " << (*velT)[Z];
-
-      // Angular velocity
-      velR = (*particle)->getAngularVelocity();
-      m_angular_velocity_x << " " << (*velR)[X];
-      m_angular_velocity_y << " " << (*velR)[Y];
-      m_angular_velocity_z << " " << (*velR)[Z];
+      pp = IDtoPart[i];
       
-      // Number of contacts
-      m_coordination_number << " 0";
+      if ( m_binary )
+      {
+        // Center of mass position
+        centre = const_cast<Point3*>(pp->getPosition());
+	m_gc_coordinates_x.write( reinterpret_cast<char*>( &(*centre)[X] ), 
+    		sizeof(double) );
+	m_gc_coordinates_y.write( reinterpret_cast<char*>( &(*centre)[Y] ), 
+    		sizeof(double) );
+	m_gc_coordinates_z.write( reinterpret_cast<char*>( &(*centre)[Z] ), 
+    		sizeof(double) );
+		
+        // Translational velocity
+        velT = const_cast<Vector3*>(pp->getTranslationalVelocity());
+        m_translational_velocity_x.write( reinterpret_cast<char*>( 
+		&(*velT)[X] ), sizeof(double) );
+        m_translational_velocity_y.write( reinterpret_cast<char*>( 
+		&(*velT)[Y] ), sizeof(double) );
+        m_translational_velocity_z.write( reinterpret_cast<char*>( 
+		&(*velT)[Z] ), sizeof(double) );
+		    
+        // Angular velocity
+        velR = const_cast<Vector3*>(pp->getAngularVelocity());
+        m_angular_velocity_x.write( reinterpret_cast<char*>( 
+		&(*velR)[X] ), sizeof(double) );
+        m_angular_velocity_y.write( reinterpret_cast<char*>( 
+		&(*velR)[Y] ), sizeof(double) );
+        m_angular_velocity_z.write( reinterpret_cast<char*>( 
+		&(*velR)[Z] ), sizeof(double) );
+    
+        // Number of contacts
+        coord = pp->getCoordinationNumber(); 
+	m_coordination_number.write( reinterpret_cast<char*>( 
+		&coord ), sizeof(int) );
+      }
+      else
+      {
+        // Center of mass position
+        centre = const_cast<Point3*>(pp->getPosition());
+        m_gc_coordinates_x << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*centre)[X] ) ;
+        m_gc_coordinates_y << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*centre)[Y] ) ;
+        m_gc_coordinates_z << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*centre)[Z] ) ;
+
+        // Translational velocity
+        velT = const_cast<Vector3*>(pp->getTranslationalVelocity());
+        m_translational_velocity_x << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*velT)[X] ) ;
+        m_translational_velocity_y << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*velT)[Y] ) ;
+        m_translational_velocity_z << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*velT)[Z] ) ;
+    
+        // Angular velocity
+        velR = const_cast<Vector3*>(pp->getAngularVelocity());
+        m_angular_velocity_x << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*velR)[X] ) ;
+        m_angular_velocity_y << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*velR)[Y] ) ;
+        m_angular_velocity_z << " " << GrainsExec::doubleToString( 
+    	ios::scientific, m_ndigits, (*velR)[Z] ) ;
+    
+        // Number of contacts
+        m_coordination_number << " " << pp->getCoordinationNumber(); 
+      }         
     }
+    else
+    {
+      if ( m_binary )
+      {
+        // Center of mass position
+	m_gc_coordinates_x.write( reinterpret_cast<char*>( &zero ), 
+    		sizeof(double) );
+	m_gc_coordinates_y.write( reinterpret_cast<char*>( &zero ), 
+    		sizeof(double) );
+	m_gc_coordinates_z.write( reinterpret_cast<char*>( &zero ), 
+    		sizeof(double) );
+		
+        // Translational velocity
+        m_translational_velocity_x.write( reinterpret_cast<char*>( 
+		&zero ), sizeof(double) );
+        m_translational_velocity_y.write( reinterpret_cast<char*>( 
+		&zero ), sizeof(double) );
+        m_translational_velocity_z.write( reinterpret_cast<char*>( 
+		&zero ), sizeof(double) );
+		    
+        // Angular velocity
+        m_angular_velocity_x.write( reinterpret_cast<char*>( 
+		&zero ), sizeof(double) );
+        m_angular_velocity_y.write( reinterpret_cast<char*>( 
+		&zero ), sizeof(double) );
+        m_angular_velocity_z.write( reinterpret_cast<char*>( 
+		&zero ), sizeof(double) );
+    
+        // Number of contacts
+	m_coordination_number.write( reinterpret_cast<char*>( 
+		&izero ), sizeof(int) );      
+      }
+      else
+      {      
+        // Center of mass position
+        m_gc_coordinates_x << " 0.";
+        m_gc_coordinates_y << " 0.";
+        m_gc_coordinates_z << " 0.";
+
+        // Translational velocity
+        m_translational_velocity_x << " 0.";
+        m_translational_velocity_y << " 0.";
+        m_translational_velocity_z << " 0."; 
+    
+        // Angular velocity
+        m_angular_velocity_x << " 0.";
+        m_angular_velocity_y << " 0.";
+        m_angular_velocity_z << " 0.";
+    
+        // Number of contacts
+        m_coordination_number << " 0";
+      }    
+    }   
   
   m_gc_coordinates_x << endl;
   m_gc_coordinates_y << endl;  
@@ -365,5 +632,5 @@ void RawDataPostProcessingWriter::one_output_Standard(double const& time,
 // Gets the post-processing writer type
 string RawDataPostProcessingWriter::getPostProcessingWriterType() const
 {
-  return ( "Text" );
+  return ( "RawData" );
 }

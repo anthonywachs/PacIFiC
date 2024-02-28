@@ -115,18 +115,18 @@ class GrainsMPIWrapper : public SolverComputingTime
 	vector<Particle*> const& referenceParticles,
 	size_t const& nb_total_particles ) const;	
 
-    /** @brief Gathers all particle velocity-position data on the master 
-    process for post-processing purposes
+    /** @brief Gathers all particle data on the master process for 
+    post-processing purposes
     @param particles list of active particles
     @param nb_total_particles total number of particles on all processes */
-    vector< vector<double> >* GatherPositionVelocity_PostProcessing(
+    vector< vector<double> >* GatherParticleData_PostProcessing(
   	list<Particle*> const& particles,
 	size_t const& nb_total_particles ) const;	
 
     /** @brief Gathers the class of all particles on the master process 
     @param particles list of active particles
     @param nb_total_particles total number of particles on all processes */
-    vector< vector<double> >* GatherParticlesClass_PostProcessing(
+    vector<int>* GatherParticlesClass_PostProcessing(
   	list<Particle*> const& particles,
 	size_t const& nb_total_particles ) const;	
 

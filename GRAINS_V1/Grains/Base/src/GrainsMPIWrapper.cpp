@@ -1363,66 +1363,57 @@ vector<Particle*>* GrainsMPIWrapper::GatherParticles_PostProcessing(
 
 
 // ----------------------------------------------------------------------------
-// Gathers all particle velocity-position data on the master process for 
-// post-processing purposes
+// Gathers all particle data on the master process for post-processing purposes
 vector< vector<double> >* GrainsMPIWrapper::
-    GatherPositionVelocity_PostProcessing(
-        list<Particle*> const& particles,
+    GatherParticleData_PostProcessing( list<Particle*> const& particles,
 	size_t const& nb_total_particles ) const
 {
-  vector< vector<double> >* cinematique_Global = NULL;
-
-  // TO DO
-  
-  return ( cinematique_Global );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Gathers the class of all particles on the master process 
-vector< vector<double> >* GrainsMPIWrapper::
-    GatherParticlesClass_PostProcessing(
-    const list<Particle*> &particles,
-    const size_t& nb_total_particles ) const
-{
-  double intTodouble = 0.1 ;
-  int i=0, tag_DOUBLE = 1, recvsize = 0, ID_part=0;
+  vector< vector<double> >* data_Global = NULL;
+  int NB_DOUBLE_PART = 11, recvsize = 0;
+  list<Particle*>::const_iterator il;
+  int i = 0, nb_part_loc = int( particles.size() ), tag_DOUBLE = 1, id = 0;  
+  double intTodouble = 0.1 ;  
   MPI_Status status;
   MPI_Request idreq;
-
-  vector< vector<double> >* class_Global = NULL;
+  
+  
+  // Allocate the receiving vector on master process
+  if ( m_rank == m_rank_masterWorld )
+  { 
+    vector<double> work( NB_DOUBLE_PART - 1, 0. );
+    data_Global = new vector< vector<double> >( nb_total_particles, work );
+  }
     
-  list<Particle*>::const_iterator il;
-  int nb_part_loc = int(particles.size());
-  
-  // We do not care about particles in  halozone
+  // Exclude clone particles
   for (il=particles.begin();il!=particles.end();il++)
-    if ((*il)->getTag()==2) nb_part_loc--;
-
+    if ( (*il)->getTag() == 2 ) nb_part_loc--;
+    
   // Buffer size depend on the number of particles per core
-  double *buffer = new double[2*nb_part_loc];
+  double* buffer = new double[ NB_DOUBLE_PART * nb_part_loc ];
   
-  for (il=particles.begin(), i=0; il!=particles.end(); il++, i+=2)
+  for (il=particles.begin(), i=0; il!=particles.end(); il++)
   {
-    if( (*il)->getTag()==2 ) i-=2;
-    else
+    if( (*il)->getTag() != 2 )
     {
-      buffer[i] = (*il)->getID() + intTodouble ;
-      buffer[i+1] = (*il)->getGeometricType();
+      buffer[i] = (*il)->getID() + intTodouble;
+      (*il)->copyPosition( buffer, i+1 );
+      (*il)->copyTranslationalVelocity( buffer, i+4 );
+      (*il)->copyAngularVelocity( buffer, i+7 );    
+      buffer[i+10] = (*il)->getCoordinationNumber() + intTodouble;
+      i += 11; 
     }
   }
 
-  MPI_Isend( buffer, 2*nb_part_loc, MPI_DOUBLE, m_rank_masterWorld,
-      tag_DOUBLE, m_MPI_COMM_activProc, &idreq );	
+  // Process sends buffer to the master process
+  MPI_Isend( buffer, NB_DOUBLE_PART * nb_part_loc, MPI_DOUBLE, 
+  	m_rank_masterWorld, tag_DOUBLE, m_MPI_COMM_activProc, &idreq );           
 
   // Reception by the master process
-  // -------------------------------
-  if( m_rank == m_rank_masterWorld )
+  if ( m_rank == m_rank_masterWorld )
   {
-    vector<double> work( nb_total_particles, 0. ) ; 
-    class_Global = new vector< vector<double> >( 1, work ) ;
+    // Allocate the receiving vector on master process
+    vector<double> work( NB_DOUBLE_PART, 0. );
+    data_Global = new vector< vector<double> >( nb_total_particles, work );
 
     for (int irank=0; irank<m_nprocs; ++irank)
     {
@@ -1431,18 +1422,89 @@ vector< vector<double> >* GrainsMPIWrapper::
       MPI_Get_count( &status, MPI_DOUBLE, &recvsize );
 
       // Reception of the actual message	
-      double *recvbuf_DOUBLE = new double[recvsize];
+      double* recvbuf_DOUBLE = new double[recvsize];
       MPI_Recv( recvbuf_DOUBLE, recvsize, MPI_DOUBLE, 
           irank, tag_DOUBLE, m_MPI_COMM_activProc, &status );	    
       
-      // Copy in class_Global
-      for(int j=0; j<recvsize; j+=2)
+      // Copy in data_Global
+      for (int j=0; j<recvsize; j+=NB_DOUBLE_PART)
       {
-        ID_part = int(recvbuf_DOUBLE[j]) ;
-        (*class_Global)[0][ID_part] = recvbuf_DOUBLE[j+1];
-      }
+        id = int(recvbuf_DOUBLE[j]);
+	for (int k=1;k<NB_DOUBLE_PART;k++)
+	  (*data_Global)[id][k-1] = recvbuf_DOUBLE[j+k]; 
+      }	
       
       delete [] recvbuf_DOUBLE; 
+    }
+  }
+
+  // Verify that all non-blocking sends completed
+  MPI_Wait( &idreq, &status );    
+
+  delete [] buffer ;
+  
+  return ( data_Global );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Gathers the class of all particles on the master process 
+vector<int>* GrainsMPIWrapper::
+    GatherParticlesClass_PostProcessing(
+    const list<Particle*> &particles,
+    const size_t& nb_total_particles ) const
+{
+  int i=0, tag_INT = 2, recvsize = 0;
+  MPI_Status status;
+  MPI_Request idreq;
+  vector<int>* class_Global = NULL;    
+  list<Particle*>::const_iterator il;
+  int nb_part_loc = int( particles.size() );
+  
+  // Exclude clone particles
+  for (il=particles.begin();il!=particles.end();il++)
+    if ( (*il)->getTag() == 2 ) nb_part_loc--;
+
+  // Buffer size depend on the number of particles per core
+  int* buffer = new int[ 2 * nb_part_loc ];
+  
+  for (il=particles.begin(), i=0; il!=particles.end(); il++)
+  {
+    if ( (*il)->getTag() != 2 )
+    {
+      buffer[i] = (*il)->getID();
+      buffer[i+1] = (*il)->getGeometricType();
+      i += 2;
+    }
+  }
+
+  // Process sends buffer to the master process
+  MPI_Isend( buffer, 2 * nb_part_loc, MPI_INT, m_rank_masterWorld,
+      tag_INT, m_MPI_COMM_activProc, &idreq );	
+
+  // Reception by the master process
+  if ( m_rank == m_rank_masterWorld )
+  {
+    class_Global = new vector<int>( nb_total_particles, 0 ) ;
+
+    for (int irank=0; irank<m_nprocs; ++irank)
+    {
+      // Size of the message
+      MPI_Probe( irank, tag_INT, m_MPI_COMM_activProc, &status );  
+      MPI_Get_count( &status, MPI_INT, &recvsize );
+
+      // Reception of the actual message	
+      int* recvbuf_INT = new int[recvsize];
+      MPI_Recv( recvbuf_INT, recvsize, MPI_INT, 
+          irank, tag_INT, m_MPI_COMM_activProc, &status );	    
+      
+      // Copy in class_Global
+      for (int j=0; j<recvsize; j+=2)
+        (*class_Global)[recvbuf_INT[j]] = recvbuf_INT[j+1];
+      
+      delete [] recvbuf_INT; 
     }
   }
 

@@ -87,17 +87,16 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     /** @brief Writes data in parallel mode at one physical time
     @param time physical time
     @param nb_total_part total number of particles
-    @param cinematique_Global vector containing particle data  */
+    @param data_Global vector containing particle data  */
     void one_output_MPI( double const& time, size_t& nb_total_part,
-  	vector< vector<double> > const* cinematique_Global );
+  	vector< vector<double> > const* data_Global );
 	
     /** @brief Writes data in serial mode at one physical time
-    @param time physical time 
-    @param particles active particles
-    @param pwait inactive particles */
-    void one_output_Standard( double const& time,
-  	list<Particle*> const* particles,
-  	list<Particle*> const* pwait );
+    @param time physical time
+    @param nb_total_part total number of particles     
+    @param particles active particles */
+    void one_output_Standard( double const& time, size_t& nb_total_part,
+  	list<Particle*> const* particles );
 	
     /** @brief Delete all result files */
     void clearResultFiles() const ; 	  
@@ -111,11 +110,11 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
   private:
     /**@name Parameters */
     //@{  
-    ofstream m_gc_coordinates_x; /**< center of mass x-ccordinate output 
+    ofstream m_gc_coordinates_x; /**< center of mass x-coordinate output 
     	stream */
-    ofstream m_gc_coordinates_y; /**< center of mass y-ccordinate output 
+    ofstream m_gc_coordinates_y; /**< center of mass y-coordinate output 
     	stream */ 
-    ofstream m_gc_coordinates_z; /**< center of mass z-ccordinate output 
+    ofstream m_gc_coordinates_z; /**< center of mass z-coordinate output 
     	stream */
     ofstream m_translational_velocity_x; /**< x-translational velocity output 
     	stream */ 
@@ -129,6 +128,10 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     ofstream m_coordination_number; /**< coordination number output stream */
     ofstream m_particle_class; /**< particle class output stream */
     string m_filerootname; /**< files root name */
+    bool m_binary; /**< whether to write data in binary */
+    int m_ndigits; /**< number of digits after the decimal in the scientific
+    	format in text mode writing */ 
+       
 
 
   protected:

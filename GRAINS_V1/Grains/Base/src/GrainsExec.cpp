@@ -35,7 +35,7 @@ string GrainsExec::m_shift15 = "               ";
 bool GrainsExec::m_output_data_at_this_time = false;
 GrainsMPIWrapper* GrainsExec::m_wrapper = NULL;
 list<App*> GrainsExec::m_allApp;
-size_t GrainsExec::m_total_nb_particles = 0;
+size_t GrainsExec::m_total_nb_physical_particles = 0;
 list< pair<Point3*,VertexBase *> > GrainsExec::m_allPolytopeRefPointBase;
 list<IndexArray*> GrainsExec::m_allPolytopeNodeNeighbors;
 list<IndexArray*> GrainsExec::m_allPolytopeNodesIndex;
@@ -144,20 +144,24 @@ list<App*> GrainsExec::get_listApp()
 
 
 // ----------------------------------------------------------------------------
-// Returns the total number of particles (active and inactive) on all processes
-size_t GrainsExec::getNumberParticlesOnAllProc()
+// Returns the total number of particles in the physical system 
+// (i.e. on all subdomains/processes), i.e. sum of total number of active 
+// particles with tag 0 or 1 and inactive particles
+size_t GrainsExec::getTotalNumberPhysicalParticles()
 {
-  return ( m_total_nb_particles );
+  return ( m_total_nb_physical_particles );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns the total number of particles (active and inactive) on all processes
-void GrainsExec::setNumberParticlesOnAllProc( size_t const& nb_ )
+// Sets the total number of particles in the physical system 
+// (i.e. on all subdomains/processes), i.e. sum of total number of active 
+// particles with tag 0 or 1 and inactive particles
+void GrainsExec::setTotalNumberPhysicalParticles( size_t const& nb_ )
 {
-  m_total_nb_particles = nb_;
+  m_total_nb_physical_particles = nb_;
 }
 
 

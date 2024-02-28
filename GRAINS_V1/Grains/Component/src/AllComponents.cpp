@@ -1740,6 +1740,9 @@ void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
   
   m_total_nb_physical_particles = m_total_nb_active_particles_on_all_procs
   	+ m_nb_inactive_particles;
+	
+  GrainsExec::setTotalNumberPhysicalParticles( 
+  	m_total_nb_physical_particles );	
 }
 
 

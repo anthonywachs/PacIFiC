@@ -433,7 +433,7 @@ class AllComponents
     list<Particle*> m_ActiveParticles; /**< All active particles in the
   	simulation */
     list<Particle*> m_ParticlesInHalozone; /**< Active particles in a
-    	halozone (i.e.a buffer zone) */
+    	halozone (i.e. a buffer zone) */
     list<Particle*> m_CloneParticles; /**< Active particles that are parallel
   	clones of other active particles located in another subdomain/process */
     multimap<int,Particle*> m_PeriodicCloneParticles; /**< Periodic clone

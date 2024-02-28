@@ -75,9 +75,10 @@ class GrainsExec
     /** @brief Returns the list of applications */
     static list<App*> get_listApp();
 
-    /** @brief Returns the total number of particles (active and inactive)
-    on all processes */
-    static size_t getNumberParticlesOnAllProc();
+    /** @brief Returns the total number of particles in the physical system 
+    (i.e. on all subdomains/processes), i.e. sum of total number of active 
+    particles with tag 0 or 1 and inactive particles */
+    static size_t getTotalNumberPhysicalParticles();
     //@}
 
 
@@ -91,11 +92,11 @@ class GrainsExec
     @param allApp_ list of pointers to applications */
     static void set_listApp( list<App*> allApp_ );
 
-    /** @brief Sets the total number of particles (active and inactive)
-    on all processes
-    @param nb_ total number of particles (active and inactive)
-    on all processes */
-    static void setNumberParticlesOnAllProc( size_t const& nb_ );
+    /** @brief Sets the total number of particles in the physical system 
+    (i.e. on all subdomains/processes), i.e. sum of total number of active 
+    particles with tag 0 or 1 and inactive particles
+    @param nb_ total number of physical particles */
+    static void setTotalNumberPhysicalParticles( size_t const& nb_ );
     //@}
 
 
@@ -303,8 +304,10 @@ class GrainsExec
     static list<App*> m_allApp; /**< List of all applications used in
     	the simulation (the 1st application is contact detection, i.e., the
 	LinkedCell) */
-    static size_t m_total_nb_particles; /**< total number of particles (active
-    	and inactive) on all processes */
+    static size_t m_total_nb_physical_particles; /**< total number of particles
+    	in the physical system (i.e. on all subdomains/processes), i.e. sum of 
+	total number of active particles with tag 0 or 1 and inactive 
+	particles */
     static list< pair<Point3*,VertexBase *> > m_allPolytopeRefPointBase; /**<
   	list of reference points used by the polytopes */
     static list<IndexArray*> m_allPolytopeNodeNeighbors; /**< list of
