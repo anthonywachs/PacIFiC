@@ -53,7 +53,7 @@ AllComponents::~AllComponents()
   m_InactiveParticles.clear();
   m_PeriodicCloneParticles.clear();
 
-  m_ParticlesInHalozone.clear();
+  m_ParticlesInBufferzone.clear();
   m_CloneParticles.clear();
 
   vector<Particle*>::iterator ivp;
@@ -332,17 +332,17 @@ void AllComponents::computeWeight( double time, double dt )
   list<Particle*>::iterator particle;
   vector<Particle*>::iterator ivp;
 
-  // Classes de reference
+  // Reference types
   for (ivp=m_ReferenceParticles.begin();
   	ivp!=m_ReferenceParticles.end(); ivp++)
     (*ivp)->computeWeight();
 
-  // Particles en attente
+  // Inactive particles
   for (particle=m_InactiveParticles.begin();
   	particle!=m_InactiveParticles.end(); particle++)
     (*particle)->computeWeight();
 
-  // Particles actives
+  // Active particles
   for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
     (*particle)->computeWeight();
@@ -495,20 +495,20 @@ list<Particle*> const* AllComponents::getInactiveParticles() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a pointer to the list of particles in the halozone
-list<Particle*>* AllComponents::getParticlesInHalozone()
+// Returns a pointer to the list of particles in the buffer zone
+list<Particle*>* AllComponents::getParticlesInBufferzone()
 {
-  return ( &m_ParticlesInHalozone );
+  return ( &m_ParticlesInBufferzone );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns a pointer to the list of particles in the halozone
-list<Particle*> const* AllComponents::getParticlesInHalozone() const
+// Returns a pointer to the list of particles in the buffer zone
+list<Particle*> const* AllComponents::getParticlesInBufferzone() const
 {
-  return ( &m_ParticlesInHalozone );
+  return ( &m_ParticlesInBufferzone );
 }
 
 
@@ -754,7 +754,7 @@ void AllComponents::ShiftParticleOutIn( bool const& parallel )
   m_ActiveParticles.push_back( m_wait );
   if ( parallel )
   {
-    if ( m_wait->getTag() == 1 ) m_ParticlesInHalozone.push_back( m_wait );
+    if ( m_wait->getTag() == 1 ) m_ParticlesInBufferzone.push_back( m_wait );
     else if ( m_wait->getTag() == 2 ) m_CloneParticles.push_back( m_wait );
   }
   m_wait = NULL;
@@ -933,7 +933,7 @@ void AllComponents::read( istream& fileSave, string const& filename )
 	  switch ( ParticleTag )
           {
             case 1:
-              m_ParticlesInHalozone.push_back( particle );
+              m_ParticlesInBufferzone.push_back( particle );
               break;
 
             case 2:
@@ -1053,8 +1053,8 @@ ostream& operator << ( ostream& f, AllComponents const& EC )
   	<< endl;
   f << "Number of inactive particles = " << EC.m_InactiveParticles.size()
   	<< endl;
-  f << "Number of particles in halozone = " <<
-  	EC.m_ParticlesInHalozone.size() << endl;
+  f << "Number of particles in buffer zone = " <<
+  	EC.m_ParticlesInBufferzone.size() << endl;
   f << "Number of clone particles = " << EC.m_CloneParticles.size() << endl;
   list<Particle*>::const_iterator il;
   for (il=EC.m_ActiveParticles.begin();il!=EC.m_ActiveParticles.end();il++)
@@ -1326,19 +1326,6 @@ void AllComponents::monitorParticlesVelocity( double time, ofstream& fileOut,
     }
     fileOut << endl;
   }
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Updates geographic position of particles in the halozone
-void AllComponents::updateGeoPositionParticlesHalozone()
-{
-  list<Particle*>::iterator particle;
-  for (particle=m_ParticlesInHalozone.begin();
-  	particle!=m_ParticlesInHalozone.end();particle++)
-    (*particle)->updateGeoPosition();
 }
 
 
@@ -1751,9 +1738,9 @@ void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
 // ----------------------------------------------------------------------------
 // Updates list of particles in parallel
 void AllComponents::updateParticleLists( double time, 
-	list<Particle*>* newHaloPart )
+	list<Particle*>* newBufPart )
 {
-  newHaloPart->clear();
+  newBufPart->clear();
   
   list<Particle*>::iterator particle;
   int tag = 0, tagnm1 = 0;
@@ -1766,16 +1753,16 @@ void AllComponents::updateParticleLists( double time,
     switch ( tagnm1 )
     {
       case 0:
-        // Interior to halozone (0 -> 1)
+        // Interior to buffer (0 -> 1)
 	if ( tag == 1 ) 
 	{
-	  m_ParticlesInHalozone.push_back( *particle);
-	  newHaloPart->push_back( *particle);
+	  m_ParticlesInBufferzone.push_back( *particle);
+	  newBufPart->push_back( *particle);
           if ( GrainsExec::m_MPI_verbose )
 	  {
 	    ostringstream oss;
 	    oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
-		" Interior to Halozone (0 -> 1)               Id = " <<
+		" Interior to Buffer (0 -> 1) Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
 	    GrainsMPIWrapper::addToMPIString( oss.str() );
@@ -1786,31 +1773,31 @@ void AllComponents::updateParticleLists( double time,
       case 1:
         switch ( tag )
 	{
-	  // Halozone to interior (1 -> 0)
+	  // Buffer to interior (1 -> 0)
 	  case 0:
-	    removeParticleFromList( m_ParticlesInHalozone, *particle );
+	    removeParticleFromList( m_ParticlesInBufferzone, *particle );
             if ( GrainsExec::m_MPI_verbose )
 	    {
               ostringstream oss;
               oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT )
-      		<< " Halozone to Interior (1 -> 0)               Id = " <<
+      		<< " Buffer to Interior (1 -> 0) Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
               GrainsMPIWrapper::addToMPIString( oss.str() );
 	    } 
             break;
 	    
-	  // Halozone to halozone ( 1 -> 1)
+	  // Buffer to buffer ( 1 -> 1)
 	  case 1:
 	    if ( (*particle)->getGeoPosition() 
 	    	!= (*particle)->getGeoPositionNm1() )
 	    {
-	      newHaloPart->push_back( *particle);
+	      newBufPart->push_back( *particle);
               if ( GrainsExec::m_MPI_verbose )
 	      {
                 ostringstream oss;
                 oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT )
-      		<< " Halozone to Halozone (1 -> 1)               Id = " <<
+      		<< " Buffer to Buffer (1 -> 1)   Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
 		oss << "                From " <<
@@ -1822,15 +1809,15 @@ void AllComponents::updateParticleLists( double time,
 	    }	      	  
 	    break;
 	    
-	  // Halozone to Clone (1 -> 2)
+	  // Buffer to clone (1 -> 2)
 	  case 2:
-            removeParticleFromList( m_ParticlesInHalozone, *particle );
+            removeParticleFromList( m_ParticlesInBufferzone, *particle );
 	    m_CloneParticles.push_back( *particle);
 	    if ( GrainsExec::m_MPI_verbose )
             {
               ostringstream oss;
               oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT )
-      		<< " Halozone to Clone (1 -> 2)                  Id = " <<
+      		<< " Buffer to Clone (1 -> 2)    Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
               GrainsMPIWrapper::addToMPIString( oss.str() );
@@ -1840,16 +1827,16 @@ void AllComponents::updateParticleLists( double time,
 	break;      
     
       case 2:
-        // Clone to halozone (2 -> 1)
+        // Clone to buffer (2 -> 1)
 	if ( tag == 1 ) 
 	{
           removeParticleFromList( m_CloneParticles, *particle );
-	  m_ParticlesInHalozone.push_back( *particle);          
+	  m_ParticlesInBufferzone.push_back( *particle);          
           if ( GrainsExec::m_MPI_verbose )
 	  {
             ostringstream oss;
             oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
-      		" Clone to Halozone (2 -> 1)                  Id = " <<
+      		" Clone to Buffer (2 -> 1)    Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
             GrainsMPIWrapper::addToMPIString( oss.str() );

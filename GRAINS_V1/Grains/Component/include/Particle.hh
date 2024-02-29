@@ -658,14 +658,14 @@ class Particle : public Component
     	contribution of the particle acceleration treated explicitly (used for
 	neutrally buoyant or lighter particles than the fluid) */
     int m_tag; /**< tag of the cell the particle belongs to at the
-    	current time: 0=interior, 1=buffer zone, 2=halo zone */
+    	current time: 0=interior, 1=buffer zone, 2=clone zone */
     GeoPosition m_GeoLoc; /**< geographic position of the particle in the
     	Linked cell, i.e. geographic position of the cell the particle belongs
 	to at the current time */
     Cell* m_cellule; /**< Cell that the particle belongs to at the
     	current time */
     int m_tag_nm1; /**< tag of the cell the particle belonged to at the
-    	previous time: 0=interior, 1=buffer zone, 2=halo zone */
+    	previous time: 0=interior, 1=buffer zone, 2=clone zone */
     GeoPosition m_GeoLoc_nm1; /**< geographic position of the particle in the
     	Linked cell, i.e. geographic position of the cell the particle belonged
 	to at the previous time */

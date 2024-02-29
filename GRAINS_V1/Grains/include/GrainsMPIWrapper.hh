@@ -91,14 +91,14 @@ class GrainsMPIWrapper : public SolverComputingTime
     with neighboring processes in the MPI cartesian topology
     @param time physical time
     @param particles list of active particles
-    @param particlesHalozone list of active particles in the halo (buffer) zone 
+    @param particlesBufferzone list of active particles in the buffer zone 
     @param particlesClones list of active clone particles
     @param referenceParticles reference particles
     @param LC linked cell grid 
     @param update update clones if true, otherwise create */
     void UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,  	
 	list<Particle*>* particles,
-  	list<Particle*> const* particlesHalozone,
+  	list<Particle*> const* particlesBufferzone,
   	list<Particle*>* particlesClones,
 	vector<Particle*> const* referenceParticles,
 	LinkedCell* LC, bool update );
@@ -400,8 +400,8 @@ class GrainsMPIWrapper : public SolverComputingTime
     int *m_master_localComm; /**< rank of master process in local MPI 
     	communicators */
     static string *m_MPILogString; /**< MPI log string */
-    static vector< vector<int> > m_particleHalozoneToNeighboringProcs; /**< 
-  	relationship between the GeoPosition in a halo zone from which 
+    static vector< vector<int> > m_particleBufferzoneToNeighboringProcs; /**< 
+  	relationship between the GeoPosition in a buffer zone from which 
 	data are sent and the GeoPosition of the neighboring processes 
 	that receive the data */
     static vector<int> m_GeoLocReciprocity; /**< reciprocal correspondence of
@@ -421,10 +421,10 @@ class GrainsMPIWrapper : public SolverComputingTime
 
     /** @name Methods  */
     //@{
-    /** @brief Sets the relationship between the GeoPosition in a halo
+    /** @brief Sets the relationship between the GeoPosition in a buffer
     zone from which data are sent and the GeoPosition of the neighboring
     processes that receive the data */
-    void setParticleHalozoneToNeighboringProcs(); 
+    void setParticleBufferzoneToNeighboringProcs(); 
   
     /** @brief Sets the GeoPosition of the master process in the local
     communicators involving neighbors only to which this process belongs to */
@@ -437,7 +437,7 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param NB_DOUBLE_PART number of doubles per particle       
     @param particlesClones list of active clone particles
     @param particles list of active particles
-    @param particlesHalozone list of active particles in the halo (buffer) zone
+    @param particlesBufferzone list of active particles in the buffer zone
     @param referenceParticles vector of reference particles
     @param LC linked cell grid */
     void UpdateClones( double time,
@@ -445,7 +445,7 @@ class GrainsMPIWrapper : public SolverComputingTime
 	int const& NB_DOUBLE_PART, 
   	list<Particle*>* particlesClones,
 	list<Particle*>* particles,
-  	list<Particle*> const* particlesHalozone,
+  	list<Particle*> const* particlesBufferzone,
 	vector<Particle*> const* referenceParticles,
 	LinkedCell* LC ); 
 	
@@ -456,7 +456,7 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param NB_DOUBLE_PART number of doubles per particle       
     @param particlesClones list of active clone particles
     @param particles list of active particles
-    @param particlesHalozone list of active particles in the halo (buffer) zone
+    @param particlesBufferzone list of active particles in the buffer zone
     @param referenceParticles vector of reference particles
     @param LC linked cell grid */
     void CreateClones( double time,
@@ -464,7 +464,7 @@ class GrainsMPIWrapper : public SolverComputingTime
 	int const& NB_DOUBLE_PART, 
   	list<Particle*>* particlesClones,
 	list<Particle*>* particles,
-  	list<Particle*> const* particlesHalozone,
+  	list<Particle*> const* particlesBufferzone,
 	vector<Particle*> const* referenceParticles,
 	LinkedCell* LC );		              
     //@}  

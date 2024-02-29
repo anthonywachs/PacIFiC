@@ -473,7 +473,7 @@ size_t LinkedCell::set( double cellsize_, int const* nprocsdir,
     m_cellsize_Z = App::m_domain_local_size_Z;
   }
 
-  // Add cells in halo zones
+  // Add cells in clone zones
   int suppX = 0, suppY = 0, suppZ = 0;
   if ( MPIcoords[0] != 0 || m_domain_global_periodicity[0] ) suppX++;
   if ( MPIcoords[0] != nprocsdir[0] - 1 ||  m_domain_global_periodicity[0] ) 
@@ -1648,124 +1648,6 @@ bool LinkedCell::isInLinkedCell( double const& gx, double const& gy,
 
 
 // ----------------------------------------------------------------------------
-// Updates active particles with an interior tag (tag=0)
-void LinkedCell::updateInteriorTag( double time,
-	list<Particle*>* particles,
-	list<Particle*>* particlesHalozone,
-	GrainsMPIWrapper const* wrapper )
-{
-  list<Particle*>::iterator particle;
-  int tag_nm1,tag;
-  Cell* current_cell = NULL;
-
-  for (particle=particles->begin(); particle!=particles->end();
-	 particle++)
-  {
-    tag_nm1 = (*particle)->getTag();
-    current_cell = getCell( *(*particle)->getPosition() );
-    if ( tag_nm1 == 0 )
-    {
-      tag = (*particle)->setTag( current_cell->m_tag );
-
-      // Interior to Halozone (0 -> 1)
-      if ( tag == 1 )
-      {
-        if ( GrainsExec::m_MPI_verbose )
-	{
-	  ostringstream oss;
-	  oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
-		" Interior to Halozone (0 -> 1)               Id = " <<
-      		(*particle)->getID() << " " << *(*particle)->getPosition();
-	  GrainsMPIWrapper::addToMPIString( oss.str() );
-	}
-        (*particle)->setGeoPosition( current_cell->m_GeoPosCell );
-	particlesHalozone->push_back( *particle );
-      }
-    }
-  }
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Updates active particles with a halo tag (tag=1) or a clone tag (tag=2)
-void LinkedCell::updateHalozoneCloneTag( double time,
-	list<Particle*>* particlesHalozone,
-	list<Particle*>* particlesClones,
-	GrainsMPIWrapper const* wrapper )
-{
-  list<Particle*>::iterator particle;
-  int tag;
-
-  for (particle=particlesHalozone->begin();
-  	particle!=particlesHalozone->end(); )
-  {
-    tag = (*particle)->setTag(
-    	getCell( *(*particle)->getPosition() )->m_tag );
-
-    // Halozone to Clone (1 -> 2)
-    if ( tag == 2 )
-    {
-      if ( GrainsExec::m_MPI_verbose )
-      {
-        ostringstream oss;
-        oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
-      		" Halozone to Clone (1 -> 2)                  Id = " <<
-      		(*particle)->getID() << " " << *(*particle)->getPosition();
-        GrainsMPIWrapper::addToMPIString( oss.str() );
-      }
-      particlesClones->push_back( *particle );
-      (*particle)->setGeoPosition( GEOPOS_NONE );
-      particle = particlesHalozone->erase( particle );
-    }
-    // Halozone to Interior (1 -> 0)
-    else if (tag==0)
-    {
-      if ( GrainsExec::m_MPI_verbose )
-      {
-        ostringstream oss;
-        oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
-      		" Halozone to Interior (1 -> 0)               Id = " <<
-      		(*particle)->getID() << " " << *(*particle)->getPosition();
-        GrainsMPIWrapper::addToMPIString( oss.str() );
-      }
-      (*particle)->setGeoPosition( GEOPOS_NONE );
-      particle = particlesHalozone->erase( particle );
-    }
-    else particle++;
-  }
-
-  for (particle=particlesClones->begin();
-  	particle!=particlesClones->end(); )
-  {
-    tag = (*particle)->setTag(
-    	getCell( *(*particle)->getPosition() )->m_tag );
-
-    // Clone to Halozone (2 -> 1)
-    if ( tag == 1 )
-    {
-      if ( GrainsExec::m_MPI_verbose )
-      {
-        ostringstream oss;
-        oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
-      		" Clone to Halozone (2 -> 1)                  Id = " <<
-      		(*particle)->getID() << " " << *(*particle)->getPosition();
-        GrainsMPIWrapper::addToMPIString( oss.str() );
-      }
-      (*particle)->setGeoPosition(
-      	getCell( *(*particle)->getPosition() )->m_GeoPosCell );
-      particlesHalozone->push_back( *particle );
-      particle = particlesClones->erase( particle );
-    }
-    else particle++;
-  }
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Removes clone particles that exited the local linked cell grid
 void LinkedCell::DestroyOutOfDomainClones( double time,
 	list<Particle*>* particles,
@@ -1784,7 +1666,7 @@ void LinkedCell::DestroyOutOfDomainClones( double time,
       {
         ostringstream oss;
         oss << "   t=" << GrainsExec::doubleToString( time, TIMEFORMAT ) <<
-      		" Destroy clone                               Id = " <<
+      		" Destroy clone               Id = " <<
       		(*particle)->getID() << " " << *(*particle)->getPosition()
 		<< endl;
         GrainsMPIWrapper::addToMPIString( oss.str() );
@@ -2031,9 +1913,9 @@ pair<bool,bool> LinkedCell::insertParticleParallel( double time,
           {
             ostringstream oss;
             oss << "   t=" << GrainsExec::doubleToString(time,TIMEFORMAT)
-		<< " Create Clone                                Id = " 
+		<< " Create Clone                Id = " 
 		<< particle->getID()
-		<< " Classe = " << particle->getGeometricType() << " " 
+		<< " Type = " << particle->getGeometricType() << " " 
 		<< (*(particle->getPosition()))[X] << " " 
 		<< (*(particle->getPosition()))[Y] << " " 
 		<< (*(particle->getPosition()))[Z]
@@ -2256,8 +2138,8 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
         // have exited the linked cell grid and were destroyed
         // by updateDestroyPeriodicClones
 
-        // Particle moved from buffer to halozone: add particle to the periodic
-        // clone multimap
+        // Particle moved from buffer zone to clone zone: add particle to the 
+	// periodic clone multimap
         if ( tag == 2 )
         {	  
 	  particlesPeriodicClones->insert(
@@ -2327,8 +2209,8 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
 	break;
 
       default: // i.e. 2
-        // Particle moved from halozone to buffer: remove particle from the
-        // periodic clone multimap
+        // Particle moved from clone zone to buffer zone: remove particle from 
+	// the periodic clone multimap
         if ( tag == 1 )
         {
           particleID = (*particle)->getID();	  

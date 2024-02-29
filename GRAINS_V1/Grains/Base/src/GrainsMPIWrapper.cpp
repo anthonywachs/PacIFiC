@@ -11,7 +11,7 @@
 
 
 string *GrainsMPIWrapper::m_MPILogString = new string;
-vector< vector<int> > GrainsMPIWrapper::m_particleHalozoneToNeighboringProcs;
+vector< vector<int> > GrainsMPIWrapper::m_particleBufferzoneToNeighboringProcs;
 vector<int> GrainsMPIWrapper::m_GeoLocReciprocity;
 
 
@@ -101,10 +101,10 @@ GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
     m_MPIperiodes.reserve( 27 );
     for (int i=0;i<27;++i) m_MPIperiodes.push_back( Vector3Nul ); 
 
-    // Sets the relationship between the GeoPosition in a halo
+    // Sets the relationship between the GeoPosition in a buffer
     // zone from which data are sent and the GeoPosition of the 
     // neighboring processes that receive the data
-    setParticleHalozoneToNeighboringProcs();
+    setParticleBufferzoneToNeighboringProcs();
 
     // Re-number processes: no 
     int reorganisation = 0; 
@@ -170,10 +170,10 @@ GrainsMPIWrapper::~GrainsMPIWrapper()
     if ( m_master_localComm ) delete [] m_master_localComm; 
     if ( m_MPILogString ) delete m_MPILogString;
     vector< vector<int> >::iterator ivv;
-    for (ivv=m_particleHalozoneToNeighboringProcs.begin();
-  	ivv!=m_particleHalozoneToNeighboringProcs.end();ivv++)
+    for (ivv=m_particleBufferzoneToNeighboringProcs.begin();
+  	ivv!=m_particleBufferzoneToNeighboringProcs.end();ivv++)
       ivv->clear();
-    m_particleHalozoneToNeighboringProcs.clear();
+    m_particleBufferzoneToNeighboringProcs.clear();
     
     m_MPIperiodes.clear();  
   }
@@ -340,19 +340,21 @@ void GrainsMPIWrapper::setMasterGeoLocInLocalComm()
 
 
 // ----------------------------------------------------------------------------
-// Definition de particleHalozoneToNeighboringProcs
-void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
+// Sets the relationship between the GeoPosition in a buffer
+// zone from which data are sent and the GeoPosition of the neighboring
+// processes that receive the data
+void GrainsMPIWrapper::setParticleBufferzoneToNeighboringProcs()
 {
-  m_particleHalozoneToNeighboringProcs.reserve(26);
+  m_particleBufferzoneToNeighboringProcs.reserve(26);
   vector<int> emptyVECINT;
   for (int i=0;i<26;++i) 
-    m_particleHalozoneToNeighboringProcs.push_back(emptyVECINT);
+    m_particleBufferzoneToNeighboringProcs.push_back(emptyVECINT);
   vector<int> *work;
   
   // NORTH => NORTH
   work = new vector<int>(1,0);
   (*work)[0] = GEOPOS_NORTH;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_NORTH] = *work;
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_NORTH] = *work;
   work->clear();
   delete work;
   
@@ -361,7 +363,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_NORTH;
   (*work)[1] = GEOPOS_EAST;  
   (*work)[2] = GEOPOS_NORTH_EAST;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_NORTH_EAST] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_NORTH_EAST] = *work;    
   work->clear();
   delete work;
   
@@ -370,7 +372,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_NORTH;
   (*work)[1] = GEOPOS_WEST;  
   (*work)[2] = GEOPOS_NORTH_WEST;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_NORTH_WEST] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_NORTH_WEST] = *work;    
   work->clear();
   delete work;    
 
@@ -379,7 +381,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_NORTH;
   (*work)[1] = GEOPOS_FRONT;  
   (*work)[2] = GEOPOS_NORTH_FRONT;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_NORTH_FRONT] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_NORTH_FRONT] = *work;    
   work->clear();
   delete work;  
 
@@ -388,7 +390,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_NORTH;
   (*work)[1] = GEOPOS_BEHIND;  
   (*work)[2] = GEOPOS_NORTH_BEHIND;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_NORTH_BEHIND] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_NORTH_BEHIND] = *work;    
   work->clear();
   delete work; 
 
@@ -402,7 +404,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[4] = GEOPOS_NORTH_EAST;  
   (*work)[5] = GEOPOS_NORTH_FRONT;  
   (*work)[6] = GEOPOS_NORTH_EAST_FRONT;  
-  m_particleHalozoneToNeighboringProcs[GEOPOS_NORTH_EAST_FRONT] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_NORTH_EAST_FRONT] = *work;    
   work->clear();
   delete work; 
 
@@ -416,7 +418,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[4] = GEOPOS_NORTH_EAST;  
   (*work)[5] = GEOPOS_NORTH_BEHIND;  
   (*work)[6] = GEOPOS_NORTH_EAST_BEHIND;  
-  m_particleHalozoneToNeighboringProcs[GEOPOS_NORTH_EAST_BEHIND] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_NORTH_EAST_BEHIND] = *work;    
   work->clear();
   delete work; 
 
@@ -430,7 +432,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[4] = GEOPOS_NORTH_WEST;  
   (*work)[5] = GEOPOS_NORTH_FRONT;  
   (*work)[6] = GEOPOS_NORTH_WEST_FRONT;  
-  m_particleHalozoneToNeighboringProcs[GEOPOS_NORTH_WEST_FRONT] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_NORTH_WEST_FRONT] = *work;    
   work->clear();
   delete work; 
 
@@ -444,14 +446,14 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[4] = GEOPOS_NORTH_WEST;  
   (*work)[5] = GEOPOS_NORTH_BEHIND;  
   (*work)[6] = GEOPOS_NORTH_WEST_BEHIND;  
-  m_particleHalozoneToNeighboringProcs[GEOPOS_NORTH_WEST_BEHIND] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_NORTH_WEST_BEHIND] = *work;    
   work->clear();
   delete work; 
 
   // SOUTH => SOUTH
   work = new vector<int>(1,0);
   (*work)[0] = GEOPOS_SOUTH;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_SOUTH] = *work;
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_SOUTH] = *work;
   work->clear();
   delete work;
   
@@ -460,7 +462,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_SOUTH;
   (*work)[1] = GEOPOS_EAST;  
   (*work)[2] = GEOPOS_SOUTH_EAST;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_SOUTH_EAST] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_SOUTH_EAST] = *work;    
   work->clear();
   delete work;
   
@@ -469,7 +471,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_SOUTH;
   (*work)[1] = GEOPOS_WEST;  
   (*work)[2] = GEOPOS_SOUTH_WEST;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_SOUTH_WEST] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_SOUTH_WEST] = *work;    
   work->clear();
   delete work;    
 
@@ -478,7 +480,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_SOUTH;
   (*work)[1] = GEOPOS_FRONT;  
   (*work)[2] = GEOPOS_SOUTH_FRONT;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_SOUTH_FRONT] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_SOUTH_FRONT] = *work;    
   work->clear();
   delete work;  
 
@@ -487,7 +489,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_SOUTH;
   (*work)[1] = GEOPOS_BEHIND;  
   (*work)[2] = GEOPOS_SOUTH_BEHIND;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_SOUTH_BEHIND] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_SOUTH_BEHIND] = *work;    
   work->clear();
   delete work; 
 
@@ -501,7 +503,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[4] = GEOPOS_SOUTH_EAST;  
   (*work)[5] = GEOPOS_SOUTH_FRONT;  
   (*work)[6] = GEOPOS_SOUTH_EAST_FRONT;  
-  m_particleHalozoneToNeighboringProcs[GEOPOS_SOUTH_EAST_FRONT] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_SOUTH_EAST_FRONT] = *work;    
   work->clear();
   delete work; 
 
@@ -515,7 +517,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[4] = GEOPOS_SOUTH_EAST;  
   (*work)[5] = GEOPOS_SOUTH_BEHIND;  
   (*work)[6] = GEOPOS_SOUTH_EAST_BEHIND;  
-  m_particleHalozoneToNeighboringProcs[GEOPOS_SOUTH_EAST_BEHIND] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_SOUTH_EAST_BEHIND] = *work;    
   work->clear();
   delete work; 
 
@@ -529,7 +531,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[4] = GEOPOS_SOUTH_WEST;  
   (*work)[5] = GEOPOS_SOUTH_FRONT;  
   (*work)[6] = GEOPOS_SOUTH_WEST_FRONT;  
-  m_particleHalozoneToNeighboringProcs[GEOPOS_SOUTH_WEST_FRONT] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_SOUTH_WEST_FRONT] = *work;    
   work->clear();
   delete work; 
 
@@ -543,21 +545,21 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[4] = GEOPOS_SOUTH_WEST;  
   (*work)[5] = GEOPOS_SOUTH_BEHIND;  
   (*work)[6] = GEOPOS_SOUTH_WEST_BEHIND;  
-  m_particleHalozoneToNeighboringProcs[GEOPOS_SOUTH_WEST_BEHIND] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_SOUTH_WEST_BEHIND] = *work;    
   work->clear();
   delete work; 
   
   // EAST => EAST
   work = new vector<int>(1,0);
   (*work)[0] = GEOPOS_EAST;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_EAST] = *work;
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_EAST] = *work;
   work->clear();
   delete work;  
 
   // WEST => WEST
   work = new vector<int>(1,0);
   (*work)[0] = GEOPOS_WEST;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_WEST] = *work;
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_WEST] = *work;
   work->clear();
   delete work;  
 
@@ -566,7 +568,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_EAST;
   (*work)[1] = GEOPOS_FRONT;  
   (*work)[2] = GEOPOS_EAST_FRONT;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_EAST_FRONT] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_EAST_FRONT] = *work;    
   work->clear();
   delete work;  
 
@@ -575,7 +577,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_EAST;
   (*work)[1] = GEOPOS_BEHIND;  
   (*work)[2] = GEOPOS_EAST_BEHIND;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_EAST_BEHIND] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_EAST_BEHIND] = *work;    
   work->clear();
   delete work; 
 
@@ -584,7 +586,7 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_WEST;
   (*work)[1] = GEOPOS_FRONT;  
   (*work)[2] = GEOPOS_WEST_FRONT;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_WEST_FRONT] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_WEST_FRONT] = *work;    
   work->clear();
   delete work;  
 
@@ -593,21 +595,21 @@ void GrainsMPIWrapper::setParticleHalozoneToNeighboringProcs()
   (*work)[0] = GEOPOS_WEST;
   (*work)[1] = GEOPOS_BEHIND;  
   (*work)[2] = GEOPOS_WEST_BEHIND;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_WEST_BEHIND] = *work;    
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_WEST_BEHIND] = *work;    
   work->clear();
   delete work; 
   
   // TOP => TOP
   work = new vector<int>(1,0);
   (*work)[0] = GEOPOS_FRONT;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_FRONT] = *work;
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_FRONT] = *work;
   work->clear();
   delete work;  
 
   // BEHIND => BEHIND
   work = new vector<int>(1,0);
   (*work)[0] = GEOPOS_BEHIND;
-  m_particleHalozoneToNeighboringProcs[GEOPOS_BEHIND] = *work;
+  m_particleBufferzoneToNeighboringProcs[GEOPOS_BEHIND] = *work;
   work->clear();
   delete work;  
   
@@ -1525,7 +1527,7 @@ vector<int>* GrainsMPIWrapper::
 // with neighboring processes in the MPI cartesian topology
 void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
 	list<Particle*>* particles,
-  	list<Particle*> const* particlesHalozone,
+  	list<Particle*> const* particlesBufferzone,
   	list<Particle*>* particlesClones,
 	vector<Particle*> const* referenceParticles,
 	LinkedCell* LC, bool update )
@@ -1551,15 +1553,15 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
     m_AccessToClones.insert( pair<int,Particle*>( (*il)->getID(), *il ) );     
   
         
-  // Copy particles in halozone data into local buffers
-  // --------------------------------------------------
+  // Copy particles in buffer zone into local buffers
+  // ------------------------------------------------
   vector<int> nbHzGeoLoc(26,0);
   vector<int>::iterator iv;
-  for (il=particlesHalozone->begin();il!=particlesHalozone->end();il++)
+  for (il=particlesBufferzone->begin();il!=particlesBufferzone->end();il++)
   {
     geoLoc = (*il)->getGeoPosition();
-    for (iv=m_particleHalozoneToNeighboringProcs[geoLoc].begin();
-    	iv!=m_particleHalozoneToNeighboringProcs[geoLoc].end();iv++)
+    for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
+    	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
       nbHzGeoLoc[*iv]++;
   }             
 
@@ -1575,13 +1577,13 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   for (i=0;i<26;i++) features[i] = new double[ NB_DOUBLE_PART * nbHzGeoLoc[i] ];
   double ParticleID = 0., ParticleClass = 0.;
 
-  for (il=particlesHalozone->begin(),i=0;il!=particlesHalozone->end();il++)
+  for (il=particlesBufferzone->begin(),i=0;il!=particlesBufferzone->end();il++)
   {
     geoLoc = (*il)->getGeoPosition();
     ParticleID = (*il)->getID() + intTodouble ;
     ParticleClass = (*il)->getGeometricType() + intTodouble ;
-    for (iv=m_particleHalozoneToNeighboringProcs[geoLoc].begin();
-    	iv!=m_particleHalozoneToNeighboringProcs[geoLoc].end();iv++)
+    for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
+    	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
     {
       j = index[*iv]; 
       features[*iv][j] = ParticleID;             
@@ -1636,11 +1638,11 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
     if ( update )    
       UpdateClones( time, recvsize, recvbuf_DOUBLE,
 		NB_DOUBLE_PART, particlesClones,
-		particles, particlesHalozone, referenceParticles, LC );
+		particles, particlesBufferzone, referenceParticles, LC );
     else
       CreateClones( time, recvsize, recvbuf_DOUBLE,
 		NB_DOUBLE_PART, particlesClones,
-		particles, particlesHalozone, referenceParticles, LC );      
+		particles, particlesBufferzone, referenceParticles, LC );      
 
     delete [] recvbuf_DOUBLE;
 
@@ -2338,7 +2340,7 @@ void GrainsMPIWrapper::UpdateClones(double time,
 	const int& NB_DOUBLE_PART,  
   	list<Particle*>* particlesClones,
 	list<Particle*>* particles,
-  	list<Particle*> const* particlesHalozone,
+  	list<Particle*> const* particlesBufferzone,
 	vector<Particle*> const* referenceParticles,
 	LinkedCell* LC )
 {
@@ -2436,7 +2438,7 @@ void GrainsMPIWrapper::CreateClones(double time,
 	const int& NB_DOUBLE_PART,  
   	list<Particle*>* particlesClones,
 	list<Particle*>* particles,
-  	list<Particle*> const* particlesHalozone,
+  	list<Particle*> const* particlesBufferzone,
 	vector<Particle*> const* referenceParticles,
 	LinkedCell* LC )
 {
@@ -2451,9 +2453,10 @@ void GrainsMPIWrapper::CreateClones(double time,
 	  
   // Note: although we create new clones here, we need to check if they
   // do not already exist. This scenario happens if a master particle moves from
-  // a halozone cell to another halozone cell and the two halozone cells have
-  // a different GeoPosition, then such a master particle is added to the list 
-  // of new halozone particle but might already exist on the local process
+  // a buffer zone cell to another buffer zone cell and the two buffer zone 
+  // cells have a different GeoPosition, then such a master particle is added 
+  // to the list of new buffer zone particles but might already exist on the 
+  // local process
 
   for( j=0; j<recvsize; ++j )
   {
@@ -2507,9 +2510,9 @@ void GrainsMPIWrapper::CreateClones(double time,
       {
         ostringstream oss;
         oss << "   t=" << GrainsExec::doubleToString(time,TIMEFORMAT)
-		<< " Create Clone                                Id = " 
+		<< " Create Clone                Id = " 
 		<< id
-		<< " Classe = " << classe << " " 
+		<< " Type = " << classe << " " 
 		<< recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] << " " 
 		<< recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] << " " 
 		<< recvbuf_DOUBLE[NB_DOUBLE_PART*j+24]

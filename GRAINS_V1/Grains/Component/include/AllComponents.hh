@@ -190,17 +190,15 @@ class AllComponents
     void monitorParticlesVelocity( double time, ofstream& fileOut,
   	int rank = 0, GrainsMPIWrapper const* wrapper = NULL ) const;
 
-    /** @brief Updates geolocalization of particles in the halozone */
-    void updateGeoPositionParticlesHalozone();
-
     /** @brief Updates obstacles' velocity without actually moving them
     @param time physical time
     @param dt time step magnitude */
     void setKinematicsObstacleWithoutMoving( double time, double dt );
     
     /** @brief Updates list of particles in parallel
-    @param time physical time */
-    void updateParticleLists( double time, list<Particle*>* newHaloPart );    
+    @param time physical time 
+    @param newBufPart list of new buffer particles */
+    void updateParticleLists( double time, list<Particle*>* newBufPart );    
     //@}
 
 
@@ -238,11 +236,11 @@ class AllComponents
     /** @brief Returns a const pointer to the list of inactive particles */
     list<Particle*> const* getInactiveParticles() const;
 
-    /** @brief Returns a pointer to the list of particles in the halozone */
-    list<Particle*>* getParticlesInHalozone();
+    /** @brief Returns a pointer to the list of particles in the buffer zone */
+    list<Particle*>* getParticlesInBufferzone();
     
-    /** @brief Returns a pointer to the list of particles in the halozone */
-    list<Particle*> const* getParticlesInHalozone() const;    
+    /** @brief Returns a pointer to the list of particles in the buffer zone */
+    list<Particle*> const* getParticlesInBufferzone() const;    
 
     /** @brief Returns a pointer to the list of clone particles */
     list<Particle*>* getCloneParticles();
@@ -432,8 +430,8 @@ class AllComponents
     	be inserted */
     list<Particle*> m_ActiveParticles; /**< All active particles in the
   	simulation */
-    list<Particle*> m_ParticlesInHalozone; /**< Active particles in a
-    	halozone (i.e. a buffer zone) */
+    list<Particle*> m_ParticlesInBufferzone; /**< Active particles in a
+	buffer zone */
     list<Particle*> m_CloneParticles; /**< Active particles that are parallel
   	clones of other active particles located in another subdomain/process */
     multimap<int,Particle*> m_PeriodicCloneParticles; /**< Periodic clone

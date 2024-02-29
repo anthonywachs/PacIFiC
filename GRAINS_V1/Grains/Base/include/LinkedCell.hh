@@ -109,27 +109,6 @@ class LinkedCell : public AppCollision
     @param obs obstacle to be deleted */
     void remove( SimpleObstacle* obs );
 
-    /** @brief Updates active particles with an interior tag (tag=0)
-    @param time physical time
-    @param particles list of active particles
-    @param particlesHalozone list of active particles in the halo (buffer) zone
-    @param wrapper MPI wrapper */
-    void updateInteriorTag( double time,
-  	list<Particle*>* particles,
-  	list<Particle*>* particlesHalozone,
-	GrainsMPIWrapper const* wrapper = NULL );
-
-    /** @brief Updates active particles with a halo tag (tag=1) or a clone tag
-    (tag=2)
-    @param time physical time
-    @param particlesHalozone list of active particles in the halo zone
-    @param particlesClones list of active clone particles
-    @param wrapper MPI wrapper */
-    void updateHalozoneCloneTag( double time,
-  	list<Particle*>* particlesHalozone,
-	list<Particle*>* particlesClones,
-	GrainsMPIWrapper const* wrapper = NULL );
-
     /** @brief Removes clone particles that exited the local linked cell grid
     @param time physical time
     @param particles list of active particles

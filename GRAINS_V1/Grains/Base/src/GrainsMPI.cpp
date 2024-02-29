@@ -47,7 +47,7 @@ void GrainsMPI::initialOutputMessage()
 void GrainsMPI::Simulation( double time_interval )
 {
   double vmax = 0., vmean = 0. ;
-  list<Particle*>* newHaloPart = new list<Particle*>;
+  list<Particle*>* newBufPart = new list<Particle*>;
 
   // Timers
   SCT_insert_app( "ParticlesInsertion" );
@@ -120,7 +120,7 @@ void GrainsMPI::Simulation( double time_interval )
       // Update particle position and velocity
       m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
 	m_allcomponents.getActiveParticles(),
-  	m_allcomponents.getParticlesInHalozone(),
+  	m_allcomponents.getParticlesInBufferzone(),
   	m_allcomponents.getCloneParticles(),
 	m_allcomponents.getReferenceParticles(),
 	m_collision, true );
@@ -144,13 +144,13 @@ void GrainsMPI::Simulation( double time_interval )
       SCT_set_start( "LinkUpdate" );
       m_collision->LinkUpdate( m_time, m_dt, 
       	m_allcomponents.getActiveParticles() );  
-      m_allcomponents.updateParticleLists( m_time, newHaloPart ); 
+      m_allcomponents.updateParticleLists( m_time, newBufPart ); 
 
 
       // Create new clones
       m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
 	m_allcomponents.getActiveParticles(),
-  	newHaloPart,
+  	newBufPart,
   	m_allcomponents.getCloneParticles(),
 	m_allcomponents.getReferenceParticles(),
 	m_collision, false );

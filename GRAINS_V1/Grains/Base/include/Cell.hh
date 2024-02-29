@@ -255,7 +255,7 @@ class Cell
     <ul> 
       <li> 0=interior, 
       <li> 1=buffer zone, 
-      <li> 2=halozone
+      <li> 2=clone zone
     </ul> */
     Point3 m_centre; /**< cell center coordinates */
     GeoPosition m_GeoPosCell; /**< geographic position in the linked-cell
