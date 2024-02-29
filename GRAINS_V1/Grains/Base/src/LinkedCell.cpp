@@ -2299,3 +2299,21 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
     }
   }
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns an array of point coordinates of the grid in a direction
+vector<double> LinkedCell::coordinates( size_t const& dir ) const
+{
+  int npts = ( dir == 0 ? m_nbi + 1 : ( dir == 1 ? m_nbj + 1 : m_nbk + 1 ) );
+  vector<double> coord( npts, 0. );
+  double step = ( dir == 0 ? m_cellsize_X : 
+  	( dir == 1 ? m_cellsize_Y : m_cellsize_Z ) );
+  
+  for (int i=0;i<npts;i++) 
+    coord[i] = m_LC_local_origin[dir] + double(i) * step;
+  
+  return ( coord );
+}

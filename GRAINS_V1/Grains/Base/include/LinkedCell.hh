@@ -167,7 +167,11 @@ class LinkedCell : public AppCollision
 	list<Particle*>* particlesClones,
 	vector<Particle*> const* ReferenceParticles,
     	bool const& periodic, bool const& force_insertion,
-	GrainsMPIWrapper const* wrapper = NULL );	
+	GrainsMPIWrapper const* wrapper = NULL );
+	
+    /** @brief Returns an array of point coordinates of the grid in a direction
+    @param dir direction */
+    vector<double> coordinates( size_t const& dir ) const;		
     //@}
 
 

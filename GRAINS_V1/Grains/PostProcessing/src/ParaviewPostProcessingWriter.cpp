@@ -254,20 +254,20 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
 	  m_Paraview_saveContactForceChains_pvd << "<Collection>" << endl; 
 	}
 	
-//         // Linked cell grid 
-//         writePVTU_Paraview( "LinkedCell" , &empty_string_list, 
-// 		&empty_string_list, &empty_string_list );
+        // Linked cell grid 
+        writePVTU_Paraview( m_ParaviewFilename + "_LinkedCell" , 
+		&empty_string_list, &empty_string_list, &empty_string_list );
       }                  
     } 
 
-     // Linked cell grid
-//      if ( LC )
-//      { 
-//        ostringstream ossRK;
-//        ossRK << m_rank;       
-//        writeLinkedCellPostProcessing_Paraview( LC,
-//       	"LinkedCell_" + ossRK.str() + ".vtu" );
-//      } 
+    // Linked cell grid
+    if ( LC )
+    { 
+      ostringstream ossRK;
+      ossRK << m_rank;       
+      writeLinkedCellPostProcessing_Paraview( LC,
+      	m_ParaviewFilename + "_LinkedCell_" + ossRK.str() + ".vtu" );
+    } 
            
     one_output( time, dt, particles, periodic_clones, referenceParticles,
   	obstacle, LC );
@@ -1115,14 +1115,10 @@ void ParaviewPostProcessingWriter::writeParticlesPostProcessing_Paraview(
 void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
 	LinkedCell const* LC, string const& partFilename )
 {
-  vector<Cell*> const* allCells = LC->getAllCells();
-  vector<Cell*>::const_iterator icell;
-  Transform CelPosition;
-  Convex* convexCell = new Box( LC->getCellSize(X), LC->getCellSize(Y),
-    	LC->getCellSize(Z) );
-  RigidBody CelRigidBody( convexCell, CelPosition );
-  Point3 const* cg = NULL;
-  
+  vector<double> x = LC->coordinates( X ), y = LC->coordinates( Y ),  
+  	z = LC->coordinates( Z );
+  size_t nx = x.size(), ny = y.size(), nz = z.size(), i, j, k;
+    
   ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename ).c_str(), 
   	ios::out );
   
@@ -1131,12 +1127,8 @@ void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
   if ( m_binary ) f << "compressor=\"vtkZLibDataCompressor\"";
   f << ">" << endl;
   f << "<UnstructuredGrid>" << endl;
-  int nbpts = 0, nbcells = 0;
-  for (icell=allCells->begin();icell!=allCells->end();icell++)
-  {
-    nbpts+=8;
-    nbcells+=1;
-  }
+  size_t nbcells = nx * ny + nx * nz + ny * nz;
+  size_t nbpts = 2 * nbcells; 
   f << "<Piece NumberOfPoints=\"" << nbpts << "\""
     	<< " NumberOfCells=\"" << nbcells << "\">" << endl;
   f << "<Points>" << endl;
@@ -1146,51 +1138,125 @@ void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
   f << endl;
   if ( m_binary )
   {
-    list<Point3> ppp;
-    list<Point3>::iterator ilpp;    
-    start_output_binary( sizeof_Float32, 3*nbpts ) ;
-    for (icell=allCells->begin();icell!=allCells->end();icell++)
-    {
-      cg = (*icell)->getCentre();
-      CelRigidBody.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
-      ppp = CelRigidBody.get_polygonsPts_PARAVIEW();
-      for (ilpp=ppp.begin();ilpp!=ppp.end();ilpp++)
-        for (int comp=0;comp<3;++comp)
-	  write_double_binary( (*ilpp)[comp] ) ;
-    }
+    start_output_binary( sizeof_Float32, 3*int(nbpts) ) ;
+    // X-Y plane
+    for (i=0;i<nx;i++)
+      for (j=0;j<ny;j++)
+      {
+        write_double_binary( x[i] ) ;
+        write_double_binary( y[j] ) ;	
+        write_double_binary( z[0] ) ;	
+        write_double_binary( x[i] ) ;	
+        write_double_binary( y[j] ) ;	
+        write_double_binary( z[nz-1] ) ;		
+      }
+      
+    // X-Z plane
+    for (i=0;i<nx;i++)
+      for (k=0;k<nz;k++)
+      {
+        write_double_binary( x[i] ) ;
+        write_double_binary( y[0] ) ;	
+        write_double_binary( z[k] ) ;	
+        write_double_binary( x[i] ) ;	
+        write_double_binary( y[ny-1] ) ;	
+        write_double_binary( z[k] ) ;	
+      }
+      
+    // Y-Z plane
+    for (j=0;j<ny;j++)
+      for (k=0;k<nz;k++)
+      {
+        write_double_binary( x[0] ) ;
+        write_double_binary( y[j] ) ;	
+        write_double_binary( z[k] ) ;	
+        write_double_binary( x[nx-1] ) ;	
+        write_double_binary( y[j] ) ;	
+        write_double_binary( z[k] ) ;	
+      }
+                        
     flush_binary( f, "writeLinkedCellPostProcessing_Paraview/Points" );
   }
   else
-    for (icell=allCells->begin();icell!=allCells->end();icell++)
-    {
-      cg = (*icell)->getCentre();
-      CelRigidBody.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
-      CelRigidBody.write_polygonsPts_PARAVIEW( f );
-    }            
+  {
+    // X-Y plane
+    for (i=0;i<nx;i++)
+      for (j=0;j<ny;j++)
+      {
+        f << x[i] << " " << y[j] << " " << z[0] << endl;
+        f << x[i] << " " << y[j] << " " << z[nz-1] << endl;	
+      }
+
+    // X-Z plane
+    for (i=0;i<nx;i++)
+      for (k=0;k<nz;k++)
+      {
+        f << x[i] << " " << y[0] << " " << z[k] << endl;
+        f << x[i] << " " << y[ny-1] << " " << z[k] << endl;	
+      }    
+
+    // Y-Z plane
+    for (j=0;j<ny;j++)
+      for (k=0;k<nz;k++)
+      {
+        f << x[0] << " " << y[j] << " " << z[k] << endl;
+        f << x[nx-1] << " " << y[j] << " " << z[k] << endl;	
+      }
+  }           
   f << "</DataArray>" << endl;
   f << "</Points>" << endl;
-  list<int> connectivity,offsets,cellstype;
-  list<int>::iterator ii;
-  int firstpoint_globalnumber=0,last_offset=0;
-  for (icell=allCells->begin();icell!=allCells->end();icell++)
-    CelRigidBody.getConvex()->write_polygonsStr_PARAVIEW( 
-    	connectivity,
-    	offsets, cellstype, firstpoint_globalnumber, last_offset ); 
   f << "<Cells>" << endl;
   f << "<DataArray type=\"Int32\" Name=\"connectivity\" ";
   if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
   else f << "format=\"ascii\">";
   f << endl;
+  int counter = 0;
   if ( m_binary )
   {
-    start_output_binary( sizeof_Int32, int(connectivity.size()) ) ;
-    for (ii=connectivity.begin();ii!=connectivity.end();ii++)
-      write_int_binary( *ii );
+    start_output_binary( sizeof_Int32, 2*int(nbpts) ) ;
+    // X-Y plane
+    for (i=0;i<nx;i++)
+      for (j=0;j<ny;j++,counter+=2)
+      {
+        write_int_binary( counter );
+        write_int_binary( counter + 1 );	
+      }
+      
+    // X-Z plane
+    for (i=0;i<nx;i++)
+      for (k=0;k<nz;k++,counter+=2)
+      {
+        write_int_binary( counter );
+        write_int_binary( counter + 1 );	
+      }
+	
+    // Y-Z plane
+    for (j=0;j<ny;j++)
+      for (k=0;k<nz;k++,counter+=2)
+      {
+        write_int_binary( counter );
+        write_int_binary( counter + 1 );	
+      }
+      
     flush_binary( f, "writeLinkedCellPostProcessing_Paraview/connectivity" );
   }
-  else  
-    for (ii=connectivity.begin();ii!=connectivity.end();ii++)
-      f << *ii << " ";	
+  else
+  {  
+    // X-Y plane
+    for (i=0;i<nx;i++)
+      for (j=0;j<ny;j++,counter+=2)
+        f << counter << " " << counter + 1 << " ";
+      
+    // X-Z plane
+    for (i=0;i<nx;i++)
+      for (k=0;k<nz;k++,counter+=2)
+        f << counter << " " << counter + 1 << " ";
+	
+    // Y-Z plane
+    for (j=0;j<ny;j++)
+      for (k=0;k<nz;k++,counter+=2)
+        f << counter << " " << counter + 1 << " ";
+  }	
   f << endl;     
   f << "</DataArray>" << endl;
   f << "<DataArray type=\"Int32\" Name=\"offsets\" ";
@@ -1199,14 +1265,12 @@ void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
   f << endl;
   if ( m_binary )
   {
-    start_output_binary( sizeof_Int32, int(offsets.size()) ) ;
-    for (ii=offsets.begin();ii!=offsets.end();ii++)
-      write_int_binary( *ii );
+    start_output_binary( sizeof_Int32, int(nbpts) ) ;
+    for (i=0;i<nbpts;i++) write_int_binary( 2*(int(i)+1) );
     flush_binary( f, "writeLinkedCellPostProcessing_Paraview/offsets" );
   }
-  else  
-    for (ii=offsets.begin();ii!=offsets.end();ii++)
-      f << *ii << " ";	
+  else 
+    for (i=0;i<nbpts;i++) f << 2*(i+1) << " ";	
   f << endl; 
   f << "</DataArray>" << endl;
   f << "<DataArray type=\"Int32\" Name=\"types\" ";
@@ -1215,14 +1279,13 @@ void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
   f << endl;
   if ( m_binary )
   {
-    start_output_binary( sizeof_Int32, int(cellstype.size()) ) ;
-    for (ii=cellstype.begin();ii!=cellstype.end();ii++)
-      write_int_binary( *ii );
+    start_output_binary( sizeof_Int32, int(nbpts) ) ;
+    int type = 3;
+    for (i=0;i<nbpts;i++) write_int_binary( type );
     flush_binary( f, "writeLinkedCellPostProcessing_Paraview/types" );
   }
   else  
-    for (ii=cellstype.begin();ii!=cellstype.end();ii++)
-      f << *ii << " ";	
+    for (i=0;i<nbpts;i++) f << "3 ";
   f << endl;
   f << "</DataArray>" << endl;
   f << "</Cells>" << endl;
