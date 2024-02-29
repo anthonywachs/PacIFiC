@@ -1143,7 +1143,8 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	    DOMNode* nWindows = ReaderXML::getNode( nPosition, "Windows" );
             if ( nWindows )
 	    {
-	      cout << GrainsExec::m_shift9 << "Insertion windows" << endl;
+	      if ( m_rank == 0 )
+	        cout << GrainsExec::m_shift9 << "Insertion windows" << endl;
 	      DOMNodeList* allWindows = ReaderXML::getNodes( nWindows );
               for (XMLSize_t i=0; i<allWindows->getLength(); i++)
 	      {

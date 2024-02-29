@@ -1792,7 +1792,10 @@ void LinkedCell::DestroyOutOfDomainClones( double time,
       pdestroy = *particle;
 
       // Removes the clone particle from the last cell it belonged to
-      pdestroy->getCellNm1()->remove( pdestroy );
+      // Note: we user getCell because we have moved the particle already
+      // but did not execute LinkUpdate yet (see the sequence of steps in 
+      // GrainsMPI::Simulation) 
+      pdestroy->getCell()->remove( pdestroy );
 
       // Removes the clone particle from the list of active particles
       removeParticleFromList( *particles, pdestroy );
