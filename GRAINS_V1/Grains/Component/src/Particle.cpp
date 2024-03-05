@@ -424,7 +424,7 @@ void Particle::Move( double time,
   if ( depl > crust )
   {
     cout << endl << "Processor = " <<
-    	(GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+    	(GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< " has thrown an DisplacementError exception" <<  endl;
     GrainsExec::m_exception_Displacement = true;
     DisplacementError erreur( this, depl, crust, time );
@@ -482,7 +482,7 @@ void Particle::InterAction( Component* voisin,
     catch (ContactError &erreur_level2)
     {
       cout << endl << "Processor = "
-	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< " has thrown an ContactError exception" <<  endl;
       erreur_level2.setMessage( "Particle::InterAction : choc de croute a t="
       	+ GrainsExec::doubleToString( time, TIMEFORMAT ) );
@@ -539,7 +539,7 @@ void Particle::SearchContact( Component* voisin, double dt,
     catch (ContactError &erreur_level2)
     {
       cout << endl << "Processor = "
-	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< " has thrown an ContactError exception" <<  endl;
       erreur_level2.setMessage( "Particle::InterAction : choc de croute a t="
       	+ GrainsExec::doubleToString( time, TIMEFORMAT ) );

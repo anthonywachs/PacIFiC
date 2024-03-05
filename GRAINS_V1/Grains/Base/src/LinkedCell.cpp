@@ -1867,7 +1867,7 @@ pair<bool,bool> LinkedCell::insertParticleParallel( double time,
       Cell::GetCell( centre, id );
       Cell* cell_ = getCell( id[X], id[Y], id[Z] );
       geoloc = cell_->m_GeoPosCell;
-      source = wrapper->get_rank_active();    
+      source = wrapper->get_rank();    
     }
     
     // Broadcast the geoloc

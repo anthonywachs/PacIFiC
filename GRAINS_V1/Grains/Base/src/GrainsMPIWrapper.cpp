@@ -24,23 +24,25 @@ GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
    m_period( NULL ),
    m_isMPIperiodic( false ),   
    m_rank( 0 ), 
-   m_rank_world( 0 ),
-   m_rank_masterWorld( 0 ),
+   m_rank_master( 0 ),
    m_nprocs( 0 ), 
    m_nprocs_world( 0 ),
-   m_is_activ( false ),
+   m_is_active( false ),
    m_neighbors( NULL ),
-   m_commgrainsMPI_3D( NULL ),
-   m_nprocs_localComm( 0 ),
-   m_rank_localComm( 0 ), 
-   m_master_localComm( NULL )
+   m_commgrainsMPI_3D( NULL )
 { 
+  // We set all communicators such that the rank in each communicator is the 
+  // same and we test that this is true. To do so, if the code runs with a 
+  // subset of m_nprocs processes only, it runs with the processes numbered
+  // 0 to m_nprocs-1, and the process 0 is always considered as the master
+  // process
+
   // Total number of processes and data in the world communicator
   MPI_Comm_size( MPI_COMM_WORLD, &m_nprocs_world );
-  MPI_Comm_rank( MPI_COMM_WORLD, &m_rank_world );  
+  MPI_Comm_rank( MPI_COMM_WORLD, &m_rank );  
   if ( NX * NY * NZ > m_nprocs_world )
   {
-    if ( m_rank_world == 0 )
+    if ( m_rank == m_rank_master )
       cout << endl << "!!! WARNING !!!" << endl << 
       	"Domain decomposition does not match total number of processus" 
 	<< endl << endl;
@@ -50,7 +52,7 @@ GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
   else
   {
     m_nprocs = NX * NY * NZ;
-    if ( m_rank_world == 0 )
+    if ( m_rank == m_rank_master )
     {
       cout << oshift << "Total number of processes = " << m_nprocs_world 
       	<< endl;
@@ -68,26 +70,16 @@ GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
   MPI_Group_incl( world_group, m_nprocs, activ_proc, &m_MPI_GROUP_activProc );
   if ( m_nprocs < m_nprocs_world )
     MPI_Comm_create( MPI_COMM_WORLD, m_MPI_GROUP_activProc, 
-    	&m_MPI_COMM_activProc );
+    	&m_MPI_COMM_activeProc );
   else
-    MPI_Comm_dup( MPI_COMM_WORLD, &m_MPI_COMM_activProc );  
-  if ( m_rank_world < m_nprocs ) m_is_activ = true;   
-  else m_is_activ = false;  
+    MPI_Comm_dup( MPI_COMM_WORLD, &m_MPI_COMM_activeProc );  
+  if ( m_rank < m_nprocs ) m_is_active = true;   
+  else m_is_active = false;  
   MPI_Group_free( &world_group );
 
   // Among the active processes
-  if ( m_is_activ )
+  if ( m_is_active )
   {     
-    // Rank of the process in the group of active processes
-    MPI_Comm_rank( m_MPI_COMM_activProc, &m_rank ); 
-
-    // Rank in the m_MPI_COMM_activProc communicator of the process that has
-    // rank 0 (master) in the MPI_COMM_WORLD communicator
-    int loc_m_rank_masterWorld = -1;
-    if ( m_rank_world == 0 ) loc_m_rank_masterWorld = m_rank;
-    MPI_Allreduce( &loc_m_rank_masterWorld, &m_rank_masterWorld, 1, MPI_INT, 
-    	MPI_MAX, m_MPI_COMM_activProc ) ;   
-
     // Number of processes per direction
     m_dim = new int[3];
     m_dim[0] = NX, m_dim[1] = NY, m_dim[2] = NZ;
@@ -111,14 +103,17 @@ GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
       
     // Creates the MPI Cartesian topology with periodicity if any
     m_commgrainsMPI_3D = new MPI_Comm;
-    MPI_Cart_create( m_MPI_COMM_activProc, 3, m_dim, m_period, reorganisation, 
+    MPI_Cart_create( m_MPI_COMM_activeProc, 3, m_dim, m_period, reorganisation, 
    	m_commgrainsMPI_3D );
      
     // Rank and MPI cartesian coordinates
-    // We assume that the process rank is the same in m_MPI_COMM_activProc
-    // and in m_commgrainsMPI_3D. This may need to be verified with an assert.
-    MPI_Comm_rank( *m_commgrainsMPI_3D, &m_rank );
-    if ( m_nprocs == m_nprocs_world ) assert( m_rank == m_rank_world );
+    // We assert that the rank of active processors in all communicators is 
+    // the same
+    int rank_active, rank_cart; 
+    MPI_Comm_rank( MPI_COMM_WORLD, &rank_active );  
+    MPI_Comm_rank( *m_commgrainsMPI_3D, &rank_cart );
+    assert( rank_active == m_rank );
+    assert( rank_cart == m_rank );        
     m_coords = new int[3];
     MPI_Cart_coords( *m_commgrainsMPI_3D, m_rank, 3, m_coords );
 
@@ -131,7 +126,6 @@ GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
     SCT_insert_app( "MPIComm" );
     SCT_insert_app( "UpdateCreateClones" );          
   }
-  else m_rank = -1;
     
 }
 
@@ -143,197 +137,24 @@ GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
 GrainsMPIWrapper::~GrainsMPIWrapper()
 {
   MPI_Group_free( &m_MPI_GROUP_activProc );
-  if ( m_is_activ ) 
+
+  if ( m_is_active ) 
   {
-    MPI_Comm_free( &m_MPI_COMM_activProc ); 
+    MPI_Comm_free( &m_MPI_COMM_activeProc ); 
     delete [] m_coords;
     delete [] m_dim;
     delete [] m_period;
     MPI_Comm_free( m_commgrainsMPI_3D );
     delete m_commgrainsMPI_3D;
     delete m_neighbors;
-    vector<MPI_Group*>::iterator ivg;
-    for (ivg=m_groupMPINeighbors.begin();ivg!=m_groupMPINeighbors.end();ivg++) 
-    {
-      MPI_Group_free( *ivg );    
-      delete *ivg;
-    }
-    m_groupMPINeighbors.clear();
-    if (!m_isInCommMPINeighbors.empty())
-      for (int j=0;j<m_nprocs;j++)
-      {
-        if ( m_isInCommMPINeighbors[j] ) MPI_Comm_free( m_commMPINeighbors[j] );
-        delete m_commMPINeighbors[j]; 
-      }
-    m_commMPINeighbors.clear();
-    m_isInCommMPINeighbors.clear();  
-    if ( m_master_localComm ) delete [] m_master_localComm; 
     if ( m_MPILogString ) delete m_MPILogString;
     vector< vector<int> >::iterator ivv;
     for (ivv=m_particleBufferzoneToNeighboringProcs.begin();
   	ivv!=m_particleBufferzoneToNeighboringProcs.end();ivv++)
       ivv->clear();
-    m_particleBufferzoneToNeighboringProcs.clear();
-    
+    m_particleBufferzoneToNeighboringProcs.clear();    
     m_MPIperiodes.clear();  
   }
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Sets the local MPI communicators involving the MPI cartesian neighbors
-void GrainsMPIWrapper::setCommLocal()
-{
-  int i,j;
-
-  // Size of messages is proportional to the number of neighbors
-  int nbv = m_neighbors->nbMPINeighbors();
-
-  // Size of messages
-  int* recvcounts = new int[m_nprocs];
-  for (i=0; i<m_nprocs; ++i) recvcounts[i]=0;
-  MPI_Allgather( &nbv, 1, MPI_INT, recvcounts, 1, MPI_INT, 
-  	m_MPI_COMM_activProc );
-
-  // Partition and size of the reception buffer
-  int* displs = new int[m_nprocs];
-  displs[0] = 0; 
-  for (i=1; i<m_nprocs; ++i) displs[i] = displs[i-1]+recvcounts[i-1];  
-  int recvsize = displs[m_nprocs-1] + recvcounts[m_nprocs-1];
-
-    
-  // Communicate MPI cartesian neighbor ranks
-  int* rankMPINeighbors = m_neighbors->rankMPINeighbors();
-  int* recvbuf_rang = new int[recvsize];  
-  MPI_Allgatherv( rankMPINeighbors, nbv, MPI_INT, recvbuf_rang, 
-  	recvcounts, displs, MPI_INT, m_MPI_COMM_activProc );
-
-
-  // Create local MPI communicators involving the MPI cartesian neighbors
-  m_groupMPINeighbors.reserve( m_nprocs );  
-  MPI_Group* empty_MPI_Group = NULL;
-  for (j=0;j<m_nprocs;j++) m_groupMPINeighbors.push_back(empty_MPI_Group);
-  m_commMPINeighbors.reserve( m_nprocs );  
-  MPI_Comm* empty_MPI_Comm = NULL;
-  for (j=0;j<m_nprocs;j++) m_commMPINeighbors.push_back(empty_MPI_Comm);
-  m_isInCommMPINeighbors.reserve( m_nprocs ); 
-  for (j=0;j<m_nprocs;j++) m_isInCommMPINeighbors.push_back(false); 
-  MPI_Group activ_group;
-  MPI_Comm_group( m_MPI_COMM_activProc, &activ_group );   
-  for (j=0;j<m_nprocs;j++)
-  {
-    for (i=displs[j];i<displs[j]+recvcounts[j];++i)
-      if ( recvbuf_rang[i] == m_rank ) m_isInCommMPINeighbors[j] = true;
-    m_groupMPINeighbors[j] = new MPI_Group;    
-    m_commMPINeighbors[j] = new MPI_Comm;
-    MPI_Group_incl( activ_group, recvcounts[j], &recvbuf_rang[displs[j]], 
-    	m_groupMPINeighbors[j] );
-    MPI_Comm_create( m_MPI_COMM_activProc, *m_groupMPINeighbors[j], 
-    	m_commMPINeighbors[j] );
-  }   
-  MPI_Group_free(&activ_group);
-  
-
-  // Rank in and size of the local MPI communicator
-  MPI_Comm_rank( *m_commMPINeighbors[m_rank], &m_rank_localComm );
-  MPI_Comm_size( *m_commMPINeighbors[m_rank], &m_nprocs_localComm );
-  m_master_localComm = new int[m_nprocs];
-  MPI_Allgather( &m_rank_localComm, 1, MPI_INT, m_master_localComm, 1, MPI_INT,
-  	m_MPI_COMM_activProc ); 
-
-		         
-  delete [] recvcounts;
-  delete [] displs; 
-  delete [] rankMPINeighbors;
-  delete [] recvbuf_rang;
-
-
-  // Set the GeoPosition of the master process in the local
-  // communicators involving neighbors only to which this process belongs to
-  setMasterGeoLocInLocalComm();
-  
-
-  // Output on screen
-  if ( 0 == m_rank ) cout << "Local MPI communicators" << endl; 
-  for (i=0;i<m_nprocs;++i)
-  {
-    if ( i == m_rank )
-    {      
-      cout << "Process = " << m_rank << endl;
-      cout << "   Rank in local comm = " << m_rank_localComm << endl;
-      cout << "   Coordinates in local comm = " << m_coords[0] << " " <<
-      	m_coords[1] << " " << m_coords[2] << endl;      
-      cout << "   Nb procs in local comm = " << m_nprocs_localComm << endl;
-      cout << "   Rank of master in local comms: ";      
-      for (j=0;j<m_nprocs;++j) cout << m_master_localComm[j] << " ";
-      cout << endl; 
-      cout << "   Geolocalisation of master in local comms: ";      
-      for (j=0;j<m_nprocs;++j) 
-        if ( m_masterGeoPos[j] != -1 ) cout << 
-		Cell::getGeoPositionName(m_masterGeoPos[j]) << " "; 
-	else cout << m_masterGeoPos[j] << " ";     
-      cout << endl; 
-      cout << "   Rank in Activ Comm of master in World Comm = " << 
-      	m_rank_masterWorld << endl;
-    }
-    MPI_Barrier( m_MPI_COMM_activProc );
-  } 
-  if ( 0 == m_rank ) cout << endl;
-} 
-
-
-
-
-// ----------------------------------------------------------------------------
-// Definition de la geolocalisation du master dans les communicateurs
-// lies aux voisins auquel appartient le proc
-void GrainsMPIWrapper::setMasterGeoLocInLocalComm()
-{
-  int i,j,k,globalRank,ii;
-  
-  m_masterGeoPos.reserve(m_nprocs);
-  for (i=0;i<m_nprocs;++i) m_masterGeoPos.push_back(-1); 
-  
-  // Geolocalisation du master pour ses voisins sur le proc
-  // ------------------------------------------------------
-  int *geoPosMasterOnProc = new int[m_nprocs];
-  for (i=0;i<m_nprocs;++i) geoPosMasterOnProc[i] = -1;
-  for (i=-1;i<2;++i)
-    for (j=-1;j<2;++j)    
-      for (k=-1;k<2;++k)
-        if ( i || j || k )
-	{
-	  globalRank = m_neighbors->rank( i, j, k );
-	  if ( globalRank != -1 ) 
-	    geoPosMasterOnProc[globalRank] = 
-	    	getGeoPosition( -i, -j, -k );	  
-	}  
-
-  // Communication des geolocalisations des masters
-  // ----------------------------------------------
-  int *recvcounts = new int[m_nprocs];
-  for (i=0; i<m_nprocs; ++i) recvcounts[i] = m_nprocs;
-  int *displs = new int[m_nprocs];
-  displs[0] = 0; 
-  for (i=1; i<m_nprocs; ++i) displs[i] = displs[i-1] + recvcounts[i-1];  
-  int recvsize = displs[m_nprocs-1] + recvcounts[m_nprocs-1];
-
-  int *allGeoPosMasterOnProc = new int[recvsize];  
-  MPI_Allgatherv( geoPosMasterOnProc, m_nprocs, MPI_INT, allGeoPosMasterOnProc, 
-  	recvcounts, displs, MPI_INT, m_MPI_COMM_activProc ); 
-	
-  // Stockage dans masterGeoLoc
-  // --------------------------
-  for (i=0;i<m_nprocs*m_nprocs;++i)
-  {
-    ii = int(i/m_nprocs);
-    j = i - ii * m_nprocs;
-    if ( j == m_rank )
-      if ( allGeoPosMasterOnProc[i] != -1 ) 
-        m_masterGeoPos[ii] = allGeoPosMasterOnProc[i];  
-  } 	   
 }
 
 
@@ -1236,18 +1057,8 @@ int GrainsMPIWrapper::get_total_number_of_active_processes() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the process rank in the MPI_COMM_WORLD communicator
-int GrainsMPIWrapper::get_rank_world() const
-{
-  return ( m_rank_world );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns the process rank in the MPI_COMM_activProc communicator
-int GrainsMPIWrapper::get_rank_active() const
+// Returns the process rank in all communicators
+int GrainsMPIWrapper::get_rank() const
 {
   return ( m_rank );
 }
@@ -1259,7 +1070,7 @@ int GrainsMPIWrapper::get_rank_active() const
 // Returns whether the process is active
 bool GrainsMPIWrapper::isActive() const
 {
-  return ( m_is_activ );
+  return ( m_is_active );
 } 
 
 
@@ -1300,7 +1111,7 @@ int const* GrainsMPIWrapper::get_MPI_periodicity() const
 // Writes the MPI wrapper features in a stream
 void GrainsMPIWrapper::display( ostream& f, string const& oshift ) const
 {
-  if ( m_rank == 0 )
+  if ( m_rank == m_rank_master )
   {
     f << oshift << "Domain decomposition = ";
     for (int j=0;j<3;++j) f << "N[" << j << "]=" << m_dim[j] << " ";
@@ -1347,24 +1158,6 @@ void GrainsMPIWrapper::display( ostream& f, string const& oshift ) const
 
 
 // ----------------------------------------------------------------------------
-// Gathers all particles on the master process for post-processing purposes
-vector<Particle*>* GrainsMPIWrapper::GatherParticles_PostProcessing(
-  	list<Particle*> const& particles,
-	list<Particle*> const& pwait,
-	vector<Particle*> const& referenceParticles,
-	size_t const& nb_total_particles ) const
-{
-  vector<Particle*>* allparticles = NULL;
-  
-  // TO DO
-  
-  return ( allparticles );
-}   
-
-
-
-
-// ----------------------------------------------------------------------------
 // Gathers all particle data on the master process for post-processing purposes
 vector< vector<double> >* GrainsMPIWrapper::
     GatherParticleData_PostProcessing( list<Particle*> const& particles,
@@ -1380,7 +1173,7 @@ vector< vector<double> >* GrainsMPIWrapper::
   
   
   // Allocate the receiving vector on master process
-  if ( m_rank == m_rank_masterWorld )
+  if ( m_rank == m_rank_master )
   { 
     vector<double> work( NB_DOUBLE_PART - 1, 0. );
     data_Global = new vector< vector<double> >( nb_total_particles, work );
@@ -1408,10 +1201,10 @@ vector< vector<double> >* GrainsMPIWrapper::
 
   // Process sends buffer to the master process
   MPI_Isend( buffer, NB_DOUBLE_PART * nb_part_loc, MPI_DOUBLE, 
-  	m_rank_masterWorld, tag_DOUBLE, m_MPI_COMM_activProc, &idreq );           
+  	m_rank_master, tag_DOUBLE, m_MPI_COMM_activeProc, &idreq );           
 
   // Reception by the master process
-  if ( m_rank == m_rank_masterWorld )
+  if ( m_rank == m_rank_master )
   {
     // Allocate the receiving vector on master process
     vector<double> work( NB_DOUBLE_PART, 0. );
@@ -1420,13 +1213,13 @@ vector< vector<double> >* GrainsMPIWrapper::
     for (int irank=0; irank<m_nprocs; ++irank)
     {
       // Size of the message
-      MPI_Probe( irank, tag_DOUBLE, m_MPI_COMM_activProc, &status );  
+      MPI_Probe( irank, tag_DOUBLE, m_MPI_COMM_activeProc, &status );  
       MPI_Get_count( &status, MPI_DOUBLE, &recvsize );
 
       // Reception of the actual message	
       double* recvbuf_DOUBLE = new double[recvsize];
       MPI_Recv( recvbuf_DOUBLE, recvsize, MPI_DOUBLE, 
-          irank, tag_DOUBLE, m_MPI_COMM_activProc, &status );	    
+          irank, tag_DOUBLE, m_MPI_COMM_activeProc, &status );	    
       
       // Copy in data_Global
       for (int j=0; j<recvsize; j+=NB_DOUBLE_PART)
@@ -1483,24 +1276,24 @@ vector<int>* GrainsMPIWrapper::
   }
 
   // Process sends buffer to the master process
-  MPI_Isend( buffer, 2 * nb_part_loc, MPI_INT, m_rank_masterWorld,
-      tag_INT, m_MPI_COMM_activProc, &idreq );	
+  MPI_Isend( buffer, 2 * nb_part_loc, MPI_INT, m_rank_master,
+      tag_INT, m_MPI_COMM_activeProc, &idreq );	
 
   // Reception by the master process
-  if ( m_rank == m_rank_masterWorld )
+  if ( m_rank == m_rank_master )
   {
     class_Global = new vector<int>( nb_total_particles, 0 ) ;
 
     for (int irank=0; irank<m_nprocs; ++irank)
     {
       // Size of the message
-      MPI_Probe( irank, tag_INT, m_MPI_COMM_activProc, &status );  
+      MPI_Probe( irank, tag_INT, m_MPI_COMM_activeProc, &status );  
       MPI_Get_count( &status, MPI_INT, &recvsize );
 
       // Reception of the actual message	
       int* recvbuf_INT = new int[recvsize];
       MPI_Recv( recvbuf_INT, recvsize, MPI_INT, 
-          irank, tag_INT, m_MPI_COMM_activProc, &status );	    
+          irank, tag_INT, m_MPI_COMM_activeProc, &status );	    
       
       // Copy in class_Global
       for (int j=0; j<recvsize; j+=2)
@@ -1608,7 +1401,7 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   	irn!=neighborsRank->end();irn++,ign++,++ireq)
     MPI_Isend( features[*ign], nbHzGeoLoc[*ign] * NB_DOUBLE_PART, MPI_DOUBLE, 
 	*irn, tag_DOUBLE + m_GeoLocReciprocity[*ign], 
-	m_MPI_COMM_activProc, &idreq[ireq] );
+	m_MPI_COMM_activeProc, &idreq[ireq] );
   SCT_get_elapsed_time( "MPIComm" );
 
   // Receive data sent by neighboring processes and processing of these data
@@ -1621,14 +1414,14 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
     // Reception
     // ---------
     // Size of the message -> number of particles
-    MPI_Probe( *irn, tag_DOUBLE + *ign, m_MPI_COMM_activProc, &status );  
+    MPI_Probe( *irn, tag_DOUBLE + *ign, m_MPI_COMM_activeProc, &status );  
     MPI_Get_count( &status, MPI_DOUBLE, &recvsize );
     recvsize /= NB_DOUBLE_PART;  
 
     // Reception of the actual message	    
     double *recvbuf_DOUBLE = new double[recvsize * NB_DOUBLE_PART];
     MPI_Recv( recvbuf_DOUBLE, recvsize * NB_DOUBLE_PART, MPI_DOUBLE, 
-	*irn, tag_DOUBLE + *ign, m_MPI_COMM_activProc, &status );	    
+	*irn, tag_DOUBLE + *ign, m_MPI_COMM_activeProc, &status );	    
 
     SCT_add_elapsed_time( "MPIComm" );
     SCT_set_start( "UpdateCreateClones" );
@@ -1673,7 +1466,7 @@ double GrainsMPIWrapper::Broadcast_DOUBLE( double const& d ) const
 {
   double collective_d = d;
   
-  MPI_Bcast( &collective_d, 1, MPI_DOUBLE, 0, m_MPI_COMM_activProc );
+  MPI_Bcast( &collective_d, 1, MPI_DOUBLE, 0, m_MPI_COMM_activeProc );
   
   return ( collective_d ); 
 }
@@ -1688,7 +1481,7 @@ int GrainsMPIWrapper::Broadcast_INT( int const& i, int source ) const
 {
   int collective_i = i;
   
-  MPI_Bcast( &collective_i, 1, MPI_INT, source, m_MPI_COMM_activProc );
+  MPI_Bcast( &collective_i, 1, MPI_INT, source, m_MPI_COMM_activeProc );
   
   return ( collective_i ); 
 }
@@ -1703,7 +1496,7 @@ size_t GrainsMPIWrapper::Broadcast_UNSIGNED_INT( size_t const& i ) const
 {
   size_t collective_i = i;
   
-  MPI_Bcast( &collective_i, 1, MPI_UNSIGNED_LONG, 0, m_MPI_COMM_activProc );
+  MPI_Bcast( &collective_i, 1, MPI_UNSIGNED_LONG, 0, m_MPI_COMM_activeProc );
   
   return collective_i; 
 }
@@ -1718,7 +1511,7 @@ double GrainsMPIWrapper::sum_DOUBLE( double const& x ) const
 {
   double sum = 0;
   
-  MPI_Allreduce( &x, &sum, 1, MPI_DOUBLE, MPI_SUM, m_MPI_COMM_activProc );
+  MPI_Allreduce( &x, &sum, 1, MPI_DOUBLE, MPI_SUM, m_MPI_COMM_activeProc );
   
   return ( sum );
 }
@@ -1733,8 +1526,8 @@ double GrainsMPIWrapper::sum_DOUBLE_master( double const& x ) const
 {
   double sum = 0;
   
-  MPI_Reduce( &x, &sum, 1, MPI_DOUBLE, MPI_SUM, m_rank_masterWorld,
-  	m_MPI_COMM_activProc );
+  MPI_Reduce( &x, &sum, 1, MPI_DOUBLE, MPI_SUM, m_rank_master,
+  	m_MPI_COMM_activeProc );
   
   return ( sum );
 }
@@ -1749,7 +1542,7 @@ int GrainsMPIWrapper::sum_INT( int const& i ) const
 {
   int sum = 0;
   
-  MPI_Allreduce( &i, &sum, 1, MPI_INT, MPI_SUM, m_MPI_COMM_activProc );
+  MPI_Allreduce( &i, &sum, 1, MPI_INT, MPI_SUM, m_MPI_COMM_activeProc );
   
   return ( sum );
 }
@@ -1765,7 +1558,7 @@ size_t GrainsMPIWrapper::sum_UNSIGNED_INT( size_t const& i ) const
   size_t sum = 0;
   
   MPI_Allreduce( &i, &sum, 1, MPI_UNSIGNED_LONG, MPI_SUM, 
-  	m_MPI_COMM_activProc );
+  	m_MPI_COMM_activeProc );
   
   return ( sum );
 }
@@ -1780,8 +1573,8 @@ int GrainsMPIWrapper::sum_INT_master( int const& i ) const
 {
   int sum = 0;
   
-  MPI_Reduce( &i, &sum, 1, MPI_INT, MPI_SUM, m_rank_masterWorld, 
-  	m_MPI_COMM_activProc );
+  MPI_Reduce( &i, &sum, 1, MPI_INT, MPI_SUM, m_rank_master, 
+  	m_MPI_COMM_activeProc );
   
   return ( sum );
 }
@@ -1796,8 +1589,8 @@ size_t GrainsMPIWrapper::sum_UNSIGNED_INT_master( size_t const& i ) const
 {
   int sum = 0;
   
-  MPI_Reduce( &i, &sum, 1, MPI_UNSIGNED_LONG, MPI_SUM, m_rank_masterWorld, 
-  	m_MPI_COMM_activProc );
+  MPI_Reduce( &i, &sum, 1, MPI_UNSIGNED_LONG, MPI_SUM, m_rank_master, 
+  	m_MPI_COMM_activeProc );
   
   return ( sum );
 }
@@ -1813,7 +1606,7 @@ bool GrainsMPIWrapper::logical_and( bool const& input ) const
   int land=0;
   
   MPI_Allreduce( &input, &land, 1, MPI_UNSIGNED_SHORT, MPI_LAND,
-  	m_MPI_COMM_activProc );
+  	m_MPI_COMM_activeProc );
   
   return ( land );
 }
@@ -1829,7 +1622,7 @@ int GrainsMPIWrapper::min_INT( int const& i ) const
   int collective_i = 0;
 
   MPI_Allreduce( &i, &collective_i, 1, MPI_INT, MPI_MIN, 
-  	m_MPI_COMM_activProc ) ;
+  	m_MPI_COMM_activeProc ) ;
 
   return ( collective_i );
 }  
@@ -1844,7 +1637,7 @@ int GrainsMPIWrapper::max_INT( int const& i ) const
   int collective_i = 0;
 
   MPI_Allreduce( &i, &collective_i, 1, MPI_INT, MPI_MAX, 
-  	m_MPI_COMM_activProc ) ;
+  	m_MPI_COMM_activeProc ) ;
 
   return ( collective_i );
 }  
@@ -1859,7 +1652,7 @@ size_t GrainsMPIWrapper::min_UNSIGNED_INT( size_t const& i ) const
   size_t collective_i = 0;
 
   MPI_Allreduce( &i, &collective_i, 1, MPI_UNSIGNED_LONG, MPI_MIN, 
-  	m_MPI_COMM_activProc ) ;
+  	m_MPI_COMM_activeProc ) ;
 
   return ( collective_i );
 }  
@@ -1875,7 +1668,7 @@ size_t GrainsMPIWrapper::max_UNSIGNED_INT( size_t const& i ) const
   size_t collective_i = 0;
 
   MPI_Allreduce( &i, &collective_i, 1, MPI_UNSIGNED_LONG, MPI_MAX, 
-  	m_MPI_COMM_activProc ) ;
+  	m_MPI_COMM_activeProc ) ;
 
   return ( collective_i );
 }  
@@ -1890,7 +1683,7 @@ double GrainsMPIWrapper::max_DOUBLE( double const& x ) const
 {
   double max = 0.;
 
-  MPI_Allreduce( &x, &max, 1, MPI_DOUBLE, MPI_MAX, m_MPI_COMM_activProc ) ;
+  MPI_Allreduce( &x, &max, 1, MPI_DOUBLE, MPI_MAX, m_MPI_COMM_activeProc ) ;
 
   return ( max );
 } 
@@ -1905,8 +1698,8 @@ double GrainsMPIWrapper::max_DOUBLE_master( double const& x ) const
 {
   double max = 0.;
 
-  MPI_Reduce( &x, &max, 1, MPI_DOUBLE, MPI_MAX, m_rank_masterWorld,
-  	m_MPI_COMM_activProc ) ;
+  MPI_Reduce( &x, &max, 1, MPI_DOUBLE, MPI_MAX, m_rank_master,
+  	m_MPI_COMM_activeProc ) ;
 
   return ( max );
 } 
@@ -1921,7 +1714,7 @@ double GrainsMPIWrapper::min_DOUBLE( double const& x ) const
 {
   double min = 0.;
 
-  MPI_Allreduce( &x, &min, 1, MPI_DOUBLE, MPI_MIN, m_MPI_COMM_activProc ) ;
+  MPI_Allreduce( &x, &min, 1, MPI_DOUBLE, MPI_MIN, m_MPI_COMM_activeProc ) ;
 
   return ( min );
 } 
@@ -1936,8 +1729,8 @@ double GrainsMPIWrapper::min_DOUBLE_master( double const& x ) const
 {
   double min = 0.;
 
-  MPI_Reduce( &x, &min, 1, MPI_DOUBLE, MPI_MIN, m_rank_masterWorld,
-  	m_MPI_COMM_activProc ) ;
+  MPI_Reduce( &x, &min, 1, MPI_DOUBLE, MPI_MIN, m_rank_master,
+  	m_MPI_COMM_activeProc ) ;
 
   return ( min );
 } 
@@ -1953,7 +1746,7 @@ size_t* GrainsMPIWrapper::AllGather_UNSIGNED_INT( size_t const& i ) const
   size_t* recv = new size_t[m_nprocs];
   
   MPI_Allgather( &i, 1, MPI_UNSIGNED_LONG, recv, 1, MPI_UNSIGNED_LONG, 
-  	m_MPI_COMM_activProc ); 
+  	m_MPI_COMM_activeProc ); 
 
   return ( recv );
 } 
@@ -1971,7 +1764,7 @@ Point3 GrainsMPIWrapper::Broadcast_Point3( Point3 const& pt ) const
   coordinates[1] = pt[Y];  
   coordinates[2] = pt[Z];  
 
-  MPI_Bcast( coordinates, 3, MPI_DOUBLE, 0, m_MPI_COMM_activProc );  
+  MPI_Bcast( coordinates, 3, MPI_DOUBLE, 0, m_MPI_COMM_activeProc );  
   
   Point3 cpt( coordinates[0], coordinates[1], coordinates[2] );
   delete [] coordinates;
@@ -1992,7 +1785,7 @@ Vector3 GrainsMPIWrapper::Broadcast_Vector3( Vector3 const& v ) const
   coordinates[1] = v[Y];  
   coordinates[2] = v[Z];  
 
-  MPI_Bcast( coordinates, 3, MPI_DOUBLE, 0, m_MPI_COMM_activProc );  
+  MPI_Bcast( coordinates, 3, MPI_DOUBLE, 0, m_MPI_COMM_activeProc );  
   
   Vector3 cv( coordinates[0], coordinates[1], coordinates[2] );
   delete [] coordinates;
@@ -2020,7 +1813,7 @@ Matrix GrainsMPIWrapper::Broadcast_Matrix( Matrix const& mat ) const
   mat_coef[7] = mmat[Z][Y];  
   mat_coef[8] = mmat[Z][Z];     
 
-  MPI_Bcast( mat_coef, 9, MPI_DOUBLE, 0, m_MPI_COMM_activProc );  
+  MPI_Bcast( mat_coef, 9, MPI_DOUBLE, 0, m_MPI_COMM_activeProc );  
   
   Matrix bmat( mat_coef[0], mat_coef[1], mat_coef[2],
   	mat_coef[3], mat_coef[4], mat_coef[5],
@@ -2028,221 +1821,6 @@ Matrix GrainsMPIWrapper::Broadcast_Matrix( Matrix const& mat ) const
   delete [] mat_coef;
   
   return ( bmat );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Test avec communicateur local: validation
-void GrainsMPIWrapper::testCommLocal_Gather_INT() const
-{
-  int nb_hz = - m_rank, i, j, ii;
-  int *recvbuf_INT = new int[m_nprocs_localComm];
-  for (i=0; i<m_nprocs_localComm; ++i) recvbuf_INT[i]=0;   
-  for (ii=0;ii<m_nprocs;++ii)  
-    if ( m_isInCommMPINeighbors[ii] )
-      MPI_Gather( &nb_hz, 1, MPI_INT, recvbuf_INT, 1, MPI_INT,
-  	m_master_localComm[ii], *m_commMPINeighbors[ii] ); 
-    
-
-  for (i=0;i<m_nprocs;++i)
-  {
-    if ( i == m_rank )
-    {      
-      cout << "Test comm local : "; 
-      for (j=0;j<m_nprocs_localComm;++j) cout << recvbuf_INT[j] << " ";
-      cout << endl;        
-    }
-    MPI_Barrier( m_MPI_COMM_activProc );
-  } 
-  
-  delete [] recvbuf_INT;
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// AllGather of a 1D array of n integers within the MPI_COMM_activProc 
-// communicator
-void GrainsMPIWrapper::test_AllGatherv_INT( int const& n ) const
-{
-  int i;
-
-  // Local array
-  int *local_vec = new int[n];
-  for (i=0;i<n;++i) local_vec[i] = 100000 * m_rank + i;
-
-  // Partition and size of the reception buffer
-  int *recvcounts_INT = new int[m_nprocs];
-  for (i=0; i<m_nprocs; ++i) recvcounts_INT[i] = n;
-  int *displs_INT = new int[m_nprocs];
-  displs_INT[0] = 0; 
-  for (i=1; i<m_nprocs; ++i) 
-    displs_INT[i] = displs_INT[i-1] + recvcounts_INT[i-1];  
-  int recvsize_INT = displs_INT[m_nprocs-1] + recvcounts_INT[m_nprocs-1];
-  int *recvbuf_INT = new int[recvsize_INT];
-  
-  // MPI communication 
-  MPI_Allgatherv( local_vec, n, MPI_INT, recvbuf_INT, 
-  	recvcounts_INT, displs_INT, MPI_INT, m_MPI_COMM_activProc );
-	
-  delete [] local_vec;
-  delete [] recvcounts_INT;
-  delete [] displs_INT;
-  delete [] recvbuf_INT; 
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// AllGather of a 1D array of n integers within the m_commMPINeighbors local 
-// communicator
-void GrainsMPIWrapper::testCommLocal_AllGatherv_INT( const int &n ) const
-{
-  int i,ii;
-
-  // Local array
-  int *local_vec = new int[n];
-  for (i=0;i<n;++i) local_vec[i] = 100000 * m_rank + i;
-
-  // Partition and size of the reception buffer
-  int *recvcounts_INT = new int[m_nprocs_localComm];
-  for (i=0; i<m_nprocs_localComm; ++i) recvcounts_INT[i] = n;
-  int *displs_INT = new int[m_nprocs_localComm];
-  displs_INT[0] = 0; 
-  for (i=1; i<m_nprocs_localComm; ++i) 
-    displs_INT[i] = displs_INT[i-1] + recvcounts_INT[i-1];  
-  int recvsize_INT = displs_INT[m_nprocs_localComm-1] 
-  	+ recvcounts_INT[m_nprocs_localComm-1];
-  int *recvbuf_INT = new int[recvsize_INT];
-  
-  // MPI communication 
-  for (ii=0;ii<m_nprocs;++ii)  
-    if ( m_isInCommMPINeighbors[ii] )  
-      MPI_Gatherv( local_vec, n, MPI_INT, recvbuf_INT, 
-  	recvcounts_INT, displs_INT, MPI_INT, m_master_localComm[ii],
-	*m_commMPINeighbors[ii] );
-	
-  delete [] local_vec;
-  delete [] recvcounts_INT;
-  delete [] displs_INT;
-  delete [] recvbuf_INT; 
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// AllGather of a 1D array of n doubles within the MPI_COMM_activProc 
-// communicator
-void GrainsMPIWrapper::test_AllGatherv_DOUBLE( int const& n ) const
-{
-  int i;
-
-  // Local array
-  double *local_vec = new double[n];
-  for (i=0;i<n;++i) local_vec[i] = 20000. * double(m_rank) + 1.1 * double(i);
-
-  // Partition and size of the reception buffer
-  int *recvcounts_DOUBLE = new int[m_nprocs];
-  for (i=0; i<m_nprocs; ++i) recvcounts_DOUBLE[i] = n;
-  int *displs_DOUBLE = new int[m_nprocs];
-  displs_DOUBLE[0] = 0; 
-  for (i=1; i<m_nprocs; ++i) 
-    displs_DOUBLE[i] = displs_DOUBLE[i-1] + recvcounts_DOUBLE[i-1];  
-  int recvsize_DOUBLE = displs_DOUBLE[m_nprocs-1] 
-  	+ recvcounts_DOUBLE[m_nprocs-1];
-  double *recvbuf_DOUBLE = new double[recvsize_DOUBLE];
-  
-  // MPI communication 
-  MPI_Allgatherv( local_vec, n, MPI_DOUBLE, recvbuf_DOUBLE, 
-  	recvcounts_DOUBLE, displs_DOUBLE, MPI_DOUBLE, m_MPI_COMM_activProc );
-	
-  delete [] local_vec;
-  delete [] recvcounts_DOUBLE;
-  delete [] displs_DOUBLE;
-  delete [] recvbuf_DOUBLE; 
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// AllGather of a 1D array of n doubles within the m_commMPINeighbors local 
-// communicator
-void GrainsMPIWrapper::testCommLocal_AllGatherv_DOUBLE( int const& n ) const
-{
-  int i,ii;
-
-  // Local array
-  double *local_vec = new double[n];
-  for (i=0;i<n;++i) local_vec[i] = 20000. * double(m_rank) + 1.1 * double(i);
-
-  // Partition and size of the reception buffer
-  int *recvcounts_DOUBLE = new int[m_nprocs_localComm];
-  for (i=0; i<m_nprocs_localComm; ++i) recvcounts_DOUBLE[i] = n;
-  int *displs_DOUBLE = new int[m_nprocs_localComm];
-  displs_DOUBLE[0] = 0; 
-  for (i=1; i<m_nprocs_localComm; ++i) 
-    displs_DOUBLE[i] = displs_DOUBLE[i-1] + recvcounts_DOUBLE[i-1];  
-  int recvsize_DOUBLE = displs_DOUBLE[m_nprocs_localComm-1] 
-  	+ recvcounts_DOUBLE[m_nprocs_localComm-1];
-  double *recvbuf_DOUBLE = new double[recvsize_DOUBLE];
-  
-  // MPI communication 
-  for (ii=0;ii<m_nprocs;++ii)  
-    if ( m_isInCommMPINeighbors[ii] )  
-      MPI_Gatherv( local_vec, n, MPI_DOUBLE, recvbuf_DOUBLE, 
-  	recvcounts_DOUBLE, displs_DOUBLE, MPI_DOUBLE, m_master_localComm[ii],
-	*m_commMPINeighbors[ii] );
-	
-  delete [] local_vec;
-  delete [] recvcounts_DOUBLE;
-  delete [] displs_DOUBLE;
-  delete [] recvbuf_DOUBLE; 
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Send-Recv of a 1D array of n doubles within the m_commMPINeighbors local 
-// communicator
-void GrainsMPIWrapper::testCommLocal_SendRecv_DOUBLE( int const& n ) const
-{
-  int i,ii;
-  MPI_Status status;
-  int nloc = n + m_rank;
-
-  // Local array
-  double *local_vec = new double[nloc];
-  for (i=0;i<nloc;++i) local_vec[i] = 20000. * double(m_rank) + 1.1 * double(i);
-  
-  // MPI communication 
-  for (ii=0;ii<m_nprocs;++ii)  
-    if ( m_isInCommMPINeighbors[ii] )
-    {
-      if ( ii != m_rank )
-        MPI_Ssend( local_vec, nloc, MPI_DOUBLE, m_master_localComm[ii], 0, 
-		*m_commMPINeighbors[ii] );	
-      else
-        for (i=0;i<m_nprocs_localComm;++i)
-          if ( i != m_rank_localComm )
-          {
-            MPI_Probe( i, 0, *m_commMPINeighbors[ii], &status );
-	    int sizemess = 0;
-	    MPI_Get_count( &status, MPI_DOUBLE, &sizemess );
-	    double *recvbuf_DOUBLE = new double[sizemess];
-	    MPI_Recv( recvbuf_DOUBLE, sizemess, MPI_DOUBLE, i, 0, 
-		*m_commMPINeighbors[ii], &status );	    
-            delete [] recvbuf_DOUBLE;	      
-          }               
-    }
-
-  delete [] local_vec;
 }
 
 
@@ -2289,7 +1867,7 @@ void GrainsMPIWrapper::writeAndFlushMPIString( ostream &f )
 // MPI_Barrier pour les processus actifs uniquement
 void GrainsMPIWrapper::MPI_Barrier_ActivProc() const
 {
-  MPI_Barrier( m_MPI_COMM_activProc );
+  MPI_Barrier( m_MPI_COMM_activeProc );
 
 }
 
@@ -2307,9 +1885,9 @@ void GrainsMPIWrapper::ContactsFeatures( double& overlap_max,
   double *recvbuf_time = new double[m_nprocs];   
 
   MPI_Allgather( &overlap_max, 1, MPI_DOUBLE, recvbuf_overlap,
-  	1, MPI_DOUBLE, m_MPI_COMM_activProc ); 
+  	1, MPI_DOUBLE, m_MPI_COMM_activeProc ); 
   MPI_Allgather( &time_overlapMax, 1, MPI_DOUBLE, recvbuf_time,
-  	1, MPI_DOUBLE, m_MPI_COMM_activProc );	 
+  	1, MPI_DOUBLE, m_MPI_COMM_activeProc );	 
 	
   double ovmax=0.;
   for (int i=0;i<m_nprocs;++i)
@@ -2582,7 +2160,7 @@ void GrainsMPIWrapper::sumObstaclesLoad(
 
   // Copy in a local buffer except on the master process where buffer is set 
   // to 0
-  if ( m_rank == m_rank_masterWorld )
+  if ( m_rank == m_rank_master )
     for (i=0;i<6*nobs;++i) forcetorque[i] = 0.;
   else
     for (obstacle=allMyObs.begin(); obstacle!=allMyObs.end(); obstacle++,i+=6)
@@ -2599,10 +2177,10 @@ void GrainsMPIWrapper::sumObstaclesLoad(
   
   // Sum all contributions from other processes on the master
   MPI_Reduce( forcetorque, forcetorque_collective, 6*nobs, MPI_DOUBLE, 
-  	MPI_SUM, m_rank_masterWorld, m_MPI_COMM_activProc ); 
+  	MPI_SUM, m_rank_master, m_MPI_COMM_activeProc ); 
 	
   // Add all contributions from other processes on the master
-  if ( m_rank == m_rank_masterWorld )
+  if ( m_rank == m_rank_master )
   {
     i = 0;
     for (obstacle=allMyObs.begin(); obstacle!=allMyObs.end(); obstacle++,i+=6)
@@ -2629,7 +2207,7 @@ void GrainsMPIWrapper::sumObstaclesLoad(
 // Writes the memory consumption per process in a stream
 void GrainsMPIWrapper::display_used_memory( ostream& f ) const
 {
-  if ( m_rank == 0 ) f << "Memory used by Grains3D" << endl;
+  if ( m_rank == m_rank_master ) f << "Memory used by Grains3D" << endl;
   
   ostringstream out;
   GrainsExec::display_memory( out, GrainsExec::used_memory() ); 
@@ -2664,7 +2242,7 @@ void GrainsMPIWrapper::distributeParticlesClassProc(
   
   // Distribution is performed sequentially from 0 to the last
   // process
-  if ( m_rank == 0 )
+  if ( m_rank == m_rank_master )
   {
     // All types except the last type
     ipart = newPart.begin();
@@ -2693,16 +2271,16 @@ void GrainsMPIWrapper::distributeParticlesClassProc(
     tabNbPartRestantesParClasse[nbClasses-1] -= nclasseproc;
   
     MPI_Send( tabNbPartRestantesParClasse, nbClasses, MPI_INT, 1, m_rank, 
-  	m_MPI_COMM_activProc );
+  	m_MPI_COMM_activeProc );
   }
   else
   {
     if ( m_rank != m_nprocs - 1 )
     {
       MPI_Recv( tabNbPartRestantesParClasse, nbClasses, MPI_INT, m_rank - 1,
-    	m_rank - 1, m_MPI_COMM_activProc, &status );
+    	m_rank - 1, m_MPI_COMM_activeProc, &status );
 
-    // All types except the last type
+      // All types except the last type
       for (i=0,ipart=newPart.begin(),ipartProc=newPartProc.begin();
     	i<nbClasses-1;++i,ipart++,ipartProc++)      
       {
@@ -2727,12 +2305,12 @@ void GrainsMPIWrapper::distributeParticlesClassProc(
       tabNbPartRestantesParClasse[nbClasses-1] -= nclasseproc;
   
       MPI_Send( tabNbPartRestantesParClasse, nbClasses, MPI_INT, m_rank + 1, 
-  		m_rank, m_MPI_COMM_activProc );
+  		m_rank, m_MPI_COMM_activeProc );
     }
     else
     {
       MPI_Recv( tabNbPartRestantesParClasse, nbClasses, MPI_INT, m_rank - 1,
-    	m_rank - 1, m_MPI_COMM_activProc, &status );      
+    	m_rank - 1, m_MPI_COMM_activeProc, &status );      
 	
       for (i=0,ipartProc=newPartProc.begin();i<nbClasses;++i,ipartProc++)
         ipartProc->second = tabNbPartRestantesParClasse[i];
@@ -2740,12 +2318,12 @@ void GrainsMPIWrapper::distributeParticlesClassProc(
   }    	
   
   // Output and verify distribution per class and per process
-  if ( m_rank == 0 )
+  if ( m_rank == m_rank_master )
     cout << endl << "Distribution " << endl << 
     	"Per process and per class" << endl;
   for (int m=0;m<m_nprocs;++m)
   {
-    if ( m == m_rank && m_is_activ )
+    if ( m == m_rank && m_is_active )
     {      
       cout << "Proc " << m_rank << endl;
       int ntot_ = 0 ;
@@ -2758,172 +2336,21 @@ void GrainsMPIWrapper::distributeParticlesClassProc(
       cout << "   Total: " << ntot_ << " = " << npartproc << endl;
 
     }
-    MPI_Barrier( m_MPI_COMM_activProc );
+    MPI_Barrier( m_MPI_COMM_activeProc );
   }
-  MPI_Barrier( m_MPI_COMM_activProc );
+  MPI_Barrier( m_MPI_COMM_activeProc );
 
-  if ( m_rank == 0 )
+  if ( m_rank == m_rank_master )
     cout << "Per class on all processes" << endl;
   for (i=0,ipart=newPart.begin(),ipartProc=newPartProc.begin();
     	i<nbClasses;++i,ipart++,ipartProc++)
   {
     int ntotc =  sum_INT_master( ipartProc->second ) ;
-    if ( m_rank == 0 )
+    if ( m_rank == m_rank_master )
       cout << "   Class " << i << " " << ntotc << " = " << ipart->second 
       	<< endl;
   }
-  if ( m_rank == 0 ) cout << endl;
-} 
-
-
-
-
-// ----------------------------------------------------------------------------
-// Gathers all periodic clone particles on the master 
-// process for post-processing purposes
-list<Particle*>* GrainsMPIWrapper::GatherPeriodicClones_PostProcessing(
-  	list<Particle*> const& periodicCloneParticles,
-	vector<Particle*> const& referenceParticles ) const
-{
-  list<Particle*>* allClonesPeriodiques = NULL;
-//   list<Particle*>::const_iterator il;
-//   int i,j;
-// 
-//   // Taille des messages proportionnel au nombre de particles dans 
-//   // ParticlesReference
-//   // ---------------------------------------------------------------
-//   int nb_part = int(particlesClonesPeriodiques.size());
-//   for (il=particlesClonesPeriodiques.begin();
-//   	il!=particlesClonesPeriodiques.end();il++)
-//     if ((*il)->getTag()==2) nb_part--;
-// 
-//   // Taille des messages à passer
-//   int *recvcounts = new int[m_nprocs];
-//   for (i=0; i<m_nprocs; ++i) recvcounts[i]=0;
-//   MPI_Gather( &nb_part, 1, MPI_INT, recvcounts, 1, MPI_INT, 
-//   	m_rank_masterWorld, m_MPI_COMM_activProc ); 
-// 
-//   // Partition et taille du buffer de réception
-//   int *displs = new int[m_nprocs];
-//   displs[0] = 0; 
-//   for (i=1; i<m_nprocs; ++i) displs[i] = displs[i-1]+recvcounts[i-1];  
-//   int recvsize = displs[m_nprocs-1]+recvcounts[m_nprocs-1];
-// 
-// 
-// 
-//   // Communication des entiers: 
-//   // Ordre par particle: 
-//   // [numero de particle, classe]
-//   // -----------------------------
-//   int NB_INT_PART = 2;
-//   int *numClass = new int[NB_INT_PART*nb_part];
-//   for (il=particlesClonesPeriodiques.begin(),i=0;
-//   	il!=particlesClonesPeriodiques.end();il++)
-//   {
-//     if ( (*il)->getTag() == 0 || (*il)->getTag() == 1 )
-//     {    
-//       numClass[i] = (*il)->getID();
-//       numClass[i+1] = (*il)->getGeometricType();
-//       i+=NB_INT_PART;
-//     }
-//   }            
-// 
-//   // Partition et taille du buffer de réception
-//   int *recvcounts_INT = new int[m_nprocs];
-//   for (i=0; i<m_nprocs; ++i) recvcounts_INT[i] = NB_INT_PART * recvcounts[i];
-//   int *displs_INT = new int[m_nprocs];
-//   displs_INT[0] = 0; 
-//   for (i=1; i<m_nprocs; ++i) 
-//     displs_INT[i] = displs_INT[i-1] + recvcounts_INT[i-1];  
-//   int recvsize_INT = displs_INT[m_nprocs-1] + recvcounts_INT[m_nprocs-1];
-//   int *recvbuf_INT = new int[recvsize_INT];
-// 
-//   // Communication des entiers: 2 integer par particle
-//   MPI_Gatherv( numClass, NB_INT_PART * nb_part, MPI_INT, recvbuf_INT, 
-//   	recvcounts_INT, displs_INT, MPI_INT, 
-// 	m_rank_masterWorld, m_MPI_COMM_activProc );
-// 
-// 
-// 
-//   // Communication des doubles: cinématique & configuration
-//   // Ordre par particle: 
-//   // [position, vitesse translation, quaternion rotation, vitesse rotation]
-//   // ----------------------------------------------------------------------
-//   int NB_DOUBLE_PART = 26;  
-//   double *features = new double[NB_DOUBLE_PART*nb_part];
-//   for (il=particlesClonesPeriodiques.begin(),i=0;
-//   	il!=particlesClonesPeriodiques.end();il++)
-//   {
-//     if ( (*il)->getTag() == 0 || (*il)->getTag() == 1 )
-//     {
-//       (*il)->copyTranslationalVelocity( features, i );
-//       (*il)->copyQuaternionRotation( features, i+3 );    
-//       (*il)->copyAngularVelocity( features, i+7 );
-//       (*il)->copyTransform( features, i+10 ); 
-//       i += NB_DOUBLE_PART;
-//     }                  
-//   }  
-// 
-//   // Partition et taille du buffer de réception
-//   int *recvcounts_DOUBLE = new int[m_nprocs];
-//   for (i=0; i<m_nprocs; ++i) 
-//     recvcounts_DOUBLE[i] = NB_DOUBLE_PART * recvcounts[i];
-//   int *displs_DOUBLE = new int[m_nprocs];
-//   displs_DOUBLE[0] = 0; 
-//   for (i=1; i<m_nprocs; ++i) 
-//     displs_DOUBLE[i] = displs_DOUBLE[i-1] + recvcounts_DOUBLE[i-1];  
-//   int recvsize_DOUBLE = displs_DOUBLE[m_nprocs-1] 
-//   	+ recvcounts_DOUBLE[m_nprocs-1];
-//   double *recvbuf_DOUBLE = new double[recvsize_DOUBLE];
-//       
-//   // Communication de la cinématique & configuration: 26 double par 
-//   // particle
-//   MPI_Gatherv( features, NB_DOUBLE_PART * nb_part, MPI_DOUBLE, recvbuf_DOUBLE, 
-//   	recvcounts_DOUBLE, displs_DOUBLE, MPI_DOUBLE, 
-// 	m_rank_masterWorld, m_MPI_COMM_activProc ); 
-// 
-// 
-//   // Creation des Particles pour Post-processing
-//   // --------------------------------------------
-//   if ( m_rank == m_rank_masterWorld )
-//   {
-//     allClonesPeriodiques = new list<Particle*>;
-// 
-//     // Clones periodiques sur tous les proc
-//     for (j=0;j<recvsize;++j)
-//     {
-//       // Creation de la particle
-//       Particle *part_post=new Particle( recvbuf_INT[NB_INT_PART*j],
-//       		referenceParticles[recvbuf_INT[NB_INT_PART*j+1]],
-//       		recvbuf_DOUBLE[NB_DOUBLE_PART*j],
-//       		recvbuf_DOUBLE[NB_DOUBLE_PART*j+1],
-//     		recvbuf_DOUBLE[NB_DOUBLE_PART*j+2],
-//       		recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
-//       		recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
-//     		recvbuf_DOUBLE[NB_DOUBLE_PART*j+5],		
-//       		recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
-//       		recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
-//     		recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],
-//     		recvbuf_DOUBLE[NB_DOUBLE_PART*j+9],		
-//       		&recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],		
-// 		COMPUTE,
-// 		0 ); 		    
-//       allClonesPeriodiques->push_back(part_post);    
-//     }
-//   } 
-// 
-//   delete [] numClass;
-//   delete [] features;    
-//   delete [] recvcounts;
-//   delete [] recvcounts_INT;
-//   delete [] recvcounts_DOUBLE;    
-//   delete [] displs;
-//   delete [] displs_INT;
-//   delete [] displs_DOUBLE;      
-//   delete [] recvbuf_INT;
-//   delete [] recvbuf_DOUBLE;
-
-  return ( allClonesPeriodiques );
+  if ( m_rank == m_rank_master ) cout << endl;
 } 
 
 
@@ -2939,7 +2366,7 @@ void GrainsMPIWrapper::writeStringPerProcess( ostream& f, string const& out,
   int tag_CHAR = 111;
   MPI_Status status;
   
-  if ( m_rank == 0 ) 
+  if ( m_rank == m_rank_master ) 
   {
     if ( creturn ) allout += "\n";
     else allout += ": ";
@@ -2947,13 +2374,13 @@ void GrainsMPIWrapper::writeStringPerProcess( ostream& f, string const& out,
     for ( int irank=1;irank<m_nprocs;irank++)
     {
       // Size of the message
-      MPI_Probe( irank, tag_CHAR, m_MPI_COMM_activProc, &status );  
+      MPI_Probe( irank, tag_CHAR, m_MPI_COMM_activeProc, &status );  
       MPI_Get_count( &status, MPI_CHAR, &recvsize );
 
       // Reception of the actual message	
       char *recvbuf_char = new char[recvsize];
       MPI_Recv( recvbuf_char, recvsize, MPI_CHAR, 
-          irank, tag_CHAR, m_MPI_COMM_activProc, &status );
+          irank, tag_CHAR, m_MPI_COMM_activeProc, &status );
 
       if ( recvsize != 1 )
       { 
@@ -2971,9 +2398,9 @@ void GrainsMPIWrapper::writeStringPerProcess( ostream& f, string const& out,
   {
     // Send the string to the master proc
     dim = int(out.size()+1);
-    MPI_Send( out.c_str(), dim, MPI_CHAR, 0, tag_CHAR, m_MPI_COMM_activProc );
+    MPI_Send( out.c_str(), dim, MPI_CHAR, 0, tag_CHAR, m_MPI_COMM_activeProc );
   }
 
   // The master proc writes to the stream
-  if ( m_rank == 0 ) f << allout << endl; 
+  if ( m_rank == m_rank_master ) f << allout << endl; 
 }

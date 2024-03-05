@@ -251,7 +251,7 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
     if ( distance < EPSILON )
     {
       cout << "ERR RigidBodyWithCrust::ClosestPoint on Processor "
-      << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+      << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	    << endl;
       throw ContactError();
     }
@@ -325,7 +325,7 @@ PointContact RigidBodyWithCrust::ClosestPoint_ErreurHandling(
   {
       cout << "ERR RigidBodyWithCrust::ClosestPoint_ErreurHandling on "
       << " Processor " << (GrainsExec::m_MPI ?
-	    GrainsExec::getComm()->get_rank_active() : 0 )
+	    GrainsExec::getComm()->get_rank() : 0 )
 	    << " between components " << id << " and " << id_neighbor
 	    << endl;
       throw ContactError();
@@ -333,7 +333,7 @@ PointContact RigidBodyWithCrust::ClosestPoint_ErreurHandling(
   else
   {
     cout << "Handling contact error on Processor "
-	   << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+	   << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	   << " between components " << id << " and " << id_neighbor
 	   << endl;
   }
@@ -401,7 +401,7 @@ PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
     if ( - distance >= rdwA + rdwB )
     {
       cout << "ERR RigidBodyWithCrust::ClosestPointSPHERE on Processor "
-      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< ": " << - distance << " & " << rdwA + rdwB << "\n";
       throw ContactError();
     }
@@ -458,7 +458,7 @@ PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
       if ( - overlap >=  rdwA + rdwB )
       {
         cout << "ERR RigidBodyWithCrust::ClosestPointSPHEREBOX on Processor "
-      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	      << ": " << - overlap << " & " << rdwA + rdwB << endl;
 	      throw ContactError();
       }
@@ -484,7 +484,7 @@ PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
       if ( - overlap >= rdwA + rdwB )
       {
         cout << "ERR RigidBodyWithCrust::ClosestPointSPHEREBOX on Processor "
-      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	      << ": " << - overlap << " & " << rdwA + rdwB << endl;
 	      throw ContactError();
       }

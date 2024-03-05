@@ -73,12 +73,8 @@ class GrainsMPIWrapper : public SolverComputingTime
     MPI_COMM_activProc communicator */
     int get_total_number_of_active_processes() const;   
   
-    /** @brief Returns the process rank in the MPI_COMM_WORLD communicator */
-    int get_rank_world() const; 
-  
-    /** @brief Returns the process rank in the MPI_COMM_activProc 
-    communicator */
-    int get_rank_active() const;   
+    /** @brief Returns the process rank in all communicators */
+    int get_rank() const;   
   
     /** @brief Returns whether the process is active */
     bool isActive() const;                  
@@ -101,19 +97,7 @@ class GrainsMPIWrapper : public SolverComputingTime
   	list<Particle*> const* particlesBufferzone,
   	list<Particle*>* particlesClones,
 	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC, bool update );
-	
-    /** @brief Gathers all particles on the master process for post-processing
-    purposes
-    @param particles list of active particles
-    @param pwait list of non-active particles 
-    @param referenceParticles reference particles
-    @param nb_total_particles total number of particles on all processes */	
-    vector<Particle*>* GatherParticles_PostProcessing(
-  	list<Particle*> const& particles,
-	list<Particle*> const& pwait,
-	vector<Particle*> const& referenceParticles,
-	size_t const& nb_total_particles ) const;	
+	LinkedCell* LC, bool update );	
 
     /** @brief Gathers all particle data on the master process for 
     post-processing purposes
@@ -129,14 +113,6 @@ class GrainsMPIWrapper : public SolverComputingTime
     vector<int>* GatherParticlesClass_PostProcessing(
   	list<Particle*> const& particles,
 	size_t const& nb_total_particles ) const;	
-
-    /** @brief Gathers all periodic clone particles on the master 
-    process for post-processing purposes
-    @param periodicCloneParticles list of periodic clone particles
-    @param referenceParticles reference particles */	
-    list<Particle*>* GatherPeriodicClones_PostProcessing(
-  	list<Particle*> const& periodicCloneParticles,
-	vector<Particle*> const& referenceParticles ) const;	
 		
     /** @brief Broadcasts an integer from the master to all processes within the
     MPI_COMM_activProc communicator
@@ -249,10 +225,6 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param mat matrix */
     Matrix Broadcast_Matrix( Matrix const& mat ) const;   
   
-    /** @brief Sets the local MPI communicators involving the MPI cartesian 
-    neighbors */
-    void setCommLocal(); 
-  
     /** @brief Outputs timer summary */
     void timerSummary() const;
   
@@ -299,42 +271,11 @@ class GrainsMPIWrapper : public SolverComputingTime
 	
     /** @brief Writes a string per process in a process-id ordered manner
     @param f output flux
-    @param out string */
+    @param out string
+    @param creturn use carriage return if true, else ": " 
+    @param shift empty string to shift the output*/
     void writeStringPerProcess( ostream& f, string const& out, 
     	bool creturn = true, string const& shift="" ) const;	
-    //@}  
-
-
-    /** @name Test methods */
-    //@{
-    /** @brief AllGather of a 1D array of n integers within the 
-    MPI_COMM_activProc communicator
-    @param n number of elements of the 1D array */
-    void test_AllGatherv_INT( int const& n ) const;
-  
-    /** @brief AllGather of a 1D array of n integers within the 
-    m_commMPINeighbors local communicator
-    @param n number of elements of the 1D array */
-    void testCommLocal_AllGatherv_INT( int const& n ) const;  
-
-    /** @brief AllGather of a 1D array of n doubles within the 
-    MPI_COMM_activProc communicator
-    @param n number of elements of the 1D array */
-    void test_AllGatherv_DOUBLE( int const& n ) const;
-  
-    /** @brief AllGather of a 1D array of n doubles within the 
-    m_commMPINeighbors local communicator
-    @param n number of elements of the 1D array */
-    void testCommLocal_AllGatherv_DOUBLE( int const& n ) const;  
-
-    /** @brief Send-Recv of a 1D array of n doubles within the 
-    m_commMPINeighbors local communicator
-    @param n number of elements of the 1D array */
-    void testCommLocal_SendRecv_DOUBLE( int const& n ) const;  
-
-    /** @brief Gather of an integer within the m_commMPINeighbors local 
-    communicator */
-    void testCommLocal_Gather_INT() const;
     //@}  
 
 
@@ -370,35 +311,20 @@ class GrainsMPIWrapper : public SolverComputingTime
     /** @name Parameters */
     //@{
     MPI_Group m_MPI_GROUP_activProc; /**< active process group */    
-    MPI_Comm m_MPI_COMM_activProc; /**< active process communicator */
+    MPI_Comm m_MPI_COMM_activeProc; /**< active process communicator */
     int *m_coords; /**< coordinates in the MPI cartesian topology */
     int *m_dim; /**< number of processes in each direction of the MPI cartesian
 	topology */
     int *m_period; /**< Periodicity in each direction */
     bool m_isMPIperiodic; /**< true if at least one direction is periodic */
-    int m_rank; /**< rank in the MPI_COMM_activProc communicator */
-    int m_rank_world; /**< rank in the MPI_COMM_WORLD communicator */
-    int m_rank_masterWorld; /**< rank in the MPI_COMM_activProc communicator of
-    the process that has rank 0 in the MPI_COMM_WORLD communicator */
+    int m_rank; /**< rank in all communicators */
+    int m_rank_master; /**< rank of the master process in all communicators */
     int m_nprocs; /**< number of active processes */
     int m_nprocs_world; /**< total number of processes */
-    bool m_is_activ; /**< is this process active ? */  
+    bool m_is_active; /**< is this process active ? */  
     MPINeighbors *m_neighbors; /**< neighbors of the process in the MPI 
     	cartesian topology */
     MPI_Comm *m_commgrainsMPI_3D; /**< MPI cartesian communicator */
-    vector<MPI_Group*> m_groupMPINeighbors; /**< local groups involving 
-    	neighbors in the MPI cartesian topology */	
-    vector<MPI_Comm*> m_commMPINeighbors; /**< local MPI communicators involving
-     	neighbors in the MPI cartesian topology */
-    vector<bool> m_isInCommMPINeighbors; /**< local MPI communicators the
-    	process is part of */
-    vector<int> m_masterGeoPos; /**< GeoPosition of the master process
-    	in local MPI communicators the process is part of */
-    int m_nprocs_localComm; /**< number of processes in the local MPI 
-    	communicator */
-    int m_rank_localComm; /**< rank in the local MPI communicator */	
-    int *m_master_localComm; /**< rank of master process in local MPI 
-    	communicators */
     static string *m_MPILogString; /**< MPI log string */
     static vector< vector<int> > m_particleBufferzoneToNeighboringProcs; /**< 
   	relationship between the GeoPosition in a buffer zone from which 
@@ -425,10 +351,6 @@ class GrainsMPIWrapper : public SolverComputingTime
     zone from which data are sent and the GeoPosition of the neighboring
     processes that receive the data */
     void setParticleBufferzoneToNeighboringProcs(); 
-  
-    /** @brief Sets the GeoPosition of the master process in the local
-    communicators involving neighbors only to which this process belongs to */
-    void setMasterGeoLocInLocalComm(); 
 	
     /** @brief Updates clones with the data sent by the neighboring processes 
     @param time physical time

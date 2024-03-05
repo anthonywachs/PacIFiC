@@ -46,195 +46,197 @@ void GrainsMPI::initialOutputMessage()
 // Runs the simulation over the prescribed time interval
 void GrainsMPI::Simulation( double time_interval )
 {
-  double vmax = 0., vmean = 0. ;
-  list<Particle*>* newBufPart = new list<Particle*>;
-
-  // Timers
-  SCT_insert_app( "ParticlesInsertion" );
-  SCT_insert_app( "ComputeForces" );
-  SCT_insert_app( "Move" );
-  SCT_insert_app( "UpdateParticleActivity" );
-  SCT_insert_app( "LinkUpdate" );
-  SCT_insert_app( "OutputResults" );
-
-  // Simulation: time marching algorithm
-  while ( m_tend - m_time > 0.01 * m_dt )
+  if ( m_processorIsActive )
   {
-    try
+    double vmax = 0., vmean = 0. ;
+    list<Particle*>* newBufPart = new list<Particle*>;
+
+    // Timers
+    SCT_insert_app( "ParticlesInsertion" );
+    SCT_insert_app( "ComputeForces" );
+    SCT_insert_app( "Move" );
+    SCT_insert_app( "UpdateParticleActivity" );
+    SCT_insert_app( "LinkUpdate" );
+    SCT_insert_app( "OutputResults" );
+
+    // Simulation: time marching algorithm
+    while ( m_tend - m_time > 0.01 * m_dt )
     {
-      m_time += m_dt;
+      try
+      {
+        m_time += m_dt;
 
 
-      // Check whether data are output at this time
-      m_lastTime_save = false;
-      GrainsExec::m_output_data_at_this_time = false;
-      if ( m_timeSave != m_save.end() )
-        if ( *m_timeSave - m_time < 0.01 * m_dt )
-	{
-	  // Set the global data output boolean to true
-	  GrainsExec::m_output_data_at_this_time = true;
-	  if ( m_rank == 0 ) cout << endl << "Time = " << m_time << endl
+        // Check whether data are output at this time
+        m_lastTime_save = false;
+        GrainsExec::m_output_data_at_this_time = false;
+        if ( m_timeSave != m_save.end() )
+          if ( *m_timeSave - m_time < 0.01 * m_dt )
+	  {
+	    // Set the global data output boolean to true
+	    GrainsExec::m_output_data_at_this_time = true;
+	    if ( m_rank == 0 ) cout << endl << "Time = " << m_time << endl
 	  	<< std::flush;
 
-	  // Reset counter for force postprocessing
-	  m_collision->resetPPForceIndex();
+	    // Reset counter for force postprocessing
+	    m_collision->resetPPForceIndex();
 
-	  // Next time of writing files
-	  m_timeSave++;
+	    // Next time of writing files
+	    m_timeSave++;
 
-	  m_lastTime_save = true;
-	  
-	}
+	    m_lastTime_save = true;
+	  }
 
 
-      // Insertion of particles     
-      SCT_set_start( "ParticlesInsertion" );
-      m_allcomponents.computeNumberParticles( m_wrapper );
-      if ( GrainsExec::m_output_data_at_this_time )
-        if ( m_rank == 0 )
-	{
-	  if ( m_allcomponents.getNumberActiveParticlesOnAllProc() !=
-	  	m_allcomponents.getTotalNumberPhysicalParticles() ) 
+        // Insertion of particles     
+        SCT_set_start( "ParticlesInsertion" );
+        m_allcomponents.computeNumberParticles( m_wrapper );
+        if ( GrainsExec::m_output_data_at_this_time )
+          if ( m_rank == 0 )
 	  {
-	    cout << "Number of active particles on all proc = " <<
+	    if ( m_allcomponents.getNumberActiveParticlesOnAllProc() !=
+	  	m_allcomponents.getTotalNumberPhysicalParticles() ) 
+	    {
+	      cout << "Number of active particles on all proc = " <<
 	  	m_allcomponents.getNumberActiveParticlesOnAllProc() << endl;
-	    cout << "Number of inactive particles = " <<
+	      cout << "Number of inactive particles = " <<
 	  	m_allcomponents.getNumberInactiveParticles() << endl;
-	  }		
-	}
-      if ( m_insertion_mode == IM_OVERTIME )
-        insertParticle( m_insertion_order );
-      SCT_get_elapsed_time( "ParticlesInsertion" );
+	    }		
+	  }
+        if ( m_insertion_mode == IM_OVERTIME )
+          insertParticle( m_insertion_order );
+        SCT_get_elapsed_time( "ParticlesInsertion" );
 
       
-      // Move particles and obstacles
-      // Update particle velocity over dt/2 and particle position over dt,
-      // obstacle velocity and position over dt
-      // v_i+1/2 = v_i + a_i * dt / 2
-      // x_i+1 = x_i + v_i+1/2 * dt
-      // Solve Newton's law and move particles
-      SCT_set_start( "Move" );
-      m_allcomponents.Move( m_time, 0.5 * m_dt, m_dt, m_dt );
+        // Move particles and obstacles
+        // Update particle velocity over dt/2 and particle position over dt,
+        // obstacle velocity and position over dt
+        // v_i+1/2 = v_i + a_i * dt / 2
+        // x_i+1 = x_i + v_i+1/2 * dt
+        // Solve Newton's law and move particles
+        SCT_set_start( "Move" );
+        m_allcomponents.Move( m_time, 0.5 * m_dt, m_dt, m_dt );
 
    
-      // Update particle position and velocity
-      m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
-	m_allcomponents.getActiveParticles(),
-  	m_allcomponents.getParticlesInBufferzone(),
-  	m_allcomponents.getCloneParticles(),
-	m_allcomponents.getReferenceParticles(),
-	m_collision, true );
+        // Update particle position and velocity
+        m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
+		m_allcomponents.getActiveParticles(),
+  		m_allcomponents.getParticlesInBufferzone(),
+  		m_allcomponents.getCloneParticles(),
+		m_allcomponents.getReferenceParticles(),
+		m_collision, true );
 
 
-      // Destroy out of domain clones
-      m_collision->DestroyOutOfDomainClones( m_time,
-	m_allcomponents.getActiveParticles(),
-	m_allcomponents.getCloneParticles(),
-	m_wrapper );      
-      SCT_get_elapsed_time( "Move" );
+        // Destroy out of domain clones
+        m_collision->DestroyOutOfDomainClones( m_time,
+		m_allcomponents.getActiveParticles(),
+		m_allcomponents.getCloneParticles(),
+		m_wrapper );      
+        SCT_get_elapsed_time( "Move" );
       
       
-      // Update particle activity
-      SCT_set_start( "UpdateParticleActivity" );
-      m_allcomponents.UpdateParticleActivity();
-      SCT_get_elapsed_time( "UpdateParticleActivity" );
+        // Update particle activity
+        SCT_set_start( "UpdateParticleActivity" );
+        m_allcomponents.UpdateParticleActivity();
+        SCT_get_elapsed_time( "UpdateParticleActivity" );
 
 
-      // Update the particle & obstacles links with the grid
-      SCT_set_start( "LinkUpdate" );
-      m_collision->LinkUpdate( m_time, m_dt, 
-      	m_allcomponents.getActiveParticles() );  
-      m_allcomponents.updateParticleLists( m_time, newBufPart ); 
+        // Update the particle & obstacles links with the grid
+        SCT_set_start( "LinkUpdate" );
+        m_collision->LinkUpdate( m_time, m_dt, 
+      		m_allcomponents.getActiveParticles() );  
+        m_allcomponents.updateParticleLists( m_time, newBufPart ); 
 
 
-      // Create new clones
-      m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
-	m_allcomponents.getActiveParticles(),
-  	newBufPart,
-  	m_allcomponents.getCloneParticles(),
-	m_allcomponents.getReferenceParticles(),
-	m_collision, false );
-      SCT_get_elapsed_time( "LinkUpdate" );
+        // Create new clones
+        m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
+		m_allcomponents.getActiveParticles(),
+  		newBufPart,
+  		m_allcomponents.getCloneParticles(),
+		m_allcomponents.getReferenceParticles(),
+		m_collision, false );
+        SCT_get_elapsed_time( "LinkUpdate" );
       
       
-      // Compute particle forces and acceleration
-      // Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)
-      SCT_set_start( "ComputeForces" );
-      computeParticlesForceAndAcceleration();
-      SCT_get_elapsed_time( "ComputeForces" );
+        // Compute particle forces and acceleration
+        // Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)
+        SCT_set_start( "ComputeForces" );
+        computeParticlesForceAndAcceleration();
+        SCT_get_elapsed_time( "ComputeForces" );
 
 
-      // Update particle velocity over dt/2
-      // v_i+1 = v_i+1/2 + a_i+1 * dt / 2 
-      SCT_set_start( "Move" );      
-      m_allcomponents.advanceParticlesVelocity( m_time, 0.5 * m_dt );            
-      SCT_add_elapsed_time( "Move" );
+        // Update particle velocity over dt/2
+        // v_i+1 = v_i+1/2 + a_i+1 * dt / 2 
+        SCT_set_start( "Move" );      
+        m_allcomponents.advanceParticlesVelocity( m_time, 0.5 * m_dt );            
+        SCT_add_elapsed_time( "Move" );
 
-      // Write force & torque exerted on obstacles
-      m_allcomponents.outputObstaclesLoad( m_time, m_dt );
+        // Write force & torque exerted on obstacles
+        m_allcomponents.outputObstaclesLoad( m_time, m_dt );
 
 
-      // Write postprocessing and reload files
-      if ( GrainsExec::m_output_data_at_this_time )
-      {
-	SCT_set_start( "OutputResults" );
+        // Write postprocessing and reload files
+        if ( GrainsExec::m_output_data_at_this_time )
+        {
+	  SCT_set_start( "OutputResults" );
 		
-	// Write time, track component max and mean velocity
-	m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );
-        if ( m_rank == 0 )
-	{
-	  cout << "Component velocity : max = " << vmax
+	  // Write time, track component max and mean velocity
+	  m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );
+          if ( m_rank == 0 )
+	  {
+	    cout << "Component velocity : max = " << vmax
                << " average = " << vmean << endl;
-          fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
+            fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
                << "\t" << GrainsExec::doubleToString( ios::scientific, 6,
                vmax ) << "\t" << GrainsExec::doubleToString( ios::scientific,
                6, vmean ) << endl;
-	}
+	  }
 
-	// Display memory used by Grains
-	display_used_memory();
+	  // Display memory used by Grains
+	  display_used_memory();
 		
-        // Summary of MPI particle comms
-        if ( GrainsExec::m_MPI_verbose ) 
-          m_wrapper->writeAndFlushMPIString( cout );		
+          // Summary of MPI particle comms
+          if ( GrainsExec::m_MPI_verbose ) 
+            m_wrapper->writeAndFlushMPIString( cout );		
 
-	// Write postprocessing files
-        m_allcomponents.PostProcessing( m_time, m_dt, m_collision,
+	  // Write postprocessing files
+          m_allcomponents.PostProcessing( m_time, m_dt, m_collision,
 		m_rank, m_nprocs, m_wrapper );
 
-	// Write reload files
-	saveReload( m_time );
+	  // Write reload files
+	  saveReload( m_time );
 
-	SCT_get_elapsed_time( "OutputResults" );
+	  SCT_get_elapsed_time( "OutputResults" );
+        }
       }
-    }
-    catch (ContactError &errContact)
-    {
-      // Max overlap exceeded
-      cout << endl;
-      m_allcomponents.PostProcessingErreurComponents( "ContactError",
+      catch (ContactError &errContact)
+      {
+        // Max overlap exceeded
+        cout << endl;
+        m_allcomponents.PostProcessingErreurComponents( "ContactError",
             errContact.getComponents() );
-      errContact.Message( cout );
-      m_error_occured = true;
-      break;
-    }
-    catch (DisplacementError &errDisplacement)
-    {
-      // Particle displacement over dt is too large
-      cout << endl;
-      m_allcomponents.PostProcessingErreurComponents( "DisplacementError",
+        errContact.Message( cout );
+        m_error_occured = true;
+        break;
+      }
+      catch (DisplacementError &errDisplacement)
+      {
+        // Particle displacement over dt is too large
+        cout << endl;
+        m_allcomponents.PostProcessingErreurComponents( "DisplacementError",
             errDisplacement.getComponent() );
-      errDisplacement.Message(cout);
-      m_error_occured = true;
-      break;
-    }
-    catch (SimulationError &errSimulation)
-    {
-      // Simulation error
-      cout << endl;
-      errSimulation.Message(cout);
-      m_error_occured = true;
-      break;
+        errDisplacement.Message(cout);
+        m_error_occured = true;
+        break;
+      }
+      catch (SimulationError &errSimulation)
+      {
+        // Simulation error
+        cout << endl;
+        errSimulation.Message(cout);
+        m_error_occured = true;
+        break;
+      }
     }
   }
 }
@@ -260,11 +262,12 @@ void GrainsMPI::readDomainDecomposition( DOMNode* root,
   GrainsExec::setComm( m_wrapper );
   GrainsExec::m_MPI = true;
   m_processorIsActive = m_wrapper->isActive();
-  m_rank = m_wrapper->get_rank_active();
+  m_rank = m_wrapper->get_rank();
   m_nprocs = m_wrapper->get_total_number_of_active_processes();
   DOMNode* mpiNode = ReaderXML::getNode( root, "Verbosity" );
   GrainsExec::m_MPI_verbose = 
   	ReaderXML::getNodeAttr_Int( mpiNode, "Level" );
+
   if ( m_processorIsActive )
   {      
     // Local domain geometric features

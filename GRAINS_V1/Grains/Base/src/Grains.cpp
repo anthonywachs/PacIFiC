@@ -69,10 +69,7 @@ Grains::~Grains()
 // Writes an initial message in the standard output only on the process ranked 0
 void Grains::initialOutputMessage()
 {
-  int rankproc = 0;
-  MPI_Comm_rank( MPI_COMM_WORLD, &rankproc );
-  if ( !rankproc )
-    cout << "Grains3D serial" << endl;
+  cout << "Grains3D serial" << endl;
 }
 
 
@@ -86,74 +83,76 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
   Forces( rootElement );
   AdditionalFeatures( rootElement );
 
+  if ( m_processorIsActive )
+  {
+    // Initialisation
+    double vmax = 0., vmean = 0. ;
 
-  // Initialisation
-  double vmax = 0., vmean = 0. ;
+    // Timers
+    CT_set_start();
+    SCT_insert_app( "Initialization" );
+    SCT_set_start( "Initialization" );
+    if ( m_rank == 0 ) cout << endl << "Initialization" << endl;
 
-  // Timers
-  CT_set_start();
-  SCT_insert_app( "Initialization" );
-  SCT_set_start( "Initialization" );
-  if ( m_rank == 0 ) cout << endl << "Initialization" << endl;
+    // Set time to initial time
+    m_time = m_tstart;
 
-  // Set time to initial time
-  m_time = m_tstart;
+    // Particle creation, insertion and link to grid
+    InsertCreateNewParticles();
 
-  // Particle creation, insertion and link to grid
-  InsertCreateNewParticles();
+    // Number of particles: inserted and in the system
+    m_allcomponents.computeNumberParticles( m_wrapper );
+    m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
 
-  // Number of particles: inserted and in the system
-  m_allcomponents.computeNumberParticles( m_wrapper );
-  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
+    // Initialisation of obstacle kinematics
+    m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt );
 
-  // Initialisation of obstacle kinematics
-  m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt );
-
-  // In case of initial random motion
-  if ( m_initvit_mode == IV_RANDOM )
-    m_allcomponents.setRandomMotion( m_RandomMotionCoefTrans,
+    // In case of initial random motion
+    if ( m_initvit_mode == IV_RANDOM )
+      m_allcomponents.setRandomMotion( m_RandomMotionCoefTrans,
 	m_RandomMotionCoefRot );
 
-  // Writing results for postprocessing
-  m_allcomponents.PostProcessing_start( m_time, m_dt, m_collision,
+    // Writing results for postprocessing
+    m_allcomponents.PostProcessing_start( m_time, m_dt, m_collision,
   	m_insertion_windows, m_rank, m_nprocs, m_wrapper );
 
-  // Track component max and mean velocity
-  m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );
-  if ( m_rank == 0 ) 
-  {
-    fVitMax.open( (m_fileSave + "_VelocityMaxMean.dat").c_str(), ios::out );
-    cout << "Component velocity : max = " << vmax << " average = " <<
+    // Track component max and mean velocity
+    m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );
+    if ( m_rank == 0 ) 
+    {
+      fVitMax.open( (m_fileSave + "_VelocityMaxMean.dat").c_str(), ios::out );
+      cout << "Component velocity : max = " << vmax << " average = " <<
     	vmean << endl;
-    fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
+      fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
     	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmax )
 	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmean )
 	<< endl;
-  }
+    }
 
-  // Display memory used by Grains
-  display_used_memory();
+    // Display memory used by Grains
+    display_used_memory();
 
-  // Postprocessing of force & torque on obstacles
-  m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );
-  m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
+    // Postprocessing of force & torque on obstacles
+    m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );
+    m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
       GrainsExec::m_ReloadType == "same", m_rank, m_nprocs, m_wrapper );
 
-  // Next time of writing results
-  m_timeSave = m_save.begin();
-  while ( *m_timeSave - m_time < 0.01 * m_dt && m_timeSave != m_save.end() )
+    // Next time of writing results
+    m_timeSave = m_save.begin();
+    while ( *m_timeSave - m_time < 0.01 * m_dt && m_timeSave != m_save.end() )
       m_timeSave++;
       
-  // In case of SecondOrderLeapFrog, initialize acceleration
-  if ( GrainsExec::m_TIScheme == "SecondOrderLeapFrog" && 
-  	!GrainsExec::m_isReloaded )
-  {
-    computeParticlesForceAndAcceleration();
-    m_allcomponents.setAllContactMapFeaturesToZero();
-  }
+    // In case of SecondOrderLeapFrog, initialize acceleration
+    if ( GrainsExec::m_TIScheme == "SecondOrderLeapFrog" && 
+    	!GrainsExec::m_isReloaded )
+    {
+      computeParticlesForceAndAcceleration();
+      m_allcomponents.setAllContactMapFeaturesToZero();
+    }
 
-  if ( m_rank == 0 ) cout << "Initialization completed" << endl << endl;
-  SCT_get_elapsed_time( "Initialization" );
+    if ( m_rank == 0 ) cout << "Initialization completed" << endl << endl;
+    SCT_get_elapsed_time( "Initialization" );
+  }
 }
 
 
@@ -163,66 +162,69 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
 // Tasks to perform before time-stepping
 void Grains::do_after_time_stepping()
 {
-  double vmax = 0., vmean = 0. ;
-
-  // Particles in & out at the end of the simulation 
-  if ( m_rank == 0 )
-  {  
-    cout << endl << "Number of active particles in the simulation = " 
-    	<< m_allcomponents.getNumberActiveParticlesOnAllProc() << endl;
-    cout << "Number of inactive particles in the simulation = " 
-    	<< m_allcomponents.getNumberInactiveParticles() << endl;
-  }	
-
-  // Write reload files
-  if ( !m_lastTime_save )
+  if ( m_processorIsActive )
   {
-    SCT_set_start( "OutputResults" );
+    double vmax = 0., vmean = 0. ;
 
-    // Track component max and mean velocity at the end of the simulation
-    m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );
+    // Particles in & out at the end of the simulation 
     if ( m_rank == 0 )
+    {  
+      cout << endl << "Number of active particles in the simulation = " 
+    	<< m_allcomponents.getNumberActiveParticlesOnAllProc() << endl;
+      cout << "Number of inactive particles in the simulation = " 
+    	<< m_allcomponents.getNumberInactiveParticles() << endl;
+    }	
+
+    // Write reload files
+    if ( !m_lastTime_save )
     {
-      cout << endl << "Component velocity : max = " << vmax
-	<< " average = " << vmean << endl;
-      fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
-	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6,
-	vmax ) << "\t" << GrainsExec::doubleToString( ios::scientific,
-	6, vmean ) << endl;
-      fVitMax.close();
+      SCT_set_start( "OutputResults" );
+
+      // Track component max and mean velocity at the end of the simulation
+      m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );
+      if ( m_rank == 0 )
+      {
+        cout << endl << "Component velocity : max = " << vmax
+		<< " average = " << vmean << endl;
+        fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
+		<< "\t" << GrainsExec::doubleToString( ios::scientific, 6,
+		vmax ) << "\t" << GrainsExec::doubleToString( ios::scientific,
+		6, vmean ) << endl;
+        fVitMax.close();
+      }
+
+      // Reload files are always written at the end of the simulation
+      if ( !m_error_occured ) saveReload( m_time );
+
+      SCT_get_elapsed_time( "OutputResults" );
     }
 
-    // Reload files are always written at the end of the simulation
-    if ( !m_error_occured ) saveReload( m_time );
+    // Final tasks performed by postprocessing writers
+    m_allcomponents.PostProcessing_end();
 
-    SCT_get_elapsed_time( "OutputResults" );
-  }
-
-  // Final tasks performed by postprocessing writers
-  m_allcomponents.PostProcessing_end();
-
-  // Contact features over the simulation
-  double omax = m_collision->getOverlapMax(),
+    // Contact features over the simulation
+    double omax = m_collision->getOverlapMax(),
   	omean = m_collision->getOverlapMean(),
 	timemax = m_collision->getTimeOverlapMax(),
 	ngjk = m_collision->getNbIterGJKMean();
-  if ( m_wrapper ) m_wrapper->ContactsFeatures( omax, omean, timemax, ngjk );	
+    if ( m_wrapper ) m_wrapper->ContactsFeatures( omax, omean, timemax, ngjk );	
 
-  if ( m_rank == 0 )
-  {   
-    cout << endl << "Contact features over the simulation" << endl;
-    cout << GrainsExec::m_shift3 << "Minimal crust thickness = " <<
+    if ( m_rank == 0 )
+    {   
+      cout << endl << "Contact features over the simulation" << endl;
+      cout << GrainsExec::m_shift3 << "Minimal crust thickness = " <<
     	m_allcomponents.getCrustThicknessMin() << endl;
-    cout << GrainsExec::m_shift3 << "Maximum overlap = " << omax << endl;
-    cout << GrainsExec::m_shift3 << "Average overlap = " << omean << endl;
-    cout << GrainsExec::m_shift3 << "Time of maximum overlap = " <<
+      cout << GrainsExec::m_shift3 << "Maximum overlap = " << omax << endl;
+      cout << GrainsExec::m_shift3 << "Average overlap = " << omean << endl;
+      cout << GrainsExec::m_shift3 << "Time of maximum overlap = " <<
 	timemax << endl;
-    cout << GrainsExec::m_shift3 << "Average number of iterations of GJK = " <<
+      cout << GrainsExec::m_shift3 << "Average number of iterations of GJK = " <<
     	ngjk << endl;
-  }
+    }
 
-  // Timer outcome
-  display_timer_summary();
+    // Timer outcome
+    display_timer_summary();
+  }
 }
 
 
