@@ -181,10 +181,24 @@ class Particle : public Component
     /** @brief Sets the angular velocity
     @param vrot angular velocity */
     virtual void setAngularVelocity( Vector3 const& vrot );
+    
+    /** @brief Sets the angular velocity
+    @param vx x-angular velocity component 
+    @param vy y-angular velocity component     
+    @param vz z-angular velocity component */
+    virtual void setAngularVelocity( double const& omx, double const& omy,
+	double const& omz );    
 
     /** @brief Sets the translation velocity
     @param vtrans translation velocity */
     virtual void setTranslationalVelocity( Vector3 const& vtrans );
+    
+    /** @brief Sets the translation velocity
+    @param vx x-translation velocity component 
+    @param vy y-translation velocity component     
+    @param vz z-translation velocity component */
+    virtual void setTranslationalVelocity( double const& vx, double const& vy,
+	double const& vz );     
 
     /** @brief Sets particle activity
     @param activity particle activity */

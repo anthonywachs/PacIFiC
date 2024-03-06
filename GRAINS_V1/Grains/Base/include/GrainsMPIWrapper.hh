@@ -91,13 +91,16 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param particlesClones list of active clone particles
     @param referenceParticles reference particles
     @param LC linked cell grid 
-    @param update update clones if true, otherwise create */
+    @param update update clones if true, otherwise create 
+    @param update_velocity_only update clone velocity only if true, otherwise
+    update all clone features */
     void UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,  	
 	list<Particle*>* particles,
   	list<Particle*> const* particlesBufferzone,
   	list<Particle*>* particlesClones,
 	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC, bool update );	
+	LinkedCell* LC, bool update, 
+	bool update_velocity_only );	
 
     /** @brief Gathers all particle data on the master process for 
     post-processing purposes
@@ -361,7 +364,9 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param particles list of active particles
     @param particlesBufferzone list of active particles in the buffer zone
     @param referenceParticles vector of reference particles
-    @param LC linked cell grid */
+    @param LC linked cell grid
+    @param update_velocity_only update clone velocity only if true, otherwise
+    update all clone features */
     void UpdateClones( double time,
  	int const& recvsize, double const* recvbuf_DOUBLE,
 	int const& NB_DOUBLE_PART, 
@@ -369,7 +374,8 @@ class GrainsMPIWrapper : public SolverComputingTime
 	list<Particle*>* particles,
   	list<Particle*> const* particlesBufferzone,
 	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC ); 
+	LinkedCell* LC, 
+	bool update_velocity_only ); 
 	
     /** @brief Creates clones with the data sent by the neighboring processes 
     @param time physical time

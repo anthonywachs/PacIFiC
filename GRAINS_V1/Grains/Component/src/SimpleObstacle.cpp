@@ -627,10 +627,10 @@ void SimpleObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
 
 // ----------------------------------------------------------------------------
 // Writes the contact map information in an array of doubles
-void SimpleObstacle::copyHistoryContacts( double* &destination, 
+void SimpleObstacle::copyContactMap( double* destination, 
 	int start_index )
 {
-  Component::copyHistoryContacts( destination, start_index ) ;
+  Component::copyContactMap( destination, start_index ) ;
 }
 
 

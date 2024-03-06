@@ -595,8 +595,11 @@ void Component::copyContactInMap( std::tuple<int,int,int> const& id,
 	bool const& isActive, Vector3 const& kdelta, Vector3 const& prev_normal,
 	Vector3 const& cumulSpringTorque )
 {
-  m_contactMap.insert( std::make_pair( id, std::make_tuple(
-    isActive, kdelta, prev_normal, cumulSpringTorque) ) );
+  // We use operator [] here and not insert as insert does not update the 
+  // mapped value is the key already exists while [] always returns a reference
+  // to the mapped value
+  m_contactMap[id] = std::make_tuple(
+    isActive, kdelta, prev_normal, cumulSpringTorque ); 
 }
 
 
@@ -694,7 +697,7 @@ void Component::printActiveNeighbors(int const& id )
 
 // ---------------------------------------------------------------------------
 // Writes the contact map information in an array of doubles
-void Component::copyHistoryContacts( double* &destination, int start_index )
+void Component::copyContactMap( double* destination, int start_index )
 {
   int nb_contacts = (int) m_contactMap.size();
   destination[start_index] = nb_contacts;
@@ -1022,3 +1025,18 @@ map< std::tuple<int,int,int>,
 {
   return ( &m_contactMap );
 }	  
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the contact map 
+void Component::setContactMap( map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const& othermap )
+{
+  map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
+    ::const_iterator it;  
+
+  for (it=othermap.begin();it!=othermap.end();it++)
+    m_contactMap[it->first] = it->second;
+} 

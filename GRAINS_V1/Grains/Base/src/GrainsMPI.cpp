@@ -118,13 +118,13 @@ void GrainsMPI::Simulation( double time_interval )
         m_allcomponents.Move( m_time, 0.5 * m_dt, m_dt, m_dt );
 
    
-        // Update particle position and velocity
+        // Update clone particle position and velocity
         m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
 		m_allcomponents.getActiveParticles(),
   		m_allcomponents.getParticlesInBufferzone(),
   		m_allcomponents.getCloneParticles(),
 		m_allcomponents.getReferenceParticles(),
-		m_collision, true );
+		m_collision, true, false );
 
 
         // Destroy out of domain clones
@@ -154,7 +154,7 @@ void GrainsMPI::Simulation( double time_interval )
   		newBufPart,
   		m_allcomponents.getCloneParticles(),
 		m_allcomponents.getReferenceParticles(),
-		m_collision, false );
+		m_collision, false, false );
         SCT_get_elapsed_time( "LinkUpdate" );
       
       
@@ -179,6 +179,14 @@ void GrainsMPI::Simulation( double time_interval )
         if ( GrainsExec::m_output_data_at_this_time )
         {
 	  SCT_set_start( "OutputResults" );
+
+          // Update clone particle position and velocity
+          m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
+		m_allcomponents.getActiveParticles(),
+  		m_allcomponents.getParticlesInBufferzone(),
+  		m_allcomponents.getCloneParticles(),
+		m_allcomponents.getReferenceParticles(),
+		m_collision, true, true );
 		
 	  // Write time, track component max and mean velocity
 	  m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );

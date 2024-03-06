@@ -507,9 +507,9 @@ void Obstacle::updateContactMapId( int prev_id, int new_id )
 
 // ----------------------------------------------------------------------------
 // Writes the contact map information in an array of doubles
-void Obstacle::copyHistoryContacts( double* &destination, int start_index )
+void Obstacle::copyContactMap( double* destination, int start_index )
 {
-  cout << "Warning when calling Obstacle::copyHistoryContacts() "
+  cout << "Warning when calling Obstacle::copyContactMap() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);

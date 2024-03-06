@@ -268,9 +268,23 @@ class CompositeParticle : public Particle
     @param vrot angular velocity */
     void setAngularVelocity( Vector3 const& vrot );
 
+    /** @brief Sets the angular velocity
+    @param vx x-angular velocity component 
+    @param vy y-angular velocity component     
+    @param vz z-angular velocity component */
+    void setAngularVelocity( double const& omx, double const& omy,
+	double const& omz ); 
+
     /** @brief Sets the translation velocity
     @param vtrans translation velocity */
     void setTranslationalVelocity( Vector3 const& vtrans );
+
+    /** @brief Sets the translation velocity
+    @param vx x-translation velocity component 
+    @param vy y-translation velocity component     
+    @param vz z-translation velocity component */
+    void setTranslationalVelocity( double const& vx, double const& vy,
+	double const& vz ); 
 
     /** @brief Sets the origin of the composite particle's transformation
     @param centre origin coordinates as a Point3 */

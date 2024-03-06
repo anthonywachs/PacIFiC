@@ -1190,11 +1190,11 @@ vector< vector<double> >* GrainsMPIWrapper::
   {
     if( (*il)->getTag() != 2 )
     {
-      buffer[i] = (*il)->getID() + intTodouble;
+      buffer[i] = double((*il)->getID()) + intTodouble;
       (*il)->copyPosition( buffer, i+1 );
       (*il)->copyTranslationalVelocity( buffer, i+4 );
       (*il)->copyAngularVelocity( buffer, i+7 );    
-      buffer[i+10] = (*il)->getCoordinationNumber() + intTodouble;
+      buffer[i+10] = double((*il)->getCoordinationNumber()) + intTodouble;
       i += 11; 
     }
   }
@@ -1323,7 +1323,8 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   	list<Particle*> const* particlesBufferzone,
   	list<Particle*>* particlesClones,
 	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC, bool update )
+	LinkedCell* LC, bool update,
+	bool update_velocity_only )
 {
   list<Particle*>::const_iterator il;
   int i, j, tag_DOUBLE = 1, recvsize = 0, geoLoc, ireq = 0;
@@ -1348,40 +1349,39 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
         
   // Copy particles in buffer zone into local buffers
   // ------------------------------------------------
-  vector<int> nbHzGeoLoc(26,0);
+  int NB_DOUBLE_PART = 25;
+  vector<int> nbBufGeoLoc(26,0);
   vector<int>::iterator iv;
   for (il=particlesBufferzone->begin();il!=particlesBufferzone->end();il++)
   {
     geoLoc = (*il)->getGeoPosition();
     for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
     	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
-      nbHzGeoLoc[*iv]++;
+      nbBufGeoLoc[*iv] += NB_DOUBLE_PART;
   }             
 
   // Buffer of doubles: kinematics and configuration as follows 
   // [ID number, class, rank of sending process, translational
   //  velocity, rotation quaternion, angular velocity, transform]
   // ------------------------------------------------------------
-  int NB_DOUBLE_PART = 25;
-
   vector<int> index( 26, 0 );
   double *pDOUBLE = NULL;  
   vector<double*> features( 26, pDOUBLE );
-  for (i=0;i<26;i++) features[i] = new double[ NB_DOUBLE_PART * nbHzGeoLoc[i] ];
+  for (i=0;i<26;i++) features[i] = new double[ nbBufGeoLoc[i] ];
   double ParticleID = 0., ParticleClass = 0.;
 
   for (il=particlesBufferzone->begin(),i=0;il!=particlesBufferzone->end();il++)
   {
     geoLoc = (*il)->getGeoPosition();
-    ParticleID = (*il)->getID() + intTodouble ;
-    ParticleClass = (*il)->getGeometricType() + intTodouble ;
+    ParticleID = double((*il)->getID()) + intTodouble ;
+    ParticleClass = double((*il)->getGeometricType()) + intTodouble ;
     for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
     	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
     {
       j = index[*iv]; 
       features[*iv][j] = ParticleID;             
       features[*iv][j+1] = ParticleClass;
-      features[*iv][j+2] = m_rank + intTodouble ;
+      features[*iv][j+2] = double(m_rank) + intTodouble ;
       (*il)->copyTranslationalVelocity( features[*iv], j+3 );
       (*il)->copyQuaternionRotation( features[*iv], j+6 );    
       (*il)->copyAngularVelocity( features[*iv], j+10 );
@@ -1399,7 +1399,7 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   SCT_set_start( "MPIComm" );
   for (ireq=0,irn=neighborsRank->begin(),ign=neighborsGeoloc->begin();
   	irn!=neighborsRank->end();irn++,ign++,++ireq)
-    MPI_Isend( features[*ign], nbHzGeoLoc[*ign] * NB_DOUBLE_PART, MPI_DOUBLE, 
+    MPI_Isend( features[*ign], nbBufGeoLoc[*ign], MPI_DOUBLE, 
 	*irn, tag_DOUBLE + m_GeoLocReciprocity[*ign], 
 	m_MPI_COMM_activeProc, &idreq[ireq] );
   SCT_get_elapsed_time( "MPIComm" );
@@ -1431,7 +1431,8 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
     if ( update )    
       UpdateClones( time, recvsize, recvbuf_DOUBLE,
 		NB_DOUBLE_PART, particlesClones,
-		particles, particlesBufferzone, referenceParticles, LC );
+		particles, particlesBufferzone, referenceParticles, LC,
+		update_velocity_only );
     else
       CreateClones( time, recvsize, recvbuf_DOUBLE,
 		NB_DOUBLE_PART, particlesClones,
@@ -1920,7 +1921,7 @@ void GrainsMPIWrapper::UpdateClones(double time,
 	list<Particle*>* particles,
   	list<Particle*> const* particlesBufferzone,
 	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC )
+	LinkedCell* LC, bool update_velocity_only )
 {
   int j, id;
   bool found = false;
@@ -1984,19 +1985,20 @@ void GrainsMPIWrapper::UpdateClones(double time,
       pClone = imm->second;
       m_AccessToClones.erase( imm );
       
-      pClone->setPosition( &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13] );
-      Vector3 trans( recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
-	  	recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+5] );
-      pClone->setTranslationalVelocity( trans );
-      pClone->setQuaternionRotation( recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
+      if ( !update_velocity_only )
+      {
+        pClone->setPosition( &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13] );
+        pClone->setQuaternionRotation( recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
 		recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
 		recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],
 		recvbuf_DOUBLE[NB_DOUBLE_PART*j+9] );
-      Vector3 rot(recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
+      }      
+      pClone->setTranslationalVelocity( recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
+	  	recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
+		recvbuf_DOUBLE[NB_DOUBLE_PART*j+5] );
+      pClone->setAngularVelocity(recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
 	  	recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
 		recvbuf_DOUBLE[NB_DOUBLE_PART*j+12] );
-      pClone->setAngularVelocity( rot );
     }
     else
     {

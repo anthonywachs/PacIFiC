@@ -852,10 +852,32 @@ void Particle::setAngularVelocity( Vector3 const& vrot )
 
 
 // ----------------------------------------------------------------------------
+// Sets the angular velocity
+void Particle::setAngularVelocity( double const& omx, double const& omy,
+	double const& omz )
+{
+  m_kinematics->setAngularVelocity( omx, omy, omz );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Sets the translation velocity
 void Particle::setTranslationalVelocity( Vector3 const& vtrans )
 {
   m_kinematics->setTranslationalVelocity( vtrans );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the translation velocity
+void Particle::setTranslationalVelocity( double const& vx, double const& vy,
+	double const& vz )
+{
+  m_kinematics->setTranslationalVelocity( vx, vy, vz );
 }
 
 

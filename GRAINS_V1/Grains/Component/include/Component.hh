@@ -95,7 +95,7 @@ class Component
     or to 0 is false */
     virtual void InitializeForce( bool const& withWeight );
 
-    /** @brief Update contact map */
+    /** @brief Updates contact map */
     virtual void updateContactMap();
 
     /** @brief Does the contact exist in the map? If so, return true and make
@@ -147,7 +147,7 @@ class Component
     @param destination the array of double where the contact map should be 
     stored
     @param start_index the index of destination where the copy should start */
-    virtual void copyHistoryContacts( double* &destination, int start_index );
+    virtual void copyContactMap( double* destination, int start_index );
 
     /** @brief Adds a single contact info to the contact map
     @param id key in the map
@@ -198,8 +198,13 @@ class Component
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
     
-    /** @brief Set contact map entry features to zero */
-    virtual void setContactMapFeaturesToZero();     
+    /** @brief Sets contact map entry features to zero */
+    virtual void setContactMapFeaturesToZero();
+    
+    /** @brief Sets the contact map 
+    @param othermap the contact map to be copied */
+    void setContactMap( map< std::tuple<int,int,int>,
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const& othermap );         
     //@}
 
 

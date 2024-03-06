@@ -149,11 +149,38 @@ void ParticleKinematics::setTranslationalVelocity( Vector3 const& vtrans )
 
 
 // ----------------------------------------------------------------------------
+// Sets the translation velocity
+void ParticleKinematics::setTranslationalVelocity( double const& vx, 
+	double const& vy, double const& vz )
+{
+  m_translationalVelocity[X] = vx;
+  m_translationalVelocity[Y] = vy;  
+  m_translationalVelocity[Z] = vz;  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Sets the angular velocity
 void ParticleKinematics::setAngularVelocity( Vector3 const& omega )
 {
   m_angularVelocity = omega;
-  m_dQuaternionRotationdt = 0.5 * ( omega , m_QuaternionRotation );
+  m_dQuaternionRotationdt = 0.5 * ( m_angularVelocity , m_QuaternionRotation );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the angular velocity
+void ParticleKinematics::setAngularVelocity( double const& omx, 
+	double const& omy, double const& omz )
+{
+  m_angularVelocity[X] = omx;
+  m_angularVelocity[Y] = omy;  
+  m_angularVelocity[Z] = omz; 
+  m_dQuaternionRotationdt = 0.5 * ( m_angularVelocity , m_QuaternionRotation );
 }
 
 

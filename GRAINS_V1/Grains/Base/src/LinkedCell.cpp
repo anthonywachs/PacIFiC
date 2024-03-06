@@ -2002,6 +2002,7 @@ void LinkedCell::updateDestroyPeriodicClones( list<Particle*>* particles,
 	imm->second->setQuaternionRotation(
 		*((*particle)->getQuaternionRotation()) );
 	imm->second->setAngularVelocity( *((*particle)->getAngularVelocity()) );
+	imm->second->setContactMap( *((*particle)->getContactMap()) ); 
       }
       else
       // Case 2: multiple periodic clones
@@ -2039,6 +2040,7 @@ void LinkedCell::updateDestroyPeriodicClones( list<Particle*>* particles,
 		*((*particle)->getQuaternionRotation()) );
 	  periodic_clone->setAngularVelocity(
 	  	*((*particle)->getAngularVelocity()) );
+	  periodic_clone->setContactMap( *((*particle)->getContactMap()) ); 	
         }
       }
     }

@@ -143,10 +143,24 @@ class ParticleKinematics : public Kinematics
     /** @brief Sets the angular velocity
     @param omega angular velocity */
     void setAngularVelocity( Vector3 const& omega );
+    
+    /** @brief Sets the angular velocity
+    @param vx x-angular velocity component 
+    @param vy y-angular velocity component     
+    @param vz z-angular velocity component */
+    void setAngularVelocity( double const& omx, double const& omy,
+	double const& omz );     
 
     /** @brief Sets the translation velocity
     @param vtrans translation velocity */
     void setTranslationalVelocity( Vector3 const& vtrans );
+    
+    /** @brief Sets the translation velocity
+    @param vx x-translation velocity component 
+    @param vy y-translation velocity component     
+    @param vz z-translation velocity component */
+    void setTranslationalVelocity( double const& vx, double const& vy,
+	double const& vz );    
 
     /** @brief Sets kinematics at time t-2dt from a 1D array of 12 scalars
     (translational velocity, angular velocity, variation of translational

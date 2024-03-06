@@ -208,7 +208,7 @@ class CompositeObstacle : public Obstacle
     @param destination the array of double where the contact map should be 
     stored
     @param start_index the index of destination where the copy should start */
-    virtual void copyHistoryContacts( double* &destination, int start_index );
+    virtual void copyContactMap( double* destination, int start_index );
 
     /** @brief Adds a single contact info to the contact map
     @param id key in the map

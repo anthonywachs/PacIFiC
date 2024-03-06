@@ -479,6 +479,24 @@ void CompositeParticle::setAngularVelocity( Vector3 const& vrot )
 
 
 // ----------------------------------------------------------------------------
+// Sets the angular velocity
+void CompositeParticle::setAngularVelocity( double const& omx, 
+	double const& omy, double const& omz )
+{
+  Particle::setAngularVelocity( omx, omy, omz );
+
+  // Note: my impression is that we never use the elementary particle
+  // velocity anywhere, so it might be valuable not to update it
+  // and save computing time
+
+  for ( size_t i=0; i<m_nbElemPart; ++i )
+    m_elementaryParticles[i]->setAngularVelocity( omx, omy, omz );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Sets the translation velocity
 void CompositeParticle::setTranslationalVelocity( Vector3 const& vtrans )
 {
@@ -496,6 +514,33 @@ void CompositeParticle::setTranslationalVelocity( Vector3 const& vtrans )
   {
     m_elementaryParticles[i]->setTranslationalVelocity(
     	vtrans + ( vrot ^ ( rota * m_InitialRelativePositions[i] ) ) );
+  }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the translation velocity
+void CompositeParticle::setTranslationalVelocity( double const& vx, 
+	double const& vy, double const& vz )
+{
+  Particle::setTranslationalVelocity( vx, vy, vz );
+
+  // Note: my impression is that we never use the elementary particle
+  // velocity anywhere, so it might be valuable not to update it
+  // and save computing time
+
+  // Translational velocity of elementary particles satisfies rigid-body motion
+  // so U_elempart = U_composite + om_composite ^ leverarm_at_present_time
+  Matrix rota = m_geoRBWC->getTransform()->getBasis() ;
+  Vector3 vrot = *(m_kinematics->getAngularVelocity());  
+  Vector3 vrotcrossl;
+  for ( size_t i=0; i<m_nbElemPart; ++i )
+  {
+    vrotcrossl = vrot ^ ( rota * m_InitialRelativePositions[i] );
+    m_elementaryParticles[i]->setTranslationalVelocity(
+    	vx + vrotcrossl[X], vy + vrotcrossl[Y], vz + vrotcrossl[Z] );
   }
 }
 
