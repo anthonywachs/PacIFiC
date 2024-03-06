@@ -1327,7 +1327,8 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
 	bool update_velocity_only )
 {
   list<Particle*>::const_iterator il;
-  int i, j, tag_DOUBLE = 1, recvsize = 0, geoLoc, ireq = 0;
+  int i, j, tag_DOUBLE = 1, recvsize = 0, geoLoc, ireq = 0,
+  	contact_map_size = 0, NB_DOUBLE_PER_CONTACT = 13, NB_DOUBLE_PART = 25;
   MPI_Status status;
   MPI_Request sreq = 0;
   list<int> const* neighborsRank = m_neighbors->rankMPINeighborsOnly();
@@ -1349,15 +1350,16 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
         
   // Copy particles in buffer zone into local buffers
   // ------------------------------------------------
-  int NB_DOUBLE_PART = 25;
   vector<int> nbBufGeoLoc(26,0);
   vector<int>::iterator iv;
   for (il=particlesBufferzone->begin();il!=particlesBufferzone->end();il++)
   {
     geoLoc = (*il)->getGeoPosition();
+    contact_map_size = (*il)->getContactMapSize();
     for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
     	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
-      nbBufGeoLoc[*iv] += NB_DOUBLE_PART;
+      nbBufGeoLoc[*iv] += NB_DOUBLE_PART + 1 
+      	+ contact_map_size * NB_DOUBLE_PER_CONTACT;
   }             
 
   // Buffer of doubles: kinematics and configuration as follows 
@@ -1375,6 +1377,7 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
     geoLoc = (*il)->getGeoPosition();
     ParticleID = double((*il)->getID()) + intTodouble ;
     ParticleClass = double((*il)->getGeometricType()) + intTodouble ;
+    contact_map_size = (*il)->getContactMapSize();
     for (iv=m_particleBufferzoneToNeighboringProcs[geoLoc].begin();
     	iv!=m_particleBufferzoneToNeighboringProcs[geoLoc].end();iv++)
     {
@@ -1385,8 +1388,10 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
       (*il)->copyTranslationalVelocity( features[*iv], j+3 );
       (*il)->copyQuaternionRotation( features[*iv], j+6 );    
       (*il)->copyAngularVelocity( features[*iv], j+10 );
-      (*il)->copyTransform( features[*iv], j+13, m_MPIperiodes[*iv] );     
-      index[*iv] += NB_DOUBLE_PART;
+      (*il)->copyTransform( features[*iv], j+13, m_MPIperiodes[*iv] );
+      (*il)->copyContactMap( features[*iv], j+NB_DOUBLE_PART );     
+      index[*iv] += NB_DOUBLE_PART + 1 
+      	+ contact_map_size * NB_DOUBLE_PER_CONTACT;
     }
   }           
   SCT_get_elapsed_time("BuffersCopy");
@@ -1416,11 +1421,10 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
     // Size of the message -> number of particles
     MPI_Probe( *irn, tag_DOUBLE + *ign, m_MPI_COMM_activeProc, &status );  
     MPI_Get_count( &status, MPI_DOUBLE, &recvsize );
-    recvsize /= NB_DOUBLE_PART;  
 
     // Reception of the actual message	    
-    double *recvbuf_DOUBLE = new double[recvsize * NB_DOUBLE_PART];
-    MPI_Recv( recvbuf_DOUBLE, recvsize * NB_DOUBLE_PART, MPI_DOUBLE, 
+    double *recvbuf_DOUBLE = new double[recvsize];
+    MPI_Recv( recvbuf_DOUBLE, recvsize, MPI_DOUBLE, 
 	*irn, tag_DOUBLE + *ign, m_MPI_COMM_activeProc, &status );	    
 
     SCT_add_elapsed_time( "MPIComm" );
@@ -1430,12 +1434,12 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
     // -------------------------------------
     if ( update )    
       UpdateClones( time, recvsize, recvbuf_DOUBLE,
-		NB_DOUBLE_PART, particlesClones,
+		NB_DOUBLE_PART, NB_DOUBLE_PER_CONTACT, particlesClones,
 		particles, particlesBufferzone, referenceParticles, LC,
 		update_velocity_only );
     else
       CreateClones( time, recvsize, recvbuf_DOUBLE,
-		NB_DOUBLE_PART, particlesClones,
+		NB_DOUBLE_PART, NB_DOUBLE_PER_CONTACT, particlesClones,
 		particles, particlesBufferzone, referenceParticles, LC );      
 
     delete [] recvbuf_DOUBLE;
@@ -1455,6 +1459,298 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   for (vector<double*>::iterator ivpd=features.begin();ivpd!=features.end();
   	ivpd++) delete [] *ivpd;
   features.clear(); 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Updates clones with the data sent by the neighboring processes 
+void GrainsMPIWrapper::UpdateClones(double time,
+ 	int const &recvsize, double const* recvbuf_DOUBLE,
+	const int& NB_DOUBLE_PART,
+	int const& NB_DOUBLE_PER_CONTACT,  
+  	list<Particle*>* particlesClones,
+	list<Particle*>* particles,
+  	list<Particle*> const* particlesBufferzone,
+	vector<Particle*> const* referenceParticles,
+	LinkedCell* LC, bool update_velocity_only )
+{
+  int j, id, contact_map_size = 0;
+  bool found = false;
+  double distGC = 0. ; 
+  Point3 const* GC = NULL ; 
+  multimap<int,Particle*>::iterator imm;
+  size_t ncid = 0;
+  Particle* pClone = NULL ;
+  pair < multimap<int,Particle*>::iterator, 
+  	multimap<int,Particle*>::iterator > crange;
+  
+  for (j=0; j<recvsize; )
+  {
+    found = false;
+    id = int( recvbuf_DOUBLE[j] );
+    contact_map_size = int( recvbuf_DOUBLE[j+NB_DOUBLE_PART] );  
+      
+    // Searh whether the clone already exists in this local domain
+    ncid = m_AccessToClones.count( id );
+    switch( ncid )
+    {
+      case 0: // no clone with this ID number in this local domain
+        break;
+      case 1: // 1 clone with this ID number in this local domain
+        imm = m_AccessToClones.find( id );
+        if ( m_isMPIperiodic )
+        {
+          GC = imm->second->getPosition();
+          distGC = sqrt( 
+          	pow( recvbuf_DOUBLE[j+22] - (*GC)[X], 2. ) +
+            	pow( recvbuf_DOUBLE[j+23] - (*GC)[Y], 2. ) +
+            	pow( recvbuf_DOUBLE[j+24] - (*GC)[Z], 2. ) ) ;
+          if ( distGC < 1.1 * imm->second->getCrustThickness() )  
+              found = true;	
+        }
+        else found = true;
+        break;
+      default: // more than 1 clone with this ID number in this local domain
+        // Periodic case with 1 multi-proc clone and 1 periodic clone in the
+	// same local domain
+        crange = m_AccessToClones.equal_range( id );
+        for (imm=crange.first; imm!=crange.second && !found; )
+        {
+          GC = imm->second->getPosition();
+          distGC = sqrt( 
+          	pow( recvbuf_DOUBLE[j+22] - (*GC)[X], 2. ) +
+          	pow( recvbuf_DOUBLE[j+23] - (*GC)[Y], 2. ) +
+          	pow( recvbuf_DOUBLE[j+24] - (*GC)[Z], 2. ) ) ;
+          if ( distGC < 1.1 * imm->second->getCrustThickness() )  
+            found = true;
+          else imm++;
+        }
+        break;    
+    }   
+       
+    // If found, update the clone features
+    if ( found )
+    {
+      // We get the pointer to the clone and erase it from the map, because
+      // each clone has a single master only and can therefore be updated 
+      // only once
+      pClone = imm->second;
+      m_AccessToClones.erase( imm );
+      
+      if ( !update_velocity_only )
+      {
+        pClone->setPosition( &recvbuf_DOUBLE[j+13] );
+        pClone->setQuaternionRotation( recvbuf_DOUBLE[j+6],
+		recvbuf_DOUBLE[j+7],
+		recvbuf_DOUBLE[j+8],
+		recvbuf_DOUBLE[j+9] );
+        if ( contact_map_size )
+	{
+          std::tuple<int,int,int> key;
+          Vector3 kdelta, prev_normal, cumulSpringTorque;
+	  int ii = 0;
+          for (int m=0; m < contact_map_size; m++)
+          {
+            ii = j + NB_DOUBLE_PART + 1 + NB_DOUBLE_PER_CONTACT * m;
+	    key = std::make_tuple(int(recvbuf_DOUBLE[ii]),
+                  int(recvbuf_DOUBLE[ii+1]),
+                  int(recvbuf_DOUBLE[ii+2]));
+	    kdelta = Vector3( recvbuf_DOUBLE[ii+4],
+                  recvbuf_DOUBLE[ii+5],
+                  recvbuf_DOUBLE[ii+6]) ;
+            prev_normal = Vector3( recvbuf_DOUBLE[ii+7],
+                  recvbuf_DOUBLE[ii+8],
+                  recvbuf_DOUBLE[ii+9]) ;
+            cumulSpringTorque = Vector3( recvbuf_DOUBLE[ii+10],
+                  recvbuf_DOUBLE[ii+11],
+                  recvbuf_DOUBLE[ii+12]) ;
+            pClone->copyContactInMap( key, bool(recvbuf_DOUBLE[ii+3]), kdelta,
+                  prev_normal, cumulSpringTorque) ;
+          }	
+	}
+      }      
+      pClone->setTranslationalVelocity( recvbuf_DOUBLE[j+3],
+	  	recvbuf_DOUBLE[j+4],
+		recvbuf_DOUBLE[j+5] );
+      pClone->setAngularVelocity(recvbuf_DOUBLE[j+10],
+	  	recvbuf_DOUBLE[j+11],
+		recvbuf_DOUBLE[j+12] );
+    }
+    else
+    {
+      cout << "!!! Warning !!! Clone " << id << " not found in proc " 
+      	<< m_rank << endl;
+    } 
+    
+    j += NB_DOUBLE_PART + 1 + contact_map_size * NB_DOUBLE_PER_CONTACT; 
+  } 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Creates and updates clones with the data sent by the neighboring processes 
+void GrainsMPIWrapper::CreateClones(double time,
+ 	int const &recvsize, double const* recvbuf_DOUBLE,
+	const int& NB_DOUBLE_PART,
+	int const& NB_DOUBLE_PER_CONTACT,  
+  	list<Particle*>* particlesClones,
+	list<Particle*>* particles,
+  	list<Particle*> const* particlesBufferzone,
+	vector<Particle*> const* referenceParticles,
+	LinkedCell* LC )
+{
+  int j, id, classe, contact_map_size = 0;
+  bool found = false;
+  double distGC = 0. ; 
+  Point3 const* GC = NULL ; 
+  multimap<int,Particle*>::iterator imm;
+  size_t ncid = 0;
+  pair < multimap<int,Particle*>::iterator, 
+  	multimap<int,Particle*>::iterator > crange;
+	  
+  // Note: although we create new clones here, we need to check if they
+  // do not already exist. This scenario happens if a master particle moves from
+  // a buffer zone cell to another buffer zone cell and the two buffer zone 
+  // cells have a different GeoPosition, then such a master particle is added 
+  // to the list of new buffer zone particles but teh corresponding clone
+  // particle might already exist on the local process
+
+  for( j=0; j<recvsize; )
+  {
+    found = false;
+    id = int( recvbuf_DOUBLE[j] ); 
+    contact_map_size = int( recvbuf_DOUBLE[j+NB_DOUBLE_PART] );       
+      
+    // Search whether the clone already exists in this local domain
+    ncid = m_AccessToClones.count( id );
+    switch( ncid )
+    {
+      case 0: // no clone with this ID number in this local domain
+        break;
+      case 1: // 1 clone with this ID number in this local domain
+        imm = m_AccessToClones.find( id );
+        if ( m_isMPIperiodic )
+        {
+          GC = imm->second->getPosition();
+          distGC = sqrt( 
+          	pow( recvbuf_DOUBLE[j+22] - (*GC)[X], 2. ) +
+            pow( recvbuf_DOUBLE[j+23] - (*GC)[Y], 2. ) +
+            pow( recvbuf_DOUBLE[j+24] - (*GC)[Z], 2. ) ) ;
+            if ( distGC < 1.1 * imm->second->getCrustThickness() )  
+              found = true;	
+        }
+        else found = true;
+        break;
+      default: // more than 1 clone with this ID number in this local domain
+        // Periodic case with 1 multi-proc clone and 1 periodic clone in the
+	// same local domain
+        crange = m_AccessToClones.equal_range( id );
+        for (imm=crange.first; imm!=crange.second && !found; )
+        {
+          GC = imm->second->getPosition();
+          distGC = sqrt( 
+          pow( recvbuf_DOUBLE[j+22] - (*GC)[X], 2. ) +
+          pow( recvbuf_DOUBLE[j+23] - (*GC)[Y], 2. ) +
+          pow( recvbuf_DOUBLE[j+24] - (*GC)[Z], 2. ) ) ;
+          if ( distGC < 1.1 * imm->second->getCrustThickness() )  
+            found = true;
+          else imm++;
+        }
+        break;    
+    }   
+       
+    // If not found, create the clone particle
+    if ( !found )
+    {
+      classe = int( recvbuf_DOUBLE[j+1] );
+	
+      if ( GrainsExec::m_MPI_verbose )
+      {
+        ostringstream oss;
+        oss << "   t=" << GrainsExec::doubleToString(time,TIMEFORMAT)
+		<< " Create Clone                Id = " 
+		<< id
+		<< " Type = " << classe << " " 
+		<< recvbuf_DOUBLE[j+22] << " " 
+		<< recvbuf_DOUBLE[j+23] << " " 
+		<< recvbuf_DOUBLE[j+24]
+		<< endl;
+        GrainsMPIWrapper::addToMPIString(oss.str());
+      }
+
+      // Creation of the clone particle
+      Particle *new_clone = NULL ;
+      if ( (*referenceParticles)[classe]->isCompositeParticle() )
+        new_clone = new CompositeParticle( id,
+              (*referenceParticles)[classe],
+              recvbuf_DOUBLE[j+3],
+              recvbuf_DOUBLE[j+4],
+              recvbuf_DOUBLE[j+5],
+              recvbuf_DOUBLE[j+6],
+              recvbuf_DOUBLE[j+7],
+              recvbuf_DOUBLE[j+8],	
+              recvbuf_DOUBLE[j+9],
+              recvbuf_DOUBLE[j+10],
+              recvbuf_DOUBLE[j+11],
+              recvbuf_DOUBLE[j+12],
+              &recvbuf_DOUBLE[j+13],
+              COMPUTE, 2, 0 );   
+      else
+        new_clone = new Particle( id,
+              (*referenceParticles)[classe],
+              recvbuf_DOUBLE[j+3],
+              recvbuf_DOUBLE[j+4],
+              recvbuf_DOUBLE[j+5],
+              recvbuf_DOUBLE[j+6],
+              recvbuf_DOUBLE[j+7],
+              recvbuf_DOUBLE[j+8],	
+              recvbuf_DOUBLE[j+9],
+              recvbuf_DOUBLE[j+10],
+              recvbuf_DOUBLE[j+11],
+              recvbuf_DOUBLE[j+12],
+              &recvbuf_DOUBLE[j+13],
+              COMPUTE, 2, 0 );
+
+      if ( contact_map_size )
+      {
+        std::tuple<int,int,int> key;
+        Vector3 kdelta, prev_normal, cumulSpringTorque;
+	int ii = 0;
+        for (int m=0; m < contact_map_size; m++)
+        {
+          ii = j + NB_DOUBLE_PART + 1 + NB_DOUBLE_PER_CONTACT * m;
+	  key = std::make_tuple(int(recvbuf_DOUBLE[ii]),
+                  int(recvbuf_DOUBLE[ii+1]),
+                  int(recvbuf_DOUBLE[ii+2]));
+	  kdelta = Vector3( recvbuf_DOUBLE[ii+4],
+                  recvbuf_DOUBLE[ii+5],
+                  recvbuf_DOUBLE[ii+6]) ;
+          prev_normal = Vector3( recvbuf_DOUBLE[ii+7],
+                  recvbuf_DOUBLE[ii+8],
+                  recvbuf_DOUBLE[ii+9]) ;
+          cumulSpringTorque = Vector3( recvbuf_DOUBLE[ii+10],
+                  recvbuf_DOUBLE[ii+11],
+                  recvbuf_DOUBLE[ii+12]) ;
+          new_clone->copyContactInMap( key, bool(recvbuf_DOUBLE[ii+3]), kdelta,
+                  prev_normal, cumulSpringTorque) ;
+        }	
+      }
+
+      // Add to the LinkedCell
+      LC->Link( new_clone );
+	
+      // Add to active particle and clone particle lists
+      particlesClones->push_back( new_clone );
+      particles->push_back( new_clone ); 
+    }
+    else m_AccessToClones.erase( imm ); 
+    
+    j += NB_DOUBLE_PART + 1 + contact_map_size * NB_DOUBLE_PER_CONTACT; 
+  } 
 }
 
 
@@ -1907,241 +2203,6 @@ void GrainsMPIWrapper::ContactsFeatures( double& overlap_max,
 
   delete [] recvbuf_overlap;
   delete [] recvbuf_time;   
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Updates clones with the data sent by the neighboring processes 
-void GrainsMPIWrapper::UpdateClones(double time,
- 	int const &recvsize, double const* recvbuf_DOUBLE,
-	const int& NB_DOUBLE_PART,  
-  	list<Particle*>* particlesClones,
-	list<Particle*>* particles,
-  	list<Particle*> const* particlesBufferzone,
-	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC, bool update_velocity_only )
-{
-  int j, id;
-  bool found = false;
-  double distGC = 0. ; 
-  Point3 const* GC = NULL ; 
-  multimap<int,Particle*>::iterator imm;
-  size_t ncid = 0;
-  Particle* pClone = NULL ;
-  pair < multimap<int,Particle*>::iterator, 
-  	multimap<int,Particle*>::iterator > crange;
-  
-  for( j=0; j<recvsize; ++j )
-  {
-    found = false;
-    id = int( recvbuf_DOUBLE[NB_DOUBLE_PART*j] );  
-      
-    // Searh whether the clone already exists in this local domain
-    ncid = m_AccessToClones.count( id );
-    switch( ncid )
-    {
-      case 0: // no clone with this ID number in this local domain
-        break;
-      case 1: // 1 clone with this ID number in this local domain
-        imm = m_AccessToClones.find( id );
-        if ( m_isMPIperiodic )
-        {
-          GC = imm->second->getPosition();
-          distGC = sqrt( 
-          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] - (*GC)[X], 2. ) +
-            	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] - (*GC)[Y], 2. ) +
-            	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+24] - (*GC)[Z], 2. ) ) ;
-          if ( distGC < 1.1 * imm->second->getCrustThickness() )  
-              found = true;	
-        }
-        else found = true;
-        break;
-      default: // more than 1 clone with this ID number in this local domain
-        // Periodic case with 1 multi-proc clone and 1 periodic clone in the
-	// same local domain
-        crange = m_AccessToClones.equal_range( id );
-        for (imm=crange.first; imm!=crange.second && !found; )
-        {
-          GC = imm->second->getPosition();
-          distGC = sqrt( 
-          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] - (*GC)[X], 2. ) +
-          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] - (*GC)[Y], 2. ) +
-          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+24] - (*GC)[Z], 2. ) ) ;
-          if ( distGC < 1.1 * imm->second->getCrustThickness() )  
-            found = true;
-          else imm++;
-        }
-        break;    
-    }   
-       
-    // If found, update the clone features
-    if ( found )
-    {
-      // We get the pointer to the clone and erase it from the map, because
-      // each clone has a single master only and can therefore be updated 
-      // only once
-      pClone = imm->second;
-      m_AccessToClones.erase( imm );
-      
-      if ( !update_velocity_only )
-      {
-        pClone->setPosition( &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13] );
-        pClone->setQuaternionRotation( recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+9] );
-      }      
-      pClone->setTranslationalVelocity( recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
-	  	recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+5] );
-      pClone->setAngularVelocity(recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
-	  	recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
-		recvbuf_DOUBLE[NB_DOUBLE_PART*j+12] );
-    }
-    else
-    {
-      cout << "!!! Warning !!! Clone " << id << " not found in proc " 
-      	<< m_rank << endl;
-    }  
-  } 
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Creates and updates clones with the data sent by the neighboring processes 
-void GrainsMPIWrapper::CreateClones(double time,
- 	int const &recvsize, double const* recvbuf_DOUBLE,
-	const int& NB_DOUBLE_PART,  
-  	list<Particle*>* particlesClones,
-	list<Particle*>* particles,
-  	list<Particle*> const* particlesBufferzone,
-	vector<Particle*> const* referenceParticles,
-	LinkedCell* LC )
-{
-  int j, id, classe;
-  bool found = false;
-  double distGC = 0. ; 
-  Point3 const* GC = NULL ; 
-  multimap<int,Particle*>::iterator imm;
-  size_t ncid = 0;
-  pair < multimap<int,Particle*>::iterator, 
-  	multimap<int,Particle*>::iterator > crange;
-	  
-  // Note: although we create new clones here, we need to check if they
-  // do not already exist. This scenario happens if a master particle moves from
-  // a buffer zone cell to another buffer zone cell and the two buffer zone 
-  // cells have a different GeoPosition, then such a master particle is added 
-  // to the list of new buffer zone particles but might already exist on the 
-  // local process
-
-  for( j=0; j<recvsize; ++j )
-  {
-    found = false;
-    id = int( recvbuf_DOUBLE[NB_DOUBLE_PART*j] );  
-      
-    // Search whether the clone already exists in this local domain
-    ncid = m_AccessToClones.count( id );
-    switch( ncid )
-    {
-      case 0: // no clone with this ID number in this local domain
-        break;
-      case 1: // 1 clone with this ID number in this local domain
-        imm = m_AccessToClones.find( id );
-        if ( m_isMPIperiodic )
-        {
-          GC = imm->second->getPosition();
-          distGC = sqrt( 
-          	pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] - (*GC)[X], 2. ) +
-            pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] - (*GC)[Y], 2. ) +
-            pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+24] - (*GC)[Z], 2. ) ) ;
-            if ( distGC < 1.1 * imm->second->getCrustThickness() )  
-              found = true;	
-        }
-        else found = true;
-        break;
-      default: // more than 1 clone with this ID number in this local domain
-        // Periodic case with 1 multi-proc clone and 1 periodic clone in the
-	// same local domain
-        crange = m_AccessToClones.equal_range( id );
-        for (imm=crange.first; imm!=crange.second && !found; )
-        {
-          GC = imm->second->getPosition();
-          distGC = sqrt( 
-          pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] - (*GC)[X], 2. ) +
-          pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] - (*GC)[Y], 2. ) +
-          pow( recvbuf_DOUBLE[NB_DOUBLE_PART*j+24] - (*GC)[Z], 2. ) ) ;
-          if ( distGC < 1.1 * imm->second->getCrustThickness() )  
-            found = true;
-          else imm++;
-        }
-        break;    
-    }   
-       
-    // If not found, create the clone particle
-    if ( !found )
-    {
-      classe = int( recvbuf_DOUBLE[NB_DOUBLE_PART*j+1] );
-	
-      if ( GrainsExec::m_MPI_verbose )
-      {
-        ostringstream oss;
-        oss << "   t=" << GrainsExec::doubleToString(time,TIMEFORMAT)
-		<< " Create Clone                Id = " 
-		<< id
-		<< " Type = " << classe << " " 
-		<< recvbuf_DOUBLE[NB_DOUBLE_PART*j+22] << " " 
-		<< recvbuf_DOUBLE[NB_DOUBLE_PART*j+23] << " " 
-		<< recvbuf_DOUBLE[NB_DOUBLE_PART*j+24]
-		<< endl;
-        GrainsMPIWrapper::addToMPIString(oss.str());
-      }
-
-      // Creation of the clone particle
-      Particle *new_clone = NULL ;
-      if ( (*referenceParticles)[classe]->isCompositeParticle() )
-        new_clone = new CompositeParticle( id,
-              (*referenceParticles)[classe],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+5],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],	
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+9],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+12],
-              &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13],
-              COMPUTE, 2, 0 );   
-      else
-        new_clone = new Particle( id,
-              (*referenceParticles)[classe],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+3],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+4],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+5],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+6],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+7],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+8],	
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+9],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+10],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+11],
-              recvbuf_DOUBLE[NB_DOUBLE_PART*j+12],
-              &recvbuf_DOUBLE[NB_DOUBLE_PART*j+13],
-              COMPUTE, 2, 0 );
-
-      // Add to the LinkedCell
-      LC->Link( new_clone );
-	
-      // Add to active particle and clone particle lists
-      particlesClones->push_back( new_clone );
-      particles->push_back( new_clone ); 
-    }
-    else m_AccessToClones.erase( imm ); 
-  } 
 }
 
 

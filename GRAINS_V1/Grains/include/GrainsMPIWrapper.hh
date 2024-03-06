@@ -357,9 +357,10 @@ class GrainsMPIWrapper : public SolverComputingTime
 	
     /** @brief Updates clones with the data sent by the neighboring processes 
     @param time physical time
-    @param recvsize number of particles received
+    @param recvsize number of doubles received
     @param recvbuf_DOUBLE array of double containing the data received
-    @param NB_DOUBLE_PART number of doubles per particle       
+    @param NB_DOUBLE_PART number of doubles per particle
+    @param NB_DOUBLE_PER_CONTACT number of doubles per contact           
     @param particlesClones list of active clone particles
     @param particles list of active particles
     @param particlesBufferzone list of active particles in the buffer zone
@@ -369,7 +370,8 @@ class GrainsMPIWrapper : public SolverComputingTime
     update all clone features */
     void UpdateClones( double time,
  	int const& recvsize, double const* recvbuf_DOUBLE,
-	int const& NB_DOUBLE_PART, 
+	int const& NB_DOUBLE_PART,
+	int const& NB_DOUBLE_PER_CONTACT, 
   	list<Particle*>* particlesClones,
 	list<Particle*>* particles,
   	list<Particle*> const* particlesBufferzone,
@@ -379,9 +381,10 @@ class GrainsMPIWrapper : public SolverComputingTime
 	
     /** @brief Creates clones with the data sent by the neighboring processes 
     @param time physical time
-    @param recvsize number of particles received
+    @param recvsize number of doubles received
     @param recvbuf_DOUBLE array of double containing the data received
     @param NB_DOUBLE_PART number of doubles per particle       
+    @param NB_DOUBLE_PER_CONTACT number of doubles per contact 
     @param particlesClones list of active clone particles
     @param particles list of active particles
     @param particlesBufferzone list of active particles in the buffer zone
@@ -390,6 +393,7 @@ class GrainsMPIWrapper : public SolverComputingTime
     void CreateClones( double time,
  	int const& recvsize, double const* recvbuf_DOUBLE,
 	int const& NB_DOUBLE_PART, 
+	int const& NB_DOUBLE_PER_CONTACT, 	
   	list<Particle*>* particlesClones,
 	list<Particle*>* particles,
   	list<Particle*> const* particlesBufferzone,

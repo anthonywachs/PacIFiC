@@ -699,20 +699,21 @@ void Component::printActiveNeighbors(int const& id )
 // Writes the contact map information in an array of doubles
 void Component::copyContactMap( double* destination, int start_index )
 {
+  double intTodouble = 0.1 ;
   int nb_contacts = (int) m_contactMap.size();
   destination[start_index] = nb_contacts;
   start_index++;
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
     ::iterator it;
 
-  if (m_contactMap.begin() != m_contactMap.end())
+  if ( nb_contacts )
   {
     for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
     {
-      destination[start_index] = (double)get<0>(it->first) ;
-      destination[start_index + 1] = (double)get<1>(it->first) ;
-      destination[start_index + 2] = (double)get<2>(it->first) ;
-      destination[start_index + 3] = (double)get<0>(it->second) ;
+      destination[start_index] = (double)get<0>(it->first) + intTodouble;
+      destination[start_index + 1] = (double)get<1>(it->first) + intTodouble;
+      destination[start_index + 2] = (double)get<2>(it->first) + intTodouble;
+      destination[start_index + 3] = (double)get<0>(it->second) + intTodouble;
       destination[start_index + 4] = get<1>(it->second)[0] ;
       destination[start_index + 5] = get<1>(it->second)[1] ;
       destination[start_index + 6] = get<1>(it->second)[2] ;
