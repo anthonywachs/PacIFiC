@@ -228,8 +228,9 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param mat matrix */
     Matrix Broadcast_Matrix( Matrix const& mat ) const;   
   
-    /** @brief Outputs timer summary */
-    void timerSummary() const;
+    /** @brief Outputs timer summary 
+    @param f output stream */
+    void timerSummary( ostream &f ) const;
   
     /** @brief Outputs the MPI log string per process and reinitialize it to
     empty
@@ -278,7 +279,31 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param creturn use carriage return if true, else ": " 
     @param shift empty string to shift the output*/
     void writeStringPerProcess( ostream& f, string const& out, 
-    	bool creturn = true, string const& shift="" ) const;	
+    	bool creturn = true, string const& shift="" ) const;
+	
+    /** @brief Sends an array of integers
+    @param tab array of integers
+    @param dim size of the array
+    @param to rank of the recipient */
+    void send( int const* tab, int const& dim, int const& to ) const;
+    
+    /** @brief Receives an array of integers
+    @param recvbuf receive buffer
+    @param dim size of the receive buffer 
+    @param from rank of the sender */
+    void receive( int* &recvbuf, int &dim, int const& from ) const;
+    
+    /** @brief Sends an array of doubles
+    @param tab array of doubles
+    @param dim size of the array
+    @param to rank of the recipient */
+    void send( double const* tab, int const& dim, int const& to ) const;
+    
+    /** @brief Receives an array of doubles
+    @param recvbuf receive buffer
+    @param dim size of the receive buffer
+    @param from rank of the sender */
+    void receive( double* &recvbuf, int &dim, int const& from ) const;
     //@}  
 
 
@@ -338,6 +363,9 @@ class GrainsMPIWrapper : public SolverComputingTime
     vector<Vector3> m_MPIperiodes; /**< periodic vectors */
     multimap<int,Particle*> m_AccessToClones; /**< facilitates access to clone
     	particles via their ID number */
+    int m_tag_INT; /**< default tag for integer communications */
+    int m_tag_DOUBLE; /**< default tag for double communications */    
+    int m_tag_CHAR; /**< default tag for character communications */     	
     //@}
 
 

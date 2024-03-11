@@ -171,6 +171,7 @@ void GrainsMPI::Simulation( double time_interval )
         m_allcomponents.advanceParticlesVelocity( m_time, 0.5 * m_dt );            
         SCT_add_elapsed_time( "Move" );
 
+
         // Write force & torque exerted on obstacles
         m_allcomponents.outputObstaclesLoad( m_time, m_dt );
 
@@ -180,7 +181,7 @@ void GrainsMPI::Simulation( double time_interval )
         {
 	  SCT_set_start( "OutputResults" );
 
-          // Update clone particle position and velocity
+          // Update clone particle velocity
           m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
 		m_allcomponents.getActiveParticles(),
   		m_allcomponents.getParticlesInBufferzone(),
@@ -915,22 +916,17 @@ void GrainsMPI::synchronize_PPWindow()
 // Outputs timer summary */
 void GrainsMPI::display_timer_summary()
 {
-  for (int i=0;i<m_wrapper->get_total_number_of_active_processes();++i)
-  {    
-    if ( m_rank == i )
-    {
-      cout << endl;
-      cout << "Processor " << m_rank << endl;
-      m_wrapper->timerSummary();
-      double cputime = CT_get_elapsed_time();
-      cout << endl << "Full problem" << endl;
-      write_elapsed_time_smhd( cout, cputime, "Computing time" );
-      cout << "Mean number of particles on this sub-domain = " << 
+  ostringstream oss;
+  m_wrapper->timerSummary( oss );
+  double cputime = CT_get_elapsed_time();
+  oss << endl << "Full problem" << endl;
+  write_elapsed_time_smhd( oss, cputime, "Computing time" );
+  oss << "Mean number of particles on this sub-domain = " << 
 	m_collision->getNbParticlesPerProcMean() << endl;     
-      SCT_get_summary(cout,cputime);
-    }
-    m_wrapper->MPI_Barrier_ActivProc(); 
-  }
+  SCT_get_summary( oss, cputime );
+  
+  m_wrapper->writeStringPerProcess( cout, oss.str(), true, 
+  	GrainsExec::m_shift0 ); 
 }
 
 

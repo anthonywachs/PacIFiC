@@ -219,7 +219,7 @@ void Grains::do_after_time_stepping()
       cout << GrainsExec::m_shift3 << "Time of maximum overlap = " <<
 	timemax << endl;
       cout << GrainsExec::m_shift3 << "Average number of iterations of GJK = " <<
-    	ngjk << endl;
+    	ngjk << endl << endl;
     }
 
     // Timer outcome
@@ -2230,7 +2230,7 @@ void Grains::readWindow( DOMNode* nWindow, Window& iwindow,
 void Grains::display_timer_summary()
 {
   double cputime = CT_get_elapsed_time();
-  cout << endl << "Full problem" << endl;
+  cout << "Full problem" << endl;
   write_elapsed_time_smhd( cout, cputime, "Computing time" );
   SCT_get_summary( cout, cputime );
 }

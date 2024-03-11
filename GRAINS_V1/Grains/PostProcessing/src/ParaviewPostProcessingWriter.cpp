@@ -979,7 +979,7 @@ void ParaviewPostProcessingWriter::writeParticlesPostProcessing_Paraview(
   for (particle=particles->begin();particle!=particles->end();particle++)
     if ( (*particle)->getActivity() == COMPUTE &&
 	( (*particle)->getTag() != 2 || forceForAllTag ) )    
-      (*particle)->write_polygonsStr_PARAVIEW(connectivity,
+      (*particle)->write_polygonsStr_PARAVIEW( connectivity,
     	offsets, cellstype, firstpoint_globalnumber, last_offset );
   f << "<Cells>" << endl;
   f << "<DataArray type=\"Int32\" Name=\"connectivity\" ";
@@ -2853,7 +2853,7 @@ int ParaviewPostProcessingWriter:: store_int_binary( int val )
 
 void ParaviewPostProcessingWriter:: check_allocated_binary( int size )  
 {
-  if(OFFSET+size>=ALLOCATED) 
+  if ( OFFSET + size >= ALLOCATED ) 
   {
     int new_size = max( 2*ALLOCATED, (int)1024 ) ;
     new_size = max( new_size, 2*(OFFSET+size) ) ;
@@ -2873,7 +2873,7 @@ void ParaviewPostProcessingWriter:: check_allocated_binary( int size )
 void ParaviewPostProcessingWriter:: flush_binary( std::ofstream& file, 
 	string const& calling )  
 {
-  compress_segment_binary(CURRENT_LENGTH,calling) ;         
+  compress_segment_binary( CURRENT_LENGTH, calling ) ;         
   file << endl ;
 }
 
@@ -2909,11 +2909,11 @@ void ParaviewPostProcessingWriter:: compress_segment_binary( int seg,
       unsigned char* encoded = &encoded_buff[encoded_offset] ;
       unsigned long ncomp = encoded_buff_size - encoded_offset ;
 
-      if(compress2((Bytef*)encoded,
+      if ( compress2( (Bytef*)encoded,
                    &ncomp,
                    (const Bytef*)to_encode,
                    length,
-                   Z_DEFAULT_COMPRESSION) != Z_OK)
+                   Z_DEFAULT_COMPRESSION) != Z_OK )
       {
          cout << "Zlib error while compressing data." << endl;
 	 cout << "from " << calling << endl;
@@ -2922,17 +2922,15 @@ void ParaviewPostProcessingWriter:: compress_segment_binary( int seg,
 		<< ncomp << endl;
 	 exit(0);
       }
-//       CompressionHeader[3+block] = ncomp ;
-//       encoded_offset += ncomp ;
       CompressionHeader[3+block] = int(ncomp) ;
       encoded_offset += int(ncomp) ;      
    }
    
    OFFSET = seg ;
-   check_allocated_binary( headerLength*sizeof_Int32 + encoded_offset ) ;
+   check_allocated_binary( headerLength * sizeof_Int32 + encoded_offset ) ;
    
    for(int i=0 ; i<headerLength ; i++ )
-      store_int_binary(CompressionHeader[i]) ;     
+      store_int_binary( CompressionHeader[i] ) ;     
 
    for(int i=0 ; i<encoded_offset ; i++ )
       BUFFER[OFFSET++] = encoded_buff[i] ;
