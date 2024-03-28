@@ -77,7 +77,10 @@ class GrainsMPIWrapper : public SolverComputingTime
     int get_rank() const;   
   
     /** @brief Returns whether the process is active */
-    bool isActive() const;                  
+    bool isActive() const;
+    
+    /** @brief Returns the active process communicator */
+    MPI_Comm get_active_procs_comm() const;                  
     //@}  
 
 
@@ -117,16 +120,17 @@ class GrainsMPIWrapper : public SolverComputingTime
   	list<Particle*> const& particles,
 	size_t const& nb_total_particles ) const;	
 		
-    /** @brief Broadcasts an integer from the master to all processes within the
-    MPI_COMM_activProc communicator
+    /** @brief Broadcasts an integer from one process to all processes within 
+    the MPI_COMM_activProc communicator
     @param i integer 
     @param source rank of sending process (default is master = 0 ) */
     int Broadcast_INT( int const& i, int source = 0 ) const;
 
-    /** @brief Broadcasts a double from the master to all processes within the 
+    /** @brief Broadcasts a double from one process to all processes within the 
     MPI_COMM_activProc communicator
-    @param d double */
-    double Broadcast_DOUBLE( double const& d ) const;
+    @param d double 
+    @param source rank of sending process (default is master = 0 ) */
+    double Broadcast_DOUBLE( double const& d, int source = 0 ) const;
   
     /** @brief Broadcasts an unsigned integer from the master to all processes 
     within the MPI_COMM_activProc communicator
@@ -211,7 +215,17 @@ class GrainsMPIWrapper : public SolverComputingTime
     /** @brief AllGather of an unsigned integer from all processes on all 
     processes within the MPI_COMM_activProc communicator
     @param i unsigned integer */
-    size_t* AllGather_UNSIGNED_INT( size_t const& i ) const;          
+    size_t* AllGather_UNSIGNED_INT( size_t const& i ) const;
+    
+    /** @brief AllGather of a signed integer from all processes on all 
+    processes within the MPI_COMM_activProc communicator
+    @param i integer */
+    int* AllGather_INT( int const& i ) const;    
+    
+    /** @brief Gather of an integer from all processes on the master process 
+    within the MPI_COMM_activProc communicator
+    @param i integer */
+    int* Gather_INT_master( int const& i ) const;              
   
     /** @brief Broadcasts a 3D point from the master to all processes within 
     the MPI_COMM_activProc communicator

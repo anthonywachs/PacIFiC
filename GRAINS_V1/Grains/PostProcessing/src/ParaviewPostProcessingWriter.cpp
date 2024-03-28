@@ -35,6 +35,7 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
   , m_postProcessObstacle( true )
   , m_initialCycleNumber_forced( false )
   , m_network( false )
+  , m_mpiio_singlefile( false )
   , BUFFER( NULL )
   , ALLOCATED( 0 )
   , OFFSET( 0 )
@@ -56,6 +57,11 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
     string sm_obstacle = ReaderXML::getNodeAttr_String( dn, "Obstacle" );
     if ( sm_obstacle == "False" ) m_postProcessObstacle = false; 
   }
+  if ( ReaderXML::hasNodeAttr( dn, "MPIIO" ) && m_nprocs > 1 )
+  { 
+    string sm_onefile = ReaderXML::getNodeAttr_String( dn, "MPIIO" );
+    if ( sm_onefile == "True" ) m_mpiio_singlefile = true; 
+  }  
   
   if ( m_rank == 0 && verbose )
   {
@@ -69,7 +75,9 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
     cout << GrainsExec::m_shift12 << "Write force network = " 
     	<< ( m_network ? "True" : "False" ) << endl;
     cout << GrainsExec::m_shift12 << "Write obstacles = " 
-    	<< ( m_postProcessObstacle ? "True" : "False" ) << endl;	
+    	<< ( m_postProcessObstacle ? "True" : "False" ) << endl;
+    cout << GrainsExec::m_shift12 << "MPIIO = " 
+    	<< ( m_mpiio_singlefile ? "True" : "False" ) << endl;		
   } 
 }
 
@@ -92,7 +100,8 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
   , m_binary( isBinary )
   , m_postProcessObstacle( true ) 
   , m_initialCycleNumber_forced( false )
-  , m_network( false )     
+  , m_network( false )
+  , m_mpiio_singlefile( false )     
   , BUFFER( NULL )
   , ALLOCATED( 0 )
   , OFFSET( 0 )
@@ -109,7 +118,9 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
     cout << GrainsExec::m_shift12 << "Write force network = " 
     	<< ( m_network ? "True" : "False" ) << endl;
     cout << GrainsExec::m_shift12 << "Write obstacles = " 
-    	<< ( m_postProcessObstacle ? "True" : "False" ) << endl;	
+    	<< ( m_postProcessObstacle ? "True" : "False" ) << endl;
+    cout << GrainsExec::m_shift12 << "MPIIO = " 
+    	<< ( m_mpiio_singlefile ? "True" : "False" ) << endl;			
   }
 }	
 
@@ -493,7 +504,6 @@ void ParaviewPostProcessingWriter::one_output(
       ofstream f( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_Obstacles.pvd" ).c_str(), ios::out );	 
       f << m_Paraview_saveObstacles_pvd.str();
-//      writeBigOSS( f, m_Paraview_saveObstacles_pvd );
       f << "</Collection>" << endl;
       f << "</VTKFile>" << endl;
       f.close();      
@@ -511,38 +521,68 @@ void ParaviewPostProcessingWriter::one_output(
     {     
       *m_Paraview_saveParticles_pvd[0] << "<DataSet timestep=\"" << time 
       	<< "\" " << "group=\"\" part=\"0\" file=\"" << partFilename 
-	<< ".pvtu\"/>" << endl;       
+	<< ( m_nprocs > 1 && !m_mpiio_singlefile ? 
+	  ".pvtu\"/>" : ".vtu\"/>" ) << endl;             
        
       ofstream g( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_Particles.pvd" ).c_str(), ios::out );
       g << m_Paraview_saveParticles_pvd[0]->str();
-//      writeBigOSS( g, *m_Paraview_saveParticles_pvd[0] );
       g << "</Collection>" << endl;
       g << "</VTKFile>" << endl;
       g.close();
 
-      if ( (*referenceParticles)[0]->getRigidBody()->getConvex()
+      if ( m_nprocs > 1 && !m_mpiio_singlefile )
+      {       
+        if ( (*referenceParticles)[0]->getRigidBody()->getConvex()
        	->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
-      {
-        list<string> ptVec;
-        ptVec.push_back("Orientation");
-        writePVTU_Paraview( partFilename, &ptVec, &Scalars, 
+        {
+          list<string> ptVec;
+          ptVec.push_back("Orientation");
+          writePVTU_Paraview( partFilename, &ptVec, &Scalars, 
 	 	&empty_string_list );
-      }
-      else writePVTU_Paraview( partFilename, &empty_string_list,
-	 	&empty_string_list, &Scalars );     
+        }
+        else writePVTU_Paraview( partFilename, &empty_string_list,
+	 	&empty_string_list, &Scalars ); 
+      }    
     }
     
-    // Does this processor write data ?
-    if( PostProcessingWriter::m_bPPWindow[m_rank] )
-    {
-      if( (*referenceParticles)[0]->getRigidBody()->getConvex()
+    // VTU files
+    if ( (*referenceParticles)[0]->getRigidBody()->getConvex()
           ->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
-	writeSpheresPostProcessing_Paraview( particles,
-     	  partFilename + "_" + ossRK.str() + ".vtu" );
-      else     
-	writeParticlesPostProcessing_Paraview( particles,
-    	  partFilename + "_" + ossRK.str() + ".vtu" );
+    {
+      if ( m_mpiio_singlefile && m_nprocs > 1 )
+      {
+	if ( m_binary )
+	  writeSpheresPostProcessing_Paraview_MPIIO_binary( particles,
+     	  	partFilename + ".vtu", false, 
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+	else
+	  writeSpheresPostProcessing_Paraview_MPIIO_text( particles,
+     	  	partFilename + ".vtu", false,
+		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
+      }
+      else		
+	writeSpheresPostProcessing_Paraview( particles, partFilename 
+	  	+ ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", false,
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+    }
+    else
+    {             
+      if ( m_mpiio_singlefile && m_nprocs > 1 )
+      {
+	if ( m_binary )
+	  writeParticlesPostProcessing_Paraview_MPIIO_binary( particles,
+     	  	partFilename + ".vtu", false, 
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+	  else
+	    writeParticlesPostProcessing_Paraview_MPIIO_text( particles,
+     	  	partFilename + ".vtu", false,
+		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
+      }
+      else		
+	writeParticlesPostProcessing_Paraview( particles, partFilename 
+	  + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", false,
+	  PostProcessingWriter::m_bPPWindow[m_rank] );
     }
   }
   else
@@ -567,39 +607,69 @@ void ParaviewPostProcessingWriter::one_output(
       { 	
         *m_Paraview_saveParticles_pvd[i] << "<DataSet timestep=\"" << time 
        		<< "\" " << "group=\"\" part=\"0\" file=\"" << partFilename 
-		<< ".pvtu\"/>" << endl;  
+		<< ( m_nprocs > 1 && !m_mpiio_singlefile ? 
+	  	".pvtu\"/>" : ".vtu\"/>" ) << endl;  
        
         ofstream g( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        		+ "_Particles_Type" + ossPC->str() + ".pvd" ).c_str(), 
 		ios::out );
         g << m_Paraview_saveParticles_pvd[i]->str();
-//	writeBigOSS( g, *m_Paraview_saveParticles_pvd[i] );
         g << "</Collection>" << endl;
         g << "</VTKFile>" << endl;
         g.close(); 
 
-        if ( (*referenceParticles)[i]->getRigidBody()->getConvex()
+        if ( m_nprocs > 1 && !m_mpiio_singlefile )
+	{
+	  if ( (*referenceParticles)[i]->getRigidBody()->getConvex()
 	 	->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
-        {
-          list<string> ptVec;
-          ptVec.push_back("Orientation");
-          writePVTU_Paraview( partFilename, &ptVec, &Scalars,
+          {
+            list<string> ptVec;
+            ptVec.push_back("Orientation");
+            writePVTU_Paraview( partFilename, &ptVec, &Scalars,
 	   	&empty_string_list );
-        }
-        else writePVTU_Paraview( partFilename, &empty_string_list,
-	 	&empty_string_list, &Scalars );   
+          }
+          else writePVTU_Paraview( partFilename, &empty_string_list,
+	 	&empty_string_list, &Scalars ); 
+	}  
       }
 
-    // Does this processor write data ?
-      if( PostProcessingWriter::m_bPPWindow[m_rank] )
+      // VTU files
+      if ( (*referenceParticles)[i]->getRigidBody()->getConvex()
+          ->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
       {
-	if ( (*referenceParticles)[i]->getRigidBody()->getConvex()
-	 	  ->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
-          writeSpheresPostProcessing_Paraview( &partPerType[i],
-       		  partFilename + "_" + ossRK.str() + ".vtu" );
-	else	
-          writeParticlesPostProcessing_Paraview( &partPerType[i],
-       		  partFilename + "_" + ossRK.str() + ".vtu" );	
+        if ( m_mpiio_singlefile && m_nprocs > 1 )
+        {
+	  if ( m_binary )
+	    writeSpheresPostProcessing_Paraview_MPIIO_binary( &partPerType[i],
+     	  	partFilename + ".vtu", false, 
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+	  else
+	    writeSpheresPostProcessing_Paraview_MPIIO_text( &partPerType[i],
+     	  	partFilename + ".vtu", false,
+		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
+        }
+        else		
+	  writeSpheresPostProcessing_Paraview( &partPerType[i], partFilename 
+	  	+ ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", false,
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+      }
+      else
+      {             
+        if ( m_mpiio_singlefile && m_nprocs > 1 )
+        {
+	  if ( m_binary )
+	    writeParticlesPostProcessing_Paraview_MPIIO_binary( &partPerType[i],
+     	  	partFilename + ".vtu", false, 
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+	  else
+	    writeParticlesPostProcessing_Paraview_MPIIO_text( &partPerType[i],
+     	  	partFilename + ".vtu", false,
+		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
+        }
+        else		
+	  writeParticlesPostProcessing_Paraview( &partPerType[i], partFilename 
+	  + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", false,
+	  PostProcessingWriter::m_bPPWindow[m_rank] );
       }
       
       delete ossPC;
@@ -615,42 +685,70 @@ void ParaviewPostProcessingWriter::one_output(
     {
       m_Paraview_savePeriodicCloneParticles_pvd << "<DataSet timestep=\"" 
       	<< time << "\" " << "group=\"\" part=\"0\" file=\"" << partFilename
-	<< ".pvtu\"/>" << endl; 	
+	<< ( m_nprocs > 1 && !m_mpiio_singlefile ? ".pvtu\"/>" : ".vtu\"/>" ) 
+	<< endl; 	
        
       ofstream g( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_PeriodicCloneParticles.pvd" ).c_str(), ios::out );
       g << m_Paraview_savePeriodicCloneParticles_pvd.str();
-//      writeBigOSS( g, m_Paraview_savePeriodicCloneParticles_pvd );
       g << "</Collection>" << endl;
       g << "</VTKFile>" << endl;
       g.close(); 
-     
-      if ( nbParticleTypes == 1 
-       	&& ( (*referenceParticles)[0]->getRigidBody()->getConvex()
-	->isSphere() && !GrainsExec::m_SphereAsPolyParaview ) )
+
+      if ( m_nprocs > 1 && !m_mpiio_singlefile )
       {
-        list<string> ptVec;
-        ptVec.push_back("Orientation");
-        writePVTU_Paraview( partFilename, &ptVec, &Scalars, 
-	 	&empty_string_list );	
-      }       	
-      else writePVTU_Paraview( partFilename, &empty_string_list, 
-      	&empty_string_list, &Scalars );
+	if ( nbParticleTypes == 1 
+		&& (*referenceParticles)[0]->getRigidBody()->getConvex()
+	 	->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
+        {
+          list<string> ptVec;
+          ptVec.push_back("Orientation");
+          writePVTU_Paraview( partFilename, &ptVec, &Scalars,
+	   	&empty_string_list );
+        }
+        else writePVTU_Paraview( partFilename, &empty_string_list,
+	 	&empty_string_list, &Scalars ); 
+      } 
     }
 
-    // Does this processor write data ?
-    if( PostProcessingWriter::m_bPPWindow[m_rank] )
+    // VTU files
+    if ( nbParticleTypes == 1 
+	&& (*referenceParticles)[0]->getRigidBody()->getConvex()
+          ->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
     {
-      if ( nbParticleTypes == 1 
-      	  && ( (*referenceParticles)[0]->getRigidBody()->getConvex()
-	  ->isSphere() && !GrainsExec::m_SphereAsPolyParaview ) )
-	writeSpheresPostProcessing_Paraview( periodic_clones,
-       		  partFilename + "_" + ossRK.str() + ".vtu", 
-		  GrainsExec::m_periodic );
-      else	
-	writeParticlesPostProcessing_Paraview( periodic_clones,
-     		  partFilename + "_" + ossRK.str() + ".vtu", 
-		  GrainsExec::m_periodic );
+      if ( m_mpiio_singlefile && m_nprocs > 1 )
+      {
+	if ( m_binary )
+	  writeSpheresPostProcessing_Paraview_MPIIO_binary( periodic_clones,
+     	  	partFilename + ".vtu", true, 
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+	else
+	  writeSpheresPostProcessing_Paraview_MPIIO_text( periodic_clones,
+     	  	partFilename + ".vtu", true,
+		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
+      }
+      else		
+	writeSpheresPostProcessing_Paraview( periodic_clones, partFilename 
+	  	+ ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", true,
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+    }
+    else
+    {             
+      if ( m_mpiio_singlefile && m_nprocs > 1 )
+      {
+	if ( m_binary )
+	  writeParticlesPostProcessing_Paraview_MPIIO_binary( periodic_clones,
+     	  	partFilename + ".vtu", true, 
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+	  else
+	    writeParticlesPostProcessing_Paraview_MPIIO_text( periodic_clones,
+     	  	partFilename + ".vtu", true,
+		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
+      }
+      else		
+	writeParticlesPostProcessing_Paraview( periodic_clones, partFilename 
+	  + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", true,
+	  PostProcessingWriter::m_bPPWindow[m_rank] );
     }
   }
    
@@ -664,12 +762,12 @@ void ParaviewPostProcessingWriter::one_output(
     {   
       m_Paraview_saveParticleVelocityVectors_pvd << "<DataSet timestep=\"" 
       	<< time << "\" " << "group=\"\" part=\"0\" file=\"" << vectFilename
-	<< ".pvtu\"/>" << endl; 	
+	<< ( m_nprocs > 1 && !m_mpiio_singlefile ? ".pvtu\"/>" : ".vtu\"/>" ) 
+	<< endl; 	
        
       ofstream h( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_ParticleVelocityVectors.pvd" ).c_str(), ios::out );
       h << m_Paraview_saveParticleVelocityVectors_pvd.str();
-//      writeBigOSS( h, m_Paraview_saveParticleVelocityVectors_pvd );
       h << "</Collection>" << endl;
       h << "</VTKFile>" << endl;
       h.close();      
@@ -677,14 +775,27 @@ void ParaviewPostProcessingWriter::one_output(
       list<string> vecMotion;
       vecMotion.push_back("U");
       vecMotion.push_back("Omega");
-      writePVTU_Paraview( vectFilename, &vecMotion, &empty_string_list,
-       	&empty_string_list ); 
+      if ( m_nprocs > 1 && !m_mpiio_singlefile )
+        writePVTU_Paraview( vectFilename, &vecMotion, &empty_string_list,
+       		&empty_string_list ); 
     }  
             
-    // Does this processor write data ?
-    if( PostProcessingWriter::m_bPPWindow[m_rank] )
+    // VTU files
+    if ( m_mpiio_singlefile && m_nprocs > 1 )
+    {
+      if ( m_binary )
+	writeParticleVelocityVectorsPostProcessing_Paraview_MPIIO_binary( 
+		particles, vectFilename + ".vtu", false,
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+	else
+	  writeParticleVelocityVectorsPostProcessing_Paraview_MPIIO_text( 
+	  	particles, vectFilename + ".vtu", false,
+		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
+    }
+    else		
       writeParticleVelocityVectorsPostProcessing_Paraview( particles,
-   	vectFilename + "_" + ossRK.str() + ".vtu" );
+   	vectFilename + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", 
+	PostProcessingWriter::m_bPPWindow[m_rank] );
 
 
     // Contact force vectors
@@ -694,59 +805,71 @@ void ParaviewPostProcessingWriter::one_output(
     if ( m_rank == 0 ) 
     {   
       m_Paraview_saveContactForceVectors_pvd << "<DataSet timestep=\"" << time 
-        	<< "\" " << "group=\"\" part=\"0\" file=\"" << forceFilename
- 	<< ".pvtu\"/>" << endl; 	
+	<< "\" " << "group=\"\" part=\"0\" file=\"" << forceFilename
+ 	<< ( m_nprocs > 1 && !m_mpiio_singlefile ? ".pvtu\"/>" : ".vtu\"/>" ) 
+	<< endl; 	
         
       ofstream h( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
         	+ "_ContactForceVectors.pvd" ).c_str(), ios::out );
-       h << m_Paraview_saveContactForceVectors_pvd.str();
-//      writeBigOSS( h, m_Paraview_saveContactForceVectors_pvd );        
+      h << m_Paraview_saveContactForceVectors_pvd.str();   
       h << "</Collection>" << endl;
       h << "</VTKFile>" << endl;
       h.close();      
  
       list<string> vecForce;
       vecForce.push_back("Force");
-      writePVTU_Paraview( forceFilename, &vecForce, &empty_string_list,
+      if ( m_nprocs > 1 && !m_mpiio_singlefile )
+        writePVTU_Paraview( forceFilename, &vecForce, &empty_string_list,
         	&empty_string_list ); 
     }
 
-    // Does this processor write data ?
-    if( PostProcessingWriter::m_bPPWindow[m_rank] )
+    // VTU files
+    if ( m_mpiio_singlefile && m_nprocs > 1 )
+    {
+      if ( m_binary )
+	writeContactForceVectorsPostProcessing_Paraview_MPIIO_binary( 
+		particles, LC, forceFilename + ".vtu", time,
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+	else
+	writeContactForceVectorsPostProcessing_Paraview_MPIIO_text( 
+		particles, LC, forceFilename + ".vtu", time,
+		PostProcessingWriter::m_bPPWindow[m_rank] );    	     
+    }
+    else		
       writeContactForceVectorsPostProcessing_Paraview( particles, LC,
-   	forceFilename + "_" + ossRK.str() + ".vtu", time );
+   	forceFilename + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", 
+	time, PostProcessingWriter::m_bPPWindow[m_rank] );
 
 
     if ( m_network )
     {
-      // Force chain
-      string forceChainFilename = m_ParaviewFilename + "_ContactForceChains_T" +
-        	ossCN.str();
-		
-      if ( m_rank == 0 )
-      {
-        m_Paraview_saveContactForceChains_pvd << "<DataSet timestep=\"" << time 
-          	<< "\" " << "group=\"\" part=\"0\" file=\"" << 
-		forceChainFilename << ".pvtp\"/>" << endl; 	
-          
-        ofstream h( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
-          	+ "_ContactForceChains.pvd" ).c_str(), ios::out );
-        h << m_Paraview_saveContactForceChains_pvd.str();
-//	writeBigOSS( h, m_Paraview_saveContactForceChains_pvd );        
-        h << "</Collection>" << endl;
-        h << "</VTKFile>" << endl;
-        h.close();      
- 
-        list<string> vecForce;
-        vecForce.push_back("ForceChain");
-        writePVTP_Paraview( forceChainFilename, &vecForce, &empty_string_list,
-          	&empty_string_list ); 
-      }
- 
-      // Does this processor write data ?
-      if ( PostProcessingWriter::m_bPPWindow[m_rank] )
-        writeContactForceChains_Paraview( particles, LC, forceChainFilename 
-		+ "_" + ossRK.str() + ".vtp", time );
+//       // Force chain
+//       string forceChainFilename = m_ParaviewFilename + "_ContactForceChains_T" +
+//         	ossCN.str();
+// 		
+//       if ( m_rank == 0 )
+//       {
+//         m_Paraview_saveContactForceChains_pvd << "<DataSet timestep=\"" << time 
+//           	<< "\" " << "group=\"\" part=\"0\" file=\"" << 
+// 		forceChainFilename << ".pvtp\"/>" << endl; 	
+//           
+//         ofstream h( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
+//           	+ "_ContactForceChains.pvd" ).c_str(), ios::out );
+//         h << m_Paraview_saveContactForceChains_pvd.str();      
+//         h << "</Collection>" << endl;
+//         h << "</VTKFile>" << endl;
+//         h.close();      
+//  
+//         list<string> vecForce;
+//         vecForce.push_back("ForceChain");
+//         writePVTP_Paraview( forceChainFilename, &vecForce, &empty_string_list,
+//           	&empty_string_list ); 
+//       }
+//  
+//       // Does this processor write data ?
+//       if ( PostProcessingWriter::m_bPPWindow[m_rank] )
+//         writeContactForceChains_Paraview( particles, LC, forceChainFilename 
+// 		+ "_" + ossRK.str() + ".vtp", time );
     }
   }
 
@@ -917,7 +1040,7 @@ void ParaviewPostProcessingWriter::updateObstaclesIndicator(
 // Writes particles data
 void ParaviewPostProcessingWriter::writeParticlesPostProcessing_Paraview(
 	list<Particle*> const* particles, string const& partFilename,
-	bool const& forceForAllTag )
+	bool const& forceForAllTag, bool const& processwrites )
 {
   list<Particle*>::const_iterator particle;
   Vector3 const* PPTranslation = 
@@ -1746,7 +1869,8 @@ void ParaviewPostProcessingWriter::writePeriodicBoundaryPostProcessing_Paraview(
 // Writes particle translational and angular velocity vectors
 void ParaviewPostProcessingWriter::
 	writeParticleVelocityVectorsPostProcessing_Paraview(
-	list<Particle*> const* particles, string const& partFilename )
+	list<Particle*> const* particles, string const& partFilename,
+	bool const& processwrites )
 {
   list<Particle*>::const_iterator particle;
   Point3 gc; 
@@ -2098,7 +2222,8 @@ void ParaviewPostProcessingWriter::writeContactForceChains_Paraview(
 void ParaviewPostProcessingWriter::
 	writeContactForceVectorsPostProcessing_Paraview(
 	list<Particle*> const* particles,
-  	LinkedCell const* LC, string const& partFilename, double const& time )
+  	LinkedCell const* LC, string const& partFilename, double const& time,
+	bool const& processwrites )
 {
   vector<struct PointForcePostProcessing> const* pallContacts = 
   	LC->getPPForces();
@@ -2244,7 +2369,7 @@ void ParaviewPostProcessingWriter::
 void ParaviewPostProcessingWriter:: writeSpheresPostProcessing_Paraview(
     list<Particle*> const* particles,
     string const& partFilename,
-    bool const& forceForAllTag )
+    bool const& forceForAllTag, bool const& processwrites )
 {
   list<Particle*>::const_iterator particle;
   Point3 gc; 
@@ -2857,7 +2982,7 @@ void ParaviewPostProcessingWriter:: check_allocated_binary( int size )
   {
     int new_size = max( 2*ALLOCATED, (int)1024 ) ;
     new_size = max( new_size, 2*(OFFSET+size) ) ;
-    new_size = 4 * ( new_size/4 +1 ) ; // allignement sur 4 bytes
+    new_size = 4 * ( new_size/4 +1 ) ; // alignment on 4 bytes
       
     char * new_buffer = new char [ new_size ] ;
     for( int i=0 ;i<OFFSET ;i++ ) new_buffer[i] = BUFFER[i] ;
@@ -2936,7 +3061,7 @@ void ParaviewPostProcessingWriter:: compress_segment_binary( int seg,
       BUFFER[OFFSET++] = encoded_buff[i] ;
 
    if( OFFSET%4 != 0 )
-      OFFSET = 4*( OFFSET/4 +1 ) ; // Re-allignement
+      OFFSET = 4*( OFFSET/4 +1 ) ; // Re-alignment
    
    delete [] CompressionHeader ;
    delete [] encoded_buff ;

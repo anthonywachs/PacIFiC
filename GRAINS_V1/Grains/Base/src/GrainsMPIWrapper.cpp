@@ -1762,11 +1762,11 @@ void GrainsMPIWrapper::CreateClones(double time,
 // ----------------------------------------------------------------------------
 // Broadcasts a double from the master to all processes within the 
 // MPI_COMM_activProc communicator
-double GrainsMPIWrapper::Broadcast_DOUBLE( double const& d ) const
+double GrainsMPIWrapper::Broadcast_DOUBLE( double const& d, int source ) const
 {
   double collective_d = d;
   
-  MPI_Bcast( &collective_d, 1, MPI_DOUBLE, 0, m_MPI_COMM_activeProc );
+  MPI_Bcast( &collective_d, 1, MPI_DOUBLE, source, m_MPI_COMM_activeProc );
   
   return ( collective_d ); 
 }
@@ -2050,6 +2050,39 @@ size_t* GrainsMPIWrapper::AllGather_UNSIGNED_INT( size_t const& i ) const
 
   return ( recv );
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// AllGather of an unsigned integer from all processes on all processes within 
+// the MPI_COMM_activProc communicator
+int* GrainsMPIWrapper::AllGather_INT( int const& i ) const
+{
+  int* recv = new int[m_nprocs];
+  
+  MPI_Allgather( &i, 1, MPI_INT, recv, 1, MPI_INT, m_MPI_COMM_activeProc ); 
+
+  return ( recv );
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Gather of an integer from all processes on the master process 
+// within the MPI_COMM_activProc communicator
+int* GrainsMPIWrapper::Gather_INT_master( int const& i ) const
+{
+  int* recv = NULL;
+  if ( m_rank == 0 ) recv = new int[m_nprocs];
+  
+  MPI_Gather( &i, 1, MPI_INT, recv, 1, MPI_INT, 0, m_MPI_COMM_activeProc ); 
+
+  return ( recv );
+} 
+
+
 
 
 
@@ -2428,6 +2461,7 @@ void GrainsMPIWrapper::writeStringPerProcess( ostream& f, string const& out,
     	bool creturn, string const& shift ) const
 {
   string allout = shift + "Process 0";
+  bool write = false;
   int dim = 0, recvsize = 0 ;
   MPI_Status status;
   
@@ -2435,7 +2469,8 @@ void GrainsMPIWrapper::writeStringPerProcess( ostream& f, string const& out,
   {
     if ( creturn ) allout += "\n";
     else allout += ": ";
-    allout += out + "\n"; 
+    allout += out + "\n";
+    if ( !out.empty() ) write = true;   
     for ( int irank=1;irank<m_nprocs;irank++)
     {
       // Size of the message
@@ -2449,7 +2484,8 @@ void GrainsMPIWrapper::writeStringPerProcess( ostream& f, string const& out,
 
       if ( recvsize != 1 )
       { 
-        string recstring = string( recvbuf_char );
+        write = true; 
+	string recstring = string( recvbuf_char );
         allout += shift + "Process " + GrainsExec::intToString( irank );
         if ( creturn ) allout += "\n";
         else allout += ": ";
@@ -2468,7 +2504,7 @@ void GrainsMPIWrapper::writeStringPerProcess( ostream& f, string const& out,
   }
 
   // The master proc writes to the stream
-  if ( m_rank == m_rank_master ) f << allout << endl; 
+  if ( m_rank == m_rank_master && write ) f << allout << endl; 
 }
 
 
@@ -2532,3 +2568,13 @@ void GrainsMPIWrapper::receive( double* &recvbuf, int &dim, int const& from )
   MPI_Recv( recvbuf, dim, MPI_DOUBLE, from, m_tag_DOUBLE, 
   	m_MPI_COMM_activeProc, &status );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the active process communicator
+MPI_Comm GrainsMPIWrapper::get_active_procs_comm() const
+{
+  return ( m_MPI_COMM_activeProc ) ;
+} 
