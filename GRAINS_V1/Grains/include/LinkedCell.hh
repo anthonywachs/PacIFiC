@@ -169,9 +169,15 @@ class LinkedCell : public AppCollision
     	bool const& periodic, bool const& force_insertion,
 	GrainsMPIWrapper const* wrapper = NULL );
 	
-    /** @brief Returns an array of point coordinates of the grid in a direction
+    /** @brief Returns an array of point coordinates of the local grid in a 
+    direction
     @param dir direction */
-    vector<double> coordinates( size_t const& dir ) const;		
+    vector<double> local_coordinates( size_t const& dir ) const;
+    
+    /** @brief Returns an array of point coordinates of the global grid in a 
+    direction
+    @param dir direction */
+    vector<double> global_coordinates( size_t const& dir ) const;    		
     //@}
 
 
@@ -254,6 +260,7 @@ class LinkedCell : public AppCollision
     double m_cellsize_Y; /**< cell size in Y direction */
     double m_cellsize_Z; /**< cell size in Z direction */
     Point3 m_LC_global_origin; /**< Linked cell global origin */
+    Point3 m_LC_global_max; /**< Linked cell global max point */    
     Point3 m_LC_local_origin; /**< Linked cell local origin */
     double m_LC_local_xmin; /**< Linked cell minimum coordinate in the
     	X direction */

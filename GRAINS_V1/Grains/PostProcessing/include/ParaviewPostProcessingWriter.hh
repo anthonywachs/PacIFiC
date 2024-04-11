@@ -153,6 +153,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     bool m_network; /**< whether to write force chain network data */
     bool m_mpiio_singlefile; /**< whether to use MPI I/O writing routines to
     	output data in a single file */
+    bool m_pertype; /**< whether to write particle files per type */
     char * BUFFER ;
     int ALLOCATED ;
     int OFFSET ;
@@ -246,9 +247,11 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
 	
     /** @brief Writes linked-cell grid data
     @param LC linked-cell grid
-    @param partFilename output file name  */
+    @param partFilename output file name 
+    @param local use local coordinates if true, global if false */
     void writeLinkedCellPostProcessing_Paraview(
-  	LinkedCell const* LC, string const& partFilename );
+  	LinkedCell const* LC, string const& partFilename,
+	bool const& local );
 
     /** @brief Writes insertion windows data
     @param insert_windows insertion windows

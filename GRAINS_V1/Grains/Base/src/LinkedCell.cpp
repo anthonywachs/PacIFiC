@@ -65,6 +65,10 @@ size_t LinkedCell::set( double cellsize_, string const& oshift )
   }
   
   m_LC_global_origin = m_domain_global_origin;
+  m_LC_global_max = m_domain_global_origin;
+  m_LC_global_max[X] += m_domain_global_size_X;
+  m_LC_global_max[Y] += m_domain_global_size_Y;  
+  m_LC_global_max[Z] += m_domain_global_size_Z;  
   m_LC_local_origin = m_domain_local_origin;
 
   // Number of cells and cell edge length in each direction and
@@ -101,18 +105,21 @@ size_t LinkedCell::set( double cellsize_, string const& oshift )
   if ( m_domain_global_periodicity[X] )
   {
     m_LC_global_origin.Move( - m_cellsize_X, 0., 0. );
+    m_LC_global_max.Move( m_cellsize_X, 0., 0. );
     m_LC_local_origin.Move( - m_cellsize_X, 0., 0. );
     m_nbi += 2;
   }
   if ( m_domain_global_periodicity[Y] )
   {
     m_LC_global_origin.Move( 0., - m_cellsize_Y, 0. );
+    m_LC_global_max.Move( 0., m_cellsize_Y, 0. );    
     m_LC_local_origin.Move( 0., - m_cellsize_Y, 0. );
     m_nbj += 2;
   }
   if ( m_domain_global_periodicity[Z] )
   {
     m_LC_global_origin.Move( 0., 0., - m_cellsize_Z );
+    m_LC_global_max.Move( 0., 0., m_cellsize_Z );     
     m_LC_local_origin.Move( 0., 0., - m_cellsize_Z );
     m_nbk += 2;
   }      
@@ -124,6 +131,7 @@ size_t LinkedCell::set( double cellsize_, string const& oshift )
   cout << oshift << "Cell size  = " << m_cellsize_X << " x " << m_cellsize_Y <<
   	" x " << m_cellsize_Z << endl;
   cout << oshift << "Global origin = " << m_LC_global_origin << endl;
+  cout << oshift << "Global max = " << m_LC_global_max << endl;  
   cout << oshift << "Local origin = " << m_LC_global_origin << endl;
 
   m_LC_local_xmin = m_LC_local_origin[0];
@@ -441,6 +449,10 @@ size_t LinkedCell::set( double cellsize_, int const* nprocsdir,
   }
 
   m_LC_global_origin = m_domain_global_origin;
+  m_LC_global_max = m_domain_global_origin;
+  m_LC_global_max[X] += m_domain_global_size_X;
+  m_LC_global_max[Y] += m_domain_global_size_Y;  
+  m_LC_global_max[Z] += m_domain_global_size_Z;  
   m_LC_local_origin = m_domain_local_origin;
 
   // Number of cells and cell edge length in each direction and
@@ -497,12 +509,21 @@ size_t LinkedCell::set( double cellsize_, int const* nprocsdir,
     	0., 0., - m_cellsize_Z );
 
   // Periodicity
-  if ( m_domain_global_periodicity[0] ) 
+  if ( m_domain_global_periodicity[0] )
+  { 
     m_LC_global_origin.Move( - m_cellsize_X, 0., 0. );
-  if ( m_domain_global_periodicity[1] )	
+    m_LC_global_max.Move( m_cellsize_X, 0., 0. );    
+  }
+  if ( m_domain_global_periodicity[1] )
+  {	
     m_LC_global_origin.Move( 0., - m_cellsize_Y, 0. );
+    m_LC_global_max.Move( 0., m_cellsize_Y, 0. );    
+  }
   if ( m_domain_global_periodicity[2] )	
+  {
     m_LC_global_origin.Move( 0., 0., - m_cellsize_Z );
+    m_LC_global_max.Move( 0., 0., m_cellsize_Z );    
+  }
 
   m_nb = m_nbi * m_nbj * m_nbk;
 
@@ -514,6 +535,7 @@ size_t LinkedCell::set( double cellsize_, int const* nprocsdir,
     cout << oshift << "Cell size = " << m_cellsize_X << " x " << m_cellsize_Y <<
   	" x " << m_cellsize_Z << endl;
     cout << oshift << "Global origin = " << m_LC_global_origin << endl;
+    cout << oshift << "Global max = " << m_LC_global_max << endl;    
     cout << oshift << "Local origin = " << m_LC_global_origin << endl;
   }
 
@@ -2306,8 +2328,8 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
 
 
 // ----------------------------------------------------------------------------
-// Returns an array of point coordinates of the grid in a direction
-vector<double> LinkedCell::coordinates( size_t const& dir ) const
+// Returns an array of point coordinates of the local grid in a direction
+vector<double> LinkedCell::local_coordinates( size_t const& dir ) const
 {
   int npts = ( dir == 0 ? m_nbi + 1 : ( dir == 1 ? m_nbj + 1 : m_nbk + 1 ) );
   vector<double> coord( npts, 0. );
@@ -2316,6 +2338,30 @@ vector<double> LinkedCell::coordinates( size_t const& dir ) const
   
   for (int i=0;i<npts;i++) 
     coord[i] = m_LC_local_origin[dir] + double(i) * step;
+  
+  return ( coord );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns an array of point coordinates of the global grid in a direction
+vector<double> LinkedCell::global_coordinates( size_t const& dir ) const
+{
+  int npts = ( dir == 0 ? 
+	int( ( m_LC_global_max[X] - m_LC_global_origin[X] + EPSILON ) 
+	/ m_cellsize_X ) + 1 : ( dir == 1 ? 
+	int( ( m_LC_global_max[Y] - m_LC_global_origin[Y] + EPSILON ) 
+	/ m_cellsize_Y ) + 1 : 
+	int( ( m_LC_global_max[Z] - m_LC_global_origin[Z] + EPSILON ) 
+	/ m_cellsize_Z ) + 1 ) );
+  vector<double> coord( npts, 0. );
+  double step = ( dir == 0 ? m_cellsize_X : 
+  	( dir == 1 ? m_cellsize_Y : m_cellsize_Z ) );
+  
+  for (int i=0;i<npts;i++) 
+    coord[i] = m_LC_global_origin[dir] + double(i) * step;
   
   return ( coord );
 }

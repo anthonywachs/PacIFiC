@@ -34,9 +34,9 @@ void ParaviewPostProcessingWriter::
   MPI_Datatype num_as_string;
   int nbpts = 0, nbcells = 0, nparts = 0, i, rank, j, nc, coordNum;
   list<Particle*>::const_iterator particle;
-  char fmt[7] = "%8.6f ";
-  char endfmt[7] = "%8.6f\n";
-  const int charspernum = 9;
+  char fmt[8] = "%12.5e ";
+  char endfmt[8] = "%12.5e\n";
+  const int charspernum = 13;
   size_t counter = 0;
   Vector3 const* PPTranslation = 
   	GrainsExec::m_translationParaviewPostProcessing ;
@@ -625,7 +625,246 @@ void ParaviewPostProcessingWriter::
 	bool const& forceForAllTag,
 	bool const& processwrites )
 {
+  GrainsMPIWrapper* wrapper = GrainsExec::getComm();
+  MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
+  MPI_File file;
+  MPI_Status status;
+  MPI_Datatype num_as_string;
+  int nbpts = 0, i, coordNum;
+  list<Particle*>::const_iterator particle;
+  char fmt[8] = "%12.5e ";
+  char endfmt[8] = "%12.5e\n";
+  const int charspernum = 13;
+  size_t counter = 0;
+  Vector3 const* PPTranslation = 
+  	GrainsExec::m_translationParaviewPostProcessing ;
+  Point3 gc; 
+  Vector3 vec; 
+  double nu, nom;       
+  
+  // Create a MPI datatype to write doublea as stringa with a given format
+  MPI_Type_contiguous( charspernum, MPI_CHAR, &num_as_string ); 
+  MPI_Type_commit( &num_as_string );
 
+  // Open the file 
+  MPI_File_open( MPI_COMM_activeProc, ( m_ParaviewFilename_dir 
+  	+ "/" + partFilename ).c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY,
+	MPI_INFO_NULL, &file );
+
+  // Numbers of Paraview points
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+       ( (*particle)->getTag() != 2 || forceForAllTag ) )
+      nbpts++;
+  
+  int total_nbpts = wrapper->sum_INT( nbpts ); 
+  int* nbpts_per_proc = wrapper->AllGather_INT( nbpts );       
+
+
+  // File header
+  ostringstream oss;
+  oss << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
+    	<< "byte_order=\"LittleEndian\">\n";
+  oss << "<UnstructuredGrid>\n";
+  oss << "<Piece NumberOfPoints=\"" << total_nbpts << "\""
+    	<< " NumberOfCells=\"0\">\n";
+  oss << "<Points>\n";
+  oss << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
+  oss << "format=\"ascii\">";
+  oss << "\n";        
+  int header = int(oss.str().size());
+  if ( m_rank == 0 )
+    MPI_File_write( file, oss.str().c_str(), header, MPI_CHAR, &status );
+
+  // Write point coordinates to the MPI file
+  char* coord = new char[ 3 * nbpts * charspernum + 1 ];
+  list<Point3> ppp;
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+	( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      gc = *(*particle)->getPosition();
+      if ( PPTranslation ) gc += *PPTranslation ;
+      sprintf( &coord[3*counter*charspernum], fmt, gc[X] );
+      sprintf( &coord[(3*counter+1)*charspernum], fmt, gc[Y] );
+      sprintf( &coord[(3*counter+2)*charspernum], endfmt, gc[Z] );
+      ++counter;
+    }    
+
+  vector<int> mpifile_offsets( m_nprocs, 0 );
+  mpifile_offsets[0] = header * sizeof(char);
+  for (i=1;i<m_nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbpts_per_proc[i-1] * 3 * charspernum * sizeof(char);
+
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], coord, 3 * nbpts, 
+    	num_as_string, &status ); 
+  
+
+  // Connectivity, offsets and types and header for orientation
+  ostringstream oss2;
+  oss2 << "</DataArray>\n";
+  oss2 << "</Points>\n";
+  oss2 << "<Cells>\n";
+  oss2 << "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">";
+  oss2 << "0 0 0</DataArray>\n";
+  oss2 << "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">";
+  oss2 << "3</DataArray>\n";
+  oss2 << "<DataArray type=\"Int32\" Name=\"types\" format=\"ascii\">";
+  oss2 << "5</DataArray>\n";
+  oss2 << "</Cells>\n"; 
+  oss2 << "<PointData Vectors=\"Orientation\" ";
+  oss2 << "Scalars=\"NormU,NormOm,CoordNumb\">\n";
+  oss2 << "<DataArray Name=\"Orientation\" "
+    << "NumberOfComponents=\"3\" type=\"Float32\" format=\"ascii\">\n";         
+  header = int(oss2.str().size());
+  int mpifile_offset = mpifile_offsets[m_nprocs-1] 
+  	+ nbpts_per_proc[m_nprocs-1] * 3 * charspernum * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, oss2.str().c_str(), header, 
+    	MPI_CHAR, &status );
+    
+  
+  // Orientation vector
+  counter = 0;
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+	( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      vec = (*particle)->computeOrientationVector();
+      sprintf( &coord[3*counter*charspernum], fmt, vec[X] );
+      sprintf( &coord[(3*counter+1)*charspernum], fmt, vec[Y] );
+      sprintf( &coord[(3*counter+2)*charspernum], endfmt, vec[Z] );
+      ++counter;
+    }    
+
+  mpifile_offsets[0] = mpifile_offset + header * sizeof(char);
+  for (i=1;i<m_nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbpts_per_proc[i-1] * 3 * charspernum * sizeof(char);
+
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], coord, 3 * nbpts, 
+    	num_as_string, &status );
+	
+  delete [] coord;
+	
+
+  // Norm of translational velocity
+  ostringstream oss5;
+  oss5 << "</DataArray>\n";
+  oss5 << "<DataArray type=\"Float32\" Name=\"NormU\" format=\"ascii\">\n";    
+  header = int(oss5.str().size());
+  mpifile_offset = mpifile_offsets[m_nprocs-1] 
+  	+ nbpts_per_proc[m_nprocs-1] * 3 * charspernum * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, oss5.str().c_str(), header, 
+    	MPI_CHAR, &status ); 
+
+  char* scalar = new char[ nbpts * charspernum + 1 ];
+  counter = 0;
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+       ( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      nu = Norm( *(*particle)->getTranslationalVelocity() );
+      sprintf( &scalar[counter*charspernum], fmt, nu );
+      ++counter;	
+    }
+
+  mpifile_offsets[0] = mpifile_offset + header * sizeof(char);
+  for (i=1;i<m_nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbpts_per_proc[i-1] * charspernum * sizeof(char) ;
+ 
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], scalar, nbpts, 
+    	num_as_string, &status ); 
+  
+  
+  // Norm of angular velocity
+  ostringstream oss6;
+  oss6 << "\n</DataArray>\n";  
+  oss6 << "<DataArray type=\"Float32\" Name=\"NormOm\" format=\"ascii\">\n";    
+  header = int(oss6.str().size());
+  mpifile_offset = mpifile_offsets[m_nprocs-1] 
+  	+ nbpts_per_proc[m_nprocs-1] * charspernum * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, oss6.str().c_str(), header, 
+    	MPI_CHAR, &status ); 
+
+  counter = 0;
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+       ( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      nom = Norm( *(*particle)->getAngularVelocity() );
+      sprintf( &scalar[counter*charspernum], fmt, nom );
+      ++counter;	
+    }
+
+  mpifile_offsets[0] = mpifile_offset + header * sizeof(char);
+  for (i=1;i<m_nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbpts_per_proc[i-1] * charspernum * sizeof(char) ;
+ 
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], scalar, nbpts, 
+    	num_as_string, &status );
+  
+  
+  // Coordination number
+  ostringstream oss7;
+  oss7 << "\n</DataArray>\n";  
+  oss7 << "<DataArray type=\"Float32\" Name=\"CoordNumb\" ";        
+  oss7 << "format=\"ascii\">\n";    
+  header = int(oss7.str().size());
+  mpifile_offset = mpifile_offsets[m_nprocs-1] 
+  	+ nbpts_per_proc[m_nprocs-1] * charspernum * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, oss7.str().c_str(), header, 
+    	MPI_CHAR, &status ); 
+
+  ostringstream* oss_out = new ostringstream;
+  for (particle=particles->begin();
+    	particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+       ( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      coordNum = (*particle)->getCoordinationNumber();
+      *oss_out << coordNum << " ";
+    }
+  int out_length = int(oss_out->str().size());
+  int* out_length_per_proc = wrapper->AllGather_INT( out_length );
+  
+  mpifile_offsets[0] = mpifile_offset + header * sizeof(char);
+  for (i=1;i<m_nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ out_length_per_proc[i-1] * sizeof(char) ;
+
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], oss_out->str().c_str(), 
+  	out_length, MPI_CHAR, &status );   
+
+  delete oss_out;
+  delete [] scalar;
+   
+   
+  // Closing text
+  ostringstream oss8;
+  oss8 << "\n</DataArray>\n";
+  oss8 << "</PointData>\n";
+  oss8 << "</Piece>\n";
+  oss8 << "</UnstructuredGrid>\n";
+  oss8 << "</VTKFile>\n";
+  header = int(oss8.str().size());
+  mpifile_offset = mpifile_offsets[m_nprocs-1] 
+  	+ out_length_per_proc[m_nprocs-1] * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, oss8.str().c_str(), header, 
+    	MPI_CHAR, &status );   
+
+
+  // Close MPI file and free remaining pointers
+  MPI_File_close( &file );
+  MPI_Type_free( &num_as_string );
+  delete [] nbpts_per_proc;     
 }
 
 
@@ -641,7 +880,192 @@ void ParaviewPostProcessingWriter::
 	bool const& forceForAllTag,
 	bool const& processwrites )
 {
+  GrainsMPIWrapper* wrapper = GrainsExec::getComm();
+  MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
+  MPI_File file;
+  MPI_Status status;
+  int nbpts = 0, rank;
+  list<Particle*>::const_iterator particle;
+  Vector3 const* PPTranslation = 
+  	GrainsExec::m_translationParaviewPostProcessing ;
+  double normU, normOm, coordNum;
+  int point_binary_offset = 0, orientation_binary_offset, 
+  	normU_binary_offset, normOm_binary_offset, coord_binary_offset, 
+	total_offset; 
+  Point3 gc;
+  Vector3 vec;    	    
 
+  // Open the file 
+  MPI_File_open( MPI_COMM_activeProc, ( m_ParaviewFilename_dir 
+  	+ "/" + partFilename ).c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY,
+	MPI_INFO_NULL, &file );
+
+  // Numbers of Paraview points
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+       ( (*particle)->getTag() != 2 || forceForAllTag ) )
+      nbpts++;
+
+
+  // Write point coordinates to the binary buffer
+  start_output_binary( sizeof_Float32, 3 * nbpts ) ;
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+	( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      gc = *(*particle)->getPosition();
+      if ( PPTranslation ) gc += *PPTranslation ;
+      for (int comp=0;comp<3;++comp) write_double_binary( gc[comp] ) ;
+    }   
+  compress_segment_binary( CURRENT_LENGTH,	
+  	"writeSpheresPostProcessing_Paraview_MPIIO_binary/Points" );  
+
+
+  // Orientation vector
+  orientation_binary_offset = OFFSET;
+  start_output_binary( sizeof_Float32, 3 * nbpts );  
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+	( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      vec = (*particle)->computeOrientationVector();
+      for (int comp=0;comp<3;++comp) write_double_binary( vec[comp] ) ;
+    }    
+  compress_segment_binary( CURRENT_LENGTH, 
+  	"writeSpheresPostProcessing_Paraview_MPIIO_binary/Orientation" ); 
+
+
+  // Write field values to the binary buffer
+  normU_binary_offset = OFFSET;
+  start_output_binary( sizeof_Float32, nbpts );
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+       ( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      normU = Norm( *(*particle)->getTranslationalVelocity() );
+      write_double_binary( normU );
+    }
+  compress_segment_binary( CURRENT_LENGTH, 
+  	"writeSpheresPostProcessing_Paraview_MPIIO_binary/NormU" ); 
+  
+  normOm_binary_offset = OFFSET;
+  start_output_binary( sizeof_Float32, nbpts );
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+       ( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      normOm = Norm( *(*particle)->getAngularVelocity() );
+      write_double_binary( normOm );
+    }
+  compress_segment_binary( CURRENT_LENGTH, 
+  	"writeSpheresPostProcessing_Paraview_MPIIO_binary/NormOm" ); 
+
+  coord_binary_offset = OFFSET;
+  start_output_binary( sizeof_Float32, nbpts );
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+       ( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      coordNum = double((*particle)->getCoordinationNumber());
+      write_double_binary( coordNum );
+    }
+  compress_segment_binary( CURRENT_LENGTH, 
+  	"writeSpheresPostProcessing_Paraview_MPIIO_binary/CoordNumb" ); 
+  total_offset = OFFSET;  
+  
+  int* total_binary_offset_per_proc = wrapper->AllGather_INT( total_offset );
+  int* cumul_binary_offset_per_proc = new int[m_nprocs];
+  cumul_binary_offset_per_proc[0] = 0;
+  for (rank=1;rank<m_nprocs;rank++) 
+    cumul_binary_offset_per_proc[rank] = cumul_binary_offset_per_proc[rank-1]
+    	+ total_binary_offset_per_proc[rank-1];
+
+
+  // Header per piece + general for 1st and last process
+  ostringstream oss;
+  if ( m_rank == 0 )
+  {   
+    oss << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
+    	<< "byte_order=\"LittleEndian\" ";
+    oss << "compressor=\"vtkZLibDataCompressor\">\n";
+    oss << "<UnstructuredGrid>\n";  
+  }
+  oss << "<Piece NumberOfPoints=\"" << nbpts << "\""
+    	<< " NumberOfCells=\"0\">\n";
+  oss << "<Points>\n";
+  oss << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
+  oss << "offset=\"" << cumul_binary_offset_per_proc[m_rank] 
+  	+ point_binary_offset << "\" format=\"appended\"></DataArray>\n"; 
+  oss << "</Points>\n";
+  oss << "<Cells>\n";
+  oss << "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">";
+  oss << "0 0 0</DataArray>\n";
+  oss << "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">";
+  oss << "3</DataArray>\n";
+  oss << "<DataArray type=\"Int32\" Name=\"types\" format=\"ascii\">";
+  oss << "5</DataArray>\n";
+  oss << "</Cells>\n"; 
+  oss << "<PointData Vectors=\"Orientation\" ";
+  oss << "Scalars=\"NormU,NormOm,CoordNumb\">\n";
+  oss << "<DataArray Name=\"Orientation\" NumberOfComponents=\"3\" " <<
+  	"type=\"Float32\" offset=\"" << cumul_binary_offset_per_proc[m_rank] 
+	+ orientation_binary_offset << "\" format=\"appended\"></DataArray>\n";
+  oss << "<DataArray type=\"Float32\" Name=\"NormU\" offset=\"" << 
+  	cumul_binary_offset_per_proc[m_rank] + normU_binary_offset 
+	<< "\" format=\"appended\"></DataArray>\n";        
+  oss << "<DataArray type=\"Float32\" Name=\"NormOm\" offset=\"" << 
+  	cumul_binary_offset_per_proc[m_rank] + normOm_binary_offset 
+	<< "\" format=\"appended\"></DataArray>\n"; 
+  oss << "<DataArray type=\"Float32\" Name=\"CoordNumb\" offset=\"" << 
+  	cumul_binary_offset_per_proc[m_rank] + coord_binary_offset 
+	<< "\" format=\"appended\"></DataArray>\n"; 
+  oss << "</PointData>\n";
+  oss << "</Piece>\n";
+  if ( m_rank == m_nprocs - 1 )
+  { 
+    oss << "</UnstructuredGrid>\n"; 
+    oss << "<AppendedData encoding=\"raw\">\n" << "    _" ;  
+  }            
+  int header = int(oss.str().size());
+  int* header_per_proc = wrapper->AllGather_INT( header );
+  vector<int> mpifile_offsets( m_nprocs, 0 );
+  mpifile_offsets[0] = 0;
+  for (rank=1;rank<m_nprocs;rank++) 
+    mpifile_offsets[rank] = mpifile_offsets[rank-1]
+    	+ header_per_proc[rank-1] * sizeof(char);  
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], oss.str().c_str(), 
+  	header, MPI_CHAR, &status ); 
+
+
+  // Write the binary buffers
+  int starting_point = mpifile_offsets[m_nprocs-1] 
+  	+ header_per_proc[m_nprocs-1] * sizeof(char); 
+  for (rank=0;rank<m_nprocs;rank++) 
+    mpifile_offsets[rank] = starting_point
+    	+ cumul_binary_offset_per_proc[rank] * sizeof(char);	
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], BUFFER, OFFSET, 
+	MPI_CHAR, &status );	 	
+  delete [] BUFFER ; BUFFER = 0 ;
+  ALLOCATED = 0 ;
+  OFFSET = 0 ;
+
+
+  // Closing text
+  ostringstream oss2;
+  oss2 << "\n</AppendedData>\n";
+  oss2 << "</VTKFile>\n";
+  header = int(oss2.str().size());
+  starting_point = mpifile_offsets[m_nprocs-1] 
+  	+ total_binary_offset_per_proc[m_nprocs-1] * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, starting_point, oss2.str().c_str(), header, 
+    	MPI_CHAR, &status );
+
+  // Close MPI file and free remaining pointers
+  MPI_File_close( &file );
+  delete [] total_binary_offset_per_proc;
+  delete [] cumul_binary_offset_per_proc; 
+  delete [] header_per_proc;
 }
 
 
@@ -656,7 +1080,180 @@ void ParaviewPostProcessingWriter::
 	bool const& forceForAllTag,
 	bool const& processwrites )
 {
+  GrainsMPIWrapper* wrapper = GrainsExec::getComm();
+  MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
+  MPI_File file;
+  MPI_Status status;
+  MPI_Datatype num_as_string;
+  int nbpts = 0, i;
+  list<Particle*>::const_iterator particle;
+  char fmt[8] = "%12.5e ";
+  char endfmt[8] = "%12.5e\n";
+  const int charspernum = 13;
+  size_t counter = 0;
+  Vector3 const* PPTranslation = 
+  	GrainsExec::m_translationParaviewPostProcessing ;
+  Point3 gc; 
+  Vector3 const* vec;      
+  
+  // Create a MPI datatype to write doublea as stringa with a given format
+  MPI_Type_contiguous( charspernum, MPI_CHAR, &num_as_string ); 
+  MPI_Type_commit( &num_as_string );
 
+  // Open the file 
+  MPI_File_open( MPI_COMM_activeProc, ( m_ParaviewFilename_dir 
+  	+ "/" + partFilename ).c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY,
+	MPI_INFO_NULL, &file );
+
+  // Numbers of Paraview points
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+       ( (*particle)->getTag() != 2 || forceForAllTag ) )
+      nbpts++;
+  
+  int total_nbpts = wrapper->sum_INT( nbpts ); 
+  int* nbpts_per_proc = wrapper->AllGather_INT( nbpts );       
+
+
+  // File header
+  ostringstream oss;
+  oss << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
+    	<< "byte_order=\"LittleEndian\">\n";
+  oss << "<UnstructuredGrid>\n";
+  oss << "<Piece NumberOfPoints=\"" << total_nbpts << "\""
+    	<< " NumberOfCells=\"0\">\n";
+  oss << "<Points>\n";
+  oss << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
+  oss << "format=\"ascii\">";
+  oss << "\n";        
+  int header = int(oss.str().size());
+  if ( m_rank == 0 )
+    MPI_File_write( file, oss.str().c_str(), header, MPI_CHAR, &status );
+
+  // Write point coordinates to the MPI file
+  char* coord = new char[ 3 * nbpts * charspernum + 1 ];
+  list<Point3> ppp;
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+	( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      gc = *(*particle)->getPosition();
+      if ( PPTranslation ) gc += *PPTranslation ;
+      sprintf( &coord[3*counter*charspernum], fmt, gc[X] );
+      sprintf( &coord[(3*counter+1)*charspernum], fmt, gc[Y] );
+      sprintf( &coord[(3*counter+2)*charspernum], endfmt, gc[Z] );
+      ++counter;
+    }    
+
+  vector<int> mpifile_offsets( m_nprocs, 0 );
+  mpifile_offsets[0] = header * sizeof(char);
+  for (i=1;i<m_nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbpts_per_proc[i-1] * 3 * charspernum * sizeof(char);
+
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], coord, 3 * nbpts, 
+    	num_as_string, &status ); 
+  
+
+  // Connectivity, offsets and types and header for orientation
+  ostringstream oss2;
+  oss2 << "</DataArray>\n";
+  oss2 << "</Points>\n";
+  oss2 << "<Cells>\n";
+  oss2 << "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">";
+  oss2 << "0 0 0</DataArray>\n";
+  oss2 << "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">";
+  oss2 << "3</DataArray>\n";
+  oss2 << "<DataArray type=\"Int32\" Name=\"types\" format=\"ascii\">";
+  oss2 << "5</DataArray>\n";
+  oss2 << "</Cells>\n"; 
+  oss2 << "<PointData Vectors=\"U,Omega\">\n";
+  oss2 << "<DataArray Name=\"U\" "
+    << "NumberOfComponents=\"3\" type=\"Float32\" format=\"ascii\">\n";         
+  header = int(oss2.str().size());
+  int mpifile_offset = mpifile_offsets[m_nprocs-1] 
+  	+ nbpts_per_proc[m_nprocs-1] * 3 * charspernum * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, oss2.str().c_str(), header, 
+    	MPI_CHAR, &status );
+    
+  
+  // Translational velocity vector
+  counter = 0;
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+	( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      vec = (*particle)->getTranslationalVelocity();
+      sprintf( &coord[3*counter*charspernum], fmt, (*vec)[X] );
+      sprintf( &coord[(3*counter+1)*charspernum], fmt, (*vec)[Y] );
+      sprintf( &coord[(3*counter+2)*charspernum], endfmt, (*vec)[Z] );
+      ++counter;
+    }    
+
+  mpifile_offsets[0] = mpifile_offset + header * sizeof(char);
+  for (i=1;i<m_nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbpts_per_proc[i-1] * 3 * charspernum * sizeof(char);
+
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], coord, 3 * nbpts, 
+    	num_as_string, &status );	
+	
+
+  // Angular velocity
+  ostringstream oss5;
+  oss5 << "</DataArray>\n";
+  oss5 << "<DataArray Name=\"Omega\" "
+    << "NumberOfComponents=\"3\" type=\"Float32\" format=\"ascii\">\n";    
+  header = int(oss5.str().size());
+  mpifile_offset = mpifile_offsets[m_nprocs-1] 
+  	+ nbpts_per_proc[m_nprocs-1] * 3 * charspernum * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, oss5.str().c_str(), header, 
+    	MPI_CHAR, &status ); 
+
+  counter = 0;
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+	( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      vec = (*particle)->getAngularVelocity();
+      sprintf( &coord[3*counter*charspernum], fmt, (*vec)[X] );
+      sprintf( &coord[(3*counter+1)*charspernum], fmt, (*vec)[Y] );
+      sprintf( &coord[(3*counter+2)*charspernum], endfmt, (*vec)[Z] );
+      ++counter;
+    }    
+
+  mpifile_offsets[0] = mpifile_offset + header * sizeof(char);
+  for (i=1;i<m_nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbpts_per_proc[i-1] * 3 * charspernum * sizeof(char);
+
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], coord, 3 * nbpts, 
+    	num_as_string, &status );
+	
+  delete [] coord;
+   
+   
+  // Closing text
+  ostringstream oss8;
+  oss8 << "</DataArray>\n";
+  oss8 << "</PointData>\n";
+  oss8 << "</Piece>\n";
+  oss8 << "</UnstructuredGrid>\n";
+  oss8 << "</VTKFile>\n";
+  header = int(oss8.str().size());
+  mpifile_offset = mpifile_offsets[m_nprocs-1] 
+  	+ nbpts_per_proc[m_nprocs-1] * 3 * charspernum * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, oss8.str().c_str(), header, 
+    	MPI_CHAR, &status );   
+
+
+  // Close MPI file and free remaining pointers
+  MPI_File_close( &file );
+  MPI_Type_free( &num_as_string );
+  delete [] nbpts_per_proc;
 }
 
 
@@ -671,7 +1268,161 @@ void ParaviewPostProcessingWriter::
 	bool const& forceForAllTag,
 	bool const& processwrites )
 {
+  GrainsMPIWrapper* wrapper = GrainsExec::getComm();
+  MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
+  MPI_File file;
+  MPI_Status status;
+  int nbpts = 0, rank;
+  list<Particle*>::const_iterator particle;
+  Vector3 const* PPTranslation = 
+  	GrainsExec::m_translationParaviewPostProcessing ;
+  int point_binary_offset = 0, translational_binary_offset, 
+  	angular_binary_offset, total_offset; 
+  Point3 gc;
+  Vector3 const* vec;     	    
 
+  // Open the file 
+  MPI_File_open( MPI_COMM_activeProc, ( m_ParaviewFilename_dir 
+  	+ "/" + partFilename ).c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY,
+	MPI_INFO_NULL, &file );
+
+  // Numbers of Paraview points
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+       ( (*particle)->getTag() != 2 || forceForAllTag ) )
+      nbpts++;
+
+
+  // Write point coordinates to the binary buffer
+  start_output_binary( sizeof_Float32, 3 * nbpts ) ;
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+	( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      gc = *(*particle)->getPosition();
+      if ( PPTranslation ) gc += *PPTranslation ;
+      for (int comp=0;comp<3;++comp) write_double_binary( gc[comp] ) ;
+    }   
+  compress_segment_binary( CURRENT_LENGTH,	
+	"writePVelocityVectorsPostProcessing_Paraview_MPIIO_binary/Points" );  
+
+
+  // Translational velocity vector
+  translational_binary_offset = OFFSET;
+  start_output_binary( sizeof_Float32, 3 * nbpts );  
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+	( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      vec = (*particle)->getTranslationalVelocity();
+      for (int comp=0;comp<3;++comp) write_double_binary( (*vec)[comp] ) ;
+    }    
+  compress_segment_binary( CURRENT_LENGTH, 
+  	"writePVelocityVectorsPostProcessing_Paraview_MPIIO_binary/U" ); 
+
+
+  // Write field values to the binary buffer
+  angular_binary_offset = OFFSET;
+  start_output_binary( sizeof_Float32, 3 * nbpts );
+  for (particle=particles->begin();particle!=particles->end();particle++)
+    if ( (*particle)->getActivity() == COMPUTE && 
+	( (*particle)->getTag() != 2 || forceForAllTag ) )
+    {
+      vec = (*particle)->getAngularVelocity();
+      for (int comp=0;comp<3;++comp) write_double_binary( (*vec)[comp] ) ;
+    }  
+  compress_segment_binary( CURRENT_LENGTH, 
+  	"writePVelocityVectorsPostProcessing_Paraview_MPIIO_binary/Omega" ); 
+  total_offset = OFFSET;  
+  
+  int* total_binary_offset_per_proc = wrapper->AllGather_INT( total_offset );
+  int* cumul_binary_offset_per_proc = new int[m_nprocs];
+  cumul_binary_offset_per_proc[0] = 0;
+  for (rank=1;rank<m_nprocs;rank++) 
+    cumul_binary_offset_per_proc[rank] = cumul_binary_offset_per_proc[rank-1]
+    	+ total_binary_offset_per_proc[rank-1];
+
+
+  // Header per piece + general for 1st and last process
+  ostringstream oss;
+  if ( m_rank == 0 )
+  {   
+    oss << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
+    	<< "byte_order=\"LittleEndian\" ";
+    oss << "compressor=\"vtkZLibDataCompressor\">\n";
+    oss << "<UnstructuredGrid>\n";  
+  }
+  oss << "<Piece NumberOfPoints=\"" << nbpts << "\""
+    	<< " NumberOfCells=\"0\">\n";
+  oss << "<Points>\n";
+  oss << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
+  oss << "offset=\"" << cumul_binary_offset_per_proc[m_rank] 
+  	+ point_binary_offset << "\" format=\"appended\"></DataArray>\n"; 
+  oss << "</Points>\n";
+  oss << "<Cells>\n";
+  oss << "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">";
+  oss << "0 0 0</DataArray>\n";
+  oss << "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">";
+  oss << "3</DataArray>\n";
+  oss << "<DataArray type=\"Int32\" Name=\"types\" format=\"ascii\">";
+  oss << "5</DataArray>\n";
+  oss << "</Cells>\n"; 
+  oss << "<PointData Vectors=\"U,Omega\">\n";
+  oss << "<DataArray Name=\"U\" NumberOfComponents=\"3\" " <<
+  	"type=\"Float32\" offset=\"" << cumul_binary_offset_per_proc[m_rank] 
+	+ translational_binary_offset << "\" format=\"appended\">"
+	<< "</DataArray>\n";
+  oss << "<DataArray Name=\"Omega\" NumberOfComponents=\"3\" " <<
+  	"type=\"Float32\" offset=\"" << cumul_binary_offset_per_proc[m_rank] 
+	+ angular_binary_offset << "\" format=\"appended\">"
+	<< "</DataArray>\n";
+  oss << "</PointData>\n";
+  oss << "</Piece>\n";
+  if ( m_rank == m_nprocs - 1 )
+  { 
+    oss << "</UnstructuredGrid>\n"; 
+    oss << "<AppendedData encoding=\"raw\">\n" << "    _" ;  
+  }            
+  int header = int(oss.str().size());
+  int* header_per_proc = wrapper->AllGather_INT( header );
+  vector<int> mpifile_offsets( m_nprocs, 0 );
+  mpifile_offsets[0] = 0;
+  for (rank=1;rank<m_nprocs;rank++) 
+    mpifile_offsets[rank] = mpifile_offsets[rank-1]
+    	+ header_per_proc[rank-1] * sizeof(char);  
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], oss.str().c_str(), 
+  	header, MPI_CHAR, &status ); 
+
+
+  // Write the binary buffers
+  int starting_point = mpifile_offsets[m_nprocs-1] 
+  	+ header_per_proc[m_nprocs-1] * sizeof(char); 
+  for (rank=0;rank<m_nprocs;rank++) 
+    mpifile_offsets[rank] = starting_point
+    	+ cumul_binary_offset_per_proc[rank] * sizeof(char);	
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], BUFFER, OFFSET, 
+	MPI_CHAR, &status );	 	
+  delete [] BUFFER ; BUFFER = 0 ;
+  ALLOCATED = 0 ;
+  OFFSET = 0 ;
+
+
+  // Closing text
+  ostringstream oss2;
+  oss2 << "\n</AppendedData>\n";
+  oss2 << "</VTKFile>\n";
+  header = int(oss2.str().size());
+  starting_point = mpifile_offsets[m_nprocs-1] 
+  	+ total_binary_offset_per_proc[m_nprocs-1] * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, starting_point, oss2.str().c_str(), header, 
+    	MPI_CHAR, &status );
+
+  // Close MPI file and free remaining pointers
+  MPI_File_close( &file );
+  delete [] total_binary_offset_per_proc;
+  delete [] cumul_binary_offset_per_proc; 
+  delete [] header_per_proc;
 }
 
 
@@ -686,7 +1437,142 @@ void ParaviewPostProcessingWriter::
   	LinkedCell const* LC, string const& partFilename, double const& time,
 	bool const& processwrites )
 {
+  GrainsMPIWrapper* wrapper = GrainsExec::getComm();
+  MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
+  MPI_File file;
+  MPI_Status status;
+  MPI_Datatype num_as_string;
+  int nbpts = 0, i;
+  char fmt[8] = "%12.5e ";
+  char endfmt[8] = "%12.5e\n";
+  const int charspernum = 13;
+  size_t counter = 0;
+  Vector3 const* PPTranslation = 
+  	GrainsExec::m_translationParaviewPostProcessing ;
+  vector<struct PointForcePostProcessing> const* pallContacts = 
+  	LC->getPPForces();
+  Point3 pt;
+        
+  
+  // Create a MPI datatype to write doublea as stringa with a given format
+  MPI_Type_contiguous( charspernum, MPI_CHAR, &num_as_string ); 
+  MPI_Type_commit( &num_as_string );
 
+  // Open the file 
+  MPI_File_open( MPI_COMM_activeProc, ( m_ParaviewFilename_dir 
+  	+ "/" + partFilename ).c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY,
+	MPI_INFO_NULL, &file );
+
+  // Numbers of Paraview points
+  nbpts = int(LC->getNbPPForces());
+  
+  int total_nbpts = wrapper->sum_INT( nbpts ); 
+  int* nbpts_per_proc = wrapper->AllGather_INT( nbpts );       
+
+
+  // File header
+  ostringstream oss;
+  oss << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
+    	<< "byte_order=\"LittleEndian\">\n";
+  oss << "<UnstructuredGrid>\n";
+  oss << "<Piece NumberOfPoints=\"" << total_nbpts << "\""
+    	<< " NumberOfCells=\"0\">\n";
+  oss << "<Points>\n";
+  oss << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
+  oss << "format=\"ascii\">\n";        
+  int header = int(oss.str().size());
+  if ( m_rank == 0 )
+    MPI_File_write( file, oss.str().c_str(), header, MPI_CHAR, &status );
+
+
+  // Write point coordinates to the MPI file
+  char* coord = new char[ 3 * nbpts * charspernum + 1 ];
+  for (i=0;i<nbpts;++i)
+  {
+    pt = (*pallContacts)[i].geometricPointOfContact;
+    if ( PPTranslation ) pt += *PPTranslation ;
+    sprintf( &coord[3*counter*charspernum], fmt, pt[X] );
+    sprintf( &coord[(3*counter+1)*charspernum], fmt, pt[Y] );
+    sprintf( &coord[(3*counter+2)*charspernum], endfmt, pt[Z] );
+    ++counter;
+  }         
+
+  vector<int> mpifile_offsets( m_nprocs, 0 );
+  mpifile_offsets[0] = header * sizeof(char);
+  for (i=1;i<m_nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbpts_per_proc[i-1] * 3 * charspernum * sizeof(char);
+
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], coord, 3 * nbpts, 
+    	num_as_string, &status ); 
+  
+
+  // Connectivity, offsets and types and header for orientation
+  ostringstream oss2;
+  oss2 << "</DataArray>\n";
+  oss2 << "</Points>\n";
+  oss2 << "<Cells>\n";
+  oss2 << "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">";
+  oss2 << "0 0 0</DataArray>\n";
+  oss2 << "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">";
+  oss2 << "3</DataArray>\n";
+  oss2 << "<DataArray type=\"Int32\" Name=\"types\" format=\"ascii\">";
+  oss2 << "5</DataArray>\n";
+  oss2 << "</Cells>\n"; 
+  oss2 << "<PointData Vectors=\"Force\">\n";
+  oss2 << "<DataArray Name=\"Force\" "
+    << "NumberOfComponents=\"3\" type=\"Float32\" format=\"ascii\">\n";         
+  header = int(oss2.str().size());
+  int mpifile_offset = mpifile_offsets[m_nprocs-1] 
+  	+ nbpts_per_proc[m_nprocs-1] * 3 * charspernum * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, oss2.str().c_str(), header, 
+    	MPI_CHAR, &status );
+    
+  
+  // Force vector
+  counter = 0;
+  for (i=0;i<nbpts;++i)
+  {
+    sprintf( &coord[3*counter*charspernum], fmt, 
+    	(*pallContacts)[i].contactForce[X] );
+    sprintf( &coord[(3*counter+1)*charspernum], fmt, 
+    	(*pallContacts)[i].contactForce[Y] );
+    sprintf( &coord[(3*counter+2)*charspernum], endfmt, 
+    	(*pallContacts)[i].contactForce[Z] );
+    ++counter;
+  }  
+
+  mpifile_offsets[0] = mpifile_offset + header * sizeof(char);
+  for (i=1;i<m_nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ nbpts_per_proc[i-1] * 3 * charspernum * sizeof(char);
+
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], coord, 3 * nbpts, 
+    	num_as_string, &status );	
+	
+  delete [] coord;
+   
+   
+  // Closing text
+  ostringstream oss8;
+  oss8 << "</DataArray>\n";
+  oss8 << "</PointData>\n";
+  oss8 << "</Piece>\n";
+  oss8 << "</UnstructuredGrid>\n";
+  oss8 << "</VTKFile>\n";
+  header = int(oss8.str().size());
+  mpifile_offset = mpifile_offsets[m_nprocs-1] 
+  	+ nbpts_per_proc[m_nprocs-1] * 3 * charspernum * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, mpifile_offset, oss8.str().c_str(), header, 
+    	MPI_CHAR, &status );   
+
+
+  // Close MPI file and free remaining pointers
+  MPI_File_close( &file );
+  MPI_Type_free( &num_as_string );
+  delete [] nbpts_per_proc;
 }
 
 
@@ -701,5 +1587,131 @@ void ParaviewPostProcessingWriter::
   	LinkedCell const* LC, string const& partFilename, double const& time,
 	bool const& processwrites )
 {
+  GrainsMPIWrapper* wrapper = GrainsExec::getComm();
+  MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
+  MPI_File file;
+  MPI_Status status;
+  int nbpts = 0, i, rank, point_binary_offset = 0, force_binary_offset, 
+  	total_offset; 
+  Vector3 const* PPTranslation = 
+  	GrainsExec::m_translationParaviewPostProcessing ;
+  vector<struct PointForcePostProcessing> const* pallContacts = 
+  	LC->getPPForces();
+  Point3 pt;    	    
 
+  // Open the file 
+  MPI_File_open( MPI_COMM_activeProc, ( m_ParaviewFilename_dir 
+  	+ "/" + partFilename ).c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY,
+	MPI_INFO_NULL, &file );
+
+  // Numbers of Paraview points
+  nbpts = int(LC->getNbPPForces());
+
+
+  // Write point coordinates to the binary buffer
+  start_output_binary( sizeof_Float32, 3 * nbpts );    
+  for (i=0;i<nbpts;++i)
+  {
+    pt = (*pallContacts)[i].geometricPointOfContact;
+    if ( PPTranslation ) pt += *PPTranslation ;
+    for (int comp=0;comp<3;++comp) write_double_binary( pt[comp] ) ;
+  }
+  compress_segment_binary( CURRENT_LENGTH,	
+	"writeContactForceVectorsPostProcessing_Paraview_MPIIO_binary/Points" );
+
+
+  // Translational velocity vector
+  force_binary_offset = OFFSET;
+  start_output_binary( sizeof_Float32, 3 * nbpts );  
+  for (i=0;i<nbpts;++i)
+     for (int comp=0;comp<3;++comp) write_double_binary( 
+     	(*pallContacts)[i].contactForce[comp] ) ;    
+  compress_segment_binary( CURRENT_LENGTH, 
+  	"writeContactForceVectorsPostProcessing_Paraview_MPIIO_binary/Force" ); 
+  total_offset = OFFSET;  
+  
+  int* total_binary_offset_per_proc = wrapper->AllGather_INT( total_offset );
+  int* cumul_binary_offset_per_proc = new int[m_nprocs];
+  cumul_binary_offset_per_proc[0] = 0;
+  for (rank=1;rank<m_nprocs;rank++) 
+    cumul_binary_offset_per_proc[rank] = cumul_binary_offset_per_proc[rank-1]
+    	+ total_binary_offset_per_proc[rank-1];
+
+
+  // Header per piece + general for 1st and last process
+  ostringstream oss;
+  if ( m_rank == 0 )
+  {   
+    oss << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
+    	<< "byte_order=\"LittleEndian\" ";
+    oss << "compressor=\"vtkZLibDataCompressor\">\n";
+    oss << "<UnstructuredGrid>\n";  
+  }
+  oss << "<Piece NumberOfPoints=\"" << nbpts << "\""
+    	<< " NumberOfCells=\"0\">\n";
+  oss << "<Points>\n";
+  oss << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
+  oss << "offset=\"" << cumul_binary_offset_per_proc[m_rank] 
+  	+ point_binary_offset << "\" format=\"appended\"></DataArray>\n"; 
+  oss << "</Points>\n";
+  oss << "<Cells>\n";
+  oss << "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">";
+  oss << "0 0 0</DataArray>\n";
+  oss << "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">";
+  oss << "3</DataArray>\n";
+  oss << "<DataArray type=\"Int32\" Name=\"types\" format=\"ascii\">";
+  oss << "5</DataArray>\n";
+  oss << "</Cells>\n"; 
+  oss << "<PointData Vectors=\"Force\">\n";
+  oss << "<DataArray Name=\"Force\" NumberOfComponents=\"3\" " <<
+  	"type=\"Float32\" offset=\"" << cumul_binary_offset_per_proc[m_rank] 
+	+ force_binary_offset << "\" format=\"appended\">"
+	<< "</DataArray>\n";
+  oss << "</PointData>\n";
+  oss << "</Piece>\n";
+  if ( m_rank == m_nprocs - 1 )
+  { 
+    oss << "</UnstructuredGrid>\n"; 
+    oss << "<AppendedData encoding=\"raw\">\n" << "    _" ;  
+  }            
+  int header = int(oss.str().size());
+  int* header_per_proc = wrapper->AllGather_INT( header );
+  vector<int> mpifile_offsets( m_nprocs, 0 );
+  mpifile_offsets[0] = 0;
+  for (rank=1;rank<m_nprocs;rank++) 
+    mpifile_offsets[rank] = mpifile_offsets[rank-1]
+    	+ header_per_proc[rank-1] * sizeof(char);  
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], oss.str().c_str(), 
+  	header, MPI_CHAR, &status ); 
+
+
+  // Write the binary buffers
+  int starting_point = mpifile_offsets[m_nprocs-1] 
+  	+ header_per_proc[m_nprocs-1] * sizeof(char); 
+  for (rank=0;rank<m_nprocs;rank++) 
+    mpifile_offsets[rank] = starting_point
+    	+ cumul_binary_offset_per_proc[rank] * sizeof(char);	
+  MPI_File_write_at_all( file, mpifile_offsets[m_rank], BUFFER, OFFSET, 
+	MPI_CHAR, &status );	 	
+  delete [] BUFFER ; BUFFER = 0 ;
+  ALLOCATED = 0 ;
+  OFFSET = 0 ;
+
+
+  // Closing text
+  ostringstream oss2;
+  oss2 << "\n</AppendedData>\n";
+  oss2 << "</VTKFile>\n";
+  header = int(oss2.str().size());
+  starting_point = mpifile_offsets[m_nprocs-1] 
+  	+ total_binary_offset_per_proc[m_nprocs-1] * sizeof(char);
+  if ( m_rank == 0 )
+    MPI_File_write_at( file, starting_point, oss2.str().c_str(), header, 
+    	MPI_CHAR, &status );
+
+  // Close MPI file and free remaining pointers
+  MPI_File_close( &file );
+  delete [] total_binary_offset_per_proc;
+  delete [] cumul_binary_offset_per_proc; 
+  delete [] header_per_proc;
 }

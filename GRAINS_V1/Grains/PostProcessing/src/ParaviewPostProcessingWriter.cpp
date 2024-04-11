@@ -36,6 +36,7 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
   , m_initialCycleNumber_forced( false )
   , m_network( false )
   , m_mpiio_singlefile( false )
+  , m_pertype( true )
   , BUFFER( NULL )
   , ALLOCATED( 0 )
   , OFFSET( 0 )
@@ -61,7 +62,12 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
   { 
     string sm_onefile = ReaderXML::getNodeAttr_String( dn, "MPIIO" );
     if ( sm_onefile == "True" ) m_mpiio_singlefile = true; 
-  }  
+  } 
+  if ( ReaderXML::hasNodeAttr( dn, "PerType" ) )
+  { 
+    string sm_pertype = ReaderXML::getNodeAttr_String( dn, "PerType" );
+    if ( sm_pertype == "False" ) m_pertype = false; 
+  }    
   
   if ( m_rank == 0 && verbose )
   {
@@ -77,7 +83,9 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter( DOMNode* dn,
     cout << GrainsExec::m_shift12 << "Write obstacles = " 
     	<< ( m_postProcessObstacle ? "True" : "False" ) << endl;
     cout << GrainsExec::m_shift12 << "MPIIO = " 
-    	<< ( m_mpiio_singlefile ? "True" : "False" ) << endl;		
+    	<< ( m_mpiio_singlefile ? "True" : "False" ) << endl;
+    cout << GrainsExec::m_shift12 << "Per particle type = " 
+    	<< ( m_pertype ? "True" : "False" ) << endl;			
   } 
 }
 
@@ -101,7 +109,8 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
   , m_postProcessObstacle( true ) 
   , m_initialCycleNumber_forced( false )
   , m_network( false )
-  , m_mpiio_singlefile( false )     
+  , m_mpiio_singlefile( false ) 
+  , m_pertype( true )      
   , BUFFER( NULL )
   , ALLOCATED( 0 )
   , OFFSET( 0 )
@@ -120,7 +129,9 @@ ParaviewPostProcessingWriter::ParaviewPostProcessingWriter(
     cout << GrainsExec::m_shift12 << "Write obstacles = " 
     	<< ( m_postProcessObstacle ? "True" : "False" ) << endl;
     cout << GrainsExec::m_shift12 << "MPIIO = " 
-    	<< ( m_mpiio_singlefile ? "True" : "False" ) << endl;			
+    	<< ( m_mpiio_singlefile ? "True" : "False" ) << endl;
+    cout << GrainsExec::m_shift12 << "Per particle type = " 
+    	<< ( m_pertype ? "True" : "False" ) << endl;				
   }
 }	
 
@@ -153,7 +164,8 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
     LinkedCell const* LC,
     vector<Window> const& insert_windows )
 {
-  size_t nbParticleTypes = referenceParticles->size();
+  size_t nbParticleTypes = referenceParticles->size() ;
+  size_t nbPPTypes = m_pertype ? nbParticleTypes : 1;  
 
   if ( GrainsExec::m_ReloadType == "new" ) 
   {
@@ -179,13 +191,13 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
        
       // Particles
       ostringstream *ossNULL = NULL;
-      m_Paraview_saveParticles_pvd.reserve( nbParticleTypes );
-      for (size_t i=0;i<nbParticleTypes;++i)
+      m_Paraview_saveParticles_pvd.reserve( nbPPTypes );
+      for (size_t i=0;i<nbPPTypes;++i)
         m_Paraview_saveParticles_pvd.push_back(ossNULL);
-      for (size_t i=0;i<nbParticleTypes;++i)
+      for (size_t i=0;i<nbPPTypes;++i)
         m_Paraview_saveParticles_pvd[i] = new ostringstream;      
     
-      for (size_t i=0;i<nbParticleTypes;++i)
+      for (size_t i=0;i<nbPPTypes;++i)
       {
         *m_Paraview_saveParticles_pvd[i] << "<?xml version=\"1.0\"?>" << endl;
         *m_Paraview_saveParticles_pvd[i] << 
@@ -266,7 +278,8 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
 	}
 	
         // Linked cell grid 
-        writePVTU_Paraview( m_ParaviewFilename + "_LinkedCell" , 
+	if ( m_nprocs > 1 && !m_mpiio_singlefile )
+          writePVTU_Paraview( m_ParaviewFilename + "_LinkedCell" , 
 		&empty_string_list, &empty_string_list, &empty_string_list );
       }                  
     } 
@@ -277,7 +290,9 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
       ostringstream ossRK;
       ossRK << m_rank;       
       writeLinkedCellPostProcessing_Paraview( LC,
-      	m_ParaviewFilename + "_LinkedCell_" + ossRK.str() + ".vtu" );
+      	m_ParaviewFilename + "_LinkedCell" + 
+	( m_nprocs > 1 && !m_mpiio_singlefile ? "_" + ossRK.str() : "" ) 
+	+ ".vtu",  m_nprocs > 1 && !m_mpiio_singlefile );
     } 
            
     one_output( time, dt, particles, periodic_clones, referenceParticles,
@@ -297,17 +312,17 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
 
       // Particles
       ostringstream *ossNULL = NULL;
-      m_Paraview_saveParticles_pvd.reserve( nbParticleTypes );
-      for (size_t i=0;i<nbParticleTypes;++i)
+      m_Paraview_saveParticles_pvd.reserve( nbPPTypes );
+      for (size_t i=0;i<nbPPTypes;++i)
         m_Paraview_saveParticles_pvd.push_back(ossNULL);
-      for (size_t i=0;i<nbParticleTypes;++i)
+      for (size_t i=0;i<nbPPTypes;++i)
         m_Paraview_saveParticles_pvd[i] = new ostringstream;      
     
-      if ( nbParticleTypes == 1 )
+      if ( nbPPTypes == 1 )
         readPVDFile( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_Particles.pvd", *m_Paraview_saveParticles_pvd[0] );
       else
-        for (size_t i=0;i<nbParticleTypes;++i)
+        for (size_t i=0;i<nbPPTypes;++i)
 	{
           ostringstream* ossPC = new ostringstream;
           *ossPC << i;
@@ -415,7 +430,7 @@ int ParaviewPostProcessingWriter::getPreviousCycleNumber() const
   int cyleNumber = 0;
   string tline, previous_tline, buffer, part;
 
-  // Lecture dans le fichier pvd d'obstacles
+  // Read the obstacles pvd file
   ifstream fileIN( (m_ParaviewFilename_dir + "/" + m_ParaviewFilename
        	+ "_Obstacles.pvd" ).c_str(), ios::in );
   while ( tline != "</Collection>" )
@@ -424,7 +439,7 @@ int ParaviewPostProcessingWriter::getPreviousCycleNumber() const
     getline( fileIN, tline );
   }
   
-  // Manipulation de la derniere ligne pour en extraire le numero de cycle
+  // Process the penultimate line to extract the cycle number
   istringstream iss( previous_tline ); 
   iss >> buffer >> buffer >> buffer >> buffer >> part;
   size_t pos = part.find( "_T" );
@@ -478,7 +493,8 @@ void ParaviewPostProcessingWriter::one_output(
     Obstacle* obstacle,
     LinkedCell const* LC )
 {
-  size_t nbParticleTypes = referenceParticles->size();
+  size_t nbParticleTypes = referenceParticles->size() ;
+  size_t nbPPTypes = m_pertype ? nbParticleTypes : 1;  
   list<string> Scalars;
   Scalars.push_back("NormU");
   Scalars.push_back("NormOm");
@@ -514,7 +530,7 @@ void ParaviewPostProcessingWriter::one_output(
   }
    
   // Particles
-  if ( nbParticleTypes == 1 )
+  if ( nbPPTypes == 1 )
   { 
     string partFilename = m_ParaviewFilename + "_Particles_T" + ossCN.str();
     if ( m_rank == 0 ) 
@@ -533,7 +549,8 @@ void ParaviewPostProcessingWriter::one_output(
 
       if ( m_nprocs > 1 && !m_mpiio_singlefile )
       {       
-        if ( (*referenceParticles)[0]->getRigidBody()->getConvex()
+        if ( nbParticleTypes == 1 &&
+	(*referenceParticles)[0]->getRigidBody()->getConvex()
        	->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
         {
           list<string> ptVec;
@@ -547,8 +564,9 @@ void ParaviewPostProcessingWriter::one_output(
     }
     
     // VTU files
-    if ( (*referenceParticles)[0]->getRigidBody()->getConvex()
-          ->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
+    if ( nbParticleTypes == 1 &&
+    	(*referenceParticles)[0]->getRigidBody()->getConvex()
+	->isSphere() && !GrainsExec::m_SphereAsPolyParaview )
     {
       if ( m_mpiio_singlefile && m_nprocs > 1 )
       {
@@ -880,6 +898,22 @@ void ParaviewPostProcessingWriter::one_output(
 
 
 // ----------------------------------------------------------------------------
+// Updates obstacles indicator
+void ParaviewPostProcessingWriter::updateObstaclesIndicator(
+	double const& time,
+  	double const& dt,
+	Obstacle* obstacle )
+{
+  list<SimpleObstacle*> allObstacles = obstacle->getObstacles();
+  for (list<SimpleObstacle*>::iterator iv=allObstacles.begin();
+  	iv!=allObstacles.end();iv++) (*iv)->setIndicator( 0. );
+  obstacle->updateIndicator( time, dt );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Writes obstacles data
 void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
 	list<SimpleObstacle*> const& allObstacles, string const& obsFilename )
@@ -1015,220 +1049,7 @@ void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
   }  
   f << "</VTKFile>" << endl;	
   f.close();	    
-} 
-
-
-
-
-// ----------------------------------------------------------------------------
-// Updates obstacles indicator
-void ParaviewPostProcessingWriter::updateObstaclesIndicator(
-	double const& time,
-  	double const& dt,
-	Obstacle* obstacle )
-{
-  list<SimpleObstacle*> allObstacles = obstacle->getObstacles();
-  for (list<SimpleObstacle*>::iterator iv=allObstacles.begin();
-  	iv!=allObstacles.end();iv++) (*iv)->setIndicator( 0. );
-  obstacle->updateIndicator( time, dt );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Writes particles data
-void ParaviewPostProcessingWriter::writeParticlesPostProcessing_Paraview(
-	list<Particle*> const* particles, string const& partFilename,
-	bool const& forceForAllTag, bool const& processwrites )
-{
-  list<Particle*>::const_iterator particle;
-  Vector3 const* PPTranslation = 
-  	GrainsExec::m_translationParaviewPostProcessing ;
-
-  ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename ).c_str(), 
-  	ios::out );
-  
-  f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
-    	<< "byte_order=\"LittleEndian\" ";
-  if ( m_binary ) f << "compressor=\"vtkZLibDataCompressor\"";
-  f << ">" << endl;
-  f << "<UnstructuredGrid>" << endl;
-  int nbpts = 0, nbcells = 0, i;
-  for (particle=particles->begin();particle!=particles->end();particle++)
-  {
-    if ( (*particle)->getActivity() == COMPUTE && 
-    	( (*particle)->getTag() != 2 || forceForAllTag ) )
-    {
-      nbpts += (*particle)->numberOfPoints_PARAVIEW();
-      nbcells += (*particle)->numberOfCells_PARAVIEW();
-    }
-  }
-  f << "<Piece NumberOfPoints=\"" << nbpts << "\""
-    	<< " NumberOfCells=\"" << nbcells << "\">" << endl;
-
-  f << "<Points>" << endl;
-  f << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( m_binary )
-  {
-    list<Point3> ppp;
-    list<Point3>::iterator ilpp;    
-    start_output_binary( sizeof_Float32, 3*nbpts ) ;
-    for (particle=particles->begin();particle!=particles->end();particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-	( (*particle)->getTag() != 2 || forceForAllTag ) )
-      {
-        ppp = (*particle)->get_polygonsPts_PARAVIEW( PPTranslation );
-        for (ilpp=ppp.begin();ilpp!=ppp.end();ilpp++)
-          for (int comp=0;comp<3;++comp)
-	    write_double_binary( (*ilpp)[comp] ) ;
-      }
-    flush_binary( f, "writeParticlesPostProcessing_Paraview/Points" );      
-  }
-  else
-    for (particle=particles->begin();particle!=particles->end();particle++)
-      if ((*particle)->getActivity() == COMPUTE && 
-	( (*particle)->getTag() != 2 || forceForAllTag ) )
-        (*particle)->write_polygonsPts_PARAVIEW( f, PPTranslation );
-  f << "</DataArray>" << endl;
-  f << "</Points>" << endl;
-
-  list<int> connectivity, offsets, cellstype;
-  list<int>::iterator ii;
-  int firstpoint_globalnumber = 0, last_offset = 0;
-  for (particle=particles->begin();particle!=particles->end();particle++)
-    if ( (*particle)->getActivity() == COMPUTE &&
-	( (*particle)->getTag() != 2 || forceForAllTag ) )    
-      (*particle)->write_polygonsStr_PARAVIEW( connectivity,
-    	offsets, cellstype, firstpoint_globalnumber, last_offset );
-  f << "<Cells>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"connectivity\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Int32, int(connectivity.size()) ) ;
-    for (ii=connectivity.begin();ii!=connectivity.end();ii++)
-      write_int_binary( *ii );
-    flush_binary( f, "writeParticlesPostProcessing_Paraview/connectivity" );
-  }
-  else  
-    for (ii=connectivity.begin();ii!=connectivity.end();ii++)
-      f << *ii << " ";	
-  f << endl;      
-  f << "</DataArray>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"offsets\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Int32, int(offsets.size()) ) ;
-    for (ii=offsets.begin();ii!=offsets.end();ii++)
-      write_int_binary( *ii );
-    flush_binary( f, "writeParticlesPostProcessing_Paraview/offsets" );
-  }
-  else  
-    for (ii=offsets.begin();ii!=offsets.end();ii++)
-      f << *ii << " ";	
-  f << endl; 
-  f << "</DataArray>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"types\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Int32, int(cellstype.size()) ) ;
-    for (ii=cellstype.begin();ii!=cellstype.end();ii++)
-      write_int_binary( *ii );
-    flush_binary( f, "writeParticlesPostProcessing_Paraview/types" );
-  }
-  else  
-    for (ii=cellstype.begin();ii!=cellstype.end();ii++)
-      f << *ii << " ";	
-  f << endl;
-  f << "</DataArray>" << endl;
-  f << "</Cells>" << endl;
-
-  f << "<CellData Scalars=\"NormU,NormOm,CoordNumb\">" << endl;
-
-  f << "<DataArray type=\"Float32\" Name=\"NormU\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">"; 
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( m_binary ) start_output_binary( sizeof_Float32, int(cellstype.size()) );
-  for (particle=particles->begin();particle!=particles->end();particle++)
-    if ( (*particle)->getActivity() == COMPUTE && 
-       ( (*particle)->getTag() != 2 || forceForAllTag ) )
-    {
-      double normU = Norm( *(*particle)->getTranslationalVelocity() );
-      int nc = (*particle)->numberOfCells_PARAVIEW();
-      if ( m_binary ) for (i=0;i<nc;++i) write_double_binary( normU );
-      else for (i=0;i<nc;++i) f << normU << " ";
-    }
-  if ( m_binary ) flush_binary( f, 
-  	"writeParticlesPostProcessing_Paraview/NormU" ); 
-  f << endl;
-  f << "</DataArray>" << endl;      
-
-  f << "<DataArray type=\"Float32\" Name=\"NormOm\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">"; 
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( m_binary ) start_output_binary( sizeof_Float32, int(cellstype.size()) );
-  for (particle=particles->begin();particle!=particles->end();particle++)
-    if ( (*particle)->getActivity() == COMPUTE && 
-       ( (*particle)->getTag() != 2 || forceForAllTag ) )
-    {
-      double normOm = Norm( *(*particle)->getAngularVelocity() );
-      int nc = (*particle)->numberOfCells_PARAVIEW();
-      if ( m_binary ) for (i=0;i<nc;++i) write_double_binary( normOm );
-      else for (i=0;i<nc;++i) f << normOm << " ";
-    }
-  if( m_binary )
-    flush_binary( f, "writeParticlesPostProcessing_Paraview/NormOm" ); 
-  f << endl;
-  f << "</DataArray>" << endl; 
-
-  f << "<DataArray type=\"Float32\" Name=\"CoordNumb\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">"; 
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( m_binary ) start_output_binary( sizeof_Float32, int(cellstype.size()) );
-  for (particle=particles->begin();particle!=particles->end();particle++)
-    if ( (*particle)->getActivity() == COMPUTE && 
-       ( (*particle)->getTag() != 2 || forceForAllTag ) )
-    {
-      double coordNum = double((*particle)->getCoordinationNumber());
-      int nc = (*particle)->numberOfCells_PARAVIEW();
-      if ( m_binary ) for (i=0;i<nc;++i) write_double_binary( coordNum );
-      else for (i=0;i<nc;++i) f << coordNum << " ";
-    }
-  if ( m_binary ) flush_binary( f, 
-  	"writeParticlesPostProcessing_Paraview/CoordNumb" ); 
-  f << endl;
-  f << "</DataArray>" << endl;
-  f << "</CellData>" << endl;
-
-  f << "</Piece>" << endl;
-  f << "</UnstructuredGrid>" << endl;
-  if ( m_binary )
-  {
-    f << "<AppendedData encoding=\"raw\">" << endl << "    _" ;
-    f.write( BUFFER, OFFSET ) ;
-    delete [] BUFFER ; BUFFER = 0 ;
-    ALLOCATED = 0 ;
-    OFFSET = 0 ;
-    f << endl << "</AppendedData>" << endl;    
-  }  
-  f << "</VTKFile>" << endl;	
-  f.close();	    
-}	
+} 	
 
 
 
@@ -1236,10 +1057,13 @@ void ParaviewPostProcessingWriter::writeParticlesPostProcessing_Paraview(
 // ----------------------------------------------------------------------------
 // Writes linked-cell grid data
 void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
-	LinkedCell const* LC, string const& partFilename )
+	LinkedCell const* LC, string const& partFilename,
+	bool const& local )
 {
-  vector<double> x = LC->coordinates( X ), y = LC->coordinates( Y ),  
-  	z = LC->coordinates( Z );
+  vector<double> 
+  	x = local ? LC->local_coordinates( X ) : LC->global_coordinates( X ), 
+	y = local ? LC->local_coordinates( Y ) : LC->global_coordinates( Y ),
+  	z = local ? LC->local_coordinates( Z ) : LC->global_coordinates( Z );
   size_t nx = x.size(), ny = y.size(), nz = z.size(), i, j, k;
     
   ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename ).c_str(), 
@@ -1860,752 +1684,7 @@ void ParaviewPostProcessingWriter::writePeriodicBoundaryPostProcessing_Paraview(
   f.close();
   
   for (il=iwlist.begin();il!=iwlist.end();il++) delete *il;
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Writes particle translational and angular velocity vectors
-void ParaviewPostProcessingWriter::
-	writeParticleVelocityVectorsPostProcessing_Paraview(
-	list<Particle*> const* particles, string const& partFilename,
-	bool const& processwrites )
-{
-  list<Particle*>::const_iterator particle;
-  Point3 gc; 
-  Vector3 const* vectrans;
-  Vector3 const* PPTranslation = 
-      GrainsExec::m_translationParaviewPostProcessing ;
-
-  ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename ).c_str(), 
-  	ios::out );
-  
-  f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
-    << "byte_order=\"LittleEndian\" ";
-  if ( m_binary ) f << "compressor=\"vtkZLibDataCompressor\"";
-  f << ">" << endl;
-  f << "<UnstructuredGrid>" << endl;
-  int nbpts=0,nbcells=0;
-  for (particle=particles->begin();particle!=particles->end();particle++)
-    if ( (*particle)->getActivity() == COMPUTE && (*particle)->getTag() != 2 )
-      nbpts++;
-  f << "<Piece NumberOfPoints=\"" << nbpts << "\""
-    << " NumberOfCells=\"" << nbcells << "\">" << endl;
-  f << "<Points>" << endl;
-  f << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;  
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Float32, 3*nbpts ) ;
-    for (particle=particles->begin();particle!=particles->end();
-        particle++)
-      if ( (*particle)->getActivity() == COMPUTE &&
-           (*particle)->getTag() != 2 )
-      {
-        gc = *(*particle)->getPosition();
-        if ( PPTranslation ) gc += *PPTranslation ;
-        for (int comp=0;comp<3;++comp)
-          write_double_binary( gc[comp] ) ;
-      }
-    flush_binary( f, 
-    	"writeParticleVelocityVectorsPostProcessing_Paraview/Points" );
-  }
-  else
-  {
-    for (particle=particles->begin();particle!=particles->end();
-      	particle++)
-      if ( (*particle)->getActivity() == COMPUTE &&
-         (*particle)->getTag() != 2 )
-      {
-        gc = *(*particle)->getPosition();
-        if ( PPTranslation ) gc += *PPTranslation ;
-        for (int comp=0;comp<3;++comp)
-          f << gc[comp] << " " ;
-      }
-    f << endl;
-  }
-  f << "</DataArray>" << endl;
-  f << "</Points>" << endl;
-  
-  f << "<Cells>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"connectivity\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( nbpts )
-  {
-    if ( m_binary )
-    {
-      start_output_binary( sizeof_Int32, 3 ) ;
-      for (int ii=0;ii<3;ii++) write_int_binary( 0 );
-      flush_binary( f, 
-      	"writeParticleVelocityVectorsPostProcessing_Paraview/connectivity" );
-    }
-    else  
-      f << "0 0 0";
-  }
-  f << endl;      
-  f << "</DataArray>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"offsets\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( nbpts )
-  {
-    if ( m_binary )
-    {
-      start_output_binary( sizeof_Int32, 1) ;
-      write_int_binary( 3 );
-      flush_binary( f, 
-      	"writeParticleVelocityVectorsPostProcessing_Paraview/offsets" );
-    }
-    else  
-      f << "3";	
-  }
-  f << endl; 
-  f << "</DataArray>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"types\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( nbpts )
-  {
-    if ( m_binary )
-    {
-      start_output_binary( sizeof_Int32, 1 ) ;
-      write_int_binary( 5 );
-      flush_binary( f, 
-      	"writeParticleVelocityVectorsPostProcessing_Paraview/types" );
-    }
-    else  
-      f << "5";
-  }
-  f << endl;
-  f << "</DataArray>" << endl;
-  f << "</Cells>" << endl;
-  
-  f << "<PointData Vectors=\"U,Omega\">" << endl;
-  f << "<DataArray Name=\"U\" NumberOfComponents=\"3\" type=\"Float32\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;  
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Float32, 3*nbpts ) ;
-    for (particle=particles->begin();particle!=particles->end();
-      	particle++)
-      if ( (*particle)->getActivity() == COMPUTE 
-		&& (*particle)->getTag() != 2 )
-      {
-        vectrans = (*particle)->getTranslationalVelocity();
-        for (int comp=0;comp<3;++comp)
-	  write_double_binary( (*vectrans)[comp] ) ;
-      }
-    flush_binary( f, "writeParticleVelocityVectorsPostProcessing_Paraview/U" );
-  }
-  else
-  {
-    for (particle=particles->begin();particle!=particles->end();
-      	particle++)
-      if ( (*particle)->getActivity() == COMPUTE 
-		&& (*particle)->getTag() != 2 )
-      {
-        vectrans = (*particle)->getTranslationalVelocity();
-        for (int comp=0;comp<3;++comp)
-	  f << (*vectrans)[comp] << " " ;      
-      }
-    f << endl;
-  }  
-  f << "</DataArray>" << endl;
-  f << "<DataArray Name=\"Omega\" NumberOfComponents=\"3\" type=\"Float32\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;  
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Float32, 3*nbpts ) ;
-    for (particle=particles->begin();particle!=particles->end();
-      	particle++)
-      if ( (*particle)->getActivity() == COMPUTE 
-		&& (*particle)->getTag() != 2 )
-      {
-        vectrans = (*particle)->getAngularVelocity();
-        for (int comp=0;comp<3;++comp)
-	  write_double_binary( (*vectrans)[comp] ) ;
-      }
-    flush_binary( f, 
-    	"writeParticleVelocityVectorsPostProcessing_Paraview/Omega" );      
-  }
-  else
-  {
-    for (particle=particles->begin();particle!=particles->end();
-      	particle++)
-      if ( (*particle)->getActivity() == COMPUTE 
-		&& (*particle)->getTag() != 2 )
-      {
-        vectrans = (*particle)->getAngularVelocity();
-        for (int comp=0;comp<3;++comp)
-	  f << (*vectrans)[comp] << " " ;      
-      }
-    f << endl;
-  }  
-  f << "</DataArray>" << endl;       
-  f << "</PointData>" << endl; 
-   
-  f << "</Piece>" << endl;
-  f << "</UnstructuredGrid>" << endl;
-  if ( m_binary )
-  {
-    f << "<AppendedData encoding=\"raw\">" << endl << "    _" ;
-    f.write( BUFFER, OFFSET ) ;
-    delete [] BUFFER ; BUFFER = 0 ;
-    ALLOCATED = 0 ;
-    OFFSET = 0 ;
-    f << endl << "</AppendedData>" << endl;    
-  }  
-  f << "</VTKFile>" << endl;	
-  f.close();	    
 }	
-
-
-
-
-// ----------------------------------------------------------------------------
-// Writes force chain network data
-void ParaviewPostProcessingWriter::writeContactForceChains_Paraview(
-	list<Particle*> const* particles,
-  	LinkedCell const* LC, string const& filename, double const& time )
-{
-//   bool binary = false;
-//   list<struct PointForcePostProcessing>* pallContacts = 
-//   	LC->ComputeForcesPostProcessing( particles );
-//   list<struct PointForcePostProcessing>::iterator contact;
-//   ofstream f( ( m_ParaviewFilename_dir + "/" + filename ).c_str(), 
-//   	ios::out );
-//   size_t nbContact = pallContacts->size();
-//   f << "<?xml version=\"1.0\"?>" << endl;
-//   f << "<VTKFile type=\"PolyData\" version=\"0.1\" "
-//     	<< "byte_order=\"LittleEndian\" ";
-//   if ( binary ) f << "compressor=\"vtkZLibDataCompressor\"";
-//   f << ">" << endl;
-//   f << "<PolyData>" << endl;
-//   f << "<Piece NumberOfPoints=\"" << 2*nbContact 
-//     << "\" NumberOfVerts=\"" << 0
-//     << "\" NumberOfLines=\"" << nbContact
-//     << "\" NumberOfStrips=\"" << 0
-//     << "\" NumberOfPolys=\"" << 0 << "\">" << endl;
-//   f << "<Points>" << endl;
-//   f << "<DataArray type=\"Float32\" NumberOfComponents=\"3\"";
-//   if ( binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-//   else f << " format=\"ascii\">";
-//   f << endl;  
-//   if ( binary ) start_output_binary( sizeof_Float32, 6*int(nbContact) );
-//   for (contact=pallContacts->begin();contact!=pallContacts->end();contact++)
-//   {
-//     // Point 1
-//     if ( contact->comp0->isObstacle() )
-//     {
-//       if ( binary )
-// 	for ( int i=0; i<3; ++i )
-// 	  write_double_binary( contact->geometricPointOfContact[i] );
-//       else
-// 	for ( int i=0; i<3; ++i )
-// 	  f << contact->geometricPointOfContact[i] << " " ; 
-//     }
-//     else
-//     {
-//       if ( binary )
-// 	for ( int i=0; i<3; ++i )
-// 	  write_double_binary( (*contact->comp0->getPosition())[i] );
-//       else
-// 	for ( int i=0; i<3; ++i )
-// 	  f << (*contact->comp0->getPosition())[i] << " " ; 
-//     }
-//     // Point 2
-//     if ( contact->comp1->isObstacle() )
-//     {
-//       if ( binary )
-// 	for ( int i=0; i<3; ++i )
-// 	  write_double_binary( contact->geometricPointOfContact[i] );
-//       else
-// 	for ( int i=0; i<3; ++i )
-// 	  f << contact->geometricPointOfContact[i] << " " ; 
-//     }
-//     else
-//     {
-//       if ( binary )
-// 	for ( int i=0; i<3; ++i )
-// 	  write_double_binary( (*contact->comp1->getPosition())[i] );
-//       else
-// 	for ( int i=0; i<3; ++i )
-// 	  f << (*contact->comp1->getPosition())[i] << " " ; 
-//     }
-//   }
-//   if ( binary ) flush_binary( f, "writeContactForceChains_Paraview/Points" );
-//   f << endl;
-//   f << "</DataArray>" << endl;
-//   f << "</Points>" << endl;
-//   f << "<PointData Scalars=\"F_N\">" << endl;
-//   f << "<DataArray type=\"Float32\" Name=\"F_N\" ";
-//   if ( binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-//   else f << "format=\"ascii\">";
-//   f << endl;
-// 
-//   if ( binary ) start_output_binary( sizeof_Float32, 2*int(nbContact) );
-//   for (contact=pallContacts->begin();contact!=pallContacts->end();contact++)
-//   {
-//     if ( binary )
-//       for ( int i=0; i<2; ++i )
-// 	write_double_binary( fabs( contact->contactForce[Z] ) );
-//     else
-//       for ( int i=0; i<2; ++i )
-// 	f << fabs( contact->contactForce[Z] ) << " " ;
-//   }
-//   if ( binary ) flush_binary( f, "writeContactForceChains_Paraview/F_N" );
-//   f << endl;
-//   f << "</DataArray>" << endl;
-//   f << "</PointData>" << endl;
-// 
-//   f << "<Lines>" << endl;
-//   f << "<DataArray type=\"Int32\" Name=\"connectivity\" ";
-//   if ( binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-//   else f << "format=\"ascii\">";
-//   f << endl;
-//   if ( binary )
-//   {
-//     start_output_binary( sizeof_Int32, 2*int(nbContact) );
-//     for ( int i=0; i<2*int(nbContact); i++ ) write_int_binary( i );
-//   }
-//   else for ( size_t i=0; i<2*nbContact; i++ ) f << i << " ";
-//   if ( binary ) flush_binary( f, "writeContactForceChains_Paraview/connectivity" );
-//   f << endl;
-//   f << "</DataArray>" << endl;
-//   f << "<DataArray type=\"Int32\" Name=\"offsets\" ";
-//   if ( binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-//   else f << "format=\"ascii\">";
-//   f << endl;
-//   if ( binary )
-//   {
-//     start_output_binary( sizeof_Int32, int(nbContact) );
-//     for ( int i=0; i<int(nbContact); i++ ) write_int_binary( 2*i );
-//   }
-//   else for ( size_t i=1; i<=nbContact; ++i ) f << 2*i << " ";
-//   if ( binary ) flush_binary( f, "writeContactForceChains_Paraview/offsets" );
-//   f << endl;
-//   f << "</DataArray>" << endl;
-//   f << "</Lines>" << endl;
-// 
-//   f << "</Piece>" << endl;
-//   f << "</PolyData>" << endl;
-//   if ( binary )
-//   {
-//     f << "<AppendedData encoding=\"raw\">" << endl << "    _" ;
-//     f.write( BUFFER, OFFSET ) ;
-//     delete [] BUFFER ; BUFFER = 0 ;
-//     ALLOCATED = 0 ;
-//     OFFSET = 0 ;
-//     f << endl << "</AppendedData>" << endl;    
-//   }  
-//   f << "</VTKFile>" << endl;	
-// 
-//   f.close();
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Writes contact force vectors
-void ParaviewPostProcessingWriter::
-	writeContactForceVectorsPostProcessing_Paraview(
-	list<Particle*> const* particles,
-  	LinkedCell const* LC, string const& partFilename, double const& time,
-	bool const& processwrites )
-{
-  vector<struct PointForcePostProcessing> const* pallContacts = 
-  	LC->getPPForces();
-  size_t i = 0, comp = 0, nPPF = LC->getNbPPForces();
-  
-  ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename ).c_str(), 
-  	ios::out );
-  
-  f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
-    	<< "byte_order=\"LittleEndian\" ";
-  if ( m_binary ) f << "compressor=\"vtkZLibDataCompressor\"";
-  f << ">" << endl;
-  f << "<UnstructuredGrid>" << endl;
-  size_t nbpts = nPPF, nbcells = 0;
-  f << "<Piece NumberOfPoints=\"" << nbpts << "\""
-    	<< " NumberOfCells=\"" << nbcells << "\">" << endl;
-  f << "<Points>" << endl;
-  f << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;  
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Float32, 3 * int(nbpts) ) ;
-    for (i=0;i<nPPF;++i)
-    {
-      for (comp=0;comp<3;++comp)
-	write_double_binary( 
-		(*pallContacts)[i].geometricPointOfContact[comp] ) ;
-    }
-    flush_binary( f, "writeContactForceVectorsPostProcessing_Paraview/Points" );
-  }
-  else
-  {
-    for (i=0;i<nPPF;++i)
-    {
-      for (comp=0;comp<3;++comp)
-	 f << (*pallContacts)[i].geometricPointOfContact[comp] << " " ; 
-    }	 
-    f << endl;
-  }
-  f << "</DataArray>" << endl;
-  f << "</Points>" << endl;
-  f << "<Cells>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"connectivity\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( nbpts )
-  {
-    if ( m_binary )
-    {
-      start_output_binary( sizeof_Int32, 3 ) ;
-      for (size_t ii=0;ii<3;ii++) write_int_binary( 0 );
-      flush_binary( f, 
-      	"writeContactForceVectorsPostProcessing_Paraview/connectivity" );
-    }
-    else  
-      f << "0 0 0";
-  }
-  f << endl;      
-  f << "</DataArray>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"offsets\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( nbpts )
-  {
-    if ( m_binary )
-    {
-      start_output_binary( sizeof_Int32, 1) ;
-      write_int_binary( 3 );
-      flush_binary( f, 
-      	"writeContactForceVectorsPostProcessing_Paraview/offsets" );
-    }
-    else  
-      f << "3";	
-  }
-  f << endl; 
-  f << "</DataArray>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"types\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( nbpts )
-  {
-    if ( m_binary )
-    {
-      start_output_binary( sizeof_Int32, 1 ) ;
-      write_int_binary( 5 );
-      flush_binary( f, 
-      	"writeContactForceVectorsPostProcessing_Paraview/types" );
-    }
-    else  
-      f << "5";
-  }
-  f << endl;
-  f << "</DataArray>" << endl;
-  f << "</Cells>" << endl;
-  f << "<PointData Vectors=\"Force\">" << endl;
-  f << "<DataArray Name=\"Force\" NumberOfComponents=\"3\" type=\"Float32\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;  
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Float32, 3 * int(nbpts) ) ;   
-    for (i=0;i<nPPF;++i)
-      for (comp=0;comp<3;++comp)
-	write_double_binary( (*pallContacts)[i].contactForce[comp] ) ;
-    flush_binary( f, "writeContactForceVectorsPostProcessing_Paraview/Force" );
-  }
-  else
-  {
-    for (i=0;i<nPPF;++i)
-      for (comp=0;comp<3;++comp)
-        f << (*pallContacts)[i].contactForce[comp] << " " ;
-    f << endl;
-  }  
-  f << "</DataArray>" << endl;  
-  f << "</PointData>" << endl;  
-  f << "</Piece>" << endl;
-  f << "</UnstructuredGrid>" << endl;
-  if ( m_binary )
-  {
-    f << "<AppendedData encoding=\"raw\">" << endl << "    _" ;
-    f.write( BUFFER, OFFSET ) ;
-    delete [] BUFFER ; BUFFER = 0 ;
-    ALLOCATED = 0 ;
-    OFFSET = 0 ;
-    f << endl << "</AppendedData>" << endl;    
-  }  
-  f << "</VTKFile>" << endl;	
-  f.close();
-}	
-
-
-
-
-// ----------------------------------------------------------------------------
-// Writes spherical particles data in a vector form containing the
-// center of mass coordinates of each particle
-void ParaviewPostProcessingWriter:: writeSpheresPostProcessing_Paraview(
-    list<Particle*> const* particles,
-    string const& partFilename,
-    bool const& forceForAllTag, bool const& processwrites )
-{
-  list<Particle*>::const_iterator particle;
-  Point3 gc; 
-  Vector3 vectrans;
-  Vector3 const* PPTranslation = 
-  	GrainsExec::m_translationParaviewPostProcessing ;
-
-  ofstream f( ( m_ParaviewFilename_dir + "/" + partFilename ).c_str(), 
-  	ios::out );
-  
-  f << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" "
-    	<< "byte_order=\"LittleEndian\" ";
-  if ( m_binary ) f << "compressor=\"vtkZLibDataCompressor\"";
-  f << ">" << endl;
-  f << "<UnstructuredGrid>" << endl;
-  int nbpts=0,nbcells=0;
-  for (particle=particles->begin();particle!=particles->end();particle++)
-    if ( (*particle)->getActivity() == COMPUTE && 
-       ( (*particle)->getTag() != 2 || forceForAllTag ) )
-      nbpts++;
-  f << "<Piece NumberOfPoints=\"" << nbpts << "\""
-    << " NumberOfCells=\"" << nbcells << "\">" << endl;
-  f << "<Points>" << endl;
-  f << "<DataArray type=\"Float32\" NumberOfComponents=\"3\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;  
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Float32, 3*nbpts ) ;
-    for (particle=particles->begin();particle!=particles->end();
-        particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-         ( (*particle)->getTag() != 2 || forceForAllTag ) )
-      {
-        gc = *(*particle)->getPosition();
-        if ( PPTranslation ) gc += *PPTranslation ;
-        for (int comp=0;comp<3;++comp)
-          write_double_binary( gc[comp] ) ;
-      }
-    flush_binary( f, "writeSpheresPostProcessing_Paraview/Points" );
-  }
-  else
-  {
-    for (particle=particles->begin();particle!=particles->end();
-        particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-           ( (*particle)->getTag() != 2 || forceForAllTag ) )
-      {
-        gc = *(*particle)->getPosition();
-        if ( PPTranslation ) gc += *PPTranslation ;
-        for (int comp=0;comp<3;++comp)
-          f << gc[comp] << " " ;
-      }
-    f << endl;
-  }
-  f << "</DataArray>" << endl;
-  f << "</Points>" << endl;
-  f << "<Cells>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"connectivity\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( nbpts )
-  {
-    if ( m_binary )
-    {
-      start_output_binary( sizeof_Int32, 3 ) ;
-      for (int ii=0;ii<3;ii++) write_int_binary( 0 );
-      flush_binary( f, "writeSpheresPostProcessing_Paraview/connectivity" );
-    }
-    else  
-      f << "0 0 0";
-  }
-  f << endl;
-  f << "</DataArray>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"offsets\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( nbpts )
-  {
-    if ( m_binary )
-    {
-      start_output_binary( sizeof_Int32, 1 ) ;
-      write_int_binary( 3 );
-      flush_binary( f, "writeSpheresPostProcessing_Paraview/offsets" );
-    }
-    else  
-      f << "3";	
-  }
-  f << endl; 
-  f << "</DataArray>" << endl;
-  f << "<DataArray type=\"Int32\" Name=\"types\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( nbpts )
-  {
-    if ( m_binary )
-    {
-      start_output_binary( sizeof_Int32, 1 ) ;
-      write_int_binary( 5 );
-      flush_binary( f, "writeSpheresPostProcessing_Paraview/types" );
-    }
-    else  
-      f << "5";
-  }
-  f << endl;
-  f << "</DataArray>" << endl;
-  f << "</Cells>" << endl;
-  f << "<PointData Vectors=\"Orientation\" ";
-  f << "Scalars=\"NormU,NormOm,CoordNumb\">" << endl;
-  f << "<DataArray Name=\"Orientation\" "
-    << "NumberOfComponents=\"3\" type=\"Float32\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Float32, 3*nbpts ) ;
-    for (particle=particles->begin();particle!=particles->end();
-      	particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-         ( (*particle)->getTag() != 2 || forceForAllTag ) )
-      {
-        vectrans = (*particle)->computeOrientationVector();
-        for (int comp=0;comp<3;++comp)
-          write_double_binary( vectrans[comp] ) ;
-      }
-    flush_binary( f, "writeSpheresPostProcessing_Paraview/Orientation" );      
-  }
-  else
-  {
-    for (particle=particles->begin();particle!=particles->end();
-      	particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-         ( (*particle)->getTag() != 2 || forceForAllTag ) )
-      {
-        vectrans = (*particle)->computeOrientationVector();
-        for (int comp=0;comp<3;++comp)
-          f << vectrans[comp] << " " ;
-      }
-    f << endl;
-  }  
-  f << "</DataArray>" << endl;
-
-  f << "<DataArray Name=\"NormU\" type=\"Float32\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;  
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Float32, nbpts ) ;
-    for (particle=particles->begin();particle!=particles->end();
-        particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-         ( (*particle)->getTag() != 2 || forceForAllTag ) )
-        write_double_binary( Norm( *(*particle)->getTranslationalVelocity() ) );
-    flush_binary( f, "writeSpheresPostProcessing_Paraview/NormU" );      
-  }
-  else
-  {
-    for (particle=particles->begin();particle!=particles->end();
-      	particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-         ( (*particle)->getTag() != 2 || forceForAllTag ) )
-        f << Norm( *(*particle)->getTranslationalVelocity() ) << " " ;
-    f << endl;
-  }
-  f << "</DataArray>" << endl;
-
-  f << "<DataArray Name=\"NormOm\" type=\"Float32\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;  
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Float32, nbpts ) ;
-    for (particle=particles->begin();particle!=particles->end();
-      	particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-         ( (*particle)->getTag() != 2 || forceForAllTag ) )
-        write_double_binary( Norm( *(*particle)->getAngularVelocity() ) );
-    flush_binary( f, "writeSpheresPostProcessing_Paraview/NormOm" );
-  }
-  else
-  {
-    for (particle=particles->begin();particle!=particles->end();
-        particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-         ( (*particle)->getTag() != 2 || forceForAllTag ) )
-        f << Norm( *(*particle)->getAngularVelocity() ) << " " ;
-    f << endl;
-  }
-  f << "</DataArray>" << endl;
-
-  f << "<DataArray Name=\"CoordNumb\" type=\"Float32\" ";
-  if ( m_binary ) f << "offset=\"" << OFFSET << "\" format=\"appended\">";
-  else f << "format=\"ascii\">";
-  f << endl;
-  if ( m_binary )
-  {
-    start_output_binary( sizeof_Float32, nbpts ) ;
-    for (particle=particles->begin();particle!=particles->end();
-      	particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-         ( (*particle)->getTag() != 2 || forceForAllTag ) )
-        write_double_binary( double((*particle)->getCoordinationNumber()) );
-    flush_binary( f, "writeSpheresPostProcessing_Paraview/CoordNumb" );
-  }
-  else
-  {
-    for (particle=particles->begin();particle!=particles->end();
-        particle++)
-      if ( (*particle)->getActivity() == COMPUTE && 
-         ( (*particle)->getTag() != 2 || forceForAllTag ) )
-        f << double((*particle)->getCoordinationNumber()) << " " ;
-    f << endl;
-  }
-  f << "</DataArray>" << endl;  
-  f << "</PointData>" << endl;
-  f << "</Piece>" << endl;
-  f << "</UnstructuredGrid>" << endl;
-  if ( m_binary )
-  {
-    f << "<AppendedData encoding=\"raw\">" << endl << "    _" ;
-    f.write( BUFFER, OFFSET ) ;
-    delete [] BUFFER ; BUFFER = 0 ;
-    ALLOCATED = 0 ;
-    OFFSET = 0 ;
-    f << endl << "</AppendedData>" << endl;
-  }
-  f << "</VTKFile>" << endl;	
-  f.close();
-}
 
 
 
@@ -2932,8 +2011,7 @@ string ParaviewPostProcessingWriter::getPostProcessingWriterType() const
 
 
 // ----------------------------------------------------------------------------
-// Methods to write in binary copied from Pelicans-2.2.4
-// ----------------------------------------------------------------------------
+// Methods to write binary data
 void ParaviewPostProcessingWriter:: start_output_binary( int size, int number )
 {
   int current_output_size = size*number ;
@@ -2999,7 +2077,7 @@ void ParaviewPostProcessingWriter:: flush_binary( std::ofstream& file,
 	string const& calling )  
 {
   compress_segment_binary( CURRENT_LENGTH, calling ) ;         
-  file << endl ;
+//  file << endl ;
 }
 
 
@@ -3066,4 +2144,5 @@ void ParaviewPostProcessingWriter:: compress_segment_binary( int seg,
    delete [] CompressionHeader ;
    delete [] encoded_buff ;
 }
-
+// End of Methods to write binary data
+// ----------------------------------------------------------------------------
