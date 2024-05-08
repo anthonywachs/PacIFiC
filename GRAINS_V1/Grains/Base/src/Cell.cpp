@@ -171,10 +171,10 @@ bool Cell::contains( Particle* particle_ )
 // Returns the cell ijk indices that contains a point
 void Cell::GetCell( Point3 const& position, int* id )
 {	
-  // Utilisation de floor plutot que int car si x < m_LC_local_origin[X]
-  // int renvoie 0 alors que floor renvoie -1, et -1 est la valeur attendue car
-  // la particle est hors du LinkedCell
-  // Rem: floor renvoie un type double, qu'on re-cast en int 
+  // We use floor instead of int. If x < m_LC_local_origin[X]
+  // then int returns 0 while floor returns -1, and -1 is the correct value
+  // as the position is out of the LinkedCell
+  // Rem: floor returns a double that we recast into an int
   id[X] = int( floor( ( position[X] - Cell::m_LC_local_origin[X] ) 
   	/ Cell::m_edge_X ) );
   id[Y] = int( floor( ( position[Y] - Cell::m_LC_local_origin[Y] ) 
@@ -504,6 +504,26 @@ string Cell::getGeoPositionName( GeoPosition geoloc_ )
 string Cell::getGeoPositionName( int geoloc_ )
 {
   return ( Cell::getGeoPositionName_generic( geoloc_ ) );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the cell tag
+int Cell::getTag() const
+{
+  return ( m_tag );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the cell number
+int Cell::getID() const
+{
+  return ( m_number );
 }
 
 

@@ -12,11 +12,11 @@ ObstacleImposedVelocity::ObstacleImposedVelocity()
   m_type = "Undefined";
   m_tstart = 0.; 
   m_tend = 0.;
-  m_translationalVelocity = Vector3Nul;
-  m_angularVelocity = Vector3Nul;
+  m_translationalVelocity = Vector3Null;
+  m_angularVelocity = Vector3Null;
   m_Sin_amplitude = 0.;
   m_Sin_period = 0.;
-  m_Sin_vitRef = Vector3Nul;
+  m_Sin_vitRef = Vector3Null;
   m_freqX = 0.;
   m_freqY = 0.;
   m_freqZ = 0.;
@@ -24,7 +24,7 @@ ObstacleImposedVelocity::ObstacleImposedVelocity()
   m_ampX = 0.;
   m_ampY = 0.;  
   m_ampZ = 0.;  
-  m_prev = Vector3Nul;
+  m_prev = Vector3Null;
 }
 
 
@@ -365,10 +365,10 @@ istream &operator >> ( istream& fileIn,
   fileIn >> motion.m_ObstacleName;
   fileIn >> motion.m_tstart >> motion.m_tend;
   fileIn >> motion.m_translationalVelocity;
-  if ( motion.m_translationalVelocity != Vector3Nul ) 
+  if ( motion.m_translationalVelocity != Vector3Null ) 
     motion.m_type = "Translation";
   fileIn >> motion.m_angularVelocity;
-  if ( motion.m_angularVelocity != Vector3Nul ) 
+  if ( motion.m_angularVelocity != Vector3Null ) 
     motion.m_type = "Rotation";  
 
   return ( fileIn );

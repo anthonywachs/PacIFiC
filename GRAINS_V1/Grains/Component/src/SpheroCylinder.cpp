@@ -101,7 +101,7 @@ SpheroCylinder::SpheroCylinder( DOMNode* root, int const& pc )
   for ( size_t j=0; j<m_nbElemPart; ++j )
   {
     m_elementaryParticles.push_back( ppp );
-    m_InitialRelativePositions.push_back( Vector3Nul );
+    m_InitialRelativePositions.push_back( Vector3Null );
     m_InitialRotationMatrices.push_back( ttt );
   }
 

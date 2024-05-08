@@ -87,3 +87,14 @@ void TimeIntegrator::readParticleKinematics2014( istream& StreamIN,
 void TimeIntegrator::readParticleKinematics2014_binary( istream& StreamIN,
     	Vector3& dUdt, Vector3& dOmegadt )
 {}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of bytes of the time integrator data when written in a 
+// binary format to an output stream
+size_t TimeIntegrator::get_numberOfBytes() const
+{
+  return ( 0 );
+}

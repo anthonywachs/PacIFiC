@@ -193,8 +193,9 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
   assert( rootElement != NULL );
   DOMNode* root = ReaderXML::getNode( rootElement, "Construction" );
 
-  bool brestart = false, bnewpart = false, bnewobst = false;
+  bool brestart = false, bnewpart = false, bnewobst = false, b2024 = false;
   string restart;
+  int npart;
 
   // Domain size: origin, max coordinates and periodicity
   DOMNode* domain = ReaderXML::getNode( root, "LinkedCell" );
@@ -286,20 +287,32 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
         GrainsExec::m_reloadFile_suffix =
             restart.substr( restart.size()-1, 1 );
       }
-      restart = fullResultFileName( restart );
+      restart = GrainsExec::fullResultFileName( restart );
 
       // Extract the reload directory from the reload file
       GrainsExec::m_ReloadDirectory = GrainsExec::extractRoot( restart );
 
-      // Read the reload file
+      // Read the reload file and check the restart format
       string cle;
       ifstream simulLoad( restart.c_str() );
-      simulLoad >> cle >> m_time;
+      simulLoad >> cle; 
+      if ( cle == "__Format2024__" ) 
+      { 
+        b2024 = true;
+        simulLoad >> cle >> m_time;
+      }
+      else simulLoad >> m_time;         
       ContactBuilderFactory::reload( simulLoad );
-      m_allcomponents.read( simulLoad, restart );
-      ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
+      if ( !b2024 )
+      {
+        m_allcomponents.read_pre2024( simulLoad, restart );
+        ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
           m_allcomponents.getReferenceParticles() );
+      }
+      else
+        npart = m_allcomponents.read( simulLoad, m_rank, m_nprocs );      
       simulLoad >> cle;
+      simulLoad.close();
 
       // Whether to reset velocity to 0
       string reset = ReaderXML::getNodeAttr_String( reload, "Velocity" );
@@ -450,6 +463,10 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
 
     // Define the linked cell grid
     defineLinkedCell( LC_coef * maxR, GrainsExec::m_shift9 );
+
+    // If reload with 2024 format, read the particle reload file
+    if ( reload && b2024 )
+      m_allcomponents.read_particles( restart, npart, m_collision, m_nprocs );
 
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );

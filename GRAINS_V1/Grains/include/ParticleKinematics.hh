@@ -118,6 +118,10 @@ class ParticleKinematics : public Kinematics
 
     /** @brief Returns translational velocity */
     Vector3 const* getTranslationalVelocity() const;
+    
+    /** @brief Returns the number of bytes of the ParticleKinematics when 
+    written in a binary format to an output stream */
+    size_t get_numberOfBytes() const;    
     //@}
   
 

@@ -28,7 +28,7 @@ ContactForceModel* ContactBuilderFactory::contactForceModel( const string &matA,
 
 // ----------------------------------------------------------------------------
 // Checks that all couples of materials in which one of the
-/// materials is assigned to a particle has an associated contact force model.
+// materials is assigned to a particle has an associated contact force model.
 // If not, the two material names are copied in matA and matB
 bool ContactBuilderFactory::checkContactForceModelsExist( string& matA,
 	string& matB )
@@ -240,54 +240,61 @@ void ContactBuilderFactory::reload( istream& file )
 void ContactBuilderFactory::save( ostream& file, const string& contactFile,
 	const int& rank )
 {
-  string xmlFile( contactFile + "_MatContact.xml" );
-
-  // In the particle & obstacle reload file, we write the name of the
-  // contact file without the directory path
-  string xmlFileNameInDir = GrainsExec::extractFileName( xmlFile ) ;
-  file << "<ContactForceModels> " << xmlFileNameInDir
-  	<< " </ContactForceModels>" << endl;
-
   static int counter = 0 ;
 
-  if ( rank == 0 && !counter )
+  if ( rank == 0 )
   {
-    DOMElement* root = WriterXML::initialize( "GRAINS" );
+    string xmlFile( contactFile + "_MatContact.xml" );
 
-    DOMElement* materiaux = WriterXML::createNode( root, "Materials" );
-    map<string,int>::const_iterator material;
-    for (material=m_materials.begin(); material!=m_materials.end(); material++)
+    // In the particle & obstacle reload file, we write the name of the
+    // contact file without the directory path
+    string xmlFileNameInDir = GrainsExec::extractFileName( xmlFile ) ;
+    file << "<ContactForceModels> " << xmlFileNameInDir
+  	<< " </ContactForceModels>" << endl;  
+  
+    if ( !counter )
     {
-      DOMElement* materialNode = WriterXML::createNode( materiaux, "Material" );
-      WriterXML::createNodeValue( materialNode, (*material).first );
-      WriterXML::createNodeAttr( materialNode, "value", (*material).second );
-    }
+      DOMElement* root = WriterXML::initialize( "GRAINS" );
 
-    DOMElement* contacts = WriterXML::createNode( root, "ContactForceModels" );
-    map<int,ContactBuilderFactory::ContactFeatures>::const_iterator contact;
-    for (contact=m_contactParametres.begin();
-    	contact!=m_contactParametres.end(); contact++)
-    {
-      DOMElement* contactNode = WriterXML::createNode( contacts,
-      	"ContactForceModel" );
-      WriterXML::createNodeAttr( contactNode, "type", (*contact).second.name );
-      WriterXML::createNodeAttr( contactNode, "value", (*contact).first );
-
-      DOMElement* valuesNode = WriterXML::createNode( contactNode,
-      	"Parameters" );
-      const map<string,double>& values = (*contact).second.values;
-      map<string,double>::const_iterator value;
-      for (value=values.begin(); value!=values.end(); value++)
+      DOMElement* materiaux = WriterXML::createNode( root, "Materials" );
+      map<string,int>::const_iterator material;
+      for (material=m_materials.begin(); material!=m_materials.end(); 
+      	material++)
       {
-        DOMElement* valueNode = WriterXML::createNode( valuesNode,
-		"Parameter" );
-        WriterXML::createNodeValue( valueNode, (*value).second );
-        WriterXML::createNodeAttr( valueNode, "name", (*value).first );
+        DOMElement* materialNode = WriterXML::createNode( materiaux, 
+		"Material" );
+        WriterXML::createNodeValue( materialNode, (*material).first );
+        WriterXML::createNodeAttr( materialNode, "value", (*material).second );
       }
-    }
 
-    WriterXML::terminate( xmlFile );
-    ++counter;
+      DOMElement* contacts = WriterXML::createNode( root, 
+      	"ContactForceModels" );
+      map<int,ContactBuilderFactory::ContactFeatures>::const_iterator contact;
+      for (contact=m_contactParametres.begin();
+    	contact!=m_contactParametres.end(); contact++)
+      {
+        DOMElement* contactNode = WriterXML::createNode( contacts,
+      	"ContactForceModel" );
+        WriterXML::createNodeAttr( contactNode, "type", 
+		(*contact).second.name );
+        WriterXML::createNodeAttr( contactNode, "value", (*contact).first );
+
+        DOMElement* valuesNode = WriterXML::createNode( contactNode,
+      	"Parameters" );
+        const map<string,double>& values = (*contact).second.values;
+        map<string,double>::const_iterator value;
+        for (value=values.begin(); value!=values.end(); value++)
+        {
+          DOMElement* valueNode = WriterXML::createNode( valuesNode,
+		"Parameter" );
+          WriterXML::createNodeValue( valueNode, (*value).second );
+          WriterXML::createNodeAttr( valueNode, "name", (*value).first );
+        }
+      }
+
+      WriterXML::terminate( xmlFile );
+      ++counter;
+    }
   }
 }
 

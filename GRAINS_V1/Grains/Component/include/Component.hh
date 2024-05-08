@@ -443,7 +443,13 @@ class Component
     //@}
 
 
-
+    /**@name Parameters */
+    //@{
+    static size_t m_sizeofContactMemory; /** binary size of one 
+    	contact memory tuple */
+    //@}
+    
+    
   protected:
     /** @name Constructors */
     //@{

@@ -192,6 +192,12 @@ namespace solid
       //@}
 
 
+      /**@name Parameters */
+      //@{
+      static size_t m_sizeofGroup3; /** binary size of the object */
+      //@}
+
+
     protected:
       /**@name Parameters */
       //@{

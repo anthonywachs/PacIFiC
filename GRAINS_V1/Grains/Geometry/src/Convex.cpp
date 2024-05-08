@@ -211,7 +211,7 @@ void Convex::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 // Returns an orientation vector describing the convex shape angular position
 Vector3 Convex::computeOrientationVector( Transform const* transform ) const
 {
-  return ( Vector3Nul );
+  return ( Vector3Null );
 }
 
 
@@ -572,7 +572,7 @@ bool common_point( Convex const& a, Convex const& b, Transform const& b2a,
 double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
 	Transform const& b2w, Point3& pa, Point3& pb, int& nbIter )
 {
-  Vector3 v = a2w(a.support(Vector3Nul)) - b2w(b.support(Vector3Nul));
+  Vector3 v = a2w(a.support(Vector3Null)) - b2w(b.support(Vector3Null));
 
   double dist = Norm(v);
   Vector3 w;

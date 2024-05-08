@@ -1159,7 +1159,7 @@ list<Cell*> LinkedCell::getCellAndCellNeighborhood( Point3 const& position )
 
 
 // ----------------------------------------------------------------------------
-// Returns a pointer to the cell given its ijk indexing
+// Returns the cell number given its ijk indexing
 int LinkedCell::getCellNumber( int i, int j, int k ) const
 {
   return ( j * m_nbk * m_nbi + k * m_nbi + i ) ;

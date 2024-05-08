@@ -647,6 +647,10 @@ class Particle : public Component
     @param translation additional center of mass translation */
     virtual void write_polygonsPts_PARAVIEW( ostream& f,
   	Vector3 const* translation = NULL ) const ;
+	
+    /** @brief Returns the number of bytes of the particle when written in a 
+    binary format to an output stream */
+    size_t get_numberOfBytes() const ;	
     //@}
 
 

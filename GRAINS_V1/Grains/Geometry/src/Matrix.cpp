@@ -1,6 +1,8 @@
 #include "Matrix.hh"
 
 
+size_t Matrix::m_sizeofMatrix = 9 * sizeof( double );
+
 // ----------------------------------------------------------------------------
 // Default constructor. Matrix is initialized to the identity matrix
 Matrix::Matrix()

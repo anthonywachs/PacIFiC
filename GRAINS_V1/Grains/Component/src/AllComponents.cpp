@@ -842,7 +842,7 @@ bool removeObstacleFromList( list<SimpleObstacle*>& pointerslist,
 
 // ---------------------------------------------------------------------------
 // Reloads components from an input stream
-void AllComponents::read( istream& fileSave, string const& filename )
+void AllComponents::read_pre2024( istream& fileSave, string const& filename )
 {
   string buffer, readingMode ;
   int nbreParticles_, nbParticleTypes_, ParticleTag, ParticleGeomType;
@@ -882,11 +882,11 @@ void AllComponents::read( istream& fileSave, string const& filename )
 
   // Number of particles in to read
   fileSave >> readingMode >> nbreParticles_;
-  if ( readingMode == "Hybrid" ) GrainsExec::m_writingModeHybrid = true ;
+  if ( readingMode == "Hybrid" ) GrainsExec::m_readingModeHybrid = true ;
 
   // Reload of particles using the reference particles
   ifstream FILEbin;
-  if ( GrainsExec::m_writingModeHybrid )
+  if ( GrainsExec::m_readingModeHybrid )
   {
     string binary_filename = filename + ".bin";
     FILEbin.open( binary_filename.c_str(), ios::in | ios::binary );
@@ -976,52 +976,494 @@ void AllComponents::read( istream& fileSave, string const& filename )
 
 
 // ---------------------------------------------------------------------------
-// Writes components to an output stream
-void AllComponents::write( ostream &fileSave, string const& filename ) const
+// Reloads reference particles and obstacles from an input stream
+int AllComponents::read( istream& fileSave, int const& rank, int const& nprocs )
 {
-  fileSave << endl << "NumberOfParticleTypes\t" <<
+  string buffer, readingMode ;
+  int nbreParticles_, nbParticleTypes_;
+  Particle *particle;
+
+  // Number of particle types
+  fileSave >> buffer >> nbParticleTypes_;
+
+  // Reading the reference particles
+  m_ReferenceParticles.reserve( nbParticleTypes_ );
+  for (int i=0; i<nbParticleTypes_; i++)
+  {
+    // Read the buffer "<Particle>" or "<CompositeParticle>"
+    fileSave >> buffer;
+
+    // Construct an empty particle
+    if ( buffer == "<Particle>" )
+      particle = new Particle( false );
+    else
+    {
+      fileSave >> buffer >> buffer;
+      if ( buffer == "SpheroCylinder" )
+        particle = new SpheroCylinder( false );
+      else        
+        particle = new CompositeParticle( false );
+    }
+
+    // Read from stream
+    particle->read( fileSave );
+
+    // Add to the vector of reference particles
+    m_ReferenceParticles.push_back( particle );
+
+    // Read the buffer "</Particle>" or "</CompositeParticle>"
+    fileSave >> buffer;
+  }
+
+  
+  // Reload the obstacle tree
+  string name;
+  fileSave >> buffer;
+  fileSave >> buffer >> buffer;
+  fileSave >> buffer;
+  while ( buffer != "</Composite>" )
+  {
+    ObstacleBuilderFactory::reload( buffer, *m_obstacle, fileSave );
+    fileSave >> buffer;
+  }
+  fileSave >> buffer;
+  assert( buffer == "</Obstacle>" );
+
+
+  // Read the number of files
+  int nfiles; 
+  fileSave >> buffer >> nfiles;
+  assert( nfiles == 1 || nfiles == nprocs );  
+  if ( nprocs > 1 && nfiles == 1 )
+    GrainsExec::m_ReadMPIInASingleFile = true;
+
+  // Reload of particles using the reference particles
+  if ( nprocs > 1 && !GrainsExec::m_ReadMPIInASingleFile )
+  {
+    vector<int> work( nprocs, 0 );
+    for (int i=0;i<nprocs;++i) 
+      fileSave >> readingMode >> work[i];
+    nbreParticles_ = work[rank];
+  }
+  else
+    fileSave >> readingMode >> nbreParticles_;
+  
+  
+  if ( readingMode == "Hybrid" ) GrainsExec::m_readingModeHybrid = true ;
+  
+  return ( nbreParticles_ );
+}
+
+
+
+
+// ---------------------------------------------------------------------------
+// Reloads particles from an input stream 
+void AllComponents::read_particles( string const& filename, int const& npart,
+    	LinkedCell const* LC, int const& nprocs )
+{
+  ifstream FILEin;
+  int ParticleTag, ParticleGeomType, ParticleID, CellNumber;
+  unsigned int ParticleActivity;
+  Particle *particle;
+  bool construct = false, found = false;
+  string tline, buffer;
+  multimap<int,int> PartToCell;
+  pair < multimap<int,int>::iterator, 
+  	multimap<int,int>::iterator > crange;
+  multimap<int,int>::iterator imm;	  
+  Point3 gc;
+  size_t nentries, nb;
+    
+  // Particle file
+  string pfile = filename;
+  size_t pos = filename.find_first_of(".");
+  pfile.erase( pos );
+  pfile += "_Particles";  
+  pfile = GrainsExec::fullResultFileName( pfile, nprocs > 1 
+  	&& !GrainsExec::m_ReadMPIInASingleFile );  
+  if ( GrainsExec::m_readingModeHybrid ) 
+  {
+    pfile += ".bin";
+    FILEin.open( pfile.c_str(), ios::in | ios::binary );
+  } 
+  else FILEin.open( pfile.c_str(), ios::in ); 
+
+
+  // Reload of particles using the reference particles
+  for (int i=0; i<npart; i++)
+  {
+    istringstream iss;
+    construct = false;  
+
+    // Read data corresponding to this particle
+    // Binary file
+    if ( GrainsExec::m_readingModeHybrid )
+    {
+      FILEin.read( reinterpret_cast<char*>( &nb ), sizeof(size_t) );
+      char* particleData = new char[nb];
+      FILEin.read( particleData, nb );
+      string spData( particleData, nb );
+      iss.str( spData );
+    }
+    // Text file
+    else
+    {   
+      getline( FILEin, tline );
+      iss.str( tline ); 
+    }
+    
+    // In parallel, with one restart file per sub-domain, all particles are 
+    // constructed by default
+    if ( !GrainsExec::m_ReadMPIInASingleFile ) construct = true;
+    // With 1 MPI restart file for all sub-domains, we need to check which
+    // particles geometrically belong to this sub-domain 
+    else
+    {        
+      // Extract its ID number and position
+      // Binary file
+      if ( GrainsExec::m_readingModeHybrid )
+      {
+	iss.read( reinterpret_cast<char*>( &ParticleGeomType ), sizeof(int) );
+	iss.read( reinterpret_cast<char*>( &ParticleID ), sizeof(int) );
+	iss.read( reinterpret_cast<char*>( &ParticleTag ), sizeof(int) );	
+	iss.read( reinterpret_cast<char*>( &ParticleActivity ), 
+		sizeof(unsigned int) );
+	iss.read( reinterpret_cast<char*>( &gc[X] ), sizeof(double) );
+	iss.read( reinterpret_cast<char*>( &gc[Y] ), sizeof(double) );
+	iss.read( reinterpret_cast<char*>( &gc[Z] ), sizeof(double) );
+      }
+      // Text file
+      else
+        iss >> buffer >> ParticleID >> buffer >> buffer >> gc[X] >> gc[Y] 
+      		>> gc[Z];
+      
+      // Check whether this particle is in the LinkedCell of this sub-domain
+      // We need to treat carefully particles that are both clones and 
+      // periodic clones as they might be duplicated in the restart file.
+      // To avoid reading them multiple times, we keep track of the particle 
+      // ID - cell number relationship and if such a relationship already 
+      // exists, it means that this particle is duplicated in the restart file
+      // and we do not construct it again  
+      if ( LC->isInLinkedCell( gc ) ) 
+      {
+        // Interior, buffer and clones
+	if ( LC->isInDomain( &gc ) ) construct = true;
+	// Periodic clones
+	else
+	{
+	  // Search if a particle with ID number ParticleID already exists
+	  // in cell number CellNumber on this sub-domain
+	  CellNumber = LC->getCell( gc )->getID();
+	  
+	  found = false;
+	  nentries = PartToCell.count( ParticleID );
+	  if ( nentries ) 
+	  {
+            crange = PartToCell.equal_range( ParticleID );
+            for (imm=crange.first; imm!=crange.second && !found; )
+	    {
+	      if ( imm->second == CellNumber ) found = true;
+              else imm++;
+	    }    
+	  }
+	   	  
+	  // If it does not exist, add to the multimap and construct
+	  // Otherwise, do not construct
+	  if ( !found ) 
+	  {  
+	    PartToCell.insert( pair<int,int>( ParticleID, 
+	  	CellNumber ) );
+	    construct = true;
+	  }   
+	}
+      }
+      
+      // If construct, reset the input stream position to the beginning
+      if ( construct ) iss.seekg( 0, iss.beg );
+    }
+    
+    if ( construct )
+    {
+      // Read the geometric type of the particle
+      if ( GrainsExec::m_readingModeHybrid )
+        iss.read( reinterpret_cast<char*>( &ParticleGeomType ), 
+		sizeof(int) );
+      else
+        iss >> ParticleGeomType;
+
+      // Particle construction
+      if ( m_ReferenceParticles[ParticleGeomType]->isCompositeParticle() )
+      {    
+        if ( m_ReferenceParticles[ParticleGeomType]
+      		->getSpecificCompositeShapeName() == "SpheroCylinder" )
+          particle = new SpheroCylinder( false );
+        else   
+          particle = new CompositeParticle( false );
+      }
+      else
+        particle = new Particle( false );
+
+      // Set the geometric type of the particle
+      particle->setGeometricType( ParticleGeomType );
+
+      // Read the particle features
+      if ( GrainsExec::m_readingModeHybrid )
+        particle->read2014_binary( iss, &m_ReferenceParticles );
+      else
+        particle->read2014( iss, &m_ReferenceParticles );
+
+      // Add to lists
+      switch ( particle->getActivity() )
+      {
+        case COMPUTE:
+          m_ActiveParticles.push_back( particle );
+          if ( !GrainsExec::m_ReadMPIInASingleFile )
+	    ParticleTag = particle->getTag();
+	  else
+	  {
+	    ParticleTag = LC->getCell( *particle->getPosition() )->getTag(); 
+	    particle->setTag( ParticleTag );
+	  }
+ 
+	  // MPI mode
+	  if ( GrainsExec::m_MPI )
+	    switch ( ParticleTag )
+            {
+              case 1:
+                m_ParticlesInBufferzone.push_back( particle );
+                break;
+
+              case 2:
+                m_CloneParticles.push_back( particle );
+                break;
+
+	      default:
+                break;
+            }
+	  // Serial mode: periodicity
+	  else
+	    if ( ParticleTag == 2 )
+	      m_PeriodicCloneParticles.insert(
+	    	pair<int,Particle*>( particle->getID(), particle ) );
+          break;
+
+        default:
+          m_InactiveParticles.push_back( particle );
+          break;
+      }
+    }
+  }
+  FILEin.close();
+} 
+
+
+
+
+// ---------------------------------------------------------------------------
+// Writes components to an output stream
+void AllComponents::write( ostream &fileSave, string const& filename, 
+	int const& rank, int const& nprocs, GrainsMPIWrapper const* wrapper ) 
+	const
+{
+  list<Particle*>::const_iterator particle;
+  size_t nb = 0;
+  
+  if ( rank == 0 )
+  {
+    // Reference particles and obstacles
+    fileSave << endl << "NumberOfParticleTypes\t" <<
   	m_ReferenceParticles.size() << endl;
 
-  vector<Particle*>::const_iterator iv;
-  for (iv=m_ReferenceParticles.begin();
+    vector<Particle*>::const_iterator iv;
+    for (iv=m_ReferenceParticles.begin();
   	iv!=m_ReferenceParticles.end();iv++) (*iv)->write( fileSave );
 
-  size_t nbActivesNonPer = m_ActiveParticles.size();
-  list<Particle*>::const_iterator particle;
+    fileSave << endl << "<Obstacle>" << endl;
+    m_obstacle->write( fileSave );
+    fileSave << endl << "</Obstacle>" << endl << endl;
+    fileSave << "NbFiles " << nprocs << endl;
+  }
+  
+  size_t* nbpart_proc = NULL;
+  if ( nprocs > 1 )
+    nbpart_proc =  wrapper->Gather_UNSIGNED_INT_master( m_nb_particles );     
+  else
+  {
+    nbpart_proc = new size_t[1];
+    nbpart_proc[0] = m_nb_particles;
+  }
+  
+  if ( rank == 0 )  
+    for (int i=0;i<nprocs;++i)  
+      fileSave << ( GrainsExec::m_writingModeHybrid ? "Hybrid" :
+  	"Text" ) << " " << nbpart_proc[i] << endl;
+  
+  if ( nbpart_proc ) delete [] nbpart_proc;
 
-  fileSave << endl << ( GrainsExec::m_writingModeHybrid ? "Hybrid" :
-  	"Text" ) << " " << nbActivesNonPer + m_InactiveParticles.size()
-	<< endl;
+	
+  // Particle file
+  string pfile = filename;
+  size_t pos = filename.find_first_of(".");
+  pfile.erase( pos );
+  pfile += "_Particles";
+  pfile = GrainsExec::fullResultFileName( pfile, nprocs > 1 );
 
   if ( GrainsExec::m_writingModeHybrid )
   {
-    string binary_filename = filename + ".bin";
+    string binary_filename = pfile + ".bin";
     ofstream FILEbin( binary_filename.c_str(), ios::out | ios::binary );
 
+    // Note: we first write the number of bytes corresponding to each particle
+    // to be able to later read exactly the amount of bytes corresponding
+    // to that particle in AllComponents::read_particles
     for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
+    {	
+      nb = (*particle)->get_numberOfBytes();
+      FILEbin.write( reinterpret_cast<char*>( &nb ), sizeof(size_t) );      
       (*particle)->write2014_binary( FILEbin );
+    }
 
     for (particle=m_InactiveParticles.begin();
     	particle!=m_InactiveParticles.end(); particle++)
+    {
+      nb = (*particle)->get_numberOfBytes();
+      FILEbin.write( reinterpret_cast<char*>( &nb ), sizeof(size_t) );        
       (*particle)->write2014_binary( FILEbin );
+    }
 
     FILEbin.close();
   }
   else
   {
+    ofstream FILEtext( pfile.c_str(), ios::out );    
+
     for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
-      (*particle)->write2014( fileSave );
+      (*particle)->write2014( FILEtext );
 
     for (particle=m_InactiveParticles.begin();
     	particle!=m_InactiveParticles.end(); particle++)
-      (*particle)->write2014( fileSave );
+      (*particle)->write2014( FILEtext );
+      
+    FILEtext.close();    
+  }
+}
+
+
+
+
+// ---------------------------------------------------------------------------
+// Writes components to a single file MPI File in parallel
+void AllComponents::write_singleMPIFile( ostream &fileSave, 
+	string const& filename, LinkedCell const* LC, 
+    	GrainsMPIWrapper const* wrapper ) const
+{  
+  int rank = wrapper->get_rank(), tag, nb_particles_to_write,
+  	nprocs = wrapper->get_total_number_of_active_processes();  
+  MPI_Comm MPI_COMM_activeProc = wrapper->get_active_procs_comm();
+  MPI_File file;
+  MPI_Status status; 
+  list<Particle*> to_write;
+  list<Particle*>::const_iterator particle;
+  Point3 const* gc;
+
+  // Particles to write to the reload file: 
+  // * active particles interior and buffer
+  // * actives particles periodic clones
+  // * inactives particles: if their position equals default inactive position, 
+  // then these particles are in the m_InactiveParticles list of all processes,
+  // otherwise they are in the m_InactiveParticles of the current process only
+  // Note: particles that are both clones and periodic clones might 
+  // be duplicated in the reload file, this situation is explicitly handled
+  // by AllComponents::read_particles
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
+  {
+    gc = (*particle)->getPosition(); 
+    tag = (*particle)->getTag();
+    if ( tag < 2 || ( tag == 2 && !LC->isInDomain( gc ) ) )
+      to_write.push_back( *particle );
   }
 
-  fileSave << endl << "<Obstacle>" << endl;
-  m_obstacle->write( fileSave );
-  fileSave << endl << "</Obstacle>" << endl;
+  for (particle=m_InactiveParticles.begin();
+    	particle!=m_InactiveParticles.end(); particle++)
+  {
+    gc = (*particle)->getPosition(); 
+    if ( *gc == GrainsExec::m_defaultInactivePos )
+    {
+      if ( rank == 0 ) to_write.push_back( *particle );
+    }
+    else
+      to_write.push_back( *particle );
+  } 
+  
+  nb_particles_to_write = wrapper->sum_INT( int(to_write.size()) );
+
+  if ( rank == 0 )
+  {
+    // Reference particles and obstacles
+    fileSave << endl << "NumberOfParticleTypes\t" <<
+  	m_ReferenceParticles.size() << endl;
+
+    vector<Particle*>::const_iterator iv;
+    for (iv=m_ReferenceParticles.begin();
+  	iv!=m_ReferenceParticles.end();iv++) (*iv)->write( fileSave );
+
+    fileSave << endl << "<Obstacle>" << endl;
+    m_obstacle->write( fileSave );
+    fileSave << endl << "</Obstacle>" << endl << endl;
+    fileSave << "NbFiles 1" << endl; 
+    fileSave << ( GrainsExec::m_writingModeHybrid ? "Hybrid" :
+  	"Text" ) << " " << nb_particles_to_write << endl;     
+  }
+
+
+  // Particle MPI file  
+  string pfile = filename;
+  size_t pos = filename.find_first_of(".");
+  pfile.erase( pos );
+  pfile += "_Particles";
+  pfile = GrainsExec::fullResultFileName( pfile, false );
+  if ( GrainsExec::m_writingModeHybrid ) pfile += ".bin"; 
+   
+  MPI_File_open( MPI_COMM_activeProc, pfile.c_str(), 
+    	MPI_MODE_CREATE | MPI_MODE_WRONLY,
+	MPI_INFO_NULL, &file ); 
+ 
+  // Particle stream
+  ostringstream oss_particles;
+  vector<int> mpifile_offsets( nprocs, 0 ); 
+  size_t nb = 0;
+  if ( GrainsExec::m_writingModeHybrid ) 
+    for (particle=to_write.begin();particle!=to_write.end(); particle++)
+    { 
+      // Note: we first write the number of bytes corresponding to the particle
+      // to be able to later read exactly the amount of bytes corresponding
+      // to that particle in AllComponents::read_particles
+      nb = (*particle)->get_numberOfBytes();
+      oss_particles.write( reinterpret_cast<char*>( &nb ), sizeof(size_t) );
+      (*particle)->write2014_binary( oss_particles );
+    } 
+  else
+    for (particle=to_write.begin();particle!=to_write.end(); particle++) 
+      (*particle)->write2014( oss_particles );       
+
+  int out_length = int(oss_particles.str().size());
+  int* out_length_per_proc = wrapper->AllGather_INT( out_length );
+  
+  mpifile_offsets[0] = 0;
+  for (int i=1;i<nprocs;i++)
+    mpifile_offsets[i] = mpifile_offsets[i-1] 
+    	+ out_length_per_proc[i-1] * sizeof(char) ;
+
+  MPI_File_write_at_all( file, mpifile_offsets[rank], 
+  	oss_particles.str().c_str(), out_length, MPI_CHAR, &status );
+  
+  MPI_File_close( &file );
+  delete out_length_per_proc; 
+
 }
 
 

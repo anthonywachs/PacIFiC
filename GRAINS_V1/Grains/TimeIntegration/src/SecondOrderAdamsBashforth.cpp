@@ -152,3 +152,14 @@ void SecondOrderAdamsBashforth::readParticleKinematics2014_binary(
   m_dUdt_nm2.readGroup3_binary( StreamIN );  
   m_dOmegadt_nm2.readGroup3_binary( StreamIN );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of bytes of the time integrator data when written in a 
+// binary format to an output stream
+size_t SecondOrderAdamsBashforth::get_numberOfBytes() const
+{
+  return ( 4 * solid::Group3::m_sizeofGroup3 );
+}

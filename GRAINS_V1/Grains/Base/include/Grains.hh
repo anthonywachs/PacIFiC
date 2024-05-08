@@ -232,10 +232,6 @@ class Grains : public ComputingTime, public SolverComputingTime
     virtual void readDomainDecomposition( DOMNode* root,
   	double const& lx, double const& ly, double const& lz ); 
   
-    /** @brief Returns the full result file name
-    @param rootname root file name */
-    virtual string fullResultFileName( string const& rootname ) const; 
-  
     /** @brief Sets the linked cell grid
     @param radius maximum circumscribed radius of particles 
     @param oshift empty string to shift the output */

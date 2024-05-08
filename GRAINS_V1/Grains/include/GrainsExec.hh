@@ -205,6 +205,12 @@ class GrainsExec
     static bool isPointInTetrahedron( Point3 const& p1, Point3 const& p2,
     	Point3 const& p3, Point3 const& p4, Point3 const& p, 
 	bool check = false );
+	
+    /** @brief Returns the full result file name
+    @param rootname root file name 
+    @param addrank add rank number */
+    static string fullResultFileName( string const& rootname,
+    	bool addrank = true ); 	
     //@}
 
 
@@ -271,11 +277,20 @@ class GrainsExec
     	read */
     static string m_SaveDirectory; /**< Directory where reload files are
     	written */
+    static bool m_SaveMPIInASingleFile; /**< In MPI, true if all processes write
+    	the particle data in a single file, false if each process writes its own
+	data */
+    static bool m_ReadMPIInASingleFile; /**< In MPI, true if all processes read
+    	the particle data in a single file, false if each process reads its own
+	data */		
     static set<string> m_additionalDataFiles; /**< additional files for reload
     	(primarily files for polyhedrons et polygons) */
     static bool m_writingModeHybrid; /**< Is writing mode hybrid, i.e., a text
     	header for reference particles and obstacles, and a binary file for
 	particles */
+    static bool m_readingModeHybrid; /**< Is reading mode hybrid, i.e., a text
+    	header for reference particles and obstacles, and a binary file for
+	particles */	
     static string m_GRAINS_HOME; /**< Main Grains directory */
     static string m_reloadFile_suffix; /**< Reload file suffix (A or B) */
     static bool m_exception_Contact; /**< Contact exception */
@@ -294,6 +309,8 @@ class GrainsExec
     static string m_inputFile; /**< Grains3D major input file */
     static int m_return_syscmd; /**< Returned value of system command */
     static bool m_preCollision_cyl; /** precollision test w/ bounding cyls **/
+    static Point3 m_defaultInactivePos; /**< Default position of inactive 
+    	particles */    
     //@}
 
 

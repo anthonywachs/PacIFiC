@@ -83,6 +83,10 @@ class SecondOrderLeapFrog : public TimeIntegrator
     @param dOmegadt particle angular acceleration */
     void readParticleKinematics2014_binary( istream& StreamIN,
     	Vector3& dUdt, Vector3& dOmegadt );
+	
+    /** @brief Returns the number of bytes of the time integrator data when 
+    written in a binary format to an output stream */
+    size_t get_numberOfBytes() const ;		
     //@}
 
 

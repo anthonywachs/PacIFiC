@@ -225,7 +225,12 @@ class GrainsMPIWrapper : public SolverComputingTime
     /** @brief Gather of an integer from all processes on the master process 
     within the MPI_COMM_activProc communicator
     @param i integer */
-    int* Gather_INT_master( int const& i ) const;              
+    int* Gather_INT_master( int const& i ) const; 
+    
+    /** @brief Gather of an unsigned integer from all processes on the master
+    process within the MPI_COMM_activProc communicator
+    @param i unsigned integer */
+    size_t* Gather_UNSIGNED_INT_master( size_t const& i ) const;
   
     /** @brief Broadcasts a 3D point from the master to all processes within 
     the MPI_COMM_activProc communicator

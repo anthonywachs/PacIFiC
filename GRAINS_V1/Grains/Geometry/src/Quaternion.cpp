@@ -5,6 +5,9 @@
 #include <math.h>
 
 
+size_t Quaternion::m_sizeofQuaternion = solid::Group3::m_sizeofGroup3
+	+ sizeof( double );
+
 // ----------------------------------------------------------------------------
 // Default constructor
 Quaternion::Quaternion()

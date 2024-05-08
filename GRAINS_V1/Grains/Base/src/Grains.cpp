@@ -476,8 +476,9 @@ void Grains::Construction( DOMElement* rootElement )
   assert( rootElement != NULL );
   DOMNode* root = ReaderXML::getNode( rootElement, "Construction" );
 
-  bool brestart = false, bnewpart = false, bnewobst = false;
+  bool brestart = false, bnewpart = false, bnewobst = false, b2024 = false;
   string restart;
+  int npart;
 
   // Domain size: origin, max coordinates and periodicity
   DOMNode* domain = ReaderXML::getNode( root, "LinkedCell" );
@@ -570,20 +571,35 @@ void Grains::Construction( DOMElement* rootElement )
         GrainsExec::m_reloadFile_suffix =
             restart.substr( restart.size()-1, 1 );
       }
-      restart = fullResultFileName( restart );
+      restart = GrainsExec::fullResultFileName( restart, false );
+      if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+      	"Simulation reloaded from " << restart << endl;      
 
       // Extract the reload directory from the reload file
       GrainsExec::m_ReloadDirectory = GrainsExec::extractRoot( restart );
 
-      // Read the reload file
+      // Read the reload file and check the restart format
       string cle;
       ifstream simulLoad( restart.c_str() );
-      simulLoad >> cle >> m_time;
+      simulLoad >> cle; 
+      if ( cle == "__Format2024__" ) 
+      { 
+        b2024 = true;
+        simulLoad >> cle >> m_time;
+      }
+      else simulLoad >> m_time;
       ContactBuilderFactory::reload( simulLoad );
-      m_allcomponents.read( simulLoad, restart );
-      ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
+      if ( !b2024 )
+      {
+        m_allcomponents.read_pre2024( simulLoad, restart );
+        ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
           m_allcomponents.getReferenceParticles() );
+      }
+      else
+        npart = m_allcomponents.read( simulLoad, m_rank, m_nprocs );      
       simulLoad >> cle;
+      assert( cle == "#EndTime" );
+      simulLoad.close();      
 
       // Whether to reset velocity to 0
       string reset = ReaderXML::getNodeAttr_String( reload, "Velocity" );
@@ -734,6 +750,10 @@ void Grains::Construction( DOMElement* rootElement )
 
     // Define the linked cell grid
     defineLinkedCell( LC_coef * maxR, GrainsExec::m_shift9 );
+    
+    // If reload with 2024 format, read the particle reload file
+    if ( reload && b2024 )
+      m_allcomponents.read_particles( restart, npart, m_collision, m_nprocs );
 
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );
@@ -888,6 +908,13 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
       string wmode = ReaderXML::getNodeAttr_String( nRestartFile,
       	"WritingMode" );
       if ( wmode == "Hybrid" ) GrainsExec::m_writingModeHybrid = true ;
+      if ( ReaderXML::hasNodeAttr( nRestartFile, "SingleFile" ) )
+      {
+        string wsf = ReaderXML::getNodeAttr_String( nRestartFile,
+      		"SingleFile" );
+        if ( wsf == "True" && m_nprocs > 1 ) 
+	  GrainsExec::m_SaveMPIInASingleFile = true ;
+      }		        
       if ( m_rank == 0 )
       {
         cout << GrainsExec::m_shift6 << "Restart file" << endl;
@@ -896,6 +923,9 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 		GrainsExec::m_SaveDirectory << endl;
         cout << GrainsExec::m_shift9 << "Writing mode = " <<
 		( GrainsExec::m_writingModeHybrid ? "Hybrid" : "Text" ) << endl;
+        cout << GrainsExec::m_shift9 << "Single file = " <<
+		( GrainsExec::m_SaveMPIInASingleFile ? "True" : "False" ) 
+		<< endl;	
       }
     }
     else
@@ -1472,6 +1502,7 @@ void Grains::InsertCreateNewParticles()
 
   int numPartMax = getMaxParticleIDnumber();
   list< pair<Particle*,int> >::iterator ipart;
+  Point3 defaultInactivePos( -1.e10 );
 
   // New particles construction
   Component::setMaxIDnumber( numPartMax );
@@ -1481,6 +1512,7 @@ void Grains::InsertCreateNewParticles()
     for (int ii=0; ii<nbre; ii++)
     {
       Particle* particle = ipart->first->createCloneCopy( true );
+      particle->setPosition( GrainsExec::m_defaultInactivePos );
       m_allcomponents.AddParticle( particle );
     }
   }
@@ -1937,19 +1969,6 @@ void Grains::readDomainDecomposition( DOMNode* root,
 
 
 // ----------------------------------------------------------------------------
-// Returns the full result file name
-string Grains::fullResultFileName( string const& rootname ) const
-{
-  string fullname = rootname;
-  fullname += ".result";
-
-  return ( fullname );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Sets the linked cell grid
 void Grains::defineLinkedCell( double const& radius, string const& oshift )
 {
@@ -1978,20 +1997,29 @@ void Grains::saveReload( double const& time )
   	GrainsExec::m_reloadFile_suffix == "A" ? 1 : 0 ;
   string reload_suffix = reload_counter ? "B" : "A" ;
   string reload = m_fileSave + reload_suffix ;
-  reload = fullResultFileName( reload );
+  reload = GrainsExec::fullResultFileName( reload, false );
 
   // Save current reload file
-  ofstream result( reload.c_str() );
-  result << "#Time " << time << endl;
-  ContactBuilderFactory::save( result, m_fileSave, m_rank );
-  m_allcomponents.write( result, reload.c_str() );
-  result << "#EndTime" << endl;
-  result.close();
-
-  // Check that all reload files are in the same directory
-  // Add one line to RFTable.txt
+  ofstream result;
   if ( m_rank == 0 )
   {
+    result.open( reload.c_str(), ios::out );
+    result << "__Format2024__" << endl;  
+    result << "#Time " << time << endl;
+  }
+  ContactBuilderFactory::save( result, m_fileSave, m_rank );
+  if ( m_nprocs > 1 && GrainsExec::m_SaveMPIInASingleFile )
+    m_allcomponents.write_singleMPIFile( result, reload, m_collision, 
+    	m_wrapper );
+  else
+    m_allcomponents.write( result, reload, m_rank, m_nprocs, m_wrapper );
+  if ( m_rank == 0 )
+  {  
+    result << "#EndTime" << endl;
+    result.close();
+
+    // Check that all reload files are in the same directory
+    // Add one line to RFTable.txt
     GrainsExec::checkAllFilesForReload();
     ofstream RFT_out( ( m_fileSave + "_RFTable.txt" ).c_str(), ios::app );
     RFT_out << time << " " << m_fileSave + reload_suffix << endl;

@@ -1,6 +1,7 @@
 #ifndef _ALLCOMPONENTS_HH_
 #define _ALLCOMPONENTS_HH_
 
+#include "GrainsMPIWrapper.hh"
 #include "Basic.hh"
 #include "Error.hh"
 #include <fstream>
@@ -69,7 +70,7 @@ class AllComponents
     void AddReferenceParticle( Particle *particle );
 
     /** @brief Adds an obstacle
-    @param obstacle_ L'obstacle a ajouter. */
+    @param obstacle_ the obstacle to be added */
     void AddObstacle( Obstacle* obstacle_ );
 
     /** @brief Associates the imposed velocity to the obstacle
@@ -360,12 +361,39 @@ class AllComponents
     /** @brief Reloads components from an input stream
     @param fileSave input stream
     @param filename file name corresponding to the input stream */
-    void read( istream& fileSave, string const& filename );
+    void read_pre2024( istream& fileSave, string const& filename );
+	
+    /** @brief Reloads reference particles and obstacles from an input stream
+    @param fileSave input stream 
+    @param rank process rank    
+    @param nprocs number of processes */
+    int read( istream& fileSave, int const& rank, int const& nprocs );
+    
+    /** @brief Reloads particles from an input stream 
+    @param rootfilename root file name 
+    @param npart number of particles to be read
+    @param LC linked cell grid 
+    @param nprocs number of processes */
+    void read_particles( string const& filename, int const& npart,
+    	LinkedCell const* LC, int const& nprocs );     	   
 
     /** @brief Writes components to an output stream
     @param fileSave output stream
-    @param filename file name corresponding to the output stream */
-    void write( ostream &fileSave, string const& filename ) const;
+    @param filename file name corresponding to the output stream 
+    @param rank process rank
+    @param nprocs number of processes     
+    @param wrapper MPI wrapper */
+    void write( ostream &fileSave, string const& filename, int const& rank,
+  	int const& nprocs, GrainsMPIWrapper const* wrapper ) const;
+    
+    /** @brief Writes components to a single MPI File in parallel
+    @param fileSave output stream
+    @param filename file name corresponding to the output stream 
+    @param LC linked cell grid    
+    @param wrapper MPI wrapper */
+    void write_singleMPIFile( ostream &fileSave, string const& filename,
+    	LinkedCell const* LC, 
+    	GrainsMPIWrapper const* wrapper ) const;
 
     /** @brief Output operator
     @param f output stream

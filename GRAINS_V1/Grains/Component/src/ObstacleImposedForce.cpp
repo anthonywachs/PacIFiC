@@ -13,16 +13,16 @@ ObstacleImposedForce::ObstacleImposedForce()
   m_type = "Undefined";
   m_tstart = 0.; 
   m_tend = 0.;
-  m_force = Vector3Nul;
-  m_prev = Vector3Nul;
+  m_force = Vector3Null;
+  m_prev = Vector3Null;
   m_mass = 0.;
-  m_direction = Vector3Nul;
-  m_translationalVelocity = Vector3Nul;
+  m_direction = Vector3Null;
+  m_translationalVelocity = Vector3Null;
   m_freqX = 0.;
   m_freqY = 0.;
   m_freqZ = 0.;
   m_phase = 0.;
-  m_prev = Vector3Nul;
+  m_prev = Vector3Null;
 }
 
 

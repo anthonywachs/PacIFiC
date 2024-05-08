@@ -1040,7 +1040,6 @@ void Particle::read2014_binary( istream& fileIn, vector<Particle*> const*
   // ID number
   // Note: the geometric type of particle m_GeomType is read and set prior
   // to constructing the particle
-  // Note: the m_GeomType is read and set prior to constructing the particle
   fileIn.read( reinterpret_cast<char*>( &m_id ), sizeof(int) );
 
   // Create the rigid body using the copy constructor of RigidBodyWithCrust
@@ -1196,6 +1195,21 @@ void Particle::write2014_binary( ostream& fileSave )
   m_geoRBWC->getTransform()->writeTransform2014_binary( fileSave );
   m_kinematics->writeParticleKinematics2014_binary( fileSave );
   writeContactMemory2014_binary( fileSave );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of bytes of the particle when written in a binary format 
+// to an output stream
+size_t Particle::get_numberOfBytes() const
+{
+  return ( 3 * sizeof(int) + sizeof(unsigned int) 
+  	+ Transform::m_sizeofTransform 
+	+ m_kinematics->get_numberOfBytes()
+	+ sizeof(int) 
+	+ m_contactMap.size() * Component::m_sizeofContactMemory );
 }
 
 
@@ -1401,7 +1415,7 @@ void Particle::InitializeForce( bool const& withWeight )
 {
   if ( withWeight )
     m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), m_weight );
-  else m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), Vector3Nul );
+  else m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), Vector3Null );
   m_coordination_number = 0 ;
 }
 

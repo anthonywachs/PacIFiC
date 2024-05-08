@@ -94,7 +94,7 @@ GrainsMPIWrapper::GrainsMPIWrapper( int NX, int NY, int NZ,
     
     // Creates vectors of periodicity of the domain
     m_MPIperiodes.reserve( 27 );
-    for (int i=0;i<27;++i) m_MPIperiodes.push_back( Vector3Nul ); 
+    for (int i=0;i<27;++i) m_MPIperiodes.push_back( Vector3Null ); 
 
     // Sets the relationship between the GeoPosition in a buffer
     // zone from which data are sent and the GeoPosition of the 
@@ -2083,6 +2083,21 @@ int* GrainsMPIWrapper::Gather_INT_master( int const& i ) const
 } 
 
 
+
+
+// ----------------------------------------------------------------------------
+// Gather of an unsigned integer from all processes on the master process 
+// within the MPI_COMM_activProc communicator
+size_t* GrainsMPIWrapper::Gather_UNSIGNED_INT_master( size_t const& i ) const
+{
+  size_t* recv = NULL;
+  if ( m_rank == 0 ) recv = new size_t[m_nprocs];
+  
+  MPI_Gather( &i, 1, MPI_UNSIGNED_LONG, recv, 1, MPI_UNSIGNED_LONG, 0, 
+  	m_MPI_COMM_activeProc ); 
+
+  return ( recv );
+} 
 
 
 

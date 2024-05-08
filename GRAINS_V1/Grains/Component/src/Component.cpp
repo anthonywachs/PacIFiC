@@ -10,6 +10,8 @@ using namespace std;
 
 int Component::m_nb = 0;
 int Component::m_maxID = -1;
+size_t Component::m_sizeofContactMemory = 4 * sizeof( int )
+	+ 3 * solid::Group3::m_sizeofGroup3;
 
 
 // ----------------------------------------------------------------------------
@@ -445,7 +447,7 @@ Torsor const* Component::getTorsor()
 // Initialise le torseur des efforts sur le composant
 void Component::InitializeForce( bool const& withWeight )
 {
-  m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), Vector3Nul );
+  m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), Vector3Null );
 }
 
 
@@ -789,19 +791,19 @@ void Component::writeContactMemory2014_binary( ostream &fileOut )
       int buffer_int;
       Vector3 buffer_vect;
       buffer_int = get<0>(it->first);
-      fileOut.write(reinterpret_cast<char*>(&buffer_int ), sizeof(int));
+      fileOut.write( reinterpret_cast<char*>( &buffer_int ), sizeof(int) );
       buffer_int = get<1>(it->first);
-      fileOut.write(reinterpret_cast<char*>(&buffer_int ), sizeof(int));
+      fileOut.write( reinterpret_cast<char*>( &buffer_int ), sizeof(int) );
       buffer_int = get<2>(it->first);
-      fileOut.write(reinterpret_cast<char*>(&buffer_int ), sizeof(int));
+      fileOut.write( reinterpret_cast<char*>( &buffer_int ), sizeof(int) );
       buffer_int = get<0>(it->second);
-      fileOut.write(reinterpret_cast<char*>(&buffer_int ), sizeof(int));
-      buffer_vect = Vector3(get<1>(it->second));
-      buffer_vect.writeGroup3_binary(fileOut);
-      buffer_vect = Vector3(get<2>(it->second));
-      buffer_vect.writeGroup3_binary(fileOut);
-      buffer_vect = Vector3(get<3>(it->second));
-      buffer_vect.writeGroup3_binary(fileOut);
+      fileOut.write( reinterpret_cast<char*>( &buffer_int ), sizeof(int) );
+      buffer_vect = Vector3( get<1>(it->second) );
+      buffer_vect.writeGroup3_binary( fileOut );
+      buffer_vect = Vector3( get<2>(it->second) );
+      buffer_vect.writeGroup3_binary( fileOut );
+      buffer_vect = Vector3( get<3>(it->second) );
+      buffer_vect.writeGroup3_binary( fileOut );
     }
 }
 
@@ -1002,7 +1004,7 @@ bool Component::isSTLObstacle() const
 // Returns the particle class
 int Component::getGeometricType() const
 {
-  return ( -100 );
+  return ( - 100 );
 }
 
 
@@ -1019,7 +1021,7 @@ bool Component::isIn( Point3 const& pt ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns a pointer to the contact map */
+// Returns a pointer to the contact map
 map< std::tuple<int,int,int>,
      	std::tuple<bool, Vector3, Vector3, Vector3> > const* 
 	Component::getContactMap() const

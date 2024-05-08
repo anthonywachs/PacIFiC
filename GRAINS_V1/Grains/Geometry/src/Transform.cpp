@@ -6,6 +6,9 @@
 #include <sstream>
 using namespace std;
 
+size_t Transform::m_sizeofTransform = Matrix::m_sizeofMatrix + 
+	solid::Group3::m_sizeofGroup3 + sizeof( unsigned int );
+
 
 // --------------------------------------------------------------------------
 // Default constructor. Origin is (0,0,0) and matrix is identity

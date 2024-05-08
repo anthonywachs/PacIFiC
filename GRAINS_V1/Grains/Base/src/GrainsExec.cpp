@@ -10,15 +10,18 @@ bool GrainsExec::m_SphereAsPolyParaview = false;
 int GrainsExec::m_MPI_verbose = 0;
 bool GrainsExec::m_isReloaded = false;
 string GrainsExec::m_ReloadType = "new" ;
-Vector3 GrainsExec::m_vgravity = Vector3Nul;
+Vector3 GrainsExec::m_vgravity = Vector3Null;
 Vector3* GrainsExec::m_translationParaviewPostProcessing = NULL ;
 bool GrainsExec::m_periodic = false;
 bool GrainsExec::m_isGrainsCompFeatures = false;
 bool GrainsExec::m_isGrainsPorosity = false;
 string GrainsExec::m_ReloadDirectory = "";
 string GrainsExec::m_SaveDirectory = "";
+bool GrainsExec::m_SaveMPIInASingleFile = false;
+bool GrainsExec::m_ReadMPIInASingleFile = false;
 set<string> GrainsExec::m_additionalDataFiles;
 bool GrainsExec::m_writingModeHybrid = false;
+bool GrainsExec::m_readingModeHybrid = false;
 string GrainsExec::m_GRAINS_HOME = ".";
 string GrainsExec::m_reloadFile_suffix = "B";
 bool GrainsExec::m_exception_Contact = false;
@@ -43,6 +46,7 @@ list<vector< vector<int> >*> GrainsExec::m_allPolyhedronFacesConnectivity;
 string GrainsExec::m_inputFile;
 int GrainsExec::m_return_syscmd = 0;
 bool GrainsExec::m_preCollision_cyl = false;
+Point3 GrainsExec::m_defaultInactivePos = Point3( -1.e10 );
 
 
 
@@ -412,7 +416,7 @@ string GrainsExec::extractFileName( string const& FileName )
 
 // ----------------------------------------------------------------------------
 // Checks that all reload files are in the same directory (primarily
-// checks that files for polyhedrons et polygons are there)
+// checks that files for polyhedrons and polygons are there)
 void GrainsExec::checkAllFilesForReload()
 {
   if ( !m_additionalDataFiles.empty() )
@@ -683,4 +687,19 @@ bool GrainsExec::isPointInTetrahedron( Point3 const& p1, Point3 const& p2,
       isIn = true;
 
   return ( isIn );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the full result file name
+string GrainsExec::fullResultFileName( string const& rootname, bool addrank ) 
+{
+  string fullname = rootname;
+  ostringstream oss;
+  if ( addrank ) oss << "_" << m_wrapper->get_rank();
+  fullname += oss.str()+".result";
+
+  return ( fullname );
 }

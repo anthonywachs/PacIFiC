@@ -128,7 +128,7 @@ class PointContact
     //@}
 };
 
-static PointContact PointNoContact( OriginePoint, OriginePoint, OriginePoint,
-	Vector3Nul, 1.e20, 0 );	
+static PointContact PointNoContact( Point3Null, Point3Null, Point3Null,
+	Vector3Null, 1.e20, 0 );	
 
 #endif

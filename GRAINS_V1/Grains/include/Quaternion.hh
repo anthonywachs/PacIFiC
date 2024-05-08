@@ -236,6 +236,12 @@ class Quaternion
     //@}
 
 
+    /**@name Parameters */
+    //@{
+    static size_t m_sizeofQuaternion; /** binary size of the object */
+    //@}
+    
+
   protected:
     /**@name Parameters */
     //@{

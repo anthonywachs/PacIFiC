@@ -117,3 +117,14 @@ void SecondOrderLeapFrog::readParticleKinematics2014_binary(
   dUdt.readGroup3_binary( StreamIN ); 
   dOmegadt.readGroup3_binary( StreamIN );   
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of bytes of the time integrator data when written in a 
+// binary format to an output stream
+size_t SecondOrderLeapFrog::get_numberOfBytes() const
+{
+  return ( 2 * solid::Group3::m_sizeofGroup3 );
+}

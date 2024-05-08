@@ -444,6 +444,7 @@ void GrainsMPI::InsertCreateNewParticles()
       for (int ii=0; ii<nbre; ii++)
       {
         Particle* particle = ipart->first->createCloneCopy( true );
+        particle->setPosition( GrainsExec::m_defaultInactivePos );	
         m_allcomponents.AddParticle( particle );
       }
     }
@@ -492,8 +493,6 @@ void GrainsMPI::InsertCreateNewParticles()
       cout << "Remaining number of particles to insert = " << 
       	m_allcomponents.getNumberInactiveParticles() << endl;
     }     
-
-    // TO DO: create the MPI clones
   }
   if ( !b_insertion_BEFORE ) grainsAbort();
   
@@ -820,21 +819,6 @@ void GrainsMPI::setPositionParticlesArray( const PullMode& mode )
         m_allcomponents.AddParticle( newPart );
 	id++;   
      }
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns the full result file name
-string GrainsMPI::fullResultFileName( string const& rootname ) const
-{
-  string fullname = rootname;
-  ostringstream oss;
-  oss << "_" << m_rank;
-  fullname += oss.str()+".result";
-
-  return ( fullname );
 }
 
 

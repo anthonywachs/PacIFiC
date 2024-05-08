@@ -113,7 +113,13 @@ class Cell
     list<Particle*>* getParticles();
   
     /** @brief Returns the cell geographic position */
-    GeoPosition getGeoPosition() const;  
+    GeoPosition getGeoPosition() const; 
+    
+    /** @brief Returns the cell tag */
+    int getTag() const;
+    
+    /** @brief Returns the cell number */
+    int getID() const;          
     //@}
 
 

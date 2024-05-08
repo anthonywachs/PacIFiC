@@ -229,6 +229,12 @@ class Transform
     //@}
 
 
+    /**@name Parameters */
+    //@{
+    static size_t m_sizeofTransform; /** binary size of the object */
+    //@}
+
+
   private:
     enum { 
       /**@name Transformation types */

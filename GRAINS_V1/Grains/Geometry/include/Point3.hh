@@ -88,7 +88,7 @@ namespace solid
       //@}      
   };
   
-  static Point3 OriginePoint; /**< Origine (0.,0.,0.)  */
+  static Point3 Point3Null; /**< (0.,0.,0.)  */
 } // namespace solid
 
 #endif

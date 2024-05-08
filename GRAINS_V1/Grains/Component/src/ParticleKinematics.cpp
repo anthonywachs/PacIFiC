@@ -412,3 +412,15 @@ void ParticleKinematics::setKinematicsNm2( double const* tab )
 {
   m_timeIntegrationScheme->setKinematicsNm2( tab );
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of bytes of the ParticleKinematics when written in a 
+// binary format to an output stream
+size_t ParticleKinematics::get_numberOfBytes() const
+{
+  return ( solid::Group3::m_sizeofGroup3 + 2 * Quaternion::m_sizeofQuaternion
+  	+  m_timeIntegrationScheme->get_numberOfBytes() ); 
+}
