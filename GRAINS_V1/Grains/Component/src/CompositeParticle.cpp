@@ -754,7 +754,7 @@ void CompositeParticle::InterAction( Component* voisin,
       voisin->SearchContact( m_elementaryParticles[i], dt,
 	  time, LC, listContactInfos );
     else m_elementaryParticles[i]->SearchContact( voisin, dt,
-	  time, LC, listContactInfos )  ;
+	  time, LC, listContactInfos );
   }
 
   // Loop over all contact points and compute the contact force & torque

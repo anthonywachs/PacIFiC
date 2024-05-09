@@ -2,12 +2,16 @@
 #include "Basic.hh"
 #include "BBox.hh"
 #include "Sphere.hh"
+#include "Vector3.hh"
 #include "Transform.hh"
 #include "BVolume.hh"
 
 
-double rel_error = EPSILON;   // relative error in the computed distance
-double abs_error = EPSILON2;  // absolute error if the distance is almost zero
+// double rel_error = EPSILON;   // relative error in the computed distance
+// double abs_error = EPSILON2;  // absolute error if the distance is almost zero
+double rel_error = 1.e-6;   // relative error in the computed distance
+// double abs_error = 1.e-10;  // absolute error if the distance is almost zero
+double abs_error = 1.e+4 * rel_error;  // absolute error if the distance is almost zero
 int num_iterations = 0;
 
 static Point3 p[4];         // support points of object A in local coordinates
@@ -575,45 +579,80 @@ double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
 	Transform const& b2w, Point3& pa, Point3& pb, int& nbIter )
 {
   Vector3 v = a2w(a.support(Vector3Nul)) - b2w(b.support(Vector3Nul));
-
+  Vector3 w = v;
+  Vector3 d = v;
   double dist = Norm(v);
-  Vector3 w;
 
   bits = 0;
   all_bits = 0;
-  double mu = 0;
-
   num_iterations = 0;
+  double mu = 0.;
 
-  while (bits < 15 && dist > abs_error && num_iterations < 1000) {
+  double momentum, oneMinusMomentum;
+  bool acceleration = false;
 
+  while (bits < 15 && dist > EPSILON2 && num_iterations < 1000)
+  {
+    ++num_iterations;
     last = 0;
     last_bit = 1;
     while (bits & last_bit) { ++last; last_bit <<= 1; }
-    p[last] = a.support((-v) * a2w.getBasis());
 
-    q[last] = b.support(v * b2w.getBasis());
-    w = a2w(p[last]) - b2w(q[last]);
+    if ( acceleration )
+    {
+      momentum = num_iterations / ( num_iterations + 2. );
+      oneMinusMomentum = 1. - momentum;
+      d = momentum * d + 
+          momentum * oneMinusMomentum * v +
+          oneMinusMomentum * oneMinusMomentum * w;
+      p[last] = a.support( ( -d ) * a2w.getBasis() );
+      q[last] = b.support( (  d ) * b2w.getBasis() );
+      w = a2w(p[last]) - b2w(q[last]);
 
-    set_max(mu, v*w / dist);
-    if (dist - mu <= dist * rel_error)
-      break;
+      // set_max(mu, v*w / dist);
+      // if ( dist - mu <= dist * rel_error )
+      mu = dist - v * w / dist;
+      if ( mu < dist * rel_error ||
+           mu < abs_error )
+      {
+        // nbIter = num_iterations;
+        if ( Norm( d ) - v * d / dist <= abs_error )
+          break;
+        p[last] = a.support( ( -v ) * a2w.getBasis() );
+        q[last] = b.support( (  v ) * b2w.getBasis() );
+        w = a2w( p[last] ) - b2w( q[last] );
+        // mu = 0.;
+        acceleration = false;
+      }
+    }
+    else
+    {
+      p[last] = a.support( ( -v ) * a2w.getBasis() );
+      q[last] = b.support( (  v ) * b2w.getBasis() );
+      w = a2w( p[last] ) - b2w( q[last] );
+      
+      // set_max(mu, v*w / dist);
+      // if ( dist - mu <= dist * rel_error )
+      mu = dist - v * w / dist;
+      if ( mu < dist * rel_error ||
+           mu < abs_error )
+        break;
+    }
+
     if (degenerate(w))
       break;
     y[last] = w;
     all_bits = bits|last_bit;
 
-    ++num_iterations;
-
-    if (!closest(v)) {
+    if ( !closest( v ) )
       break;
-    }
     dist = Norm(v);
   }
   compute_points(bits, pa, pb);
-  if (num_iterations > 1000) catch_me();
-  else nbIter=num_iterations;
-
+  if (num_iterations > 1000) 
+    catch_me();
+  else 
+    nbIter = num_iterations;
   return ( dist );
 }
 

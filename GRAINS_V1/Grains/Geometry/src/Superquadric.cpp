@@ -1,4 +1,4 @@
-#define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1
+  #define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1
 #include <bits/stdc++.h>
 #include "Superquadric.hh"
 #include "sstream"

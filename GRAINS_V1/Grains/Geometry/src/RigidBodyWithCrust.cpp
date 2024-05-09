@@ -8,6 +8,8 @@
 #include "GrainsExec.hh"
 #include "Particle.hh"
 #include "BBox.hh"
+#include "GJK_SV.hh"
+#include "openGJK.hh"
 
 #include <fstream>
 #include <sstream>
@@ -230,6 +232,12 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
     int nbIterGJK = 0;
     double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w,
     	                                *b2w, pointA, pointB, nbIterGJK );
+    // double distance = closest_points_GJK_SV( *m_convex, *(neighbor.m_convex), 
+    //                                          *a2w, *b2w, 
+    //                                          pointA, pointB, nbIterGJK );
+    // double distance = closest_points_GJK_SV2( *m_convex, *(neighbor.m_convex), 
+    //                                           *a2w, *b2w, 
+    //                                           pointA, pointB, nbIterGJK );
     if ( distance < EPSILON )
     {
       cout << "ERR RigidBodyWithCrust::ClosestPoint on Processor "
@@ -825,7 +833,7 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
   Transform const* a2w = rbA.getTransform();
   Transform const* b2w = rbB.getTransform();
   double overlap = 0.;
-
+  // cout << "Rectangle Collision Detection: ";
   if ( convexA->getConvexType() == RECTANGLE2D )
   {
     Point3 const* rPt = a2w->getOrigin(); // rectangle center
@@ -835,18 +843,18 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     rNorm = copysign( 1., rNorm * ( cPt - *rPt ) ) * rNorm;
     Point3 pointA = (*b2w)
                     ( convexB->support( ( -rNorm ) * b2w->getBasis() ) );
-    if ( ( rNorm * (pointA - *rPt) ) * ( rNorm * (cPt - *rPt) ) < 0. )
+    // if ( ( rNorm * (pointA - *rPt) ) * ( rNorm * (cPt - *rPt) ) < 0. )
+    if ( ( rNorm * ( pointA - *rPt ) ) < 0. )
     {
       Point3 pointB = pointA - ( rNorm * pointA ) * rNorm;
       // The projection point lies in the rectangle?
       Transform invTransform;
-      invTransform.setToInverseTransform( *a2w );
+      invTransform.setToInverseTransform( *a2w );      
       if ( convexA->isIn( ( invTransform )( pointB ) ) )
       {
         Point3 contact = pointA / 2.0 + pointB / 2.0;
         Vector3 overlap_vector = pointA - pointB;
-        overlap = -Norm( overlap_vector );
-
+        overlap = -Norm( overlap_vector );        
         return ( PointContact( contact, overlap_vector, overlap, 0 ) );
       }
     }
@@ -860,7 +868,8 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
     rNorm = copysign( 1., rNorm * ( cPt - *rPt ) ) * rNorm;
     Point3 pointA = (*a2w)
                     ( convexA->support( ( -rNorm ) * a2w->getBasis() ) );
-    if ( ( rNorm * (pointA - *rPt) ) * ( rNorm * (cPt - *rPt) ) < 0. )
+    // if ( ( rNorm * (pointA - *rPt) ) * ( rNorm * (cPt - *rPt) ) < 0. )
+    if ( ( rNorm * ( pointA - *rPt ) ) < 0. )
     {
       Point3 pointB = ( ( *rPt - pointA ) * rNorm ) * rNorm + pointA;
       // The projection point lies in the rectangle?
@@ -871,7 +880,6 @@ PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA,
         Point3 contact = pointA / 2.0 + pointB / 2.0;
         Vector3 overlap_vector = pointB - pointA;
         overlap = -Norm( overlap_vector );
-
         return ( PointContact( contact, overlap_vector, overlap, 0 ) );
       }
     }
