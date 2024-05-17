@@ -107,13 +107,13 @@ void GrainsCRBFeatures::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allParticles->getLength(); i++) 
       {
         DOMNode* nParticle = allParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
         Particle* particleRef = new Particle( nParticle, nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
       
@@ -138,7 +138,7 @@ void GrainsCRBFeatures::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allCompParticles->getLength(); i++) 
       {
         DOMNode* nCompParticle = allCompParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
@@ -151,8 +151,8 @@ void GrainsCRBFeatures::Construction( DOMElement* rootElement )
 	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
 	else 	
 	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
       

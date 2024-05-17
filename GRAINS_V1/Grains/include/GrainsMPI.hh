@@ -51,14 +51,11 @@ class GrainsMPI : virtual public Grains
     @param mode insertion order */
     virtual bool insertParticle( PullMode const& mode );
 
-    /** @brief Sets particle initial positions from a file 
-    @param mode insertion order */
-    virtual void setPositionParticlesFromFile( 
-    	PullMode const& mode = PM_ORDERED );
+    /** @brief Sets particle initial positions from a file */
+    virtual size_t setPositionParticlesFromFile();
   
-    /** @brief Sets particle initial position with a structured array
-    @param mode insertion order */
-    virtual void setPositionParticlesArray( const PullMode& mode = PM_ORDERED );
+    /** @brief Sets particle initial position with a structured array */
+    virtual size_t setPositionParticlesArray();
 
     /** @brief Reads data for MPI simulations and creates and sets the MPI
     wrapper
@@ -99,7 +96,7 @@ class GrainsMPI : virtual public Grains
     @param random_local true if random is on the process, otherwise random over
     all processes */
     Particle* getParticleClassForCreation( PullMode const& mode,
-  	list< pair<Particle*,int> >& ParticleClassesForCreation,
+  	list< pair<Particle*,size_t> >& ParticleClassesForCreation,
 	bool const& random_local );                      
     //@}
   

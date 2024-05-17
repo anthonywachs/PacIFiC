@@ -61,7 +61,7 @@ struct StructArrayInsertion
 
     Fully static class that manages global variables.
 
-    @author A. WACHS - Institut Francais du Petrole - 2010 - Creation
+    @author A.WACHS - Institut Francais du Petrole - 2010 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class GrainsExec

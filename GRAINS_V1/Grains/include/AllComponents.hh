@@ -66,8 +66,9 @@ class AllComponents
     void AddParticle( Particle* particle );
 
     /** @brief Adds a reference particle
-    @param particle the reference particle to be added */
-    void AddReferenceParticle( Particle *particle );
+    @param particle the reference particle to be added 
+    @param n number of such particles to be inserted in the simulation */
+    void AddReferenceParticle( Particle *particle, size_t const &n );
 
     /** @brief Adds an obstacle
     @param obstacle_ the obstacle to be added */
@@ -161,17 +162,15 @@ class AllComponents
     void PostProcessingErreurComponents( string const& filename,
   	list<Component*> const& errcomposants );
 
-    /** @brief Set all active particles velocity to 0 if reset == "Reset"
+    /** @brief Sets all active particles velocity to 0 if reset == "Reset"
     @param reset keyword to reset the particle velocity */
     void resetKinematics( string const& reset );
 
-    /** @brief Transfer the inactive particle waiting to be inserted to the list
-    of active particles 
+    /** @brief Adds the waiting particle to the list of active particles 
     @param parallel true if Grains runs in parallel mode */
-    void ShiftParticleOutIn( bool const& parallel = false );
+    void WaitToActive( bool const& parallel = false );
 
-    /** @brief Removes the inactive particle waiting to be inserted from the
-    list of inactive particles and destroys it */
+    /** @brief Destroys the waiting particle */
     void DeleteAndDestroyWait();
   
     /** @brief Computes and returns the maximum and mean translational velocity
@@ -220,10 +219,8 @@ class AllComponents
     Component* getComponent( int id );
 
     /** @brief Returns a particle from the list of inactive particles
-    @param mode insertion mode
-    @param wrapper MPI wrapper */
-    Particle* getParticle( PullMode mode,
-  	GrainsMPIWrapper const* wrapper = NULL );
+    @param mode insertion mode */
+    Particle* getParticle( PullMode mode );
 
     /** @brief Returns a pointer to the list of active particles */
     list<Particle*>* getActiveParticles();
@@ -305,10 +302,18 @@ class AllComponents
     /** @brief Returns the number of inactive particles */
     size_t getNumberInactiveParticles() const;
     
+    /** @brief Returns the total number of inactive particles in the physical 
+    system */
+    size_t getTotalNumberInactivePhysicalParticles() const;    
+    
     /** @brief Returns the total number of particles in the physical system 
     (i.e. on all subdomains/processes), i.e. sum of total number of active 
     particles with tag 0 or 1 and inactive particles */
-    size_t getTotalNumberPhysicalParticles() const;    
+    size_t getTotalNumberPhysicalParticles() const; 
+    
+    /** @brief Returns the number of particles to insert in the physical 
+    system */
+    size_t getNumberPhysicalParticlesToInsert() const;        
 
     /** @brief Returns the highest particle ID number */
     int getMaxParticleIDnumber() const;
@@ -352,7 +357,12 @@ class AllComponents
     
     /** @brief Set all contact map entry features to zero in all particles
     and all elementary obstacles */
-    void setAllContactMapFeaturesToZero();    
+    void setAllContactMapFeaturesToZero(); 
+    
+    /** @brief Increments the total number of inactive particles in the physical 
+    system 
+    @param incr increment (can be positive or negative) */
+    void incrementTotalNumberInactivePhysicalParticles( size_t const& incr );
     //@}
 
 
@@ -373,9 +383,12 @@ class AllComponents
     @param rootfilename root file name 
     @param npart number of particles to be read
     @param LC linked cell grid 
-    @param nprocs number of processes */
+    @param rank process rank
+    @param nprocs number of processes     
+    @param wrapper MPI wrapper */
     void read_particles( string const& filename, int const& npart,
-    	LinkedCell const* LC, int const& nprocs );     	   
+    	LinkedCell const* LC, int const& rank,
+  	int const& nprocs, GrainsMPIWrapper const* wrapper );     	   
 
     /** @brief Writes components to an output stream
     @param fileSave output stream
@@ -452,8 +465,12 @@ class AllComponents
     //@{
     vector<Particle*> m_ReferenceParticles; /**< reference particle for each
     	class of particles */
-    list<Particle*> m_InactiveParticles; /**< Inactive particles, either deleted
-  	from the simulation or waiting to be inserted */
+    vector<size_t> m_NbRemainingParticlesToInsert; /**< number of remaining 
+    	particles in each class to be inserted */
+    size_t m_nb_physical_particles_to_insert; /**< number of 
+    	remaining particles to insert in the physical system */		
+    list<Particle*> m_InactiveParticles; /**< Inactive particles deleted
+  	from the simulation */
     Particle* m_wait; /**< Particle from the inactive particle list waiting to
     	be inserted */
     list<Particle*> m_ActiveParticles; /**< All active particles in the
@@ -477,12 +494,16 @@ class AllComponents
     size_t m_total_nb_active_particles_on_all_procs; /**< total number of 
     	active particles with tag 0 or 1 in the system 
 	(i.e. on all subdomains/processes) */
-    size_t m_nb_inactive_particles; /**< number of inactive particles in the
-    	system (i.e. on all subdomains/processes) */
+    size_t m_nb_inactive_particles; /**< number of inactive particles in 
+    	this process */
+    size_t m_total_nb_inactive_particles; /**< number of inactive particles in 
+    	the system (i.e. on all subdomains/processes) */	
     size_t m_total_nb_physical_particles; /**< total number of particles 
     	in the physical system (i.e. on all subdomains/processes), i.e. sum of 
-	total number of active particles with tag 0 or 1 and inactive 
-	particles */		
+	total number of active particles with tag 0 or 1 and inactive physical
+	particles */
+    size_t m_total_nb_inactive_physical_particles; /**< total number of 
+    	inactive particles in the physical system */			
     Obstacle *m_obstacle; /**< Root obstacle */
     list<PostProcessingWriter*> m_postProcessors; /**< list of
   	post-processors */

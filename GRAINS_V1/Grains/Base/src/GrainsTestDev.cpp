@@ -335,13 +335,13 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allParticles->getLength(); i++)
       {
         DOMNode* nParticle = allParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
         Particle* particleRef = new Particle( nParticle, nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
 
@@ -365,7 +365,7 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allCompParticles->getLength(); i++)
       {
         DOMNode* nCompParticle = allCompParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
@@ -378,8 +378,8 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
 	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
 	else 	
 	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
 
@@ -466,7 +466,8 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
 
     // If reload with 2024 format, read the particle reload file
     if ( reload && b2024 )
-      m_allcomponents.read_particles( restart, npart, m_collision, m_nprocs );
+      m_allcomponents.read_particles( restart, npart, m_collision, m_rank, 
+      	m_nprocs, m_wrapper );
 
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );

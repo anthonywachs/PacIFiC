@@ -2335,21 +2335,21 @@ void GrainsMPIWrapper::display_used_memory( ostream& f ) const
 // Distributes the number of particles in each class and on each
 // process in the case of the block structured insertion
 void GrainsMPIWrapper::distributeParticlesClassProc( 
-  	list< pair<Particle*,int> > const& newPart,
-	list< pair<Particle*,int> >&newPartProc,
+  	list< pair<Particle*,size_t> > const& newPart,
+	list< pair<Particle*,size_t> >&newPartProc,
 	size_t const& npartproc,
 	size_t const& ntotalinsert ) const
 {
-  list< pair<Particle*,int> >::const_iterator ipart;
-  list< pair<Particle*,int> >::iterator ipartProc;
-  int nclasseproc = 0, npartproc_ = int(npartproc), i, 
-  	nbClasses = int(newPart.size()) ;
+  list< pair<Particle*,size_t> >::const_iterator ipart;
+  list< pair<Particle*,size_t> >::iterator ipartProc;
+  size_t nclasseproc = 0, npartproc_ = npartproc, i, 
+  	nbClasses = newPart.size() ;
   MPI_Status status;
   
 
   // Initialisation of lists and arrays
   newPartProc = newPart;
-  int* tabNbPartRestantesParClasse = new int[nbClasses];
+  size_t* tabNbPartRestantesParClasse = new size_t[nbClasses];
   for (i=0,ipart=newPart.begin();i<nbClasses;++i,ipart++) 
     tabNbPartRestantesParClasse[i] = ipart->second;
   
@@ -2364,10 +2364,11 @@ void GrainsMPIWrapper::distributeParticlesClassProc(
     for (i=0,ipart=newPart.begin(),ipartProc=newPartProc.begin();
     	i<nbClasses-1;++i,ipart++,ipartProc++)
     {
-      nclasseproc = int( npartproc * ipart->second / ntotalinsert ) ;
+      nclasseproc = size_t( npartproc * ipart->second / ntotalinsert ) ;
       // If ratio is integer, we keep it, otherwise we add 1
       if ( fabs( double( npartproc * ipart->second / ntotalinsert )
-      	- double( int( npartproc * ipart->second / ntotalinsert ) ) ) > 1.e-14 )
+      	- double( size_t( npartproc * ipart->second / ntotalinsert ) ) ) 
+	> 1.e-14 )
 	++nclasseproc;
       if ( nclasseproc > tabNbPartRestantesParClasse[i] ) 
         nclasseproc = tabNbPartRestantesParClasse[i];
@@ -2384,24 +2385,25 @@ void GrainsMPIWrapper::distributeParticlesClassProc(
     ipartProc->second = nclasseproc;
     tabNbPartRestantesParClasse[nbClasses-1] -= nclasseproc;
   
-    MPI_Send( tabNbPartRestantesParClasse, nbClasses, MPI_INT, 1, m_rank, 
-  	m_MPI_COMM_activeProc );
+    MPI_Send( tabNbPartRestantesParClasse, int(nbClasses), MPI_UNSIGNED_LONG, 
+    	1, m_rank, m_MPI_COMM_activeProc );
   }
   else
   {
     if ( m_rank != m_nprocs - 1 )
     {
-      MPI_Recv( tabNbPartRestantesParClasse, nbClasses, MPI_INT, m_rank - 1,
-    	m_rank - 1, m_MPI_COMM_activeProc, &status );
+      MPI_Recv( tabNbPartRestantesParClasse, int(nbClasses), MPI_UNSIGNED_LONG, 
+      	m_rank - 1, m_rank - 1, m_MPI_COMM_activeProc, &status );
 
       // All types except the last type
       for (i=0,ipart=newPart.begin(),ipartProc=newPartProc.begin();
     	i<nbClasses-1;++i,ipart++,ipartProc++)      
       {
-        nclasseproc = int( npartproc * ipart->second / ntotalinsert ) ;
+        nclasseproc = size_t( npartproc * ipart->second / ntotalinsert ) ;
         // If ratio is integer, we keep it, otherwise we add 1
         if ( fabs( double( npartproc * ipart->second / ntotalinsert )
-      	- double( int( npartproc * ipart->second / ntotalinsert ) ) ) > 1.e-14 )
+      	- double( size_t( npartproc * ipart->second / ntotalinsert ) ) ) 
+	> 1.e-14 )
 	  ++nclasseproc;        
 	if ( nclasseproc > tabNbPartRestantesParClasse[i] ) 
           nclasseproc = tabNbPartRestantesParClasse[i];
@@ -2418,13 +2420,13 @@ void GrainsMPIWrapper::distributeParticlesClassProc(
       ipartProc->second = nclasseproc;
       tabNbPartRestantesParClasse[nbClasses-1] -= nclasseproc;
   
-      MPI_Send( tabNbPartRestantesParClasse, nbClasses, MPI_INT, m_rank + 1, 
-  		m_rank, m_MPI_COMM_activeProc );
+      MPI_Send( tabNbPartRestantesParClasse, int(nbClasses), MPI_UNSIGNED_LONG, 
+      	m_rank + 1, m_rank, m_MPI_COMM_activeProc );
     }
     else
     {
-      MPI_Recv( tabNbPartRestantesParClasse, nbClasses, MPI_INT, m_rank - 1,
-    	m_rank - 1, m_MPI_COMM_activeProc, &status );      
+      MPI_Recv( tabNbPartRestantesParClasse, int(nbClasses), MPI_UNSIGNED_LONG, 
+      	m_rank - 1, m_rank - 1, m_MPI_COMM_activeProc, &status );      
 	
       for (i=0,ipartProc=newPartProc.begin();i<nbClasses;++i,ipartProc++)
         ipartProc->second = tabNbPartRestantesParClasse[i];
@@ -2440,7 +2442,7 @@ void GrainsMPIWrapper::distributeParticlesClassProc(
     if ( m == m_rank && m_is_active )
     {      
       cout << "Proc " << m_rank << endl;
-      int ntot_ = 0 ;
+      size_t ntot_ = 0 ;
       for (i=0,ipart=newPart.begin(),ipartProc=newPartProc.begin();
     	i<nbClasses;++i,ipart++,ipartProc++)
       {
@@ -2459,7 +2461,7 @@ void GrainsMPIWrapper::distributeParticlesClassProc(
   for (i=0,ipart=newPart.begin(),ipartProc=newPartProc.begin();
     	i<nbClasses;++i,ipart++,ipartProc++)
   {
-    int ntotc =  sum_INT_master( ipartProc->second ) ;
+    size_t ntotc =  sum_UNSIGNED_INT_master( ipartProc->second ) ;
     if ( m_rank == m_rank_master )
       cout << "   Class " << i << " " << ntotc << " = " << ipart->second 
       	<< endl;

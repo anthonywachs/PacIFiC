@@ -441,7 +441,8 @@ void GrainsPostProcessing::Construction( DOMElement* rootElement )
 
     // If reload with 2024 format, read the particle reload file
     if ( b2024 )
-      m_allcomponents.read_particles( restart, npart, m_collision, m_nprocs );
+      m_allcomponents.read_particles( restart, npart, m_collision, m_rank, 
+      	m_nprocs, m_wrapper );
     
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );     

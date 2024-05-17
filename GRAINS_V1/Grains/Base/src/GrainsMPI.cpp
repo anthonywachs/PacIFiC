@@ -100,7 +100,8 @@ void GrainsMPI::Simulation( double time_interval )
 	      cout << "Number of active particles on all proc = " <<
 	  	m_allcomponents.getNumberActiveParticlesOnAllProc() << endl;
 	      cout << "Number of inactive particles = " <<
-	  	m_allcomponents.getNumberInactiveParticles() << endl;
+	  	m_allcomponents.getTotalNumberInactivePhysicalParticles() 
+		<< endl;
 	    }		
 	  }
         if ( m_insertion_mode == IM_OVERTIME )
@@ -320,12 +321,12 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
     // the list of particles to insert is scanned in an ordered way
     // In the case of insertion via a window, the procedure is similar to the 
     // serial insertion, all processes have the same list of particles to insert
-    // and the random selection of particles is performed is performed in 
+    // and the random selection of particles is performed in 
     //  m_allcomponents.getParticle( mode ) when mode == PM_RANDOM
     Particle *particle = NULL;
     if ( m_position != "" ) 
-      particle = m_allcomponents.getParticle( PM_ORDERED, m_wrapper );
-    else particle = m_allcomponents.getParticle( mode, m_wrapper );
+      particle = m_allcomponents.getParticle( PM_ORDERED );
+    else particle = m_allcomponents.getParticle( mode );
  
     if ( particle )
     {
@@ -394,7 +395,7 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
         // If particle is in LinkedCell
 	if ( insert.first )
 	{
-	  m_allcomponents.ShiftParticleOutIn( true );
+	  m_allcomponents.WaitToActive( true );
 	  particle->InitializeForce( true );
 	  particle->computeAcceleration( m_time );
         }
@@ -424,36 +425,38 @@ void GrainsMPI::InsertCreateNewParticles()
   // are re-numbered
 
   int numPartMax = getMaxParticleIDnumber();
-  list< pair<Particle*,int> >::iterator ipart;
+  list< pair<Particle*,size_t> >::iterator ipart;
+  size_t error = 0;
 
   // New particles construction
   Component::setMaxIDnumber( numPartMax );
   if ( m_position != "" )
   {
     // From a structured array
-    if ( m_position == "STRUCTURED" )
-      setPositionParticlesArray( m_insertion_order );
+    if ( m_position == "STRUCTURED" ) error = setPositionParticlesArray();
     // From a file
-    else setPositionParticlesFromFile( m_insertion_order );
+    else error = setPositionParticlesFromFile();
   }
   else
   {
     for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
     {
-      int nbre = ipart->second;
-      for (int ii=0; ii<nbre; ii++)
+      size_t nbre = ipart->second;
+      for (size_t ii=0; ii<nbre; ii++)
       {
         Particle* particle = ipart->first->createCloneCopy( true );
         particle->setPosition( GrainsExec::m_defaultInactivePos );	
         m_allcomponents.AddParticle( particle );
       }
+      m_allcomponents.incrementTotalNumberInactivePhysicalParticles( nbre );      
     }
   }
+  if ( error ) grainsAbort();  
 
   // Obstacle renumbering
   int numInitObstacles = numPartMax;
   for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
-    numInitObstacles += ipart->second;
+    numInitObstacles += int(ipart->second);
   list<SimpleObstacle*> lisObstaclesPrimaires =
     	m_allcomponents.getObstacles()->getObstacles();
   list<SimpleObstacle*>::iterator iobs;
@@ -473,9 +476,9 @@ void GrainsMPI::InsertCreateNewParticles()
   {
     // From a structured array
     if ( m_position == "STRUCTURED" )
-      setPositionParticlesArray( m_insertion_order );
+      setPositionParticlesArray();
     // From a file
-    else setPositionParticlesFromFile( m_insertion_order );
+    else setPositionParticlesFromFile();
   }
 
   // Insertion at initial time
@@ -483,7 +486,7 @@ void GrainsMPI::InsertCreateNewParticles()
   bool b_insertion_BEFORE = true;  
   if ( m_insertion_mode == IM_INITIALTIME )
   {
-    nbPW = m_allcomponents.getNumberInactiveParticles() ;
+    nbPW = m_allcomponents.getTotalNumberInactivePhysicalParticles() ;
     for (size_t i=0;i<nbPW && b_insertion_BEFORE;++i)
       b_insertion_BEFORE = insertParticle( m_insertion_order );
     if ( !b_insertion_BEFORE )
@@ -491,7 +494,7 @@ void GrainsMPI::InsertCreateNewParticles()
       cout << "Process " << m_rank << endl;
       cout << "Insertion issue with defined position method" << endl;
       cout << "Remaining number of particles to insert = " << 
-      	m_allcomponents.getNumberInactiveParticles() << endl;
+      	m_allcomponents.getTotalNumberInactivePhysicalParticles() << endl;
     }     
   }
   if ( !b_insertion_BEFORE ) grainsAbort();
@@ -512,77 +515,15 @@ void GrainsMPI::InsertCreateNewParticles()
 
 // ----------------------------------------------------------------------------
 // Sets particle initial positions from a file
-void GrainsMPI::setPositionParticlesFromFile( const PullMode& mode )
+size_t GrainsMPI::setPositionParticlesFromFile()
 {
-  Particle* newPart = NULL;
-  Particle* particleClass = NULL;
-  int id;
-  Point3 position;
-  list< pair<Particle*,int> > newParticles_ = m_newParticles;
-  list< pair<Particle*,int> >::iterator ipart;
-
-  // Check that position file exists 
-  ifstream filePos;
-  size_t notok = 0;
-  if ( m_rank == 0 )
-  {
-    filePos.open( m_position.c_str() );
-    if ( !filePos.is_open() ) notok = 1;
-  }
-  notok = m_wrapper->sum_UNSIGNED_INT( notok );
-  if ( notok )
-  {
-    if ( m_rank == 0 ) cout << "ERR : Position file does not exist" << 
-    	m_position << endl << endl;  
-    m_wrapper->MPI_Barrier_ActivProc();	
-    grainsAbort();
-  }
-
-  // Check that the number of positions matches the number of particles
-  // to insert
-  size_t nwait = 0, npos = 0; 
-  if ( m_rank == 0 )
-  {
-    for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
-      nwait += ipart->second;
-    while ( filePos >> position ) ++npos;
-    if ( nwait != npos ) notok = 1;
-    filePos.close();
-  }
-  notok = m_wrapper->sum_UNSIGNED_INT( notok );
-  if ( notok )
-  {
-    if ( m_rank == 0 )
-      cout << "ERR: number of particles to insert is "
-           << "different from the number of positions in the file " 
-	   << m_position << " : " << nwait << " != " << npos << endl << endl;
-    m_wrapper->MPI_Barrier_ActivProc();	
-    grainsAbort();
-  }
+  size_t error = 0;
   
-  // Initialisation of particle numbering
-  id = getMaxParticleIDnumber();
+  // Note: only the master proc reads and stores positions  
+  if ( m_rank == 0 ) error = GrainsMPI::setPositionParticlesFromFile();
+  error = m_wrapper->Broadcast_UNSIGNED_INT( error );
 
-  // All processes read the entire position file, but a particle is created
-  // on this process if the position is inside the local domain of the process
-  filePos.open( m_position.c_str() );
-  while ( filePos >> position ) 
-  {
-    // Select a particle class
-    particleClass = getParticleClassForCreation( mode, newParticles_, 
-    	false );
-       
-    // Create the particle only if in the local domain
-    if ( App::isInLocalDomain( &position ) )
-    {
-      newPart = new Particle( *particleClass );
-      newPart->setPosition( position );
-      newPart->setID( id );
-      m_allcomponents.AddParticle( newPart ); 
-    }
-    id++;      	
-  }
-  filePos.close();
+  return ( error );
 }
 
 
@@ -590,64 +531,29 @@ void GrainsMPI::setPositionParticlesFromFile( const PullMode& mode )
 
 // ----------------------------------------------------------------------------
 // Sets particle initial position with a structured array
-void GrainsMPI::setPositionParticlesArray( const PullMode& mode )
+size_t GrainsMPI::setPositionParticlesArray()
 {
-  Particle* newPart = NULL; 
-  Particle* particleClass = NULL;
-  int id, k, l, m, kmin = 0, kmax = int(m_InsertionArray->NX) - 1, 
-  	lmin = 0, lmax = int(m_InsertionArray->NY) - 1, 
-	mmin = 0, mmax = int(m_InsertionArray->NZ) - 1,
-	npartproc;
-  Point3 position;
-  list< pair<Particle*,int> > newParticles_ = m_newParticles;
-  bool found = false, no_overlap = false ;
-
-  // Test the number of particles to insert
-  size_t ntotalinsert = 0;
-  list< pair<Particle*,int> >::iterator ipart,ipart2;
-  for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
-    ntotalinsert += ipart->second; 
-
-  if ( ntotalinsert != m_InsertionArray->NX * m_InsertionArray->NY 
-  	* m_InsertionArray->NZ )
-  {
-    if ( m_rank == 0 )
-      cout << "ERR: number of particles to insert is different from"
-    	<< " the number of positions in the structured array : " << 
-	ntotalinsert << " != " <<
-	m_InsertionArray->NX * m_InsertionArray->NY * m_InsertionArray->NZ 
-	<< endl;
-    m_wrapper->MPI_Barrier_ActivProc();	
-    grainsAbort();	
-  }
-
-
-  // Uniform cell size of the structured array
-  double deltax = 
-  	( m_InsertionArray->box.ptB[X] - m_InsertionArray->box.ptA[X] ) 
-  	/ double(m_InsertionArray->NX) ;
-  double deltay = 
-  	( m_InsertionArray->box.ptB[Y] - m_InsertionArray->box.ptA[Y] ) 
-  	/ double(m_InsertionArray->NY) ;  
-  double deltaz = 
-  	( m_InsertionArray->box.ptB[Z] - m_InsertionArray->box.ptA[Z] ) 
-  	/ double(m_InsertionArray->NZ) ;  
-
+  Point3 localOrigin, position;
+  Vector3 localSize;  
 
   // Coordinates of local domain
-  Point3 localOrigin;
   App::get_local_domain_origin( localOrigin[X], localOrigin[Y], 
   	localOrigin[Z] );
-  Vector3 localSize;
   App::get_local_domain_size( localSize[X], localSize[Y], localSize[Z] );
   Point3 MaxLocal = localOrigin + localSize;	
     
-
   // Test that no coordinate matches exactly the local domain limits
   // If any does, translate by 1e-12
+  double deltax = ( m_InsertionArray->box.ptB[X]
+  	- m_InsertionArray->box.ptA[X] ) / double(m_InsertionArray->NX) ;
+  double deltay = ( m_InsertionArray->box.ptB[Y]
+  	- m_InsertionArray->box.ptA[Y] ) / double(m_InsertionArray->NY) ;
+  double deltaz = ( m_InsertionArray->box.ptB[Z]
+  	- m_InsertionArray->box.ptA[Z] ) / double(m_InsertionArray->NZ) ;
   double geoshift = 1.e-12;
   vector<size_t> coorMatchLocLim( 3, 0 );
-  for (k=0;k<int(m_InsertionArray->NX) && !coorMatchLocLim[0];++k)
+  size_t k, l, m, error = 0;
+  for (k=0;k<m_InsertionArray->NX && !coorMatchLocLim[0];++k)
   {
     position[X] = m_InsertionArray->box.ptA[X] + ( double(k) + 0.5 ) * deltax;
     if ( fabs( position[X] - localOrigin[X] ) < geoshift
@@ -655,7 +561,7 @@ void GrainsMPI::setPositionParticlesArray( const PullMode& mode )
       coorMatchLocLim[0] = 1;
   }
   
-  for (l=0;l<int(m_InsertionArray->NY) && !coorMatchLocLim[1];++l)
+  for (l=0;l<m_InsertionArray->NY && !coorMatchLocLim[1];++l)
   {
     position[Y] = m_InsertionArray->box.ptA[Y] + ( double(l) + 0.5 ) * deltay;
     if ( fabs( position[Y] - localOrigin[Y] ) < geoshift
@@ -663,7 +569,7 @@ void GrainsMPI::setPositionParticlesArray( const PullMode& mode )
       coorMatchLocLim[1] = 1;
   }  
 
-  for (m=0;m<int(m_InsertionArray->NZ) && !coorMatchLocLim[2];++m)
+  for (m=0;m<m_InsertionArray->NZ && !coorMatchLocLim[2];++m)
   {
     position[Z] = m_InsertionArray->box.ptA[Z] + ( double(m) + 0.5 ) * deltaz;
     if ( fabs( position[Z] - localOrigin[Z] ) < geoshift
@@ -687,138 +593,14 @@ void GrainsMPI::setPositionParticlesArray( const PullMode& mode )
     for (size_t i=0;i<3;++i)
       if ( coorMatchLocLim[i] )
         cout << "   * " << ( i == 0 ? "X" : i == 1 ? "Y" : "Z" ) << 
-      	" automatix translation of " << geoshift << endl;	
+      	" automatic translation of " << geoshift << endl;	
   }	      
-  m_wrapper->MPI_Barrier_ActivProc();	
-
-  // Number of particles to insert on this process
-  // We determine the min and max indices of particles located in this local
-  // domain
-  k = 0;
-  found = false;
-  while( !found && k < int(m_InsertionArray->NX) )
-  {
-    position[X] = m_InsertionArray->box.ptA[X] + ( double(k) + 0.5 ) * deltax;
-    if ( position[X] > localOrigin[X] ) {kmin = k; found = true;}
-    ++k;
-  }
-  if ( found )
-  {
-    k = kmax;
-    found = false;
-    while( !found && k >= 0 )
-    {
-      position[X] = m_InsertionArray->box.ptA[X] + ( double(k) + 0.5 ) * deltax;
-      if ( position[X] < MaxLocal[X] ) {kmax = k; found = true;}
-      --k;
-    }
-    if ( !found ) no_overlap = true ;
-  }
-  else no_overlap = true ;
   
-  if ( !no_overlap )
-  {    
-    l = 0;
-    found = false;  
-    while( !found && l < int(m_InsertionArray->NY) )
-    {
-      position[Y] = m_InsertionArray->box.ptA[Y] + ( double(l) + 0.5 ) * deltay;
-      if ( position[Y] > localOrigin[Y] ) {lmin = l; found = true;}
-      ++l;
-    }
-    if ( found )
-    {
-      l = lmax; 
-      found = false;
-      while( !found && l >= 0 )
-      {
-        position[Y] = m_InsertionArray->box.ptA[Y] 
-		+ ( double(l) + 0.5 ) * deltay;
-        if ( position[Y] < MaxLocal[Y] ) {lmax = l; found = true;}
-        --l;
-      }
-      if ( !found ) no_overlap = true ;
-    }
-    else no_overlap = true ;
-  }
-  
-  if ( !no_overlap )
-  {    
-    m = 0;
-    found = false; 
-    while( !found && m < int(m_InsertionArray->NZ) )
-    { 
-      position[Z] = m_InsertionArray->box.ptA[Z] 
-      	+ ( double(m) + 0.5 ) * deltaz;
-      if ( position[Z] > localOrigin[Z] ) {mmin = m; found = true;}
-      ++m;
-    }
-    if ( found )
-    {
-      m = mmax;
-      found = false;
-      while( !found && m >= 0 )
-      {
-        position[Z] = m_InsertionArray->box.ptA[Z] 
-		+ ( double(m) + 0.5 ) * deltaz;
-        if ( position[Z] < MaxLocal[Z] ) {mmax = m; found = true;}
-        --m;
-      }     
-      if ( !found ) no_overlap = true ;
-    }
-    else no_overlap = true ;
-  }  
-  
-  if ( no_overlap )
-  {
-    npartproc = kmin = lmin = mmin = 0;
-    kmax = lmax = mmax = -1;
-  }
-  else npartproc = ( kmax - kmin + 1 ) * ( lmax - lmin + 1 )
-  	* ( mmax - mmin + 1 );
+  // Note: only the master proc computes and stores positions  
+  if ( m_rank == 0 ) error = GrainsMPI::setPositionParticlesArray();
+  error = m_wrapper->Broadcast_UNSIGNED_INT( error );
 
-        	
-  // Number of particles of each class to insert in this local domain
-  // Warning: works only if the number of particles per class is larger
-  // than the number of processes
-  if ( m_newParticles.size() == 1 )
-    newParticles_.front().second = int(npartproc);
-  else
-    m_wrapper->distributeParticlesClassProc( m_newParticles,
-    	newParticles_, npartproc, ntotalinsert );	
- 
-   
-  // Initialisation of particle numbering
-  size_t* vnbpartproc = m_wrapper->AllGather_UNSIGNED_INT( npartproc );  
-  id = getMaxParticleIDnumber();
-  for (k=0;k<m_rank;++k) id += int(vnbpartproc[k]);
-  delete [] vnbpartproc;
-
-  
-  // Assign positions
-  for (k=kmin;k<=kmax;++k)
-    for (l=lmin;l<=lmax;++l)
-      for (m=mmin;m<=mmax;++m)    
-      {
-	// Position
-        position[X] = m_InsertionArray->box.ptA[X] 
-		+ ( double(k) + 0.5 ) * deltax;
-        position[Y] = m_InsertionArray->box.ptA[Y] 
-		+ ( double(l) + 0.5 ) * deltay;	
-        position[Z] = m_InsertionArray->box.ptA[Z] 
-		+ ( double(m) + 0.5 ) * deltaz;
-
-        // Select a particle class
-        particleClass = getParticleClassForCreation( mode, newParticles_,
-		true );
-
-        // Create the particle
-	newPart = new Particle( *particleClass );
-        newPart->setPosition( position );
-        newPart->setID( id );
-        m_allcomponents.AddParticle( newPart );
-	id++;   
-     }
+  return ( error );    
 }
 
 
@@ -919,11 +701,11 @@ void GrainsMPI::display_timer_summary()
 // ----------------------------------------------------------------------------
 // Returns a particle class among the classes of new particles to insert
 Particle* GrainsMPI::getParticleClassForCreation( PullMode const& mode,
-  	list< pair<Particle*,int> >& ParticleClassesForCreation,
+  	list< pair<Particle*,size_t> >& ParticleClassesForCreation,
 	bool const& random_local )
 {
   Particle* particleClass = NULL;
-  list< pair<Particle*,int> >::iterator il;
+  list< pair<Particle*,size_t> >::iterator il;
   list<int> availableClasses;
   bool found = false;
   int i,i0;

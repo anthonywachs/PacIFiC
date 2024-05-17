@@ -34,6 +34,7 @@ Grains::Grains()
   , m_init_angpos( IAP_FIXED )
   , m_randomseed( RGS_DEFAULT )
   , m_InsertionArray( NULL )
+  , m_insertion_position( NULL )
   , m_insertion_frequency( 1 )
   , m_force_insertion( false )
   , m_RandomMotionCoefTrans( 0. )
@@ -45,6 +46,7 @@ Grains::Grains()
   , m_wrapper( NULL )
 {
   if ( GrainsBuilderFactory::getContext() == DIM_2 ) m_dimension = 2;
+  m_insertion_position = new list<Point3>;
 }
 
 
@@ -60,6 +62,8 @@ Grains::~Grains()
   m_newParticles.clear();
   ContactBuilderFactory::eraseAllContactForceModels();
   GrainsExec::GarbageCollector();
+  m_insertion_position->clear();
+  delete m_insertion_position;
 }
 
 
@@ -102,7 +106,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
 
     // Number of particles: inserted and in the system
     m_allcomponents.computeNumberParticles( m_wrapper );
-    m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
+    m_npwait_nm1 = m_allcomponents.getTotalNumberInactivePhysicalParticles();
 
     // Initialisation of obstacle kinematics
     m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt );
@@ -172,7 +176,7 @@ void Grains::do_after_time_stepping()
       cout << endl << "Number of active particles in the simulation = " 
     	<< m_allcomponents.getNumberActiveParticlesOnAllProc() << endl;
       cout << "Number of inactive particles in the simulation = " 
-    	<< m_allcomponents.getNumberInactiveParticles() << endl;
+    	<< m_allcomponents.getTotalNumberInactivePhysicalParticles() << endl;
     }	
 
     // Write reload files
@@ -275,7 +279,8 @@ void Grains::Simulation( double time_interval )
       // Insertion of particles
       m_allcomponents.computeNumberParticles( m_wrapper );
       SCT_set_start( "ParticlesInsertion" );
-      if ( m_npwait_nm1 != m_allcomponents.getNumberInactiveParticles() )
+      if ( m_npwait_nm1 
+      	!= m_allcomponents.getTotalNumberInactivePhysicalParticles() )
           cout << "\r                                              "
                << "                 " << flush;
       ostringstream oss;
@@ -283,8 +288,9 @@ void Grains::Simulation( double time_interval )
       oss << left << m_time;
       cout << '\r' << oss.str() << "  \t" << m_tend << "\t\t\t"
            << m_allcomponents.getNumberActiveParticlesOnProc() << '\t'
-           << m_allcomponents.getNumberInactiveParticles()    << flush;
-      m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
+           << m_allcomponents.getTotalNumberInactivePhysicalParticles() 
+	   << flush;
+      m_npwait_nm1 = m_allcomponents.getTotalNumberInactivePhysicalParticles();
       if ( m_insertion_mode == IM_OVERTIME )
         insertParticle( m_insertion_order );
       SCT_get_elapsed_time( "ParticlesInsertion" );
@@ -622,13 +628,13 @@ void Grains::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allParticles->getLength(); i++)
       {
         DOMNode* nParticle = allParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
         Particle* particleRef = new Particle( nParticle, nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        m_allcomponents.AddReferenceParticle( particleRef, nb  );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
 
@@ -652,7 +658,7 @@ void Grains::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allCompParticles->getLength(); i++)
       {
         DOMNode* nCompParticle = allCompParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
@@ -665,8 +671,8 @@ void Grains::Construction( DOMElement* rootElement )
 	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
 	else 	
 	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
 
@@ -753,7 +759,8 @@ void Grains::Construction( DOMElement* rootElement )
     
     // If reload with 2024 format, read the particle reload file
     if ( reload && b2024 )
-      m_allcomponents.read_particles( restart, npart, m_collision, m_nprocs );
+      m_allcomponents.read_particles( restart, npart, m_collision, m_rank, 
+      	m_nprocs, m_wrapper );
 
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );
@@ -1500,27 +1507,13 @@ void Grains::InsertCreateNewParticles()
   // In the case of reload with additional insertion, it means that obstacles
   // are re-numbered
 
-  int numPartMax = getMaxParticleIDnumber();
-  list< pair<Particle*,int> >::iterator ipart;
-  Point3 defaultInactivePos( -1.e10 );
-
-  // New particles construction
-  Component::setMaxIDnumber( numPartMax );
-  for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
-  {
-    int nbre = ipart->second;
-    for (int ii=0; ii<nbre; ii++)
-    {
-      Particle* particle = ipart->first->createCloneCopy( true );
-      particle->setPosition( GrainsExec::m_defaultInactivePos );
-      m_allcomponents.AddParticle( particle );
-    }
-  }
-
   // Obstacle renumbering
+  list< pair<Particle*,size_t> >::iterator ipart;  
+  int numPartMax = getMaxParticleIDnumber();  
+  Component::setMaxIDnumber( numPartMax );  
   int numInitObstacles = numPartMax;
   for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
-    numInitObstacles += ipart->second;
+    numInitObstacles += int(ipart->second);
   list<SimpleObstacle*> lisObstaclesPrimaires =
     	m_allcomponents.getObstacles()->getObstacles();
   list<SimpleObstacle*>::iterator iobs;
@@ -1536,26 +1529,28 @@ void Grains::InsertCreateNewParticles()
   m_allcomponents.Link( *m_collision );
 
   // Set particle positions from file or from a structured array
+  size_t error = 0;
   if ( m_position != "" )
   {
     // From a structured array
-    if ( m_position == "STRUCTURED" )
-      setPositionParticlesArray( m_insertion_order );
+    if ( m_position == "STRUCTURED" )error = setPositionParticlesArray();
     // From a file
-    else setPositionParticlesFromFile( m_insertion_order );
+    else error = setPositionParticlesFromFile();
   }
+  if ( error ) grainsAbort();
 
   // Insertion at initial time
   if ( m_insertion_mode == IM_INITIALTIME )
   {
     cout << "Particles \tIn \tOut" << endl;
-    while ( m_allcomponents.getNumberInactiveParticles() != 0 )
+    while ( m_allcomponents.getTotalNumberInactivePhysicalParticles() != 0 )
     {
         insertParticle( m_insertion_order );
         cout << "\r                                              " << flush;
         cout << "\r\t\t"
 	   << m_allcomponents.getNumberActiveParticlesOnProc() << '\t'
-	   << m_allcomponents.getNumberInactiveParticles()    << flush;
+	   << m_allcomponents.getTotalNumberInactivePhysicalParticles() 
+	   << flush;
     }
     cout << endl;
   }
@@ -1571,107 +1566,129 @@ void Grains::InsertCreateNewParticles()
 
 
 // ----------------------------------------------------------------------------
-// Returns a point randomly selected in one of the insertion windows
-Point3 Grains::getInsertionPoint() const
+// Returns a point randomly selected in one of the insertion windows or in 
+// the list of positions. Note: list of positions has priority over windows 
+// until it is empty
+Point3 Grains::getInsertionPoint()
 {
   Point3 P;
-  int nWindow = 0;
-  int nbreWindows = int( m_insertion_windows.size() );
-
-  // Random selection of an insertion window
-  if ( nbreWindows != 1 )
+  
+  // List of positions
+  if ( !m_insertion_position->empty() )
   {
-    double n = double(random()) / double(INT_MAX);
-    nWindow = int( n * nbreWindows );
-    if ( nWindow == nbreWindows ) nWindow--;
+    // If order, pick the first position
+    il_sp = m_insertion_position->begin();    
+    
+    // If random, pick a random position in the list
+    if ( m_insertion_order == PM_RANDOM )  
+    {
+      double n = double(random()) / double(INT_MAX);
+      size_t shift = size_t( n * double(m_insertion_position->size()) );
+      std::advance( il_sp, shift );      
+    }
+    P = *il_sp; 
   }
-
-  // Random position in the selected insertion window
-  double r = 0., theta = 0., axiscoor = 0.;
-  switch( m_insertion_windows[nWindow].ftype )
+  // Insertion windows
+  else
   {
-    case WINDOW_BOX:
-      P[X] = m_insertion_windows[nWindow].ptA[X]
-      	+ ( double(random()) / double(INT_MAX) )
-	* ( m_insertion_windows[nWindow].ptB[X]
-		- m_insertion_windows[nWindow].ptA[X] );
-      P[Y] = m_insertion_windows[nWindow].ptA[Y]
-      	+ ( double(random()) / double(INT_MAX) )
-	* ( m_insertion_windows[nWindow].ptB[Y]
-		- m_insertion_windows[nWindow].ptA[Y] );
-      P[Z] = m_insertion_windows[nWindow].ptA[Z]
-      	+ ( double(random()) / double(INT_MAX) )
-	* ( m_insertion_windows[nWindow].ptB[Z]
-		- m_insertion_windows[nWindow].ptA[Z] );
-      break;
+    int nWindow = 0;
+    int nbreWindows = int( m_insertion_windows.size() );
 
-    case WINDOW_CYLINDER:
-      r = ( double(random()) / double(INT_MAX) )
-      	* m_insertion_windows[nWindow].radius;
-      theta = ( double(random()) / double(INT_MAX) ) * 2. * PI;
-      axiscoor = ( double(random()) / double(INT_MAX) )
-      	* m_insertion_windows[nWindow].height;
-      switch ( m_insertion_windows[nWindow].axisdir )
-      {
-        case X:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + axiscoor;
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * cos( theta );
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * sin( theta );
-	  break;
+    // Random selection of an insertion window
+    if ( nbreWindows != 1 )
+    {
+      double n = double(random()) / double(INT_MAX);
+      nWindow = int( n * nbreWindows );
+      if ( nWindow == nbreWindows ) nWindow--;
+    }
 
-        case Y:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + r * sin( theta );
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + axiscoor;
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * cos( theta );
-	  break;
+    // Random position in the selected insertion window
+    double r = 0., theta = 0., axiscoor = 0.;
+    switch( m_insertion_windows[nWindow].ftype )
+    {
+      case WINDOW_BOX:
+        P[X] = m_insertion_windows[nWindow].ptA[X]
+      		+ ( double(random()) / double(INT_MAX) )
+		* ( m_insertion_windows[nWindow].ptB[X]
+			- m_insertion_windows[nWindow].ptA[X] );
+        P[Y] = m_insertion_windows[nWindow].ptA[Y]
+      		+ ( double(random()) / double(INT_MAX) )
+		* ( m_insertion_windows[nWindow].ptB[Y]
+			- m_insertion_windows[nWindow].ptA[Y] );
+      	P[Z] = m_insertion_windows[nWindow].ptA[Z]
+      		+ ( double(random()) / double(INT_MAX) )
+		* ( m_insertion_windows[nWindow].ptB[Z]
+			- m_insertion_windows[nWindow].ptA[Z] );
+        break;
 
-        default:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + r * cos( theta );
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * sin( theta );
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + axiscoor;
-	  break;
-      }
-      break;
+      case WINDOW_CYLINDER:
+        r = ( double(random()) / double(INT_MAX) )
+      		* m_insertion_windows[nWindow].radius;
+        theta = ( double(random()) / double(INT_MAX) ) * 2. * PI;
+        axiscoor = ( double(random()) / double(INT_MAX) )
+      		* m_insertion_windows[nWindow].height;
+        switch ( m_insertion_windows[nWindow].axisdir )
+        {
+          case X:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + axiscoor;
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * cos( theta );
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * sin( theta );
+	    break;
 
-    case WINDOW_ANNULUS:
-      r = m_insertion_windows[nWindow].radius_int
-      	+ ( double(random()) / double(INT_MAX) )
-      	* ( m_insertion_windows[nWindow].radius
-		- m_insertion_windows[nWindow].radius_int );
-      theta = ( double(random()) / double(INT_MAX) ) * 2. * PI;
-      axiscoor = ( double(random()) / double(INT_MAX) )
-      	* m_insertion_windows[nWindow].height;
-      switch ( m_insertion_windows[nWindow].axisdir )
-      {
-        case X:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + axiscoor;
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * cos( theta );
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * sin( theta );
-	  break;
+          case Y:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * sin( theta );
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + axiscoor;
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * cos( theta );
+	    break;
 
-        case Y:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + r * sin( theta );
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + axiscoor;
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * cos( theta );
-	  break;
+          default:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * cos( theta );
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * sin( theta );
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + axiscoor;
+	    break;
+        }
+        break;
 
-        default:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + r * cos( theta );
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * sin( theta );
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + axiscoor;
-	  break;
-      }
-      break;
+      case WINDOW_ANNULUS:
+        r = m_insertion_windows[nWindow].radius_int
+      		+ ( double(random()) / double(INT_MAX) )
+      		* ( m_insertion_windows[nWindow].radius
+			- m_insertion_windows[nWindow].radius_int );
+        theta = ( double(random()) / double(INT_MAX) ) * 2. * PI;
+        axiscoor = ( double(random()) / double(INT_MAX) )
+      		* m_insertion_windows[nWindow].height;
+        switch ( m_insertion_windows[nWindow].axisdir )
+        {
+          case X:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + axiscoor;
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * cos( theta );
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * sin( theta );
+	    break;
 
-    case WINDOW_LINE:
-      P = m_insertion_windows[nWindow].ptA
-      	+ ( double(random()) / double(INT_MAX) )
-      	* ( m_insertion_windows[nWindow].ptB
-		- m_insertion_windows[nWindow].ptA );
-      break;
+          case Y:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * sin( theta );
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + axiscoor;
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * cos( theta );
+	    break;
 
-    default:
-      break;
+          default:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * cos( theta );
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * sin( theta );
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + axiscoor;
+	    break;
+        }
+        break;
+
+      case WINDOW_LINE:
+        P = m_insertion_windows[nWindow].ptA
+      		+ ( double(random()) / double(INT_MAX) )
+      		* ( m_insertion_windows[nWindow].ptB
+			- m_insertion_windows[nWindow].ptA );
+        break;
+
+      default:
+        break;
+    }
   }
 
   return ( P );
@@ -1687,24 +1704,16 @@ bool Grains::insertParticle( PullMode const& mode )
   static size_t insert_counter = 0;
   bool insert = true;
   Vector3 vtrans, vrot ;
-  Quaternion qrot;  
+  Quaternion qrot;
+  size_t npositions = m_insertion_position->size();
 
   if ( insert_counter == 0 )
   {
     Particle *particle = m_allcomponents.getParticle( mode );
     if ( particle )
     {
-      // Initialisation of the particle velocity
-      computeInitVit( vtrans, vrot );
-      particle->setTranslationalVelocity( vtrans );
-      particle->setAngularVelocity( vrot );
-
       // Initialisation of the centre of mass position of the particle
-      if ( m_position == "" )
-      {
-        Point3 position = getInsertionPoint();
-        particle->setPosition( position );
-      }
+      particle->setPosition( getInsertionPoint() );
 
       // Initialisation of the angular position of the particle
       // Rem: we compose to the right by a pure rotation as the particle
@@ -1717,6 +1726,12 @@ bool Grains::insertParticle( PullMode const& mode )
         particle->composePositionRightByTransform( trot );
       }
 
+      // Initialisation of the particle velocity
+      computeInitVit( vtrans, vrot );
+      particle->setTranslationalVelocity( vtrans );
+      particle->setAngularVelocity( vrot );
+
+      // Transform and quaternion
       particle->initialize_transformWithCrust_to_notComputed();
       qrot.setQuaternion( particle->getRigidBody()->getTransform()
 		->getBasis() );
@@ -1731,9 +1746,10 @@ bool Grains::insertParticle( PullMode const& mode )
 	m_periodic, m_force_insertion );
       if ( insert )
       {
-        m_allcomponents.ShiftParticleOutIn();
+        m_allcomponents.WaitToActive();
 	particle->InitializeForce( true );
 	particle->computeAcceleration( m_time );
+	if ( npositions ) m_insertion_position->erase( il_sp );
       }
     }
   }
@@ -1805,62 +1821,45 @@ void Grains::computeInitVit( Vector3& vtrans, Vector3& vrot ) const
 
 // ----------------------------------------------------------------------------
 // Sets particle initial positions from a file
-void Grains::setPositionParticlesFromFile( const PullMode& mode )
+size_t Grains::setPositionParticlesFromFile()
 {
+  size_t nnewpart = 0, npos = 0, error = 0;
+  list< pair<Particle*,size_t> >::const_iterator il;
+  Point3 position;
   ifstream filePos( m_position.c_str() );
 
-  // Verification de l'existence du fichier
+  // Check that the file exists
   if ( !filePos.is_open() )
   {
-    cout << "ERR : Fichier absent " << m_position << endl;
-    grainsAbort();
+    cout << "ERR : File " << m_position << " does not exist !" << endl;
+    error = 1;
   }
 
-  list<Particle*> copie_ParticlesWait;
-  list<Particle*>* particles = m_allcomponents.getInactiveParticles();
-  list<Particle*>::iterator particle = particles->begin();
-  Particle* selected=NULL;
-  int id,i;
-  double v;
-  Point3 position;
-  size_t nwait = particles->size(), npos = 0;
-
-  // Verifie que le nb de positions est egal au nombre de particles a inserer
-  while ( filePos >> position ) ++npos;
-  if ( nwait != npos )
+  // Check that the number of positions in the file equals the number of 
+  // new particles to insert
+  if ( !error )
   {
-    cout << "ERR: nombre de particles a inserer est different du"
-    	<< " nombre de positions dans le fichier " << m_position << " : "
-	<< nwait << " != " << npos << endl;
-    grainsAbort();
-  }
-  filePos.close();
-
-  // Lit et affecte la position des particles
-  filePos.open( m_position.c_str() );
-  if ( mode == PM_RANDOM ) copie_ParticlesWait = *particles;
-  while ( filePos >> position )
-  {
-    switch (mode)
+    for (il=m_newParticles.cbegin();il!=m_newParticles.cend();il++)
+      nnewpart += il->second;
+    while ( filePos >> position ) ++npos;
+    if ( nnewpart != npos )
     {
-      case PM_ORDERED:
-        (*particle)->setPosition( position );
-        particle++;
-        break;
-
-      case PM_RANDOM:
-        v = double(random()) / double(INT_MAX);
-        id = int( double(copie_ParticlesWait.size()) * v );
-        particle = copie_ParticlesWait.begin();
-        for (i=0; i<id && particle!=copie_ParticlesWait.end();
-          i++, particle++) {}
-        selected = *particle;
-        particle = copie_ParticlesWait.erase( particle );
-        selected->setPosition( position );
-        break;
+      cout << "ERR: number of new particles to insert is different from the"
+    	<< " number of positions in file " << m_position << " : "
+	<< nnewpart << " != " << npos << endl;
+      filePos.close(); 
+      error = 1;
+    }
+    else
+    {
+      // Read positions from the file and add them to the list
+      filePos.seekg( 0, filePos.beg );
+      while ( filePos >> position ) m_insertion_position->push_back( position );
+      filePos.close();
     }
   }
-  filePos.close();
+  
+  return ( error );
 }
 
 
@@ -1868,18 +1867,11 @@ void Grains::setPositionParticlesFromFile( const PullMode& mode )
 
 // ----------------------------------------------------------------------------
 // Sets particle initial position with a structured array
-void Grains::setPositionParticlesArray( const PullMode& mode )
+size_t Grains::setPositionParticlesArray()
 {
-  list<Particle*> copie_ParticlesWait;
-  list<Particle*>* particles = m_allcomponents.getInactiveParticles();
-  list<Particle*>::iterator particle = particles->begin();
-  Particle* selected=NULL;
-  int id, i;
-  size_t k, l, m, nwait = particles->size();
-  double v;
+  size_t k, l, m, nnewpart = 0, error;
+  list< pair<Particle*,size_t> >::const_iterator il;
   Point3 position;
-  if ( mode == PM_RANDOM ) copie_ParticlesWait = *particles;
-
   double deltax = ( m_InsertionArray->box.ptB[X]
   	- m_InsertionArray->box.ptA[X] ) / double(m_InsertionArray->NX) ;
   double deltay = ( m_InsertionArray->box.ptB[Y]
@@ -1887,47 +1879,37 @@ void Grains::setPositionParticlesArray( const PullMode& mode )
   double deltaz = ( m_InsertionArray->box.ptB[Z]
   	- m_InsertionArray->box.ptA[Z] ) / double(m_InsertionArray->NZ) ;
 
-  // Checks that number of positions equals number of particles to insert
-  if ( nwait != m_InsertionArray->NX * m_InsertionArray->NY
+  // Checks that number of positions equals the number of new particles 
+  // to insert
+  for (il=m_newParticles.cbegin();il!=m_newParticles.cend();il++)
+    nnewpart += il->second;
+  if ( nnewpart != m_InsertionArray->NX * m_InsertionArray->NY
   	* m_InsertionArray->NZ )
   {
-    cout << "ERR: number of particles to insert does not equal"
-    	<< " number of positions in the structured array: " << nwait << " != " <<
-	m_InsertionArray->NX * m_InsertionArray->NY * m_InsertionArray->NZ
-	<< endl;
-    grainsAbort();
+    cout << "ERR: number of new particles to insert is different from the"
+    	<< " number of positions in the structured array: " << nnewpart << 
+	" != " << m_InsertionArray->NX * m_InsertionArray->NY 
+	* m_InsertionArray->NZ << endl;
+    error = 1;
   }
-
-  // Set particles' position
-  for (k=0;k<m_InsertionArray->NX;++k)
-    for (l=0;l<m_InsertionArray->NY;++l)
-      for (m=0;m<m_InsertionArray->NZ;++m)
-      {
-        position[X] = m_InsertionArray->box.ptA[X]
-		+ ( double(k) + 0.5 ) * deltax;
-        position[Y] = m_InsertionArray->box.ptA[Y]
-		+ ( double(l) + 0.5 ) * deltay;
-        position[Z] = m_InsertionArray->box.ptA[Z]
-		+ ( double(m) + 0.5 ) * deltaz;
-	switch (mode)
+  else
+  {
+    // Compute positions and add them to the list
+    for (k=0;k<m_InsertionArray->NX;++k)
+      for (l=0;l<m_InsertionArray->NY;++l)
+        for (m=0;m<m_InsertionArray->NZ;++m)
         {
-          case PM_ORDERED:
-            (*particle)->setPosition( position );
-            particle++;
-            break;
-
-          case PM_RANDOM:
-            v = double(random()) / double(INT_MAX);
-            id = int( double(copie_ParticlesWait.size()) * v );
-            particle = copie_ParticlesWait.begin();
-            for (i=0; i<id && particle!=copie_ParticlesWait.end();
-          	i++, particle++) {}
-            selected = *particle;
-            particle = copie_ParticlesWait.erase( particle );
-            selected->setPosition( position );
-            break;
-       }
-     }
+          position[X] = m_InsertionArray->box.ptA[X]
+		+ ( double(k) + 0.5 ) * deltax;
+          position[Y] = m_InsertionArray->box.ptA[Y]
+		+ ( double(l) + 0.5 ) * deltay;
+          position[Z] = m_InsertionArray->box.ptA[Z]
+		+ ( double(m) + 0.5 ) * deltaz;
+          m_insertion_position->push_back( position );
+        }
+  }
+  
+  return ( error );  
 }
 
 

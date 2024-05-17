@@ -152,11 +152,14 @@ class Grains : public ComputingTime, public SolverComputingTime
     	inserted particles */
     RandomGeneratorSeed m_randomseed; /**< Random generator seed */
     vector<Window> m_insertion_windows; /**< Insertion windows */  
-    string m_position; /**< External position file */
+    string m_position; /**< External position file name or structured array */
     struct StructArrayInsertion* m_InsertionArray; /**< Structured array 
     	insertion features */   
-    list< pair<Particle*,int> > m_newParticles; /**< types of new particles to
-    	be inserted */	
+    list< pair<Particle*,size_t> > m_newParticles; /**< types of new particles 
+    	to be inserted */
+    list<Point3>* m_insertion_position; /**< list of insertion positions */
+    list<Point3>::iterator il_sp; /**< iterator on the selected position in
+    	m_insertion_position */
     size_t m_insertion_frequency; /**< Insertion attempted every 
     	m_insertion_frequency time steps */
     bool m_force_insertion; /**< Force insertion even in case of contact with
@@ -207,21 +210,20 @@ class Grains : public ComputingTime, public SolverComputingTime
     virtual void Forces( DOMElement* rootElement );
 
     /** @brief Returns a point randomly selected in one of the insertion 
-    windows */
-    Point3 getInsertionPoint() const;
+    windows or in the list of positions. Note: list of positions has priority
+    over windows until it is empty */
+    Point3 getInsertionPoint();
   
     /** @brief Attempts to insert a particle in the simulation
     @param mode insertion order */
     virtual bool insertParticle( PullMode const& mode );
   
-    /** @brief Sets particle initial positions from a file 
-    @param mode insertion order */
-    virtual void setPositionParticlesFromFile( 
-    	PullMode const& mode = PM_ORDERED );
+    /** @brief Sets particle initial positions from a file */
+    virtual size_t setPositionParticlesFromFile();
   
     /** @brief Sets particle initial position with a structured array
     @param mode insertion order */
-    virtual void setPositionParticlesArray( const PullMode& mode = PM_ORDERED );
+    virtual size_t setPositionParticlesArray();
   
     /** @brief Reads data for MPI simulations and creates and sets the MPI
     wrapper

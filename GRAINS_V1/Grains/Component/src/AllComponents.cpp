@@ -26,9 +26,10 @@ AllComponents::AllComponents()
   , m_total_nb_active_particles_on_all_procs( 0 )
   , m_nb_inactive_particles( 0 )
   , m_total_nb_physical_particles( 0 )
+  , m_total_nb_inactive_physical_particles( 0 )
   , m_obstacle( NULL )
   , m_outputTorsorObstacles_counter( 1 )
-  , m_outputTorsorObstacles_frequency( 0 )
+  , m_outputTorsorObstacles_frequency( 0 )  
 {
   m_obstacle = new CompositeObstacle( "__AllObstacles___" );
 }
@@ -48,6 +49,8 @@ AllComponents::~AllComponents()
 
   for (particle=m_InactiveParticles.begin(); 
   	particle!=m_InactiveParticles.end();particle++)  delete *particle;
+	
+  if ( m_wait ) delete m_wait;
 
   m_ActiveParticles.clear();
   m_InactiveParticles.clear();
@@ -132,10 +135,14 @@ void AllComponents::AddParticle( Particle* particle )
 
 // ----------------------------------------------------------------------------
 // Adds a reference particle
-void AllComponents::AddReferenceParticle( Particle* particle )
+void AllComponents::AddReferenceParticle( Particle* particle, size_t const &n )
 {
   m_ReferenceParticles.reserve( m_ReferenceParticles.size() + 1 );
   m_ReferenceParticles.push_back( particle );
+  m_NbRemainingParticlesToInsert.reserve( 
+  	m_NbRemainingParticlesToInsert.size() + 1 );
+  m_NbRemainingParticlesToInsert.push_back( n );
+  m_nb_physical_particles_to_insert += n;
 }
 
 
@@ -418,32 +425,43 @@ Component* AllComponents::getComponent( int id )
 
 // ----------------------------------------------------------------------------
 // Returns a particle from the list of inactive particles
-Particle* AllComponents::getParticle( PullMode mode,
-	GrainsMPIWrapper const* wrapper )
+Particle* AllComponents::getParticle( PullMode mode )
 {
-  if ( !m_InactiveParticles.empty() )
+  if ( m_nb_physical_particles_to_insert )
   {
-    switch ( mode )
+    size_t type = 0;
+    if ( !m_wait )
     {
-      case PM_ORDERED:
-        m_wait = m_InactiveParticles.front();
-        break;
+      switch ( mode )
+      {
+        case PM_ORDERED:                
+          while ( !m_NbRemainingParticlesToInsert[type] ) type++;
+          break;
 
-      case PM_RANDOM:
-        if ( m_wait == NULL )
-	{
-	  double v = double(random()) / double(INT_MAX);
-	  int id = int( double(m_InactiveParticles.size()) * v );
-
-	  // Only the master proc randomly selects and then the random
-	  // number is broadcasted to all other processes
-	  if ( wrapper ) id = wrapper->Broadcast_INT( id );
-
-	  list<Particle*>::iterator p = m_InactiveParticles.begin();
-	  for (int i=0; i<id && p!=m_InactiveParticles.end(); i++, p++) {}
-	  m_wait = *p;
-        }
-        break;
+        case PM_RANDOM:
+          if ( m_wait == NULL )
+	  {
+	    // Find the set of particle classes that still have particles to
+	    // insert
+	    size_t nrem = 0, j = 0, i;
+	    for (i=0;i<m_NbRemainingParticlesToInsert.size();++i)
+	      if ( m_NbRemainingParticlesToInsert[i] ) nrem++;
+	    vector<size_t> setrem( nrem, 0 );
+	    for (i=0;i<m_NbRemainingParticlesToInsert.size();++i)
+	      if ( m_NbRemainingParticlesToInsert[i] ) 
+	      { 
+	        setrem[j] = i;
+		++j;
+              }
+	      
+	    // Randomly pick a class
+	    double v = double(random()) / double(INT_MAX);   	    
+	    type = size_t( double(setrem.size()) * v );
+          }
+          break;
+      }
+      m_wait = m_ReferenceParticles[type]->createCloneCopy( true ); 
+      m_NbRemainingParticlesToInsert[type]--;     
     }
   }
   else m_wait = NULL;
@@ -729,7 +747,7 @@ void AllComponents::Link( AppCollision& app )
 
 
 // ----------------------------------------------------------------------------
-// Set all active particles velocity to 0 if reset == "Reset"
+// Sets all active particles velocity to 0 if reset == "Reset"
 void AllComponents::resetKinematics( string const& reset )
 {
   if ( reset == "Reset" )
@@ -745,12 +763,10 @@ void AllComponents::resetKinematics( string const& reset )
 
 
 // ----------------------------------------------------------------------------
-// Transfer the inactive particle waiting to be inserted to the list
-// of active particles
-void AllComponents::ShiftParticleOutIn( bool const& parallel )
+// Adds the waiting particle to the list of active particles
+void AllComponents::WaitToActive( bool const& parallel )
 {
   m_wait->setActivity( COMPUTE );
-  removeParticleFromList( m_InactiveParticles, m_wait );
   m_ActiveParticles.push_back( m_wait );
   if ( parallel )
   {
@@ -764,11 +780,9 @@ void AllComponents::ShiftParticleOutIn( bool const& parallel )
 
 
 // ----------------------------------------------------------------------------
-// Removes the inactive particle waiting to be inserted from the
-// list of inactive particles and destroys it
+// Destroys the waiting particle
 void AllComponents::DeleteAndDestroyWait()
 {
-  removeParticleFromList( m_InactiveParticles, m_wait );
   delete m_wait;
   m_wait = NULL;  
 }
@@ -1047,8 +1061,7 @@ int AllComponents::read( istream& fileSave, int const& rank, int const& nprocs )
   }
   else
     fileSave >> readingMode >> nbreParticles_;
-  
-  
+    
   if ( readingMode == "Hybrid" ) GrainsExec::m_readingModeHybrid = true ;
   
   return ( nbreParticles_ );
@@ -1060,7 +1073,8 @@ int AllComponents::read( istream& fileSave, int const& rank, int const& nprocs )
 // ---------------------------------------------------------------------------
 // Reloads particles from an input stream 
 void AllComponents::read_particles( string const& filename, int const& npart,
-    	LinkedCell const* LC, int const& nprocs )
+    	LinkedCell const* LC, int const& rank,
+  	int const& nprocs, GrainsMPIWrapper const* wrapper )
 {
   ifstream FILEin;
   int ParticleTag, ParticleGeomType, ParticleID, CellNumber;
@@ -1073,7 +1087,7 @@ void AllComponents::read_particles( string const& filename, int const& npart,
   	multimap<int,int>::iterator > crange;
   multimap<int,int>::iterator imm;	  
   Point3 gc;
-  size_t nentries, nb;
+  size_t nentries, nb, nwaitpos = 0;
     
   // Particle file
   string pfile = filename;
@@ -1105,6 +1119,7 @@ void AllComponents::read_particles( string const& filename, int const& npart,
       FILEin.read( particleData, nb );
       string spData( particleData, nb );
       iss.str( spData );
+      delete [] particleData;
     }
     // Text file
     else
@@ -1135,8 +1150,8 @@ void AllComponents::read_particles( string const& filename, int const& npart,
       }
       // Text file
       else
-        iss >> buffer >> ParticleID >> buffer >> buffer >> gc[X] >> gc[Y] 
-      		>> gc[Z];
+        iss >> buffer >> ParticleID >> buffer >> ParticleActivity >> gc[X] >> 
+		gc[Y] >> gc[Z];
       
       // Check whether this particle is in the LinkedCell of this sub-domain
       // We need to treat carefully particles that are both clones and 
@@ -1144,39 +1159,48 @@ void AllComponents::read_particles( string const& filename, int const& npart,
       // To avoid reading them multiple times, we keep track of the particle 
       // ID - cell number relationship and if such a relationship already 
       // exists, it means that this particle is duplicated in the restart file
-      // and we do not construct it again  
-      if ( LC->isInLinkedCell( gc ) ) 
+      // and we do not construct it again 
+      // We also need to distinguish between particles to be inserted that 
+      // have the default position and those who have already been assigned 
+      // a position. The former are constructed on all sub-domains while the
+      // latter are constructed in the sub-domain they belong to only
+      if ( ParticleActivity == WAIT && gc == GrainsExec::m_defaultInactivePos )
+        construct = true;
+      else
       {
-        // Interior, buffer and clones
-	if ( LC->isInDomain( &gc ) ) construct = true;
-	// Periodic clones
-	else
-	{
-	  // Search if a particle with ID number ParticleID already exists
-	  // in cell number CellNumber on this sub-domain
-	  CellNumber = LC->getCell( gc )->getID();
-	  
-	  found = false;
-	  nentries = PartToCell.count( ParticleID );
-	  if ( nentries ) 
+        if ( LC->isInLinkedCell( gc ) ) 
+        {
+          // Interior, buffer and clones
+	  if ( LC->isInDomain( &gc ) ) construct = true;
+	  // Periodic clones
+	  else
 	  {
-            crange = PartToCell.equal_range( ParticleID );
-            for (imm=crange.first; imm!=crange.second && !found; )
+	    // Search if a particle with ID number ParticleID already exists
+	    // in cell number CellNumber on this sub-domain
+	    CellNumber = LC->getCell( gc )->getID();
+	  
+	    found = false;
+	    nentries = PartToCell.count( ParticleID );
+	    if ( nentries ) 
 	    {
-	      if ( imm->second == CellNumber ) found = true;
-              else imm++;
-	    }    
-	  }
+              crange = PartToCell.equal_range( ParticleID );
+              for (imm=crange.first; imm!=crange.second && !found; )
+	      {
+	        if ( imm->second == CellNumber ) found = true;
+                else imm++;
+	      }    
+	    }
 	   	  
-	  // If it does not exist, add to the multimap and construct
-	  // Otherwise, do not construct
-	  if ( !found ) 
-	  {  
-	    PartToCell.insert( pair<int,int>( ParticleID, 
+	    // If it does not exist, add to the multimap and construct
+	    // Otherwise, do not construct
+	    if ( !found ) 
+	    {  
+	      PartToCell.insert( pair<int,int>( ParticleID, 
 	  	CellNumber ) );
-	    construct = true;
-	  }   
-	}
+	      construct = true;
+	    }   
+	  }
+        }
       }
       
       // If construct, reset the input stream position to the beginning
@@ -1250,11 +1274,19 @@ void AllComponents::read_particles( string const& filename, int const& npart,
 
         default:
           m_InactiveParticles.push_back( particle );
+	  if ( gc == GrainsExec::m_defaultInactivePos )
+	    m_total_nb_inactive_physical_particles++;
+	  else
+	    nwaitpos++;
           break;
       }
     }
   }
   FILEin.close();
+  
+  // Set total number of inactive physical particles
+  if ( wrapper ) nwaitpos = wrapper->sum_UNSIGNED_INT( nwaitpos );
+  m_total_nb_inactive_physical_particles += nwaitpos;
 } 
 
 
@@ -2143,6 +2175,37 @@ size_t AllComponents::getTotalNumberPhysicalParticles() const
 
 
 // ----------------------------------------------------------------------------
+// Returns the total number of inactive particles in the physical system
+size_t AllComponents::getTotalNumberInactivePhysicalParticles() const
+{
+  return ( m_total_nb_inactive_physical_particles );
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Increments the total number of inactive particles in the physical system 
+void AllComponents::incrementTotalNumberInactivePhysicalParticles( 
+	size_t const& incr )
+{
+  m_total_nb_inactive_physical_particles += incr;
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of particles to insert in the physical system
+size_t AllComponents::getNumberPhysicalParticlesToInsert() const
+{
+  return ( m_nb_physical_particles_to_insert );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Computes and sets the numbers of particles in the system */
 void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
 {
@@ -2150,13 +2213,23 @@ void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
 
   m_nb_active_particles = m_ActiveParticles.size();
 
-  if ( wrapper ) m_total_nb_active_particles = wrapper->sum_UNSIGNED_INT( 
+  if ( wrapper ) 
+  {
+    m_total_nb_active_particles = wrapper->sum_UNSIGNED_INT( 
   	 m_nb_active_particles );
-  else m_total_nb_active_particles = m_nb_active_particles;  
+    m_total_nb_inactive_particles = wrapper->sum_UNSIGNED_INT( 
+  	 m_nb_inactive_particles );	   
+  }
+  else 
+  {
+    m_total_nb_active_particles = m_nb_active_particles; 
+    m_total_nb_inactive_particles = m_nb_inactive_particles;
+  } 
 
   m_nb_particles = m_nb_active_particles + m_nb_inactive_particles;
 
-  m_total_nb_particles = m_total_nb_active_particles + m_nb_inactive_particles;
+  m_total_nb_particles = m_total_nb_active_particles 
+  	+ m_total_nb_inactive_particles;
 
   m_nb_active_particles_on_proc = m_nb_active_particles;
   for (list<Particle*>::const_iterator il=m_ActiveParticles.begin();
@@ -2168,7 +2241,7 @@ void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
   else m_total_nb_active_particles_on_all_procs = m_nb_active_particles_on_proc;
   
   m_total_nb_physical_particles = m_total_nb_active_particles_on_all_procs
-  	+ m_nb_inactive_particles;
+  	+ m_total_nb_inactive_physical_particles;
 	
   GrainsExec::setTotalNumberPhysicalParticles( 
   	m_total_nb_physical_particles );	

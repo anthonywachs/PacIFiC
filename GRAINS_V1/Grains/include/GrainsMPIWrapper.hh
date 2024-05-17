@@ -287,8 +287,8 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param npartproc total number of particles to insert on this process
     @param ntotalinsert total number of particles to insert on all processes */
     void distributeParticlesClassProc( 
-  	list< pair<Particle*,int> > const& newPart,
-	list< pair<Particle*,int> >& newPartProc,
+  	list< pair<Particle*,size_t> > const& newPart,
+	list< pair<Particle*,size_t> >& newPartProc,
 	size_t const& npartproc,
 	size_t const& ntotalinsert ) const; 
 	
