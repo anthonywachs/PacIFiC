@@ -28,6 +28,7 @@ Grains::Grains()
   , m_fileSave( "undefined" )
   , m_dimension( 3 )
   , m_allProcTiming( true )
+  , m_restart( false )
   , m_insertion_order( PM_ORDERED )
   , m_insertion_mode( IM_NOINSERT )
   , m_initvit_mode( IV_ZERO )
@@ -106,7 +107,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
 
     // Number of particles: inserted and in the system
     m_allcomponents.computeNumberParticles( m_wrapper );
-    m_npwait_nm1 = m_allcomponents.getTotalNumberInactivePhysicalParticles();
+    m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();
 
     // Initialisation of obstacle kinematics
     m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt );
@@ -175,8 +176,8 @@ void Grains::do_after_time_stepping()
     {  
       cout << endl << "Number of active particles in the simulation = " 
     	<< m_allcomponents.getNumberActiveParticlesOnAllProc() << endl;
-      cout << "Number of inactive particles in the simulation = " 
-    	<< m_allcomponents.getTotalNumberInactivePhysicalParticles() << endl;
+      cout << "Number of particles to insert in the simulation = " 
+    	<< m_allcomponents.getNumberPhysicalParticlesToInsert() << endl;
     }	
 
     // Write reload files
@@ -277,10 +278,13 @@ void Grains::Simulation( double time_interval )
 
 
       // Insertion of particles
+      SCT_set_start( "ParticlesInsertion" );      
+      m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();      
+      if ( m_insertion_mode == IM_OVERTIME )
+        insertParticle( m_insertion_order );      
       m_allcomponents.computeNumberParticles( m_wrapper );
-      SCT_set_start( "ParticlesInsertion" );
       if ( m_npwait_nm1 
-      	!= m_allcomponents.getTotalNumberInactivePhysicalParticles() )
+      	!= m_allcomponents.getNumberPhysicalParticlesToInsert() )
           cout << "\r                                              "
                << "                 " << flush;
       ostringstream oss;
@@ -288,11 +292,8 @@ void Grains::Simulation( double time_interval )
       oss << left << m_time;
       cout << '\r' << oss.str() << "  \t" << m_tend << "\t\t\t"
            << m_allcomponents.getNumberActiveParticlesOnProc() << '\t'
-           << m_allcomponents.getTotalNumberInactivePhysicalParticles() 
+           << m_allcomponents.getNumberPhysicalParticlesToInsert() 
 	   << flush;
-      m_npwait_nm1 = m_allcomponents.getTotalNumberInactivePhysicalParticles();
-      if ( m_insertion_mode == IM_OVERTIME )
-        insertParticle( m_insertion_order );
       SCT_get_elapsed_time( "ParticlesInsertion" );
 
 
@@ -482,9 +483,9 @@ void Grains::Construction( DOMElement* rootElement )
   assert( rootElement != NULL );
   DOMNode* root = ReaderXML::getNode( rootElement, "Construction" );
 
-  bool brestart = false, bnewpart = false, bnewobst = false, b2024 = false;
+  bool bnewpart = false, bnewobst = false, b2024 = false;
   string restart;
-  int npart;
+  size_t npart;
 
   // Domain size: origin, max coordinates and periodicity
   DOMNode* domain = ReaderXML::getNode( root, "LinkedCell" );
@@ -553,8 +554,8 @@ void Grains::Construction( DOMElement* rootElement )
     DOMNode* reload = ReaderXML::getNode( root, "Reload" );
     if ( reload )
     {
-      brestart = true;
-      GrainsExec::m_isReloaded = brestart;
+      m_restart = true;
+      GrainsExec::m_isReloaded = m_restart;
 
       // Restart mode
       string reload_type = ReaderXML::getNodeAttr_String( reload, "Type" );
@@ -602,7 +603,8 @@ void Grains::Construction( DOMElement* rootElement )
           m_allcomponents.getReferenceParticles() );
       }
       else
-        npart = m_allcomponents.read( simulLoad, m_rank, m_nprocs );      
+        npart = m_allcomponents.read( simulLoad, m_insertion_position, 
+		m_rank, m_nprocs );      
       simulLoad >> cle;
       assert( cle == "#EndTime" );
       simulLoad.close();      
@@ -641,6 +643,7 @@ void Grains::Construction( DOMElement* rootElement )
       if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Reading new particle types completed" << endl;
     }
+
 
     // Composite particles
     DOMNode* nCompositeParticles =
@@ -726,7 +729,7 @@ void Grains::Construction( DOMElement* rootElement )
 
 
     // Check that construction is fine
-    if ( !brestart && !bnewpart && !bnewobst )
+    if ( !m_restart && !bnewpart && !bnewobst )
     {
       if ( m_rank == 0 )
         cout << "ERR : Error in input file in <Contruction>" << endl;
@@ -758,9 +761,9 @@ void Grains::Construction( DOMElement* rootElement )
     defineLinkedCell( LC_coef * maxR, GrainsExec::m_shift9 );
     
     // If reload with 2024 format, read the particle reload file
-    if ( reload && b2024 )
+    if ( m_restart && b2024 )
       m_allcomponents.read_particles( restart, npart, m_collision, m_rank, 
-      	m_nprocs, m_wrapper );
+      	m_nprocs, m_wrapper );  
 
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );
@@ -1209,7 +1212,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
       }
       else
       {
-        if ( m_insertion_mode != IM_NOINSERT )
+        if ( m_insertion_mode != IM_NOINSERT && !getNbInsertionPositions() )
         {
           if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
 		"Insertion positions/windows are mandatory !!" << endl;
@@ -1217,7 +1220,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
         }
       }
 
-
+ 
       // Initialization of particle velocity
       if ( m_rank == 0 )
         cout << GrainsExec::m_shift6 << "Particle initial velocity: ";
@@ -1528,12 +1531,16 @@ void Grains::InsertCreateNewParticles()
   // Link all components with the grid
   m_allcomponents.Link( *m_collision );
 
+  // In case of a restarted simulation, if the linked cell changed from the 
+  // previous simulation, we need to check that all periodic clones are there
+  if ( m_restart && m_periodic ) checkClonesReload();
+
   // Set particle positions from file or from a structured array
   size_t error = 0;
   if ( m_position != "" )
   {
     // From a structured array
-    if ( m_position == "STRUCTURED" )error = setPositionParticlesArray();
+    if ( m_position == "STRUCTURED" ) error = setPositionParticlesArray();
     // From a file
     else error = setPositionParticlesFromFile();
   }
@@ -1543,13 +1550,13 @@ void Grains::InsertCreateNewParticles()
   if ( m_insertion_mode == IM_INITIALTIME )
   {
     cout << "Particles \tIn \tOut" << endl;
-    while ( m_allcomponents.getTotalNumberInactivePhysicalParticles() != 0 )
+    while ( m_allcomponents.getNumberPhysicalParticlesToInsert() )
     {
         insertParticle( m_insertion_order );
         cout << "\r                                              " << flush;
         cout << "\r\t\t"
 	   << m_allcomponents.getNumberActiveParticlesOnProc() << '\t'
-	   << m_allcomponents.getTotalNumberInactivePhysicalParticles() 
+	   << m_allcomponents.getNumberPhysicalParticlesToInsert() 
 	   << flush;
     }
     cout << endl;
@@ -1709,7 +1716,7 @@ bool Grains::insertParticle( PullMode const& mode )
 
   if ( insert_counter == 0 )
   {
-    Particle *particle = m_allcomponents.getParticle( mode );
+    Particle *particle = m_allcomponents.getParticleToInsert( mode );
     if ( particle )
     {
       // Initialisation of the centre of mass position of the particle
@@ -1738,7 +1745,6 @@ bool Grains::insertParticle( PullMode const& mode )
       particle->setQuaternionRotation( qrot );      
 
       // If insertion if successful, shift particle from wait to inserted
-      // and initialize particle rotation quaternion from rotation matrix
       insert = m_collision->insertParticleSerial( particle,
       	m_allcomponents.getActiveParticles(),
 	m_allcomponents.getPeriodicCloneParticles(),
@@ -1869,7 +1875,7 @@ size_t Grains::setPositionParticlesFromFile()
 // Sets particle initial position with a structured array
 size_t Grains::setPositionParticlesArray()
 {
-  size_t k, l, m, nnewpart = 0, error;
+  size_t k, l, m, nnewpart = 0, error = 0;
   list< pair<Particle*,size_t> >::const_iterator il;
   Point3 position;
   double deltax = ( m_InsertionArray->box.ptB[X]
@@ -1991,10 +1997,11 @@ void Grains::saveReload( double const& time )
   }
   ContactBuilderFactory::save( result, m_fileSave, m_rank );
   if ( m_nprocs > 1 && GrainsExec::m_SaveMPIInASingleFile )
-    m_allcomponents.write_singleMPIFile( result, reload, m_collision, 
-    	m_wrapper );
+    m_allcomponents.write_singleMPIFile( result, reload, m_insertion_position,
+    	m_collision, m_wrapper );
   else
-    m_allcomponents.write( result, reload, m_rank, m_nprocs, m_wrapper );
+    m_allcomponents.write( result, reload, m_insertion_position, 
+    	m_rank, m_nprocs, m_wrapper );
   if ( m_rank == 0 )
   {  
     result << "#EndTime" << endl;
@@ -2236,11 +2243,31 @@ void Grains::readWindow( DOMNode* nWindow, Window& iwindow,
 
 
 // ----------------------------------------------------------------------------
-// Outputs timer summary */
+// Outputs timer summary
 void Grains::display_timer_summary()
 {
   double cputime = CT_get_elapsed_time();
   cout << "Full problem" << endl;
   write_elapsed_time_smhd( cout, cputime, "Computing time" );
   SCT_get_summary( cout, cputime );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of insertion positions */
+size_t Grains::getNbInsertionPositions() const
+{
+  return ( m_insertion_position->size() );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Checks the (periodic) clones when a simulation is reloaded */
+void Grains::checkClonesReload()
+{
+
 }

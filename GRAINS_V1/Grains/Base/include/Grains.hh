@@ -139,6 +139,8 @@ class Grains : public ComputingTime, public SolverComputingTime
     vector<bool> m_periodicity; /**< vector of periodicity (3 booleans) */	
     bool m_allProcTiming; /**< whether all processes return data on the time
     	consumption in different parts of the code */
+    bool m_restart; /**< is this simulation a continuation of a previous
+    	simulation ? */	
     //@}
 
 
@@ -278,13 +280,19 @@ class Grains : public ComputingTime, public SolverComputingTime
     /** @brief Moves particles and obstacles
     @param dt_particle_vel time step to advance particle velocity 
     @param dt_particle_disp time step to advance particle position     
-    @param dt_obstacle time step to advance obstacle velocity and position */    
+    @param dt_obstacle time step to advance obstacle velocity and position */
     void moveParticlesAndObstacles( double const& dt_particle_vel, 
     	double const& dt_particle_disp,
 	double const& dt_obstacle );
 	
     /** @brief Outputs timer summary */
-    virtual void display_timer_summary(); 	
+    virtual void display_timer_summary();
+    
+    /** @brief Returns the number of insertion positions */
+    virtual size_t getNbInsertionPositions() const;
+    
+    /** @brief Checks the periodic clones when a simulation is reloaded */
+    virtual void checkClonesReload();         	
     //@}
   
 };

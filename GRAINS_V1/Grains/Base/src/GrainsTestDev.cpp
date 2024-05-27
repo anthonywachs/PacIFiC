@@ -71,7 +71,7 @@ void GrainsTestDev::do_before_time_stepping( DOMElement* rootElement )
 
   // Number of particles: inserted and in the system
   m_allcomponents.computeNumberParticles( m_wrapper );
-  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
+  m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();
 
   // Initialisation obstacle kinematics
   m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt );
@@ -132,7 +132,7 @@ void GrainsTestDev::do_after_time_stepping()
          << "                 " << flush;
   cout << '\r' << oss.str() << "  \t" << m_tend << "\t\t\t"
          << m_allcomponents.getNumberActiveParticlesOnProc() << '\t'
-         << m_allcomponents.getNumberInactiveParticles() << endl;
+         << m_allcomponents.getNumberPhysicalParticlesToInsert() << endl;
 
   // Write reload files
   if ( !m_lastTime_save )
@@ -193,9 +193,9 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
   assert( rootElement != NULL );
   DOMNode* root = ReaderXML::getNode( rootElement, "Construction" );
 
-  bool brestart = false, bnewpart = false, bnewobst = false, b2024 = false;
+  bool bnewpart = false, bnewobst = false, b2024 = false;
   string restart;
-  int npart;
+  size_t npart;
 
   // Domain size: origin, max coordinates and periodicity
   DOMNode* domain = ReaderXML::getNode( root, "LinkedCell" );
@@ -264,7 +264,7 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
     DOMNode* reload = ReaderXML::getNode( root, "Reload" );
     if ( reload )
     {
-      brestart = true;
+      m_restart = true;
 
       // Restart mode
       string reload_type = ReaderXML::getNodeAttr_String( reload, "Type" );
@@ -310,7 +310,8 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
           m_allcomponents.getReferenceParticles() );
       }
       else
-        npart = m_allcomponents.read( simulLoad, m_rank, m_nprocs );      
+        npart = m_allcomponents.read( simulLoad, m_insertion_position, 
+		m_rank, m_nprocs );      
       simulLoad >> cle;
       simulLoad.close();
 
@@ -433,7 +434,7 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
 
 
     // Check that construction is fine
-    if ( !brestart && !bnewpart && !bnewobst )
+    if ( !m_restart && !bnewpart && !bnewobst )
     {
       if ( m_rank == 0 )
         cout << "ERR : Error in input file in <Contruction>" << endl;

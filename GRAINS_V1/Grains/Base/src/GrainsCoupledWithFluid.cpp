@@ -66,7 +66,7 @@ void GrainsCoupledWithFluid::do_before_time_stepping( DOMElement* rootElement )
 
   // Number of particles: inserted and in the system
   m_allcomponents.computeNumberParticles( m_wrapper );
-  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles(); 
+  m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert(); 
       
   // Allocate hydro force and torque arrays in the AppPRSHydroFT app
   if ( m_PRSHydroFT ) m_PRSHydroFT->allocateHydroFT( 
@@ -226,9 +226,9 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
   assert( rootElement != NULL );
   DOMNode* root = ReaderXML::getNode( rootElement, "Construction" );
 
-  bool brestart = false, b2024 = false;
+  bool b2024 = false;
   string restart;
-  int npart;
+  size_t npart;
 
   // Domain size: origin, max coordinates and periodicity
   DOMNode* domain = ReaderXML::getNode( root, "LinkedCell" );
@@ -297,7 +297,7 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
     DOMNode* reload = ReaderXML::getNode( root, "Reload" );
     if ( reload ) 
     {
-      brestart = true;
+      m_restart = true;
 
       // Restart mode
       string reload_type;
@@ -345,7 +345,8 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
           m_allcomponents.getReferenceParticles() );
       }
       else
-        npart = m_allcomponents.read( simulLoad, m_rank, m_nprocs );      
+        npart = m_allcomponents.read( simulLoad, m_insertion_position, 
+		m_rank, m_nprocs );      
       simulLoad >> cle;
       simulLoad.close(); 
 
@@ -356,7 +357,7 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
    
 
     // Check that construction is fine
-    if ( !brestart ) 
+    if ( !m_restart ) 
     {
       if ( m_rank == 0 )
         cout << "ERR : Error in input file in <Contruction>" << endl;

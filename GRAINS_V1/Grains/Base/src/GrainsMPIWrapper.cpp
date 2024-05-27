@@ -1349,8 +1349,7 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   m_AccessToClones.clear();
   for (il=particlesClones->begin();il!=particlesClones->end();il++)
     m_AccessToClones.insert( pair<int,Particle*>( (*il)->getID(), *il ) );     
-  
-        
+          
   // Copy particles in buffer zone into local buffers
   // ------------------------------------------------
   vector<int> nbBufGeoLoc(26,0);
@@ -1495,7 +1494,7 @@ void GrainsMPIWrapper::UpdateClones(double time,
     id = int( recvbuf_DOUBLE[j] );
     contact_map_size = int( recvbuf_DOUBLE[j+NB_DOUBLE_PART] );  
       
-    // Searh whether the clone already exists in this local domain
+    // Search whether the clone already exists in this local domain
     ncid = m_AccessToClones.count( id );
     switch( ncid )
     {
@@ -1616,11 +1615,15 @@ void GrainsMPIWrapper::CreateClones(double time,
   	multimap<int,Particle*>::iterator > crange;
 	  
   // Note: although we create new clones here, we need to check if they
-  // do not already exist. This scenario happens if a master particle moves from
-  // a buffer zone cell to another buffer zone cell and the two buffer zone 
-  // cells have a different GeoPosition, then such a master particle is added 
-  // to the list of new buffer zone particles but teh corresponding clone
-  // particle might already exist on the local process
+  // do not already exist. This scenario happens in the 2 following cases:
+  // 1) if a master particle moves from a buffer zone cell to another buffer 
+  // zone cell and the two buffer zone cells have a different GeoPosition, 
+  // then such a master particle is added to the list of new buffer zone 
+  // particles but the corresponding clone particle might already exist on the 
+  // local process
+  // 2) in case of a reloaded simulation, if the linked cell has changed
+  // from the previous simulation (the linked cell size has become larger), 
+  // some periodic clones may not exist and we need te create them 
 
   for( j=0; j<recvsize; )
   {

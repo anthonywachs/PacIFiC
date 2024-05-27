@@ -90,22 +90,21 @@ void GrainsMPI::Simulation( double time_interval )
 
         // Insertion of particles     
         SCT_set_start( "ParticlesInsertion" );
+        if ( m_insertion_mode == IM_OVERTIME )
+          insertParticle( m_insertion_order );	
         m_allcomponents.computeNumberParticles( m_wrapper );
-        if ( GrainsExec::m_output_data_at_this_time )
+	if ( GrainsExec::m_output_data_at_this_time )
           if ( m_rank == 0 )
 	  {
-	    if ( m_allcomponents.getNumberActiveParticlesOnAllProc() !=
-	  	m_allcomponents.getTotalNumberPhysicalParticles() ) 
+	    if ( m_allcomponents.getNumberPhysicalParticlesToInsert() ) 
 	    {
 	      cout << "Number of active particles on all proc = " <<
 	  	m_allcomponents.getNumberActiveParticlesOnAllProc() << endl;
-	      cout << "Number of inactive particles = " <<
-	  	m_allcomponents.getTotalNumberInactivePhysicalParticles() 
+	      cout << "Number of particles to insert = " <<
+	  	m_allcomponents.getNumberPhysicalParticlesToInsert() 
 		<< endl;
 	    }		
 	  }
-        if ( m_insertion_mode == IM_OVERTIME )
-          insertParticle( m_insertion_order );
         SCT_get_elapsed_time( "ParticlesInsertion" );
 
       
@@ -310,71 +309,53 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
   Matrix mrot;
   Transform trot;
   Quaternion qrot;    
-
+  int ptype = - 1;
+  size_t npositions = m_insertion_position->size();
+  Particle *particle = NULL;    
+  
   if ( insert_counter == 0 )
   {
-    // In parallel, in case of an insertion via a position file or a structured
-    // array, particles are created in this process if they are in the local 
-    // domain. Therefore, each process has a different list of particles to 
-    // insert. The random selection of particles is performed
-    // in setPositionParticlesFromFile or setPositionParticlesArray, therefore
-    // the list of particles to insert is scanned in an ordered way
-    // In the case of insertion via a window, the procedure is similar to the 
-    // serial insertion, all processes have the same list of particles to insert
-    // and the random selection of particles is performed in 
-    //  m_allcomponents.getParticle( mode ) when mode == PM_RANDOM
-    Particle *particle = NULL;
-    if ( m_position != "" ) 
-      particle = m_allcomponents.getParticle( PM_ORDERED );
-    else particle = m_allcomponents.getParticle( mode );
- 
-    if ( particle )
+    // Return the particle to be inserted
+    if ( m_rank == 0 ) 
     {
-      if ( m_position == "" ) 
-      {      
-        // Initialisation of the particle velocity
-        if ( m_rank == 0 ) computeInitVit( vtrans, vrot );
-        vtrans = m_wrapper->Broadcast_Vector3( vtrans ); 
-        vrot = m_wrapper->Broadcast_Vector3( vrot ); 
-        particle->setTranslationalVelocity( vtrans );
-        particle->setAngularVelocity( vrot );
-
-        // Initialisation of the centre of mass position of the particle
-        if ( m_rank == 0 ) position = getInsertionPoint();
-	position = m_wrapper->Broadcast_Point3( position );
-	particle->setPosition( position );
-
-        // Initialisation of the angular position of the particle
-        // Rem: we compose to the right by a pure rotation as the particle
-        // already has a non-zero position that we do not want to change (and
-        // that we would change if we would compose to the left)
-        if ( m_init_angpos == IAP_RANDOM )
-        {
-          if ( m_rank == 0 ) mrot = GrainsExec::RandomRotationMatrix( 
-	  	m_dimension );
-          mrot = m_wrapper->Broadcast_Matrix( mrot );
-          trot.setBasis( mrot );
-          particle->composePositionRightByTransform( trot );
-        }
-      }
-      else
-      {
-        // Initialisation of the particle velocity
-        computeInitVit( vtrans, vrot );
-        particle->setTranslationalVelocity( vtrans );
-        particle->setAngularVelocity( vrot ); 
+      particle = m_allcomponents.getParticleToInsert( mode );
+      if ( particle ) ptype = particle->getGeometricType();
+    }
+    
+    // Broadcast particle type
+    ptype = m_wrapper->Broadcast_INT( ptype );
+      
+    if ( ptype > - 1 )
+    {
+      // Return the particle to be inserted
+      particle = m_allcomponents.getParticleToInsert( ptype );
 	
-        // Initialisation of the angular position of the particle
-        // Rem: we compose to the right by a pure rotation as the particle
-        // already has a non-zero position that we do not want to change (and
-        // that we would change if we would compose to the left)
-        if ( m_init_angpos == IAP_RANDOM )
-        {
-          trot.setBasis( GrainsExec::RandomRotationMatrix( m_dimension ) );
-          particle->composePositionRightByTransform( trot );
-        }	     
-      }
+      // Initialisation of the centre of mass position of the particle
+      if ( m_rank == 0 ) position = getInsertionPoint();
+      position = m_wrapper->Broadcast_Point3( position );
+      particle->setPosition( position );
+      
+      // Initialisation of the angular position of the particle
+      // Rem: we compose to the right by a pure rotation as the particle
+      // already has a non-zero position that we do not want to change (and
+      // that we would change if we would compose to the left)
+      if ( m_init_angpos == IAP_RANDOM )
+      {
+        if ( m_rank == 0 ) mrot = GrainsExec::RandomRotationMatrix( 
+	  	m_dimension );
+        mrot = m_wrapper->Broadcast_Matrix( mrot );
+        trot.setBasis( mrot );
+        particle->composePositionRightByTransform( trot );
+      }            
+      
+      // Initialisation of the particle velocity
+      if ( m_rank == 0 ) computeInitVit( vtrans, vrot );
+      vtrans = m_wrapper->Broadcast_Vector3( vtrans ); 
+      vrot = m_wrapper->Broadcast_Vector3( vrot ); 
+      particle->setTranslationalVelocity( vtrans );
+      particle->setAngularVelocity( vrot );      
 
+      // Transform and quaternion
       particle->initialize_transformWithCrust_to_notComputed();
       qrot.setQuaternion( particle->getRigidBody()->getTransform()
 		->getBasis() );
@@ -388,7 +369,7 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
 	m_allcomponents.getReferenceParticles(), 
 	m_periodic, m_force_insertion,
 	m_wrapper );
-	
+
       // If no contact
       if ( !insert.second )
       {
@@ -402,6 +383,8 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
 	// If not in LinkedCell
         else
           m_allcomponents.DeleteAndDestroyWait();
+
+	if ( npositions ) m_insertion_position->erase( il_sp );
       }
     }
   }
@@ -424,36 +407,10 @@ void GrainsMPI::InsertCreateNewParticles()
   // In the case of reload with additional insertion, it means that obstacles
   // are re-numbered
 
-  int numPartMax = getMaxParticleIDnumber();
-  list< pair<Particle*,size_t> >::iterator ipart;
-  size_t error = 0;
-
-  // New particles construction
-  Component::setMaxIDnumber( numPartMax );
-  if ( m_position != "" )
-  {
-    // From a structured array
-    if ( m_position == "STRUCTURED" ) error = setPositionParticlesArray();
-    // From a file
-    else error = setPositionParticlesFromFile();
-  }
-  else
-  {
-    for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
-    {
-      size_t nbre = ipart->second;
-      for (size_t ii=0; ii<nbre; ii++)
-      {
-        Particle* particle = ipart->first->createCloneCopy( true );
-        particle->setPosition( GrainsExec::m_defaultInactivePos );	
-        m_allcomponents.AddParticle( particle );
-      }
-      m_allcomponents.incrementTotalNumberInactivePhysicalParticles( nbre );      
-    }
-  }
-  if ( error ) grainsAbort();  
-
   // Obstacle renumbering
+  list< pair<Particle*,size_t> >::iterator ipart;  
+  int numPartMax = getMaxParticleIDnumber();  
+  Component::setMaxIDnumber( numPartMax );  
   int numInitObstacles = numPartMax;
   for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
     numInitObstacles += int(ipart->second);
@@ -471,22 +428,27 @@ void GrainsMPI::InsertCreateNewParticles()
   // Link all components with the grid
   m_allcomponents.Link( *m_collision );
 
+  // In case of a restarted simulation, if the linked cell changed from the 
+  // previous simulation, we need to check that all periodic clones are there
+  if ( m_restart && m_periodic ) checkClonesReload();  
+
   // Set particle positions from file or from a structured array
+  size_t error = 0;
   if ( m_position != "" )
   {
     // From a structured array
-    if ( m_position == "STRUCTURED" )
-      setPositionParticlesArray();
+    if ( m_position == "STRUCTURED" ) error = setPositionParticlesArray();
     // From a file
-    else setPositionParticlesFromFile();
+    else error = setPositionParticlesFromFile();
   }
+  if ( error )  grainsAbort();
 
   // Insertion at initial time
   size_t nbPW = 0 ;
   bool b_insertion_BEFORE = true;  
   if ( m_insertion_mode == IM_INITIALTIME )
   {
-    nbPW = m_allcomponents.getTotalNumberInactivePhysicalParticles() ;
+    nbPW = m_allcomponents.getNumberPhysicalParticlesToInsert() ;
     for (size_t i=0;i<nbPW && b_insertion_BEFORE;++i)
       b_insertion_BEFORE = insertParticle( m_insertion_order );
     if ( !b_insertion_BEFORE )
@@ -494,7 +456,7 @@ void GrainsMPI::InsertCreateNewParticles()
       cout << "Process " << m_rank << endl;
       cout << "Insertion issue with defined position method" << endl;
       cout << "Remaining number of particles to insert = " << 
-      	m_allcomponents.getTotalNumberInactivePhysicalParticles() << endl;
+      	m_allcomponents.getNumberPhysicalParticlesToInsert() << endl;
     }     
   }
   if ( !b_insertion_BEFORE ) grainsAbort();
@@ -597,7 +559,7 @@ size_t GrainsMPI::setPositionParticlesArray()
   }	      
   
   // Note: only the master proc computes and stores positions  
-  if ( m_rank == 0 ) error = GrainsMPI::setPositionParticlesArray();
+  if ( m_rank == 0 ) error = Grains::setPositionParticlesArray();
   error = m_wrapper->Broadcast_UNSIGNED_INT( error );
 
   return ( error );    
@@ -766,4 +728,41 @@ Particle* GrainsMPI::getParticleClassForCreation( PullMode const& mode,
   }      
 
   return ( particleClass );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of insertion positions */
+size_t GrainsMPI::getNbInsertionPositions() const
+{
+  size_t nbinsertionpos = m_wrapper->Broadcast_UNSIGNED_INT( 
+	m_insertion_position->size() );
+  return ( nbinsertionpos );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Checks the clones when a simulation is reloaded */
+void GrainsMPI::checkClonesReload()
+{
+  // If the linked cell size is smaller compared to that in the previous
+  // simulation, we need to destroy the clones that are out of the 
+  // linked cell   
+  m_collision->DestroyOutOfDomainClones( m_time,
+	m_allcomponents.getActiveParticles(),
+	m_allcomponents.getCloneParticles(),
+	m_wrapper ); 
+
+  // If the linked cell size is larger compared to that in the previous
+  // simulation, we need to create the missing clones
+  m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
+	m_allcomponents.getActiveParticles(),
+	m_allcomponents.getParticlesInBufferzone(),
+	m_allcomponents.getCloneParticles(),
+	m_allcomponents.getReferenceParticles(),
+	m_collision, false, false );		
 }

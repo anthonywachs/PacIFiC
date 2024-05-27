@@ -97,7 +97,13 @@ class GrainsMPI : virtual public Grains
     all processes */
     Particle* getParticleClassForCreation( PullMode const& mode,
   	list< pair<Particle*,size_t> >& ParticleClassesForCreation,
-	bool const& random_local );                      
+	bool const& random_local );
+	
+    /** @brief Returns the number of insertion positions */
+    virtual size_t getNbInsertionPositions() const;
+    
+    /** @brief Checks the clones when a simulation is reloaded */
+    virtual void checkClonesReload();      	                      
     //@}
   
 };

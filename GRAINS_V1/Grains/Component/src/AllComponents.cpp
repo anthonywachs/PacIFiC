@@ -17,16 +17,15 @@
 // ----------------------------------------------------------------------------
 // Default constructor
 AllComponents::AllComponents()
-  : m_wait( NULL )
+  : m_nb_physical_particles_to_insert( 0 )
+  , m_wait( NULL )
   , m_nb_particles( 0 )
   , m_total_nb_particles( 0 )
   , m_nb_active_particles( 0 )
   , m_total_nb_active_particles( 0 )
   , m_nb_active_particles_on_proc( 0 )
   , m_total_nb_active_particles_on_all_procs( 0 )
-  , m_nb_inactive_particles( 0 )
   , m_total_nb_physical_particles( 0 )
-  , m_total_nb_inactive_physical_particles( 0 )
   , m_obstacle( NULL )
   , m_outputTorsorObstacles_counter( 1 )
   , m_outputTorsorObstacles_frequency( 0 )  
@@ -47,21 +46,19 @@ AllComponents::~AllComponents()
   	particle!=m_ActiveParticles.end(); particle++)
     delete *particle;
 
-  for (particle=m_InactiveParticles.begin(); 
-  	particle!=m_InactiveParticles.end();particle++)  delete *particle;
+  for (particle=m_RemovedParticles.begin(); 
+  	particle!=m_RemovedParticles.end();particle++)  delete *particle;
 	
   if ( m_wait ) delete m_wait;
 
   m_ActiveParticles.clear();
-  m_InactiveParticles.clear();
+  m_RemovedParticles.clear();
   m_PeriodicCloneParticles.clear();
-
   m_ParticlesInBufferzone.clear();
   m_CloneParticles.clear();
 
   vector<Particle*>::iterator ivp;
-  for (ivp=m_ReferenceParticles.begin();
-  	ivp!=m_ReferenceParticles.end(); ivp++)
+  for (ivp=m_ReferenceParticles.begin();ivp!=m_ReferenceParticles.end(); ivp++)
     delete *ivp;
   m_ReferenceParticles.clear();
 
@@ -98,35 +95,13 @@ void AllComponents::UpdateParticleActivity()
 
       case CLEARandWAIT:
         (*particle)->reset();
-        m_InactiveParticles.push_back(*particle);
+        m_RemovedParticles.push_back(*particle);
         particle = m_ActiveParticles.erase( particle );
         break;
 
       default:
         break;
     }
-  }
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Adds a particle
-void AllComponents::AddParticle( Particle* particle )
-{
-  switch ( particle->getActivity() )
-  {
-    case WAIT:
-      m_InactiveParticles.push_back( particle );
-      break;
-
-    case COMPUTE:
-      m_ActiveParticles.push_back( particle );
-      break;
-
-    default:
-      break;
   }
 }
 
@@ -344,11 +319,6 @@ void AllComponents::computeWeight( double time, double dt )
   	ivp!=m_ReferenceParticles.end(); ivp++)
     (*ivp)->computeWeight();
 
-  // Inactive particles
-  for (particle=m_InactiveParticles.begin();
-  	particle!=m_InactiveParticles.end(); particle++)
-    (*particle)->computeWeight();
-
   // Active particles
   for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
@@ -424,8 +394,8 @@ Component* AllComponents::getComponent( int id )
 
 
 // ----------------------------------------------------------------------------
-// Returns a particle from the list of inactive particles
-Particle* AllComponents::getParticle( PullMode mode )
+// Returns a pointer to the particle to be inserted
+Particle* AllComponents::getParticleToInsert( PullMode mode )
 {
   if ( m_nb_physical_particles_to_insert )
   {
@@ -456,17 +426,30 @@ Particle* AllComponents::getParticle( PullMode mode )
 	      
 	    // Randomly pick a class
 	    double v = double(random()) / double(INT_MAX);   	    
-	    type = size_t( double(setrem.size()) * v );
+	    j = size_t( double(setrem.size()) * v );
+	    type = setrem[j];
           }
           break;
       }
-      m_wait = m_ReferenceParticles[type]->createCloneCopy( true ); 
-      m_NbRemainingParticlesToInsert[type]--;     
+      m_wait = m_ReferenceParticles[type]->createCloneCopy( true );           
     }
   }
   else m_wait = NULL;
 
   return ( m_wait );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a pointer to the particle to be inserted
+Particle* AllComponents::getParticleToInsert( int const& geomtype )
+{
+  if ( !m_wait )
+    m_wait = m_ReferenceParticles[geomtype]->createCloneCopy( true );
+
+  return ( m_wait );   
 }
 
 
@@ -493,20 +476,10 @@ list<Particle*> const* AllComponents::getActiveParticles() const
 
 
 // ----------------------------------------------------------------------------
-// Returns a pointer to the list of inactive particles
-list<Particle*>* AllComponents::getInactiveParticles()
+// Returns a pointer to the list of removed particles
+list<Particle*>* AllComponents::getRemovedParticles()
 {
-  return ( &m_InactiveParticles );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns a const pointer to the list of inactive particles
-list<Particle*> const* AllComponents::getInactiveParticles() const
-{
-  return ( &m_InactiveParticles );
+  return ( &m_RemovedParticles );
 }
 
 
@@ -679,19 +652,20 @@ double AllComponents::getCrustThicknessMin()
 
 
 // ----------------------------------------------------------------------------
-// Returns the cumulative volume of all particles, both active and inactive
+// Returns the cumulative volume of all particles, both active and to insert
 double AllComponents::getVolume() const
 {
   double volume = 0.;
   list<Particle*>::const_iterator particle;
+  size_t i, n = m_NbRemainingParticlesToInsert.size();
 
-  for (particle=m_ActiveParticles.begin();
-  	particle!=m_ActiveParticles.end(); particle++)
+  for (particle=m_ActiveParticles.cbegin();
+  	particle!=m_ActiveParticles.cend(); particle++)
     volume += (*particle)->getVolume();
 
-  for (particle=m_InactiveParticles.begin();
-  	particle!=m_InactiveParticles.end(); particle++)
-    volume += (*particle)->getVolume();
+  for (i=0;i<n;++i)
+    volume += double(m_NbRemainingParticlesToInsert[i])
+    	* m_ReferenceParticles[i]->getVolume();
 
   return ( volume );
 }
@@ -706,8 +680,8 @@ double AllComponents::getVolumeIn() const
   double volume = 0.;
   list<Particle*>::const_iterator particle;
 
-  for (particle=m_ActiveParticles.begin();
-  	particle!=m_ActiveParticles.end(); particle++)
+  for (particle=m_ActiveParticles.cbegin();
+  	particle!=m_ActiveParticles.cend(); particle++)
     volume += (*particle)->getVolume();
 
   return ( volume );
@@ -717,15 +691,15 @@ double AllComponents::getVolumeIn() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the cumulative volume of all inactives particles
+// Returns the cumulative volume of all particles to insert
 double AllComponents::getVolumeOut() const
 {
   double volume = 0.;
-  list<Particle*>::const_iterator particle;
+  size_t i, n = m_NbRemainingParticlesToInsert.size();
 
-  for (particle=m_InactiveParticles.begin();
-  	particle!=m_InactiveParticles.end(); particle++)
-    volume += (*particle)->getVolume();
+  for (i=0;i<n;++i)
+    volume += double(m_NbRemainingParticlesToInsert[i])
+    	* m_ReferenceParticles[i]->getVolume();
 
   return ( volume );
 }
@@ -768,6 +742,8 @@ void AllComponents::WaitToActive( bool const& parallel )
 {
   m_wait->setActivity( COMPUTE );
   m_ActiveParticles.push_back( m_wait );
+  m_nb_physical_particles_to_insert--;
+  m_NbRemainingParticlesToInsert[m_wait->getGeometricType()]--;
   if ( parallel )
   {
     if ( m_wait->getTag() == 1 ) m_ParticlesInBufferzone.push_back( m_wait );
@@ -783,7 +759,9 @@ void AllComponents::WaitToActive( bool const& parallel )
 // Destroys the waiting particle
 void AllComponents::DeleteAndDestroyWait()
 {
-  delete m_wait;
+  m_NbRemainingParticlesToInsert[m_wait->getGeometricType()]--;
+  m_nb_physical_particles_to_insert--;    
+  delete m_wait;  
   m_wait = NULL;  
 }
 
@@ -856,6 +834,9 @@ bool removeObstacleFromList( list<SimpleObstacle*>& pointerslist,
 
 // ---------------------------------------------------------------------------
 // Reloads components from an input stream
+// Note: back-compatibility for old pre-2024 restart files that features 
+// particles to be inserted (previously called inactive particles) is not 
+// handled.
 void AllComponents::read_pre2024( istream& fileSave, string const& filename )
 {
   string buffer, readingMode ;
@@ -965,7 +946,9 @@ void AllComponents::read_pre2024( istream& fileSave, string const& filename )
         break;
 
       default:
-        m_InactiveParticles.push_back( particle );
+        // Note: back-compatibility for old pre-2024 restart files that
+	// features particles to be inserted (previously called inactive
+	// particles) is not handled.
         break;
     }
   }
@@ -991,18 +974,19 @@ void AllComponents::read_pre2024( istream& fileSave, string const& filename )
 
 // ---------------------------------------------------------------------------
 // Reloads reference particles and obstacles from an input stream
-int AllComponents::read( istream& fileSave, int const& rank, int const& nprocs )
+size_t AllComponents::read( istream& fileSave, list<Point3>* known_positions, 
+	int const& rank, int const& nprocs )
 {
   string buffer, readingMode ;
-  int nbreParticles_, nbParticleTypes_;
+  size_t i, nbreParticles_, nbParticleTypes_, nfiles;
   Particle *particle;
 
   // Number of particle types
   fileSave >> buffer >> nbParticleTypes_;
 
-  // Reading the reference particles
+  // Read the reference particles
   m_ReferenceParticles.reserve( nbParticleTypes_ );
-  for (int i=0; i<nbParticleTypes_; i++)
+  for (i=0; i<nbParticleTypes_; i++)
   {
     // Read the buffer "<Particle>" or "<CompositeParticle>"
     fileSave >> buffer;
@@ -1028,7 +1012,32 @@ int AllComponents::read( istream& fileSave, int const& rank, int const& nprocs )
     // Read the buffer "</Particle>" or "</CompositeParticle>"
     fileSave >> buffer;
   }
-
+  
+  // Read the number of remaining particles to insert per class
+  m_NbRemainingParticlesToInsert.reserve( nbParticleTypes_ );
+  for (i=0; i<nbParticleTypes_; i++) 
+    m_NbRemainingParticlesToInsert.push_back( 0 );
+  fileSave >> buffer;
+  m_nb_physical_particles_to_insert = 0;
+  for (i=0; i<nbParticleTypes_; i++) 
+  {      
+    fileSave >> m_NbRemainingParticlesToInsert[i];
+    m_nb_physical_particles_to_insert += m_NbRemainingParticlesToInsert[i];
+  }
+    
+  // Read the number of remaining known insertion positions
+  // Only the master process stores the positions
+  size_t npos = 0;
+  fileSave >> buffer >> npos;
+  if ( npos )
+  {
+    Point3 P;
+    for (i=0; i<npos; i++) 
+    {
+      fileSave >> P[X] >> P[Y] >> P[Z];
+      if ( rank == 0 ) known_positions->push_back( P );
+    }
+  }      
   
   // Reload the obstacle tree
   string name;
@@ -1045,17 +1054,16 @@ int AllComponents::read( istream& fileSave, int const& rank, int const& nprocs )
 
 
   // Read the number of files
-  int nfiles; 
   fileSave >> buffer >> nfiles;
-  assert( nfiles == 1 || nfiles == nprocs );  
+  assert( nfiles == 1 || nfiles == size_t(nprocs) );  
   if ( nprocs > 1 && nfiles == 1 )
     GrainsExec::m_ReadMPIInASingleFile = true;
 
   // Reload of particles using the reference particles
   if ( nprocs > 1 && !GrainsExec::m_ReadMPIInASingleFile )
   {
-    vector<int> work( nprocs, 0 );
-    for (int i=0;i<nprocs;++i) 
+    vector<size_t> work( nprocs, 0 );
+    for (i=0;i<size_t(nprocs);++i) 
       fileSave >> readingMode >> work[i];
     nbreParticles_ = work[rank];
   }
@@ -1072,7 +1080,7 @@ int AllComponents::read( istream& fileSave, int const& rank, int const& nprocs )
 
 // ---------------------------------------------------------------------------
 // Reloads particles from an input stream 
-void AllComponents::read_particles( string const& filename, int const& npart,
+void AllComponents::read_particles( string const& filename, size_t const& npart,
     	LinkedCell const* LC, int const& rank,
   	int const& nprocs, GrainsMPIWrapper const* wrapper )
 {
@@ -1087,7 +1095,7 @@ void AllComponents::read_particles( string const& filename, int const& npart,
   	multimap<int,int>::iterator > crange;
   multimap<int,int>::iterator imm;	  
   Point3 gc;
-  size_t nentries, nb, nwaitpos = 0;
+  size_t nentries, nb;
     
   // Particle file
   string pfile = filename;
@@ -1105,7 +1113,7 @@ void AllComponents::read_particles( string const& filename, int const& npart,
 
 
   // Reload of particles using the reference particles
-  for (int i=0; i<npart; i++)
+  for (size_t i=0; i<npart; i++)
   {
     istringstream iss;
     construct = false;  
@@ -1160,46 +1168,37 @@ void AllComponents::read_particles( string const& filename, int const& npart,
       // ID - cell number relationship and if such a relationship already 
       // exists, it means that this particle is duplicated in the restart file
       // and we do not construct it again 
-      // We also need to distinguish between particles to be inserted that 
-      // have the default position and those who have already been assigned 
-      // a position. The former are constructed on all sub-domains while the
-      // latter are constructed in the sub-domain they belong to only
-      if ( ParticleActivity == WAIT && gc == GrainsExec::m_defaultInactivePos )
-        construct = true;
-      else
+      if ( LC->isInLinkedCell( gc ) ) 
       {
-        if ( LC->isInLinkedCell( gc ) ) 
-        {
-          // Interior, buffer and clones
-	  if ( LC->isInDomain( &gc ) ) construct = true;
-	  // Periodic clones
-	  else
-	  {
-	    // Search if a particle with ID number ParticleID already exists
-	    // in cell number CellNumber on this sub-domain
-	    CellNumber = LC->getCell( gc )->getID();
+        // Interior, buffer and clones
+	if ( LC->isInDomain( &gc ) ) construct = true;
+	// Periodic clones
+	else
+	{
+	  // Search if a particle with ID number ParticleID already exists
+	  // in cell number CellNumber on this sub-domain
+	  CellNumber = LC->getCell( gc )->getID();
 	  
-	    found = false;
-	    nentries = PartToCell.count( ParticleID );
-	    if ( nentries ) 
+	  found = false;
+	  nentries = PartToCell.count( ParticleID );
+	  if ( nentries ) 
+	  {
+            crange = PartToCell.equal_range( ParticleID );
+            for (imm=crange.first; imm!=crange.second && !found; )
 	    {
-              crange = PartToCell.equal_range( ParticleID );
-              for (imm=crange.first; imm!=crange.second && !found; )
-	      {
-	        if ( imm->second == CellNumber ) found = true;
-                else imm++;
-	      }    
-	    }
-	   	  
-	    // If it does not exist, add to the multimap and construct
-	    // Otherwise, do not construct
-	    if ( !found ) 
-	    {  
-	      PartToCell.insert( pair<int,int>( ParticleID, 
-	  	CellNumber ) );
-	      construct = true;
-	    }   
+	      if ( imm->second == CellNumber ) found = true;
+              else imm++;
+	    }    
 	  }
+	   	  
+	  // If it does not exist, add to the multimap and construct
+	  // Otherwise, do not construct
+	  if ( !found ) 
+	  {  
+	    PartToCell.insert( pair<int,int>( ParticleID, 
+	  	CellNumber ) );
+	    construct = true;
+	  }   
         }
       }
       
@@ -1238,65 +1237,46 @@ void AllComponents::read_particles( string const& filename, int const& npart,
         particle->read2014( iss, &m_ReferenceParticles );
 
       // Add to lists
-      switch ( particle->getActivity() )
-      {
-        case COMPUTE:
-          m_ActiveParticles.push_back( particle );
-          if ( !GrainsExec::m_ReadMPIInASingleFile )
-	    ParticleTag = particle->getTag();
-	  else
-	  {
-	    ParticleTag = LC->getCell( *particle->getPosition() )->getTag(); 
-	    particle->setTag( ParticleTag );
-	  }
+      // We need to reset ParticleTag in case the linked cell changed
+      // from the previous simulation
+      m_ActiveParticles.push_back( particle );
+      ParticleTag = LC->getCell( *particle->getPosition() )->getTag(); 
+      particle->setTag( ParticleTag );
  
-	  // MPI mode
-	  if ( GrainsExec::m_MPI )
-	    switch ( ParticleTag )
-            {
-              case 1:
-                m_ParticlesInBufferzone.push_back( particle );
-                break;
+      // MPI mode
+      if ( GrainsExec::m_MPI )
+	switch ( ParticleTag )
+        {
+          case 1:
+            m_ParticlesInBufferzone.push_back( particle );
+            break;
 
-              case 2:
-                m_CloneParticles.push_back( particle );
-                break;
+          case 2:
+            m_CloneParticles.push_back( particle );
+            break;
 
-	      default:
-                break;
-            }
-	  // Serial mode: periodicity
-	  else
-	    if ( ParticleTag == 2 )
-	      m_PeriodicCloneParticles.insert(
+	  default:
+            break;
+        }
+      // Serial mode: periodicity
+      else
+	if ( ParticleTag == 2 )
+	  m_PeriodicCloneParticles.insert(
 	    	pair<int,Particle*>( particle->getID(), particle ) );
-          break;
-
-        default:
-          m_InactiveParticles.push_back( particle );
-	  if ( gc == GrainsExec::m_defaultInactivePos )
-	    m_total_nb_inactive_physical_particles++;
-	  else
-	    nwaitpos++;
-          break;
-      }
     }
   }
   FILEin.close();
-  
-  // Set total number of inactive physical particles
-  if ( wrapper ) nwaitpos = wrapper->sum_UNSIGNED_INT( nwaitpos );
-  m_total_nb_inactive_physical_particles += nwaitpos;
 } 
 
 
 
 
 // ---------------------------------------------------------------------------
-// Writes components to an output stream
+// Writes components to an output stream. Only active particles are written 
+// to the stream
 void AllComponents::write( ostream &fileSave, string const& filename, 
-	int const& rank, int const& nprocs, GrainsMPIWrapper const* wrapper ) 
-	const
+	list<Point3> const* known_positions, int const& rank, 
+	int const& nprocs, GrainsMPIWrapper const* wrapper ) const
 {
   list<Particle*>::const_iterator particle;
   size_t nb = 0;
@@ -1304,32 +1284,54 @@ void AllComponents::write( ostream &fileSave, string const& filename,
   if ( rank == 0 )
   {
     // Reference particles and obstacles
-    fileSave << endl << "NumberOfParticleTypes\t" <<
+    fileSave << endl << "NumberOfParticleTypes " <<
   	m_ReferenceParticles.size() << endl;
 
     vector<Particle*>::const_iterator iv;
     for (iv=m_ReferenceParticles.begin();
   	iv!=m_ReferenceParticles.end();iv++) (*iv)->write( fileSave );
 
+    fileSave << endl;
+    fileSave << "RemainingNbParticlesToInsertPerType";
+    for (size_t i=0;i<m_NbRemainingParticlesToInsert.size();++i)
+      fileSave << " " << m_NbRemainingParticlesToInsert[i];
+    fileSave << endl << endl;
+    
+    fileSave << "RemainingKnownInsertionPositions " << known_positions->size()
+    	<< endl;
+    if ( known_positions->size() )
+    {
+      list<Point3>::const_iterator il;
+      for (il=known_positions->cbegin();il!=known_positions->cend();il++)
+        fileSave << GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+  		(*il)[X]) << " " << 
+		GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+  		(*il)[Y]) << " " << 
+		GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+  		(*il)[Z]) << endl;
+    }     
+              
     fileSave << endl << "<Obstacle>" << endl;
     m_obstacle->write( fileSave );
     fileSave << endl << "</Obstacle>" << endl << endl;
-    fileSave << "NbFiles " << nprocs << endl;
   }
   
   size_t* nbpart_proc = NULL;
   if ( nprocs > 1 )
-    nbpart_proc =  wrapper->Gather_UNSIGNED_INT_master( m_nb_particles );     
+    nbpart_proc =  wrapper->Gather_UNSIGNED_INT_master( m_nb_active_particles );
   else
   {
     nbpart_proc = new size_t[1];
-    nbpart_proc[0] = m_nb_particles;
+    nbpart_proc[0] = m_nb_active_particles;
   }
   
-  if ( rank == 0 )  
+  if ( rank == 0 )
+  {      
+    fileSave << "NbFiles " << nprocs << endl;    
     for (int i=0;i<nprocs;++i)  
       fileSave << ( GrainsExec::m_writingModeHybrid ? "Hybrid" :
   	"Text" ) << " " << nbpart_proc[i] << endl;
+  }
   
   if ( nbpart_proc ) delete [] nbpart_proc;
 
@@ -1357,14 +1359,6 @@ void AllComponents::write( ostream &fileSave, string const& filename,
       (*particle)->write2014_binary( FILEbin );
     }
 
-    for (particle=m_InactiveParticles.begin();
-    	particle!=m_InactiveParticles.end(); particle++)
-    {
-      nb = (*particle)->get_numberOfBytes();
-      FILEbin.write( reinterpret_cast<char*>( &nb ), sizeof(size_t) );        
-      (*particle)->write2014_binary( FILEbin );
-    }
-
     FILEbin.close();
   }
   else
@@ -1373,10 +1367,6 @@ void AllComponents::write( ostream &fileSave, string const& filename,
 
     for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
-      (*particle)->write2014( FILEtext );
-
-    for (particle=m_InactiveParticles.begin();
-    	particle!=m_InactiveParticles.end(); particle++)
       (*particle)->write2014( FILEtext );
       
     FILEtext.close();    
@@ -1389,8 +1379,8 @@ void AllComponents::write( ostream &fileSave, string const& filename,
 // ---------------------------------------------------------------------------
 // Writes components to a single file MPI File in parallel
 void AllComponents::write_singleMPIFile( ostream &fileSave, 
-	string const& filename, LinkedCell const* LC, 
-    	GrainsMPIWrapper const* wrapper ) const
+	string const& filename, list<Point3> const* known_positions,
+	LinkedCell const* LC, GrainsMPIWrapper const* wrapper ) const
 {  
   int rank = wrapper->get_rank(), tag, nb_particles_to_write,
   	nprocs = wrapper->get_total_number_of_active_processes();  
@@ -1404,9 +1394,6 @@ void AllComponents::write_singleMPIFile( ostream &fileSave,
   // Particles to write to the reload file: 
   // * active particles interior and buffer
   // * actives particles periodic clones
-  // * inactives particles: if their position equals default inactive position, 
-  // then these particles are in the m_InactiveParticles list of all processes,
-  // otherwise they are in the m_InactiveParticles of the current process only
   // Note: particles that are both clones and periodic clones might 
   // be duplicated in the reload file, this situation is explicitly handled
   // by AllComponents::read_particles
@@ -1416,18 +1403,6 @@ void AllComponents::write_singleMPIFile( ostream &fileSave,
     gc = (*particle)->getPosition(); 
     tag = (*particle)->getTag();
     if ( tag < 2 || ( tag == 2 && !LC->isInDomain( gc ) ) )
-      to_write.push_back( *particle );
-  }
-
-  for (particle=m_InactiveParticles.begin();
-    	particle!=m_InactiveParticles.end(); particle++)
-  {
-    gc = (*particle)->getPosition(); 
-    if ( *gc == GrainsExec::m_defaultInactivePos )
-    {
-      if ( rank == 0 ) to_write.push_back( *particle );
-    }
-    else
       to_write.push_back( *particle );
   } 
   
@@ -1442,6 +1417,26 @@ void AllComponents::write_singleMPIFile( ostream &fileSave,
     vector<Particle*>::const_iterator iv;
     for (iv=m_ReferenceParticles.begin();
   	iv!=m_ReferenceParticles.end();iv++) (*iv)->write( fileSave );
+
+    fileSave << endl;
+    fileSave << "RemainingNbParticlesToInsertPerType";
+    for (size_t i=0;i<m_NbRemainingParticlesToInsert.size();++i)
+      fileSave << " " << m_NbRemainingParticlesToInsert[i];
+    fileSave << endl << endl;
+    
+    fileSave << "RemainingKnownInsertionPositions " << known_positions->size()
+    	<< endl;
+    if ( known_positions->size() )
+    {
+      list<Point3>::const_iterator il;
+      for (il=known_positions->cbegin();il!=known_positions->cend();il++)
+        fileSave << GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+  		(*il)[X]) << " " << 
+		GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+  		(*il)[Y]) << " " << 
+		GrainsExec::doubleToString(ios::scientific,POSITIONFORMAT,
+  		(*il)[Z]) << endl;
+    }
 
     fileSave << endl << "<Obstacle>" << endl;
     m_obstacle->write( fileSave );
@@ -1507,9 +1502,9 @@ void AllComponents::debug( char* s )
 {
   cout << s << '\n'
        << "Particles " << m_ActiveParticles.size()
-       		+ m_InactiveParticles.size()  << '\n'
+       		+ m_nb_physical_particles_to_insert  << '\n'
        << "   Actives " << m_ActiveParticles.size() << '\t'
-       << "   Wait    " << m_InactiveParticles.size()      << endl;
+       << "   Wait    " << m_nb_physical_particles_to_insert << endl;
 }
 
 
@@ -1522,11 +1517,12 @@ ostream& operator << ( ostream& f, AllComponents const& EC )
   f << "Number of particles on all processes = "
   	<< EC.m_total_nb_particles << endl;
   f << "Number of particles = " <<
-  	EC.m_ActiveParticles.size() + EC.m_InactiveParticles.size() << endl;
+  	EC.m_ActiveParticles.size() + EC.m_nb_physical_particles_to_insert 
+	<< endl;
   f << "Number of active particles = " << EC.m_ActiveParticles.size()
   	<< endl;
-  f << "Number of inactive particles = " << EC.m_InactiveParticles.size()
-  	<< endl;
+  f << "Number of particles to insert = " << 
+  	EC.m_nb_physical_particles_to_insert << endl;
   f << "Number of particles in buffer zone = " <<
   	EC.m_ParticlesInBufferzone.size() << endl;
   f << "Number of clone particles = " << EC.m_CloneParticles.size() << endl;
@@ -1585,7 +1581,7 @@ void AllComponents::PostProcessing_start( double time, double dt,
   // Post processing writers
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
     (*pp)->PostProcessing_start( time, dt, &m_ActiveParticles,
-	&m_InactiveParticles, postProcessingPeriodic,
+	&m_RemovedParticles, postProcessingPeriodic,
 	&m_ReferenceParticles, m_obstacle, LC, insert_windows );
 
   // Destruction of local containers
@@ -1653,7 +1649,7 @@ void AllComponents::PostProcessing( double time, double dt,
   // Post processing writers
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
     (*pp)->PostProcessing( time, dt, &m_ActiveParticles,
-	&m_InactiveParticles, postProcessingPeriodic,
+	&m_RemovedParticles, postProcessingPeriodic,
 	&m_ReferenceParticles, m_obstacle, LC );
 
   // Destruction of local containers
@@ -1884,11 +1880,6 @@ int AllComponents::getMaxParticleIDnumber() const
 
   for (particle=m_ActiveParticles.begin();
   	particle!=m_ActiveParticles.end(); particle++)
-    numeroMax = numeroMax < (*particle)->getID() ?
-    	(*particle)->getID() : numeroMax;
-
-  for (particle=m_InactiveParticles.begin();
-  	particle!=m_InactiveParticles.end(); particle++)
     numeroMax = numeroMax < (*particle)->getID() ?
     	(*particle)->getID() : numeroMax;
 
@@ -2153,44 +2144,14 @@ size_t AllComponents::getNumberActiveParticlesOnAllProc() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the number of inactive particles
-size_t AllComponents::getNumberInactiveParticles() const
-{
-  return ( m_nb_inactive_particles );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns the total number of particles in the physical system 
 // (i.e. on all subdomains/processes), i.e. sum of total number of active 
-// particles with tag 0 or 1 and inactive particles
+// particles with tag 0 or 1 and particles to be inserted
 size_t AllComponents::getTotalNumberPhysicalParticles() const
 {
   return ( m_total_nb_physical_particles );
 }
 
-
-
-
-// ----------------------------------------------------------------------------
-// Returns the total number of inactive particles in the physical system
-size_t AllComponents::getTotalNumberInactivePhysicalParticles() const
-{
-  return ( m_total_nb_inactive_physical_particles );
-} 
-
-
-
-
-// ----------------------------------------------------------------------------
-// Increments the total number of inactive particles in the physical system 
-void AllComponents::incrementTotalNumberInactivePhysicalParticles( 
-	size_t const& incr )
-{
-  m_total_nb_inactive_physical_particles += incr;
-} 
 
 
 
@@ -2209,27 +2170,18 @@ size_t AllComponents::getNumberPhysicalParticlesToInsert() const
 // Computes and sets the numbers of particles in the system */
 void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
 {
-  m_nb_inactive_particles = m_InactiveParticles.size();  
-
   m_nb_active_particles = m_ActiveParticles.size();
 
   if ( wrapper ) 
-  {
     m_total_nb_active_particles = wrapper->sum_UNSIGNED_INT( 
   	 m_nb_active_particles );
-    m_total_nb_inactive_particles = wrapper->sum_UNSIGNED_INT( 
-  	 m_nb_inactive_particles );	   
-  }
   else 
-  {
     m_total_nb_active_particles = m_nb_active_particles; 
-    m_total_nb_inactive_particles = m_nb_inactive_particles;
-  } 
 
-  m_nb_particles = m_nb_active_particles + m_nb_inactive_particles;
+  m_nb_particles = m_nb_active_particles + m_nb_physical_particles_to_insert;
 
   m_total_nb_particles = m_total_nb_active_particles 
-  	+ m_total_nb_inactive_particles;
+  	+ m_nb_physical_particles_to_insert;
 
   m_nb_active_particles_on_proc = m_nb_active_particles;
   for (list<Particle*>::const_iterator il=m_ActiveParticles.begin();
@@ -2241,7 +2193,7 @@ void AllComponents::computeNumberParticles( GrainsMPIWrapper const* wrapper )
   else m_total_nb_active_particles_on_all_procs = m_nb_active_particles_on_proc;
   
   m_total_nb_physical_particles = m_total_nb_active_particles_on_all_procs
-  	+ m_total_nb_inactive_physical_particles;
+  	+ m_nb_physical_particles_to_insert;
 	
   GrainsExec::setTotalNumberPhysicalParticles( 
   	m_total_nb_physical_particles );	

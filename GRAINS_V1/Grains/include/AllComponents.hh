@@ -61,10 +61,6 @@ class AllComponents
     /** @brief Updates particle activity */
     void UpdateParticleActivity();
 
-    /** @brief Adds a particle
-    @param particle the particle to be added */
-    void AddParticle( Particle* particle );
-
     /** @brief Adds a reference particle
     @param particle the reference particle to be added 
     @param n number of such particles to be inserted in the simulation */
@@ -218,9 +214,13 @@ class AllComponents
     /** @brief Returns component with ID number id */
     Component* getComponent( int id );
 
-    /** @brief Returns a particle from the list of inactive particles
+    /** @brief Returns a pointer to the particle to be inserted
     @param mode insertion mode */
-    Particle* getParticle( PullMode mode );
+    Particle* getParticleToInsert( PullMode mode );
+    
+    /** @brief Returns a pointer to the particle to be inserted
+    @param geomtype particle geometric type */
+    Particle* getParticleToInsert( int const& geomtype );    
 
     /** @brief Returns a pointer to the list of active particles */
     list<Particle*>* getActiveParticles();
@@ -228,11 +228,8 @@ class AllComponents
     /** @brief Returns a const pointer to the list of active particles */
     list<Particle*> const* getActiveParticles() const;
 
-    /** @brief Returns a pointer to the list of inactive particles */
-    list<Particle*>* getInactiveParticles();
-
-    /** @brief Returns a const pointer to the list of inactive particles */
-    list<Particle*> const* getInactiveParticles() const;
+    /** @brief Returns a pointer to the list of removed particles */
+    list<Particle*>* getRemovedParticles();
 
     /** @brief Returns a pointer to the list of particles in the buffer zone */
     list<Particle*>* getParticlesInBufferzone();
@@ -268,13 +265,13 @@ class AllComponents
     double getCrustThicknessMin();
 
     /** @brief Returns the cumulative volume of all particles, both active and
-    inactive */
+    to be inserted */
     double getVolume() const;
 
     /** @brief Returns the cumulative volume of all actives particles */
     double getVolumeIn() const;
 
-    /** @brief Returns the cumulative volume of all inactives particles */
+    /** @brief Returns the cumulative volume of all particles to be inserted */
     double getVolumeOut() const;
 
     /** @brief Returns the number of particles in this process */
@@ -297,18 +294,11 @@ class AllComponents
 
     /** @brief Returns the total number of active particles with tag 
     0 ou 1 in the system (i.e. on all subdomains/processes) */
-    size_t getNumberActiveParticlesOnAllProc() const;
-
-    /** @brief Returns the number of inactive particles */
-    size_t getNumberInactiveParticles() const;
-    
-    /** @brief Returns the total number of inactive particles in the physical 
-    system */
-    size_t getTotalNumberInactivePhysicalParticles() const;    
+    size_t getNumberActiveParticlesOnAllProc() const;   
     
     /** @brief Returns the total number of particles in the physical system 
     (i.e. on all subdomains/processes), i.e. sum of total number of active 
-    particles with tag 0 or 1 and inactive particles */
+    particles with tag 0 or 1 and particles to be inserted */
     size_t getTotalNumberPhysicalParticles() const; 
     
     /** @brief Returns the number of particles to insert in the physical 
@@ -358,11 +348,6 @@ class AllComponents
     /** @brief Set all contact map entry features to zero in all particles
     and all elementary obstacles */
     void setAllContactMapFeaturesToZero(); 
-    
-    /** @brief Increments the total number of inactive particles in the physical 
-    system 
-    @param incr increment (can be positive or negative) */
-    void incrementTotalNumberInactivePhysicalParticles( size_t const& incr );
     //@}
 
 
@@ -377,7 +362,8 @@ class AllComponents
     @param fileSave input stream 
     @param rank process rank    
     @param nprocs number of processes */
-    int read( istream& fileSave, int const& rank, int const& nprocs );
+    size_t read( istream& fileSave, list<Point3>* known_positions,
+    	int const& rank, int const& nprocs );
     
     /** @brief Reloads particles from an input stream 
     @param rootfilename root file name 
@@ -386,26 +372,29 @@ class AllComponents
     @param rank process rank
     @param nprocs number of processes     
     @param wrapper MPI wrapper */
-    void read_particles( string const& filename, int const& npart,
+    void read_particles( string const& filename, size_t const& npart,
     	LinkedCell const* LC, int const& rank,
   	int const& nprocs, GrainsMPIWrapper const* wrapper );     	   
 
-    /** @brief Writes components to an output stream
+    /** @brief Writes components to an output stream. Only active particles are
+    written to the stream
     @param fileSave output stream
     @param filename file name corresponding to the output stream 
     @param rank process rank
     @param nprocs number of processes     
     @param wrapper MPI wrapper */
-    void write( ostream &fileSave, string const& filename, int const& rank,
+    void write( ostream &fileSave, string const& filename, 
+    	list<Point3> const* known_positions, int const& rank,
   	int const& nprocs, GrainsMPIWrapper const* wrapper ) const;
     
-    /** @brief Writes components to a single MPI File in parallel
+    /** @brief Writes components to a single MPI File in parallel. Only active 
+    particles are written to the stream
     @param fileSave output stream
     @param filename file name corresponding to the output stream 
     @param LC linked cell grid    
     @param wrapper MPI wrapper */
     void write_singleMPIFile( ostream &fileSave, string const& filename,
-    	LinkedCell const* LC, 
+    	list<Point3> const* known_positions, LinkedCell const* LC, 
     	GrainsMPIWrapper const* wrapper ) const;
 
     /** @brief Output operator
@@ -469,10 +458,9 @@ class AllComponents
     	particles in each class to be inserted */
     size_t m_nb_physical_particles_to_insert; /**< number of 
     	remaining particles to insert in the physical system */		
-    list<Particle*> m_InactiveParticles; /**< Inactive particles deleted
-  	from the simulation */
-    Particle* m_wait; /**< Particle from the inactive particle list waiting to
-    	be inserted */
+    Particle* m_wait; /**< Next particle to be inserted */
+    list<Particle*> m_RemovedParticles; /**< Particles removed from the
+  	simulation */	
     list<Particle*> m_ActiveParticles; /**< All active particles in the
   	simulation */
     list<Particle*> m_ParticlesInBufferzone; /**< Active particles in a
@@ -493,17 +481,11 @@ class AllComponents
     	this process with tag 0 or 1 */
     size_t m_total_nb_active_particles_on_all_procs; /**< total number of 
     	active particles with tag 0 or 1 in the system 
-	(i.e. on all subdomains/processes) */
-    size_t m_nb_inactive_particles; /**< number of inactive particles in 
-    	this process */
-    size_t m_total_nb_inactive_particles; /**< number of inactive particles in 
-    	the system (i.e. on all subdomains/processes) */	
+	(i.e. on all subdomains/processes) */	
     size_t m_total_nb_physical_particles; /**< total number of particles 
     	in the physical system (i.e. on all subdomains/processes), i.e. sum of 
-	total number of active particles with tag 0 or 1 and inactive physical
-	particles */
-    size_t m_total_nb_inactive_physical_particles; /**< total number of 
-    	inactive particles in the physical system */			
+	total number of active particles with tag 0 or 1 and physical
+	particles to be inserted */			
     Obstacle *m_obstacle; /**< Root obstacle */
     list<PostProcessingWriter*> m_postProcessors; /**< list of
   	post-processors */
