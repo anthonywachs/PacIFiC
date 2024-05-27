@@ -1179,6 +1179,9 @@ vector< vector<double> >* GrainsMPIWrapper::
   if ( m_rank == m_rank_master )
   { 
     vector<double> work( NB_DOUBLE_PART - 1, 0. );
+    work[0] = GrainsExec::m_defaultInactivePos[X];
+    work[1] = GrainsExec::m_defaultInactivePos[Y];    
+    work[2] = GrainsExec::m_defaultInactivePos[Z];    
     data_Global = new vector< vector<double> >( nb_total_particles, work );
   }
     
