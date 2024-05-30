@@ -133,6 +133,8 @@ class Grains : public ComputingTime, public SolverComputingTime
     	files */
     bool m_error_occured; /**< true if an error occured over the simulation */	
     string m_fileSave; /**< Root name of restart files */
+    CloneInReload m_clonesInReloadFile; /**< clone (periodic, parallel or both)
+    	writing mode */
     size_t m_dimension; /**< space dimension */
     bool m_periodic; /**< true if the domain is periodic in at least one
     	direction */

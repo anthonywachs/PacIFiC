@@ -429,7 +429,7 @@ void GrainsMPI::InsertCreateNewParticles()
   m_allcomponents.Link( *m_collision );
 
   // In case of a restarted simulation, if the linked cell changed from the 
-  // previous simulation, we need to check that all periodic clones are there
+  // previous simulation, we need to check that all clones are there
   if ( m_restart && m_periodic ) checkClonesReload();  
 
   // Set particle positions from file or from a structured array
@@ -758,7 +758,8 @@ void GrainsMPI::checkClonesReload()
 	m_wrapper ); 
 
   // If the linked cell size is larger compared to that in the previous
-  // simulation, we need to create the missing clones
+  // simulation or clones were not stored in the restart file, we need to 
+  // create the missing clones
   m_wrapper->UpdateOrCreateClones_SendRecvLocal_GeoLoc( m_time,
 	m_allcomponents.getActiveParticles(),
 	m_allcomponents.getParticlesInBufferzone(),

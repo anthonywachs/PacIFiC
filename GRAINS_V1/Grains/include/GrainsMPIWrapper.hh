@@ -118,7 +118,15 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param nb_total_particles total number of particles on all processes */
     vector<int>* GatherParticlesClass_PostProcessing(
   	list<Particle*> const& particles,
-	size_t const& nb_total_particles ) const;	
+	size_t const& nb_total_particles ) const;
+	
+    /** @brief Returns the map of periodic clones in parallel that each process
+    must not write to avoid duplicated particles in the single restart file
+    @param particles list of active particless 
+    @param LC linked cell grid */
+    multimap<int,Point3>* doNotWritePeriodicClones(
+  	list<Particle*> const& particles,
+	LinkedCell const* LC ) const;    		
 		
     /** @brief Broadcasts an integer from one process to all processes within 
     the MPI_COMM_activProc communicator
@@ -279,24 +287,12 @@ class GrainsMPIWrapper : public SolverComputingTime
     /** @brief Sums force & torque exerted on obstacles on the master process 
     @param allMyObs list of simple obstacles */
     void sumObstaclesLoad( list<SimpleObstacle*> const& allMyObs ) const;
-  
-    /** @brief Distributes the number of particles in each class and on each
-    process in the case of the block structured insertion   
-    @param newPart total number of particles per class
-    @param newPartProc number of particles per class on this process
-    @param npartproc total number of particles to insert on this process
-    @param ntotalinsert total number of particles to insert on all processes */
-    void distributeParticlesClassProc( 
-  	list< pair<Particle*,size_t> > const& newPart,
-	list< pair<Particle*,size_t> >& newPartProc,
-	size_t const& npartproc,
-	size_t const& ntotalinsert ) const; 
 	
     /** @brief Writes a string per process in a process-id ordered manner
     @param f output flux
     @param out string
     @param creturn use carriage return if true, else ": " 
-    @param shift empty string to shift the output*/
+    @param shift empty string to shift the output */
     void writeStringPerProcess( ostream& f, string const& out, 
     	bool creturn = true, string const& shift="" ) const;
 	

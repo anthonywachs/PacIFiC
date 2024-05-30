@@ -1085,17 +1085,17 @@ void AllComponents::read_particles( string const& filename, size_t const& npart,
   	int const& nprocs, GrainsMPIWrapper const* wrapper )
 {
   ifstream FILEin;
-  int ParticleTag, ParticleGeomType, ParticleID, CellNumber;
+  int ParticleTag, ParticleGeomType, ParticleID;
   unsigned int ParticleActivity;
   Particle *particle;
-  bool construct = false, found = false;
+  bool construct = false;
   string tline, buffer;
   multimap<int,int> PartToCell;
   pair < multimap<int,int>::iterator, 
   	multimap<int,int>::iterator > crange;
   multimap<int,int>::iterator imm;	  
   Point3 gc;
-  size_t nentries, nb;
+  size_t nb;
     
   // Particle file
   string pfile = filename;
@@ -1162,48 +1162,12 @@ void AllComponents::read_particles( string const& filename, size_t const& npart,
 		gc[Y] >> gc[Z];
       
       // Check whether this particle is in the LinkedCell of this sub-domain
-      // We need to treat carefully particles that are both clones and 
-      // periodic clones as they might be duplicated in the restart file.
-      // To avoid reading them multiple times, we keep track of the particle 
-      // ID - cell number relationship and if such a relationship already 
-      // exists, it means that this particle is duplicated in the restart file
-      // and we do not construct it again 
+      // If construct, reset the input stream position to the beginning       
       if ( LC->isInLinkedCell( gc ) ) 
       {
-        // Interior, buffer and clones
-	if ( LC->isInDomain( &gc ) ) construct = true;
-	// Periodic clones
-	else
-	{
-	  // Search if a particle with ID number ParticleID already exists
-	  // in cell number CellNumber on this sub-domain
-	  CellNumber = LC->getCell( gc )->getID();
-	  
-	  found = false;
-	  nentries = PartToCell.count( ParticleID );
-	  if ( nentries ) 
-	  {
-            crange = PartToCell.equal_range( ParticleID );
-            for (imm=crange.first; imm!=crange.second && !found; )
-	    {
-	      if ( imm->second == CellNumber ) found = true;
-              else imm++;
-	    }    
-	  }
-	   	  
-	  // If it does not exist, add to the multimap and construct
-	  // Otherwise, do not construct
-	  if ( !found ) 
-	  {  
-	    PartToCell.insert( pair<int,int>( ParticleID, 
-	  	CellNumber ) );
-	    construct = true;
-	  }   
-        }
+        construct = true; 
+        iss.seekg( 0, iss.beg );
       }
-      
-      // If construct, reset the input stream position to the beginning
-      if ( construct ) iss.seekg( 0, iss.beg );
     }
     
     if ( construct )
@@ -1240,7 +1204,7 @@ void AllComponents::read_particles( string const& filename, size_t const& npart,
       // We need to reset ParticleTag in case the linked cell changed
       // from the previous simulation
       m_ActiveParticles.push_back( particle );
-      ParticleTag = LC->getCell( *particle->getPosition() )->getTag(); 
+      ParticleTag = LC->getCell( *(particle->getPosition()) )->getTag(); 
       particle->setTag( ParticleTag );
  
       // MPI mode
@@ -1275,7 +1239,8 @@ void AllComponents::read_particles( string const& filename, size_t const& npart,
 // Writes components to an output stream. Only active particles are written 
 // to the stream
 void AllComponents::write( ostream &fileSave, string const& filename, 
-	list<Point3> const* known_positions, int const& rank, 
+	list<Point3> const* known_positions, CloneInReload cir, 
+	LinkedCell const* LC, int const& rank,
 	int const& nprocs, GrainsMPIWrapper const* wrapper ) const
 {
   list<Particle*>::const_iterator particle;
@@ -1316,19 +1281,37 @@ void AllComponents::write( ostream &fileSave, string const& filename,
     fileSave << endl << "</Obstacle>" << endl << endl;
   }
   
+  // Number of particles to write
+  vector<bool> write( m_nb_active_particles, true );
+  size_t m_write = 0;
+  int i;
+  for (particle=m_ActiveParticles.begin(),i=0;
+	particle!=m_ActiveParticles.end(); particle++,++i)
+  {	
+    switch(cir)
+    {
+      case CIR_NONE: if ( (*particle)->getTag() > 1 ) write[i] = false; break;
+      case CIR_NOPERIODIC: 
+	if ( !LC->isInDomain( (*particle)->getPosition() ) ) write[i] = false; 
+	break;
+      case CIR_ALL: write[i] = true; break;
+    }
+    if ( write[i] ) ++m_write;
+  }    
+
   size_t* nbpart_proc = NULL;
   if ( nprocs > 1 )
-    nbpart_proc =  wrapper->Gather_UNSIGNED_INT_master( m_nb_active_particles );
+    nbpart_proc =  wrapper->Gather_UNSIGNED_INT_master( m_write );
   else
   {
     nbpart_proc = new size_t[1];
-    nbpart_proc[0] = m_nb_active_particles;
+    nbpart_proc[0] = m_write;
   }
   
   if ( rank == 0 )
   {      
     fileSave << "NbFiles " << nprocs << endl;    
-    for (int i=0;i<nprocs;++i)  
+    for (i=0;i<nprocs;++i)  
       fileSave << ( GrainsExec::m_writingModeHybrid ? "Hybrid" :
   	"Text" ) << " " << nbpart_proc[i] << endl;
   }
@@ -1351,13 +1334,14 @@ void AllComponents::write( ostream &fileSave, string const& filename,
     // Note: we first write the number of bytes corresponding to each particle
     // to be able to later read exactly the amount of bytes corresponding
     // to that particle in AllComponents::read_particles
-    for (particle=m_ActiveParticles.begin();
-  	particle!=m_ActiveParticles.end(); particle++)
-    {	
-      nb = (*particle)->get_numberOfBytes();
-      FILEbin.write( reinterpret_cast<char*>( &nb ), sizeof(size_t) );      
-      (*particle)->write2014_binary( FILEbin );
-    }
+    for (particle=m_ActiveParticles.begin(),i=0;
+  	particle!=m_ActiveParticles.end(); particle++,++i)      
+      if ( write[i] )
+      {
+        nb = (*particle)->get_numberOfBytes();
+        FILEbin.write( reinterpret_cast<char*>( &nb ), sizeof(size_t) );      
+        (*particle)->write2014_binary( FILEbin );
+      }
 
     FILEbin.close();
   }
@@ -1365,9 +1349,9 @@ void AllComponents::write( ostream &fileSave, string const& filename,
   {
     ofstream FILEtext( pfile.c_str(), ios::out );    
 
-    for (particle=m_ActiveParticles.begin();
-  	particle!=m_ActiveParticles.end(); particle++)
-      (*particle)->write2014( FILEtext );
+    for (particle=m_ActiveParticles.begin(),i=0;
+  	particle!=m_ActiveParticles.end(); particle++,++i)
+      if ( write[i] ) (*particle)->write2014( FILEtext );
       
     FILEtext.close();    
   }
@@ -1379,8 +1363,9 @@ void AllComponents::write( ostream &fileSave, string const& filename,
 // ---------------------------------------------------------------------------
 // Writes components to a single file MPI File in parallel
 void AllComponents::write_singleMPIFile( ostream &fileSave, 
-	string const& filename, list<Point3> const* known_positions,
-	LinkedCell const* LC, GrainsMPIWrapper const* wrapper ) const
+	string const& filename, list<Point3> const* known_positions, 
+	CloneInReload cir, LinkedCell const* LC, 
+	GrainsMPIWrapper const* wrapper, bool periodic ) const
 {  
   int rank = wrapper->get_rank(), tag, nb_particles_to_write,
   	nprocs = wrapper->get_total_number_of_active_processes();  
@@ -1390,21 +1375,52 @@ void AllComponents::write_singleMPIFile( ostream &fileSave,
   list<Particle*> to_write;
   list<Particle*>::const_iterator particle;
   Point3 const* gc;
+  multimap< int, Point3 >* doNotWrite = NULL; 
+  multimap< int, Point3 >::iterator imm;      
 
   // Particles to write to the reload file: 
   // * active particles interior and buffer
-  // * actives particles periodic clones
-  // Note: particles that are both clones and periodic clones might 
-  // be duplicated in the reload file, this situation is explicitly handled
-  // by AllComponents::read_particles
-  for (particle=m_ActiveParticles.begin();
-  	particle!=m_ActiveParticles.end(); particle++)
+  // * actives particles periodic clones if clone writing mode is ALL
+  // Some periodic clones may be duplicated and we first need to determine on 
+  // each process the list of periodic clones that must not be written by this 
+  // process as another process is in charge
+  if ( periodic && cir == CIR_ALL ) 
   {
-    gc = (*particle)->getPosition(); 
-    tag = (*particle)->getTag();
-    if ( tag < 2 || ( tag == 2 && !LC->isInDomain( gc ) ) )
-      to_write.push_back( *particle );
-  } 
+    doNotWrite = wrapper->doNotWritePeriodicClones(
+  	m_ActiveParticles, LC );
+
+    for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
+    {
+      gc = (*particle)->getPosition(); 
+      tag = (*particle)->getTag();
+      if ( tag < 2 ) to_write.push_back( *particle );
+      else if ( !LC->isInDomain( gc ) )
+      {
+        if ( doNotWrite->count( (*particle)->getID() ) )
+        {
+          bool found = false;
+          pair < multimap<int,Point3>::iterator, 
+  		multimap<int,Point3>::iterator > crange = 
+		doNotWrite->equal_range( (*particle)->getID() );
+	  for (imm=crange.first; imm!=crange.second && !found; )
+	    if ( gc->DistanceTo( imm->second ) 
+	  	< 2. * (*particle)->getCrustThickness() )
+	      found = true;
+	    else imm++;
+	  if ( !found ) to_write.push_back( *particle );
+	  else doNotWrite->erase( imm );
+        }
+        else to_write.push_back( *particle );	
+      }      
+    }
+    
+    delete doNotWrite;      
+  }		
+  else
+    for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
+      if ( (*particle)->getTag() < 2 ) to_write.push_back( *particle );  
   
   nb_particles_to_write = wrapper->sum_INT( int(to_write.size()) );
 

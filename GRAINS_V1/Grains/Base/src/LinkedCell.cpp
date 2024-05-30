@@ -1982,7 +1982,8 @@ pair<bool,bool> LinkedCell::insertParticleParallel( double time,
 // Updates periodic clones and destroy those out of the linked cell grid in
 // serial mode
 void LinkedCell::updateDestroyPeriodicClones( list<Particle*>* particles,
-    	multimap<int,Particle*>* particlesPeriodicClones )
+    	multimap<int,Particle*>* particlesPeriodicClones,
+	bool destroyOnly )
 {
   list<Cell*>::iterator il;
   list<Particle*>::iterator particle;
@@ -1996,73 +1997,77 @@ void LinkedCell::updateDestroyPeriodicClones( list<Particle*>* particles,
   Particle* periodic_clone = NULL ;
 
   // Loop over all buffer cells to update periodic clones
-  for (il=m_buffer_cells.begin();il!=m_buffer_cells.end();il++)
+  if ( !destroyOnly )
   {
-    // Get the cell geographic position
-    geoloc = (*il)->m_GeoPosCell;
-
-    // For all particles in the cell
-    for (particle=(*il)->m_particles.begin();particle!=(*il)->m_particles.end();
-    	particle++)
+    for (il=m_buffer_cells.begin();il!=m_buffer_cells.end();il++)
     {
-      particleID = (*particle)->getID();
-      ncid = particlesPeriodicClones->count( particleID );
+      // Get the cell geographic position
+      geoloc = (*il)->m_GeoPosCell;
 
-      // Case 1: 1 periodic clone
-      if ( ncid == 1 )
+      // For all particles in the cell
+      for (particle=(*il)->m_particles.begin();
+      	particle!=(*il)->m_particles.end(); particle++)
       {
-        // Find the periodic clone
-	imm = particlesPeriodicClones->find( particleID );
+        particleID = (*particle)->getID();
+        ncid = particlesPeriodicClones->count( particleID );
 
-	// Update the periodic clone features
-	imm->second->setTransform(
-		*((*particle)->getRigidBody()->getTransform()) );
-	imm->second->Translate( m_domain_global_periodic_vectors[
-		m_periodic_vector_indices[geoloc][0]] );
-	imm->second->setTranslationalVelocity(
-		*((*particle)->getTranslationalVelocity()) );
-	imm->second->setQuaternionRotation(
-		*((*particle)->getQuaternionRotation()) );
-	imm->second->setAngularVelocity( *((*particle)->getAngularVelocity()) );
-	imm->second->setContactMap( *((*particle)->getContactMap()) ); 
-      }
-      else
-      // Case 2: multiple periodic clones
-      {
-        crange = particlesPeriodicClones->equal_range( particleID );
-
-	// Loop over the domain periodic vectors for this geographic position
-        for ( size_t i=0;i<m_periodic_vector_indices[geoloc].size();++i)
+        // Case 1: 1 periodic clone
+        if ( ncid == 1 )
         {
-          found = false;
+          // Find the periodic clone
+	  imm = particlesPeriodicClones->find( particleID );
 
-	  // Find the periodic clone assuming that the master particle has not
-	  // moved by more than twice its crust thickness (an assumption that
-	  // is always verified in Grains3D)
-	  for (imm=crange.first; imm!=crange.second && !found; )
-            if ( imm->second->getPosition()->DistanceTo(
+	  // Update the periodic clone features
+	  imm->second->setTransform(
+		*((*particle)->getRigidBody()->getTransform()) );
+	  imm->second->Translate( m_domain_global_periodic_vectors[
+		m_periodic_vector_indices[geoloc][0]] );
+	  imm->second->setTranslationalVelocity(
+		*((*particle)->getTranslationalVelocity()) );
+	  imm->second->setQuaternionRotation(
+		*((*particle)->getQuaternionRotation()) );
+	  imm->second->setAngularVelocity( 
+	  	*((*particle)->getAngularVelocity()) );
+	  imm->second->setContactMap( *((*particle)->getContactMap()) ); 
+        }
+        else
+        // Case 2: multiple periodic clones
+        {
+          crange = particlesPeriodicClones->equal_range( particleID );
+
+	  // Loop over the domain periodic vectors for this geographic position
+          for ( size_t i=0;i<m_periodic_vector_indices[geoloc].size();++i)
+          {
+            found = false;
+
+	    // Find the periodic clone assuming that the master particle has not
+	    // moved by more than twice its crust thickness (an assumption that
+	    // is always verified in Grains3D)
+	    for (imm=crange.first; imm!=crange.second && !found; )
+              if ( imm->second->getPosition()->DistanceTo(
 	    	*((*particle)->getPosition())
 		+ m_domain_global_periodic_vectors[
 			m_periodic_vector_indices[geoloc][i]] ) <
 		2. * (*particle)->getCrustThickness() )
-	    {
-	      periodic_clone = imm->second;
-	      found = true;
-	    }
-	    else imm++;
+	      {
+	        periodic_clone = imm->second;
+	        found = true;
+	      }
+	      else imm++;
 
-	  // Update the periodic clone features
-	  periodic_clone->setTransform(
+	    // Update the periodic clone features
+	    periodic_clone->setTransform(
 		*((*particle)->getRigidBody()->getTransform()) );
-	  periodic_clone->Translate( m_domain_global_periodic_vectors[
+	    periodic_clone->Translate( m_domain_global_periodic_vectors[
 		m_periodic_vector_indices[geoloc][i]] );
-	  periodic_clone->setTranslationalVelocity(
+	    periodic_clone->setTranslationalVelocity(
 		*((*particle)->getTranslationalVelocity()) );
-	  periodic_clone->setQuaternionRotation(
+	    periodic_clone->setQuaternionRotation(
 		*((*particle)->getQuaternionRotation()) );
-	  periodic_clone->setAngularVelocity(
+	    periodic_clone->setAngularVelocity(
 	  	*((*particle)->getAngularVelocity()) );
-	  periodic_clone->setContactMap( *((*particle)->getContactMap()) ); 	
+	    periodic_clone->setContactMap( *((*particle)->getContactMap()) ); 	
+          }
         }
       }
     }
@@ -2322,6 +2327,97 @@ void LinkedCell::createDestroyPeriodicClones( list<Particle*>* particles,
       }
     }
   }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Checks periodic clones in serial mode when a simulation is reloaded
+void LinkedCell::checkPeriodicClonesReload( list<Particle*>* particles,
+    	multimap<int,Particle*>* particlesPeriodicClones,
+	vector<Particle*> const* ReferenceParticles, 
+	double const& time )
+{
+  GeoPosition geoloc = GEOPOS_NONE;
+  list<Cell*>::iterator il;
+  list<Particle*>::iterator particle;
+  multimap<int,Particle*>::iterator imm;
+  pair < multimap<int,Particle*>::iterator,
+  	multimap<int,Particle*>::iterator > crange;
+  int particleID = 0;
+  bool found = false;
+  Particle* periodic_clone = NULL;
+  size_t counter = 0;
+  Point3 gc;  
+
+  // Destroy periodic clones that are out of the linked cell grid
+  updateDestroyPeriodicClones( particles, particlesPeriodicClones, true );
+
+  // Create periodic clones that do not yet exist
+  for (il=m_buffer_cells.begin();il!=m_buffer_cells.end();il++)
+  {
+    // Get the cell geographic position
+    geoloc = (*il)->m_GeoPosCell;
+
+    // For all particles in the cell
+    for (particle=(*il)->m_particles.begin();particle!=(*il)->m_particles.end();
+    	particle++)
+    {
+      particleID = (*particle)->getID();
+      crange = particlesPeriodicClones->equal_range( particleID );
+
+      // Loop over the domain periodic vectors for this geographic position
+      for ( size_t i=0;i<m_periodic_vector_indices[geoloc].size();++i)
+      {
+        found = false;
+
+	// Try to find the periodic clone
+	for (imm=crange.first; imm!=crange.second && !found; )
+          if ( imm->second->getPosition()->DistanceTo(
+	    	*((*particle)->getPosition())
+		+ m_domain_global_periodic_vectors[
+			m_periodic_vector_indices[geoloc][i]] ) <
+		2. * (*particle)->getCrustThickness() ) found = true;
+	  else imm++; 
+	  
+	// Create the periodic clone if it was not found
+	if ( !found )
+	{
+          ++counter;
+	  
+	  // Create periodic clone
+	  periodic_clone = (*particle)->createCloneCopy(
+		(*particle)->getID(),
+		(*ReferenceParticles)[(*particle)->getGeometricType()],
+		*((*particle)->getTranslationalVelocity()),
+		*((*particle)->getQuaternionRotation()),
+		*((*particle)->getAngularVelocity()),
+		*((*particle)->getRigidBody()->getTransform()),
+		COMPUTE, (*particle)->getContactMap() );
+
+	  // Translate to its periodic position
+	  periodic_clone->Translate( m_domain_global_periodic_vectors[
+		m_periodic_vector_indices[geoloc][i]] );
+
+          // Link periodic clone
+          Link( periodic_clone );
+
+	  // Insert into periodic clone map
+	  particlesPeriodicClones->insert(
+		pair<int,Particle*>( (*particle)->getID(), periodic_clone ) );
+
+	  // Insert into active particle list
+	  particles->push_back( periodic_clone );
+	}
+      }
+    }
+  }
+  
+  if ( counter )
+    cout << "Creation of additional periodic clones (different"
+	<< " link cell grid or clones not stored in the reload file)" 
+	<< endl; 
 }
 
 

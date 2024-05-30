@@ -35,6 +35,14 @@ enum PullMode
 };
 
 
+/** @brief Insertion order */
+enum CloneInReload
+{
+  CIR_NONE, /**< no clone in the reload file */
+  CIR_NOPERIODIC, /**< no periodic clone in the reload file */
+  CIR_ALL, /**< all clones in the reload file */  
+};
+
 
 /** @brief The class AllComponents.
 
@@ -380,22 +388,30 @@ class AllComponents
     written to the stream
     @param fileSave output stream
     @param filename file name corresponding to the output stream 
+    @param known_positions the list of remaining insertion positions
+    @param cir clone (periodic, parallel or both) writing mode
+    @param LC linked cell grid 
     @param rank process rank
     @param nprocs number of processes     
     @param wrapper MPI wrapper */
     void write( ostream &fileSave, string const& filename, 
-    	list<Point3> const* known_positions, int const& rank,
+    	list<Point3> const* known_positions, CloneInReload cir, 
+	LinkedCell const* LC, int const& rank,
   	int const& nprocs, GrainsMPIWrapper const* wrapper ) const;
     
     /** @brief Writes components to a single MPI File in parallel. Only active 
     particles are written to the stream
     @param fileSave output stream
     @param filename file name corresponding to the output stream 
+    @param known_positions the list of remaining insertion positions
+    @param cir clone (periodic, parallel or both) writing mode
     @param LC linked cell grid    
-    @param wrapper MPI wrapper */
+    @param wrapper MPI wrapper 
+    @param periodic true if the domain is periodic */
     void write_singleMPIFile( ostream &fileSave, string const& filename,
-    	list<Point3> const* known_positions, LinkedCell const* LC, 
-    	GrainsMPIWrapper const* wrapper ) const;
+    	list<Point3> const* known_positions, CloneInReload cir, 
+	LinkedCell const* LC, GrainsMPIWrapper const* wrapper, 
+	bool periodic ) const;
 
     /** @brief Output operator
     @param f output stream

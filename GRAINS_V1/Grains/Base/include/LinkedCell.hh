@@ -139,9 +139,12 @@ class LinkedCell : public AppCollision
     /** @brief Updates periodic clones and destroys those out of the linked cell
     grid in serial mode
     @param particles list of active particles
-    @param particlesPeriodicClones map of active periodic clone particles */
+    @param particlesPeriodicClones map of active periodic clone particles 
+    @param destroyOnly performs periodic clones destruction only when true (i.e.
+    does not update periodic clones in the linked cell grid) */
     void updateDestroyPeriodicClones( list<Particle*>* particles,
-    	multimap<int,Particle*>* particlesPeriodicClones );
+    	multimap<int,Particle*>* particlesPeriodicClones,
+	bool destroyOnly = false );
 
     /** @brief Creates/destroys periodic clones after LinkUpdate in serial mode
     @param particles list of active particles
@@ -150,6 +153,17 @@ class LinkedCell : public AppCollision
     void createDestroyPeriodicClones( list<Particle*>* particles,
     	multimap<int,Particle*>* particlesPeriodicClones,
 	vector<Particle*> const* ReferenceParticles );
+	
+    /** @brief Checks periodic clones in serial mode when a simulation is
+    reloaded
+    @param particles list of active particles
+    @param particlesPeriodicClones map of active periodic clone particles
+    @param ReferenceParticles vector of reference particles 
+    @param time physical time */
+    void checkPeriodicClonesReload( list<Particle*>* particles,
+    	multimap<int,Particle*>* particlesPeriodicClones,
+	vector<Particle*> const* ReferenceParticles, 
+	double const& time );	
 	
     /** @brief Attempts to insert a particle in parallel mode
     @param time physical time    

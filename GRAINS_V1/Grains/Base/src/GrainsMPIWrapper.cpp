@@ -1766,6 +1766,186 @@ void GrainsMPIWrapper::CreateClones(double time,
 
 
 // ----------------------------------------------------------------------------
+// Returns the map of periodic clones in parallel that each process
+// must not write to avoid duplicated particles in the single restart file
+multimap<int,Point3>* GrainsMPIWrapper::doNotWritePeriodicClones(
+  	list<Particle*> const& particles,
+	LinkedCell const* LC ) const
+{
+  list<Particle*>::const_iterator particle;
+  Point3 const* gc;
+  int tag, i = 0, j, nrecbuf = 0, ndata = 0;
+  double intTodouble = 0.1 ; 
+  double* vdata = new double[ndata];
+  double* recbuf = NULL;
+  Point3 pt;      
+  multimap< int, pair<Point3, size_t> > allperclones; 
+  multimap< int, pair<Point3, size_t> >::const_iterator kmm, lmm; 
+  multimap< int, Point3 >* doNotWrite = new multimap< int, Point3 >; 
+  multimap< int, Point3 >::iterator imm;
+  list<double> data;
+  list<double>::const_iterator il;    
+    
+  // List all periodic clones in a list of double and right away in a 
+  // multimap ID - ( position - rank ) on the master process 
+  for (particle=particles.cbegin();particle!=particles.cend();particle++)
+  {
+    gc = (*particle)->getPosition(); 
+    tag = (*particle)->getTag();
+    if ( tag == 2 && !LC->isInDomain( gc ) )
+    {
+      data.push_back( double((*particle)->getID()) + intTodouble );
+      data.push_back( (*gc)[X] );	
+      data.push_back( (*gc)[Y] );
+      data.push_back( (*gc)[Z] );	
+      
+      if ( m_rank == 0 )
+      {
+	pair<Point3, size_t> pp( *gc, m_rank );
+	allperclones.insert( pair<int,pair<Point3, size_t>>( 
+	  	(*particle)->getID(), pp ) );
+      }		
+    }
+  }
+  
+  // Transfer the content of this list to an 1D array of doubles
+  ndata = int(data.size());
+  vdata = new double[ndata]; 
+  for (il=data.cbegin(),i=0;il!=data.cend();il++,i++) vdata[i] = *il;
+  
+  // All processes sends their 1D array of doubles to the master process
+  // and the master process receives, processes the data and adds to the 
+  // multimap ID - ( position - rank )
+  if ( m_rank ) send( vdata, ndata, 0 );
+  else
+  {      
+    for (i=1;i<m_nprocs;++i)
+    {
+      receive( recbuf, nrecbuf, i );
+	
+      for (j=0;j< nrecbuf;j+=4)
+      {
+	pt[X] = recbuf[j+1];
+	pt[Y] = recbuf[j+2];
+	pt[Z] = recbuf[j+3];
+	pair<Point3, size_t> pp( pt, i );
+	allperclones.insert( pair<int,pair<Point3, size_t>>( 
+	  	int(recbuf[j]), pp ) );
+      }
+      
+      delete [] recbuf;
+      recbuf = NULL;
+      nrecbuf = 0;		
+    } 
+  }        
+  delete [] vdata;
+  vdata = NULL;
+    
+  // Master process identifies the duplicated periodic clones and establishes
+  // the list of periodic clones that each process must not write
+  if ( m_rank == 0 )
+  {
+    set<int> keys;
+    set<int>::const_iterator is;
+    size_t ncid = 0, k, l;
+    pair < multimap<int,pair<Point3, size_t>>::iterator, 
+  	multimap<int,pair<Point3, size_t>>::iterator > crange; 
+    list<double> ldwork;
+    list<double>::const_iterator cil;
+    vector< list<double> > vecDoNotWrite( m_nprocs, ldwork );        
+    
+    // Get the lists of particle ID numbers in the multimap
+    for (kmm=allperclones.cbegin();kmm!=allperclones.cend();kmm++)
+        keys.insert( kmm->first );
+	
+    // For each ID number, search for duplicated positions
+    for (is=keys.cbegin();is!=keys.cend();is++)
+    {
+      ncid = allperclones.count( *is );
+      if ( ncid > 1 )
+      {
+        crange = allperclones.equal_range( *is );
+	vector<bool> exclude( ncid, false );
+	
+	// Search for all entries with this ID number
+	for (k=0;k<ncid;++k)
+	{
+	  kmm = crange.first;
+	  std::advance( kmm, k );
+	  
+	  // Compare to all entries in the multimap after this entry
+	  // to avoid double checks
+	  // As soon as a duplicated periodic clone is found, it is excluded
+	  // for subsequent tests via exclude[l] = true;
+	  for (l=k+1;l<ncid;++l)
+          {
+	    lmm = crange.first;
+	    std::advance( lmm, l );
+	    if ( !exclude[l] )
+	      // We use 10^-6 * linked cell size in X as an approx of 0
+	      if ( kmm->second.first.DistanceTo( lmm->second.first ) <
+			LOWEPS * LC->getCellSize(0) )
+	      {
+		exclude[l] = true;
+		vecDoNotWrite[lmm->second.second].push_back( 
+		  	double(lmm->first) + intTodouble );
+		vecDoNotWrite[lmm->second.second].push_back( 
+		  	lmm->second.first[X] );
+		vecDoNotWrite[lmm->second.second].push_back( 
+		  	lmm->second.first[Y] );
+		vecDoNotWrite[lmm->second.second].push_back( 
+		  	lmm->second.first[Z] );
+	      } 
+	  }
+	}
+      }     
+    }
+      
+    // Send the lists of periodic clones that must not be written to each
+    // process. First, the lists are transferred to an 1D array of doubles
+    // and then sent to each process
+    for (i=1;i<m_nprocs;++i)
+    { 
+      vdata = new double[ vecDoNotWrite[i].size() ];
+      k = 0;
+      for (cil=vecDoNotWrite[i].cbegin();cil!=vecDoNotWrite[i].cend();
+	cil++,++k) vdata[k] = *cil; 
+      send( vdata, int(vecDoNotWrite[i].size()), i );
+      delete [] vdata;
+      vdata = NULL;	
+    }
+      
+    // On the master process, we transfer the lists of periodic clones that 
+    // must not be written directly to the receiving buffer
+    nrecbuf = int(vecDoNotWrite[0].size());
+    recbuf = new double[ nrecbuf ];
+    k = 0;
+    for (cil=vecDoNotWrite[0].cbegin();cil!=vecDoNotWrite[0].cend();
+		cil++,++k) recbuf[k] = *cil;                      
+  }
+  else
+    // Processes with rank > 0 receive the the lists of periodic clones that 
+    // must not be written as an 1D array of doubles
+    receive( recbuf, nrecbuf, 0 );
+
+    
+  // Finally, data are processes on each process and transferred to the map 
+  // particle ID - position of periodic clones that must not be written
+  for (i=0;i<nrecbuf;i+=4)
+  {
+    pt[X] = recbuf[i+1];
+    pt[Y] = recbuf[i+2];      
+    pt[Z] = recbuf[i+3];
+    doNotWrite->insert( pair<int,Point3>( int(recbuf[i]), pt ) );     
+  }
+  
+  return ( doNotWrite );            
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Broadcasts a double from the master to all processes within the 
 // MPI_COMM_activProc communicator
 double GrainsMPIWrapper::Broadcast_DOUBLE( double const& d, int source ) const
@@ -2333,147 +2513,6 @@ void GrainsMPIWrapper::display_used_memory( ostream& f ) const
   GrainsExec::display_memory( out, GrainsExec::used_memory() ); 
   writeStringPerProcess( f, out.str(), false, GrainsExec::m_shift3 );   
 }
-
-
-
-
-// ----------------------------------------------------------------------------
-// Distributes the number of particles in each class and on each
-// process in the case of the block structured insertion
-void GrainsMPIWrapper::distributeParticlesClassProc( 
-  	list< pair<Particle*,size_t> > const& newPart,
-	list< pair<Particle*,size_t> >&newPartProc,
-	size_t const& npartproc,
-	size_t const& ntotalinsert ) const
-{
-  list< pair<Particle*,size_t> >::const_iterator ipart;
-  list< pair<Particle*,size_t> >::iterator ipartProc;
-  size_t nclasseproc = 0, npartproc_ = npartproc, i, 
-  	nbClasses = newPart.size() ;
-  MPI_Status status;
-  
-
-  // Initialisation of lists and arrays
-  newPartProc = newPart;
-  size_t* tabNbPartRestantesParClasse = new size_t[nbClasses];
-  for (i=0,ipart=newPart.begin();i<nbClasses;++i,ipart++) 
-    tabNbPartRestantesParClasse[i] = ipart->second;
-  
-  
-  // Distribution is performed sequentially from 0 to the last
-  // process
-  if ( m_rank == m_rank_master )
-  {
-    // All types except the last type
-    ipart = newPart.begin();
-    ipartProc = newPartProc.begin();  
-    for (i=0,ipart=newPart.begin(),ipartProc=newPartProc.begin();
-    	i<nbClasses-1;++i,ipart++,ipartProc++)
-    {
-      nclasseproc = size_t( npartproc * ipart->second / ntotalinsert ) ;
-      // If ratio is integer, we keep it, otherwise we add 1
-      if ( fabs( double( npartproc * ipart->second / ntotalinsert )
-      	- double( size_t( npartproc * ipart->second / ntotalinsert ) ) ) 
-	> 1.e-14 )
-	++nclasseproc;
-      if ( nclasseproc > tabNbPartRestantesParClasse[i] ) 
-        nclasseproc = tabNbPartRestantesParClasse[i];
-      if ( nclasseproc > npartproc_ ) nclasseproc = npartproc_; 
-      ipartProc->second = nclasseproc;
-      npartproc_ -= nclasseproc;
-      tabNbPartRestantesParClasse[i] -= nclasseproc;
-    }
-  
-    // Correction for the last type to satisfy that the sum of the numbers of
-    // particles per type is equal to the total number of particles to insert on
-    // this process
-    nclasseproc = npartproc_;
-    ipartProc->second = nclasseproc;
-    tabNbPartRestantesParClasse[nbClasses-1] -= nclasseproc;
-  
-    MPI_Send( tabNbPartRestantesParClasse, int(nbClasses), MPI_UNSIGNED_LONG, 
-    	1, m_rank, m_MPI_COMM_activeProc );
-  }
-  else
-  {
-    if ( m_rank != m_nprocs - 1 )
-    {
-      MPI_Recv( tabNbPartRestantesParClasse, int(nbClasses), MPI_UNSIGNED_LONG, 
-      	m_rank - 1, m_rank - 1, m_MPI_COMM_activeProc, &status );
-
-      // All types except the last type
-      for (i=0,ipart=newPart.begin(),ipartProc=newPartProc.begin();
-    	i<nbClasses-1;++i,ipart++,ipartProc++)      
-      {
-        nclasseproc = size_t( npartproc * ipart->second / ntotalinsert ) ;
-        // If ratio is integer, we keep it, otherwise we add 1
-        if ( fabs( double( npartproc * ipart->second / ntotalinsert )
-      	- double( size_t( npartproc * ipart->second / ntotalinsert ) ) ) 
-	> 1.e-14 )
-	  ++nclasseproc;        
-	if ( nclasseproc > tabNbPartRestantesParClasse[i] ) 
-          nclasseproc = tabNbPartRestantesParClasse[i];
-        if ( nclasseproc > npartproc_ ) nclasseproc = npartproc_; 
-        ipartProc->second = nclasseproc;
-        npartproc_ -= nclasseproc;
-        tabNbPartRestantesParClasse[i] -= nclasseproc;
-      }
-  
-      // Correction for the last class to satisfy that the sum of the numbers of
-      // particles per class is equal to the total number of particles to insert
-      // on this process
-      nclasseproc = npartproc_;
-      ipartProc->second = nclasseproc;
-      tabNbPartRestantesParClasse[nbClasses-1] -= nclasseproc;
-  
-      MPI_Send( tabNbPartRestantesParClasse, int(nbClasses), MPI_UNSIGNED_LONG, 
-      	m_rank + 1, m_rank, m_MPI_COMM_activeProc );
-    }
-    else
-    {
-      MPI_Recv( tabNbPartRestantesParClasse, int(nbClasses), MPI_UNSIGNED_LONG, 
-      	m_rank - 1, m_rank - 1, m_MPI_COMM_activeProc, &status );      
-	
-      for (i=0,ipartProc=newPartProc.begin();i<nbClasses;++i,ipartProc++)
-        ipartProc->second = tabNbPartRestantesParClasse[i];
-    }
-  }    	
-  
-  // Output and verify distribution per class and per process
-  if ( m_rank == m_rank_master )
-    cout << endl << "Distribution " << endl << 
-    	"Per process and per class" << endl;
-  for (int m=0;m<m_nprocs;++m)
-  {
-    if ( m == m_rank && m_is_active )
-    {      
-      cout << "Proc " << m_rank << endl;
-      size_t ntot_ = 0 ;
-      for (i=0,ipart=newPart.begin(),ipartProc=newPartProc.begin();
-    	i<nbClasses;++i,ipart++,ipartProc++)
-      {
-        ntot_ += ipartProc->second;
-	cout << "   Class " << i << " = " << ipartProc->second << endl;
-      }
-      cout << "   Total: " << ntot_ << " = " << npartproc << endl;
-
-    }
-    MPI_Barrier( m_MPI_COMM_activeProc );
-  }
-  MPI_Barrier( m_MPI_COMM_activeProc );
-
-  if ( m_rank == m_rank_master )
-    cout << "Per class on all processes" << endl;
-  for (i=0,ipart=newPart.begin(),ipartProc=newPartProc.begin();
-    	i<nbClasses;++i,ipart++,ipartProc++)
-  {
-    size_t ntotc =  sum_UNSIGNED_INT_master( ipartProc->second ) ;
-    if ( m_rank == m_rank_master )
-      cout << "   Class " << i << " " << ntotc << " = " << ipart->second 
-      	<< endl;
-  }
-  if ( m_rank == m_rank_master ) cout << endl;
-} 
 
 
 

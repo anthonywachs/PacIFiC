@@ -26,6 +26,7 @@ Grains::Grains()
   , m_lastTime_save( false )
   , m_error_occured( false )
   , m_fileSave( "undefined" )
+  , m_clonesInReloadFile( CIR_NONE )
   , m_dimension( 3 )
   , m_allProcTiming( true )
   , m_restart( false )
@@ -924,7 +925,15 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
       		"SingleFile" );
         if ( wsf == "True" && m_nprocs > 1 ) 
 	  GrainsExec::m_SaveMPIInASingleFile = true ;
-      }		        
+      }
+      if ( ReaderXML::hasNodeAttr( nRestartFile, "Clones" ) )
+      {
+        string wclones = ReaderXML::getNodeAttr_String( nRestartFile,
+      		"Clones" );
+        if ( wclones == "All" ) m_clonesInReloadFile = CIR_ALL;
+	else if ( wclones == "NoPer" ) m_clonesInReloadFile = CIR_NOPERIODIC;
+	else m_clonesInReloadFile = CIR_NONE;
+      }      		        
       if ( m_rank == 0 )
       {
         cout << GrainsExec::m_shift6 << "Restart file" << endl;
@@ -935,7 +944,11 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 		( GrainsExec::m_writingModeHybrid ? "Hybrid" : "Text" ) << endl;
         cout << GrainsExec::m_shift9 << "Single file = " <<
 		( GrainsExec::m_SaveMPIInASingleFile ? "True" : "False" ) 
-		<< endl;	
+		<< endl;
+        cout << GrainsExec::m_shift9 << "Clones = " <<
+		( m_clonesInReloadFile == CIR_ALL ? "All" : 
+		m_clonesInReloadFile == CIR_NOPERIODIC ? "No periodic clones" :
+		"None" ) << endl;			
       }
     }
     else
@@ -1998,10 +2011,10 @@ void Grains::saveReload( double const& time )
   ContactBuilderFactory::save( result, m_fileSave, m_rank );
   if ( m_nprocs > 1 && GrainsExec::m_SaveMPIInASingleFile )
     m_allcomponents.write_singleMPIFile( result, reload, m_insertion_position,
-    	m_collision, m_wrapper );
+    	m_clonesInReloadFile, m_collision, m_wrapper, m_periodic );
   else
     m_allcomponents.write( result, reload, m_insertion_position, 
-    	m_rank, m_nprocs, m_wrapper );
+    	m_clonesInReloadFile, m_collision, m_rank, m_nprocs, m_wrapper );
   if ( m_rank == 0 )
   {  
     result << "#EndTime" << endl;
@@ -2269,5 +2282,9 @@ size_t Grains::getNbInsertionPositions() const
 // Checks the (periodic) clones when a simulation is reloaded */
 void Grains::checkClonesReload()
 {
-
+  m_collision->checkPeriodicClonesReload(
+	m_allcomponents.getActiveParticles(),
+	m_allcomponents.getPeriodicCloneParticles(),
+	m_allcomponents.getReferenceParticles(),
+	m_time );
 }
