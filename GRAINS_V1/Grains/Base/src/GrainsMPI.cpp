@@ -392,7 +392,7 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
   ++insert_counter;
   if ( insert_counter == m_insertion_frequency ) insert_counter = 0;
 
-  return ( !insert.second && insert.first );
+  return ( !insert.second && m_wrapper->max_UNSIGNED_INT( insert.first ) );
 }
 
 
