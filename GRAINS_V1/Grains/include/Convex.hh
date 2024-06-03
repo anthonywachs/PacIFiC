@@ -58,7 +58,16 @@ class Convex : public Shape
     //@{
     /** @brief Returns shape type */
     ShapeType getType() const;
+    
+    /** @brief Returns whether two convexes are of the same type 
+    @param other the other convex
+    @param level2 if true, performs advanced comparison */
+    bool equalType( Convex const* other, bool const& level2 ) const;    
+    //@}    
 
+
+    /**@name Virtual methods */
+    //@{
     /** @brief Returns the convex shape bounding box
     @param t geometric transformation */
     virtual BBox bbox( Transform const& t ) const;
@@ -81,9 +90,6 @@ class Convex : public Shape
     the input file */
     virtual double computeCircumscribedRadius() const = 0;
 
-
-    /**@name Virtual methods */
-    //@{
     /** @brief Returns the convex type */
     virtual ConvexType getConvexType() const = 0;
 
@@ -163,6 +169,11 @@ class Convex : public Shape
     /** @ brief Returns whether a point lies inside the convex shape
     @param pt point */
     virtual bool isIn( Point3 const& pt ) const = 0;
+    
+    /** @brief Performs advanced comparison of the two convexes and returns
+    whether they match
+    @param other the other convex */
+    virtual bool equalType_level2( Convex const* other ) const = 0;       
     //@}
 
 

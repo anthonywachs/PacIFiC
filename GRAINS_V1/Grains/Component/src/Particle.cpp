@@ -1835,3 +1835,28 @@ string Particle::getSpecificCompositeShapeName() const
 {
   return ( m_specific_composite_shape );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether two particles are of the same type
+bool Particle::equalType( Particle const* other ) const
+{
+  bool same = false;
+  
+  // Check if particle/composite particle matches
+  same = !other->isCompositeParticle();
+
+  // Check if density matches
+  if ( same ) same = fabs( m_density - other->m_density ) < LOWEPS;
+
+  // Check if material matches
+  if ( same ) same = ( m_materialName == other->m_materialName );   
+	
+  // Check geometric shape type
+  if ( same ) same = ( m_geoRBWC->getConvex()->equalType( 
+      other->m_geoRBWC->getConvex(), true ) );
+
+  return ( same );
+}

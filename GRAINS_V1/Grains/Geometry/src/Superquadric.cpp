@@ -594,48 +594,24 @@ bool Superquadric::isIn( Point3 const& pt ) const
 
 
 
-// // ----------------------------------------------------------------------------
-// // Writes the superquadric in a STL format
-// void Superquadric::write_convex_STL( ostream& f,
-//   Transform const& transform ) const
-// {
-//   cerr << "Program Error :\n"
-//        << "Superquadric::write_convex_STL non accessible.\n";
-//   exit( 3 );
-// }
-
-
-
-
 // ----------------------------------------------------------------------------
-// Writes a triangular facet in the STL format based on its 3
-// vertices and the center of mass coordinates
-// void Superquadric::write_STLfacet_sphere( ostream &f, Point3 const& GC,
-//   	Point3 const& pp1,
-//   	Point3 const& pp2,
-//   	Point3 const& pp3 ) const
+// Performs advanced comparison of the two superquadrics and returns whether 
+// they match
+bool Superquadric::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Superquadric, we dynamically cast it to 
+  // actual type
+  Superquadric const* other_ = dynamic_cast<Superquadric const*>(other);
+  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() );    
 
-
-
-
-// // ----------------------------------------------------------------------------
-// // Returns an orientation vector describing the convex shape angular position
-// Vector3 Superquadric::computeOrientationVector( Transform const* transform ) const
-// {
-//   Point3 pp( 0., m_radius, 0. );
-//   Point3 pptrans = (*transform)( pp );
-//
-//   return ( pptrans - *transform->getOrigin() );
-// }
-//
-//
-//
-//
-// // ----------------------------------------------------------------------------
-// // Sets the number of point per quarter of the equator line for
-// // Paraview post-processing, i.e., controls the number of facets in the sphere
-// // reconstruction in Paraview
-// void Superquadric::SetvisuNodeNbPerQar( int nbpts )
-// {
-//   m_visuNodeNbPerQar = nbpts;
-// }
+  bool same = ( 
+  	fabs( m_a - other_->m_a ) <  LOWEPS * lmin 
+	&& fabs( m_b - other_->m_b ) <  LOWEPS * lmin
+	&& fabs( m_c - other_->m_c ) <  LOWEPS * lmin	
+	&& fabs( m_n1 - other_->m_n1 ) <  LOWEPS 
+	&& fabs( m_n2 - other_->m_n2 ) <  LOWEPS );
+  
+  return ( same );
+}

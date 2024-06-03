@@ -371,11 +371,11 @@ void Polygon::BuildPolygon( int nbedge, IndexArray const* edge )
   }
   
   for (i = 0; i < numVerts(); ++i) 
-    if (indexBuf[i].size()) 
+    if ( indexBuf[i].size() ) 
       new(&m_cobound[i]) IndexArray(int(indexBuf[i].size()), &indexBuf[i][0]);
   
   m_curr_vertex = 0;
-  while (indexBuf[m_curr_vertex].size() == 0) ++m_curr_vertex;
+  while ( indexBuf[m_curr_vertex].size() == 0 ) ++m_curr_vertex;
   
   delete [] indexBuf;
 }
@@ -452,3 +452,28 @@ bool Polygon::isIn( Point3 const& pt ) const
   
   return ( false );
 }  
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two polygons and returns whether 
+// they match
+bool Polygon::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Polygon, we dynamically cast it to 
+  // actual type
+  Polygon const* other_ = dynamic_cast<Polygon const*>(other);
+  
+  double lmin = computeCircumscribedRadius();    
+
+  // Check the number of vertices
+  int ncorners = numVerts();  
+  bool same = ( ncorners == other_->numVerts() );
+  
+  // Check vertex coordinates
+  for (int i=0;i<ncorners && same;++i) 
+    same  = ( (*this)[i].DistanceTo( (*other_)[i] ) < LOWEPS * lmin ); 
+  
+  return ( same );
+} 

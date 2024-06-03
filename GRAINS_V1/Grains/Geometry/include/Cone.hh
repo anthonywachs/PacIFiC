@@ -112,7 +112,12 @@ class Cone : public Convex {
     
     /** @ brief Returns whether a point lies inside the cone
     @param pt point */
-    bool isIn( Point3 const& pt ) const;    
+    bool isIn( Point3 const& pt ) const; 
+    
+    /** @brief Performs advanced comparison of the two cones and returns
+    whether they match
+    @param other the other cone */
+    bool equalType_level2( Convex const* other ) const;        
     //@}
   
 

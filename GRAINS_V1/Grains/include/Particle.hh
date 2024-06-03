@@ -457,6 +457,10 @@ class Particle : public Component
     frame
     @param inertia inertia tensor in the space fixed coordinate frame */
     void computeInertiaTensorSpaceFixed( vector<double>& inertia ) const;
+    
+    /** @brief Returns whether two particles are of the same type
+    @param other the other particle */
+    virtual bool equalType( Particle const* other ) const;    
     //@}
 
 

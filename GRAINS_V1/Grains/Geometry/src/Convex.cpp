@@ -62,7 +62,7 @@ BCylinder Convex::bcylinder() const
   cout << "Warning for this Convex the method Convex::bcylinder() "
        << "is not yet implemented !\n"
        << "Need for an assistance ! Stop running !\n";
-  // exit(10);
+  exit(10);
 
   return( BCylinder() );
 }
@@ -657,4 +657,18 @@ ShapeType Convex::getType() const
 bool Convex::isSphere() const
 {
   return ( false );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether two convexes are of the same type 
+bool Convex::equalType( Convex const* other, bool const& level2 ) const
+{
+  bool same = ( getConvexType() == other->getConvexType() );
+
+  if ( same && level2 ) same = equalType_level2( other );
+  
+  return ( same );
 }

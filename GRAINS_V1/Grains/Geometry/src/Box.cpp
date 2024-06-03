@@ -989,3 +989,31 @@ BCylinder Box::bcylinder() const
 
   return( BCylinder( r, h, e ) );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two boxes and returns whether 
+// they match
+bool Box::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Box, we dynamically cast it to actual type
+  Box const* other_ = dynamic_cast<Box const*>(other); 
+
+  size_t dim = ( GrainsBuilderFactory::getContext() == DIM_2 ? 2: 3 ), j;
+  bool same = true;  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() ); 
+  
+  if ( dim == 2 )
+    for (j=0;j<4 && same;++j)
+      same = ( (*m_corners2D_XY)[j].DistanceTo( (*other_->m_corners2D_XY)[j] ) 
+      	< LOWEPS * lmin );
+  else
+    for (j=0;j<8 && same;++j)
+      same = ( m_corners[j].DistanceTo( (other_->m_corners)[j] ) 
+      	< LOWEPS * lmin );
+  
+  return ( same );
+} 

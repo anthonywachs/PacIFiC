@@ -162,6 +162,11 @@ class Box : public Convex
 
     /** @ Returns the bounding cylinder to box */
     BCylinder bcylinder() const;
+    
+    /** @brief Performs advanced comparison of the two boxes and returns
+    whether they match
+    @param other the other box */
+    bool equalType_level2( Convex const* other ) const;    
     //@}
 
 
@@ -176,7 +181,7 @@ class Box : public Convex
 
     /** @name Parameters*/
     //@{
-    Vector3 m_extent; /**< vector containing the half-legnth of the edges */
+    Vector3 m_extent; /**< vector containing the half-length of the edges */
     vector<Point3> m_corners; /**< vector of the 8 corners/vertices of the
     	box */
     vector<Point3>* m_corners2D_XY; /**< vector of the 4 corners/vertices in the

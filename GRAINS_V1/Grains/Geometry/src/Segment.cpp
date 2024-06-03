@@ -291,3 +291,21 @@ bool Segment::isIn( Point3 const& pt ) const
   return ( pt[X] <= m_halflength && pt[X] >= - m_halflength );
 }    
   
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two segments and returns whether 
+// they match
+bool Segment::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Segment, we dynamically cast it to actual 
+  // type
+  Segment const* other_ = dynamic_cast<Segment const*>(other);
+  
+  double lmin = min( m_halflength, other_->m_halflength );
+
+  bool same = ( fabs( m_halflength - other_->m_halflength ) <  LOWEPS * lmin );
+  
+  return ( same );
+} 

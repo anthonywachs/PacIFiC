@@ -166,5 +166,21 @@ bool Polytope::isIn( Point3 const& pt ) const
   cout << "Warning when calling Polytope::isIn(x,y,z) "
        << "\nShould not go into this method !\n"
        << "Need for an assistance ! Stop running !\n";
+  exit(10);
+  return ( false );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two convexes and returns whether they 
+// match
+bool Polytope::equalType_level2( Convex const* other ) const
+{
+  cout << "Warning when calling Polytope::equalType_level2(other) "
+       << "\nShould not go into this method !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
   return ( false );
 }

@@ -114,6 +114,11 @@ class Rectangle : public Convex
     /** @ brief Returns whether a point lies inside the rectangle
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Performs advanced comparison of the two rectangles and returns
+    whether they match
+    @param other the other rectangle */
+    bool equalType_level2( Convex const* other ) const;     
     //@}
 
 

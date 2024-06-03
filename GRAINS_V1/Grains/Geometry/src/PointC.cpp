@@ -116,3 +116,14 @@ bool PointC::isIn( Point3 const& pt ) const
 {
   return ( false );
 }  
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two points and returns whether 
+// they match
+bool PointC::equalType_level2( Convex const* other ) const
+{
+  return ( true );
+} 

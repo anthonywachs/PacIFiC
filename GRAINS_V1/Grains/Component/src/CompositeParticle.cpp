@@ -1146,3 +1146,56 @@ void CompositeParticle::setQuaternionRotation( Quaternion const& qrot )
   for ( size_t i=0; i<m_nbElemPart; ++i )
     m_elementaryParticles[i]->setQuaternionRotation( qrot );  
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether two particles are of the same type
+bool CompositeParticle::equalType( Particle const* other ) const
+{
+  bool same = false;
+  
+  // Check if particle/composite particle matches
+  same = other->isCompositeParticle();
+
+  // Check if density matches
+  if ( same ) same = fabs( m_density - other->getDensity() ) < LOWEPS;
+
+  // Check if material matches
+  if ( same ) same = ( m_materialName == other->getMaterial() );
+  
+  // Check if geometric features match
+  if ( same )
+  {
+    // We know that ParticleRef points to a CompositeParticle, such that
+    // we can dynamically cast it to actual type
+    CompositeParticle const* other_ =
+  	dynamic_cast<CompositeParticle const*>(other);
+	
+    // Check if number of elementary particles matches
+    same = ( m_nbElemPart == other_->m_nbElemPart ); 
+    
+    // Check if elementary particles match
+    if ( same )
+      for ( size_t i=0; i<m_nbElemPart && same; ++i )
+        same = m_elementaryParticles[i]->equalType( 
+		other_->m_elementaryParticles[i] ); 
+		
+    // Check if relative positions of elementary particles match
+    double lmin = m_geoRBWC->getCircumscribedRadius();
+    if ( same )
+      for ( size_t i=0; i<m_nbElemPart && same; ++i )
+        same = ( Norm( m_InitialRelativePositions[i]
+		- other_->m_InitialRelativePositions[i] ) < LOWEPS * lmin ) ;
+		
+    // Check if initial rotation matrices of elementary particles match
+    if ( same )
+      for ( size_t i=0; i<m_nbElemPart && same; ++i )
+        for ( int j=0; j<int(m_nbElemPart) && same; ++j )  
+        same = ( Norm( m_InitialRotationMatrices[i][j]
+		- other_->m_InitialRotationMatrices[i][j] ) < LOWEPS * lmin ) ;
+  }
+  
+  return ( same );  
+}

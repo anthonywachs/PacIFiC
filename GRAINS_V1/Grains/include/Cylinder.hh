@@ -120,6 +120,11 @@ class Cylinder : public Convex
 
     /** @ Returns the bounding cylinder to cylinder */
     BCylinder bcylinder() const;
+    
+    /** @brief Performs advanced comparison of the two cylinders and returns
+    whether they match
+    @param other the other cylinder */
+    bool equalType_level2( Convex const* other ) const;    
     //@}
 
 

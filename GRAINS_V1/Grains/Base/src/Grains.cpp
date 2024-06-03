@@ -683,6 +683,10 @@ void Grains::Construction( DOMElement* rootElement )
       if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Reading new composite particle types completed" << endl;
     }
+    
+    if  ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+      	"Number of particle types = " << 
+	m_allcomponents.getReferenceParticles()->size() << endl;
 
 
     // Obstacles

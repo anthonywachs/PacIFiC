@@ -200,6 +200,10 @@ class CompositeParticle : public Particle
     /** @ brief Returns whether a point lies inside the composite particle
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+
+    /** @brief Returns whether two particles are of the same type
+    @param other the other particle */
+    virtual bool equalType( Particle const* other ) const;    
     //@}
 
 

@@ -364,3 +364,25 @@ BCylinder Cylinder::bcylinder() const
   Vector3 e = Vector3( 0., 1., 0. );
   return( BCylinder( m_radius, 2*m_halfHeight, e ) );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two cylinders and returns whether 
+// they match
+bool Cylinder::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Cylinder, we dynamically cast it to actual 
+  // type
+  Cylinder const* other_ = dynamic_cast<Cylinder const*>(other);
+  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() );  
+  
+  bool same = ( 
+  	fabs( m_radius - other_->m_radius ) <  LOWEPS * lmin 
+	&& fabs( m_halfHeight - other_->m_halfHeight ) <  LOWEPS * lmin );
+  
+  return ( same );
+} 

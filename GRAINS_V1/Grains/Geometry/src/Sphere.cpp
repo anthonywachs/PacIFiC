@@ -538,4 +538,23 @@ bool Sphere::isIn( Point3 const& pt ) const
 {
   return ( pt[X] * pt[X] + pt[Y] * pt[Y] +  pt[Z] * pt[Z] 
   	<= m_radius * m_radius );
-}  
+} 
+
+
+
+ 
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two spheres and returns whether 
+// they match
+bool Sphere::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Sphere, we dynamically cast it to actual 
+  // type
+  Sphere const* other_ = dynamic_cast<Sphere const*>(other);
+  
+  double lmin = min( m_radius, other_->m_radius );
+
+  bool same = ( fabs( m_radius - other_->m_radius ) <  LOWEPS * lmin );
+  
+  return ( same );
+} 

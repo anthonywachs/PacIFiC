@@ -105,6 +105,11 @@ class Segment : public Convex
     /** @ brief Returns whether a point lies inside the segment
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Performs advanced comparison of the two segments and returns
+    whether they match
+    @param other the other segment */
+    bool equalType_level2( Convex const* other ) const;    
     //@}
 
 

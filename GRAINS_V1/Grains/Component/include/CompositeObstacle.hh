@@ -233,7 +233,7 @@ class CompositeObstacle : public Obstacle
 	
     /** @ brief Returns whether a point lies inside the composite obstacle
     @param pt point */
-    bool isIn( Point3 const& pt ) const;			
+    bool isIn( Point3 const& pt ) const;
     //@}
 
 

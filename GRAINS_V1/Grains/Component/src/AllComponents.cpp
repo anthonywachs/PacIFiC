@@ -112,12 +112,34 @@ void AllComponents::UpdateParticleActivity()
 // Adds a reference particle
 void AllComponents::AddReferenceParticle( Particle* particle, size_t const &n )
 {
-  m_ReferenceParticles.reserve( m_ReferenceParticles.size() + 1 );
-  m_ReferenceParticles.push_back( particle );
-  m_NbRemainingParticlesToInsert.reserve( 
+  bool exist = false;
+  size_t ntypes = m_ReferenceParticles.size(), i, i0;
+
+  // Check whether such a type of particle already exists
+  for (i=0;i<ntypes && !exist;++i)
+    if ( particle->equalType( m_ReferenceParticles[i] ) ) 
+    {
+      exist = true;
+      i0 = i;
+    }  
+  
+  // If it does not exist, we add it to the vector of reference particles
+  // If it exists, we add the number of new particles to this type
+  if ( !exist )
+  {
+    m_ReferenceParticles.reserve( m_ReferenceParticles.size() + 1 );
+    m_ReferenceParticles.push_back( particle );
+    m_NbRemainingParticlesToInsert.reserve( 
   	m_NbRemainingParticlesToInsert.size() + 1 );
-  m_NbRemainingParticlesToInsert.push_back( n );
-  m_nb_physical_particles_to_insert += n;
+    m_NbRemainingParticlesToInsert.push_back( n );
+  }
+  else
+  {
+    m_NbRemainingParticlesToInsert[i0] += n;
+    delete particle;
+    particle = m_ReferenceParticles[i0];
+  }
+  m_nb_physical_particles_to_insert += n;  
 }
 
 

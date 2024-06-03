@@ -720,50 +720,6 @@ void Polyhedron::write_polygonsStr_PARAVIEW( list<int>& connectivity,
   {
   
   }
-//   int ncorners = numVerts();
-//   
-//   // Tetrahedron or box or prism
-//   if ( ncorners == 4 || ncorners == 8 || 
-//   	( ncorners == 6 && m_allFaces->size() == 5 ) )
-//   {
-//     int count = firstpoint_globalnumber + 1;
-//     for (int i=0;i<ncorners;++i)
-//     {
-//       connectivity.push_back(count);
-//       ++count;
-//     }  
-//     last_offset += ncorners;
-//     offsets.push_back(last_offset);
-//     if ( ncorners == 4 ) cellstype.push_back(10);
-//     else if ( ncorners == 8 ) cellstype.push_back(12);
-//     else cellstype.push_back(13);
-//   
-//     firstpoint_globalnumber += ncorners + 1;
-//   }
-//   // Icosahedron
-//   // The icosahedron is split into 20 tetrahedrons using the center of mass and
-//   // 3 vertices on each face
-//   else if ( ncorners == 12 && m_allFaces->size() == 20 )
-//   {
-//     size_t nbface = m_allFaces->size();
-//     for (size_t i=0;i<nbface;++i)
-//     {
-//       connectivity.push_back( firstpoint_globalnumber );
-//       size_t nbv = (*m_allFaces)[i].size();
-//       for (size_t j=0;j<nbv;++j) 
-//         connectivity.push_back( firstpoint_globalnumber 
-// 		+ (*m_allFaces)[i][j] + 1 );
-//       last_offset += 4;
-//       offsets.push_back(last_offset);
-//       cellstype.push_back(10);
-//     }
-//      
-//     firstpoint_globalnumber += ncorners + 1;       
-//   }
-//   else
-//   {
-//     // General: not implemented yet !!  
-//   }
 }
 
 
@@ -795,7 +751,7 @@ void Polyhedron::write_convex_STL( ostream& f, Transform const& transform )
       for (int j=0;j<4;++j)
         FC[j] = transform((*this)[(*m_allFaces)[i][j]]); 
 	
-      // On divise la face rectangulaire en 2 triangles
+      // Divide each faces into 2 triangles
       // Triangle 0
       f << "  facet normal " << outward_normal[X]
       	<< " " << outward_normal[Y]
@@ -870,3 +826,37 @@ bool Polyhedron::isIn( Point3 const& pt ) const
   
   return ( isIn );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two polyhedrons and returns whether 
+// they match
+bool Polyhedron::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Polyhedron, we dynamically cast it to 
+  // actual type
+  Polyhedron const* other_ = dynamic_cast<Polyhedron const*>(other);
+  
+  double lmin = computeCircumscribedRadius();    
+
+  // Check the number of vertices
+  int ncorners = numVerts();  
+  bool same = ( ncorners == other_->numVerts() );
+  
+  // Check vertex coordinates
+  for (int i=0;i<ncorners && same;++i) 
+    same = ( (*this)[i].DistanceTo( (*other_)[i] ) < LOWEPS * lmin );     
+    
+  // Check face numbering
+  if ( same )
+  {
+    size_t nbface = m_allFaces->size();
+    for (size_t i=0;i<nbface;i++) 
+      for (size_t j=0;j<(*m_allFaces)[i].size();++j) 
+        same = ( (*m_allFaces)[i][j] == (*other_->m_allFaces)[i][j] );
+  }
+  
+  return ( same );
+} 
