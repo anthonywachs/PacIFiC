@@ -126,7 +126,7 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
   m_ismoving = m_kinematics.Deplacement( time, dt );
   m_ismoving = m_ismoving || b_deplaceCine_Comp;
 
-  // Deplacement du centre du composite
+  // Composite center displacement
   if ( m_ismoving && Obstacle::m_MoveObstacle ) 
   {
     Vector3 const* translation = m_kinematics.getTranslation();

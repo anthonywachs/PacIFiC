@@ -132,6 +132,9 @@ CompositeParticle::CompositeParticle( DOMNode* root, int const& pc )
 
     // Set the composite as the master particle
     m_elementaryParticles[i]->setMasterParticle( this );
+    
+    // Set its ID number
+    m_elementaryParticles[i]->setID( int(i) );
   }
 
   // Set crust thickness of the composite as the minimum of the crust
@@ -944,6 +947,9 @@ void CompositeParticle::readAdditionalFeatures( istream& fileIn )
 
     // Set the activity as the composite activity
     m_elementaryParticles[j]->setActivity( m_activity );
+    
+    // Set its ID number
+    m_elementaryParticles[j]->setID( int(j) );    
   }
 
   // Read the buffer "</ElementaryParticles>"

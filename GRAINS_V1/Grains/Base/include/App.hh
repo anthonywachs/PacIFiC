@@ -49,7 +49,7 @@ class App
     /** @brief Returns the name of the application */
     string getName() const;
     
-    /** @brief Returns whether the name of the application matches a input name
+    /** @brief Returns whether the name of the application matches an input name
     @param name_ name */
     bool isName( string const& name_ );         
     //@}

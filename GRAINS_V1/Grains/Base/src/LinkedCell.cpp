@@ -1041,8 +1041,7 @@ void LinkedCell::ComputeForces( double time, double dt,
   list<Cell*>::iterator around;
   int id[3];
 
-  for( particle=particles->begin(); particle!=particles->end();
-       particle++)
+  for (particle=particles->cbegin(); particle!=particles->cend(); particle++)
   {
     reference = *particle;
 

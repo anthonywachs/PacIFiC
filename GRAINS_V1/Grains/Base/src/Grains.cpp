@@ -1,6 +1,7 @@
 #include "Grains.hh"
 #include "ContactBuilderFactory.hh"
 #include "LinkedCell.hh"
+#include "Brownian.hh"
 #include "ObstacleBuilderFactory.hh"
 #include "ObstacleImposedVelocity.hh"
 #include "GrainsBuilderFactory.hh"
@@ -796,7 +797,7 @@ void Grains::Forces( DOMElement* rootElement )
     {
       // Gravity
       DOMNode* nGravity = ReaderXML::getNode( root, "Gravity" );
-      if( nGravity )
+      if ( nGravity )
       {
         GrainsExec::m_vgravity[X] = ReaderXML::getNodeAttr_Double(
       		nGravity, "GX" );
@@ -812,6 +813,16 @@ void Grains::Forces( DOMElement* rootElement )
         if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
 		"Gravity is mandatory !!" << endl;
         grainsAbort();
+      }
+      
+      // Brownian force
+      DOMNode* nBrownian = ReaderXML::getNode( root, "Brownian" );
+      if ( nBrownian )
+      {
+        size_t error = 0;
+	App* force = new Brownian( nBrownian, m_rank, error );
+	if ( error ) grainsAbort();
+	else m_allApp.push_back( force );
       }
     }
     else
