@@ -48,6 +48,7 @@ enum InitialAngularPosition
 enum RandomGeneratorSeed 
 {
   RGS_DEFAULT, /**< initialized to default value (i.e., 1) */
+  RGS_UDEF, /**< initialized to a user provided value */
   RGS_RANDOM /**< randomly initialized */
 };
 

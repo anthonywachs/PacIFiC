@@ -1080,19 +1080,27 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 
       // Random generator seed
       DOMNode* nRGS = ReaderXML::getNode( nInsertion, "RandomGeneratorSeed" );
+      int seed = 0;
       if ( nRGS )
       {
         string type = ReaderXML::getNodeAttr_String( nRGS, "Type" );
-	if ( type == "Random" )
+	if ( type == "UserDefined" )
+	{
+	  m_randomseed = RGS_UDEF;
+	  seed = ReaderXML::getNodeAttr_Int( nRGS, "Value" );
+	  srand( (unsigned int)( seed ) );
+	}
+	else if ( type == "Random" )
 	{
 	  m_randomseed = RGS_RANDOM;
-	  srand( (unsigned int)( time(NULL)) );
+	  srand( (unsigned int)( time(NULL) ) );
 	}
       }
       if ( m_rank == 0 ) cout << GrainsExec::m_shift9 << "Random generator"
       	" seed = " << ( m_randomseed == RGS_DEFAULT ? "Default to 1 "
-	"(infinitely reproducible)" : "Initialized with running day/time "
-	"(non-reproducible)" ) << endl;
+	"(infinitely reproducible)" : ( m_randomseed == RGS_UDEF ? 
+	"Set to "+GrainsExec::intToString( seed )+" (infinitely reproducible)" :
+	"Initialized with running day/time (non-reproducible)" ) ) << endl;
 
 
       // Insertion attempt frequency
