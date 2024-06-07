@@ -1,11 +1,11 @@
-#include "Brownian.hh"
+#include "AppBrownian.hh"
 #include "GrainsExec.hh"
 #include "GrainsBuilderFactory.hh"
 
 
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter
-Brownian::Brownian( DOMNode* root, int rank, size_t& error )
+AppBrownian::AppBrownian( DOMNode* root, int rank, size_t& error )
   : App()
   , m_mag( 0 )
 {
@@ -13,13 +13,13 @@ Brownian::Brownian( DOMNode* root, int rank, size_t& error )
   {
     m_mag = ReaderXML::getNodeAttr_Double( root, "Magnitude" );
     if ( rank == 0 ) cout << GrainsExec::m_shift6 
-    	<< "Brownian Force magnitude = " << m_mag << endl;
+    	<< "AppBrownian Force magnitude = " << m_mag << endl;
     error = 0;
   }
   else
   {
     if ( rank == 0 ) cout << GrainsExec::m_shift6 
-    	<< "Brownian Force: magnitude is mandatory!" << endl;
+    	<< "AppBrownian Force: magnitude is mandatory!" << endl;
     error = 1;  
   }  
 }
@@ -29,7 +29,7 @@ Brownian::Brownian( DOMNode* root, int rank, size_t& error )
 
 // ----------------------------------------------------------------------------
 // Destructor
-Brownian::~Brownian()
+AppBrownian::~AppBrownian()
 {}
 
 
@@ -37,7 +37,7 @@ Brownian::~Brownian()
 
 // ----------------------------------------------------------------------------
 // Computes forces and torques exerted on rigid bodies
-void Brownian::ComputeForces( double time, double dt,
+void AppBrownian::ComputeForces( double time, double dt,
   	list<Particle*> const* particles )
 {
   list<Particle*>::const_iterator particle;

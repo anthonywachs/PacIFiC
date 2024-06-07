@@ -4,6 +4,7 @@
 #include "LinkedCell.hh"
 #include "Torsor.hh"
 #include "PointC.hh"
+#include "GrainsExec.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -11,7 +12,7 @@
 CompositeObstacle::CompositeObstacle( string const& s ) :
   Obstacle( s, false )
 {
-  m_id = -4;
+  m_id = GrainsExec::m_CompositeObstacleDefaultID;
   m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
 }
 
@@ -23,7 +24,7 @@ CompositeObstacle::CompositeObstacle( string const& s ) :
 CompositeObstacle::CompositeObstacle( DOMNode* root ) :
   Obstacle( "obstacle", false )
 {
-  m_id = -4;
+  m_id = GrainsExec::m_CompositeObstacleDefaultID;
   assert( root != NULL );
 
   m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
@@ -779,21 +780,6 @@ void CompositeObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
 
 
 // ----------------------------------------------------------------------------
-// Updates the ids of the contact map: in the case of a reload with 
-// insertion, the obstacle's ids are reset. This function keeps track of that 
-// change.
-void CompositeObstacle::updateContactMapId( int prev_id, int new_id )
-{
-  cout << "Warning when calling CompositeObstacle::updateContactMapId() "
-       << "\nShould not go into this class !\n"
-       << "Need for an assistance ! Stop running !\n";
-  exit(10);
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Writes the contact map information in an array of doubles
 void CompositeObstacle::copyContactMap( double* destination, 
 	int start_index )
@@ -871,4 +857,16 @@ bool CompositeObstacle::isIn( Point3 const& pt ) const
 bool CompositeObstacle::isCompositeObstacle() const
 {
   return ( true ); 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Resets the minimum ID number of an obstacle for autonumbering */
+void CompositeObstacle::setMinIDnumber()
+{
+  list<Obstacle*>::iterator obstacle;
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+    (*obstacle)->setMinIDnumber();
 }

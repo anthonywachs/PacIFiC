@@ -39,11 +39,6 @@ class Obstacle : public Component
   public:
     /** @name Constructors */
     //@{
-    /** @brief Constructor with name and autonumbering as input parameters
-    @param s obstacle name
-    @param autonumbering obstacle autonumbering */
-    Obstacle( string const& s = "obstacle", bool const& autonumbering = true );
-
     /** @brief Destructor */
     virtual ~Obstacle();
     //@}
@@ -224,13 +219,6 @@ class Obstacle : public Component
   	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
 
-    /** @brief Updates the ids of the contact map: in the case of a reload with 
-    insertion, the obstacle's ids are reset. This function keeps track of that 
-    change.
-    @param prev_id previous id that should be updated
-    @param new_id updated id */
-    virtual void updateContactMapId( int prev_id, int new_id );
-
     /** @brief Writes the contact map information in an array of doubles
     @param destination the array of double where the contact map should be 
     stored
@@ -303,6 +291,9 @@ class Obstacle : public Component
 
     /** @brief Gets the boolean to actually move obstacles */
     static bool getMoveObstacle();
+    
+    /** @brief Returns the minimum ID number of an obstacle */
+    static int getMinIDnumber();    
     //@}
 
 
@@ -365,6 +356,9 @@ class Obstacle : public Component
     /**  @brief Outputs information to be transferred to the fluid
     @param fluid output stream */
     virtual void writePositionInFluid( ostream& fluid );
+    
+    /** @brief Resets the minimum ID number of an obstacle for autonumbering */
+    virtual void setMinIDnumber() = 0;     
     //@}
 
 
@@ -390,15 +384,28 @@ class Obstacle : public Component
     	not actually moving obstacles if set to false, useful in periodic
 	cases */
     static bool m_isConfinement; /**< true if imposed force */
-  //@}
-  
+    static int m_minID; /**< Minimum ID number, obstacle ID numbers range
+    	from -1 down to m_minID and are therefore always negative */    
+    //@}
+
+
+    /** @name Constructors */
+    //@{
+    /** @brief Constructor with name and autonumbering as input parameters
+    @param s obstacle name
+    @param autonumbering obstacle autonumbering */
+    Obstacle( string const& s, bool const& autonumbering );
+    //@}
+
   
   private:
     /** @name Constructors */
     //@{
+    /** @brief Default constructor */
+    Obstacle();
+
     /** @brief Copy constructor
-    @param copy copied Obstacle
-    @param s obstacle name */
+    @param copy copied Obstacle */
     Obstacle( Obstacle const& copy );
     //@}      
 

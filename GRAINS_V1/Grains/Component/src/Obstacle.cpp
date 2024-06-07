@@ -12,17 +12,24 @@
 int Obstacle::m_totalNbSingleObstacles = 0;
 bool Obstacle::m_MoveObstacle = true ;
 bool Obstacle::m_isConfinement = false;
+int Obstacle::m_minID = 0;
 
 
 //-----------------------------------------------------------------------------
 // Constructor with name and autonumbering as input parameters
 Obstacle::Obstacle( string const& s, bool const& autonumbering ) :
-  Component( autonumbering ),
+  Component(),
   m_name( s ),
   m_ismoving( false ),
   m_indicator( 0. ),
   m_ObstacleType ( "0" )
-{}
+{
+  if ( autonumbering )
+  {
+    Obstacle::m_minID--;
+    m_id = Obstacle::m_minID;
+  }
+}
 
 
 
@@ -491,21 +498,6 @@ void Obstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
 
 
 // ----------------------------------------------------------------------------
-// Updates the ids of the contact map: in the case of a reload with 
-// insertion, the obstacle's ids are reset. This function keeps track of that 
-// change.
-void Obstacle::updateContactMapId( int prev_id, int new_id )
-{
-  cout << "Warning when calling Obstacle::updateContactMapId() "
-       << "\nShould not go into this class !\n"
-       << "Need for an assistance ! Stop running !\n";
-  exit(10);
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Writes the contact map information in an array of doubles
 void Obstacle::copyContactMap( double* destination, int start_index )
 {
@@ -555,4 +547,14 @@ void Obstacle::printActiveNeighbors( int const& id )
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the minimum ID number of an obstacle
+int Obstacle::getMinIDnumber()
+{
+  return ( m_minID );
 }

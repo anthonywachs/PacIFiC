@@ -859,7 +859,8 @@ bool removeObstacleFromList( list<SimpleObstacle*>& pointerslist,
 // Note: back-compatibility for old pre-2024 restart files that features 
 // particles to be inserted (previously called inactive particles) is not 
 // handled.
-void AllComponents::read_pre2024( istream& fileSave, string const& filename )
+void AllComponents::read_pre2024( istream& fileSave, string const& filename,
+	GrainsMPIWrapper const* wrapper )
 {
   string buffer, readingMode ;
   int nbreParticles_, nbParticleTypes_, ParticleTag, ParticleGeomType;
@@ -989,6 +990,9 @@ void AllComponents::read_pre2024( istream& fileSave, string const& filename )
   fileSave >> buffer;
 
   assert( buffer == "</Obstacle>" );
+  
+  // Set the maximum particle ID number and minimum obstacle ID number
+  setParticleMaxIDObstacleMinID( wrapper );
 }
 
 
@@ -1252,6 +1256,8 @@ void AllComponents::read_particles( string const& filename, size_t const& npart,
     }
   }
   FILEin.close();
+  // Set the maximum particle ID number and minimum obstacle ID number
+  setParticleMaxIDObstacleMinID( wrapper ); 
 } 
 
 
@@ -2350,4 +2356,25 @@ void AllComponents::updateParticleLists( double time,
 	break;
     }
   }   
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes and sets the maximum particle ID number and minimum obstacle ID 
+// number
+void AllComponents::setParticleMaxIDObstacleMinID( 
+	GrainsMPIWrapper const* wrapper )
+{
+  list<Particle*>::iterator particle;
+  int maxID = 0;
+  for (particle=m_ActiveParticles.begin();particle!=m_ActiveParticles.end(); 
+  	particle++)
+    maxID = max( maxID, (*particle)->getID() );
+  
+  if ( wrapper ) maxID = wrapper->max_INT( maxID );
+  Particle::setMaxIDnumber( maxID );
+
+  m_obstacle->setMinIDnumber();
 }

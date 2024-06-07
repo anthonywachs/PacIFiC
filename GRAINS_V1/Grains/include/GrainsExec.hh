@@ -310,7 +310,11 @@ class GrainsExec
     static int m_return_syscmd; /**< Returned value of system command */
     static bool m_preCollision_cyl; /** precollision test w/ bounding cyls **/
     static Point3 m_defaultInactivePos; /**< Default position of inactive 
-    	particles */    
+    	particles */
+    static int m_CompositeObstacleDefaultID; /**< Default ID number of composite
+    	obstacle */ 
+    static int m_ReferenceParticleDefaultID; /**< Default ID number of reference
+    	particle */ 		    
     //@}
 
 

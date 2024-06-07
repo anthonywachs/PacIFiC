@@ -18,7 +18,7 @@ using namespace std;
 // ----------------------------------------------------------------------------
 // Constructor with name as input parameter
 SimpleObstacle::SimpleObstacle( const string &s )
-  : Obstacle( s )
+  : Obstacle( s, true )
   , m_transferToFluid( false )
 {
   m_ObstacleType = "SimpleObstacle";
@@ -33,7 +33,7 @@ SimpleObstacle::SimpleObstacle( const string &s )
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter
 SimpleObstacle::SimpleObstacle( DOMNode *root )
-  : Obstacle()
+  : Obstacle( "", true )
   , m_transferToFluid( false )
 {
   m_ObstacleType = "SimpleObstacle";
@@ -659,21 +659,19 @@ int SimpleObstacle::getContactMapSize()
 
 
 // ----------------------------------------------------------------------------
-// Updates the ids of the contact map: in the case of a reload with 
-// insertion, the obstacle's ids are reset. This function keeps track of that 
-// change.
-void SimpleObstacle::updateContactMapId( int prev_id, int new_id )
+// Displays the active neighbours in the format "my_elementary_id/neighbour_id/
+// neightbout_elementary_id ; ...". Useful for debugging only.
+void SimpleObstacle::printActiveNeighbors( int const& id )
 {
-  Component::updateContactMapId( prev_id, new_id );
+  Component::printActiveNeighbors( id );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Displays the active neighbours in the format "my_elementary_id/neighbour_id/
-// neightbout_elementary_id ; ...". Useful for debugging only.
-void SimpleObstacle::printActiveNeighbors( int const& id )
+// Resets the minimum ID number of an obstacle for autonumbering */
+void SimpleObstacle::setMinIDnumber()
 {
-  Component::printActiveNeighbors( id );
+  m_minID = min( m_minID, m_id );
 }

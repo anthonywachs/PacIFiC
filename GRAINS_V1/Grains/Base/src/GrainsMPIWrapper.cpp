@@ -1231,8 +1231,10 @@ vector< vector<double> >* GrainsMPIWrapper::
       for (int j=0; j<recvsize; j+=NB_DOUBLE_PART)
       {
         id = int(recvbuf_DOUBLE[j]);
+	// Recall that particle numbering starts from 1, thus using id - 1
+	// in the array below
 	for (int k=1;k<NB_DOUBLE_PART;k++)
-	  (*data_Global)[id][k-1] = recvbuf_DOUBLE[j+k]; 
+	  (*data_Global)[id-1][k-1] = recvbuf_DOUBLE[j+k]; 
       }	
       
       delete [] recvbuf_DOUBLE; 

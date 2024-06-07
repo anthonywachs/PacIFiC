@@ -197,13 +197,6 @@ class CompositeObstacle : public Obstacle
   	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
 
-    /** @brief Updates the ids of the contact map: in the case of a reload with 
-    insertion, the obstacle's ids are reset. This function keeps track of that 
-    change.
-    @param prev_id previous id that should be updated
-    @param new_id updated id */
-    virtual void updateContactMapId( int prev_id, int new_id );
-
     /** @brief Writes the contact map information in an array of doubles
     @param destination the array of double where the contact map should be 
     stored
@@ -234,6 +227,9 @@ class CompositeObstacle : public Obstacle
     /** @ brief Returns whether a point lies inside the composite obstacle
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+            
+    /** @brief Resets the minimum ID number of an obstacle for autonumbering */
+    virtual void setMinIDnumber();      
     //@}
 
 
@@ -308,7 +304,7 @@ class CompositeObstacle : public Obstacle
 
     /**  @brief Outputs information to be transferred to the fluid
     @param fluid output stream */
-    virtual void writePositionInFluid( ostream& fluid );
+    virtual void writePositionInFluid( ostream& fluid );  
     //@}
 
 

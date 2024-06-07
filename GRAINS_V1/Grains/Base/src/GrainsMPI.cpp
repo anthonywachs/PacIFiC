@@ -246,7 +246,7 @@ void GrainsMPI::Simulation( double time_interval )
         m_error_occured = true;
         break;
       }
-    }
+    }  
   }
 }
 
@@ -403,27 +403,7 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
 void GrainsMPI::InsertCreateNewParticles()
 {
   // IMPORTANT: for any system with N particles and M obstacles, particles are
-  // numbered 0 to N-1 and obstacles are numbered N to N+M-1
-  // In the case of reload with additional insertion, it means that obstacles
-  // are re-numbered
-
-  // Obstacle renumbering
-  list< pair<Particle*,size_t> >::iterator ipart;  
-  int numPartMax = getMaxParticleIDnumber();  
-  Component::setMaxIDnumber( numPartMax );  
-  int numInitObstacles = numPartMax;
-  for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
-    numInitObstacles += int(ipart->second);
-  list<SimpleObstacle*> lisObstaclesPrimaires =
-    	m_allcomponents.getObstacles()->getObstacles();
-  list<SimpleObstacle*>::iterator iobs;
-  int ObstacleID = numInitObstacles;
-  for (iobs=lisObstaclesPrimaires.begin();iobs!=lisObstaclesPrimaires.end();
-    	iobs++)
-  {
-    (*iobs)->setID( ObstacleID );
-    ++ObstacleID;
-  }
+  // numbered 1 to N and obstacles are numbered -1 to -M
 
   // Link all components with the grid
   m_allcomponents.Link( *m_collision );

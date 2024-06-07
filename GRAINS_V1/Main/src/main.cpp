@@ -70,8 +70,7 @@ int main( int argc, char *argv[] )
   }
 
   // Close all MPI apps
-  MPI_Finalize();
-
+  MPI_Finalize(); 
 
   return(0);
 }

@@ -181,13 +181,6 @@ class SimpleObstacle : public Obstacle
   	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
 
-    /** @brief Updates the ids of the contact map: in the case of a reload with 
-    insertion, the obstacle's ids are reset. This function keeps track of that 
-    change.
-    @param prev_id previous id that should be updated
-    @param new_id updated id */
-    void updateContactMapId( int prev_id, int new_id );
-
     /** @brief Writes the contact map information in an array of doubles
     @param destination the array of double where the contact map should be 
     stored
@@ -214,7 +207,10 @@ class SimpleObstacle : public Obstacle
     format "my_elementary_id/neighbour_id/neightbout_elementary_id ; ...". 
     Useful for debugging only.
     @param id id of this component */
-    virtual void printActiveNeighbors( int const& id );    
+    virtual void printActiveNeighbors( int const& id );
+            
+    /** @brief Resets the minimum ID number of an obstacle for autonumbering */
+    virtual void setMinIDnumber();          
     //@}
     
 

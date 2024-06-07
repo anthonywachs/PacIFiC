@@ -133,8 +133,8 @@ CompositeParticle::CompositeParticle( DOMNode* root, int const& pc )
     // Set the composite as the master particle
     m_elementaryParticles[i]->setMasterParticle( this );
     
-    // Set its ID number
-    m_elementaryParticles[i]->setID( int(i) );
+    // Set its ID number (always > 0 for particles )
+    m_elementaryParticles[i]->setID( int(i) + 1 );
   }
 
   // Set crust thickness of the composite as the minimum of the crust
@@ -250,7 +250,7 @@ CompositeParticle::CompositeParticle( CompositeParticle const& other,
     m_elementaryParticles[i] = new Particle(
       *((other.m_elementaryParticles)[i]), false );    
     m_elementaryParticles[i]->setMasterParticle( this );
-    m_elementaryParticles[i]->setID( int(i) );
+    m_elementaryParticles[i]->setID( int(i) + 1 );
   }
 
   // Initial relative positions
@@ -949,7 +949,7 @@ void CompositeParticle::readAdditionalFeatures( istream& fileIn )
     m_elementaryParticles[j]->setActivity( m_activity );
     
     // Set its ID number
-    m_elementaryParticles[j]->setID( int(j) );    
+    m_elementaryParticles[j]->setID( int(j) + 1 );    
   }
 
   // Read the buffer "</ElementaryParticles>"
@@ -1046,7 +1046,7 @@ void CompositeParticle::createSetElementaryParticles(
     m_elementaryParticles[i] = new Particle(
       *((CompParticleRef->m_elementaryParticles)[i]), false );
     m_elementaryParticles[i]->setMasterParticle( this );
-    m_elementaryParticles[i]->setID( int(i) );
+    m_elementaryParticles[i]->setID( int(i) + 1 );
   }
 
   // Initial relative positions

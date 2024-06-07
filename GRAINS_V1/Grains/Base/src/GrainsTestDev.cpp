@@ -305,7 +305,7 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
       ContactBuilderFactory::reload( simulLoad );
       if ( !b2024 )
       {
-        m_allcomponents.read_pre2024( simulLoad, restart );
+        m_allcomponents.read_pre2024( simulLoad, restart, m_wrapper );
         ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
           m_allcomponents.getReferenceParticles() );
       }

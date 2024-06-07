@@ -167,6 +167,13 @@ class Particle : public Component
     /** @brief Sets the viscosity of the surrounding fluid
     @param mu fluid viscosity */
     static void setFluidViscosity( double mu );
+
+    /** @brief Returns the maximum ID number of a particle */
+    static int getMaxIDnumber();
+    
+    /** @brief Resets the maximum ID number of a particle for autonumbering
+    @param maxID_ maximum ID number */
+    static void setMaxIDnumber( int const& maxID_ );    
     //@}
 
 
@@ -697,7 +704,9 @@ class Particle : public Component
     int m_coordination_number; /**< coordination number */
     Vector3 m_weight; /**< particle weight */
     string m_specific_composite_shape; /**< specific composite particle 
-    	shape, e.g., SpheroCylinder */  
+    	shape, e.g., SpheroCylinder */
+    static int m_maxID; /**< Maximum ID number, particle ID numbers range
+    	from 1 to m_maxID and are therefore always positive */	  
     //@}
 
 

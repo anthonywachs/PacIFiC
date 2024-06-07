@@ -1,7 +1,7 @@
 #include "Grains.hh"
 #include "ContactBuilderFactory.hh"
 #include "LinkedCell.hh"
-#include "Brownian.hh"
+#include "AppBrownian.hh"
 #include "ObstacleBuilderFactory.hh"
 #include "ObstacleImposedVelocity.hh"
 #include "GrainsBuilderFactory.hh"
@@ -600,7 +600,7 @@ void Grains::Construction( DOMElement* rootElement )
       ContactBuilderFactory::reload( simulLoad );
       if ( !b2024 )
       {
-        m_allcomponents.read_pre2024( simulLoad, restart );
+        m_allcomponents.read_pre2024( simulLoad, restart, m_wrapper );
         ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
           m_allcomponents.getReferenceParticles() );
       }
@@ -815,12 +815,12 @@ void Grains::Forces( DOMElement* rootElement )
         grainsAbort();
       }
       
-      // Brownian force
-      DOMNode* nBrownian = ReaderXML::getNode( root, "Brownian" );
-      if ( nBrownian )
+      // AppBrownian force
+      DOMNode* nAppBrownian = ReaderXML::getNode( root, "AppBrownian" );
+      if ( nAppBrownian )
       {
         size_t error = 0;
-	App* force = new Brownian( nBrownian, m_rank, error );
+	App* force = new AppBrownian( nAppBrownian, m_rank, error );
 	if ( error ) grainsAbort();
 	else m_allApp.push_back( force );
       }
@@ -1542,27 +1542,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 void Grains::InsertCreateNewParticles()
 {
   // IMPORTANT: for any system with N particles and M obstacles, particles are
-  // numbered 0 to N-1 and obstacles are numbered N to N+M-1
-  // In the case of reload with additional insertion, it means that obstacles
-  // are re-numbered
-
-  // Obstacle renumbering
-  list< pair<Particle*,size_t> >::iterator ipart;  
-  int numPartMax = getMaxParticleIDnumber();  
-  Component::setMaxIDnumber( numPartMax );  
-  int numInitObstacles = numPartMax;
-  for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
-    numInitObstacles += int(ipart->second);
-  list<SimpleObstacle*> lisObstaclesPrimaires =
-    	m_allcomponents.getObstacles()->getObstacles();
-  list<SimpleObstacle*>::iterator iobs;
-  int ObstacleID = numInitObstacles;
-  for (iobs=lisObstaclesPrimaires.begin();iobs!=lisObstaclesPrimaires.end();
-    	iobs++)
-  {
-    (*iobs)->setID( ObstacleID );
-    ++ObstacleID;
-  }
+  // numbered 1 to N and obstacles are numbered -1 to -M
 
   // Link all components with the grid
   m_allcomponents.Link( *m_collision );

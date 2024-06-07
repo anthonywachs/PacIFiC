@@ -47,6 +47,8 @@ string GrainsExec::m_inputFile;
 int GrainsExec::m_return_syscmd = 0;
 bool GrainsExec::m_preCollision_cyl = false;
 Point3 GrainsExec::m_defaultInactivePos = Point3( -1.e10 );
+int GrainsExec::m_CompositeObstacleDefaultID = 0;
+int GrainsExec::m_ReferenceParticleDefaultID = 0;
 
 
 

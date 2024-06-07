@@ -8,28 +8,21 @@
 using namespace std;
 
 
-int Component::m_nb = 0;
-int Component::m_maxID = -1;
+size_t Component::m_nb = 0;
 size_t Component::m_sizeofContactMemory = 4 * sizeof( int )
 	+ 3 * solid::Group3::m_sizeofGroup3;
 
 
 // ----------------------------------------------------------------------------
 // Default constructor
-Component::Component( bool const& autonumbering )
-  : m_materialName( "" )
+Component::Component()
+  : m_id( 0 )
+  , m_materialName( "" )
   , m_mass( 0. )
   , m_geoRBWC( NULL )
   , m_memento( NULL )
 {
-  Component::m_nb++;  
-  
-  if ( autonumbering )
-  {
-    Component::m_maxID++;
-    m_id = Component::m_maxID;
-  }
-  else m_id = -1;
+  Component::m_nb++;
 }
 
 
@@ -37,19 +30,13 @@ Component::Component( bool const& autonumbering )
 
 // ----------------------------------------------------------------------------
 // Copy constructor
-Component::Component( Component const& copy, bool const& autonumbering )
-  : m_materialName( copy.m_materialName )
+Component::Component( Component const& copy )
+  : m_id( 0 )
+  , m_materialName( copy.m_materialName )
   , m_mass( copy.m_mass )
   , m_memento( NULL )
 {
   Component::m_nb++;
-
-  if ( autonumbering )
-  {
-    Component::m_maxID++;
-    m_id = Component::m_maxID;
-  }
-  else m_id = -1;
 
   m_geoRBWC = new RigidBodyWithCrust( *copy.m_geoRBWC );
   
@@ -702,7 +689,7 @@ void Component::printActiveNeighbors(int const& id )
 void Component::copyContactMap( double* destination, int start_index )
 {
   double intTodouble = 0.1 ;
-  int nb_contacts = (int) m_contactMap.size();
+  int nb_contacts = (int) m_contactMap.size(), neighbourID;
   destination[start_index] = nb_contacts;
   start_index++;
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
@@ -713,7 +700,15 @@ void Component::copyContactMap( double* destination, int start_index )
     for (it=m_contactMap.begin();it!=m_contactMap.end();++it)
     {
       destination[start_index] = (double)get<0>(it->first) + intTodouble;
-      destination[start_index + 1] = (double)get<1>(it->first) + intTodouble;
+      // The neighbour ID can be strictly positive (particle) or strictly
+      // negative (<0), only reference particles have an ID number of 0
+      // Since we will recast these numbers into signed integers, we need to 
+      // make sure that the casting recovers the right number, therefore
+      // if >0, we do "+ intTodouble"
+      // if <0, we do "- intTodouble"
+      neighbourID = get<1>(it->first);
+      destination[start_index + 1] = neighbourID > 0 ? neighbourID 
+      	+ intTodouble : neighbourID - intTodouble;
       destination[start_index + 2] = (double)get<2>(it->first) + intTodouble;
       destination[start_index + 3] = (double)get<0>(it->second) + intTodouble;
       destination[start_index + 4] = get<1>(it->second)[0] ;
@@ -811,31 +806,6 @@ void Component::writeContactMemory2014_binary( ostream &fileOut )
 
 
 // ---------------------------------------------------------------------------
-// Updates the ids of the contact map: in the case of a reload with 
-// insertion, the obstacle's ids are reset. This function keeps track of that 
-// change.
-void Component::updateContactMapId( int prev_id, int new_id )
-{
-  map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
-    ::iterator it;
-  for(it=m_contactMap.begin();it!=m_contactMap.end();++it)
-  {
-    if (get<1>((it->first)) == prev_id)
-    {
-      copyContactInMap( std::make_tuple(get<0>(it->first),new_id,
-            get<2>(it->first)), get<0>(it->second), get<1>(it->second), 
-	    get<2>(it->second), get<3>(it->second));
-      m_contactMap.erase(std::make_tuple(get<0>(it->first),get<1>(it->first),
-            get<2>(it->first)));
-      break;
-    }
-  }
-}
-
-
-
-
-// ---------------------------------------------------------------------------
 // Set all contact map entry features to zero in all particles
 // and all elementary obstacles
 void Component::setContactMapFeaturesToZero()
@@ -920,28 +890,8 @@ void Component::setID( int const& id_ )
 
 
 // ----------------------------------------------------------------------------
-// Resets the maximum ID number of a component for autonumbering
-void Component::setMaxIDnumber( int const& maxID_ )
-{
-  m_maxID = maxID_;
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns the maximum ID number of a component
-int Component::getMaxIDnumber()
-{
-  return ( m_maxID );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns the number of created components  */
-int Component::getNbCreatedComponents()
+size_t Component::getNbCreatedComponents()
 {
   return ( m_nb );
 }

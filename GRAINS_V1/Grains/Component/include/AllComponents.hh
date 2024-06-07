@@ -363,8 +363,10 @@ class AllComponents
     //@{
     /** @brief Reloads components from an input stream
     @param fileSave input stream
-    @param filename file name corresponding to the input stream */
-    void read_pre2024( istream& fileSave, string const& filename );
+    @param filename file name corresponding to the input stream 
+    @param wrapper MPI wrapper */
+    void read_pre2024( istream& fileSave, string const& filename,
+    	GrainsMPIWrapper const* wrapper );
 	
     /** @brief Reloads reference particles and obstacles from an input stream
     @param fileSave input stream 
@@ -518,6 +520,15 @@ class AllComponents
     int m_outputTorsorObstacles_frequency; /**< frequency of force and torque on
   	obstacles output */
     //@}
+    
+    
+    /**@name Methods */
+    //@{
+    /** @brief Computes and sets the maximum particle ID number and minimum 
+    obstacle ID number
+    @param wrapper MPI wrapper */
+    void setParticleMaxIDObstacleMinID( GrainsMPIWrapper const* wrapper );    
+    //@}    
 };
 
 

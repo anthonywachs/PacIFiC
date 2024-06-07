@@ -136,13 +136,6 @@ class Component
   	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque );
 
-    /** @brief Updates the ids of the contact map: in the case of a reload with 
-    insertion, the obstacle's ids are reset. This function keeps track of that 
-    change.
-    @param prev_id previous id that should be updated
-    @param new_id updated id */
-    virtual void updateContactMapId( int prev_id, int new_id );
-
     /** @brief Writes the contact map information in an array of doubles
     @param destination the array of double where the contact map should be 
     stored
@@ -420,16 +413,9 @@ class Component
 
 
     /** @name Static methods */
-    //@{
-    /** @brief Resets the maximum ID number of a component for autonumbering
-    @param maxID_ maximum ID number */
-    static void setMaxIDnumber( int const& maxID_ );
-    
-    /** @brief Returns the maximum ID number of a component */
-    static int getMaxIDnumber();    
-
+    //@{    
     /** @brief Returns the number of created components  */
-    static int getNbCreatedComponents();
+    static size_t getNbCreatedComponents();
     //@}
 
 
@@ -453,16 +439,12 @@ class Component
   protected:
     /** @name Constructors */
     //@{
-    /** @brief Default constructor
-    @param autonumbering whether to increase the number of created components or
-    not */
-    Component( bool const& autonumbering );
+    /** @brief Default constructor */
+    Component();
 
     /** @brief Copy constructor 
-    @param copy copied Component object 
-    @param autonumbering whether to increase the number of created components or
-    not */
-    Component( Component const& copy, bool const& autonumbering );
+    @param copy copied Component object */
+    Component( Component const& copy );
     //@}
 
 
@@ -480,7 +462,9 @@ class Component
 
     /** @name Parameters */
     //@{
-    int m_id; /**< ID number */
+    int m_id; /**< ID number, particle ID numbers are always positive and
+    	obstacles ID numbes are always negative, reference particle ID number is
+    	always 0 */
     string m_materialName; /**< Material name */
     double m_mass; /**< Mass */
     RigidBodyWithCrust *m_geoRBWC; /**< geometric shape with crust */
@@ -494,8 +478,7 @@ class Component
     	particle id>, tuple<isContactActive, kt * cumulative tangential 
 	dispacement, previous normal vector, kr * cumulative rotational 
 	displacement> > */
-    static int m_nb; /**< Number of created components */
-    static int m_maxID; /**< Maximum ID number */
+    static size_t m_nb; /**< Number of created components */
     //@}
 };
 

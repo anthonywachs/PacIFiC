@@ -31,10 +31,6 @@ void ContactError::Message( ostream& fileOut ) const
 
   fileOut << "Component 0 : " << endl;
   fileOut << "  Number = " << m_id0->getMasterComponent()->getID() << endl;
-  //fileOut << "  Numero = " << id0->getID() << endl;
-//   if ( m_id0->getID() == -2 ) 
-//     fileOut << "  Numero de la particle de reference = " 
-//    	<< m_id0->getPeriodicReferenceID() << endl;
   fileOut << "  Class = ";
   if ( m_id0->getGeometricType() != -100 ) 
     fileOut << m_id0->getGeometricType() << endl;
@@ -49,12 +45,7 @@ void ContactError::Message( ostream& fileOut ) const
   fileOut << "    Norm = " << Norm( *(m_id0->getAngularVelocity()) ) << endl;
 
   fileOut << "Component 1 : " << endl;
-  fileOut << "  Numero = " << m_id1->getMasterComponent()->getID() << endl; 
-  //fileOut << "  Numero = " << id1->getID() << endl; 
-//   if ( m_id1->getID() == -2 ) 
-//     fileOut << "  Numero de la particle de reference = " 
-//    	<< m_id1->getPeriodicReferenceID() << endl
-// 	<< "  Nb de periodes = " << m_id1->getNbPeriodes() << endl;   
+  fileOut << "  Numero = " << m_id1->getMasterComponent()->getID() << endl;    
   fileOut << "  Class = ";
   if ( m_id1->getGeometricType() != -100 ) 
     fileOut << m_id1->getGeometricType() << endl;
@@ -157,9 +148,6 @@ void DisplacementError::Message( ostream& fileOut ) const
 	<< GrainsExec::doubleToString(m_time,TIMEFORMAT) << endl;
   fileOut << "Component : " << endl;
   fileOut << "  Number = " << m_id0->getID() << endl;
-//   if ( m_id0->getID() == -2 ) 
-//     fileOut << "  Numero de la particle de reference = " 
-//    	<< m_id0->getPeriodicReferenceID() << endl;
   fileOut << "  Class = ";
   if ( m_id0->getGeometricType() != -100 ) 
     fileOut << m_id0->getGeometricType() << endl;

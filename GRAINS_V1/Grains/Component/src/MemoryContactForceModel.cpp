@@ -232,8 +232,8 @@ bool MemoryContactForceModel::computeForces( Component* p0_,
 
   // In case of composite particles, we retrieve the ids of the elementary
   // components
-  int elementary_id0 = 0;
-  int elementary_id1 = 0;
+  int elementary_id0 = 1;
+  int elementary_id1 = 1;
   if ( ref_p0_->isCompositeParticle() ) elementary_id0 = p0_->getID() ;
   if ( ref_p1_->isCompositeParticle() ) elementary_id1 = p1_->getID() ;
 

@@ -17,17 +17,17 @@
 using namespace std;
 
 
-// Initialisation des attributs static
 double Particle::m_fluidDensity = 0.;
 double Particle::m_fluidViscosity = 0.;
 bool Particle::m_fluidCorrectedAcceleration = true ;
 bool Particle::m_splitExplicitAcceleration = false;
+int Particle::m_maxID = 0;
 
 
 // ----------------------------------------------------------------------------
 // Constructor with autonumbering as input parameter
 Particle::Particle( bool const& autonumbering )
-  : Component( autonumbering )
+  : Component()
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_density( 2500. )
@@ -43,7 +43,12 @@ Particle::Particle( bool const& autonumbering )
   , m_coordination_number( 0 )
   , m_specific_composite_shape( "none" )
 {
-  // Initialize inertia
+  if ( autonumbering )
+  {
+    Particle::m_maxID++;
+    m_id = Particle::m_maxID;
+  }
+
   for (int i=0; i<6; i++)
   {
     m_inertia[i] = 0.0;
@@ -57,7 +62,7 @@ Particle::Particle( bool const& autonumbering )
 // ----------------------------------------------------------------------------
 // Copy constructor (the torsor is initialized to 0)
 Particle::Particle( Particle const& other, bool const& autonumbering )
-  : Component( other, autonumbering )
+  : Component( other )
   , m_masterParticle( this )
   , m_density( other.m_density )
   , m_activity( WAIT )
@@ -73,6 +78,12 @@ Particle::Particle( Particle const& other, bool const& autonumbering )
   , m_weight( other.m_weight )
   , m_specific_composite_shape( other.m_specific_composite_shape )  
 {
+  if ( autonumbering )
+  {
+    Particle::m_maxID++;
+    m_id = Particle::m_maxID;
+  }
+
   m_kinematics = other.m_kinematics->clone();
   copy( &other.m_inertia[0], &other.m_inertia[6], &m_inertia[0] );
   copy( &other.m_inertia_1[0], &other.m_inertia_1[6], &m_inertia_1[0] );
@@ -98,7 +109,7 @@ Particle::Particle( Particle const& other, bool const& autonumbering )
 // Constructor with an XML node as an input parameter. This constructor is
 // expected to be used for reference particles
 Particle::Particle( DOMNode* root, int const& pc )
-  : Component( false )
+  : Component()
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_density( 2500. )
@@ -114,6 +125,9 @@ Particle::Particle( DOMNode* root, int const& pc )
   , m_coordination_number( 0 )
   , m_specific_composite_shape( "none" )
 {
+  // ID number is set to the reference particle default ID 
+  m_id = GrainsExec::m_ReferenceParticleDefaultID;
+  
   for (int i=0; i<6; i++)
   {
     m_inertia[i] = 0.0;
@@ -160,7 +174,7 @@ Particle::Particle( DOMNode* root, int const& pc )
 // expected to be used for reference particles
 Particle::Particle( RigidBodyWithCrust* georbwc, double const& density,
     	string const& mat, int const& pc )
-  : Component( false )
+  : Component()
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_density( 2500. )
@@ -176,6 +190,9 @@ Particle::Particle( RigidBodyWithCrust* georbwc, double const& density,
   , m_coordination_number( 0 )
   , m_specific_composite_shape( "none" )
 {
+  // ID number is set to the reference particle default ID 
+  m_id = GrainsExec::m_ReferenceParticleDefaultID;
+
   for (int i=0; i<6; i++)
   {
     m_inertia[i] = 0.0;
@@ -223,7 +240,7 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
 	ParticleActivity const& activ,
 	int const& tag_,
 	int const& coordination_number_ )
-  : Component( false )
+  : Component()
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_activity( activ )
@@ -290,7 +307,7 @@ Particle::Particle( int const& id_, Particle const* ParticleRef,
 	ParticleActivity const& activ,
      	map< std::tuple<int,int,int>,
      	std::tuple<bool, Vector3, Vector3, Vector3> > const* contactMap )
-  : Component( false )
+  : Component()
   , m_masterParticle( this )
   , m_kinematics( NULL )
   , m_activity( activ )
@@ -1859,4 +1876,24 @@ bool Particle::equalType( Particle const* other ) const
       other->m_geoRBWC->getConvex(), true ) );
 
   return ( same );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the maximum ID number of a particle
+int Particle::getMaxIDnumber()
+{
+  return ( m_maxID );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Resets the maximum ID number of a particle for autonumbering
+void Particle::setMaxIDnumber( int const& maxID_ )
+{
+  m_maxID = maxID_;
 }
