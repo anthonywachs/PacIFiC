@@ -34,8 +34,8 @@ class ObstacleKinematicsForce : public Kinematics
     /**@name Methods */
     //@{
     /** @brief Adds an imposed force load to the obstacle kinematics
-    @param chargement the imposed force load */
-    void append( ObstacleImposedForce* chargement );
+    @param oif the imposed force load */
+    void append( ObstacleImposedForce* oif );
 
     /** @brief Composes the obstacle kinematics with another "higher level"
     force kinematics
@@ -49,9 +49,9 @@ class ObstacleKinematicsForce : public Kinematics
     @param time physical time
     @param dt time step magnitude 
     @param obstacle obstacle the kinematics is related to */
-    bool Deplacement( double time, double dt, Obstacle* obstacle );	
+    bool ImposedMotion( double time, double dt, Obstacle* obstacle );	
 
-    /** @brief Returns translational displacement over dt 
+    /** @brief Returns translational motion over dt 
     @param dt time step magnitude */
     Vector3 getTranslation( double dt ) const;
 
@@ -81,7 +81,7 @@ class ObstacleKinematicsForce : public Kinematics
     	loads */
     ObstacleImposedForce* m_currentImposedForce; /**< Current imposed force 
     	load */
-    Vector3 m_translationOverTimeStep; /**< Translational displacement over 
+    Vector3 m_translationOverTimeStep; /**< Translational motion over 
     	dt */
     //@}
 };

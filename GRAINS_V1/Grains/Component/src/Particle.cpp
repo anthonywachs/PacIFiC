@@ -436,21 +436,21 @@ void Particle::Move( double time,
   double depl = m_kinematics->Move( this, dt_particle_vel, 
     	dt_particle_disp );
 
-  // Check that translational displacement is smaller than crust thickness
+  // Check that translational motion is smaller than crust thickness
   double crust = m_geoRBWC->getCrustThickness();
   if ( depl > crust )
   {
     cout << endl << "Processor = " <<
     	(GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
-	<< " has thrown an DisplacementError exception" <<  endl;
-    GrainsExec::m_exception_Displacement = true;
-    DisplacementError erreur( this, depl, crust, time );
+	<< " has thrown an MotionError exception" <<  endl;
+    GrainsExec::m_exception_Motion = true;
+    MotionError erreur( this, depl, crust, time );
     throw erreur;
   }
 
   }
-  catch (const DisplacementError&) {
-    throw DisplacementError();
+  catch (const MotionError&) {
+    throw MotionError();
   }
 }
 

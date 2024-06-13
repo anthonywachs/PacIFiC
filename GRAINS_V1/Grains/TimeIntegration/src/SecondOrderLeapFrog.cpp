@@ -40,15 +40,15 @@ TimeIntegrator* SecondOrderLeapFrog::clone() const
 // ----------------------------------------------------------------------------
 // Computes the new velocity and position at time t+dt
 void SecondOrderLeapFrog::Move( Vector3 const& dUdt, Vector3& vtrans, 
-	Vector3& transDisplacement, Vector3 const& dOmegadt,
+	Vector3& transMotion, Vector3 const& dOmegadt,
 	Vector3& vrot, Vector3& meanVRot, double const& dt_particle_vel, 
     	double const& dt_particle_disp )
 {
-  // Translational velocity and displacement
+  // Translational velocity and motion
   vtrans += dUdt * dt_particle_vel;
-  transDisplacement = vtrans * dt_particle_disp;
+  transMotion = vtrans * dt_particle_disp;
 
-  // Angular velocity and displacement
+  // Angular velocity and motion
   vrot += dOmegadt * dt_particle_vel;
   meanVRot = vrot;    
 }
@@ -61,10 +61,10 @@ void SecondOrderLeapFrog::Move( Vector3 const& dUdt, Vector3& vtrans,
 void SecondOrderLeapFrog::advanceVelocity( Vector3 const& dUdt, Vector3& vtrans,
 	Vector3 const& dOmegadt, Vector3& vrot, double const& dt_particle_vel )
 {
-  // Translational velocity and displacement
+  // Translational velocity and motion
   vtrans += dUdt * dt_particle_vel;
 
-  // Angular velocity and displacement
+  // Angular velocity and motion
   vrot += dOmegadt * dt_particle_vel;
 }
 

@@ -68,7 +68,7 @@ class MemoryContactForceModel : public ContactForceModel
     @param tij vector where the result is stored
     @param n_t eta_t, tangential damping coefficient
     @param ut tangential velocity
-    @param kdelta cumulative displacement */
+    @param kdelta cumulative motion */
     void computeTangentialVector( Vector3& tij, double n_t, const Vector3 ut,
   	const Vector3 kdelta );
     //@}

@@ -2,6 +2,7 @@
 #define _OBSTACLEIMPOSEDVELOCITY_HH_
 
 #include "Vector3.hh"
+#include "Point3.hh"
 using namespace solid;
 #include <list>
 #include <string>
@@ -49,7 +50,7 @@ class ObstacleImposedVelocity
     /**@name Methods */
     //@{
     /** @brief Returns obstacle name */
-    string getNom() const;
+    string getObstacleName() const;
 
     /** @brief Returns the remaining active time interval of the imposed motion
     @param debut simulation start time
@@ -68,23 +69,27 @@ class ObstacleImposedVelocity
   
     /** @brief Returns the translational velocity at time t 
     @param time physical time
-    @param dt time step magnitude */
-    Vector3 const* translationalVelocity( double time, double dt );
+    @param dt time step magnitude 
+    @param cg center of mass of the obstacle */
+    Vector3 const* translationalVelocity( double time, double dt, 
+    	Point3 const& cg );
 
     /** @brief Returns the angular velocity at time t 
     @param time physical time
     @param dt time step magnitude */
     Vector3 const* angularVelocity( double time, double dt );
  
-    /** @brief Returns the translational displacement over dt at time t 
+    /** @brief Returns the translational motion over dt at time t 
     @param time physical time
-    @param dt time step magnitude */
-    Vector3 translationalDisplacement( double time, double dt );  
+    @param dt time step magnitude 
+    @param cg center of mass of the obstacle */
+    Vector3 translationalMotion( double time, double dt, 
+    	Point3 const& cg );  
   
-    /** @brief Returns the angular displacement over dt at time t 
+    /** @brief Returns the angular motion over dt at time t 
     @param time physical time
     @param dt time step magnitude */  
-    Vector3 angularDisplacement( double time, double dt ); 
+    Vector3 angularMotion( double time, double dt ); 
 
     /** @brief Debug
     @param c debug message */
@@ -109,18 +114,6 @@ class ObstacleImposedVelocity
     Returns true if c0.tdebut < c1.tdebut */
     friend bool operator < ( ObstacleImposedVelocity const& c0,
 	ObstacleImposedVelocity const& c1 );
-
-    /** @brief Output operator
-    @param fileOut output stream
-    @param motion ObstacleImposedVelocity object */
-    friend ostream& operator << ( ostream& fileOut, 
-	ObstacleImposedVelocity const& motion );
-	
-    /** @brief Input operator
-    @param fileIn input stream
-    @param motion ObstacleImposedVelocity object */
-    friend istream& operator >> ( istream& fileIn, 
-	ObstacleImposedVelocity& motion );
     //@}
 
 
@@ -133,18 +126,21 @@ class ObstacleImposedVelocity
     double m_tend; /**< End time */
     Vector3 m_translationalVelocity; /**< translational velocity */
     Vector3 m_angularVelocity; /**< angular velocity */
+    bool m_rotationCenterIsCenterOfMass; /**< true if the center of rotation
+    	is the center of mass of the obstacle. In this case, there is no
+    	contribution to the translation motion, otherwise there is */
+    Point3 m_rotationCenter; /**< center of rotation */
     double m_Sin_amplitude; /**< sinusoidal velocity amplitude */
     double m_Sin_period; /**< sinusoidal velocity period */
-    double m_Sin_phase; /**< sinusoidal velocity phase shift */    
-    Vector3 m_Sin_vitRef; /**< sinusoidal velocity reference vector */  
-    double m_freqX; /**< cyclic motion frequency in x */
-    double m_freqY; /**< cyclic motion frequency in y */ 
-    double m_freqZ; /**< cyclic motion frequency in z */
-    double m_phase; /**< cyclic motion phase shift */
-    double m_ampX; /**< cyclic motion amplitude in x */
-    double m_ampY; /**< cyclic motion amplitude in y */
-    double m_ampZ; /**< cyclic motion amplitude in z */
-    Vector3 m_prev; /**< cyclic motion previous position */
+    double m_Sin_phase_shift; /**< sinusoidal velocity phase shift */    
+    Vector3 m_unit_vitRef; /**< sinusoidal (cyclic) velocity unit reference 
+    	vector */  
+    Vector3 m_SinCyclic_period; /**< sinusoidal cyclic motion period in each
+    	direction */
+    Vector3 m_SinCyclic_amplitude; /**< sinusoidal cyclic motion amplitude in 
+    	each direction */
+    Vector3 m_SinCyclic_phase_shift; /**< sinusoidal velocity phase shift in 
+    	each direction */    
     //@}
     
 

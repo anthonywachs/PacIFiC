@@ -48,7 +48,7 @@ Obstacle::~Obstacle()
 bool Obstacle::LinkImposedMotion( ObstacleImposedVelocity* imposed )
 {
   bool status = false;
-  if ( m_name == imposed->getNom() )
+  if ( m_name == imposed->getObstacleName() )
   {
     m_kinematics.append( imposed );
     status = true;
@@ -76,7 +76,7 @@ Torsor const* Obstacle::getTorsor()
 bool Obstacle::LinkImposedMotion( ObstacleImposedForce* imposed )
 {
   bool status = false;
-  if ( m_name == imposed->getNom() )
+  if ( m_name == imposed->getObstacleName() )
   {
     m_confinement.append( imposed );
     Obstacle::m_isConfinement = status = true;
@@ -278,7 +278,7 @@ void Obstacle::setMoveObstacle( bool const& depObs )
 
 
 // ----------------------------------------------------------------------------
-// Deplacement geometrique des obstacles
+// Geometric motion of obstacles
 bool Obstacle::getMoveObstacle()
 {
   return ( Obstacle::m_MoveObstacle ) ;
@@ -483,7 +483,7 @@ void Obstacle::addNewContactInMap( std::tuple<int,int,int> const& id,
 
 
 // ----------------------------------------------------------------------------
-// Increases cumulative tangential displacement with component id
+// Increases cumulative tangential motion with component id
 void Obstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
   	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque )

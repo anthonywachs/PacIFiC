@@ -53,13 +53,13 @@ class Obstacle : public Component
     /** @brief Moves the obstacle and returns a list of moved obstacles
     @param time physical time
     @param dt time step magnitude
-    @param b_deplaceCine_Comp whether to move the composite that the obstacle
-    belongs to (imposed velocity)
-    @param b_deplaceF_Comp whether to move the composite that the obstacle
-    belongs to (imposed force) */
+    @param motherCompositeHasImposedVelocity whether the composite that the 
+    obstacle belongs to has a non-zero imposed velocity
+    @param motherCompositeHasImposedForce whether the composite that the 
+    obstacle belongs to has a non-zero imposed force */
     virtual list<SimpleObstacle*> Move( double time,
-	double dt, bool const& b_deplaceCine_Comp,
-        bool const& b_deplaceF_Comp ) = 0;
+	double dt, bool const& motherCompositeHasImposedVelocity,
+        bool const& motherCompositeHasImposedForce ) = 0;
 
     /** @brief Returns a pointer to the obstacle if the name matches
     @param nom_ obstacle name */
@@ -74,7 +74,7 @@ class Obstacle : public Component
     obstacle) */
     virtual list<Obstacle*> getObstaclesToFluid() = 0;
 
-    /** @brief Rotates the obstacle with a quaternion
+    /** @brief Rotates the obstacle with a quaternion about its center of mass
     @param rotation the quaternion defining the rotation */
     virtual void Rotate( Quaternion const& rotation ) = 0;
 
@@ -94,6 +94,9 @@ class Obstacle : public Component
 
     /** @brief Returns obstacle type */
     virtual string getObstacleType() = 0;
+    
+    /** @brief Computes center of mass position */
+    virtual pair<Point3,double> computeCenterOfMass() = 0;    
     //@}
 
 
@@ -207,7 +210,7 @@ class Obstacle : public Component
   	Vector3 const& cumulSpringTorque );
 
     /** @brief Stores memory of the contact with component id: increase 
-    cumulative tangential displacement and cumulative spring torque, remember 
+    cumulative tangential motion and cumulative spring torque, remember 
     contact normal.
     @param id key in the map
     @param kdelta kt * delta_t vector
@@ -396,7 +399,7 @@ class Obstacle : public Component
     @param autonumbering obstacle autonumbering */
     Obstacle( string const& s, bool const& autonumbering );
     //@}
-
+    
   
   private:
     /** @name Constructors */

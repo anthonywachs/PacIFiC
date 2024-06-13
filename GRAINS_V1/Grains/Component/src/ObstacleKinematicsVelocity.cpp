@@ -27,17 +27,16 @@ ObstacleKinematicsVelocity::~ObstacleKinematicsVelocity()
 
 // ----------------------------------------------------------------------------
 // Adds an imposed velocity motion to the obstacle kinematics
-void ObstacleKinematicsVelocity::append( ObstacleImposedVelocity* chargement )
+void ObstacleKinematicsVelocity::append( ObstacleImposedVelocity* oiv )
 {
   if ( m_imposedVelocities.empty( ))
-    m_imposedVelocities.push_back( chargement );
+    m_imposedVelocities.push_back( oiv );
   else 
   {
     list<ObstacleImposedVelocity*>::iterator c;
     for (c=m_imposedVelocities.begin(); 
-    	c!=m_imposedVelocities.end() && **c<*chargement; c++)
-      {}
-    m_imposedVelocities.insert( c, chargement );
+    	c!=m_imposedVelocities.end() && **c<*oiv; c++) {}
+    m_imposedVelocities.insert( c, oiv );
   }
 }
 
@@ -48,11 +47,10 @@ void ObstacleKinematicsVelocity::append( ObstacleImposedVelocity* chargement )
 // Deletes all imposed motions
 void ObstacleKinematicsVelocity::clearAndDestroy()
 {
-  list<ObstacleImposedVelocity*>::iterator chargement;
+  list<ObstacleImposedVelocity*>::iterator il;
 
-  for (chargement=m_imposedVelocities.begin(); 
-       chargement!=m_imposedVelocities.end(); chargement++) 
-    delete *chargement;
+  for (il=m_imposedVelocities.begin(); il!=m_imposedVelocities.end(); il++) 
+    delete *il;
 
   m_imposedVelocities.clear();
 }
@@ -66,27 +64,12 @@ void ObstacleKinematicsVelocity::clearAndDestroy()
 void ObstacleKinematicsVelocity::Compose( 
 	ObstacleKinematicsVelocity const& other, 
     	Vector3 const& lever )
-{
-  Matrix mat( other.m_QuaternionRotationOverDt );
-  Vector3 rota = other.m_rotationOverTimeStep;
-  double  d = Norm(rota);
-
-  if ( d != 0. ) 
-  {
-    Vector3 vect = ( sin( d / 2.) / d ) * rota;
-    m_QuaternionRotationOverDt = Quaternion( vect, cos( d / 2. ) );
-  }
-  else 
-    m_QuaternionRotationOverDt = Quaternion( 0., 0., 0., 1. );
-  
-  // Pour des composites de composites de ... etc, vérifier
-  // que l'écriture correcte ne serait pas:
-  // m_rotationOverTimeStep += voisine.m_rotationOverTimeStep;
-  // pour conserver l'aspect récursif
-  // A discuter avec Gilles
-  m_rotationOverTimeStep = other.m_rotationOverTimeStep;
+{  
+  m_rotationOverTimeStep += other.m_rotationOverTimeStep;
+  m_QuaternionRotationOverDt = 
+  	other.m_QuaternionRotationOverDt * m_QuaternionRotationOverDt;
   m_translationOverTimeStep = other.m_translationOverTimeStep 
-  	+ ( ( mat * lever ) - lever );
+  	+ ( other.m_QuaternionRotationOverDt.rotateVector( lever ) - lever );
 	
   m_angularVelocity += other.m_angularVelocity;
   m_translationalVelocity += other.m_translationalVelocity 
@@ -97,40 +80,40 @@ void ObstacleKinematicsVelocity::Compose(
 
 
 // ----------------------------------------------------------------------------
-// Returns whether the obstacle moved from t to t+dt
-bool ObstacleKinematicsVelocity::Deplacement( double time, double dt )
+// Updates the obstacle translational and angular velocity at time t
+// and translational and angular motion from t to t+dt and returns whether the 
+// obstacle moved from t to t+dt
+bool ObstacleKinematicsVelocity::ImposedMotion( double time, double dt, 
+	Point3 const& cg )
 {
   Vector3 depl, rota, vt, vr;
+  Quaternion qrot;
 
-  // Chargements de l'obstacle
-  list<ObstacleImposedVelocity*>::iterator chargement;
-  for (chargement=m_imposedVelocities.begin(); 
-  	chargement!=m_imposedVelocities.end();chargement++) 
-    if ( (*chargement)->isActif(time, dt) ) 
+  // Imposed kinematics
+  list<ObstacleImposedVelocity*>::iterator il;
+  for (il=m_imposedVelocities.begin();il!=m_imposedVelocities.end();il++) 
+    if ( (*il)->isActif( time, dt ) ) 
     {
-      depl += (*chargement)->translationalDisplacement( time, dt ); 
-      rota += (*chargement)->angularDisplacement( time, dt );
-      vt += *(*chargement)->translationalVelocity( time, dt );
-      vr += *(*chargement)->angularVelocity( time, dt );      
+      depl += (*il)->translationalMotion( time, dt, cg ); 
+      rota += (*il)->angularMotion( time, dt );
+      vt += *(*il)->translationalVelocity( time, dt, cg );
+      vr += *(*il)->angularVelocity( time, dt );      
     } 
 
+  // Rotation quaternion over dt
   double d = Norm( rota );
   if ( d != 0. ) 
   {
-    Vector3 vect = ( sin( d /2. ) / d ) * rota;
-    m_QuaternionRotationOverDt = Quaternion( vect, cos( d / 2. ) );
+    Vector3 vect = ( sin( d / 2. ) / d ) * rota;
+    qrot.setQuaternion( vect, cos( d / 2. ) );
   }
 
-  // Sur le pas de time, le mouvement de l'obstacle correspond à celui du
-  // composite dont il fait partie plus son mouvement propre
-  // Si le composite dont il fait partie n'a pas de mouvement imposé, 
-  // m_translationOverTimeStep et m_rotationOverTimeStep sont mis à 0 par
-  // la méthode ObstacleKinematicsVelocity::Compose et seuls les chargements 
-  // propres de
-  // l'obstacle sont pris en compte, ce qui justifie l'utilisation du +=  
+  // The obstacle motion is the sum of its own and that of the composite
+  // obstacle it belongs. The motion of the composite obstcale it belongs
+  // to is added by the Compose method 
   m_translationOverTimeStep += depl;
-  m_rotationOverTimeStep += rota;
-  
+  m_rotationOverTimeStep += rota; 
+  m_QuaternionRotationOverDt = qrot * m_QuaternionRotationOverDt;   
   m_angularVelocity += vr;
   m_translationalVelocity += vt; 
 
@@ -187,6 +170,7 @@ void ObstacleKinematicsVelocity::reset()
 {
   m_translationOverTimeStep = 0.;
   m_rotationOverTimeStep = 0.;
+  m_QuaternionRotationOverDt.setQuaternion( 0., 0., 0., 1. );
   m_translationalVelocity = 0.;
   m_angularVelocity = 0.;
 }
@@ -195,7 +179,7 @@ void ObstacleKinematicsVelocity::reset()
 
 
 // ----------------------------------------------------------------------------
-// Sets the velocity and displacement using another velocity kinematics
+// Sets the velocity and motion using another velocity kinematics
 void ObstacleKinematicsVelocity::set( ObstacleKinematicsVelocity& kine_ )
 {
   m_translationOverTimeStep = kine_.m_translationOverTimeStep;
@@ -230,51 +214,16 @@ Vector3 ObstacleKinematicsVelocity::Velocity( Vector3 const& om ) const
 
 
 // ----------------------------------------------------------------------------
-// Output operator
-ostream& operator << ( ostream& fileOut, 
-    	ObstacleKinematicsVelocity const& kine_ )
-{
-  fileOut << "*ObstacleKinematicsVelocity\n";
-  fileOut << kine_.m_translationOverTimeStep;
-   fileOut << "*Chargement\n";
-  fileOut << kine_.m_imposedVelocities.size() << '\n';
-  list<ObstacleImposedVelocity*>::const_iterator chargement;
-  for (chargement=kine_.m_imposedVelocities.begin(); 
-       chargement!=kine_.m_imposedVelocities.end(); chargement++)
-    fileOut << **chargement;
-
- return ( fileOut );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Input operator
-istream& operator >> ( istream& fileIn, ObstacleKinematicsVelocity& kine_ )
-{
-  string cle;
-  fileIn >> cle;
-  fileIn >> kine_.m_translationOverTimeStep;
-
-  return ( fileIn );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns whether there is an active angular motion imposed from t to t+dt
 bool ObstacleKinematicsVelocity::activAngularMotion( double time, double dt ) 
 	const
 {
   bool rotation = false ;
-  list<ObstacleImposedVelocity*>::const_iterator chargement;
-  for (chargement=m_imposedVelocities.begin(); 
-  	chargement!=m_imposedVelocities.end() && !rotation; chargement++)
-    if ( (*chargement)->isActif( time, dt ) &&
-    	( (*chargement)->getType() == "Rotation" ||
-	(*chargement)->getType() == "RotationSinusoidale" ) ) rotation = true;
+  list<ObstacleImposedVelocity*>::const_iterator il;
+  for (il=m_imposedVelocities.cbegin(); 
+  	il!=m_imposedVelocities.cend() && !rotation; il++)
+    if ( (*il)->isActif( time, dt ) && ( (*il)->getType() == "Rotation" ) ) 
+      rotation = true;
   
   return ( rotation ); 
 }

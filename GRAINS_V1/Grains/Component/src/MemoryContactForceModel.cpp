@@ -75,7 +75,7 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
 {
   Point3 geometricPointOfContact = contactInfos.getContact();
   Vector3 penetration = contactInfos.getOverlapVector();
-  Vector3 *pkdelta = NULL; // previous vector ks * tangential displacement
+  Vector3 *pkdelta = NULL; // previous vector ks * tangential motion
   Vector3 *pprev_normal = NULL; // previous vector normal to the contact plane
   Vector3 *pspringRotFriction = NULL; // previous rolling friction spring-torque
   Vector3 tij = Vector3(0.); // tangential vector (lives in the contact plane)
@@ -135,7 +135,7 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   // Tangential viscous dissipative force
   Vector3 viscousFT = v_t * ( -muet * 2.0 * avmass );
 
-  // Retrieve the previous cumulative displacement (if the contact does not 
+  // Retrieve the previous cumulative motion (if the contact does not 
   // exist we create it)
   bool contact_existed;
   contact_existed = p0_->getContactMemory( idmap0, pkdelta, pprev_normal,
@@ -161,7 +161,7 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
     delFT = Norm(-*pkdelta + viscousFT) * tij ;
   else 
   {
-    // Otherwise, we modify the cumulative tangential displacement and replace
+    // Otherwise, we modify the cumulative tangential motion and replace
     // the tangential force by the Coulomb limit
     *pkdelta = - muec * normFN * tij + viscousFT;
     delFT = muec * normFN * tij ;
@@ -203,7 +203,7 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   }
   else delM = Vector3(0.);
 
-  // Finally, we update the cumulative displacements in component p1_
+  // Finally, we update the cumulative motions in component p1_
   // If contact_existed was false, it also creates the contact in p1_
   p1_->addDeplContactInMap( idmap1,
     -*pkdelta, -normal, -*pspringRotFriction );

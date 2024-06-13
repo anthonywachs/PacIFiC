@@ -65,34 +65,34 @@ class ContactError
 
 
 
-/** @brief The class DisplacementError.
+/** @brief The class MotionError.
 
-    To manage displacement errors as exceptions.
+    To manage motion errors as exceptions.
 
     @author GRAINS Project - IFP - 2007
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
-class DisplacementError
+class MotionError
 {
   public:
     /** @name Constructors */
     //@{
     /** @brief Constructor with input parameters
     @param id0_ component
-    @param depl component displacement
-    @param deplMax maximum displacement allowed
+    @param depl component motion
+    @param deplMax maximum motion allowed
     @param time_ physical time */
-    DisplacementError( Component* id0_, double depl, double deplMax,
+    MotionError( Component* id0_, double depl, double deplMax,
   	double time_ );
 
     /** @name Contructors */
     //@{
     /** @brief Default constructor (forbidden) */
-    DisplacementError();
+    MotionError();
     //@}
 
     /** @brief Destructor */
-    ~DisplacementError();
+    ~MotionError();
     //@}
 
 
@@ -102,7 +102,7 @@ class DisplacementError
     @param fileOut output stream */
     void Message( ostream& fileOut ) const;
 
-    /** @brief Returns the pointer to the component involved in the displacement
+    /** @brief Returns the pointer to the component involved in the motion
     error in a list for further post-processing */
     list<Component*> getComponent();
     //@}
@@ -112,8 +112,8 @@ class DisplacementError
     /** @name Parameters */
     //@{
     Component *m_id0; /**< Component */
-    double m_depl; /**< Component displacement */
-    double m_deplMax; /**< Maximum displacement allowed */
+    double m_depl; /**< Component motion */
+    double m_deplMax; /**< Maximum motion allowed */
     double m_time; /**< physical time */
     //@}
 };

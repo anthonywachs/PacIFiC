@@ -82,7 +82,7 @@ class Component
     @param voisin the other component */
     virtual bool isCloseWithCrust( Component const* voisin ) const;
 
-    /** @brief Rotates the component using a quaternion
+    /** @brief Rotates the component using a quaternion about its center of mass
     @param rotation quaternion representing the rotation */
     virtual void Rotate( Quaternion const& rotation );
 
@@ -124,7 +124,7 @@ class Component
   	Vector3 const& cumulSpringTorque );
 
     /** @brief Stores memory of the contact with component id: increase 
-    cumulative tangential displacement and cumulative spring torque, remember 
+    cumulative tangential motion and cumulative spring torque, remember 
     contact normal.
     @param id key in the map
     @param kdelta kt * delta_t vector
@@ -477,7 +477,7 @@ class Component
     	map<tuple<own elementary particle id, neighbour id, neighbour elementary
     	particle id>, tuple<isContactActive, kt * cumulative tangential 
 	dispacement, previous normal vector, kr * cumulative rotational 
-	displacement> > */
+	motion> > */
     static size_t m_nb; /**< Number of created components */
     //@}
 };

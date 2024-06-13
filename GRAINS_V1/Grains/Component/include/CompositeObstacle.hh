@@ -90,13 +90,13 @@ class CompositeObstacle : public Obstacle
     obstacles
     @param time physical time
     @param dt time step magnitude
-    @param b_deplaceCine_Comp whether to move the composite that the composite 
-    obstacle belongs to (imposed velocity)
-    @param b_deplaceF_Comp whether to move the composite that the composite 
-    obstacle belongs to (imposed force) */
+    @param motherCompositeHasImposedVelocity whether the composite that the 
+    obstacle belongs to has a non-zero imposed velocity
+    @param motherCompositeHasImposedForce whether the composite that the 
+    obstacle belongs to has a non-zero imposed force */
     list<SimpleObstacle*> Move( double time,
-	double dt, bool const& b_deplaceCine_Comp, 
-        bool const& b_deplaceF_Comp ) ;
+	double dt, bool const& motherCompositeHasImposedVelocity, 
+        bool const& motherCompositeHasImposedForce ) ;
 
     /** @brief Returns whether the component is a composite obstacle ? */
     virtual bool isCompositeObstacle() const;
@@ -125,7 +125,8 @@ class CompositeObstacle : public Obstacle
     /** @brief Resets kinematics to 0 */
     void resetKinematics();
 
-    /** @brief Rotates the composite obstacle with a quaternion
+    /** @brief Rotates the composite obstacle with a quaternion about its 
+    center of mass. Warning: This method is not defined and must not be called
     @param rotation the quaternion defining the rotation */
     void Rotate( Quaternion const& rotation ) ;
 
@@ -185,7 +186,7 @@ class CompositeObstacle : public Obstacle
   	Vector3 const& cumulSpringTorque );
 
     /** @brief Stores memory of the contact with component id: increase 
-    cumulative tangential displacement and cumulative spring torque, remember 
+    cumulative tangential motion and cumulative spring torque, remember 
     contact normal.
     @param id key in the map
     @param kdelta kt * delta_t vector
@@ -312,8 +313,9 @@ class CompositeObstacle : public Obstacle
     /** @name Methods */
     //@{  
     /** @brief Computes center of mass position */
-    void EvalPosition();
+    pair<Point3,double> computeCenterOfMass();
     //@}
+    
 
     /** @name Parameters */
     //@{  

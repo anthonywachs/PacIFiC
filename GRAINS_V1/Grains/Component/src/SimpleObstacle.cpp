@@ -90,41 +90,49 @@ void SimpleObstacle::append( Obstacle* obstacle )
 // ----------------------------------------------------------------------------
 // Moves the simple obstacle and returns a list of moved obstacles (here itself)
 list<SimpleObstacle*> SimpleObstacle::Move( double time,
-	double dt, bool const& b_deplaceCine_Comp,
-        bool const& b_deplaceF_Comp )
+	double dt, bool const& motherCompositeHasImposedVelocity,
+        bool const& motherCompositeHasImposedForce )
 {
+  list<SimpleObstacle*> movingObstacles;
 
-  m_ismoving = m_kinematics.Deplacement( time, dt );
-  m_ismoving = m_ismoving || b_deplaceCine_Comp;
+  // Updates the obstacle translational and angular velocity at time t and 
+  // translational and angular motion from t to t+dt and returns whether the 
+  // obstacle moved from t to t+dt
+  m_ismoving = m_kinematics.ImposedMotion( time, dt, *m_geoRBWC->getCentre() );
+  
+  // Check whether the composite obstacle it belongs to has an imposed velocity  
+  m_ismoving = m_ismoving || motherCompositeHasImposedVelocity;
 
+  // Obstacle motion
   if ( m_ismoving && Obstacle::m_MoveObstacle )
   {
     Vector3 const* translation = m_kinematics.getTranslation();
     m_geoRBWC->composeLeftByTranslation( *translation );
     Quaternion const* w = m_kinematics.getQuaternionRotationOverDt();
-    Rotate(*w);
+    Rotate( *w );
   }
 
-  bool deplaceF = m_confinement.Deplacement( time, dt, this );
-  deplaceF = deplaceF || b_deplaceF_Comp;
+//   bool deplaceF = m_confinement.ImposedMotion( time, dt, this );
+//   deplaceF = deplaceF || motherCompositeHasImposedForce;
+// 
+//   if ( deplaceF && Obstacle::m_MoveObstacle )
+//   {
+//     Vector3 translation = m_confinement.getTranslation( dt );
+//     m_geoRBWC->composeLeftByTranslation( translation );
+//     //    Quaternion w = cinematique.getRotation(dt);
+//     //    Rotate(w);
+//   }
+//   m_ismoving = m_ismoving || deplaceF;
 
-  if ( deplaceF && Obstacle::m_MoveObstacle )
-  {
-    Vector3 translation = m_confinement.getTranslation( dt );
-    m_geoRBWC->composeLeftByTranslation( translation );
-    //    Quaternion w = cinematique.getRotation(dt);
-    //    Rotate(w);
-  }
-  m_ismoving = m_ismoving || deplaceF;
-
-  list<SimpleObstacle*> obstacleEnDeplacement;
+  // If the obstacle moved, add it to the list of moving obstacles and 
+  // updates its boundind box
   if ( m_ismoving )
   {
     m_obstacleBox = Component::BoundingBox();
-    obstacleEnDeplacement.push_back( this );
+    movingObstacles.push_back( this );
   }
 
-  return ( obstacleEnDeplacement );
+  return ( movingObstacles );
 }
 
 
@@ -590,7 +598,7 @@ void SimpleObstacle::updateContactMap()
 
 // ----------------------------------------------------------------------------
 // Does the contact exist in the map, if yes return the pointer to the
-// cumulative tangential displacement
+// cumulative tangential motion
 bool SimpleObstacle::getContactMemory( std::tuple<int,int,int> const& id,
   Vector3* &tangent, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
   bool createContact)
@@ -615,7 +623,7 @@ void SimpleObstacle::addNewContactInMap( std::tuple<int,int,int> const& id,
 
 
 // ----------------------------------------------------------------------------
-// Increases cumulative tangential displacement with component id
+// Increases cumulative tangential motion with component id
 void SimpleObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
   Vector3 const& tangent, Vector3 const& prev_normal,
   Vector3 const& cumulSpringTorque )
@@ -674,4 +682,14 @@ void SimpleObstacle::printActiveNeighbors( int const& id )
 void SimpleObstacle::setMinIDnumber()
 {
   m_minID = min( m_minID, m_id );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes center of mass position
+pair<Point3,double> SimpleObstacle::computeCenterOfMass()
+{
+  return( pair<Point3,double>( *(getPosition()), getVolume() ) );
 }

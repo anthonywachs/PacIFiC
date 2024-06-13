@@ -1834,7 +1834,7 @@ void ParaviewPostProcessingWriter::writePVTU_Paraview( string const& filename,
 
 
 // ----------------------------------------------------------------------------
-// Writes components involved in a displacement or a contact error
+// Writes components involved in a motion or a contact error
 void ParaviewPostProcessingWriter::writeErreurComponentsPostProcessing(
 	string const& filename,
   	list<Component*> const& errcomposants )

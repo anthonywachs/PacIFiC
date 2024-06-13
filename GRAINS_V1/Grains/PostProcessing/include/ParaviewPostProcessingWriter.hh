@@ -101,7 +101,7 @@ class ParaviewPostProcessingWriter : public PostProcessingWriter
     @param cycle0 initial cycle number */
     void setInitialCycleNumber( const int& cycle0 );
 
-    /** @brief Writes components involved in a displacement or a contact error
+    /** @brief Writes components involved in a motion or a contact error
     @param filename file root name
     @param errcomposants list of the 2 components invovled */
     void writeErreurComponentsPostProcessing( string const& filename,

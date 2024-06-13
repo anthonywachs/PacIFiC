@@ -93,7 +93,7 @@ class PostProcessingWriter
     /** @brief Gets the post-processing writer type */
     virtual string getPostProcessingWriterType() const = 0;
   
-    /** @brief Writes components involved in a displacement or a contact error
+    /** @brief Writes components involved in a motion or a contact error
     @param filename file root name
     @param errcomposants list of the 2 components invovled */
     virtual void writeErreurComponentsPostProcessing( string const& filename,

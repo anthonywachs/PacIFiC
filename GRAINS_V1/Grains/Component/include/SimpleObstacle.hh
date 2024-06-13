@@ -82,13 +82,13 @@ class SimpleObstacle : public Obstacle
     obstacles (here itself)
     @param time physical time
     @param dt time step magnitude
-    @param b_deplaceCine_Comp whether to move the composite that the composite
-    obstacle belongs to (imposed velocity)
-    @param b_deplaceF_Comp whether to move the composite that the composite
-    obstacle belongs to (imposed force) */
+    @param motherCompositeHasImposedVelocity whether the composite that the 
+    obstacle belongs to has a non-zero imposed velocity
+    @param motherCompositeHasImposedForce whether the composite that the 
+    obstacle belongs to has a non-zero imposed force */
     virtual list<SimpleObstacle*> Move( double time,
-	double dt, bool const& b_deplaceCine_Comp,
-        bool const& b_deplaceF_Comp ) ;
+	double dt, bool const& motherCompositeHasImposedVelocity,
+        bool const& motherCompositeHasImposedForce ) ;
 
     /** @brief Contact between a simple obstacle and a component. If contact
     exists, computes the contact force and torque and adds to each component
@@ -169,7 +169,7 @@ class SimpleObstacle : public Obstacle
   	Vector3 const& cumulSpringTorque );
 
     /** @brief Stores memory of the contact with component id: increase 
-    cumulative tangential displacement and cumulative spring torque, remember 
+    cumulative tangential motion and cumulative spring torque, remember 
     contact normal.
     @param id key in the map
     @param kdelta kt * delta_t vector
@@ -302,6 +302,13 @@ class SimpleObstacle : public Obstacle
     	the linked-cell grid */
     bool m_transferToFluid; /**< whether to transfer the obstacle to the fluid
   	solver or not in case of coupling to a fluid solver */
+    //@}
+
+
+    /** @name Methods */
+    //@{  
+    /** @brief Computes center of mass position */
+    pair<Point3,double> computeCenterOfMass();
     //@}
 
 

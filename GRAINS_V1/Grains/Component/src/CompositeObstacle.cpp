@@ -38,7 +38,7 @@ CompositeObstacle::CompositeObstacle( DOMNode* root ) :
     obstacle = ObstacleBuilderFactory::create( allObstacles->item( i ) );
     m_obstacles.push_back(obstacle);
   }
-  EvalPosition();
+  computeCenterOfMass();
 }
 
 
@@ -76,7 +76,7 @@ void CompositeObstacle::append( Obstacle* obstacle )
 bool CompositeObstacle::LinkImposedMotion( ObstacleImposedVelocity* imposed )
 {
   bool status = false;
-  if ( m_name == imposed->getNom() ) 
+  if ( m_name == imposed->getObstacleName() ) 
   {
     m_kinematics.append( imposed );
     status = true;
@@ -100,7 +100,7 @@ bool CompositeObstacle::LinkImposedMotion( ObstacleImposedVelocity* imposed )
 bool CompositeObstacle::LinkImposedMotion( ObstacleImposedForce* imposed )
 {
   bool status = false;
-  if ( m_name == imposed->getNom() ) 
+  if ( m_name == imposed->getObstacleName() ) 
   {
     m_confinement.append( imposed );
     status = true;
@@ -121,56 +121,69 @@ bool CompositeObstacle::LinkImposedMotion( ObstacleImposedForce* imposed )
 // ----------------------------------------------------------------------------
 // Moves the composite obstacle and returns a list of moved obstacles
 list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt, 
-	bool const& b_deplaceCine_Comp, 
-        bool const& b_deplaceF_Comp )
+	bool const& motherCompositeHasImposedVelocity, 
+        bool const& motherCompositeHasImposedForce )
 {
-  m_ismoving = m_kinematics.Deplacement( time, dt );
-  m_ismoving = m_ismoving || b_deplaceCine_Comp;
+  list<Obstacle*>::iterator obstacle;
+  list<SimpleObstacle*> movingObstacles;
+  list<SimpleObstacle*>::iterator ilo; 
+  bool imposedForce = false;   
 
-  // Composite center displacement
+  // Updates the obstacle translational and angular velocity at time t and 
+  // translational and angular motion from t to t+dt and returns whether the 
+  // obstacle moved from t to t+dt
+  m_ismoving = m_kinematics.ImposedMotion( time, dt, *m_geoRBWC->getCentre() );
+  
+  // Check whether the composite obstacle it belongs to has an imposed velocity
+  m_ismoving = m_ismoving || motherCompositeHasImposedVelocity;
+
+  // Composite center motion
   if ( m_ismoving && Obstacle::m_MoveObstacle ) 
   {
+    // Translation motion
     Vector3 const* translation = m_kinematics.getTranslation();
     m_geoRBWC->composeLeftByTranslation( *translation );
-    /* Rotation non utilisee pour le centre du composite.
-      Quaternion w = cinematique.getQuaternionRotationOverDt();
-      Rotate(w);
-    */
+
+    // Angular motion
+    Quaternion const* w = m_kinematics.getQuaternionRotationOverDt();
+    m_geoRBWC->Rotate( *w );
   }
+  
+  // Updated center of the composite
   Point3 centre = *getPosition();
 
-  // Deplacement des obstacles
-  list<Obstacle*>::iterator obstacle;
+  // Apply the composite imposed motion to its elementary obstacles
   if ( m_ismoving ) 
   {
-    Vector3 levier;
+    Vector3 lever;
     for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
     {
-      levier = *(*obstacle)->getPosition() - centre;
-      (*obstacle)->Compose( m_kinematics, levier );
+      lever = *(*obstacle)->getPosition() - centre;
+      (*obstacle)->Compose( m_kinematics, lever );
     }
   }
-  
-  
-  bool deplaceF = m_confinement.Deplacement( time, dt, this );
-  deplaceF = deplaceF || b_deplaceF_Comp;    
-  
-  if ( deplaceF ) 
-    for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
-      (*obstacle)->Compose( m_confinement, *(*obstacle)->getPosition() );
 
-  m_ismoving = m_ismoving || deplaceF; // ??? demander à Gillos !!
+      
+//   bool deplaceF = m_confinement.ImposedMotion( time, dt, this );
+//   deplaceF = deplaceF || motherCompositeHasImposedForce;    
+//   
+//   if ( deplaceF ) 
+//     for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
+//       (*obstacle)->Compose( m_confinement, *(*obstacle)->getPosition() );
+// 
+//   m_ismoving = m_ismoving || deplaceF; // ??? demander à Gillos !!
 
-  list<SimpleObstacle*> obstacleEnDeplacement;
-  list<SimpleObstacle*>::iterator ilo;     
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) {
+  
+  // Finally, move the elementary obstacles     
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+  {
     list<SimpleObstacle*> lod = (*obstacle)->Move( time, dt, m_ismoving, 
-    	deplaceF );
+    	imposedForce );
     for (ilo=lod.begin();ilo!=lod.end();ilo++) 
-      obstacleEnDeplacement.push_back(*ilo);
+      movingObstacles.push_back(*ilo);
   }
   
-  return ( obstacleEnDeplacement );
+  return ( movingObstacles );
 }
 
 
@@ -178,19 +191,33 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
 
 // ----------------------------------------------------------------------------
 // Computes center of mass position
-void CompositeObstacle::EvalPosition()
+pair<Point3,double> CompositeObstacle::computeCenterOfMass()
 {
+  // Notes: 
+  // 1) Obstacles do not have any density, so we assume that all obstacles 
+  // have the same density when computing the center of mass
+  // 2) This method ignores geometric overlaps between obstacles so this
+  // computation might be erroneous if obstacles overlap signigicantly
+
   Point3 centre;
-  int nbre=0;
+  double mass = 0.;
+  int nbre = 0;
   list<Obstacle*>::iterator obstacle;
+  pair<Point3,double> pp;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); 
       nbre++, obstacle++)
-    centre += *(*obstacle)->getPosition();
-  centre /= nbre;
-  setPosition(centre);
+  {
+    pp = (*obstacle)->computeCenterOfMass();
+    centre += pp.first * pp.second;
+    mass += pp.second; 
+  }
+  centre /= mass;
+  setPosition( centre );
   
-  // Note: this computation works only if the composite has some symmetry
-  // properties and needs to be updated in the future to work for any composite 
+  pp.first = centre;
+  pp.second = mass;
+  
+  return ( pp );
 }
 
 
@@ -346,7 +373,8 @@ bool CompositeObstacle::isCloseWithCrust( Component const* voisin ) const
 
 
 // ----------------------------------------------------------------------------
-// Reload du groupe d'Obstacle & publication dans son referent
+// Reloads the composite obstacle and links it to the higher level 
+// obstacle in the obstacle tree
 void CompositeObstacle::reload( Obstacle& mother, istream& file )
 {
   string ttag;
@@ -356,7 +384,7 @@ void CompositeObstacle::reload( Obstacle& mother, istream& file )
     ObstacleBuilderFactory::reload( ttag, *this, file );
     file >> ttag;
   }
-  EvalPosition();
+  computeCenterOfMass();
   mother.append(this);
 }    
 
@@ -382,9 +410,10 @@ void CompositeObstacle::resetKinematics()
 // Rotates the composite obstacle with a quaternion
 void CompositeObstacle::Rotate( Quaternion const& rotation )
 {
-  list<Obstacle*>::iterator obstacle;
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
-    (*obstacle)->Rotate(rotation);
+  cout << "Warning when calling CompositeObstacle::Rotate(rotation) "
+       << "\nShould not go into this class !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
 }
 
 
@@ -765,7 +794,7 @@ void CompositeObstacle::addNewContactInMap( std::tuple<int,int,int> const& id,
 
 
 // ----------------------------------------------------------------------------
-// Increases cumulative tangential displacement with component id
+// Increases cumulative tangential motion with component id
 void CompositeObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
   	Vector3 const& kdelta, Vector3 const& prev_normal,
   	Vector3 const& cumulSpringTorque )

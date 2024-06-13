@@ -843,8 +843,8 @@ void CompositeParticle::Move( double time,
     	vtrans + ( vrot ^ ( rota * m_InitialRelativePositions[i] ) ) );
   }
   }
-  catch (const DisplacementError&) {
-    throw DisplacementError();
+  catch (const MotionError&) {
+    throw MotionError();
   }
 }
 

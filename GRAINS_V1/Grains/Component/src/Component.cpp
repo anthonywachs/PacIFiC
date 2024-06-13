@@ -643,7 +643,7 @@ bool Component::getContactMemory( std::tuple<int,int,int> const& id,
 
 
 // ----------------------------------------------------------------------------
-// Increases cumulative tangential displacement with component id
+// Increases cumulative tangential motion with component id
 void Component::addDeplContactInMap( std::tuple<int,int,int> const& id,
 	Vector3 const& kdelta, Vector3 const& prev_normal,
 	Vector3 const& cumulSpringTorque )

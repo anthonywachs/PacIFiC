@@ -186,10 +186,10 @@ class CompositeParticle : public Particle
     void composePositionRightByTransform( Transform const& t );
 
     /** @brief Solves the Newton's law and move particle to their new position
-    @exception DisplacementError displacement is larger than crust thickness
+    @exception MotionError motion is larger than crust thickness
     @param time physical time
     @param dt_particle_vel velocity time step magnitude 
-    @param dt_particle_disp displacement time step magnitude */
+    @param dt_particle_disp motion time step magnitude */
     void Move( double time, double const& dt_particle_vel, 
     	double const& dt_particle_disp );
 

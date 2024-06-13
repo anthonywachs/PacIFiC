@@ -49,17 +49,17 @@ namespace solid
       /**@name Methods */
       //@{
       /** @brief Adds the same value to all 3 components
-      @param dist displacement value */
+      @param dist motion value */
       void Move( double dist );
     
       /** @brief Adds values to the 3 components using a 3-component array
-      @param dist 3-component array with displacement in each direction */
+      @param dist 3-component array with motion in each direction */
       void Move( double const* dist );
     
       /** @brief Adds values to the 3 components using 3 scalars
-      @param distX displacement in x
-      @param distY displacement in y
-      @param distZ displacement in z */
+      @param distX motion in x
+      @param distY motion in y
+      @param distZ motion in z */
       void Move( double distX, double distY, double distZ );
 
       /** @brief Distance between 2 points of type Point3

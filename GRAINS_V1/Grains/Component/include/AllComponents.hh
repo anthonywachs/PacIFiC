@@ -107,8 +107,8 @@ class AllComponents
     /** @brief Moves all components
     @param time physical time
     @param dt_particle_vel velocity time step magnitude 
-    @param dt_particle_disp displacement time step magnitude
-    @param dt_obstacle obstacle velocity and displacement time step magnitude */
+    @param dt_particle_disp motion time step magnitude
+    @param dt_obstacle obstacle velocity and motion time step magnitude */
     list<SimpleObstacle*> Move( double time,
 	double const& dt_particle_vel, 
     	double const& dt_particle_disp,
@@ -160,7 +160,7 @@ class AllComponents
     void PostProcessing_end();
 
     /** @brief Writes components for Post-Processing in case of an error in
-    contact or displacement
+    contact or motion
     @param filename file root name
     @param errcomposants list of components involved in the error */
     void PostProcessingErreurComponents( string const& filename,

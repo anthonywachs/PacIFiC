@@ -44,7 +44,7 @@ class ObstacleImposedForce
     /**@name Methods */
     //@{
     /** @brief Returns obstacle name */
-    string getNom() const;
+    string getObstacleName() const;
 
     /** @brief Returns the remaining active time interval of the imposed motion
     @param debut simulation start time
@@ -78,19 +78,11 @@ class ObstacleImposedForce
     /** @brief Returns the obstacle virtual mass */
     double getMass() const ;
 
-    /** @brief Returns the direction of displacement */
+    /** @brief Returns the direction of motion */
     Vector3 const* getDirection() const ;
 
     /** @brief Returns the imposed force type */
     string getType() const; 
-    //@}
-
-
-    /**@name Methods Static */
-    //@{
-    /** @brief Creates and reads the imposed force features from an input stream
-    @param fileIn input stream */
-    static ObstacleImposedForce* read( istream& fileIn );
     //@}
 
 
@@ -103,7 +95,7 @@ class ObstacleImposedForce
     Vector3 m_force; /**< Imposed force */
     string m_type; /**< Force type */
     double m_mass; /**< Virtual mass of obstacle */
-    Vector3 m_direction; /**< Displacement (or force) direction */
+    Vector3 m_direction; /**< Motion (or force) direction */
     Vector3 m_translationalVelocity; /**< translational velocity */
     double m_freqX; /**< cyclic motion frequency in x */
     double m_freqY; /**< cyclic motion frequency in y */

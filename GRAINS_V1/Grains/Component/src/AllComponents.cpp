@@ -186,14 +186,14 @@ list<SimpleObstacle*> AllComponents::Move( double time,
 	double const& dt_obstacle )
 {
   try{
-  // Particles displacement
+  // Particles motion
   list<Particle*>::iterator particle;
   for (particle=m_ActiveParticles.begin();
       particle!=m_ActiveParticles.end(); particle++)
     if ( (*particle)->getTag() != 2 )
       (*particle)->Move( time, dt_particle_vel, dt_particle_disp );
 
-  // Obstacles displacement
+  // Obstacles motion
   list<SimpleObstacle*> displacedObstacles;
   if ( !m_AllImposedVelocitiesOnObstacles.empty()
   	|| !m_AllImposedForcesOnObstacles.empty() )
@@ -201,27 +201,27 @@ list<SimpleObstacle*> AllComponents::Move( double time,
     m_obstacle->resetKinematics();
     displacedObstacles = m_obstacle->Move( time, dt_obstacle, false, false );
 
-    list<ObstacleImposedVelocity*>::iterator chargement;
-    for (chargement=m_AllImposedVelocitiesOnObstacles.begin();
-  	chargement!=m_AllImposedVelocitiesOnObstacles.end(); )
-      if ( (*chargement)->isCompleted( time, dt_obstacle ) )
-        chargement = m_AllImposedVelocitiesOnObstacles.erase( chargement );
-      else chargement++;
+    list<ObstacleImposedVelocity*>::iterator il;
+    for (il=m_AllImposedVelocitiesOnObstacles.begin();
+  	il!=m_AllImposedVelocitiesOnObstacles.end(); )
+      if ( (*il)->isCompleted( time, dt_obstacle ) )
+        il = m_AllImposedVelocitiesOnObstacles.erase( il );
+      else il++;
 
-    list<ObstacleImposedForce*>::iterator chargement_F;
-    for (chargement_F=m_AllImposedForcesOnObstacles.begin();
-  	chargement_F!=m_AllImposedForcesOnObstacles.end(); )
+    list<ObstacleImposedForce*>::iterator il_F;
+    for (il_F=m_AllImposedForcesOnObstacles.begin();
+  	il_F!=m_AllImposedForcesOnObstacles.end(); )
     {
-      if ( (*chargement_F)->isCompleted( time, dt_obstacle ) )
-        chargement_F = m_AllImposedForcesOnObstacles.erase( chargement_F );
-      else chargement_F++;
+      if ( (*il_F)->isCompleted( time, dt_obstacle ) )
+        il_F = m_AllImposedForcesOnObstacles.erase( il_F );
+      else il_F++;
     }
   }
 
   return ( displacedObstacles );
   }
-  catch (const DisplacementError&) {
-    throw DisplacementError();
+  catch (const MotionError&) {
+    throw MotionError();
   }
 }
 
@@ -1732,7 +1732,7 @@ void AllComponents::PostProcessing_end()
 
 // ----------------------------------------------------------------------------
 // Writes components for Post-Processing in case of an error in
-// contact or displacement
+// contact or motion
 void AllComponents::PostProcessingErreurComponents( string const& filename,
 	list<Component*> const& errcomposants )
 {

@@ -194,13 +194,13 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
       m_error_occured = true;
       break;
     } 
-    catch (DisplacementError &errDisplacement) 
+    catch (MotionError &errMotion) 
     {
-      // Particle displacement over dt is too large
+      // Particle motion over dt is too large
       cout << endl;
-      m_allcomponents.PostProcessingErreurComponents( "DisplacementError",
-            errDisplacement.getComponent() );
-      errDisplacement.Message(cout);
+      m_allcomponents.PostProcessingErreurComponents( "MotionError",
+            errMotion.getComponent() );
+      errMotion.Message(cout);
       m_error_occured = true;	
       break;
     } 

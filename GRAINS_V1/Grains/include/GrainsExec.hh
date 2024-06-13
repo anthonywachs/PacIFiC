@@ -294,7 +294,7 @@ class GrainsExec
     static string m_GRAINS_HOME; /**< Main Grains directory */
     static string m_reloadFile_suffix; /**< Reload file suffix (A or B) */
     static bool m_exception_Contact; /**< Contact exception */
-    static bool m_exception_Displacement; /**< Displacement exception */
+    static bool m_exception_Motion; /**< Motion exception */
     static bool m_exception_Simulation; /**< Simulation exception */
     static string m_shift0; /**< string of 0 blank space */
     static string m_shift1; /**< string of 1 blank space */

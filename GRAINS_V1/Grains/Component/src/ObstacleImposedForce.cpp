@@ -66,8 +66,11 @@ ObstacleImposedForce::ObstacleImposedForce( DOMNode* root, double dt,
 
   if ( rank == 0 )
   {
-    cout << "Chargement en force sur " << m_ObstacleName << endl;
-    cout << "Type de chargement : " << m_type << endl;
+    cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
+      	<< endl;      
+    cout << GrainsExec::m_shift12 << "Time interval = [" 
+      	<< m_tstart << "," << m_tend << "]" << endl;
+    cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
     cout << "Amplitude de la force = " << m_force[X] << "\t" << m_force[Y] 
 	 << "\t" << m_force[Z] << endl;
     cout << "Direction de la force = " << m_direction[X] << "\t"
@@ -93,7 +96,7 @@ ObstacleImposedForce::~ObstacleImposedForce()
 
 // ----------------------------------------------------------------------------
 // Returns obstacle name
-string ObstacleImposedForce::getNom() const
+string ObstacleImposedForce::getObstacleName() const
 {
   return ( m_ObstacleName );
 }
@@ -137,25 +140,6 @@ bool ObstacleImposedForce::isCompleted( double t, double dt ) const
 
 
 // ----------------------------------------------------------------------------
-// Creates and reads the imposed force features from an input stream
-ObstacleImposedForce* ObstacleImposedForce::read( istream& fileIn )
-{
-  ObstacleImposedForce* chargement;
-  chargement = new ObstacleImposedForce();
-
-  fileIn >> chargement->m_ObstacleName
-	>> chargement->m_tstart >> chargement->m_tend
-	>> chargement->m_force 
-	>> chargement->m_mass
-	>> chargement->m_direction;
-  
-  return ( chargement );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns the imposed force
 Vector3 ObstacleImposedForce::getForce() const
 {
@@ -176,7 +160,7 @@ double ObstacleImposedForce::getMass() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the direction of displacement
+// Returns the direction of motion
 Vector3 const* ObstacleImposedForce::getDirection() const
 {
   return ( &m_direction );

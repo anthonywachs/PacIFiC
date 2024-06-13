@@ -53,14 +53,14 @@ double ParticleKinematics::Move( Particle* particle,
 {
   // Time integration
   m_timeIntegrationScheme->Move( m_dUdt, m_translationalVelocity,
-  	m_translationalDisplacementOverDt,
+  	m_translationalMotionOverDt,
 	m_dOmegadt, m_angularVelocity, m_averageAngularVelocityOverDt, 
 	dt_particle_vel, dt_particle_disp );
   
-  // Translational displacement
-  particle->Translate( m_translationalDisplacementOverDt );
+  // Translational motion
+  particle->Translate( m_translationalMotionOverDt );
   
-  // Angular displacement 
+  // Angular motion 
   double nOmega = Norm( m_averageAngularVelocityOverDt );
   if ( nOmega > EPSILON ) 
   {
@@ -77,7 +77,7 @@ double ParticleKinematics::Move( Particle* particle,
   m_dQuaternionRotationdt = 0.5 * ( m_angularVelocity , m_QuaternionRotation );
   particle->Rotate( m_QuaternionRotationOverDt );
 
-  return Norm( m_translationalDisplacementOverDt );
+  return Norm( m_translationalMotionOverDt );
 }
 
 

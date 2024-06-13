@@ -63,7 +63,7 @@ class ParticleKinematics : public Kinematics
     /** @brief Integrates Newton's law and moves the particle 
     @param particle the particle
     @param dt_particle_vel velocity time step magnitude 
-    @param dt_particle_disp displacement time step magnitude */
+    @param dt_particle_disp motion time step magnitude */
     double Move( Particle* particle, double const& dt_particle_vel, 
     	double const& dt_particle_disp );
 	
@@ -234,7 +234,7 @@ class ParticleKinematics : public Kinematics
     Quaternion m_QuaternionRotation; /**< Rotation quaternion */ 
     Vector3 m_dUdt; /**< Translational velocity variation dU/dt */
     Vector3 m_dOmegadt; /**< Angular velocity variation dom/dt */
-    Vector3 m_translationalDisplacementOverDt; /**< Translational displacement
+    Vector3 m_translationalMotionOverDt; /**< Translational motion
   	over dt */
     Vector3 m_averageAngularVelocityOverDt; /**< average angular velocity over 
   	dt */

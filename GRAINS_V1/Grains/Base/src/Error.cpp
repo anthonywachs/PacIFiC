@@ -111,10 +111,10 @@ list<Component*> ContactError::getComponents()
 
 
 
-// DisplacementError
+// MotionError
 // ----------------------------------------------------------------------------
 // Constructor with input parameters
-DisplacementError::DisplacementError( Component* id0_, double depl, 
+MotionError::MotionError( Component* id0_, double depl, 
 	double deplMax, double time_ ) 
   : m_id0( id0_ ) 
   , m_depl( depl ) 
@@ -126,14 +126,14 @@ DisplacementError::DisplacementError( Component* id0_, double depl,
 
 
 // ----------------------------------------------------------------------------
-DisplacementError::DisplacementError() 
+MotionError::MotionError() 
 {}
 
 
 
   
 // ----------------------------------------------------------------------------
-DisplacementError::~DisplacementError() 
+MotionError::~MotionError() 
 {}
 
 
@@ -141,9 +141,9 @@ DisplacementError::~DisplacementError()
 
 // ----------------------------------------------------------------------------
 // Outputs message when exception is caught
-void DisplacementError::Message( ostream& fileOut ) const
+void MotionError::Message( ostream& fileOut ) const
 {
-  fileOut << "ERR Displacement : " << m_depl 
+  fileOut << "ERR Motion : " << m_depl 
 	<< " compared to " << m_deplMax << " allowed at t=" 
 	<< GrainsExec::doubleToString(m_time,TIMEFORMAT) << endl;
   fileOut << "Component : " << endl;
@@ -165,9 +165,9 @@ void DisplacementError::Message( ostream& fileOut ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns the pointer to the component involved in the displacement
+// Returns the pointer to the component involved in the motion
 // error in a list for further post-processing
-list<Component*> DisplacementError::getComponent()
+list<Component*> MotionError::getComponent()
 {
   list<Component*> lc;
   lc.push_back(m_id0);

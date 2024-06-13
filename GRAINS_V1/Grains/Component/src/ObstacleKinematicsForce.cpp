@@ -25,9 +25,9 @@ ObstacleKinematicsForce::~ObstacleKinematicsForce()
 
 // ----------------------------------------------------------------------------
 // Adds an imposed force load to the obstacle kinematics
-void ObstacleKinematicsForce::append( ObstacleImposedForce* chargement_ )
+void ObstacleKinematicsForce::append( ObstacleImposedForce* oif )
 {
-  m_imposedForces.push_back( chargement_ );
+  m_imposedForces.push_back( oif );
 }
 
 
@@ -66,10 +66,10 @@ void ObstacleKinematicsForce::Compose( ObstacleKinematicsForce const& other,
 // ----------------------------------------------------------------------------
 // Computes the obstacle velocity and returns whether the obstacle 
 // moved from t to t+dt
-bool ObstacleKinematicsForce::Deplacement( double time, double dt, 
+bool ObstacleKinematicsForce::ImposedMotion( double time, double dt, 
 	Obstacle* obstacle )
 {
-  // Recherche du chargement dans l'increment de time
+  // Force load over [t,t+dt]
   double fin = time + dt;
   double dtt = 0.;
   if ( m_currentImposedForce ) 
@@ -100,7 +100,7 @@ bool ObstacleKinematicsForce::Deplacement( double time, double dt,
       }
   }
   
-//  // Il existe un chargement dans l'increment de time
+//  // Il existe un force load dans l'increment de time
 //  if ( m_currentImposedForce ) 
 //  {
 
@@ -113,13 +113,13 @@ bool ObstacleKinematicsForce::Deplacement( double time, double dt,
     //         deplacement - direction
     /*
     double ratio = 0.;
-    if (force < chargement->getForceImpMin())
+    if (force < force load->getForceImpMin())
       ratio = 1.;
-    else if (force > chargement->getForceImpMax())
+    else if (force > force load->getForceImpMax())
       ratio = -1.;
 
-    vitesseD = ratio + chargement->getDeplacement() / dt;
-    Vector3 direction = chargement->getDirection();
+    vitesseD = ratio + force load->getImposedMotion() / dt;
+    Vector3 direction = force load->getDirection();
     vtrans += vitesseD * direction;
     */
 
@@ -131,7 +131,7 @@ bool ObstacleKinematicsForce::Deplacement( double time, double dt,
 
 
 // ----------------------------------------------------------------------------
-// Returns translational displacement over dt 
+// Returns translational motion over dt 
 Vector3 ObstacleKinematicsForce::getTranslation( double dt ) const
 {
   return ( m_translationalVelocity * dt );

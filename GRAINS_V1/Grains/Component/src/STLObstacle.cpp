@@ -163,13 +163,13 @@ bool STLObstacle::isSTLObstacle() const
 // ----------------------------------------------------------------------------
 // Moves the simple obstacle and returns a list of moved obstacles (here itself)
 list<SimpleObstacle*> STLObstacle::Move( double time,
-	double dt, bool const& b_deplaceCine_Comp,
-        bool const& b_deplaceF_Comp )
+	double dt, bool const& motherCompositeHasImposedVelocity,
+        bool const& motherCompositeHasImposedForce )
 {
   // TO DO
 
-  list<SimpleObstacle*> obstacleEnDeplacement;
-  return ( obstacleEnDeplacement );
+  list<SimpleObstacle*> movingObstacles;
+  return ( movingObstacles );
 }
 
 
@@ -1023,3 +1023,16 @@ int STLObstacle::isVinV(STLVertex &v1, STLVertex &v2)
     
    else return 0;
 }*/
+
+
+
+// ----------------------------------------------------------------------------
+// Computes center of mass position
+pair<Point3,double> STLObstacle::computeCenterOfMass()
+{
+  pair<Point3,double> pp( Vector3Null, 0. );
+  
+  // TO DO
+    
+  return( pp );
+}
