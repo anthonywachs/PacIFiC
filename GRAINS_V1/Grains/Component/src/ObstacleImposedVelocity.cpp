@@ -87,7 +87,8 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
     DOMNode* nPar = ReaderXML::getNode( nVTranslation, "Parameters" );        
     m_Sin_amplitude = ReaderXML::getNodeAttr_Double( nPar, "Amplitude" ); 
     m_Sin_period = ReaderXML::getNodeAttr_Double( nPar, "Period" ); 
-    m_Sin_phase_shift = ReaderXML::getNodeAttr_Double( nPar, "PhaseShift" );
+    m_Sin_phase_shift = ReaderXML::getNodeAttr_Double( nPar, "PhaseShift" ) 
+    	* PI / 180.;
     if ( rank == 0 )
     {
       cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
@@ -101,7 +102,7 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
       	m_Sin_amplitude << endl;
       cout << GrainsExec::m_shift12 << "Period = " << 
       	m_Sin_period << endl;
-      cout << GrainsExec::m_shift12 << "Phase shift = " << 
+      cout << GrainsExec::m_shift12 << "Phase shift in rad = " << 
       	m_Sin_phase_shift << endl;	
       cout << GrainsExec::m_shift12 << "Maximum motion = " << 
       	m_Sin_amplitude * m_Sin_period / ( 2. * PI ) << endl;
@@ -162,7 +163,7 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
     m_SinCyclic_phase_shift[Y] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
     	"PhiY" ) * PI / 180.;	
     m_SinCyclic_phase_shift[Z] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
-    	"PhiZ" ) * PI / 180.;	       
+    	"PhiZ" ) * PI / 180.;
     DOMNode* nAmp = ReaderXML::getNode( nCyclic, "Amplitude" );
     m_SinCyclic_amplitude[X] = ReaderXML::getNodeAttr_Double( nAmp, "AX" ) 
     	* m_unit_vitRef[X];
@@ -183,7 +184,7 @@ ObstacleImposedVelocity::ObstacleImposedVelocity( DOMNode* root,
       cout << GrainsExec::m_shift12 << "Period = " << 
       	m_SinCyclic_period[X] << " " << m_SinCyclic_period[Y] << " " <<
 	m_SinCyclic_period[Z] << endl;
-      cout << GrainsExec::m_shift12 << "Phase shift = " << 
+      cout << GrainsExec::m_shift12 << "Phase shift in rad = " << 
       	m_SinCyclic_phase_shift[X] << " " << m_SinCyclic_phase_shift[Y] << " " 
 	<< m_SinCyclic_phase_shift[Z] << endl;	 
     }   

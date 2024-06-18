@@ -1256,8 +1256,8 @@ vector< vector<double> >* GrainsMPIWrapper::
 // Gathers the class of all particles on the master process 
 vector<int>* GrainsMPIWrapper::
     GatherParticlesClass_PostProcessing(
-    const list<Particle*> &particles,
-    const size_t& nb_total_particles ) const
+    list<Particle*> const& particles,
+    size_t const& nb_total_particles ) const
 {
   int i=0, recvsize = 0;
   MPI_Status status;
@@ -1277,7 +1277,7 @@ vector<int>* GrainsMPIWrapper::
   {
     if ( (*il)->getTag() != 2 )
     {
-      buffer[i] = (*il)->getID();
+      buffer[i] = (*il)->getID() - 1; // because particles are numbered from 1
       buffer[i+1] = (*il)->getGeometricType();
       i += 2;
     }
@@ -1290,7 +1290,8 @@ vector<int>* GrainsMPIWrapper::
   // Reception by the master process
   if ( m_rank == m_rank_master )
   {
-    class_Global = new vector<int>( nb_total_particles, 0 ) ;
+    // Particles that are not active yet are assigned a default type of -1     
+    class_Global = new vector<int>( nb_total_particles, -1 ) ;
 
     for (int irank=0; irank<m_nprocs; ++irank)
     {

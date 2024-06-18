@@ -87,15 +87,17 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     /** @brief Writes data in parallel mode at one physical time
     @param time physical time
     @param nb_total_part total number of particles
+    @param types_Global vector containing particle type
     @param data_Global vector containing particle data  */
-    void one_output_MPI( double const& time, size_t& nb_total_part,
-  	vector< vector<double> > const* data_Global );
+    void one_output_MPI( double const& time, size_t const& nb_total_part,
+  	vector<int>* types_Global,
+	vector< vector<double> > const* data_Global );
 	
     /** @brief Writes data in serial mode at one physical time
     @param time physical time
     @param nb_total_part total number of particles     
     @param particles active particles */
-    void one_output_Standard( double const& time, size_t& nb_total_part,
+    void one_output_Standard( double const& time, size_t const& nb_total_part,
   	list<Particle*> const* particles );
 	
     /** @brief Delete all result files */
@@ -104,7 +106,20 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     /** @brief Creates output files and open streams
     @param mode File opening mode (here : ios::app) */
     void prepareResultFiles( ios_base::openmode mode ) ;
+        
+    /** @brief Writes particle type file 
+    @param nb_total_part total number of particles     
+    @param particles active particles */
+    void writeParticleTypeFile( size_t const& nb_total_part,
+  	list<Particle*> const* particles ) ;    
     //@}
+    
+
+    /** @name Constructors */
+    //@{
+    /** @brief Default constructor */
+    RawDataPostProcessingWriter();  
+    //@}      
   
 
   private:
@@ -131,15 +146,6 @@ class RawDataPostProcessingWriter : public PostProcessingWriter
     bool m_binary; /**< whether to write data in binary */
     int m_ndigits; /**< number of digits after the decimal in the scientific
     	format in text mode writing */ 
-       
-
-
-  protected:
-    /** @name Constructors */
-    //@{
-    /** @brief Default constructor */
-    RawDataPostProcessingWriter();  
-    //@}  
 };
 
 #endif

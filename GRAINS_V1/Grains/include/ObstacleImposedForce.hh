@@ -68,12 +68,9 @@ class ObstacleImposedForce
     Vector3 const* translationalVelocity( double time, double dt, 
       Obstacle* obstacle ); 
 
-    /** @brief Returns the imposed force in cyclic mode 
+    /** @brief Returns the imposed force 
     @param time physical time */
-    Vector3 cyclicForce( double time ) const ;
-
-    /** @brief Returns the imposed force */
-    Vector3 getForce() const ;
+    Vector3 getForce( double time );
 
     /** @brief Returns the obstacle virtual mass */
     double getMass() const ;
@@ -92,15 +89,17 @@ class ObstacleImposedForce
     string m_ObstacleName; /**< Obstacle name the force is imposed to */  
     double m_tstart; /**< start time */
     double m_tend; /**< end time */
-    Vector3 m_force; /**< Imposed force */
+    Vector3 m_force_amplitude; /**< Imposed force amplitude */
+    Vector3 m_force; /**< Imposed force at time t */    
     string m_type; /**< Force type */
     double m_mass; /**< Virtual mass of obstacle */
-    Vector3 m_direction; /**< Motion (or force) direction */
+    Vector3 m_direction; /**< Motion (or force) direction, i.e. unit imposed
+    	force vector */
     Vector3 m_translationalVelocity; /**< translational velocity */
-    double m_freqX; /**< cyclic motion frequency in x */
-    double m_freqY; /**< cyclic motion frequency in y */
-    double m_freqZ; /**< cyclic motion frequency in z */
-    double m_phase; /**< cyclic motion phase shift */
+    Vector3 m_SinCyclic_period; /**< sinusoidal cyclic force period in each
+    	direction */
+    Vector3 m_SinCyclic_phase_shift; /**< sinusoidal velocity phase shift in 
+    	each direction */    
     Vector3 m_prev; /**< cyclic motion previous position */    
     //@}
     
@@ -109,7 +108,15 @@ class ObstacleImposedForce
     //@{
     /** @brief Copy constructor */
     ObstacleImposedForce( ObstacleImposedForce const& copy );
-    //@}    
+    //@}
+    
+    
+    /**@name Methods */
+    //@{
+    /** @brief Sets the sinusoidal cyclic force at a given time 
+    @param time physical time */
+    void SinCyclicForce( double time );
+    //@}        
 };
 
 #endif

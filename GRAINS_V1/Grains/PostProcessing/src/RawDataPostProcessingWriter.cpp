@@ -63,10 +63,7 @@ void RawDataPostProcessingWriter::PostProcessing_start(
     LinkedCell const* LC,
     vector<Window> const& insert_windows )
 {
-  GrainsMPIWrapper const* wrapper = GrainsExec::getComm() ;
-  size_t nb_total_part = GrainsExec::getTotalNumberPhysicalParticles() ;
-  int type = 0;
-
+  // Open files
   if ( m_rank == 0 )
   {
     ios_base::openmode mode = ios::app;
@@ -78,80 +75,9 @@ void RawDataPostProcessingWriter::PostProcessing_start(
     prepareResultFiles( mode );
   }     
 
-  // In parallel mode
-  if ( wrapper )
-  {
-    vector<int>* types_Global = NULL;
-    vector< vector<double> >* data_Global = NULL;    
-    
-    // Gather particles class from every proc on master proc
-    types_Global = 
-        wrapper->GatherParticlesClass_PostProcessing( *particles,
-            nb_total_part );
-
-    // Write down particles class only once at the begining
-    if ( m_rank == 0 )
-    {
-      if ( m_binary )
-      { 
-        for (size_t i=0; i<nb_total_part; i++)
-	{
-	  type = (*types_Global)[i];
-	  m_particle_class.write( reinterpret_cast<char*>( &type ), 
-	  	sizeof(int) );
-	}      
-      }
-      else
-      {     
-        for (size_t i=0; i<nb_total_part; i++)
-          m_particle_class << (*types_Global)[i] << " " ;
-        m_particle_class << endl ;
-      }
-    }
-    if ( types_Global ) delete types_Global ;
-    
-    // Gather particle data ordered by particle ID on the master proc
-    data_Global = wrapper->GatherParticleData_PostProcessing( 
-    	  *particles, nb_total_part );
-
-    // Write particle data
-    if ( m_rank == 0 )
-      if ( GrainsExec::m_ReloadType == "new" )
-        one_output_MPI( time, nb_total_part, data_Global ) ;
-    if ( data_Global ) delete data_Global ;
-  }
-  // In serial mode
-  else
-  {  
-    // Extract the active particles that are not periodic clones
-    // and create a map part ID - particle pointer such that we can write data
-    // in increasing order of particle ID from 0 to nb_total_part-1
-    map<size_t,Particle*> IDtoPart;
-    list<Particle*>::const_iterator il;
-    for (il=particles->begin(); il!=particles->end();il++)
-      if ( (*il)->getTag() != 2 )
-        IDtoPart.insert( pair<int,Particle*>( size_t((*il)->getID()), *il ) );
-      
-    map<size_t,Particle*>::const_iterator im; 
-    if ( m_binary )
-    {
-      for (im=IDtoPart.begin();im!=IDtoPart.end();im++)
-      {
-	type = im->second->getGeometricType();
-	m_particle_class.write( reinterpret_cast<char*>( &type ), sizeof(int) );
-      }              
-    }
-    else
-    { 
-      for (im=IDtoPart.begin();im!=IDtoPart.end();im++)
-        m_particle_class << im->second->getGeometricType() << " " ;
-      m_particle_class << endl ;
-    }
-
-       
-    // Write particle data
-    one_output_Standard( time, nb_total_part, particles );    
-  }
+  // Write data
+  PostProcessing( time, dt, particles, inactiveparticles, periodic_clones,
+    referenceParticles, obstacle, LC );
 }
 
 
@@ -168,22 +94,31 @@ void RawDataPostProcessingWriter::PostProcessing( double const& time,
     Obstacle* obstacle,
     LinkedCell const* LC )
 {
-
   GrainsMPIWrapper const* wrapper = GrainsExec::getComm() ;
   size_t nb_total_part = GrainsExec::getTotalNumberPhysicalParticles() ;
 
+  // Particle data and type
+  // In parallel mode
   if ( wrapper )
   {
-    vector< vector<double> >* data_Global = 
-        wrapper->GatherParticleData_PostProcessing( *particles,
+    // Gather particles class from every proc on master proc
+    vector<int>* types_Global = NULL;
+    types_Global = wrapper->GatherParticlesClass_PostProcessing( *particles,
+            nb_total_part );
+
+    // Gather particle data ordered by particle ID on the master proc    
+    vector< vector<double> >* data_Global = NULL;
+    data_Global = wrapper->GatherParticleData_PostProcessing( *particles,
         nb_total_part );
 
-    // Write data
+    // Write particle data
     if ( m_rank == 0 )
-      one_output_MPI( time, nb_total_part, data_Global ) ;
+      one_output_MPI( time, nb_total_part, types_Global, data_Global ) ;
 
     if ( data_Global ) delete data_Global ;
+    if ( types_Global ) delete types_Global ;    
   }
+  // In serial mode
   else
     one_output_Standard( time, nb_total_part, particles );
 }
@@ -217,9 +152,12 @@ void RawDataPostProcessingWriter::PostProcessing_end()
 // ----------------------------------------------------------------------------
 // Writes data in parallel mode at one physical time
 void RawDataPostProcessingWriter::one_output_MPI( double const& time, 
-    size_t& nb_total_part, 
+    size_t const& nb_total_part, vector<int>* types_Global, 
     vector< vector<double> > const* data_Global )
 {
+  m_particle_class.open( ( m_filerootname + "_particleType.dat" ).c_str(), 
+  	ios::out | ( m_binary ? ios::binary : ios::out ) );
+
   if ( m_binary )
   {
     double tt = time;
@@ -260,10 +198,11 @@ void RawDataPostProcessingWriter::one_output_MPI( double const& time,
   }
 
   // Write in files: inactive particles are assigned 0 values and values are
-  // written in increasing order of particle ID from 0 to nb_total_part-1
+  // written in increasing order of particle ID from 1 to nb_total_part (but
+  // from 0 to nb_total_part - 1 in the data_Global vector
   if ( m_binary )
   {
-    int coord = 0;
+    int coord = 0, type = 0;
     double val = 0.;
     
     for (size_t i=0; i<nb_total_part; i++)
@@ -305,6 +244,11 @@ void RawDataPostProcessingWriter::one_output_MPI( double const& time,
       coord = int((*data_Global)[i][9]) ;
       m_coordination_number.write( reinterpret_cast<char*>( 
       	&coord ), sizeof(int) );
+      
+      // Particle type          
+      type = (*types_Global)[i];
+      m_particle_class.write( reinterpret_cast<char*>( &type ), 
+	  	sizeof(int) );	
     }  
   }
   else
@@ -337,6 +281,9 @@ void RawDataPostProcessingWriter::one_output_MPI( double const& time,
 
       // Number of contacts
       m_coordination_number << " " << int((*data_Global)[i][9] ) ;
+      
+      // Particle type  
+      m_particle_class << (*types_Global)[i] << " " ;             
     }
   }
   
@@ -352,7 +299,10 @@ void RawDataPostProcessingWriter::one_output_MPI( double const& time,
     m_angular_velocity_y << endl ;
     m_angular_velocity_z << endl ;
     m_coordination_number << endl ;
-  }
+    m_particle_class << endl ;    
+  }  
+  
+  m_particle_class.close();
 }
 
 
@@ -411,11 +361,6 @@ void RawDataPostProcessingWriter::prepareResultFiles( ios_base::openmode mode )
   file = m_filerootname+"_coordinationNumber.dat";
   m_coordination_number.open( file.c_str(), mode | ( m_binary ? 
   	ios::binary : mode ) );
-
-  file = m_filerootname+"_particleType.dat";
-  m_particle_class.open( file.c_str(), mode | ( m_binary ? 
-  	ios::binary : mode ) );
-
 }
 
 
@@ -424,13 +369,15 @@ void RawDataPostProcessingWriter::prepareResultFiles( ios_base::openmode mode )
 // ----------------------------------------------------------------------------
 // Writes data in serial mode at one physical time
 void RawDataPostProcessingWriter::one_output_Standard( double const& time,
-    size_t& nb_total_part, list<Particle*> const* particles )
+    size_t const& nb_total_part, list<Particle*> const* particles )
 { 
   Point3* centre = NULL;
   Vector3* velT = NULL; 
   Vector3* velR = NULL; 
   double zero = 0., tt = time; 
-  int coord = 0, izero = 0; 
+  int coord = 0, izero = 0, type = 0;
+  m_particle_class.open( ( m_filerootname + "_particleType.dat" ).c_str(), 
+  	ios::out | ( m_binary ? ios::binary : ios::out ) );
 
   if ( m_binary )
   {
@@ -472,7 +419,7 @@ void RawDataPostProcessingWriter::one_output_Standard( double const& time,
   
   // Extract the active particles that are not periodic clones
   // and create a map part ID - particle pointer such that we can write data
-  // in increasing order of particle ID from 0 to nb_total_part-1
+  // in increasing order of particle ID from 1 to nb_total_part
   map<size_t,Particle*> IDtoPart;
   list<Particle*>::const_iterator il;
   Particle* pp = NULL;
@@ -480,12 +427,14 @@ void RawDataPostProcessingWriter::one_output_Standard( double const& time,
     if ( (*il)->getTag() != 2 )
        IDtoPart.insert( pair<int,Particle*>( size_t((*il)->getID()), *il ) ); 
        
-  // Write in files: inactive particles are assigned 0 values and values are
-  // written in increasing order of particle ID from 0 to nb_total_part-1
-  for (size_t i=0;i<nb_total_part;i++)
+  // Write in files: inactive particles are assigned 0 values and -1 type 
+  // and values are written in increasing order of particle ID from 1 to 
+  // nb_total_part
+  for (size_t i=1;i<nb_total_part+1;i++)
     if ( IDtoPart.count( i ) )
     {
       pp = IDtoPart[i];
+      type = pp->getGeometricType();
       
       if ( m_binary )
       {
@@ -520,6 +469,9 @@ void RawDataPostProcessingWriter::one_output_Standard( double const& time,
         coord = pp->getCoordinationNumber(); 
 	m_coordination_number.write( reinterpret_cast<char*>( 
 		&coord ), sizeof(int) );
+		
+	// Particle type
+	m_particle_class.write( reinterpret_cast<char*>( &type ), sizeof(int) );
       }
       else
       {
@@ -551,11 +503,16 @@ void RawDataPostProcessingWriter::one_output_Standard( double const& time,
     	ios::scientific, m_ndigits, (*velR)[Z] ) ;
     
         // Number of contacts
-        m_coordination_number << " " << pp->getCoordinationNumber(); 
+        m_coordination_number << " " << pp->getCoordinationNumber();
+	
+	// Particle type        
+	m_particle_class << type << " " ;	 
       }         
     }
     else
     {
+      type = - 1;
+      
       if ( m_binary )
       {
         // Center of mass position
@@ -587,7 +544,10 @@ void RawDataPostProcessingWriter::one_output_Standard( double const& time,
     
         // Number of contacts
 	m_coordination_number.write( reinterpret_cast<char*>( 
-		&izero ), sizeof(int) );      
+		&izero ), sizeof(int) );
+		
+	// Particle type
+	m_particle_class.write( reinterpret_cast<char*>( &type ), sizeof(int) );
       }
       else
       {      
@@ -617,19 +577,28 @@ void RawDataPostProcessingWriter::one_output_Standard( double const& time,
     
         // Number of contacts
         m_coordination_number << " 0";
+	
+	// Particle type        
+	m_particle_class << type << " " ;	
       }    
     }   
   
-  m_gc_coordinates_x << endl;
-  m_gc_coordinates_y << endl;  
-  m_gc_coordinates_z << endl; 
-  m_translational_velocity_x << endl;
-  m_translational_velocity_y << endl;   
-  m_translational_velocity_z << endl;
-  m_angular_velocity_x << endl;
-  m_angular_velocity_y << endl;   
-  m_angular_velocity_z << endl;  
-  m_coordination_number << endl;
+  if ( !m_binary )
+  {
+    m_gc_coordinates_x << endl;
+    m_gc_coordinates_y << endl;  
+    m_gc_coordinates_z << endl; 
+    m_translational_velocity_x << endl;
+    m_translational_velocity_y << endl;   
+    m_translational_velocity_z << endl;
+    m_angular_velocity_x << endl;
+    m_angular_velocity_y << endl;   
+    m_angular_velocity_z << endl;  
+    m_coordination_number << endl;
+    m_particle_class << endl ;
+  }
+  
+  m_particle_class.close();
 }
 
 
@@ -640,4 +609,79 @@ void RawDataPostProcessingWriter::one_output_Standard( double const& time,
 string RawDataPostProcessingWriter::getPostProcessingWriterType() const
 {
   return ( "RawData" );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes particle type file */
+void RawDataPostProcessingWriter::writeParticleTypeFile( 
+	size_t const& nb_total_part, list<Particle*> const* particles )
+{
+  GrainsMPIWrapper const* wrapper = GrainsExec::getComm() ;
+  string file = m_filerootname+"_particleType.dat";
+  int type = 0;
+  if ( m_rank == 0 ) m_particle_class.open( file.c_str(), ios::out | 
+  	( m_binary ? ios::binary : ios::out ) );
+
+  // In parallel mode
+  if ( wrapper )
+  {
+    vector<int>* types_Global = NULL;
+    
+    // Gather particles class from every proc on master proc
+    types_Global = 
+        wrapper->GatherParticlesClass_PostProcessing( *particles,
+            nb_total_part );
+
+    // Write down particles class only once at the begining
+    if ( m_rank == 0 )
+    {
+      if ( m_binary )
+      { 
+        for (size_t i=0; i<nb_total_part; i++)
+	{
+	  type = (*types_Global)[i];
+	  m_particle_class.write( reinterpret_cast<char*>( &type ), 
+	  	sizeof(int) );
+	}      
+      }
+      else
+      {     
+        for (size_t i=0; i<nb_total_part; i++)
+          m_particle_class << (*types_Global)[i] << " " ;
+        m_particle_class << endl ;
+      }
+    }
+    if ( types_Global ) delete types_Global ;
+  }
+  // In serial mode
+  else
+  {  
+    // Extract the active particles that are not periodic clones
+    // and create a map part ID - particle pointer such that we can write data
+    // in increasing order of particle ID from 0 to nb_total_part-1
+    map<size_t,Particle*> IDtoPart;
+    list<Particle*>::const_iterator il;
+    for (il=particles->cbegin(); il!=particles->cend();il++)
+      if ( (*il)->getTag() != 2 )
+         IDtoPart.insert( pair<int,Particle*>( size_t((*il)->getID()), *il ) ); 
+       
+    // Write in files: inactive particles are assigned -1 type and values are
+    // written in increasing order of particle ID from 0 to nb_total_part-1
+    for (size_t i=0;i<nb_total_part;i++)
+    {
+      if ( IDtoPart.count( i ) ) type = IDtoPart[i]->getGeometricType();
+      else type = -1;
+	
+      if ( m_binary )
+        m_particle_class.write( reinterpret_cast<char*>( &type ), sizeof(int) );
+      else
+        m_particle_class << type << " " ;
+    }
+    if ( !m_binary ) m_particle_class << endl ;     
+  }
+  
+  if ( m_rank == 0 ) m_particle_class.close();  
 }
