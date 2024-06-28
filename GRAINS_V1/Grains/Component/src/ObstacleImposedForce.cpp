@@ -61,7 +61,8 @@ ObstacleImposedForce::ObstacleImposedForce( DOMNode* root, double dt,
     m_force_amplitude[X] = ReaderXML::getNodeAttr_Double( force, "AX" );
     m_force_amplitude[Y] = ReaderXML::getNodeAttr_Double( force, "AY" );
     m_force_amplitude[Z] = ReaderXML::getNodeAttr_Double( force, "AZ" ); 
-    m_direction = m_force_amplitude / Norm( m_force_amplitude );   
+    m_direction = m_force_amplitude / Norm( m_force_amplitude ); 
+    m_force = m_force_amplitude; 
     DOMNode* property = ReaderXML::getNode( nCT, "Property" );
     m_mass = ReaderXML::getNodeAttr_Double( property, "Mass" );
     if ( rank == 0 )
@@ -71,8 +72,8 @@ ObstacleImposedForce::ObstacleImposedForce( DOMNode* root, double dt,
       cout << GrainsExec::m_shift12 << "Time interval = [" 
       	<< m_tstart << "," << m_tend << "]" << endl;
       cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
-      cout << "Force = " << m_force[X] << " " << m_force[Y] << " " << 
-    	m_force[Z] << endl; 
+      cout << GrainsExec::m_shift12 << "Force = " << m_force[X] << " " << 
+      	m_force[Y] << " " << m_force[Z] << endl; 
     }
   } 
   else if ( ReaderXML::getNode( root, "SinCyclicTranslation" ) )
@@ -234,18 +235,25 @@ Vector3 const* ObstacleImposedForce::translationalVelocity( double time,
   
   // Translational velocity of the obstacle over [t,t+dt]
   Vector3 dforce, depl, trans;
-  if ( m_type == "Translation" )
+  static Vector3 dforce_nm1;
+  static Vector3 depl_nm1;
+  double Kp = 0.5 * dt * dt / m_mass ;
+  double Ki = dt / m_mass ;  
+  if ( m_type == "ConstantTranslation" )
   {
     m_force = m_force_amplitude;
-    dforce = m_force - force;
+    dforce = force - m_force;
     for (size_t i=0;i<3;++i) dforce[i] *= m_direction[i]; 
-    depl = 0.5 *( dt * dt / m_mass ) * dforce; 
+    //depl = 0.5 *( dt * dt / m_mass ) * dforce;
+    depl = Kp * ( dforce - dforce_nm1 ) + Ki * dt * dforce + depl_nm1; 
     m_translationalVelocity = depl / dt;
+    dforce_nm1 = dforce;
+    depl_nm1 = depl;  
   }
   else if ( m_type == "SinCyclicTranslation" )
   {
     SinCyclicForce( time );
-    dforce = m_force - force;
+    dforce = force - m_force;
     for (size_t i=0;i<3;++i) dforce[i] *= m_direction[i]; 
     trans = 0.5 *( dt * dt / m_mass ) * dforce; 
     depl = trans - m_prev;

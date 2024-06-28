@@ -127,8 +127,8 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
   list<Obstacle*>::iterator obstacle;
   list<SimpleObstacle*> movingObstacles;
   list<SimpleObstacle*>::iterator ilo; 
-  bool imposedForce = false;   
 
+  // Imposed velocity
   // Updates the obstacle translational and angular velocity at time t and 
   // translational and angular motion from t to t+dt and returns whether the 
   // obstacle moved from t to t+dt
@@ -163,25 +163,37 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
     }
   }
 
-      
-//   bool deplaceF = m_confinement.ImposedMotion( time, dt, this );
-//   deplaceF = deplaceF || motherCompositeHasImposedForce;    
-//   
-//   if ( deplaceF ) 
-//     for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
-//       (*obstacle)->Compose( m_confinement, *(*obstacle)->getPosition() );
-// 
-//   m_ismoving = m_ismoving || deplaceF; // ??? demander à Gillos !!
+
+  // Imposed force
+  // Updates the obstacle translational velocity at time t and translational 
+  // motion from t to t+dt and returns whether the obstacle moved from t to 
+  // t+dt      
+  bool moveForce = m_confinement.ImposedMotion( time, dt, this );
+  moveForce = moveForce || motherCompositeHasImposedForce;    
+
+  // Composite center motion
+  if ( moveForce && Obstacle::m_MoveObstacle )
+  {
+    Vector3 translation = m_confinement.getTranslation( dt );
+    m_geoRBWC->composeLeftByTranslation( translation );
+  }
+
+  // Apply the composite imposed force to its elementary obstacles  
+  if ( moveForce ) 
+    for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
+      (*obstacle)->Compose( m_confinement, *(*obstacle)->getPosition() );
 
   
   // Finally, move the elementary obstacles     
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
   {
     list<SimpleObstacle*> lod = (*obstacle)->Move( time, dt, m_ismoving, 
-    	imposedForce );
+    	moveForce );
     for (ilo=lod.begin();ilo!=lod.end();ilo++) 
       movingObstacles.push_back(*ilo);
   }
+  
+  m_ismoving = m_ismoving || moveForce;  
   
   return ( movingObstacles );
 }

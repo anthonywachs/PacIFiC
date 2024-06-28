@@ -112,21 +112,20 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
     Rotate( *w );
   }
 
-//   bool deplaceF = m_confinement.ImposedMotion( time, dt, this );
-//   deplaceF = deplaceF || motherCompositeHasImposedForce;
-// 
-//   if ( deplaceF && Obstacle::m_MoveObstacle )
-//   {
-//     Vector3 translation = m_confinement.getTranslation( dt );
-//     m_geoRBWC->composeLeftByTranslation( translation );
-//     //    Quaternion w = cinematique.getRotation(dt);
-//     //    Rotate(w);
-//   }
-//   m_ismoving = m_ismoving || deplaceF;
+  bool moveForce = m_confinement.ImposedMotion( time, dt, this );
+  moveForce = moveForce || motherCompositeHasImposedForce;
+
+  if ( moveForce && Obstacle::m_MoveObstacle )
+  {
+    Vector3 translation = m_confinement.getTranslation( dt );
+    m_geoRBWC->composeLeftByTranslation( translation );
+  }
+  
+  m_ismoving = m_ismoving || moveForce;
 
   // If the obstacle moved, add it to the list of moving obstacles and 
   // updates its boundind box
-  if ( m_ismoving )
+  if ( m_ismoving && Obstacle::m_MoveObstacle )
   {
     m_obstacleBox = Component::BoundingBox();
     movingObstacles.push_back( this );

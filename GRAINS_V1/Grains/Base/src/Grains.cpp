@@ -816,7 +816,7 @@ void Grains::Forces( DOMElement* rootElement )
       }
       
       // AppBrownian force
-      DOMNode* nAppBrownian = ReaderXML::getNode( root, "AppBrownian" );
+      DOMNode* nAppBrownian = ReaderXML::getNode( root, "Brownian" );
       if ( nAppBrownian )
       {
         size_t error = 0;
@@ -1365,7 +1365,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	if ( m_rank == 0 )
           cout << GrainsExec::m_shift9 << "Type = " << type << endl;
 
-	// Chargements en Force
+	// Imposed force
 	if ( type == "Force" )
 	{
 	  ObstacleImposedForce* load = new ObstacleImposedForce(
@@ -1373,6 +1373,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  if ( error != 0 ) grainsAbort();
 	  else m_allcomponents.LinkImposedMotion( load );
 	}
+	// Imposed velocity	
 	else if ( type == "Velocity" )
 	{
 	  ObstacleImposedVelocity* load = new ObstacleImposedVelocity(

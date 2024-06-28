@@ -55,9 +55,7 @@ void ObstacleKinematicsForce::clearAndDestroy()
 void ObstacleKinematicsForce::Compose( ObstacleKinematicsForce const& other, 
     	Point3 const& centre )
 {
-  Vector3 direction = *(other.m_currentImposedForce->getDirection()) - centre;
-  double ratio = other.m_vitesseD / Norm( direction );
-  m_translationalVelocity += direction * ratio;
+  m_translationalVelocity += other.m_translationalVelocity;
 }
 
 
@@ -86,8 +84,7 @@ bool ObstacleKinematicsForce::ImposedMotion( double time, double dt,
       m_currentImposedForce = NULL;
     }
   }
-
-  if ( !m_currentImposedForce ) 
+  else 
   {
     list<ObstacleImposedForce*>::iterator iter;
     for (iter=m_imposedForces.begin(); iter!=m_imposedForces.end(); iter++)
@@ -96,35 +93,12 @@ bool ObstacleKinematicsForce::ImposedMotion( double time, double dt,
 	m_currentImposedForce = *iter;
 	iter = m_imposedForces.erase( iter );
 	iter = m_imposedForces.end();
-	//dtt = m_currentImposedForce->getTime( time, fin );
       }
   }
   
-//  // Il existe un force load dans l'increment de time
-//  if ( m_currentImposedForce ) 
-//  {
-
-    // ratio : direction du deplacement pour compenser la force
-    // Cas 0 : force de reaction = force de confinement +/- epsilon
-    //         deplacement - null
-    // Cas 1 : force de reaction < force de confinement - epsilon
-    //         deplacement + direction
-    // Cas 2 : force de reaction > force de confinement + epsilon
-    //         deplacement - direction
-    /*
-    double ratio = 0.;
-    if (force < force load->getForceImpMin())
-      ratio = 1.;
-    else if (force > force load->getForceImpMax())
-      ratio = -1.;
-
-    vitesseD = ratio + force load->getImposedMotion() / dt;
-    Vector3 direction = force load->getDirection();
-    vtrans += vitesseD * direction;
-    */
-
-//  }
-  return ( Norm( m_translationalVelocity ) != 0. );
+  m_vitesseD = Norm( m_translationalVelocity );
+  
+  return ( m_vitesseD != 0. );
 }
 
 
