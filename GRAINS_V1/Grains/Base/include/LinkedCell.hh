@@ -191,7 +191,14 @@ class LinkedCell : public AppCollision
     /** @brief Returns an array of point coordinates of the global grid in a 
     direction
     @param dir direction */
-    vector<double> global_coordinates( size_t const& dir ) const;    		
+    vector<double> global_coordinates( size_t const& dir ) const; 
+    
+    /** @brief Checks that none of the structured array positions is exactly 
+    at a limit of the linked cell grid, otherwise shift by 1e-12 
+    @param InsertionArray structured array positions 
+    @param wrapper MPI wrapper */
+    void checkStructuredArrayPositionsMPI( struct StructArrayInsertion* 
+    	InsertionArray, GrainsMPIWrapper const* wrapper ) const;   		
     //@}
 
 
@@ -276,18 +283,7 @@ class LinkedCell : public AppCollision
     Point3 m_LC_global_origin; /**< Linked cell global origin */
     Point3 m_LC_global_max; /**< Linked cell global max point */    
     Point3 m_LC_local_origin; /**< Linked cell local origin */
-    double m_LC_local_xmin; /**< Linked cell minimum coordinate in the
-    	X direction */
-    double m_LC_local_ymin; /**< Linked cell minimum coordinate in the
-    	Y direction */
-    double m_LC_local_zmin; /**< Linked cell minimum coordinate in the
-    	Z direction */
-    double m_LC_local_xmax; /**< Linked cell maximum coordinate in the
-    	X direction */
-    double m_LC_local_ymax; /**< Linked cell maximum coordinate in the
-    	Y direction */
-    double m_LC_local_zmax; /**< Linked cell maximum coordinate in the
-    	Z direction */
+    Point3 m_LC_local_max; /**< Linked cell local max point */      
     BBox* m_extendedBBox; /**< Bounding Box of the local Linked cell extended by
     	half a cell in each direction */
     //@}

@@ -173,7 +173,8 @@ void GrainsMPI::Simulation( double time_interval )
 
 
         // Write force & torque exerted on obstacles
-        m_allcomponents.outputObstaclesLoad( m_time, m_dt );
+        m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
+      	GrainsExec::m_ReloadType == "same", m_rank, m_nprocs, m_wrapper );
 
 
         // Write postprocessing and reload files
@@ -475,68 +476,11 @@ size_t GrainsMPI::setPositionParticlesFromFile()
 // Sets particle initial position with a structured array
 size_t GrainsMPI::setPositionParticlesArray()
 {
-  Point3 localOrigin, position;
-  Vector3 localSize;  
-
-  // Coordinates of local domain
-  App::get_local_domain_origin( localOrigin[X], localOrigin[Y], 
-  	localOrigin[Z] );
-  App::get_local_domain_size( localSize[X], localSize[Y], localSize[Z] );
-  Point3 MaxLocal = localOrigin + localSize;	
-    
-  // Test that no coordinate matches exactly the local domain limits
-  // If any does, translate by 1e-12
-  double deltax = ( m_InsertionArray->box.ptB[X]
-  	- m_InsertionArray->box.ptA[X] ) / double(m_InsertionArray->NX) ;
-  double deltay = ( m_InsertionArray->box.ptB[Y]
-  	- m_InsertionArray->box.ptA[Y] ) / double(m_InsertionArray->NY) ;
-  double deltaz = ( m_InsertionArray->box.ptB[Z]
-  	- m_InsertionArray->box.ptA[Z] ) / double(m_InsertionArray->NZ) ;
-  double geoshift = 1.e-12;
-  vector<size_t> coorMatchLocLim( 3, 0 );
-  size_t k, l, m, error = 0;
-  for (k=0;k<m_InsertionArray->NX && !coorMatchLocLim[0];++k)
-  {
-    position[X] = m_InsertionArray->box.ptA[X] + ( double(k) + 0.5 ) * deltax;
-    if ( fabs( position[X] - localOrigin[X] ) < geoshift
-    	|| fabs( position[X] - MaxLocal[X] ) < geoshift ) 
-      coorMatchLocLim[0] = 1;
-  }
+  size_t error = 0;
   
-  for (l=0;l<m_InsertionArray->NY && !coorMatchLocLim[1];++l)
-  {
-    position[Y] = m_InsertionArray->box.ptA[Y] + ( double(l) + 0.5 ) * deltay;
-    if ( fabs( position[Y] - localOrigin[Y] ) < geoshift
-    	|| fabs( position[Y] - MaxLocal[Y] ) < geoshift ) 
-      coorMatchLocLim[1] = 1;
-  }  
-
-  for (m=0;m<m_InsertionArray->NZ && !coorMatchLocLim[2];++m)
-  {
-    position[Z] = m_InsertionArray->box.ptA[Z] + ( double(m) + 0.5 ) * deltaz;
-    if ( fabs( position[Z] - localOrigin[Z] ) < geoshift
-    	|| fabs( position[Z] - MaxLocal[Z] ) < geoshift ) 
-      coorMatchLocLim[2] = 1;
-  }
-  
-  coorMatchLocLim[0] = m_wrapper->max_UNSIGNED_INT( coorMatchLocLim[0] );
-  if ( coorMatchLocLim[0] ) m_InsertionArray->box.ptA[X] += geoshift;
-  coorMatchLocLim[1] = m_wrapper->max_UNSIGNED_INT( coorMatchLocLim[1] );
-  if ( coorMatchLocLim[1] ) m_InsertionArray->box.ptA[Y] += geoshift;  
-  coorMatchLocLim[2] = m_wrapper->max_UNSIGNED_INT( coorMatchLocLim[2] );
-  if ( coorMatchLocLim[2] ) m_InsertionArray->box.ptA[Z] += geoshift;
-  
-  if ( ( coorMatchLocLim[0] || coorMatchLocLim[1] || coorMatchLocLim[2] )
-  	&& m_rank == 0 )
-  {
-    cout << endl << "Warning: Structured array positions: some coordinates"
-    	<< " exactly match local domain limits in the following directions:"
-	<< endl;
-    for (size_t i=0;i<3;++i)
-      if ( coorMatchLocLim[i] )
-        cout << "   * " << ( i == 0 ? "X" : i == 1 ? "Y" : "Z" ) << 
-      	" automatic translation of " << geoshift << endl;	
-  }	      
+  // Checks that none of the structured array positions is exactly 
+  // at a limit of the linked cell grid, otherwise shift by 1e-12
+  m_collision->checkStructuredArrayPositionsMPI( m_InsertionArray, m_wrapper );
   
   // Note: only the master proc computes and stores positions  
   if ( m_rank == 0 ) error = Grains::setPositionParticlesArray();

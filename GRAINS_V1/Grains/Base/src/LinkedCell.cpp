@@ -22,12 +22,6 @@ LinkedCell::LinkedCell()
   , m_cellsize_X( 0. )
   , m_cellsize_Y( 0. )
   , m_cellsize_Z( 0. )
-  , m_LC_local_xmin( 0. )
-  , m_LC_local_ymin( 0. )
-  , m_LC_local_zmin( 0. )
-  , m_LC_local_xmax( 0. )
-  , m_LC_local_ymax( 0. )
-  , m_LC_local_zmax( 0. )
   , m_extendedBBox( NULL )
 {}
 
@@ -134,23 +128,23 @@ size_t LinkedCell::set( double cellsize_, string const& oshift )
   cout << oshift << "Global max = " << m_LC_global_max << endl;  
   cout << oshift << "Local origin = " << m_LC_global_origin << endl;
 
-  m_LC_local_xmin = m_LC_local_origin[0];
-  m_LC_local_ymin = m_LC_local_origin[1];
-  m_LC_local_zmin = m_LC_local_origin[2];
-  m_LC_local_xmax = m_LC_local_xmin + m_nbi * m_cellsize_X;
-  m_LC_local_ymax = m_LC_local_ymin + m_nbj * m_cellsize_Y;
-  m_LC_local_zmax = m_LC_local_zmin + m_nbk * m_cellsize_Z;
+  m_LC_local_origin[X] = m_LC_local_origin[0];
+  m_LC_local_origin[Y] = m_LC_local_origin[1];
+  m_LC_local_origin[Z] = m_LC_local_origin[2];
+  m_LC_local_max[X] = m_LC_local_origin[X] + m_nbi * m_cellsize_X;
+  m_LC_local_max[Y] = m_LC_local_origin[Y] + m_nbj * m_cellsize_Y;
+  m_LC_local_max[Z] = m_LC_local_origin[Z] + m_nbk * m_cellsize_Z;
   m_extendedBBox = new BBox(
-  	Point3( m_LC_local_xmin - 0.5 * m_cellsize_X,
-		m_LC_local_ymin - 0.5 * m_cellsize_Y,
-		m_LC_local_zmin - 0.5 * m_cellsize_Z ),
-	Point3( m_LC_local_xmax + 0.5 * m_cellsize_X,
-		m_LC_local_ymax + 0.5 * m_cellsize_Y,
-		m_LC_local_zmax + 0.5 * m_cellsize_Z ) );
+  	Point3( m_LC_local_origin[X] - 0.5 * m_cellsize_X,
+		m_LC_local_origin[Y] - 0.5 * m_cellsize_Y,
+		m_LC_local_origin[Z] - 0.5 * m_cellsize_Z ),
+	Point3( m_LC_local_max[X] + 0.5 * m_cellsize_X,
+		m_LC_local_max[Y] + 0.5 * m_cellsize_Y,
+		m_LC_local_max[Z] + 0.5 * m_cellsize_Z ) );
 
-  cout << oshift << "Local size  = " << m_LC_local_xmax - m_LC_local_xmin
-  	<< " x " << m_LC_local_ymax - m_LC_local_ymin
-	<< " x " << m_LC_local_zmax - m_LC_local_zmin << endl;
+  cout << oshift << "Local size  = " << m_LC_local_max[X] - m_LC_local_origin[X]
+  	<< " x " << m_LC_local_max[Y] - m_LC_local_origin[Y]
+	<< " x " << m_LC_local_max[Z] - m_LC_local_origin[Z] << endl;
 
   // Cells construction
   m_allcells.reserve( m_nb );
@@ -161,7 +155,7 @@ size_t LinkedCell::set( double cellsize_, string const& oshift )
         m_allcells.push_back( new Cell( getCellNumber( i, j, k ),
                 i, j, k, m_LC_local_origin,
 		m_cellsize_X, m_cellsize_Y, m_cellsize_Z,
-                m_LC_local_xmax, m_LC_local_ymax, m_LC_local_zmax ) );
+                m_LC_local_max[X], m_LC_local_max[Y], m_LC_local_max[Z] ) );
 
   // Sets the the list of neighboring cells over which broad phase
   // contact detection is performed
@@ -539,25 +533,26 @@ size_t LinkedCell::set( double cellsize_, int const* nprocsdir,
     cout << oshift << "Local origin = " << m_LC_global_origin << endl;
   }
 
-  m_LC_local_xmin = m_LC_local_origin[0];
-  m_LC_local_ymin = m_LC_local_origin[1];
-  m_LC_local_zmin = m_LC_local_origin[2];
-  m_LC_local_xmax = m_LC_local_xmin + m_nbi * m_cellsize_X;
-  m_LC_local_ymax = m_LC_local_ymin + m_nbj * m_cellsize_Y;
-  m_LC_local_zmax = m_LC_local_zmin + m_nbk * m_cellsize_Z;
+  m_LC_local_origin[X] = m_LC_local_origin[0];
+  m_LC_local_origin[Y] = m_LC_local_origin[1];
+  m_LC_local_origin[Z] = m_LC_local_origin[2];
+  m_LC_local_max[X] = m_LC_local_origin[X] + m_nbi * m_cellsize_X;
+  m_LC_local_max[Y] = m_LC_local_origin[Y] + m_nbj * m_cellsize_Y;
+  m_LC_local_max[Z] = m_LC_local_origin[Z] + m_nbk * m_cellsize_Z;
   m_extendedBBox = new BBox(
-  	Point3( m_LC_local_xmin - 0.5 * m_cellsize_X,
-		m_LC_local_ymin - 0.5 * m_cellsize_Y,
-		m_LC_local_zmin - 0.5 * m_cellsize_Z ),
-	Point3( m_LC_local_xmax + 0.5 * m_cellsize_X,
-		m_LC_local_ymax + 0.5 * m_cellsize_Y,
-		m_LC_local_zmax + 0.5 * m_cellsize_Z ) );
+  	Point3( m_LC_local_origin[X] - 0.5 * m_cellsize_X,
+		m_LC_local_origin[Y] - 0.5 * m_cellsize_Y,
+		m_LC_local_origin[Z] - 0.5 * m_cellsize_Z ),
+	Point3( m_LC_local_max[X] + 0.5 * m_cellsize_X,
+		m_LC_local_max[Y] + 0.5 * m_cellsize_Y,
+		m_LC_local_max[Z] + 0.5 * m_cellsize_Z ) );
 
   if ( voisins->rank( 0, 0, 0 ) == 0 )
   {
-    cout << oshift << "Local size  = " << m_LC_local_xmax - m_LC_local_xmin
-  	<< " x " << m_LC_local_ymax - m_LC_local_ymin
-	<< " x " << m_LC_local_zmax - m_LC_local_zmin << endl;
+    cout << oshift << "Local size  = " 
+    	<< m_LC_local_max[X] - m_LC_local_origin[X]
+  	<< " x " << m_LC_local_max[Y] - m_LC_local_origin[Y]
+	<< " x " << m_LC_local_max[Z] - m_LC_local_origin[Z] << endl;
   }
 
   // Cells construction
@@ -863,7 +858,7 @@ size_t LinkedCell::set( double cellsize_, int const* nprocsdir,
 	m_allcells.push_back( new Cell( getCellNumber( i, j, k ),
 		i, j, k, m_LC_local_origin,
 		m_cellsize_X, m_cellsize_Y, m_cellsize_Z,
-		m_LC_local_xmax, m_LC_local_ymax, m_LC_local_zmax,
+		m_LC_local_max[X], m_LC_local_max[Y], m_LC_local_max[Z],
 		tag, geoLoc ) );
       }
     }
@@ -1621,8 +1616,8 @@ ostream& operator <<( ostream& f, LinkedCell const& LC )
   f << "Cell size in X x Y x Z = " << LC.m_cellsize_X << " x "
   	<< LC.m_cellsize_Y << " x " << LC.m_cellsize_Z << endl;
   f << "Local origin = " << LC.m_LC_local_origin;
-  f << "Max coordinates of local grid = " << LC.m_LC_local_xmax << " "
-  	<< LC.m_LC_local_ymax << " " << LC.m_LC_local_zmax << endl;
+  f << "Max coordinates of local grid = " << LC.m_LC_local_max[X] << " "
+  	<< LC.m_LC_local_max[Y] << " " << LC.m_LC_local_max[Z] << endl;
   f << "CELLS" << endl;
   for (iv=LC.m_allcells.begin();iv!=LC.m_allcells.end();iv++)
     f << *(*iv) << endl << endl;
@@ -1639,9 +1634,9 @@ bool LinkedCell::isInLinkedCell( Point3 const& position ) const
 {
   bool isIn = true;
 
-  if ( position[0] < m_LC_local_xmin || position[0] > m_LC_local_xmax
-  	|| position[1] < m_LC_local_ymin || position[1] > m_LC_local_ymax
-  	|| position[2] < m_LC_local_zmin || position[2] > m_LC_local_zmax )
+  if ( position[0] < m_LC_local_origin[X] || position[0] > m_LC_local_max[X]
+    || position[1] < m_LC_local_origin[Y] || position[1] > m_LC_local_max[Y]
+    || position[2] < m_LC_local_origin[Z] || position[2] > m_LC_local_max[Z] )
     isIn = false;
 
   return ( isIn );
@@ -1657,9 +1652,9 @@ bool LinkedCell::isInLinkedCell( double const& gx, double const& gy,
 {
   bool isIn = true;
 
-  if ( gx < m_LC_local_xmin || gx > m_LC_local_xmax
-  	|| gy < m_LC_local_ymin || gy > m_LC_local_ymax
-  	|| gz < m_LC_local_zmin || gz > m_LC_local_zmax )
+  if ( gx < m_LC_local_origin[X] || gx > m_LC_local_max[X]
+  	|| gy < m_LC_local_origin[Y] || gy > m_LC_local_max[Y]
+  	|| gz < m_LC_local_origin[Z] || gz > m_LC_local_max[Z] )
     isIn = false;
 
   return ( isIn );
@@ -2459,4 +2454,68 @@ vector<double> LinkedCell::global_coordinates( size_t const& dir ) const
     coord[i] = m_LC_global_origin[dir] + double(i) * step;
   
   return ( coord );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Checks that none of the structured array positions is exactly 
+// at a limit of the linked cell grid, otherwise shift by 1e-12 
+void LinkedCell::checkStructuredArrayPositionsMPI( struct StructArrayInsertion* 
+    	InsertionArray, GrainsMPIWrapper const* wrapper ) const
+{
+  Point3 position;
+  double geoshift = 1.e-12;      
+  double deltax = ( InsertionArray->box.ptB[X]
+  	- InsertionArray->box.ptA[X] ) / double(InsertionArray->NX) ;
+  double deltay = ( InsertionArray->box.ptB[Y]
+  	- InsertionArray->box.ptA[Y] ) / double(InsertionArray->NY) ;
+  double deltaz = ( InsertionArray->box.ptB[Z]
+  	- InsertionArray->box.ptA[Z] ) / double(InsertionArray->NZ) ;
+  vector<size_t> coorMatchLocLim( 3, 0 );
+  size_t k, l, m;
+  
+  for (k=0;k<InsertionArray->NX && !coorMatchLocLim[X];++k)
+  {
+    position[X] = InsertionArray->box.ptA[X] + ( double(k) + 0.5 ) * deltax;
+    if ( fabs( position[X] - m_LC_local_origin[X] ) < geoshift
+    	|| fabs( position[X] - m_LC_local_max[X] ) < geoshift ) 
+      coorMatchLocLim[X] = 1;
+  }
+  
+  for (l=0;l<InsertionArray->NY && !coorMatchLocLim[Y];++l)
+  {
+    position[Y] = InsertionArray->box.ptA[Y] + ( double(l) + 0.5 ) * deltay;
+    if ( fabs( position[Y] - m_LC_local_origin[Y] ) < geoshift
+    	|| fabs( position[Y] - m_LC_local_max[Y] ) < geoshift ) 
+      coorMatchLocLim[Y] = 1;
+  }  
+
+  for (m=0;m<InsertionArray->NZ && !coorMatchLocLim[Z];++m)
+  {
+    position[Z] = InsertionArray->box.ptA[Z] + ( double(m) + 0.5 ) * deltaz;
+    if ( fabs( position[Z] - m_LC_local_origin[Z] ) < geoshift
+    	|| fabs( position[Z] - m_LC_local_max[Z] ) < geoshift ) 
+      coorMatchLocLim[Z] = 1;
+  }
+  
+  coorMatchLocLim[X] = wrapper->max_UNSIGNED_INT( coorMatchLocLim[X] );
+  if ( coorMatchLocLim[X] ) InsertionArray->box.ptA[X] += geoshift;
+  coorMatchLocLim[Y] = wrapper->max_UNSIGNED_INT( coorMatchLocLim[Y] );
+  if ( coorMatchLocLim[Y] ) InsertionArray->box.ptA[Y] += geoshift;  
+  coorMatchLocLim[Z] = wrapper->max_UNSIGNED_INT( coorMatchLocLim[Z] );
+  if ( coorMatchLocLim[Z] ) InsertionArray->box.ptA[Z] += geoshift;
+  
+  if ( ( coorMatchLocLim[X] || coorMatchLocLim[Y] || coorMatchLocLim[Z] )
+  	&& wrapper->get_rank() == 0 )
+  {
+    cout << endl << "Warning: Structured array positions: some coordinates"
+    	<< " exactly match local linked cell grid limits in the following "
+	<< "directions:" << endl;
+    for (size_t i=0;i<3;++i)
+      if ( coorMatchLocLim[i] )
+        cout << "   * " << ( i == 0 ? "X" : i == 1 ? "Y" : "Z" ) << 
+      	" automatic translation of " << geoshift << endl;	
+  }
 }

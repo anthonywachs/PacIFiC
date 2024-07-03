@@ -93,6 +93,7 @@ class ObstacleImposedForce
     Vector3 m_force; /**< Imposed force at time t */    
     string m_type; /**< Force type */
     double m_mass; /**< Virtual mass of obstacle */
+    bool m_automass; /**< true if the mass is determined by the code */
     Vector3 m_direction; /**< Motion (or force) direction, i.e. unit imposed
     	force vector */
     Vector3 m_translationalVelocity; /**< translational velocity */
@@ -100,7 +101,9 @@ class ObstacleImposedForce
     	direction */
     Vector3 m_SinCyclic_phase_shift; /**< sinusoidal velocity phase shift in 
     	each direction */    
-    Vector3 m_prev; /**< cyclic motion previous position */    
+    Vector3 m_prev; /**< cyclic motion previous position */
+    double m_vmaxzeroforce; /**< maximum velocity magnitude at early stages if 
+    	the force is zero */        
     //@}
     
     
