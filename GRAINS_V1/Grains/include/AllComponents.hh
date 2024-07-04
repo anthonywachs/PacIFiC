@@ -450,13 +450,17 @@ class AllComponents
     @param dt time step magnitude
     @param enforceOutput force writing
     @param increaseCounterOnly increases the writing counter only
-    @param rank process rank
-    @param nprocs number of processes
-    @param wrapper MPI wrapper */
+    @param rank process rank */
     void outputObstaclesLoad( double time, double dt,
-    	bool enforceOutput = false,
-      	bool increaseCounterOnly = false,
-      	int rank = 0, int nprocs = 1, GrainsMPIWrapper const* wrapper = NULL );
+    	bool enforceOutput = false, bool increaseCounterOnly = false,
+	int rank = 0 );
+
+    /** @brief Computes load on obstacles
+    @param time physical time
+    @param dt time step magnitude
+    @param wrapper MPI wrapper */
+    void computeObstaclesLoad( double time, double dt,
+      	GrainsMPIWrapper const* wrapper = NULL );
 
     /** @brief Initialises output files to write loads on obstacles
     @param rank process rank

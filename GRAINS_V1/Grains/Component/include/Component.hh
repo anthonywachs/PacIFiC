@@ -197,7 +197,15 @@ class Component
     /** @brief Sets the contact map 
     @param othermap the contact map to be copied */
     void setContactMap( map< std::tuple<int,int,int>,
-     	std::tuple<bool, Vector3, Vector3, Vector3> > const& othermap );         
+     	std::tuple<bool, Vector3, Vector3, Vector3> > const& othermap );
+	
+    /** @brief Sets the total force exerted on the component
+    @param force new total force */
+    void setForce( Vector3 const& force );
+    
+    /** @brief Sets the total torque exerted on the component
+    @param torque new total torque */
+    void setTorque( Vector3 const& torque ); 	         
     //@}
 
 
@@ -263,7 +271,11 @@ class Component
     /** @brief Returns a pointer to the contact map */
     map< std::tuple<int,int,int>,
      	std::tuple<bool, Vector3, Vector3, Vector3> > const* getContactMap()
-	const;    
+	const;
+	
+    /** @brief Returns component tag at the current discrete time (default 
+    is 0) */
+    virtual int getTag() const;	    
     //@}
 
 
@@ -272,8 +284,11 @@ class Component
     /** @brief Adds a force exerted at a point to the torsor (torsor adds torque
     automatically)
     @param force force
-    @param point point where the force is exerted */
-    virtual void addForce( Point3 const& point, Vector3 const& force );
+    @param point point where the force is exerted 
+    @param tagSecondComp tag of the other compoenent in case of a contact 
+    force */
+    virtual void addForce( Point3 const& point, Vector3 const& force,
+    	int tagSecondComp );
 
     /** @brief Adds a body force exerted at the center of mass of the component
     to the torsor (associated torque is 0)
@@ -281,8 +296,10 @@ class Component
     virtual void addBodyForce( Vector3 const& force );
 
     /** @brief Adds a torque to the torsor
-    @param torque torque */
-    virtual void addTorque( Vector3 const& torque );
+    @param torque torque 
+    @param tagSecondComp tag of the other compoenent in case of a contact 
+    torque */
+    virtual void addTorque( Vector3 const& torque, int tagSecondComp );
 
     /** @brief Copies the center of mass of the component in a 1D array
     @param pos 1D array where center of mass is copied

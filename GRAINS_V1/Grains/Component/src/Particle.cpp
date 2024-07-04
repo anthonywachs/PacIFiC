@@ -766,17 +766,6 @@ void Particle::copyKinematicsNm2( double* vit, int i ) const
 
 
 // ----------------------------------------------------------------------------
-// Adds a force whose point of application is different from the
-// reference point of the torsor (additional torque contribution)
-void Particle::addForce( Point3 const& point, Vector3 const& f_ )
-{
-  m_torsor.addForce( point, f_ );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Resets kinematics and transformation to 0
 void Particle::reset()
 {

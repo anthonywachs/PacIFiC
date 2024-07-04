@@ -237,20 +237,25 @@ bool MemoryContactForceModel::computeForces( Component* p0_,
   if ( ref_p0_->isCompositeParticle() ) elementary_id0 = p0_->getID() ;
   if ( ref_p1_->isCompositeParticle() ) elementary_id1 = p1_->getID() ;
 
+  // Component tags
+  int tag_p0_ = ref_p0_->getTag();
+  int tag_p1_ = ref_p1_->getTag();    
+
   Vector3 delFN, delFT, delM;
   Point3 geometricPointOfContact = contactInfos.getContact();
 
-  // Calcul des forces & moments de contact
+  // Compute contact force and torque
   performForcesCalculus( ref_p0_, ref_p1_, dt, contactInfos, delFN, delFT, 
   	delM, elementary_id0, elementary_id1 );
 
   // Component p0_
-  ref_p0_->addForce( geometricPointOfContact, coef * (delFN + delFT) );
-  if ( rolling_friction ) ref_p0_->addTorque( delM * coef );
+  ref_p0_->addForce( geometricPointOfContact, coef * (delFN + delFT), tag_p1_ );
+  if ( rolling_friction ) ref_p0_->addTorque( delM * coef, tag_p1_ );
 
   // Component p1_
-  ref_p1_->addForce( geometricPointOfContact, coef * ( - delFN - delFT ) );
-  if ( rolling_friction ) ref_p1_->addTorque( - delM * coef );
+  ref_p1_->addForce( geometricPointOfContact, coef * ( - delFN - delFT ), 
+  	tag_p0_ );
+  if ( rolling_friction ) ref_p1_->addTorque( - delM * coef, tag_p0_ );
 
   // Force postprocessing
   if ( GrainsExec::m_output_data_at_this_time )

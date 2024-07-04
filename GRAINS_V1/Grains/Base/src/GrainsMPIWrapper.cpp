@@ -2461,43 +2461,35 @@ void GrainsMPIWrapper::sumObstaclesLoad(
   double* forcetorque = new double[6*nobs];
   double* forcetorque_collective = new double[6*nobs];   
 
-  // Copy in a local buffer except on the master process where buffer is set 
-  // to 0
-  if ( m_rank == m_rank_master )
-    for (i=0;i<6*nobs;++i) forcetorque[i] = 0.;
-  else
-    for (obstacle=allMyObs.begin(); obstacle!=allMyObs.end(); obstacle++,i+=6)
-    {
-      force = (*obstacle)->getForce();
-      torque = (*obstacle)->getTorque();
-      forcetorque[i] = (*force)[X];
-      forcetorque[i+1] = (*force)[Y];    
-      forcetorque[i+2] = (*force)[Z];    
-      forcetorque[i+3] = (*torque)[X];    
-      forcetorque[i+4] = (*torque)[Y];   
-      forcetorque[i+5] = (*torque)[Z];        
-    } 
+  // Copy in a local buffer
+  for (obstacle=allMyObs.begin(),i=0; obstacle!=allMyObs.end(); obstacle++,i+=6)
+  {
+    force = (*obstacle)->getForce();
+    torque = (*obstacle)->getTorque();
+    forcetorque[i] = (*force)[X];
+    forcetorque[i+1] = (*force)[Y];    
+    forcetorque[i+2] = (*force)[Z]; 
+    forcetorque[i+3] = (*torque)[X];    
+    forcetorque[i+4] = (*torque)[Y];   
+    forcetorque[i+5] = (*torque)[Z];        
+  } 
   
   // Sum all contributions from other processes on the master
-  MPI_Reduce( forcetorque, forcetorque_collective, 6*nobs, MPI_DOUBLE, 
-  	MPI_SUM, m_rank_master, m_MPI_COMM_activeProc ); 
+  MPI_Allreduce( forcetorque, forcetorque_collective, 6 * nobs, MPI_DOUBLE, 
+  	MPI_SUM, m_MPI_COMM_activeProc ); 
 	
   // Add all contributions from other processes on the master
-  if ( m_rank == m_rank_master )
+  for (obstacle=allMyObs.begin(),i=0; obstacle!=allMyObs.end(); obstacle++,i+=6)
   {
-    i = 0;
-    for (obstacle=allMyObs.begin(); obstacle!=allMyObs.end(); obstacle++,i+=6)
-    {
-      collective_force[X] = forcetorque_collective[i] ;
-      collective_force[Y] = forcetorque_collective[i+1] ;    
-      collective_force[Z] = forcetorque_collective[i+2] ;    
-      collective_torque[X] = forcetorque_collective[i+3] ;
-      collective_torque[Y] = forcetorque_collective[i+4] ;    
-      collective_torque[Z] = forcetorque_collective[i+5] ; 
-      (*obstacle)->addBodyForce( collective_force );
-      (*obstacle)->addTorque( collective_torque );           
-    }
-  }  	     
+    collective_force[X] = forcetorque_collective[i] ;
+    collective_force[Y] = forcetorque_collective[i+1] ;    
+    collective_force[Z] = forcetorque_collective[i+2] ;    
+    collective_torque[X] = forcetorque_collective[i+3] ;
+    collective_torque[Y] = forcetorque_collective[i+4] ;    
+    collective_torque[Z] = forcetorque_collective[i+5] ;
+    (*obstacle)->setForce( collective_force );     
+    (*obstacle)->setTorque( collective_torque );           
+  }	     
   
   delete [] forcetorque;
   delete [] forcetorque_collective;  

@@ -379,12 +379,6 @@ class Particle : public Component
     @param i start index to copy in the 1D array */
     void copyKinematicsNm2( double* vit, int i ) const;
 
-    /** @brief Adds a force whose point of application is different from the
-    reference point of the torsor (additional torque contribution)
-    @param f_ the added force
-    @param point point of application of the force */
-    void addForce( Point3 const& point, Vector3 const& f_ );
-
     /** @brief Updates geographic localisation in the LinkedCell. Note that
     this method uses the cell from the previous time m_cellule_nm1 */
     void updateGeoPosition();

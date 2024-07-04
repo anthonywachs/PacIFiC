@@ -172,9 +172,10 @@ void GrainsMPI::Simulation( double time_interval )
         SCT_add_elapsed_time( "Move" );
 
 
-        // Write force & torque exerted on obstacles
-        m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
-      	GrainsExec::m_ReloadType == "same", m_rank, m_nprocs, m_wrapper );
+        // Compute and write force & torque exerted on obstacles
+        m_allcomponents.computeObstaclesLoad( m_time, m_dt, m_wrapper ); 
+	m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
+      		GrainsExec::m_ReloadType == "same", m_rank );
 
 
         // Write postprocessing and reload files

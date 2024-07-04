@@ -1970,21 +1970,29 @@ void AllComponents::setOutputObstaclesLoadParameters( string const& root_,
 
 
 // ----------------------------------------------------------------------------
+// Computes load on obstacles
+void AllComponents::computeObstaclesLoad( double time, double dt,
+      	GrainsMPIWrapper const* wrapper )
+{
+  // Load on simple obstacles
+  if ( wrapper ) wrapper->sumObstaclesLoad( m_obstacle->getObstacles() );
+    
+  // Load on composite obstacles  
+}
+
+
+
+// ----------------------------------------------------------------------------
 // Writes load on obstacles in a file
 void AllComponents::outputObstaclesLoad( double time, double dt,
-	bool enforceOutput, bool increaseCounterOnly, int rank, int nprocs,
-	GrainsMPIWrapper const* wrapper )
+	bool enforceOutput, bool increaseCounterOnly, int rank )
 {
   if ( !increaseCounterOnly )
   {
     if ( m_outputTorsorObstacles_counter == 0 || enforceOutput )
     {
-      if ( nprocs > 1 )
-        wrapper->sumObstaclesLoad( m_obstacle->getObstacles() );
-
       if ( rank == 0 )
       {
-        Torsor const* torseur = NULL;
         Vector3 const* force = NULL;
         Vector3 const* torque = NULL;
         for (list<Obstacle*>::iterator
@@ -1993,9 +2001,8 @@ void AllComponents::outputObstaclesLoad( double time, double dt,
         {
           ofstream OUT( ( m_outputTorsorObstacles_dir
       	+ "/Loading_" + (*obstacle)->getName() + ".res" ).c_str(), ios::app );
-          torseur = (*obstacle)->getTorsor();
-	  force = torseur->getForce();
-          torque = torseur->getTorque();
+	  force = (*obstacle)->getForce();
+          torque = (*obstacle)->getTorque();
 	  OUT << time << " " <<
 		GrainsExec::doubleToString( ios::scientific, 6, (*force)[X] )
 		<< " " <<

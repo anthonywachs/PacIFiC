@@ -280,6 +280,21 @@ class Obstacle : public Component
     @param LC linked-cell grid */
     virtual void InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC );
+	
+    /** @brief Adds a force exerted at a point to the torsor (torsor adds torque
+    automatically)
+    @param force force
+    @param point point where the force is exerted 
+    @param tagSecondComp tag of the other compoenent in case of a contact 
+    force */
+    void addForce( Point3 const& point, Vector3 const& force,
+    	int tagSecondComp );
+
+    /** @brief Adds a torque to the torsor
+    @param torque torque 
+    @param tagSecondComp tag of the other compoenent in case of a contact 
+    torque */
+    void addTorque( Vector3 const& torque, int tagSecondComp );	
     //@}
 
 

@@ -230,19 +230,8 @@ string ObstacleImposedForce::getType() const
 Vector3 const* ObstacleImposedForce::translationalVelocity( double time, 
 	double dt, Obstacle* obstacle )
 {
-  Vector3 center = *obstacle->getPosition();
-  GrainsMPIWrapper* wrapper = GrainsExec::getComm();
-
-  // Sum of forces of the obstacle
-  Torsor const* somme  = obstacle->getTorsor();
-  Vector3 force = *(somme->getForce());
-  
-  if ( wrapper )
-  {
-    force[X] = wrapper->sum_DOUBLE( force[X] ); 
-    force[Y] = wrapper->sum_DOUBLE( force[Y] ); 
-    force[Z] = wrapper->sum_DOUBLE( force[Z] ); 
-  }
+  Vector3 center = *(obstacle->getPosition());
+  Vector3 force = *(obstacle->getForce());
 
   // Mass coeficient
   // If automatically determined, it is set such that the obstacle motion

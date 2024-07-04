@@ -558,3 +558,33 @@ int Obstacle::getMinIDnumber()
 {
   return ( m_minID );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Adds a force exerted at a point  to the torsor (torsor adds torque
+// automatically)
+void Obstacle::addForce( Point3 const& point, Vector3 const& force, 
+	int tagSecondComp )
+{
+  // In case of a contact force, if the tag of the other component is 2, this
+  // component is a periodic or parallel clone particle and its contribution 
+  // must not be added as its periodic/parallel master particle's contribution 
+  // is already accounted for 
+  if ( tagSecondComp != 2 ) m_torsor.addForce( point, force );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Adds a torque to the torsor
+void Obstacle::addTorque( Vector3 const& torque, int tagSecondComp )
+{
+  // In case of a contact force, if the tag of the other component is 2, this
+  // component is a periodic or parallel clone particle and its contribution 
+  // must not be added as its periodic/parallel master particle's contribution 
+  // is already accounted for 
+  if ( tagSecondComp != 2 ) m_torsor.addTorque( torque );
+}

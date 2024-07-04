@@ -142,7 +142,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
     // Postprocessing of force & torque on obstacles
     m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );
     m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
-      GrainsExec::m_ReloadType == "same", m_rank, m_nprocs, m_wrapper );
+      GrainsExec::m_ReloadType == "same", m_rank );
 
     // Next time of writing results
     m_timeSave = m_save.begin();
@@ -335,7 +335,8 @@ void Grains::Simulation( double time_interval )
       }
 
 
-      // Write force & torque exerted on obstacles
+      // Compute and write force & torque exerted on obstacles
+      m_allcomponents.computeObstaclesLoad( m_time, m_dt ); 
       m_allcomponents.outputObstaclesLoad( m_time, m_dt );
 
 

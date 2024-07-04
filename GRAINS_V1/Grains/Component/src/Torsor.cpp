@@ -145,6 +145,16 @@ void Torsor::setPoint( Point3 const& point )
 
 
 // ----------------------------------------------------------------------------
+// Sets the total torque of the torsor
+void Torsor::setTorque( Vector3 const& t_ )
+{
+  m_totalTorque = t_;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Sets the total force of the torsor, the reference point of the
 // torsor and initializes the torque to (0,0,0)
 void Torsor::setToBodyForce( Point3 const& point, Vector3 const& f_ )
@@ -335,22 +345,6 @@ Torsor& Torsor::operator += ( Torsor const& k2 )
 
 
 // ----------------------------------------------------------------------------
-// Addition of a torsor whose actual reference point is specified as
-// an additional parameter and not the reference point in the torsor itself.
-// Helpful for periodic particles.
-void Torsor::addWithSpecifiedReferencePoint( Torsor const& rhs, 
-	Point3 const& rp_rhs )
-{
-  m_totalForce += rhs.m_totalForce;
-  Vector3 vecteurA = rhs.m_refPoint - rp_rhs;
-  vecteurA.round();
-  m_totalTorque += rhs.m_totalTorque + ( vecteurA ^ rhs.m_totalForce );    
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Comparaison operator
 bool Torsor::operator == ( Torsor const& top2 )
 {
@@ -407,7 +401,7 @@ void Torsor::write( ostream& fileOut )
 // Output operator
 ostream& operator << ( ostream& fileOut, Torsor const& object )
 {
-  fileOut << "Point3 reduction = " << object.m_refPoint
+  fileOut << "Point = " << object.m_refPoint
 	  << "Force = " << object.m_totalForce
 	  << "Moment = " << object.m_totalTorque;
   return ( fileOut );

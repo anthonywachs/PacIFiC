@@ -128,7 +128,11 @@ bool HODCContactForceModel::computeForces( Component* p0_,
   // In the case of composite particles, we use the composite particle not the
   // elemetary particles
   Component* ref_p0_ = p0_->getMasterComponent() ;
-  Component* ref_p1_ = p1_->getMasterComponent() ; 
+  Component* ref_p1_ = p1_->getMasterComponent() ;
+
+  // Component tags
+  int tag_p0_ = ref_p0_->getTag();
+  int tag_p1_ = ref_p1_->getTag();   
 
   Vector3 delFN, delFT, delM; 
   Point3 geometricPointOfContact = contactInfos.getContact();
@@ -137,12 +141,13 @@ bool HODCContactForceModel::computeForces( Component* p0_,
   performForcesCalculus( ref_p0_, ref_p1_, contactInfos, delFN, delFT, delM );
 
   // Component p0_
-  ref_p0_->addForce( geometricPointOfContact, coef * (delFN + delFT) );
-  if ( k_m_s ) ref_p0_->addTorque( delM * coef );     
+  ref_p0_->addForce( geometricPointOfContact, coef * (delFN + delFT), tag_p1_ );
+  if ( k_m_s ) ref_p0_->addTorque( delM * coef, tag_p1_ );     
     
   // Component p1_
-  ref_p1_->addForce( geometricPointOfContact, coef * ( - delFN - delFT ) );
-  if ( k_m_s ) ref_p1_->addTorque( - delM * coef );
+  ref_p1_->addForce( geometricPointOfContact, coef * ( - delFN - delFT ),
+  	 tag_p0_ );
+  if ( k_m_s ) ref_p1_->addTorque( - delM * coef, tag_p0_ );
     
   // Force postprocessing
   if ( GrainsExec::m_output_data_at_this_time )

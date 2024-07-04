@@ -59,9 +59,10 @@ Component::~Component()
 
 
 // ----------------------------------------------------------------------------
-// Adds a force exerted at a point  to the torsor (torsor adds torque
+// Adds a force exerted at a point to the torsor (torsor adds torque
 // automatically)
-void Component::addForce( Point3 const& point, Vector3 const& force )
+void Component::addForce( Point3 const& point, Vector3 const& force,
+	int tagSecondComp )
 {
   m_torsor.addForce( point, force );
 }
@@ -82,9 +83,29 @@ void Component::addBodyForce( Vector3 const& force )
 
 // ----------------------------------------------------------------------------
 // Adds a torque to the torsor
-void Component::addTorque( Vector3 const& torque )
+void Component::addTorque( Vector3 const& torque, int tagSecondComp )
 {
   m_torsor.addTorque( torque );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the total force exerted on the component
+void Component::setForce( Vector3 const& force )
+{
+  m_torsor.setForce( force );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the total torque exerted on the component
+void Component::setTorque( Vector3 const& torque )
+{
+  m_torsor.setTorque( torque );
 }
 
 
@@ -993,3 +1014,13 @@ void Component::setContactMap( map< std::tuple<int,int,int>,
   for (it=othermap.begin();it!=othermap.end();it++)
     m_contactMap[it->first] = it->second;
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns component tag at the current discrete time (default is 0)
+int Component::getTag() const
+{
+  return ( 0 );
+}
