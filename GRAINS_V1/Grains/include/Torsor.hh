@@ -181,9 +181,13 @@ class Torsor
 
     /**@name I/O methods */
     //@{
-    /** @brief Write the object in a output stream
+    /** @brief Writes the object in a output stream
     @param fileOut output stream */
-    void write( ostream& fileOut );
+    void write( ostream& fileOut ) const;
+    
+    /** @brief Reads the object from an input stream
+    @param fileOut output stream */
+    void read( istream& fileIN );    
     //@}
 
 

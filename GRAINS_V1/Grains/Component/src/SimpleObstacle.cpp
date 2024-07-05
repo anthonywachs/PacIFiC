@@ -244,6 +244,9 @@ void SimpleObstacle::reload( Obstacle& mother, istream& file )
 
   // Obstacle ID number
   file >> m_id;
+  
+  // Torsor
+  m_torsor.read( file ); 
 
   // Material name
   file >> buffer >> m_materialName;
@@ -313,6 +316,7 @@ void SimpleObstacle::Translate( Vector3 const& translation )
 void SimpleObstacle::write( ostream& fileSave ) const
 {
   fileSave << "<Simple> " << m_name << " " << m_id << endl;
+  m_torsor.write( fileSave );
   fileSave << "*Material " << m_materialName << endl;
   m_geoRBWC->writeStatic( fileSave );
   fileSave << endl;

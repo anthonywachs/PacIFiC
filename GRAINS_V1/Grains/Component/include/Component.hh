@@ -480,8 +480,8 @@ class Component
     /** @name Parameters */
     //@{
     int m_id; /**< ID number, particle ID numbers are always positive and
-    	obstacles ID numbes are always negative, reference particle ID number is
-    	always 0 */
+    	obstacles ID numbes are always negative, reference particle ID number 
+	and composite obstacle ID number are always 0 */
     string m_materialName; /**< Material name */
     double m_mass; /**< Mass */
     RigidBodyWithCrust *m_geoRBWC; /**< geometric shape with crust */

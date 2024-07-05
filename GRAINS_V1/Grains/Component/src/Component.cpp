@@ -452,7 +452,7 @@ Torsor const* Component::getTorsor()
 
 
 // ----------------------------------------------------------------------------
-// Initialise le torseur des efforts sur le composant
+// Initializes the component's torsor
 void Component::InitializeForce( bool const& withWeight )
 {
   m_torsor.setToBodyForce( *m_geoRBWC->getCentre(), Vector3Null );
@@ -779,7 +779,6 @@ void Component::writeContactMemory2014( ostream &fileOut ) const
       fileOut << get<2>(it->first) ;
       fileOut << " ";
       fileOut << get<0>(it->second) ;
-      fileOut << " ";
       fileOut << " ";
       get<1>(it->second).writeGroup3(fileOut);
       fileOut << " ";

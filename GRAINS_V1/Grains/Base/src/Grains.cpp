@@ -1008,11 +1008,11 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
         ObstacleUpdateFreq = ReaderXML::getNodeAttr_Int( nMovingObstacles,
       		"LinkUpdateEvery" );
 
-      // Whether moving obstacles are geometrically displaced
-      if ( ReaderXML::hasNodeAttr( nMovingObstacles, "GeometricallyDisplace" ) )
+      // Whether moving obstacles are geometrically moving
+      if ( ReaderXML::hasNodeAttr( nMovingObstacles, "GeometricallyMove" ) )
       {
         string disp = ReaderXML::getNodeAttr_String( nMovingObstacles,
-     		"GeometricallyDisplace" );
+     		"GeometricallyMove" );
         if ( disp == "False" )
 	{
 	  displaceObstacles = false;
@@ -1523,10 +1523,16 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 		( FToutputFreq > 1 ? "s" : "" ) << endl;
           cout << GrainsExec::m_shift12 << "Output file directory name = "
     		<< ppObsdir << endl;
-          cout << GrainsExec::m_shift12 << "Obstacle names" << endl;
-	  for (list<string>::const_iterator il=allppObsName.begin();
+          cout << GrainsExec::m_shift12 << "Obstacle name";
+	  if ( allppObsName.size() == 1 ) cout << " = " << *allppObsName.begin()
+	  	<< endl;
+	  else
+	  {
+	    cout << "s" << endl;
+	    for (list<string>::const_iterator il=allppObsName.begin();
 	  	il!=allppObsName.end();il++)
-	    cout << GrainsExec::m_shift15 << *il << endl;
+	      cout << GrainsExec::m_shift15 << *il << endl;
+	  }
 	}
       }
     }

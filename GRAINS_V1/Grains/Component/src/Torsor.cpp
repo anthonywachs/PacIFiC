@@ -383,15 +383,22 @@ Torsor Torsor::operator * ( double d )
 
 
 // ----------------------------------------------------------------------------
-// Write the object in a output stream
-void Torsor::write( ostream& fileOut )
+// Writes the object in a output stream
+void Torsor::write( ostream& fileOut ) const
 {
-  fileOut << "*PtContact\t" << m_refPoint;
-  fileOut << "*Fn+Ft\t"     << m_totalForce;
-  if ( Norm( m_totalTorque ) < 1.e20 )
-    fileOut << "*Moment\t"    << m_totalTorque;
-  else
-    fileOut << "*Moment   0.   0.   0.\n";
+  fileOut << "*Torsor " << m_refPoint << " " << m_totalForce << " " <<
+  	m_totalTorque << endl;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads the object from an input stream
+void Torsor::read( istream& fileIn )
+{
+  string buffer;
+  fileIn >> buffer >> m_refPoint >> m_totalForce >> m_totalTorque;
 }
 
 

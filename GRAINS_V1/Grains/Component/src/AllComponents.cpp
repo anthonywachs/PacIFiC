@@ -1066,6 +1066,9 @@ size_t AllComponents::read( istream& fileSave, list<Point3>* known_positions,
   }      
   
   // Reload the obstacle tree
+  // The highest level composite obstacle is a default composite obstacle that 
+  // is created as the root of the obstacle tree, its torsor is physically 
+  // meaning less and is not written, therefore not read here
   string name;
   fileSave >> buffer;
   fileSave >> buffer >> buffer;
@@ -1977,7 +1980,8 @@ void AllComponents::computeObstaclesLoad( double time, double dt,
   // Load on simple obstacles
   if ( wrapper ) wrapper->sumObstaclesLoad( m_obstacle->getObstacles() );
     
-  // Load on composite obstacles  
+  // Load on composite obstacles 
+  m_obstacle->getTorsor(); 
 }
 
 

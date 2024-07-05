@@ -321,6 +321,15 @@ class CompositeObstacle : public Obstacle
     //@{  
     list<Obstacle*> m_obstacles; /**< list of obstacles in the composite
     	obstacle */
+    int m_CompositeObstacle_id; /**< standard ID number is 0, the composite
+    	obstacle ID number is used to distinguish the highest level composite
+    	obstacle that is artificially created as the root of the obstacle tree 
+	from all other physically relevant and user created composite 
+	obstacles */    	 
+    static int m_minCompositeObstacleID; /**< Minimum composite
+    	obstacle ID number, composite obstacle ID numbers range
+    	from 0 (the root) down to m_min_CompositeObstacle_id and are 
+	therefore always negative except the root */ 
     //@}
 
 

@@ -7,13 +7,18 @@
 #include "GrainsExec.hh"
 
 
+int CompositeObstacle::m_minCompositeObstacleID = -1;
+
+
 // ----------------------------------------------------------------------------
 // Constructor with name as input parameter
 CompositeObstacle::CompositeObstacle( string const& s ) :
   Obstacle( s, false )
 {
   m_id = GrainsExec::m_CompositeObstacleDefaultID;
-  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
+  m_minCompositeObstacleID++;
+  m_CompositeObstacle_id = m_minCompositeObstacleID;   
+  m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() ); 
 }
 
 
@@ -25,6 +30,9 @@ CompositeObstacle::CompositeObstacle( DOMNode* root ) :
   Obstacle( "obstacle", false )
 {
   m_id = GrainsExec::m_CompositeObstacleDefaultID;
+  m_minCompositeObstacleID++;
+  m_CompositeObstacle_id = m_minCompositeObstacleID;   
+    
   assert( root != NULL );
 
   m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() );
@@ -385,11 +393,30 @@ bool CompositeObstacle::isCloseWithCrust( Component const* voisin ) const
 
 
 // ----------------------------------------------------------------------------
+// Outputs the composite obstacle for reload
+void CompositeObstacle::write( ostream& fileSave ) const
+{
+  fileSave << "<Composite> " << m_name << endl;
+  if ( m_CompositeObstacle_id ) m_torsor.write( fileSave );
+  list<Obstacle*>::const_iterator obstacle;
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
+  {
+    (*obstacle)->write( fileSave );
+    fileSave << endl;
+  }
+  fileSave << "</Composite>";
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Reloads the composite obstacle and links it to the higher level 
 // obstacle in the obstacle tree
 void CompositeObstacle::reload( Obstacle& mother, istream& file )
 {
   string ttag;
+  if ( m_CompositeObstacle_id ) m_torsor.read( file ); 
   file >> ttag;
   while ( ttag != "</Composite>" ) 
   {
@@ -397,7 +424,7 @@ void CompositeObstacle::reload( Obstacle& mother, istream& file )
     file >> ttag;
   }
   computeCenterOfMass();
-  mother.append(this);
+  mother.append( this );
 }    
 
 
@@ -478,23 +505,6 @@ void CompositeObstacle::writeStatic( ostream& fileOut ) const
   list<Obstacle*>::const_iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
     (*obstacle)->writeStatic( fileOut );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Outputs the composite obstacle for reload
-void CompositeObstacle::write( ostream& fileSave ) const
-{
-  fileSave << "<Composite> " << m_name << endl;
-  list<Obstacle*>::const_iterator obstacle;
-  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
-  {
-    (*obstacle)->write( fileSave );
-    fileSave << endl;
-  }
-  fileSave << "</Composite>";
 }
 
 
