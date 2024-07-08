@@ -131,7 +131,7 @@ class STLObstacle : public SimpleObstacle
 
     /** @brief Returns the maximum of the absolute value of the obstacle
     velocity in each direction */
-    virtual Vector3 vitesseMaxPerDirection() const;
+    virtual Vector3 velocityMaxPerDirection() const;
   
     /** @brief Returns whether the component is an STL obstacle */
     virtual bool isSTLObstacle() const;  

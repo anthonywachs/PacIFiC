@@ -1332,24 +1332,27 @@ void LinkedCell::Link( Obstacle* obstacle )
   // largest particle in the simulation, hence guaranteeing that no collision
   // between particles and the obstacle is missed
 
-  AppCollision::Link(obstacle);
+  AppCollision::Link( obstacle );
+  
   list<SimpleObstacle*> list_obstacles = obstacle->getObstacles();
   list<SimpleObstacle*>::iterator myObs;
   Cell* cell_ = NULL;
-  Transform CelPosition;
-  double alpha=2.;
+  Transform cellPosition;
+  double alpha = 2.;
   Point3 const* cg = NULL;
   bool add = false;
 
   for (myObs=list_obstacles.begin();myObs!=list_obstacles.end();myObs++)
   {
     RigidBody const* obstacleRigidBody = (*myObs)->getRigidBody();
-    BBox const* obsBox = (*myObs)->getObstacleBox();
-    if ( (*myObs)->getMaterial() == "periode" ) alpha = 3.1;
-    else alpha = 2.;
-    Convex* convexCell = new Box( alpha * m_cellsize_X, alpha * m_cellsize_Y,
-    	alpha * m_cellsize_Z );
-    RigidBody CelRigidBody( convexCell, CelPosition );
+    BBox const* obstacleBBox = (*myObs)->getObstacleBox();
+    Vector3 cellBoxExtension( 0.5 * alpha * m_cellsize_X, 
+    	0.5 * alpha * m_cellsize_Y,
+	0.5 * alpha * m_cellsize_Z );    
+    Convex* cellBox = new Box( 2. * cellBoxExtension[X], 
+    	2. * cellBoxExtension[Y],
+    	2. * cellBoxExtension[Z] );
+    RigidBody cellBoxRigidBody( cellBox, cellPosition );
 
     // Intersection of the cell with the obstacle
     for (int i=0; i<m_nb; i++)
@@ -1357,15 +1360,14 @@ void LinkedCell::Link( Obstacle* obstacle )
       cell_ = m_allcells[i];
       cg = cell_->getCentre();
       add = false;
-      if ( obsBox->InZone( cg, 0.5 * alpha * m_cellsize_X,
-      		0.5 * alpha * m_cellsize_Y,
-      		0.5 * alpha * m_cellsize_Z ) )
+      if ( obstacleBBox->InZone( cg, cellBoxExtension[X], cellBoxExtension[Y],
+      		cellBoxExtension[Z] ) )
       {
-        if ( (*myObs)->isSTLObstacle() ) add = true;
+        if ( (*myObs)->isSTLObstacle() ) add = true; // Temporary, TO DO
 	else 
 	{
-	  CelRigidBody.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
-	  add = CelRigidBody.isContact( *obstacleRigidBody );	
+	  cellBoxRigidBody.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
+	  add = cellBoxRigidBody.isContact( *obstacleRigidBody );	
 	}
 	
 	if ( add )
@@ -1390,44 +1392,45 @@ void LinkedCell::Link( Obstacle* obstacle )
 void LinkedCell::LinkUpdate( double time, double dt,
   	list<Particle*>* particles )
 {
-  try{
-  // If the particle is not active anymore, we remove it from the cell it
-  // belongs to and from the list of active particles
-  list<Particle*>::iterator particle;
-  for (particle=particles->begin(); particle!=particles->end(); )
+  try
   {
-    switch ( (*particle)->getActivity() )
+    // If the particle is not active anymore, we remove it from the cell it
+    // belongs to and from the list of active particles
+    list<Particle*>::iterator particle;
+    for (particle=particles->begin(); particle!=particles->end(); )
     {
-      case COMPUTE:
-        particle++;
-        break;
-
-      default:
-        (*particle)->getCell()->remove( *particle );
-        particle = particles->erase( particle );
-        break;
-    }
-  }
-
-  // Update obstacles in case they move
-  list<SimpleObstacle*>::iterator myObs;
-  for (myObs=m_allObstacles.begin();myObs!=m_allObstacles.end();myObs++)
-    if ( (*myObs)->hasMoved() )
-    {
-      // Check whether the obstacle intersects the local linked cell grid
-      if ( intersect( *(*myObs)->getObstacleBox() , *m_extendedBBox ) )
+      switch ( (*particle)->getActivity() )
       {
-	// If the obstacle has not been linked yet, we perform a classic Link
-	// Otherwise we perform a LinkUpdate
-	if ( (*myObs)->getInCells()->empty() ) Link( *myObs );
-	else LinkUpdate( time, dt, *myObs );
+        case COMPUTE:
+          particle++;
+          break;
+
+        default:
+          (*particle)->getCell()->remove( *particle );
+          particle = particles->erase( particle );
+          break;
       }
     }
 
-  // Update active particles
-  for (particle=particles->begin(); particle!=particles->end();
-	 particle++)
-    LinkUpdateActiveParticle( *particle );
+    // Update obstacles in case they move
+    list<SimpleObstacle*>::iterator myObs;
+    for (myObs=m_allObstacles.begin();myObs!=m_allObstacles.end();myObs++)
+      if ( (*myObs)->hasMoved() )
+      {
+        // Check whether the obstacle intersects the local linked cell grid
+        if ( intersect( *(*myObs)->getObstacleBox() , *m_extendedBBox ) )
+        {
+	  // If the obstacle has not been linked yet, we perform a classic Link
+	  // Otherwise we perform a LinkUpdate
+	  if ( (*myObs)->getInCells()->empty() ) Link( *myObs );
+	  else LinkUpdate( time, dt, *myObs );
+        }
+      }
+
+    // Update active particles
+    for (particle=particles->begin(); particle!=particles->end();
+	particle++)
+      LinkUpdateActiveParticle( *particle );
   }
   catch (const SimulationError&) {
     throw SimulationError();
@@ -1441,45 +1444,46 @@ void LinkedCell::LinkUpdate( double time, double dt,
 // Updates the link of an active particle and the linked cell grid
 void LinkedCell::LinkUpdateActiveParticle( Particle* particle )
 {
-  try{
-  if ( particle->getActivity() != COMPUTE )
+  try
   {
+    if ( particle->getActivity() != COMPUTE )
+    {
       cout << "\nParticle not active " << particle->getID() << endl;
       cout << "            " << *particle->getPosition() << endl;
       GrainsExec::m_exception_Simulation = true;
       throw(SimulationError("LinkedCell::LinkUpdateActiveParticle"));
-  }
+    }
 
-  // Copies the cell the particle belonged to, the particle tag and
-  // the geographic location of the particle from current time to previous
-  // time
-  particle->copyCellTagGeoPosition_n_to_nm1();
+    // Copies the cell the particle belonged to, the particle tag and
+    // the geographic location of the particle from current time to previous
+    // time
+    particle->copyCellTagGeoPosition_n_to_nm1();
 
-  // Cell the particle belongs to at the current discrete time
-  Point3 centre = *(particle->getPosition());
-  int id[3];
-  Cell::GetCell( centre, id );
-  Cell* cellNew = getCell( id[X], id[Y], id[Z] );
+    // Cell the particle belongs to at the current discrete time
+    Point3 centre = *(particle->getPosition());
+    int id[3];
+    Cell::GetCell( centre, id );
+    Cell* cellNew = getCell( id[X], id[Y], id[Z] );
 
-  if ( cellNew == NULL )
-  {
-    cout << "\nParticle " << particle->getID()       << endl;
-    cout << "            " << *particle->getPosition() << endl;
-    GrainsExec::m_exception_Simulation = true;
-    throw(SimulationError("LinkedCell::LinkUpdateActiveParticle"));
-  }
+    if ( cellNew == NULL )
+    {
+      cout << "\nParticle " << particle->getID()       << endl;
+      cout << "            " << *particle->getPosition() << endl;
+      GrainsExec::m_exception_Simulation = true;
+      throw(SimulationError("LinkedCell::LinkUpdateActiveParticle"));
+    }
 
-  // Update if the particle has moved to a different cell
-  Cell* cellNm1 = particle->getCellNm1();
-  if ( cellNew != cellNm1 )
-  {
-    cellNew->add( particle );
-    cellNm1->remove( particle );
-  }
+    // Update if the particle has moved to a different cell
+    Cell* cellNm1 = particle->getCellNm1();
+    if ( cellNew != cellNm1 )
+    {
+      cellNew->add( particle );
+      cellNm1->remove( particle );
+    }
 
-  // Set the cell the particle belongs to, the particle tag and
-  // the geographic location of the particle at the current time
-  particle->setCellTagGeoPosition( cellNew, cellNew->m_tag,
+    // Set the cell the particle belongs to, the particle tag and
+    // the geographic location of the particle at the current time
+    particle->setCellTagGeoPosition( cellNew, cellNew->m_tag,
   	cellNew->m_GeoPosCell );
   }
   catch (const SimulationError&) {
@@ -1494,81 +1498,39 @@ void LinkedCell::LinkUpdateActiveParticle( Particle* particle )
 // Updates the link between the cells and a simple obstacle
 void LinkedCell::LinkUpdate( double time, double dt, SimpleObstacle *myObs )
 {
+  // We search intersection between the obstacle AABBox and twice expanded cells
+  // i.e. cells expanded by a least the maximum circumscribed radius of the
+  // largest particle in the simulation, hence guaranteeing that no collision
+  // between particles and the obstacle is missed
+  // This method is highly sub-optimal for the following two reasons:
+  // 1) the whole linked cell grid is searched
+  // 2) we use the AABBox of the obstacle such that the geometric intersection
+  // test is faster than relying on GJK, leading to unnecessary cells whenever
+  // the obstacle is not "reasonably" aligned with the coordinate axis
+
   if ( myObs->performLinkUpdate() )
   {
-    BBox const* obsBox = myObs->getObstacleBox();
+    BBox const* obstacleBBox = myObs->getObstacleBox();
     Cell* cell_ = NULL;
-    Vector3 deplMax;
     Point3 const* cg = NULL;
-
-    // le coefficient 1.2 donne une marge d'erreur de 20%, ce qui signifie
-    // qu'on suppose que le vecteur vitesse de l'obstacle sur les n pas de time
-    // suivants ne varie pas de plus de 20%
-    // Attention: rien dans le code verifie cette hypothese !!
-    int updateFreq = myObs->getObstacleLinkedCellUpdateFrequency();
-    double coefApprox = updateFreq == 1 ? 1. : 1.2;
-    deplMax = myObs->vitesseMaxPerDirection() * coefApprox
-   	* updateFreq * dt;
-
-    Vector3 CelExtent( m_cellsize_X + deplMax[X], m_cellsize_Y + deplMax[Y],
-    	m_cellsize_Z + deplMax[Z] );
+    double alpha = 2.;    
+    Vector3 cellBoxExtension( 0.5 * alpha * m_cellsize_X, 
+    	0.5 * alpha * m_cellsize_Y,
+	0.5 * alpha * m_cellsize_Z );
 
     myObs->resetInCells();
     for (int i=0; i<m_nb; i++)
     {
       cell_ = m_allcells[i];
       cg = cell_->getCentre();
-      if ( obsBox->InZone( cg, CelExtent[X], CelExtent[Y], CelExtent[Z] ) )
+      if ( obstacleBBox->InZone( cg, cellBoxExtension[X], cellBoxExtension[Y],
+      		cellBoxExtension[Z] ) )
       {
         cell_->addObstacle( myObs );
         myObs->add( cell_ );
       }
     }
   }
-
-//   const list<Cell*>* voisinageCourant = myObs->getInCells();
-//   list<Cell*> voisinageEtendu = *voisinageCourant;
-//   const list<Cell*>*	celluleVoisinageComplet = NULL;
-//   list<Cell*>::const_iterator icellule,icelluleVoisine;
-//   list<Cell*>::iterator il;
-//   const RigidBody* obstacleRigidBody = myObs->getRigidBody();
-//   BBox obsBox = obstacleRigidBody->BoxRigidBody();
-//   Cell* cellule = NULL;
-//   Transform CelPosition;
-//   double alpha = 2.;
-//   Convex* convexCell = new Box(alpha*m_cellsize_X,alpha*m_cellsize_Y,
-//     	alpha*m_cellsize_Z);
-//   RigidBody CelRigidBody(convexCell,CelPosition);
-//
-//   // Voisinage etendu
-//   for (icellule=voisinageCourant->begin();icellule!=voisinageCourant->end();
-//   	icellule++)
-//   {
-//     celluleVoisinageComplet = (*icellule)->getCompleteNeighborhood();
-//     for (icelluleVoisine=celluleVoisinageComplet->begin();
-//     	icelluleVoisine!=celluleVoisinageComplet->end();icelluleVoisine++)
-//       voisinageEtendu.push_back(*icelluleVoisine);
-//   }
-//   voisinageEtendu.sort();
-//   voisinageEtendu.unique();
-//
-//   // Intersection g�om�trique de la cellule avec l'obstacle
-//   // dans le voisinage etendu
-//   myObs->resetInCells();
-//   for (il=voisinageEtendu.begin();il!=voisinageEtendu.end();il++)
-//   {
-//     cellule = *il;
-//     Point3 cg = cellule->Gravite();
-//     if (obsBox.InZone(cg,m_cellsize_X,m_cellsize_Y,m_cellsize_Z))
-//     {
-//       CelRigidBody.setOrigin(cg[X],cg[Y],cg[Z]);
-//       if (CelRigidBody.isContact(*obstacleRigidBody))
-//       {
-//         cellule->addObstacle(myObs);
-//         myObs->add(cellule);
-//       }
-//     }
-//   }
 }
 
 

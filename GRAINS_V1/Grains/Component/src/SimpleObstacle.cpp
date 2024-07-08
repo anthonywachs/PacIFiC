@@ -40,12 +40,13 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
 
   Obstacle::m_totalNbSingleObstacles++;
 
+  // Name
   m_name = ReaderXML::getNodeAttr_String( root, "name" );
 
   // Convex - Position & Orientation
   m_geoRBWC = new RigidBodyWithCrust( root );
 
-  // Materiau
+  // Material
   DOMNode* materiau_ = ReaderXML::getNode( root, "Material" );
   m_materialName = ReaderXML::getNodeValue_String( materiau_ );
   ContactBuilderFactory::defineMaterial( m_materialName, true );
@@ -58,6 +59,27 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
   m_obstacleBox = Component::BoundingBox();
   m_LinkUpdate_frequency = 1;
   m_LinkUpdate_counter = 0;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Constructor with input parameters. 
+SimpleObstacle::SimpleObstacle( string const& name, 
+	RigidBodyWithCrust* georbwc, 
+    	string const& mat, bool const& toFluid )
+  : Obstacle( "", true )
+  , m_transferToFluid( false )
+{
+  m_name = name;
+  m_geoRBWC = georbwc;
+  m_materialName = mat;
+  ContactBuilderFactory::defineMaterial( m_materialName, true );
+  m_transferToFluid = toFluid;
+  m_obstacleBox = Component::BoundingBox();
+  m_LinkUpdate_frequency = 1;
+  m_LinkUpdate_counter = 0;    
 }
 
 
@@ -431,7 +453,7 @@ bool SimpleObstacle::performLinkUpdate()
 // ----------------------------------------------------------------------------
 // Returns the maximum of the absolute value of the obstacle
 // velocity in each direction
-Vector3 SimpleObstacle::vitesseMaxPerDirection() const
+Vector3 SimpleObstacle::velocityMaxPerDirection() const
 {
   list<Point3> surface = m_geoRBWC->get_polygonsPts_PARAVIEW();
   list<Point3>::iterator iv;

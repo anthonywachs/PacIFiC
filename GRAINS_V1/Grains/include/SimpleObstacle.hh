@@ -34,6 +34,14 @@ class SimpleObstacle : public Obstacle
     /** @brief Constructor with an XML node as an input parameter
     @param root XML node */
     SimpleObstacle( DOMNode* root );
+    
+    /** @brief Constructor with input parameters
+    @param name obstacle name 
+    @param georbwc pointer to a rigid body with crust object
+    @param mat obstacle material 
+    @param toFluid whether to transfer the obstacle to the fluid solver */
+    SimpleObstacle( string const& name, RigidBodyWithCrust* georbwc, 
+    	string const& mat, bool const& toFluid );	    
 
     /** @brief Destructor */
     ~SimpleObstacle();
@@ -138,7 +146,7 @@ class SimpleObstacle : public Obstacle
 
     /** @brief Returns the maximum of the absolute value of the obstacle
     velocity in each direction */
-    virtual Vector3 vitesseMaxPerDirection() const;
+    virtual Vector3 velocityMaxPerDirection() const;
 
     /** @brief Update contact map */
     virtual void updateContactMap();

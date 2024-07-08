@@ -357,7 +357,7 @@ void STLObstacle::write( ostream& fileSave ) const
 // ----------------------------------------------------------------------------
 // Returns the maximum of the absolute value of the obstacle
 // velocity in each direction
-Vector3 STLObstacle::vitesseMaxPerDirection() const
+Vector3 STLObstacle::velocityMaxPerDirection() const
 {
   Vector3 vmax;
 

@@ -1000,7 +1000,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
     DOMNode* nMovingObstacles = ReaderXML::getNode( root,
     	"MovingObstacles" );
     int ObstacleUpdateFreq = 1;
-    bool displaceObstacles = true;
+    bool geomMoveObstacles = true;
     if ( nMovingObstacles )
     {
       // Linked cell grid update frequency
@@ -1015,7 +1015,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
      		"GeometricallyMove" );
         if ( disp == "False" )
 	{
-	  displaceObstacles = false;
+	  geomMoveObstacles = false;
 	  Obstacle::setMoveObstacle( false );
 	}
       }
@@ -1029,8 +1029,8 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	ObstacleUpdateFreq << " time step" <<
 	( ObstacleUpdateFreq > 1 ? "s" : "" ) << endl;
       cout << GrainsExec::m_shift9 <<
-      	"Displace moving obstacles geometrically = " <<
-      	( displaceObstacles ? "True" : "False" ) << endl;
+      	"Move obstacles geometrically = " <<
+      	( geomMoveObstacles ? "True" : "False" ) << endl;
     }
 
 

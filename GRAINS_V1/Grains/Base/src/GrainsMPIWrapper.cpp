@@ -1124,10 +1124,11 @@ void GrainsMPIWrapper::display( ostream& f, string const& oshift ) const
     f << endl;    
   }
 
+  if ( GrainsExec::m_MPI_verbose == 2 ) 
+  {
   ostringstream out;
-  out << oshift << GrainsExec::m_shift3 << "Process PID = " << getpid() << endl;
-  out << oshift << GrainsExec::m_shift3 << "Position in the MPI cartesian"
-      	" topology = ";
+  out << oshift << GrainsExec::m_shift3 << "PID = " << getpid() << endl;
+  out << oshift << GrainsExec::m_shift3 << "MPICart position = ";
   for (int j=0;j<3;++j) out << m_coords[j] << " ";
   out << endl;
   out << oshift << GrainsExec::m_shift3 << "Neighboring processes in the MPI "
@@ -1154,7 +1155,8 @@ void GrainsMPIWrapper::display( ostream& f, string const& oshift ) const
 	      	m_MPIperiodes[ getGeoPosition( i, j, k ) ][Z];	
         }
 
-  writeStringPerProcess( f, out.str(), true, oshift + GrainsExec::m_shift3 );
+  writeStringPerProcess( f, out.str(), true, oshift );
+  }
 }
 
 
