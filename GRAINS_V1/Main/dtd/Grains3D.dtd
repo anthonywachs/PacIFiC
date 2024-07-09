@@ -57,6 +57,13 @@
 
     <!ELEMENT ContactForceModels (Default?, ContactForceModel*)>
     
+    <!ELEMENT CollisionDetectionAlgorithm (CollisionDetection?, BoundingVolume?)>
+    <!ELEMENT CollisionDetection EMPTY>
+    <!ATTLIST CollisionDetection Type (GJK) "GJK">
+    <!ATTLIST CollisionDetection Tolerance CDATA "1e-15">
+    <!ATTLIST CollisionDetection Acceleration (ON|OFF) "OFF">
+    <!ELEMENT BoundingVolume EMPTY>
+    <!ATTLIST BoundingVolume Type (OFF|OBB|OBC) "OFF">
       
     <!ELEMENT Particles (Particle+)>    
       <!ELEMENT Particle (Convex, AngularPosition, Material)>
