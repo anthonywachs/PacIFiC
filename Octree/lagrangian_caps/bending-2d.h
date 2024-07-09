@@ -15,29 +15,31 @@ unstressed configuration, and $l$ is a line element along the membrane.
 #endif
 
   event init (i=0) {
-    for(int k=0; k<mbs.nbmb; k++) {
-      comp_curvature(&mbs.mb[k]);
-      for(int i=0; i<mbs.mb[k].nlp; i++) {
-        #if REF_CURV
-          mbs.mb[k].nodes[i].ref_curv = mbs.mb[k].nodes[i].curv;
-        #else
-          mbs.mb[k].nodes[i].ref_curv = 0.;
-        #endif
+    for(int k=0; k<NCAPS; k++) {
+      if (CAPS(k).isactive) {
+        comp_curvature(&CAPS(k));
+        for(int i=0; i<CAPS(k).nln; i++) {
+          #if REF_CURV
+            CAPS(k).nodes[i].ref_curv = CAPS(k).nodes[i].curv;
+          #else
+            CAPS(k).nodes[i].ref_curv = 0.;
+          #endif
+        }
       }
     }
   }
 
 void bending(lagMesh* mesh) {
   comp_curvature(mesh);
-  coord* raw_bending = malloc(mesh->nlp*sizeof(coord));
-  for(int i=0; i<mesh->nlp; i++) {
+  coord* raw_bending = malloc(mesh->nln*sizeof(coord));
+  for(int i=0; i<mesh->nln; i++) {
     double l[2];
     for(int j=0; j<2; j++)
       l[j] = mesh->edges[mesh->nodes[i].edge_ids[j]].length;
     double lavg = .5*(l[0] + l[1]);
     double curv[3];
     for(int j=0; j<3; j++) {
-      int neighbor_index = (i-1+j) > 0 ? (i-1+j)%mesh->nlp : mesh->nlp - 1;
+      int neighbor_index = (i-1+j) > 0 ? (i-1+j)%mesh->nln : mesh->nln - 1;
       curv[j] = mesh->nodes[neighbor_index].curv - mesh->nodes[neighbor_index].ref_curv;
     }
     double ddcurv = (curv[0]/(l[0]*lavg) - 2.*curv[1]/(l[0]*l[1])
@@ -48,17 +50,17 @@ void bending(lagMesh* mesh) {
   /** We apply a smoothing to the bending force, from Longuet-Higgins &
   Cokelet, Proc. R. Soc. Long., 1976; as advised by Pozrikidis in his book
   Computational hydrodynamics of capsules and biological cells (2010). */
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     // double coeff[5] = {-1./16., 1./4., 5./8., 1./4., -1./16.};
     double coeff[7] = {-1./32., 0., 9./32., 1./2., 9./32., 0., -1./32.};
     for(int j=0; j<7; j++)
       foreach_dimension()
         mesh->nodes[i].lagForce.x +=
-          coeff[j]*raw_bending[(mesh->nlp + i - 3 + j)%mesh->nlp].x;
+          coeff[j]*raw_bending[(mesh->nln + i - 3 + j)%mesh->nln].x;
   }
   free(raw_bending);
 }
 
 event acceleration (i++) {
-  for(int i=0; i<mbs.nbmb; i++) bending(&mbs.mb[i]);
+  for(int i=0; i<NCAPS; i++) if (CAPS(i).isactive) bending(&CAPS(i));
 }

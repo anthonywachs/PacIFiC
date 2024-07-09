@@ -113,7 +113,13 @@ class Cell
     list<Particle*>* getParticles();
   
     /** @brief Returns the cell geographic position */
-    GeoPosition getGeoPosition() const;  
+    GeoPosition getGeoPosition() const; 
+    
+    /** @brief Returns the cell tag */
+    int getTag() const;
+    
+    /** @brief Returns the cell number */
+    int getID() const;          
     //@}
 
 
@@ -255,7 +261,7 @@ class Cell
     <ul> 
       <li> 0=interior, 
       <li> 1=buffer zone, 
-      <li> 2=halozone
+      <li> 2=clone zone
     </ul> */
     Point3 m_centre; /**< cell center coordinates */
     GeoPosition m_GeoPosCell; /**< geographic position in the linked-cell

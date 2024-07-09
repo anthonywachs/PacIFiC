@@ -85,9 +85,8 @@ void GrainsTestDev::do_before_time_stepping( DOMElement* rootElement )
   InsertCreateNewParticles();
 
   // Number of particles: inserted and in the system
-  m_allcomponents.setNumberParticlesOnAllProc(
-  	m_allcomponents.getNumberParticles() );
-  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
+  m_allcomponents.computeNumberParticles( m_wrapper );
+  m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();
 
   // Initialisation obstacle kinematics
   m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt );
@@ -148,7 +147,7 @@ void GrainsTestDev::do_after_time_stepping()
          << "                 " << flush;
   cout << '\r' << oss.str() << "  \t" << m_tend << "\t\t\t"
          << m_allcomponents.getNumberActiveParticlesOnProc() << '\t'
-         << m_allcomponents.getNumberInactiveParticles() << endl;
+         << m_allcomponents.getNumberPhysicalParticlesToInsert() << endl;
 
   // Write reload files
   if ( !m_lastTime_save )
@@ -209,8 +208,9 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
   assert( rootElement != NULL );
   DOMNode* root = ReaderXML::getNode( rootElement, "Construction" );
 
-  bool brestart = false, bnewpart = false, bnewobst = false;
+  bool bnewpart = false, bnewobst = false, b2024 = false;
   string restart;
+  size_t npart;
 
   // Domain size: origin, max coordinates and periodicity
   DOMNode* domain = ReaderXML::getNode( root, "LinkedCell" );
@@ -279,7 +279,7 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
     DOMNode* reload = ReaderXML::getNode( root, "Reload" );
     if ( reload )
     {
-      brestart = true;
+      m_restart = true;
 
       // Restart mode
       string reload_type = ReaderXML::getNodeAttr_String( reload, "Type" );
@@ -302,20 +302,33 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
         GrainsExec::m_reloadFile_suffix =
             restart.substr( restart.size()-1, 1 );
       }
-      restart = fullResultFileName( restart );
+      restart = GrainsExec::fullResultFileName( restart );
 
       // Extract the reload directory from the reload file
       GrainsExec::m_ReloadDirectory = GrainsExec::extractRoot( restart );
 
-      // Read the reload file
+      // Read the reload file and check the restart format
       string cle;
       ifstream simulLoad( restart.c_str() );
-      simulLoad >> cle >> m_time;
+      simulLoad >> cle; 
+      if ( cle == "__Format2024__" ) 
+      { 
+        b2024 = true;
+        simulLoad >> cle >> m_time;
+      }
+      else simulLoad >> m_time;         
       ContactBuilderFactory::reload( simulLoad );
-      m_allcomponents.read( simulLoad, restart );
-      ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
+      if ( !b2024 )
+      {
+        m_allcomponents.read_pre2024( simulLoad, restart, m_wrapper );
+        ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
           m_allcomponents.getReferenceParticles() );
+      }
+      else
+        npart = m_allcomponents.read( simulLoad, m_insertion_position, 
+		m_rank, m_nprocs );      
       simulLoad >> cle;
+      simulLoad.close();
 
       // Whether to reset velocity to 0
       string reset = ReaderXML::getNodeAttr_String( reload, "Velocity" );
@@ -338,14 +351,13 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allParticles->getLength(); i++)
       {
         DOMNode* nParticle = allParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
-        Particle* particleRef = new Particle( nParticle, false,
-            nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        Particle* particleRef = new Particle( nParticle, nbPC+int(i) );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
 
@@ -369,14 +381,21 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allCompParticles->getLength(); i++)
       {
         DOMNode* nCompParticle = allCompParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
-        Particle* particleRef = new CompositeParticle( nCompParticle,
-              false, nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        Particle* particleRef = NULL;
+	string sshape = "none";
+	if ( ReaderXML::hasNodeAttr( nCompParticle, "SpecificShape" )  )
+	  sshape = ReaderXML::getNodeAttr_String( nCompParticle, 
+	  	"SpecificShape" );
+	if ( sshape == "SpheroCylinder" )
+	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
+	else 	
+	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
 
@@ -430,7 +449,7 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
 
 
     // Check that construction is fine
-    if ( !brestart && !bnewpart && !bnewobst )
+    if ( !m_restart && !bnewpart && !bnewobst )
     {
       if ( m_rank == 0 )
         cout << "ERR : Error in input file in <Contruction>" << endl;
@@ -460,6 +479,11 @@ void GrainsTestDev::Construction( DOMElement* rootElement )
 
     // Define the linked cell grid
     defineLinkedCell( LC_coef * maxR, GrainsExec::m_shift9 );
+
+    // If reload with 2024 format, read the particle reload file
+    if ( reload && b2024 )
+      m_allcomponents.read_particles( restart, npart, m_collision, m_rank, 
+      	m_nprocs, m_wrapper );
 
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );
@@ -1177,85 +1201,102 @@ void GrainsTestDev::AdditionalFeatures( DOMElement* rootElement )
 // Runs the simulation over the prescribed time interval
 void GrainsTestDev::Simulation( double time_interval )
 {
+// 
+//   int rankproc = 0, nprocs = 0;
+//   MPI_Comm_rank( MPI_COMM_WORLD, &rankproc );
+//   MPI_Comm_size( MPI_COMM_WORLD, &nprocs );
+// 
+//   // Input file
+//   string filename = "Grains/Init/insert.xml";
+//   size_t error = 0;
+//   size_t pos = filename.find(".xml");
+//   if ( pos == string::npos )
+//   {
+//     cout << "ERROR : input file need the .xml extension" << endl;
+//     error = 1;
+//   }
+// 
+//   // Creating STL file and reading it
+//  // string str1 = "wall_double_ramp.stl";
+//   //string str1 = "wall_unit.stl";
+//   string str1 = "long_wall.stl";
+//     
+//   Obstacle *stlob = new STLObstacle( "testSTL", str1 );  
+// 
+//   cout << "Creating STLObstacle..." << endl;
+// 
+// 
+//   // ******************************
+//   //           TESTING 
+//   // ******************************
+// 
+//   int test1 = 0, test2 = 1;
+// 
+//   if (test1)
+//   {
+// 
+//   double xp = 0.5,   yp = 0.5,   zp = 0.5;
+//   double R = 0.1;
+// 
+//   // Test 1: projection belongs to triangle
+//   
+//   Point3 Pa(0., 0.5, 0.);
+//   Point3 Pb(-1000., 0.5, -1000.);
+//   Point3 Pc(-1., 0., 1.);
+//   Point3 Pd(-1., 0.1, 1.);
+//   Point3 P1(-1., 0., 1.);
+//   Point3 P2(1., 0., 1.);
+//   Point3 P3(0., 0., -1.);
+//  
+//   
+//   cout << "IsInter(Pa): " << STLObstacle::intersect(Pa, P1, P2, P3) << endl;
+//   cout << "IsInter(Pb): " << STLObstacle::intersect(Pb, P1, P2, P3) << endl;
+//   cout << "IsInter(Pc): " << STLObstacle::intersect(Pc, P1, P2, P3) << endl;
+//   cout << "IsInter(Pd): " << STLObstacle::intersect(Pd, P1, P2, P3) << endl;
+// 
+//   }
+// 
+//   cout << "Testing again..." << endl;
+// 
+//   // Test 2: triangle area
+//  
+//   if (test2)
+//   {
+// 
+//   double x1, y1, z1, x2, y2, z2, x3, y3, z3;
+// 
+//   x1 = 0.0;
+//   y1 = 0.0;
+//   z1 = 0.0;
+// 
+//   x2 = 1.0;
+//   y2 = 0.0;
+//   z2 = 0.0;
+// 
+//   x3 = 0.0;
+//   y3 = 0.0;
+//   z3 = 1.0;
+// 
+//   Vector3 n;
+//   n[0] = 0.; n[1] = 0.; n[2] = 0.;
+// 
+//   size_t vid = 0;
+//   STLVertex *v1 = new STLVertex(x1,y1,z1,n,vid); 
+//   STLVertex *v2 = new STLVertex(x2,y2,z2,n,vid);  
+//   STLVertex *v3 = new STLVertex(x3,y3,z3,n,vid);
+// 
+//   size_t tid = 0;
+//   tuple<STLVertex*,STLVertex*,STLVertex*> vetest;
+//   vetest = std::make_tuple(v1, v2, v3);
+//   STLTriangle trtest(vetest,n,tid); 
+// 
+//   cout << "Testing area computation: " << trtest.getSurfaceArea() << endl;
+// 
+//   }
+// 
+//   // Test 3: RBWC
+// //   
+// //   Rectangle *Rect = new Rectangle( 1.0, 1.0 );
+// //   Rect->ClosestPoint( RigidBodyWithCrust &Rect );
 
-  int rankproc = 0, nprocs = 0;
-  MPI_Comm_rank( MPI_COMM_WORLD, &rankproc );
-  MPI_Comm_size( MPI_COMM_WORLD, &nprocs );
-
-  // Input file
-  string filename = "Grains/Init/insert.xml";
-  size_t error = 0;
-  size_t pos = filename.find(".xml");
-  if ( pos == string::npos )
-  {
-    cout << "ERROR : input file need the .xml extension" << endl;
-    error = 1;
-  }
-
-  // ******************************
-  //           TESTING 
-  // ******************************
-
-  // Constructing Convex
-  Convex* convexA  = new Cylinder( 5.e-2, 15.e-2 );
-  // Convex* convexA  = new Superquadric( 5.e-2, 5.e-2, 75.e-3, 64., 2. );
-
-  // Transformation
-  double aX, aY, aZ;
-  aX = 0.; aY = 0.; aZ = 0.;
-  double const AAA[12] =
-  { cos(aZ)*cos(aY), cos(aZ)*sin(aY)*sin(aX) - sin(aZ)*cos(aX), cos(aZ)*sin(aY)*cos(aX) + sin(aZ)*sin(aX),
-    sin(aZ)*cos(aY), sin(aZ)*sin(aY)*sin(aX) + cos(aZ)*cos(aX), sin(aZ)*sin(aY)*cos(aX) - cos(aZ)*sin(aX),
-    -sin(aY), cos(aY)*sin(aX), cos(aY)*cos(aX),
-    0., 0., 0.};
-  Transform const* trA = new Transform( AAA );
-
-  // RBWC
-  RigidBodyWithCrust* rbwcA = new RigidBodyWithCrust( convexA, *trA );
-
-  // Particle
-  Particle* p = new Particle( 1 );
-  p->m_geoRBWC = rbwcA;
-  p->m_density = 7750;
-  p->m_mass = p->m_density * p->m_geoRBWC->getVolume();
-  p->m_geoRBWC->BuildInertia( p->m_inertia, p->m_inertia_1 );
-  for ( int i = 0; i < 6; i++ )
-  {
-    p->m_inertia[i] *= p->m_density;
-    p->m_inertia_1[i] /= p->m_density;
-  }
-
-  // Torque
-  double M = 0.5;
-  p->m_torsor = Torsor( OriginePoint, Vector3Nul, Vector3( 0., M, 0. ) );
-
-  // Kinematics
-  p->m_kinematics = KinematicsBuilderFactory::create( convexA );
-  p->m_kinematics->setAngularVelocity( Vector3( -0.9, 0.3, 0.6 ) );
-
-  // Move
-  double dt = 1.e-8;
-  // for ( dt = 1.e-2; dt > 1.e-7; dt /= 10. )
-  for ( double time = 0; time < 1.; time += dt )
-    p->Move( time, dt );
-
-  // Saving the results
-  auto savename = "dt" + to_string( (int) -log10( dt ) ) + ".txt";
-  ofstream MyFile( savename );
-  std::cout << std::fixed << std::showpoint;
-    std::cout << std::setprecision(15);
-  MyFile << std::fixed << setprecision(15) << endl;
-  MyFile << *( p->m_kinematics->getAngularVelocity() ) << " " 
-          << *( p->m_kinematics->getQuaternionRotation() ) << endl;
-  
-  
-  
-  // std::chrono::seconds dura( 1 );
-  // std::this_thread::sleep_for( dura );
-  // auto savename = "dt" + to_string( (int) -log10( dt ) ) + ".txt";
-  // ofstream MyFile( savename );
-
-  // // Write to the file
-  // MyFile << *( p->m_kinematics->getAngularVelocity() ) << " " 
-  //        << *( p->m_kinematics->getQuaternionRotation() ) << endl;
 }

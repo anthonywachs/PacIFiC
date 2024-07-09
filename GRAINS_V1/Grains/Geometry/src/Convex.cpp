@@ -70,7 +70,7 @@ BVolume* Convex::computeBVolume( unsigned int type ) const
            ") method Convex::computeBVolume() " << 
            "is not yet implemented !\n"
        << "Need for an assistance ! Stop running !\n";
-  // exit(10);
+  exit(10);
 
   return( nullptr );
 }
@@ -87,8 +87,8 @@ vector<Point3> Convex::getEnvelope() const
        << "Need for an assistance ! Stop running !\n";
   exit(10);
 
-  vector<Point3> enveloppe;
-  return ( enveloppe );
+  vector<Point3> envelope;
+  return ( envelope );
 }
 
 
@@ -219,7 +219,7 @@ void Convex::write_polygonsStr_PARAVIEW( list<int>& connectivity,
 // Returns an orientation vector describing the convex shape angular position
 Vector3 Convex::computeOrientationVector( Transform const* transform ) const
 {
-  return ( Vector3Nul );
+  return ( Vector3Null );
 }
 
 
@@ -580,7 +580,7 @@ bool common_point( Convex const& a, Convex const& b, Transform const& b2a,
 double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
 	Transform const& b2w, Point3& pa, Point3& pb, int& nbIter )
 {
-  Vector3 v = a2w(a.support(Vector3Nul)) - b2w(b.support(Vector3Nul));
+  Vector3 v = a2w(a.support(Vector3Null)) - b2w(b.support(Vector3Null));
   Vector3 w = v;
   Vector3 d = v;
   double dist = Norm(v);
@@ -700,4 +700,18 @@ ShapeType Convex::getType() const
 bool Convex::isSphere() const
 {
   return ( false );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether two convexes are of the same type 
+bool Convex::equalType( Convex const* other, bool const& level2 ) const
+{
+  bool same = ( getConvexType() == other->getConvexType() );
+
+  if ( same && level2 ) same = equalType_level2( other );
+  
+  return ( same );
 }

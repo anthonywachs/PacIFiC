@@ -23,10 +23,7 @@ MemoryContactForceModel::MemoryContactForceModel( map<string,double>& parameters
 
   /** If the user defines a rolling friction coefficient, we will compute the
   rolling friction torque. */
-  if ( (eta_r) || (mu_r) )
-  {
-    rolling_friction = true;
-  }
+  if ( eta_r || mu_r ) rolling_friction = true;
   else rolling_friction = false;
 }
 
@@ -42,6 +39,7 @@ MemoryContactForceModel::~MemoryContactForceModel()
 
 
 // ----------------------------------------------------------------------------
+// Returns the name of the contact force model
 string MemoryContactForceModel::name() const
 {
   return ( "MemoryContactForceModel" );
@@ -50,23 +48,19 @@ string MemoryContactForceModel::name() const
 
 
 
-void MemoryContactForceModel::computeTangentialVector(Vector3& tij, double n_t,
-  const Vector3 ut, const Vector3 kdelta)
+// ----------------------------------------------------------------------------
+// Computes the vector tangent at the contact point
+void MemoryContactForceModel::computeTangentialVector( Vector3& tij, 
+	double n_t, const Vector3 ut, const Vector3 kdelta )
 {
   // Definition of the tangential vector (cf Costa et.al., 2015)
-  if (Norm(ut) > 0.001)
-  {
+  if ( Norm(ut) > 0.001 )
     tij = - ut/Norm(ut);
-  }
-  else if ((Norm(kdelta)>epsilon || Norm(n_t*ut)>epsilon) &&
-      Norm(kdelta + n_t*ut)>epsilon)
-  {
-    tij = -(kdelta + n_t*ut) / Norm(kdelta + n_t*ut) ;
-  }
+  else if ( ( Norm(kdelta) > epsilon || Norm(n_t*ut) > epsilon ) &&
+      Norm(kdelta + n_t*ut) > epsilon )
+    tij = -( kdelta + n_t*ut ) / Norm(kdelta + n_t*ut) ;
   else
-  {
     tij=Vector3(0.);
-  }
 }
 
 
@@ -77,11 +71,11 @@ void MemoryContactForceModel::computeTangentialVector(Vector3& tij, double n_t,
 void MemoryContactForceModel::performForcesCalculus( Component* p0_,
 	Component* p1_, double dt, PointContact const& contactInfos,
 	Vector3& delFN, Vector3& delFT, Vector3& delM, int elementary_id0,
-  int elementary_id1)
+  	int elementary_id1 )
 {
   Point3 geometricPointOfContact = contactInfos.getContact();
   Vector3 penetration = contactInfos.getOverlapVector();
-  Vector3 *pkdelta = NULL; // previous vector ks * tangential displacement
+  Vector3 *pkdelta = NULL; // previous vector ks * tangential motion
   Vector3 *pprev_normal = NULL; // previous vector normal to the contact plane
   Vector3 *pspringRotFriction = NULL; // previous rolling friction spring-torque
   Vector3 tij = Vector3(0.); // tangential vector (lives in the contact plane)
@@ -141,65 +135,76 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   // Tangential viscous dissipative force
   Vector3 viscousFT = v_t * ( -muet * 2.0 * avmass );
 
-  // Retrieve the previous cumulative displacement (if the contact did not exist
-  // we create it)
+  // Retrieve the previous cumulative motion (if the contact does not 
+  // exist we create it)
   bool contact_existed;
   contact_existed = p0_->getContactMemory( idmap0, pkdelta, pprev_normal,
-    pspringRotFriction, true);
-  if (contact_existed) {
+    pspringRotFriction, true );
+  if ( contact_existed ) 
+  {
     // Rotate it to the new plane and add the contribution of the current time
     // step
-    qrot.setRotFromTwoVectors(*pprev_normal,normal) ;
-    *pkdelta = qrot.rotateVector(*pkdelta);
+    qrot.setRotFromTwoVectors( *pprev_normal, normal ) ;
+    *pkdelta = qrot.rotateVector( *pkdelta );
   }
   *pkdelta += dt*ks*v_t;
+  
+  // Update the normal vector in the map
+  *pprev_normal = normal;  
+  
   // Compute a tentative friction force (including the viscous disspative terms)
-  computeTangentialVector(tij, muet * 2.0 * avmass, v_t, *pkdelta);
+  computeTangentialVector( tij, muet * 2.0 * avmass, v_t, *pkdelta );
   double normFT = Norm(-*pkdelta + viscousFT);
+  
   // If less than the Coulomb limit, we are done
-  if ( normFT <= muec * normFN) delFT = Norm(-*pkdelta + viscousFT) * tij ;
-  else {
-    // Otherwise, we modify the cumulative tangential displacement and replace
+  if ( normFT <= muec * normFN ) 
+    delFT = Norm(-*pkdelta + viscousFT) * tij ;
+  else 
+  {
+    // Otherwise, we modify the cumulative tangential motion and replace
     // the tangential force by the Coulomb limit
     *pkdelta = - muec * normFN * tij + viscousFT;
     delFT = muec * normFN * tij ;
   }
 
   // 3) Compute rolling resistance moment with memory (if applicable)
-  if (rolling_friction) {
+  if ( rolling_friction ) 
+  {
     // Compute the spring and dashpot coefficients from the particle properties
     radius = p0_->getEquivalentSphereRadius() ;
-    if (!Req)
+    if ( !Req )
     {
       radius1 = p1_->getEquivalentSphereRadius() ;
-      Req = radius * radius1 / (radius + radius1) ;
+      Req = radius * radius1 / ( radius + radius1 ) ;
     }
-    kr = 3 * stiff * mu_r * mu_r * Req * Req ; // c.f. Jiang et al (2005,2015)
-    Cr = 3 * (muen * 2.0 * avmass) * mu_r * mu_r * Req * Req ; // c.f. Jiang et
+    kr = 3. * stiff * mu_r * mu_r * Req * Req ; // c.f. Jiang et al (2005,2015)
+    Cr = 3. * (muen * 2.0 * avmass) * mu_r * mu_r * Req * Req ; // c.f. Jiang et
     // al (2005,2015)
     double max_normFT = mu_r * Req * normFN ;
+    
     // Compute the relative angular velocity
     w = *p0_->getAngularVelocity() - *p1_->getAngularVelocity();
     wn = ( w * normal ) * normal;
     wt = w - wn ;
 
-    if (contact_existed) {
+    if ( contact_existed ) 
+    {
       // Rotate the cumulative spring torque to the new plane
-      *pspringRotFriction = qrot.rotateVector(*pspringRotFriction);
+      *pspringRotFriction = qrot.rotateVector( *pspringRotFriction );
     }
     *pspringRotFriction += (-kr) * dt * wt ;
     normFT = Norm(*pspringRotFriction);
-    if (normFT > max_normFT) {
+    if ( normFT > max_normFT ) 
+    {
       // Otherwise, we replace the tangential torque by the Coulomb limit
-      *pspringRotFriction *= max_normFT/normFT;
+      *pspringRotFriction *= max_normFT / normFT;
     }
     delM = *pspringRotFriction + (-m_f) * Cr * wt;
   }
   else delM = Vector3(0.);
 
-  // Finally, we update the cumulative rotational displacement
-  p0_->addDeplContactInMap( idmap0,
-    *pkdelta, normal, *pspringRotFriction ); // is this line really necessary?
+  // Finally, we update the cumulative motions in component p1_
+  // If contact_existed was false, it also creates the contact in p1_
   p1_->addDeplContactInMap( idmap1,
     -*pkdelta, -normal, -*pspringRotFriction );
 }
@@ -215,52 +220,49 @@ bool MemoryContactForceModel::computeForces( Component* p0_,
 	LinkedCell* LC,
 	double dt, int nbContact )
 {
-  bool compute = true ; //TODO: remove this boolean? It does not look useful.
-
-  // Pour les particles composite, on calcule la moyenne des forces appliquees
-  // a chaque point de contact. Par defaut nbContact = 1 (particles convexes)
+  // In the case of composite particles, we compute the average of the 
+  // contact force over all contact points between two rigid bodies
+  // By default, nbContact = 1
   double coef = 1. / double( nbContact );
 
-  // Pour les particles composites, on renvoie la reference du composite
-  // et non celle des particles elementaires
+  // In the case of composite particles, we use the composite particle not the
+  // elemetary particles
   Component* ref_p0_ = p0_->getMasterComponent() ;
   Component* ref_p1_ = p1_->getMasterComponent() ;
-  // In case of composite particles, we retreive the ids of the elementary
+
+  // In case of composite particles, we retrieve the ids of the elementary
   // components
-  int elementary_id0 = 0;
-  int elementary_id1 = 0;
-  if( (ref_p0_)->isCompositeParticle() )
-  {
-    elementary_id0 = p0_->getID() ;
-  }
-  if( (ref_p1_)->isCompositeParticle() )
-  {
-    elementary_id1 = p1_->getID() ;
-  }
+  int elementary_id0 = 1;
+  int elementary_id1 = 1;
+  if ( ref_p0_->isCompositeParticle() ) elementary_id0 = p0_->getID() ;
+  if ( ref_p1_->isCompositeParticle() ) elementary_id1 = p1_->getID() ;
 
-  if ( compute  )
-  {
-    Vector3 delFN, delFT, delM;
-    Point3 geometricPointOfContact = contactInfos.getContact();
+  // Component tags
+  int tag_p0_ = ref_p0_->getTag();
+  int tag_p1_ = ref_p1_->getTag();    
 
-    // Calcul des forces & moments de contact
-    performForcesCalculus( ref_p0_, ref_p1_, dt, contactInfos, delFN, delFT, delM, elementary_id0, elementary_id1 );
+  Vector3 delFN, delFT, delM;
+  Point3 geometricPointOfContact = contactInfos.getContact();
 
-    // Component p0_
-    ref_p0_->addForce( geometricPointOfContact, coef * (delFN + delFT) );
-    if ( rolling_friction ) ref_p0_->addTorque( delM * coef );
+  // Compute contact force and torque
+  performForcesCalculus( ref_p0_, ref_p1_, dt, contactInfos, delFN, delFT, 
+  	delM, elementary_id0, elementary_id1 );
 
-    // Component p1_
-    ref_p1_->addForce( geometricPointOfContact, coef * ( - delFN - delFT ) );
-    if ( rolling_friction ) ref_p1_->addTorque( - delM * coef );
+  // Component p0_
+  ref_p0_->addForce( geometricPointOfContact, coef * (delFN + delFT), tag_p1_ );
+  if ( rolling_friction ) ref_p0_->addTorque( delM * coef, tag_p1_ );
 
-    // Force postprocessing
-    if ( GrainsExec::m_output_data_at_this_time )
-      LC->addPPForce( geometricPointOfContact, coef * (delFN + delFT),
+  // Component p1_
+  ref_p1_->addForce( geometricPointOfContact, coef * ( - delFN - delFT ), 
+  	tag_p0_ );
+  if ( rolling_friction ) ref_p1_->addTorque( - delM * coef, tag_p0_ );
+
+  // Force postprocessing
+  if ( GrainsExec::m_output_data_at_this_time )
+    LC->addPPForce( geometricPointOfContact, coef * (delFN + delFT),
 	ref_p0_, ref_p1_ );
-  }
 
-  return ( compute ) ;
+  return ( true ) ;
 }
 
 
@@ -288,31 +290,31 @@ map<string,double> MemoryContactForceModel::defineParameters( DOMNode* & root )
   parameters["mut"]    = value;
   // TODO: define default values in the DTD file instead?
   parameter = ReaderXML::getNode(root, "nr");
-  if (parameter)
+  if ( parameter )
   {
     value     = ReaderXML::getNodeValue_Double(parameter);
     parameters["nr"]    = value;
   }
-  else parameters["nr"] = 0;
+  else parameters["nr"] = 0.;
   parameter = ReaderXML::getNode(root, "mur");
-  if (parameter)
+  if ( parameter )
   {
     value     = ReaderXML::getNodeValue_Double(parameter);
     parameters["mur"]    = value;
   }
-  else parameters["mur"] = 0;
+  else parameters["mur"] = 0.;
   parameter = ReaderXML::getNode(root, "f");
-  if (parameter)
+  if ( parameter )
   {
     value     = ReaderXML::getNodeValue_Double(parameter);
     parameters["f"]    = value;
   }
-  else parameters["f"] = 0;
+  else parameters["f"] = 0.;
   parameter = ReaderXML::getNode(root, "ks");
   value     = ReaderXML::getNodeValue_Double(parameter);
   parameters["ks"]    = value;
   parameter = ReaderXML::getNode(root, "eps");
-  if (parameter)
+  if ( parameter )
   {
     value     = ReaderXML::getNodeValue_Double(parameter);
     parameters["eps"]  = value;

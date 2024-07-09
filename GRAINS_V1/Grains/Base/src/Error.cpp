@@ -31,10 +31,6 @@ void ContactError::Message( ostream& fileOut ) const
 
   fileOut << "Component 0 : " << endl;
   fileOut << "  Number = " << m_id0->getMasterComponent()->getID() << endl;
-  //fileOut << "  Numero = " << id0->getID() << endl;
-//   if ( m_id0->getID() == -2 ) 
-//     fileOut << "  Numero de la particle de reference = " 
-//    	<< m_id0->getPeriodicReferenceID() << endl;
   fileOut << "  Class = ";
   if ( m_id0->getGeometricType() != -100 ) 
     fileOut << m_id0->getGeometricType() << endl;
@@ -49,12 +45,7 @@ void ContactError::Message( ostream& fileOut ) const
   fileOut << "    Norm = " << Norm( *(m_id0->getAngularVelocity()) ) << endl;
 
   fileOut << "Component 1 : " << endl;
-  fileOut << "  Numero = " << m_id1->getMasterComponent()->getID() << endl; 
-  //fileOut << "  Numero = " << id1->getID() << endl; 
-//   if ( m_id1->getID() == -2 ) 
-//     fileOut << "  Numero de la particle de reference = " 
-//    	<< m_id1->getPeriodicReferenceID() << endl
-// 	<< "  Nb de periodes = " << m_id1->getNbPeriodes() << endl;   
+  fileOut << "  Numero = " << m_id1->getMasterComponent()->getID() << endl;    
   fileOut << "  Class = ";
   if ( m_id1->getGeometricType() != -100 ) 
     fileOut << m_id1->getGeometricType() << endl;
@@ -120,10 +111,10 @@ list<Component*> ContactError::getComponents()
 
 
 
-// DisplacementError
+// MotionError
 // ----------------------------------------------------------------------------
 // Constructor with input parameters
-DisplacementError::DisplacementError( Component* id0_, double depl, 
+MotionError::MotionError( Component* id0_, double depl, 
 	double deplMax, double time_ ) 
   : m_id0( id0_ ) 
   , m_depl( depl ) 
@@ -135,14 +126,14 @@ DisplacementError::DisplacementError( Component* id0_, double depl,
 
 
 // ----------------------------------------------------------------------------
-DisplacementError::DisplacementError() 
+MotionError::MotionError() 
 {}
 
 
 
   
 // ----------------------------------------------------------------------------
-DisplacementError::~DisplacementError() 
+MotionError::~MotionError() 
 {}
 
 
@@ -150,16 +141,13 @@ DisplacementError::~DisplacementError()
 
 // ----------------------------------------------------------------------------
 // Outputs message when exception is caught
-void DisplacementError::Message( ostream& fileOut ) const
+void MotionError::Message( ostream& fileOut ) const
 {
-  fileOut << "ERR Displacement : " << m_depl 
+  fileOut << "ERR Motion : " << m_depl 
 	<< " compared to " << m_deplMax << " allowed at t=" 
 	<< GrainsExec::doubleToString(m_time,TIMEFORMAT) << endl;
   fileOut << "Component : " << endl;
   fileOut << "  Number = " << m_id0->getID() << endl;
-//   if ( m_id0->getID() == -2 ) 
-//     fileOut << "  Numero de la particle de reference = " 
-//    	<< m_id0->getPeriodicReferenceID() << endl;
   fileOut << "  Class = ";
   if ( m_id0->getGeometricType() != -100 ) 
     fileOut << m_id0->getGeometricType() << endl;
@@ -177,9 +165,9 @@ void DisplacementError::Message( ostream& fileOut ) const
 
 
 // ----------------------------------------------------------------------------
-// Returns the pointer to the component involved in the displacement
+// Returns the pointer to the component involved in the motion
 // error in a list for further post-processing
-list<Component*> DisplacementError::getComponent()
+list<Component*> MotionError::getComponent()
 {
   list<Component*> lc;
   lc.push_back(m_id0);

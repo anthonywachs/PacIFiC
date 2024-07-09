@@ -5,6 +5,9 @@
 #include <math.h>
 
 
+size_t Quaternion::m_sizeofQuaternion = solid::Group3::m_sizeofGroup3
+	+ sizeof( double );
+
 // ----------------------------------------------------------------------------
 // Default constructor
 Quaternion::Quaternion()
@@ -250,43 +253,51 @@ void Quaternion::setQuaternion( Matrix const& rot )
 }
 
 
-/* Build a unit quaternion representing the rotation
- * from u to v. The input vectors need not be normalised. */
-// TODO: if the input vectors aren't normalized, normalize then and warn the
+
+
+// ----------------------------------------------------------------------------
+// Build a unit quaternion representing the rotation from u to v. 
+// The input vectors need not be normalised. */
+// TODO: if the input vectors aren't normalized, normalize them and warn the
 // user.
-void Quaternion::setRotFromTwoVectors( const Vector3& u, const Vector3& v)
+void Quaternion::setRotFromTwoVectors( Vector3 const& u, Vector3 const& v )
 {
-    double norm_u_norm_v = sqrt( (u*u) * (v*v) );
-    double real_part = norm_u_norm_v + u*v;
-    Vector3 vect;
+  double norm_u_norm_v = sqrt( (u*u) * (v*v) );
+  double real_part = norm_u_norm_v + u*v;
+  Vector3 vect;
 
-    if (real_part < 1.e-6 * norm_u_norm_v)
-    {
-        /* If u and v are exactly opposite, rotate 180 degrees
-         * around an arbitrary orthogonal axis. Axis normalisation
-         * can happen later, when we normalise the quaternion. */
-        real_part = 0.;
-        vect = fabs(u[0]) > fabs(u[2]) ? Vector3(-u[1], u[0], 0.)
-                                : Vector3(0., -u[2], u[1]);
-    }
-    else
-    {
-        /* Otherwise, build quaternion the standard way. */
-        vect = u^v;
-    }
+  if (real_part < 1.e-6 * norm_u_norm_v)
+  {
+    /* If u and v are exactly opposite, rotate 180 degrees
+    around an arbitrary orthogonal axis. Axis normalisation
+    can happen later, when we normalise the quaternion. */
+    real_part = 0.;
+    vect = fabs(u[0]) > fabs(u[2]) ? Vector3( -u[1], u[0], 0. )
+                                : Vector3( 0., -u[2], u[1] );
+  }
+  else
+  {
+    /* Otherwise, build quaternion the standard way. */
+    vect = u ^ v;
+  }
 
-    *this = Quaternion(vect[0],vect[1],vect[2],real_part) * (1/
-            Norm( Quaternion(vect[0],vect[1],vect[2],real_part)) );
+  Quaternion qq( vect[0], vect[1], vect[2], real_part );
+  *this = qq * ( 1. / Norm( qq ) );
 }
 
 
-Vector3 Quaternion::rotateVector(const Vector3 v)
+
+
+// ----------------------------------------------------------------------------
+// Rotates a vector using the quaternion *this
+Vector3 Quaternion::rotateVector( Vector3 const& v ) const
 {
-  Vector3 v_rotated;
-  v_rotated = (m_w*m_w - Norm(m_vqt)*Norm(m_vqt))*v + 2*(v*m_vqt)*m_vqt
-              + 2*m_w*(m_vqt^v);
-  return v_rotated ;
+  Vector3 v_rotated = ( m_w * m_w - Norm(m_vqt) * Norm(m_vqt) ) * v 
+  	+ 2. * ( v * m_vqt ) * m_vqt + 2. * m_w * ( m_vqt ^ v );
+  return ( v_rotated );
 }
+
+
 
 
 // ----------------------------------------------------------------------------

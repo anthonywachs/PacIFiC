@@ -4,6 +4,7 @@
 
 # PacIFiC home
 export PACIFIC_HOME=TO_BE_OVERWRITTEN
+export PACIFIC_HOME=TO_BE_OVERWRITTEN
 export PACIFIC_BITS_DEFAULT="64"
 export PACIFIC_BITS_EXT="64"
 echo -e '\033[94m*** PacIFiC shell variables\033[0m'
@@ -14,7 +15,7 @@ echo -e '  '
 
 
 # MPI
-export PACIFIC_MPI_ROOT=/media/data/softwares/openmpi-2.1.1-r8k1/build
+export PACIFIC_MPI_ROOT=/home/gitlab-runner/dependencies/openmpi-2.1.1/build
 export PACIFIC_MPI_DISTRIB=OpenMPI
 export PACIFIC_MPI_VERSION=2.1.1
 export PACIFIC_MPI_INCDIR="${PACIFIC_MPI_ROOT}/include"
@@ -116,14 +117,14 @@ echo -e '  '
 source ${PACIFIC_HOME}/Octree/Env/octree.env.sh
 
 
-# Post processing
-echo -e '  '
-export PP_HOME=$PACIFIC_HOME/postProcessingTools
-echo -e '\033[94m*** Post processing shell variables\033[0m'
-echo -e '\033[94mPP_HOME\033[0m =' $PP_HOME
+# # Post processing
+# echo -e '  '
+# export PP_HOME=$PACIFIC_HOME/postProcessingTools
+# echo -e '\033[94m*** Post processing shell variables\033[0m'
+# echo -e '\033[94mPP_HOME\033[0m =' $PP_HOME
 
-# Print current branch name:
-echo -e '  '
-cd $PACIFIC_HOME
-echo -e '\033[32m*** You are currently on branch\033[32m' $(git rev-parse --abbrev-ref HEAD) '\033[32m***\033[0m'
-cd -
+# # Print current branch name:
+# echo -e '  '
+# cd $PACIFIC_HOME
+# echo -e '\033[32m*** You are currently on branch\033[32m' $(git rev-parse --abbrev-ref HEAD) '\033[32m***\033[0m'
+# cd -

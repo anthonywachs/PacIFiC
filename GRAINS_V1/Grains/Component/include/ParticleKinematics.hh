@@ -46,10 +46,9 @@ class ParticleKinematics : public Kinematics
 
     /** @brief Computes the momentum change over dt 
     @param torseur particle torsor 
-    @param dt time step magnitude 
     @param particle particle related to the kinematics */
-    virtual void computeMomentumChangeOverDt( Torsor const& torseur,
-	double dt, Particle const* particle ) = 0;
+    virtual void computeAcceleration( Torsor const& torseur,
+	Particle const* particle ) = 0;
 			   
     /** @brief Computes explicitly Idw/dt
     @param dw explicit change of angular velocity
@@ -63,8 +62,14 @@ class ParticleKinematics : public Kinematics
     //@{
     /** @brief Integrates Newton's law and moves the particle 
     @param particle the particle
-    @param dt time step magnitude */
-    double Move( Particle* particle, double dt );
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp motion time step magnitude */
+    double Move( Particle* particle, double const& dt_particle_vel, 
+    	double const& dt_particle_disp );
+	
+    /** @brief Advances velocity over dt_particle_vel
+    @param dt_particle_vel velocity time step magnitude */
+    void advanceVelocity( double const& dt_particle_vel ); 	
 
     /** @brief Returns the total velocity U + om x R given R 
     @param lev lever arm vector */
@@ -84,6 +89,10 @@ class ParticleKinematics : public Kinematics
     and 2014 format
     @param fileOut output stream */
     void writeParticleKinematics2014_binary( ostream& fileOut );
+
+    /** @brief Reads particle kinematics from a stream in the 2014 format 
+    @param StreamIN input stream */
+    void readParticleKinematics2014( istream& StreamIN ); 
   
     /** @brief Reads particle kinematics from a stream in a binary form in the
     2014 format 
@@ -109,6 +118,10 @@ class ParticleKinematics : public Kinematics
 
     /** @brief Returns translational velocity */
     Vector3 const* getTranslationalVelocity() const;
+    
+    /** @brief Returns the number of bytes of the ParticleKinematics when 
+    written in a binary format to an output stream */
+    size_t get_numberOfBytes() const;    
     //@}
   
 
@@ -134,10 +147,24 @@ class ParticleKinematics : public Kinematics
     /** @brief Sets the angular velocity
     @param omega angular velocity */
     void setAngularVelocity( Vector3 const& omega );
+    
+    /** @brief Sets the angular velocity
+    @param vx x-angular velocity component 
+    @param vy y-angular velocity component     
+    @param vz z-angular velocity component */
+    void setAngularVelocity( double const& omx, double const& omy,
+	double const& omz );     
 
     /** @brief Sets the translation velocity
     @param vtrans translation velocity */
     void setTranslationalVelocity( Vector3 const& vtrans );
+    
+    /** @brief Sets the translation velocity
+    @param vx x-translation velocity component 
+    @param vy y-translation velocity component     
+    @param vz z-translation velocity component */
+    void setTranslationalVelocity( double const& vx, double const& vy,
+	double const& vz );    
 
     /** @brief Sets kinematics at time t-2dt from a 1D array of 12 scalars
     (translational velocity, angular velocity, variation of translational
@@ -207,7 +234,7 @@ class ParticleKinematics : public Kinematics
     Quaternion m_QuaternionRotation; /**< Rotation quaternion */ 
     Vector3 m_dUdt; /**< Translational velocity variation dU/dt */
     Vector3 m_dOmegadt; /**< Angular velocity variation dom/dt */
-    Vector3 m_translationalDisplacementOverDt; /**< Translational displacement
+    Vector3 m_translationalMotionOverDt; /**< Translational motion
   	over dt */
     Vector3 m_averageAngularVelocityOverDt; /**< average angular velocity over 
   	dt */

@@ -19,13 +19,6 @@ method introduced by [Charrier et al.](#charrier1989free).
   #define DWDL2(L1, L2) (E_S/(3.*L2)*(sq(L2) - 1./(sq(L1*L2))))
 #endif
 
-/** For validation purposes, the option is given to the user to print the
-principal stresses on each triangle. They are printed to the standard output
-stream */
-#ifndef OUTPUT_PRINCIPAL_STRESS
-  #define OUTPUT_PRINCIPAL_STRESS 0
-#endif
-
 /**
 ## Finite Element helper functions
 
@@ -137,7 +130,7 @@ void comp_elastic_stress(lagMesh* mesh) {
   don't need the finite element framework. For the moment, the Neo-Hookean law
   is hard-coded below, but other 2D elastic laws will be available soon.*/
   compute_lengths(mesh);
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     coord T[2];
     for(int j=0; j<2; j++) {
       int edge_id, edge_node1, edge_node2;
@@ -154,13 +147,14 @@ void comp_elastic_stress(lagMesh* mesh) {
       foreach_dimension() {
         double x1 = mesh->nodes[edge_node1].pos.x;
         double x2 = mesh->nodes[edge_node2].pos.x;
+        /** Warning: the line below was not tested when the origin is not
+        (0,0,0): it might be wrong in that case.*/
         e.x = (fabs(x1 - x2) < L0/2.) ? x1 - x2 : ((fabs(x1 - L0 - x2) > L0/2.)
           ? x1 + L0 - x2 : x1 - L0 - x2) ;
         ne += sq(e.x);
       }
       ne = sqrt(ne);
-      /** $\bm{T_i} = \frac{E_s}{\lambda_i^{3/2}} (\lambda^3 - 1)
-      \bm{e_i}$ */
+      /** $\bm{T_i} = \frac{E_s}{\lambda_i^{3/2}} (\lambda^3 - 1) \bm{e_i}$ */
       foreach_dimension()
         T[j].x = (fabs(ne) > 1.e-10) ? tension_norm*e.x/ne : 0.;
     }
@@ -226,16 +220,14 @@ void comp_elastic_stress(lagMesh* mesh) {
     lambda[1] = sqrt(.5*(C[0][0] + C[1][1] + sqrt(sq(C[0][0] - C[1][1]) +
       4*sq(C[0][1]))));
 
-    /** If the user wants to output the two principal stresses (for validation
-  purposes), print them to the standard output */
-    #if OUTPUT_PRINCIPAL_STRESS
-    double e1, e2, t1, t2;
-    e1 = .5*(sq(lambda[0]) - 1.);
-    e2 = .5*(sq(lambda[1]) - 1.);
+    /** Below we add the stretch and stress  */
+    double t1, t2;
     t1 = DWDL1(lambda[0], lambda[1])/lambda[1];
     t2 = DWDL2(lambda[0], lambda[1])/lambda[0];
-    fprintf(stdout, "%d, %g, %g, %g, %g\n", i, e1, e2, t1, t2);
-    #endif
+    mesh->triangles[i].tension[0] = t1;
+    mesh->triangles[i].tension[1] = t2;
+    mesh->triangles[i].stretch[0] = lambda[0];
+    mesh->triangles[i].stretch[1] = lambda[1];
 
     /** #### Step 5. For each node of the triangle, compute the force in the common plane,
     then rotate it and add it to the Lagrangian force of the node */
@@ -298,12 +290,17 @@ according to the desired pre-stressed conditions. See the
 an example of a isotropically pre-stressed membrane.*/
 #if dimension > 2
 event init (i = 0) {
-  for(int j=0; j<NCAPS; j++) store_initial_configuration(&MB(j));
+  #if (RESTART_CASE == 0)
+    for(int j=0; j<NCAPS; j++)
+      if (CAPS(j).isactive) store_initial_configuration(&(CAPS(j)));
+  #endif
 }
 #endif
 
 event acceleration (i++) {
-  for(int i=0; i<mbs.nbmb; i++) comp_elastic_stress(&mbs.mb[i]);
+  for(int i=0; i<allCaps.nbcaps; i++)
+    if (CAPS(i).isactive)
+      comp_elastic_stress(&CAPS(i));
 }
 
 /**

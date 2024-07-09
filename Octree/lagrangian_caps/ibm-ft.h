@@ -14,9 +14,12 @@ not with Cartesian nor multigrids}.
 
 #define BGHOSTS 2 // Having two layers of ghost cells should not be mandatory since the implementation relies on Caches
 
-#define POS_PBC_X(X) ((u.x.boundary[left] != periodic_bc) ? (X) : (((X) > L0/2.) ? (X) - L0 : (X)))
-#define POS_PBC_Y(Y) ((u.x.boundary[top] != periodic_bc) ? (Y) : (((Y) > L0/2.) ? (Y) - L0 : (Y)))
-#define POS_PBC_Z(Z) ((u.x.boundary[top] != periodic_bc) ? (Z) : (((Z) > L0/2.) ? (Z) - L0 : (Z)))
+#define POS_PBC_X(X) ((u.x.boundary[left] != periodic_bc) ? (X) : (((X - (X0 +\
+  L0/2)) > L0/2.) ? (X) - L0 : (X)))
+#define POS_PBC_Y(Y) ((u.x.boundary[top] != periodic_bc) ? (Y) : (((Y - (Y0 +\
+  L0/2)) > L0/2.) ? (Y) - L0 : (Y)))
+#define POS_PBC_Z(Z) ((u.x.boundary[front] != periodic_bc) ? (Z) : (((Z - (Z0 +\
+  L0/2)) > L0/2.) ? (Z) - L0 : (Z)))
 
 struct _generate_lag_stencils_one_caps {
   lagMesh* mesh;
@@ -32,7 +35,7 @@ trace
 void generate_lag_stencils_one_caps(struct _generate_lag_stencils_one_caps p) {
   lagMesh* mesh = p.mesh;
   bool no_warning = p.no_warning;
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     mesh->nodes[i].stencil.n = 0;
     /**
     The current implementation assumes that the Eulerian cells around Lagrangian
@@ -78,8 +81,9 @@ struct _generate_lag_stencils {
 
 trace
 void generate_lag_stencils(struct _generate_lag_stencils p) {
-  for(int k=0; k<NCAPS; k++) generate_lag_stencils_one_caps(mesh = &MB(k),
-    no_warning = p.no_warning);
+  for(int k=0; k<NCAPS; k++)
+    if (CAPS(k).isactive)
+      generate_lag_stencils_one_caps(mesh = &CAPS(k), no_warning = p.no_warning);
 }
 
 
@@ -91,7 +95,7 @@ the intention is to include them in the forcing).
 */
 trace
 void lag2eul(vector forcing, lagMesh* mesh) {
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
         #if EMBED
@@ -131,7 +135,7 @@ the Lagrangian mesh.
 */
 trace
 void eul2lag(lagMesh* mesh) {
-  for(int ii=0; ii<mesh->nlp; ii++) {
+  for(int ii=0; ii<mesh->nln; ii++) {
     foreach_dimension() mesh->nodes[ii].lagVel.x = 0.;
     foreach_cache(mesh->nodes[ii].stencil) {
       if (point.level >= 0) {
@@ -174,7 +178,7 @@ the 5x5(x5) stencils around the Lagrangian nodes are at the same level.
 scalar stencils[];
 trace
 void tag_ibm_stencils_one_caps(lagMesh* mesh) {
-  for(int i=0; i<mesh->nlp; i++) {
+  for(int i=0; i<mesh->nln; i++) {
     foreach_cache(mesh->nodes[i].stencil) {
       if (point.level >= 0) {
         coord dist;
@@ -195,15 +199,13 @@ void tag_ibm_stencils_one_caps(lagMesh* mesh) {
       }
     }
   }
-  #if OLD_QCC
-  boundary({stencils});
-  #endif
 }
 
 trace
 void tag_ibm_stencils() {
   foreach() stencils[] = 0.;
-  for(int k=0; k<NCAPS; k++) tag_ibm_stencils_one_caps(&MB(k));
+  for(int k=0; k<NCAPS; k++)
+    if (CAPS(k).isactive) tag_ibm_stencils_one_caps(&CAPS(k));
 }
 
 /**

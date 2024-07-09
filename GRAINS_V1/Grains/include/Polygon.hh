@@ -86,6 +86,11 @@ class Polygon : public Polytope
     /** @ brief Returns whether a point lies inside the polygon
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Performs advanced comparison of the two polygons and returns
+    whether they match
+    @param other the other convex */
+    bool equalType_level2( Convex const* other ) const;    
     //@}
 
 

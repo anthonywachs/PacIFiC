@@ -13,16 +13,17 @@ ObstacleImposedForce::ObstacleImposedForce()
   m_type = "Undefined";
   m_tstart = 0.; 
   m_tend = 0.;
-  m_force = Vector3Nul;
-  m_prev = Vector3Nul;
+  m_force_amplitude = Vector3Null;
+  m_force = Vector3Null;
+  m_prev = Vector3Null;
   m_mass = 0.;
-  m_direction = Vector3Nul;
-  m_translationalVelocity = Vector3Nul;
-  m_freqX = 0.;
-  m_freqY = 0.;
-  m_freqZ = 0.;
-  m_phase = 0.;
-  m_prev = Vector3Nul;
+  m_automass = false;
+  m_direction = Vector3Null;
+  m_translationalVelocity = Vector3Null;
+  m_SinCyclic_period = Vector3Null;
+  m_SinCyclic_phase_shift = Vector3Null;
+  m_prev = Vector3Null;
+  m_vmaxzeroforce = 0.;
 }
 
 
@@ -33,50 +34,97 @@ ObstacleImposedForce::ObstacleImposedForce()
 ObstacleImposedForce::ObstacleImposedForce( DOMNode* root, double dt, 
 	int rank, size_t& error )
 {
+  m_ObstacleName = "Undefined";
+  m_type = "Undefined";
+  m_tstart = 0.; 
+  m_tend = 0.;
+  m_force_amplitude = Vector3Null;
+  m_force = Vector3Null;
+  m_prev = Vector3Null;
+  m_mass = 0.;
+  m_automass = false;  
+  m_direction = Vector3Null;
+  m_translationalVelocity = Vector3Null;
+  m_SinCyclic_period = Vector3Null;
+  m_SinCyclic_phase_shift = Vector3Null;
+  m_prev = Vector3Null;
+  m_vmaxzeroforce = 0.;  
+
   m_ObstacleName = ReaderXML::getNodeAttr_String( root, "ObstacleName" );
   
   DOMNode* nTimeInterval = ReaderXML::getNode( root, "TimeInterval" );
   m_tstart = ReaderXML::getNodeAttr_Double( nTimeInterval, "Start" );
   m_tend = ReaderXML::getNodeAttr_Double( nTimeInterval, "End" );
   
-  DOMNode* force    = ReaderXML::getNode( root, "Amplitude" );
-  DOMNode* nVector3 = ReaderXML::getNode( root, "Vector3" );
-  DOMNode* property = ReaderXML::getNode( root, "Property" );
-  m_mass	    = ReaderXML::getNodeAttr_Double( property, "Masse" );
-
-  m_direction[X] = ReaderXML::getNodeAttr_Double( nVector3, "X" );
-  m_direction[Y] = ReaderXML::getNodeAttr_Double( nVector3, "Y" );
-  m_direction[Z] = ReaderXML::getNodeAttr_Double( nVector3, "Z" );
-
-  m_type            = ReaderXML::getNodeAttr_String( root, "Type" );
-
-  m_force[X]   	    = ReaderXML::getNodeAttr_Double( force, "AX" );
-  m_force[Y]   	    = ReaderXML::getNodeAttr_Double( force, "AY" );
-  m_force[Z]   	    = ReaderXML::getNodeAttr_Double( force, "AZ" );
-
-  if ( m_type == "Cyclic")
+  // Constant translation
+  if ( ReaderXML::getNode( root, "ConstantTranslation" ) )
+  {  
+    m_type = "ConstantTranslation";
+    DOMNode* nCT = ReaderXML::getNode( root, "ConstantTranslation" );      
+    DOMNode* force = ReaderXML::getNode( nCT, "Amplitude" );
+    m_force_amplitude[X] = ReaderXML::getNodeAttr_Double( force, "AX" );
+    m_force_amplitude[Y] = ReaderXML::getNodeAttr_Double( force, "AY" );
+    m_force_amplitude[Z] = ReaderXML::getNodeAttr_Double( force, "AZ" ); 
+    m_direction = m_force_amplitude / Norm( m_force_amplitude ); 
+    m_force = m_force_amplitude; 
+    DOMNode* property = ReaderXML::getNode( nCT, "Property" );
+    if ( ReaderXML::hasNodeAttr( property, "Mass" ) )
+      m_mass = ReaderXML::getNodeAttr_Double( property, "Mass" );
+    else m_automass = true;
+    m_vmaxzeroforce = ReaderXML::getNodeAttr_Double( property, "Vmax" );    
+    if ( rank == 0 )
+    {
+      cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
+      	<< endl;      
+      cout << GrainsExec::m_shift12 << "Time interval = [" 
+      	<< m_tstart << "," << m_tend << "]" << endl;
+      cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
+      cout << GrainsExec::m_shift12 << "Force = " << m_force[X] << " " << 
+      	m_force[Y] << " " << m_force[Z] << endl;
+      cout << GrainsExec::m_shift12 << "Mass = ";
+      if ( m_automass ) cout << "auto" << endl;
+      else cout << m_mass << endl;
+      cout << GrainsExec::m_shift12 << "Vmax = " << m_vmaxzeroforce << endl;
+    }
+  } 
+  else if ( ReaderXML::getNode( root, "SinCyclicTranslation" ) )
   {
-    DOMNode* frequence  = ReaderXML::getNode( root, "Frequence" );
-    m_phase             = ReaderXML::getNodeAttr_Double( frequence, "Phi" );
-    m_freqX        = ReaderXML::getNodeAttr_Double( frequence, "FX" );
-    m_freqY        = ReaderXML::getNodeAttr_Double( frequence, "FY" );
-    m_freqZ        = ReaderXML::getNodeAttr_Double( frequence, "FZ" );
-    m_phase            *= PI / 180.;
-  }
-
-  if ( rank == 0 )
-  {
-    cout << "Chargement en force sur " << m_ObstacleName << endl;
-    cout << "Type de chargement : " << m_type << endl;
-    cout << "Amplitude de la force = " << m_force[X] << "\t" << m_force[Y] 
-	 << "\t" << m_force[Z] << endl;
-    cout << "Direction de la force = " << m_direction[X] << "\t"
-	 << m_direction[Y] << "\t" << m_direction[Z] << endl;
-    if ( m_type == "Cyclic" )
-      cout << "Frequence : FX = " << m_freqX << "\tFY = " << m_freqY
-           << "\tFZ = " << m_freqZ << endl;
-    cout << "   Temps de depart = " << m_tstart << endl;
-    cout << "   Temps de fin = " << m_tend << endl;
+    m_type = "SinCyclicTranslation";
+    DOMNode* nCyclic = ReaderXML::getNode( root, "SinCyclicTranslation" );        
+    DOMNode* force = ReaderXML::getNode( nCyclic, "Amplitude" );
+    m_force_amplitude[X] = ReaderXML::getNodeAttr_Double( force, "AX" );
+    m_force_amplitude[Y] = ReaderXML::getNodeAttr_Double( force, "AY" );
+    m_force_amplitude[Z] = ReaderXML::getNodeAttr_Double( force, "AZ" ); 
+    m_direction = m_force_amplitude / Norm( m_force_amplitude );   
+    DOMNode* property = ReaderXML::getNode( nCyclic, "Property" );
+    m_mass = ReaderXML::getNodeAttr_Double( property, "Mass" );
+    DOMNode* nPer = ReaderXML::getNode( nCyclic, "Period" );
+    m_SinCyclic_period[X] = ReaderXML::getNodeAttr_Double( nPer, "PX" );
+    m_SinCyclic_period[Y] = ReaderXML::getNodeAttr_Double( nPer, "PY" );
+    m_SinCyclic_period[Z] = ReaderXML::getNodeAttr_Double( nPer, "PZ" ); 
+    DOMNode* nPhaseShift = ReaderXML::getNode( nCyclic, "PhaseShift" );    
+    m_SinCyclic_phase_shift[X] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
+    	"PhiX" ) * PI / 180.;
+    m_SinCyclic_phase_shift[Y] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
+    	"PhiY" ) * PI / 180.;	
+    m_SinCyclic_phase_shift[Z] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
+    	"PhiZ" ) * PI / 180.;    
+    if ( rank == 0 )
+    {
+      cout << GrainsExec::m_shift12 << "Obstacle name = " << m_ObstacleName 
+      	<< endl;      
+      cout << GrainsExec::m_shift12 << "Time interval = [" 
+      	<< m_tstart << "," << m_tend << "]" << endl;
+      cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
+      cout << "Force = " << m_force[X] << " " << m_force[Y] << " " << 
+    	m_force[Z] << endl; 
+      cout << GrainsExec::m_shift12 << "Period = " << 
+      	m_SinCyclic_period[X] << " " << m_SinCyclic_period[Y] << " " <<
+	m_SinCyclic_period[Z] << endl;
+      cout << GrainsExec::m_shift12 << "Phase shift in rad = " << 
+      	m_SinCyclic_phase_shift[X] << " " << m_SinCyclic_phase_shift[Y] << " " 
+	<< m_SinCyclic_phase_shift[Z] << endl;	
+    }    
   }
 }
 
@@ -93,7 +141,7 @@ ObstacleImposedForce::~ObstacleImposedForce()
 
 // ----------------------------------------------------------------------------
 // Returns obstacle name
-string ObstacleImposedForce::getNom() const
+string ObstacleImposedForce::getObstacleName() const
 {
   return ( m_ObstacleName );
 }
@@ -137,28 +185,10 @@ bool ObstacleImposedForce::isCompleted( double t, double dt ) const
 
 
 // ----------------------------------------------------------------------------
-// Creates and reads the imposed force features from an input stream
-ObstacleImposedForce* ObstacleImposedForce::read( istream& fileIn )
-{
-  ObstacleImposedForce* chargement;
-  chargement = new ObstacleImposedForce();
-
-  fileIn >> chargement->m_ObstacleName
-	>> chargement->m_tstart >> chargement->m_tend
-	>> chargement->m_force 
-	>> chargement->m_mass
-	>> chargement->m_direction;
-  
-  return ( chargement );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Returns the imposed force
-Vector3 ObstacleImposedForce::getForce() const
+Vector3 ObstacleImposedForce::getForce( double time )
 {
+  if ( m_type == "SinCyclicTranslation" ) SinCyclicForce( time );
   return ( m_force );
 }
 
@@ -176,7 +206,7 @@ double ObstacleImposedForce::getMass() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the direction of displacement
+// Returns the direction of motion
 Vector3 const* ObstacleImposedForce::getDirection() const
 {
   return ( &m_direction );
@@ -200,43 +230,64 @@ string ObstacleImposedForce::getType() const
 Vector3 const* ObstacleImposedForce::translationalVelocity( double time, 
 	double dt, Obstacle* obstacle )
 {
-  Vector3 center = *obstacle->getPosition();
-  GrainsMPIWrapper* wrapper = GrainsExec::getComm();
-  // Somme des forces sur l'obstacle
-  Torsor const* somme  = obstacle->getTorsor();
-  Vector3 const* forces = somme->getForce();
-  Vector3 force = *forces;
-  force[X] = wrapper->sum_DOUBLE_master( force[X] ); 
-  force[Y] = wrapper->sum_DOUBLE_master( force[Y] ); 
-  force[Z] = wrapper->sum_DOUBLE_master( force[Z] ); 
+  Vector3 center = *(obstacle->getPosition());
+  Vector3 force = *(obstacle->getForce());
 
-  force[X] = wrapper->Broadcast_DOUBLE( force[X] );
-  force[Y] = wrapper->Broadcast_DOUBLE( force[Y] );
-  force[Z] = wrapper->Broadcast_DOUBLE( force[Z] );
+  // Mass coeficient
+  // If automatically determined, it is set such that the obstacle motion
+  // over [t,t+dt] is equal to its crust thickness divided by 10^7 when
+  // the controller is simply a propertional controller and df is equal 
+  // to the imposed force  
+  if ( m_automass )
+    m_mass = dt * dt * Norm( m_force_amplitude ) * 1.e7 /
+    	( 2. * obstacle->getCrustThickness() );
+
+  // PID controller coefficients (Ziegler-Nichols method) 
+  // The proportionality coefficient Kp is the solution of the simple
+  // ODE m_mass * d^22 x/dt^2 = df with df constant over [t,t+dt] where
+  // x is the obstacle motion, i.e. x = dt^2 * df / ( 2 * m_mass )  
+  double Kp = 0.5 * dt * dt / m_mass ;
+  double Ki = 2. * Kp / dt ;
+  double Kd = 3. * Kp * dt / 24.; 
+     
+  // Translational velocity of the obstacle over [t,t+dt]
+  Vector3 dforce, depl, trans;
+  static Vector3 dforce_nm1;
+  static Vector3 dforce_nm2;
+  static Vector3 depl_nm1;
   
-  Vector3 dforce;
-  Vector3 depl;
-  Vector3 trans;
-  if ( m_type == "Translation" )
+  static bool nonzeroforce = false;
+  if ( nonzeroforce == false ) nonzeroforce = Norm( force ) > EPSILON;
+
+  if ( m_type == "ConstantTranslation" )
   {
-    dforce = m_force - force;
-    dforce[X] *= m_direction[X]; 
-    dforce[Y] *= m_direction[Y]; 
-    dforce[Z] *= m_direction[Z]; 
-    depl = 0.5 *( dt * dt / m_mass ) * dforce; 
-    m_translationalVelocity = depl / dt;
+    m_force = m_force_amplitude;
+    dforce = force - m_force;
+    for (size_t i=0;i<3;++i) dforce[i] *= m_direction[i]; 
+    if ( nonzeroforce )
+    { 
+      depl = depl_nm1 + ( Kp + Ki * dt + Kd / dt ) * dforce
+      	- ( Kp + 2. * Kd / dt ) * dforce_nm1 + ( Kd / dt ) * dforce_nm2; 
+      m_translationalVelocity = depl / dt;
+      dforce_nm2 = dforce_nm1;
+      dforce_nm1 = dforce;
+      depl_nm1 = depl;
+    }
+    else
+      m_translationalVelocity = - m_vmaxzeroforce * m_direction;      
   }
-  else if ( m_type == "Cyclic" )
+  else if ( m_type == "SinCyclicTranslation" )
   {
-    dforce = cyclicForce( time ) - force;
-    dforce[X] *= m_direction[X]; 
-    dforce[Y] *= m_direction[Y]; 
-    dforce[Z] *= m_direction[Z]; 
-    trans = 0.5 *( dt * dt / m_mass ) * dforce; 
-    depl = trans - m_prev;
-    m_translationalVelocity = depl / dt;
-    // t-dt 
-    m_prev = trans;
+    // TO DO
+    
+//     SinCyclicForce( time );
+//     dforce = force - m_force;
+//     for (size_t i=0;i<3;++i) dforce[i] *= m_direction[i]; 
+//     trans = 0.5 *( dt * dt / m_mass ) * dforce; 
+//     depl = trans - m_prev;
+//     m_translationalVelocity = depl / dt;
+//     // t-dt 
+//     m_prev = trans;
   }
   
   return ( &m_translationalVelocity );
@@ -246,16 +297,10 @@ Vector3 const* ObstacleImposedForce::translationalVelocity( double time,
 
 
 // ----------------------------------------------------------------------------
-// Returns the imposed force in cyclic mode 
-Vector3 ObstacleImposedForce::cyclicForce( double time ) const
+// Sets the sinusoidal cyclic force at a given time 
+void ObstacleImposedForce::SinCyclicForce( double time )
 {
-  Vector3 cycForce;
-  cycForce[X] = m_force[X] * sin( 2. * PI * m_freqX * 
-      	( time - m_tstart ) );
-  cycForce[Y] = m_force[Y] * sin( 2. * PI * m_freqY *
-      	( time - m_tstart ) + m_phase );
-  cycForce[Z] = m_force[Z] * sin( 2. * PI * m_freqZ *
-      	( time - m_tstart ) + m_phase );
-
-  return ( cycForce );
+  for (size_t i=0;i<3;++i)
+    m_force[i] = m_force_amplitude[i] * sin( 2. * PI * ( time - m_tstart ) 
+    	/ m_SinCyclic_period[i] );
 }

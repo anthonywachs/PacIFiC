@@ -172,7 +172,7 @@ DS_NavierStokes:: DS_NavierStokes( MAC_Object* a_owner,
 		// controller = DS_PID::create(0.5,1.,0);
 		// Set the initial pressure drop, required in case of given flow rate
 		if (!b_restart) {
-			if (UF->primary_grid()->get_periodic_pressure_drop() < 1.e-12)
+			if (fabs(UF->primary_grid()->get_periodic_pressure_drop()) < 1.e-12)
 				const_cast<FV_Mesh*>(UF->primary_grid())
 								->set_periodic_pressure_drop( -100. ) ;
 			if (macCOMM->rank() == 0) {

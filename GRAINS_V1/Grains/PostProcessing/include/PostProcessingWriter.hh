@@ -49,7 +49,7 @@ class PostProcessingWriter
     @param time physical time
     @param dt time step magnitude
     @param particles active particles
-    @param pwait inactive particles
+    @param inactiveparticles inactive particles
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
@@ -58,7 +58,7 @@ class PostProcessingWriter
     virtual void PostProcessing_start( double const& time,
   	double const& dt,
   	list<Particle*> const* particles,
-	list<Particle*> const* pwait,
+	list<Particle*> const* inactiveparticles,
 	list<Particle*> const* periodic_clones,	
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
@@ -69,7 +69,7 @@ class PostProcessingWriter
     @param time physical time
     @param dt time step magnitude
     @param particles active particles
-    @param pwait inactive particles
+    @param inactiveparticles inactive particles
     @param periodic_clones periodic particles
     @param referenceParticles reference particles
     @param obstacle obstacles 
@@ -77,7 +77,7 @@ class PostProcessingWriter
     virtual void PostProcessing( double const& time,
   	double const& dt,
   	list<Particle*> const* particles,
-	list<Particle*> const* pwait,
+	list<Particle*> const* inactiveparticles,
 	list<Particle*> const* periodic_clones,		
 	vector<Particle*> const* referenceParticles,
 	Obstacle* obstacle,
@@ -93,7 +93,7 @@ class PostProcessingWriter
     /** @brief Gets the post-processing writer type */
     virtual string getPostProcessingWriterType() const = 0;
   
-    /** @brief Writes components involved in a displacement or a contact error
+    /** @brief Writes components involved in a motion or a contact error
     @param filename file root name
     @param errcomposants list of the 2 components invovled */
     virtual void writeErreurComponentsPostProcessing( string const& filename,

@@ -627,8 +627,8 @@ double closest_points_GJK_SV2( Convex const& a,
   
 
   // Vectors and initial search direction
-  Vector3 wVec = a2w( a.support( Vector3Nul ) ) - 
-                 b2w( b.support( Vector3Nul ) );
+  Vector3 wVec = a2w( a.support( Vector3Null ) ) - 
+                 b2w( b.support( Vector3Null ) );
   Vector3 vVec = wVec;
   Vector3 dVec = wVec;
   

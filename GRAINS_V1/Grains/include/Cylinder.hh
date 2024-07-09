@@ -117,12 +117,18 @@ class Cylinder : public Convex
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const;
 
-    /** @ brief Returns whether a point lies inside the cylinder
+    /** @brief Returns whether a point lies inside the cylinder
     @param pt point */
     bool isIn( Point3 const& pt ) const;
 
-    /** @ Returns the bounding volume to cylinder */
+    /** @brief Returns the bounding volume to cylinder */
     BVolume* computeBVolume( unsigned int type ) const;
+
+
+    /** @brief Performs advanced comparison of the two cylinders and returns
+    whether they match
+    @param other the other cylinder */
+    bool equalType_level2( Convex const* other ) const;    
     //@}
 
     /** @name Friend methods */
@@ -138,6 +144,7 @@ class Cylinder : public Convex
                                    Transform const& b2w );
     //@}
 
+    
   protected:
     /** @name Parameters */
     //@{

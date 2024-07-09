@@ -114,10 +114,10 @@ Point3 Disc::support( Vector3 const& v ) const
 // Here simply returns the point (0,0,0) as a convention
 vector<Point3> Disc::getEnvelope() const
 {
-  vector<Point3> enveloppe;
+  vector<Point3> envelope;
   Point3 point( 0.,0.,0. );
-  enveloppe.push_back( point );
-  return ( enveloppe );
+  envelope.push_back( point );
+  return ( envelope );
 }
 
 
@@ -275,3 +275,22 @@ bool Disc::isIn( Point3 const& pt ) const
 {
   return ( pt[X] * pt[X] + pt[Y] * pt[Y] <= m_radius * m_radius );
 }  
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two discs and returns whether 
+// they match
+bool Disc::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Disc, we dynamically cast it to actual 
+  // type
+  Disc const* other_ = dynamic_cast<Disc const*>(other);
+  
+  double lmin = min( m_radius, other_->m_radius );
+
+  bool same = ( fabs( m_radius - other_->m_radius ) <  LOWEPS * lmin );
+  
+  return ( same );
+} 

@@ -73,7 +73,12 @@ class Polytope : public Convex
 	
     /** @ brief Returns whether a point lies inside the polytope
     @param pt point */
-    virtual bool isIn( Point3 const& pt ) const; 	
+    virtual bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Performs advanced comparison of the two convexes and returns
+    whether they match
+    @param other the other convex */
+    virtual bool equalType_level2( Convex const* other ) const;     	
     //@}
 
   

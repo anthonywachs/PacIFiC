@@ -3,6 +3,7 @@
 #include "CompositeObstacle.hh"
 #include "SimpleObstacle.hh"
 #include "STLObstacle.hh"
+// #include "CylindricalShell.hh"
 #include <string>
 using namespace std;
 
@@ -26,6 +27,8 @@ Obstacle* ObstacleBuilderFactory::create( DOMNode* root )
   }
   else if ( type == "Composite" )
     obstacle = new CompositeObstacle( root );
+  // else if ( type == "CylindricalShell" )
+  //   obstacle = new CylindricalShell( root );  
 
   return ( obstacle );
 }

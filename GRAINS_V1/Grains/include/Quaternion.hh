@@ -96,6 +96,10 @@ class Quaternion
     /** @brief Reads the object in binary format
     @param StreamIN input stream */
     void readQuaternion_binary( istream &StreamIN );
+    
+    /** @brief Rotates a vector using the quaternion *this
+    @param v The vector to be rotated */
+    Vector3 rotateVector( Vector3 const& v ) const;    
     //@}
 
 
@@ -142,11 +146,9 @@ class Quaternion
     The input vectors need not be normalised.
     @param u First vector
     @param v Second vector */
-    void setRotFromTwoVectors(const Vector3& u, const Vector3& v);
-
-    /** @brief Rotates a vector using the quaternion *this
-    @param v The vector to be rotated */
-    Vector3 rotateVector(const Vector3 v);
+    void setRotFromTwoVectors( Vector3 const& u, Vector3 const& v );
+    //@}
+    
 
     /**@name Operators */
     //@{
@@ -235,6 +237,12 @@ class Quaternion
     friend double Norm2( Quaternion const& q );
     //@}
 
+
+    /**@name Parameters */
+    //@{
+    static size_t m_sizeofQuaternion; /** binary size of the object */
+    //@}
+    
 
   protected:
     /**@name Parameters */

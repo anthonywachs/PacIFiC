@@ -89,11 +89,11 @@ Point3 Cone::support( Vector3 const& v ) const
 vector<Point3> Cone::getEnvelope() const
 {
   Point3 point(0.,0.,0.);
-  vector<Point3> enveloppe(1,point);
+  vector<Point3> envelope(1,point);
 
   // TO DO
 
-  return ( enveloppe );
+  return ( envelope );
 }
 
 
@@ -101,7 +101,7 @@ vector<Point3> Cone::getEnvelope() const
 
 // ----------------------------------------------------------------------------
 // Returns the number of vertices/corners or a code corresponding to
-// a specific convex shape. Here returns the code 777
+// a specific convex shape. Here returns the code 888
 int Cone::getNbCorners() const
 {
   return ( 888 );
@@ -340,3 +340,25 @@ bool Cone::isIn( Point3 const& pt ) const
 		( 3. * m_quarterHeight - pt[Y] ) * m_sinAngle 
 			/ sqrt( 1. - m_sinAngle * m_sinAngle ) );
 }  
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two cones and returns whether 
+// they match
+bool Cone::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Cone, we dynamically cast it to actual type
+  Cone const* other_ = dynamic_cast<Cone const*>(other);
+  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() );    
+
+  bool same = ( 
+  	fabs( m_bottomRadius - other_->m_bottomRadius ) <  LOWEPS * lmin 
+	&& fabs( m_quarterHeight - other_->m_quarterHeight ) <  LOWEPS * lmin
+	&& fabs( m_sinAngle - other_->m_sinAngle ) <  LOWEPS );
+  
+  return ( same );
+} 

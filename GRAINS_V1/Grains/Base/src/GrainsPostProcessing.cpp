@@ -59,9 +59,8 @@ void GrainsPostProcessing::do_before_time_stepping( DOMElement* rootElement )
   m_allcomponents.Link( *m_collision );
 
   // Number of particles: inserted and in the system
-  m_allcomponents.setNumberParticlesOnAllProc( 
-  	m_allcomponents.getNumberParticles() );
-  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
+  m_allcomponents.computeNumberParticles( m_wrapper );
+  m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();
 
   // Initialisation obstacle kinematics
   m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt ); 
@@ -299,8 +298,9 @@ void GrainsPostProcessing::Construction( DOMElement* rootElement )
   assert( rootElement != NULL );
   DOMNode* root = ReaderXML::getNode( rootElement, "Construction" );
 
-  bool brestart = false;
+  bool b2024 = false;
   string restart;
+  size_t npart;
 
   // Domain size: origin, max coordinates and periodicity
   DOMNode* domain = ReaderXML::getNode( root, "LinkedCell" );
@@ -369,25 +369,38 @@ void GrainsPostProcessing::Construction( DOMElement* rootElement )
     DOMNode* reload = ReaderXML::getNode( root, "Reload" );
     if ( reload ) 
     {
-      brestart = true;
+      m_restart = true;
 
       // Restart mode is new, not read in XML file
       GrainsExec::m_ReloadType = "new" ;
       restart  = ReaderXML::getNodeAttr_String( reload, "Filename" );	
-      restart = fullResultFileName( restart );
+      restart = GrainsExec::fullResultFileName( restart, false );
       
       // Extract the reload directory from the reload file
       GrainsExec::m_ReloadDirectory = GrainsExec::extractRoot( restart ); 
 
-      // Read the reload file
+      // Read the reload file and check the restart format
       string cle;
       ifstream simulLoad( restart.c_str() );
-      simulLoad >> cle >> m_time;
+      simulLoad >> cle; 
+      if ( cle == "__Format2024__" ) 
+      { 
+        b2024 = true;
+        simulLoad >> cle >> m_time;
+      }
+      else simulLoad >> m_time;         
       ContactBuilderFactory::reload( simulLoad );
-      m_allcomponents.read( simulLoad, restart );
-      ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
+      if ( !b2024 )
+      {
+        m_allcomponents.read_pre2024( simulLoad, restart, m_wrapper );
+        ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
           m_allcomponents.getReferenceParticles() );
+      }
+      else
+        npart = m_allcomponents.read( simulLoad, m_insertion_position, 
+		m_rank, m_nprocs );      
       simulLoad >> cle;
+      simulLoad.close(); 
 
       // Whether to reset velocity to 0
       string reset = ReaderXML::getNodeAttr_String( reload, "Velocity" );
@@ -396,7 +409,7 @@ void GrainsPostProcessing::Construction( DOMElement* rootElement )
    
 
     // Check that construction is fine
-    if ( !brestart ) 
+    if ( !m_restart ) 
     {
       if ( m_rank == 0 )
         cout << "ERR : Error in input file in <Contruction>" << endl;
@@ -426,6 +439,11 @@ void GrainsPostProcessing::Construction( DOMElement* rootElement )
     
     // Define the linked cell grid
     defineLinkedCell( LC_coef * maxR, GrainsExec::m_shift9 ); 
+
+    // If reload with 2024 format, read the particle reload file
+    if ( b2024 )
+      m_allcomponents.read_particles( restart, npart, m_collision, m_rank, 
+      	m_nprocs, m_wrapper );
     
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );     

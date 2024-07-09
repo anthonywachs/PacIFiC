@@ -35,7 +35,7 @@ void AppPRSHydroFT::ComputeForces( double time, double dt,
     if ( (*particle)->getTag() < 2 )
     {
       (*particle)->addBodyForce( m_PRSHydroForce[i] );
-      (*particle)->addTorque( m_PRSHydroTorque[i] );
+      (*particle)->addTorque( m_PRSHydroTorque[i], 0 );
       i++;
     }
   }        
@@ -63,8 +63,7 @@ void AppPRSHydroFT::allocateHydroFT( size_t const& nbPart )
 void AppPRSHydroFT::setHydroFT( vector< vector<double> > const* hydrovec )
 {
   size_t i, j, nbPart = hydrovec->size();
-  
-  
+    
   for (i=0;i<nbPart;++i)
     for (j=0;j<3;++j) 
     {

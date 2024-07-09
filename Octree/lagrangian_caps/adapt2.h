@@ -17,20 +17,32 @@ struct Adapt2 {
 trace
 astats adapt_wavelet2 (struct Adapt2 p)
 {
-  if (p.list == NULL)
-    p.list = all;
-  if (is_constant(cm))
+  scalar * list = p.list;
+
+  if (is_constant(cm)) {
+	if (list == NULL || list == all)
+		list = list_copy (all);
+	boundary (list);
     restriction (p.slist);
+  }
   else {
-    scalar * listr = list_concat ({cm}, p.slist);
+	if (list == NULL || list == all) {
+      list = list_copy ({cm, fm});
+      for (scalar s in all)
+	list = list_add (list, s);
+    }
+    boundary (list);
+    scalar * listr = list_concat (p.slist, {cm});
     restriction (listr);
     free (listr);
   }
+
   astats st = {0, 0};
   scalar * listc = NULL;
-  for (scalar s in p.list)
+  for (scalar s in list)
     if (!is_constant(s) && s.restriction != no_restriction)
       listc = list_add (listc, s);
+  
   // refinement
   if (p.minlevel < 1)
     p.minlevel = 1;
@@ -57,8 +69,9 @@ astats adapt_wavelet2 (struct Adapt2 p)
 	bool local = is_local(cell);
 	if (!local)
 	  foreach_child()
-	    if (is_local(cell))
+	    if (is_local(cell)) {
 	      local = true; break;
+		}
 	if (local) {
 	  int i = 0;
 	  static const int just_fine = 1 << (user + 3);
@@ -137,5 +150,9 @@ astats adapt_wavelet2 (struct Adapt2 p)
   mpi_all_reduce (st.nc, MPI_INT, MPI_SUM);
   if (st.nc || st.nf)
     mpi_boundary_update (p.list);
+
+	if (list != p.list)
+		free (list);
+
   return st;
 }

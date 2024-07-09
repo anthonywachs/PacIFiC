@@ -1,6 +1,8 @@
 #ifndef _GRAINS_HH_
 #define _GRAINS_HH_
 
+#include <mpi.h>
+#include "GrainsMPIWrapper.hh"
 #include "GrainsExec.hh"
 #include "AllComponents.hh"
 #include "App.hh"
@@ -46,6 +48,7 @@ enum InitialAngularPosition
 enum RandomGeneratorSeed 
 {
   RGS_DEFAULT, /**< initialized to default value (i.e., 1) */
+  RGS_UDEF, /**< initialized to a user provided value */
   RGS_RANDOM /**< randomly initialized */
 };
 
@@ -131,12 +134,16 @@ class Grains : public ComputingTime, public SolverComputingTime
     	files */
     bool m_error_occured; /**< true if an error occured over the simulation */	
     string m_fileSave; /**< Root name of restart files */
+    CloneInReload m_clonesInReloadFile; /**< clone (periodic, parallel or both)
+    	writing mode */
     size_t m_dimension; /**< space dimension */
     bool m_periodic; /**< true if the domain is periodic in at least one
     	direction */
     vector<bool> m_periodicity; /**< vector of periodicity (3 booleans) */	
     bool m_allProcTiming; /**< whether all processes return data on the time
     	consumption in different parts of the code */
+    bool m_restart; /**< is this simulation a continuation of a previous
+    	simulation ? */	
     //@}
 
 
@@ -150,11 +157,14 @@ class Grains : public ComputingTime, public SolverComputingTime
     	inserted particles */
     RandomGeneratorSeed m_randomseed; /**< Random generator seed */
     vector<Window> m_insertion_windows; /**< Insertion windows */  
-    string m_position; /**< External position file */
+    string m_position; /**< External position file name or structured array */
     struct StructArrayInsertion* m_InsertionArray; /**< Structured array 
     	insertion features */   
-    list< pair<Particle*,int> > m_newParticles; /**< types of new particles to
-    	be inserted */	
+    list< pair<Particle*,size_t> > m_newParticles; /**< types of new particles 
+    	to be inserted */
+    list<Point3>* m_insertion_position; /**< list of insertion positions */
+    list<Point3>::iterator il_sp; /**< iterator on the selected position in
+    	m_insertion_position */
     size_t m_insertion_frequency; /**< Insertion attempted every 
     	m_insertion_frequency time steps */
     bool m_force_insertion; /**< Force insertion even in case of contact with
@@ -183,7 +193,8 @@ class Grains : public ComputingTime, public SolverComputingTime
     int m_nprocs; /**< Total number of processes in the MPI_COMM_activProc 
     	communicator (=1 in serial) */	 
     bool m_processorIsActive; /**< true if the process is active
-  	(=true in serial) */	
+  	(=true in serial) */
+    GrainsMPIWrapper* m_wrapper; /**< manages MPI communications */		
     //@}  
 
 
@@ -204,21 +215,20 @@ class Grains : public ComputingTime, public SolverComputingTime
     virtual void Forces( DOMElement* rootElement );
 
     /** @brief Returns a point randomly selected in one of the insertion 
-    windows */
-    Point3 getInsertionPoint() const;
+    windows or in the list of positions. Note: list of positions has priority
+    over windows until it is empty */
+    Point3 getInsertionPoint();
   
     /** @brief Attempts to insert a particle in the simulation
     @param mode insertion order */
     virtual bool insertParticle( PullMode const& mode );
   
-    /** @brief Sets particle initial positions from a file 
-    @param mode insertion order */
-    virtual void setPositionParticlesFromFile( 
-    	PullMode const& mode = PM_ORDERED );
+    /** @brief Sets particle initial positions from a file */
+    virtual size_t setPositionParticlesFromFile();
   
     /** @brief Sets particle initial position with a structured array
     @param mode insertion order */
-    virtual void setPositionParticlesArray( const PullMode& mode = PM_ORDERED );
+    virtual size_t setPositionParticlesArray();
   
     /** @brief Reads data for MPI simulations and creates and sets the MPI
     wrapper
@@ -228,10 +238,6 @@ class Grains : public ComputingTime, public SolverComputingTime
     @param root XML node */
     virtual void readDomainDecomposition( DOMNode* root,
   	double const& lx, double const& ly, double const& lz ); 
-  
-    /** @brief Returns the full result file name
-    @param rootname root file name */
-    virtual string fullResultFileName( string const& rootname ) const; 
   
     /** @brief Sets the linked cell grid
     @param radius maximum circumscribed radius of particles 
@@ -270,6 +276,26 @@ class Grains : public ComputingTime, public SolverComputingTime
     @param iwindow the window 
     @param oshift empty string to shift the output */
     void readWindow( DOMNode* nWindow, Window& iwindow, string const& oshift );
+    
+    /** @brief Computes particle forces and acceleration */
+    void computeParticlesForceAndAcceleration();
+	
+    /** @brief Moves particles and obstacles
+    @param dt_particle_vel time step to advance particle velocity 
+    @param dt_particle_disp time step to advance particle position     
+    @param dt_obstacle time step to advance obstacle velocity and position */
+    void moveParticlesAndObstacles( double const& dt_particle_vel, 
+    	double const& dt_particle_disp,
+	double const& dt_obstacle );
+	
+    /** @brief Outputs timer summary */
+    virtual void display_timer_summary();
+    
+    /** @brief Returns the number of insertion positions */
+    virtual size_t getNbInsertionPositions() const;
+    
+    /** @brief Checks the periodic clones when a simulation is reloaded */
+    virtual void checkClonesReload();         	
     //@}
   
 };

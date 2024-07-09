@@ -7,21 +7,25 @@
 bool GrainsExec::m_MPI = false;
 string GrainsExec::m_TIScheme = "SecondOrderLeapFrog";
 bool GrainsExec::m_SphereAsPolyParaview = false;
-int GrainsExec::m_MPI_verbose = 2;
+int GrainsExec::m_MPI_verbose = 0;
+bool GrainsExec::m_isReloaded = false;
 string GrainsExec::m_ReloadType = "new" ;
-Vector3 GrainsExec::m_vgravity = Vector3Nul;
+Vector3 GrainsExec::m_vgravity = Vector3Null;
 Vector3* GrainsExec::m_translationParaviewPostProcessing = NULL ;
 bool GrainsExec::m_periodic = false;
 bool GrainsExec::m_isGrainsCompFeatures = false;
 bool GrainsExec::m_isGrainsPorosity = false;
 string GrainsExec::m_ReloadDirectory = "";
 string GrainsExec::m_SaveDirectory = "";
+bool GrainsExec::m_SaveMPIInASingleFile = false;
+bool GrainsExec::m_ReadMPIInASingleFile = false;
 set<string> GrainsExec::m_additionalDataFiles;
 bool GrainsExec::m_writingModeHybrid = false;
+bool GrainsExec::m_readingModeHybrid = false;
 string GrainsExec::m_GRAINS_HOME = ".";
 string GrainsExec::m_reloadFile_suffix = "B";
 bool GrainsExec::m_exception_Contact = false;
-bool GrainsExec::m_exception_Displacement = false;
+bool GrainsExec::m_exception_Motion = false;
 bool GrainsExec::m_exception_Simulation = false;
 string GrainsExec::m_shift0 = "";
 string GrainsExec::m_shift1 = " ";
@@ -34,7 +38,7 @@ string GrainsExec::m_shift15 = "               ";
 bool GrainsExec::m_output_data_at_this_time = false;
 GrainsMPIWrapper* GrainsExec::m_wrapper = NULL;
 list<App*> GrainsExec::m_allApp;
-size_t GrainsExec::m_total_nb_particles = 0;
+size_t GrainsExec::m_total_nb_physical_particles = 0;
 list< pair<Point3*,VertexBase *> > GrainsExec::m_allPolytopeRefPointBase;
 list<IndexArray*> GrainsExec::m_allPolytopeNodeNeighbors;
 list<IndexArray*> GrainsExec::m_allPolytopeNodesIndex;
@@ -45,6 +49,9 @@ string GrainsExec::m_colDetMethod = "GJK";
 double GrainsExec::m_colDetTolerance = EPSILON2;
 bool GrainsExec::m_colDetAcceleration = false;
 unsigned int GrainsExec::m_colDetBoundingVolume = 1;
+Point3 GrainsExec::m_defaultInactivePos = Point3( -1.e10 );
+int GrainsExec::m_CompositeObstacleDefaultID = 0;
+int GrainsExec::m_ReferenceParticleDefaultID = 0;
 
 
 
@@ -146,20 +153,24 @@ list<App*> GrainsExec::get_listApp()
 
 
 // ----------------------------------------------------------------------------
-// Returns the total number of particles (active and inactive) on all processes
-size_t GrainsExec::getNumberParticlesOnAllProc()
+// Returns the total number of particles in the physical system 
+// (i.e. on all subdomains/processes), i.e. sum of total number of active 
+// particles with tag 0 or 1 and inactive particles
+size_t GrainsExec::getTotalNumberPhysicalParticles()
 {
-  return ( m_total_nb_particles );
+  return ( m_total_nb_physical_particles );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns the total number of particles (active and inactive) on all processes
-void GrainsExec::setNumberParticlesOnAllProc( size_t const& nb_ )
+// Sets the total number of particles in the physical system 
+// (i.e. on all subdomains/processes), i.e. sum of total number of active 
+// particles with tag 0 or 1 and inactive particles
+void GrainsExec::setTotalNumberPhysicalParticles( size_t const& nb_ )
 {
-  m_total_nb_particles = nb_;
+  m_total_nb_physical_particles = nb_;
 }
 
 
@@ -267,10 +278,10 @@ void GrainsExec::display_memory( ostream& os, size_t memory )
   static size_t const go = 1024*1024*1024 ;
 
   if( memory > go )
-    os << ( (double) memory )/go << " Go" ;
+    os << ( (double) memory )/go << " Go" << std::flush;
   else if( memory > mo )
-    os << ( (double) memory )/mo << " Mo" ;
-  else os << memory << " octets" ;
+    os << ( (double) memory )/mo << " Mo" << std::flush ;
+  else os << memory << " octets" << std::flush ;
 }
 
 
@@ -410,7 +421,7 @@ string GrainsExec::extractFileName( string const& FileName )
 
 // ----------------------------------------------------------------------------
 // Checks that all reload files are in the same directory (primarily
-// checks that files for polyhedrons et polygons are there)
+// checks that files for polyhedrons and polygons are there)
 void GrainsExec::checkAllFilesForReload()
 {
   if ( !m_additionalDataFiles.empty() )
@@ -681,4 +692,19 @@ bool GrainsExec::isPointInTetrahedron( Point3 const& p1, Point3 const& p2,
       isIn = true;
 
   return ( isIn );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the full result file name
+string GrainsExec::fullResultFileName( string const& rootname, bool addrank ) 
+{
+  string fullname = rootname;
+  ostringstream oss;
+  if ( addrank ) oss << "_" << m_wrapper->get_rank();
+  fullname += oss.str()+".result";
+
+  return ( fullname );
 }

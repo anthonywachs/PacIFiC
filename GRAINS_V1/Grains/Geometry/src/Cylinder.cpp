@@ -135,17 +135,17 @@ Point3 Cylinder::support( Vector3 const& v ) const
 // ----------------------------------------------------------------------------
 // Returns a vector of points describing the envelope of the
 // cylinder. Here simply returns 3 points as follows: center of bottom circular
-// face, center of top circular face and an arbitrary point on the lateral
-// surface of the cylinder
+// face, an arbitrary point on the lateral surface of the cylinder and center 
+// of top circular face
 vector<Point3> Cylinder::getEnvelope() const
 {
-  Point3 point(0.,0.,0.);
-  vector<Point3> enveloppe(3,point);
-  enveloppe[0][Y] = - m_halfHeight;
-  enveloppe[1][Y] = - m_halfHeight;
-  enveloppe[1][X] = m_radius;
-  enveloppe[2][Y] = m_halfHeight;
-  return ( enveloppe );
+  Point3 point( 0., 0., 0. );
+  vector<Point3> envelope( 3, point );
+  envelope[0][Y] = - m_halfHeight;
+  envelope[1][Y] = - m_halfHeight;
+  envelope[1][X] = m_radius;
+  envelope[2][Y] = m_halfHeight;
+  return ( envelope );
 }
 
 
@@ -357,6 +357,28 @@ bool Cylinder::isIn( Point3 const& pt ) const
   return ( pt[Y] >= - m_halfHeight && pt[Y] <= m_halfHeight
   	&& sqrt( pt[X] * pt[X] + pt[Z] * pt[Z] ) <= m_radius );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two cylinders and returns whether 
+// they match
+bool Cylinder::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Cylinder, we dynamically cast it to actual 
+  // type
+  Cylinder const* other_ = dynamic_cast<Cylinder const*>(other);
+  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() );  
+  
+  bool same = ( 
+  	fabs( m_radius - other_->m_radius ) <  LOWEPS * lmin 
+	&& fabs( m_halfHeight - other_->m_halfHeight ) <  LOWEPS * lmin );
+  
+  return ( same );
+} 
 
 
 

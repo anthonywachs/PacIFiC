@@ -75,13 +75,13 @@ int Polytope::numVerts() const
 // Returns a vector of points describing the envelope of the polytope
 vector<Point3> Polytope::getEnvelope() const
 {
-  vector<Point3> enveloppe;
+  vector<Point3> envelope;
   for (int i=0; i<numVerts(); i++) 
   {
     Point3 const& p = (*this)[i];
-    enveloppe.push_back( p );
+    envelope.push_back( p );
   }
-  return ( enveloppe );
+  return ( envelope );
 }
 
 
@@ -166,5 +166,21 @@ bool Polytope::isIn( Point3 const& pt ) const
   cout << "Warning when calling Polytope::isIn(x,y,z) "
        << "\nShould not go into this method !\n"
        << "Need for an assistance ! Stop running !\n";
+  exit(10);
+  return ( false );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two convexes and returns whether they 
+// match
+bool Polytope::equalType_level2( Convex const* other ) const
+{
+  cout << "Warning when calling Polytope::equalType_level2(other) "
+       << "\nShould not go into this method !\n"
+       << "Need for an assistance ! Stop running !\n";
+  exit(10);
   return ( false );
 }

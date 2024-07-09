@@ -65,9 +65,8 @@ void GrainsCoupledWithFluid::do_before_time_stepping( DOMElement* rootElement )
   m_allcomponents.Link( *m_collision );
 
   // Number of particles: inserted and in the system
-  m_allcomponents.setNumberParticlesOnAllProc( 
-  	m_allcomponents.getNumberParticles() );
-  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles(); 
+  m_allcomponents.computeNumberParticles( m_wrapper );
+  m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert(); 
       
   // Allocate hydro force and torque arrays in the AppPRSHydroFT app
   if ( m_PRSHydroFT ) m_PRSHydroFT->allocateHydroFT( 
@@ -115,50 +114,38 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
   	m_min_dt );
   m_ndt = size_t( m_fluidflow_dt / dteff );
   m_dt = m_fluidflow_dt / double(m_ndt);  
-//   cout << m_fluidflow_dt << " " << m_dt << " " << m_ndt << endl;
-//   cout << m_time << endl;
+
 
   // Simulation: time marching algorithm
+  // We implement the kick-drift-kick version of the LeapFrog scheme
   for (size_t m=0;m<m_ndt;++m)
   {
     try 
     {        	
       m_time += m_dt;
-	
-      // Initiliaze all component transforms with crust to non computed
-      m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
-
-
-      // Compute volume and contact forces
-      // Initialisation torsors with weight only
-      m_allcomponents.InitializeForces( m_time, m_dt, true );
       
-      // Compute forces from all applications     
-      for (app=m_allApp.begin(); app!=m_allApp.end(); app++)
-        (*app)->ComputeForces( m_time, m_dt, 
-      		m_allcomponents.getActiveParticles() );
-
-
+      // Move particles and obstacles
+      // Update particle velocity over dt/2 and particle position over dt,
+      // obstacle velocity and position over dt
+      // v_i+1/2 = v_i + a_i * dt / 2
+      // x_i+1 = x_i + v_i+1/2 * dt
+      
       // Solve Newton's law and move particles
-      m_allcomponents.Move( m_time, m_dt );
-      
-      
+      m_allcomponents.Move( m_time, 0.5 * m_dt, m_dt, m_dt );
+            
       // In case of periodicity, update periodic clones and destroy periodic
       // clones that are out of the linked cell grid
       if ( m_periodic )
         m_collision->updateDestroyPeriodicClones( 
 		m_allcomponents.getActiveParticles(),
 		m_allcomponents.getPeriodicCloneParticles() );
-      
-      	
+            	
       // Update particle activity
       m_allcomponents.UpdateParticleActivity();
  
-
       // Update the particle & obstacles links with the grid
       m_collision->LinkUpdate( m_time, m_dt, 
         	m_allcomponents.getActiveParticles() );
-
 
       // In case of periodicity, create new periodic clones and destroy periodic
       // clones because the master particle has changed tag/geoposition
@@ -166,29 +153,54 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
         m_collision->createDestroyPeriodicClones( 
 		m_allcomponents.getActiveParticles(),
 		m_allcomponents.getPeriodicCloneParticles(),
-		m_allcomponents.getReferenceParticles() );
+		m_allcomponents.getReferenceParticles() );      
+      
+      
+      // Compute particle forces and acceleration
+      // Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)      
+            	
+      // Initiliaze all component transforms with crust to non computed
+      m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
+
+
+      // Compute forces from all applications
+      // Initialisation torsors with weight only
+      m_allcomponents.InitializeForces( m_time, m_dt, true );
+      
+      // Compute forces    
+      for (app=m_allApp.begin(); app!=m_allApp.end(); app++)
+        (*app)->ComputeForces( m_time, m_dt, 
+      		m_allcomponents.getActiveParticles() );
+
+      // Compute particle acceleration
+      m_allcomponents.computeParticlesAcceleration( m_time );
+
+
+      // Update particle velocity over dt/2
+      // v_i+1 = v_i+1/2 + a_i+1 * dt / 2 
+      m_allcomponents.advanceParticlesVelocity( m_time, 0.5 * m_dt );
   
         
       // Write force & torque exerted on obstacles
       m_allcomponents.outputObstaclesLoad( m_time, m_dt );
     } 
-    catch (ContactError &chocCroute) 
+    catch (ContactError &errContact) 
     {
       // Max overlap exceeded
       cout << endl;
       m_allcomponents.PostProcessingErreurComponents( "ContactError",
-            chocCroute.getComponents() );
-      chocCroute.Message( cout );
+            errContact.getComponents() );
+      errContact.Message( cout );
       m_error_occured = true;
       break;
     } 
-    catch (DisplacementError &errDeplacement) 
+    catch (MotionError &errMotion) 
     {
-      // Particle displacement over dt is too large
+      // Particle motion over dt is too large
       cout << endl;
-      m_allcomponents.PostProcessingErreurComponents( "DisplacementError",
-            errDeplacement.getComponent() );
-      errDeplacement.Message(cout);
+      m_allcomponents.PostProcessingErreurComponents( "MotionError",
+            errMotion.getComponent() );
+      errMotion.Message(cout);
       m_error_occured = true;	
       break;
     } 
@@ -214,8 +226,9 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
   assert( rootElement != NULL );
   DOMNode* root = ReaderXML::getNode( rootElement, "Construction" );
 
-  bool brestart = false;
+  bool b2024 = false;
   string restart;
+  size_t npart;
 
   // Domain size: origin, max coordinates and periodicity
   DOMNode* domain = ReaderXML::getNode( root, "LinkedCell" );
@@ -284,7 +297,7 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
     DOMNode* reload = ReaderXML::getNode( root, "Reload" );
     if ( reload ) 
     {
-      brestart = true;
+      m_restart = true;
 
       // Restart mode
       string reload_type;
@@ -309,20 +322,33 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
         GrainsExec::m_reloadFile_suffix = 
             restart.substr( restart.size()-1, 1 );
       }	
-      restart = fullResultFileName( restart );
+      restart = GrainsExec::fullResultFileName( restart, false );
       
       // Extract the reload directory from the reload file
       GrainsExec::m_ReloadDirectory = GrainsExec::extractRoot( restart ); 
 
-      // Read the reload file
+      // Read the reload file and check the restart format
       string cle;
       ifstream simulLoad( restart.c_str() );
-      simulLoad >> cle >> m_time;
+      simulLoad >> cle; 
+      if ( cle == "__Format2024__" ) 
+      { 
+        b2024 = true;
+        simulLoad >> cle >> m_time;
+      }
+      else simulLoad >> m_time;         
       ContactBuilderFactory::reload( simulLoad );
-      m_allcomponents.read( simulLoad, restart );
-      ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
+      if ( !b2024 )
+      {
+        m_allcomponents.read_pre2024( simulLoad, restart, m_wrapper );
+        ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
           m_allcomponents.getReferenceParticles() );
+      }
+      else
+        npart = m_allcomponents.read( simulLoad, m_insertion_position, 
+		m_rank, m_nprocs );      
       simulLoad >> cle;
+      simulLoad.close(); 
 
       // Whether to reset velocity to 0
       string reset = ReaderXML::getNodeAttr_String( reload, "Velocity" );
@@ -331,7 +357,7 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
    
 
     // Check that construction is fine
-    if ( !brestart ) 
+    if ( !m_restart ) 
     {
       if ( m_rank == 0 )
         cout << "ERR : Error in input file in <Contruction>" << endl;
@@ -361,6 +387,11 @@ void GrainsCoupledWithFluid::Construction( DOMElement* rootElement )
     
     // Define the linked cell grid
     defineLinkedCell( LC_coef * maxR, GrainsExec::m_shift9 ); 
+
+    // If reload with 2024 format, read the particle reload file
+    if ( b2024 )
+      m_allcomponents.read_particles( restart, npart, m_collision, m_rank, 
+      	m_nprocs, m_wrapper );
     
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );     
@@ -1076,21 +1107,23 @@ void GrainsCoupledWithFluid::updateParticlesVelocity(
     list<Particle*>* particles = m_allcomponents.getActiveParticles(); 
     list<Particle*>::iterator particle;
     int id = 0;
-    size_t vecSize = 0;
+    size_t vecSize = 0, nparticles = 0;
     Vector3 vtrans, vrot;
     
     // TO DO: the particle number used to communicate with the fluid is 
     // different from its actual number in Grains. 
     // This needs to be fixed in the future
+    for (particle=particles->begin();particle!=particles->end();particle++)
+      if ( (*particle)->getTag() < 2 ) nparticles++;
 
     if ( m_dimension == 3 )
     {
-      if ( velocity_data_array.size() != particles->size() )
+      if ( velocity_data_array.size() != nparticles )
         cout << "WARNING: numbers of particles in Grains and in the fluid "
 		<< "solver are different" << endl;
 
       for (particle=particles->begin(), id=0; particle!=particles->end();
-       		particle++, id++)
+       		particle++)
       {
         if ( (*particle)->getActivity() == COMPUTE
     		&& (*particle)->getTag() < 2 )
@@ -1112,6 +1145,8 @@ void GrainsCoupledWithFluid::updateParticlesVelocity(
 
           if ( b_set_velocity_nm1_and_diff )
             (*particle)->setVelocityAndVelocityDifferencePreviousTime();
+	    
+	  id++;
         }
       }    
     }

@@ -63,15 +63,15 @@ class MemoryContactForceModel : public ContactForceModel
     bool computeForces( Component* p0_, Component* p1_,
 	PointContact const& contactInfos, LinkedCell* LC,
 	double dt, int nbContact = 1 ) ;
-    //@}
 
-    /** @brief Computation of vector tangent to contact
-    @param tij The vector where the result is stored
-    @param n_t Eta_t, the tangential damping coefficient
-    @param u_t The tangential velocity
-    @param kdelta The cumulative displacement */
-    void computeTangentialVector(Vector3& tij, double n_t, const Vector3 ut,
-  const Vector3 kdelta);
+    /** @brief Computes the vector tangent at the contact point
+    @param tij vector where the result is stored
+    @param n_t eta_t, tangential damping coefficient
+    @param ut tangential velocity
+    @param kdelta cumulative motion */
+    void computeTangentialVector( Vector3& tij, double n_t, const Vector3 ut,
+  	const Vector3 kdelta );
+    //@}
 
 
     /** @name Static methods */
@@ -93,10 +93,11 @@ class MemoryContactForceModel : public ContactForceModel
     double eta_r; /**< Viscous rolling damping ratio */
     double mu_r; /**< Rolling resistance coefficient */
     double Jn; /**< dimensionless coefficient used to compute the rotational
-                    stiffness coefficient (Ai et al. 2011) */
+	stiffness coefficient (Ai et al. 2011) */
     double m_f; /**< binary value: if f=0, no viscous rolling damping when the
-                   spring rolling friction is saturated. Default value is 0. */
-    double epsilon; /**< Criterion on velocity norm for cumulative tangential vector. Default value is 1.e-10. */
+	spring rolling friction is saturated. Default value is 0. */
+    double epsilon; /**< Criterion on velocity norm for cumulative tangential 
+    	vector. Default value is 1.e-10. */
     bool rolling_friction; /**< Boolean to switch on/off the rolling friction */
     //@}
 
@@ -123,6 +124,7 @@ class MemoryContactForceModel : public ContactForceModel
     /** @brief Performs forces & torques computation
     @param p0_ first Component (Particle)
     @param p1_ second Component (Particle ou Obstacle)
+    @param dt time step magnitude
     @param contactInfos geometric contact features
     @param delFN normal force
     @param delFT tangential force

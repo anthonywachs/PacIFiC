@@ -69,13 +69,13 @@ class STLObstacle : public SimpleObstacle
     obstacles (here itself)
     @param time physical time
     @param dt time step magnitude
-    @param b_deplaceCine_Comp whether to move the composite that the composite
-    obstacle belongs to (imposed velocity)
-    @param b_deplaceF_Comp whether to move the composite that the composite
-    obstacle belongs to (imposed force) */
+    @param motherCompositeHasImposedVelocity whether the composite that the 
+    obstacle belongs to has a non-zero imposed velocity
+    @param motherCompositeHasImposedForce whether the composite that the 
+    obstacle belongs to has a non-zero imposed force */
     virtual list<SimpleObstacle*> Move( double time,
-	double dt, bool const& b_deplaceCine_Comp,
-        bool const& b_deplaceF_Comp ) ;
+	double dt, bool const& motherCompositeHasImposedVelocity,
+        bool const& motherCompositeHasImposedForce ) ;
 
     /** @brief Contact between a simple obstacle and a component. If contact
     exists, computes the contact force and torque and adds to each component
@@ -131,7 +131,7 @@ class STLObstacle : public SimpleObstacle
 
     /** @brief Returns the maximum of the absolute value of the obstacle
     velocity in each direction */
-    virtual Vector3 vitesseMaxPerDirection() const;
+    virtual Vector3 velocityMaxPerDirection() const;
   
     /** @brief Returns whether the component is an STL obstacle */
     virtual bool isSTLObstacle() const;  
@@ -269,6 +269,13 @@ class STLObstacle : public SimpleObstacle
     vector<STLTriangle> m_allSTLTriangles; /**< vector containing the
     	vertices of the triangulation */    
     //@}
+    
+    
+    /** @name Methods */
+    //@{  
+    /** @brief Computes center of mass position */
+    pair<Point3,double> computeCenterOfMass();
+    //@}    
 
 };
 

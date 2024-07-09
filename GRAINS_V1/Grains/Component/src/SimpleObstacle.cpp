@@ -18,7 +18,7 @@ using namespace std;
 // ----------------------------------------------------------------------------
 // Constructor with name as input parameter
 SimpleObstacle::SimpleObstacle( const string &s )
-  : Obstacle( s )
+  : Obstacle( s, true )
   , m_transferToFluid( false )
 {
   m_ObstacleType = "SimpleObstacle";
@@ -33,19 +33,20 @@ SimpleObstacle::SimpleObstacle( const string &s )
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter
 SimpleObstacle::SimpleObstacle( DOMNode *root )
-  : Obstacle()
+  : Obstacle( "", true )
   , m_transferToFluid( false )
 {
   m_ObstacleType = "SimpleObstacle";
 
   Obstacle::m_totalNbSingleObstacles++;
 
+  // Name
   m_name = ReaderXML::getNodeAttr_String( root, "name" );
 
   // Convex - Position & Orientation
   m_geoRBWC = new RigidBodyWithCrust( root );
 
-  // Materiau
+  // Material
   DOMNode* materiau_ = ReaderXML::getNode( root, "Material" );
   m_materialName = ReaderXML::getNodeValue_String( materiau_ );
   ContactBuilderFactory::defineMaterial( m_materialName, true );
@@ -64,41 +65,21 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
 
 
 // ----------------------------------------------------------------------------
-// Copy constructor from a Component
-SimpleObstacle::SimpleObstacle( Component& copy, char const* s )
-  : Obstacle( copy, s )
+// Constructor with input parameters. 
+SimpleObstacle::SimpleObstacle( string const& name, 
+	RigidBodyWithCrust* georbwc, 
+    	string const& mat, bool const& toFluid )
+  : Obstacle( "", true )
+  , m_transferToFluid( false )
 {
-  m_ObstacleType = "SimpleObstacle";
-
-  Obstacle::m_totalNbSingleObstacles++;
-  m_obstacleBox = Component::BoundingBox();
-  m_LinkUpdate_frequency = 1;
-  m_LinkUpdate_counter = 0;
-  m_transferToFluid = false;
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Constructor with a rigid body, a name and a material as input parameters
-SimpleObstacle::SimpleObstacle( RigidBodyWithCrust* geoRBWC, string const& name,
-      string const& materialName, bool const& transferToFluid_ )
-  : Obstacle()
-{
-  m_ObstacleType = "SimpleObstacle";
-
-  Obstacle::m_totalNbSingleObstacles++;
-
   m_name = name;
-  m_geoRBWC = geoRBWC;
-  m_materialName = materialName;
-  m_transferToFluid = transferToFluid_;
-  ContactBuilderFactory::defineMaterial( materialName, true );
-
+  m_geoRBWC = georbwc;
+  m_materialName = mat;
+  ContactBuilderFactory::defineMaterial( m_materialName, true );
+  m_transferToFluid = toFluid;
   m_obstacleBox = Component::BoundingBox();
   m_LinkUpdate_frequency = 1;
-  m_LinkUpdate_counter = 0;
+  m_LinkUpdate_counter = 0;    
 }
 
 
@@ -131,41 +112,48 @@ void SimpleObstacle::append( Obstacle* obstacle )
 // ----------------------------------------------------------------------------
 // Moves the simple obstacle and returns a list of moved obstacles (here itself)
 list<SimpleObstacle*> SimpleObstacle::Move( double time,
-	double dt, bool const& b_deplaceCine_Comp,
-        bool const& b_deplaceF_Comp )
+	double dt, bool const& motherCompositeHasImposedVelocity,
+        bool const& motherCompositeHasImposedForce )
 {
+  list<SimpleObstacle*> movingObstacles;
 
-  m_ismoving = m_kinematics.Deplacement( time, dt );
-  m_ismoving = m_ismoving || b_deplaceCine_Comp;
+  // Updates the obstacle translational and angular velocity at time t and 
+  // translational and angular motion from t to t+dt and returns whether the 
+  // obstacle moved from t to t+dt
+  m_ismoving = m_kinematics.ImposedMotion( time, dt, *m_geoRBWC->getCentre() );
+  
+  // Check whether the composite obstacle it belongs to has an imposed velocity  
+  m_ismoving = m_ismoving || motherCompositeHasImposedVelocity;
 
+  // Obstacle motion
   if ( m_ismoving && Obstacle::m_MoveObstacle )
   {
     Vector3 const* translation = m_kinematics.getTranslation();
     m_geoRBWC->composeLeftByTranslation( *translation );
     Quaternion const* w = m_kinematics.getQuaternionRotationOverDt();
-    Rotate(*w);
+    Rotate( *w );
   }
 
-  bool deplaceF = m_confinement.Deplacement( time, dt, this );
-  deplaceF = deplaceF || b_deplaceF_Comp;
+  bool moveForce = m_confinement.ImposedMotion( time, dt, this );
+  moveForce = moveForce || motherCompositeHasImposedForce;
 
-  if ( deplaceF && Obstacle::m_MoveObstacle )
+  if ( moveForce && Obstacle::m_MoveObstacle )
   {
     Vector3 translation = m_confinement.getTranslation( dt );
     m_geoRBWC->composeLeftByTranslation( translation );
-    //    Quaternion w = cinematique.getRotation(dt);
-    //    Rotate(w);
   }
-  m_ismoving = m_ismoving || deplaceF;
+  
+  m_ismoving = m_ismoving || moveForce;
 
-  list<SimpleObstacle*> obstacleEnDeplacement;
-  if ( m_ismoving )
+  // If the obstacle moved, add it to the list of moving obstacles and 
+  // updates its boundind box
+  if ( m_ismoving && Obstacle::m_MoveObstacle )
   {
     m_obstacleBox = Component::BoundingBox();
-    obstacleEnDeplacement.push_back( this );
+    movingObstacles.push_back( this );
   }
 
-  return ( obstacleEnDeplacement );
+  return ( movingObstacles );
 }
 
 
@@ -236,7 +224,7 @@ void SimpleObstacle::InterAction( Component* voisin,
       {
         cout << endl << "Processor = " <<
     		(GrainsExec::m_MPI ?
-			GrainsExec::getComm()->get_rank_active() : 0 )
+			GrainsExec::getComm()->get_rank() : 0 )
 		<< " has thrown a ContactError exception" <<  endl;
         erreur_level2.setMessage(
 		"SimpleObstacle::InterAction : choc de croute ! a t="
@@ -270,7 +258,7 @@ void SimpleObstacle::InterAction( Component* voisin,
 
 
 // ----------------------------------------------------------------------------
-// Reloads the composite obstacle and links it to the higher level
+// Reloads the simple obstacle and links it to the higher level
 // obstacle in the obstacle tree
 void SimpleObstacle::reload( Obstacle& mother, istream& file )
 {
@@ -278,6 +266,9 @@ void SimpleObstacle::reload( Obstacle& mother, istream& file )
 
   // Obstacle ID number
   file >> m_id;
+  
+  // Torsor
+  m_torsor.read( file ); 
 
   // Material name
   file >> buffer >> m_materialName;
@@ -296,6 +287,9 @@ void SimpleObstacle::reload( Obstacle& mother, istream& file )
   // Obstacle position
   file >> buffer;
   m_geoRBWC->readPosition( file );
+
+  // Read contact map
+  readContactMap2014( file );
 
   // Add the obstacle to the tree
   mother.append( this );
@@ -344,12 +338,15 @@ void SimpleObstacle::Translate( Vector3 const& translation )
 void SimpleObstacle::write( ostream& fileSave ) const
 {
   fileSave << "<Simple> " << m_name << " " << m_id << endl;
+  m_torsor.write( fileSave );
   fileSave << "*Material " << m_materialName << endl;
   m_geoRBWC->writeStatic( fileSave );
   fileSave << endl;
   fileSave << "*ToFluid " << m_transferToFluid << endl;
   m_geoRBWC->writePosition( fileSave );
   fileSave << endl;
+  writeContactMemory2014( fileSave );
+  fileSave << endl;  
   fileSave << "</Simple>";
 }
 
@@ -456,7 +453,7 @@ bool SimpleObstacle::performLinkUpdate()
 // ----------------------------------------------------------------------------
 // Returns the maximum of the absolute value of the obstacle
 // velocity in each direction
-Vector3 SimpleObstacle::vitesseMaxPerDirection() const
+Vector3 SimpleObstacle::velocityMaxPerDirection() const
 {
   list<Point3> surface = m_geoRBWC->get_polygonsPts_PARAVIEW();
   list<Point3>::iterator iv;
@@ -605,6 +602,16 @@ void SimpleObstacle::setContactMapToFalse()
 
 
 // ----------------------------------------------------------------------------
+// Set contact map entry features to zero
+void SimpleObstacle::setContactMapFeaturesToZero()
+{
+  Component::setContactMapFeaturesToZero();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Updates contact map
 void SimpleObstacle::updateContactMap()
 {
@@ -616,7 +623,7 @@ void SimpleObstacle::updateContactMap()
 
 // ----------------------------------------------------------------------------
 // Does the contact exist in the map, if yes return the pointer to the
-// cumulative tangential displacement
+// cumulative tangential motion
 bool SimpleObstacle::getContactMemory( std::tuple<int,int,int> const& id,
   Vector3* &tangent, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
   bool createContact)
@@ -641,7 +648,7 @@ void SimpleObstacle::addNewContactInMap( std::tuple<int,int,int> const& id,
 
 
 // ----------------------------------------------------------------------------
-// Increases cumulative tangential displacement with component id
+// Increases cumulative tangential motion with component id
 void SimpleObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
   Vector3 const& tangent, Vector3 const& prev_normal,
   Vector3 const& cumulSpringTorque )
@@ -653,10 +660,10 @@ void SimpleObstacle::addDeplContactInMap( std::tuple<int,int,int> const& id,
 
 // ----------------------------------------------------------------------------
 // Writes the contact map information in an array of doubles
-void SimpleObstacle::copyHistoryContacts( double* &destination, 
+void SimpleObstacle::copyContactMap( double* destination, 
 	int start_index )
 {
-  Component::copyHistoryContacts( destination, start_index ) ;
+  Component::copyContactMap( destination, start_index ) ;
 }
 
 
@@ -685,10 +692,29 @@ int SimpleObstacle::getContactMapSize()
 
 
 // ----------------------------------------------------------------------------
-// Updates the ids of the contact map: in the case of a reload with 
-// insertion, the obstacle's ids are reset. This function keeps track of that 
-// change.
-void SimpleObstacle::updateContactMapId( int prev_id, int new_id )
+// Displays the active neighbours in the format "my_elementary_id/neighbour_id/
+// neightbout_elementary_id ; ...". Useful for debugging only.
+void SimpleObstacle::printActiveNeighbors( int const& id )
 {
-  Component::updateContactMapId( prev_id, new_id);
+  Component::printActiveNeighbors( id );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Resets the minimum ID number of an obstacle for autonumbering */
+void SimpleObstacle::setMinIDnumber()
+{
+  m_minID = min( m_minID, m_id );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes center of mass position
+pair<Point3,double> SimpleObstacle::computeCenterOfMass()
+{
+  return( pair<Point3,double>( *(getPosition()), getVolume() ) );
 }

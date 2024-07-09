@@ -135,6 +135,11 @@ class Sphere : public Convex
     /** @ brief Returns whether a point lies inside the sphere
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Performs advanced comparison of the two spheres and returns
+    whether they match
+    @param other the other sphere */
+    bool equalType_level2( Convex const* other ) const;    
     //@}
 
 

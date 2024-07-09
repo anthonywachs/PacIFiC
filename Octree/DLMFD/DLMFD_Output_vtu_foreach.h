@@ -57,11 +57,11 @@ void output_vtu_ascii_foreach (scalar * list, vector * vlist, int n, FILE * fp, 
 
   vertex scalar marker[];
   int no_points = 0, no_cells=0 ;
-  foreach_vertex(){
+  foreach_vertex(serial, noauto){
     marker[] = _k;
     no_points += 1;
   }
-  foreach(){
+  foreach(serial, noauto){
     no_cells += 1;
   }
 
@@ -72,14 +72,14 @@ void output_vtu_ascii_foreach (scalar * list, vector * vlist, int n, FILE * fp, 
   fputs ("\t\t\t <CellData Scalars=\"scalars\">\n", fp);
   for (scalar s in list) {
     fprintf (fp,"\t\t\t\t <DataArray type=\"Float64\" Name=\"%s\" format=\"ascii\">\n", s.name);
-    foreach(){
+    foreach(serial, noauto){
       fprintf (fp, "%g\n", val(s));
     }
     fputs ("\t\t\t\t </DataArray>\n", fp);
   }
   for (vector v in vlist) {
-    fprintf (fp,"\t\t\t\t <DataArray type=\"Float64\" NumberOfComponents=\"3\" Name=\"Vect-%s\" format=\"ascii\">\n", v.x.name);
-    foreach(){
+    fprintf (fp,"\t\t\t\t <DataArray type=\"Float64\" NumberOfComponents=\"3\" Name=\"%s\" format=\"ascii\">\n", v.x.name);
+    foreach(serial, noauto){
 #if dimension == 2
       fprintf (fp, "%g %g 0.\n", val(v.x), val(v.y));
 #endif
@@ -92,7 +92,7 @@ void output_vtu_ascii_foreach (scalar * list, vector * vlist, int n, FILE * fp, 
   fputs ("\t\t\t </CellData>\n", fp);
   fputs ("\t\t\t <Points>\n", fp);
   fputs ("\t\t\t\t <DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">\n", fp);
-  foreach_vertex(){
+  foreach_vertex(serial, noauto){
 #if dimension == 2
     fprintf (fp, "%g %g 0\n", x, y);
 #endif
@@ -104,7 +104,7 @@ void output_vtu_ascii_foreach (scalar * list, vector * vlist, int n, FILE * fp, 
   fputs ("\t\t\t </Points>\n", fp);
   fputs ("\t\t\t <Cells>\n", fp);
   fputs ("\t\t\t\t <DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">\n", fp);
-  foreach(){
+  foreach(serial, noauto){
 #if dimension == 2
     // Edit OLAND:
     // %g will turn into scientific notation for high integer values. this does not work with paraview
@@ -143,7 +143,7 @@ void output_vtu_ascii_foreach (scalar * list, vector * vlist, int n, FILE * fp, 
   }
   fputs ("\t\t\t\t </DataArray>\n", fp);
   fputs ("\t\t\t\t <DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">\n", fp);
-  foreach(){
+  foreach(serial, noauto){
 #if dimension == 2
     fputs ("9 \n", fp);
 #endif
@@ -216,11 +216,11 @@ void output_vtu_bin_foreach (scalar * list, vector * vlist, FILE * fp, bool line
 
   vertex scalar marker[];
   int no_points = 0, no_cells=0 ;
-  foreach_vertex(){
+  foreach_vertex(serial, noauto){
     marker[] = _k;
     no_points += 1;
   }
-  foreach(){
+  foreach(serial, noauto){
     no_cells += 1;
   }
 
@@ -237,7 +237,7 @@ void output_vtu_bin_foreach (scalar * list, vector * vlist, FILE * fp, bool line
     fputs ("\t\t\t\t </DataArray>\n", fp);
   }
   for (vector v in vlist) {
-    fprintf (fp,"\t\t\t\t <DataArray type=\"Float64\" Name=\"Vect-%s\" NumberOfComponents=\"3\"  format=\"appended\" offset=\"%d\">\n", v.x.name,count);
+    fprintf (fp,"\t\t\t\t <DataArray type=\"Float64\" Name=\"%s\" NumberOfComponents=\"3\"  format=\"appended\" offset=\"%d\">\n", v.x.name,count);
     count += ((no_cells*3)+1)*8;
     fputs ("\t\t\t\t </DataArray>\n", fp);
   }
@@ -249,7 +249,7 @@ void output_vtu_bin_foreach (scalar * list, vector * vlist, FILE * fp, bool line
   fputs ("\t\t\t </Points>\n", fp);
   fputs ("\t\t\t <Cells>\n", fp);
   fputs ("\t\t\t\t <DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">\n", fp);
-  foreach(){
+  foreach(serial, noauto){
 #if dimension == 2
 // Edit OLAND:
     // %g will turn into scientific notation for high integer values. this does not work with paraview
@@ -287,7 +287,7 @@ void output_vtu_bin_foreach (scalar * list, vector * vlist, FILE * fp, bool line
   }
   fputs ("\t\t\t\t </DataArray>\n", fp);
   fputs ("\t\t\t\t <DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">\n", fp);
-  foreach(){
+  foreach(serial, noauto){
 #if dimension == 2
     fputs ("9 \n", fp);
 #endif
@@ -307,13 +307,13 @@ void output_vtu_bin_foreach (scalar * list, vector * vlist, FILE * fp, bool line
 #endif
   for (scalar s in list) {
     fwrite (&block_len, sizeof (unsigned long long), 1, fp);
-    foreach()
+    foreach(serial, noauto)
       fwrite (&val(s), sizeof (double), 1, fp);
   }
   block_len=no_cells*8*3;
   for (vector v in vlist) {
     fwrite (&block_len, sizeof (unsigned long long), 1, fp);
-    foreach(){
+    foreach(serial, noauto){
       fwrite (&val(v.x), sizeof (double), 1, fp);
       fwrite (&val(v.y), sizeof (double), 1, fp);
 #if dimension == 2
@@ -326,7 +326,7 @@ void output_vtu_bin_foreach (scalar * list, vector * vlist, FILE * fp, bool line
   }
   block_len=no_points*8*3;
   fwrite (&block_len, sizeof (unsigned long long), 1, fp);
-  foreach_vertex(){
+  foreach_vertex(serial, noauto){
     fwrite (&x, sizeof (double), 1, fp);
     fwrite (&y, sizeof (double), 1, fp);
     fwrite (&z, sizeof (double), 1, fp);

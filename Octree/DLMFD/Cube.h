@@ -387,7 +387,6 @@ void create_FD_Interior_Cube( particle* p, vector Index_lambda,
   /* 1- u.p0 <= u.x <= u.p3 */
   /* 2- v.p0 <= v.x <= v.p1 */
   /* 3- w.p0 <= w.w <= w.p4  */
-  coord checkpt;
   coord u1 = p->g.pgp->u1;
   coord v1 = p->g.pgp->v1;
   coord w1 = p->g.pgp->w1;
@@ -422,6 +421,7 @@ void create_FD_Interior_Cube( particle* p, vector Index_lambda,
 
   foreach() 
   {
+    coord checkpt;
     checkpt.x = x;
     checkpt.y = y;
     checkpt.z = z;

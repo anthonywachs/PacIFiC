@@ -24,7 +24,8 @@ void output_dlmfd_perf (const timing d, const int i, particle * p)
     ++iii;     
   }  
   
-  static FILE* dlmfdperf = fopen( dlmfd_perf_complete_name, "a" );
+  static FILE* dlmfdperf;
+  dlmfdperf = fopen( dlmfd_perf_complete_name, "a" );
 
   // global timer/timings
   timing gns = timer_timing( perf.gt, i, perf.tnc, mpitimings );

@@ -1,6 +1,7 @@
 #ifndef _ALLCOMPONENTS_HH_
 #define _ALLCOMPONENTS_HH_
 
+#include "GrainsMPIWrapper.hh"
 #include "Basic.hh"
 #include "Error.hh"
 #include <fstream>
@@ -10,6 +11,7 @@
 using namespace std;
 #include "Particle.hh"
 #include "CompositeParticle.hh"
+#include "SpheroCylinder.hh"
 #include "Obstacle.hh"
 #include "SimpleObstacle.hh"
 #include "WriterXML.hh"
@@ -32,6 +34,14 @@ enum PullMode
   PM_RANDOM /**< in a random order */
 };
 
+
+/** @brief Insertion order */
+enum CloneInReload
+{
+  CIR_NONE, /**< no clone in the reload file */
+  CIR_NOPERIODIC, /**< no periodic clone in the reload file */
+  CIR_ALL, /**< all clones in the reload file */  
+};
 
 
 /** @brief The class AllComponents.
@@ -59,16 +69,13 @@ class AllComponents
     /** @brief Updates particle activity */
     void UpdateParticleActivity();
 
-    /** @brief Adds a particle
-    @param particle the particle to be added */
-    void AddParticle( Particle* particle );
-
     /** @brief Adds a reference particle
-    @param particle the reference particle to be added */
-    void AddReferenceParticle( Particle *particle );
+    @param particle the reference particle to be added 
+    @param n number of such particles to be inserted in the simulation */
+    void AddReferenceParticle( Particle *particle, size_t const &n );
 
     /** @brief Adds an obstacle
-    @param obstacle_ L'obstacle a ajouter. */
+    @param obstacle_ the obstacle to be added */
     void AddObstacle( Obstacle* obstacle_ );
 
     /** @brief Associates the imposed velocity to the obstacle
@@ -99,9 +106,23 @@ class AllComponents
 
     /** @brief Moves all components
     @param time physical time
-    @param dt time step magnitude */
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp motion time step magnitude
+    @param dt_obstacle obstacle velocity and motion time step magnitude */
     list<SimpleObstacle*> Move( double time,
-		double dt );
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp,
+	double const& dt_obstacle );
+	
+    /** @brief Computes particles acceleration
+    @param time physical time */
+    void computeParticlesAcceleration( double time );
+    
+    /** @brief Advances particles velocity over dt_particle_vel
+    @param time physical time 
+    @param dt_particle_vel velocity time step magnitude */
+    void advanceParticlesVelocity( double time, 
+    	double const& dt_particle_vel );        
 
     /** @brief Links all active particles to the application
     @param app application */
@@ -139,20 +160,23 @@ class AllComponents
     void PostProcessing_end();
 
     /** @brief Writes components for Post-Processing in case of an error in
-    contact or displacement
+    contact or motion
     @param filename file root name
     @param errcomposants list of components involved in the error */
     void PostProcessingErreurComponents( string const& filename,
   	list<Component*> const& errcomposants );
 
-    /** @brief Set all active particles velocity to 0 if reset == "Reset"
+    /** @brief Sets all active particles velocity to 0 if reset == "Reset"
     @param reset keyword to reset the particle velocity */
     void resetKinematics( string const& reset );
 
-    /** @brief Transfer the inactive particle waiting to be inserted to the list
-    of active particles */
-    void ShiftParticleOutIn();
+    /** @brief Adds the waiting particle to the list of active particles 
+    @param parallel true if Grains runs in parallel mode */
+    void WaitToActive( bool const& parallel = false );
 
+    /** @brief Destroys the waiting particle */
+    void DeleteAndDestroyWait();
+  
     /** @brief Computes and returns the maximum and mean translational velocity
     of all components i.e. particles and obstacles
     @param vmax maximum translational velocity
@@ -170,13 +194,15 @@ class AllComponents
     void monitorParticlesVelocity( double time, ofstream& fileOut,
   	int rank = 0, GrainsMPIWrapper const* wrapper = NULL ) const;
 
-    /** @brief Updates geolocalization of particles in the halozone */
-    void updateGeoPositionParticlesHalozone();
-
     /** @brief Updates obstacles' velocity without actually moving them
     @param time physical time
     @param dt time step magnitude */
     void setKinematicsObstacleWithoutMoving( double time, double dt );
+    
+    /** @brief Updates list of particles in parallel
+    @param time physical time 
+    @param newBufPart list of new buffer particles */
+    void updateParticleLists( double time, list<Particle*>* newBufPart );    
     //@}
 
 
@@ -196,11 +222,13 @@ class AllComponents
     /** @brief Returns component with ID number id */
     Component* getComponent( int id );
 
-    /** @brief Returns a particle from the list of inactive particles
-    @param mode insertion mode
-    @param wrapper MPI wrapper */
-    Particle* getParticle( PullMode mode,
-  	GrainsMPIWrapper const* wrapper = NULL );
+    /** @brief Returns a pointer to the particle to be inserted
+    @param mode insertion mode */
+    Particle* getParticleToInsert( PullMode mode );
+    
+    /** @brief Returns a pointer to the particle to be inserted
+    @param geomtype particle geometric type */
+    Particle* getParticleToInsert( int const& geomtype );    
 
     /** @brief Returns a pointer to the list of active particles */
     list<Particle*>* getActiveParticles();
@@ -208,14 +236,14 @@ class AllComponents
     /** @brief Returns a const pointer to the list of active particles */
     list<Particle*> const* getActiveParticles() const;
 
-    /** @brief Returns a pointer to the list of inactive particles */
-    list<Particle*>* getInactiveParticles();
+    /** @brief Returns a pointer to the list of removed particles */
+    list<Particle*>* getRemovedParticles();
 
-    /** @brief Returns a const pointer to the list of inactive particles */
-    list<Particle*> const* getInactiveParticles() const;
-
-    /** @brief Returns a pointer to the list of particles in the halozone */
-    list<Particle*>* getParticlesInHalozone();
+    /** @brief Returns a pointer to the list of particles in the buffer zone */
+    list<Particle*>* getParticlesInBufferzone();
+    
+    /** @brief Returns a pointer to the list of particles in the buffer zone */
+    list<Particle*> const* getParticlesInBufferzone() const;    
 
     /** @brief Returns a pointer to the list of clone particles */
     list<Particle*>* getCloneParticles();
@@ -245,30 +273,45 @@ class AllComponents
     double getCrustThicknessMin();
 
     /** @brief Returns the cumulative volume of all particles, both active and
-    inactive */
+    to be inserted */
     double getVolume() const;
 
     /** @brief Returns the cumulative volume of all actives particles */
     double getVolumeIn() const;
 
-    /** @brief Returns the cumulative volume of all inactives particles */
+    /** @brief Returns the cumulative volume of all particles to be inserted */
     double getVolumeOut() const;
 
-    /** @brief Returns the total number of particles, both active and
-    inactive */
+    /** @brief Returns the number of particles in this process */
     size_t getNumberParticles() const;
+    
+    /** @brief Returns the total number of particles in the
+    system (i.e. on all subdomains/processes) */
+    size_t getTotalNumberParticles() const;    
 
-    /** @brief Returns the number of active particles */
+    /** @brief Returns the number of active particles in this process */
     size_t getNumberActiveParticles() const;
+    
+    /** @brief Returns the total number of active particles in the system (i.e. 
+    on all subdomains/processes) */
+    size_t getTotalNumberActiveParticles() const;    
 
-    /** @brief Returns the number of active particles with tag 0 ou 1 */
+    /** @brief Returns the number of active particles in this process with tag 
+    0 ou 1 */
     size_t getNumberActiveParticlesOnProc() const;
 
-    /** @brief Returns the total number of particles on all processes */
-    size_t getNumberParticlesOnAllProc() const;
-
-    /** @brief Returns the number of inactive particles */
-    size_t getNumberInactiveParticles() const;
+    /** @brief Returns the total number of active particles with tag 
+    0 ou 1 in the system (i.e. on all subdomains/processes) */
+    size_t getNumberActiveParticlesOnAllProc() const;   
+    
+    /** @brief Returns the total number of particles in the physical system 
+    (i.e. on all subdomains/processes), i.e. sum of total number of active 
+    particles with tag 0 or 1 and particles to be inserted */
+    size_t getTotalNumberPhysicalParticles() const; 
+    
+    /** @brief Returns the number of particles to insert in the physical 
+    system */
+    size_t getNumberPhysicalParticlesToInsert() const;        
 
     /** @brief Returns the highest particle ID number */
     int getMaxParticleIDnumber() const;
@@ -280,9 +323,9 @@ class AllComponents
 
     /**@name Methods Set */
     //@{
-    /** @brief Sets the total number of particles on all processes
-    @param nb_ total number of particles on all processes */
-    void setNumberParticlesOnAllProc( size_t const& nb_ );
+    /** @brief Computes and sets the numbers of particles in the system 
+    @param wrapper MPI wrapper */
+    void computeNumberParticles( GrainsMPIWrapper const* wrapper );    
 
     /** @brief Sets the frequency at which the relationship between obstacles
     and linked cell grid is updated
@@ -309,6 +352,10 @@ class AllComponents
     /** @brief Update all contact map entries in all particles
     and all elementary obstacles */
     void updateAllContactMaps();
+    
+    /** @brief Set all contact map entry features to zero in all particles
+    and all elementary obstacles */
+    void setAllContactMapFeaturesToZero(); 
     //@}
 
 
@@ -316,13 +363,57 @@ class AllComponents
     //@{
     /** @brief Reloads components from an input stream
     @param fileSave input stream
-    @param filename file name corresponding to the input stream */
-    void read( istream& fileSave, string const& filename );
+    @param filename file name corresponding to the input stream 
+    @param wrapper MPI wrapper */
+    void read_pre2024( istream& fileSave, string const& filename,
+    	GrainsMPIWrapper const* wrapper );
+	
+    /** @brief Reloads reference particles and obstacles from an input stream
+    @param fileSave input stream 
+    @param rank process rank    
+    @param nprocs number of processes */
+    size_t read( istream& fileSave, list<Point3>* known_positions,
+    	int const& rank, int const& nprocs );
+    
+    /** @brief Reloads particles from an input stream 
+    @param rootfilename root file name 
+    @param npart number of particles to be read
+    @param LC linked cell grid 
+    @param rank process rank
+    @param nprocs number of processes     
+    @param wrapper MPI wrapper */
+    void read_particles( string const& filename, size_t const& npart,
+    	LinkedCell const* LC, int const& rank,
+  	int const& nprocs, GrainsMPIWrapper const* wrapper );     	   
 
-    /** @brief Writes components to an output stream
+    /** @brief Writes components to an output stream. Only active particles are
+    written to the stream
     @param fileSave output stream
-    @param filename file name corresponding to the output stream */
-    void write( ostream &fileSave, string const& filename ) const;
+    @param filename file name corresponding to the output stream 
+    @param known_positions the list of remaining insertion positions
+    @param cir clone (periodic, parallel or both) writing mode
+    @param LC linked cell grid 
+    @param rank process rank
+    @param nprocs number of processes     
+    @param wrapper MPI wrapper */
+    void write( ostream &fileSave, string const& filename, 
+    	list<Point3> const* known_positions, CloneInReload cir, 
+	LinkedCell const* LC, int const& rank,
+  	int const& nprocs, GrainsMPIWrapper const* wrapper ) const;
+    
+    /** @brief Writes components to a single MPI File in parallel. Only active 
+    particles are written to the stream
+    @param fileSave output stream
+    @param filename file name corresponding to the output stream 
+    @param known_positions the list of remaining insertion positions
+    @param cir clone (periodic, parallel or both) writing mode
+    @param LC linked cell grid    
+    @param wrapper MPI wrapper 
+    @param periodic true if the domain is periodic */
+    void write_singleMPIFile( ostream &fileSave, string const& filename,
+    	list<Point3> const* known_positions, CloneInReload cir, 
+	LinkedCell const* LC, GrainsMPIWrapper const* wrapper, 
+	bool periodic ) const;
 
     /** @brief Output operator
     @param f output stream
@@ -359,13 +450,17 @@ class AllComponents
     @param dt time step magnitude
     @param enforceOutput force writing
     @param increaseCounterOnly increases the writing counter only
-    @param rank process rank
-    @param nprocs number of processes
-    @param wrapper MPI wrapper */
+    @param rank process rank */
     void outputObstaclesLoad( double time, double dt,
-    	bool enforceOutput = false,
-      	bool increaseCounterOnly = false,
-      	int rank = 0, int nprocs = 1, GrainsMPIWrapper const* wrapper = NULL );
+    	bool enforceOutput = false, bool increaseCounterOnly = false,
+	int rank = 0 );
+
+    /** @brief Computes load on obstacles
+    @param time physical time
+    @param dt time step magnitude
+    @param wrapper MPI wrapper */
+    void computeObstaclesLoad( double time, double dt,
+      	GrainsMPIWrapper const* wrapper = NULL );
 
     /** @brief Initialises output files to write loads on obstacles
     @param rank process rank
@@ -381,21 +476,38 @@ class AllComponents
     //@{
     vector<Particle*> m_ReferenceParticles; /**< reference particle for each
     	class of particles */
-    list<Particle*> m_InactiveParticles; /**< Inactive particles, either deleted
-  	from the simulation or waiting to be inserted */
-    Particle* m_wait; /**< Particle from the inactive particle list waiting to
-    	be inserted */
+    vector<size_t> m_NbRemainingParticlesToInsert; /**< number of remaining 
+    	particles in each class to be inserted */
+    size_t m_nb_physical_particles_to_insert; /**< number of 
+    	remaining particles to insert in the physical system */		
+    Particle* m_wait; /**< Next particle to be inserted */
+    list<Particle*> m_RemovedParticles; /**< Particles removed from the
+  	simulation */	
     list<Particle*> m_ActiveParticles; /**< All active particles in the
   	simulation */
-    list<Particle*> m_ParticlesInHalozone; /**< Active particles in a
-    	halozone (i.e.a buffer zone) */
+    list<Particle*> m_ParticlesInBufferzone; /**< Active particles in a
+	buffer zone */
     list<Particle*> m_CloneParticles; /**< Active particles that are parallel
   	clones of other active particles located in another subdomain/process */
     multimap<int,Particle*> m_PeriodicCloneParticles; /**< Periodic clone
     	particles and their relation to their master particle through its ID
 	number */
+    size_t m_nb_particles; /**< number of particles in this process */
     size_t m_total_nb_particles; /**< total number of particles in the system
   	(i.e. on all subdomains/processes) */
+    size_t m_nb_active_particles; /**< number of active particles in this 
+    	process */
+    size_t m_total_nb_active_particles; /**< total number of active particles 
+    	in the system (i.e. on all subdomains/processes) */
+    size_t m_nb_active_particles_on_proc; /**< number of active particles in 
+    	this process with tag 0 or 1 */
+    size_t m_total_nb_active_particles_on_all_procs; /**< total number of 
+    	active particles with tag 0 or 1 in the system 
+	(i.e. on all subdomains/processes) */	
+    size_t m_total_nb_physical_particles; /**< total number of particles 
+    	in the physical system (i.e. on all subdomains/processes), i.e. sum of 
+	total number of active particles with tag 0 or 1 and physical
+	particles to be inserted */			
     Obstacle *m_obstacle; /**< Root obstacle */
     list<PostProcessingWriter*> m_postProcessors; /**< list of
   	post-processors */
@@ -412,6 +524,15 @@ class AllComponents
     int m_outputTorsorObstacles_frequency; /**< frequency of force and torque on
   	obstacles output */
     //@}
+    
+    
+    /**@name Methods */
+    //@{
+    /** @brief Computes and sets the maximum particle ID number and minimum 
+    obstacle ID number
+    @param wrapper MPI wrapper */
+    void setParticleMaxIDObstacleMinID( GrainsMPIWrapper const* wrapper );    
+    //@}    
 };
 
 
@@ -434,7 +555,7 @@ bool removeParticleFromSet( set<Particle*>& pointersSet, Particle* value );
 of pointers to simple obstacle
 @param pointerslist simple obstaclr pointer list
 @param value pointer to delete */
-bool removeObstacleFromList( list<SimpleObstacle*> &pointerslist,
+bool removeObstacleFromList( list<SimpleObstacle*>& pointerslist,
 	SimpleObstacle* value );
 //@}
 

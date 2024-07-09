@@ -68,7 +68,7 @@ void App::set_periodicity( vector<bool> const& vper )
   {
     m_domain_global_periodic_vectors.reserve( 27 );
     for (int i=0;i<27;++i) 
-      m_domain_global_periodic_vectors.push_back( Vector3Nul );
+      m_domain_global_periodic_vectors.push_back( Vector3Null );
       
     // Single periodicity
     // West East

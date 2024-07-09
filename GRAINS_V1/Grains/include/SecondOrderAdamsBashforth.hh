@@ -31,16 +31,18 @@ class SecondOrderAdamsBashforth : public TimeIntegrator
     TimeIntegrator* clone() const ;
 
     /** @brief Computes the new velocity and position at time t+dt
-    @param vtrans translational velocity at time t
-    @param dUdt Translational velocity variation dU/dt
-    @param transDisplacement translation displacement
-    @param dOmegadt Angular velocity variation dom/dt
-    @param vrot angular velocity at time t 
+    @param dUdt Translational acceleration dU/dt
+    @param vtrans translational velocity 
+    @param transMotion translation motion
+    @param dOmegadt Angular ecceleration dom/dt
+    @param vrot angular velocity 
     @param meanVRot average angular velocity in interval [t,t+dt]
-    @param dt time step magnitude */        
-    void Move( Vector3& vtrans, Vector3 const& dUdt,
-	Vector3& transDisplacement, Vector3 const& dOmegadt,
-	Vector3& vrot, Vector3& meanVRot, double dt ) ;
+    @param dt_particle_vel velocity time step magnitude 
+    @param dt_particle_disp motion time step magnitude */        
+    void Move( Vector3 const& dUdt, Vector3& vtrans, 
+	Vector3& transMotion, Vector3 const& dOmegadt,
+	Vector3& vrot, Vector3& meanVRot, double const& dt_particle_vel, 
+    	double const& dt_particle_disp );
 
     /** @brief Copies kinematics at time t-2dt (translational velocity, angular 
     velocity, variation of translational velocity, variation of angular 
@@ -48,6 +50,41 @@ class SecondOrderAdamsBashforth : public TimeIntegrator
     @param vit 1D array where kinematics at time t-2dt is copied
     @param i start index to copy in the 1D array */
     void copyKinematicsNm2( double* vit, int i ) const;
+    
+    /** @brief Writes time integrator data in an output stream with a high
+    precision and 2014 format
+    @param fileOut output stream 
+    @param dUdt particle translational acceleration 
+    @param dOmegadt particle angular acceleration */
+    void writeParticleKinematics2014( ostream& fileOut,
+    	Vector3 const& dUdt, Vector3 const& dOmegadt ) const; 
+  
+    /** @brief Writes time integrator data in an output stream with a binary 
+    and 2014 format
+    @param fileOut output stream 
+    @param dUdt particle translational acceleration 
+    @param dOmegadt particle angular acceleration */
+    void writeParticleKinematics2014_binary( ostream& fileOut,
+    	Vector3& dUdt, Vector3& dOmegadt );
+
+    /** @brief Reads time integrator data from a stream in the 2014 format 
+    @param StreamIN input stream 
+    @param dUdt particle translational acceleration 
+    @param dOmegadt particle angular acceleration */
+    void readParticleKinematics2014( istream& StreamIN,
+    	Vector3& dUdt, Vector3& dOmegadt ); 
+  
+    /** @brief Reads time integrator data from a stream in a binary form in the
+    2014 format 
+    @param StreamIN input stream 
+    @param dUdt particle translational acceleration 
+    @param dOmegadt particle angular acceleration */
+    void readParticleKinematics2014_binary( istream& StreamIN,
+    	Vector3& dUdt, Vector3& dOmegadt ); 
+	
+    /** @brief Returns the number of bytes of the time integrator data when 
+    written in a binary format to an output stream */
+    size_t get_numberOfBytes() const ;	   
     //@}
 
     
@@ -77,8 +114,8 @@ class SecondOrderAdamsBashforth : public TimeIntegrator
     //@{
     Vector3 m_translationalVelocity_nm2; /**< Translational velocity at t-dt */
     Vector3 m_angularVelocity_nm2; /**< Angular velocity at t-dt */
-    Vector3 m_dUdt_nm2; /**< Translational velocity variation at t-dt */
-    Vector3 m_dOmegadt_nm2; /**< Angular velocity variation at t-dt */
+    Vector3 m_dUdt_nm2; /**< Translational acceleration at t-dt */
+    Vector3 m_dOmegadt_nm2; /**< Angular acceleration at t-dt */
     //@}      
 };
 

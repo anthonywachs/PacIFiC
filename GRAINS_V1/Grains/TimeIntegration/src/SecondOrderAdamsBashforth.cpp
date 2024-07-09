@@ -45,21 +45,22 @@ TimeIntegrator* SecondOrderAdamsBashforth::clone() const
 
 // ----------------------------------------------------------------------------
 // Computes the new velocity and position at time t+dt
-void SecondOrderAdamsBashforth::Move( Vector3& vtrans, Vector3 const& dUdt,
-	Vector3& transDisplacement, Vector3 const& dOmegadt,
-	Vector3& vrot, Vector3& meanVRot, double dt )
+void SecondOrderAdamsBashforth::Move( Vector3 const& dUdt, Vector3& vtrans, 
+	Vector3& transMotion, Vector3 const& dOmegadt,
+	Vector3& vrot, Vector3& meanVRot, double const& dt_particle_vel, 
+    	double const& dt_particle_disp )
 {      
-  // Velocity et deplacement translationnels
-  transDisplacement = 0.5 * ( 3.*vtrans 
-  	- m_translationalVelocity_nm2 ) * dt;
+  // Translational velocity and motion
+  transMotion = 0.5 * ( 3. * vtrans 
+  	- m_translationalVelocity_nm2 ) * dt_particle_disp;
   m_translationalVelocity_nm2 = vtrans;
-  vtrans += 0.5 * ( 3.*dUdt - m_dUdt_nm2 ) * dt;
+  vtrans += 0.5 * ( 3. * dUdt - m_dUdt_nm2 ) * dt_particle_vel;
   m_dUdt_nm2 = dUdt;  
 
-  // Velocity et deplacement rotationnels
-  meanVRot = 0.5 * ( 3.*vrot  - m_angularVelocity_nm2 );
+  // Angular velocity and motion
+  meanVRot = 0.5 * ( 3. * vrot  - m_angularVelocity_nm2 );
   m_angularVelocity_nm2 = vrot;  
-  vrot += 0.5 * ( 3.*dOmegadt - m_dOmegadt_nm2 ) * dt;
+  vrot += 0.5 * ( 3. * dOmegadt - m_dOmegadt_nm2 ) * dt_particle_vel;
   m_dOmegadt_nm2 = dOmegadt;  
 }
 
@@ -92,3 +93,73 @@ void SecondOrderAdamsBashforth::setKinematicsNm2(double const* tab)
   for (int j=0 ;j<3; j++) m_dUdt_nm2[j] = tab[j+6];  
   for (int j=0 ;j<3; j++) m_dOmegadt_nm2[j] = tab[j+9];   
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes time integrator data in an output stream with a high
+// precision and 2014 format
+void SecondOrderAdamsBashforth::writeParticleKinematics2014( ostream& fileOut,
+    	Vector3 const& dUdt, Vector3 const& dOmegadt ) const
+{
+  fileOut << " "; 
+  m_translationalVelocity_nm2.writeGroup3( fileOut ); 
+  fileOut << " "; 
+  m_angularVelocity_nm2.writeGroup3( fileOut ); 
+  fileOut << " ";  
+  m_dUdt_nm2.writeGroup3( fileOut ); 
+  fileOut << " ";  
+  m_dOmegadt_nm2.writeGroup3( fileOut );    
+} 
+
+
+
+  
+// ----------------------------------------------------------------------------
+// Writes time integrator data in an output stream with a binary and 2014 format
+void SecondOrderAdamsBashforth::writeParticleKinematics2014_binary( 
+	ostream& fileOut, Vector3& dUdt, Vector3& dOmegadt )
+{
+  m_translationalVelocity_nm2.writeGroup3_binary( fileOut ); 
+  m_angularVelocity_nm2.writeGroup3_binary( fileOut );   
+  m_dUdt_nm2.writeGroup3_binary( fileOut );  
+  m_dOmegadt_nm2.writeGroup3_binary( fileOut );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads time integrator data from a stream in the 2014 format 
+void SecondOrderAdamsBashforth::readParticleKinematics2014( istream& StreamIN,
+    	Vector3& dUdt, Vector3& dOmegadt )
+{
+  StreamIN >> m_translationalVelocity_nm2 >> m_angularVelocity_nm2
+  	>> m_dUdt_nm2 >> m_dOmegadt_nm2;
+} 
+
+
+
+  
+// ----------------------------------------------------------------------------
+// Reads time integrator data from a stream in a binary form in the 2014 format 
+void SecondOrderAdamsBashforth::readParticleKinematics2014_binary( 
+	istream& StreamIN, Vector3& dUdt, Vector3& dOmegadt )
+{
+  m_translationalVelocity_nm2.readGroup3_binary( StreamIN ); 
+  m_angularVelocity_nm2.readGroup3_binary( StreamIN );   
+  m_dUdt_nm2.readGroup3_binary( StreamIN );  
+  m_dOmegadt_nm2.readGroup3_binary( StreamIN );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of bytes of the time integrator data when written in a 
+// binary format to an output stream
+size_t SecondOrderAdamsBashforth::get_numberOfBytes() const
+{
+  return ( 4 * solid::Group3::m_sizeofGroup3 );
+}

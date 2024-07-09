@@ -1,11 +1,287 @@
 /**
-# Toolbox to perform operations on a Lagrangian mesh
+# Toolbox to perform operations on a triangulated meshes
 
-From defining useful macros, subdividing triangles, or dumping the mesh in
-restart files: below is a collection of helpful functions to deal with
-triangular meshes.
+From defining geometric computations such as normal vectors, volume and 
+centroid, useful macros, subdividing triangles, below is a collection of helpful 
+functions to deal with triangular meshes.
 */
 
+/**
+## Geometric computations
+
+The function below computes the length of an edge. It takes as arguments
+a pointer to the mesh as well as the ID of the edge of interest.
+*/
+double edge_length(lagMesh* mesh, int i) {
+  double length = 0.;
+  int v1, v2;
+  v1 = mesh->edges[i].node_ids[0];
+  v2 = mesh->edges[i].node_ids[1];
+  foreach_dimension() {
+    length += sq(GENERAL_1DIST(mesh->nodes[v1].pos.x, mesh->nodes[v2].pos.x));
+  }
+  return sqrt(length);
+}
+
+/**
+The function ```compute_lengths``` below computes the lengths of all edges. It
+takes as an argument a pointer to the mesh. If the optional argument
+```force``` is set to ```true```, the edges' lengths are computed no matter the value of ```updated_stretches```.
+*/
+struct _compute_lengths{
+  lagMesh* mesh;
+  bool force;
+};
+
+void compute_lengths(struct _compute_lengths p) {
+  lagMesh* mesh = p.mesh;
+  bool force = (p.force) ? p.force : false;
+  if (force || !mesh->updated_stretches) {
+    for(int i=0; i < mesh->nle; i++)
+      mesh->edges[i].length = edge_length(mesh, i);
+    mesh->updated_stretches = true;
+  }
+}
+
+#if dimension < 3
+/**
+The two functions below compute the outward normal vector to all the edges of
+a Lagrangian mesh, for 2D simulations.
+*/
+void comp_edge_normal(lagMesh* mesh, int i) {
+  int node_id[2];
+  for(int j=0; j<2; j++) node_id[j] = mesh->edges[i].node_ids[j];
+  mesh->edges[i].normal.y = GENERAL_1DIST(mesh->nodes[node_id[0]].pos.x,
+    mesh->nodes[node_id[1]].pos.x);
+  mesh->edges[i].normal.x = GENERAL_1DIST(mesh->nodes[node_id[1]].pos.y,
+    mesh->nodes[node_id[0]].pos.y);
+  double normn = sqrt(sq(mesh->edges[i].normal.x)
+    + sq(mesh->edges[i].normal.y));
+  foreach_dimension() mesh->edges[i].normal.x /= normn;
+}
+
+void comp_edge_normals(lagMesh* mesh) {
+  for(int i=0; i<mesh->nle; i++) comp_edge_normal(mesh, i);
+}
+#else // dimension > 2
+/** In 3D simulations, the function below assumes that the Lagrangian mesh contains the origin and
+is convex, and swaps the order of the nodes in order to compute an outward
+normal vector. This only need to be performed at the creation of the mesh since
+the outward property of the normal vectors won't change through the simulation.
+*/
+void comp_initial_area_normals(lagMesh* mesh) {
+  for(int i=0; i<mesh->nlt; i++) {
+    int nid[3]; // node ids
+    coord centroid; /** Note: the centroid is only valid if the triangle is not
+    across periodic boundaries, which is fine for this function since it is
+    assumed the center of the membrane is at the origin. */
+    foreach_dimension() centroid.x = 0.;
+    for(int j=0; j<3; j++) {
+      nid[j] = mesh->triangles[i].node_ids[j];
+      foreach_dimension() centroid.x += mesh->nodes[nid[j]].pos.x/3;
+    }
+    coord normal, e[2];
+    for(int j=0; j<2; j++)
+      foreach_dimension()
+        e[j].x = GENERAL_1DIST(mesh->nodes[nid[0]].pos.x,
+          mesh->nodes[nid[j+1]].pos.x);
+    foreach_dimension() normal.x = e[0].y*e[1].z - e[0].z*e[1].y;
+    double norm = sqrt(sq(normal.x) + sq(normal.y) + sq(normal.z));
+    double dp = 0.; // dp for "dot product"
+    foreach_dimension() dp += normal.x*centroid.x;
+    /** If the dot product is negative, the computed normal is inward and we
+    need to swap two nodes of the triangle.*/
+    if (dp < 0) {
+      mesh->triangles[i].node_ids[1] = nid[2];
+      mesh->triangles[i].node_ids[2] = nid[1];
+      foreach_dimension() normal.x *= -1;
+    }
+    foreach_dimension() {
+      mesh->triangles[i].centroid.x = centroid.x;
+      mesh->triangles[i].normal.x = normal.x/norm;
+    }
+    mesh->triangles[i].area = norm/2;
+  }
+}
+
+/** The two functions below compute the outward normal vector to all the
+triangles of the mesh, for 3D simulations. */
+void comp_triangle_area_normal(lagMesh* mesh, int i) {
+  int nid[3]; // node ids
+  for(int j=0; j<3; j++) nid[j] = mesh->triangles[i].node_ids[j];
+  /** The next 15 lines compute the centroid of the triangle, making sure it is
+  valid when the triangle lies across periodic boundaries. */
+  foreach_dimension() mesh->triangles[i].centroid.x = 0.;
+  for(int j=0; j<3; j++) {
+    foreach_dimension() {
+      mesh->triangles[i].centroid.x +=
+        ACROSS_PERIODIC(mesh->nodes[nid[j]].pos.x/3,
+        mesh->nodes[nid[0]].pos.x/3) ? mesh->nodes[nid[j]].pos.x/3 - L0 :
+        mesh->nodes[nid[j]].pos.x/3;
+    }
+  }
+  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+  foreach_dimension() {
+    if (fabs(mesh->triangles[i].centroid.x - origin.x) > L0/2.) {
+      if (mesh->triangles[i].centroid.x - origin.x > 0)
+        mesh->triangles[i].centroid.x -= L0;
+      else mesh->triangles[i].centroid.x += L0;
+    }
+  }
+  coord normal, e[2];
+  for(int j=0; j<2; j++)
+    foreach_dimension()
+      e[j].x = GENERAL_1DIST(mesh->nodes[nid[0]].pos.x,
+        mesh->nodes[nid[j+1]].pos.x);
+  foreach_dimension() normal.x = e[0].y*e[1].z - e[0].z*e[1].y;
+  double norm = sqrt(sq(normal.x) + sq(normal.y) + sq(normal.z));
+  foreach_dimension() mesh->triangles[i].normal.x = normal.x/norm;
+  mesh->triangles[i].area = norm/2.;
+}
+
+void comp_triangle_area_normals(lagMesh* mesh) {
+  for(int i=0; i<mesh->nlt; i++) comp_triangle_area_normal(mesh, i);
+}
+#endif
+
+/**
+If a Lagrangian node falls exactly on an edge or a vertex of the Eulerian
+mesh, some issues arise when checking for periodic boundary conditions. As a
+quick fix, if this is the case we shift the point position by $10^{-10}$, as
+is done in the two functions below.
+*/
+bool on_face(double p, int n, double l0) {
+  if ((fabs(p/(l0/n)) - ((int)fabs(p/(l0/n)))) < 1.e-10) return true;
+  else return false;
+}
+
+void correct_node_pos(coord* node) {
+  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+  foreach_dimension() {
+    if (on_face(node->x, N, L0))
+      node->x += 1.e-10;
+    //FIXME: the nodes should not be sent to the other side of the domain if the boundary is not periodic...
+    if (node->x > origin.x + L0/2)
+      node->x -= L0;
+    else if (node->x < origin.x - L0/2)
+      node->x += L0;
+  }
+}
+
+void correct_lag_pos(lagMesh* mesh) {
+  for(int i=0; i < mesh->nln; i++) {
+    correct_node_pos(&mesh->nodes[i].pos);
+  }
+  mesh->updated_stretches = false;
+  mesh->updated_normals = false;
+  mesh->updated_curvatures = false;
+}
+
+/**
+The function below computes the centroid of the capsule as the average of the
+coordinates of all its nodes. The centroid is stored as an attribute of the
+caps structure.
+*/
+void comp_centroid(lagMesh* mesh) {
+  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+  foreach_dimension() mesh->centroid.x = 0.;
+  for(int i=0; i<mesh->nln; i++)
+    foreach_dimension() {
+      double tentative_pos = mesh->nodes[i].pos.x - mesh->nodes[0].pos.x;
+      mesh->centroid.x += (tentative_pos < origin.x - L0/2) ?
+        tentative_pos + L0 : 
+          ((tentative_pos > origin.x + L0/2) ? tentative_pos - L0 :
+          tentative_pos);
+    }
+  foreach_dimension() 
+    mesh->centroid.x = mesh->centroid.x/mesh->nln + mesh->nodes[0].pos.x;
+  correct_node_pos(&mesh->centroid);
+}
+
+trace
+void comp_volume(lagMesh* mesh) {
+  coord origin = {X0 + L0/2, Y0 + L0/2, Z0 + L0/2};
+  comp_centroid(mesh);
+  double volume = 0;
+  for(int i=0; i<mesh->nlt; i++) {
+    coord nodes[3];
+    for(int j=0; j<3; j++)
+      foreach_dimension() {
+        double tentative_pos = mesh->nodes[mesh->triangles[i].node_ids[j]].pos.x
+          - mesh->centroid.x;
+        nodes[j].x = (tentative_pos < origin.x - L0/2) ?
+          tentative_pos + L0 : 
+          ((tentative_pos > origin.x + L0/2) ? tentative_pos - L0 :
+          tentative_pos);
+      }
+    for(int j=0; j<3; j++) {
+      coord cross_product;
+      foreach_dimension() 
+        cross_product.x = nodes[(j+1)%3].y*nodes[(j+2)%3].z - 
+          nodes[(j+1)%3].z*nodes[(j+2)%3].y;
+      volume += cdot(nodes[j],cross_product);
+    }
+  }
+  mesh->volume = volume/18;
+}
+
+
+/** The function below updates the normal vectors on all the nodes as well as
+the lengths and midpoints of all the edges (in 2D) or the area and centroids of
+all the triangles (in 3D). */
+void comp_normals(lagMesh* mesh) {
+  if (!mesh->updated_normals) {
+    #if dimension < 3
+    compute_lengths(mesh);
+    for(int i=0; i<mesh->nln; i++) {
+      coord n[2];
+      double l[2];
+      double normn;
+      for(int j=0; j<2; j++) {
+        int edge_id;
+        edge_id = mesh->nodes[i].edge_ids[j];
+        l[j] = mesh->edges[edge_id].length;
+        comp_edge_normal(mesh, edge_id);
+        foreach_dimension() n[j].x = mesh->edges[edge_id].normal.x;
+      }
+      /** the normal vector at a node is the weighted average of the normal
+      vectors of its edges. The average is weighted by the distance of the node
+      to each of the edges' centers. */
+      double epsilon = l[1]/(l[0] + l[1]);
+      normn = 0.;
+      foreach_dimension() {
+        mesh->nodes[i].normal.x = epsilon*n[0].x + (1. - epsilon)*n[1].x;
+        normn += sq(mesh->nodes[i].normal.x);
+      }
+      normn = sqrt(normn);
+      foreach_dimension() mesh->nodes[i].normal.x /= normn;
+    }
+    #else // dimension == 3
+    comp_triangle_area_normals(mesh);
+    for(int i=0; i<mesh->nln; i++) {
+      foreach_dimension() mesh->nodes[i].normal.x = 0.;
+      double sw = 0.; // sum of the weights
+      for(int j=0; j<mesh->nodes[i].nb_triangles; j++) {
+        int tid = mesh->nodes[i].triangle_ids[j];
+        double dist = 0.;
+        foreach_dimension()
+          dist += sq(mesh->nodes[i].pos.x - mesh->triangles[tid].centroid.x);
+        dist = sqrt(dist);
+        sw += dist;
+        foreach_dimension()
+          mesh->nodes[i].normal.x += mesh->triangles[tid].normal.x*dist;
+      }
+      foreach_dimension()
+        mesh->nodes[i].normal.x /= sw;
+      double normn = cnorm(mesh->nodes[i].normal);
+      foreach_dimension() mesh->nodes[i].normal.x /= normn;
+    }
+    #endif
+    mesh->updated_normals = true;
+  }
+}
+
+#if dimension > 2
 
 /**
 ## Useful macros
@@ -57,6 +333,15 @@ bool is_edge_across_periodic(lagMesh* mesh, int i) {
       return true;
   return false;
 }
+
+// foreach_dimension()
+// bool is_edge_across_periodic_x(lagMesh* mesh, int i) {
+//   int n[2];
+//   for(int k=0; k<2; k++) n[k] = mesh->edges[i].node_ids[k];
+//     if (ACROSS_PERIODIC(mesh->nodes[n[0]].pos.x, mesh->nodes[n[1]].pos.x))
+//       return true;
+//   return false;
+// }
 
 
 struct _write_edge {
@@ -135,25 +420,25 @@ void split_edge(lagMesh* mesh, int i) {
 
   /** Create new node */
   foreach_dimension()
-    mesh->nodes[mesh->nlp].pos.x =
+    mesh->nodes[mesh->nln].pos.x =
       .5*(mesh->nodes[nid[0]].pos.x + mesh->nodes[nid[1]].pos.x);
-  mesh->nodes[mesh->nlp].nb_neighbors = 6;
-  mesh->nodes[mesh->nlp].nb_triangles = 6;
-  mesh->nodes[mesh->nlp].neighbor_ids[0] = nid[0];
-  mesh->nodes[mesh->nlp].neighbor_ids[1] = nid[1];
-  mesh->nodes[mesh->nlp].edge_ids[0] = i;
-  mesh->nodes[mesh->nlp].edge_ids[1] = mesh->nle;
+  mesh->nodes[mesh->nln].nb_neighbors = 6;
+  mesh->nodes[mesh->nln].nb_triangles = 6;
+  mesh->nodes[mesh->nln].neighbor_ids[0] = nid[0];
+  mesh->nodes[mesh->nln].neighbor_ids[1] = nid[1];
+  mesh->nodes[mesh->nln].edge_ids[0] = i;
+  mesh->nodes[mesh->nln].edge_ids[1] = mesh->nle;
   for(int j=0; j<6; j++) {
-    mesh->nodes[mesh->nlp].triangle_ids[j] = -1;
+    mesh->nodes[mesh->nln].triangle_ids[j] = -1;
     if (j>1) {
-      mesh->nodes[mesh->nlp].neighbor_ids[j] = -1;
-      mesh->nodes[mesh->nlp].edge_ids[j] = -1;
+      mesh->nodes[mesh->nln].neighbor_ids[j] = -1;
+      mesh->nodes[mesh->nln].edge_ids[j] = -1;
     }
   }
 
   /** Create new edge and update current one */
-  write_edge(mesh, i, nid[0], mesh->nlp, overwrite = true);
-  write_edge(mesh, mesh->nle, nid[1], mesh->nlp);
+  write_edge(mesh, i, nid[0], mesh->nln, overwrite = true);
+  write_edge(mesh, mesh->nle, nid[1], mesh->nln);
   for (int j=0; j<2; j++) {
     mesh->edges[i].triangle_ids[j] = -1;
     mesh->edges[mesh->nle].triangle_ids[j] = -1;
@@ -162,15 +447,15 @@ void split_edge(lagMesh* mesh, int i) {
   /** Update node information: neighboring nodes, connecting edges */
   for(int j=0; j<mesh->nodes[nid[0]].nb_neighbors; j++)
     if (mesh->nodes[nid[0]].neighbor_ids[j] == nid[1])
-      mesh->nodes[nid[0]].neighbor_ids[j] = mesh->nlp;
+      mesh->nodes[nid[0]].neighbor_ids[j] = mesh->nln;
   for(int j=0; j<mesh->nodes[nid[1]].nb_neighbors; j++)
     if (mesh->nodes[nid[1]].neighbor_ids[j] == nid[0])
-      mesh->nodes[nid[1]].neighbor_ids[j] = mesh->nlp;
+      mesh->nodes[nid[1]].neighbor_ids[j] = mesh->nln;
   for(int j=0; j<mesh->nodes[nid[1]].nb_neighbors; j++)
     if (mesh->nodes[nid[1]].edge_ids[j] == i)
       mesh->nodes[nid[1]].edge_ids[j] = mesh->nle;
 
-  mesh->nlp++;
+  mesh->nln++;
   mesh->nle++;
 }
 
@@ -272,7 +557,7 @@ struct _new_triangle {
 but in the specific context of the refinement process. The variable $prev\_tid$
 is used to update the connectivity information of the nodes and edges. */
 void new_triangle(lagMesh* mesh, int i, int j, int k, int prev_tid) {
-  assert((i < mesh->nlp) && (j < mesh->nlp) && (k < mesh->nlp));
+  assert((i < mesh->nln) && (j < mesh->nln) && (k < mesh->nln));
   int nodes[3];
   nodes[0] = i; nodes[1] = j; nodes[2] = k;
 
@@ -383,7 +668,7 @@ double comp_angle(lagNode* n1, lagNode* n2, lagNode* n3) {
     norm2 += sq(n1->pos.x - n3->pos.x);
   }
   theta /= sqrt(norm1)*sqrt(norm2);
-  theta = acos(fabs(theta));
+  theta = acos(theta);
   return theta;
 }
 
@@ -395,7 +680,7 @@ bool is_obtuse_node(lagMesh* mesh, int tid, int i) {
   lagNode* n[3];
   for(int j=0; j<3; j++)
     n[j] = &(mesh->nodes[mesh->triangles[tid].node_ids[j]]);
-  if (comp_angle(n[i], n[(i+1)%3], n[(i+2)%3]) > pi) return true;
+  if (comp_angle(n[i], n[(i+1)%3], n[(i+2)%3]) > pi/2.) return true;
   else return false;
 }
 
@@ -426,7 +711,7 @@ void refine_mesh(lagMesh* mesh) {
       int edge_id = mesh->triangles[i].edge_ids[j];
       if (mesh->edges[edge_id].triangle_ids[1] > -1) {
         split_edge(mesh, edge_id);
-        mid_ids[j] = mesh->nlp-1;
+        mid_ids[j] = mesh->nln-1;
       }
       else {
         mid_ids[j] = is_triangle_vertex(mesh, i,
@@ -457,224 +742,73 @@ void refine_mesh(lagMesh* mesh) {
   }
 }
 
-/**
-## Adding capsules after restart
-
-In case we add membranes to a simulation after restart, we need to call
-the function below. */
-void initialize_membranes() {
-  mbs.nbmb = NCAPS;
-  for(int i=0; i<mbs.nbmb; i++) {
-    initialize_empty_mb(&mbs.mb[i]);
-  }
-  if (is_constant(a.x)) {
-    a = new face vector;
-    foreach_face() a.x[] = 0.;
-  }
-}
-
-void initialize_membranes_stencils() {
-  for(int i=0; i<mbs.nbmb; i++) {
-    for(int j=0; j<MB(i).nlp; j++) {
-      MB(i).nodes[j].stencil.n = STENCIL_SIZE;
-      MB(i).nodes[j].stencil.nm = STENCIL_SIZE;
-      MB(i).nodes[j].stencil.p = (Index*) malloc(STENCIL_SIZE*sizeof(Index));
-    }
-  }
-}
 
 /**
-## Output
-The functions below write/read the lagrangian mesh to/from a file in order
-to restart simulations.
+## Periodicity helper functions
 
-At the moment these functions are only valid for three-dimensional simulations.
+In some situations, for instance to compute the volume of a capsule, we need to 
+take the dot and cross products of
+neighboring nodes that can be across periodic boundaries. The next three 
+functions implement ``periodic-friendly" versions of the dot and cross products
+that do not take into account the coordinates jump across the periodic
+boundaries. The implementation relies on the assumption that a capsule is
+*always* smaller in the x, y and z directions that half the domain size L0/2.
 */
 
-void dump_lagmesh(FILE* fp, lagMesh* mesh) {
-  /** Step 1: The array of Lagrangian nodes is dumped */
-  fwrite(&(mesh->nlp), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nlp; i++) {
-    foreach_dimension() fwrite(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
-    fwrite(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
-    fwrite(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fwrite(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
-    fwrite(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fwrite(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
-    fwrite(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fwrite(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
-  }
-  /** Step 2: The array of Lagrangian edges is dumped */
-  fwrite(&(mesh->nle), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nle; i++) {
-    fwrite(&(mesh->edges[i].l0), sizeof(double), 1, fp);
-    for(int j=0; j<2; j++) {
-      fwrite(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
-      fwrite(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
+/**
+The function below corrects the coordinates of one node $a$ in order to
+ensure it is placed on the same side of a reference coordinate (in practice,
+the centroid of the capsule). The function returns the corrected node 
+coordinate.
+*/
+coord correct_periodic_node_pos(coord a, coord ref) {
+    coord result;
+    foreach_dimension() {
+        result.x = (fabs(a.x - ref.x) < L0/2) ? a.x : 
+            (a.x > ref.x) ? a.x - L0 : a.x + L0;
     }
-  }
-  /** Step 3: The array of Lagrangian triangles is dumped. If the finite element
-  functions are not used, some attributes of the Triangle structure are not
-  initialized and we don't have to dump them. */
-  fwrite(&(mesh->nlt), sizeof(int), 1, fp);
-  for(int i=0; i<mesh->nlt; i++) {
-    #if _ELASTICITY_FT
-    for(int j=0; j<2; j++) {
-      foreach_dimension()
-        fwrite(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
-    }
-    for(int j=0; j<3; j++) {
-      for(int k=0; k<2; k++) {
-        fwrite(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
-      }
-    }
-    #endif
-    for(int j=0; j<3; j++)
-      fwrite(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
-    for(int j=0; j<3; j++)
-      fwrite(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
+    return result;
+}
+
+/**
+The function below corrects the coordinates of two nodes $a$ and $b$ in order to
+ensure they are placed on the same side of a reference coordinate (in practice,
+the centroid of the capsule). The result is stored in an array of `coord` of
+length 2.
+*/
+void correct_periodic_nodes_pos(coord* result, coord a, coord b, coord ref) {
+  foreach_dimension() {
+    result[0].x = (fabs(a.x - ref.x) < L0/2) ? a.x : 
+      (a.x > ref.x) ? a.x - L0 : a.x + L0;
+    result[1].x = (fabs(b.x - ref.x) < L0/2) ? b.x : 
+      (b.x > ref.x) ? b.x - L0 : b.x + L0;
   }
 }
 
-void restore_lagmesh(FILE* fp, lagMesh* mesh) {
-  /** Step 1: The array of Lagrangian nodes is read */
-  fread(&(mesh->nlp), sizeof(int), 1, fp);
-  mesh->nodes = malloc(mesh->nlp*sizeof(lagNode));
-  for(int i=0; i<mesh->nlp; i++) {
-    foreach_dimension() fread(&(mesh->nodes[i].pos.x), sizeof(double), 1, fp);
-    fread(&(mesh->nodes[i].ref_curv), sizeof(double), 1, fp);
-    fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fread(&(mesh->nodes[i].neighbor_ids[j]), sizeof(int), 1, fp);
-    fread(&(mesh->nodes[i].nb_neighbors), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fread(&(mesh->nodes[i].edge_ids[j]), sizeof(int), 1, fp);
-    fread(&(mesh->nodes[i].nb_triangles), sizeof(int), 1, fp);
-    for(int j=0; j<6; j++)
-      fread(&(mesh->nodes[i].triangle_ids[j]), sizeof(int), 1, fp);
-  }
-  /** Step 1: The array of Lagrangian edges is read */
-  fread(&(mesh->nle), sizeof(int), 1, fp);
-  mesh->edges = malloc(mesh->nle*sizeof(Edge));
-  for(int i=0; i<mesh->nle; i++) {
-    fread(&(mesh->edges[i].l0), sizeof(double), 1, fp);
-    for(int j=0; j<2; j++) {
-      fread(&(mesh->edges[i].node_ids[j]), sizeof(int), 1, fp);
-      fread(&(mesh->edges[i].triangle_ids[j]), sizeof(int), 1, fp);
-    }
-  }
-  /** Step 3: The array of Lagrangian triangles is read. If the finite element
-  functions are not used, some attributes of the Triangle structure are not
-  dumped and we should not read them. */
-  fread(&(mesh->nlt), sizeof(int), 1, fp);
-  mesh->triangles = malloc(mesh->nlt*sizeof(Triangle));
-  for(int i=0; i<mesh->nlt; i++) {
-    #if _ELASTICITY_FT
-    for(int j=0; j<2; j++) {
-      foreach_dimension()
-        fread(&(mesh->triangles[i].refShape[j].x), sizeof(double), 1, fp);
-    }
-    for(int j=0; j<3; j++) {
-      for(int k=0; k<2; k++) {
-        fread(&(mesh->triangles[i].sfc[j][k]), sizeof(double), 1, fp);
-      }
-    }
-    #endif
-    for(int j=0; j<3; j++)
-      fread(&(mesh->triangles[i].node_ids[j]), sizeof(int), 1, fp);
-    for(int j=0; j<3; j++)
-      fread(&(mesh->triangles[i].edge_ids[j]), sizeof(int), 1, fp);
-  }
-  mesh->updated_stretches = false;
-  mesh->updated_normals = false;
-  mesh->updated_curvatures = false;
+/**
+The function below computes the cross product of two coordinates $a$ and $b$
+that potentially lie across periodic boundaries. The coordinates are 
+temporarilly moved on the same side of the periodic boundary as a reference 
+coordinate `ref`, in practice the centroid of the capsule.
+*/
+foreach_dimension()
+double periodic_friendly_cross_product_x(coord a, coord b, coord ref) {
+  coord nodes[2];
+  correct_periodic_nodes_pos(nodes, a, b, ref);
+  return nodes[0].y*nodes[1].z - nodes[0].z*nodes[1].y;
 }
 
-/** If the simulation contains several membranes, we dump and read one mesh at
-a time, but all meshes are stored in the same file. */
-void dump_membranes(char* filename) {
-  FILE* file = fopen(filename, "w");
-  assert(file);
-  for(int i=0; i<mbs.nbmb; i++) {
-    dump_lagmesh(file, &MB(i));
-  }
-  fclose(file);
+/**
+The function below computes the dot product of two coordinates $a$ and $b$
+that potentially lie across periodic boundaries. The coordinates are 
+temporarilly moved on the same side of the periodic boundary as a reference 
+coordinate `ref`, in practice the centroid of the capsule.
+*/
+double periodic_friendly_dot_product(coord a, coord b, coord ref) {
+  coord nodes[2];
+  correct_periodic_nodes_pos(nodes, a, b, ref);
+  return cdot(nodes[0], nodes[1]);
 }
 
-void restore_membranes(char* filename) {
-  FILE* file = fopen(filename, "r");
-  assert(file);
-  for(int i=0; i<mbs.nbmb; i++) {
-    restore_lagmesh(file, &MB(i));
-  }
-  fclose(file);
-}
 
-/** ### Output membrane position for external post-processing */
-void dump_plain_nodes_pos(lagMesh* mesh, char* filename) {
-  if (pid() == 0) {
-    FILE* file = fopen(filename, "a");
-    assert(file);
-    fprintf(file, "%g", t);
-    for(int i=0; i<mesh->nlp; i++) {
-      fprintf(file, ",%g %g %g", mesh->nodes[i].pos.x, mesh->nodes[i].pos.y,
-        mesh->nodes[i].pos.z);
-    }
-    fprintf(file, "\n");
-    fclose(file);
-  }
-}
-
-/** ### Visualization in paraview */
-#ifndef PARAVIEW_CAPSULE
-  #define PARAVIEW_CAPSULE 0
-#endif
-
-#if PARAVIEW_CAPSULE
-int pv_timestep = 0;
-
-void pv_output_ascii() {
-  char filename[128];
-  FILE* file;
-  sprintf(filename, "caps_T%d.vtk", pv_timestep);
-  file = fopen(filename, "w");
-
-  /** Populate the header and other non-data fields */
-  fprintf(file, "# vtk DataFile Version 4.2\n");
-  fprintf(file, "Capsules at time %g\n", t);
-  fprintf(file, "ASCII\n");
-  fprintf(file, "DATASET POLYDATA\n");
-
-  /** Populate the coordinates of all the Lagrangian nodes */
-  int nbpts_tot = 0;
-  for(int j=0; j<NCAPS; j++) nbpts_tot += MB(j).nlp;
-  fprintf(file, "POINTS %d double\n", nbpts_tot);
-  for(int j=0; j<NCAPS; j++) {
-    for(int k=0; k<MB(j).nlp; k++) {
-      fprintf(file, "%g %g %g\n", MB(j).nodes[k].pos.x, MB(j).nodes[k].pos.y,
-        MB(j).nodes[k].pos.z);
-    }
-  }
-
-  /** Populate the connectivity of the triangles */
-  int nbtri_tot = 0;
-  for(int j=0; j<NCAPS; j++) nbtri_tot += MB(j).nlt;
-  fprintf(file, "TRIANGLE_STRIPS %d %d\n", nbtri_tot, 4*nbtri_tot);
-  for(int j=0; j<NCAPS; j++) {
-    int offset = 0;
-    for(int k=0; k<MB(j).nlt; k++) {
-      fprintf(file, "%d %d %d %d\n", 3,
-        offset + MB(j).triangles[k].node_ids[0],
-        offset + MB(j).triangles[k].node_ids[1],
-        offset + MB(j).triangles[k].node_ids[2]);
-    }
-    offset += MB(j).nlp;
-  }
-
-  fclose(file);
-  pv_timestep++;
-}
-#endif
+#endif // dimension > 2

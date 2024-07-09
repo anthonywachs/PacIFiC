@@ -62,7 +62,10 @@ class CompositeObstacle : public Obstacle
     /** @name Set methods Set */
     //@{  
     /** @brief Initializes all contact map entries to false */
-    virtual void setContactMapToFalse();       
+    virtual void setContactMapToFalse();
+    
+    /** @brief Set contact map entry features to zero */
+    virtual void setContactMapFeaturesToZero();            
     //@}
 
 
@@ -87,13 +90,13 @@ class CompositeObstacle : public Obstacle
     obstacles
     @param time physical time
     @param dt time step magnitude
-    @param b_deplaceCine_Comp whether to move the composite that the composite 
-    obstacle belongs to (imposed velocity)
-    @param b_deplaceF_Comp whether to move the composite that the composite 
-    obstacle belongs to (imposed force) */
+    @param motherCompositeHasImposedVelocity whether the composite that the 
+    obstacle belongs to has a non-zero imposed velocity
+    @param motherCompositeHasImposedForce whether the composite that the 
+    obstacle belongs to has a non-zero imposed force */
     list<SimpleObstacle*> Move( double time,
-	double dt, bool const& b_deplaceCine_Comp, 
-        bool const& b_deplaceF_Comp ) ;
+	double dt, bool const& motherCompositeHasImposedVelocity, 
+        bool const& motherCompositeHasImposedForce ) ;
 
     /** @brief Returns whether the component is a composite obstacle ? */
     virtual bool isCompositeObstacle() const;
@@ -122,7 +125,8 @@ class CompositeObstacle : public Obstacle
     /** @brief Resets kinematics to 0 */
     void resetKinematics();
 
-    /** @brief Rotates the composite obstacle with a quaternion
+    /** @brief Rotates the composite obstacle with a quaternion about its 
+    center of mass. Warning: This method is not defined and must not be called
     @param rotation the quaternion defining the rotation */
     void Rotate( Quaternion const& rotation ) ;
 
@@ -153,30 +157,80 @@ class CompositeObstacle : public Obstacle
     obstacle */
     Torsor const* getTorsor();  
       
-    /** @brief Updates contact map */
-    virtual void updateContactMap(); 
-  
-    /** @brief Does the contact exist in the map, if yes return the pointer to 
-    the cumulative tangential displacement 
-    @param tangentialDepl pointer to the cumulative tangential displacement 
-    @param id id number of the other component */
-    virtual bool ContactInMapIsActive( double*& tangentialDepl, int const& id );
-  
-    /** @brief Adds new contact in the map
-    @param tangentialDepl initial tangential displacement 
-    @param id id number of the other component */
-    virtual void addNewContactInMap( double const& tangentialDepl, 
-  	int const& id ); 
+    /** @brief Update contact map */
+    virtual void updateContactMap();
 
-    /** @brief Increases cumulative tangential displacement with component id
-    @param tangentialDepl additional tangential displacement 
-    @param id id number of the other component */
-    virtual void addDeplContactInMap( double const& tangentialDepl, 
-  	int const& id ); 
+    /** @brief Does the contact exist in the map? If so, return true and make
+    kdelta, prev_normal and cumulSpringTorque point to the memorized info. 
+    Otherwise, return false and set those pointers to NULL.
+    @param id key in the map
+    @param kdelta pointer to the memory of the vector kt * delta_t
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque 
+    @param createContact when true, create contact if it does not exist */
+    virtual bool getContactMemory( std::tuple<int,int,int> const& id,
+  	Vector3* &kdelta, Vector3* &prev_normal, Vector3* &cumulSpringTorque,
+  	bool createContact );
+
+    /** @brief Adds new contact in the map
+    @param id key in the map
+    @param kdelta kt * delta_t vector
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
+    virtual void addNewContactInMap( std::tuple<int,int,int> const& id,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
+
+    /** @brief Stores memory of the contact with component id: increase 
+    cumulative tangential motion and cumulative spring torque, remember 
+    contact normal.
+    @param id key in the map
+    @param kdelta kt * delta_t vector
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
+    virtual void addDeplContactInMap( std::tuple<int,int,int> const& id,
+  	Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
+
+    /** @brief Writes the contact map information in an array of doubles
+    @param destination the array of double where the contact map should be 
+    stored
+    @param start_index the index of destination where the copy should start */
+    virtual void copyContactMap( double* destination, int start_index );
+
+    /** @brief Adds a single contact info to the contact map
+    @param id key in the map
+    @param isActive boolean: true if the contact is active, false otherwise
+    @param kdelta kt * delta_t vector
+    @param prev_normal pointer to the previous vector normal to the contact 
+    plane
+    @param cumulSpringTorque pointer to the memory of the spring-like component 
+    of the friction torque */
+    virtual void copyContactInMap( std::tuple<int,int,int> const& id,
+  	bool const& isActive, Vector3 const& kdelta, Vector3 const& prev_normal,
+  	Vector3 const& cumulSpringTorque );
+
+    /** @brief Returns the number of contacts in the contact map */
+    virtual int getContactMapSize();
+
+    /** @brief Displays the active neighbours in the 
+    format "my_elementary_id/neighbour_id/neightbout_elementary_id ; ...". 
+    Useful for debugging only.
+    @param id id of this component */
+    virtual void printActiveNeighbors( int const& id );
 	
     /** @ brief Returns whether a point lies inside the composite obstacle
     @param pt point */
-    bool isIn( Point3 const& pt ) const;			
+    bool isIn( Point3 const& pt ) const;
+            
+    /** @brief Resets the minimum ID number of an obstacle for autonumbering */
+    virtual void setMinIDnumber();      
     //@}
 
 
@@ -251,7 +305,7 @@ class CompositeObstacle : public Obstacle
 
     /**  @brief Outputs information to be transferred to the fluid
     @param fluid output stream */
-    virtual void writePositionInFluid( ostream& fluid );
+    virtual void writePositionInFluid( ostream& fluid );  
     //@}
 
 
@@ -259,21 +313,34 @@ class CompositeObstacle : public Obstacle
     /** @name Methods */
     //@{  
     /** @brief Computes center of mass position */
-    void EvalPosition();
+    pair<Point3,double> computeCenterOfMass();
     //@}
+    
 
     /** @name Parameters */
     //@{  
     list<Obstacle*> m_obstacles; /**< list of obstacles in the composite
     	obstacle */
+    int m_CompositeObstacle_id; /**< standard ID number is 0, the composite
+    	obstacle ID number is used to distinguish the highest level composite
+    	obstacle that is artificially created as the root of the obstacle tree 
+	from all other physically relevant and user created composite 
+	obstacles */    	 
+    static int m_minCompositeObstacleID; /**< Minimum composite
+    	obstacle ID number, composite obstacle ID numbers range
+    	from 0 (the root) down to m_min_CompositeObstacle_id and are 
+	therefore always negative except the root */ 
     //@}
 
 
   private:
-    /** @name Methods */
-    //@{  
-
-    //@}
+    /** @name Constructors */
+    //@{
+    /** @brief Copy constructor
+    @param copy copied CompositeObstacle
+    @param s obstacle name */
+    CompositeObstacle( CompositeObstacle const& copy );
+    //@}   
 };
 
 #endif

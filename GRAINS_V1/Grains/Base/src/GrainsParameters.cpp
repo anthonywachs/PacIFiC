@@ -111,14 +111,13 @@ void GrainsParameters::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allParticles->getLength(); i++) 
       {
         DOMNode* nParticle = allParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
-        Particle* particleRef = new Particle( nParticle, false, 
-            nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        Particle* particleRef = new Particle( nParticle, nbPC+int(i) );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
       
@@ -143,14 +142,21 @@ void GrainsParameters::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allCompParticles->getLength(); i++) 
       {
         DOMNode* nCompParticle = allCompParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
-        Particle* particleRef = new CompositeParticle( nCompParticle, 
-              false, nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        Particle* particleRef = NULL;
+	string sshape = "none";
+	if ( ReaderXML::hasNodeAttr( nCompParticle, "SpecificShape" )  )
+	  sshape = ReaderXML::getNodeAttr_String( nCompParticle, 
+	  	"SpecificShape" );
+	if ( sshape == "SpheroCylinder" )
+	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
+	else 	
+	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
       
@@ -288,7 +294,7 @@ void GrainsParameters::Simulation( double time_interval )
     // Between particles of same class
     for (i=0;i<nClasses;++i)
     {
-      Particle* particle = new Particle( *((*particleClasses)[i]) );    
+      Particle* particle = new Particle( *((*particleClasses)[i]), true );    
       cout << "Contact Class " << i << " / Class " << i << endl;
       ContactBuilderFactory::contactForceModel( 
        	(*particleClasses)[i]->getMaterial(),
@@ -326,7 +332,6 @@ void GrainsParameters::Simulation( double time_interval )
       } 
 	
     cout << "PARTICLE DISPLACEMENT" << endl;    
-    // Entre particles de la meme classe
     for (i=0;i<nClasses;++i)
     {
       cout << "  Class " << i << " : v0*dt/crust = " << 

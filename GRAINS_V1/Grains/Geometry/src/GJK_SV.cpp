@@ -687,8 +687,8 @@ double closest_points_GJK_SV( Convex const& a,
     // Vector3 c2c = b2w.getOrigin() - a2w.getOrigin();
     // Vector3 w = a2w( a.support( ( -c2c ) * a2w.getBasis() ) ) - 
     //             b2w( b.support( (  c2c ) * b2w.getBasis() ) );
-    Vector3 w = a2w( a.support( Vector3Nul ) ) - 
-                b2w( b.support( Vector3Nul ) );
+    Vector3 w = a2w( a.support( Vector3Null ) ) - 
+                b2w( b.support( Vector3Null ) );
     Vector3 v = w;
     Vector3 d = w;
     double dist2 = Norm2( v );

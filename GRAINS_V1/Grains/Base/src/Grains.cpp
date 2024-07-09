@@ -1,6 +1,7 @@
 #include "Grains.hh"
 #include "ContactBuilderFactory.hh"
 #include "LinkedCell.hh"
+#include "AppBrownian.hh"
 #include "ObstacleBuilderFactory.hh"
 #include "ObstacleImposedVelocity.hh"
 #include "GrainsBuilderFactory.hh"
@@ -26,14 +27,17 @@ Grains::Grains()
   , m_lastTime_save( false )
   , m_error_occured( false )
   , m_fileSave( "undefined" )
+  , m_clonesInReloadFile( CIR_NONE )
   , m_dimension( 3 )
   , m_allProcTiming( true )
+  , m_restart( false )
   , m_insertion_order( PM_ORDERED )
   , m_insertion_mode( IM_NOINSERT )
   , m_initvit_mode( IV_ZERO )
   , m_init_angpos( IAP_FIXED )
   , m_randomseed( RGS_DEFAULT )
   , m_InsertionArray( NULL )
+  , m_insertion_position( NULL )
   , m_insertion_frequency( 1 )
   , m_force_insertion( false )
   , m_RandomMotionCoefTrans( 0. )
@@ -42,8 +46,10 @@ Grains::Grains()
   , m_rank( 0 )
   , m_nprocs( 1 )
   , m_processorIsActive( true )
+  , m_wrapper( NULL )
 {
   if ( GrainsBuilderFactory::getContext() == DIM_2 ) m_dimension = 2;
+  m_insertion_position = new list<Point3>;
 }
 
 
@@ -59,6 +65,8 @@ Grains::~Grains()
   m_newParticles.clear();
   ContactBuilderFactory::eraseAllContactForceModels();
   GrainsExec::GarbageCollector();
+  m_insertion_position->clear();
+  delete m_insertion_position;
 }
 
 
@@ -68,10 +76,7 @@ Grains::~Grains()
 // Writes an initial message in the standard output only on the process ranked 0
 void Grains::initialOutputMessage()
 {
-  int rankproc = 0;
-  MPI_Comm_rank( MPI_COMM_WORLD, &rankproc );
-  if ( !rankproc )
-    cout << "Grains3D serial" << endl;
+  cout << "Grains3D serial" << endl;
 }
 
 
@@ -85,65 +90,76 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
   Forces( rootElement );
   AdditionalFeatures( rootElement );
 
+  if ( m_processorIsActive )
+  {
+    // Initialisation
+    double vmax = 0., vmean = 0. ;
 
-  // Initialisation
-  double vmax = 0., vmean = 0. ;
+    // Timers
+    CT_set_start();
+    SCT_insert_app( "Initialization" );
+    SCT_set_start( "Initialization" );
+    if ( m_rank == 0 ) cout << endl << "Initialization" << endl;
 
-  // Timers
-  CT_set_start();
-  SCT_insert_app( "Initialization" );
-  SCT_set_start( "Initialization" );
-  cout << endl << "Initialization" << endl;
+    // Set time to initial time
+    m_time = m_tstart;
 
-  // Set time to initial time
-  m_time = m_tstart;
+    // Particle creation, insertion and link to grid
+    InsertCreateNewParticles();
 
-  // Particle creation, insertion and link to grid
-  InsertCreateNewParticles();
+    // Number of particles: inserted and in the system
+    m_allcomponents.computeNumberParticles( m_wrapper );
+    m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();
 
-  // Number of particles: inserted and in the system
-  m_allcomponents.setNumberParticlesOnAllProc(
-  	m_allcomponents.getNumberParticles() );
-  m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
+    // Initialisation of obstacle kinematics
+    m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt );
 
-  // Initialisation obstacle kinematics
-  m_allcomponents.setKinematicsObstacleWithoutMoving( m_time, m_dt );
-
-  // In case of initial random motion
-  if ( m_initvit_mode == IV_RANDOM )
-    m_allcomponents.setRandomMotion( m_RandomMotionCoefTrans,
+    // In case of initial random motion
+    if ( m_initvit_mode == IV_RANDOM )
+      m_allcomponents.setRandomMotion( m_RandomMotionCoefTrans,
 	m_RandomMotionCoefRot );
 
-  // Writing results for postprocessing
-  m_allcomponents.PostProcessing_start( m_time, m_dt, m_collision,
-  	m_insertion_windows );
+    // Writing results for postprocessing
+    m_allcomponents.PostProcessing_start( m_time, m_dt, m_collision,
+  	m_insertion_windows, m_rank, m_nprocs, m_wrapper );
 
-  // Track component max and mean velocity
-  fVitMax.open( (m_fileSave + "_VelocityMaxMean.dat").c_str(), ios::out );
-  m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean );
-  cout << "Component velocity : max = " << vmax << " average = " <<
+    // Track component max and mean velocity
+    m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );
+    if ( m_rank == 0 ) 
+    {
+      fVitMax.open( (m_fileSave + "_VelocityMaxMean.dat").c_str(), ios::out );
+      cout << "Component velocity : max = " << vmax << " average = " <<
     	vmean << endl;
-  fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
+      fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
     	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmax )
 	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6, vmean )
 	<< endl;
-  fVitMax.close();
+    }
 
-  // Display memory used by Grains
-  display_used_memory();
+    // Display memory used by Grains
+    display_used_memory();
 
-  // Postprocessing of force & torque on obstacles
-  m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );
-  m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
-      GrainsExec::m_ReloadType == "same" );
+    // Postprocessing of force & torque on obstacles
+    m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );
+    m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
+      GrainsExec::m_ReloadType == "same", m_rank );
 
-  // Next time of writing results
-  m_timeSave = m_save.begin();
-  while ( *m_timeSave - m_time < 0.01 * m_dt && m_timeSave != m_save.end() )
+    // Next time of writing results
+    m_timeSave = m_save.begin();
+    while ( *m_timeSave - m_time < 0.01 * m_dt && m_timeSave != m_save.end() )
       m_timeSave++;
+      
+    // In case of SecondOrderLeapFrog, initialize acceleration
+    if ( GrainsExec::m_TIScheme == "SecondOrderLeapFrog" && 
+    	!GrainsExec::m_isReloaded )
+    {
+      computeParticlesForceAndAcceleration();
+      m_allcomponents.setAllContactMapFeaturesToZero();
+    }
 
-  cout << "Initialization completed" << endl << endl;
-  SCT_get_elapsed_time( "Initialization" );
+    if ( m_rank == 0 ) cout << "Initialization completed" << endl << endl;
+    SCT_get_elapsed_time( "Initialization" );
+  }
 }
 
 
@@ -153,60 +169,69 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
 // Tasks to perform before time-stepping
 void Grains::do_after_time_stepping()
 {
-  double vmax = 0., vmean = 0. ;
-
-  // Particles in & out at the end of the simulation
-  ostringstream oss;
-  oss.width(10);
-  oss << left << m_time;
-  cout << "\r                                              "
-         << "                 " << flush;
-  cout << '\r' << oss.str() << "  \t" << m_tend << "\t\t\t"
-         << m_allcomponents.getNumberActiveParticlesOnProc() << '\t'
-         << m_allcomponents.getNumberInactiveParticles() << endl;
-
-  // Write reload files
-  if ( !m_lastTime_save )
+  if ( m_processorIsActive )
   {
-    SCT_set_start( "OutputResults" );
+    double vmax = 0., vmean = 0. ;
 
-    // Track component max and mean velocity at the end of the simulation
-    m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean );
-    cout << endl << "Component velocity : max = " << vmax
-	<< " average = " << vmean << endl;
-    fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
-	<< "\t" << GrainsExec::doubleToString( ios::scientific, 6,
-	vmax ) << "\t" << GrainsExec::doubleToString( ios::scientific,
-	6, vmean ) << endl;
-    fVitMax.close();
+    // Particles in & out at the end of the simulation 
+    if ( m_rank == 0 )
+    {  
+      cout << endl << "Number of active particles in the simulation = " 
+    	<< m_allcomponents.getNumberActiveParticlesOnAllProc() << endl;
+      cout << "Number of particles to insert in the simulation = " 
+    	<< m_allcomponents.getNumberPhysicalParticlesToInsert() << endl;
+    }	
 
-    // Reload files are alsways written at the end of the simulation
-    if ( !m_error_occured ) saveReload( m_time );
+    // Write reload files
+    if ( !m_lastTime_save )
+    {
+      SCT_set_start( "OutputResults" );
 
-    SCT_get_elapsed_time( "OutputResults" );
-  }
+      // Track component max and mean velocity at the end of the simulation
+      m_allcomponents.ComputeMaxMeanVelocity( vmax, vmean, m_wrapper );
+      if ( m_rank == 0 )
+      {
+        cout << endl << "Component velocity : max = " << vmax
+		<< " average = " << vmean << endl;
+        fVitMax << GrainsExec::doubleToString( ios::scientific, 6, m_time )
+		<< "\t" << GrainsExec::doubleToString( ios::scientific, 6,
+		vmax ) << "\t" << GrainsExec::doubleToString( ios::scientific,
+		6, vmean ) << endl;
+        fVitMax.close();
+      }
 
-  // Final tasks performed by postprocessing writers
-  m_allcomponents.PostProcessing_end();
+      // Reload files are always written at the end of the simulation
+      if ( !m_error_occured ) saveReload( m_time );
 
-  // Contact features over the simulation
-  cout << endl << "Contact features over the simulation" << endl;
-  cout << GrainsExec::m_shift3 << "Minimal crust thickness = " <<
+      SCT_get_elapsed_time( "OutputResults" );
+    }
+
+    // Final tasks performed by postprocessing writers
+    m_allcomponents.PostProcessing_end();
+
+    // Contact features over the simulation
+    double omax = m_collision->getOverlapMax(),
+  	omean = m_collision->getOverlapMean(),
+	timemax = m_collision->getTimeOverlapMax(),
+	ngjk = m_collision->getNbIterGJKMean();
+    if ( m_wrapper ) m_wrapper->ContactsFeatures( omax, omean, timemax, ngjk );	
+
+    if ( m_rank == 0 )
+    {   
+      cout << endl << "Contact features over the simulation" << endl;
+      cout << GrainsExec::m_shift3 << "Minimal crust thickness = " <<
     	m_allcomponents.getCrustThicknessMin() << endl;
-  cout << GrainsExec::m_shift3 << "Average overlap = " <<
-  	m_collision->getOverlapMean() << endl;
-  cout << GrainsExec::m_shift3 << "Maximum overlap = " <<
-  	m_collision->getOverlapMax() << endl;
-  cout << GrainsExec::m_shift3 << "Time of maximum overlap = " <<
-	m_collision->getTimeOverlapMax() << endl;
-  cout << GrainsExec::m_shift3 << "Average number of iterations of GJK = " <<
-    	m_collision->getNbIterGJKMean() << endl;
+      cout << GrainsExec::m_shift3 << "Maximum overlap = " << omax << endl;
+      cout << GrainsExec::m_shift3 << "Average overlap = " << omean << endl;
+      cout << GrainsExec::m_shift3 << "Time of maximum overlap = " <<
+	timemax << endl;
+      cout << GrainsExec::m_shift3 << "Average number of iterations of GJK = " <<
+    	ngjk << endl << endl;
+    }
 
-  // Timer outcome
-  double cputime = CT_get_elapsed_time();
-  cout << endl << "Full problem" << endl;
-  write_elapsed_time_smhd(cout,cputime,"Computation time");
-  SCT_get_summary( cout, cputime );
+    // Timer outcome
+    display_timer_summary();
+  }
 }
 
 
@@ -216,7 +241,6 @@ void Grains::do_after_time_stepping()
 // Runs the simulation over the prescribed time interval
 void Grains::Simulation( double time_interval )
 {
-  list<App*>::iterator app;
   double vmax = 0., vmean = 0. ;
 
   // Timers
@@ -227,7 +251,6 @@ void Grains::Simulation( double time_interval )
   SCT_insert_app( "LinkUpdate" );
   SCT_insert_app( "OutputResults" );
 
-
   // Simulation: time marching algorithm
   cout << "Time \t TO \tend \tParticles \tIn \tOut" << endl;
   while ( m_tend - m_time > 0.01 * m_dt )
@@ -235,6 +258,7 @@ void Grains::Simulation( double time_interval )
     try
     {
       m_time += m_dt;
+
 
       // Check whether data are output at this time
       m_lastTime_save = false;
@@ -255,15 +279,14 @@ void Grains::Simulation( double time_interval )
 	}
 
 
-      // Initiliaze all component transforms with crust to non computed
-      SCT_set_start( "ComputeForces" );
-      m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
-      SCT_get_elapsed_time( "ComputeForces" );
-
-
       // Insertion of particles
-      SCT_set_start( "ParticlesInsertion" );
-      if ( m_npwait_nm1 != m_allcomponents.getNumberInactiveParticles() )
+      SCT_set_start( "ParticlesInsertion" );      
+      m_npwait_nm1 = m_allcomponents.getNumberPhysicalParticlesToInsert();      
+      if ( m_insertion_mode == IM_OVERTIME )
+        insertParticle( m_insertion_order );      
+      m_allcomponents.computeNumberParticles( m_wrapper );
+      if ( m_npwait_nm1 
+      	!= m_allcomponents.getNumberPhysicalParticlesToInsert() )
           cout << "\r                                              "
                << "                 " << flush;
       ostringstream oss;
@@ -271,71 +294,49 @@ void Grains::Simulation( double time_interval )
       oss << left << m_time;
       cout << '\r' << oss.str() << "  \t" << m_tend << "\t\t\t"
            << m_allcomponents.getNumberActiveParticlesOnProc() << '\t'
-           << m_allcomponents.getNumberInactiveParticles()    << flush;
-      m_npwait_nm1 = m_allcomponents.getNumberInactiveParticles();
-      if ( m_insertion_mode == IM_OVERTIME )
-        insertParticle( m_insertion_order );
+           << m_allcomponents.getNumberPhysicalParticlesToInsert() 
+	   << flush;
       SCT_get_elapsed_time( "ParticlesInsertion" );
 
-      // Initialize contact maps (for contact model with memory)
-      // TODO: add if-statement that bypasses this step when contact model has
-      // no memory.
-      m_allcomponents.setAllContactMapToFalse();
 
-      // Compute volume and contact forces
-      SCT_set_start( "ComputeForces" );
-      // Initialisation torsors with weight only
-      m_allcomponents.InitializeForces( m_time, m_dt, true );
+      if ( GrainsExec::m_TIScheme == "SecondOrderLeapFrog" )
+      {
+        // We implement the kick-drift-kick version of the LeapFrog scheme
 
-      // Compute forces from all applications
-      for (app=m_allApp.begin(); app!=m_allApp.end(); app++)
-        (*app)->ComputeForces( m_time, m_dt,
-      		m_allcomponents.getActiveParticles() );
-      SCT_add_elapsed_time( "ComputeForces" );
-
-
-      // Update contact maps (for contact model with memory)
-      // TODO: add if-statement that bypasses this step when contact model has
-      // no memory.
-      m_allcomponents.updateAllContactMaps();
-
-      // Solve Newton's law and move particles
-      SCT_set_start( "Move" );
-      m_allcomponents.Move( m_time, m_dt );
-
-
-      // In case of periodicity, update periodic clones and destroy periodic
-      // clones that are out of the linked cell grid
-      if ( m_periodic )
-        m_collision->updateDestroyPeriodicClones(
-		m_allcomponents.getActiveParticles(),
-		m_allcomponents.getPeriodicCloneParticles() );
-      SCT_get_elapsed_time( "Move" );
-
-
-      // Update particle activity
-      SCT_set_start( "UpdateParticleActivity" );
-      m_allcomponents.UpdateParticleActivity();
-      SCT_get_elapsed_time( "UpdateParticleActivity" );
+	// Move particles and obstacles
+	// Update particle velocity over dt/2 and particle position over dt,
+	// obstacle velocity and position over dt
+	// v_i+1/2 = v_i + a_i * dt / 2
+	// x_i+1 = x_i + v_i+1/2 * dt
+        moveParticlesAndObstacles( 0.5 * m_dt, m_dt, m_dt );
+	
+        // Compute particle forces and acceleration
+	// Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)
+	SCT_set_start( "ComputeForces" );
+        computeParticlesForceAndAcceleration();
+        SCT_get_elapsed_time( "ComputeForces" );	
+	
+	// Update particle velocity over dt/2
+	// v_i+1 = v_i+1/2 + a_i+1 * dt / 2 
+	m_allcomponents.advanceParticlesVelocity( m_time, 0.5 * m_dt );
+      }
+      else
+      {
+        // Compute particle forces and acceleration
+	// Compute f_i and a_i as a function of (x_i,v_i) 
+	SCT_set_start( "ComputeForces" );
+        computeParticlesForceAndAcceleration();
+        SCT_get_elapsed_time( "ComputeForces" );
+      
+        // Move particles and obstacles
+	// x_i+1 = x_i + g(v_i,v_i-1,a_i,dt)
+	// v_i+1 = v_i + g(a_i,a_i-1,dt)
+        moveParticlesAndObstacles( m_dt, m_dt, m_dt );
+      }
 
 
-      // Update the particle & obstacles links with the grid
-      SCT_set_start( "LinkUpdate" );
-      m_collision->LinkUpdate( m_time, m_dt,
-        	m_allcomponents.getActiveParticles() );
-
-
-      // In case of periodicity, create new periodic clones and destroy periodic
-      // clones because the master particle has changed tag/geoposition
-      if ( m_periodic )
-        m_collision->createDestroyPeriodicClones(
-		m_allcomponents.getActiveParticles(),
-		m_allcomponents.getPeriodicCloneParticles(),
-		m_allcomponents.getReferenceParticles() );
-      SCT_get_elapsed_time( "LinkUpdate" );
-
-
-      // Write force & torque exerted on obstacles
+      // Compute and write force & torque exerted on obstacles
+      m_allcomponents.computeObstaclesLoad( m_time, m_dt ); 
       m_allcomponents.outputObstaclesLoad( m_time, m_dt );
 
 
@@ -365,23 +366,23 @@ void Grains::Simulation( double time_interval )
 	SCT_get_elapsed_time( "OutputResults" );
       }
     }
-    catch (ContactError &chocCroute)
+    catch (ContactError &errContact)
     {
       // Max overlap exceeded
       cout << endl;
       m_allcomponents.PostProcessingErreurComponents( "ContactError",
-            chocCroute.getComponents() );
-      chocCroute.Message( cout );
+            errContact.getComponents() );
+      errContact.Message( cout );
       m_error_occured = true;
       break;
     }
-    catch (DisplacementError &errDeplacement)
+    catch (MotionError &errMotion)
     {
-      // Particle displacement over dt is too large
+      // Particle motion over dt is too large
       cout << endl;
-      m_allcomponents.PostProcessingErreurComponents( "DisplacementError",
-            errDeplacement.getComponent() );
-      errDeplacement.Message(cout);
+      m_allcomponents.PostProcessingErreurComponents( "MotionError",
+            errMotion.getComponent() );
+      errMotion.Message(cout);
       m_error_occured = true;
       break;
     }
@@ -400,6 +401,84 @@ void Grains::Simulation( double time_interval )
 
 
 // ----------------------------------------------------------------------------
+// Computes particle forces and acceleration
+void Grains::computeParticlesForceAndAcceleration()
+{
+  // Initiliaze all component transforms with crust to non computed
+  m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
+
+  // Initialize contact maps (for contact model with memory)
+  // TODO: add if-statement that bypasses this step when contact model has
+  // no memory.
+  m_allcomponents.setAllContactMapToFalse();
+
+  // Compute forces from all applications
+  // Initialisation torsors with weight only
+  m_allcomponents.InitializeForces( m_time, m_dt, true );
+
+  // Compute forces
+  for (list<App*>::iterator app=m_allApp.begin(); app!=m_allApp.end(); app++)
+    (*app)->ComputeForces( m_time, m_dt,
+	m_allcomponents.getActiveParticles() );
+
+  // Update contact maps (for contact model with memory)
+  // TODO: add if-statement that bypasses this step when contact model has
+  // no memory.
+  m_allcomponents.updateAllContactMaps();
+      
+  // Compute particle acceleration
+  m_allcomponents.computeParticlesAcceleration( m_time );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Moves particles and obstacles	
+void Grains::moveParticlesAndObstacles( double const& dt_particle_vel, 
+    	double const& dt_particle_disp,
+	double const& dt_obstacle )
+{
+  // Solve Newton's law and move particles
+  SCT_set_start( "Move" );
+  m_allcomponents.Move( m_time, dt_particle_vel, dt_particle_disp, 
+      	dt_obstacle );
+
+
+  // In case of periodicity, update periodic clones and destroy periodic
+  // clones that are out of the linked cell grid
+  if ( m_periodic )
+    m_collision->updateDestroyPeriodicClones(
+		m_allcomponents.getActiveParticles(),
+		m_allcomponents.getPeriodicCloneParticles() );
+  SCT_get_elapsed_time( "Move" );
+
+
+  // Update particle activity
+  SCT_set_start( "UpdateParticleActivity" );
+  m_allcomponents.UpdateParticleActivity();
+  SCT_get_elapsed_time( "UpdateParticleActivity" );
+
+
+  // Update the particle & obstacles links with the grid
+  SCT_set_start( "LinkUpdate" );
+  m_collision->LinkUpdate( m_time, m_dt, m_allcomponents.getActiveParticles() );
+
+
+  // In case of periodicity, create new periodic clones and destroy periodic
+  // clones because the master particle has changed tag/geoposition
+  if ( m_periodic )
+    m_collision->createDestroyPeriodicClones(
+	m_allcomponents.getActiveParticles(),
+	m_allcomponents.getPeriodicCloneParticles(),
+	m_allcomponents.getReferenceParticles() );
+  SCT_get_elapsed_time( "LinkUpdate" );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Construction of the simulation: linked cell, particles & obstacles, domain
 // decomposition
 void Grains::Construction( DOMElement* rootElement )
@@ -407,8 +486,9 @@ void Grains::Construction( DOMElement* rootElement )
   assert( rootElement != NULL );
   DOMNode* root = ReaderXML::getNode( rootElement, "Construction" );
 
-  bool brestart = false, bnewpart = false, bnewobst = false;
+  bool bnewpart = false, bnewobst = false, b2024 = false;
   string restart;
+  size_t npart;
 
   // Domain size: origin, max coordinates and periodicity
   DOMNode* domain = ReaderXML::getNode( root, "LinkedCell" );
@@ -477,7 +557,8 @@ void Grains::Construction( DOMElement* rootElement )
     DOMNode* reload = ReaderXML::getNode( root, "Reload" );
     if ( reload )
     {
-      brestart = true;
+      m_restart = true;
+      GrainsExec::m_isReloaded = m_restart;
 
       // Restart mode
       string reload_type = ReaderXML::getNodeAttr_String( reload, "Type" );
@@ -500,20 +581,36 @@ void Grains::Construction( DOMElement* rootElement )
         GrainsExec::m_reloadFile_suffix =
             restart.substr( restart.size()-1, 1 );
       }
-      restart = fullResultFileName( restart );
+      restart = GrainsExec::fullResultFileName( restart, false );
+      if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+      	"Simulation reloaded from " << restart << endl;      
 
       // Extract the reload directory from the reload file
       GrainsExec::m_ReloadDirectory = GrainsExec::extractRoot( restart );
 
-      // Read the reload file
+      // Read the reload file and check the restart format
       string cle;
       ifstream simulLoad( restart.c_str() );
-      simulLoad >> cle >> m_time;
+      simulLoad >> cle; 
+      if ( cle == "__Format2024__" ) 
+      { 
+        b2024 = true;
+        simulLoad >> cle >> m_time;
+      }
+      else simulLoad >> m_time;
       ContactBuilderFactory::reload( simulLoad );
-      m_allcomponents.read( simulLoad, restart );
-      ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
+      if ( !b2024 )
+      {
+        m_allcomponents.read_pre2024( simulLoad, restart, m_wrapper );
+        ContactBuilderFactory::set_materialsForObstaclesOnly_reload(
           m_allcomponents.getReferenceParticles() );
+      }
+      else
+        npart = m_allcomponents.read( simulLoad, m_insertion_position, 
+		m_rank, m_nprocs );      
       simulLoad >> cle;
+      assert( cle == "#EndTime" );
+      simulLoad.close();      
 
       // Whether to reset velocity to 0
       string reset = ReaderXML::getNodeAttr_String( reload, "Velocity" );
@@ -626,16 +723,16 @@ void Grains::Construction( DOMElement* rootElement )
         
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
-        Particle* particleRef = new Particle( nParticle, false,
-            nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        Particle* particleRef = new Particle( nParticle, nbPC+int(i) );
+        m_allcomponents.AddReferenceParticle( particleRef, nb  );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
 
       if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Reading new particle types completed" << endl;
     }
+
 
     // Composite particles
     DOMNode* nCompositeParticles =
@@ -653,20 +750,31 @@ void Grains::Construction( DOMElement* rootElement )
       for (XMLSize_t i=0; i<allCompParticles->getLength(); i++)
       {
         DOMNode* nCompParticle = allCompParticles->item( i );
-        int nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
+        size_t nb = ReaderXML::getNodeAttr_Int( nCompParticle, "Number" );
 
         // Remark: reference particles' ID number is -1, which explains
         // auto_numbering = false in the constructor
-        Particle* particleRef = new CompositeParticle( nCompParticle,
-              false, nbPC+int(i) );
-        m_allcomponents.AddReferenceParticle( particleRef );
-        pair<Particle*,int> ppp( particleRef, nb );
+        Particle* particleRef = NULL;
+	string sshape = "none";
+	if ( ReaderXML::hasNodeAttr( nCompParticle, "SpecificShape" )  )
+	  sshape = ReaderXML::getNodeAttr_String( nCompParticle, 
+	  	"SpecificShape" );
+	if ( sshape == "SpheroCylinder" )
+	  particleRef = new SpheroCylinder( nCompParticle, nbPC+int(i) );
+	else 	
+	  particleRef = new CompositeParticle( nCompParticle, nbPC+int(i) );
+        m_allcomponents.AddReferenceParticle( particleRef, nb );
+        pair<Particle*,size_t> ppp( particleRef, nb );
         m_newParticles.push_back( ppp );
       }
 
       if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Reading new composite particle types completed" << endl;
     }
+    
+    if  ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
+      	"Number of particle types = " << 
+	m_allcomponents.getReferenceParticles()->size() << endl;
 
 
     // Obstacles
@@ -714,7 +822,7 @@ void Grains::Construction( DOMElement* rootElement )
 
 
     // Check that construction is fine
-    if ( !brestart && !bnewpart && !bnewobst )
+    if ( !m_restart && !bnewpart && !bnewobst )
     {
       if ( m_rank == 0 )
         cout << "ERR : Error in input file in <Contruction>" << endl;
@@ -744,6 +852,11 @@ void Grains::Construction( DOMElement* rootElement )
 
     // Define the linked cell grid
     defineLinkedCell( LC_coef * maxR, GrainsExec::m_shift9 );
+    
+    // If reload with 2024 format, read the particle reload file
+    if ( m_restart && b2024 )
+      m_allcomponents.read_particles( restart, npart, m_collision, m_rank, 
+      	m_nprocs, m_wrapper );  
 
     // Link obstacles with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );
@@ -771,7 +884,7 @@ void Grains::Forces( DOMElement* rootElement )
     {
       // Gravity
       DOMNode* nGravity = ReaderXML::getNode( root, "Gravity" );
-      if( nGravity )
+      if ( nGravity )
       {
         GrainsExec::m_vgravity[X] = ReaderXML::getNodeAttr_Double(
       		nGravity, "GX" );
@@ -787,6 +900,16 @@ void Grains::Forces( DOMElement* rootElement )
         if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
 		"Gravity is mandatory !!" << endl;
         grainsAbort();
+      }
+      
+      // AppBrownian force
+      DOMNode* nAppBrownian = ReaderXML::getNode( root, "Brownian" );
+      if ( nAppBrownian )
+      {
+        size_t error = 0;
+	App* force = new AppBrownian( nAppBrownian, m_rank, error );
+	if ( error ) grainsAbort();
+	else m_allApp.push_back( force );
       }
     }
     else
@@ -884,6 +1007,21 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
       string wmode = ReaderXML::getNodeAttr_String( nRestartFile,
       	"WritingMode" );
       if ( wmode == "Hybrid" ) GrainsExec::m_writingModeHybrid = true ;
+      if ( ReaderXML::hasNodeAttr( nRestartFile, "SingleFile" ) )
+      {
+        string wsf = ReaderXML::getNodeAttr_String( nRestartFile,
+      		"SingleFile" );
+        if ( wsf == "True" && m_nprocs > 1 ) 
+	  GrainsExec::m_SaveMPIInASingleFile = true ;
+      }
+      if ( ReaderXML::hasNodeAttr( nRestartFile, "Clones" ) )
+      {
+        string wclones = ReaderXML::getNodeAttr_String( nRestartFile,
+      		"Clones" );
+        if ( wclones == "All" ) m_clonesInReloadFile = CIR_ALL;
+	else if ( wclones == "NoPer" ) m_clonesInReloadFile = CIR_NOPERIODIC;
+	else m_clonesInReloadFile = CIR_NONE;
+      }      		        
       if ( m_rank == 0 )
       {
         cout << GrainsExec::m_shift6 << "Restart file" << endl;
@@ -892,6 +1030,13 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 		GrainsExec::m_SaveDirectory << endl;
         cout << GrainsExec::m_shift9 << "Writing mode = " <<
 		( GrainsExec::m_writingModeHybrid ? "Hybrid" : "Text" ) << endl;
+        cout << GrainsExec::m_shift9 << "Single file = " <<
+		( GrainsExec::m_SaveMPIInASingleFile ? "True" : "False" ) 
+		<< endl;
+        cout << GrainsExec::m_shift9 << "Clones = " <<
+		( m_clonesInReloadFile == CIR_ALL ? "All" : 
+		m_clonesInReloadFile == CIR_NOPERIODIC ? "No periodic clones" :
+		"None" ) << endl;			
       }
     }
     else
@@ -927,7 +1072,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
     DOMNode* nMovingObstacles = ReaderXML::getNode( root,
     	"MovingObstacles" );
     int ObstacleUpdateFreq = 1;
-    bool displaceObstacles = true;
+    bool geomMoveObstacles = true;
     if ( nMovingObstacles )
     {
       // Linked cell grid update frequency
@@ -935,14 +1080,14 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
         ObstacleUpdateFreq = ReaderXML::getNodeAttr_Int( nMovingObstacles,
       		"LinkUpdateEvery" );
 
-      // Whether moving obstacles are geometrically displaced
-      if ( ReaderXML::hasNodeAttr( nMovingObstacles, "GeometricallyDisplace" ) )
+      // Whether moving obstacles are geometrically moving
+      if ( ReaderXML::hasNodeAttr( nMovingObstacles, "GeometricallyMove" ) )
       {
         string disp = ReaderXML::getNodeAttr_String( nMovingObstacles,
-     		"GeometricallyDisplace" );
+     		"GeometricallyMove" );
         if ( disp == "False" )
 	{
-	  displaceObstacles = false;
+	  geomMoveObstacles = false;
 	  Obstacle::setMoveObstacle( false );
 	}
       }
@@ -956,8 +1101,8 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	ObstacleUpdateFreq << " time step" <<
 	( ObstacleUpdateFreq > 1 ? "s" : "" ) << endl;
       cout << GrainsExec::m_shift9 <<
-      	"Displace moving obstacles geometrically = " <<
-      	( displaceObstacles ? "True" : "False" ) << endl;
+      	"Move obstacles geometrically = " <<
+      	( geomMoveObstacles ? "True" : "False" ) << endl;
     }
 
 
@@ -1008,19 +1153,27 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 
       // Random generator seed
       DOMNode* nRGS = ReaderXML::getNode( nInsertion, "RandomGeneratorSeed" );
+      int seed = 0;
       if ( nRGS )
       {
         string type = ReaderXML::getNodeAttr_String( nRGS, "Type" );
-	if ( type == "Random" )
+	if ( type == "UserDefined" )
+	{
+	  m_randomseed = RGS_UDEF;
+	  seed = ReaderXML::getNodeAttr_Int( nRGS, "Value" );
+	  srand( (unsigned int)( seed ) );
+	}
+	else if ( type == "Random" )
 	{
 	  m_randomseed = RGS_RANDOM;
-	  srand( (unsigned int)( time(NULL)) );
+	  srand( (unsigned int)( time(NULL) ) );
 	}
       }
       if ( m_rank == 0 ) cout << GrainsExec::m_shift9 << "Random generator"
       	" seed = " << ( m_randomseed == RGS_DEFAULT ? "Default to 1 "
-	"(infinitely reproducible)" : "Initialized with running day/time "
-	"(non-reproducible)" ) << endl;
+	"(infinitely reproducible)" : ( m_randomseed == RGS_UDEF ? 
+	"Set to "+GrainsExec::intToString( seed )+" (infinitely reproducible)" :
+	"Initialized with running day/time (non-reproducible)" ) ) << endl;
 
 
       // Insertion attempt frequency
@@ -1141,7 +1294,8 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	    DOMNode* nWindows = ReaderXML::getNode( nPosition, "Windows" );
             if ( nWindows )
 	    {
-	      cout << GrainsExec::m_shift9 << "Insertion windows" << endl;
+	      if ( m_rank == 0 )
+	        cout << GrainsExec::m_shift9 << "Insertion windows" << endl;
 	      DOMNodeList* allWindows = ReaderXML::getNodes( nWindows );
               for (XMLSize_t i=0; i<allWindows->getLength(); i++)
 	      {
@@ -1163,11 +1317,11 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
               }
 	    }
 	  }
-  }
+        }
       }
       else
       {
-        if ( m_insertion_mode != IM_NOINSERT )
+        if ( m_insertion_mode != IM_NOINSERT && !getNbInsertionPositions() )
         {
           if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
 		"Insertion positions/windows are mandatory !!" << endl;
@@ -1175,7 +1329,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
         }
       }
 
-
+ 
       // Initialization of particle velocity
       if ( m_rank == 0 )
         cout << GrainsExec::m_shift6 << "Particle initial velocity: ";
@@ -1284,7 +1438,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	if ( m_rank == 0 )
           cout << GrainsExec::m_shift9 << "Type = " << type << endl;
 
-	// Chargements en Force
+	// Imposed force
 	if ( type == "Force" )
 	{
 	  ObstacleImposedForce* load = new ObstacleImposedForce(
@@ -1292,6 +1446,7 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  if ( error != 0 ) grainsAbort();
 	  else m_allcomponents.LinkImposedMotion( load );
 	}
+	// Imposed velocity	
 	else if ( type == "Velocity" )
 	{
 	  ObstacleImposedVelocity* load = new ObstacleImposedVelocity(
@@ -1440,10 +1595,16 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 		( FToutputFreq > 1 ? "s" : "" ) << endl;
           cout << GrainsExec::m_shift12 << "Output file directory name = "
     		<< ppObsdir << endl;
-          cout << GrainsExec::m_shift12 << "Obstacle names" << endl;
-	  for (list<string>::const_iterator il=allppObsName.begin();
+          cout << GrainsExec::m_shift12 << "Obstacle name";
+	  if ( allppObsName.size() == 1 ) cout << " = " << *allppObsName.begin()
+	  	<< endl;
+	  else
+	  {
+	    cout << "s" << endl;
+	    for (list<string>::const_iterator il=allppObsName.begin();
 	  	il!=allppObsName.end();il++)
-	    cout << GrainsExec::m_shift15 << *il << endl;
+	      cout << GrainsExec::m_shift15 << *il << endl;
+	  }
 	}
       }
     }
@@ -1461,183 +1622,176 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 void Grains::InsertCreateNewParticles()
 {
   // IMPORTANT: for any system with N particles and M obstacles, particles are
-  // numbered 0 to N-1 and obstacles are numbered N to N+M-1
-  // In the case of reload with additional insertion, it means that obstacles
-  // are re-numbered
-
-  int numPartMax = getMaxParticleIDnumber();
-  if ( numPartMax ) ++numPartMax;
-  list< pair<Particle*,int> >::iterator ipart;
-
-  // New particles construction
-  Component::setNbCreatedComponents( numPartMax );
-  for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
-  {
-    int nbre = ipart->second;
-    for (int ii=0; ii<nbre; ii++)
-    {
-      Particle* particle = ipart->first->createCloneCopy();
-      m_allcomponents.AddParticle( particle );
-    }
-  }
-
-  // Obstacle renumbering
-  int numInitObstacles = numPartMax;
-  for (ipart=m_newParticles.begin();ipart!=m_newParticles.end();ipart++)
-    numInitObstacles += ipart->second;
-  list<SimpleObstacle*> lisObstaclesPrimaires =
-    	m_allcomponents.getObstacles()->getObstacles();
-  list<SimpleObstacle*>::iterator iobs;
-  int ObstacleID = numInitObstacles;
-  for (iobs=lisObstaclesPrimaires.begin();iobs!=lisObstaclesPrimaires.end();
-    	iobs++)
-  {
-    (*iobs)->setID( ObstacleID );
-    ++ObstacleID;
-  }
+  // numbered 1 to N and obstacles are numbered -1 to -M
 
   // Link all components with the grid
   m_allcomponents.Link( *m_collision );
 
+  // In case of a restarted simulation, if the linked cell changed from the 
+  // previous simulation, we need to check that all periodic clones are there
+  if ( m_restart && m_periodic ) checkClonesReload();
+
   // Set particle positions from file or from a structured array
+  size_t error = 0;
   if ( m_position != "" )
   {
     // From a structured array
-    if ( m_position == "STRUCTURED" )
-      setPositionParticlesArray( m_insertion_order );
+    if ( m_position == "STRUCTURED" ) error = setPositionParticlesArray();
     // From a file
-    else setPositionParticlesFromFile( m_insertion_order );
+    else error = setPositionParticlesFromFile();
   }
+  if ( error ) grainsAbort();
 
   // Insertion at initial time
   if ( m_insertion_mode == IM_INITIALTIME )
   {
     cout << "Particles \tIn \tOut" << endl;
-    while ( m_allcomponents.getNumberInactiveParticles() != 0 )
+    while ( m_allcomponents.getNumberPhysicalParticlesToInsert() )
     {
         insertParticle( m_insertion_order );
         cout << "\r                                              " << flush;
         cout << "\r\t\t"
 	   << m_allcomponents.getNumberActiveParticlesOnProc() << '\t'
-	   << m_allcomponents.getNumberInactiveParticles()    << flush;
+	   << m_allcomponents.getNumberPhysicalParticlesToInsert() 
+	   << flush;
     }
     cout << endl;
   }
 
   if ( m_rank == 0 )
-  {
     cout << "Particle volume IN  : " <<
     	m_allcomponents.getVolumeIn()  << endl
 	<< "                OUT : " <<
 	m_allcomponents.getVolumeOut() << endl;
-  }
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns a point randomly selected in one of the insertion windows
-Point3 Grains::getInsertionPoint() const
+// Returns a point randomly selected in one of the insertion windows or in 
+// the list of positions. Note: list of positions has priority over windows 
+// until it is empty
+Point3 Grains::getInsertionPoint()
 {
   Point3 P;
-  int nWindow = 0;
-  int nbreWindows = int( m_insertion_windows.size() );
-
-  // Random selection of an insertion window
-  if ( nbreWindows != 1 )
+  
+  // List of positions
+  if ( !m_insertion_position->empty() )
   {
-    double n = double(random()) / double(INT_MAX);
-    nWindow = int( n * nbreWindows );
-    if ( nWindow == nbreWindows ) nWindow--;
+    // If order, pick the first position
+    il_sp = m_insertion_position->begin();    
+    
+    // If random, pick a random position in the list
+    if ( m_insertion_order == PM_RANDOM )  
+    {
+      double n = double(random()) / double(INT_MAX);
+      size_t shift = size_t( n * double(m_insertion_position->size()) );
+      std::advance( il_sp, shift );      
+    }
+    P = *il_sp; 
   }
-
-  // Random position in the selected insertion window
-  double r = 0., theta = 0., axiscoor = 0.;
-  switch( m_insertion_windows[nWindow].ftype )
+  // Insertion windows
+  else
   {
-    case WINDOW_BOX:
-      P[X] = m_insertion_windows[nWindow].ptA[X]
-      	+ ( double(random()) / double(INT_MAX) )
-	* ( m_insertion_windows[nWindow].ptB[X]
-		- m_insertion_windows[nWindow].ptA[X] );
-      P[Y] = m_insertion_windows[nWindow].ptA[Y]
-      	+ ( double(random()) / double(INT_MAX) )
-	* ( m_insertion_windows[nWindow].ptB[Y]
-		- m_insertion_windows[nWindow].ptA[Y] );
-      P[Z] = m_insertion_windows[nWindow].ptA[Z]
-      	+ ( double(random()) / double(INT_MAX) )
-	* ( m_insertion_windows[nWindow].ptB[Z]
-		- m_insertion_windows[nWindow].ptA[Z] );
-      break;
+    int nWindow = 0;
+    int nbreWindows = int( m_insertion_windows.size() );
 
-    case WINDOW_CYLINDER:
-      r = ( double(random()) / double(INT_MAX) )
-      	* m_insertion_windows[nWindow].radius;
-      theta = ( double(random()) / double(INT_MAX) ) * 2. * PI;
-      axiscoor = ( double(random()) / double(INT_MAX) )
-      	* m_insertion_windows[nWindow].height;
-      switch ( m_insertion_windows[nWindow].axisdir )
-      {
-        case X:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + axiscoor;
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * cos( theta );
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * sin( theta );
-	  break;
+    // Random selection of an insertion window
+    if ( nbreWindows != 1 )
+    {
+      double n = double(random()) / double(INT_MAX);
+      nWindow = int( n * nbreWindows );
+      if ( nWindow == nbreWindows ) nWindow--;
+    }
 
-        case Y:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + r * sin( theta );
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + axiscoor;
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * cos( theta );
-	  break;
+    // Random position in the selected insertion window
+    double r = 0., theta = 0., axiscoor = 0.;
+    switch( m_insertion_windows[nWindow].ftype )
+    {
+      case WINDOW_BOX:
+        P[X] = m_insertion_windows[nWindow].ptA[X]
+      		+ ( double(random()) / double(INT_MAX) )
+		* ( m_insertion_windows[nWindow].ptB[X]
+			- m_insertion_windows[nWindow].ptA[X] );
+        P[Y] = m_insertion_windows[nWindow].ptA[Y]
+      		+ ( double(random()) / double(INT_MAX) )
+		* ( m_insertion_windows[nWindow].ptB[Y]
+			- m_insertion_windows[nWindow].ptA[Y] );
+      	P[Z] = m_insertion_windows[nWindow].ptA[Z]
+      		+ ( double(random()) / double(INT_MAX) )
+		* ( m_insertion_windows[nWindow].ptB[Z]
+			- m_insertion_windows[nWindow].ptA[Z] );
+        break;
 
-        default:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + r * cos( theta );
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * sin( theta );
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + axiscoor;
-	  break;
-      }
-      break;
+      case WINDOW_CYLINDER:
+        r = ( double(random()) / double(INT_MAX) )
+      		* m_insertion_windows[nWindow].radius;
+        theta = ( double(random()) / double(INT_MAX) ) * 2. * PI;
+        axiscoor = ( double(random()) / double(INT_MAX) )
+      		* m_insertion_windows[nWindow].height;
+        switch ( m_insertion_windows[nWindow].axisdir )
+        {
+          case X:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + axiscoor;
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * cos( theta );
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * sin( theta );
+	    break;
 
-    case WINDOW_ANNULUS:
-      r = m_insertion_windows[nWindow].radius_int
-      	+ ( double(random()) / double(INT_MAX) )
-      	* ( m_insertion_windows[nWindow].radius
-		- m_insertion_windows[nWindow].radius_int );
-      theta = ( double(random()) / double(INT_MAX) ) * 2. * PI;
-      axiscoor = ( double(random()) / double(INT_MAX) )
-      	* m_insertion_windows[nWindow].height;
-      switch ( m_insertion_windows[nWindow].axisdir )
-      {
-        case X:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + axiscoor;
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * cos( theta );
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * sin( theta );
-	  break;
+          case Y:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * sin( theta );
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + axiscoor;
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * cos( theta );
+	    break;
 
-        case Y:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + r * sin( theta );
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + axiscoor;
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * cos( theta );
-	  break;
+          default:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * cos( theta );
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * sin( theta );
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + axiscoor;
+	    break;
+        }
+        break;
 
-        default:
-	  P[X] = m_insertion_windows[nWindow].ptA[X] + r * cos( theta );
-	  P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * sin( theta );
-	  P[Z] = m_insertion_windows[nWindow].ptA[Z] + axiscoor;
-	  break;
-      }
-      break;
+      case WINDOW_ANNULUS:
+        r = m_insertion_windows[nWindow].radius_int
+      		+ ( double(random()) / double(INT_MAX) )
+      		* ( m_insertion_windows[nWindow].radius
+			- m_insertion_windows[nWindow].radius_int );
+        theta = ( double(random()) / double(INT_MAX) ) * 2. * PI;
+        axiscoor = ( double(random()) / double(INT_MAX) )
+      		* m_insertion_windows[nWindow].height;
+        switch ( m_insertion_windows[nWindow].axisdir )
+        {
+          case X:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + axiscoor;
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * cos( theta );
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * sin( theta );
+	    break;
 
-    case WINDOW_LINE:
-      P = m_insertion_windows[nWindow].ptA
-      	+ ( double(random()) / double(INT_MAX) )
-      	* ( m_insertion_windows[nWindow].ptB
-		- m_insertion_windows[nWindow].ptA );
-      break;
+          case Y:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * sin( theta );
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + axiscoor;
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + r * cos( theta );
+	    break;
 
-    default:
-      break;
+          default:
+	    P[X] = m_insertion_windows[nWindow].ptA[X] + r * cos( theta );
+	    P[Y] = m_insertion_windows[nWindow].ptA[Y] + r * sin( theta );
+	    P[Z] = m_insertion_windows[nWindow].ptA[Z] + axiscoor;
+	    break;
+        }
+        break;
+
+      case WINDOW_LINE:
+        P = m_insertion_windows[nWindow].ptA
+      		+ ( double(random()) / double(INT_MAX) )
+      		* ( m_insertion_windows[nWindow].ptB
+			- m_insertion_windows[nWindow].ptA );
+        break;
+
+      default:
+        break;
+    }
   }
 
   return ( P );
@@ -1647,29 +1801,22 @@ Point3 Grains::getInsertionPoint() const
 
 
 // ----------------------------------------------------------------------------
-// Insertion d'une particle dans les algorithmes
+// Attempts to insert a particle in the simulation
 bool Grains::insertParticle( PullMode const& mode )
 {
   static size_t insert_counter = 0;
   bool insert = true;
   Vector3 vtrans, vrot ;
+  Quaternion qrot;
+  size_t npositions = m_insertion_position->size();
 
   if ( insert_counter == 0 )
   {
-    Particle *particle = m_allcomponents.getParticle( mode );
+    Particle *particle = m_allcomponents.getParticleToInsert( mode );
     if ( particle )
     {
-      // Initialisation of the particle velocity
-      computeInitVit( vtrans, vrot );
-      particle->setTranslationalVelocity( vtrans );
-      particle->setAngularVelocity( vrot );
-
       // Initialisation of the centre of mass position of the particle
-      if ( m_position == "" )
-      {
-        Point3 position = getInsertionPoint();
-        particle->setPosition( position );
-      }
+      particle->setPosition( getInsertionPoint() );
 
       // Initialisation of the angular position of the particle
       // Rem: we compose to the right by a pure rotation as the particle
@@ -1682,10 +1829,18 @@ bool Grains::insertParticle( PullMode const& mode )
         particle->composePositionRightByTransform( trot );
       }
 
+      // Initialisation of the particle velocity
+      computeInitVit( vtrans, vrot );
+      particle->setTranslationalVelocity( vtrans );
+      particle->setAngularVelocity( vrot );
+
+      // Transform and quaternion
       particle->initialize_transformWithCrust_to_notComputed();
+      qrot.setQuaternion( particle->getRigidBody()->getTransform()
+		->getBasis() );
+      particle->setQuaternionRotation( qrot );      
 
       // If insertion if successful, shift particle from wait to inserted
-      // and initialize particle rotation quaternion from rotation matrix
       insert = m_collision->insertParticleSerial( particle,
       	m_allcomponents.getActiveParticles(),
 	m_allcomponents.getPeriodicCloneParticles(),
@@ -1693,11 +1848,10 @@ bool Grains::insertParticle( PullMode const& mode )
 	m_periodic, m_force_insertion );
       if ( insert )
       {
-        m_allcomponents.ShiftParticleOutIn();
-	Quaternion qrot;
-	qrot.setQuaternion( particle->getRigidBody()->getTransform()
-		->getBasis() );
-	particle->setQuaternionRotation( qrot );
+        m_allcomponents.WaitToActive();
+	particle->InitializeForce( true );
+	particle->computeAcceleration( m_time );
+	if ( npositions ) m_insertion_position->erase( il_sp );
       }
     }
   }
@@ -1743,14 +1897,16 @@ void Grains::computeInitVit( Vector3& vtrans, Vector3& vrot ) const
 
       if ( m_RandomMotionCoefRot )
       {
-	vrot[X] = m_RandomMotionCoefRot * (
-	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
-	vrot[Y] = m_RandomMotionCoefRot * (
-	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
+	vrot[Z] = m_RandomMotionCoefRot * (
+	      	2. * (double(random()) / double(INT_MAX)) - 1. ) ;	
 	if ( m_dimension == 3 )
-	  vrot[Z] = m_RandomMotionCoefRot * (
-	      	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
-	else vrot[Z] = 0.;
+	{
+	  vrot[X] = m_RandomMotionCoefRot * (
+	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
+	  vrot[Y] = m_RandomMotionCoefRot * (
+	    	2. * (double(random()) / double(INT_MAX)) - 1. ) ;
+	}
+	else vrot[X] = vrot[Y] = 0.;
       }
       else vrot.reset();
       break;
@@ -1767,62 +1923,45 @@ void Grains::computeInitVit( Vector3& vtrans, Vector3& vrot ) const
 
 // ----------------------------------------------------------------------------
 // Sets particle initial positions from a file
-void Grains::setPositionParticlesFromFile( const PullMode& mode )
+size_t Grains::setPositionParticlesFromFile()
 {
+  size_t nnewpart = 0, npos = 0, error = 0;
+  list< pair<Particle*,size_t> >::const_iterator il;
+  Point3 position;
   ifstream filePos( m_position.c_str() );
 
-  // Verification de l'existence du fichier
+  // Check that the file exists
   if ( !filePos.is_open() )
   {
-    cout << "ERR : Fichier absent " << m_position << endl;
-    grainsAbort();
+    cout << "ERR : File " << m_position << " does not exist !" << endl;
+    error = 1;
   }
 
-  list<Particle*> copie_ParticlesWait;
-  list<Particle*>* particles = m_allcomponents.getInactiveParticles();
-  list<Particle*>::iterator particle = particles->begin();
-  Particle* selected=NULL;
-  int id,i;
-  double v;
-  Point3 position;
-  size_t nwait = particles->size(), npos = 0;
-
-  // Verifie que le nb de positions est egal au nombre de particles a inserer
-  while ( filePos >> position ) ++npos;
-  if ( nwait != npos )
+  // Check that the number of positions in the file equals the number of 
+  // new particles to insert
+  if ( !error )
   {
-    cout << "ERR: nombre de particles a inserer est different du"
-    	<< " nombre de positions dans le fichier " << m_position << " : "
-	<< nwait << " != " << npos << endl;
-    grainsAbort();
-  }
-  filePos.close();
-
-  // Lit et affecte la position des particles
-  filePos.open( m_position.c_str() );
-  if ( mode == PM_RANDOM ) copie_ParticlesWait = *particles;
-  while ( filePos >> position )
-  {
-    switch (mode)
+    for (il=m_newParticles.cbegin();il!=m_newParticles.cend();il++)
+      nnewpart += il->second;
+    while ( filePos >> position ) ++npos;
+    if ( nnewpart != npos )
     {
-      case PM_ORDERED:
-        (*particle)->setPosition( position );
-        particle++;
-        break;
-
-      case PM_RANDOM:
-        v = double(random()) / double(INT_MAX);
-        id = int( double(copie_ParticlesWait.size()) * v );
-        particle = copie_ParticlesWait.begin();
-        for (i=0; i<id && particle!=copie_ParticlesWait.end();
-          i++, particle++) {}
-        selected = *particle;
-        particle = copie_ParticlesWait.erase( particle );
-        selected->setPosition( position );
-        break;
+      cout << "ERR: number of new particles to insert is different from the"
+    	<< " number of positions in file " << m_position << " : "
+	<< nnewpart << " != " << npos << endl;
+      filePos.close(); 
+      error = 1;
+    }
+    else
+    {
+      // Read positions from the file and add them to the list
+      filePos.seekg( 0, filePos.beg );
+      while ( filePos >> position ) m_insertion_position->push_back( position );
+      filePos.close();
     }
   }
-  filePos.close();
+  
+  return ( error );
 }
 
 
@@ -1830,18 +1969,11 @@ void Grains::setPositionParticlesFromFile( const PullMode& mode )
 
 // ----------------------------------------------------------------------------
 // Sets particle initial position with a structured array
-void Grains::setPositionParticlesArray( const PullMode& mode )
+size_t Grains::setPositionParticlesArray()
 {
-  list<Particle*> copie_ParticlesWait;
-  list<Particle*>* particles = m_allcomponents.getInactiveParticles();
-  list<Particle*>::iterator particle = particles->begin();
-  Particle* selected=NULL;
-  int id, i;
-  size_t k, l, m, nwait = particles->size();
-  double v;
+  size_t k, l, m, nnewpart = 0, error = 0;
+  list< pair<Particle*,size_t> >::const_iterator il;
   Point3 position;
-  if ( mode == PM_RANDOM ) copie_ParticlesWait = *particles;
-
   double deltax = ( m_InsertionArray->box.ptB[X]
   	- m_InsertionArray->box.ptA[X] ) / double(m_InsertionArray->NX) ;
   double deltay = ( m_InsertionArray->box.ptB[Y]
@@ -1849,47 +1981,37 @@ void Grains::setPositionParticlesArray( const PullMode& mode )
   double deltaz = ( m_InsertionArray->box.ptB[Z]
   	- m_InsertionArray->box.ptA[Z] ) / double(m_InsertionArray->NZ) ;
 
-  // Checks that number of positions equals number of particles to insert
-  if ( nwait != m_InsertionArray->NX * m_InsertionArray->NY
+  // Checks that number of positions equals the number of new particles 
+  // to insert
+  for (il=m_newParticles.cbegin();il!=m_newParticles.cend();il++)
+    nnewpart += il->second;
+  if ( nnewpart != m_InsertionArray->NX * m_InsertionArray->NY
   	* m_InsertionArray->NZ )
   {
-    cout << "ERR: number of particles to insert does not equal"
-    	<< " number of positions in the structured array: " << nwait << " != " <<
-	m_InsertionArray->NX * m_InsertionArray->NY * m_InsertionArray->NZ
-	<< endl;
-    grainsAbort();
+    cout << "ERR: number of new particles to insert is different from the"
+    	<< " number of positions in the structured array: " << nnewpart << 
+	" != " << m_InsertionArray->NX * m_InsertionArray->NY 
+	* m_InsertionArray->NZ << endl;
+    error = 1;
   }
-
-  // Set particles' position
-  for (k=0;k<m_InsertionArray->NX;++k)
-    for (l=0;l<m_InsertionArray->NY;++l)
-      for (m=0;m<m_InsertionArray->NZ;++m)
-      {
-        position[X] = m_InsertionArray->box.ptA[X]
-		+ ( double(k) + 0.5 ) * deltax;
-        position[Y] = m_InsertionArray->box.ptA[Y]
-		+ ( double(l) + 0.5 ) * deltay;
-        position[Z] = m_InsertionArray->box.ptA[Z]
-		+ ( double(m) + 0.5 ) * deltaz;
-	switch (mode)
+  else
+  {
+    // Compute positions and add them to the list
+    for (k=0;k<m_InsertionArray->NX;++k)
+      for (l=0;l<m_InsertionArray->NY;++l)
+        for (m=0;m<m_InsertionArray->NZ;++m)
         {
-          case PM_ORDERED:
-            (*particle)->setPosition( position );
-            particle++;
-            break;
-
-          case PM_RANDOM:
-            v = double(random()) / double(INT_MAX);
-            id = int( double(copie_ParticlesWait.size()) * v );
-            particle = copie_ParticlesWait.begin();
-            for (i=0; i<id && particle!=copie_ParticlesWait.end();
-          	i++, particle++) {}
-            selected = *particle;
-            particle = copie_ParticlesWait.erase( particle );
-            selected->setPosition( position );
-            break;
-       }
-     }
+          position[X] = m_InsertionArray->box.ptA[X]
+		+ ( double(k) + 0.5 ) * deltax;
+          position[Y] = m_InsertionArray->box.ptA[Y]
+		+ ( double(l) + 0.5 ) * deltay;
+          position[Z] = m_InsertionArray->box.ptA[Z]
+		+ ( double(m) + 0.5 ) * deltaz;
+          m_insertion_position->push_back( position );
+        }
+  }
+  
+  return ( error );  
 }
 
 
@@ -1931,19 +2053,6 @@ void Grains::readDomainDecomposition( DOMNode* root,
 
 
 // ----------------------------------------------------------------------------
-// Returns the full result file name
-string Grains::fullResultFileName( string const& rootname ) const
-{
-  string fullname = rootname;
-  fullname += ".result";
-
-  return ( fullname );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
 // Sets the linked cell grid
 void Grains::defineLinkedCell( double const& radius, string const& oshift )
 {
@@ -1972,20 +2081,30 @@ void Grains::saveReload( double const& time )
   	GrainsExec::m_reloadFile_suffix == "A" ? 1 : 0 ;
   string reload_suffix = reload_counter ? "B" : "A" ;
   string reload = m_fileSave + reload_suffix ;
-  reload = fullResultFileName( reload );
+  reload = GrainsExec::fullResultFileName( reload, false );
 
   // Save current reload file
-  ofstream result( reload.c_str() );
-  result << "#Time " << time << endl;
-  ContactBuilderFactory::save( result, m_fileSave, m_rank );
-  m_allcomponents.write( result, reload.c_str() );
-  result << "#EndTime" << endl;
-  result.close();
-
-  // Check that all reload files are in the same directory
-  // Add one line to RFTable.txt
+  ofstream result;
   if ( m_rank == 0 )
   {
+    result.open( reload.c_str(), ios::out );
+    result << "__Format2024__" << endl;  
+    result << "#Time " << time << endl;
+  }
+  ContactBuilderFactory::save( result, m_fileSave, m_rank );
+  if ( m_nprocs > 1 && GrainsExec::m_SaveMPIInASingleFile )
+    m_allcomponents.write_singleMPIFile( result, reload, m_insertion_position,
+    	m_clonesInReloadFile, m_collision, m_wrapper, m_periodic );
+  else
+    m_allcomponents.write( result, reload, m_insertion_position, 
+    	m_clonesInReloadFile, m_collision, m_rank, m_nprocs, m_wrapper );
+  if ( m_rank == 0 )
+  {  
+    result << "#EndTime" << endl;
+    result.close();
+
+    // Check that all reload files are in the same directory
+    // Add one line to RFTable.txt
     GrainsExec::checkAllFilesForReload();
     ofstream RFT_out( ( m_fileSave + "_RFTable.txt" ).c_str(), ios::app );
     RFT_out << time << " " << m_fileSave + reload_suffix << endl;
@@ -2214,4 +2333,41 @@ void Grains::readWindow( DOMNode* nWindow, Window& iwindow,
       grainsAbort();
       break;
   }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Outputs timer summary
+void Grains::display_timer_summary()
+{
+  double cputime = CT_get_elapsed_time();
+  cout << "Full problem" << endl;
+  write_elapsed_time_smhd( cout, cputime, "Computing time" );
+  SCT_get_summary( cout, cputime );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of insertion positions */
+size_t Grains::getNbInsertionPositions() const
+{
+  return ( m_insertion_position->size() );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Checks the (periodic) clones when a simulation is reloaded */
+void Grains::checkClonesReload()
+{
+  m_collision->checkPeriodicClonesReload(
+	m_allcomponents.getActiveParticles(),
+	m_allcomponents.getPeriodicCloneParticles(),
+	m_allcomponents.getReferenceParticles(),
+	m_time );
 }

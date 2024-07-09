@@ -17,8 +17,8 @@ class Rectangle : public Convex
     /** @name Constructors */
     //@{
     /** @brief Constructor with edge length as input parameters
-    @param x edge length in x
-    @param y edge length in y */
+    @param LX edge length in x
+    @param LY edge length in y */
     Rectangle( double LX = 0., double LY = 0. );
 
     /** @brief Constructor with an input stream
@@ -108,15 +108,20 @@ class Rectangle : public Convex
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	    int& last_offset ) const;
 
-    /** Returns whether the convex shape is a rectangle */
+    /** @brief Returns whether the convex shape is a rectangle */
     bool isRectangle() const;
 
-    /** @ brief Returns whether a point lies inside the rectangle
+    /** @brief Returns whether a point lies inside the rectangle
     @param pt point */
     bool isIn( Point3 const& pt ) const;
 
-    /** @ Returns the bounding volume to rectangle */
+    /** @brief Returns the bounding volume to rectangle */
     BVolume* computeBVolume( unsigned int type ) const;
+    
+    /** @brief Performs advanced comparison of the two rectangles and returns
+    whether they match
+    @param other the other rectangle */
+    bool equalType_level2( Convex const* other ) const;     
     //@}
 
 

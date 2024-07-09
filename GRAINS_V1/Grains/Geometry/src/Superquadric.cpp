@@ -224,12 +224,12 @@ Point3 Superquadric::support( Vector3 const& v ) const
 vector<Point3> Superquadric::getEnvelope() const
 {
   Point3 point( 0., 0., 0. );
-  vector<Point3> enveloppe( 3, point );
-  /**  enveloppe[0][Y] = - halfHeight;
-  enveloppe[1][Y] = - halfHeight;
-  enveloppe[1][X] = radius;
-  enveloppe[2][Y] = halfHeight; */
-  return ( enveloppe );
+  vector<Point3> envelope( 3, point );
+  /**  envelope[0][Y] = - halfHeight;
+  envelope[1][Y] = - halfHeight;
+  envelope[1][X] = radius;
+  envelope[2][Y] = halfHeight; */
+  return ( envelope );
 }
 
 
@@ -632,4 +632,29 @@ BVolume* Superquadric::computeBVolume( unsigned int type ) const
   }
 
   return( bvol );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two superquadrics and returns whether 
+// they match
+bool Superquadric::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Superquadric, we dynamically cast it to 
+  // actual type
+  Superquadric const* other_ = dynamic_cast<Superquadric const*>(other);
+  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() );    
+
+  bool same = ( 
+  	fabs( m_a - other_->m_a ) <  LOWEPS * lmin 
+	&& fabs( m_b - other_->m_b ) <  LOWEPS * lmin
+	&& fabs( m_c - other_->m_c ) <  LOWEPS * lmin	
+	&& fabs( m_n1 - other_->m_n1 ) <  LOWEPS 
+	&& fabs( m_n2 - other_->m_n2 ) <  LOWEPS );
+  
+  return ( same );
 }

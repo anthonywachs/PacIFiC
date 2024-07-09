@@ -231,6 +231,13 @@ class Matrix
     friend istream& operator >> ( istream& fileIn, Matrix& m );
     //@}
 
+
+    /**@name Parameters */
+    //@{
+    static size_t m_sizeofMatrix; /** binary size of the object */
+    //@}
+
+
   protected:
     /**@name Parameters */
     //@{

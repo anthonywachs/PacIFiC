@@ -140,10 +140,10 @@ Point3 Rectangle::support( Vector3 const& v ) const
 // Here simply returns the point (0,0,0) as a convention
 vector<Point3> Rectangle::getEnvelope() const
 {
-  vector<Point3> enveloppe;
+  vector<Point3> envelope;
   Point3 point( 0.,0.,0. );
-  enveloppe.push_back( point );
-  return ( enveloppe );
+  envelope.push_back( point );
+  return ( envelope );
 }
 
 
@@ -295,10 +295,35 @@ bool Rectangle::isRectangle() const
 // Returns whether a point lies in the rectangle
 bool Rectangle::isIn( Point3 const& pt ) const
 {
-  return ( ( fabs( pt[Z] ) <= EPSILON ) &&
-           ( fabs( pt[Y] ) <= m_LY/2. ) &&
-           ( fabs( pt[X] ) <= m_LX/2. ) );
+  return ( fabs( pt[Z] ) < EPSILON &&
+           fabs( pt[Y] ) < m_LY/2. &&
+           fabs( pt[X] ) < m_LX/2. );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Performs advanced comparison of the two rectangles and returns whether 
+// they match
+bool Rectangle::equalType_level2( Convex const* other ) const
+{
+  // We know that other points to a Rectangle, we dynamically cast it to 
+  // actual type
+  Rectangle const* other_ = dynamic_cast<Rectangle const*>(other); 
+  
+  double lmin = min( computeCircumscribedRadius(),
+  	other_->computeCircumscribedRadius() ); 
+  
+  bool same = ( fabs( m_LX - other_->m_LX ) <  LOWEPS * lmin 
+	&& fabs( m_LY - other_->m_LY ) <  LOWEPS * lmin );  
+
+  for (size_t j=0;j<4 && same;++j)
+      same = ( m_corners[j].DistanceTo( (other_->m_corners)[j] ) 
+      	< LOWEPS * lmin );
+  
+  return ( same );
+} 
 
 
 

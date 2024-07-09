@@ -5,6 +5,8 @@
 
 namespace solid
 {
+  size_t Group3::m_sizeofGroup3 = 3 * sizeof( double );
+
   // --------------------------------------------------------------------------
   // Default constructor
   Group3::Group3( double def )

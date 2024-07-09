@@ -46,16 +46,38 @@ RigidBodyWithCrust::RigidBodyWithCrust( RigidBodyWithCrust const& rbwc )
 
 
 // ----------------------------------------------------------------------------
-// Constructor with a convex and a transformation as input
-// parameters, used exclusively by compObstacle whose own shape is not defined
+// Constructor with input parameters, used by composite component 
+// whose own shape is not defined (composite = true) or to create component 
+// from scratch in the code ( composite = false )
 RigidBodyWithCrust::RigidBodyWithCrust( Convex* convex_,
-	Transform const& position_ )
+	Transform const& position_,
+	bool composite, double const& crust_thickness )
   : RigidBody( convex_, position_ )
-  , m_crustThickness( 0.0 )
+  , m_crustThickness( crust_thickness )
   , m_scaling( NULL )
   , m_transformWithCrust( NULL )
   , m_transformWithCrust_computed( false )
-{}
+{
+  if ( !composite )
+  {
+    m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+    m_scaling = new Vector3;
+    BBox box = m_convex->bbox( TransformIdentity );
+    Vector3 const& extent = box.getExtent();
+
+    // Scaling factor from bounding box
+    (*m_scaling)[X] = extent[X] < EPSILON ?
+  	1. : ( extent[X] - m_crustThickness ) / extent[X];
+    (*m_scaling)[Y] = extent[Y] < EPSILON ?
+  	1. : ( extent[Y] - m_crustThickness ) / extent[Y];
+    (*m_scaling)[Z] = extent[Z] < EPSILON ?
+  	1. : ( extent[Z] - m_crustThickness ) / extent[Z];
+
+    // Transformation with crust
+    m_transformWithCrust = new Transform();
+    m_transformWithCrust_computed = false ;  
+  }
+}
 
 
 
@@ -251,7 +273,7 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
     if ( distance < EPSILON )
     {
       cout << "ERR RigidBodyWithCrust::ClosestPoint on Processor "
-      << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+      << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	    << endl;
       throw ContactError();
     }
@@ -336,7 +358,7 @@ PointContact RigidBodyWithCrust::ClosestPoint_ErreurHandling(
   {
       cout << "ERR RigidBodyWithCrust::ClosestPoint_ErreurHandling on "
       << " Processor " << (GrainsExec::m_MPI ?
-	    GrainsExec::getComm()->get_rank_active() : 0 )
+	    GrainsExec::getComm()->get_rank() : 0 )
 	    << " between components " << id << " and " << id_neighbor
 	    << endl;
       throw ContactError();
@@ -344,7 +366,7 @@ PointContact RigidBodyWithCrust::ClosestPoint_ErreurHandling(
   else
   {
     cout << "Handling contact error on Processor "
-	   << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+	   << (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	   << " between components " << id << " and " << id_neighbor
 	   << endl;
   }
@@ -412,7 +434,7 @@ PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
     if ( - distance >= rdwA + rdwB )
     {
       cout << "ERR RigidBodyWithCrust::ClosestPointSPHERE on Processor "
-      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< ": " << - distance << " & " << rdwA + rdwB << "\n";
       throw ContactError();
     }
@@ -469,7 +491,7 @@ PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
       if ( - overlap >=  rdwA + rdwB )
       {
         cout << "ERR RigidBodyWithCrust::ClosestPointSPHEREBOX on Processor "
-      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	      << ": " << - overlap << " & " << rdwA + rdwB << endl;
 	      throw ContactError();
       }
@@ -495,7 +517,7 @@ PointContact ClosestPointSPHEREBOX( RigidBodyWithCrust const& rbA,
       if ( - overlap >= rdwA + rdwB )
       {
         cout << "ERR RigidBodyWithCrust::ClosestPointSPHEREBOX on Processor "
-      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank_active() : 0 )
+      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	      << ": " << - overlap << " & " << rdwA + rdwB << endl;
 	      throw ContactError();
       }

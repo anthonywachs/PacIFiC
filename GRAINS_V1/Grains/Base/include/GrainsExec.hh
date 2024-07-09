@@ -61,7 +61,7 @@ struct StructArrayInsertion
 
     Fully static class that manages global variables.
 
-    @author A. WACHS - Institut Francais du Petrole - 2010 - Creation
+    @author A.WACHS - Institut Francais du Petrole - 2010 - Creation
     @author A.WACHS - 2019 - Major cleaning & refactoring */
 // ============================================================================
 class GrainsExec
@@ -75,9 +75,10 @@ class GrainsExec
     /** @brief Returns the list of applications */
     static list<App*> get_listApp();
 
-    /** @brief Returns the total number of particles (active and inactive)
-    on all processes */
-    static size_t getNumberParticlesOnAllProc();
+    /** @brief Returns the total number of particles in the physical system 
+    (i.e. on all subdomains/processes), i.e. sum of total number of active 
+    particles with tag 0 or 1 and inactive particles */
+    static size_t getTotalNumberPhysicalParticles();
     //@}
 
 
@@ -91,11 +92,11 @@ class GrainsExec
     @param allApp_ list of pointers to applications */
     static void set_listApp( list<App*> allApp_ );
 
-    /** @brief Sets the total number of particles (active and inactive)
-    on all processes
-    @param nb_ total number of particles (active and inactive)
-    on all processes */
-    static void setNumberParticlesOnAllProc( size_t const& nb_ );
+    /** @brief Sets the total number of particles in the physical system 
+    (i.e. on all subdomains/processes), i.e. sum of total number of active 
+    particles with tag 0 or 1 and inactive particles
+    @param nb_ total number of physical particles */
+    static void setTotalNumberPhysicalParticles( size_t const& nb_ );
     //@}
 
 
@@ -204,6 +205,12 @@ class GrainsExec
     static bool isPointInTetrahedron( Point3 const& p1, Point3 const& p2,
     	Point3 const& p3, Point3 const& p4, Point3 const& p, 
 	bool check = false );
+	
+    /** @brief Returns the full result file name
+    @param rootname root file name 
+    @param addrank add rank number */
+    static string fullResultFileName( string const& rootname,
+    	bool addrank = true ); 	
     //@}
 
 
@@ -252,7 +259,9 @@ class GrainsExec
     static bool m_SphereAsPolyParaview; /**< in Paraview, true if spheres are
     	faceted as polyhedrons, false if post-processed as a vectorial field */
     static int m_MPI_verbose; /**< MPI verbosity level, 3 levels: 0=none,
-    	1=particles, 2=particles+contact */
+    	1=particles, 2=particles and MPI Cartesian grid */
+    static bool m_isReloaded; /**< whether the simulation starts from a reload 
+    	state */ 
     static string m_ReloadType; /**< Reload type: "new" for a new simulation and
     	 "same" for an on-going simulation */
     static Vector3 m_vgravity; /**< gravity vector */
@@ -268,15 +277,24 @@ class GrainsExec
     	read */
     static string m_SaveDirectory; /**< Directory where reload files are
     	written */
+    static bool m_SaveMPIInASingleFile; /**< In MPI, true if all processes write
+    	the particle data in a single file, false if each process writes its own
+	data */
+    static bool m_ReadMPIInASingleFile; /**< In MPI, true if all processes read
+    	the particle data in a single file, false if each process reads its own
+	data */		
     static set<string> m_additionalDataFiles; /**< additional files for reload
     	(primarily files for polyhedrons et polygons) */
     static bool m_writingModeHybrid; /**< Is writing mode hybrid, i.e., a text
     	header for reference particles and obstacles, and a binary file for
 	particles */
+    static bool m_readingModeHybrid; /**< Is reading mode hybrid, i.e., a text
+    	header for reference particles and obstacles, and a binary file for
+	particles */	
     static string m_GRAINS_HOME; /**< Main Grains directory */
     static string m_reloadFile_suffix; /**< Reload file suffix (A or B) */
     static bool m_exception_Contact; /**< Contact exception */
-    static bool m_exception_Displacement; /**< Displacement exception */
+    static bool m_exception_Motion; /**< Motion exception */
     static bool m_exception_Simulation; /**< Simulation exception */
     static string m_shift0; /**< string of 0 blank space */
     static string m_shift1; /**< string of 1 blank space */
@@ -294,6 +312,12 @@ class GrainsExec
     static double m_colDetTolerance; /** Tol for Collision detection **/
     static bool m_colDetAcceleration; /** Tol for Collision detection **/
     static unsigned int m_colDetBoundingVolume; /** bounding volume type **/
+    static Point3 m_defaultInactivePos; /**< Default position of inactive 
+    	particles */
+    static int m_CompositeObstacleDefaultID; /**< Default ID number of composite
+    	obstacle */ 
+    static int m_ReferenceParticleDefaultID; /**< Default ID number of reference
+    	particle */ 		    
     //@}
 
 
@@ -304,8 +328,10 @@ class GrainsExec
     static list<App*> m_allApp; /**< List of all applications used in
     	the simulation (the 1st application is contact detection, i.e., the
 	LinkedCell) */
-    static size_t m_total_nb_particles; /**< total number of particles (active
-    	and inactive) on all processes */
+    static size_t m_total_nb_physical_particles; /**< total number of particles
+    	in the physical system (i.e. on all subdomains/processes), i.e. sum of 
+	total number of active particles with tag 0 or 1 and inactive 
+	particles */
     static list< pair<Point3*,VertexBase *> > m_allPolytopeRefPointBase; /**<
   	list of reference points used by the polytopes */
     static list<IndexArray*> m_allPolytopeNodeNeighbors; /**< list of

@@ -219,7 +219,7 @@ timing dlmfd_globaltiming = {0.};
 
 // Uzawa algorithm for the DLMFD problem
 // Important comments:
-// 1) only u, tu, DLM_lambda and DLM_w need to be synchronized with boundary, 
+// 1) only u, tu, DLM_lambda and DLM_w need to be explicitly synchronized, 
 // all other fields are local to each thread
 //----------------------------------------------------------------------------
 void DLMFD_subproblem( particle * p, const int i, const double rho_f ) 
@@ -344,7 +344,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
 	  if (index_lambda.x[] > -1.) 
 	    index_lambda.x[] = -1.;
     }
-    boundary((scalar*) {index_lambda});
+    synchronize((scalar*) {index_lambda});
 
     reverse_fill_flagfield( p, flagfield, index_lambda, 1, DLM_periodic_shift );
 # endif
@@ -473,23 +473,23 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
         cache_append( &Traversal_uqutu, point, 0);  
 # endif  
       
-  boundary ((scalar*) {DLM_periodic_shift});
+  synchronize((scalar*) {DLM_periodic_shift});
 
 
 # if DLMFD_OPT    
     // Only DLM_lambda has not been nullified at the end of the previous
     // call to DLMFD_subproblem as it is needed for the computation of the 
     // hydrodynamic force & torque for post-processing, so we nullify it here
-    foreach() 
-    {
-      tcells ++; 
+    foreach(reduction(+:tcells)) tcells++;     
+    foreach()
+    { 
       foreach_dimension() 
-        DLM_lambda.x[] = 0.;      
-    }
+        DLM_lambda.x[] = 0.; 
+    }     
 # else
+    foreach(reduction(+:tcells)) tcells++;
     foreach() 
     {
-      tcells ++; 
       foreach_dimension()
       {
         DLM_lambda.x[] = 0.;
@@ -502,9 +502,9 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
     }  
 # endif  
   
-# if _MPI
-    mpi_all_reduce( tcells, MPI_INT, MPI_SUM );
-# endif
+// # if _MPI
+//     mpi_all_reduce( tcells, MPI_INT, MPI_SUM );
+// # endif
 
 
   // Statistics of number of Lagrange multiplier points  
@@ -656,7 +656,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
     coord lambdapos = {0., 0., 0.};
     coord sum = {0., 0., 0.};
 
-    boundary ((scalar*) {DLM_lambda});
+    synchronize((scalar*) {DLM_lambda});
 
 #   if DLMFD_OPT
       double* qux_ = NULL; 
@@ -1075,7 +1075,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
   /* So r^0 = G -<alpha, u>_P(t) + <alpha, U>_P(t) + <alpha, w^r_GM>_P(t) */
 # if debugBD == 0
     double testweight = 0.;
-    boundary((scalar*){u});
+    synchronize((scalar*){u});
 #   if DLMFD_OPT
       int ndof = 0;
 #   endif  
@@ -1346,8 +1346,8 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
 #     if DLMFD_OPT
         // Use of the fast loop for the computations of 
         // qu = (M_u^T)*DLM_w = <DLM_w, v>_P(t) over the boundary points
-        boundary ((scalar*){DLM_w});
-        int endloop = LMloop.n;  
+        synchronize((scalar*){DLM_w});
+        int endloop = LMloop.n; 
         for (int k=0; k<endloop; ++k )
         {
           weight = LMloop.weight[k];
@@ -1355,10 +1355,10 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
           *(LMloop.quy[k]) += weight * *(LMloop.dlmwy[k]);    
 #         if dimension == 3	
             *(LMloop.quz[k]) += weight * *(LMloop.dlmwz[k]); 
-#         endif	       
+#         endif		      
         }
 #     else
-        boundary ((scalar*){DLM_w, qu});    
+        synchronize((scalar*){DLM_w, qu});    
         for (int k = 0; k < NPARTICLES; k++) 
         {
           particle * pp = &p[k];
@@ -1679,7 +1679,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
       /* Boundary points: y = M*t */
       /* Boundary points: y = M_u*tu + M_U*tU + M_w*tw */
       /* So y = <alpha, tu>_P(t) - <alpha, tU>_P(t) - <alpha, tw^r_GM>_P(t) */
-      boundary ((scalar*){tu});
+      synchronize((scalar*){tu});
 #     if DLMFD_OPT
         // Use of the fast loop for the computations of 
         // M_u * tu = <alpha, tu>_P(t) over the boundary points
@@ -1911,7 +1911,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
   
   /* Compute the explicit term here */
 # if DLM_alpha_coupling 
-    boundary ((scalar*) {DLM_lambda});
+    synchronize((scalar*) {DLM_lambda});
 
     for (int k = 0; k < NPARTICLES; k++) 
     {
@@ -1968,7 +1968,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
         }
 #     endif
     }
-    boundary((scalar *) {DLM_explicit});
+    synchronize((scalar *) {DLM_explicit});
 # endif
 
 
@@ -1985,14 +1985,14 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
         DLM_w.x[] = 0.; 
         DLM_v.x[] = 0.; 
       }
-    boundary((scalar *) {DLM_w});      
+    synchronize((scalar *) {DLM_w});      
     
     // We do not need to nullify qu as it will be assigned on all cells
     // at the next call of DLMFD_subproblem  
     foreach_cache( Traversal_uqutu ) 
       foreach_dimension()
         tu.x[] = 0.;      
-    boundary((scalar *) {tu});  
+    synchronize((scalar *) {tu});  
 
   
     // Free DLMFD global caches
@@ -2002,7 +2002,7 @@ void DLMFD_subproblem( particle * p, const int i, const double rho_f )
 
   
   // To guarantee that u is the same on all sub-domains
-  boundary ((scalar*) {u});
+  synchronize((scalar*) {u});
 
 
   /* Timers and Timings */

@@ -47,21 +47,25 @@ ParticleKinematics::~ParticleKinematics()
 
 // ----------------------------------------------------------------------------
 // Integrates Newton's law and moves the particle
-double ParticleKinematics::Move( Particle* particle, double dt )
+double ParticleKinematics::Move( Particle* particle, 
+	double const& dt_particle_vel, 
+    	double const& dt_particle_disp )
 {
-  // Integration en time 
-  m_timeIntegrationScheme->Move( m_translationalVelocity,
-  	m_dUdt, m_translationalDisplacementOverDt,
-	m_dOmegadt, m_angularVelocity, m_averageAngularVelocityOverDt, dt );
+  // Time integration
+  m_timeIntegrationScheme->Move( m_dUdt, m_translationalVelocity,
+  	m_translationalMotionOverDt,
+	m_dOmegadt, m_angularVelocity, m_averageAngularVelocityOverDt, 
+	dt_particle_vel, dt_particle_disp );
   
-  particle->Translate( m_translationalDisplacementOverDt );
+  // Translational motion
+  particle->Translate( m_translationalMotionOverDt );
   
-  // Deplacement rotationnel  
+  // Angular motion 
   double nOmega = Norm( m_averageAngularVelocityOverDt );
   if ( nOmega > EPSILON ) 
   {
-    double c = cos( nOmega * dt / 2. );
-    double s = sin( nOmega * dt / 2. );
+    double c = cos( nOmega * dt_particle_disp / 2. );
+    double s = sin( nOmega * dt_particle_disp / 2. );
     Vector3 t;
     t = ( s * 1. / nOmega ) * m_averageAngularVelocityOverDt;
     m_QuaternionRotationOverDt.setQuaternion( t, c );
@@ -73,7 +77,19 @@ double ParticleKinematics::Move( Particle* particle, double dt )
   m_dQuaternionRotationdt = 0.5 * ( m_angularVelocity , m_QuaternionRotation );
   particle->Rotate( m_QuaternionRotationOverDt );
 
-  return Norm( m_translationalDisplacementOverDt );
+  return Norm( m_translationalMotionOverDt );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Advances velocity over dt_particle_vel
+void ParticleKinematics::advanceVelocity( double const& dt_particle_vel )
+{
+  // Time integration
+  m_timeIntegrationScheme->advanceVelocity( m_dUdt, m_translationalVelocity,
+  	m_dOmegadt, m_angularVelocity, dt_particle_vel );
 }
 
 
@@ -133,11 +149,38 @@ void ParticleKinematics::setTranslationalVelocity( Vector3 const& vtrans )
 
 
 // ----------------------------------------------------------------------------
+// Sets the translation velocity
+void ParticleKinematics::setTranslationalVelocity( double const& vx, 
+	double const& vy, double const& vz )
+{
+  m_translationalVelocity[X] = vx;
+  m_translationalVelocity[Y] = vy;  
+  m_translationalVelocity[Z] = vz;  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Sets the angular velocity
 void ParticleKinematics::setAngularVelocity( Vector3 const& omega )
 {
   m_angularVelocity = omega;
-  m_dQuaternionRotationdt = 0.5 * ( omega , m_QuaternionRotation );
+  m_dQuaternionRotationdt = 0.5 * ( m_angularVelocity , m_QuaternionRotation );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the angular velocity
+void ParticleKinematics::setAngularVelocity( double const& omx, 
+	double const& omy, double const& omz )
+{
+  m_angularVelocity[X] = omx;
+  m_angularVelocity[Y] = omy;  
+  m_angularVelocity[Z] = omz; 
+  m_dQuaternionRotationdt = 0.5 * ( m_angularVelocity , m_QuaternionRotation );
 }
 
 
@@ -251,7 +294,9 @@ void ParticleKinematics::writeParticleKinematics2014( ostream& fileOut ) const
   fileOut << " ";  
   m_QuaternionRotation.writeQuaternion( fileOut ); 
   fileOut << " "; 
-  m_dQuaternionRotationdt.writeQuaternion( fileOut ); 
+  m_dQuaternionRotationdt.writeQuaternion( fileOut );
+  m_timeIntegrationScheme->writeParticleKinematics2014( fileOut,
+    	m_dUdt, m_dOmegadt ); 
 }
 
 
@@ -263,7 +308,9 @@ void ParticleKinematics::writeParticleKinematics2014_binary( ostream &fileOut )
 {
   m_translationalVelocity.writeGroup3_binary( fileOut ); 
   m_QuaternionRotation.writeQuaternion_binary( fileOut ); 
-  m_dQuaternionRotationdt.writeQuaternion_binary( fileOut );   
+  m_dQuaternionRotationdt.writeQuaternion_binary( fileOut );
+  m_timeIntegrationScheme->writeParticleKinematics2014_binary( fileOut,
+    	m_dUdt, m_dOmegadt );      
 }
 
 
@@ -288,6 +335,24 @@ istream& operator >> ( istream& fileIn, ParticleKinematics& cinematique )
 
 // ----------------------------------------------------------------------------
 // Reads particle kinematics from a stream in a binary form in the 2014 format
+void ParticleKinematics::readParticleKinematics2014( istream &StreamIN )
+{
+  StreamIN >> m_translationalVelocity
+	 >> m_QuaternionRotation
+	 >> m_dQuaternionRotationdt;
+
+  m_angularVelocity = 2.0 * m_dQuaternionRotationdt.multConjugateToVector3( 
+  	m_QuaternionRotation );
+	
+  m_timeIntegrationScheme->readParticleKinematics2014( StreamIN,
+    	m_dUdt, m_dOmegadt );     
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Reads particle kinematics from a stream in a binary form in the 2014 format
 void ParticleKinematics::readParticleKinematics2014_binary( istream &StreamIN )
 {
   m_translationalVelocity.readGroup3_binary( StreamIN );
@@ -295,7 +360,10 @@ void ParticleKinematics::readParticleKinematics2014_binary( istream &StreamIN )
   m_dQuaternionRotationdt.readQuaternion_binary( StreamIN );
 
   m_angularVelocity = 2.0 * m_dQuaternionRotationdt.multConjugateToVector3( 
-  	m_QuaternionRotation );  
+  	m_QuaternionRotation );
+	
+  m_timeIntegrationScheme->readParticleKinematics2014_binary( StreamIN,
+    	m_dUdt, m_dOmegadt );   
 } 
 
 
@@ -344,3 +412,15 @@ void ParticleKinematics::setKinematicsNm2( double const* tab )
 {
   m_timeIntegrationScheme->setKinematicsNm2( tab );
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the number of bytes of the ParticleKinematics when written in a 
+// binary format to an output stream
+size_t ParticleKinematics::get_numberOfBytes() const
+{
+  return ( solid::Group3::m_sizeofGroup3 + 2 * Quaternion::m_sizeofQuaternion
+  	+  m_timeIntegrationScheme->get_numberOfBytes() ); 
+}

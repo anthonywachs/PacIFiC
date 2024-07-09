@@ -124,6 +124,17 @@ bool PointC::isIn( Point3 const& pt ) const
 
 
 // ----------------------------------------------------------------------------
+// Performs advanced comparison of the two points and returns whether 
+// they match
+bool PointC::equalType_level2( Convex const* other ) const
+{
+  return ( true );
+} 
+
+
+
+
+// ----------------------------------------------------------------------------
 // Returns the bounding volume to point
 BVolume* PointC::computeBVolume( unsigned int type ) const
 {
