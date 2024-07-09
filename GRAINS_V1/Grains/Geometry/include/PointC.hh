@@ -61,6 +61,9 @@ class PointC : public Convex
     by convention)
     @param pt point */
     bool isIn( Point3 const& pt ) const;    
+
+    /** @ Returns the bounding volume to point */
+    BVolume* computeBVolume( unsigned int type ) const;
     //@}
 
 

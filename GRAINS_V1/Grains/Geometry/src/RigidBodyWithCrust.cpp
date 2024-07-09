@@ -73,7 +73,8 @@ RigidBodyWithCrust::RigidBodyWithCrust( istream& fileIn, string type )
 
   // Read the rigid body shape
   m_convex = ConvexBuilderFactory::create( cle, fileIn );
-  m_boundingVolume = m_convex->computeBVolume( GrainsExec::m_boundingVolume );
+  m_boundingVolume = m_convex->
+                        computeBVolume( GrainsExec::m_colDetBoundingVolume );
   fileIn >> cle;
   assert( cle == "*END" );
 
@@ -111,7 +112,8 @@ RigidBodyWithCrust::RigidBodyWithCrust( DOMNode* root )
   DOMNode* forme = ReaderXML::getNode( root, "Convex" );
   m_convex = ConvexBuilderFactory::create( forme );
   m_crustThickness = ReaderXML::getNodeAttr_Double( forme, "CrustThickness" );
-  m_boundingVolume = m_convex->computeBVolume( GrainsExec::m_boundingVolume );
+  m_boundingVolume = m_convex->
+                          computeBVolume( GrainsExec::m_colDetBoundingVolume );
 
   // Transformation
   m_transform.load( root );
@@ -222,7 +224,8 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
       return ( ClosestPointRECTANGLE( *this, neighbor ) );
 
     // Pre-collision Test
-    if( GrainsExec::m_boundingVolume && !isContactBVolume( *this, neighbor ) )
+    if( GrainsExec::m_colDetBoundingVolume && 
+        !isContactBVolume( *this, neighbor ) )
          return ( PointNoContact );
 
     // Distance between the 2 rigid bodies shrunk by their crust thickness
@@ -230,6 +233,13 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
     Transform const* b2w = neighbor.getTransformWithCrust();
     Point3 pointA, pointB;
     int nbIterGJK = 0;
+
+    // TODO: 
+    // Here, we can choose between different collision detection algorithms.
+    // Maybe, it is best to dynamically choose the algorithm of interest in the
+    // XML file. Probably, using a new class CollisionDetection and overloading
+    // the operator ().
+    // So far, it is hard-coded for the original GJK algorithm.
     double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w,
     	                                *b2w, pointA, pointB, nbIterGJK );
     // double distance = closest_points_GJK_SV( *m_convex, *(neighbor.m_convex), 

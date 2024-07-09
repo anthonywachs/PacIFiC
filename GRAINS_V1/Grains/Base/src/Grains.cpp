@@ -520,28 +520,92 @@ void Grains::Construction( DOMElement* rootElement )
       m_allcomponents.resetKinematics( reset );
     }
 
-    // Bounding volume precollision test
-    DOMNode* nBoundingVolume = ReaderXML::getNode( root, "BoundingVolume" );
-    if ( nBoundingVolume )
-    {
-      string nBVtype = ReaderXML::getNodeAttr_String( nBoundingVolume, "Type" );
-      if ( nBVtype == "OBB" )
-        GrainsExec::m_boundingVolume = 1;
-      else if ( nBVtype == "OBC" )
-        GrainsExec::m_boundingVolume = 2;
-      else
-        GrainsExec::m_boundingVolume = 0;
-    }
-    if ( m_rank == 0 && GrainsExec::m_boundingVolume == 1 )
-      cout << GrainsExec::m_shift6 <<
-      "Pre-collision Test with oriented bounding boxes is on." << endl;
-    else if ( m_rank == 0 && GrainsExec::m_boundingVolume == 2 )
-      cout << GrainsExec::m_shift6 <<
-      "Pre-collision Test with oriented bounding cylinders is on." << endl;
-    else if ( m_rank == 0 )
-      cout << GrainsExec::m_shift6 <<
-      "Pre-collision Test with bounding volumes is off." << endl;
 
+    // Collision detection
+    DOMNode* collision = 
+                      ReaderXML::getNode( root, "CollisionDetectionAlgorithm" );
+    if ( !collision )
+    {
+      cout << GrainsExec::m_shift6 <<
+              "Default collision detection algorithm using GJK, " <<
+              "1E-15 tolerance, " << 
+              "without acceleration, " <<
+              "and without any bounding volume collision detection!" << endl;
+    }
+    else 
+    {
+      DOMNode* collisionAlg = 
+                       ReaderXML::getNode( collision, "CollisionDetection" );
+      if ( m_rank == 0 && collisionAlg )
+      {
+        string nCollisionAlg = 
+                          ReaderXML::getNodeAttr_String( collisionAlg, "Type" );
+        if ( nCollisionAlg != "GJK" )
+        {
+          cout << GrainsExec::m_shift6 <<
+              "Collision detection algorithm is not defined!" << endl;
+          grainsAbort();
+        }
+
+        double tol = ReaderXML::getNodeAttr_Double( collisionAlg, "Tolerance" );
+        if ( tol < 1e-15 )
+        {
+          cout << GrainsExec::m_shift6 <<
+              "Tolerance should be greater than 1E-15!" << endl;
+          grainsAbort();
+        }
+        else
+          GrainsExec::m_colDetTolerance = tol;
+        
+        string acc = 
+                  ReaderXML::getNodeAttr_String( collisionAlg, "Acceleration" );
+        if ( acc == "ON" )
+          GrainsExec::m_colDetAcceleration = true;
+        else if ( acc == "OFF" )
+          GrainsExec::m_colDetAcceleration = false;
+        else
+        {
+          cout << GrainsExec::m_shift6 <<
+              "Acceleration should be ON or OFF!" << endl;
+          grainsAbort();
+        }
+
+        cout << GrainsExec::m_shift6 <<
+              "Collision detection algorithm using " <<
+              GrainsExec::m_colDetMethod << ", " <<
+              GrainsExec::m_colDetTolerance <<
+              " tolerance, and acceleration is " << 
+              ( GrainsExec::m_colDetAcceleration ? "on." : "off." ) << endl;
+      }
+      else
+      {
+        cout << GrainsExec::m_shift6 <<
+              "Default collision detection algorithm using GJK, " <<
+              "1E-15 tolerance, and without acceleration!" << endl;
+      }
+
+      DOMNode* bVolumeAlg = 
+                       ReaderXML::getNode( collision, "BoundingVolume" );
+      if ( bVolumeAlg )
+      {
+        string nBVtype = ReaderXML::getNodeAttr_String( bVolumeAlg, "Type" );
+        if ( nBVtype == "OBB" )
+          GrainsExec::m_colDetBoundingVolume = 1;
+        else if ( nBVtype == "OBC" )
+          GrainsExec::m_colDetBoundingVolume = 2;
+        else
+          GrainsExec::m_colDetBoundingVolume = 0;
+      }
+      if ( m_rank == 0 && GrainsExec::m_colDetBoundingVolume == 1 )
+        cout << GrainsExec::m_shift6 <<
+        "Pre-collision Test with oriented bounding boxes." << endl;
+      else if ( m_rank == 0 && GrainsExec::m_colDetBoundingVolume == 2 )
+        cout << GrainsExec::m_shift6 <<
+        "Pre-collision Test with oriented bounding cylinders." << endl;
+      else if ( m_rank == 0 )
+        cout << GrainsExec::m_shift6 <<
+        "Pre-collision Test with bounding volumes is off." << endl;
+    }
 
     // Particles
     DOMNode* particles = ReaderXML::getNode( root, "Particles" );

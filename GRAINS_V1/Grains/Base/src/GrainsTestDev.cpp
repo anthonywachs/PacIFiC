@@ -14,11 +14,16 @@
 #include <stdlib.h>
 #include <time.h>
 #include <random>
+#include <thread>
 
 #include <chrono>
 #include "Box.hh"
 #include "Cylinder.hh"
+#include "Superquadric.hh"
 #include "PointContact.hh"
+#include "Particle.hh"
+#include "KinematicsBuilderFactory.hh"
+
 
 using namespace std;
 using namespace std::chrono;
@@ -1187,158 +1192,70 @@ void GrainsTestDev::Simulation( double time_interval )
     error = 1;
   }
 
-    // Comparing GJK and BCylinder
-  //   int nIter = 1e6;
-
-  //   // bodies
-  //   Convex* convexA = new Box( 1., 1., 16. );
-  //   // Convex* convexA  = new Cylinder( 1., 4. );
-  //   // RigidBodyWithCrust RBWCa( convexA, trA );
-  //   // RBWCa.setCrustThickness( 0.1 );
-
-  //   Convex* convexB = new Box( 16., 1., 1. );
-  //   // Convex* convexB = new Cylinder( 1., 4. );
-  //   // RigidBodyWithCrust RBWCb( convexB, trB );
-  //   // RBWCb.setCrustThickness( 0.1 );
-
-
-  //   // Transformation
-  //   double aX, aY, aZ;
-  //   aX = 0.; aY = aZ = 0.;
-  //   double const AAA[12] =
-  //   { cos(aZ)*cos(aY), cos(aZ)*sin(aY)*sin(aX) - sin(aZ)*cos(aX), cos(aZ)*sin(aY)*cos(aX) + sin(aZ)*sin(aX),
-  //     sin(aZ)*cos(aY), sin(aZ)*sin(aY)*sin(aX) + cos(aZ)*cos(aX), sin(aZ)*sin(aY)*cos(aX) - cos(aZ)*sin(aX),
-  //     -sin(aY), cos(aY)*sin(aX), cos(aY)*cos(aX),
-  //     0., 0., 0.};
-  //   Transform const* trA = new Transform( AAA );
-
-  //   aX = 0.; aY = 0.; aZ = M_PI/6.;
-  //   double const BBB[12] =
-  //   { cos(aZ)*cos(aY), cos(aZ)*sin(aY)*sin(aX) - sin(aZ)*cos(aX), cos(aZ)*sin(aY)*cos(aX) + sin(aZ)*sin(aX),
-  //     sin(aZ)*cos(aY), sin(aZ)*sin(aY)*sin(aX) + cos(aZ)*cos(aX), sin(aZ)*sin(aY)*cos(aX) - cos(aZ)*sin(aX),
-  //     -sin(aY), cos(aY)*sin(aX), cos(aY)*cos(aX),
-  //     0., 0., 2.5};
-  //   Transform const* trB = new Transform( BBB );
-  // Creating STL file and reading it
- // string str1 = "wall_double_ramp.stl";
-  //string str1 = "wall_unit.stl";
-  string str1 = "long_wall.stl";
-    
-  Obstacle *stlob = new STLObstacle( "testSTL", str1 );  
-
-  cout << "Creating STLObstacle..." << endl;
-
-
   // ******************************
   //           TESTING 
   // ******************************
 
-  int test1 = 0, test2 = 1;
+  // Constructing Convex
+  Convex* convexA  = new Cylinder( 5.e-2, 15.e-2 );
+  // Convex* convexA  = new Superquadric( 5.e-2, 5.e-2, 75.e-3, 64., 2. );
 
-  if (test1)
+  // Transformation
+  double aX, aY, aZ;
+  aX = 0.; aY = 0.; aZ = 0.;
+  double const AAA[12] =
+  { cos(aZ)*cos(aY), cos(aZ)*sin(aY)*sin(aX) - sin(aZ)*cos(aX), cos(aZ)*sin(aY)*cos(aX) + sin(aZ)*sin(aX),
+    sin(aZ)*cos(aY), sin(aZ)*sin(aY)*sin(aX) + cos(aZ)*cos(aX), sin(aZ)*sin(aY)*cos(aX) - cos(aZ)*sin(aX),
+    -sin(aY), cos(aY)*sin(aX), cos(aY)*cos(aX),
+    0., 0., 0.};
+  Transform const* trA = new Transform( AAA );
+
+  // RBWC
+  RigidBodyWithCrust* rbwcA = new RigidBodyWithCrust( convexA, *trA );
+
+  // Particle
+  Particle* p = new Particle( 1 );
+  p->m_geoRBWC = rbwcA;
+  p->m_density = 7750;
+  p->m_mass = p->m_density * p->m_geoRBWC->getVolume();
+  p->m_geoRBWC->BuildInertia( p->m_inertia, p->m_inertia_1 );
+  for ( int i = 0; i < 6; i++ )
   {
-
-  //   int ctr = 1;
-  //   bool cntct = false;
-
-  //   // Call GJK
-  //   {
-  //     Point3 pointA, pointB;
-  //     int nbIterGJK = 0;
-  //     auto start = high_resolution_clock::now();
-  //     for ( ctr = 1; ctr <= nIter && cntct == false; ctr++ )
-  //     {
-  //       double distance = closest_points( *convexA, *convexB, *trA, *trB,
-  //                                         pointA, pointB, nbIterGJK );
-  //       if ( distance <= 0 )
-  //         cntct = true;
-  //     }
-  //     auto stop = high_resolution_clock::now();
-  //     auto duration = duration_cast<microseconds>( stop - start );
-  //     cout << "Contact " << cntct << ", Iter " << ctr << ", No. GJK Iter. "
-  //          << nbIterGJK  << ", Time taken by GJK: " << duration.count() << " us" << endl;
-  //   }
-
-  //   // Call analCyl
-  //   {
-  //     PointContact pt;
-  //     BCylinder bCylA = convexA->bcylinder();
-  //     BCylinder bCylB = convexB->bcylinder();
-  //     // Transform const* a2wNoCrust = rbA.getTransform();
-  //     // Transform const* b2wNoCrust = rbB.getTransform();
-  //     auto start = high_resolution_clock::now();
-  //     for ( ctr = 1; ctr <= nIter && cntct == false; ctr++ )
-  //     {
-  //       // pt = intersect( bCylA, bCylB, *trA, *trB );
-  //       cntct = isContact( bCylA, bCylB, *trA, *trB );
-  //     }
-  //     auto stop = high_resolution_clock::now();
-  //     auto duration = duration_cast<microseconds>( stop - start );
-  //     cout << "Contact " << cntct << ", Iter " << ctr <<
-  //             ", Time taken by Cyl: " << duration.count() << " us" << endl;
-  //   }
-  double xp = 0.5,   yp = 0.5,   zp = 0.5;
-  double R = 0.1;
-
-  // Test 1: projection belongs to triangle
-  
-  Point3 Pa(0., 0.5, 0.);
-  Point3 Pb(-1000., 0.5, -1000.);
-  Point3 Pc(-1., 0., 1.);
-  Point3 Pd(-1., 0.1, 1.);
-  Point3 P1(-1., 0., 1.);
-  Point3 P2(1., 0., 1.);
-  Point3 P3(0., 0., -1.);
- 
-  
-  cout << "IsInter(Pa): " << STLObstacle::intersect(Pa, P1, P2, P3) << endl;
-  cout << "IsInter(Pb): " << STLObstacle::intersect(Pb, P1, P2, P3) << endl;
-  cout << "IsInter(Pc): " << STLObstacle::intersect(Pc, P1, P2, P3) << endl;
-  cout << "IsInter(Pd): " << STLObstacle::intersect(Pd, P1, P2, P3) << endl;
-
+    p->m_inertia[i] *= p->m_density;
+    p->m_inertia_1[i] /= p->m_density;
   }
 
-  cout << "Testing again..." << endl;
+  // Torque
+  double M = 0.5;
+  p->m_torsor = Torsor( OriginePoint, Vector3Nul, Vector3( 0., M, 0. ) );
 
-  // Test 2: triangle area
- 
-  if (test2)
-  {
+  // Kinematics
+  p->m_kinematics = KinematicsBuilderFactory::create( convexA );
+  p->m_kinematics->setAngularVelocity( Vector3( -0.9, 0.3, 0.6 ) );
 
-  double x1, y1, z1, x2, y2, z2, x3, y3, z3;
+  // Move
+  double dt = 1.e-8;
+  // for ( dt = 1.e-2; dt > 1.e-7; dt /= 10. )
+  for ( double time = 0; time < 1.; time += dt )
+    p->Move( time, dt );
 
-  x1 = 0.0;
-  y1 = 0.0;
-  z1 = 0.0;
+  // Saving the results
+  auto savename = "dt" + to_string( (int) -log10( dt ) ) + ".txt";
+  ofstream MyFile( savename );
+  std::cout << std::fixed << std::showpoint;
+    std::cout << std::setprecision(15);
+  MyFile << std::fixed << setprecision(15) << endl;
+  MyFile << *( p->m_kinematics->getAngularVelocity() ) << " " 
+          << *( p->m_kinematics->getQuaternionRotation() ) << endl;
+  
+  
+  
+  // std::chrono::seconds dura( 1 );
+  // std::this_thread::sleep_for( dura );
+  // auto savename = "dt" + to_string( (int) -log10( dt ) ) + ".txt";
+  // ofstream MyFile( savename );
 
-  x2 = 1.0;
-  y2 = 0.0;
-  z2 = 0.0;
-
-  x3 = 0.0;
-  y3 = 0.0;
-  z3 = 1.0;
-
-  Vector3 n;
-  n[0] = 0.; n[1] = 0.; n[2] = 0.;
-
-  size_t vid = 0;
-  STLVertex *v1 = new STLVertex(x1,y1,z1,n,vid); 
-  STLVertex *v2 = new STLVertex(x2,y2,z2,n,vid);  
-  STLVertex *v3 = new STLVertex(x3,y3,z3,n,vid);
-
-  size_t tid = 0;
-  tuple<STLVertex*,STLVertex*,STLVertex*> vetest;
-  vetest = std::make_tuple(v1, v2, v3);
-  STLTriangle trtest(vetest,n,tid); 
-
-  cout << "Testing area computation: " << trtest.getSurfaceArea() << endl;
-
-  }
-
-  // Test 3: RBWC
-//   
-//   Rectangle *Rect = new Rectangle( 1.0, 1.0 );
-//   Rect->ClosestPoint( RigidBodyWithCrust &Rect );
-
+  // // Write to the file
+  // MyFile << *( p->m_kinematics->getAngularVelocity() ) << " " 
+  //        << *( p->m_kinematics->getQuaternionRotation() ) << endl;
 }

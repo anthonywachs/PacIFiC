@@ -1,3 +1,5 @@
+#include "OBB.hh"
+#include "OBC.hh"
 #include "Rectangle.hh"
 
 
@@ -296,4 +298,23 @@ bool Rectangle::isIn( Point3 const& pt ) const
   return ( ( fabs( pt[Z] ) <= EPSILON ) &&
            ( fabs( pt[Y] ) <= m_LY/2. ) &&
            ( fabs( pt[X] ) <= m_LX/2. ) );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to rectangle
+BVolume* Rectangle::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( m_LX, m_LY, 0. ), Matrix() );
+  else if ( type == 2 ) // OBC
+  {
+    bvol = new OBC( sqrt( m_LX * m_LX + m_LY * m_LY ), 
+                    0.,
+                    Vector3( 0., 0., 1. ) );
+  }
+  return( bvol );
 }

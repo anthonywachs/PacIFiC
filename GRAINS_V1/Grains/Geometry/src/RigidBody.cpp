@@ -25,7 +25,8 @@ RigidBody::RigidBody( Convex* convex_, Transform const& position_ )
   : m_transform( position_ )
   , m_convex( convex_ )
 {
-  m_boundingVolume = m_convex->computeBVolume( GrainsExec::m_boundingVolume );
+  m_boundingVolume = 
+                m_convex->computeBVolume( GrainsExec::m_colDetBoundingVolume );
   m_circumscribedRadius = m_convex->computeCircumscribedRadius();
 }
 

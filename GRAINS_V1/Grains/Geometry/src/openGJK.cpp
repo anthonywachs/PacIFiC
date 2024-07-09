@@ -31,15 +31,12 @@
 
 #include "Matrix.hh"
 #include "openGJK.hh"
+#include "GrainsExec.hh"
 
-#include <stdio.h>
-#include <stdlib.h>
 
-#include "math.h"
-
-double rel_error2 = 1.e-6;   // relative error in the computed distance
-// double abs_error2 = 1.e-10;  // absolute error if the distance is almost zero
-double abs_error2 = 1.e+4 * rel_error2;  // absolute error if the distance is almost zero
+// We will use the given tolerance in the XML input file instead
+// #define eps_rel22        (gkFloat) gkEpsilon * 1e4f
+// #define eps_tot22        (gkFloat) gkEpsilon * 1e2f
 
 #define norm2(a)         (a[0] * a[0] + a[1] * a[1] + a[2] * a[2])
 #define dotProduct(a, b) (a[0] * b[0] + a[1] * b[1] + a[2] * b[2])
@@ -617,97 +614,93 @@ double closest_points_GJK_SV2( Convex const& a,
                        Point3& pb,
                        int& nbIter )
 {
-  unsigned int k = 0;                /**< Iteration counter                 */
-  const int maxk = 30;               /**< Maximum number of GJK iterations  */
-  unsigned int i;
+  double relError = GrainsExec::m_colDetTolerance;
+  double absError = 1.e-4 * relError;
+  bool acceleration = GrainsExec::m_colDetAcceleration;
+  double momentum = 0., oneMinusMomentum = 1.;
 
+  unsigned int numIterations = 0;   /**< Iteration counter                 */
+  const int maxNumIterations = 30;  /**< Maximum number of GJK iterations  */
+  unsigned int i;
+  double v[3];
+  double mu = 0.;
+  
+
+  // Vectors and initial search direction
   Vector3 wVec = a2w( a.support( Vector3Nul ) ) - 
                  b2w( b.support( Vector3Nul ) );
   Vector3 vVec = wVec;
   Vector3 dVec = wVec;
   
-  gkFloat w[3];
-  gkFloat v[3];
-  for (int t = 0; t < 3; ++t)
-  {
-    w[t] = wVec[t];
-    v[t] = vVec[t];
-  }
-  double dist = sqrt( norm2( v ) );
-  double momentum = 0., oneMinusMomentum = 1.;
-  double mu = 0.;
-  bool acceleration = false;
   
   /* Initialise simplex */
+  double dist = Norm( vVec );
   gkSimplex s = { 1, { 0. } };
   for (int t = 0; t < 3; ++t)
-    s.vrtx[0][t] = w[t];
+    s.vrtx[0][t] = wVec[t];
+
 
   /* Begin GJK iteration */
   do {
-    k++;
-    if ( acceleration )
+    numIterations++;
+
+    // Finding the suitable direction using either Nesterov or original
+    // The number 8 is hard-coded. Emprically, it shows the best convergence for
+    // superquadrics. For the rest of shapes, we really do not need to use
+    // Nesterov as the improvemenet is marginal.
+    if ( acceleration && numIterations % 8 != 0 )
     {
-      momentum = k / ( k + 2. );
+      momentum = numIterations / ( numIterations + 2. );
       oneMinusMomentum = 1. - momentum;
       dVec = momentum * dVec + 
              momentum * oneMinusMomentum * vVec +
              oneMinusMomentum * oneMinusMomentum * wVec;
-      wVec = a2w( a.support( ( -dVec ) * a2w.getBasis() ) ) - 
-             b2w( b.support( (  dVec ) * b2w.getBasis() ) );
-      for (int t = 0; t < 3; ++t)
-        w[t] = wVec[t];
-      
-      // set_max( mu, vVec * wVec / dist );
-      // if ( dist - mu <= dist * rel_error2 )
-      mu = dist - dotProduct( v, w ) / dist;
-      if ( mu < dist * rel_error2 ||
-           mu < abs_error2 )
-      {
-        // nbIter = k;
-        if ( Norm( dVec ) - vVec * dVec / dist <= abs_error2 )
-            break;
-        wVec = a2w( a.support( ( -vVec ) * a2w.getBasis() ) ) - 
-               b2w( b.support( (  vVec ) * b2w.getBasis() ) );
-        for (int t = 0; t < 3; ++t)
-          w[t] = wVec[t];
-        // mu = 0.;
-        acceleration = false;
-      }
     }
     else
+      dVec = vVec;
+    
+    wVec = a2w( a.support( ( -dVec ) * a2w.getBasis() ) ) - 
+           b2w( b.support( (  dVec ) * b2w.getBasis() ) );
+    
+    // termination criteria
+    if ( mu < dist * relError ||
+         mu < absError )
     {
-      wVec = a2w( a.support( ( -vVec ) * a2w.getBasis() ) ) - 
-             b2w( b.support( (  vVec ) * b2w.getBasis() ) );
-      for (int t = 0; t < 3; ++t)
-        w[t] = wVec[t];
-
-      // set_max( mu, vVec * wVec / dist );
-      // if ( dist - mu <= dist * rel_error2 )
-      mu = dist - dotProduct( v, w ) / dist;
-      if ( mu < dist * rel_error2 ||
-           mu < abs_error2 )
+      if ( acceleration )
+      {
+        if ( Norm( dVec - vVec ) < EPSILON )
+          break;
+        acceleration = false;
+        wVec = a2w( a.support( ( -vVec ) * a2w.getBasis() ) ) - 
+               b2w( b.support( (  vVec ) * b2w.getBasis() ) );
+      }
+      else
         break;
     }
-    
-    if ( dist < EPSILON2 )
-      break;
 
     /* Add new vertex to simplex */
     i = s.nvrtx;
     for (int t = 0; t < 3; ++t) {
-      s.vrtx[i][t] = w[t];
+      s.vrtx[i][t] = wVec[t];
     }
     s.nvrtx++;
 
     /* Invoke distance sub-algorithm */
     subalgorithm(&s, v);
-    vVec.setValue( v[0], v[1], v[2] );
     dist = sqrt( norm2( v ) );
+    vVec.setValue( v[0], v[1], v[2] );
 
-  } while ((s.nvrtx != 4) && (k != maxk));
+  } while ( ( s.nvrtx != 4 ) && 
+            ( numIterations != maxNumIterations ) && 
+            ( dist > EPSILON2 ) );
+
+  // It is not the best way to return the witness points.
+  // It seems to be inconsistent with the way that it has been done in the
+  // original GJK.
+  // We can use the latest update on wVec to get a better estimate on witness
+  // points.
   pa = a.support( ( -vVec ) * a2w.getBasis() );
   pb = a.support( (  vVec ) * b2w.getBasis() );
-  nbIter = k;
+  nbIter = numIterations;
   return ( dist );
 }

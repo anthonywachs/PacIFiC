@@ -427,7 +427,7 @@ class Component
 
 
 
-  protected:
+  // protected:
     /** @name Constructors */
     //@{
     /** @brief Default constructor

@@ -5,6 +5,8 @@
 #include <stdlib.h>
 
 
+using namespace std;
+
 /** @brief Various constants and type definitions.
 
     @author A.WACHS - 2019 - Major cleaning & refactoring */

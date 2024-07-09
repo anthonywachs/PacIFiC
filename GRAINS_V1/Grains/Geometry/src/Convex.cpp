@@ -5,14 +5,14 @@
 #include "Vector3.hh"
 #include "Transform.hh"
 #include "BVolume.hh"
+#include "GrainsExec.hh"
 
 
+// Tolerances are commented out, as we can dynamically set them through the XML
+// file 
 // double rel_error = EPSILON;   // relative error in the computed distance
 // double abs_error = EPSILON2;  // absolute error if the distance is almost zero
-double rel_error = 1.e-6;   // relative error in the computed distance
-// double abs_error = 1.e-10;  // absolute error if the distance is almost zero
-double abs_error = 1.e+4 * rel_error;  // absolute error if the distance is almost zero
-int num_iterations = 0;
+int numIterations = 0;
 
 static Point3 p[4];         // support points of object A in local coordinates
 static Point3 q[4];         // support points of object B in local coordinates
@@ -65,8 +65,10 @@ BBox Convex::bbox( Transform const& t ) const
 // Returns the convex shape bounding volume
 BVolume* Convex::computeBVolume( unsigned int type ) const
 {
-  cout << "Warning for this Convex the method Convex::computeBVolume() "
-       << "is not yet implemented !\n"
+  cout << "Warning for this Convex (" <<
+           this->getConvexType() <<
+           ") method Convex::computeBVolume() " << 
+           "is not yet implemented !\n"
        << "Need for an assistance ! Stop running !\n";
   // exit(10);
 
@@ -398,7 +400,7 @@ inline bool degenerate(const Vector3& w)
 
 
 // ----------------------------------------------------------------------------
-// For num_iterations > 1000
+// For numIterations > 1000
 void catch_me()
 {
   cerr << "closest_points : Out on iteration > 1000\n";
@@ -585,62 +587,62 @@ double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
 
   bits = 0;
   all_bits = 0;
-  num_iterations = 0;
+  numIterations = 0;
   double mu = 0.;
 
   double momentum, oneMinusMomentum;
-  bool acceleration = false;
+  bool acceleration = GrainsExec::m_colDetAcceleration;
+  double relError = GrainsExec::m_colDetTolerance;
+  double absError = 1.e-4 * relError;
 
-  while (bits < 15 && dist > EPSILON2 && num_iterations < 1000)
+  while (bits < 15 && dist > EPSILON2 && numIterations < 1000)
   {
-    ++num_iterations;
+    ++numIterations;
     last = 0;
     last_bit = 1;
     while (bits & last_bit) { ++last; last_bit <<= 1; }
 
-    if ( acceleration )
+    // Finding the suitable direction using either Nesterov or original
+    // The number 8 is hard-coded. Emprically, it shows the best convergence for
+    // superquadrics. For the rest of shapes, we really do not need to use
+    // Nesterov as the improvemenet is marginal.
+    if ( acceleration && numIterations % 8 != 0 )
     {
-      momentum = num_iterations / ( num_iterations + 2. );
+      momentum = numIterations / ( numIterations + 2. );
       oneMinusMomentum = 1. - momentum;
       d = momentum * d + 
           momentum * oneMinusMomentum * v +
           oneMinusMomentum * oneMinusMomentum * w;
-      p[last] = a.support( ( -d ) * a2w.getBasis() );
-      q[last] = b.support( (  d ) * b2w.getBasis() );
-      w = a2w(p[last]) - b2w(q[last]);
+    }
+    else
+      d = v;
 
-      // set_max(mu, v*w / dist);
-      // if ( dist - mu <= dist * rel_error )
-      mu = dist - v * w / dist;
-      if ( mu < dist * rel_error ||
-           mu < abs_error )
+    p[last] = a.support( ( -d ) * a2w.getBasis() );
+    q[last] = b.support( (  d ) * b2w.getBasis() );
+    w = a2w(p[last]) - b2w(q[last]);
+
+    // termination criteria
+    mu = dist - v * w / dist;
+    if ( mu < dist * relError ||
+         mu < absError )
+    {
+      if ( acceleration )
       {
-        // nbIter = num_iterations;
-        if ( Norm( d ) - v * d / dist <= abs_error )
+        if ( Norm( d - v ) < EPSILON )
           break;
+        acceleration = false;
         p[last] = a.support( ( -v ) * a2w.getBasis() );
         q[last] = b.support( (  v ) * b2w.getBasis() );
         w = a2w( p[last] ) - b2w( q[last] );
-        // mu = 0.;
-        acceleration = false;
       }
-    }
-    else
-    {
-      p[last] = a.support( ( -v ) * a2w.getBasis() );
-      q[last] = b.support( (  v ) * b2w.getBasis() );
-      w = a2w( p[last] ) - b2w( q[last] );
-      
-      // set_max(mu, v*w / dist);
-      // if ( dist - mu <= dist * rel_error )
-      mu = dist - v * w / dist;
-      if ( mu < dist * rel_error ||
-           mu < abs_error )
+      else
         break;
     }
 
     if (degenerate(w))
       break;
+
+    
     y[last] = w;
     all_bits = bits|last_bit;
 
@@ -649,10 +651,10 @@ double closest_points( Convex const& a, Convex const& b, Transform const& a2w,
     dist = Norm(v);
   }
   compute_points(bits, pa, pb);
-  if (num_iterations > 1000) 
+  if (numIterations > 1000) 
     catch_me();
   else 
-    nbIter = num_iterations;
+    nbIter = numIterations;
   return ( dist );
 }
 

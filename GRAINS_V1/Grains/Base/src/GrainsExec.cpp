@@ -41,7 +41,10 @@ list<IndexArray*> GrainsExec::m_allPolytopeNodesIndex;
 list<vector< vector<int> >*> GrainsExec::m_allPolyhedronFacesConnectivity;
 string GrainsExec::m_inputFile;
 int GrainsExec::m_return_syscmd = 0;
-unsigned int GrainsExec::m_boundingVolume = 0;
+string GrainsExec::m_colDetMethod = "GJK";
+double GrainsExec::m_colDetTolerance = EPSILON2;
+bool GrainsExec::m_colDetAcceleration = false;
+unsigned int GrainsExec::m_colDetBoundingVolume = 1;
 
 
 

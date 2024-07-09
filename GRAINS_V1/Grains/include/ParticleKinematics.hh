@@ -182,7 +182,7 @@ class ParticleKinematics : public Kinematics
     //@}
     
 
-  protected:
+  // protected:
     /** @name Constructors */
     //@{
     /** @brief Default constructor forbidden if not called by derived class */

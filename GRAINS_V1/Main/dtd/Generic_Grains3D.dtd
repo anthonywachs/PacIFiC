@@ -40,7 +40,7 @@
 <!ELEMENT Grains3D (Construction, Forces, Simulation)>
 <!ATTLIST Grains3D Type (Standard|MPI) "Standard">
 
-  <!ELEMENT Construction (LinkedCell, Origin?, Periodicity?, DomainDecomposition?, MPI?, ContactForceModels, BoundingVolume?, Particles?, Obstacles?, Reload?)>
+  <!ELEMENT Construction (LinkedCell, Origin?, Periodicity?, DomainDecomposition?, MPI?, ContactForceModels, CollisionDetectionAlgorithm?, Particles?, Obstacles?, Reload?)>
     <!ELEMENT LinkedCell EMPTY>
     <!ATTLIST LinkedCell MX CDATA #REQUIRED>
     <!ATTLIST LinkedCell MY CDATA #REQUIRED>
@@ -57,8 +57,6 @@
 
     <!ELEMENT ContactForceModels (Default?, ContactForceModel*)>
     
-    <!ELEMENT BoundingVolume EMPTY>
-    <!ATTLIST BoundingVolume Type (OFF|OBB|OBC) "OFF">
       
     <!ELEMENT Particles (Particle+)>    
       <!ELEMENT Particle (Convex, AngularPosition, Material)>
