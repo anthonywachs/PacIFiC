@@ -1964,8 +1964,7 @@ void AllComponents::setOutputObstaclesLoadParameters( string const& root_,
   {
     Obstacle* pobs = const_cast<Obstacle*>(m_obstacle->getObstacleFromName(
     	*il ));
-    if ( pobs )
-      m_outputTorsorObstacles.push_back( pobs );
+    if ( pobs ) m_outputTorsorObstacles.push_back( pobs );
   }
 }
 

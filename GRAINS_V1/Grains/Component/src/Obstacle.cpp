@@ -17,12 +17,13 @@ int Obstacle::m_minID = 0;
 
 //-----------------------------------------------------------------------------
 // Constructor with name and autonumbering as input parameters
-Obstacle::Obstacle( string const& s, bool const& autonumbering ) :
-  Component(),
-  m_name( s ),
-  m_ismoving( false ),
-  m_indicator( 0. ),
-  m_ObstacleType ( "0" )
+Obstacle::Obstacle( string const& s, bool const& autonumbering ) 
+  : Component()
+  , m_name( s )
+  , m_ismoving( false )
+  , m_indicator( 0. )
+  , m_ObstacleType ( "0" )
+  , m_force_move( false )
 {
   if ( autonumbering )
   {
@@ -587,4 +588,23 @@ void Obstacle::addTorque( Vector3 const& torque, int tagSecondComp )
   // must not be added as its periodic/parallel master particle's contribution 
   // is already accounted for 
   if ( tagSecondComp != 2 ) m_torsor.addTorque( torque );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Checks if there is anything special to do about periodicity and
+// if there is applies periodicity
+void Obstacle::periodicity()
+{}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets motion forcing to true
+void Obstacle::setForceMove()
+{
+  m_force_move = true;
 }

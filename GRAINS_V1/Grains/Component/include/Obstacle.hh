@@ -117,8 +117,11 @@ class Obstacle : public Component
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
         
-    /** @brief Set contact map entry features to zero */
-    virtual void setContactMapFeaturesToZero();    
+    /** @brief Sets contact map entry features to zero */
+    virtual void setContactMapFeaturesToZero(); 
+    
+    /** @brief Sets motion forcing to true */
+    void setForceMove();   
     //@}
 
 
@@ -248,6 +251,10 @@ class Obstacle : public Component
     Useful for debugging only.
     @param id id of this component */
     virtual void printActiveNeighbors( int const& id );
+    
+    /** @brief Checks if there is anything special to do about periodicity and
+    if there is applies periodicity */
+    virtual void periodicity();    
     //@}
 
 
@@ -392,6 +399,8 @@ class Obstacle : public Component
     double m_indicator; /**< post-processing indicator for the rotation of
   	composite obstacle in Paraview */
     string m_ObstacleType; /**< obstacle type */
+    bool m_force_move; /**< geometrically move the obstacle even if 
+    	m_MoveObstacle is set to false, default is false */    
     //@}
 
     /** @name Parameters Static */

@@ -12,8 +12,9 @@ int CompositeObstacle::m_minCompositeObstacleID = -1;
 
 // ----------------------------------------------------------------------------
 // Constructor with name as input parameter
-CompositeObstacle::CompositeObstacle( string const& s ) :
-  Obstacle( s, false )
+CompositeObstacle::CompositeObstacle( string const& s ) 
+  : Obstacle( s, false )
+  , m_type( "Standard" )
 {
   m_id = GrainsExec::m_CompositeObstacleDefaultID;
   m_minCompositeObstacleID++;
@@ -26,8 +27,9 @@ CompositeObstacle::CompositeObstacle( string const& s ) :
 
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter
-CompositeObstacle::CompositeObstacle( DOMNode* root ) :
-  Obstacle( "obstacle", false )
+CompositeObstacle::CompositeObstacle( DOMNode* root ) 
+  : Obstacle( "obstacle", false )
+  , m_type( "Standard" )  
 {
   m_id = GrainsExec::m_CompositeObstacleDefaultID;
   m_minCompositeObstacleID++;
@@ -44,7 +46,7 @@ CompositeObstacle::CompositeObstacle( DOMNode* root ) :
   for (XMLSize_t i=0; i<allObstacles->getLength(); i++) 
   {
     obstacle = ObstacleBuilderFactory::create( allObstacles->item( i ) );
-    m_obstacles.push_back(obstacle);
+    m_obstacles.push_back( obstacle );
   }
   computeCenterOfMass();
 }
@@ -146,7 +148,7 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
   m_ismoving = m_ismoving || motherCompositeHasImposedVelocity;
 
   // Composite center motion
-  if ( m_ismoving && Obstacle::m_MoveObstacle ) 
+  if ( m_ismoving && ( Obstacle::m_MoveObstacle || m_force_move ) ) 
   {
     // Translation motion
     Vector3 const* translation = m_kinematics.getTranslation();
@@ -180,7 +182,7 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
   moveForce = moveForce || motherCompositeHasImposedForce;    
 
   // Composite center motion
-  if ( moveForce && Obstacle::m_MoveObstacle )
+  if ( moveForce && ( Obstacle::m_MoveObstacle || m_force_move ) )
   {
     Vector3 translation = m_confinement.getTranslation( dt );
     m_geoRBWC->composeLeftByTranslation( translation );
@@ -396,7 +398,7 @@ bool CompositeObstacle::isCloseWithCrust( Component const* voisin ) const
 // Outputs the composite obstacle for reload
 void CompositeObstacle::write( ostream& fileSave ) const
 {
-  fileSave << "<Composite> " << m_name << endl;
+  fileSave << "<Composite> " << m_name << " " << m_type << endl;
   if ( m_CompositeObstacle_id ) m_torsor.write( fileSave );
   list<Obstacle*>::const_iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
@@ -920,4 +922,17 @@ void CompositeObstacle::setMinIDnumber()
   list<Obstacle*>::iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
     (*obstacle)->setMinIDnumber();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Checks if there is anything special to do about periodicity and
+// if there is applies periodicity
+void CompositeObstacle::periodicity()
+{
+  list<Obstacle*>::iterator obstacle;
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+    (*obstacle)->periodicity();
 }

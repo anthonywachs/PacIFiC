@@ -617,8 +617,40 @@ bool App::isInDomain( Point3 const* position )
     isIn = false;
   
   return ( isIn );
-}  
+} 
 
+
+
+ 
+// ----------------------------------------------------------------------------
+// Returns whether a point belongs to the global domain in a given direction
+bool App::isInDomain( Point3 const* position, size_t const& dir )
+{
+  bool isIn = true;
+  
+  switch ( dir )
+  {
+    case 0:
+      if ( (*position)[0] < m_domain_global_origin[0] 
+  	|| (*position)[0] > m_domain_global_origin[0] + m_domain_global_size_X )
+      isIn = false; 
+      break;
+      
+    case 1:
+      if ( (*position)[1] < m_domain_global_origin[1] 
+	|| (*position)[1] > m_domain_global_origin[1] + m_domain_global_size_Y )
+      isIn = false; 
+      break;
+      
+    default:
+      if ( (*position)[2] < m_domain_global_origin[2] 
+	|| (*position)[2] > m_domain_global_origin[2] + m_domain_global_size_Z )
+      isIn = false;                        
+      break;  
+  }
+  
+  return ( isIn );
+}  
 
 
 

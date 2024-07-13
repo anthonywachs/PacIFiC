@@ -158,7 +158,7 @@ class AppCollision : public App
 
     /** @name Parameters */
     //@{  
-    Obstacle* m_obstacles; /**< Parent obstacle */  
+    Obstacle* m_obstacles; /**< Root obstacle */  
     list<SimpleObstacle*> m_allObstacles; /**< List of simple obstacles */
     double m_overlap_max; /**< Maximum overlap between 2 colliding
     	components */

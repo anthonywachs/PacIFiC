@@ -68,10 +68,15 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
 // Constructor with input parameters. 
 SimpleObstacle::SimpleObstacle( string const& name, 
 	RigidBodyWithCrust* georbwc, 
-    	string const& mat, bool const& toFluid )
-  : Obstacle( "", true )
+    	string const& mat, bool const& toFluid, 
+	bool const& autonumbering )
+  : Obstacle( "", autonumbering )
   , m_transferToFluid( false )
 {
+  m_ObstacleType = "SimpleObstacle";
+
+  Obstacle::m_totalNbSingleObstacles++;
+
   m_name = name;
   m_geoRBWC = georbwc;
   m_materialName = mat;
@@ -90,6 +95,7 @@ SimpleObstacle::SimpleObstacle( string const& name,
 SimpleObstacle::~SimpleObstacle()
 {
   m_inCells.clear();
+  Obstacle::m_totalNbSingleObstacles--;
 }
 
 
@@ -126,7 +132,7 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
   m_ismoving = m_ismoving || motherCompositeHasImposedVelocity;
 
   // Obstacle motion
-  if ( m_ismoving && Obstacle::m_MoveObstacle )
+  if ( m_ismoving && ( Obstacle::m_MoveObstacle || m_force_move ) )
   {
     Vector3 const* translation = m_kinematics.getTranslation();
     m_geoRBWC->composeLeftByTranslation( *translation );
@@ -137,7 +143,7 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
   bool moveForce = m_confinement.ImposedMotion( time, dt, this );
   moveForce = moveForce || motherCompositeHasImposedForce;
 
-  if ( moveForce && Obstacle::m_MoveObstacle )
+  if ( moveForce && ( Obstacle::m_MoveObstacle || m_force_move ) )
   {
     Vector3 translation = m_confinement.getTranslation( dt );
     m_geoRBWC->composeLeftByTranslation( translation );
@@ -147,7 +153,7 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
 
   // If the obstacle moved, add it to the list of moving obstacles and 
   // updates its boundind box
-  if ( m_ismoving && Obstacle::m_MoveObstacle )
+  if ( m_ismoving && ( Obstacle::m_MoveObstacle || m_force_move ) )
   {
     m_obstacleBox = Component::BoundingBox();
     movingObstacles.push_back( this );

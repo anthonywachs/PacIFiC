@@ -1411,6 +1411,9 @@ void LinkedCell::LinkUpdate( double time, double dt,
           break;
       }
     }
+    
+    // Obstacle periodicity
+    if ( m_domain_global_periodic ) m_obstacles->periodicity();
 
     // Update obstacles in case they move
     list<SimpleObstacle*>::iterator myObs;

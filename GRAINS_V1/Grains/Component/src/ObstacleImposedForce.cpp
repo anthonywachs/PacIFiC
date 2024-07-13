@@ -236,7 +236,7 @@ Vector3 const* ObstacleImposedForce::translationalVelocity( double time,
   // Mass coeficient
   // If automatically determined, it is set such that the obstacle motion
   // over [t,t+dt] is equal to its crust thickness divided by 10^7 when
-  // the controller is simply a propertional controller and df is equal 
+  // the controller is simply a proportional controller and df is equal 
   // to the imposed force  
   if ( m_automass )
     m_mass = dt * dt * Norm( m_force_amplitude ) * 1.e7 /
@@ -274,7 +274,7 @@ Vector3 const* ObstacleImposedForce::translationalVelocity( double time,
       depl_nm1 = depl;
     }
     else
-      m_translationalVelocity = - m_vmaxzeroforce * m_direction;      
+      m_translationalVelocity = - m_vmaxzeroforce * m_direction;            
   }
   else if ( m_type == "SinCyclicTranslation" )
   {

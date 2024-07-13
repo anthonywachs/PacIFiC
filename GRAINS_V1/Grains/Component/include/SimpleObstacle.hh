@@ -39,9 +39,11 @@ class SimpleObstacle : public Obstacle
     @param name obstacle name 
     @param georbwc pointer to a rigid body with crust object
     @param mat obstacle material 
-    @param toFluid whether to transfer the obstacle to the fluid solver */
+    @param toFluid whether to transfer the obstacle to the fluid solver 
+    @param autonumbering obstacle autonumbering */
     SimpleObstacle( string const& name, RigidBodyWithCrust* georbwc, 
-    	string const& mat, bool const& toFluid );	    
+    	string const& mat, bool const& toFluid, 
+	bool const& autonumbering );	    
 
     /** @brief Destructor */
     ~SimpleObstacle();

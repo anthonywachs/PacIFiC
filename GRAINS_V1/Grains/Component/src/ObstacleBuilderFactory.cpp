@@ -4,6 +4,7 @@
 #include "SimpleObstacle.hh"
 #include "STLObstacle.hh"
 #include "CylindricalShell.hh"
+#include "RoughWall.hh"
 #include <string>
 using namespace std;
 
@@ -28,7 +29,9 @@ Obstacle* ObstacleBuilderFactory::create( DOMNode* root )
   else if ( type == "Composite" )
     obstacle = new CompositeObstacle( root );
   else if ( type == "CylindricalShell" )
-    obstacle = new CylindricalShell( root );  
+    obstacle = new CylindricalShell( root );
+  else if ( type == "RoughWall" )
+    obstacle = new RoughWall( root );      
 
   return ( obstacle );
 }
@@ -41,18 +44,23 @@ Obstacle* ObstacleBuilderFactory::create( DOMNode* root )
 void ObstacleBuilderFactory::reload( string const& tag, Obstacle& mother, 
 	istream& file )
 { 
-  string name;
+  string name, type;
+  Obstacle *obstacle = NULL;  
 
   if ( tag == "<Composite>" ) 
   {
-    file >> name;
-    Obstacle *composite = new CompositeObstacle( name );
-    composite->reload( mother, file );
+    file >> name >> type;
+    if ( type == "Standard" ) obstacle = new CompositeObstacle( name );
+    else if ( type == "CylindricalShell" )
+      obstacle = new CylindricalShell( name );
+    else if ( type == "RoughWall" )
+      obstacle = new RoughWall( name );    
+    obstacle->reload( mother, file );
   } 
   else if ( tag == "<Simple>" ) 
   {
     file >> name;
-    Obstacle *simple = new SimpleObstacle( name );
-    simple->reload( mother, file );
+    obstacle = new SimpleObstacle( name );
+    obstacle->reload( mother, file );
   } 
 }
