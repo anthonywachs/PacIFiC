@@ -132,10 +132,13 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
   m_ismoving = m_ismoving || motherCompositeHasImposedVelocity;
 
   // Obstacle motion
-  if ( m_ismoving && ( Obstacle::m_MoveObstacle || m_force_move ) )
-  {
-    Vector3 const* translation = m_kinematics.getTranslation();
-    m_geoRBWC->composeLeftByTranslation( *translation );
+  if ( m_ismoving && Obstacle::m_MoveObstacle )
+  {    
+    Vector3 translation = *(m_kinematics.getTranslation());
+    if ( m_restrict_geommotion )
+      for (list<size_t>::iterator il=m_dir_restricted_geommotion.begin();
+      	il!=m_dir_restricted_geommotion.end();il++) translation[*il] = 0.;
+    m_geoRBWC->composeLeftByTranslation( translation );    
     Quaternion const* w = m_kinematics.getQuaternionRotationOverDt();
     Rotate( *w );
   }
@@ -143,9 +146,12 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
   bool moveForce = m_confinement.ImposedMotion( time, dt, this );
   moveForce = moveForce || motherCompositeHasImposedForce;
 
-  if ( moveForce && ( Obstacle::m_MoveObstacle || m_force_move ) )
+  if ( moveForce && Obstacle::m_MoveObstacle )
   {
     Vector3 translation = m_confinement.getTranslation( dt );
+    if ( m_restrict_geommotion )
+      for (list<size_t>::iterator il=m_dir_restricted_geommotion.begin();
+      	il!=m_dir_restricted_geommotion.end();il++) translation[*il] = 0.;    
     m_geoRBWC->composeLeftByTranslation( translation );
   }
   
@@ -153,7 +159,7 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
 
   // If the obstacle moved, add it to the list of moving obstacles and 
   // updates its boundind box
-  if ( m_ismoving && ( Obstacle::m_MoveObstacle || m_force_move ) )
+  if ( m_ismoving && Obstacle::m_MoveObstacle )
   {
     m_obstacleBox = Component::BoundingBox();
     movingObstacles.push_back( this );

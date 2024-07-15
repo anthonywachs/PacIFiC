@@ -145,6 +145,9 @@ class AppCollision : public App
     
     /** @brief Returns a pointer to the vector of postprocessing forces */
     vector<struct PointForcePostProcessing> const* getPPForces() const;
+    
+    /** @brief Resets the list of simple obstacles */
+    void resetListSimpleObstacles();    
     //@}  
 
   
@@ -159,7 +162,7 @@ class AppCollision : public App
     /** @name Parameters */
     //@{  
     Obstacle* m_obstacles; /**< Root obstacle */  
-    list<SimpleObstacle*> m_allObstacles; /**< List of simple obstacles */
+    list<SimpleObstacle*> m_allSimpleObstacles; /**< List of simple obstacles */
     double m_overlap_max; /**< Maximum overlap between 2 colliding
     	components */
     double m_overlap_mean; /**< Average overlap between 2 colliding

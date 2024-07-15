@@ -49,6 +49,7 @@ RoughWall::RoughWall( DOMNode* root ) :
   m_random_mag = ReaderXML::getNodeAttr_Double( nRough, "RandMag" );
   
   m_periodic = false;
+  m_restrict_box_geommotion = false;
   DOMNode* nPer = ReaderXML::getNode( nGeom, "Periodicity" ); 
   if ( nPer )
   {
@@ -76,6 +77,11 @@ RoughWall::RoughWall( DOMNode* root ) :
     else
       cout << "WARNING: unknown periodic directions in RoughWall " <<
      	 m_name << endl;
+    if ( ReaderXML::hasNodeAttr( nPer, "RestrictBoxMotion" ) )
+    {	 
+      string sres = ReaderXML::getNodeAttr_String( nPer, "RestrictBoxMotion" );
+      if ( sres == "True" ) m_restrict_box_geommotion = true;
+    }
   }   
   
   // Crust thickness 
@@ -94,6 +100,8 @@ RoughWall::RoughWall( DOMNode* root ) :
  	m_materialName, transferToFluid, true );
   Point3 cg, cgphys;
   sbox->setPosition( cg );
+  if ( m_restrict_box_geommotion )
+    sbox->setRestrictedGeomDirMotion( m_periodic_directions );
   m_obstacles.push_back( sbox );		 
 
   // Create elememtary sphere obstacles to create roughness
@@ -129,7 +137,6 @@ RoughWall::RoughWall( DOMNode* root ) :
         Obstacle* ssphere = new SimpleObstacle( name, geoRBWC_sphere, 
 		m_materialName, transferToFluid, true );
         ssphere->setPosition( cg );
-	ssphere->setForceMove();
         m_obstacles.push_back( ssphere );
 	++counter;
       }	    
@@ -179,7 +186,6 @@ RoughWall::RoughWall( DOMNode* root ) :
 	  cg[m] = cg[m] + ( cg[m] < m_domain_origin[m] + m_lper[m] ? 
 	    	1. : -1. ) * m_domain_size[m];
           ssphere->setPosition( cg );
-	  ssphere->setForceMove();
           perspheres.push_back( ssphere );
 	  ++counter;	    
 	}
@@ -251,7 +257,6 @@ RoughWall::RoughWall( DOMNode* root ) :
 		m_materialName, transferToFluid, false );
 	  ssphere->setID( (*obstacle)->getID() );
           ssphere->setPosition( cg );
-	  ssphere->setForceMove();
           perspheres.push_back( ssphere );
 	  ++counter;	    
 	}   
@@ -303,14 +308,14 @@ RoughWall::~RoughWall()
 // ----------------------------------------------------------------------------
 // Checks if there is anything special to do about periodicity and
 // if there is applies periodicity
-void RoughWall::periodicity()
+void RoughWall::periodicity( LinkedCell* LC )
 {
   Point3 cg;
   list<Obstacle*>::iterator obstacle;
   string name;
   list<Obstacle*> perspheres;
   bool create = true;
-  size_t m, n; 
+  size_t m, n, ndel = 0; 
   
   if ( GrainsExec::m_periodic && m_periodic && m_ismoving )
   {
@@ -328,12 +333,16 @@ void RoughWall::periodicity()
 	if ( cg[m] < m_domain_origin[m] - m_lper[m] 
 		|| cg[m] > m_domain_origin[m] + m_domain_size[m] + m_lper[m] )
 	{
+	  LC->remove( (SimpleObstacle*)*obstacle );
 	  delete *obstacle;
 	  obstacle = m_obstacles.erase( obstacle );
+	  ndel++;
 	}
 	else obstacle++;
       }
     }
+    
+    if ( ndel ) LC->resetListSimpleObstacles();
    
     // Create new periodic spheres
     // Mono-periodicity
@@ -385,7 +394,6 @@ void RoughWall::periodicity()
 			(*obstacle)->getObstaclesToFluid().size() != 0, false );
 	    ssphere->setID( (*obstacle)->getID() );	      
             ssphere->setPosition( cg );
-	    ssphere->setForceMove();
             perspheres.push_back( ssphere );
 	  }
         }
@@ -483,7 +491,6 @@ void RoughWall::periodicity()
 			(*obstacle)->getObstaclesToFluid().size() != 0, false );
 	      ssphere->setID( (*obstacle)->getID() );
               ssphere->setPosition( cg );
-	      ssphere->setForceMove();
               perspheres.push_back( ssphere );	    
 	    }
 	  }
@@ -544,7 +551,8 @@ void RoughWall::write( ostream& fileSave ) const
   if ( m_periodic_directions.size() )
     for (list<size_t>::const_iterator il=m_periodic_directions.begin();
     	il!=m_periodic_directions.end();il++) fileSave << *il << " ";
-  fileSave << m_domain_origin << " " << m_domain_size << " " << m_lper << endl;
+  fileSave << m_restrict_box_geommotion << " " << m_domain_origin << " " << 
+  	m_domain_size << " " << m_lper << endl;
   if ( m_CompositeObstacle_id ) m_torsor.write( fileSave );
   list<Obstacle*>::const_iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
@@ -575,7 +583,8 @@ void RoughWall::reload( Obstacle& mother, istream& file )
       file >> dir;
       m_periodic_directions.push_back( dir );
     }
-  file >> m_domain_origin >> m_domain_size >> m_lper;
+  file >> m_restrict_box_geommotion >> m_domain_origin >> m_domain_size >> 
+  	m_lper;
   
   // Standard Composite Obstacle reload  
   if ( m_CompositeObstacle_id ) m_torsor.read( file ); 
@@ -588,12 +597,14 @@ void RoughWall::reload( Obstacle& mother, istream& file )
   computeCenterOfMass();
   mother.append( this );
   
-  // Set force move to true and initialize position at previous time
+  // Restricts the geometric directions of translational motion of the box 
+  // and initialize position at previous time
   list<Obstacle*>::iterator obstacle = m_obstacles.begin();
+  if ( m_restrict_box_geommotion )
+    (*obstacle)->setRestrictedGeomDirMotion( m_periodic_directions );
   obstacle++;
   for (; obstacle!=m_obstacles.end();obstacle++)
   {
-    (*obstacle)->setForceMove();
     if ( isInDomain( (*obstacle)->getPosition() ) ) 
       m_pos_nm1[(*obstacle)->getID()] = *(*obstacle)->getPosition();
   }  

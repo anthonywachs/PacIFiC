@@ -23,7 +23,7 @@ Obstacle::Obstacle( string const& s, bool const& autonumbering )
   , m_ismoving( false )
   , m_indicator( 0. )
   , m_ObstacleType ( "0" )
-  , m_force_move( false )
+  , m_restrict_geommotion( false )
 {
   if ( autonumbering )
   {
@@ -596,15 +596,16 @@ void Obstacle::addTorque( Vector3 const& torque, int tagSecondComp )
 // ----------------------------------------------------------------------------
 // Checks if there is anything special to do about periodicity and
 // if there is applies periodicity
-void Obstacle::periodicity()
+void Obstacle::periodicity( LinkedCell* LC )
 {}
 
 
 
 
 // ----------------------------------------------------------------------------
-// Sets motion forcing to true
-void Obstacle::setForceMove()
+// Restricts the geometric directions of translational motion 
+void Obstacle::setRestrictedGeomDirMotion( list<size_t> const& dir )
 {
-  m_force_move = true;
+  m_restrict_geommotion = true;
+  m_dir_restricted_geommotion = dir;
 }

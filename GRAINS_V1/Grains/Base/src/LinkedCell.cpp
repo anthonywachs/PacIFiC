@@ -1334,7 +1334,6 @@ void LinkedCell::Link( Obstacle* obstacle )
 
   AppCollision::Link( obstacle );
   
-  list<SimpleObstacle*> list_obstacles = obstacle->getObstacles();
   list<SimpleObstacle*>::iterator myObs;
   Cell* cell_ = NULL;
   Transform cellPosition;
@@ -1342,7 +1341,8 @@ void LinkedCell::Link( Obstacle* obstacle )
   Point3 const* cg = NULL;
   bool add = false;
 
-  for (myObs=list_obstacles.begin();myObs!=list_obstacles.end();myObs++)
+  for (myObs=m_allSimpleObstacles.begin();myObs!=m_allSimpleObstacles.end();
+  	myObs++)
   {
     RigidBody const* obstacleRigidBody = (*myObs)->getRigidBody();
     BBox const* obstacleBBox = (*myObs)->getObstacleBox();
@@ -1413,11 +1413,11 @@ void LinkedCell::LinkUpdate( double time, double dt,
     }
     
     // Obstacle periodicity
-    if ( m_domain_global_periodic ) m_obstacles->periodicity();
+    if ( m_domain_global_periodic ) m_obstacles->periodicity( this );
 
     // Update obstacles in case they move
     list<SimpleObstacle*>::iterator myObs;
-    for (myObs=m_allObstacles.begin();myObs!=m_allObstacles.end();myObs++)
+    for (myObs=m_allSimpleObstacles.begin();myObs!=m_allSimpleObstacles.end();myObs++)
       if ( (*myObs)->hasMoved() )
       {
         // Check whether the obstacle intersects the local linked cell grid

@@ -148,11 +148,14 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
   m_ismoving = m_ismoving || motherCompositeHasImposedVelocity;
 
   // Composite center motion
-  if ( m_ismoving && ( Obstacle::m_MoveObstacle || m_force_move ) ) 
+  if ( m_ismoving && Obstacle::m_MoveObstacle ) 
   {
     // Translation motion
-    Vector3 const* translation = m_kinematics.getTranslation();
-    m_geoRBWC->composeLeftByTranslation( *translation );
+    Vector3 translation = *(m_kinematics.getTranslation());
+    if ( m_restrict_geommotion )
+      for (list<size_t>::iterator il=m_dir_restricted_geommotion.begin();
+      	il!=m_dir_restricted_geommotion.end();il++) translation[*il] = 0.;    
+    m_geoRBWC->composeLeftByTranslation( translation );
 
     // Angular motion
     Quaternion const* w = m_kinematics.getQuaternionRotationOverDt();
@@ -182,9 +185,12 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
   moveForce = moveForce || motherCompositeHasImposedForce;    
 
   // Composite center motion
-  if ( moveForce && ( Obstacle::m_MoveObstacle || m_force_move ) )
+  if ( moveForce && Obstacle::m_MoveObstacle )
   {
     Vector3 translation = m_confinement.getTranslation( dt );
+    if ( m_restrict_geommotion )
+      for (list<size_t>::iterator il=m_dir_restricted_geommotion.begin();
+      	il!=m_dir_restricted_geommotion.end();il++) translation[*il] = 0.; 
     m_geoRBWC->composeLeftByTranslation( translation );
   }
 
@@ -930,9 +936,22 @@ void CompositeObstacle::setMinIDnumber()
 // ----------------------------------------------------------------------------
 // Checks if there is anything special to do about periodicity and
 // if there is applies periodicity
-void CompositeObstacle::periodicity()
+void CompositeObstacle::periodicity( LinkedCell* LC )
 {
   list<Obstacle*>::iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
-    (*obstacle)->periodicity();
+    (*obstacle)->periodicity( LC );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Empties the list of cells the obstacle is linked to and deletes the pointer 
+// to the obstacle is these cells */
+void CompositeObstacle::resetInCells() 
+{
+  list<Obstacle*>::iterator obstacle;
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+    (*obstacle)->resetInCells();
 }

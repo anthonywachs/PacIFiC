@@ -38,7 +38,7 @@ class CompositeObstacle : public Obstacle
     //@}
 
 
-    /** @name Methods Get */
+    /** @name Accessors */
     //@{
     /**
     @brief Returns a pointer to the obstacle if the name matches. Searches all
@@ -59,7 +59,7 @@ class CompositeObstacle : public Obstacle
     //@}
 
 
-    /** @name Set methods Set */
+    /** @name Set methods */
     //@{  
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
@@ -233,8 +233,13 @@ class CompositeObstacle : public Obstacle
     virtual void setMinIDnumber(); 
     
     /** @brief Checks if there is anything special to do about periodicity and
-    if there is applies periodicity */
-    virtual void periodicity();         
+    if there is applies periodicity 
+    @param LC linked-cell grid */
+    virtual void periodicity( LinkedCell* LC );
+    
+    /** @brief Empties the list of cells the obstacle is linked to and deletes
+    the pointer to the obstacle is these cells */
+    virtual void resetInCells();              
     //@}
 
 

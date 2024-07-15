@@ -96,7 +96,11 @@ class Obstacle : public Component
     virtual string getObstacleType() = 0;
     
     /** @brief Computes center of mass position */
-    virtual pair<Point3,double> computeCenterOfMass() = 0;    
+    virtual pair<Point3,double> computeCenterOfMass() = 0;
+    
+    /** @brief Empties the list of cells the obstacle is linked to and deletes
+    the pointer to the obstacle is these cells */
+    virtual void resetInCells() = 0;        
     //@}
 
 
@@ -120,8 +124,9 @@ class Obstacle : public Component
     /** @brief Sets contact map entry features to zero */
     virtual void setContactMapFeaturesToZero(); 
     
-    /** @brief Sets motion forcing to true */
-    void setForceMove();   
+    /** @brief Restricts the geometric directions of translational motion 
+    @param dir restricted geometric directions of translational motion */
+    void setRestrictedGeomDirMotion( list<size_t> const& dir );   
     //@}
 
 
@@ -253,8 +258,9 @@ class Obstacle : public Component
     virtual void printActiveNeighbors( int const& id );
     
     /** @brief Checks if there is anything special to do about periodicity and
-    if there is applies periodicity */
-    virtual void periodicity();    
+    if there is applies periodicity 
+    @param LC linked-cell grid */
+    virtual void periodicity( LinkedCell* LC );    
     //@}
 
 
@@ -399,8 +405,10 @@ class Obstacle : public Component
     double m_indicator; /**< post-processing indicator for the rotation of
   	composite obstacle in Paraview */
     string m_ObstacleType; /**< obstacle type */
-    bool m_force_move; /**< geometrically move the obstacle even if 
-    	m_MoveObstacle is set to false, default is false */    
+    bool m_restrict_geommotion; /**< restrict the geometric translation motion
+    	of the obstacle to specific direction */
+    list<size_t> m_dir_restricted_geommotion; /**< geometric direction of 
+    	translational motion that are not allowed */    
     //@}
 
     /** @name Parameters Static */

@@ -93,10 +93,20 @@ void AppCollision::Link( Obstacle* obstacle )
   if ( !m_obstacles )
   {
     m_obstacles = obstacle;
-    m_allObstacles = obstacle->getObstacles();
+    m_allSimpleObstacles = obstacle->getObstacles();
   }
 }
 
+
+
+
+// ----------------------------------------------------------------------------
+// Resets the list of simple obstacles */
+void AppCollision::resetListSimpleObstacles()
+{
+  m_allSimpleObstacles = m_obstacles->getObstacles();
+}
+ 
 
 
 
@@ -105,8 +115,8 @@ void AppCollision::Link( Obstacle* obstacle )
 void AppCollision::remove( SimpleObstacle* obs )
 {
   list<SimpleObstacle*>::iterator il;
-  for (il=m_allObstacles.begin();il!=m_allObstacles.end();)
-    if ( *il == obs ) il = m_allObstacles.erase( il );
+  for (il=m_allSimpleObstacles.begin();il!=m_allSimpleObstacles.end();)
+    if ( *il == obs ) il = m_allSimpleObstacles.erase( il );
     else il++;   
 }
 
@@ -237,7 +247,7 @@ SimpleObstacle* AppCollision::getSimpleObstacle( int const& num ) const
   list<SimpleObstacle*>::const_iterator il;
   SimpleObstacle* pp = NULL;
   bool found = false;
-  for (il=m_allObstacles.begin();il!=m_allObstacles.end() && !found;il++)
+  for (il=m_allSimpleObstacles.begin();il!=m_allSimpleObstacles.end() && !found;il++)
     if ( (*il)->getID() == num )
     {
       pp = *il;
