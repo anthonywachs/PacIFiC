@@ -609,3 +609,13 @@ void Obstacle::setRestrictedGeomDirMotion( list<size_t> const& dir )
   m_restrict_geommotion = true;
   m_dir_restricted_geommotion = dir;
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the obstacle name
+void Obstacle::setName( string const& name_ )
+{
+  m_name = name_ ;
+}

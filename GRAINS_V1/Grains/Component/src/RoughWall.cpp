@@ -130,13 +130,14 @@ RoughWall::RoughWall( DOMNode* root ) :
       // Create sphere
       if ( create )
       {
-        name = m_name + "_Sphere" + GrainsExec::intToString( counter );
         Sphere* sphere = new Sphere( m_radius );
         RigidBodyWithCrust* geoRBWC_sphere = new RigidBodyWithCrust( sphere, 
       		Transform(), false, crust_thickness ); 
-        Obstacle* ssphere = new SimpleObstacle( name, geoRBWC_sphere, 
+        Obstacle* ssphere = new SimpleObstacle( "", geoRBWC_sphere, 
 		m_materialName, transferToFluid, true );
         ssphere->setPosition( cg );
+	name = m_name + "_Rough" + GrainsExec::intToString( ssphere->getID() );
+	ssphere->setName( name );
         m_obstacles.push_back( ssphere );
 	++counter;
       }	    
@@ -176,16 +177,17 @@ RoughWall::RoughWall( DOMNode* root ) :
 		|| ( cg[m] > m_domain_origin[m] + m_domain_size[m] - m_lper[m]
 			&& cg[m] < m_domain_origin[m] + m_domain_size[m] ) )
 	{
-          name = m_name + "_Sphere" + GrainsExec::intToString( counter );
           Sphere* sphere = new Sphere( m_radius );
           RigidBodyWithCrust* geoRBWC_sphere = new RigidBodyWithCrust( sphere,
       		Transform(), false, crust_thickness ); 
-          Obstacle* ssphere = new SimpleObstacle( name, geoRBWC_sphere, 
+          Obstacle* ssphere = new SimpleObstacle( "", geoRBWC_sphere, 
 		m_materialName, transferToFluid, false );
 	  ssphere->setID( (*obstacle)->getID() );
 	  cg[m] = cg[m] + ( cg[m] < m_domain_origin[m] + m_lper[m] ? 
 	    	1. : -1. ) * m_domain_size[m];
           ssphere->setPosition( cg );
+          name = m_name + "_Rough" + GrainsExec::intToString( ssphere->getID() );
+	  ssphere->setName( name );	  
           perspheres.push_back( ssphere );
 	  ++counter;	    
 	}
@@ -249,14 +251,15 @@ RoughWall::RoughWall( DOMNode* root ) :
 
         if ( create )
 	{
-          name = m_name + "_Sphere" + GrainsExec::intToString( counter );
           Sphere* sphere = new Sphere( m_radius );
           RigidBodyWithCrust* geoRBWC_sphere = new RigidBodyWithCrust( sphere,
       		Transform(), false, crust_thickness ); 
-          Obstacle* ssphere = new SimpleObstacle( name, geoRBWC_sphere, 
+          Obstacle* ssphere = new SimpleObstacle( "", geoRBWC_sphere, 
 		m_materialName, transferToFluid, false );
 	  ssphere->setID( (*obstacle)->getID() );
           ssphere->setPosition( cg );
+          name = m_name + "_Rough" + GrainsExec::intToString( ssphere->getID() );
+	  ssphere->setName( name );	  
           perspheres.push_back( ssphere );
 	  ++counter;	    
 	}   
@@ -384,16 +387,16 @@ void RoughWall::periodicity( LinkedCell* LC )
 	    
           if ( create )	    	    
 	  {
-            name = m_name + "_Sphere";
             Sphere* sphere = new Sphere( m_radius );
             RigidBodyWithCrust* geoRBWC_sphere = new RigidBodyWithCrust( 
 	      		sphere, Transform(), false, 
 			(*obstacle)->getCrustThickness() ); 
-            Obstacle* ssphere = new SimpleObstacle( name, geoRBWC_sphere, 
+            Obstacle* ssphere = new SimpleObstacle( "", geoRBWC_sphere, 
 			(*obstacle)->getMaterial(), 
 			(*obstacle)->getObstaclesToFluid().size() != 0, false );
 	    ssphere->setID( (*obstacle)->getID() );	      
             ssphere->setPosition( cg );
+	    ssphere->setName( (*obstacle)->getName() );
             perspheres.push_back( ssphere );
 	  }
         }
@@ -481,16 +484,16 @@ void RoughWall::periodicity( LinkedCell* LC )
 
             if ( create )
 	    {
-              name = m_name + "_Sphere";
               Sphere* sphere = new Sphere( m_radius );
               RigidBodyWithCrust* geoRBWC_sphere = new RigidBodyWithCrust( 
 		  	sphere, Transform(), false, 
 			(*obstacle)->getCrustThickness() ); 
-              Obstacle* ssphere = new SimpleObstacle( name, geoRBWC_sphere, 
+              Obstacle* ssphere = new SimpleObstacle( "", geoRBWC_sphere, 
 			(*obstacle)->getMaterial(), 
 			(*obstacle)->getObstaclesToFluid().size() != 0, false );
 	      ssphere->setID( (*obstacle)->getID() );
               ssphere->setPosition( cg );
+	      ssphere->setName( (*obstacle)->getName() );
               perspheres.push_back( ssphere );	    
 	    }
 	  }
@@ -596,6 +599,9 @@ void RoughWall::reload( Obstacle& mother, istream& file )
   }
   computeCenterOfMass();
   mother.append( this );
+
+  // Crust thickness 
+  m_geoRBWC->setCrustThickness( m_obstacles.front()->getCrustThickness() ); 
   
   // Restricts the geometric directions of translational motion of the box 
   // and initialize position at previous time

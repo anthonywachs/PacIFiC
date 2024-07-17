@@ -274,7 +274,7 @@ Vector3 const* ObstacleImposedForce::translationalVelocity( double time,
       depl_nm1 = depl;
     }
     else
-      m_translationalVelocity = - m_vmaxzeroforce * m_direction;            
+      m_translationalVelocity = - m_vmaxzeroforce * m_direction;           
   }
   else if ( m_type == "SinCyclicTranslation" )
   {

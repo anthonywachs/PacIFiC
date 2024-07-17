@@ -126,11 +126,8 @@ size_t LinkedCell::set( double cellsize_, string const& oshift )
   	" x " << m_cellsize_Z << endl;
   cout << oshift << "Global origin = " << m_LC_global_origin << endl;
   cout << oshift << "Global max = " << m_LC_global_max << endl;  
-  cout << oshift << "Local origin = " << m_LC_global_origin << endl;
+  cout << oshift << "Local origin = " << m_LC_local_origin << endl;
 
-  m_LC_local_origin[X] = m_LC_local_origin[0];
-  m_LC_local_origin[Y] = m_LC_local_origin[1];
-  m_LC_local_origin[Z] = m_LC_local_origin[2];
   m_LC_local_max[X] = m_LC_local_origin[X] + m_nbi * m_cellsize_X;
   m_LC_local_max[Y] = m_LC_local_origin[Y] + m_nbj * m_cellsize_Y;
   m_LC_local_max[Z] = m_LC_local_origin[Z] + m_nbk * m_cellsize_Z;
@@ -530,12 +527,9 @@ size_t LinkedCell::set( double cellsize_, int const* nprocsdir,
   	" x " << m_cellsize_Z << endl;
     cout << oshift << "Global origin = " << m_LC_global_origin << endl;
     cout << oshift << "Global max = " << m_LC_global_max << endl;    
-    cout << oshift << "Local origin = " << m_LC_global_origin << endl;
+    cout << oshift << "Local origin = " << m_LC_local_origin << endl;
   }
 
-  m_LC_local_origin[X] = m_LC_local_origin[0];
-  m_LC_local_origin[Y] = m_LC_local_origin[1];
-  m_LC_local_origin[Z] = m_LC_local_origin[2];
   m_LC_local_max[X] = m_LC_local_origin[X] + m_nbi * m_cellsize_X;
   m_LC_local_max[Y] = m_LC_local_origin[Y] + m_nbj * m_cellsize_Y;
   m_LC_local_max[Z] = m_LC_local_origin[Z] + m_nbk * m_cellsize_Z;

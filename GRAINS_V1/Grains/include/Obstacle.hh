@@ -126,7 +126,11 @@ class Obstacle : public Component
     
     /** @brief Restricts the geometric directions of translational motion 
     @param dir restricted geometric directions of translational motion */
-    void setRestrictedGeomDirMotion( list<size_t> const& dir );   
+    void setRestrictedGeomDirMotion( list<size_t> const& dir );
+    
+    /** @brief Sets the obstacle name
+    @param name_ obstacle name */
+    void setName( string const& name_ );       
     //@}
 
 
