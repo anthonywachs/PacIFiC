@@ -14,8 +14,8 @@ struct PointForcePostProcessing
 {
   Point3 geometricPointOfContact; /**< contact point */
   Vector3 contactForce; /**< contact force */
-  Component* comp0; /**< component 0 in contact */
-  Component* comp1; /**< component 1 in contact */
+  Point3 PPptComp0; /**< post processing contact point in component 0 */
+  Point3 PPptComp1; /**< post processing contact point in component 1 */
 }; 
 
 

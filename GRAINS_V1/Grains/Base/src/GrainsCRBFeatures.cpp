@@ -600,7 +600,7 @@ void GrainsCRBFeatures::Simulation( double time_interval )
     list<Particle*> lcp;
     particle->setActivity( COMPUTE );
     lcp.push_back( particle );
-    ppVTK.writeParticlesPostProcessing_Paraview( &lcp, 
+    ppVTK.writeParticles_Paraview( &lcp, 
     	m_outputfilename + ".vtu", true );     
   }
 }

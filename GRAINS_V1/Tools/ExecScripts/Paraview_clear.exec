@@ -23,6 +23,22 @@ for file in $1/$2*.pvtu
         rm -f $file
     fi
   done
+  
+for file in $1/$2*.vtp
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done
+  
+for file in $1/$2*.pvtp
+  do
+    if [ -f $file ]
+      then
+        rm -f $file
+    fi
+  done    
 
 for file in $1/ErreurContact*
   do

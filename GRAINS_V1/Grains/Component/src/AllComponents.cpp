@@ -1742,7 +1742,7 @@ void AllComponents::PostProcessingErreurComponents( string const& filename,
   // Post processing writers
   list<PostProcessingWriter*>::iterator pp;
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
-    (*pp)->writeErreurComponentsPostProcessing( filename, errcomposants );
+    (*pp)->writeErreurComponents_Paraview( filename, errcomposants );
 }
 
 
@@ -2006,7 +2006,8 @@ void AllComponents::outputObstaclesLoad( double time, double dt,
       	+ "/Loading_" + (*obstacle)->getName() + ".res" ).c_str(), ios::app );
 	  force = (*obstacle)->getForce();
           torque = (*obstacle)->getTorque();
-	  OUT << time << " " <<
+	  OUT << GrainsExec::doubleToString( ios::scientific, 6, time ) 
+	  	<< " " <<
 		GrainsExec::doubleToString( ios::scientific, 6, (*force)[X] )
 		<< " " <<
 		GrainsExec::doubleToString( ios::scientific, 6, (*force)[Y] )

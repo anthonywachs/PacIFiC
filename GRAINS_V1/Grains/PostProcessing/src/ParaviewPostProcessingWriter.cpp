@@ -289,7 +289,7 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
     { 
       ostringstream ossRK;
       ossRK << m_rank;       
-      writeLinkedCellPostProcessing_Paraview( LC,
+      writeLinked_Paraview( LC,
       	m_ParaviewFilename + "_LinkedCell" + 
 	( m_nprocs > 1 && !m_mpiio_singlefile ? "_" + ossRK.str() : "" ) 
 	+ ".vtu",  m_nprocs > 1 && !m_mpiio_singlefile );
@@ -367,11 +367,11 @@ void ParaviewPostProcessingWriter::PostProcessing_start(
   // Windows d'insertion
   if ( m_rank == 0 ) 
   {
-    writeInsertionPostProcessing_Paraview( insert_windows, 
+    writeInsertion_Paraview( insert_windows, 
     	m_ParaviewFilename + "_InsertionWindows" );
 	
     if ( GrainsExec::m_periodic == true && LC )
-      writePeriodicBoundaryPostProcessing_Paraview(
+      writePeriodicBoundary_Paraview(
   	LC, m_ParaviewFilename + "_PeriodicBoundaries" );
   }	
 }
@@ -524,7 +524,7 @@ void ParaviewPostProcessingWriter::one_output(
       f << "</VTKFile>" << endl;
       f.close();      
             
-      if ( obstacle ) writeObstaclesPostProcessing_Paraview( allObstacles,
+      if ( obstacle ) writeObstacles_Paraview( allObstacles,
      		obsFilename );   
     }
   }
@@ -571,16 +571,16 @@ void ParaviewPostProcessingWriter::one_output(
       if ( m_mpiio_singlefile && m_nprocs > 1 )
       {
 	if ( m_binary )
-	  writeSpheresPostProcessing_Paraview_MPIIO_binary( particles,
+	  writeSpheres_Paraview_MPIIO_binary( particles,
      	  	partFilename + ".vtu", false, 
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	else
-	  writeSpheresPostProcessing_Paraview_MPIIO_text( particles,
+	  writeSpheres_Paraview_MPIIO_text( particles,
      	  	partFilename + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
       }
       else		
-	writeSpheresPostProcessing_Paraview( particles, partFilename 
+	writeSpheres_Paraview( particles, partFilename 
 	  	+ ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );
     }
@@ -589,16 +589,16 @@ void ParaviewPostProcessingWriter::one_output(
       if ( m_mpiio_singlefile && m_nprocs > 1 )
       {
 	if ( m_binary )
-	  writeParticlesPostProcessing_Paraview_MPIIO_binary( particles,
+	  writeParticles_Paraview_MPIIO_binary( particles,
      	  	partFilename + ".vtu", false, 
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	  else
-	    writeParticlesPostProcessing_Paraview_MPIIO_text( particles,
+	    writeParticles_Paraview_MPIIO_text( particles,
      	  	partFilename + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
       }
       else		
-	writeParticlesPostProcessing_Paraview( particles, partFilename 
+	writeParticles_Paraview( particles, partFilename 
 	  + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", false,
 	  PostProcessingWriter::m_bPPWindow[m_rank] );
     }
@@ -658,16 +658,16 @@ void ParaviewPostProcessingWriter::one_output(
         if ( m_mpiio_singlefile && m_nprocs > 1 )
         {
 	  if ( m_binary )
-	    writeSpheresPostProcessing_Paraview_MPIIO_binary( &partPerType[i],
+	    writeSpheres_Paraview_MPIIO_binary( &partPerType[i],
      	  	partFilename + ".vtu", false, 
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	  else
-	    writeSpheresPostProcessing_Paraview_MPIIO_text( &partPerType[i],
+	    writeSpheres_Paraview_MPIIO_text( &partPerType[i],
      	  	partFilename + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
         }
         else		
-	  writeSpheresPostProcessing_Paraview( &partPerType[i], partFilename 
+	  writeSpheres_Paraview( &partPerType[i], partFilename 
 	  	+ ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );
       }
@@ -676,16 +676,16 @@ void ParaviewPostProcessingWriter::one_output(
         if ( m_mpiio_singlefile && m_nprocs > 1 )
         {
 	  if ( m_binary )
-	    writeParticlesPostProcessing_Paraview_MPIIO_binary( &partPerType[i],
+	    writeParticles_Paraview_MPIIO_binary( &partPerType[i],
      	  	partFilename + ".vtu", false, 
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	  else
-	    writeParticlesPostProcessing_Paraview_MPIIO_text( &partPerType[i],
+	    writeParticles_Paraview_MPIIO_text( &partPerType[i],
      	  	partFilename + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
         }
         else		
-	  writeParticlesPostProcessing_Paraview( &partPerType[i], partFilename 
+	  writeParticles_Paraview( &partPerType[i], partFilename 
 	  + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", false,
 	  PostProcessingWriter::m_bPPWindow[m_rank] );
       }
@@ -737,16 +737,16 @@ void ParaviewPostProcessingWriter::one_output(
       if ( m_mpiio_singlefile && m_nprocs > 1 )
       {
 	if ( m_binary )
-	  writeSpheresPostProcessing_Paraview_MPIIO_binary( periodic_clones,
+	  writeSpheres_Paraview_MPIIO_binary( periodic_clones,
      	  	partFilename + ".vtu", true, 
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	else
-	  writeSpheresPostProcessing_Paraview_MPIIO_text( periodic_clones,
+	  writeSpheres_Paraview_MPIIO_text( periodic_clones,
      	  	partFilename + ".vtu", true,
 		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
       }
       else		
-	writeSpheresPostProcessing_Paraview( periodic_clones, partFilename 
+	writeSpheres_Paraview( periodic_clones, partFilename 
 	  	+ ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", true,
 		PostProcessingWriter::m_bPPWindow[m_rank] );
     }
@@ -755,16 +755,16 @@ void ParaviewPostProcessingWriter::one_output(
       if ( m_mpiio_singlefile && m_nprocs > 1 )
       {
 	if ( m_binary )
-	  writeParticlesPostProcessing_Paraview_MPIIO_binary( periodic_clones,
+	  writeParticles_Paraview_MPIIO_binary( periodic_clones,
      	  	partFilename + ".vtu", true, 
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	  else
-	    writeParticlesPostProcessing_Paraview_MPIIO_text( periodic_clones,
+	    writeParticles_Paraview_MPIIO_text( periodic_clones,
      	  	partFilename + ".vtu", true,
 		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
       }
       else		
-	writeParticlesPostProcessing_Paraview( periodic_clones, partFilename 
+	writeParticles_Paraview( periodic_clones, partFilename 
 	  + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", true,
 	  PostProcessingWriter::m_bPPWindow[m_rank] );
     }
@@ -802,16 +802,16 @@ void ParaviewPostProcessingWriter::one_output(
     if ( m_mpiio_singlefile && m_nprocs > 1 )
     {
       if ( m_binary )
-	writeParticleVelocityVectorsPostProcessing_Paraview_MPIIO_binary( 
+	writeParticleVelocityVectors_Paraview_MPIIO_binary( 
 		particles, vectFilename + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	else
-	  writeParticleVelocityVectorsPostProcessing_Paraview_MPIIO_text( 
+	  writeParticleVelocityVectors_Paraview_MPIIO_text( 
 	  	particles, vectFilename + ".vtu", false,
 		PostProcessingWriter::m_bPPWindow[m_rank] );	    	     
     }
     else		
-      writeParticleVelocityVectorsPostProcessing_Paraview( particles,
+      writeParticleVelocityVectors_Paraview( particles,
    	vectFilename + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", 
 	PostProcessingWriter::m_bPPWindow[m_rank] );
 
@@ -845,49 +845,64 @@ void ParaviewPostProcessingWriter::one_output(
     if ( m_mpiio_singlefile && m_nprocs > 1 )
     {
       if ( m_binary )
-	writeContactForceVectorsPostProcessing_Paraview_MPIIO_binary( 
+	writeContactForceVectors_Paraview_MPIIO_binary( 
 		particles, LC, forceFilename + ".vtu", time,
 		PostProcessingWriter::m_bPPWindow[m_rank] );
 	else
-	writeContactForceVectorsPostProcessing_Paraview_MPIIO_text( 
+	writeContactForceVectors_Paraview_MPIIO_text( 
 		particles, LC, forceFilename + ".vtu", time,
 		PostProcessingWriter::m_bPPWindow[m_rank] );    	     
     }
     else		
-      writeContactForceVectorsPostProcessing_Paraview( particles, LC,
+      writeContactForceVectors_Paraview( particles, LC,
    	forceFilename + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) + ".vtu", 
 	time, PostProcessingWriter::m_bPPWindow[m_rank] );
 
 
+    // Force chain network
     if ( m_network )
     {
-//       // Force chain
-//       string forceChainFilename = m_ParaviewFilename + "_ContactForceChains_T" +
-//         	ossCN.str();
-// 		
-//       if ( m_rank == 0 )
-//       {
-//         m_Paraview_saveContactForceChains_pvd << "<DataSet timestep=\"" << time 
-//           	<< "\" " << "group=\"\" part=\"0\" file=\"" << 
-// 		forceChainFilename << ".pvtp\"/>" << endl; 	
-//           
-//         ofstream h( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
-//           	+ "_ContactForceChains.pvd" ).c_str(), ios::out );
-//         h << m_Paraview_saveContactForceChains_pvd.str();      
-//         h << "</Collection>" << endl;
-//         h << "</VTKFile>" << endl;
-//         h.close();      
-//  
-//         list<string> vecForce;
-//         vecForce.push_back("ForceChain");
-//         writePVTP_Paraview( forceChainFilename, &vecForce, &empty_string_list,
-//           	&empty_string_list ); 
-//       }
-//  
-//       // Does this processor write data ?
-//       if ( PostProcessingWriter::m_bPPWindow[m_rank] )
-//         writeContactForceChains_Paraview( particles, LC, forceChainFilename 
-// 		+ "_" + ossRK.str() + ".vtp", time );
+      string forceChainFilename = m_ParaviewFilename + "_ContactForceChains_T" +
+		ossCN.str();
+	
+      if ( m_rank == 0 )
+      {
+        m_Paraview_saveContactForceChains_pvd << "<DataSet timestep=\"" << time 
+          	<< "\" " << "group=\"\" part=\"0\" file=\"" << 
+		forceChainFilename << 
+		( m_nprocs > 1 && !m_mpiio_singlefile ? ".pvtp\"/>" 
+		: ".vtp\"/>" ) << endl; 	
+          
+        ofstream h( ( m_ParaviewFilename_dir + "/" + m_ParaviewFilename
+          	+ "_ContactForceChains.pvd" ).c_str(), ios::out );
+        h << m_Paraview_saveContactForceChains_pvd.str();      
+        h << "</Collection>" << endl;
+        h << "</VTKFile>" << endl;
+        h.close();      
+ 
+        list<string> ptScaForce;
+        ptScaForce.push_back("ForceMag");
+        if ( m_nprocs > 1 && !m_mpiio_singlefile )
+          writePVTP_Paraview( forceChainFilename, &empty_string_list,
+          	&ptScaForce, &empty_string_list ); 
+      }
+
+      // VTP files
+      if ( m_mpiio_singlefile && m_nprocs > 1 )
+      {
+        if ( m_binary )
+	  writeContactForceChains_Paraview_MPIIO_binary( 
+		particles, LC, forceChainFilename + ".vtp", time,
+		PostProcessingWriter::m_bPPWindow[m_rank] );
+	else
+	  writeContactForceChains_Paraview_MPIIO_text( 
+		particles, LC, forceChainFilename + ".vtp", time,
+		PostProcessingWriter::m_bPPWindow[m_rank] );     
+      }
+      else		
+        writeContactForceChains_Paraview( particles, LC, 
+		forceChainFilename + ( m_nprocs > 1 ? "_" + ossRK.str() : "" ) 
+		+ ".vtp", time );
     }
   }
 
@@ -915,7 +930,7 @@ void ParaviewPostProcessingWriter::updateObstaclesIndicator(
 
 // ----------------------------------------------------------------------------
 // Writes obstacles data
-void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
+void ParaviewPostProcessingWriter::writeObstacles_Paraview(
 	list<SimpleObstacle*> const& allObstacles, string const& obsFilename )
 {
   ofstream f( ( m_ParaviewFilename_dir + "/" + obsFilename ).c_str(), 
@@ -952,7 +967,7 @@ void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
         for (int comp=0;comp<3;++comp)
 	  write_double_binary( (*ilpp)[comp] ) ;
     }
-    flush_binary( f, "writeObstaclesPostProcessing_Paraview/Points" );      
+    flush_binary( f, "writeObstacles_Paraview/Points" );      
   }
   else
     for (il=allObstacles.begin();il!=allObstacles.end();il++)
@@ -976,7 +991,7 @@ void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
     start_output_binary( sizeof_Int32, int(connectivity.size()) ) ;
     for (ii=connectivity.begin();ii!=connectivity.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeObstaclesPostProcessing_Paraview/connectivity" );
+    flush_binary( f, "writeObstacles_Paraview/connectivity" );
   }
   else  
     for (ii=connectivity.begin();ii!=connectivity.end();ii++)
@@ -992,7 +1007,7 @@ void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
     start_output_binary( sizeof_Int32, int(offsets.size()) ) ;
     for (ii=offsets.begin();ii!=offsets.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeObstaclesPostProcessing_Paraview/offsets" );
+    flush_binary( f, "writeObstacles_Paraview/offsets" );
   }
   else  
     for (ii=offsets.begin();ii!=offsets.end();ii++)
@@ -1008,7 +1023,7 @@ void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
     start_output_binary( sizeof_Int32, int(cellstype.size()) ) ;
     for (ii=cellstype.begin();ii!=cellstype.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeObstaclesPostProcessing_Paraview/types" );
+    flush_binary( f, "writeObstacles_Paraview/types" );
   }
   else  
     for (ii=cellstype.begin();ii!=cellstype.end();ii++)
@@ -1031,7 +1046,7 @@ void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
     else for (i=0;i<nc;++i) f << indic << " ";         
   }        
   if ( m_binary ) flush_binary( f, 
-  	"writeObstaclesPostProcessing_Paraview/Indicator" ); 
+  	"writeObstacles_Paraview/Indicator" ); 
   f << endl;
   f << "</DataArray>" << endl;   
   f << "</CellData>" << endl;    
@@ -1056,7 +1071,7 @@ void ParaviewPostProcessingWriter::writeObstaclesPostProcessing_Paraview(
 
 // ----------------------------------------------------------------------------
 // Writes linked-cell grid data
-void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
+void ParaviewPostProcessingWriter::writeLinked_Paraview(
 	LinkedCell const* LC, string const& partFilename,
 	bool const& local )
 {
@@ -1122,7 +1137,7 @@ void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
         write_double_binary( z[k] ) ;	
       }
                         
-    flush_binary( f, "writeLinkedCellPostProcessing_Paraview/Points" );
+    flush_binary( f, "writeLinked_Paraview/Points" );
   }
   else
   {
@@ -1185,7 +1200,7 @@ void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
         write_int_binary( counter + 1 );	
       }
       
-    flush_binary( f, "writeLinkedCellPostProcessing_Paraview/connectivity" );
+    flush_binary( f, "writeLinked_Paraview/connectivity" );
   }
   else
   {  
@@ -1214,7 +1229,7 @@ void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
   {
     start_output_binary( sizeof_Int32, int(nbpts) ) ;
     for (i=0;i<nbpts;i++) write_int_binary( 2*(int(i)+1) );
-    flush_binary( f, "writeLinkedCellPostProcessing_Paraview/offsets" );
+    flush_binary( f, "writeLinked_Paraview/offsets" );
   }
   else 
     for (i=0;i<nbpts;i++) f << 2*(i+1) << " ";	
@@ -1229,7 +1244,7 @@ void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
     start_output_binary( sizeof_Int32, int(nbpts) ) ;
     int type = 3;
     for (i=0;i<nbpts;i++) write_int_binary( type );
-    flush_binary( f, "writeLinkedCellPostProcessing_Paraview/types" );
+    flush_binary( f, "writeLinked_Paraview/types" );
   }
   else  
     for (i=0;i<nbpts;i++) f << "3 ";
@@ -1256,7 +1271,7 @@ void ParaviewPostProcessingWriter::writeLinkedCellPostProcessing_Paraview(
 
 // ----------------------------------------------------------------------------
 // Writes insertion windows data
-void ParaviewPostProcessingWriter::writeInsertionPostProcessing_Paraview(
+void ParaviewPostProcessingWriter::writeInsertion_Paraview(
    	vector<Window> const& insert_windows,
   	string const& partFilename )
 {
@@ -1430,7 +1445,7 @@ void ParaviewPostProcessingWriter::writeInsertionPostProcessing_Paraview(
         for (int comp=0;comp<3;++comp)
           write_double_binary( (*ilpp)[comp] ) ;
     }
-    flush_binary( f, "writeInsertionPostProcessing_Paraview/Points" );
+    flush_binary( f, "writeInsertion_Paraview/Points" );
   }
   else
     for (il=iwlist.begin();il!=iwlist.end();il++)
@@ -1454,7 +1469,7 @@ void ParaviewPostProcessingWriter::writeInsertionPostProcessing_Paraview(
     start_output_binary( sizeof_Int32, int(connectivity.size()) ) ;
     for (ii=connectivity.begin();ii!=connectivity.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeInsertionPostProcessing_Paraview/connectivity" );
+    flush_binary( f, "writeInsertion_Paraview/connectivity" );
   }
   else  
     for (ii=connectivity.begin();ii!=connectivity.end();ii++)
@@ -1470,7 +1485,7 @@ void ParaviewPostProcessingWriter::writeInsertionPostProcessing_Paraview(
     start_output_binary( sizeof_Int32, int(offsets.size()) ) ;
     for (ii=offsets.begin();ii!=offsets.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeInsertionPostProcessing_Paraview/offsets" );
+    flush_binary( f, "writeInsertion_Paraview/offsets" );
   }
   else  
     for (ii=offsets.begin();ii!=offsets.end();ii++)
@@ -1486,7 +1501,7 @@ void ParaviewPostProcessingWriter::writeInsertionPostProcessing_Paraview(
     start_output_binary( sizeof_Int32, int(cellstype.size()) ) ;
     for (ii=cellstype.begin();ii!=cellstype.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeInsertionPostProcessing_Paraview/types" );
+    flush_binary( f, "writeInsertion_Paraview/types" );
   }
   else
     for (ii=cellstype.begin();ii!=cellstype.end();ii++)
@@ -1516,7 +1531,7 @@ void ParaviewPostProcessingWriter::writeInsertionPostProcessing_Paraview(
 
 // ----------------------------------------------------------------------------
 // Writes periodic boundary data
-void ParaviewPostProcessingWriter::writePeriodicBoundaryPostProcessing_Paraview(
+void ParaviewPostProcessingWriter::writePeriodicBoundary_Paraview(
    	LinkedCell const* LC, string const& partFilename )
 {
   list<RigidBody*> iwlist;
@@ -1605,7 +1620,7 @@ void ParaviewPostProcessingWriter::writePeriodicBoundaryPostProcessing_Paraview(
         for (int comp=0;comp<3;++comp)
           write_double_binary( (*ilpp)[comp] ) ;
     }
-    flush_binary( f, "writeInsertionPostProcessing_Paraview/Points" );
+    flush_binary( f, "writeInsertion_Paraview/Points" );
   }
   else
     for (il=iwlist.begin();il!=iwlist.end();il++)
@@ -1629,7 +1644,7 @@ void ParaviewPostProcessingWriter::writePeriodicBoundaryPostProcessing_Paraview(
     start_output_binary( sizeof_Int32, int(connectivity.size()) ) ;
     for (ii=connectivity.begin();ii!=connectivity.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeInsertionPostProcessing_Paraview/connectivity" );
+    flush_binary( f, "writeInsertion_Paraview/connectivity" );
   }
   else  
     for (ii=connectivity.begin();ii!=connectivity.end();ii++)
@@ -1645,7 +1660,7 @@ void ParaviewPostProcessingWriter::writePeriodicBoundaryPostProcessing_Paraview(
     start_output_binary( sizeof_Int32, int(offsets.size()) ) ;
     for (ii=offsets.begin();ii!=offsets.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeInsertionPostProcessing_Paraview/offsets" );
+    flush_binary( f, "writeInsertion_Paraview/offsets" );
   }
   else  
     for (ii=offsets.begin();ii!=offsets.end();ii++)
@@ -1661,7 +1676,7 @@ void ParaviewPostProcessingWriter::writePeriodicBoundaryPostProcessing_Paraview(
     start_output_binary( sizeof_Int32, int(cellstype.size()) ) ;
     for (ii=cellstype.begin();ii!=cellstype.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeInsertionPostProcessing_Paraview/types" );
+    flush_binary( f, "writeInsertion_Paraview/types" );
   }
   else
     for (ii=cellstype.begin();ii!=cellstype.end();ii++)
@@ -1696,6 +1711,11 @@ void ParaviewPostProcessingWriter::writePVTP_Paraview( string const& filename,
 	list<string> const* pointScalar,
 	list<string> const* cellScalar )
 {
+  // Only used for force chain network so far with scalar field as contact
+  // force magnitude
+  assert( pointScalar->size() == 1 && pointVector->empty() 
+  	&& cellScalar->empty() ); 
+
   ofstream f( ( m_ParaviewFilename_dir + "/" + filename + ".pvtp" ).c_str(),
   	ios::out );
   f << "<?xml version=\"1.0\"?>" << endl; 
@@ -1707,8 +1727,9 @@ void ParaviewPostProcessingWriter::writePVTP_Paraview( string const& filename,
   f << "<PPoints>" << endl;
   f << "<PDataArray type=\"Float32\" NumberOfComponents=\"3\"/>" << endl;
   f << "</PPoints>" << endl;
-  f << "<PPointData Scalars=\"F_N\">" << endl;
-  f << "<PDataArray type=\"Float32\" Name=\"F_N\"/>" << endl;
+  f << "<PPointData Scalars=\"" << pointScalar->front() << "\">" << endl;
+  f << "<PDataArray type=\"Float32\" Name=\"" << pointScalar->front() 
+  	<< "\"/>" << endl;
   f << "</PPointData>" << endl;
   f << "<PLines>" << endl;
   f << "<PDataArray Name=\"connectivity\" type=\"Int32\" format=\"ascii\">"
@@ -1765,7 +1786,7 @@ void ParaviewPostProcessingWriter::writePVTU_Paraview( string const& filename,
   f << "<PDataArray Name=\"types\" type=\"Int32\" format=\"ascii\">" << endl;
   f << "</PDataArray>" << endl;
   f << "</PCells>" << endl;    
-  if ( pointVector->size() || pointScalar->size())
+  if ( pointVector->size() || pointScalar->size() )
   {
     f << "<PPointData";
     if ( pointVector->size() )
@@ -1835,7 +1856,7 @@ void ParaviewPostProcessingWriter::writePVTU_Paraview( string const& filename,
 
 // ----------------------------------------------------------------------------
 // Writes components involved in a motion or a contact error
-void ParaviewPostProcessingWriter::writeErreurComponentsPostProcessing(
+void ParaviewPostProcessingWriter::writeErreurComponents_Paraview(
 	string const& filename,
   	list<Component*> const& errcomposants )
 {
@@ -1877,7 +1898,7 @@ void ParaviewPostProcessingWriter::writeErreurComponentsPostProcessing(
         for (int comp=0;comp<3;++comp)
 	  write_double_binary( (*ilpp)[comp] ) ;
     }
-    flush_binary( f, "writeErreurComponentsPostProcessing/Points" );      
+    flush_binary( f, "writeErreurComponents_Paraview/Points" );      
   }
   else
     for (compo=errcomposants.begin();compo!=errcomposants.end();compo++)
@@ -1901,7 +1922,7 @@ void ParaviewPostProcessingWriter::writeErreurComponentsPostProcessing(
     start_output_binary( sizeof_Int32, int(connectivity.size()) ) ;
     for (ii=connectivity.begin();ii!=connectivity.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeErreurComponentsPostProcessing/connectivity" );
+    flush_binary( f, "writeErreurComponents_Paraview/connectivity" );
   }
   else  
     for (ii=connectivity.begin();ii!=connectivity.end();ii++)
@@ -1917,7 +1938,7 @@ void ParaviewPostProcessingWriter::writeErreurComponentsPostProcessing(
     start_output_binary( sizeof_Int32, int(offsets.size()) ) ;
     for (ii=offsets.begin();ii!=offsets.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeErreurComponentsPostProcessing/offsets" );
+    flush_binary( f, "writeErreurComponents_Paraview/offsets" );
   }
   else  
     for (ii=offsets.begin();ii!=offsets.end();ii++)
@@ -1933,7 +1954,7 @@ void ParaviewPostProcessingWriter::writeErreurComponentsPostProcessing(
     start_output_binary( sizeof_Int32, int(cellstype.size()) ) ;
     for (ii=cellstype.begin();ii!=cellstype.end();ii++)
       write_int_binary( *ii );
-    flush_binary( f, "writeErreurComponentsPostProcessing/types" );
+    flush_binary( f, "writeErreurComponents_Paraview/types" );
   }
   else  
     for (ii=cellstype.begin();ii!=cellstype.end();ii++)
