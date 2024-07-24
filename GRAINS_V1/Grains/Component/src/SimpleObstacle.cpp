@@ -434,7 +434,6 @@ void SimpleObstacle::DestroyObstacle( string const& name_ )
 void SimpleObstacle::ClearObstacle( string const& name_, LinkedCell* LC )
 {
   if ( m_name == name_ || name_ == "ToBeErased" )
-    // Suppression de l'obstacle du LinkedCell
     LC->remove( this );
 }
 

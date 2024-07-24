@@ -85,13 +85,14 @@ bool AppCollision::isCloseWithCrust( Particle const* particle ) const
 
 
 // ----------------------------------------------------------------------------
-// Links the parent obstacle with the contact detection algorithm
-void AppCollision::Link( Obstacle* obstacle )
+// Links the root obstacle with the contact detection algorithm at
+// the start of the simulation
+void AppCollision::Link( Obstacle* root_obstacle )
 {
   if ( !m_obstacles )
   {
-    m_obstacles = obstacle;
-    m_allSimpleObstacles = obstacle->getObstacles();
+    m_obstacles = root_obstacle;
+    m_allSimpleObstacles = m_obstacles->getObstacles();
   }
 }
 

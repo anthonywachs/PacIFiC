@@ -69,9 +69,10 @@ class LinkedCell : public AppCollision
     @param particle particle */
     void Link( Particle* particle );
 
-    /** @brief Links an obstacle with the linked cell grid
-    @param obstacle obstacle */
-    void Link( Obstacle* obstacle );
+    /** @brief Links the root obstacle with the linked cell grid at the start
+    of the simulation
+    @param root_obstacle root obstacle */
+    void Link( Obstacle* root_obstacle );
 
     /** @brief Updates links between particles & obstacles and the linked cell
     grid

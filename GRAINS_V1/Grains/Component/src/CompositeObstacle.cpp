@@ -7,7 +7,7 @@
 #include "GrainsExec.hh"
 
 
-int CompositeObstacle::m_minCompositeObstacleID = -1;
+int CompositeObstacle::m_minCompositeObstacleID = 1;
 
 
 // ----------------------------------------------------------------------------
@@ -17,7 +17,7 @@ CompositeObstacle::CompositeObstacle( string const& s )
   , m_type( "Standard" )
 {
   m_id = GrainsExec::m_CompositeObstacleDefaultID;
-  m_minCompositeObstacleID++;
+  m_minCompositeObstacleID--;
   m_CompositeObstacle_id = m_minCompositeObstacleID;   
   m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() ); 
 }
@@ -32,7 +32,7 @@ CompositeObstacle::CompositeObstacle( DOMNode* root )
   , m_type( "Standard" )  
 {
   m_id = GrainsExec::m_CompositeObstacleDefaultID;
-  m_minCompositeObstacleID++;
+  m_minCompositeObstacleID--;
   m_CompositeObstacle_id = m_minCompositeObstacleID;   
     
   assert( root != NULL );

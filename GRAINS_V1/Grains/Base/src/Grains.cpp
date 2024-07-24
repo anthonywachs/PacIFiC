@@ -772,7 +772,7 @@ void Grains::Construction( DOMElement* rootElement )
       m_allcomponents.read_particles( restart, npart, m_collision, m_rank, 
       	m_nprocs, m_wrapper );  
 
-    // Link obstacles with the linked cell grid
+    // Link the root obstacle with the linked cell grid
     m_collision->Link( m_allcomponents.getObstacles() );
   }
 }

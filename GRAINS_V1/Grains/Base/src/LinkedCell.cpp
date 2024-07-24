@@ -1318,15 +1318,16 @@ void LinkedCell::Link( Particle* particle )
 
 
 // ----------------------------------------------------------------------------
-// Links an obstacle with the linked cell grid
-void LinkedCell::Link( Obstacle* obstacle )
+// Links the root obstacle with the linked cell grid at the start
+// of the simulation
+void LinkedCell::Link( Obstacle* root_obstacle )
 {
   // We search intersection between the obstacle and twice expanded cells
   // i.e. cells expanded by a least the maximum circumscribed radius of the
   // largest particle in the simulation, hence guaranteeing that no collision
   // between particles and the obstacle is missed
 
-  AppCollision::Link( obstacle );
+  AppCollision::Link( root_obstacle );
   
   list<SimpleObstacle*>::iterator myObs;
   Cell* cell_ = NULL;
@@ -1411,17 +1412,13 @@ void LinkedCell::LinkUpdate( double time, double dt,
 
     // Update obstacles in case they move
     list<SimpleObstacle*>::iterator myObs;
-    for (myObs=m_allSimpleObstacles.begin();myObs!=m_allSimpleObstacles.end();myObs++)
+    for (myObs=m_allSimpleObstacles.begin();myObs!=m_allSimpleObstacles.end();
+    	myObs++)
       if ( (*myObs)->hasMoved() )
       {
         // Check whether the obstacle intersects the local linked cell grid
         if ( intersect( *(*myObs)->getObstacleBox() , *m_extendedBBox ) )
-        {
-	  // If the obstacle has not been linked yet, we perform a classic Link
-	  // Otherwise we perform a LinkUpdate
-	  if ( (*myObs)->getInCells()->empty() ) Link( *myObs );
-	  else LinkUpdate( time, dt, *myObs );
-        }
+          LinkUpdate( time, dt, *myObs );
       }
 
     // Update active particles

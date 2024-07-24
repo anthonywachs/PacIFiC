@@ -975,9 +975,9 @@ void ParaviewPostProcessingWriter::writeObstacles_Paraview(
   f << "</DataArray>" << endl;
   f << "</Points>" << endl;
 
-  list<int> connectivity,offsets,cellstype;
+  list<int> connectivity, offsets, cellstype;
   list<int>::iterator ii;
-  int firstpoint_globalnumber=0,last_offset=0;
+  int firstpoint_globalnumber = 0, last_offset = 0;
   for (il=allObstacles.begin();il!=allObstacles.end();il++)
     (*il)->write_polygonsStr_PARAVIEW( connectivity,
     	offsets, cellstype, firstpoint_globalnumber, last_offset );   
@@ -2041,7 +2041,7 @@ void ParaviewPostProcessingWriter:: start_output_binary( int size, int number )
   int ncomp = current_output_size + (current_output_size+999)/1000 
   	+ 12 + sizeof_Int32 ;	
   check_allocated_binary( ncomp ) ;
-  CURRENT_LENGTH = store_int_binary(current_output_size) ;
+  CURRENT_LENGTH = store_int_binary( current_output_size ) ;
 }
 
 
@@ -2058,7 +2058,9 @@ void ParaviewPostProcessingWriter:: write_double_binary( double val )
 
 void ParaviewPostProcessingWriter:: write_int_binary( int val )  
 {
-  store_int_binary(val) ;
+//  store_int_binary(val) ;
+  *((int*)&(BUFFER[OFFSET])) = val ;
+  OFFSET += sizeof_Int32  ;
 }
 
 
@@ -2085,7 +2087,7 @@ void ParaviewPostProcessingWriter:: check_allocated_binary( int size )
       
     char * new_buffer = new char [ new_size ] ;
     for( int i=0 ;i<OFFSET ;i++ ) new_buffer[i] = BUFFER[i] ;
-    if( BUFFER!=0 ) delete [] BUFFER ;
+    if ( BUFFER!=0 ) delete [] BUFFER ;
     BUFFER = new_buffer ;
     ALLOCATED = new_size ;      
   }

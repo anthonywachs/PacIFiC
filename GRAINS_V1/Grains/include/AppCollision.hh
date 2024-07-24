@@ -70,9 +70,10 @@ class AppCollision : public App
     @param particle particle */
     virtual void Link( Particle* particle ) = 0;
 
-    /** @brief Links the parent obstacle with the contact detection algorithm 
-    @param obstacle obstacle */
-    virtual void Link( Obstacle* obstacle );
+    /** @brief Links the root obstacle with the contact detection algorithm at
+    the start of the simulation
+    @param root_obstacle root obstacle */
+    virtual void Link( Obstacle* root_obstacle );
 
     /** @brief Updates links between particles & obstacles and the contact 
     detection algorithm
