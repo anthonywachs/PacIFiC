@@ -71,7 +71,7 @@ AllComponents::~AllComponents()
  
   // Note: the loadings are destroyed by the destructors of the classes
   // ObstacleKinematicsVelocity and ObstacleKinematicsForce
-  // Hence we are free the lists here but do not destroy the pointed objects
+  // Hence we free the lists here but do not destroy the pointed objects
   m_AllImposedVelocitiesOnObstacles.clear();
   m_AllImposedForcesOnObstacles.clear();
 }

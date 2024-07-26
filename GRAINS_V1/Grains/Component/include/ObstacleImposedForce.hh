@@ -46,27 +46,34 @@ class ObstacleImposedForce
     /** @brief Returns obstacle name */
     string getObstacleName() const;
 
-    /** @brief Returns the remaining active time interval of the imposed motion
-    @param debut simulation start time
-    @param fin simulation end time */
-    double getTime( double debut, double fin ) const;
-
-    /** @brief Returns whether the imposed motion is activ at time t
-    @param t physical time
-    @param dt time step magnitude */
-    bool isActif( double t, double dt ) const;
+    /** @brief Returns whether the imposed motion is active over the time
+    interval [td,te] and if it is the sub-interval length within [td,te] when it
+    is actually active 
+    @param td simulation start time
+    @param fin simulation end time
+    @param dt time step magnitude 
+    @param subinterval the sub-interval length within [td,te] when it
+    is actually active */
+    bool isActif( double const& td, double const& te, double const& dt,
+    	double& subinterval ) const;
 
     /** @brief Returns whether the imposed motion is completed at time t
     @param t physical time
     @param dt time step magnitude */
     bool isCompleted( double t, double dt ) const;
 
-    /** @brief Returns the translational velocity at time t 
+    /** @brief Computes the translational velocity at time time and the
+    translation over [time-dt,time]
     @param time physical time
     @param dt time step magnitude 
+    @param subinterval the sub-interval length within [td,te] when it
+    is actually active
+    @param vt translational velocity at time time
+    @param translation translation over [time-dt,time]
     @param obstacle the obstacle the force is imposed on */
-    Vector3 const* translationalVelocity( double time, double dt, 
-      Obstacle* obstacle ); 
+    void translationalVelocity( double time, double dt, 
+      double const& subinterval, Vector3& vt, Vector3& translation, 
+      const Obstacle* obstacle ); 
 
     /** @brief Returns the imposed force 
     @param time physical time */

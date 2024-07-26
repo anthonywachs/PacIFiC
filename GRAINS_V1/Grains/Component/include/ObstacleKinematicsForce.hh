@@ -39,13 +39,11 @@ class ObstacleKinematicsForce : public Kinematics
 
     /** @brief Composes the obstacle kinematics with another "higher level"
     force kinematics
-    @param other the higher level kinematics
-    @param centre not clear what this parameter is */
-    void Compose( ObstacleKinematicsForce const& other, 
-    	Point3 const& centre );
+    @param other the higher level kinematics */
+    void Compose( ObstacleKinematicsForce const& other );
 	
     /** @brief Computes the obstacle velocity and returns whether the obstacle 
-    moved from t to t+dt
+    moved from time - dt to time
     @param time physical time
     @param dt time step magnitude 
     @param obstacle obstacle the kinematics is related to */
@@ -61,6 +59,9 @@ class ObstacleKinematicsForce : public Kinematics
     /** @brief Computes the total velocity of the obstacle using the arm lever
     @param om arm lever */
     Vector3 Velocity( const Vector3 &om ) const; 
+    
+    /** @brief Returns a pointer to the current translational velocity vector */
+    Vector3 const* getTranslationalVelocity() const;    
     //@}
 
 
@@ -79,8 +80,6 @@ class ObstacleKinematicsForce : public Kinematics
     double m_vitesseD; /**< norm of obstacle translational velocity */  
     list<ObstacleImposedForce*> m_imposedForces; /**< list of imposed force 
     	loads */
-    ObstacleImposedForce* m_currentImposedForce; /**< Current imposed force 
-    	load */
     Vector3 m_translationOverTimeStep; /**< Translational motion over 
     	dt */
     //@}

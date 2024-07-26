@@ -106,7 +106,7 @@ class Obstacle : public Component
 
     /** @name Set methods */
     //@{
-    /** @brief Sets kinematics
+    /** @brief Sets imposed velocity kinematics
     @param kine_ the new kinematics */
     void setKinematics( ObstacleKinematicsVelocity& kine_ );
 
@@ -130,7 +130,11 @@ class Obstacle : public Component
     
     /** @brief Sets the obstacle name
     @param name_ obstacle name */
-    void setName( string const& name_ );       
+    void setName( string const& name_ );
+    
+    /** @brief Sets obstacle translational and angular velocities from active
+    kinematics with imposed velocity and  with imposed force */
+    void setVelocity();           
     //@}
 
 
@@ -280,9 +284,8 @@ class Obstacle : public Component
 
     /** @brief Composes the obstacle kinematics with another "higher level"
     force kinematics
-    @param other the higher level kinematics
-    @param centre the obstacle center of mass */
-    void Compose( ObstacleKinematicsForce const& other, Point3 const& centre );
+    @param other the higher level kinematics */
+    void Compose( ObstacleKinematicsForce const& other );
 
     /** @brief Returns whether the obstacle has moved over the last time step */
     bool hasMoved() const;
@@ -406,6 +409,8 @@ class Obstacle : public Component
   	force */
     string m_name; /**< obstacle name */
     bool m_ismoving; /**< whether the obstacle moves or not */
+    Vector3 m_translationalVelocity; /**< obstacle translational velocity */
+    Vector3 m_angularVelocity; /**< obstacle angular velocity */    
     double m_indicator; /**< post-processing indicator for the rotation of
   	composite obstacle in Paraview */
     string m_ObstacleType; /**< obstacle type */

@@ -80,22 +80,23 @@ void ObstacleKinematicsVelocity::Compose(
 
 
 // ----------------------------------------------------------------------------
-// Updates the obstacle translational and angular velocity at time t
-// and translational and angular motion from t to t+dt and returns whether the 
-// obstacle moved from t to t+dt
+// Updates the obstacle translational and angular velocity at time time
+// and translational and angular motion from time - dt to time and returns 
+// whether the obstacle moved from time - dt to time
 bool ObstacleKinematicsVelocity::ImposedMotion( double time, double dt, 
 	Point3 const& cg )
 {
   Vector3 depl, rota, vt, vr;
   Quaternion qrot;
+  double dtt = 0.;
 
   // Imposed kinematics
   list<ObstacleImposedVelocity*>::iterator il;
   for (il=m_imposedVelocities.begin();il!=m_imposedVelocities.end();il++) 
-    if ( (*il)->isActif( time, dt ) ) 
+    if ( (*il)->isActif( time - dt, time, dt, dtt ) ) 
     {
-      depl += (*il)->translationalMotion( time, dt, cg ); 
-      rota += (*il)->angularMotion( time, dt );
+      depl += (*il)->translationalMotion( time, dt, dtt, cg ); 
+      rota += (*il)->angularMotion( time, dt, dtt );
       vt += *(*il)->translationalVelocity( time, dt, cg );
       vr += *(*il)->angularVelocity( time, dt );      
     } 
@@ -109,7 +110,7 @@ bool ObstacleKinematicsVelocity::ImposedMotion( double time, double dt,
   }
 
   // The obstacle motion is the sum of its own and that of the composite
-  // obstacle it belongs. The motion of the composite obstcale it belongs
+  // obstacle it belongs. The motion of the composite obstacle it belongs
   // to is added by the Compose method 
   m_translationOverTimeStep += depl;
   m_rotationOverTimeStep += rota; 
@@ -207,22 +208,25 @@ void ObstacleKinematicsVelocity::setVelocity( Vector3 const* vtrans,
 // Computes the total velocity of the obstacle using the arm lever
 Vector3 ObstacleKinematicsVelocity::Velocity( Vector3 const& om ) const
 {
-  return ( m_translationalVelocity + (m_angularVelocity ^ om) );
+  return ( m_translationalVelocity + ( m_angularVelocity ^ om ) );
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Returns whether there is an active angular motion imposed from t to t+dt
-bool ObstacleKinematicsVelocity::activAngularMotion( double time, double dt ) 
+// Returns whether there is an active angular motion imposed from time - dt 
+// to time
+bool ObstacleKinematicsVelocity::activeAngularMotion( double time, double dt ) 
 	const
 {
   bool rotation = false ;
+  double dtt = 0.;
   list<ObstacleImposedVelocity*>::const_iterator il;
   for (il=m_imposedVelocities.cbegin(); 
   	il!=m_imposedVelocities.cend() && !rotation; il++)
-    if ( (*il)->isActif( time, dt ) && ( (*il)->getType() == "Rotation" ) ) 
+    if ( (*il)->isActif( time - dt, time, dt, dtt ) 
+    	&& ( (*il)->getType() == "Rotation" ) ) 
       rotation = true;
   
   return ( rotation ); 

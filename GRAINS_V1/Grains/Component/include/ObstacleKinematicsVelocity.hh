@@ -50,9 +50,9 @@ class ObstacleKinematicsVelocity : public Kinematics
     void Compose( ObstacleKinematicsVelocity const& other, 
     	Vector3 const& lever );
 
-    /** @brief Updates the obstacle translational and angular velocity at time t
-    and translational and angular motion from t to t+dt and returns whether the 
-    obstacle moved from t to t+dt
+    /** @brief Updates the obstacle translational and angular velocity at time 
+    time and translational and angular motion from time - dt to time and 
+    returns whether the obstacle moved from time - dt to time
     @param time physical time
     @param dt time step magnitude 
     @param cg center of mass of the obstacle */
@@ -62,11 +62,11 @@ class ObstacleKinematicsVelocity : public Kinematics
     @param om arm lever */
     Vector3 Velocity( Vector3 const& om ) const; 
   
-    /** @brief Returns whether there is an active angular motion imposed from t
-    to t+dt
+    /** @brief Returns whether there is an active angular motion imposed from
+    time - dt to time
     @param time physical time
     @param dt time step magnitude */
-    bool activAngularMotion( double time, double dt ) const; 
+    bool activeAngularMotion( double time, double dt ) const; 
     //@}
   
 

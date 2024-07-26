@@ -103,10 +103,9 @@ void Obstacle::Compose( ObstacleKinematicsVelocity const& other,
 // ----------------------------------------------------------------------------
 // Composes the obstacle kinematics with another "higher level" force
 // kinematics
-void Obstacle::Compose( ObstacleKinematicsForce const& other,
-	Point3 const& centre )
+void Obstacle::Compose( ObstacleKinematicsForce const& other )
 {
-  m_confinement.Compose( other, centre );
+  m_confinement.Compose( other );
 }
 
 
@@ -130,10 +129,7 @@ Vector3 Obstacle::getVelocityAtPoint( Point3 const& pt ) const
 {
   Vector3 lever = pt - *m_geoRBWC->getCentre();
 
-  if ( Obstacle::m_isConfinement )
-    return ( m_confinement.Velocity( lever ) );
-  else
-    return ( m_kinematics.Velocity( lever ) );
+  return ( m_translationalVelocity + ( m_angularVelocity ^ lever ) );
 }
 
 
@@ -143,7 +139,7 @@ Vector3 Obstacle::getVelocityAtPoint( Point3 const& pt ) const
 // Returns the angular velocity
 Vector3 const* Obstacle::getAngularVelocity() const
 {
-  return ( m_kinematics.getAngularVelocity() );
+  return ( &m_angularVelocity );
 }
 
 
@@ -153,7 +149,7 @@ Vector3 const* Obstacle::getAngularVelocity() const
 // Returns the translational velocity
 Vector3 const* Obstacle::getTranslationalVelocity() const
 {
-  return ( m_kinematics.getTranslationalVelocity() );
+  return ( &m_translationalVelocity );
 }
 
 
@@ -165,13 +161,15 @@ void Obstacle::resetKinematics()
 {
   m_kinematics.reset();
   m_confinement.reset();
+  m_translationalVelocity = 0.;
+  m_angularVelocity = 0.;  
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Sets kinematics
+// Sets imposed velocity kinematics
 void Obstacle::setKinematics( ObstacleKinematicsVelocity& kine_ )
 {
   m_kinematics.set( kine_ );
@@ -619,3 +617,16 @@ void Obstacle::setName( string const& name_ )
 {
   m_name = name_ ;
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets obstacle translational and angular velocities from active
+// kinematics with imposed velocity and  with imposed force
+void Obstacle::setVelocity()
+{
+  m_translationalVelocity = *(m_kinematics.getTranslationalVelocity())
+  	+ *(m_confinement.getTranslationalVelocity());
+  m_angularVelocity = *(m_kinematics.getAngularVelocity());
+} 

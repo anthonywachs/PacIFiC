@@ -197,7 +197,7 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
   // Apply the composite imposed force to its elementary obstacles  
   if ( moveForce ) 
     for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
-      (*obstacle)->Compose( m_confinement, *(*obstacle)->getPosition() );
+      (*obstacle)->Compose( m_confinement );
 
   
   // Finally, move the elementary obstacles     
@@ -209,7 +209,11 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
       movingObstacles.push_back(*ilo);
   }
   
-  m_ismoving = m_ismoving || moveForce;  
+  m_ismoving = m_ismoving || moveForce; 
+  
+  // Assign the total translational and angular velocities to the obstacle
+  // from its imposed kinematics
+  if ( m_ismoving ) setVelocity(); 
   
   return ( movingObstacles );
 }
@@ -572,7 +576,7 @@ void CompositeObstacle::updateIndicator( double time, double dt )
 {
   list<Obstacle*>::iterator obstacle;
   
-  if ( m_kinematics.activAngularMotion( time, dt ) )
+  if ( m_kinematics.activeAngularMotion( time, dt ) )
       getObstacles().front()->setIndicator( 1. );  
   
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)   
