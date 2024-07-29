@@ -13,6 +13,21 @@
 #include "Rectangle.hh"
 #include <stdlib.h>
 #include <time.h>
+#include <random>
+#include <thread>
+
+#include <chrono>
+#include "Box.hh"
+#include "Cylinder.hh"
+#include "Superquadric.hh"
+#include "PointContact.hh"
+#include "Particle.hh"
+#include "KinematicsBuilderFactory.hh"
+
+
+using namespace std;
+using namespace std::chrono;
+
 
 // ----------------------------------------------------------------------------
 // Default constructor

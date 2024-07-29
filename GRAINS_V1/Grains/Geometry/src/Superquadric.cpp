@@ -1,7 +1,10 @@
-#define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1
+  #define __STDCPP_WANT_MATH_SPEC_FUNCS__ 1
 #include <bits/stdc++.h>
 #include "Superquadric.hh"
 #include "sstream"
+#include "BVolume.hh"
+#include "OBB.hh"
+#include "OBC.hh"
 
 using namespace std;
 
@@ -589,6 +592,46 @@ bool Superquadric::isIn( Point3 const& pt ) const
 {
   return ( pow( pow( pt[X]/m_a, m_n1 ) + pow( pt[Y]/m_b, m_n1 ), m_n1/m_n2 ) +
     pow( pt[Z]/m_c, m_n2 ) <= 1. );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to superquadrics
+BVolume* Superquadric::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( m_a, m_b, m_c ), Matrix() );
+  else if ( type == 2 ) // OBC
+  {
+    double a[2];
+    int axis = ( a[X] = fabs( m_a ) ) < ( a[Y] = fabs( m_b ) ) ? Y : X;
+    axis = a[axis] < fabs( m_c ) ? Z : axis;
+    Vector3 e( 0., 0., 0. );
+    e[axis] = 1.;
+    double h = 0., r = 0.;
+    switch ( axis )
+    {
+      case 0:
+        h = 2. * m_a;
+        r = m_b > m_c ? m_b : m_c;
+      break;
+      case 1:
+        h = 2. * m_b;
+        r = m_a > m_c ? m_a : m_c;
+      break;
+      case 2:
+        h = 2. * m_c;
+        r = m_b > m_a ? m_b : m_a;
+      break;
+    }
+
+    bvol = new OBC( r, h, e );
+  }
+
+  return( bvol );
 }
 
 

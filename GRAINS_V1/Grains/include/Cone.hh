@@ -110,7 +110,7 @@ class Cone : public Convex {
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const;
     
-    /** @ brief Returns whether a point lies inside the cone
+    /** @brief Returns whether a point lies inside the cone
     @param pt point */
     bool isIn( Point3 const& pt ) const; 
     

@@ -9,7 +9,7 @@ class Transform;
 
     Convex with a rectangular shape.
 
-    @author A.YAZDANI - 2019 - Creation */
+    @author A.YAZDANI - 2022 - Creation */
 // ============================================================================
 class Rectangle : public Convex
 {
@@ -108,12 +108,15 @@ class Rectangle : public Convex
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	    int& last_offset ) const;
 
-    /** Returns whether the convex shape is a rectangle */
+    /** @brief Returns whether the convex shape is a rectangle */
     bool isRectangle() const;
 
-    /** @ brief Returns whether a point lies inside the rectangle
+    /** @brief Returns whether a point lies inside the rectangle
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+
+    /** @brief Returns the bounding volume to rectangle */
+    BVolume* computeBVolume( unsigned int type ) const;
     
     /** @brief Performs advanced comparison of the two rectangles and returns
     whether they match

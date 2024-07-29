@@ -61,6 +61,9 @@ class PointC : public Convex
     by convention)
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+
+    /** @brief Returns the bounding volume to point */
+    BVolume* computeBVolume( unsigned int type ) const;
     
     /** @brief Performs advanced comparison of the two points and returns
     whether they match

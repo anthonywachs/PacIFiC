@@ -3,6 +3,7 @@
 
 #include "Vector3.hh"
 #include "Point3.hh"
+#include "Transform.hh"
 using namespace solid;
 
 class BBox;
@@ -121,7 +122,7 @@ class BBox
 
     /** @brief Debugging method
     @param s debugging message to be printed on the default error output cerr */
-    void debug( char const* s) const;
+    void debug( char const* s ) const;
 
     /** @brief Returns whether the bounding box fully contains the other
     bounding box
@@ -136,6 +137,14 @@ class BBox
     @param a 1st bounding box
     @param b 2nd bounding box */
     friend bool intersect( BBox const& a, BBox const& b );
+
+    /** @brief Returns whether 2 boxes are in contact
+    @param a 1st bounding box
+    @param b 2nd bounding box
+    @param a2w transformation of the first box
+    @param b2w transformation of the second box */
+    friend bool isContact( BBox const& boxA, BBox const& boxB,
+                           Transform const& a2w, Transform const& b2w );
 
     /** @brief Output operator
     @param f output stream

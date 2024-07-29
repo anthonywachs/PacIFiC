@@ -2,6 +2,9 @@
 #define _CYLINDER_HH_
 
 #include "Convex.hh"
+#include "BVolume.hh"
+#include "PointContact.hh"
+#include "Transform.hh"
 #include "ReaderXML.hh"
 
 
@@ -114,20 +117,34 @@ class Cylinder : public Convex
     	list<int>& offsets, list<int>& cellstype, int& firstpoint_globalnumber,
 	int& last_offset ) const;
 
-    /** @ brief Returns whether a point lies inside the cylinder
+    /** @brief Returns whether a point lies inside the cylinder
     @param pt point */
     bool isIn( Point3 const& pt ) const;
 
-    /** @ Returns the bounding cylinder to cylinder */
-    BCylinder bcylinder() const;
-    
+    /** @brief Returns the bounding volume to cylinder */
+    BVolume* computeBVolume( unsigned int type ) const;
+
+
     /** @brief Performs advanced comparison of the two cylinders and returns
     whether they match
     @param other the other cylinder */
     bool equalType_level2( Convex const* other ) const;    
     //@}
 
+    /** @name Friend methods */
+    //@{
+    /** @brief Returns the contact point of the cylinder with another cylinder
+    @param a 1st cylinder
+    @param b 2nd cylinder
+    @param a2w transformation of the 1st cylinder
+    @param b2w transformation of the 2nd cylinder */
+    friend PointContact intersect( Cylinder const& a,
+                                   Cylinder const& b,
+                                   Transform const& a2w, 
+                                   Transform const& b2w );
+    //@}
 
+    
   protected:
     /** @name Parameters */
     //@{

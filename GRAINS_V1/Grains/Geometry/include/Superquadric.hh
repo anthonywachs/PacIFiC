@@ -119,9 +119,12 @@ class Superquadric : public Convex
     /** @brief Returns whether the convex shape is a superquadric */
     bool isSuperquadric() const;
 
-    /** @ brief Returns whether a point lies inside the superquadric
+    /** @brief Returns whether a point lies inside the superquadric
     @param pt point */
     bool isIn( Point3 const& pt ) const;
+
+    /** @brief Returns the bounding volume to superquadric */
+    BVolume* computeBVolume( unsigned int type ) const;
     
     /** @brief Performs advanced comparison of the two superquadrics and returns
     whether they match

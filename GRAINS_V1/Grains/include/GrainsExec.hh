@@ -308,7 +308,10 @@ class GrainsExec
     	result files at this time */
     static string m_inputFile; /**< Grains3D major input file */
     static int m_return_syscmd; /**< Returned value of system command */
-    static bool m_preCollision_cyl; /** precollision test w/ bounding cyls **/
+    static string m_colDetMethod; /**< Collision detection method */
+    static double m_colDetTolerance; /** Tol for Collision detection **/
+    static bool m_colDetAcceleration; /** Tol for Collision detection **/
+    static unsigned int m_colDetBoundingVolume; /** bounding volume type **/
     static Point3 m_defaultInactivePos; /**< Default position of inactive 
     	particles */
     static int m_CompositeObstacleDefaultID; /**< Default ID number of composite

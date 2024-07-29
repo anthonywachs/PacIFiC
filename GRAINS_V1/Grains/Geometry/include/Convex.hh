@@ -2,8 +2,7 @@
 #define _CONVEX_HH_
 
 #include "Shape.hh"
-#include "BBox.hh"
-#include "BCylinder.hh"
+#include "BVolume.hh"
 #include "Transform.hh"
 #include "Point3.hh"
 #include "ReaderXML.hh"
@@ -72,9 +71,9 @@ class Convex : public Shape
     @param t geometric transformation */
     virtual BBox bbox( Transform const& t ) const;
 
-    /** @brief Returns the convex shape bounding box
-    @param t geometric transformation */
-    virtual BCylinder bcylinder() const;
+    /** @brief Returns the convex shape bounding volume
+    @param type 1 = OBB, 2 = OBC */
+    virtual BVolume* computeBVolume( unsigned int type ) const;
 
     /** @brief Convex support function, returns the support point P, i.e. the
     point on the surface of the convex shape that satisfies max(P.v)

@@ -160,8 +160,8 @@ class Box : public Convex
     @param pt point */
     bool isIn( Point3 const& pt ) const;
 
-    /** @ Returns the bounding cylinder to box */
-    BCylinder bcylinder() const;
+    /** @ Returns the bounding volume to box */
+    BVolume* computeBVolume( unsigned int type ) const;
     
     /** @brief Performs advanced comparison of the two boxes and returns
     whether they match
