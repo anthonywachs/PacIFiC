@@ -461,7 +461,11 @@ class Particle : public Component
     
     /** @brief Returns whether two particles are of the same type
     @param other the other particle */
-    virtual bool equalType( Particle const* other ) const;    
+    virtual bool equalType( Particle const* other ) const; 
+    
+    /** @brief Returns whether to store the contact force for post-processing 
+    @param othercomp the other component invovled in the contact */
+    bool storePPForce( Component const* othercomp ) const;         
     //@}
 
 

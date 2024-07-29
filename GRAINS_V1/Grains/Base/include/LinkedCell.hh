@@ -199,7 +199,7 @@ class LinkedCell : public AppCollision
     @param InsertionArray structured array positions 
     @param wrapper MPI wrapper */
     void checkStructuredArrayPositionsMPI( struct StructArrayInsertion* 
-    	InsertionArray, GrainsMPIWrapper const* wrapper ) const;   		
+    	InsertionArray, GrainsMPIWrapper const* wrapper ) const;  		
     //@}
 
 

@@ -250,10 +250,15 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param v 3D vector */
     Vector3 Broadcast_Vector3( Vector3 const& v ) const;    
 
-    /** @brief Broadcasts a 3D vector from the master to all processes within 
+    /** @brief Broadcasts a 3D matrix from the master to all processes within 
     the MPI_COMM_activProc communicator
     @param mat matrix */
-    Matrix Broadcast_Matrix( Matrix const& mat ) const;   
+    Matrix Broadcast_Matrix( Matrix const& mat ) const;
+    
+    /** @brief Sums a matrix from all processes on the master process 
+    within the MPI_COMM_activProc communicator
+    @param mat matrix */
+    Matrix sum_Matrix_master( Matrix const& mat ) const;       
   
     /** @brief Outputs timer summary 
     @param f output stream */

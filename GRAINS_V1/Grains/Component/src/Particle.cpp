@@ -1886,3 +1886,34 @@ void Particle::setMaxIDnumber( int const& maxID_ )
 {
   m_maxID = maxID_;
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether to store the contact force for post-processing 
+bool Particle::storePPForce( Component const* othercomp ) const
+{
+  bool store = false;
+  // Case of an interior or buffer particle
+  if ( m_tag < 2 )
+  {
+    // Other component is either an obstacle or an interior/buffer particle
+    if ( othercomp->getTag() < 2 ) store = true;
+    // Other component is a clone particle and we store if ID > othercomp.ID
+    // to avoid duplicate storing on multi-procs or with periodic BC
+    else if ( m_id > othercomp->getID() ) store = true; 
+  }
+  // Case of clone particle
+  else
+  {
+    // Other component is an obstacle -> we do not store
+    // Other component is an interior/buffer particle: we store if 
+    // ID > othercomp.ID to avoid duplicate storing on multi-procs or with 
+    // periodic BC
+    if ( !othercomp->isObstacle() && othercomp->getTag() < 2
+    	&& m_id < othercomp->getID() ) store = true;  
+  }
+  
+  return ( store );
+}

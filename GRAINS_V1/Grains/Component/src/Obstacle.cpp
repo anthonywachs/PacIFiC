@@ -630,3 +630,14 @@ void Obstacle::setVelocity()
   	+ *(m_confinement.getTranslationalVelocity());
   m_angularVelocity = *(m_kinematics.getAngularVelocity());
 } 
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether to store the contact force for post-processing 
+bool Obstacle::storePPForce( Component const* othercomp ) const
+{
+  // Here we know that the other component is automatically a particle
+  return ( othercomp->getTag() != 2 );
+}

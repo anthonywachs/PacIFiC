@@ -692,3 +692,17 @@ istream& operator >> ( istream& fileIn, Matrix& m )
 {
   return ( fileIn >> m[X] >> m[Y] >> m[Z] );
 }
+
+
+
+
+// -----------------------------------------------------------------------
+// Operator /= by a float number
+Matrix& Matrix::operator /= ( double const& d )
+{
+  for ( int i=0;i<3;++i )
+    for ( int j=0;j<3;++j )
+        m_elem[i][j] /= d;
+
+  return ( *this );
+} 

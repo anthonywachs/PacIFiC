@@ -804,6 +804,7 @@ void ParaviewPostProcessingWriter::writeContactForceChains_Paraview(
   vector<struct PointForcePostProcessing> const* pallContacts = 
   	LC->getPPForces();
   size_t i, k, nPPF = LC->getNbPPForces();
+  cout << "nPPF = " << nPPF << endl;
   Vector3 const* PPTranslation = 
       GrainsExec::m_translationParaviewPostProcessing ;
   Point3 pt0, pt1;

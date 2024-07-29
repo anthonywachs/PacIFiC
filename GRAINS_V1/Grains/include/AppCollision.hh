@@ -8,6 +8,8 @@
 using namespace std;
 
 class SimpleObstacle;
+class Matrix;
+class GrainsMPIWrapper;
 
 
 struct PointForcePostProcessing
@@ -148,7 +150,13 @@ class AppCollision : public App
     vector<struct PointForcePostProcessing> const* getPPForces() const;
     
     /** @brief Resets the list of simple obstacles */
-    void resetListSimpleObstacles();    
+    void resetListSimpleObstacles(); 
+    
+    /** @brief Computes the stress tensor in the whole domain 
+    @param stress the stress tensor
+    @param wrapper MPI wrapper */
+    void computeStressTensor( Matrix& stress, 
+    	GrainsMPIWrapper const* wrapper );        
     //@}  
 
   

@@ -166,6 +166,10 @@ class Component
     /** @brief Returns whether a point lies inside the component
     @param pt point */
     virtual bool isIn( Point3 const& pt ) const;
+    
+    /** @brief Returns whether to store the contact force for post-processing 
+    @param othercomp the other component invovled in the contact */
+    virtual bool storePPForce( Component const* othercomp ) const = 0;
     //@}
 
 

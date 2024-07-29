@@ -1,10 +1,12 @@
 #include "GrainsMPIWrapper.hh"
-#include "GrainsExec.hh"
 #include "AppCollision.hh"
+#include "GrainsExec.hh"
 #include "Component.hh"
 #include "ContactBuilderFactory.hh"
 #include "PointContact.hh"
 #include "SimpleObstacle.hh"
+#include "Matrix.hh"
+#include "GrainsBuilderFactory.hh"
 
 
 size_t AppCollision::m_allforces_blocksize = 128;
@@ -275,23 +277,29 @@ void AppCollision::resetPPForceIndex()
 void AppCollision::addPPForce( Point3 const& pc, Vector3 const& force,
 	Component* comp0_, Component* comp1_)
 {
-  // Re-allocate 
-  if ( m_allforces_index >= m_allforces.size() )
-  {
-    struct PointForcePostProcessing pfpp;
-    size_t prevsize = m_allforces.size();  
-    m_allforces.reserve( prevsize + m_allforces_blocksize );
-    for (size_t i=0;i<m_allforces_blocksize;++i) m_allforces.push_back( pfpp );
-  }
+  // Test if we store this force to avoif duplicate force due to multi-procs 
+  // or periodic BC
+  if ( comp0_->storePPForce( comp1_ ) )
+  {  
+    // Re-allocate 
+    if ( m_allforces_index >= m_allforces.size() )
+    {
+      struct PointForcePostProcessing pfpp;
+      size_t prevsize = m_allforces.size();  
+      m_allforces.reserve( prevsize + m_allforces_blocksize );
+      for (size_t i=0;i<m_allforces_blocksize;++i) 
+        m_allforces.push_back( pfpp );
+    }
   
-  // Sets contact force features
-  m_allforces[m_allforces_index].geometricPointOfContact = pc;
-  m_allforces[m_allforces_index].contactForce = force;
-  m_allforces[m_allforces_index].PPptComp0 = comp0_->isObstacle() ? 
+    // Sets contact force features
+    m_allforces[m_allforces_index].geometricPointOfContact = pc;
+    m_allforces[m_allforces_index].contactForce = force;
+    m_allforces[m_allforces_index].PPptComp0 = comp0_->isObstacle() ? 
   	pc : *(comp0_->getPosition());
-  m_allforces[m_allforces_index].PPptComp1 = comp1_->isObstacle() ? 
+    m_allforces[m_allforces_index].PPptComp1 = comp1_->isObstacle() ? 
   	pc : *(comp1_->getPosition());
-  ++m_allforces_index;
+    ++m_allforces_index;
+  }
 }
 
 
@@ -312,4 +320,38 @@ size_t AppCollision::getNbPPForces() const
 vector<struct PointForcePostProcessing> const* AppCollision::getPPForces() const
 {
   return ( &m_allforces );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Computes the stress tensor in the whole domain */
+void AppCollision::computeStressTensor( Matrix& stress, 
+    	GrainsMPIWrapper const* wrapper )
+{
+  size_t m;
+  int i, j;
+  Vector3 r;
+  
+  // Reset the tensor to 0
+  stress.setValue( 0., 0., 0., 0., 0., 0., 0., 0., 0. );
+  
+  // Loop over all contact forces
+  for (m=0;m<m_allforces_index;++m)
+  {
+    r = m_allforces[m].PPptComp1 - m_allforces[m].PPptComp0;
+    for (i=0;i<3;++i)
+      for (j=0;j<3;++j)
+        stress[i][j] += r[i] * m_allforces[m].contactForce[j];
+  }
+
+  // If in MPI, sum contributions from each subdomain
+  if ( wrapper ) stress = wrapper->sum_Matrix_master( stress );
+
+  // Divide by the domain volume
+  double volume = m_domain_global_size_X * m_domain_global_size_Y
+  	* ( GrainsBuilderFactory::getContext() == DIM_2 ? 1 : 
+		m_domain_global_size_Z );
+  stress /= volume;  
 }

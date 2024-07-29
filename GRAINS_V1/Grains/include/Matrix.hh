@@ -215,6 +215,10 @@ class Matrix
     /** @brief Equal operator to another Matrix object
     @param m the other Matrix object */
     Matrix& operator = ( Matrix const& m );
+    
+    /** @brief Operator /= by a float number
+    @param d the float number */
+    Matrix& operator /= ( double const& d );    
     //@}
 
 

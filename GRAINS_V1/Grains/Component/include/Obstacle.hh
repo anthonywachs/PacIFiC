@@ -315,6 +315,10 @@ class Obstacle : public Component
     @param tagSecondComp tag of the other compoenent in case of a contact 
     torque */
     void addTorque( Vector3 const& torque, int tagSecondComp );	
+    
+    /** @brief Returns whether to store the contact force for post-processing 
+    @param othercomp the other component invovled in the contact */
+    bool storePPForce( Component const* othercomp ) const;    
     //@}
 
 
