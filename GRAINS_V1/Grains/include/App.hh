@@ -110,6 +110,12 @@ class App
     /** @brief Returns whether a point belongs to the global domain
     @param position point */
     static bool isInDomain( Point3 const* position );
+    
+    /** @brief Returns whether a point belongs to the global domain in a given 
+    direction
+    @param position point 
+    @param dir direction */
+    static bool isInDomain( Point3 const* position, size_t const& dir );    
   
     /** @brief Returns whether a point belongs to the local domain
     @param position point */

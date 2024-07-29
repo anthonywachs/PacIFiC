@@ -150,25 +150,18 @@ string ObstacleImposedForce::getObstacleName() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the remaining active time interval of the imposed motion
-double ObstacleImposedForce::getTime( double debut, double fin ) const
+// Returns whether the imposed motion is activ over the time interval [td,te] 
+// and if it is the sub-interval length within [td,te] when it is actually 
+// active
+bool ObstacleImposedForce::isActif( double const& td, double const& te, 
+	double const& dt, double& subinterval ) const 
 {
-  double activtimeint = fin - debut;
+  subinterval = te - td;
 
-  if ( debut < m_tstart ) activtimeint -= ( m_tstart - debut );
-  if ( m_tend < fin ) activtimeint -= ( fin - m_tend );
+  if ( td < m_tstart ) subinterval -= ( m_tstart - td );
+  if ( m_tend < te ) subinterval -= ( te - m_tend );
 
-  return ( activtimeint );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns whether the imposed motion is activ at time t
-bool ObstacleImposedForce::isActif( double t, double dt ) const 
-{
-  return ( t > m_tstart - dt * 1.e-5  && t < m_tend + dt * 1.e-5 );
+  return ( subinterval > dt * 1.e-5 );
 }
 
 
@@ -227,16 +220,17 @@ string ObstacleImposedForce::getType() const
 
 // ----------------------------------------------------------------------------
 // Returns the translational velocity at time t 
-Vector3 const* ObstacleImposedForce::translationalVelocity( double time, 
-	double dt, Obstacle* obstacle )
+void ObstacleImposedForce::translationalVelocity( double time, double dt, 
+      double const& subinterval, Vector3& vt, Vector3& translation, 
+      const Obstacle* obstacle )
 {
   Vector3 center = *(obstacle->getPosition());
   Vector3 force = *(obstacle->getForce());
 
   // Mass coeficient
   // If automatically determined, it is set such that the obstacle motion
-  // over [t,t+dt] is equal to its crust thickness divided by 10^7 when
-  // the controller is simply a propertional controller and df is equal 
+  // over [time-dt,time] is equal to its crust thickness divided by 10^7 when
+  // the controller is simply a proportional controller and df is equal 
   // to the imposed force  
   if ( m_automass )
     m_mass = dt * dt * Norm( m_force_amplitude ) * 1.e7 /
@@ -244,7 +238,7 @@ Vector3 const* ObstacleImposedForce::translationalVelocity( double time,
 
   // PID controller coefficients (Ziegler-Nichols method) 
   // The proportionality coefficient Kp is the solution of the simple
-  // ODE m_mass * d^22 x/dt^2 = df with df constant over [t,t+dt] where
+  // ODE m_mass * d^22 x/dt^2 = df with df constant over [time-dt,time] where
   // x is the obstacle motion, i.e. x = dt^2 * df / ( 2 * m_mass )  
   double Kp = 0.5 * dt * dt / m_mass ;
   double Ki = 2. * Kp / dt ;
@@ -269,12 +263,16 @@ Vector3 const* ObstacleImposedForce::translationalVelocity( double time,
       depl = depl_nm1 + ( Kp + Ki * dt + Kd / dt ) * dforce
       	- ( Kp + 2. * Kd / dt ) * dforce_nm1 + ( Kd / dt ) * dforce_nm2; 
       m_translationalVelocity = depl / dt;
+      translation = ( subinterval / dt ) * depl;       
       dforce_nm2 = dforce_nm1;
       dforce_nm1 = dforce;
       depl_nm1 = depl;
     }
     else
-      m_translationalVelocity = - m_vmaxzeroforce * m_direction;      
+    {
+      m_translationalVelocity = - m_vmaxzeroforce * m_direction;
+      translation = subinterval * m_translationalVelocity;
+    }                   
   }
   else if ( m_type == "SinCyclicTranslation" )
   {
@@ -290,7 +288,9 @@ Vector3 const* ObstacleImposedForce::translationalVelocity( double time,
 //     m_prev = trans;
   }
   
-  return ( &m_translationalVelocity );
+  // Set transalation velocity to zero is forcing is complete at time time
+  if ( isCompleted( time, dt ) ) m_translationalVelocity = 0.;
+  vt = m_translationalVelocity;
 }
 
 

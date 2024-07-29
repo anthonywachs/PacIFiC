@@ -219,25 +219,18 @@ string ObstacleImposedVelocity::getObstacleName() const
 
 
 // ----------------------------------------------------------------------------
-// Returns the remaining active time interval of the imposed motion
-double ObstacleImposedVelocity::getTime( double debut, double fin ) const
+// Returns whether the imposed motion is activ over the time interval [td,te] 
+// and if it is the sub-interval length within [td,te] when it is actually 
+// active
+bool ObstacleImposedVelocity::isActif( double const& td, double const& te, 
+	double const& dt, double& subinterval ) const 
 {
-  double activtimeint = fin - debut;
+  subinterval = te - td;
 
-  if ( debut < m_tstart ) activtimeint -= ( m_tstart - debut );
-  if ( m_tend < fin ) activtimeint -= ( fin - m_tend );
+  if ( td < m_tstart ) subinterval -= ( m_tstart - td );
+  if ( m_tend < te ) subinterval -= ( te - m_tend );
 
-  return ( activtimeint );
-}
-
-
-
-
-// ----------------------------------------------------------------------------
-// Returns whether the imposed motion is activ at time t
-bool ObstacleImposedVelocity::isActif( double t, double dt ) const 
-{
-  return ( t > m_tstart - dt * 1.e-5  && t < m_tend + dt * 1.e-5 );
+  return ( subinterval > dt * 1.e-5 );
 }
 
 
@@ -258,19 +251,23 @@ bool ObstacleImposedVelocity::isCompleted( double t, double dt ) const
 Vector3 const* ObstacleImposedVelocity::translationalVelocity( double time, 
 	double dt, Point3 const& cg )
 {
-  if ( m_type == "SinTranslation" )
-    m_translationalVelocity = m_Sin_amplitude * 
+  if ( isCompleted( time, dt ) ) m_translationalVelocity = 0.;
+  else
+  {
+    if ( m_type == "SinTranslation" )
+      m_translationalVelocity = m_Sin_amplitude * 
     	sin( 2. * PI * ( time - m_tstart ) / m_Sin_period + m_Sin_phase_shift )
 	* m_unit_vitRef ;
-  else if ( m_type == "SinCyclicTranslation" )
-  {
-    for (size_t i=0;i<3;++i)
-      m_translationalVelocity[i] = m_SinCyclic_amplitude[i] * 
-    	sin( 2. * PI * ( time - m_tstart ) / m_SinCyclic_period[i] 
-	+ m_SinCyclic_phase_shift[i] ) * m_unit_vitRef[i] ;	    	
+    else if ( m_type == "SinCyclicTranslation" )
+    {
+      for (size_t i=0;i<3;++i)
+        m_translationalVelocity[i] = m_SinCyclic_amplitude[i] * 
+		sin( 2. * PI * ( time - m_tstart ) / m_SinCyclic_period[i] 
+		+ m_SinCyclic_phase_shift[i] ) * m_unit_vitRef[i] ;	    	
+    }
+    else if ( m_type == "ConstantRotation" && !m_rotationCenterIsCenterOfMass )
+      m_translationalVelocity = m_angularVelocity ^ ( cg - m_rotationCenter );
   }
-  else if ( m_type == "ConstantRotation" && !m_rotationCenterIsCenterOfMass )
-    m_translationalVelocity = m_angularVelocity ^ ( cg - m_rotationCenter );
 
   return ( &m_translationalVelocity );
 }
@@ -283,6 +280,7 @@ Vector3 const* ObstacleImposedVelocity::translationalVelocity( double time,
 Vector3 const* ObstacleImposedVelocity::angularVelocity( double time, 
 	double dt )
 {    
+  if ( isCompleted( time, dt ) ) m_angularVelocity = 0.;  
   return ( &m_angularVelocity );
 }
 
@@ -292,32 +290,35 @@ Vector3 const* ObstacleImposedVelocity::angularVelocity( double time,
 // ----------------------------------------------------------------------------
 // Returns the translational motion over dt at time t
 Vector3 ObstacleImposedVelocity::translationalMotion( double time, 
-	double dt, Point3 const& cg ) 
+	double dt, double const& subinterval, Point3 const& cg ) 
 {
-  // We integrate the velocity over [t,t+dt] analytically to be more accurate
+  // We integrate analytically the velocity over the subinterval of 
+  // [time-dt,time] where the imposed motion is active
   Vector3 translation;
+  double ti = time - dt < m_tstart ? m_tstart : time - dt;
+  double te = time > m_tend ? m_tend : time;   
   
   if ( m_type == "ConstantTranslation" ) 
-    translation = m_translationalVelocity * dt;
+    translation = m_translationalVelocity * subinterval;
   else if ( m_type == "SinTranslation" )
     translation = ( m_Sin_amplitude * m_Sin_period / ( 2. * PI ) )
-    	* ( cos( 2. * PI * ( time - m_tstart ) / m_Sin_period 
+    	* ( cos( 2. * PI * ( ti - m_tstart ) / m_Sin_period 
 		+ m_Sin_phase_shift ) 
-	- cos( 2. * PI * ( time + dt - m_tstart ) / m_Sin_period 
+	- cos( 2. * PI * ( te - m_tstart ) / m_Sin_period 
 		+ m_Sin_phase_shift ) ) * m_unit_vitRef ;
   else if ( m_type == "SinCyclicTranslation" )
   {
     for (size_t i=0;i<3;++i)
       translation[i] = 
       	( m_SinCyclic_amplitude[i] * m_SinCyclic_period[i] / ( 2. * PI ) )
-    	* ( cos( 2. * PI * ( time - m_tstart ) / m_SinCyclic_period[i] 
+    	* ( cos( 2. * PI * ( ti - m_tstart ) / m_SinCyclic_period[i] 
 		+ m_SinCyclic_phase_shift[i] ) 
-	- cos( 2. * PI * ( time + dt - m_tstart ) / m_SinCyclic_period[i] 
+	- cos( 2. * PI * ( te - m_tstart ) / m_SinCyclic_period[i] 
 		+ m_SinCyclic_phase_shift[i] ) ) * m_unit_vitRef[i] ;	    	
   }
   else if ( m_type == "ConstantRotation" && !m_rotationCenterIsCenterOfMass )
   {
-    Vector3 rota = angularMotion( time, dt );
+    Vector3 rota = angularMotion( time, dt, subinterval );
     double d = Norm(rota);
     Quaternion q;
 
@@ -340,10 +341,11 @@ Vector3 ObstacleImposedVelocity::translationalMotion( double time,
 
 // ----------------------------------------------------------------------------
 // Returns the angular motion over dt at time t 
-Vector3 ObstacleImposedVelocity::angularMotion( double time, double dt )
+Vector3 ObstacleImposedVelocity::angularMotion( double time, double dt, 
+	double const& subinterval )
 {
   // We only consider contant angular velocity so far
-  return ( m_angularVelocity * dt );
+  return ( m_angularVelocity * subinterval );
 }  
 
 

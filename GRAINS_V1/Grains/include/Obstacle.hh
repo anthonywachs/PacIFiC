@@ -96,13 +96,17 @@ class Obstacle : public Component
     virtual string getObstacleType() = 0;
     
     /** @brief Computes center of mass position */
-    virtual pair<Point3,double> computeCenterOfMass() = 0;    
+    virtual pair<Point3,double> computeCenterOfMass() = 0;
+    
+    /** @brief Empties the list of cells the obstacle is linked to and deletes
+    the pointer to the obstacle is these cells */
+    virtual void resetInCells() = 0;        
     //@}
 
 
     /** @name Set methods */
     //@{
-    /** @brief Sets kinematics
+    /** @brief Sets imposed velocity kinematics
     @param kine_ the new kinematics */
     void setKinematics( ObstacleKinematicsVelocity& kine_ );
 
@@ -117,8 +121,20 @@ class Obstacle : public Component
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
         
-    /** @brief Set contact map entry features to zero */
-    virtual void setContactMapFeaturesToZero();    
+    /** @brief Sets contact map entry features to zero */
+    virtual void setContactMapFeaturesToZero(); 
+    
+    /** @brief Restricts the geometric directions of translational motion 
+    @param dir restricted geometric directions of translational motion */
+    void setRestrictedGeomDirMotion( list<size_t> const& dir );
+    
+    /** @brief Sets the obstacle name
+    @param name_ obstacle name */
+    void setName( string const& name_ );
+    
+    /** @brief Sets obstacle translational and angular velocities from active
+    kinematics with imposed velocity and  with imposed force */
+    void setVelocity();           
     //@}
 
 
@@ -248,6 +264,11 @@ class Obstacle : public Component
     Useful for debugging only.
     @param id id of this component */
     virtual void printActiveNeighbors( int const& id );
+    
+    /** @brief Checks if there is anything special to do about periodicity and
+    if there is applies periodicity 
+    @param LC linked-cell grid */
+    virtual void periodicity( LinkedCell* LC );    
     //@}
 
 
@@ -263,9 +284,8 @@ class Obstacle : public Component
 
     /** @brief Composes the obstacle kinematics with another "higher level"
     force kinematics
-    @param other the higher level kinematics
-    @param centre the obstacle center of mass */
-    void Compose( ObstacleKinematicsForce const& other, Point3 const& centre );
+    @param other the higher level kinematics */
+    void Compose( ObstacleKinematicsForce const& other );
 
     /** @brief Returns whether the obstacle has moved over the last time step */
     bool hasMoved() const;
@@ -389,9 +409,15 @@ class Obstacle : public Component
   	force */
     string m_name; /**< obstacle name */
     bool m_ismoving; /**< whether the obstacle moves or not */
+    Vector3 m_translationalVelocity; /**< obstacle translational velocity */
+    Vector3 m_angularVelocity; /**< obstacle angular velocity */    
     double m_indicator; /**< post-processing indicator for the rotation of
   	composite obstacle in Paraview */
     string m_ObstacleType; /**< obstacle type */
+    bool m_restrict_geommotion; /**< restrict the geometric translation motion
+    	of the obstacle to specific direction */
+    list<size_t> m_dir_restricted_geommotion; /**< geometric direction of 
+    	translational motion that are not allowed */    
     //@}
 
     /** @name Parameters Static */

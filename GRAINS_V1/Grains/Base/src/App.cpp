@@ -223,304 +223,465 @@ void App::set_periodicity( vector<bool> const& vper )
   {
     m_periodic_vector_indices.reserve(30);
     vector<int> emptyVECINT;
+    list<int> indices;    
     for (int i=0;i<30;++i) 
-      m_periodic_vector_indices.push_back(emptyVECINT);
-    vector<int>* work = NULL;
+      m_periodic_vector_indices.push_back( emptyVECINT );
   
     // NORTH => NORTH
-    work = new vector<int>(1,0);
-    (*work)[0] = GEOPOS_NORTH;
-    m_periodic_vector_indices[GEOPOS_NORTH] = *work;
-    work->clear();
-    delete work;
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH );
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_NORTH] = w;
+      indices.clear();
+    }  
   
     // NORTH_EAST => NORTH, EAST, NORTH_EAST
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_NORTH;
-    (*work)[1] = GEOPOS_EAST;  
-    (*work)[2] = GEOPOS_NORTH_EAST;
-    m_periodic_vector_indices[GEOPOS_NORTH_EAST] = *work;    
-    work->clear();
-    delete work;
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_EAST );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_NORTH_EAST] = w;
+      indices.clear();
+    }        
   
     // NORTH_WEST => NORTH, WEST, NORTH_WEST
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_NORTH;
-    (*work)[1] = GEOPOS_WEST;  
-    (*work)[2] = GEOPOS_NORTH_WEST;
-    m_periodic_vector_indices[GEOPOS_NORTH_WEST] = *work;    
-    work->clear();
-    delete work;    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_WEST );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_NORTH_WEST] = w;
+      indices.clear();
+    }  
 
     // NORTH_FRONT => NORTH, FRONT, NORTH_FRONT
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_NORTH;
-    (*work)[1] = GEOPOS_FRONT;  
-    (*work)[2] = GEOPOS_NORTH_FRONT;
-    m_periodic_vector_indices[GEOPOS_NORTH_FRONT] = *work;    
-    work->clear();
-    delete work;  
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_FRONT );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_FRONT );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_NORTH_FRONT] = w;
+      indices.clear();
+    } 
 
     // NORTH_BEHIND => NORTH, BEHIND, NORTH_BEHIND
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_NORTH;
-    (*work)[1] = GEOPOS_BEHIND;  
-    (*work)[2] = GEOPOS_NORTH_BEHIND;
-    m_periodic_vector_indices[GEOPOS_NORTH_BEHIND] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_BEHIND );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_BEHIND );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_NORTH_BEHIND] = w;
+      indices.clear();
+    }
 
     // NORTH_EAST_FRONT => NORTH, EAST, FRONT, EAST_FRONT, NORTH_EAST, 
     // NORTH_FRONT, NORTH_EAST_FRONT
-    work = new vector<int>(7,0);
-    (*work)[0] = GEOPOS_NORTH;
-    (*work)[1] = GEOPOS_EAST;  
-    (*work)[2] = GEOPOS_FRONT;
-    (*work)[3] = GEOPOS_EAST_FRONT;  
-    (*work)[4] = GEOPOS_NORTH_EAST;  
-    (*work)[5] = GEOPOS_NORTH_FRONT;  
-    (*work)[6] = GEOPOS_NORTH_EAST_FRONT;  
-    m_periodic_vector_indices[GEOPOS_NORTH_EAST_FRONT] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_FRONT ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_EAST_FRONT );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_FRONT ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST_FRONT] 
+    	!= Vector3Null ) indices.push_back( GEOPOS_NORTH_EAST_FRONT ); 
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_NORTH_EAST_FRONT] = w;
+      indices.clear();
+    }
 
     // NORTH_EAST_BEHIND => NORTH, EAST, BEHIND, EAST_BEHIND, NORTH_EAST, 
     // NORTH_BEHIND, NORTH_EAST_BEHIND
-    work = new vector<int>(7,0);
-    (*work)[0] = GEOPOS_NORTH;
-    (*work)[1] = GEOPOS_EAST;  
-    (*work)[2] = GEOPOS_BEHIND;
-    (*work)[3] = GEOPOS_EAST_BEHIND;  
-    (*work)[4] = GEOPOS_NORTH_EAST;  
-    (*work)[5] = GEOPOS_NORTH_BEHIND;  
-    (*work)[6] = GEOPOS_NORTH_EAST_BEHIND;  
-    m_periodic_vector_indices[GEOPOS_NORTH_EAST_BEHIND] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_BEHIND ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_EAST_BEHIND );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_BEHIND ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST_BEHIND] 
+    	!= Vector3Null ) indices.push_back( GEOPOS_NORTH_EAST_BEHIND ); 
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_NORTH_EAST_BEHIND] = w;
+      indices.clear();
+    }
 
     // NORTH_WEST_FRONT => NORTH, WEST, FRONT, WEST_FRONT, NORTH_WEST, 
     // NORTH_FRONT, NORTH_WEST_FRONT
-    work = new vector<int>(7,0);
-    (*work)[0] = GEOPOS_NORTH;
-    (*work)[1] = GEOPOS_WEST;  
-    (*work)[2] = GEOPOS_FRONT;
-    (*work)[3] = GEOPOS_WEST_FRONT;  
-    (*work)[4] = GEOPOS_NORTH_WEST;  
-    (*work)[5] = GEOPOS_NORTH_FRONT;  
-    (*work)[6] = GEOPOS_NORTH_WEST_FRONT;  
-    m_periodic_vector_indices[GEOPOS_NORTH_WEST_FRONT] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_FRONT ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_WEST_FRONT );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_FRONT ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST_FRONT] 
+    	!= Vector3Null ) indices.push_back( GEOPOS_NORTH_WEST_FRONT ); 
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_NORTH_WEST_FRONT] = w;
+      indices.clear();
+    }
 
     // NORTH_WEST_BEHIND => NORTH, WEST, BEHIND, WEST_BEHIND, NORTH_WEST, 
     // NORTH_BEHIND, NORTH_WEST_BEHIND
-    work = new vector<int>(7,0);
-    (*work)[0] = GEOPOS_NORTH;
-    (*work)[1] = GEOPOS_WEST;  
-    (*work)[2] = GEOPOS_BEHIND;
-    (*work)[3] = GEOPOS_WEST_BEHIND;  
-    (*work)[4] = GEOPOS_NORTH_WEST;  
-    (*work)[5] = GEOPOS_NORTH_BEHIND;  
-    (*work)[6] = GEOPOS_NORTH_WEST_BEHIND;  
-    m_periodic_vector_indices[GEOPOS_NORTH_WEST_BEHIND] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_BEHIND ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_WEST_BEHIND );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_BEHIND ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST_BEHIND] 
+    	!= Vector3Null ) indices.push_back( GEOPOS_NORTH_WEST_BEHIND ); 
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_NORTH_WEST_BEHIND] = w;
+      indices.clear();
+    } 
  
     // SOUTH => SOUTH
-    work = new vector<int>(1,0);
-    (*work)[0] = GEOPOS_SOUTH;
-    m_periodic_vector_indices[GEOPOS_SOUTH] = *work;
-    work->clear();
-    delete work;
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_SOUTH] = w;
+      indices.clear();
+    }        
   
     // SOUTH_EAST => SOUTH, EAST, SOUTH_EAST
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_SOUTH;
-    (*work)[1] = GEOPOS_EAST;  
-    (*work)[2] = GEOPOS_SOUTH_EAST;
-    m_periodic_vector_indices[GEOPOS_SOUTH_EAST] = *work;    
-    work->clear();
-    delete work;
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_EAST );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_SOUTH_EAST] = w;
+      indices.clear();
+    }
   
     // SOUTH_WEST => SOUTH, WEST, SOUTH_WEST
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_SOUTH;
-    (*work)[1] = GEOPOS_WEST;  
-    (*work)[2] = GEOPOS_SOUTH_WEST;
-    m_periodic_vector_indices[GEOPOS_SOUTH_WEST] = *work;    
-    work->clear();
-    delete work;    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_WEST );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_SOUTH_WEST] = w;
+      indices.clear();
+    }   
 
     // SOUTH_FRONT => SOUTH, FRONT, SOUTH_FRONT
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_SOUTH;
-    (*work)[1] = GEOPOS_FRONT;  
-    (*work)[2] = GEOPOS_SOUTH_FRONT;
-    m_periodic_vector_indices[GEOPOS_SOUTH_FRONT] = *work;    
-    work->clear();
-    delete work;  
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_FRONT );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_FRONT );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_SOUTH_FRONT] = w;
+      indices.clear();
+    }
 
     // SOUTH_BEHIND => SOUTH, BEHIND, SOUTH_BEHIND
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_SOUTH;
-    (*work)[1] = GEOPOS_BEHIND;  
-    (*work)[2] = GEOPOS_SOUTH_BEHIND;
-    m_periodic_vector_indices[GEOPOS_SOUTH_BEHIND] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_BEHIND );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_BEHIND );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_SOUTH_BEHIND] = w;
+      indices.clear();
+    }
 
     // SOUTH_EAST_FRONT => SOUTH, EAST, FRONT, EAST_FRONT, SOUTH_EAST, 
     // SOUTH_FRONT, SOUTH_EAST_FRONT
-    work = new vector<int>(7,0);
-    (*work)[0] = GEOPOS_SOUTH;
-    (*work)[1] = GEOPOS_EAST;  
-    (*work)[2] = GEOPOS_FRONT;
-    (*work)[3] = GEOPOS_EAST_FRONT;  
-    (*work)[4] = GEOPOS_SOUTH_EAST;  
-    (*work)[5] = GEOPOS_SOUTH_FRONT;  
-    (*work)[6] = GEOPOS_SOUTH_EAST_FRONT;  
-    m_periodic_vector_indices[GEOPOS_SOUTH_EAST_FRONT] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_FRONT ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_EAST_FRONT );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_FRONT ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST_FRONT] 
+    	!= Vector3Null ) indices.push_back( GEOPOS_SOUTH_EAST_FRONT ); 
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_SOUTH_EAST_FRONT] = w;
+      indices.clear();
+    } 
 
     // SOUTH_EAST_BEHIND => SOUTH, EAST, BEHIND, EAST_BEHIND, SOUTH_EAST, 
     // SOUTH_BEHIND, SOUTH_EAST_BEHIND
-    work = new vector<int>(7,0);
-    (*work)[0] = GEOPOS_SOUTH;
-    (*work)[1] = GEOPOS_EAST;  
-    (*work)[2] = GEOPOS_BEHIND;
-    (*work)[3] = GEOPOS_EAST_BEHIND;  
-    (*work)[4] = GEOPOS_SOUTH_EAST;  
-    (*work)[5] = GEOPOS_SOUTH_BEHIND;  
-    (*work)[6] = GEOPOS_SOUTH_EAST_BEHIND;  
-    m_periodic_vector_indices[GEOPOS_SOUTH_EAST_BEHIND] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_BEHIND ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_EAST_BEHIND );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_BEHIND ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST_BEHIND] 
+    	!= Vector3Null ) indices.push_back( GEOPOS_SOUTH_EAST_BEHIND ); 
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_SOUTH_EAST_BEHIND] = w;
+      indices.clear();
+    }
 
-    // SOUTH_WEST_FRONT => SOUTH, WEST, FRONT, WEST_FRONT, SOUTH_WEST, SOUTH_FRONT,
-    // SOUTH_WEST_FRONT
-    work = new vector<int>(7,0);
-    (*work)[0] = GEOPOS_SOUTH;
-    (*work)[1] = GEOPOS_WEST;  
-    (*work)[2] = GEOPOS_FRONT;
-    (*work)[3] = GEOPOS_WEST_FRONT;  
-    (*work)[4] = GEOPOS_SOUTH_WEST;  
-    (*work)[5] = GEOPOS_SOUTH_FRONT;  
-    (*work)[6] = GEOPOS_SOUTH_WEST_FRONT;  
-    m_periodic_vector_indices[GEOPOS_SOUTH_WEST_FRONT] = *work;    
-    work->clear();
-    delete work; 
+    // SOUTH_WEST_FRONT => SOUTH, WEST, FRONT, WEST_FRONT, SOUTH_WEST, 
+    // SOUTH_FRONT, SOUTH_WEST_FRONT
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_FRONT ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_WEST_FRONT );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_FRONT ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST_FRONT] 
+    	!= Vector3Null ) indices.push_back( GEOPOS_SOUTH_WEST_FRONT ); 
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_SOUTH_WEST_FRONT] = w;
+      indices.clear();
+    }
 
     // SOUTH_WEST_BEHIND => SOUTH, WEST, BEHIND, WEST_BEHIND, SOUTH_WEST, 
     // SOUTH_BEHIND, SOUTH_WEST_BEHIND
-    work = new vector<int>(7,0);
-    (*work)[0] = GEOPOS_SOUTH;
-    (*work)[1] = GEOPOS_WEST;  
-    (*work)[2] = GEOPOS_BEHIND;
-    (*work)[3] = GEOPOS_WEST_BEHIND;  
-    (*work)[4] = GEOPOS_SOUTH_WEST;  
-    (*work)[5] = GEOPOS_SOUTH_BEHIND;  
-    (*work)[6] = GEOPOS_SOUTH_WEST_BEHIND;  
-    m_periodic_vector_indices[GEOPOS_SOUTH_WEST_BEHIND] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_BEHIND ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_WEST_BEHIND );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_BEHIND ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST_BEHIND] 
+    	!= Vector3Null ) indices.push_back( GEOPOS_SOUTH_WEST_BEHIND ); 
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_SOUTH_WEST_BEHIND] = w;
+      indices.clear();
+    }
   
     // EAST => EAST
-    work = new vector<int>(1,0);
-    (*work)[0] = GEOPOS_EAST;
-    m_periodic_vector_indices[GEOPOS_EAST] = *work;
-    work->clear();
-    delete work;  
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_EAST] = w;
+      indices.clear();
+    } 
 
     // WEST => WEST
-    work = new vector<int>(1,0);
-    (*work)[0] = GEOPOS_WEST;
-    m_periodic_vector_indices[GEOPOS_WEST] = *work;
-    work->clear();
-    delete work;  
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_WEST] = w;
+      indices.clear();
+    } 
 
     // EAST_FRONT => EAST, FRONT, EAST_FRONT
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_EAST;
-    (*work)[1] = GEOPOS_FRONT;  
-    (*work)[2] = GEOPOS_EAST_FRONT;
-    m_periodic_vector_indices[GEOPOS_EAST_FRONT] = *work;    
-    work->clear();
-    delete work;  
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_FRONT );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_EAST_FRONT );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_EAST_FRONT] = w;
+      indices.clear();
+    }  
 
     // EAST_BEHIND => EAST, BEHIND, EAST_BEHIND
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_EAST;
-    (*work)[1] = GEOPOS_BEHIND;  
-    (*work)[2] = GEOPOS_EAST_BEHIND;
-    m_periodic_vector_indices[GEOPOS_EAST_BEHIND] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_BEHIND );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_EAST_BEHIND );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_EAST_BEHIND] = w;
+      indices.clear();
+    } 
 
     // WEST_FRONT => WEST, FRONT, WEST_FRONT
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_WEST;
-    (*work)[1] = GEOPOS_FRONT;  
-    (*work)[2] = GEOPOS_WEST_FRONT;
-    m_periodic_vector_indices[GEOPOS_WEST_FRONT] = *work;    
-    work->clear();
-    delete work;  
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_FRONT );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_WEST_FRONT );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_WEST_FRONT] = w;
+      indices.clear();
+    }  
 
     // WEST_BEHIND => WEST, BEHIND, WEST_BEHIND
-    work = new vector<int>(3,0);
-    (*work)[0] = GEOPOS_WEST;
-    (*work)[1] = GEOPOS_BEHIND;  
-    (*work)[2] = GEOPOS_WEST_BEHIND;
-    m_periodic_vector_indices[GEOPOS_WEST_BEHIND] = *work;    
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_BEHIND );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_WEST_BEHIND );      
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_WEST_BEHIND] = w;
+      indices.clear();
+    }
    
     // FRONT => FRONT
-    work = new vector<int>(1,0);
-    (*work)[0] = GEOPOS_FRONT;
-    m_periodic_vector_indices[GEOPOS_FRONT] = *work;
-    work->clear();
-    delete work;  
+    if ( m_domain_global_periodic_vectors[GEOPOS_FRONT] != Vector3Null )
+      indices.push_back( GEOPOS_FRONT );
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_FRONT] = w;
+      indices.clear();
+    }   
 
     // BEHIND => BEHIND
-    work = new vector<int>(1,0);
-    (*work)[0] = GEOPOS_BEHIND;
-    m_periodic_vector_indices[GEOPOS_BEHIND] = *work;
-    work->clear();
-    delete work; 
+    if ( m_domain_global_periodic_vectors[GEOPOS_BEHIND] != Vector3Null )
+      indices.push_back( GEOPOS_BEHIND );
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_BEHIND] = w;
+      indices.clear();
+    }
+ 
     
     // Special cases for serial periodicity with a single cell in the main 
     // domain in the periodic direction(s)
     // EASTWEST => EAST, WEST
-    work = new vector<int>(2,0);
-    (*work)[0] = GEOPOS_EAST;
-    (*work)[1] = GEOPOS_WEST;    
-    m_periodic_vector_indices[GEOPOS_EASTWEST] = *work;
-    work->clear();
-    delete work;
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );          
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_EASTWEST] = w;
+      indices.clear();
+    }
     
     // NORTHSOUTH => NORTH, SOUTH
-    work = new vector<int>(2,0);
-    (*work)[0] = GEOPOS_NORTH;
-    (*work)[1] = GEOPOS_SOUTH;    
-    m_periodic_vector_indices[GEOPOS_NORTHSOUTH] = *work;
-    work->clear();
-    delete work;
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );          
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_NORTHSOUTH] = w;
+      indices.clear();
+    }
     
     // GEOPOS_EASTWESTNORTHSOUTH => EAST, WEST, NORTH, NORTH_EAST, NORTH_WEST,
     // SOUTH_EAST, SOUTH_WEST
-    work = new vector<int>(8,0);
-    (*work)[0] = GEOPOS_EAST;
-    (*work)[1] = GEOPOS_WEST;  
-    (*work)[2] = GEOPOS_NORTH;
-    (*work)[3] = GEOPOS_SOUTH;  
-    (*work)[4] = GEOPOS_NORTH_EAST;  
-    (*work)[5] = GEOPOS_NORTH_WEST;  
-    (*work)[6] = GEOPOS_SOUTH_EAST; 
-    (*work)[7] = GEOPOS_SOUTH_WEST;     
-    m_periodic_vector_indices[GEOPOS_EASTWESTNORTHSOUTH] = *work;
-    work->clear();
-    delete work;               
+    if ( m_domain_global_periodic_vectors[GEOPOS_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_WEST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_NORTH_WEST ); 
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_EAST );    
+    if ( m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST] != Vector3Null )
+      indices.push_back( GEOPOS_SOUTH_WEST ); 
+    if ( indices.size() )
+    {
+      vector<int> w( begin(indices), end(indices) );
+      m_periodic_vector_indices[GEOPOS_EASTWESTNORTHSOUTH] = w;
+      indices.clear();
+    }               
   } 
 }
 
@@ -544,7 +705,7 @@ void App::set_local_domain_size( double lx_, double ly_, double lz_ )
 void App::set_local_domain_origin( int const* nprocsdir, int const* MPIcoords )
 {
   m_domain_local_origin[0] = m_domain_global_origin[0] 
-  	+ MPIcoords[0] * m_domain_local_size_X ;
+  	+ MPIcoords[0] * m_domain_local_size_X ;	
   m_domain_local_origin[1] = m_domain_global_origin[1] 
   	+ MPIcoords[1] * m_domain_local_size_Y ;  
   m_domain_local_origin[2] = m_domain_global_origin[2] 
@@ -617,8 +778,40 @@ bool App::isInDomain( Point3 const* position )
     isIn = false;
   
   return ( isIn );
-}  
+} 
 
+
+
+ 
+// ----------------------------------------------------------------------------
+// Returns whether a point belongs to the global domain in a given direction
+bool App::isInDomain( Point3 const* position, size_t const& dir )
+{
+  bool isIn = true;
+  
+  switch ( dir )
+  {
+    case 0:
+      if ( (*position)[0] < m_domain_global_origin[0] 
+  	|| (*position)[0] > m_domain_global_origin[0] + m_domain_global_size_X )
+      isIn = false; 
+      break;
+      
+    case 1:
+      if ( (*position)[1] < m_domain_global_origin[1] 
+	|| (*position)[1] > m_domain_global_origin[1] + m_domain_global_size_Y )
+      isIn = false; 
+      break;
+      
+    default:
+      if ( (*position)[2] < m_domain_global_origin[2] 
+	|| (*position)[2] > m_domain_global_origin[2] + m_domain_global_size_Z )
+      isIn = false;                        
+      break;  
+  }
+  
+  return ( isIn );
+}  
 
 
 

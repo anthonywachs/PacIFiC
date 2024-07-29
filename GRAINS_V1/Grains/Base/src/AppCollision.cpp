@@ -22,9 +22,7 @@ AppCollision::AppCollision()
   , m_nbParticles_mean( 0. )
   , m_allforces_index( 0 )
 {
-  struct PointForcePostProcessing pfpp;
-  pfpp.comp0 = NULL;
-  pfpp.comp1 = NULL;  
+  struct PointForcePostProcessing pfpp; 
   m_allforces.reserve( m_allforces_blocksize );
   for (size_t i=0;i<m_allforces_blocksize;++i) m_allforces.push_back( pfpp );
 }
@@ -87,16 +85,27 @@ bool AppCollision::isCloseWithCrust( Particle const* particle ) const
 
 
 // ----------------------------------------------------------------------------
-// Links the parent obstacle with the contact detection algorithm
-void AppCollision::Link( Obstacle* obstacle )
+// Links the root obstacle with the contact detection algorithm at
+// the start of the simulation
+void AppCollision::Link( Obstacle* root_obstacle )
 {
   if ( !m_obstacles )
   {
-    m_obstacles = obstacle;
-    m_allObstacles = obstacle->getObstacles();
+    m_obstacles = root_obstacle;
+    m_allSimpleObstacles = m_obstacles->getObstacles();
   }
 }
 
+
+
+
+// ----------------------------------------------------------------------------
+// Resets the list of simple obstacles */
+void AppCollision::resetListSimpleObstacles()
+{
+  m_allSimpleObstacles = m_obstacles->getObstacles();
+}
+ 
 
 
 
@@ -105,8 +114,8 @@ void AppCollision::Link( Obstacle* obstacle )
 void AppCollision::remove( SimpleObstacle* obs )
 {
   list<SimpleObstacle*>::iterator il;
-  for (il=m_allObstacles.begin();il!=m_allObstacles.end();)
-    if ( *il == obs ) il = m_allObstacles.erase( il );
+  for (il=m_allSimpleObstacles.begin();il!=m_allSimpleObstacles.end();)
+    if ( *il == obs ) il = m_allSimpleObstacles.erase( il );
     else il++;   
 }
 
@@ -237,7 +246,8 @@ SimpleObstacle* AppCollision::getSimpleObstacle( int const& num ) const
   list<SimpleObstacle*>::const_iterator il;
   SimpleObstacle* pp = NULL;
   bool found = false;
-  for (il=m_allObstacles.begin();il!=m_allObstacles.end() && !found;il++)
+  for (il=m_allSimpleObstacles.begin();il!=m_allSimpleObstacles.end() && !found;
+  	il++)
     if ( (*il)->getID() == num )
     {
       pp = *il;
@@ -269,8 +279,6 @@ void AppCollision::addPPForce( Point3 const& pc, Vector3 const& force,
   if ( m_allforces_index >= m_allforces.size() )
   {
     struct PointForcePostProcessing pfpp;
-    pfpp.comp0 = NULL;
-    pfpp.comp1 = NULL;
     size_t prevsize = m_allforces.size();  
     m_allforces.reserve( prevsize + m_allforces_blocksize );
     for (size_t i=0;i<m_allforces_blocksize;++i) m_allforces.push_back( pfpp );
@@ -279,8 +287,10 @@ void AppCollision::addPPForce( Point3 const& pc, Vector3 const& force,
   // Sets contact force features
   m_allforces[m_allforces_index].geometricPointOfContact = pc;
   m_allforces[m_allforces_index].contactForce = force;
-  m_allforces[m_allforces_index].comp0 = comp0_;
-  m_allforces[m_allforces_index].comp1 = comp1_;
+  m_allforces[m_allforces_index].PPptComp0 = comp0_->isObstacle() ? 
+  	pc : *(comp0_->getPosition());
+  m_allforces[m_allforces_index].PPptComp1 = comp1_->isObstacle() ? 
+  	pc : *(comp1_->getPosition());
   ++m_allforces_index;
 }
 

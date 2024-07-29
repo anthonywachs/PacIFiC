@@ -1420,7 +1420,6 @@ void GrainsMPIWrapper::UpdateOrCreateClones_SendRecvLocal_GeoLoc( double time,
   SCT_get_elapsed_time( "MPIComm" );
 
   // Receive data sent by neighboring processes and processing of these data
-  // Reception par le processus des messages envoyés par ses voisins
   for (irn=neighborsRank->begin(),ign=neighborsGeoloc->begin();
   	irn!=neighborsRank->end();irn++,ign++)  
   {

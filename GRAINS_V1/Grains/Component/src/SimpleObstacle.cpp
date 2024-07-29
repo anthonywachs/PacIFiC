@@ -68,10 +68,15 @@ SimpleObstacle::SimpleObstacle( DOMNode *root )
 // Constructor with input parameters. 
 SimpleObstacle::SimpleObstacle( string const& name, 
 	RigidBodyWithCrust* georbwc, 
-    	string const& mat, bool const& toFluid )
-  : Obstacle( "", true )
+    	string const& mat, bool const& toFluid, 
+	bool const& autonumbering )
+  : Obstacle( "", autonumbering )
   , m_transferToFluid( false )
 {
+  m_ObstacleType = "SimpleObstacle";
+
+  Obstacle::m_totalNbSingleObstacles++;
+
   m_name = name;
   m_geoRBWC = georbwc;
   m_materialName = mat;
@@ -90,6 +95,7 @@ SimpleObstacle::SimpleObstacle( string const& name,
 SimpleObstacle::~SimpleObstacle()
 {
   m_inCells.clear();
+  Obstacle::m_totalNbSingleObstacles--;
 }
 
 
@@ -117,9 +123,9 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
 {
   list<SimpleObstacle*> movingObstacles;
 
-  // Updates the obstacle translational and angular velocity at time t and 
-  // translational and angular motion from t to t+dt and returns whether the 
-  // obstacle moved from t to t+dt
+  // Updates the obstacle translational and angular velocity at time time and 
+  // translational and angular motion from time - dt to time and returns 
+  // whether the obstacle moved from time - dt to time
   m_ismoving = m_kinematics.ImposedMotion( time, dt, *m_geoRBWC->getCentre() );
   
   // Check whether the composite obstacle it belongs to has an imposed velocity  
@@ -127,9 +133,12 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
 
   // Obstacle motion
   if ( m_ismoving && Obstacle::m_MoveObstacle )
-  {
-    Vector3 const* translation = m_kinematics.getTranslation();
-    m_geoRBWC->composeLeftByTranslation( *translation );
+  {    
+    Vector3 translation = *(m_kinematics.getTranslation());
+    if ( m_restrict_geommotion )
+      for (list<size_t>::iterator il=m_dir_restricted_geommotion.begin();
+      	il!=m_dir_restricted_geommotion.end();il++) translation[*il] = 0.;
+    m_geoRBWC->composeLeftByTranslation( translation );    
     Quaternion const* w = m_kinematics.getQuaternionRotationOverDt();
     Rotate( *w );
   }
@@ -140,17 +149,27 @@ list<SimpleObstacle*> SimpleObstacle::Move( double time,
   if ( moveForce && Obstacle::m_MoveObstacle )
   {
     Vector3 translation = m_confinement.getTranslation( dt );
+    if ( m_restrict_geommotion )
+      for (list<size_t>::iterator il=m_dir_restricted_geommotion.begin();
+      	il!=m_dir_restricted_geommotion.end();il++) translation[*il] = 0.;    
     m_geoRBWC->composeLeftByTranslation( translation );
   }
   
   m_ismoving = m_ismoving || moveForce;
 
-  // If the obstacle moved, add it to the list of moving obstacles and 
-  // updates its boundind box
-  if ( m_ismoving && Obstacle::m_MoveObstacle )
+  // If the obstacle moved:
+  // * assign the total translational and angular velocities to the obstacle
+  // from its imposed kinematics
+  // * add it to the list of moving obstacles
+  // * update its boundind box
+  if ( m_ismoving )
   {
-    m_obstacleBox = Component::BoundingBox();
-    movingObstacles.push_back( this );
+    setVelocity(); 
+    if ( Obstacle::m_MoveObstacle )
+    {
+      m_obstacleBox = Component::BoundingBox();
+      movingObstacles.push_back( this );
+    }
   }
 
   return ( movingObstacles );
@@ -422,7 +441,6 @@ void SimpleObstacle::DestroyObstacle( string const& name_ )
 void SimpleObstacle::ClearObstacle( string const& name_, LinkedCell* LC )
 {
   if ( m_name == name_ || name_ == "ToBeErased" )
-    // Suppression de l'obstacle du LinkedCell
     LC->remove( this );
 }
 

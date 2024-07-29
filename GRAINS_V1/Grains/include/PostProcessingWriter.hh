@@ -96,7 +96,7 @@ class PostProcessingWriter
     /** @brief Writes components involved in a motion or a contact error
     @param filename file root name
     @param errcomposants list of the 2 components invovled */
-    virtual void writeErreurComponentsPostProcessing( string const& filename,
+    virtual void writeErreurComponents_Paraview( string const& filename,
   	list<Component*> const& errcomposants );  
     //@}
 

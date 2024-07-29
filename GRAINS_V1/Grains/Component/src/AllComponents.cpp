@@ -71,7 +71,7 @@ AllComponents::~AllComponents()
  
   // Note: the loadings are destroyed by the destructors of the classes
   // ObstacleKinematicsVelocity and ObstacleKinematicsForce
-  // Hence we are free the lists here but do not destroy the pointed objects
+  // Hence we free the lists here but do not destroy the pointed objects
   m_AllImposedVelocitiesOnObstacles.clear();
   m_AllImposedForcesOnObstacles.clear();
 }
@@ -1742,7 +1742,7 @@ void AllComponents::PostProcessingErreurComponents( string const& filename,
   // Post processing writers
   list<PostProcessingWriter*>::iterator pp;
   for (pp=m_postProcessors.begin();pp!=m_postProcessors.end();pp++)
-    (*pp)->writeErreurComponentsPostProcessing( filename, errcomposants );
+    (*pp)->writeErreurComponents_Paraview( filename, errcomposants );
 }
 
 
@@ -1964,8 +1964,7 @@ void AllComponents::setOutputObstaclesLoadParameters( string const& root_,
   {
     Obstacle* pobs = const_cast<Obstacle*>(m_obstacle->getObstacleFromName(
     	*il ));
-    if ( pobs )
-      m_outputTorsorObstacles.push_back( pobs );
+    if ( pobs ) m_outputTorsorObstacles.push_back( pobs );
   }
 }
 
@@ -2007,7 +2006,8 @@ void AllComponents::outputObstaclesLoad( double time, double dt,
       	+ "/Loading_" + (*obstacle)->getName() + ".res" ).c_str(), ios::app );
 	  force = (*obstacle)->getForce();
           torque = (*obstacle)->getTorque();
-	  OUT << time << " " <<
+	  OUT << GrainsExec::doubleToString( ios::scientific, 6, time ) 
+	  	<< " " <<
 		GrainsExec::doubleToString( ios::scientific, 6, (*force)[X] )
 		<< " " <<
 		GrainsExec::doubleToString( ios::scientific, 6, (*force)[Y] )

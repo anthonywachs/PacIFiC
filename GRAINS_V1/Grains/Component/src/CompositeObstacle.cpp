@@ -7,16 +7,17 @@
 #include "GrainsExec.hh"
 
 
-int CompositeObstacle::m_minCompositeObstacleID = -1;
+int CompositeObstacle::m_minCompositeObstacleID = 1;
 
 
 // ----------------------------------------------------------------------------
 // Constructor with name as input parameter
-CompositeObstacle::CompositeObstacle( string const& s ) :
-  Obstacle( s, false )
+CompositeObstacle::CompositeObstacle( string const& s ) 
+  : Obstacle( s, false )
+  , m_type( "Standard" )
 {
   m_id = GrainsExec::m_CompositeObstacleDefaultID;
-  m_minCompositeObstacleID++;
+  m_minCompositeObstacleID--;
   m_CompositeObstacle_id = m_minCompositeObstacleID;   
   m_geoRBWC = new RigidBodyWithCrust( new PointC(), Transform() ); 
 }
@@ -26,11 +27,12 @@ CompositeObstacle::CompositeObstacle( string const& s ) :
 
 // ----------------------------------------------------------------------------
 // Constructor with an XML node as an input parameter
-CompositeObstacle::CompositeObstacle( DOMNode* root ) :
-  Obstacle( "obstacle", false )
+CompositeObstacle::CompositeObstacle( DOMNode* root ) 
+  : Obstacle( "obstacle", false )
+  , m_type( "Standard" )  
 {
   m_id = GrainsExec::m_CompositeObstacleDefaultID;
-  m_minCompositeObstacleID++;
+  m_minCompositeObstacleID--;
   m_CompositeObstacle_id = m_minCompositeObstacleID;   
     
   assert( root != NULL );
@@ -44,7 +46,7 @@ CompositeObstacle::CompositeObstacle( DOMNode* root ) :
   for (XMLSize_t i=0; i<allObstacles->getLength(); i++) 
   {
     obstacle = ObstacleBuilderFactory::create( allObstacles->item( i ) );
-    m_obstacles.push_back(obstacle);
+    m_obstacles.push_back( obstacle );
   }
   computeCenterOfMass();
 }
@@ -149,8 +151,11 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
   if ( m_ismoving && Obstacle::m_MoveObstacle ) 
   {
     // Translation motion
-    Vector3 const* translation = m_kinematics.getTranslation();
-    m_geoRBWC->composeLeftByTranslation( *translation );
+    Vector3 translation = *(m_kinematics.getTranslation());
+    if ( m_restrict_geommotion )
+      for (list<size_t>::iterator il=m_dir_restricted_geommotion.begin();
+      	il!=m_dir_restricted_geommotion.end();il++) translation[*il] = 0.;    
+    m_geoRBWC->composeLeftByTranslation( translation );
 
     // Angular motion
     Quaternion const* w = m_kinematics.getQuaternionRotationOverDt();
@@ -183,13 +188,16 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
   if ( moveForce && Obstacle::m_MoveObstacle )
   {
     Vector3 translation = m_confinement.getTranslation( dt );
+    if ( m_restrict_geommotion )
+      for (list<size_t>::iterator il=m_dir_restricted_geommotion.begin();
+      	il!=m_dir_restricted_geommotion.end();il++) translation[*il] = 0.; 
     m_geoRBWC->composeLeftByTranslation( translation );
   }
 
   // Apply the composite imposed force to its elementary obstacles  
   if ( moveForce ) 
     for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
-      (*obstacle)->Compose( m_confinement, *(*obstacle)->getPosition() );
+      (*obstacle)->Compose( m_confinement );
 
   
   // Finally, move the elementary obstacles     
@@ -201,7 +209,11 @@ list<SimpleObstacle*> CompositeObstacle::Move( double time, double dt,
       movingObstacles.push_back(*ilo);
   }
   
-  m_ismoving = m_ismoving || moveForce;  
+  m_ismoving = m_ismoving || moveForce; 
+  
+  // Assign the total translational and angular velocities to the obstacle
+  // from its imposed kinematics
+  if ( m_ismoving ) setVelocity(); 
   
   return ( movingObstacles );
 }
@@ -396,7 +408,7 @@ bool CompositeObstacle::isCloseWithCrust( Component const* voisin ) const
 // Outputs the composite obstacle for reload
 void CompositeObstacle::write( ostream& fileSave ) const
 {
-  fileSave << "<Composite> " << m_name << endl;
+  fileSave << "<Composite> " << m_name << " " << m_type << endl;
   if ( m_CompositeObstacle_id ) m_torsor.write( fileSave );
   list<Obstacle*>::const_iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)
@@ -564,7 +576,7 @@ void CompositeObstacle::updateIndicator( double time, double dt )
 {
   list<Obstacle*>::iterator obstacle;
   
-  if ( m_kinematics.activAngularMotion( time, dt ) )
+  if ( m_kinematics.activeAngularMotion( time, dt ) )
       getObstacles().front()->setIndicator( 1. );  
   
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++)   
@@ -920,4 +932,30 @@ void CompositeObstacle::setMinIDnumber()
   list<Obstacle*>::iterator obstacle;
   for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
     (*obstacle)->setMinIDnumber();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Checks if there is anything special to do about periodicity and
+// if there is applies periodicity
+void CompositeObstacle::periodicity( LinkedCell* LC )
+{
+  list<Obstacle*>::iterator obstacle;
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+    (*obstacle)->periodicity( LC );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Empties the list of cells the obstacle is linked to and deletes the pointer 
+// to the obstacle is these cells */
+void CompositeObstacle::resetInCells() 
+{
+  list<Obstacle*>::iterator obstacle;
+  for (obstacle=m_obstacles.begin(); obstacle!=m_obstacles.end(); obstacle++) 
+    (*obstacle)->resetInCells();
 }

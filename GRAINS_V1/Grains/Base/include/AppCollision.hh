@@ -14,8 +14,8 @@ struct PointForcePostProcessing
 {
   Point3 geometricPointOfContact; /**< contact point */
   Vector3 contactForce; /**< contact force */
-  Component* comp0; /**< component 0 in contact */
-  Component* comp1; /**< component 1 in contact */
+  Point3 PPptComp0; /**< post processing contact point in component 0 */
+  Point3 PPptComp1; /**< post processing contact point in component 1 */
 }; 
 
 
@@ -70,9 +70,10 @@ class AppCollision : public App
     @param particle particle */
     virtual void Link( Particle* particle ) = 0;
 
-    /** @brief Links the parent obstacle with the contact detection algorithm 
-    @param obstacle obstacle */
-    virtual void Link( Obstacle* obstacle );
+    /** @brief Links the root obstacle with the contact detection algorithm at
+    the start of the simulation
+    @param root_obstacle root obstacle */
+    virtual void Link( Obstacle* root_obstacle );
 
     /** @brief Updates links between particles & obstacles and the contact 
     detection algorithm
@@ -145,6 +146,9 @@ class AppCollision : public App
     
     /** @brief Returns a pointer to the vector of postprocessing forces */
     vector<struct PointForcePostProcessing> const* getPPForces() const;
+    
+    /** @brief Resets the list of simple obstacles */
+    void resetListSimpleObstacles();    
     //@}  
 
   
@@ -158,8 +162,8 @@ class AppCollision : public App
 
     /** @name Parameters */
     //@{  
-    Obstacle* m_obstacles; /**< Parent obstacle */  
-    list<SimpleObstacle*> m_allObstacles; /**< List of simple obstacles */
+    Obstacle* m_obstacles; /**< Root obstacle */  
+    list<SimpleObstacle*> m_allSimpleObstacles; /**< List of simple obstacles */
     double m_overlap_max; /**< Maximum overlap between 2 colliding
     	components */
     double m_overlap_mean; /**< Average overlap between 2 colliding

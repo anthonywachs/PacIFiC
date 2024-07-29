@@ -38,7 +38,7 @@ class CompositeObstacle : public Obstacle
     //@}
 
 
-    /** @name Methods Get */
+    /** @name Accessors */
     //@{
     /**
     @brief Returns a pointer to the obstacle if the name matches. Searches all
@@ -59,7 +59,7 @@ class CompositeObstacle : public Obstacle
     //@}
 
 
-    /** @name Set methods Set */
+    /** @name Set methods */
     //@{  
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
@@ -230,7 +230,16 @@ class CompositeObstacle : public Obstacle
     bool isIn( Point3 const& pt ) const;
             
     /** @brief Resets the minimum ID number of an obstacle for autonumbering */
-    virtual void setMinIDnumber();      
+    virtual void setMinIDnumber(); 
+    
+    /** @brief Checks if there is anything special to do about periodicity and
+    if there is applies periodicity 
+    @param LC linked-cell grid */
+    virtual void periodicity( LinkedCell* LC );
+    
+    /** @brief Empties the list of cells the obstacle is linked to and deletes
+    the pointer to the obstacle is these cells */
+    virtual void resetInCells();              
     //@}
 
 
@@ -329,7 +338,9 @@ class CompositeObstacle : public Obstacle
     static int m_minCompositeObstacleID; /**< Minimum composite
     	obstacle ID number, composite obstacle ID numbers range
     	from 0 (the root) down to m_min_CompositeObstacle_id and are 
-	therefore always negative except the root */ 
+	therefore always negative except the root */
+    string m_type; /**< type of composite obstacle: standard or one of the
+    	specific derived types such as CylindricalShell or RoughWall */	 
     //@}
 
 

@@ -17,12 +17,13 @@ int Obstacle::m_minID = 0;
 
 //-----------------------------------------------------------------------------
 // Constructor with name and autonumbering as input parameters
-Obstacle::Obstacle( string const& s, bool const& autonumbering ) :
-  Component(),
-  m_name( s ),
-  m_ismoving( false ),
-  m_indicator( 0. ),
-  m_ObstacleType ( "0" )
+Obstacle::Obstacle( string const& s, bool const& autonumbering ) 
+  : Component()
+  , m_name( s )
+  , m_ismoving( false )
+  , m_indicator( 0. )
+  , m_ObstacleType ( "0" )
+  , m_restrict_geommotion( false )
 {
   if ( autonumbering )
   {
@@ -102,10 +103,9 @@ void Obstacle::Compose( ObstacleKinematicsVelocity const& other,
 // ----------------------------------------------------------------------------
 // Composes the obstacle kinematics with another "higher level" force
 // kinematics
-void Obstacle::Compose( ObstacleKinematicsForce const& other,
-	Point3 const& centre )
+void Obstacle::Compose( ObstacleKinematicsForce const& other )
 {
-  m_confinement.Compose( other, centre );
+  m_confinement.Compose( other );
 }
 
 
@@ -129,10 +129,7 @@ Vector3 Obstacle::getVelocityAtPoint( Point3 const& pt ) const
 {
   Vector3 lever = pt - *m_geoRBWC->getCentre();
 
-  if ( Obstacle::m_isConfinement )
-    return ( m_confinement.Velocity( lever ) );
-  else
-    return ( m_kinematics.Velocity( lever ) );
+  return ( m_translationalVelocity + ( m_angularVelocity ^ lever ) );
 }
 
 
@@ -142,7 +139,7 @@ Vector3 Obstacle::getVelocityAtPoint( Point3 const& pt ) const
 // Returns the angular velocity
 Vector3 const* Obstacle::getAngularVelocity() const
 {
-  return ( m_kinematics.getAngularVelocity() );
+  return ( &m_angularVelocity );
 }
 
 
@@ -152,7 +149,7 @@ Vector3 const* Obstacle::getAngularVelocity() const
 // Returns the translational velocity
 Vector3 const* Obstacle::getTranslationalVelocity() const
 {
-  return ( m_kinematics.getTranslationalVelocity() );
+  return ( &m_translationalVelocity );
 }
 
 
@@ -164,13 +161,15 @@ void Obstacle::resetKinematics()
 {
   m_kinematics.reset();
   m_confinement.reset();
+  m_translationalVelocity = 0.;
+  m_angularVelocity = 0.;  
 }
 
 
 
 
 // ----------------------------------------------------------------------------
-// Sets kinematics
+// Sets imposed velocity kinematics
 void Obstacle::setKinematics( ObstacleKinematicsVelocity& kine_ )
 {
   m_kinematics.set( kine_ );
@@ -588,3 +587,46 @@ void Obstacle::addTorque( Vector3 const& torque, int tagSecondComp )
   // is already accounted for 
   if ( tagSecondComp != 2 ) m_torsor.addTorque( torque );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Checks if there is anything special to do about periodicity and
+// if there is applies periodicity
+void Obstacle::periodicity( LinkedCell* LC )
+{}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Restricts the geometric directions of translational motion 
+void Obstacle::setRestrictedGeomDirMotion( list<size_t> const& dir )
+{
+  m_restrict_geommotion = true;
+  m_dir_restricted_geommotion = dir;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the obstacle name
+void Obstacle::setName( string const& name_ )
+{
+  m_name = name_ ;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets obstacle translational and angular velocities from active
+// kinematics with imposed velocity and  with imposed force
+void Obstacle::setVelocity()
+{
+  m_translationalVelocity = *(m_kinematics.getTranslationalVelocity())
+  	+ *(m_confinement.getTranslationalVelocity());
+  m_angularVelocity = *(m_kinematics.getAngularVelocity());
+} 
