@@ -65,10 +65,10 @@ BBox Convex::bbox( Transform const& t ) const
 // Returns the convex shape bounding volume
 BVolume* Convex::computeBVolume( unsigned int type ) const
 {
-  cout << "Warning for this Convex (" <<
-           this->getConvexType() <<
-           ") method Convex::computeBVolume() " << 
-           "is not yet implemented !\n"
+  cout << "Warning for this Convex (" 
+       << this->getConvexType() 
+       << ") method Convex::computeBVolume() "
+       << "is not yet implemented !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);
 

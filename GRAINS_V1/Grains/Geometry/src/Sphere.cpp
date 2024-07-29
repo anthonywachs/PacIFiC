@@ -1,5 +1,7 @@
 #include "Sphere.hh"
 #include "sstream"
+#include "OBB.hh"
+#include "OBC.hh"
 #include <math.h>
 
 
@@ -543,6 +545,22 @@ bool Sphere::isIn( Point3 const& pt ) const
 
 
  
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to sphere
+BVolume* Sphere::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( m_radius, m_radius, m_radius ), Matrix() );
+  else if ( type == 2 ) // OBC
+    bvol = new OBC( m_radius, 2. * m_radius, Vector3( 1., 0., 0. ) );
+
+  return( bvol );
+}
+
+
+
+
 // ----------------------------------------------------------------------------
 // Performs advanced comparison of the two spheres and returns whether 
 // they match
