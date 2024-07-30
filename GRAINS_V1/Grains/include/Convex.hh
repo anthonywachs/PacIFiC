@@ -3,6 +3,8 @@
 
 #include "Shape.hh"
 #include "BVolume.hh"
+#include "OBB.hh"
+#include "OBC.hh"
 #include "Transform.hh"
 #include "Point3.hh"
 #include "ReaderXML.hh"

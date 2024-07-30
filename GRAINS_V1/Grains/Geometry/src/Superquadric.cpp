@@ -2,9 +2,6 @@
 #include <bits/stdc++.h>
 #include "Superquadric.hh"
 #include "sstream"
-#include "BVolume.hh"
-#include "OBB.hh"
-#include "OBC.hh"
 
 using namespace std;
 

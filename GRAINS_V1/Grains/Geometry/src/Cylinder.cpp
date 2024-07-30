@@ -1,8 +1,5 @@
 #include "Cylinder.hh"
 #include "PointContact.hh"
-#include "BVolume.hh"
-#include "OBB.hh"
-#include "OBC.hh"
 #include "Matrix.hh"
 
 int Cylinder::m_visuNodeNbOnPer = 32;

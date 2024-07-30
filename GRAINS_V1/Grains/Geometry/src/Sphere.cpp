@@ -1,7 +1,5 @@
 #include "Sphere.hh"
 #include "sstream"
-#include "OBB.hh"
-#include "OBC.hh"
 #include <math.h>
 
 
