@@ -306,6 +306,8 @@ class GrainsExec
     static string m_shift15; /**< string of 15 blank spaces */
     static bool m_output_data_at_this_time; /**< writes data in
     	result files at this time */
+    static bool m_postprocess_forces_at_this_time; /**< post-process forces
+    	at this time */	
     static string m_inputFile; /**< Grains3D major input file */
     static int m_return_syscmd; /**< Returned value of system command */
     static string m_colDetMethod; /**< Collision detection method */

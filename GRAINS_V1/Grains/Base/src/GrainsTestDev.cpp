@@ -116,7 +116,7 @@ void GrainsTestDev::do_before_time_stepping( DOMElement* rootElement )
   // Postprocessing of force & torque on obstacles
   m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );
   m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
-      GrainsExec::m_ReloadType == "same" );
+      GrainsExec::m_ReloadType == "same", m_rank );
 
   // Next time of writing results
   m_timeSave = m_save.begin();

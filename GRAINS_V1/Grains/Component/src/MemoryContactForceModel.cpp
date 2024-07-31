@@ -258,7 +258,7 @@ bool MemoryContactForceModel::computeForces( Component* p0_,
   if ( rolling_friction ) ref_p1_->addTorque( - delM * coef, tag_p0_ );
 
   // Force postprocessing
-  if ( GrainsExec::m_output_data_at_this_time )
+  if ( GrainsExec::m_postprocess_forces_at_this_time )
     LC->addPPForce( geometricPointOfContact, coef * (delFN + delFT),
 	ref_p0_, ref_p1_ );
 

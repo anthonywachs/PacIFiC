@@ -15,7 +15,7 @@ class GrainsMPIWrapper;
 struct PointForcePostProcessing
 {
   Point3 geometricPointOfContact; /**< contact point */
-  Vector3 contactForce; /**< contact force */
+  Vector3 contactForceComp0; /**< contact force exerted on component 0 */
   Point3 PPptComp0; /**< post processing contact point in component 0 */
   Point3 PPptComp1; /**< post processing contact point in component 1 */
 }; 
@@ -156,7 +156,34 @@ class AppCollision : public App
     @param stress the stress tensor
     @param wrapper MPI wrapper */
     void computeStressTensor( Matrix& stress, 
-    	GrainsMPIWrapper const* wrapper );        
+    	GrainsMPIWrapper const* wrapper );
+	
+    /** @brief Sets the parameters to output force statistics
+    @param root_ output directory name
+    @param freq_ output frequency */
+    void setForceStatsParameters( string const& root_,
+  	size_t const& freq_ );
+	
+    /** @brief Returns whether to output force statistics at this time 
+    @param enforceOutput force writing   
+    @param increaseCounterOnly increases the writing counter only */
+    bool outputForceStatsAtThisTime( bool enforceOutput, 
+    	bool increaseCounterOnly );
+	
+    /** @brief Writes force statistics in a file
+    @param time physical time
+    @param dt time step magnitude
+    @param rank process rank 
+    @param wrapper MPI wrapper */
+    void outputForceStats( double time, double dt, int rank,
+    	GrainsMPIWrapper const* wrapper );
+	
+    /** @brief Initialises output files to write force statistics
+    @param rank process rank
+    @param coupledFluid whether the simulation is coupled to a fluid solver
+    @param time physical time */
+    void initialiseForceStatsFiles( int rank,
+      	bool coupledFluid, double time );	
     //@}  
 
   
@@ -182,6 +209,13 @@ class AppCollision : public App
     double m_nbParticles_mean; /**< Average number of particles */
     vector<struct PointForcePostProcessing> m_allforces;
     size_t m_allforces_index;
+    bool m_outputForceStats; /**< whether to to write force statistics */
+    string m_outputForceStats_dir; /**< directory name where to write force
+  	statistics files, including average macro stress in the whole domain */
+    size_t m_outputForceStats_counter; /**< counter for force statistics 
+    	output */
+    size_t m_outputForceStats_frequency; /**< frequency of force statistics 
+    	output */
     static size_t m_allforces_blocksize;
   //@}
 };

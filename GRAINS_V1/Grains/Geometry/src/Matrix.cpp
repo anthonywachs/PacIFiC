@@ -706,3 +706,13 @@ Matrix& Matrix::operator /= ( double const& d )
 
   return ( *this );
 } 
+
+
+
+
+// -----------------------------------------------------------------------
+// Returns the trace of the matrix
+double Matrix::trace() const
+{
+  return ( m_elem[X][X] + m_elem[Y][Y] + m_elem[Z][Z] );
+}

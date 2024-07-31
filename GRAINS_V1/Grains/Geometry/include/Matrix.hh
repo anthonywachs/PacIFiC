@@ -191,6 +191,9 @@ class Matrix
 
     /** @brief Returns whether the matrix is a rotation matrix */
     bool isRotation( double tol = EPSILON ) const;
+    
+    /** @brief Returns the trace of the matrix */
+    double trace() const;       
     //@}
 
 
@@ -218,7 +221,7 @@ class Matrix
     
     /** @brief Operator /= by a float number
     @param d the float number */
-    Matrix& operator /= ( double const& d );    
+    Matrix& operator /= ( double const& d );        
     //@}
 
 

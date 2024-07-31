@@ -182,7 +182,8 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
   
         
       // Write force & torque exerted on obstacles
-      m_allcomponents.outputObstaclesLoad( m_time, m_dt );
+      m_allcomponents.computeObstaclesLoad( m_time, m_dt ); 
+      m_allcomponents.outputObstaclesLoad( m_time, m_dt, false, false, m_rank );
     } 
     catch (ContactError &errContact) 
     {
@@ -795,7 +796,7 @@ void GrainsCoupledWithFluid::setInitialTime( double const& time0 )
   // Postprocessing of force & torque on obstacles 
   m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );  
   m_allcomponents.outputObstaclesLoad( m_time, m_dt, false, 
-      GrainsExec::m_ReloadType == "same" );
+      GrainsExec::m_ReloadType == "same", m_rank );
 }
 
 

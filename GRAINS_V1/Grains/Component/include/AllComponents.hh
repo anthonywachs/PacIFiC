@@ -452,8 +452,8 @@ class AllComponents
     @param increaseCounterOnly increases the writing counter only
     @param rank process rank */
     void outputObstaclesLoad( double time, double dt,
-    	bool enforceOutput = false, bool increaseCounterOnly = false,
-	int rank = 0 );
+    	bool enforceOutput, bool increaseCounterOnly,
+	int rank );
 
     /** @brief Computes load on obstacles
     @param time physical time
@@ -466,8 +466,8 @@ class AllComponents
     @param rank process rank
     @param coupledFluid whether the simulation is coupled to a fluid solver
     @param time physical time */
-    void initialiseOutputObstaclesLoadFiles( int rank = 0,
-      	bool coupledFluid = false, double time = 0. );
+    void initialiseOutputObstaclesLoadFiles( int rank,
+      	bool coupledFluid, double time );
     //@}
 
 

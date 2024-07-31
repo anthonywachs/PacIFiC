@@ -763,7 +763,7 @@ void ParaviewPostProcessingWriter::
     start_output_binary( sizeof_Float32, 3 * int(nbpts) ) ;   
     for (i=0;i<nPPF;++i)
       for (comp=0;comp<3;++comp)
-	write_double_binary( (*pallContacts)[i].contactForce[comp] ) ;
+	write_double_binary( (*pallContacts)[i].contactForceComp0[comp] ) ;
     flush_binary( f, "writeContactForceVectors_Paraview/Force" );
   }
   else
@@ -771,7 +771,7 @@ void ParaviewPostProcessingWriter::
     for (i=0;i<nPPF;++i)
     {
       for (comp=0;comp<3;++comp)
-        f << (*pallContacts)[i].contactForce[comp] << " " ;
+        f << (*pallContacts)[i].contactForceComp0[comp] << " " ;
       f << endl;
     }
   }  
@@ -804,7 +804,6 @@ void ParaviewPostProcessingWriter::writeContactForceChains_Paraview(
   vector<struct PointForcePostProcessing> const* pallContacts = 
   	LC->getPPForces();
   size_t i, k, nPPF = LC->getNbPPForces();
-  cout << "nPPF = " << nPPF << endl;
   Vector3 const* PPTranslation = 
       GrainsExec::m_translationParaviewPostProcessing ;
   Point3 pt0, pt1;
@@ -860,7 +859,7 @@ void ParaviewPostProcessingWriter::writeContactForceChains_Paraview(
   if ( m_binary ) start_output_binary( sizeof_Float32, 2*int(nPPF) );
   for (i=0;i<nPPF;++i)
   {
-    norm = Norm( (*pallContacts)[i].contactForce );
+    norm = Norm( (*pallContacts)[i].contactForceComp0 );
     if ( m_binary )
       for (k=0;k<2;++k)
 	write_double_binary( norm );

@@ -139,7 +139,11 @@ class Sphere : public Convex
     /** @brief Performs advanced comparison of the two spheres and returns
     whether they match
     @param other the other sphere */
-    bool equalType_level2( Convex const* other ) const;    
+    bool equalType_level2( Convex const* other ) const;
+    
+    /** @brief Returns the sphere bounding volume
+    @param type 1 = OBB, 2 = OBC */
+    BVolume* computeBVolume( unsigned int type ) const;        
     //@}
 
 

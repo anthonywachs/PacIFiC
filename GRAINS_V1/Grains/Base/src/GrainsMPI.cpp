@@ -50,6 +50,7 @@ void GrainsMPI::Simulation( double time_interval )
   {
     double vmax = 0., vmean = 0. ;
     list<Particle*>* newBufPart = new list<Particle*>;
+    bool forcestats = false;    
 
     // Timers
     SCT_insert_app( "ParticlesInsertion" );
@@ -65,11 +66,12 @@ void GrainsMPI::Simulation( double time_interval )
       try
       {
         m_time += m_dt;
-
+	
 
         // Check whether data are output at this time
         m_lastTime_save = false;
         GrainsExec::m_output_data_at_this_time = false;
+	GrainsExec::m_postprocess_forces_at_this_time = false;
         if ( m_timeSave != m_save.end() )
           if ( *m_timeSave - m_time < 0.01 * m_dt )
 	  {
@@ -78,15 +80,18 @@ void GrainsMPI::Simulation( double time_interval )
 	    if ( m_rank == 0 ) cout << endl << "Time = " << m_time << endl
 	  	<< std::flush;
 
-	    // Reset counter for force postprocessing
-	    m_collision->resetPPForceIndex();
-
 	    // Next time of writing files
 	    m_timeSave++;
 
 	    m_lastTime_save = true;
 	  }
-
+        forcestats = m_collision->outputForceStatsAtThisTime( false, false );
+        if ( GrainsExec::m_output_data_at_this_time || forcestats )
+	{
+          GrainsExec::m_postprocess_forces_at_this_time = true;
+	  m_collision->resetPPForceIndex();
+        }
+	
 
         // Insertion of particles     
         SCT_set_start( "ParticlesInsertion" );
@@ -175,7 +180,12 @@ void GrainsMPI::Simulation( double time_interval )
         // Compute and write force & torque exerted on obstacles
         m_allcomponents.computeObstaclesLoad( m_time, m_dt, m_wrapper ); 
 	m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
-      		GrainsExec::m_ReloadType == "same", m_rank );
+      		false, m_rank );
+		
+
+        // Compute and write force statistics
+        if ( forcestats ) m_collision->outputForceStats( m_time, m_dt, m_rank, 
+      		m_wrapper );		
 
 
         // Write postprocessing and reload files

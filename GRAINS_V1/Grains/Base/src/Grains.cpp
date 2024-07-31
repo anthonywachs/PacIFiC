@@ -143,6 +143,13 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
     m_allcomponents.initialiseOutputObstaclesLoadFiles( m_rank, false, m_time );
     m_allcomponents.outputObstaclesLoad( m_time, m_dt, false,
       GrainsExec::m_ReloadType == "same", m_rank );
+      
+    // Postprocessing of force statistics
+    m_collision->initialiseForceStatsFiles( m_rank, false, m_time );      
+    bool forcestats = m_collision->outputForceStatsAtThisTime( false, 
+	GrainsExec::m_ReloadType == "same" );	
+    if ( forcestats )
+      m_collision->outputForceStats( m_time, m_dt, m_rank, m_wrapper );
 
     // Next time of writing results
     m_timeSave = m_save.begin();
@@ -242,6 +249,7 @@ void Grains::do_after_time_stepping()
 void Grains::Simulation( double time_interval )
 {
   double vmax = 0., vmean = 0. ;
+  bool forcestats = false;
 
   // Timers
   SCT_insert_app( "ParticlesInsertion" );
@@ -263,21 +271,25 @@ void Grains::Simulation( double time_interval )
       // Check whether data are output at this time
       m_lastTime_save = false;
       GrainsExec::m_output_data_at_this_time = false;
+      GrainsExec::m_postprocess_forces_at_this_time = false;
       if ( m_timeSave != m_save.end() )
         if ( *m_timeSave - m_time < 0.01 * m_dt )
 	{
 	  // Set the global data output boolean to true
 	  GrainsExec::m_output_data_at_this_time = true;
 
-	  // Reset counter for force postprocessing
-	  m_collision->resetPPForceIndex();
-
 	  // Next time of writing files
 	  m_timeSave++;
 
 	  m_lastTime_save = true;
 	}
-
+      forcestats = m_collision->outputForceStatsAtThisTime( false, false );
+      if ( GrainsExec::m_output_data_at_this_time || forcestats )
+      {
+        GrainsExec::m_postprocess_forces_at_this_time = true;
+	m_collision->resetPPForceIndex();
+      }
+	
 
       // Insertion of particles
       SCT_set_start( "ParticlesInsertion" );      
@@ -337,8 +349,13 @@ void Grains::Simulation( double time_interval )
 
       // Compute and write force & torque exerted on obstacles
       m_allcomponents.computeObstaclesLoad( m_time, m_dt ); 
-      m_allcomponents.outputObstaclesLoad( m_time, m_dt );
-
+      m_allcomponents.outputObstaclesLoad( m_time, m_dt, false, false, m_rank );
+      
+      
+      // Compute and write force statistics
+      if ( forcestats ) m_collision->outputForceStats( m_time, m_dt, m_rank, 
+      	m_wrapper );
+        
 
       // Write postprocessing and reload files
       if ( GrainsExec::m_output_data_at_this_time )
@@ -623,7 +640,8 @@ void Grains::Construction( DOMElement* rootElement )
                       ReaderXML::getNode( root, "CollisionDetectionAlgorithm" );
     if ( !collision )
     {
-      cout << GrainsExec::m_shift6 <<
+      if ( m_rank == 0 )
+        cout << GrainsExec::m_shift6 <<
               "Default collision detection algorithm using GJK, " <<
               "1E-15 tolerance, " << 
               "without acceleration, " <<
@@ -633,13 +651,14 @@ void Grains::Construction( DOMElement* rootElement )
     {
       DOMNode* collisionAlg = 
                        ReaderXML::getNode( collision, "CollisionDetection" );
-      if ( m_rank == 0 && collisionAlg )
+      if ( collisionAlg )
       {
         string nCollisionAlg = 
                           ReaderXML::getNodeAttr_String( collisionAlg, "Type" );
         if ( nCollisionAlg != "GJK" )
         {
-          cout << GrainsExec::m_shift6 <<
+          if ( m_rank == 0 )
+	    cout << GrainsExec::m_shift6 <<
               "Collision detection algorithm is not defined!" << endl;
           grainsAbort();
         }
@@ -647,7 +666,8 @@ void Grains::Construction( DOMElement* rootElement )
         double tol = ReaderXML::getNodeAttr_Double( collisionAlg, "Tolerance" );
         if ( tol < 1e-15 )
         {
-          cout << GrainsExec::m_shift6 <<
+          if ( m_rank == 0 )
+	    cout << GrainsExec::m_shift6 <<
               "Tolerance should be greater than 1E-15!" << endl;
           grainsAbort();
         }
@@ -662,12 +682,14 @@ void Grains::Construction( DOMElement* rootElement )
           GrainsExec::m_colDetAcceleration = false;
         else
         {
-          cout << GrainsExec::m_shift6 <<
+          if ( m_rank == 0 )
+	    cout << GrainsExec::m_shift6 <<
               "Acceleration should be ON or OFF!" << endl;
           grainsAbort();
         }
 
-        cout << GrainsExec::m_shift6 <<
+        if ( m_rank == 0 )
+	  cout << GrainsExec::m_shift6 <<
               "Collision detection algorithm using " <<
               GrainsExec::m_colDetMethod << ", " <<
               GrainsExec::m_colDetTolerance <<
@@ -676,7 +698,8 @@ void Grains::Construction( DOMElement* rootElement )
       }
       else
       {
-        cout << GrainsExec::m_shift6 <<
+        if ( m_rank == 0 )
+	  cout << GrainsExec::m_shift6 <<
               "Default collision detection algorithm using GJK, " <<
               "1E-15 tolerance, and without acceleration!" << endl;
       }
@@ -703,6 +726,7 @@ void Grains::Construction( DOMElement* rootElement )
         cout << GrainsExec::m_shift6 <<
         "Pre-collision Test with bounding volumes is off." << endl;
     }
+
 
     // Particles
     DOMNode* particles = ReaderXML::getNode( root, "Particles" );
@@ -1607,6 +1631,30 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
 	  }
 	}
       }
+      
+      
+      // Force statistics (for now macro stress tensor in the whole domain)
+      DOMNode* nForceStats = ReaderXML::getNode( nPostProcessing,
+      	"ForceStats" );
+      if ( nForceStats )
+      {
+        size_t FSoutputFreq = size_t( 
+		ReaderXML::getNodeAttr_Int( nForceStats, "Every" ) );
+        string ppObsdir = ReaderXML::getNodeAttr_String( nForceStats,
+		"Directory" );
+        m_collision->setForceStatsParameters( ppObsdir, FSoutputFreq );		
+
+	if ( m_rank == 0 )
+	{
+	  cout << GrainsExec::m_shift9 << "Force stats in the whole domain" 
+	  	<< endl;
+          cout << GrainsExec::m_shift12 << "Write values in file every " <<
+		FSoutputFreq << " time step" <<
+		( FSoutputFreq > 1 ? "s" : "" ) << endl;
+          cout << GrainsExec::m_shift12 << "Output file directory name = "
+    		<< ppObsdir << endl;
+	}
+      }      
     }
     else
       if ( m_rank == 0 ) cout << GrainsExec::m_shift6

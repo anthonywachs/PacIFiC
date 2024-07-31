@@ -68,9 +68,9 @@ BVolume* Convex::computeBVolume( unsigned int type ) const
   cout << "Warning for this Convex (" <<
            this->getConvexType() <<
            ") method Convex::computeBVolume() " << 
-           "is not yet implemented !\n"
-       << "Need for an assistance ! Stop running !\n";
-  exit(10);
+           "is not yet implemented !\n";
+//        << "Need for an assistance ! Stop running !\n";
+//   exit(10);
 
   return( nullptr );
 }

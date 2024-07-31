@@ -663,7 +663,7 @@ class Particle : public Component
     //@}
 
 
-  // protected:
+  protected:
     /**@name Parameters */
     //@{
     Particle* m_masterParticle; /**< master particle (the particle itself in

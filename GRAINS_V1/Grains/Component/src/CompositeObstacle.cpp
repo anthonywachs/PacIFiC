@@ -648,7 +648,7 @@ void CompositeObstacle::InitializeForce( bool const& withWeight )
 // Returns a pointer to the torsor exerted on the composite obstacle
 Torsor const* CompositeObstacle::getTorsor()
 {
-  m_torsor.setToBodyForce( *getPosition(), Vector3Null );  
+  m_torsor.setToBodyForce( *getPosition(), Vector3Null ); 
 
   for (list<Obstacle*>::iterator obstacle=m_obstacles.begin(); 
   	obstacle!=m_obstacles.end(); obstacle++)

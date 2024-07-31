@@ -23,6 +23,10 @@ AppCollision::AppCollision()
   , m_nbIterGJK_mean( 0. )
   , m_nbParticles_mean( 0. )
   , m_allforces_index( 0 )
+  , m_outputForceStats( false )
+  , m_outputForceStats_dir( "none" )
+  , m_outputForceStats_counter( 0 )
+  , m_outputForceStats_frequency( 0 )
 {
   struct PointForcePostProcessing pfpp; 
   m_allforces.reserve( m_allforces_blocksize );
@@ -293,7 +297,7 @@ void AppCollision::addPPForce( Point3 const& pc, Vector3 const& force,
   
     // Sets contact force features
     m_allforces[m_allforces_index].geometricPointOfContact = pc;
-    m_allforces[m_allforces_index].contactForce = force;
+    m_allforces[m_allforces_index].contactForceComp0 = force;
     m_allforces[m_allforces_index].PPptComp0 = comp0_->isObstacle() ? 
   	pc : *(comp0_->getPosition());
     m_allforces[m_allforces_index].PPptComp1 = comp1_->isObstacle() ? 
@@ -332,7 +336,7 @@ void AppCollision::computeStressTensor( Matrix& stress,
 {
   size_t m;
   int i, j;
-  Vector3 r;
+  Vector3 rc0, rc1;
   
   // Reset the tensor to 0
   stress.setValue( 0., 0., 0., 0., 0., 0., 0., 0., 0. );
@@ -340,10 +344,14 @@ void AppCollision::computeStressTensor( Matrix& stress,
   // Loop over all contact forces
   for (m=0;m<m_allforces_index;++m)
   {
-    r = m_allforces[m].PPptComp1 - m_allforces[m].PPptComp0;
+    rc0 = m_allforces[m].geometricPointOfContact - m_allforces[m].PPptComp0;
+    rc1 = m_allforces[m].geometricPointOfContact - m_allforces[m].PPptComp1;
     for (i=0;i<3;++i)
       for (j=0;j<3;++j)
-        stress[i][j] += r[i] * m_allforces[m].contactForce[j];
+      {
+	stress[i][j] += rc0[i] * m_allforces[m].contactForceComp0[j];
+	stress[i][j] -= rc1[i] * m_allforces[m].contactForceComp0[j];	
+      }
   }
 
   // If in MPI, sum contributions from each subdomain
@@ -351,7 +359,108 @@ void AppCollision::computeStressTensor( Matrix& stress,
 
   // Divide by the domain volume
   double volume = m_domain_global_size_X * m_domain_global_size_Y
-  	* ( GrainsBuilderFactory::getContext() == DIM_2 ? 1 : 
+  	* ( GrainsBuilderFactory::getContext() == DIM_2 ? 1. : 
 		m_domain_global_size_Z );
   stress /= volume;  
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets the parameters to output force statistics
+void AppCollision::setForceStatsParameters( string const& root_,
+  	size_t const& freq_ )
+{
+  m_outputForceStats = true;
+  m_outputForceStats_dir = root_;
+  m_outputForceStats_frequency = freq_;
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns whether to output force statistics at this time
+bool AppCollision::outputForceStatsAtThisTime( bool enforceOutput, 
+    	bool increaseCounterOnly )
+{
+  bool output = false;
+  if ( m_outputForceStats )
+  {
+    if ( ( m_outputForceStats_counter == 0 || enforceOutput )
+  	&& !increaseCounterOnly ) output = true;
+
+    if ( !enforceOutput )
+    {
+      ++m_outputForceStats_counter;
+      if ( m_outputForceStats_counter == m_outputForceStats_frequency )
+      m_outputForceStats_counter = 0 ;
+    }
+  }
+  
+  return ( output );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Writes load on obstacles in a file
+void AppCollision::outputForceStats( double time, double dt, int rank,
+    	GrainsMPIWrapper const* wrapper )
+{
+  // Compute macro stress tensor 
+  Matrix stress;
+  computeStressTensor( stress, wrapper );
+
+  // Output to a file
+  if ( rank == 0 )
+  {
+    ofstream OUT( ( m_outputForceStats_dir + "/ForceStats.res" ).c_str(), 
+  	ios::app );
+    OUT << GrainsExec::doubleToString( ios::scientific, 6, time ) 
+	<< " " <<
+	GrainsExec::doubleToString( ios::scientific, 6, stress[X][X] )
+	<< " " <<
+	GrainsExec::doubleToString( ios::scientific, 6, stress[X][Y] )
+	<< " " <<
+	GrainsExec::doubleToString( ios::scientific, 6, stress[X][Z] )
+	<< " " <<
+	GrainsExec::doubleToString( ios::scientific, 6, stress[Y][Y] )
+	<< " " <<
+	GrainsExec::doubleToString( ios::scientific, 6, stress[Y][Z] )
+	<< " " <<
+	GrainsExec::doubleToString( ios::scientific, 6, stress[Z][Z] )
+	<< " " <<
+	GrainsExec::doubleToString( ios::scientific, 6, - stress.trace() / 3. )	
+	<< " " << endl;
+    OUT.close();
+  }
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Initialises output files to write force statistics
+void AppCollision::initialiseForceStatsFiles( int rank,
+	bool coupledFluid, double time )
+{
+  m_outputForceStats_counter = coupledFluid ;
+
+  if ( rank == 0 )
+  {
+    if ( GrainsExec::m_ReloadType == "new" )
+    {
+      string cmd = "bash " + GrainsExec::m_GRAINS_HOME
+     	+ "/Tools/ExecScripts/ForceStatsFiles_clear.exec "
+	+ m_outputForceStats_dir;
+      GrainsExec::m_return_syscmd = system( cmd.c_str() );
+    }
+    else
+       GrainsExec::checkTime_outputFile( m_outputForceStats_dir
+      		+ "/ForceStats.res", time ) ;
+  }
+
 }

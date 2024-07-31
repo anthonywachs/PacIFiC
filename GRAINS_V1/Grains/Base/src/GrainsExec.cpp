@@ -36,6 +36,7 @@ string GrainsExec::m_shift9 = "         ";
 string GrainsExec::m_shift12 = "            ";
 string GrainsExec::m_shift15 = "               ";
 bool GrainsExec::m_output_data_at_this_time = false;
+bool GrainsExec::m_postprocess_forces_at_this_time = false;
 GrainsMPIWrapper* GrainsExec::m_wrapper = NULL;
 list<App*> GrainsExec::m_allApp;
 size_t GrainsExec::m_total_nb_physical_particles = 0;

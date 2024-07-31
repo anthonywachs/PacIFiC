@@ -1537,11 +1537,11 @@ void ParaviewPostProcessingWriter::
   for (i=0;i<nbpts;++i)
   {
     sprintf( &coord[3*counter*charspernum], fmt, 
-    	(*pallContacts)[i].contactForce[X] );
+    	(*pallContacts)[i].contactForceComp0[X] );
     sprintf( &coord[(3*counter+1)*charspernum], fmt, 
-    	(*pallContacts)[i].contactForce[Y] );
+    	(*pallContacts)[i].contactForceComp0[Y] );
     sprintf( &coord[(3*counter+2)*charspernum], endfmt, 
-    	(*pallContacts)[i].contactForce[Z] );
+    	(*pallContacts)[i].contactForceComp0[Z] );
     ++counter;
   }  
 
@@ -1627,7 +1627,7 @@ void ParaviewPostProcessingWriter::
   start_output_binary( sizeof_Float32, 3 * nbpts );  
   for (i=0;i<nbpts;++i)
      for (int comp=0;comp<3;++comp) write_double_binary( 
-     	(*pallContacts)[i].contactForce[comp] ) ;    
+     	(*pallContacts)[i].contactForceComp0[comp] ) ;    
   compress_segment_binary( CURRENT_LENGTH, 
   	"writeContactForceVectors_Paraview_MPIIO_binary/Force" ); 
   total_offset = OFFSET;  
@@ -1831,7 +1831,7 @@ void ParaviewPostProcessingWriter::
   counter = 0;
   for (i=0;i<nPPF;++i)
   {
-    norm = Norm( (*pallContacts)[i].contactForce );
+    norm = Norm( (*pallContacts)[i].contactForceComp0 );
     sprintf( &normF[counter*charspernum], fmt, norm );
     sprintf( &normF[(counter+1)*charspernum], fmt, norm );    
     counter += 2;    
@@ -2024,7 +2024,7 @@ void ParaviewPostProcessingWriter::
   start_output_binary( sizeof_Float32, nbpts );    
   for (i=0;i<nPPF;++i)
   {
-    norm = Norm( (*pallContacts)[i].contactForce );
+    norm = Norm( (*pallContacts)[i].contactForceComp0 );
     write_double_binary( norm ) ;
     write_double_binary( norm ) ;       
   }  

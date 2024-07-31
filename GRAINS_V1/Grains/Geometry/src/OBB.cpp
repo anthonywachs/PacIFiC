@@ -1,6 +1,6 @@
 #include "OBB.hh"
 
-static double tol = EPSILON; // Tolerance used in this class
+
 // --------------------------------------------------------------------
 // Default constructor
 OBB::OBB()

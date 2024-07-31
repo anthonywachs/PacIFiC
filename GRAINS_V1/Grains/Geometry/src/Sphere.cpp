@@ -1,4 +1,7 @@
 #include "Sphere.hh"
+#include "BVolume.hh"
+#include "OBB.hh"
+#include "OBC.hh"
 #include "sstream"
 #include <math.h>
 
@@ -538,7 +541,29 @@ bool Sphere::isIn( Point3 const& pt ) const
 {
   return ( pt[X] * pt[X] + pt[Y] * pt[Y] +  pt[Z] * pt[Z] 
   	<= m_radius * m_radius );
-} 
+}
+
+
+
+ 
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to box
+BVolume* Sphere::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+  {
+    Vector3 ext( m_radius, m_radius, m_radius );    
+    bvol = new OBB( ext, Matrix() );
+  }
+  else if ( type == 2 ) // OBC
+  {
+    Vector3 e( 0., 0., 1. );
+    bvol = new OBC( m_radius, 2. * m_radius, e );
+  }
+
+  return( bvol );
+}
 
 
 

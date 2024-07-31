@@ -13,7 +13,8 @@
 RigidBody::RigidBody()
   : m_convex( NULL )
   , m_boundingVolume( NULL )
-  , m_circumscribedRadius( 0.0 )
+  , m_circumscribedRadius( 0. )
+  , m_volume( 0. )
 {}
 
 
@@ -28,6 +29,7 @@ RigidBody::RigidBody( Convex* convex_, Transform const& position_ )
   m_boundingVolume = 
                 m_convex->computeBVolume( GrainsExec::m_colDetBoundingVolume );
   m_circumscribedRadius = m_convex->computeCircumscribedRadius();
+  m_volume = m_convex->getVolume();
 }
 
 
@@ -40,9 +42,11 @@ RigidBody::RigidBody( RigidBody const& form )
   , m_convex( NULL )
   , m_boundingVolume( NULL )
   , m_circumscribedRadius( form.m_circumscribedRadius )
+  , m_volume( form.m_volume )
 {
   if ( form.m_convex ) m_convex = form.m_convex->clone();
-  if ( form.m_boundingVolume) m_boundingVolume = form.m_boundingVolume->clone();
+  if ( form.m_boundingVolume ) 
+    m_boundingVolume = form.m_boundingVolume->clone();
 }
 
 
