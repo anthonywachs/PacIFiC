@@ -31,6 +31,7 @@ AppCollision::AppCollision()
   struct PointForcePostProcessing pfpp; 
   m_allforces.reserve( m_allforces_blocksize );
   for (size_t i=0;i<m_allforces_blocksize;++i) m_allforces.push_back( pfpp );
+  m_stressTensor.setValue( 0., 0., 0., 0., 0., 0., 0., 0., 0. );
 }
 
 
@@ -331,15 +332,14 @@ vector<struct PointForcePostProcessing> const* AppCollision::getPPForces() const
 
 // ----------------------------------------------------------------------------
 // Computes the stress tensor in the whole domain */
-void AppCollision::computeStressTensor( Matrix& stress, 
-    	GrainsMPIWrapper const* wrapper )
+void AppCollision::computeStressTensor( GrainsMPIWrapper const* wrapper )
 {
   size_t m;
   int i, j;
   Vector3 rc0, rc1;
   
   // Reset the tensor to 0
-  stress.setValue( 0., 0., 0., 0., 0., 0., 0., 0., 0. );
+  m_stressTensor.setValue( 0., 0., 0., 0., 0., 0., 0., 0., 0. );
   
   // Loop over all contact forces
   for (m=0;m<m_allforces_index;++m)
@@ -349,19 +349,19 @@ void AppCollision::computeStressTensor( Matrix& stress,
     for (i=0;i<3;++i)
       for (j=0;j<3;++j)
       {
-	stress[i][j] += rc0[i] * m_allforces[m].contactForceComp0[j];
-	stress[i][j] -= rc1[i] * m_allforces[m].contactForceComp0[j];	
+	m_stressTensor[i][j] += rc0[i] * m_allforces[m].contactForceComp0[j];
+	m_stressTensor[i][j] -= rc1[i] * m_allforces[m].contactForceComp0[j];	
       }
   }
 
   // If in MPI, sum contributions from each subdomain
-  if ( wrapper ) stress = wrapper->sum_Matrix_master( stress );
+  if ( wrapper ) m_stressTensor = wrapper->sum_Matrix( m_stressTensor );
 
   // Divide by the domain volume
   double volume = m_domain_global_size_X * m_domain_global_size_Y
   	* ( GrainsBuilderFactory::getContext() == DIM_2 ? 1. : 
 		m_domain_global_size_Z );
-  stress /= volume;  
+  m_stressTensor /= volume;  
 }
 
 
@@ -411,8 +411,7 @@ void AppCollision::outputForceStats( double time, double dt, int rank,
     	GrainsMPIWrapper const* wrapper )
 {
   // Compute macro stress tensor 
-  Matrix stress;
-  computeStressTensor( stress, wrapper );
+  computeStressTensor( wrapper );
 
   // Output to a file
   if ( rank == 0 )
@@ -421,20 +420,20 @@ void AppCollision::outputForceStats( double time, double dt, int rank,
   	ios::app );
     OUT << GrainsExec::doubleToString( ios::scientific, 6, time ) 
 	<< " " <<
-	GrainsExec::doubleToString( ios::scientific, 6, stress[X][X] )
+	GrainsExec::doubleToString( ios::scientific, 6, m_stressTensor[X][X] )
 	<< " " <<
-	GrainsExec::doubleToString( ios::scientific, 6, stress[X][Y] )
+	GrainsExec::doubleToString( ios::scientific, 6, m_stressTensor[X][Y] )
 	<< " " <<
-	GrainsExec::doubleToString( ios::scientific, 6, stress[X][Z] )
+	GrainsExec::doubleToString( ios::scientific, 6, m_stressTensor[X][Z] )
 	<< " " <<
-	GrainsExec::doubleToString( ios::scientific, 6, stress[Y][Y] )
+	GrainsExec::doubleToString( ios::scientific, 6, m_stressTensor[Y][Y] )
 	<< " " <<
-	GrainsExec::doubleToString( ios::scientific, 6, stress[Y][Z] )
+	GrainsExec::doubleToString( ios::scientific, 6, m_stressTensor[Y][Z] )
 	<< " " <<
-	GrainsExec::doubleToString( ios::scientific, 6, stress[Z][Z] )
+	GrainsExec::doubleToString( ios::scientific, 6, m_stressTensor[Z][Z] )
 	<< " " <<
-	GrainsExec::doubleToString( ios::scientific, 6, - stress.trace() / 3. )	
-	<< " " << endl;
+	GrainsExec::doubleToString( ios::scientific, 6, 
+		- m_stressTensor.trace() / 3. )	<< " " << endl;
     OUT.close();
   }
 }
@@ -463,4 +462,24 @@ void AppCollision::initialiseForceStatsFiles( int rank,
       		+ "/ForceStats.res", time ) ;
   }
 
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the macroscopic stress tensor in the whole domain */
+Matrix const* AppCollision::getStressTensor() const
+{
+  return ( &m_stressTensor );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Returns a component of the macroscopic stress tensor in the whole domain 
+double AppCollision::getStressTensorComponent( int k, int l ) const
+{
+  return ( m_stressTensor[k][l] );
 }

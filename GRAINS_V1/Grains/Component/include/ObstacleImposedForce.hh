@@ -104,11 +104,10 @@ class ObstacleImposedForce
     Vector3 m_direction; /**< Motion (or force) direction, i.e. unit imposed
     	force vector */
     Vector3 m_translationalVelocity; /**< translational velocity */
-    Vector3 m_SinCyclic_period; /**< sinusoidal cyclic force period in each
-    	direction */
-    Vector3 m_SinCyclic_phase_shift; /**< sinusoidal velocity phase shift in 
-    	each direction */    
-    Vector3 m_prev; /**< cyclic motion previous position */
+    Vector3 m_MultiSin_period; /**< multi-dimensional sinusoidal force period 
+    	in each direction */
+    Vector3 m_MultiSin_phase_shift; /**< multi-dimensional sinusoidal velocity 
+    	phase shift in each direction */    
     double m_vmaxzeroforce; /**< maximum velocity magnitude at early stages if 
     	the force is zero */        
     //@}
@@ -125,7 +124,7 @@ class ObstacleImposedForce
     //@{
     /** @brief Sets the sinusoidal cyclic force at a given time 
     @param time physical time */
-    void SinCyclicForce( double time );
+    void MultiSinForce( double time );
     //@}        
 };
 

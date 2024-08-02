@@ -108,11 +108,13 @@ class AllComponents
     @param time physical time
     @param dt_particle_vel velocity time step magnitude 
     @param dt_particle_disp motion time step magnitude
-    @param dt_obstacle obstacle velocity and motion time step magnitude */
+    @param dt_obstacle obstacle velocity and motion time step magnitude 
+    @param LC linked cell grid */
     list<SimpleObstacle*> Move( double time,
 	double const& dt_particle_vel, 
     	double const& dt_particle_disp,
-	double const& dt_obstacle );
+	double const& dt_obstacle,
+	LinkedCell const* LC );
 	
     /** @brief Computes particles acceleration
     @param time physical time */

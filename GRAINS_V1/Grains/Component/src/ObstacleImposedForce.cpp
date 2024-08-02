@@ -15,14 +15,12 @@ ObstacleImposedForce::ObstacleImposedForce()
   m_tend = 0.;
   m_force_amplitude = Vector3Null;
   m_force = Vector3Null;
-  m_prev = Vector3Null;
   m_mass = 0.;
   m_automass = false;
   m_direction = Vector3Null;
   m_translationalVelocity = Vector3Null;
-  m_SinCyclic_period = Vector3Null;
-  m_SinCyclic_phase_shift = Vector3Null;
-  m_prev = Vector3Null;
+  m_MultiSin_period = Vector3Null;
+  m_MultiSin_phase_shift = Vector3Null;
   m_vmaxzeroforce = 0.;
 }
 
@@ -40,14 +38,12 @@ ObstacleImposedForce::ObstacleImposedForce( DOMNode* root, double dt,
   m_tend = 0.;
   m_force_amplitude = Vector3Null;
   m_force = Vector3Null;
-  m_prev = Vector3Null;
   m_mass = 0.;
   m_automass = false;  
   m_direction = Vector3Null;
   m_translationalVelocity = Vector3Null;
-  m_SinCyclic_period = Vector3Null;
-  m_SinCyclic_phase_shift = Vector3Null;
-  m_prev = Vector3Null;
+  m_MultiSin_period = Vector3Null;
+  m_MultiSin_phase_shift = Vector3Null;
   m_vmaxzeroforce = 0.;  
 
   m_ObstacleName = ReaderXML::getNodeAttr_String( root, "ObstacleName" );
@@ -87,27 +83,31 @@ ObstacleImposedForce::ObstacleImposedForce( DOMNode* root, double dt,
       cout << GrainsExec::m_shift12 << "Vmax = " << m_vmaxzeroforce << endl;
     }
   } 
-  else if ( ReaderXML::getNode( root, "SinCyclicTranslation" ) )
+  else if ( ReaderXML::getNode( root, "MultiSinTranslation" ) )
   {
-    m_type = "SinCyclicTranslation";
-    DOMNode* nCyclic = ReaderXML::getNode( root, "SinCyclicTranslation" );        
-    DOMNode* force = ReaderXML::getNode( nCyclic, "Amplitude" );
+    m_type = "MultiSinTranslation";
+    DOMNode* nMS = ReaderXML::getNode( root, "MultiSinTranslation" );        
+    DOMNode* force = ReaderXML::getNode( nMS, "Amplitude" );
     m_force_amplitude[X] = ReaderXML::getNodeAttr_Double( force, "AX" );
     m_force_amplitude[Y] = ReaderXML::getNodeAttr_Double( force, "AY" );
     m_force_amplitude[Z] = ReaderXML::getNodeAttr_Double( force, "AZ" ); 
-    m_direction = m_force_amplitude / Norm( m_force_amplitude );   
-    DOMNode* property = ReaderXML::getNode( nCyclic, "Property" );
-    m_mass = ReaderXML::getNodeAttr_Double( property, "Mass" );
-    DOMNode* nPer = ReaderXML::getNode( nCyclic, "Period" );
-    m_SinCyclic_period[X] = ReaderXML::getNodeAttr_Double( nPer, "PX" );
-    m_SinCyclic_period[Y] = ReaderXML::getNodeAttr_Double( nPer, "PY" );
-    m_SinCyclic_period[Z] = ReaderXML::getNodeAttr_Double( nPer, "PZ" ); 
-    DOMNode* nPhaseShift = ReaderXML::getNode( nCyclic, "PhaseShift" );    
-    m_SinCyclic_phase_shift[X] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
+    m_direction = m_force_amplitude / Norm( m_force_amplitude ); 
+    m_force = m_force_amplitude;       
+    DOMNode* property = ReaderXML::getNode( nMS, "Property" );
+    if ( ReaderXML::hasNodeAttr( property, "Mass" ) )
+      m_mass = ReaderXML::getNodeAttr_Double( property, "Mass" );
+    else m_automass = true;
+    m_vmaxzeroforce = ReaderXML::getNodeAttr_Double( property, "Vmax" );       
+    DOMNode* nPer = ReaderXML::getNode( nMS, "Period" );
+    m_MultiSin_period[X] = ReaderXML::getNodeAttr_Double( nPer, "PX" );
+    m_MultiSin_period[Y] = ReaderXML::getNodeAttr_Double( nPer, "PY" );
+    m_MultiSin_period[Z] = ReaderXML::getNodeAttr_Double( nPer, "PZ" ); 
+    DOMNode* nPhaseShift = ReaderXML::getNode( nMS, "PhaseShift" );    
+    m_MultiSin_phase_shift[X] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
     	"PhiX" ) * PI / 180.;
-    m_SinCyclic_phase_shift[Y] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
+    m_MultiSin_phase_shift[Y] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
     	"PhiY" ) * PI / 180.;	
-    m_SinCyclic_phase_shift[Z] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
+    m_MultiSin_phase_shift[Z] = ReaderXML::getNodeAttr_Double( nPhaseShift, 
     	"PhiZ" ) * PI / 180.;    
     if ( rank == 0 )
     {
@@ -118,12 +118,16 @@ ObstacleImposedForce::ObstacleImposedForce( DOMNode* root, double dt,
       cout << GrainsExec::m_shift12 << "Type = " << m_type << endl;
       cout << "Force = " << m_force[X] << " " << m_force[Y] << " " << 
     	m_force[Z] << endl; 
+      cout << GrainsExec::m_shift12 << "Mass = ";
+      if ( m_automass ) cout << "auto" << endl;
+      else cout << m_mass << endl;
+      cout << GrainsExec::m_shift12 << "Vmax = " << m_vmaxzeroforce << endl;
       cout << GrainsExec::m_shift12 << "Period = " << 
-      	m_SinCyclic_period[X] << " " << m_SinCyclic_period[Y] << " " <<
-	m_SinCyclic_period[Z] << endl;
+      	m_MultiSin_period[X] << " " << m_MultiSin_period[Y] << " " <<
+	m_MultiSin_period[Z] << endl;
       cout << GrainsExec::m_shift12 << "Phase shift in rad = " << 
-      	m_SinCyclic_phase_shift[X] << " " << m_SinCyclic_phase_shift[Y] << " " 
-	<< m_SinCyclic_phase_shift[Z] << endl;	
+      	m_MultiSin_phase_shift[X] << " " << m_MultiSin_phase_shift[Y] << " " 
+	<< m_MultiSin_phase_shift[Z] << endl;	
     }    
   }
 }
@@ -181,7 +185,7 @@ bool ObstacleImposedForce::isCompleted( double t, double dt ) const
 // Returns the imposed force
 Vector3 ObstacleImposedForce::getForce( double time )
 {
-  if ( m_type == "SinCyclicTranslation" ) SinCyclicForce( time );
+  if ( m_type == "MultiSinTranslation" ) MultiSinForce( time );
   return ( m_force );
 }
 
@@ -274,11 +278,11 @@ void ObstacleImposedForce::translationalVelocity( double time, double dt,
       translation = subinterval * m_translationalVelocity;
     }                   
   }
-  else if ( m_type == "SinCyclicTranslation" )
+  else if ( m_type == "MultiSinTranslation" )
   {
     // TO DO
     
-//     SinCyclicForce( time );
+//     MultiSinForce( time );
 //     dforce = force - m_force;
 //     for (size_t i=0;i<3;++i) dforce[i] *= m_direction[i]; 
 //     trans = 0.5 *( dt * dt / m_mass ) * dforce; 
@@ -298,9 +302,9 @@ void ObstacleImposedForce::translationalVelocity( double time, double dt,
 
 // ----------------------------------------------------------------------------
 // Sets the sinusoidal cyclic force at a given time 
-void ObstacleImposedForce::SinCyclicForce( double time )
+void ObstacleImposedForce::MultiSinForce( double time )
 {
   for (size_t i=0;i<3;++i)
     m_force[i] = m_force_amplitude[i] * sin( 2. * PI * ( time - m_tstart ) 
-    	/ m_SinCyclic_period[i] );
+    	/ m_MultiSin_period[i] );
 }

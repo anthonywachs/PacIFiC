@@ -255,10 +255,10 @@ class GrainsMPIWrapper : public SolverComputingTime
     @param mat matrix */
     Matrix Broadcast_Matrix( Matrix const& mat ) const;
     
-    /** @brief Sums a matrix from all processes on the master process 
+    /** @brief Sums a matrix from all processes on all processes 
     within the MPI_COMM_activProc communicator
     @param mat matrix */
-    Matrix sum_Matrix_master( Matrix const& mat ) const;       
+    Matrix sum_Matrix( Matrix const& mat ) const;       
   
     /** @brief Outputs timer summary 
     @param f output stream */

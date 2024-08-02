@@ -152,11 +152,9 @@ class AppCollision : public App
     /** @brief Resets the list of simple obstacles */
     void resetListSimpleObstacles(); 
     
-    /** @brief Computes the stress tensor in the whole domain 
-    @param stress the stress tensor
+    /** @brief Computes the macroscopic stress tensor in the whole domain 
     @param wrapper MPI wrapper */
-    void computeStressTensor( Matrix& stress, 
-    	GrainsMPIWrapper const* wrapper );
+    void computeStressTensor( GrainsMPIWrapper const* wrapper );
 	
     /** @brief Sets the parameters to output force statistics
     @param root_ output directory name
@@ -183,7 +181,14 @@ class AppCollision : public App
     @param coupledFluid whether the simulation is coupled to a fluid solver
     @param time physical time */
     void initialiseForceStatsFiles( int rank,
-      	bool coupledFluid, double time );	
+      	bool coupledFluid, double time );
+	
+    /** @brief Returns the macroscopic stress tensor in the whole domain */
+    Matrix const* getStressTensor() const;
+    
+    /** @brief Returns a component of the macroscopic stress tensor in the 
+    whole domain */
+    double getStressTensorComponent( int k, int l ) const;    		
     //@}  
 
   
@@ -217,6 +222,7 @@ class AppCollision : public App
     size_t m_outputForceStats_frequency; /**< frequency of force statistics 
     	output */
     static size_t m_allforces_blocksize;
+    Matrix m_stressTensor; /**< Macroscopic stress tensor in the whole domain */
   //@}
 };
 

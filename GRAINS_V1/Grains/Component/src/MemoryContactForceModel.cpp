@@ -11,20 +11,19 @@
 MemoryContactForceModel::MemoryContactForceModel( map<string,double>& parameters )
   : ContactForceModel()
 {
-  stiff   = parameters["stiff"];
-  en      = parameters["en"   ];
-  muet    = parameters["mut"  ];
-  muec    = parameters["muc"  ];
-  ks      = parameters["ks"   ];
-  eta_r   = parameters["nr"   ];
-  mu_r    = parameters["mur"  ];
-  m_f     = parameters["f"    ];
-  epsilon = parameters["eps"  ];
+  m_kn = parameters["kn"];
+  m_en = parameters["en"];
+  m_etat = parameters["etat"];
+  m_muc = parameters["muc"];
+  m_kt = parameters["kt"];
+  m_mur = parameters["mur"];
+  m_etarpf = parameters["etarpf"];
+  m_epst = parameters["epst"];
 
   /** If the user defines a rolling friction coefficient, we will compute the
   rolling friction torque. */
-  if ( eta_r || mu_r ) rolling_friction = true;
-  else rolling_friction = false;
+  if ( m_mur ) m_rolling_friction = true;
+  else m_rolling_friction = false;
 }
 
 
@@ -54,13 +53,13 @@ void MemoryContactForceModel::computeTangentialVector( Vector3& tij,
 	double n_t, const Vector3 ut, const Vector3 kdelta )
 {
   // Definition of the tangential vector (cf Costa et.al., 2015)
-  if ( Norm(ut) > 0.001 )
-    tij = - ut/Norm(ut);
-  else if ( ( Norm(kdelta) > epsilon || Norm(n_t*ut) > epsilon ) &&
-      Norm(kdelta + n_t*ut) > epsilon )
-    tij = -( kdelta + n_t*ut ) / Norm(kdelta + n_t*ut) ;
+  if ( Norm( ut ) > 0.001 )
+    tij = - ut / Norm( ut );
+  else if ( ( Norm( kdelta ) > m_epst || Norm( n_t * ut ) > m_epst ) &&
+      Norm( kdelta + n_t * ut ) > m_epst )
+    tij = - ( kdelta + n_t * ut ) / Norm( kdelta + n_t * ut ) ;
   else
-    tij=Vector3(0.);
+    tij = 0.;
 }
 
 
@@ -75,12 +74,12 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
 {
   Point3 geometricPointOfContact = contactInfos.getContact();
   Vector3 penetration = contactInfos.getOverlapVector();
-  Vector3 *pkdelta = NULL; // previous vector ks * tangential motion
+  Vector3 *pkdelta = NULL; // previous vector kt * tangential motion
   Vector3 *pprev_normal = NULL; // previous vector normal to the contact plane
   Vector3 *pspringRotFriction = NULL; // previous rolling friction spring-torque
-  Vector3 tij = Vector3(0.); // tangential vector (lives in the contact plane)
-  Quaternion qrot=0.; // quaternion from tangential plane at previous time step
-  // to current tangential plane
+  Vector3 tij; // tangential vector (lives in the contact plane)
+  Quaternion qrot = 0.; // quaternion from tangential plane at previous time 
+  	// step to current tangential plane
   Vector3 w ; // relative angular velocity
   Vector3 wn ; // normal relative angular velocity
   Vector3 wt ; // tangential relative angular velocity
@@ -88,7 +87,7 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
   double radius1 ; // radius of particle 1
   double Req = 0. ; // effective radius
   double kr = 0.; // spring torque stiffness
-  double Cr = 0.; // critical torque (cf. Ai, 2011)
+  double etar = 0.; // critical torque (cf. Ai, 2011)
   std::tuple<int,int,int> idmap0; // id of this contact for particle 0
   std::tuple<int,int,int> idmap1; // id of this contact for particle 1
   idmap0 = std::make_tuple(elementary_id0,p1_->getID(),elementary_id1);
@@ -113,27 +112,27 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
 
   // 1) Compute normal force
   // Normal linear elastic force
-  delFN = stiff * penetration;
+  delFN = m_kn * penetration;
 
   // Normal dissipative force
   double mass0 = p0_->getMass();
   double mass1 = p1_->getMass();
   double avmass = mass0 * mass1 / ( mass0 + mass1 );
-  double omega0 = sqrt( stiff / avmass );
+  double omega0 = sqrt( m_kn / avmass );
   if ( avmass == 0. )
   {
     avmass = mass1 == 0. ? 0.5 * mass0 : 0.5 * mass1;
     Req = p0_->getEquivalentSphereRadius();
-    omega0 = sqrt( 2. * stiff / avmass );
+    omega0 = sqrt( 2. * m_kn / avmass );
   }
-  double muen = - omega0 * log(en) /
-  	sqrt( PI * PI + log(en) * log(en) );
-  delFN += - muen * 2.0 * avmass * v_n;
+  double etan = - omega0 * log(m_en) /
+  	sqrt( PI * PI + log(m_en) * log(m_en) );
+  delFN += - etan * 2.0 * avmass * v_n;
   double normFN = Norm( delFN );
 
   // 2) Compute tangential force with memory
   // Tangential viscous dissipative force
-  Vector3 viscousFT = v_t * ( -muet * 2.0 * avmass );
+  Vector3 viscousFT = v_t * ( - m_etat * 2.0 * avmass );
 
   // Retrieve the previous cumulative motion (if the contact does not 
   // exist we create it)
@@ -147,28 +146,28 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
     qrot.setRotFromTwoVectors( *pprev_normal, normal ) ;
     *pkdelta = qrot.rotateVector( *pkdelta );
   }
-  *pkdelta += dt*ks*v_t;
+  *pkdelta += dt * m_kt * v_t;
   
   // Update the normal vector in the map
   *pprev_normal = normal;  
   
   // Compute a tentative friction force (including the viscous disspative terms)
-  computeTangentialVector( tij, muet * 2.0 * avmass, v_t, *pkdelta );
-  double normFT = Norm(-*pkdelta + viscousFT);
+  computeTangentialVector( tij, m_etat * 2.0 * avmass, v_t, *pkdelta );
+  double normFT = Norm( - *pkdelta + viscousFT );
   
   // If less than the Coulomb limit, we are done
-  if ( normFT <= muec * normFN ) 
-    delFT = Norm(-*pkdelta + viscousFT) * tij ;
+  if ( normFT <= m_muc * normFN ) 
+    delFT = Norm( - *pkdelta + viscousFT ) * tij ;
   else 
   {
     // Otherwise, we modify the cumulative tangential motion and replace
     // the tangential force by the Coulomb limit
-    *pkdelta = - muec * normFN * tij + viscousFT;
-    delFT = muec * normFN * tij ;
+    *pkdelta = - m_muc * normFN * tij + viscousFT;
+    delFT = m_muc * normFN * tij ;
   }
 
   // 3) Compute rolling resistance moment with memory (if applicable)
-  if ( rolling_friction ) 
+  if ( m_rolling_friction ) 
   {
     // Compute the spring and dashpot coefficients from the particle properties
     radius = p0_->getEquivalentSphereRadius() ;
@@ -177,10 +176,10 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
       radius1 = p1_->getEquivalentSphereRadius() ;
       Req = radius * radius1 / ( radius + radius1 ) ;
     }
-    kr = 3. * stiff * mu_r * mu_r * Req * Req ; // c.f. Jiang et al (2005,2015)
-    Cr = 3. * (muen * 2.0 * avmass) * mu_r * mu_r * Req * Req ; // c.f. Jiang et
-    // al (2005,2015)
-    double max_normFT = mu_r * Req * normFN ;
+    kr = 3. * m_kn * m_mur * m_mur * Req * Req ; // c.f. Jiang et al (2005,2015)
+    etar = 3. * ( etan * 2.0 * avmass ) * m_mur * m_mur * Req * Req ; // c.f. 
+    	// Jiang et al (2005,2015)
+    double max_normFT = m_mur * Req * normFN ;
     
     // Compute the relative angular velocity
     w = *p0_->getAngularVelocity() - *p1_->getAngularVelocity();
@@ -192,21 +191,21 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
       // Rotate the cumulative spring torque to the new plane
       *pspringRotFriction = qrot.rotateVector( *pspringRotFriction );
     }
-    *pspringRotFriction += (-kr) * dt * wt ;
-    normFT = Norm(*pspringRotFriction);
+    *pspringRotFriction -= kr * dt * wt ;
+    normFT = Norm( *pspringRotFriction );
     if ( normFT > max_normFT ) 
     {
       // Otherwise, we replace the tangential torque by the Coulomb limit
       *pspringRotFriction *= max_normFT / normFT;
     }
-    delM = *pspringRotFriction + (-m_f) * Cr * wt;
+    delM = *pspringRotFriction - m_etarpf * etar * wt;
   }
   else delM = Vector3(0.);
 
   // Finally, we update the cumulative motions in component p1_
   // If contact_existed was false, it also creates the contact in p1_
   p1_->addDeplContactInMap( idmap1,
-    -*pkdelta, -normal, -*pspringRotFriction );
+    - *pkdelta, - normal, - *pspringRotFriction );
 }
 
 
@@ -250,12 +249,12 @@ bool MemoryContactForceModel::computeForces( Component* p0_,
 
   // Component p0_
   ref_p0_->addForce( geometricPointOfContact, coef * (delFN + delFT), tag_p1_ );
-  if ( rolling_friction ) ref_p0_->addTorque( delM * coef, tag_p1_ );
+  if ( m_rolling_friction ) ref_p0_->addTorque( delM * coef, tag_p1_ );
 
   // Component p1_
   ref_p1_->addForce( geometricPointOfContact, coef * ( - delFN - delFT ), 
   	tag_p0_ );
-  if ( rolling_friction ) ref_p1_->addTorque( - delM * coef, tag_p0_ );
+  if ( m_rolling_friction ) ref_p1_->addTorque( - delM * coef, tag_p0_ );
 
   // Force postprocessing
   if ( GrainsExec::m_postprocess_forces_at_this_time )
@@ -275,49 +274,49 @@ map<string,double> MemoryContactForceModel::defineParameters( DOMNode* & root )
   map<string,double> parameters;
 
   DOMNode* parameter;
-  double   value;
-  parameter = ReaderXML::getNode(root, "stiff");
-  value     = ReaderXML::getNodeValue_Double(parameter);
-  parameters["stiff"]  = value;
-  parameter = ReaderXML::getNode(root, "muc");
-  value     = ReaderXML::getNodeValue_Double(parameter);
-  parameters["muc"]    = value;
-  parameter = ReaderXML::getNode(root, "en");
-  value     = ReaderXML::getNodeValue_Double(parameter);
-  parameters["en"]    = value;
-  parameter = ReaderXML::getNode(root, "mut");
-  value     = ReaderXML::getNodeValue_Double(parameter);
-  parameters["mut"]    = value;
-  // TODO: define default values in the DTD file instead?
-  parameter = ReaderXML::getNode(root, "nr");
+  double value;
+  
+  parameter = ReaderXML::getNode( root, "kn" );
+  value = ReaderXML::getNodeValue_Double( parameter );
+  parameters["kn"] = value;
+  
+  parameter = ReaderXML::getNode( root, "muc" );
+  value = ReaderXML::getNodeValue_Double( parameter );
+  parameters["muc"] = value;
+  
+  parameter = ReaderXML::getNode( root, "en" );
+  value = ReaderXML::getNodeValue_Double( parameter );
+  parameters["en"] = value;
+  
+  parameter = ReaderXML::getNode( root, "etat" );
+  value = ReaderXML::getNodeValue_Double( parameter );
+  parameters["etat"] = value;
+  
+  parameter = ReaderXML::getNode( root, "mur" );
   if ( parameter )
   {
-    value     = ReaderXML::getNodeValue_Double(parameter);
-    parameters["nr"]    = value;
-  }
-  else parameters["nr"] = 0.;
-  parameter = ReaderXML::getNode(root, "mur");
-  if ( parameter )
-  {
-    value     = ReaderXML::getNodeValue_Double(parameter);
-    parameters["mur"]    = value;
+    value = ReaderXML::getNodeValue_Double( parameter );
+    parameters["mur"] = value;
   }
   else parameters["mur"] = 0.;
-  parameter = ReaderXML::getNode(root, "f");
+  
+  parameter = ReaderXML::getNode(root, "etarpf");
   if ( parameter )
   {
-    value     = ReaderXML::getNodeValue_Double(parameter);
-    parameters["f"]    = value;
+    value = ReaderXML::getNodeValue_Double( parameter );
+    parameters["etarpf"] = value;
   }
-  else parameters["f"] = 0.;
-  parameter = ReaderXML::getNode(root, "ks");
-  value     = ReaderXML::getNodeValue_Double(parameter);
-  parameters["ks"]    = value;
-  parameter = ReaderXML::getNode(root, "eps");
+  else parameters["etarpf"] = 0.;
+  
+  parameter = ReaderXML::getNode( root, "kt" );
+  value = ReaderXML::getNodeValue_Double( parameter );
+  parameters["kt"] = value;
+  
+  parameter = ReaderXML::getNode( root, "epst" );
   if ( parameter )
   {
-    value     = ReaderXML::getNodeValue_Double(parameter);
-    parameters["eps"]  = value;
+    value = ReaderXML::getNodeValue_Double( parameter );
+    parameters["epst"] = value;
   }
   else parameters["eps"] = 1.e-10;
 
@@ -338,7 +337,8 @@ void MemoryContactForceModel::computeAndWriteEstimates( Component* p0_,
   double mass1 = p1_->getMass();
   double avmass = mass0 * mass1 / (mass0 + mass1);
   if (avmass == 0.) avmass = mass1==0. ? 0.5*mass0 : 0.5*mass1;
-  double muen = - sqrt(stiff/avmass) * log(en) / sqrt( PI*PI+log(en)*log(en) );
+  double etan = - sqrt(m_kn/avmass) * log(m_en) 
+  	/ sqrt( PI*PI+log(m_en)*log(m_en) );
 
   // Particle/obstacle contact
   if ( p0_->isObstacle() || p1_->isObstacle() )
@@ -358,11 +358,11 @@ void MemoryContactForceModel::computeAndWriteEstimates( Component* p0_,
     mass0 = particle->getMass();
     double delta_allowed = p0_->getCrustThickness()
   	+ p1_->getCrustThickness();
-    double omega0 = sqrt(stiff/mass0);
-    double theta = sqrt(pow(omega0,2.) - pow(0.5*muen,2.));
+    double omega0 = sqrt(m_kn/mass0);
+    double theta = sqrt(pow(omega0,2.) - pow(0.5*etan,2.));
     double tc = PI / theta;
 
-    double delta_max = computeDeltaMax( theta, 0.5*muen, en, tc, v0 );
+    double delta_max = computeDeltaMax( theta, 0.5*etan, m_en, tc, v0 );
 
     OUT << "  Particle: material = " << particle->getMaterial()
   	<< " crust thickness = " << particle->getCrustThickness()
@@ -374,9 +374,9 @@ void MemoryContactForceModel::computeAndWriteEstimates( Component* p0_,
     	<< delta_allowed << endl;
     OUT << "  Collisional relative velocity = " << v0 << endl;
     OUT << "  Tc = " << tc << "  delta_max = " << delta_max << endl;
-    OUT << "  mu_n = " << muen << endl;
-    OUT << "  Maximum elastic force fel = " << stiff*delta_allowed << endl;
-    OUT << "  fel/weight0 ratio = " << stiff*delta_allowed/(mass0*9.81)
+    OUT << "  eta_n = " << etan << endl;
+    OUT << "  Maximum elastic force fel = " << m_kn*delta_allowed << endl;
+    OUT << "  fel/weight0 ratio = " << m_kn*delta_allowed/(mass0*9.81)
   	<< endl;
     if ( delta_max > delta_allowed )
     {
@@ -391,11 +391,11 @@ void MemoryContactForceModel::computeAndWriteEstimates( Component* p0_,
   {
     double delta_allowed = p0_->getCrustThickness()
   	+ p1_->getCrustThickness();
-    double omega0 = sqrt(stiff/avmass);
-    double theta = sqrt(pow(omega0,2.) - pow(muen,2.));
+    double omega0 = sqrt(m_kn/avmass);
+    double theta = sqrt(pow(omega0,2.) - pow(etan,2.));
     double tc = PI / theta;
 
-    double delta_max = computeDeltaMax( theta, muen, en, tc, v0 );
+    double delta_max = computeDeltaMax( theta, etan, m_en, tc, v0 );
 
     OUT << "  Particle 0: material = " << p0_->getMaterial()
   	<< " crust thickness = " << p0_->getCrustThickness()
@@ -407,11 +407,11 @@ void MemoryContactForceModel::computeAndWriteEstimates( Component* p0_,
     	<< endl;
     OUT << "  Collisional relative velocity = " << v0 << endl;
     OUT << "  Tc = " << tc << "  delta_max = " << delta_max << endl;
-    OUT << "  mu_n = " << muen << endl;
-    OUT << "  Maximum elastic force fel = " << stiff*delta_allowed << endl;
-    OUT << "  fel/weight0 ratio = " << stiff*delta_allowed/(mass0*9.81)
+    OUT << "  eta_n = " << etan << endl;
+    OUT << "  Maximum elastic force fel = " << m_kn*delta_allowed << endl;
+    OUT << "  fel/weight0 ratio = " << m_kn*delta_allowed/(mass0*9.81)
   	<< endl;
-    OUT << "  fel/weight1 ratio = " << stiff*delta_allowed/(mass1*9.81)
+    OUT << "  fel/weight1 ratio = " << m_kn*delta_allowed/(mass1*9.81)
   	<< endl;
     if ( delta_max > delta_allowed )
     {
@@ -431,22 +431,22 @@ void MemoryContactForceModel::computeAndWriteEstimates( Component* p0_,
 // Computes maximum penetration depth using a analytical solution
 // and a Newton algorithm
 double MemoryContactForceModel::computeDeltaMax( double const& theta_,
-	double const& mu_, double const& en_, double const& tc_,
+	double const& eta_, double const& en_, double const& tc_,
 	double const& v0_ ) const
 {
   double f=1.,df,t0 = tc_ / (en_ > 0.2 ? 2. : 100.);
   while ( fabs(f) > 1e-10 )
   {
-    f = ( v0_ / theta_ ) * exp( - mu_ * t0 ) * ( - mu_ * sin ( theta_ * t0 )
+    f = ( v0_ / theta_ ) * exp( - eta_ * t0 ) * ( - eta_ * sin ( theta_ * t0 )
     	+ theta_ * cos ( theta_ * t0 ) );
-    df = ( v0_ / theta_ ) * exp( - mu_ * t0 ) *
-    	( pow( mu_, 2. ) * sin ( theta_ * t0 )
-	- 2. * mu_ * theta_ * cos ( theta_ * t0 )
+    df = ( v0_ / theta_ ) * exp( - eta_ * t0 ) *
+    	( pow( eta_, 2. ) * sin ( theta_ * t0 )
+	- 2. * eta_ * theta_ * cos ( theta_ * t0 )
 	- pow( theta_, 2. ) * sin ( theta_ * t0 ) );
     t0 -= f / df ;
   }
 
-  double delta_max = ( v0_ / theta_ ) * exp( - mu_ * t0 )
+  double delta_max = ( v0_ / theta_ ) * exp( - eta_ * t0 )
     	* sin( theta_ * t0 );
 
   return ( delta_max );

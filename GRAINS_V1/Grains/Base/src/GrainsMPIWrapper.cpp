@@ -2367,7 +2367,7 @@ Matrix GrainsMPIWrapper::Broadcast_Matrix( Matrix const& mat ) const
 // ----------------------------------------------------------------------------
 // Sums a matrix from all processes on the master process 
 // within the MPI_COMM_activProc communicator
-Matrix GrainsMPIWrapper::sum_Matrix_master( Matrix const& mat ) const
+Matrix GrainsMPIWrapper::sum_Matrix( Matrix const& mat ) const
 {
   double *mat_coef = new double[9];
   double *sum_mat_coef = new double[9];  
@@ -2382,7 +2382,7 @@ Matrix GrainsMPIWrapper::sum_Matrix_master( Matrix const& mat ) const
   mat_coef[7] = mmat[Z][Y];  
   mat_coef[8] = mmat[Z][Z];     
 
-  MPI_Reduce( mat_coef, sum_mat_coef, 9, MPI_DOUBLE, MPI_SUM, m_rank_master,
+  MPI_Allreduce( mat_coef, sum_mat_coef, 9, MPI_DOUBLE, MPI_SUM, 
   	m_MPI_COMM_activeProc );
   
   Matrix smat( sum_mat_coef[0], sum_mat_coef[1], sum_mat_coef[2],

@@ -12,6 +12,7 @@ using namespace std;
 
 
 class ObstacleImposedVelocity;
+class LinkedCell;
 bool operator < ( ObstacleImposedVelocity const& c0,
 	ObstacleImposedVelocity const& c1 );
 ostream& operator << ( ostream& fileOut, 
@@ -101,7 +102,12 @@ class ObstacleImposedVelocity
     void debug( char *c ); 
   
     /** @brief Returns the imposed motion type */
-    string getType() const; 
+    string getType() const;
+    
+    /** @brief Updates imposed velocity based on a stress criterion (for 
+    cyclic shearing) 
+    @param LC linked cell grid */
+    void updateImposedVelocity( LinkedCell const* LC );     
     //@}
 
 
@@ -130,22 +136,28 @@ class ObstacleImposedVelocity
     double m_tstart; /**< Start time */
     double m_tend; /**< End time */
     Vector3 m_translationalVelocity; /**< translational velocity */
+    Vector3 m_previous_translationalVelocity; /**< translational velocity at
+    	time - dt */    
     Vector3 m_angularVelocity; /**< angular velocity */
     bool m_rotationCenterIsCenterOfMass; /**< true if the center of rotation
     	is the center of mass of the obstacle. In this case, there is no
     	contribution to the translation motion, otherwise there is */
     Point3 m_rotationCenter; /**< center of rotation */
-    double m_Sin_amplitude; /**< sinusoidal velocity amplitude */
-    double m_Sin_period; /**< sinusoidal velocity period */
+    double m_amplitude; /**< sinusoidal or step velocity amplitude */
+    double m_period; /**< sinusoidal or step velocity period */
     double m_Sin_phase_shift; /**< sinusoidal velocity phase shift */    
-    Vector3 m_unit_vitRef; /**< sinusoidal (cyclic) velocity unit reference 
-    	vector */  
-    Vector3 m_SinCyclic_period; /**< sinusoidal cyclic motion period in each
-    	direction */
-    Vector3 m_SinCyclic_amplitude; /**< sinusoidal cyclic motion amplitude in 
-    	each direction */
-    Vector3 m_SinCyclic_phase_shift; /**< sinusoidal velocity phase shift in 
-    	each direction */    
+    Vector3 m_unit_vitRef; /**< multi-dimensional sinusoidal velocity unit 
+    	reference vector */  
+    Vector3 m_MultiSin_period; /**< multi-dimensional sinusoidal motion period 
+    	in each direction */
+    Vector3 m_MultiSin_amplitude; /**< multi-dimensional sinusoidal motion 
+    	amplitude in each direction */
+    Vector3 m_MultiSin_phase_shift; /**< multi-dimensional sinusoidal velocity 
+    	phase shift in each direction */ 
+    pair<int,int> m_stressIndices; /**< Stress component indices */
+    double m_stress_max; /**< Maximum stress amplitude to revert the motion */
+    double m_stress; /**< Current stress */
+    double m_previous_stress; /**< Previous stress */ 
     //@}
     
 

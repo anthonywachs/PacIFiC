@@ -459,7 +459,7 @@ void Grains::moveParticlesAndObstacles( double const& dt_particle_vel,
   // Solve Newton's law and move particles
   SCT_set_start( "Move" );
   m_allcomponents.Move( m_time, dt_particle_vel, dt_particle_disp, 
-      	dt_obstacle );
+      	dt_obstacle, m_collision );
 
 
   // In case of periodicity, update periodic clones and destroy periodic

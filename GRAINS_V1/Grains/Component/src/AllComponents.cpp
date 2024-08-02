@@ -183,9 +183,12 @@ void AllComponents::LinkImposedMotion( ObstacleImposedForce* load )
 list<SimpleObstacle*> AllComponents::Move( double time,
 	double const& dt_particle_vel, 
     	double const& dt_particle_disp,
-	double const& dt_obstacle )
+	double const& dt_obstacle,
+	LinkedCell const* LC )
 {
-  try{
+  double subinterval = 0.;
+  
+  try {
   // Particles motion
   list<Particle*>::iterator particle;
   for (particle=m_ActiveParticles.begin();
@@ -198,16 +201,26 @@ list<SimpleObstacle*> AllComponents::Move( double time,
   if ( !m_AllImposedVelocitiesOnObstacles.empty()
   	|| !m_AllImposedForcesOnObstacles.empty() )
   {
+    // Update stress dependent imposed velocity
+    list<ObstacleImposedVelocity*>::iterator il;
+    for (il=m_AllImposedVelocitiesOnObstacles.begin();
+  	il!=m_AllImposedVelocitiesOnObstacles.end();il++)
+      if ( (*il)->isActif( time - dt_obstacle, time, dt_obstacle, 
+      	subinterval ) )
+	(*il)->updateImposedVelocity( LC );
+	           
+    // Move obstacles
     m_obstacle->resetKinematics();
     displacedObstacles = m_obstacle->Move( time, dt_obstacle, false, false );
 
-    list<ObstacleImposedVelocity*>::iterator il;
+    // Update imposed velocity kinematics
     for (il=m_AllImposedVelocitiesOnObstacles.begin();
   	il!=m_AllImposedVelocitiesOnObstacles.end(); )
       if ( (*il)->isCompleted( time, dt_obstacle ) )
         il = m_AllImposedVelocitiesOnObstacles.erase( il );
       else il++;
 
+    // Update imposed force kinematics    
     list<ObstacleImposedForce*>::iterator il_F;
     for (il_F=m_AllImposedForcesOnObstacles.begin();
   	il_F!=m_AllImposedForcesOnObstacles.end(); )

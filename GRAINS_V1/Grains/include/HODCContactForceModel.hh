@@ -77,11 +77,11 @@ class HODCContactForceModel : public ContactForceModel
   protected:
     /** @name Parameters */
     //@{
-    double stiff; /**< Coefficient d'elasticite */  
-    double en; /**< Coefficient de restitution */ 
-    double muet; /**< Coefficient de frottement direction tangente */
-    double muec; /**< Coefficient de frottement de coulomb */
-    double k_m_s; /**< Coefficient */
+    double m_kn; /**< Normal stiffness coefficient */  
+    double m_en; /**< Normal restitution coefficient */ 
+    double m_etat; /**< Tangential damping coefficient */
+    double m_muc; /**< Tangential Coulomb friction coefficient */
+    double m_kr; /**< Rolling resistance coefficient */
     //@}
 
 
@@ -97,11 +97,11 @@ class HODCContactForceModel : public ContactForceModel
     /** @brief Computes maximum penetration depth using a analytical solution
     and a Newton algorithm
     @param theta_ sqrt( omega0*omega0 - mu*mu ) 
-    @param mu_ dissipation coefficient
+    @param eta_ dissipation coefficient
     @param en_ restitution coefficient
     @param tc_ contact time   
     @param v0_ pre-collisional relative velocity */
-    double computeDeltaMax( double const& theta_, double const& mu_,
+    double computeDeltaMax( double const& theta_, double const& eta_,
   	double const& en_, double const& tc_, double const& v0_ ) const;
 	
     /** @brief Performs forces & torques computation

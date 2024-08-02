@@ -85,20 +85,20 @@ class MemoryContactForceModel : public ContactForceModel
   protected:
     /** @name Parameters */
     //@{
-    double stiff; /**< Normal stiffness coefficient */
-    double en; /**< Normal restitution coefficient */
-    double muet; /**< Tangential damping coefficient */
-    double ks; /**< Tangential stiffness coefficient */
-    double muec; /**< Tangential Coulomb friction coefficient */
-    double eta_r; /**< Viscous rolling damping ratio */
-    double mu_r; /**< Rolling resistance coefficient */
-    double Jn; /**< dimensionless coefficient used to compute the rotational
-	stiffness coefficient (Ai et al. 2011) */
-    double m_f; /**< binary value: if f=0, no viscous rolling damping when the
-	spring rolling friction is saturated. Default value is 0. */
-    double epsilon; /**< Criterion on velocity norm for cumulative tangential 
-    	vector. Default value is 1.e-10. */
-    bool rolling_friction; /**< Boolean to switch on/off the rolling friction */
+    double m_kn; /**< Normal stiffness coefficient */
+    double m_en; /**< Normal restitution coefficient */
+    double m_etat; /**< Tangential damping coefficient */
+    double m_kt; /**< Tangential stiffness coefficient */
+    double m_muc; /**< Tangential Coulomb friction coefficient */
+    double m_mur; /**< Angular Coulomb-like friction coefficient. Default value
+    	is 0. */
+    double m_etarpf; /**< Prefactor in [0,1] of the viscous rolling damping 
+    	when the spring rolling friction is not saturated. Default value is 
+	0. */
+    double m_epst; /**< Threshold below which the tangential vector is
+    	undefined and arbitrarily set to 0. Default value is 1.e-10. */
+    bool m_rolling_friction; /**< Boolean to switch on/off the rolling 
+    	resistance model */
     //@}
 
 
@@ -114,11 +114,11 @@ class MemoryContactForceModel : public ContactForceModel
     /** @brief Computes maximum penetration depth using a analytical solution
     and a Newton algorithm
     @param theta_ sqrt( omega0*omega0 - mu*mu )
-    @param mu_ dissipation coefficient
+    @param eta_ dissipation coefficient
     @param en_ restitution coefficient
     @param tc_ contact time
     @param v0_ pre-collisional relative velocity */
-    double computeDeltaMax( double const& theta_, double const& mu_,
+    double computeDeltaMax( double const& theta_, double const& eta_,
   	double const& en_, double const& tc_, double const& v0_ ) const;
 
     /** @brief Performs forces & torques computation

@@ -120,7 +120,7 @@ void GrainsMPI::Simulation( double time_interval )
         // x_i+1 = x_i + v_i+1/2 * dt
         // Solve Newton's law and move particles
         SCT_set_start( "Move" );
-        m_allcomponents.Move( m_time, 0.5 * m_dt, m_dt, m_dt );
+        m_allcomponents.Move( m_time, 0.5 * m_dt, m_dt, m_dt, m_collision );
 
    
         // Update clone particle position and velocity
@@ -173,7 +173,7 @@ void GrainsMPI::Simulation( double time_interval )
         // Update particle velocity over dt/2
         // v_i+1 = v_i+1/2 + a_i+1 * dt / 2 
         SCT_set_start( "Move" );      
-        m_allcomponents.advanceParticlesVelocity( m_time, 0.5 * m_dt );            
+        m_allcomponents.advanceParticlesVelocity( m_time, 0.5 * m_dt );
         SCT_add_elapsed_time( "Move" );
 
 
