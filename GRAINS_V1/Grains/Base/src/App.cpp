@@ -2,14 +2,12 @@
 #include "AllComponents.hh"
 #include "GrainsExec.hh"
 
-double App::m_domain_global_size_X = 0.;
-double App::m_domain_global_size_Y = 0.;
-double App::m_domain_global_size_Z = 0.;
-double App::m_domain_local_size_X = 0.;
-double App::m_domain_local_size_Y = 0.;
-double App::m_domain_local_size_Z = 0.;
-Point3 App::m_domain_local_origin;
+Vector3 App::m_domain_global_size;
+Vector3 App::m_domain_local_size;
 Point3 App::m_domain_global_origin;
+Point3 App::m_domain_local_origin;
+Point3 App::m_domain_global_max;
+Point3 App::m_domain_local_max;
 vector<bool> App::m_domain_global_periodicity;
 bool App::m_domain_global_periodic = false;
 vector<Vector3> App::m_domain_global_periodic_vectors;
@@ -25,7 +23,7 @@ App::App()
 
 
 // ----------------------------------------------------------------------------
-// Destructeur
+// Destructor
 App::~App()
 {}
 
@@ -37,20 +35,26 @@ App::~App()
 void App::set_dimensions( double xmax, double ymax, double zmax,
   	double ox, double oy, double oz )
 {
-  App::m_domain_global_origin[0] = ox;
-  App::m_domain_global_origin[1] = oy;
-  App::m_domain_global_origin[2] = oz;
-  App::m_domain_local_origin[0] = ox;
-  App::m_domain_local_origin[1] = oy;
-  App::m_domain_local_origin[2] = oz; 
-  App::m_domain_global_size_X = xmax - m_domain_global_origin[0];
-  App::m_domain_global_size_Y = ymax - m_domain_global_origin[1];
-  App::m_domain_global_size_Z = zmax - m_domain_global_origin[2];
-  App::m_domain_local_size_X = xmax - m_domain_global_origin[0];
-  App::m_domain_local_size_Y = ymax - m_domain_global_origin[1];
-  App::m_domain_local_size_Z = zmax - m_domain_global_origin[2];
-  assert( App::m_domain_global_size_X >= 0. && App::m_domain_global_size_Y >= 0.
- 	&& App::m_domain_global_size_Z >= 0. );   
+  m_domain_global_origin[X] = ox;
+  m_domain_global_origin[Y] = oy;
+  m_domain_global_origin[Z] = oz;
+  
+  m_domain_global_max[X] = xmax;
+  m_domain_global_max[Y] = ymax;  
+  m_domain_global_max[Z] = zmax;    
+   
+  for (size_t i=0;i<3;++i)
+  {
+    m_domain_local_origin[i] = m_domain_global_origin[i];
+    m_domain_local_max[i] = m_domain_global_max[i];
+    m_domain_global_size[i] = m_domain_global_max[i] 
+    	- m_domain_global_origin[i];
+    m_domain_local_size[i] = m_domain_global_size[i];
+  }
+
+  assert( App::m_domain_global_size[X] >= 0. 
+  	&& App::m_domain_global_size[Y] >= 0.
+ 	&& App::m_domain_global_size[Z] >= 0. );   
 }
 
 
@@ -75,27 +79,27 @@ void App::set_periodicity( vector<bool> const& vper )
     if ( m_domain_global_periodicity[X] )
     {
       m_domain_global_periodic_vectors[GEOPOS_WEST][X] = 
-      	m_domain_global_size_X ;  
+      	m_domain_global_size[X] ;  
       m_domain_global_periodic_vectors[GEOPOS_EAST][X] = 
-      	- m_domain_global_size_X ;
+      	- m_domain_global_size[X] ;
     }
 
     // South North
     if ( m_domain_global_periodicity[Y] )
     {
       m_domain_global_periodic_vectors[GEOPOS_SOUTH][Y] = 
-      	m_domain_global_size_Y ;
+      	m_domain_global_size[Y] ;
       m_domain_global_periodic_vectors[GEOPOS_NORTH][Y] = 
-      	- m_domain_global_size_Y ;
+      	- m_domain_global_size[Y] ;
     }
 
     // Behind Front
     if ( m_domain_global_periodicity[Z] )
     {
       m_domain_global_periodic_vectors[GEOPOS_BEHIND][Z] = 
-      	m_domain_global_size_Z ;
+      	m_domain_global_size[Z] ;
       m_domain_global_periodic_vectors[GEOPOS_FRONT][Z] = 
-      	- m_domain_global_size_Z ;
+      	- m_domain_global_size[Z] ;
     }
 
 
@@ -104,63 +108,63 @@ void App::set_periodicity( vector<bool> const& vper )
     if ( m_domain_global_periodicity[X] && m_domain_global_periodicity[Y] )
     {
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST][X] = 
-      	m_domain_global_size_X ;
+      	m_domain_global_size[X] ;
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST][Y] = 
-      	m_domain_global_size_Y ;
+      	m_domain_global_size[Y] ;
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST][X] = 
-      	- m_domain_global_size_X ;
+      	- m_domain_global_size[X] ;
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST][Y] = 
-      	m_domain_global_size_Y ;        
+      	m_domain_global_size[Y] ;        
       m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST][X] = 
-      	m_domain_global_size_X ;    
+      	m_domain_global_size[X] ;    
       m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST][Y] = 
-      	- m_domain_global_size_Y ;
+      	- m_domain_global_size[Y] ;
       m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST][X] = 
-      	- m_domain_global_size_X ;    
+      	- m_domain_global_size[X] ;    
       m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST][Y] = 
-      	- m_domain_global_size_Y ;
+      	- m_domain_global_size[Y] ;
     }
     
     // South North Behind Front
     if ( m_domain_global_periodicity[Y] && m_domain_global_periodicity[Z] )
     {
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_BEHIND][Y] = 
-      	m_domain_global_size_Y ;
+      	m_domain_global_size[Y] ;
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_BEHIND][Z] = 
-      	m_domain_global_size_Z ;	     
+      	m_domain_global_size[Z] ;	     
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_FRONT][Y] = 
-      	m_domain_global_size_Y ;
+      	m_domain_global_size[Y] ;
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_FRONT][Z] = 
-      	- m_domain_global_size_Z ; 
+      	- m_domain_global_size[Z] ; 
       m_domain_global_periodic_vectors[GEOPOS_NORTH_BEHIND][Y] = 
-      	- m_domain_global_size_Y ;    
+      	- m_domain_global_size[Y] ;    
       m_domain_global_periodic_vectors[GEOPOS_NORTH_BEHIND][Z] = 
-      	m_domain_global_size_Z ;     
+      	m_domain_global_size[Z] ;     
       m_domain_global_periodic_vectors[GEOPOS_NORTH_FRONT][Y] = 
-      	- m_domain_global_size_Y ;    
+      	- m_domain_global_size[Y] ;    
       m_domain_global_periodic_vectors[GEOPOS_NORTH_FRONT][Z] = 
-      	- m_domain_global_size_Z ;
+      	- m_domain_global_size[Z] ;
     }      
 
     // West East Behind Front
     if ( m_domain_global_periodicity[X] && m_domain_global_periodicity[Z] )
     {
       m_domain_global_periodic_vectors[GEOPOS_WEST_BEHIND][X] = 
-      	m_domain_global_size_X ;    
+      	m_domain_global_size[X] ;    
       m_domain_global_periodic_vectors[GEOPOS_WEST_BEHIND][Z] = 
-      	m_domain_global_size_Z ;    
+      	m_domain_global_size[Z] ;    
       m_domain_global_periodic_vectors[GEOPOS_WEST_FRONT][X] = 
-      	m_domain_global_size_X ;    
+      	m_domain_global_size[X] ;    
       m_domain_global_periodic_vectors[GEOPOS_WEST_FRONT][Z] = 
-      	- m_domain_global_size_Z ;   
+      	- m_domain_global_size[Z] ;   
       m_domain_global_periodic_vectors[GEOPOS_EAST_BEHIND][X] = 
-      	- m_domain_global_size_X ;    
+      	- m_domain_global_size[X] ;    
       m_domain_global_periodic_vectors[GEOPOS_EAST_BEHIND][Z] = 
-      	m_domain_global_size_Z ;
+      	m_domain_global_size[Z] ;
       m_domain_global_periodic_vectors[GEOPOS_EAST_FRONT][X] = 
-      	- m_domain_global_size_X ;    
+      	- m_domain_global_size[X] ;    
       m_domain_global_periodic_vectors[GEOPOS_EAST_FRONT][Z] = 
-      	- m_domain_global_size_Z ; 
+      	- m_domain_global_size[Z] ; 
     }   
 
     
@@ -169,53 +173,53 @@ void App::set_periodicity( vector<bool> const& vper )
     	&& m_domain_global_periodicity[Z] )
     {
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST_BEHIND][X] = 
-      	m_domain_global_size_X ; 
+      	m_domain_global_size[X] ; 
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST_BEHIND][Y] = 
-      	m_domain_global_size_Y ; 
+      	m_domain_global_size[Y] ; 
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST_BEHIND][Z] = 
-      	m_domain_global_size_Z ;  		     
+      	m_domain_global_size[Z] ;  		     
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST_FRONT][X] = 
-      	m_domain_global_size_X ; 
+      	m_domain_global_size[X] ; 
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST_FRONT][Y] = 
-      	m_domain_global_size_Y ; 
+      	m_domain_global_size[Y] ; 
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_WEST_FRONT][Z] = 
-      	- m_domain_global_size_Z ;
+      	- m_domain_global_size[Z] ;
       m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST_BEHIND][X] = 
-      	m_domain_global_size_X ; 
+      	m_domain_global_size[X] ; 
       m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST_BEHIND][Y] = 
-      	- m_domain_global_size_Y ; 
+      	- m_domain_global_size[Y] ; 
       m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST_BEHIND][Z] = 
-      	m_domain_global_size_Z ;
+      	m_domain_global_size[Z] ;
       m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST_FRONT][X] = 
-      	m_domain_global_size_X ; 
+      	m_domain_global_size[X] ; 
       m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST_FRONT][Y] = 
-      	- m_domain_global_size_Y ; 
+      	- m_domain_global_size[Y] ; 
       m_domain_global_periodic_vectors[GEOPOS_NORTH_WEST_FRONT][Z] = 
-      	- m_domain_global_size_Z ;
+      	- m_domain_global_size[Z] ;
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST_BEHIND][X] = 
-      	- m_domain_global_size_X ; 
+      	- m_domain_global_size[X] ; 
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST_BEHIND][Y] = 
-      	m_domain_global_size_Y ; 
+      	m_domain_global_size[Y] ; 
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST_BEHIND][Z] = 
-      	m_domain_global_size_Z ;  
+      	m_domain_global_size[Z] ;  
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST_FRONT][X] = 
-      	- m_domain_global_size_X ; 
+      	- m_domain_global_size[X] ; 
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST_FRONT][Y] = 
-      	m_domain_global_size_Y ; 
+      	m_domain_global_size[Y] ; 
       m_domain_global_periodic_vectors[GEOPOS_SOUTH_EAST_FRONT][Z] = 
-      	- m_domain_global_size_Z ;  
+      	- m_domain_global_size[Z] ;  
       m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST_BEHIND][X] = 
-      	- m_domain_global_size_X ; 
+      	- m_domain_global_size[X] ; 
       m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST_BEHIND][Y] = 
-      	- m_domain_global_size_Y ; 
+      	- m_domain_global_size[Y] ; 
       m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST_BEHIND][Z] = 
-      	m_domain_global_size_Z ; 
+      	m_domain_global_size[Z] ; 
       m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST_FRONT][X] = 
-      	- m_domain_global_size_X ; 
+      	- m_domain_global_size[X] ; 
       m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST_FRONT][Y] = 
-      	- m_domain_global_size_Y ; 
+      	- m_domain_global_size[Y] ; 
       m_domain_global_periodic_vectors[GEOPOS_NORTH_EAST_FRONT][Z] = 
-      	- m_domain_global_size_Z ;
+      	- m_domain_global_size[Z] ;
     }            
   }
   
@@ -692,9 +696,9 @@ void App::set_periodicity( vector<bool> const& vper )
 // Sets local domain size
 void App::set_local_domain_size( double lx_, double ly_, double lz_ )
 {
-  App::m_domain_local_size_X = lx_;
-  App::m_domain_local_size_Y = ly_;
-  App::m_domain_local_size_Z = lz_;
+  m_domain_local_size[X] = lx_;
+  m_domain_local_size[Y] = ly_;
+  m_domain_local_size[Z] = lz_;
 }
 
 
@@ -704,12 +708,12 @@ void App::set_local_domain_size( double lx_, double ly_, double lz_ )
 // Sets local domain origin
 void App::set_local_domain_origin( int const* nprocsdir, int const* MPIcoords )
 {
-  m_domain_local_origin[0] = m_domain_global_origin[0] 
-  	+ MPIcoords[0] * m_domain_local_size_X ;	
-  m_domain_local_origin[1] = m_domain_global_origin[1] 
-  	+ MPIcoords[1] * m_domain_local_size_Y ;  
-  m_domain_local_origin[2] = m_domain_global_origin[2] 
-  	+ MPIcoords[2] * m_domain_local_size_Z ;  
+  for (size_t i=0;i<3;++i)
+  {
+    m_domain_local_origin[i] = m_domain_global_origin[i] 
+  	+ MPIcoords[i] * m_domain_local_size[i] ;
+    m_domain_local_max[i] = m_domain_local_origin[i] + m_domain_local_size[i];
+  } 
 }
 
 
@@ -719,9 +723,9 @@ void App::set_local_domain_origin( int const* nprocsdir, int const* MPIcoords )
 // Gets local domain origin
 void App::get_local_domain_origin( double& x, double& y, double& z ) 
 {
-  x = m_domain_local_origin[0] ;
-  y = m_domain_local_origin[1] ;  
-  z = m_domain_local_origin[2] ;
+  x = m_domain_local_origin[X] ;
+  y = m_domain_local_origin[Y] ;  
+  z = m_domain_local_origin[Z] ;
 }
 
 
@@ -731,9 +735,9 @@ void App::get_local_domain_origin( double& x, double& y, double& z )
 // Gets global domain origin
 void App::get_origin( double& x, double& y, double& z ) 
 {
-  x = m_domain_global_origin[0] ;
-  y = m_domain_global_origin[1] ;  
-  z = m_domain_global_origin[2] ;
+  x = m_domain_global_origin[X] ;
+  y = m_domain_global_origin[Y] ;  
+  z = m_domain_global_origin[Z] ;
 }
 
 
@@ -743,9 +747,9 @@ void App::get_origin( double& x, double& y, double& z )
 // Gets local domain size
 void App::get_local_domain_size( double& lx, double& ly, double& lz ) 
 {
-  lx = m_domain_local_size_X ;
-  ly = m_domain_local_size_Y ;  
-  lz = m_domain_local_size_Z ;
+  lx = m_domain_local_size[X] ;
+  ly = m_domain_local_size[Y] ;  
+  lz = m_domain_local_size[Z] ;
 }
 
 
@@ -755,9 +759,9 @@ void App::get_local_domain_size( double& lx, double& ly, double& lz )
 // Gets global domain size
 void App::get_size( double& lx, double& ly, double& lz ) 
 {
-  lx = m_domain_global_size_X ;
-  ly = m_domain_global_size_Y ;  
-  lz = m_domain_global_size_Z ;
+  lx = m_domain_global_size[X] ;
+  ly = m_domain_global_size[Y] ;  
+  lz = m_domain_global_size[Z] ;
 }
 
 
@@ -769,12 +773,15 @@ bool App::isInDomain( Point3 const* position )
 {
   bool isIn = true;
   
-  if ( (*position)[0] < m_domain_global_origin[0] 
-  	|| (*position)[0] > m_domain_global_origin[0] + m_domain_global_size_X 
-  	|| (*position)[1] < m_domain_global_origin[1] 
-	|| (*position)[1] > m_domain_global_origin[1] + m_domain_global_size_Y
-  	|| (*position)[2] < m_domain_global_origin[2] 
-	|| (*position)[2] > m_domain_global_origin[2] + m_domain_global_size_Z )
+  if ( (*position)[X] < m_domain_global_origin[X] 
+  	|| (*position)[X] > m_domain_global_origin[X] 
+		+ m_domain_global_size[X] 
+  	|| (*position)[Y] < m_domain_global_origin[Y] 
+	|| (*position)[Y] > m_domain_global_origin[Y] 
+		+ m_domain_global_size[Y]
+  	|| (*position)[Z] < m_domain_global_origin[Z] 
+	|| (*position)[Z] > m_domain_global_origin[Z] 
+		+ m_domain_global_size[Z] )
     isIn = false;
   
   return ( isIn );
@@ -792,20 +799,23 @@ bool App::isInDomain( Point3 const* position, size_t const& dir )
   switch ( dir )
   {
     case 0:
-      if ( (*position)[0] < m_domain_global_origin[0] 
-  	|| (*position)[0] > m_domain_global_origin[0] + m_domain_global_size_X )
+      if ( (*position)[X] < m_domain_global_origin[X] 
+  	|| (*position)[X] > m_domain_global_origin[X] 
+		+ m_domain_global_size[X] )
       isIn = false; 
       break;
       
     case 1:
-      if ( (*position)[1] < m_domain_global_origin[1] 
-	|| (*position)[1] > m_domain_global_origin[1] + m_domain_global_size_Y )
+      if ( (*position)[Y] < m_domain_global_origin[Y] 
+	|| (*position)[Y] > m_domain_global_origin[Y] 
+		+ m_domain_global_size[Y] )
       isIn = false; 
       break;
       
     default:
-      if ( (*position)[2] < m_domain_global_origin[2] 
-	|| (*position)[2] > m_domain_global_origin[2] + m_domain_global_size_Z )
+      if ( (*position)[Z] < m_domain_global_origin[Z] 
+	|| (*position)[Z] > m_domain_global_origin[Z] 
+		+ m_domain_global_size[Z] )
       isIn = false;                        
       break;  
   }
@@ -821,12 +831,12 @@ bool App::isInLocalDomain( Point3 const* position )
 {
   bool isIn = true;
   
-  if ( (*position)[0] < m_domain_local_origin[0] 
-  	|| (*position)[0] > m_domain_local_origin[0] + m_domain_local_size_X 
-  	|| (*position)[1] < m_domain_local_origin[1] 
-	|| (*position)[1] > m_domain_local_origin[1] + m_domain_local_size_Y
-  	|| (*position)[2] < m_domain_local_origin[2] 
-	|| (*position)[2] > m_domain_local_origin[2] + m_domain_local_size_Z ) 
+  if ( (*position)[X] < m_domain_local_origin[X] 
+  	|| (*position)[X] > m_domain_local_origin[X] + m_domain_local_size[X] 
+  	|| (*position)[Y] < m_domain_local_origin[Y] 
+	|| (*position)[Y] > m_domain_local_origin[Y] + m_domain_local_size[Y]
+  	|| (*position)[Z] < m_domain_local_origin[Z] 
+	|| (*position)[Z] > m_domain_local_origin[Z] + m_domain_local_size[Z] ) 
     isIn = false;
   
   return ( isIn );
@@ -869,9 +879,9 @@ string App::getName() const
 // Writes the domain features in an output stream
 void App::output_domain_features( ostream& output, string const& oshift )
 {
-  output << oshift << "Global domain size  = " << m_domain_global_size_X 
-  	<< " x " << m_domain_global_size_Y 
-	<< " x " << m_domain_global_size_Z << endl;
+  output << oshift << "Global domain size  = " << m_domain_global_size[X] 
+  	<< " x " << m_domain_global_size[Y] 
+	<< " x " << m_domain_global_size[Z] << endl;
   output << oshift << "Periodicity = ";
   if ( !m_domain_global_periodic )
     output << "No" << endl;
@@ -960,9 +970,9 @@ void App::output_domain_features( ostream& output, string const& oshift )
       	GEOPOS_NORTH_EAST_FRONT );
     }                
   }       	
-  output << oshift << "Local domain size  = " << m_domain_local_size_X 
-  	<< " x " << m_domain_local_size_Y 
-	<< " x " << m_domain_local_size_Z << endl;
+  output << oshift << "Local domain size  = " << m_domain_local_size[X] 
+  	<< " x " << m_domain_local_size[Y] 
+	<< " x " << m_domain_local_size[Z] << endl;
   output << oshift << "Global origin = " << m_domain_global_origin << endl;
   output << oshift << "Local origin = " << m_domain_local_origin << endl;  
 }    

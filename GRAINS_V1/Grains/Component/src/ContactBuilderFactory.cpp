@@ -99,6 +99,11 @@ void ContactBuilderFactory::define( DOMNode* root )
       string matB = ReaderXML::getNodeAttr_String(material, "materialB");
       contactValue = m_materials[matA] | m_materials[matB];
     }
+    
+    // In case a contact force model existed for this pair of materials
+    // we delete it and replace it by the new contact force model
+    if ( m_contactParametres.count( contactValue ) )
+      delete m_contactForceModels[contactValue];
 
     pair<ContactBuilderFactory::ContactFeatures,ContactForceModel*> forceLaw =
     	defineParameters(contact);

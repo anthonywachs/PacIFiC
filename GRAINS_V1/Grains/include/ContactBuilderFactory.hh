@@ -108,7 +108,7 @@ class ContactBuilderFactory
     model from an XML node
     @param root XML node */
     static pair<ContactBuilderFactory::ContactFeatures,ContactForceModel*>
-  	defineParameters(DOMNode *root) ;
+  	defineParameters( DOMNode *root ) ;
     //@}
 
 

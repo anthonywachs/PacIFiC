@@ -1175,8 +1175,7 @@ vector< vector<double> >* GrainsMPIWrapper::
   double intTodouble = 0.1 ;  
   MPI_Status status;
   MPI_Request idreq;
-  
-  
+    
   // Allocate the receiving vector on master process
   if ( m_rank == m_rank_master )
   { 
@@ -1214,10 +1213,6 @@ vector< vector<double> >* GrainsMPIWrapper::
   // Reception by the master process
   if ( m_rank == m_rank_master )
   {
-    // Allocate the receiving vector on master process
-    vector<double> work( NB_DOUBLE_PART, 0. );
-    data_Global = new vector< vector<double> >( nb_total_particles, work );
-
     for (int irank=0; irank<m_nprocs; ++irank)
     {
       // Size of the message
@@ -1590,7 +1585,9 @@ void GrainsMPIWrapper::UpdateClones(double time,
     else
     {
       cout << "!!! Warning !!! Clone " << id << " not found in proc " 
-      	<< m_rank << endl;
+      	<< m_rank << " at time " << time << " and position " << 
+	recvbuf_DOUBLE[j+22] << " " << recvbuf_DOUBLE[j+23] << " " <<
+	recvbuf_DOUBLE[j+24] << endl;
     } 
     
     j += NB_DOUBLE_PART + 1 + contact_map_size * NB_DOUBLE_PER_CONTACT; 

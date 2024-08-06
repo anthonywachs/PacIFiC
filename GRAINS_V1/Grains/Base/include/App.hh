@@ -140,14 +140,12 @@ class App
 
     /**@name Parameters Static */
     //@{  
-    static double m_domain_global_size_X; /**< Domain global size in X */  
-    static double m_domain_global_size_Y; /**< Domain global size in Y */  
-    static double m_domain_global_size_Z; /**< Domain global size in Z */    
-    static double m_domain_local_size_X; /**< Domain local size in X */  
-    static double m_domain_local_size_Y; /**< Domain local size in Y */  
-    static double m_domain_local_size_Z; /**< Domain local size in Z */  
+    static Vector3 m_domain_global_size; /**< Domain global size */     
+    static Vector3 m_domain_local_size; /**< Domain local size */   
     static Point3 m_domain_global_origin; /**< Domain global origin */  
     static Point3 m_domain_local_origin; /**< Domain local origin */
+    static Point3 m_domain_global_max; /**< Domain global max point */    
+    static Point3 m_domain_local_max; /**< Domain local max point */       
     static vector<bool> m_domain_global_periodicity; /**< vector of domain 
     	periodicity (3 booleans) */ 
     static bool m_domain_global_periodic; /**< true if the domain is periodic 

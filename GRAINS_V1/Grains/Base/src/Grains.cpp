@@ -2090,10 +2090,7 @@ bool Grains::isModePredictor()
 void Grains::readDomainDecomposition( DOMNode* root,
   	double const& lx, double const& ly, double const& lz )
 {
-  int nprocs[3] = { 1, 1, 1 };
-  int coords[3] = { 0, 0, 0 };
-  App::set_local_domain_size( lx, ly, lz );
-  App::set_local_domain_origin( nprocs, coords );
+  // Nothing to do in serial mode
   m_processorIsActive = true;
 }
 

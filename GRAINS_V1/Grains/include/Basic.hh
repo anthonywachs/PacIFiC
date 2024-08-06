@@ -52,13 +52,13 @@ using namespace std;
     @param y 2nd real number */      
     inline double max( double x, double y ) { return ( x < y ? y : x ); }
     
-    /** @brief Sests the minimum of 2 real numbers defined as double to these 2
+    /** @brief Sets the minimum of 2 real numbers defined as double to these 2
     numbers
     @param x 1st real number 
     @param y 2nd real number */     
     inline void set_min( double& x, double y ) { if (x > y) x = y; }
     
-    /** @brief Sests the maximum of 2 real numbers defined as double to these 2
+    /** @brief Sets the maximum of 2 real numbers defined as double to these 2
     numbers
     @param x 1st real number 
     @param y 2nd real number */ 

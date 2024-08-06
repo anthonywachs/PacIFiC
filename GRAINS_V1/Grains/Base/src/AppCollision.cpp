@@ -358,9 +358,9 @@ void AppCollision::computeStressTensor( GrainsMPIWrapper const* wrapper )
   if ( wrapper ) m_stressTensor = wrapper->sum_Matrix( m_stressTensor );
 
   // Divide by the domain volume
-  double volume = m_domain_global_size_X * m_domain_global_size_Y
+  double volume = m_domain_global_size[X] * m_domain_global_size[Y]
   	* ( GrainsBuilderFactory::getContext() == DIM_2 ? 1. : 
-		m_domain_global_size_Z );
+		m_domain_global_size[Z] );
   m_stressTensor /= volume;  
 }
 
