@@ -107,15 +107,15 @@ void RawDataPostProcessingWriter::PostProcessing( double const& time,
             nb_total_part );
 
     // Gather particle data ordered by particle ID on the master proc    
-//    vector< vector<double> >* data_Global = NULL;
-//     data_Global = wrapper->GatherParticleData_PostProcessing( *particles,
-//         nb_total_part );
-// 
-//     // Write particle data
-//     if ( m_rank == 0 )
-//       one_output_MPI( time, nb_total_part, types_Global, data_Global ) ;
+    vector< vector<double> >* data_Global = NULL;
+    data_Global = wrapper->GatherParticleData_PostProcessing( *particles,
+        nb_total_part );
 
-//    if ( data_Global ) delete data_Global ;
+    // Write particle data
+    if ( m_rank == 0 )
+      one_output_MPI( time, nb_total_part, types_Global, data_Global ) ;
+
+    if ( data_Global ) delete data_Global ;
     if ( types_Global ) delete types_Global ;    
   }
   // In serial mode
