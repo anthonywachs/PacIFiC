@@ -424,10 +424,10 @@ void Obstacle::setContactMapToFalse()
 
 
 // ----------------------------------------------------------------------------
-// Set contact map entry features to zero */
-void Obstacle::setContactMapFeaturesToZero()
+// Set contact map cumulative features to zero */
+void Obstacle::setContactMapCumulativeFeaturesToZero()
 {
-  cout << "Warning when calling Obstacle::setContactMapFeaturesToZero() "
+  cout << "Warning when calling Obstacle::setContactMapCumulativeFeaturesToZero() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);

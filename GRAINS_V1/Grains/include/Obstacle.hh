@@ -121,8 +121,8 @@ class Obstacle : public Component
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
         
-    /** @brief Sets contact map entry features to zero */
-    virtual void setContactMapFeaturesToZero(); 
+    /** @brief Sets contact map cumulative features to zero */
+    virtual void setContactMapCumulativeFeaturesToZero(); 
     
     /** @brief Restricts the geometric directions of translational motion 
     @param dir restricted geometric directions of translational motion */

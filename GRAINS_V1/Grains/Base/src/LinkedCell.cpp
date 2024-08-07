@@ -1847,6 +1847,8 @@ pair<bool,bool> LinkedCell::insertParticleParallel( double time,
     geoloc = GeoPosition( wrapper->Broadcast_INT( int(geoloc), source ) );
     
     // Loop over the domain periodic vectors for this geographic position
+    if ( !force_insertion )
+    {
     for ( size_t i=0;i<m_periodic_vector_indices[geoloc].size() &&
 	!contact;++i)
     {
@@ -1864,6 +1866,7 @@ pair<bool,bool> LinkedCell::insertParticleParallel( double time,
 		m_periodic_vector_indices[geoloc][i]] );
     }    
     contact = wrapper->max_INT( contact ); 
+    }
     if ( contact ) insert.second = true;
     
     // If no contact for periodic clones, create them in local domains

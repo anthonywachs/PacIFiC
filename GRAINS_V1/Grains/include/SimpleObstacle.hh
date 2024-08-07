@@ -229,8 +229,8 @@ class SimpleObstacle : public Obstacle
     /** @brief Initializes all contact map entries to false */
     void setContactMapToFalse();
     
-    /** @brief Set contact map entry features to zero */
-    void setContactMapFeaturesToZero();     
+    /** @brief Set contact map cumulative features to zero */
+    void setContactMapCumulativeFeaturesToZero();     
 
     /** @brief Sets the frequency at which the obstacle link to
     the cells of the linked-cell grid is updated

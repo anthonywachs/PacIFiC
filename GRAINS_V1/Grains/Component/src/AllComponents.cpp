@@ -2131,18 +2131,18 @@ void AllComponents::updateAllContactMaps()
 
 
 // ----------------------------------------------------------------------------
-// Set all contact map entry features to zero in all particles
+// Set all contact map cumulative features to zero in all particles
 // and all elementary obstacles */
-void AllComponents::setAllContactMapFeaturesToZero()
+void AllComponents::setAllContactMapCumulativeFeaturesToZero()
 {
   for (list<Particle*>::iterator particle=m_ActiveParticles.begin();
 	particle!=m_ActiveParticles.end();particle++)
-    (*particle)->setContactMapFeaturesToZero();
+    (*particle)->setContactMapCumulativeFeaturesToZero();
 
   list<SimpleObstacle*> obstacles = m_obstacle->getObstacles();
   list<SimpleObstacle*>::iterator myObs;
   for( myObs=obstacles.begin(); myObs!=obstacles.end(); myObs++ )
-    (*myObs)->setContactMapFeaturesToZero();
+    (*myObs)->setContactMapCumulativeFeaturesToZero();
 }
 
 

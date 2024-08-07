@@ -161,7 +161,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
     	!GrainsExec::m_isReloaded )
     {
       computeParticlesForceAndAcceleration();
-      m_allcomponents.setAllContactMapFeaturesToZero();
+      m_allcomponents.setAllContactMapCumulativeFeaturesToZero();
     }
 
     if ( m_rank == 0 ) cout << "Initialization completed" << endl << endl;

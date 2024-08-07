@@ -184,12 +184,12 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
     // Compute the relative angular velocity
     w = *p0_->getAngularVelocity() - *p1_->getAngularVelocity();
     wn = ( w * normal ) * normal;
-    wt = w - wn ;
+    wt = w - wn ;  
 
     if ( contact_existed ) 
     {
-      // Rotate the cumulative spring torque to the new plane
-      *pspringRotFriction = qrot.rotateVector( *pspringRotFriction );
+      // Rotate the cumulative spring torque to the new plane    
+      *pspringRotFriction = qrot.rotateVector( *pspringRotFriction );      
     }
     *pspringRotFriction -= kr * dt * wt ;
     normFT = Norm( *pspringRotFriction );
@@ -200,7 +200,7 @@ void MemoryContactForceModel::performForcesCalculus( Component* p0_,
     }
     delM = *pspringRotFriction - m_etarpf * etar * wt;
   }
-  else delM = Vector3(0.);
+  else delM = 0.;
 
   // Finally, we update the cumulative motions in component p1_
   // If contact_existed was false, it also creates the contact in p1_

@@ -769,11 +769,11 @@ void CompositeObstacle::setContactMapToFalse()
 
 
 // ----------------------------------------------------------------------------
-// Set contact map entry features to zero */
-void CompositeObstacle::setContactMapFeaturesToZero()
+// Set contact map cumulative features to zero */
+void CompositeObstacle::setContactMapCumulativeFeaturesToZero()
 {
   cout << "Warning when calling CompositeObstacle::"
-       << "setContactMapFeaturesToZero() "
+       << "setContactMapCumulativeFeaturesToZero() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
   exit(10);

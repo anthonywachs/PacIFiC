@@ -620,10 +620,10 @@ void SimpleObstacle::setContactMapToFalse()
 
 
 // ----------------------------------------------------------------------------
-// Set contact map entry features to zero
-void SimpleObstacle::setContactMapFeaturesToZero()
+// Set contact map cumulative features to zero
+void SimpleObstacle::setContactMapCumulativeFeaturesToZero()
 {
-  Component::setContactMapFeaturesToZero();
+  Component::setContactMapCumulativeFeaturesToZero();
 }
 
 

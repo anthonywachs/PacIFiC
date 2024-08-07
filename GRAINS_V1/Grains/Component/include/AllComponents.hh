@@ -355,9 +355,9 @@ class AllComponents
     and all elementary obstacles */
     void updateAllContactMaps();
     
-    /** @brief Set all contact map entry features to zero in all particles
+    /** @brief Set all contact map cumulative features to zero in all particles
     and all elementary obstacles */
-    void setAllContactMapFeaturesToZero(); 
+    void setAllContactMapCumulativeFeaturesToZero(); 
     //@}
 
 

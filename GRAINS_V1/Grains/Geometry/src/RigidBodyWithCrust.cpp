@@ -650,7 +650,7 @@ bool RigidBodyWithCrust::isClose( RigidBodyWithCrust const& neighbor ) const
 
 // ----------------------------------------------------------------------------
 // Returns whether there is geometric contact with another rigid
-// body in the sens of ClosestPoint, i.e., if minimal distance
+// body in the sense of ClosestPoint, i.e., if minimal distance
 // between the shrunk rigid bodies < sum of the crust thicknesses
 bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
 {

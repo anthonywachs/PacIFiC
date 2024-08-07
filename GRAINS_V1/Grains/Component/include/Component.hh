@@ -195,8 +195,8 @@ class Component
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
     
-    /** @brief Sets contact map entry features to zero */
-    virtual void setContactMapFeaturesToZero();
+    /** @brief Sets contact map cumulative features to zero */
+    virtual void setContactMapCumulativeFeaturesToZero();
     
     /** @brief Sets the contact map 
     @param othermap the contact map to be copied */

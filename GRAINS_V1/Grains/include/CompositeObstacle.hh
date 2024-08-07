@@ -64,8 +64,8 @@ class CompositeObstacle : public Obstacle
     /** @brief Initializes all contact map entries to false */
     virtual void setContactMapToFalse();
     
-    /** @brief Set contact map entry features to zero */
-    virtual void setContactMapFeaturesToZero();            
+    /** @brief Set contact map cumulative features to zero */
+    virtual void setContactMapCumulativeFeaturesToZero();            
     //@}
 
 

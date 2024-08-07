@@ -826,16 +826,14 @@ void Component::writeContactMemory2014_binary( ostream &fileOut )
 
 
 // ---------------------------------------------------------------------------
-// Set all contact map entry features to zero in all particles
-// and all elementary obstacles
-void Component::setContactMapFeaturesToZero()
+// Sets contact map cumulative features to zero
+void Component::setContactMapCumulativeFeaturesToZero()
 {
   map<std::tuple<int,int,int>,std::tuple<bool, Vector3, Vector3, Vector3> >
     ::iterator it;
   for(it=m_contactMap.begin();it!=m_contactMap.end();++it)
   {
     get<1>(it->second).reset();
-    get<2>(it->second).reset();   
     get<3>(it->second).reset();        
   }
 }
