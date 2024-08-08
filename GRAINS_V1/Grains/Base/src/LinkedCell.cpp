@@ -1339,7 +1339,7 @@ void LinkedCell::Link( Obstacle* root_obstacle )
   for (myObs=m_allSimpleObstacles.begin();myObs!=m_allSimpleObstacles.end();
   	myObs++)
   {
-    RigidBody const* obstacleRigidBody = (*myObs)->getRigidBody();
+    RigidBodyWithCrust* obstacleRBWC = (*myObs)->getRigidBody();
     BBox const* obstacleBBox = (*myObs)->getObstacleBox();
     Vector3 cellBoxExtension( 0.5 * alpha * m_cellsize_X, 
     	0.5 * alpha * m_cellsize_Y,
@@ -1347,7 +1347,8 @@ void LinkedCell::Link( Obstacle* root_obstacle )
     Convex* cellBox = new Box( 2. * cellBoxExtension[X], 
     	2. * cellBoxExtension[Y],
     	2. * cellBoxExtension[Z] );
-    RigidBody cellBoxRigidBody( cellBox, cellPosition );
+    RigidBodyWithCrust cellBoxRBWC( cellBox, cellPosition, false,
+    	(*myObs)->getCrustThickness() );
 
     // Intersection of the cell with the obstacle
     for (int i=0; i<m_nb; i++)
@@ -1361,8 +1362,8 @@ void LinkedCell::Link( Obstacle* root_obstacle )
         if ( (*myObs)->isSTLObstacle() ) add = true; // Temporary, TO DO
 	else 
 	{
-	  cellBoxRigidBody.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
-	  add = cellBoxRigidBody.isContact( *obstacleRigidBody );	
+	  cellBoxRBWC.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
+	  add = cellBoxRBWC.isContact( *obstacleRBWC );	
 	}
 	
 	if ( add )
@@ -1373,9 +1374,9 @@ void LinkedCell::Link( Obstacle* root_obstacle )
       }
     }
 
-    // Rem: we do not explicitly destroy the convex convexCell because the
-    // destructor of CelRigidBody, object of type RigidBody, takes care of it
-    // (cf RigidBody.cpp)
+    // Rem: we do not explicitly destroy the convex cellBox because the
+    // destructor of cellBoxRBWC, object of type RigidBodyWithCrust, takes care
+    // of it (cf RigidBodyWithCrust.cpp)
   }
 }
 

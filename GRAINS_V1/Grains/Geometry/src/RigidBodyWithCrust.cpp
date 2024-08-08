@@ -47,7 +47,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( RigidBodyWithCrust const& rbwc )
 
 // ----------------------------------------------------------------------------
 // Constructor with input parameters, used by composite component 
-// whose own shape is not defined (composite = true) or to create component 
+// whose own shape is not defined ( composite = true ) or to create component 
 // from scratch in the code ( composite = false )
 RigidBodyWithCrust::RigidBodyWithCrust( Convex* convex_,
 	Transform const& position_,
@@ -357,10 +357,10 @@ PointContact RigidBodyWithCrust::ClosestPoint_ErreurHandling(
   if ( distance < EPSILON )
   {
       cout << "ERR RigidBodyWithCrust::ClosestPoint_ErreurHandling on "
-      << " Processor " << (GrainsExec::m_MPI ?
-	    GrainsExec::getComm()->get_rank() : 0 )
-	    << " between components " << id << " and " << id_neighbor
-	    << endl;
+      	<< " Processor " << (GrainsExec::m_MPI ?
+	GrainsExec::getComm()->get_rank() : 0 )
+	<< " between components " << id << " and " << id_neighbor
+	<< endl;
       throw ContactError();
   }
   else
@@ -434,8 +434,9 @@ PointContact ClosestPointSPHERE( RigidBodyWithCrust const& rbA,
     if ( - distance >= rdwA + rdwB )
     {
       cout << "ERR RigidBodyWithCrust::ClosestPointSPHERE on Processor "
-      	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
+	<< (GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< ": " << - distance << " & " << rdwA + rdwB << "\n";
+      cout << "Position: " << *pointA << " " << *pointB << endl;
       throw ContactError();
     }
 
@@ -667,7 +668,7 @@ bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
   	&& convexB->getConvexType() == DISC2D )
     return ( isContactSPHERE( *this, neighbor ) );
 
-  // De m�me pour une Intersection sphere-Box ou disque2D-Box
+  // In case one rigid body is a sphere/disc and the other rigid body is a box
   if ( convexA->getConvexType() == SPHERE && convexB->getConvexType() == BOX )
     return ( isContactSPHEREBOX( *this, neighbor ) );
   if ( convexA->getConvexType() == BOX && convexB->getConvexType() == SPHERE )
@@ -677,24 +678,20 @@ bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
   if ( convexA->getConvexType() == BOX && convexB->getConvexType() == DISC2D )
     return ( isContactSPHEREBOX( *this, neighbor ) );
 
-//   // General case
-//   // Comment: GJK has consistantly shown accuracy issues when 2 particles
-//   // overlap a lot. Instead returning a distance of zero to machine precision,
-//   // it returns a small number that sclaes with the size of the particle
-//   // Consequently, some particles are mistakenly inserted in the simulation
-//   // To avoid this, we now take the conservative rule of the max of 1/5 of the 
-//   // characteristic length and the crust thickness
-//   // IMPORTANT: this is a temporary fix
+  // General case
+  // Comment: GJK has consistantly shown accuracy issues when 2 particles
+  // overlap a lot. Instead returning a distance of zero to machine precision,
+  // it returns a small number that scales with the size of the particle
+  // Consequently, some particles are mistakenly inserted in the simulation
+  // This requires a fix i nthe future
   Point3 pointA, pointB;
   int nbIterGJK = 0;
   Transform const* a2w = this->getTransformWithCrust();
   Transform const* b2w = neighbor.getTransformWithCrust();  
-//  BBox bba = RigidBody::BoxRigidBody();
-//  BBox bbb = neighbor.RigidBody::BoxRigidBody();    
+   
   double distanceMin = (*this).m_crustThickness + neighbor.m_crustThickness
   	- EPSILON;
-//  double distanceMin = max((*this).m_crustThickness + neighbor.m_crustThickness,
-//  	( bba.lowestHalfLength() + bbb.lowestHalfLength() ) / 5. );
+
   double distance = closest_points( *m_convex, *(neighbor.m_convex), *a2w, *b2w,
 	pointA, pointB, nbIterGJK );
 

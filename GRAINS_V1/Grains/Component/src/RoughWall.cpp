@@ -22,7 +22,7 @@ RoughWall::RoughWall( DOMNode* root ) :
   // Name
   m_name = ReaderXML::getNodeAttr_String( root, "name" );
 
-  // Angular position of the rough wall
+  // Position of the rough wall
   m_geoRBWC->getTransform()->load( root );
 
   // Material
@@ -403,6 +403,7 @@ void RoughWall::periodicity( LinkedCell* LC )
       }    
     }
     
+    // Bi-periodicity    
     if ( m_periodic_directions.size() == 2 )
     {
       m = m_periodic_directions.front(); 
