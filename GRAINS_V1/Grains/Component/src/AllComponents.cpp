@@ -187,6 +187,8 @@ list<SimpleObstacle*> AllComponents::Move( double time,
 	LinkedCell const* LC )
 {
   double subinterval = 0.;
+  bool anyactive = false;
+  static bool anyactive_previousdt = false;
   
   try {
   // Particles motion
@@ -200,18 +202,30 @@ list<SimpleObstacle*> AllComponents::Move( double time,
   list<SimpleObstacle*> displacedObstacles;
   if ( !m_AllImposedVelocitiesOnObstacles.empty()
   	|| !m_AllImposedForcesOnObstacles.empty() )
-  {
-    // Update stress dependent imposed velocity
+  {            
+    anyactive = false;
+    
+    // Update stress dependent imposed velocity and check if any imposed 
+    // velocity/force is active over this time interval
     list<ObstacleImposedVelocity*>::iterator il;
     for (il=m_AllImposedVelocitiesOnObstacles.begin();
   	il!=m_AllImposedVelocitiesOnObstacles.end();il++)
       if ( (*il)->isActif( time - dt_obstacle, time, dt_obstacle, 
       	subinterval ) )
+      {
 	(*il)->updateImposedVelocity( LC );
-	           
+	anyactive = true;
+      }
+    list<ObstacleImposedForce*>::iterator il_F;
+    for (il_F=m_AllImposedForcesOnObstacles.begin();
+  	il_F!=m_AllImposedForcesOnObstacles.end() && !anyactive;il_F++) 
+      if ( (*il_F)->isActif( time - dt_obstacle, time, dt_obstacle, 
+      	subinterval ) )	anyactive = true;        
+    	           
     // Move obstacles
-    m_obstacle->resetKinematics();
-    displacedObstacles = m_obstacle->Move( time, dt_obstacle, false, false );
+    if ( anyactive || anyactive_previousdt ) m_obstacle->resetKinematics();
+    if ( anyactive ) displacedObstacles = 
+    	m_obstacle->Move( time, dt_obstacle, false, false );
 
     // Update imposed velocity kinematics
     for (il=m_AllImposedVelocitiesOnObstacles.begin();
@@ -221,7 +235,6 @@ list<SimpleObstacle*> AllComponents::Move( double time,
       else il++;
 
     // Update imposed force kinematics    
-    list<ObstacleImposedForce*>::iterator il_F;
     for (il_F=m_AllImposedForcesOnObstacles.begin();
   	il_F!=m_AllImposedForcesOnObstacles.end(); )
     {
