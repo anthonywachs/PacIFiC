@@ -60,7 +60,7 @@
     <!ELEMENT CollisionDetectionAlgorithm (CollisionDetection?, BoundingVolume?)>
     <!ELEMENT CollisionDetection EMPTY>
     <!ATTLIST CollisionDetection Type (GJK) "GJK">
-    <!ATTLIST CollisionDetection Tolerance CDATA "1e-15">
+    <!ATTLIST CollisionDetection Tolerance CDATA "1e-10">
     <!ATTLIST CollisionDetection Acceleration (ON|OFF) "OFF">
     <!ELEMENT BoundingVolume EMPTY>
     <!ATTLIST BoundingVolume Type (OFF|OBB|OBC) "OFF">
