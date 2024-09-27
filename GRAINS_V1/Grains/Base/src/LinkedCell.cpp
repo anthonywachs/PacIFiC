@@ -1334,6 +1334,7 @@ void LinkedCell::Link( Obstacle* root_obstacle )
   Transform cellPosition;
   double alpha = 2.;
   Point3 const* cg = NULL;
+  Point3 obscg;
   bool add = false;
 
   for (myObs=m_allSimpleObstacles.begin();myObs!=m_allSimpleObstacles.end();
@@ -1363,6 +1364,7 @@ void LinkedCell::Link( Obstacle* root_obstacle )
 	else 
 	{
 	  cellBoxRBWC.setOrigin( (*cg)[X], (*cg)[Y], (*cg)[Z] );
+	  cellBoxRBWC.initialize_transformWithCrust_to_notComputed();
 	  add = cellBoxRBWC.isContact( *obstacleRBWC );	
 	}
 	

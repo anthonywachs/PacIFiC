@@ -74,7 +74,7 @@ RigidBodyWithCrust::RigidBodyWithCrust( Convex* convex_,
   	1. : ( extent[Z] - m_crustThickness ) / extent[Z];
 
     // Transformation with crust
-    m_transformWithCrust = new Transform();
+    m_transformWithCrust = new Transform( position_ );
     m_transformWithCrust_computed = false ;  
   }
 }
@@ -683,7 +683,7 @@ bool RigidBodyWithCrust::isContact( RigidBodyWithCrust& neighbor )
   // overlap a lot. Instead returning a distance of zero to machine precision,
   // it returns a small number that scales with the size of the particle
   // Consequently, some particles are mistakenly inserted in the simulation
-  // This requires a fix i nthe future
+  // This requires a fix in the future
   Point3 pointA, pointB;
   int nbIterGJK = 0;
   Transform const* a2w = this->getTransformWithCrust();
