@@ -112,22 +112,18 @@ void OBB::writeShape ( ostream& fileOut ) const
 // ----------------------------------------------------------------------------
 #define TESTCASE1( i ) \
   ( fabs( cen[i] ) > \
-  ( a[i] + b[0]*fabs(ori[0][i]) + b[1]*fabs(ori[1][i]) + b[2]*fabs(ori[2][i]) ) )
+  ( a[i] + b[0]*oriAbs[i][0] + b[1]*oriAbs[i][1] + b[2]*oriAbs[i][2] ) )
 
 #define TESTCASE2( i ) \
-  ( fabs( cen[0]*ori[i][0] + cen[1]*ori[i][1] + cen[2]*ori[i][2] ) > \
-  ( b[i] + a[0]*fabs(ori[i][0]) + a[1]*fabs(ori[i][1]) + a[2]*fabs(ori[i][2]) ) )
-
-// #define TESTCASE3(i, j) \
-//   ( fabs( cen[(j+2)%3]*ori[i][(j+1)%3] - cen[(j+1)%3]*ori[i][(j+2)%3] ) > \
-//   ( a[(i+1)%3]*fabs(ori[(i+2)%3][j]) + a[(i+2)%3]*fabs(ori[(i+1)%3][j]) + \
-//     b[(j+1)%3]*fabs(ori[i][(j+2)%3]) + b[(j+2)%3]*fabs(ori[i][(j+1)%3]) ) )
+  ( fabs( cen[0]*ori[0][i] + cen[1]*ori[1][i] + cen[2]*ori[2][i] ) > \
+  ( b[i] + a[0]*oriAbs[0][i] + a[1]*oriAbs[1][i] + a[2]*oriAbs[2][i] ) )
 
 #define TESTCASE3(i, j) \
-  ( fabs( cen[(j+2)%3]*ori[i][(j+1)%3] - cen[(j+1)%3]*ori[i][(j+2)%3] ) > \
+  ( fabs( cen[(i+2)%3]*ori[(i+1)%3][j] - cen[(i+1)%3]*ori[(i+2)%3][j] ) > \
   ( a[(i+1)%3]*oriAbs[(i+2)%3][j] + a[(i+2)%3]*oriAbs[(i+1)%3][j] + \
     b[(j+1)%3]*oriAbs[i][(j+2)%3] + b[(j+2)%3]*oriAbs[i][(j+1)%3] ) )
 
+  
 // Returns whether two OBBs are in contact
 bool isContactBVolume( OBB const& obbA,
                        OBB const& obbB,
@@ -136,12 +132,18 @@ bool isContactBVolume( OBB const& obbA,
 {
   Vector3 const& a = obbA.getExtent();
   Vector3 const& b = obbB.getExtent();
-  Point3 const& cen = transpose( a2w.getBasis() ) * 
-                      ( *( b2w.getOrigin() ) - *( a2w.getOrigin() ) );
-  Matrix const& ori = transpose( b2w.getBasis() ) * a2w.getBasis();
-  Matrix const oriAbs( fabs(ori[0][0]), fabs(ori[0][1]), fabs(ori[0][2]),
-                       fabs(ori[1][0]), fabs(ori[1][1]), fabs(ori[1][2]),
-                       fabs(ori[2][0]), fabs(ori[2][1]), fabs(ori[2][2]) );
+  Matrix const& a2wT = transpose( a2w.getBasis() );
+  Point3 const& cen = a2wT * ( *( b2w.getOrigin() ) - *( a2w.getOrigin() ) );
+  Matrix const& ori = a2wT * b2w.getBasis();
+  Matrix const oriAbs( fabs(ori[0][0]) + LOWEPS,
+                       fabs(ori[0][1]) + LOWEPS,
+                       fabs(ori[0][2]) + LOWEPS,
+                       fabs(ori[1][0]) + LOWEPS, 
+                       fabs(ori[1][1]) + LOWEPS, 
+                       fabs(ori[1][2]) + LOWEPS,
+                       fabs(ori[2][0]) + LOWEPS, 
+                       fabs(ori[2][1]) + LOWEPS, 
+                       fabs(ori[2][2]) + LOWEPS );
 
   // CASE 1: ( three of them )
   if TESTCASE1( 0 ) return ( false );
