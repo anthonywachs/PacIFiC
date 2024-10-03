@@ -113,7 +113,10 @@ class Disc : public Convex
     
     /** @ brief Returns whether a point lies inside the disc
     @param pt point */
-    bool isIn( Point3 const& pt ) const; 
+    bool isIn( Point3 const& pt ) const;
+
+    /** @ Returns the bounding volume to disc */
+    BVolume* computeBVolume( unsigned int type ) const;
     
     /** @brief Performs advanced comparison of the two discs and returns
     whether they match

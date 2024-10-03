@@ -306,17 +306,6 @@ PointContact RigidBodyWithCrust::ClosestPoint( RigidBodyWithCrust &neighbor )
     // otherwise no contact
     distance -= m_crustThickness + neighbor.m_crustThickness;
 
-    // if ( distance < 0. && isContactOBB( *this, neighbor ) == true )
-    // {
-    //   std::cout << "T" << endl;
-    //   // bool cnt = isContactOBB2( *this, neighbor );
-    // }
-    // if ( distance < 0. && isContactOBB( *this, neighbor ) == false )
-    // {
-    //   std::cout << "F" << endl;
-    //   bool cnt = isContactOBB2( *this, neighbor );
-    // }
-
     return ( PointContact( contact, overlap_vector, distance, nbIterGJK ) );
   }
   else

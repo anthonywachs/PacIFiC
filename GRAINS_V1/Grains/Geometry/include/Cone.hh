@@ -113,6 +113,9 @@ class Cone : public Convex {
     /** @brief Returns whether a point lies inside the cone
     @param pt point */
     bool isIn( Point3 const& pt ) const; 
+
+    /** @ Returns the bounding volume to cone */
+    BVolume* computeBVolume( unsigned int type ) const;
     
     /** @brief Performs advanced comparison of the two cones and returns
     whether they match

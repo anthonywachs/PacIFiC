@@ -627,17 +627,17 @@ double closest_points_GJK_SV2( Convex const& a,
   
 
   // Vectors and initial search direction
-  Vector3 wVec = a2w( a.support( Vector3Null ) ) - 
+  Vector3 vVec = a2w( a.support( Vector3Null ) ) - 
                  b2w( b.support( Vector3Null ) );
-  Vector3 vVec = wVec;
-  Vector3 dVec = wVec;
+  Vector3 wVec;
+  Vector3 dVec;
   
   
   /* Initialise simplex */
   double dist = Norm( vVec );
   gkSimplex s = { 1, { 0. } };
   for (int t = 0; t < 3; ++t)
-    s.vrtx[0][t] = wVec[t];
+    s.vrtx[0][t] = vVec[t];
 
 
   /* Begin GJK iteration */
@@ -663,6 +663,7 @@ double closest_points_GJK_SV2( Convex const& a,
            b2w( b.support( (  dVec ) * b2w.getBasis() ) );
     
     // termination criteria
+    mu = dist - vVec * wVec / dist;
     if ( mu < dist * relError ||
          mu < absError )
     {

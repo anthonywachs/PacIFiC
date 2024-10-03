@@ -1,5 +1,3 @@
-#include "OBB.hh"
-#include "OBC.hh"
 #include "Rectangle.hh"
 
 

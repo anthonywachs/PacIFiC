@@ -2,9 +2,6 @@
 #include "GrainsBuilderFactory.hh"
 #include "Box.hh"
 #include "BBox.hh"
-#include "BVolume.hh"
-#include "OBB.hh"
-#include "OBC.hh"
 #include <sstream>
 
 // Static attribute

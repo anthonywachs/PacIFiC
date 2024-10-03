@@ -145,7 +145,7 @@ Transform Segment::computeTransform( Vector3 const& v, Point3 const& gc )
 	normxz = sqrt( v[X] * v[X] + v[Z] * v[Z] );
   double bx = fabs( v[X] );
 
-  // Angle pr la rotation par rapport à Z
+  // Angle pr la rotation par rapport ï¿½ Z
   double angleZ = 0.;
   if ( normxy > 1.e-12 )
   { 
@@ -161,7 +161,7 @@ Transform Segment::computeTransform( Vector3 const& v, Point3 const& gc )
     }
   }
    
-  // Angle pr la rotation par rapport à Y 
+  // Angle pr la rotation par rapport ï¿½ Y 
   double angleY = 0.;
   if ( normxz > 1.e-12 )
   {
@@ -291,6 +291,22 @@ bool Segment::isIn( Point3 const& pt ) const
   return ( pt[X] <= m_halflength && pt[X] >= - m_halflength );
 }    
   
+
+
+
+// ----------------------------------------------------------------------------
+// Returns the bounding volume to segment
+BVolume* Segment::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( 2. * m_halflength, 0., 0. ), Matrix() );
+  else if ( type == 2 ) // OBC
+    bvol = new OBC( 0., 2. * m_halflength, Vector3( 1., 0., 0. ) );
+
+  return( bvol );
+}
+
 
 
 

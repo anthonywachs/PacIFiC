@@ -345,6 +345,25 @@ bool Cone::isIn( Point3 const& pt ) const
 
 
 // ----------------------------------------------------------------------------
+// Returns the bounding volume to cone
+BVolume* Cone::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( m_bottomRadius, 
+                             4. * m_quarterHeight, 
+                             m_bottomRadius ), 
+                    Matrix() );
+  else if ( type == 2 ) // OBC
+    bvol = new OBC( m_bottomRadius, 4. * m_quarterHeight, Vector3(0., 1., 0.) );
+
+  return( bvol );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Performs advanced comparison of the two cones and returns whether 
 // they match
 bool Cone::equalType_level2( Convex const* other ) const

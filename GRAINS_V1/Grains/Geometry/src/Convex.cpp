@@ -65,13 +65,15 @@ BBox Convex::bbox( Transform const& t ) const
 // Returns the convex shape bounding volume
 BVolume* Convex::computeBVolume( unsigned int type ) const
 {
-  cout << "Warning for this Convex (" <<
-           this->getConvexType() <<
-           ") method Convex::computeBVolume() " << 
-           "is not yet implemented !\n";
-//        << "Need for an assistance ! Stop running !\n";
-//   exit(10);
-
+  if ( type != 0 )
+  {
+    cout << "Warning for this Convex (" 
+         << this->getConvexType() 
+         << ") method Convex::computeBVolume() "
+         << "is not yet implemented!\n"
+         << "Changing the bounding volume collision detection OFF!\n";
+    GrainsExec::m_colDetBoundingVolume = 0;
+  }
   return( nullptr );
 }
 

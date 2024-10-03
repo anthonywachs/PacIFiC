@@ -280,6 +280,22 @@ bool Disc::isIn( Point3 const& pt ) const
 
 
 // ----------------------------------------------------------------------------
+// Returns the bounding volume to disc
+BVolume* Disc::computeBVolume( unsigned int type ) const
+{
+  BVolume* bvol = NULL;
+  if ( type == 1 ) // OBB
+    bvol = new OBB( Vector3( m_radius, m_radius, 0. ), Matrix() );
+  else if ( type == 2 ) // OBC
+    bvol = new OBC( m_radius, 0., Vector3( 0., 0., 1. ) );
+
+  return( bvol );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
 // Performs advanced comparison of the two discs and returns whether 
 // they match
 bool Disc::equalType_level2( Convex const* other ) const
