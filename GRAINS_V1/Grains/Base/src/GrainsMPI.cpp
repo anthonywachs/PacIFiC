@@ -323,6 +323,7 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
   Quaternion qrot;    
   int ptype = - 1;
   size_t npositions = m_insertion_position->size();
+  size_t nangpositions = m_insertion_angular_position->size();  
   Particle *particle = NULL;    
   
   if ( insert_counter == 0 )
@@ -351,10 +352,18 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
       // Rem: we compose to the right by a pure rotation as the particle
       // already has a non-zero position that we do not want to change (and
       // that we would change if we would compose to the left)
-      if ( m_init_angpos == IAP_RANDOM )
+      if ( m_init_angpos != IAP_FIXED )
       {
-        if ( m_rank == 0 ) mrot = GrainsExec::RandomRotationMatrix( 
-	  	m_dimension );
+        if ( m_rank == 0 ) 
+	{
+	  if ( m_init_angpos == IAP_RANDOM ) 
+	    mrot = GrainsExec::RandomRotationMatrix( m_dimension );
+	  else // m_init_angpos == IAP_FILE
+	  {
+	    m_il_sap = m_insertion_angular_position->begin();
+	    mrot = *m_il_sap;
+	  }
+	} 
         mrot = m_wrapper->Broadcast_Matrix( mrot );
         trot.setBasis( mrot );
         particle->composePositionRightByTransform( trot );
@@ -396,7 +405,8 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
         else
           m_allcomponents.DeleteAndDestroyWait();
 
-	if ( npositions ) m_insertion_position->erase( il_sp );
+	if ( npositions ) m_insertion_position->erase( m_il_sp );
+	if ( nangpositions ) m_insertion_angular_position->erase( m_il_sap );
       }
     }
   }
@@ -434,6 +444,11 @@ void GrainsMPI::InsertCreateNewParticles()
     else error = setPositionParticlesFromFile();
   }
   if ( error )  grainsAbort();
+
+  // Set angular particle positions from file
+  if ( m_angular_position != "" )
+    error = setAngularPositionParticlesFromFile();
+  if ( error ) grainsAbort();  
 
   // Insertion at initial time
   size_t nbPW = 0 ;
@@ -474,7 +489,23 @@ size_t GrainsMPI::setPositionParticlesFromFile()
   size_t error = 0;
   
   // Note: only the master proc reads and stores positions  
-  if ( m_rank == 0 ) error = GrainsMPI::setPositionParticlesFromFile();
+  if ( m_rank == 0 ) error = Grains::setPositionParticlesFromFile();
+  error = m_wrapper->Broadcast_UNSIGNED_INT( error );
+
+  return ( error );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets angular particle initial positions from a file
+size_t GrainsMPI::setAngularPositionParticlesFromFile()
+{
+  size_t error = 0;
+  
+  // Note: only the master proc reads and stores positions  
+  if ( m_rank == 0 ) error = Grains::setAngularPositionParticlesFromFile();
   error = m_wrapper->Broadcast_UNSIGNED_INT( error );
 
   return ( error );

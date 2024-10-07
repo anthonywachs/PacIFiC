@@ -53,6 +53,9 @@ class GrainsMPI : virtual public Grains
 
     /** @brief Sets particle initial positions from a file */
     virtual size_t setPositionParticlesFromFile();
+    
+    /** @brief Sets angular particle initial positions from a file */
+    virtual size_t setAngularPositionParticlesFromFile();     
   
     /** @brief Sets particle initial position with a structured array */
     virtual size_t setPositionParticlesArray();

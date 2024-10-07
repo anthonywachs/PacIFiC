@@ -136,9 +136,6 @@ class Sphere : public Convex
     @param pt point */
     bool isIn( Point3 const& pt ) const;
     
-    /** @ Returns the bounding volume to sphere */
-    BVolume* computeBVolume( unsigned int type ) const;
-    
     /** @brief Performs advanced comparison of the two spheres and returns
     whether they match
     @param other the other sphere */

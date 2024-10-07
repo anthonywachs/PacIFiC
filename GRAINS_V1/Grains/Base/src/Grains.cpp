@@ -38,6 +38,7 @@ Grains::Grains()
   , m_randomseed( RGS_DEFAULT )
   , m_InsertionArray( NULL )
   , m_insertion_position( NULL )
+  , m_insertion_angular_position( NULL )  
   , m_insertion_frequency( 1 )
   , m_force_insertion( false )
   , m_RandomMotionCoefTrans( 0. )
@@ -50,6 +51,7 @@ Grains::Grains()
 {
   if ( GrainsBuilderFactory::getContext() == DIM_2 ) m_dimension = 2;
   m_insertion_position = new list<Point3>;
+  m_insertion_angular_position = new list<Matrix>;
 }
 
 
@@ -67,6 +69,8 @@ Grains::~Grains()
   GrainsExec::GarbageCollector();
   m_insertion_position->clear();
   delete m_insertion_position;
+  m_insertion_angular_position->clear();
+  delete m_insertion_angular_position;  
 }
 
 
@@ -1169,10 +1173,18 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
       {
         string type = ReaderXML::getNodeAttr_String( nInitAngPos, "Type" );
 	if ( type == "Random" ) m_init_angpos = IAP_RANDOM;
+	else if ( type == "File" ) 
+	{
+	  m_init_angpos = IAP_FILE;
+	  m_angular_position = 
+	    ReaderXML::getNodeAttr_String( nInitAngPos, "Name" );
+	}
       }
       if ( m_rank == 0 ) cout << GrainsExec::m_shift9 << "Initial angular"
       	" position = " << ( m_init_angpos == IAP_FIXED ? "Fixed as defined in "
-		"input file particle class" : "Random" ) << endl;
+		"input file particle class" : ( 
+		m_init_angpos == IAP_RANDOM ? "Random" : "Fixed defined in "
+		"file " + m_angular_position ) ) << endl;
 
 
       // Random generator seed
@@ -1689,6 +1701,11 @@ void Grains::InsertCreateNewParticles()
     else error = setPositionParticlesFromFile();
   }
   if ( error ) grainsAbort();
+  
+  // Set angular particle positions from file
+  if ( m_angular_position != "" )
+    error = setAngularPositionParticlesFromFile();
+  if ( error ) grainsAbort();  
 
   // Insertion at initial time
   if ( m_insertion_mode == IM_INITIALTIME )
@@ -1728,16 +1745,16 @@ Point3 Grains::getInsertionPoint()
   if ( !m_insertion_position->empty() )
   {
     // If order, pick the first position
-    il_sp = m_insertion_position->begin();    
+    m_il_sp = m_insertion_position->begin();    
     
     // If random, pick a random position in the list
     if ( m_insertion_order == PM_RANDOM )  
     {
       double n = double(random()) / double(INT_MAX);
       size_t shift = size_t( n * double(m_insertion_position->size()) );
-      std::advance( il_sp, shift );      
+      std::advance( m_il_sp, shift );      
     }
-    P = *il_sp; 
+    P = *m_il_sp; 
   }
   // Insertion windows
   else
@@ -1857,6 +1874,7 @@ bool Grains::insertParticle( PullMode const& mode )
   Vector3 vtrans, vrot ;
   Quaternion qrot;
   size_t npositions = m_insertion_position->size();
+  size_t nangpositions = m_insertion_angular_position->size();  
 
   if ( insert_counter == 0 )
   {
@@ -1870,10 +1888,16 @@ bool Grains::insertParticle( PullMode const& mode )
       // Rem: we compose to the right by a pure rotation as the particle
       // already has a non-zero position that we do not want to change (and
       // that we would change if we would compose to the left)
-      if ( m_init_angpos == IAP_RANDOM )
+      if ( m_init_angpos != IAP_FIXED )
       {
         Transform trot;
-        trot.setBasis( GrainsExec::RandomRotationMatrix( m_dimension ) );
+	if ( m_init_angpos == IAP_RANDOM ) 
+          trot.setBasis( GrainsExec::RandomRotationMatrix( m_dimension ) );
+	else // m_init_angpos == IAP_FILE
+	{
+	  m_il_sap = m_insertion_angular_position->begin();
+	  trot.setBasis( *m_il_sap );
+	}
         particle->composePositionRightByTransform( trot );
       }
 
@@ -1899,7 +1923,8 @@ bool Grains::insertParticle( PullMode const& mode )
         m_allcomponents.WaitToActive();
 	particle->InitializeForce( true );
 	particle->computeAcceleration( m_time );
-	if ( npositions ) m_insertion_position->erase( il_sp );
+	if ( npositions ) m_insertion_position->erase( m_il_sp );
+	if ( nangpositions ) m_insertion_angular_position->erase( m_il_sap );	
       }
     }
   }
@@ -1992,6 +2017,7 @@ size_t Grains::setPositionParticlesFromFile()
     for (il=m_newParticles.cbegin();il!=m_newParticles.cend();il++)
       nnewpart += il->second;
     while ( filePos >> position ) ++npos;
+    filePos.close();
     if ( nnewpart != npos )
     {
       cout << "ERR: number of new particles to insert is different from the"
@@ -2003,15 +2029,62 @@ size_t Grains::setPositionParticlesFromFile()
     else
     {
       // Read positions from the file and add them to the list
-      filePos.seekg( 0, filePos.beg );
+      filePos.open( m_position.c_str() );
       while ( filePos >> position ) m_insertion_position->push_back( position );
       filePos.close();
+    }
+  }
+
+  return ( error );
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets angular particle initial positions from a file
+size_t Grains::setAngularPositionParticlesFromFile()
+{
+  size_t nnewpart = 0, npos = 0, error = 0;
+  list< pair<Particle*,size_t> >::const_iterator il;
+  Matrix mat;
+  ifstream fileAngPos( m_angular_position.c_str() );
+
+  // Check that the file exists
+  if ( !fileAngPos.is_open() )
+  {
+    cout << "ERR : File " << m_angular_position << " does not exist !" << endl;
+    error = 1;
+  }
+
+  // Check that the number of positions in the file equals the number of 
+  // new particles to insert
+  if ( !error )
+  {
+    for (il=m_newParticles.cbegin();il!=m_newParticles.cend();il++)
+      nnewpart += il->second;
+    while ( fileAngPos >> mat ) ++npos;
+    fileAngPos.close();
+    if ( nnewpart != npos )
+    {
+      cout << "ERR: number of new particles to insert is different from the"
+    	<< " number of angular positions in file " << m_angular_position 
+	<< " : " << nnewpart << " != " << npos << endl;
+      fileAngPos.close(); 
+      error = 1;
+    }
+    else
+    {
+      // Read angular positions from the file and add them to the list
+      fileAngPos.open( m_angular_position.c_str() ); 
+      while ( fileAngPos >> mat ) 
+        m_insertion_angular_position->push_back( mat );
+      fileAngPos.close();
     }
   }
   
   return ( error );
 }
-
 
 
 

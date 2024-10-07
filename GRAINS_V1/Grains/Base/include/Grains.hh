@@ -40,7 +40,8 @@ enum InitialVelocity
 enum InitialAngularPosition 
 {
   IAP_FIXED, /**< fixed as defined in the particle class in the input file */
-  IAP_RANDOM /**< randomly assigned */
+  IAP_RANDOM, /**< randomly assigned */
+  IAP_FILE /**< fixed defined by an external file */
 };
 
 
@@ -158,13 +159,18 @@ class Grains : public ComputingTime, public SolverComputingTime
     RandomGeneratorSeed m_randomseed; /**< Random generator seed */
     vector<Window> m_insertion_windows; /**< Insertion windows */  
     string m_position; /**< External position file name or structured array */
+    string m_angular_position; /**< External angular position file name */    
     struct StructArrayInsertion* m_InsertionArray; /**< Structured array 
     	insertion features */   
     list< pair<Particle*,size_t> > m_newParticles; /**< types of new particles 
     	to be inserted */
     list<Point3>* m_insertion_position; /**< list of insertion positions */
-    list<Point3>::iterator il_sp; /**< iterator on the selected position in
+    list<Matrix>* m_insertion_angular_position; /**< list of insertion angular 
+    	positions */    
+    list<Point3>::iterator m_il_sp; /**< iterator on the selected position in
     	m_insertion_position */
+    list<Matrix>::iterator m_il_sap; /**< iterator on the selected angular 
+    	position in m_insertion_angular_position */	
     size_t m_insertion_frequency; /**< Insertion attempted every 
     	m_insertion_frequency time steps */
     bool m_force_insertion; /**< Force insertion even in case of contact with
@@ -225,6 +231,9 @@ class Grains : public ComputingTime, public SolverComputingTime
   
     /** @brief Sets particle initial positions from a file */
     virtual size_t setPositionParticlesFromFile();
+
+    /** @brief Sets angular particle initial positions from a file */
+    virtual size_t setAngularPositionParticlesFromFile();    
   
     /** @brief Sets particle initial position with a structured array
     @param mode insertion order */
