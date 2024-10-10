@@ -116,12 +116,13 @@ MPIFLAGS    := -L$(MPILIB) $(LIBMPI_FOR_GRAINS___)
 
 
 # Zlib
-ZLIB := /usr/lib$(GRAINS_BITS_EXT)
+ZINC := $(GRAINS_Z_INCDIR)
+ZLIB := $(GRAINS_Z_LIBDIR)
 ZFLAGS := -L$(ZLIB) -lz
 
 
 # Compiler flags
-INCFLAGS  := $(INCDIR:%=-I%) $(XERCESINC:%=-I%) $(MPIINC:%=-I%)
+INCFLAGS  := $(INCDIR:%=-I%) $(XERCESINC:%=-I%) $(MPIINC:%=-I%) $(ZINC:%=-I%)
 COMPFLAGS := $(DEBUG) $(INCFLAGS)
 
 
@@ -133,7 +134,7 @@ COMPFLAGS := $(DEBUG) $(INCFLAGS)
 all : grains Basilisk
 
 grains : MESS CPINC START XML GEOM COMPO BASE TIME PP FLUID
-	$(LINK) -shared -Wl,-soname,libgrains.so $(MPIFLAGS) $(ZFLAGS) -o $(LIBDIR)/libgrains.so $(OBJS_XML) $(OBJS_GEOM) $(OBJS_COMPO) $(OBJS_BASE) $(OBJS_TIME) $(OBJS_PP) $(OBJS_FLUID) 
+	$(LINK) -shared -Wl,-soname,libgrains.so $(MPIFLAGS) $(ZFLAGS) -o $(LIBDIR)/libgrains.so $(OBJS_XML) $(OBJS_GEOM) $(OBJS_COMPO) $(OBJS_BASE) $(OBJS_TIME) $(OBJS_PP) $(OBJS_FLUID) $(MPIFLAGS) $(ZFLAGS) $(XERCESFLAGS) 
 	@echo 'Compilation is complete'
 	@echo '--------------------------------'
 	@echo 'Library libgrains.so generated !'
@@ -187,7 +188,7 @@ CPINC  :
 
 Basilisk :
 	@echo 'Compiling $(SRCDIRBAS)/InterfaceGrains3DBasilisk.cpp'
-	$(COMP) $(COMPFLAGS) -shared $(SRCDIRBAS)/InterfaceGrains3DBasilisk.cpp -L$(LIBDIR) -lgrains $(XERCESFLAGS) -o $(LIBDIR)/libInterfaceGrains3DBasilisk.so
+	$(COMP) $(COMPFLAGS) -shared $(SRCDIRBAS)/InterfaceGrains3DBasilisk.cpp -L$(LIBDIR) -lgrains -o $(LIBDIR)/libInterfaceGrains3DBasilisk.so
 	rm -f $(BASILISK_DLMFD)/InterfaceGrains3DBasilisk.h
 	ln -s $(GRAINS_ROOT)/InterfaceCBasilisk/include/InterfaceGrains3DBasilisk.h $(BASILISK_DLMFD)/InterfaceGrains3DBasilisk.h
 	@echo '---------------------------------------------------'
