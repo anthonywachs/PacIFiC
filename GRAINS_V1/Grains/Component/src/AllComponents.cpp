@@ -2415,3 +2415,25 @@ void AllComponents::setParticleMaxIDObstacleMinID(
 
   m_obstacle->setMinIDnumber();
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets time integration scheme in all particles using the macro variable 
+// GrainsExec::m_TIScheme
+void AllComponents::setTimeIntegrationScheme()
+{
+  list<Particle*>::iterator particle;
+  vector<Particle*>::iterator ivp;
+
+  // Reference types
+  for (ivp=m_ReferenceParticles.begin();
+  	ivp!=m_ReferenceParticles.end(); ivp++)
+    (*ivp)->setTimeIntegrationScheme();
+
+  // Active particles
+  for (particle=m_ActiveParticles.begin();
+  	particle!=m_ActiveParticles.end(); particle++)
+    (*particle)->setTimeIntegrationScheme(); 
+}

@@ -424,3 +424,14 @@ size_t ParticleKinematics::get_numberOfBytes() const
   return ( solid::Group3::m_sizeofGroup3 + 2 * Quaternion::m_sizeofQuaternion
   	+  m_timeIntegrationScheme->get_numberOfBytes() ); 
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets time integration scheme using the macro variable GrainsExec::m_TIScheme
+void ParticleKinematics::setTimeIntegrationScheme()
+{
+  if ( m_timeIntegrationScheme ) delete m_timeIntegrationScheme;  
+  m_timeIntegrationScheme = TimeIntegratorBuilderFactory::create();
+}

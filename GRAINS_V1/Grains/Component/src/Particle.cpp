@@ -1917,3 +1917,13 @@ bool Particle::storePPForce( Component const* othercomp ) const
   
   return ( store );
 }
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets time integration scheme using the macro variable GrainsExec::m_TIScheme
+void Particle::setTimeIntegrationScheme()
+{
+  m_kinematics->setTimeIntegrationScheme();
+}

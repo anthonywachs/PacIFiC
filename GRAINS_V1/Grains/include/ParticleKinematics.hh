@@ -172,7 +172,11 @@ class ParticleKinematics : public Kinematics
     @param tab 1D array of 4 vectors containing translational velocity, angular
     velocity, variation of translational velocity and variation of angular 
     velocity */
-    void setKinematicsNm2( double const* tab ); 
+    void setKinematicsNm2( double const* tab );
+    
+    /** @brief Sets time integration scheme using the macro variable
+    GrainsExec::m_TIScheme */
+    void setTimeIntegrationScheme();     
     //@}
 
   

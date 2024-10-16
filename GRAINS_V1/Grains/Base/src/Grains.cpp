@@ -1022,6 +1022,8 @@ void Grains::AdditionalFeatures( DOMElement* rootElement )
     if ( nTimeIntegration )
       GrainsExec::m_TIScheme = ReaderXML::getNodeAttr_String( nTimeIntegration,
     		"Type" );
+    if ( GrainsExec::m_TIScheme != "SecondOrderLeapFrog" )
+      m_allcomponents.setTimeIntegrationScheme();
     if ( m_rank == 0 ) cout << GrainsExec::m_shift6 <<
       	"Time integration scheme = " << GrainsExec::m_TIScheme << endl;
 

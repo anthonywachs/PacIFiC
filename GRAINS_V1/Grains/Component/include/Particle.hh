@@ -301,9 +301,13 @@ class Particle : public Component
     @param transform_ transformation */
     virtual void setTransform( Transform const& transform_ );
 
-    /** @brief Sets the pointer to the particle's kinematics
+    /** @brief Sets the pointer to the particle kinematics
     @param pkine transformation */
     void setKinematics( ParticleKinematics* pkine );
+    
+    /** @brief Sets time integration scheme using the macro variable
+    GrainsExec::m_TIScheme */
+    void setTimeIntegrationScheme();     
     //@}
 
 

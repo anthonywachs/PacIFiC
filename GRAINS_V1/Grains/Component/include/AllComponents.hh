@@ -358,6 +358,10 @@ class AllComponents
     /** @brief Set all contact map cumulative features to zero in all particles
     and all elementary obstacles */
     void setAllContactMapCumulativeFeaturesToZero(); 
+    
+    /** @brief Sets time integration scheme in all particles using the macro 
+    variable GrainsExec::m_TIScheme */
+    void setTimeIntegrationScheme();     
     //@}
 
 

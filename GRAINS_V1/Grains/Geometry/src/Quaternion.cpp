@@ -500,7 +500,7 @@ bool Quaternion::operator != ( Quaternion const& rhs )
 // Output operator
 ostream& operator << ( ostream& fileOut, Quaternion const& q )
 {
-  fileOut << q.m_w << '\t' << q.m_vqt;
+  fileOut << q.m_w << " " << q.m_vqt;
   return ( fileOut );
 }
 

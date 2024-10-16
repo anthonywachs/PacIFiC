@@ -414,7 +414,6 @@ void RawDataPostProcessingWriter::one_output_Standard( double const& time,
     m_angular_velocity_x << stime;
     m_angular_velocity_y << stime;
     m_angular_velocity_z << stime;
-    m_angular_velocity_z << stime;
   }
   
   // Extract the active particles that are not periodic clones
