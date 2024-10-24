@@ -1,4 +1,6 @@
 #include "SecondOrderLeapFrog.hh"
+#include "ParticleKinematics.hh"
+#include "Particle.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -39,18 +41,29 @@ TimeIntegrator* SecondOrderLeapFrog::clone() const
 
 // ----------------------------------------------------------------------------
 // Computes the new velocity and position at time t+dt
-void SecondOrderLeapFrog::Move( Vector3 const& dUdt, Vector3& vtrans, 
-	Vector3& transMotion, Vector3 const& dOmegadt,
+void SecondOrderLeapFrog::Move( Particle* particle, ParticleKinematics* kine,
+	double const& coupling_factor, Vector3 const& torque_bf,
+	Vector3& vtrans, Vector3& transMotion, 
 	Vector3& vrot, Vector3& meanVRot, double const& dt_particle_vel, 
     	double const& dt_particle_disp )
 {
-  // Translational velocity and motion
-  vtrans += dUdt * dt_particle_vel;
-  transMotion = vtrans * dt_particle_disp;
-
-  // Angular velocity and motion
-  vrot += dOmegadt * dt_particle_vel;
-  meanVRot = vrot;    
+  // Translational velocity and motion 
+  vtrans += ( *(particle->getForce()) / 
+  	( particle->getMass() * coupling_factor ) ) * dt_particle_vel;
+  transMotion = vtrans * dt_particle_disp; 
+  
+  // Angular velocity integrated by a Strong Stability Preserving RK3  
+  Vector3 K1, K2, K3;
+  kine->computeAngularAccelerationBodyFixed( particle, torque_bf, vrot, K1 );
+  K1 *= dt_particle_vel;
+  kine->computeAngularAccelerationBodyFixed( particle, torque_bf, vrot + K1, 
+  	K2 );
+  K2 *= dt_particle_vel;  
+  kine->computeAngularAccelerationBodyFixed( particle, torque_bf, 
+  	vrot + 0.25 * ( K1 + K2 ), K3 ); 
+  K3 *= dt_particle_vel;
+  vrot += ( K1 + K2 + 4. * K3 ) / 6.;
+  meanVRot = vrot;	  
 }
 
 
@@ -58,14 +71,26 @@ void SecondOrderLeapFrog::Move( Vector3 const& dUdt, Vector3& vtrans,
 
 // ----------------------------------------------------------------------------
 // Advances velocity over dt_particle_vel
-void SecondOrderLeapFrog::advanceVelocity( Vector3 const& dUdt, Vector3& vtrans,
-	Vector3 const& dOmegadt, Vector3& vrot, double const& dt_particle_vel )
+void SecondOrderLeapFrog::advanceVelocity( Particle* particle, 
+	ParticleKinematics* kine, double const& coupling_factor, 
+	Vector3 const& torque_bf, Vector3& vtrans, Vector3& vrot, 
+	double const& dt_particle_vel )
 {
-  // Translational velocity and motion
-  vtrans += dUdt * dt_particle_vel;
-
-  // Angular velocity and motion
-  vrot += dOmegadt * dt_particle_vel;
+  // Translational velocity
+  vtrans += ( *(particle->getForce()) / 
+  	( particle->getMass() * coupling_factor ) ) * dt_particle_vel;
+	
+  // Angular velocity integrated by a Strong Stability Preserving RK3
+  Vector3 K1, K2, K3;
+  kine->computeAngularAccelerationBodyFixed( particle, torque_bf, vrot, K1 );
+  K1 *= dt_particle_vel;
+  kine->computeAngularAccelerationBodyFixed( particle, torque_bf, vrot + K1, 
+  	K2 );
+  K2 *= dt_particle_vel;  
+  kine->computeAngularAccelerationBodyFixed( particle, torque_bf, 
+  	vrot + 0.25 * ( K1 + K2 ), K3 ); 
+  K3 *= dt_particle_vel;
+  vrot += ( K1 + K2 + 4. * K3 ) / 6.;	  	  
 }
 
 
@@ -75,12 +100,12 @@ void SecondOrderLeapFrog::advanceVelocity( Vector3 const& dUdt, Vector3& vtrans,
 // Writes time integrator data in an output stream with a high
 // precision and 2014 format
 void SecondOrderLeapFrog::writeParticleKinematics2014( ostream& fileOut,
-    	Vector3 const& dUdt, Vector3 const& dOmegadt ) const
+    	Particle const* particle ) const
 {
   fileOut << " "; 
-  dUdt.writeGroup3( fileOut ); 
+  particle->getForce()->writeGroup3( fileOut ); 
   fileOut << " "; 
-  dOmegadt.writeGroup3( fileOut );   
+  particle->getTorque()->writeGroup3( fileOut );   
 } 
 
 
@@ -89,10 +114,11 @@ void SecondOrderLeapFrog::writeParticleKinematics2014( ostream& fileOut,
 // ----------------------------------------------------------------------------
 // Writes time integrator data in an output stream with a binary and 2014 format
 void SecondOrderLeapFrog::writeParticleKinematics2014_binary( 
-	ostream& fileOut, Vector3& dUdt, Vector3& dOmegadt )
+	ostream& fileOut, Particle const* particle )
 {
-  dUdt.writeGroup3_binary( fileOut ); 
-  dOmegadt.writeGroup3_binary( fileOut );   
+  Vector3 force = *(particle->getForce()), torque = *(particle->getTorque());
+  force.writeGroup3_binary( fileOut ); 
+  torque.writeGroup3_binary( fileOut );   
 }
 
 
@@ -101,9 +127,12 @@ void SecondOrderLeapFrog::writeParticleKinematics2014_binary(
 // ----------------------------------------------------------------------------
 // Reads time integrator data from a stream in the 2014 format 
 void SecondOrderLeapFrog::readParticleKinematics2014( istream& StreamIN,
-    	Vector3& dUdt, Vector3& dOmegadt )
+    	Particle* particle )
 {
-  StreamIN >> dUdt >> dOmegadt;
+  Vector3 force, torque;
+  StreamIN >> force >> torque;
+  particle->setForce( force );
+  particle->setTorque( torque );
 } 
 
 
@@ -112,10 +141,13 @@ void SecondOrderLeapFrog::readParticleKinematics2014( istream& StreamIN,
 // ----------------------------------------------------------------------------
 // Reads time integrator data from a stream in a binary form in the 2014 format 
 void SecondOrderLeapFrog::readParticleKinematics2014_binary( 
-	istream& StreamIN, Vector3& dUdt, Vector3& dOmegadt )
+	istream& StreamIN, Particle* particle )
 {
-  dUdt.readGroup3_binary( StreamIN ); 
-  dOmegadt.readGroup3_binary( StreamIN );   
+  Vector3 force, torque;
+  force.readGroup3_binary( StreamIN ); 
+  torque.readGroup3_binary( StreamIN ); 
+  particle->setForce( force );
+  particle->setTorque( torque );    
 }
 
 

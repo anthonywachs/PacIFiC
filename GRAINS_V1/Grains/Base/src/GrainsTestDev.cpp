@@ -228,78 +228,12 @@ void GrainsTestDev::Simulation( double time_interval )
 //     error = 1;
 //   }
 // 
-//   // ******************************
-//   //           TESTING 
-//   // ******************************
-// 
-//   // Constructing Convex
-//   Convex* convexA = new Cylinder( 5.e-2, 15.e-2 );
-//   // Convex* convexA  = new Superquadric( 5.e-2, 5.e-2, 75.e-3, 64., 2. );
-// 
-//   // Transformation
-//   double aX, aY, aZ;
-//   aX = 0.; aY = 0.; aZ = 0.;
-//   double const AAA[12] =
-//   { cos(aZ)*cos(aY), cos(aZ)*sin(aY)*sin(aX) - sin(aZ)*cos(aX), cos(aZ)*sin(aY)*cos(aX) + sin(aZ)*sin(aX),
-//     sin(aZ)*cos(aY), sin(aZ)*sin(aY)*sin(aX) + cos(aZ)*cos(aX), sin(aZ)*sin(aY)*cos(aX) - cos(aZ)*sin(aX),
-//     -sin(aY), cos(aY)*sin(aX), cos(aY)*cos(aX),
-//     0., 0., 0.};
-//   Transform const* trA = new Transform( AAA );
-// 
-//   // RBWC
-//   RigidBodyWithCrust* rbwcA = new RigidBodyWithCrust( convexA, *trA );
-// 
-// 
-//   // std::vector<double> dtList = {1.e-6, 1.e-7, 1.e-8, 1.e-9, 1.e-10};
-//   std::vector<double> dtList = {1.e-4};
-//   for ( auto dt : dtList )
-//   {
-//     // Particle
-//     Particle* p = new Particle( 1 );
-//     p->m_geoRBWC = rbwcA;
-//     p->m_density = 7750.;
-//     p->m_mass = p->m_density * p->m_geoRBWC->getVolume();
-//     p->m_geoRBWC->BuildInertia( p->m_inertia, p->m_inertia_1 );
-//     for ( int i = 0; i < 6; i++ )
-//     {
-//       p->m_inertia[i] *= p->m_density;
-//       p->m_inertia_1[i] /= p->m_density;
-//     }
-// 
-//     // Torque
-//     //double M = 0.5;
-//     //p->m_torsor = Torsor( Point3Null, Vector3Null, Vector3( 0., M, 0. ) );
-// 
-//     // Kinematics
-//     Vector3 angInit( 0.6, 0.3, -0.9 ), omega, omb;
-//     Quaternion qq, qqConj;
-//     p->m_kinematics = KinematicsBuilderFactory::create( convexA );
-//     p->m_kinematics->setAngularVelocity( angInit );
-// 
-//     // Move and Save
-//     auto savename = "devdt" + to_string( (int) -log10( dt ) ) + ".txt";
-//     ofstream MyFile( savename );
-//     MyFile << std::fixed << setprecision(15);
-//     double time = 0.;
-//     MyFile << time << " " << angInit << " " << qq << endl; 
-//     while ( m_tend - time > 0.01 * dt )
-//     {
-//       time += dt;         
-//       p->computeAcceleration( time );
-//       p->Move( time, dt, dt );
-//       
-//       // Saving the results
-//       qq = *( p->m_kinematics->getQuaternionRotation() );
-//       qqConj = qq.Conjugate();
-//       omega = *( p->m_kinematics->getAngularVelocity() );
-//       omb = qqConj.multToVector3( ( omega , qq ) );
-//       MyFile << time << " " << omb << " " << qq << endl;      
-//     }
-//     MyFile.close();
-//     //delete p;
-//   }
+
   
-  
+  // Test: time integration of the angular motion of a cylinder submitted
+  // to q constant torque in the body-fixed space
+  // NOTE: requires to set the torque in the body-fixed space in 
+  // ParticleKinematics.cpp to the required value    
   double vmax = 0., vmean = 0. ;
   bool forcestats = false;
   Particle const* pp = m_allcomponents.getParticle( 1 );
@@ -332,7 +266,8 @@ void GrainsTestDev::Simulation( double time_interval )
     try
     {
       m_time += m_dt;
-
+      GrainsExec::m_time_counter++;
+      
 
       // Check whether data are output at this time
       m_lastTime_save = false;
@@ -388,10 +323,10 @@ void GrainsTestDev::Simulation( double time_interval )
 	// x_i+1 = x_i + v_i+1/2 * dt
         moveParticlesAndObstacles( 0.5 * m_dt, m_dt, m_dt );
 	
-        // Compute particle forces and acceleration
+        // Compute particle forces and torque
 	// Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)
 	SCT_set_start( "ComputeForces" );
-        computeParticlesForceAndAcceleration();
+        computeParticlesForceAndTorque();
         SCT_get_elapsed_time( "ComputeForces" );	
 	
 	// Update particle velocity over dt/2
@@ -400,10 +335,10 @@ void GrainsTestDev::Simulation( double time_interval )
       }
       else
       {
-        // Compute particle forces and acceleration
+        // Compute particle forces and torque
 	// Compute f_i and a_i as a function of (x_i,v_i) 
 	SCT_set_start( "ComputeForces" );
-        computeParticlesForceAndAcceleration();
+        computeParticlesForceAndTorque();
         SCT_get_elapsed_time( "ComputeForces" );
       
         // Move particles and obstacles

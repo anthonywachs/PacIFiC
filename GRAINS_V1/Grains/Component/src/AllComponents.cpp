@@ -255,21 +255,6 @@ list<SimpleObstacle*> AllComponents::Move( double time,
 
 
 // ----------------------------------------------------------------------------
-// Computes particles acceleration
-void AllComponents::computeParticlesAcceleration( double time )
-{
-  list<Particle*>::iterator particle;
-  for (particle=m_ActiveParticles.begin();
-      particle!=m_ActiveParticles.end(); particle++)
-    if ( (*particle)->getTag() != 2 )
-      (*particle)->computeAcceleration( time );
-}
-
-
-
-
-
-// ----------------------------------------------------------------------------
 // Advances particles velocity over dt_particle_vel
 void AllComponents::advanceParticlesVelocity( double time, 
     	double const& dt_particle_vel )

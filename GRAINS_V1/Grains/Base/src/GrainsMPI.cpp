@@ -66,6 +66,7 @@ void GrainsMPI::Simulation( double time_interval )
       try
       {
         m_time += m_dt;
+	GrainsExec::m_time_counter++;
 	
 
         // Check whether data are output at this time
@@ -163,10 +164,10 @@ void GrainsMPI::Simulation( double time_interval )
         SCT_get_elapsed_time( "LinkUpdate" );
       
       
-        // Compute particle forces and acceleration
+        // Compute particle forces and torque
         // Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)
         SCT_set_start( "ComputeForces" );
-        computeParticlesForceAndAcceleration();
+        computeParticlesForceAndTorque();
         SCT_get_elapsed_time( "ComputeForces" );
 
 
@@ -399,7 +400,6 @@ bool GrainsMPI::insertParticle( PullMode const& mode )
 	{
 	  m_allcomponents.WaitToActive( true );
 	  particle->InitializeForce( true );
-	  particle->computeAcceleration( m_time );
         }
 	// If not in LinkedCell
         else

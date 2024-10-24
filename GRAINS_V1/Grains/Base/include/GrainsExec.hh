@@ -319,7 +319,8 @@ class GrainsExec
     static int m_CompositeObstacleDefaultID; /**< Default ID number of composite
     	obstacle */ 
     static int m_ReferenceParticleDefaultID; /**< Default ID number of reference
-    	particle */ 		    
+    	particle */
+    static size_t m_time_counter; /**< Discrete time counter */
     //@}
 
 

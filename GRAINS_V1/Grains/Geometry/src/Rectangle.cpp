@@ -44,7 +44,7 @@ Rectangle::~Rectangle()
 
 
 // ----------------------------------------------------------------------------
-// Construit les sommets du pav� et les faces
+// Sets the corner/vertex coordinates
 void Rectangle::setCorners()
 {
   m_corners.reserve( 4 );
@@ -172,7 +172,7 @@ double Rectangle::getVolume()const
 // Output operator
 void Rectangle::writeShape( ostream& fileOut ) const
 {
-  fileOut << "*Rectangle " << m_LX << " " << m_LY << " END*";
+  fileOut << "*Rectangle " << m_LX << " " << m_LY << " *END";
 }
 
 
@@ -182,8 +182,7 @@ void Rectangle::writeShape( ostream& fileOut ) const
 // Input operator
 void Rectangle::readShape( istream& fileIn )
 {
-  cerr << "Program Error :\n" << "Rectangle::readShape non accessible.\n";
-  exit( 3 );
+  fileIn >> m_LX >> m_LY;
 }
 
 

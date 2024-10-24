@@ -40,11 +40,13 @@ class ParticleKinematics2D : public ParticleKinematics
     /** @brief Creates and returns a clone of the object */
     ParticleKinematics* clone() const;
 
-    /** @brief Computes the momentum change over dt 
-    @param torseur particle torsor 
-    @param particle particle related to the kinematics */
-    void computeAcceleration( Torsor const& torseur,
-	Particle const* particle ) ;
+    /** @brief Computes the angular acceleration in body fixed space
+    @param particle particle related to the kinematics 
+    @param torque_bf torque in body fixed space
+    @param om_bf angular velocity in body-fixed coordinates system 
+    @param dOmdt_bf angular acceleration in body fixed space */
+    virtual void computeAngularAccelerationBodyFixed( Particle const* particle,
+    	Vector3 const& torque_bf, Vector3 const& om_bf, Vector3& dOmdt_bf );
 			   
     /** @brief Computes explicitly Idw/dt
     @param dw explicit change of angular velocity

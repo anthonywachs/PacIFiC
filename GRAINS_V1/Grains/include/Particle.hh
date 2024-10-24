@@ -321,10 +321,6 @@ class Particle : public Component
     virtual void Move( double time, 
 	double const& dt_particle_vel, 
     	double const& dt_particle_disp );
-	
-    /** @brief Computes acceleration
-    @param time physical time */
-    void computeAcceleration( double time );
     
     /** @brief Advances velocity over dt_particle_vel
     @param time physical time 
@@ -523,9 +519,6 @@ class Particle : public Component
 
     /** @brief Returns translational velocity */
     virtual Vector3 const* getTranslationalVelocity() const;
-
-    /** @brief Returns total force exerted on the particle */
-    Vector3 const* getForce() const;
 
     /** @brief Returns the cell the particle belonged to at the previous
     discrete time */

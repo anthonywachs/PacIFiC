@@ -1,4 +1,6 @@
 #include "TimeIntegrator.hh"
+#include "ParticleKinematics.hh"
+#include "Particle.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -27,8 +29,10 @@ TimeIntegrator::~TimeIntegrator()
 
 // ----------------------------------------------------------------------------
 // Advances velocity over dt_particle_vel
-void TimeIntegrator::advanceVelocity( Vector3 const& dUdt, Vector3& vtrans, 
-	Vector3 const& dOmegadt, Vector3& vrot, double const& dt_particle_vel )
+void TimeIntegrator::advanceVelocity( Particle* particle, 
+	ParticleKinematics* kine, double const& coupling_factor, 
+	Vector3 const& torque_bf, Vector3& vtrans, Vector3& vrot, 
+	double const& dt_particle_vel )
 {}
 
 
@@ -57,8 +61,8 @@ void TimeIntegrator::setKinematicsNm2( double const* tab )
 // ----------------------------------------------------------------------------
 // Writes time integrator data in an output stream with a high
 // precision and 2014 format
-void TimeIntegrator::writeParticleKinematics2014( ostream& fileOut,
-    	Vector3 const& dUdt, Vector3 const& dOmegadt ) const
+void TimeIntegrator::writeParticleKinematics2014( ostream& fileOut, 
+    	Particle const* particle ) const
 {} 
 
 
@@ -66,8 +70,8 @@ void TimeIntegrator::writeParticleKinematics2014( ostream& fileOut,
   
 // ----------------------------------------------------------------------------
 // Writes time integrator data in an output stream with a binary and 2014 format
-void TimeIntegrator::writeParticleKinematics2014_binary( ostream& fileOut,
-    	Vector3& dUdt, Vector3& dOmegadt )
+void TimeIntegrator::writeParticleKinematics2014_binary( ostream& fileOut, 
+    	Particle const* particle )
 {}
 
 
@@ -76,7 +80,7 @@ void TimeIntegrator::writeParticleKinematics2014_binary( ostream& fileOut,
 // ----------------------------------------------------------------------------
 // Reads time integrator data from a stream in the 2014 format 
 void TimeIntegrator::readParticleKinematics2014( istream& StreamIN,
-    	Vector3& dUdt, Vector3& dOmegadt )
+    	Particle* particle )
 {} 
 
 
@@ -85,7 +89,7 @@ void TimeIntegrator::readParticleKinematics2014( istream& StreamIN,
 // ----------------------------------------------------------------------------
 // Reads time integrator data from a stream in a binary form in the 2014 format 
 void TimeIntegrator::readParticleKinematics2014_binary( istream& StreamIN,
-    	Vector3& dUdt, Vector3& dOmegadt )
+    	Particle* particle )
 {}
 
 

@@ -4,6 +4,9 @@
 #include "Vector3.hh"
 #include "Quaternion.hh"
 
+class Particle;
+class ParticleKinematics;
+
 
 /** @brief The class TimeIntegrator.
 
@@ -28,28 +31,38 @@ class TimeIntegrator
     /** @brief Creates and returns a clone of the time integrator */
     virtual TimeIntegrator* clone() const = 0;
 
-    /** @brief Computes the new velocity and position at time t+dt
-    @param dUdt Translational acceleration dU/dt
+    /** @brief Computes the new velocity and position at time t
+    @param particle particle
+    @param kine particle kinematics
+    @param coupling_factor coupling factor 
+    @param torque_bf torque exerted on the particle in body-fixed coordinates 
+    system
     @param vtrans translational velocity 
     @param transMotion translation motion
-    @param dOmegadt Angular ecceleration dom/dt
-    @param vrot angular velocity 
-    @param meanVRot average angular velocity in interval [t,t+dt]
+    @param vrot angular velocity in body-fixed coordinates system 
+    @param meanVRot average angular velocity in body-fixed coordinates system 
+    in interval [t,t-dt]
     @param dt_particle_vel velocity time step magnitude 
     @param dt_particle_disp motion time step magnitude */        
-    virtual void Move( Vector3 const& dUdt, Vector3& vtrans, 
-	Vector3& transMotion, Vector3 const& dOmegadt,
+    virtual void Move( Particle* particle, ParticleKinematics* kine,
+	double const& coupling_factor, Vector3 const& torque_bf,
+	Vector3& vtrans, Vector3& transMotion, 
 	Vector3& vrot, Vector3& meanVRot, double const& dt_particle_vel, 
     	double const& dt_particle_disp ) = 0;
 
     /** @brief Advances velocity over dt_particle_vel
-    @param dUdt Translational acceleration dU/dt
+    @param particle particle
+    @param kine particle kinematics
+    @param coupling_factor coupling factor
+    @param torque_bf torque exerted on the particle in body-fixed coordinates 
+    system     
     @param vtrans translational velocity 
-    @param dOmegadt Angular ecceleration dom/dt
-    @param vrot angular velocity 
-    @param dt_particle_vel velocity time step magnitude */
-    virtual void advanceVelocity( Vector3 const& dUdt, Vector3& vtrans, 
-	Vector3 const& dOmegadt, Vector3& vrot, double const& dt_particle_vel );
+    @param vrot angular velocity in body-fixed coordinates system 
+    @param dt_particle_vel velocity time step magnitude */  
+    virtual void advanceVelocity( Particle* particle, ParticleKinematics* kine,
+	double const& coupling_factor, Vector3 const& torque_bf, 
+	Vector3& vtrans, Vector3& vrot, 
+	double const& dt_particle_vel );
 
     /** @brief Copies kinematics at time t-2dt (translational velocity, angular 
     velocity, variation of translational velocity, variation of angular 
@@ -61,33 +74,29 @@ class TimeIntegrator
     /** @brief Writes time integrator data in an output stream with a high
     precision and 2014 format
     @param fileOut output stream 
-    @param dUdt particle translational acceleration 
-    @param dOmegadt particle angular acceleration */
-    virtual void writeParticleKinematics2014( ostream& fileOut,
-    	Vector3 const& dUdt, Vector3 const& dOmegadt ) const; 
+    @param particle particle related to the time integrator */
+    virtual void writeParticleKinematics2014( ostream& fileOut, 
+    	Particle const* particle ) const; 
   
     /** @brief Writes time integrator data in an output stream with a binary 
     and 2014 format
     @param fileOut output stream 
-    @param dUdt particle translational acceleration 
-    @param dOmegadt particle angular acceleration */
-    virtual void writeParticleKinematics2014_binary( ostream& fileOut,
-    	Vector3& dUdt, Vector3& dOmegadt );
+    @param particle particle related to the time integrator */
+    virtual void writeParticleKinematics2014_binary( ostream& fileOut, 
+    	Particle const* particle );
 
     /** @brief Reads time integrator data from a stream in the 2014 format 
     @param StreamIN input stream 
-    @param dUdt particle translational acceleration 
-    @param dOmegadt particle angular acceleration */
+    @param particle particle related to the time integrator */
     virtual void readParticleKinematics2014( istream& StreamIN,
-    	Vector3& dUdt, Vector3& dOmegadt ); 
+    	Particle* particle ); 
   
     /** @brief Reads time integrator data from a stream in a binary form in the
     2014 format 
-    @param StreamIN input stream 
-    @param dUdt particle translational acceleration 
-    @param dOmegadt particle angular acceleration */
+    @param StreamIN input stream
+    @param particle particle related to the time integrator */
     virtual void readParticleKinematics2014_binary( istream& StreamIN,
-    	Vector3& dUdt, Vector3& dOmegadt );
+    	Particle* particle );
 
     /** @brief Returns the number of bytes of the time integrator data when 
     written in a binary format to an output stream */

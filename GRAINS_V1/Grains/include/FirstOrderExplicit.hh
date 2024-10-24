@@ -30,17 +30,22 @@ class FirstOrderExplicit : public TimeIntegrator
     /** @brief Creates and returns a clone of the time integrator */
     TimeIntegrator* clone() const ;
 
-    /** @brief Computes the new velocity and position at time t+dt
-    @param dUdt Translational acceleration dU/dt
+    /** @brief Computes the new velocity and position at time t
+    @param particle particle
+    @param kine particle kinematics
+    @param coupling_factor coupling factor 
+    @param torque_bf torque exerted on the particle in body-fixed coordinates 
+    system
     @param vtrans translational velocity 
     @param transMotion translation motion
-    @param dOmegadt Angular ecceleration dom/dt
-    @param vrot angular velocity 
-    @param meanVRot average angular velocity in interval [t,t+dt]
+    @param vrot angular velocity in body-fixed coordinates system 
+    @param meanVRot average angular velocity in body-fixed coordinates system 
+    in interval [t,t-dt]
     @param dt_particle_vel velocity time step magnitude 
     @param dt_particle_disp motion time step magnitude */        
-    void Move( Vector3 const& dUdt, Vector3& vtrans, 
-	Vector3& transMotion, Vector3 const& dOmegadt,
+    void Move( Particle* particle, ParticleKinematics* kine,
+	double const& coupling_factor, Vector3 const& torque_bf,
+	Vector3& vtrans, Vector3& transMotion, 
 	Vector3& vrot, Vector3& meanVRot, double const& dt_particle_vel, 
     	double const& dt_particle_disp );
     //@}

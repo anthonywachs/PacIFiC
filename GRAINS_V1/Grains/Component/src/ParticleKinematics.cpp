@@ -12,7 +12,8 @@ ParticleKinematics::ParticleKinematics() :
   m_timeIntegrationScheme( NULL ),
   m_memento( NULL ) 
 {
-  m_timeIntegrationScheme = TimeIntegratorBuilderFactory::create();  
+  m_timeIntegrationScheme = TimeIntegratorBuilderFactory::create();
+  m_coupling_factor = 1.;    
 }
 
 
@@ -25,10 +26,21 @@ ParticleKinematics::ParticleKinematics( ParticleKinematics const& copy ) :
   m_memento( NULL ) 
 {
   m_translationalVelocity = copy.m_translationalVelocity;
-  m_angularVelocity = copy.m_angularVelocity;  
-  m_dQuaternionRotationdt = copy.m_dQuaternionRotationdt;
-  m_QuaternionRotation = copy.m_QuaternionRotation;
+  m_angularVelocity = copy.m_angularVelocity;
+  m_angularVelocity_bf = copy.m_angularVelocity_bf;    
+  m_QuaternionRotation = copy.m_QuaternionRotation; 
+  m_translationalMotionOverDt = copy.m_translationalMotionOverDt;  
+  m_averageAngularVelocityOverDt = copy.m_averageAngularVelocityOverDt;  
+  m_QuaternionRotationOverDt = copy.m_QuaternionRotationOverDt;   
   m_timeIntegrationScheme = copy.m_timeIntegrationScheme->clone();
+  m_coupling_factor = copy.m_coupling_factor;
+  if ( !copy.m_memento )
+  {
+    m_memento = new ParticleKinematicsMemento();
+    m_memento->m_QuaternionRotation = m_QuaternionRotation;
+    m_memento->m_translationalVelocity = m_translationalVelocity;
+    m_memento->m_angularVelocity = m_angularVelocity;  
+  }
 }
 
 
@@ -51,11 +63,23 @@ double ParticleKinematics::Move( Particle* particle,
 	double const& dt_particle_vel, 
     	double const& dt_particle_disp )
 {
+  // Quaternion and torque in body-fixed coordinates system
+  Quaternion pConjugue = m_QuaternionRotation.Conjugate();
+  Vector3 torque_bf = pConjugue.multToVector3( 
+    	( *(particle->getTorque()) , m_QuaternionRotation ) ); 
+//  Vector3 torque_bf( 0., 0.5, 0.);	 
+
   // Time integration
-  m_timeIntegrationScheme->Move( m_dUdt, m_translationalVelocity,
-  	m_translationalMotionOverDt,
-	m_dOmegadt, m_angularVelocity, m_averageAngularVelocityOverDt, 
+  m_timeIntegrationScheme->Move( particle, this, m_coupling_factor, torque_bf, 
+  	m_translationalVelocity, m_translationalMotionOverDt,
+	m_angularVelocity_bf, m_averageAngularVelocityOverDt, 
 	dt_particle_vel, dt_particle_disp );
+
+  // Rotate back angular velocity to space-fixed coordinates system
+  m_angularVelocity = m_QuaternionRotation.multToVector3( 
+  	( m_angularVelocity_bf , pConjugue ) );
+  m_averageAngularVelocityOverDt = m_QuaternionRotation.multToVector3( 
+  	( m_averageAngularVelocityOverDt , pConjugue ) );	  	
   
   // Translational motion
   particle->Translate( m_translationalMotionOverDt );
@@ -74,7 +98,6 @@ double ParticleKinematics::Move( Particle* particle,
      m_QuaternionRotationOverDt.setQuaternion( 0., 0., 0., 1. );
    
   m_QuaternionRotation = m_QuaternionRotationOverDt * m_QuaternionRotation;
-  m_dQuaternionRotationdt = 0.5 * ( m_angularVelocity , m_QuaternionRotation );
   particle->Rotate( m_QuaternionRotationOverDt );
 
   return Norm( m_translationalMotionOverDt );
@@ -85,11 +108,23 @@ double ParticleKinematics::Move( Particle* particle,
 
 // ----------------------------------------------------------------------------
 // Advances velocity over dt_particle_vel
-void ParticleKinematics::advanceVelocity( double const& dt_particle_vel )
+void ParticleKinematics::advanceVelocity( Particle* particle, 
+	double const& dt_particle_vel )
 {
+  // Quaternion and torque in body-fixed coordinates system
+  Quaternion pConjugue = m_QuaternionRotation.Conjugate();
+  Vector3 torque_bf = pConjugue.multToVector3( 
+    	( *(particle->getTorque()) , m_QuaternionRotation ) ); 
+//  Vector3 torque_bf( 0., 0.5, 0.);
+
   // Time integration
-  m_timeIntegrationScheme->advanceVelocity( m_dUdt, m_translationalVelocity,
-  	m_dOmegadt, m_angularVelocity, dt_particle_vel );
+  m_timeIntegrationScheme->advanceVelocity( particle, this, 
+  	m_coupling_factor, torque_bf, m_translationalVelocity, 
+	m_angularVelocity_bf, dt_particle_vel );
+
+  // Rotate back angular velocity to space-fixed coordinates system
+  m_angularVelocity = m_QuaternionRotation.multToVector3( 
+  	( m_angularVelocity_bf , pConjugue ) );  	
 }
 
 
@@ -131,7 +166,6 @@ void ParticleKinematics::reset()
 {
   m_translationalVelocity = 0.;
   m_angularVelocity = 0.; 
-  m_dQuaternionRotationdt = 0.;
   m_QuaternionRotation.setQuaternion( 0., 0., 0., 1. );
 }
 
@@ -166,7 +200,7 @@ void ParticleKinematics::setTranslationalVelocity( double const& vx,
 void ParticleKinematics::setAngularVelocity( Vector3 const& omega )
 {
   m_angularVelocity = omega;
-  m_dQuaternionRotationdt = 0.5 * ( m_angularVelocity , m_QuaternionRotation );
+  m_angularVelocity_bf = m_angularVelocity;   
 }
 
 
@@ -179,8 +213,8 @@ void ParticleKinematics::setAngularVelocity( double const& omx,
 {
   m_angularVelocity[X] = omx;
   m_angularVelocity[Y] = omy;  
-  m_angularVelocity[Z] = omz; 
-  m_dQuaternionRotationdt = 0.5 * ( m_angularVelocity , m_QuaternionRotation );
+  m_angularVelocity[Z] = omz;
+  m_angularVelocity_bf = m_angularVelocity; 
 }
 
 
@@ -204,7 +238,7 @@ void ParticleKinematics::saveState()
 
   m_memento->m_QuaternionRotation = m_QuaternionRotation;
   m_memento->m_translationalVelocity = m_translationalVelocity;
-  m_memento->m_dQuaternionRotationdt = m_dQuaternionRotationdt;
+  m_memento->m_angularVelocity = m_angularVelocity;
 }
 
 
@@ -218,7 +252,7 @@ ParticleKinematicsMemento* ParticleKinematics::createState()
   
   memento_->m_QuaternionRotation = m_QuaternionRotation;
   memento_->m_translationalVelocity = m_translationalVelocity;
-  memento_->m_dQuaternionRotationdt = m_dQuaternionRotationdt;
+  memento_->m_angularVelocity = m_angularVelocity;
   
   return ( memento_ );
 }
@@ -232,9 +266,10 @@ void ParticleKinematics::restoreState()
 {
   m_QuaternionRotation = m_memento->m_QuaternionRotation;
   m_translationalVelocity = m_memento->m_translationalVelocity;
-  m_dQuaternionRotationdt = m_memento->m_dQuaternionRotationdt;
-  m_angularVelocity = 2.0 * m_dQuaternionRotationdt.multConjugateToVector3( 
-  	m_QuaternionRotation );
+  m_angularVelocity = m_memento->m_angularVelocity;
+  Quaternion pConjugue = m_QuaternionRotation.Conjugate();
+  m_angularVelocity_bf = pConjugue.multToVector3( 
+	( m_angularVelocity , m_QuaternionRotation ) );     
 }
 
 
@@ -247,9 +282,10 @@ void ParticleKinematics::restoreState(
 {
   m_QuaternionRotation = memento_->m_QuaternionRotation;
   m_translationalVelocity = memento_->m_translationalVelocity;
-  m_dQuaternionRotationdt = memento_->m_dQuaternionRotationdt;
-  m_angularVelocity = 2.0 * m_dQuaternionRotationdt.multConjugateToVector3( 
-  	m_QuaternionRotation );
+  m_angularVelocity = memento_->m_angularVelocity;
+  Quaternion pConjugue = m_QuaternionRotation.Conjugate();
+  m_angularVelocity_bf = pConjugue.multToVector3( 
+	( m_angularVelocity , m_QuaternionRotation ) );   
 }
 
 
@@ -262,7 +298,7 @@ ostream& operator << ( ostream& fileOut, ParticleKinematics const& cinematique )
   fileOut << cinematique.className() << '\n';
   fileOut << cinematique.m_translationalVelocity
 	  << cinematique.m_QuaternionRotation
-	  << cinematique.m_dQuaternionRotationdt;
+	  << cinematique.m_angularVelocity;
 	  
   return ( fileOut );
 }
@@ -279,7 +315,7 @@ void ParticleKinematics::writeParticleKinematics( ostream& fileOut ) const
   fileOut << endl;  
   m_QuaternionRotation.writeQuaternion( fileOut ); 
   fileOut << endl; 
-  m_dQuaternionRotationdt.writeQuaternion( fileOut ); 
+  m_angularVelocity.writeGroup3( fileOut ); 
 }
 
 
@@ -288,15 +324,15 @@ void ParticleKinematics::writeParticleKinematics( ostream& fileOut ) const
 // ---------------------------------------------------------------------------
 // Writes particle kinematics in an output stream with a high
 // precision and 2014 format
-void ParticleKinematics::writeParticleKinematics2014( ostream& fileOut ) const
+void ParticleKinematics::writeParticleKinematics2014( ostream& fileOut, 
+    	Particle const* particle ) const
 {
   m_translationalVelocity.writeGroup3( fileOut ); 
   fileOut << " ";  
   m_QuaternionRotation.writeQuaternion( fileOut ); 
   fileOut << " "; 
-  m_dQuaternionRotationdt.writeQuaternion( fileOut );
-  m_timeIntegrationScheme->writeParticleKinematics2014( fileOut,
-    	m_dUdt, m_dOmegadt ); 
+  m_angularVelocity.writeGroup3( fileOut );
+  m_timeIntegrationScheme->writeParticleKinematics2014( fileOut, particle ); 
 }
 
 
@@ -304,13 +340,14 @@ void ParticleKinematics::writeParticleKinematics2014( ostream& fileOut ) const
 
 // ---------------------------------------------------------------------------
 // Writes particle kinematics in an output stream with a binary and 2014 format
-void ParticleKinematics::writeParticleKinematics2014_binary( ostream &fileOut )
+void ParticleKinematics::writeParticleKinematics2014_binary( ostream &fileOut, 
+    	Particle const* particle )
 {
   m_translationalVelocity.writeGroup3_binary( fileOut ); 
   m_QuaternionRotation.writeQuaternion_binary( fileOut ); 
-  m_dQuaternionRotationdt.writeQuaternion_binary( fileOut );
+  m_angularVelocity.writeGroup3_binary( fileOut );
   m_timeIntegrationScheme->writeParticleKinematics2014_binary( fileOut,
-    	m_dUdt, m_dOmegadt );      
+  	particle );      
 }
 
 
@@ -322,11 +359,10 @@ istream& operator >> ( istream& fileIn, ParticleKinematics& cinematique )
 {
   fileIn >> cinematique.m_translationalVelocity
 	 >> cinematique.m_QuaternionRotation
-	 >> cinematique.m_dQuaternionRotationdt;
-  cinematique.m_angularVelocity = 
-  	2.0 * cinematique.m_dQuaternionRotationdt.multConjugateToVector3( 
-  	cinematique.m_QuaternionRotation );
-	  
+	 >> cinematique.m_angularVelocity;
+  Quaternion pConjugue = cinematique.m_QuaternionRotation.Conjugate();
+  cinematique.m_angularVelocity_bf = pConjugue.multToVector3( 
+	( cinematique.m_angularVelocity , cinematique.m_QuaternionRotation ) );
   return ( fileIn );
 }
 
@@ -335,17 +371,16 @@ istream& operator >> ( istream& fileIn, ParticleKinematics& cinematique )
 
 // ----------------------------------------------------------------------------
 // Reads particle kinematics from a stream in a binary form in the 2014 format
-void ParticleKinematics::readParticleKinematics2014( istream &StreamIN )
+void ParticleKinematics::readParticleKinematics2014( istream &StreamIN,
+    	Particle* particle )
 {
   StreamIN >> m_translationalVelocity
 	 >> m_QuaternionRotation
-	 >> m_dQuaternionRotationdt;
-
-  m_angularVelocity = 2.0 * m_dQuaternionRotationdt.multConjugateToVector3( 
-  	m_QuaternionRotation );
-	
-  m_timeIntegrationScheme->readParticleKinematics2014( StreamIN,
-    	m_dUdt, m_dOmegadt );     
+	 >> m_angularVelocity;
+  Quaternion pConjugue = m_QuaternionRotation.Conjugate();
+  m_angularVelocity_bf = pConjugue.multToVector3( 
+	( m_angularVelocity , m_QuaternionRotation ) ); 	
+  m_timeIntegrationScheme->readParticleKinematics2014( StreamIN, particle );
 } 
 
 
@@ -353,17 +388,17 @@ void ParticleKinematics::readParticleKinematics2014( istream &StreamIN )
 
 // ----------------------------------------------------------------------------
 // Reads particle kinematics from a stream in a binary form in the 2014 format
-void ParticleKinematics::readParticleKinematics2014_binary( istream &StreamIN )
+void ParticleKinematics::readParticleKinematics2014_binary( istream &StreamIN,
+    	Particle* particle )
 {
   m_translationalVelocity.readGroup3_binary( StreamIN );
   m_QuaternionRotation.readQuaternion_binary( StreamIN );
-  m_dQuaternionRotationdt.readQuaternion_binary( StreamIN );
-
-  m_angularVelocity = 2.0 * m_dQuaternionRotationdt.multConjugateToVector3( 
-  	m_QuaternionRotation );
-	
+  m_angularVelocity.readGroup3_binary( StreamIN );
+  Quaternion pConjugue = m_QuaternionRotation.Conjugate();
+  m_angularVelocity_bf = pConjugue.multToVector3( 
+	( m_angularVelocity , m_QuaternionRotation ) ); 	
   m_timeIntegrationScheme->readParticleKinematics2014_binary( StreamIN,
-    	m_dUdt, m_dOmegadt );   
+  	particle );   
 } 
 
 
@@ -421,8 +456,8 @@ void ParticleKinematics::setKinematicsNm2( double const* tab )
 // binary format to an output stream
 size_t ParticleKinematics::get_numberOfBytes() const
 {
-  return ( solid::Group3::m_sizeofGroup3 + 2 * Quaternion::m_sizeofQuaternion
-  	+  m_timeIntegrationScheme->get_numberOfBytes() ); 
+  return ( 2 * solid::Group3::m_sizeofGroup3 + Quaternion::m_sizeofQuaternion
+  	+  m_timeIntegrationScheme->get_numberOfBytes() );
 }
 
 
@@ -434,4 +469,16 @@ void ParticleKinematics::setTimeIntegrationScheme()
 {
   if ( m_timeIntegrationScheme ) delete m_timeIntegrationScheme;  
   m_timeIntegrationScheme = TimeIntegratorBuilderFactory::create();
+}
+
+
+
+
+// ----------------------------------------------------------------------------
+// Sets momentum equation coupling factor
+void ParticleKinematics::setCouplingFactor( double const& particle_density )
+{
+  m_coupling_factor = 1.;
+  if ( Particle::getFluidCorrectedAcceleration() )
+    m_coupling_factor -= Particle::getFluidDensity() / particle_density;   
 }

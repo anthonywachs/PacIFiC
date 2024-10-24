@@ -286,8 +286,8 @@ class Grains : public ComputingTime, public SolverComputingTime
     @param oshift empty string to shift the output */
     void readWindow( DOMNode* nWindow, Window& iwindow, string const& oshift );
     
-    /** @brief Computes particle forces and acceleration */
-    void computeParticlesForceAndAcceleration();
+    /** @brief Computes particle forces and torques */
+    void computeParticlesForceAndTorque();
 	
     /** @brief Moves particles and obstacles
     @param dt_particle_vel time step to advance particle velocity 

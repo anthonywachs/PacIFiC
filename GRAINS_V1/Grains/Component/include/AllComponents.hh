@@ -115,10 +115,6 @@ class AllComponents
     	double const& dt_particle_disp,
 	double const& dt_obstacle,
 	LinkedCell const* LC );
-	
-    /** @brief Computes particles acceleration
-    @param time physical time */
-    void computeParticlesAcceleration( double time );
     
     /** @brief Advances particles velocity over dt_particle_vel
     @param time physical time 

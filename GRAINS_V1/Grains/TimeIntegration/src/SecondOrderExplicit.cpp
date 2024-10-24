@@ -1,4 +1,6 @@
 #include "SecondOrderExplicit.hh"
+#include "ParticleKinematics.hh"
+#include "Particle.hh"
 
 
 // ----------------------------------------------------------------------------
@@ -39,17 +41,23 @@ TimeIntegrator* SecondOrderExplicit::clone() const
 
 // ----------------------------------------------------------------------------
 // Computes the new velocity and position at time t+dt
-void SecondOrderExplicit::Move( Vector3 const& dUdt, Vector3& vtrans, 
-	Vector3& transMotion, Vector3 const& dOmegadt,
+void SecondOrderExplicit::Move( Particle* particle, ParticleKinematics* kine,
+	double const& coupling_factor, Vector3 const& torque_bf,
+	Vector3& vtrans, Vector3& transMotion, 
 	Vector3& vrot, Vector3& meanVRot, double const& dt_particle_vel, 
     	double const& dt_particle_disp )
 {
   // Translational velocity and motion
+  Vector3 dUdt = *(particle->getForce()) / 
+  	( particle->getMass() * coupling_factor );
   transMotion = vtrans * dt_particle_disp 
   	+ 0.5 * dUdt * dt_particle_disp * dt_particle_disp;
   vtrans += dUdt * dt_particle_vel;
 
-  // Angular velocity and motion
-  meanVRot = vrot + 0.5 * dOmegadt * dt_particle_disp;  
-  vrot += dOmegadt * dt_particle_vel;  
+  // Angular velocity
+  Vector3 dOmegadt_bf;
+  kine->computeAngularAccelerationBodyFixed( particle, torque_bf, vrot, 
+  	dOmegadt_bf );
+  meanVRot = vrot + 0.5 * dOmegadt_bf * dt_particle_disp;
+  vrot += dOmegadt_bf * dt_particle_vel;   
 }

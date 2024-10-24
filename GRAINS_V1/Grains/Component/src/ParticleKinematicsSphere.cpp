@@ -43,32 +43,13 @@ ParticleKinematics* ParticleKinematicsSphere::clone() const
 
 
 // ----------------------------------------------------------------------------
-// Computes the momentum change over dt 
-void ParticleKinematicsSphere::computeAcceleration( 
-	Torsor const& torseur, Particle const* particle )
+// Computes the angular acceleration in body fixed space
+void ParticleKinematicsSphere::computeAngularAccelerationBodyFixed( 
+	Particle const* particle, Vector3 const& torque_bf,
+	Vector3 const& om_bf, Vector3& dOmdt_bf )
 {
-  // Values of the coupling factor:
-  // 1) purely granular
-  //    FluidCorrectedAcceleration is true and fluid density is 0
-  //    so coupling factor = 1
-  // 2) coupled to fluid, fluid density is not 0
-  //    a. FluidCorrectedAcceleration is true so coupling factor = 1 - 
-  //    fluid density / particle density
-  //    b. FluidCorrectedAcceleration is false so coupling factor = 1  
-  double couplingFactor = 1.;
-  if ( Particle::getFluidCorrectedAcceleration() )
-    couplingFactor -=
-    	Particle::getFluidDensity() / particle->getDensity(); 
-
-  // Translational momentum
-  m_dUdt = *(torseur.getForce()) / ( particle->getMass() * couplingFactor );
-  m_dUdt.round();
-
-  // Angular momentum
-  Vector3 const* Moment = torseur.getTorque();
-
-  double const* inverseInertia = particle->getInverseInertiaTensorBodyFixed();
-  m_dOmegadt[0] = inverseInertia[0] * (*Moment)[0] / couplingFactor;
-  m_dOmegadt[1] = inverseInertia[3] * (*Moment)[1] / couplingFactor;
-  m_dOmegadt[2] = inverseInertia[5] * (*Moment)[2] / couplingFactor;
+  const double *inertia = particle->getInertiaTensorBodyFixed();
+  dOmdt_bf[X] = torque_bf[X] / ( m_coupling_factor * inertia[0] );
+  dOmdt_bf[Y] = torque_bf[Y] / ( m_coupling_factor * inertia[3] );
+  dOmdt_bf[Z] = torque_bf[Z] / ( m_coupling_factor * inertia[5] );
 }

@@ -53,6 +53,7 @@ unsigned int GrainsExec::m_colDetBoundingVolume = 0;
 Point3 GrainsExec::m_defaultInactivePos = Point3( -1.e10 );
 int GrainsExec::m_CompositeObstacleDefaultID = 0;
 int GrainsExec::m_ReferenceParticleDefaultID = 0;
+size_t GrainsExec::m_time_counter = 0;
 
 
 

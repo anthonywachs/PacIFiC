@@ -90,8 +90,7 @@ class ParticleKinematicsMemento
     //@{
     Quaternion m_QuaternionRotation; /**< Rotation quaternion */
     solid::Vector3 m_translationalVelocity; /**< Translational velocity */
-    Quaternion m_dQuaternionRotationdt; /**< Time derivative of the rotation
-  	quaternion m_QuaternionRotation */
+    Vector3 m_angularVelocity; /**< Angular velocity */
     //@}
 };
 

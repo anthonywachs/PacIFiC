@@ -172,9 +172,6 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
         (*app)->ComputeForces( m_time, m_dt, 
       		m_allcomponents.getActiveParticles() );
 
-      // Compute particle acceleration
-      m_allcomponents.computeParticlesAcceleration( m_time );
-
 
       // Update particle velocity over dt/2
       // v_i+1 = v_i+1/2 + a_i+1 * dt / 2 
@@ -1179,6 +1176,7 @@ void GrainsCoupledWithFluid::updateParticlesHydroFT(
 void GrainsCoupledWithFluid::setFluidCorrectedAcceleration( bool correct )
 {
   Particle::setFluidCorrectedAcceleration( correct );
+  // TO DO: update coupling factor in ParticleKinematics
 }
 
 

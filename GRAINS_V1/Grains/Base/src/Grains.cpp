@@ -164,7 +164,7 @@ void Grains::do_before_time_stepping( DOMElement* rootElement )
     if ( GrainsExec::m_TIScheme == "SecondOrderLeapFrog" && 
     	!GrainsExec::m_isReloaded )
     {
-      computeParticlesForceAndAcceleration();
+      computeParticlesForceAndTorque();
       m_allcomponents.setAllContactMapCumulativeFeaturesToZero();
     }
 
@@ -270,7 +270,7 @@ void Grains::Simulation( double time_interval )
     try
     {
       m_time += m_dt;
-
+      GrainsExec::m_time_counter++;
 
       // Check whether data are output at this time
       m_lastTime_save = false;
@@ -326,10 +326,10 @@ void Grains::Simulation( double time_interval )
 	// x_i+1 = x_i + v_i+1/2 * dt
         moveParticlesAndObstacles( 0.5 * m_dt, m_dt, m_dt );
 	
-        // Compute particle forces and acceleration
+        // Compute particle forces and torque
 	// Compute f_i+1 and a_i+1 as a function of (x_i+1,v_i+1/2)
 	SCT_set_start( "ComputeForces" );
-        computeParticlesForceAndAcceleration();
+        computeParticlesForceAndTorque();
         SCT_get_elapsed_time( "ComputeForces" );	
 	
 	// Update particle velocity over dt/2
@@ -338,10 +338,10 @@ void Grains::Simulation( double time_interval )
       }
       else
       {
-        // Compute particle forces and acceleration
+        // Compute particle forces and torque
 	// Compute f_i and a_i as a function of (x_i,v_i) 
 	SCT_set_start( "ComputeForces" );
-        computeParticlesForceAndAcceleration();
+        computeParticlesForceAndTorque();
         SCT_get_elapsed_time( "ComputeForces" );
       
         // Move particles and obstacles
@@ -422,8 +422,8 @@ void Grains::Simulation( double time_interval )
 
 
 // ----------------------------------------------------------------------------
-// Computes particle forces and acceleration
-void Grains::computeParticlesForceAndAcceleration()
+// Computes particle forces and torques
+void Grains::computeParticlesForceAndTorque()
 {
   // Initiliaze all component transforms with crust to non computed
   m_allcomponents.InitializeRBTransformWithCrustState( m_time, m_dt );
@@ -446,9 +446,6 @@ void Grains::computeParticlesForceAndAcceleration()
   // TODO: add if-statement that bypasses this step when contact model has
   // no memory.
   m_allcomponents.updateAllContactMaps();
-      
-  // Compute particle acceleration
-  m_allcomponents.computeParticlesAcceleration( m_time );
 }
 
 
@@ -1924,7 +1921,6 @@ bool Grains::insertParticle( PullMode const& mode )
       {
         m_allcomponents.WaitToActive();
 	particle->InitializeForce( true );
-	particle->computeAcceleration( m_time );
 	if ( npositions ) m_insertion_position->erase( m_il_sp );
 	if ( nangpositions ) m_insertion_angular_position->erase( m_il_sap );	
       }
