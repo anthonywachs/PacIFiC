@@ -730,44 +730,43 @@ bool CompositeParticle::isCloseWithCrust( Component const* voisin ) const
 void CompositeParticle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
 {
-  try {
-  list<ContactInfos*>  listContactInfos;
-
-  // Search all contact points between the composite particle and the component
-  // and store them in the list listContactInfos
-  for ( size_t i=0; i<m_nbElemPart; ++i )
+  try 
   {
-    if ( voisin->isCompositeParticle() || voisin->isSTLObstacle() )
-      voisin->SearchContact( m_elementaryParticles[i], dt,
-	  time, LC, listContactInfos );
-    else m_elementaryParticles[i]->SearchContact( voisin, dt,
-	  time, LC, listContactInfos );
-  }
+    list<ContactInfos*>  listContactInfos;
 
-  // Loop over all contact points and compute the contact force & torque
-  int nbContact = int(listContactInfos.size());
-  for ( list<ContactInfos*>::iterator il=listContactInfos.begin();
+    // Search all contact points between the composite particle and the 
+    // component and store them in the list listContactInfos
+    for ( size_t i=0; i<m_nbElemPart; ++i )
+    {
+      if ( voisin->isCompositeParticle() || voisin->isSTLObstacle() )
+        voisin->SearchContact( m_elementaryParticles[i], dt,
+	  time, LC, listContactInfos );
+      else m_elementaryParticles[i]->SearchContact( voisin, dt,
+	  time, LC, listContactInfos );
+    }
+
+    // Loop over all contact points and compute the contact force & torque
+    int nbContact = int(listContactInfos.size());
+    for ( list<ContactInfos*>::iterator il=listContactInfos.begin();
       il!=listContactInfos.end(); il++ )
-  {
-    LC->addToContactsFeatures( time, (*il)->ContactPoint );
+    {
+      LC->addToContactsFeatures( time, (*il)->ContactPoint );
 
-    if ( ContactBuilderFactory::contactForceModel(
+      if ( ContactBuilderFactory::contactForceModel(
 		(*il)->p0->getMaterial(), (*il)->p1->getMaterial() )
       		->computeForces( (*il)->p0, (*il)->p1, (*il)->ContactPoint,
 		LC, dt, nbContact ) )
-    {
-      (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
-      (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+      {
+        (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
+        (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+      }
+      delete *il;
     }
-    delete *il;
-  }
 
-  // Free the list
-  listContactInfos.clear();
+    // Free the list
+    listContactInfos.clear();
   }
-  catch (const ContactError&) {
-    throw ContactError();
-  }
+  catch ( ContactError const& ) { throw; }
 }
 
 
@@ -780,14 +779,13 @@ void CompositeParticle::SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC,
       list<ContactInfos*>& listContact )
 {
-  try {
-  for ( size_t i=0; i<m_nbElemPart; ++i )
+  try 
+  {
+    for ( size_t i=0; i<m_nbElemPart; ++i )
       m_elementaryParticles[i]->SearchContact( voisin, dt, time, LC,
 	listContact );
   }
-  catch (const ContactError&) {
-    throw ContactError();
-  }
+  catch ( ContactError const& ) { throw; }
 }
 
 
@@ -823,7 +821,6 @@ void CompositeParticle::Move( double time,
 	double const& dt_particle_vel, 
     	double const& dt_particle_disp )
 {
-  try{
   // Move the composite particle
   Particle::Move( time, dt_particle_vel, dt_particle_disp );
 
@@ -841,11 +838,7 @@ void CompositeParticle::Move( double time,
   {
     m_elementaryParticles[i]->setAngularVelocity( vrot );
     m_elementaryParticles[i]->setTranslationalVelocity(
-    	vtrans + ( vrot ^ ( rota * m_InitialRelativePositions[i] ) ) );
-  }
-  }
-  catch (const MotionError&) {
-    throw MotionError();
+   	vtrans + ( vrot ^ ( rota * m_InitialRelativePositions[i] ) ) );
   }
 }
 

@@ -223,34 +223,34 @@ list<Obstacle*> SimpleObstacle::getObstaclesToFluid()
 void SimpleObstacle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
 {
-  try{
   bool contactProbable = m_obstacleBox.InZone( voisin->getPosition(),
     	voisin->getCircumscribedRadius() );
 
   PointContact closestPoint;
   if ( contactProbable )
   {
-    try {
+    try 
+    {
       closestPoint = voisin->getRigidBody()->ClosestPoint( *m_geoRBWC );
     }
-    catch (ContactError &erreur)
+    catch ( ContactError &error )
     {
-      try {
+      try 
+      {
 	closestPoint = voisin->getRigidBody()->ClosestPoint_ErreurHandling(
 		*m_geoRBWC, 10., m_id, voisin->getID() );
       }
-      catch (ContactError &erreur_level2)
+      catch ( ContactError& error_level2 )
       {
         cout << endl << "Processor = " <<
-    		(GrainsExec::m_MPI ?
-			GrainsExec::getComm()->get_rank() : 0 )
+		(GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 		<< " has thrown a ContactError exception" <<  endl;
-        erreur_level2.setMessage(
-		"SimpleObstacle::InterAction : choc de croute ! a t="
-		+GrainsExec::doubleToString(time,FORMAT10DIGITS));
-        erreur_level2.setComponents( this, voisin, time );
+        error_level2.setMessage(
+		"SimpleObstacle::InterAction : max overlap exceeded at t="
+		+ GrainsExec::doubleToString( time, FORMAT10DIGITS ) );
+        error_level2.setComponents( this, voisin, time );
         GrainsExec::m_exception_Contact = true;
-        throw(erreur_level2);
+        throw ( error_level2 );
       }
     }
   }
@@ -265,11 +265,6 @@ void SimpleObstacle::InterAction( Component* voisin,
     	m_materialName, voisin->getMaterial() )
     	->computeForces( voisin, this, closestPoint, LC, dt ) )
       voisin->addToCoordinationNumber( 1 );
-  }
-
-  }
-  catch (const ContactError&) {
-    throw ContactError();
   }
 }
 

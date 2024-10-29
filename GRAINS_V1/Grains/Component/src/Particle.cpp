@@ -437,27 +437,25 @@ void Particle::Move( double time,
 	double const& dt_particle_vel, 
     	double const& dt_particle_disp )
 {
-  try {
-  // Time integration of Newton's law and kinematic equations
-  double depl = m_kinematics->Move( this, dt_particle_vel, 
+  try 
+  {
+    // Time integration of Newton's law and kinematic equations
+    double depl = m_kinematics->Move( this, dt_particle_vel, 
     	dt_particle_disp );
 
-  // Check that translational motion is smaller than crust thickness
-  double crust = m_geoRBWC->getCrustThickness();
-  if ( depl > crust )
-  {
-    cout << endl << "Processor = " <<
+    // Check that translational motion is smaller than crust thickness
+    double crust = m_geoRBWC->getCrustThickness();
+    if ( depl > crust )
+    {
+      cout << endl << "Processor = " <<
     	(GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< " has thrown an MotionError exception" <<  endl;
-    GrainsExec::m_exception_Motion = true;
-    MotionError erreur( this, depl, crust, time );
-    throw erreur;
+      GrainsExec::m_exception_Motion = true;
+      MotionError error( this, depl, crust, time );
+      throw ( error );
+    }
   }
-
-  }
-  catch (const MotionError&) {
-    throw MotionError();
-  }
+  catch ( MotionError const& ) { throw; }
 }
 
 
@@ -479,29 +477,31 @@ void Particle::advanceVelocity( double time, double const& dt_particle_vel )
 void Particle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
 {
-  try {
   PointContact closestPoint;
   double delta=0.;
 
-  try {
+  try 
+  {
     closestPoint = m_geoRBWC->ClosestPoint( *(voisin->getRigidBody()) );
   }
-  catch ( ContactError &erreur )
+  catch ( ContactError& error ) 
   {
-    try {
+    try 
+    {
       closestPoint = m_geoRBWC->ClosestPoint_ErreurHandling(
-      	*(voisin->getRigidBody()), 10., m_id, voisin->getID() );
+     	*(voisin->getRigidBody()), 10., m_id, voisin->getID() );
     }
-    catch (ContactError &erreur_level2)
+    catch ( ContactError& error_level2 ) 
     {
       cout << endl << "Processor = "
 	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
-	<< " has thrown an ContactError exception" <<  endl;
-      erreur_level2.setMessage( "Particle::InterAction : choc de croute a t="
-      	+ GrainsExec::doubleToString( time, FORMAT10DIGITS ) );
-      erreur_level2.setComponents( this, voisin, time );
+	<< " has thrown a ContactError exception" <<  endl;
+	error_level2.setMessage( "Particle::InterAction : max overlap"
+	" exceeded at t="
+	+ GrainsExec::doubleToString( time, FORMAT10DIGITS ) );
+      error_level2.setComponents( this, voisin, time );
       GrainsExec::m_exception_Contact = true;
-      throw(erreur_level2);
+      throw ( error_level2 );
     }
   }
 
@@ -511,8 +511,8 @@ void Particle::InterAction( Component* voisin,
   if( delta < 0. )
   {
     if ( ContactBuilderFactory::contactForceModel(
-		m_materialName, voisin->getMaterial() )
-    		->computeForces( this, voisin, closestPoint, LC, dt ) )
+	m_materialName, voisin->getMaterial() )
+	->computeForces( this, voisin, closestPoint, LC, dt ) )
     {
       // Note: in this method this and voisin cannot be a CompositeParticle
       // thus there is no need to call getMasterComponent() before
@@ -520,11 +520,6 @@ void Particle::InterAction( Component* voisin,
       this->addToCoordinationNumber( 1 );
       voisin->addToCoordinationNumber( 1 );
     }
-  }
-
-  }
-  catch (const ContactError&) {
-    throw ContactError();
   }
 }
 
@@ -537,28 +532,30 @@ void Particle::InterAction( Component* voisin,
 void Particle::SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC, list<ContactInfos*>& listContact )
 {
-  try{
   PointContact closestPoint;
 
-  try {
+  try 
+  {
     closestPoint = m_geoRBWC->ClosestPoint( *(voisin->getRigidBody()) );
   }
-  catch ( ContactError &erreur )
+  catch ( ContactError& error )
   {
-    try {
+    try 
+    {
       closestPoint = m_geoRBWC->ClosestPoint_ErreurHandling(
-      	*(voisin->getRigidBody()), 10., m_id, voisin->getID() );
+		*(voisin->getRigidBody()), 10., m_id, voisin->getID() );
     }
-    catch (ContactError &erreur_level2)
+    catch ( ContactError& error_level2 )
     {
       cout << endl << "Processor = "
 	<< ( GrainsExec::m_MPI ? GrainsExec::getComm()->get_rank() : 0 )
 	<< " has thrown an ContactError exception" <<  endl;
-      erreur_level2.setMessage( "Particle::InterAction : choc de croute a t="
-      	+ GrainsExec::doubleToString( time, FORMAT10DIGITS ) );
-      erreur_level2.setComponents( this, voisin, time );
+      error_level2.setMessage( "Particle::InterAction : max overlap"
+	" exceeded at t="
+	+ GrainsExec::doubleToString( time, FORMAT10DIGITS ) );
+      error_level2.setComponents( this, voisin, time );
       GrainsExec::m_exception_Contact = true;
-      throw(erreur_level2);
+      throw ( error_level2 );
     }
   }
 
@@ -570,11 +567,6 @@ void Particle::SearchContact( Component* voisin, double dt,
     result->p0 = this;
     result->p1 = voisin;
     listContact.push_back( result );
-  }
-
-  }
-  catch (const ContactError&) {
-    throw ContactError();
   }
 }
 

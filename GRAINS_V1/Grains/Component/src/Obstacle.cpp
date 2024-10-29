@@ -312,15 +312,14 @@ void Obstacle::setIndicator( double const& value )
 void Obstacle::InterAction( Component* voisin,
 	double dt, double const& time, LinkedCell* LC )
 {
-  try{
-  cout << "Warning when calling Obstacle::InterAction() "
+  try
+  {
+    cout << "Warning when calling Obstacle::InterAction() "
        << "\nShould not go into this class !\n"
        << "Need for an assistance ! Stop running !\n";
-  exit(10);
+    exit(10);
   }
-  catch (const ContactError&) {
-    throw ContactError();
-  }
+  catch ( ContactError const& ) { throw ContactError(); }
 }
 
 

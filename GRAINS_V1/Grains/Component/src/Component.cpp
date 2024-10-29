@@ -515,13 +515,12 @@ Vector3 const* Component::getTranslationalVelocity_fluide() const
 void Component::InterAction( Component* voisin, double dt,
       double const& time, LinkedCell *LC)
 {
-  try{
-  cout << "WARNING !!! Component::SearchContact"
+  try
+  {
+    cout << "WARNING !!! Component::SearchContact"
   	" should never be called, this is a design problem !!!" << endl;
   }
-  catch (const ContactError&) {
-    throw ContactError();
-  }
+  catch ( ContactError const& ) { throw ContactError(); }
 }
 
 
@@ -533,13 +532,12 @@ void Component::InterAction( Component* voisin, double dt,
 void Component::SearchContact( Component* voisin, double dt,
       double const& time, LinkedCell *LC, list<ContactInfos*>& listContact )
 {
-  try{
-  cout << "WARNING !!! Component::SearchContact"
+  try
+  {
+    cout << "WARNING !!! Component::SearchContact"
   	" should never be called, this is a design problem !!!" << endl;
   }
-  catch (const ContactError&) {
-    throw ContactError();
-  }
+  catch ( ContactError const& ) { throw ContactError(); }
 }
 
 

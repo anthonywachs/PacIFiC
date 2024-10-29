@@ -1429,9 +1429,7 @@ void LinkedCell::LinkUpdate( double time, double dt,
 	particle++)
       LinkUpdateActiveParticle( *particle );
   }
-  catch (const SimulationError&) {
-    throw SimulationError();
-  }
+  catch ( SimulationError const& ) { throw; }
 }
 
 
@@ -1448,7 +1446,7 @@ void LinkedCell::LinkUpdateActiveParticle( Particle* particle )
       cout << "\nParticle not active " << particle->getID() << endl;
       cout << "            " << *particle->getPosition() << endl;
       GrainsExec::m_exception_Simulation = true;
-      throw(SimulationError("LinkedCell::LinkUpdateActiveParticle"));
+      throw( SimulationError( "LinkedCell::LinkUpdateActiveParticle" ) );
     }
 
     // Copies the cell the particle belonged to, the particle tag and
@@ -1467,7 +1465,7 @@ void LinkedCell::LinkUpdateActiveParticle( Particle* particle )
       cout << "\nParticle " << particle->getID()       << endl;
       cout << "            " << *particle->getPosition() << endl;
       GrainsExec::m_exception_Simulation = true;
-      throw(SimulationError("LinkedCell::LinkUpdateActiveParticle"));
+      throw ( SimulationError( "LinkedCell::LinkUpdateActiveParticle" ) );
     }
 
     // Update if the particle has moved to a different cell
@@ -1483,9 +1481,7 @@ void LinkedCell::LinkUpdateActiveParticle( Particle* particle )
     particle->setCellTagGeoPosition( cellNew, cellNew->m_tag,
   	cellNew->m_GeoPosCell );
   }
-  catch (const SimulationError&) {
-    throw SimulationError();
-  }
+  catch ( SimulationError const& ) { throw; }
 }
 
 

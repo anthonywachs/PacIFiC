@@ -231,7 +231,7 @@ void GrainsMPI::Simulation( double time_interval )
 	  SCT_get_elapsed_time( "OutputResults" );
         }
       }
-      catch (ContactError &errContact)
+      catch ( ContactError& errContact )
       {
         // Max overlap exceeded
         cout << endl;
@@ -241,7 +241,7 @@ void GrainsMPI::Simulation( double time_interval )
         m_error_occured = true;
         break;
       }
-      catch (MotionError &errMotion)
+      catch ( MotionError& errMotion )
       {
         // Particle motion over dt is too large
         cout << endl;
@@ -251,7 +251,7 @@ void GrainsMPI::Simulation( double time_interval )
         m_error_occured = true;
         break;
       }
-      catch (SimulationError &errSimulation)
+      catch ( SimulationError& errSimulation )
       {
         // Simulation error
         cout << endl;

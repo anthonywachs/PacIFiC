@@ -85,9 +85,7 @@ class MotionError
     MotionError( Component* id0_, double depl, double deplMax,
   	double time_ );
 
-    /** @name Contructors */
-    //@{
-    /** @brief Default constructor (forbidden) */
+    /** @brief Default constructor */
     MotionError();
     //@}
 
@@ -144,6 +142,7 @@ class SimulationError
     /** @brief Destructor */
     ~SimulationError();
     //@}
+
 
     /**@name Methods */
     //@{

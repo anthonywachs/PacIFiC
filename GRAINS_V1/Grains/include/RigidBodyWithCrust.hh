@@ -230,8 +230,10 @@ bool isContactBVolume( RigidBodyWithCrust const& rbA,
 /** @brief Returns the features of the contact when the 1 rigid body is
 a rectangle
 @param rbA 1st rigid body
-@param rbB 2nd rigid body */
+@param rbB 2nd rigid body 
+@param checkoverlap check whether the overlap is lower than the maximum allowed
+overlap */
 PointContact ClosestPointRECTANGLE( RigidBodyWithCrust const& rbA ,
-  RigidBodyWithCrust const& rbB );
+  RigidBodyWithCrust const& rbB, bool const& checkoverlap );
 
 #endif

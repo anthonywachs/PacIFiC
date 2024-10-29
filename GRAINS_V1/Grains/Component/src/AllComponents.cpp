@@ -190,65 +190,65 @@ list<SimpleObstacle*> AllComponents::Move( double time,
   bool anyactive = false;
   static bool anyactive_previousdt = false;
   
-  try {
-  // Particles motion
-  list<Particle*>::iterator particle;
-  for (particle=m_ActiveParticles.begin();
+  try 
+  {
+    // Particles motion
+    list<Particle*>::iterator particle;
+    for (particle=m_ActiveParticles.begin();
       particle!=m_ActiveParticles.end(); particle++)
-    if ( (*particle)->getTag() != 2 )
-      (*particle)->Move( time, dt_particle_vel, dt_particle_disp );
+      if ( (*particle)->getTag() != 2 )
+        (*particle)->Move( time, dt_particle_vel, dt_particle_disp );
 
-  // Obstacles motion
-  list<SimpleObstacle*> displacedObstacles;
-  if ( !m_AllImposedVelocitiesOnObstacles.empty()
+    // Obstacles motion
+    list<SimpleObstacle*> displacedObstacles;
+    if ( !m_AllImposedVelocitiesOnObstacles.empty()
   	|| !m_AllImposedForcesOnObstacles.empty() )
-  {            
-    anyactive = false;
+    {            
+      anyactive = false;
     
-    // Update stress dependent imposed velocity and check if any imposed 
-    // velocity/force is active over this time interval
-    list<ObstacleImposedVelocity*>::iterator il;
-    for (il=m_AllImposedVelocitiesOnObstacles.begin();
+      // Update stress dependent imposed velocity and check if any imposed 
+      // velocity/force is active over this time interval
+      list<ObstacleImposedVelocity*>::iterator il;
+      for (il=m_AllImposedVelocitiesOnObstacles.begin();
   	il!=m_AllImposedVelocitiesOnObstacles.end();il++)
-      if ( (*il)->isActif( time - dt_obstacle, time, dt_obstacle, 
-      	subinterval ) )
-      {
-	(*il)->updateImposedVelocity( LC );
-	anyactive = true;
-      }
-    list<ObstacleImposedForce*>::iterator il_F;
-    for (il_F=m_AllImposedForcesOnObstacles.begin();
+        if ( (*il)->isActif( time - dt_obstacle, time, dt_obstacle, 
+      		subinterval ) )
+        {
+	  (*il)->updateImposedVelocity( LC );
+	  anyactive = true;
+        }
+      list<ObstacleImposedForce*>::iterator il_F;
+      for (il_F=m_AllImposedForcesOnObstacles.begin();
   	il_F!=m_AllImposedForcesOnObstacles.end() && !anyactive;il_F++) 
-      if ( (*il_F)->isActif( time - dt_obstacle, time, dt_obstacle, 
-      	subinterval ) )	anyactive = true;        
+        if ( (*il_F)->isActif( time - dt_obstacle, time, dt_obstacle, 
+      		subinterval ) )	
+	  anyactive = true;        
     	           
-    // Move obstacles
-    if ( anyactive || anyactive_previousdt ) m_obstacle->resetKinematics();
-    if ( anyactive ) displacedObstacles = 
+      // Move obstacles
+      if ( anyactive || anyactive_previousdt ) m_obstacle->resetKinematics();
+      if ( anyactive ) displacedObstacles = 
     	m_obstacle->Move( time, dt_obstacle, false, false );
 
-    // Update imposed velocity kinematics
-    for (il=m_AllImposedVelocitiesOnObstacles.begin();
+      // Update imposed velocity kinematics
+      for (il=m_AllImposedVelocitiesOnObstacles.begin();
   	il!=m_AllImposedVelocitiesOnObstacles.end(); )
-      if ( (*il)->isCompleted( time, dt_obstacle ) )
-        il = m_AllImposedVelocitiesOnObstacles.erase( il );
-      else il++;
+        if ( (*il)->isCompleted( time, dt_obstacle ) )
+          il = m_AllImposedVelocitiesOnObstacles.erase( il );
+        else il++;
 
-    // Update imposed force kinematics    
-    for (il_F=m_AllImposedForcesOnObstacles.begin();
+      // Update imposed force kinematics    
+      for (il_F=m_AllImposedForcesOnObstacles.begin();
   	il_F!=m_AllImposedForcesOnObstacles.end(); )
-    {
-      if ( (*il_F)->isCompleted( time, dt_obstacle ) )
-        il_F = m_AllImposedForcesOnObstacles.erase( il_F );
-      else il_F++;
+      {
+        if ( (*il_F)->isCompleted( time, dt_obstacle ) )
+          il_F = m_AllImposedForcesOnObstacles.erase( il_F );
+        else il_F++;
+      }
     }
-  }
 
-  return ( displacedObstacles );
+    return ( displacedObstacles );
   }
-  catch (const MotionError&) {
-    throw MotionError();
-  }
+  catch ( MotionError const& ) { throw; }
 }
 
 

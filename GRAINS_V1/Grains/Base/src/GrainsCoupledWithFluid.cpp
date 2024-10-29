@@ -182,7 +182,7 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
       m_allcomponents.computeObstaclesLoad( m_time, m_dt ); 
       m_allcomponents.outputObstaclesLoad( m_time, m_dt, false, false, m_rank );
     } 
-    catch (ContactError &errContact) 
+    catch ( ContactError& errContact ) 
     {
       // Max overlap exceeded
       cout << endl;
@@ -192,7 +192,7 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
       m_error_occured = true;
       break;
     } 
-    catch (MotionError &errMotion) 
+    catch ( MotionError& errMotion ) 
     {
       // Particle motion over dt is too large
       cout << endl;
@@ -202,7 +202,7 @@ void GrainsCoupledWithFluid::Simulation( double time_interval )
       m_error_occured = true;	
       break;
     } 
-    catch (SimulationError &errSimulation) 
+    catch ( SimulationError& errSimulation ) 
     {
       // Simulation error
       cout << endl;

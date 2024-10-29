@@ -187,37 +187,36 @@ void STLObstacle::InterAction( Component* voisin,
 {
   cout << "STLObstacle::InterAction" << endl;
   
-  try {
-  list<ContactInfos*>  listContactInfos;
-
-  // Search all contact points between the STL triangulation and the component
-  // and store them in the list listContactInfos
-  SearchContact( voisin, dt, time, LC, listContactInfos );
-
-  // Loop over all contact points and compute the contact force & torque
-  int nbContact = int(listContactInfos.size());
-  for ( list<ContactInfos*>::iterator il=listContactInfos.begin();
-      il!=listContactInfos.end(); il++ )
+  try 
   {
-    LC->addToContactsFeatures( time, (*il)->ContactPoint );
+    list<ContactInfos*>  listContactInfos;
 
-    if ( ContactBuilderFactory::contactForceModel(
+    // Search all contact points between the STL triangulation and the component
+    // and store them in the list listContactInfos
+    SearchContact( voisin, dt, time, LC, listContactInfos );
+
+    // Loop over all contact points and compute the contact force & torque
+    int nbContact = int(listContactInfos.size());
+    for ( list<ContactInfos*>::iterator il=listContactInfos.begin();
+      il!=listContactInfos.end(); il++ )
+    {
+      LC->addToContactsFeatures( time, (*il)->ContactPoint );
+
+      if ( ContactBuilderFactory::contactForceModel(
 		(*il)->p0->getMaterial(), (*il)->p1->getMaterial() )
       		->computeForces( (*il)->p0, (*il)->p1, (*il)->ContactPoint,
 		LC, dt, nbContact ) )
-    {
-      (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
-      (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+      {
+        (*il)->p0->getMasterComponent()->addToCoordinationNumber( 1 );
+        (*il)->p1->getMasterComponent()->addToCoordinationNumber( 1 );
+      }
+      delete *il;
     }
-    delete *il;
-  }
 
-  // Free the list
-  listContactInfos.clear();
+    // Free the list
+    listContactInfos.clear();
   }
-  catch (const ContactError&) {
-    throw ContactError();
-  }
+  catch ( ContactError const& ) { throw; }
 }
 
 
